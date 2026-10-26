@@ -100,7 +100,9 @@ interface GameState {
   - `INVALID_JSON`, `UNSUPPORTED_SCHEMA_VERSION`, `INVALID_STATE`;
   - for `state.rules`: `INVALID_RULES`, `RULES_CONFLICT`, `UNKNOWN_PRESET`;
   - from a variant: `ILLEGAL_TURN`, and `NOT_SUPPORTED` for a flag that is
-    not built yet.
+    not built yet;
+  - from the match and turn flow: `ILLEGAL_ACTION` (the game or match is
+    over, wrong player, wrong phase).
 - Change the shape of `GameState` → bump `GAME_STATE_SCHEMA_VERSION`.
 - **Version 1 states are upgraded.** In version 1, `rules` was
   `{ id, version }`. The parser swaps it for the full preset with that id
@@ -265,6 +267,7 @@ const portes: Variant = {
   applyTurn(state, turn) { ... },    // returns a new state; throws ILLEGAL_TURN
   isGameOver(state) { ... },
   result(state) { ... },             // { winner, points, reason } or null
+  resignResult(state, player) { ... }, // optional: own scoring for a resignation
 };
 
 const variant = getVariant(VARIANT_REGISTRY, state.variant); // the built-in variants
@@ -318,14 +321,14 @@ Code: `src/variants/portes/`. Rules: `docs/rules/portes.md` and
   listed one. Bad turns throw `ILLEGAL_TURN`.
 - `result`: the winner bore off 15. Mono = 1 if the loser bore off at least
   one checker, else diplo = 2. A "backgammon" (loser also on the bar or in
-  the winner's home) is 2, or 3 with `backgammonScores3`. Match scoring is
-  #24.
+  the winner's home) is 2, or 3 with `backgammonScores3`. The match adds
+  up these points (see "Match").
 
 Flags Portes reads: `movement.higherDieRule`, `capture.noHitAndRunInHome`
 (a checker that hits in its own home, points 1–6, may not move again this
 turn; the meaning is the proposal in `portes.md`), and
-`scoring.backgammonScores3`. `match.*` is for the match and turn flow
-(#24, #25). `scoring.doublingCube: true` throws `NOT_SUPPORTED`. Every other
+`scoring.backgammonScores3`. `match.*` is for the match (`match.ts`) and
+the turn flow (#25). `scoring.doublingCube: true` throws `NOT_SUPPORTED`. Every other
 flag must keep the `portes` preset value, or the variant throws
 `RULES_CONFLICT` with the path of the flag.
 
@@ -362,10 +365,73 @@ flag must keep the `portes` preset value, or the variant throws
   side; a missing `off` means "the rest are off") and turns like `13/8* 8/5`
   or `4/0:6`. `src/testing/random-positions.ts` makes random positions.
 
+## Match
+
+Code: `src/match.ts`. Rules: `docs/rules/tavli-match.md` ("Who starts later
+games", "Winning & scoring", "Match format").
+
+```ts
+interface Match {
+  schemaVersion: 1;
+  rules: RuleSet; // rules.match holds the match flags
+  targetPoints: number; // = rules.match.targetPoints (default 3)
+  players: PerPlayer<string>; // names or ids from the app
+  score: PerPlayer<number>; // = the sum of `games`
+  games: GameRecord[]; // { variant, starter, winner, points, reason }
+  rotationIndex: number; // = games.length % rotation.length
+  nextStarter: PlayerId | null; // null = an opening roll decides
+  status: 'in-progress' | 'finished';
+  winner: PlayerId | null;
+  resignedBy: PlayerId | null;
+}
+```
+
+- `createMatch({ rules, targetPoints, players, starter })`. Every option has
+  a default: the `portes` preset, its `targetPoints` (3), `white`/`black`,
+  and an opening roll for game 1.
+- `recordGameResult(match, result, { starter })` adds a finished game and
+  returns the next match. Pass `starter` when an opening roll decided who
+  started (`nextStarter` was `null`).
+  - The match ends as soon as a score is ≥ `targetPoints`. Overshooting is
+    fine (4 + 2 = 6 in a match to 5).
+  - A draw (`winner: null`, 0 points) changes no score. The rotation moves
+    on after every game, a draw too.
+  - Next starter after a win: `nextGameStarter` (default the winner; or
+    `alternate`, or `openingRoll` = `null`). After a draw:
+    `afterDrawStarter` (default `openingRoll` = `null`).
+- `resignGame(state, player)` → the `GameResult` for a resignation now: the
+  opponent gets mono (1) if `player` has borne off a checker, else diplo
+  (2). With `backgammonScores3`, 3 when `player` is also on the bar or in
+  the opponent's home. Other `scoring.method` values work too
+  (`pointsForLoss`). A variant can score it its own way with
+  `resignResult` (Plakoto "resign or play on" later).
+- `resignMatch(match, player)` ends the match now. The opponent wins; the
+  score stays as it is.
+- `createRematch(match)`: same rules and players, score 0–0. With
+  `rematchStarter: "lastGameWinner"` (default, owner rule) the winner of the
+  last game starts with no opening roll. That is always the match winner.
+- Rotation: `nextVariantId(match)` is the next game. `startNextGame(match,
+startingPlayer)` returns its start state. A game that is not built yet
+  (today: Plakoto, Fevga) throws `UNKNOWN_VARIANT` with a clear message and
+  the path of the rotation entry. `missingVariants(match)` lists them up
+  front, so the app can offer a Portes-only rotation (`['portes']`) until
+  the other games exist.
+- `gameRules(match, variant)`: the game of `match.rules` uses those rules.
+  The other games use their default preset with the same `match` group.
+- `validateMatch(value)` checks a match from outside. Besides the shape, it
+  checks that `score`, `rotationIndex`, `status`, `winner` and
+  `nextStarter` fit the list of games. So the stored totals can never drift
+  from the games. `serializeMatch` / `parseMatch` give JSON text.
+
+Tests: `src/match.test.ts`, one test per match and scoring edge case in
+`tavli-match.md` (#4–#8) and `portes.md` (#12–#14), named like
+`tavli-match.md #7: ...`, plus every match flag, resign cases and the
+validator. The opening-roll cases (#1–#3) belong to the turn flow (#25).
+
 ## Not here yet
 
-- Match scoring (#24) and the turn state machine with the opening roll and
-  Asodio roll chains (#25). They will read their flags from `state.rules`.
+- The turn state machine with the opening roll and Asodio roll chains
+  (#25). It reads its flags from `state.rules`.
 - Plakoto, Fevga and Asodio variants.
 
 ## Commands
