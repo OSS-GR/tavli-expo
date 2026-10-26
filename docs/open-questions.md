@@ -14,7 +14,6 @@
 | Q10 | How do friends find each other: username, invite link, QR code, phone contacts? Recommended: invite link + username for MVP2. | Friends feature scope | MVP2 |
 | Q11 | Can people play as a **guest** with no account? Recommended: yes for bot and pass-and-play; account needed for online. | Auth design | MVP2 |
 | Q12 | How many hours per week can you give? | Sets realistic dates for milestones | Roadmap |
-| Q14 | Owner is buying **`tavlaki.app`** (2026-10-26). Confirm when done (#59). | Invite links, store listing | MVP2 |
 | Q15 | Turn **timer** lengths for live and async games, and what happens on timeout (lose the game, or auto-move)? | Server timer design | MVP2 |
 | Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
 | Q17 | **Provably fair dice** (commit-reveal, so players can check the server did not cheat) in MVP2, or later? Recommended: later. | Backend scope | MVP2 |
@@ -34,5 +33,6 @@
 | Q4 (d) | Owner has not played Fevga; PM checked the federation text (ΕΟΠΤ 3.4.ii): the first checker must **pass the opponent's mother** before any other checker moves. | `docs/rules/fevga.md` → `runnerTarget="passMother"` |
 | Q4 (e) | Default match: **first to 3 points**. | `docs/rules/tavli-match.md` → `targetPoints=3` |
 | Q5 follow-ups | A1 four checkers per double; A2 no moves while loading (not 100% sure); A3 no extra rolls; A4 bear-off and scoring as Portes; A5 deadlock = draw. | `docs/rules/asodio.md` |
-| Q13 | **Name: Tavlaki.** Store name "Tavlaki: Kafeneio Backgammon", Greek "Ταβλάκι: Τάβλι του Καφενείου", bundle ID `app.tavlaki`. | `docs/vision.md` → Name |
+| Q13 | **Name: Tavlaki.** Store name "Tavlaki: Kafeneio Backgammon", Greek "Ταβλάκι: Τάβλι του Καφενείου", bundle ID **`com.tavlaki`**. | `docs/vision.md` → Name |
+| Q14 | Owner bought **`tavlaki.com`**. Bundle ID follows it: `com.tavlaki`. | `docs/vision.md` → Name |
 | New | Players can make their **own house-rule variants** ("kafeneio mode"). | Backlog epic (Later) + engine rules-as-data task (MVP1) |

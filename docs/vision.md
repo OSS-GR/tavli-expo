@@ -14,9 +14,9 @@
 | Store name (English) | **Tavlaki: Kafeneio Backgammon** | 28 of 30 characters allowed |
 | Store name (Greek) | **Ταβλάκι: Τάβλι του Καφενείου** | 28 of 30 |
 | iOS subtitle / Play short text | "Greek Tavli with friends" or "Portes, Plakoto, Fevga, Asodio" | Both fit the 30-character limit |
-| Bundle ID / Android package | **`app.tavlaki`** | **Never changes** after the first store upload |
+| Bundle ID / Android package | **`com.tavlaki`** | Matches the domain. **Never changes** after the first store upload |
 | Expo slug / URL scheme | `tavlaki` | Deep links: `tavlaki://` |
-| Domain | `tavlaki.app` | Needed by MVP2 for invite links, store support page, privacy policy (#59). Not needed for MVP1. |
+| Domain | **`tavlaki.com`** (owned, bought 2026-10-26) | Invite links (`https://tavlaki.com/i/...`), store support page, privacy policy, sign-in emails |
 
 The owner's first idea was "Tavlaki: Greek Kafeneio Backgammon" (34 characters). The App Store and Google Play allow only 30, so "Greek" moves into the subtitle.
 
