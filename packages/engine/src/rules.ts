@@ -26,6 +26,7 @@ import type { StandardVariantId } from './state';
 /** The ids of the built-in presets. See `presets.ts`. */
 export const PRESET_IDS = [
   'portes',
+  'tavli',
   'plakoto',
   'plakoto.federation',
   'fevga',
@@ -267,8 +268,10 @@ export interface MatchRules {
   readonly targetPoints: number;
   /**
    * `tavli-match.md` flag `rotation` (default Portes → Plakoto → Fevga).
-   * One entry = single-game mode. Asodio is not in the standard rotation
-   * (`asodio.md`), so the Asodio presets use `['asodio']`.
+   * One entry = single-game mode. The `portes` preset is a Portes-only
+   * match (`['portes']`); the `tavli` preset is the full rotation. Asodio
+   * is not in the standard rotation (`asodio.md`), so the Asodio presets
+   * use `['asodio']`.
    */
   readonly rotation: readonly StandardVariantId[];
   /** `tavli-match.md` flag `openingRoll` (default `"useOpeningDice"`, owner / ΕΟΠΤ). */

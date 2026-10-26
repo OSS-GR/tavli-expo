@@ -47,7 +47,8 @@ export interface Match {
    * The rules of the match. `rules.match` holds the match flags. The game
    * whose preset this is uses these rules as they are; other games in the
    * rotation use their default preset with this `match` group (see
-   * `gameRules`).
+   * `gameRules`). The `tavli` preset is a match preset: every game uses its
+   * own default preset.
    */
   readonly rules: RuleSet;
   /** First to this score wins. Always equal to `rules.match.targetPoints`. */
@@ -78,7 +79,10 @@ export interface Match {
 }
 
 export interface CreateMatchOptions {
-  /** Default: the `portes` preset (rotation Portes → Plakoto → Fevga). */
+  /**
+   * Default: the `portes` preset (a Portes-only match). Use the `tavli`
+   * preset for the rotation Portes → Plakoto → Fevga.
+   */
   readonly rules?: RuleSet;
   /** Default: `rules.match.targetPoints`. Any positive integer. */
   readonly targetPoints?: number;
@@ -154,7 +158,10 @@ export function missingVariants(
   return [...missing];
 }
 
-/** The standard game a preset belongs to: `'asodio.kafeneio'` → `'asodio'`. */
+/**
+ * The game a preset belongs to: `'asodio.kafeneio'` → `'asodio'`. The
+ * match preset `'tavli'` belongs to no single game.
+ */
 function presetGame(rules: RuleSet): string {
   return rules.presetId.split('.')[0] ?? rules.presetId;
 }
@@ -163,6 +170,7 @@ function presetGame(rules: RuleSet): string {
  * The rules for one game of the match. The game of `match.rules` (its
  * preset) uses those rules. Another game in the rotation uses its default
  * preset (`DEFAULT_PRESET_BY_GAME`) with the match flags of `match.rules`.
+ * With the `tavli` preset, every game uses its default preset.
  */
 export function gameRules(match: Match, variant: StandardVariantId): RuleSet {
   if (presetGame(match.rules) === variant) return match.rules;
@@ -187,6 +195,7 @@ export function startNextGame(
 ): GameState {
   if (match.status !== 'in-progress') illegal('the match is over');
   const id = nextVariantId(match);
+  // Expected with the `tavli` preset until Plakoto (#48) and Fevga (#49) exist.
   const variant = registry.get(id);
   if (variant === undefined) {
     throw new EngineError(

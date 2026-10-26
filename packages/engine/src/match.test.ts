@@ -29,6 +29,9 @@ const win = (winner: 'white' | 'black', points = 1): GameResult => ({
 });
 const draw: GameResult = { winner: null, points: 0, reason: 'bothMothersPinned' };
 
+/** The Tavli match preset: Portes → Plakoto → Fevga. */
+const TAVLI = getPreset('tavli');
+
 function rules(overrides: RuleOverrides = {}) {
   return resolveRules('portes', overrides);
 }
@@ -67,7 +70,7 @@ describe('tavli-match.md edge cases (match and scoring)', () => {
   });
 
   it('tavli-match.md #5: Plakoto draw → 0 points, next game Fevga, a new opening roll', () => {
-    const afterDraw = play(createMatch({ starter: 'white' }), win('black'), draw);
+    const afterDraw = play(createMatch({ rules: TAVLI, starter: 'white' }), win('black'), draw);
     expect(afterDraw.score).toEqual({ white: 0, black: 1 });
     expect(afterDraw.games[1]).toMatchObject({ variant: 'plakoto', winner: null, points: 0 });
     expect(nextVariantId(afterDraw)).toBe('fevga');
@@ -76,7 +79,7 @@ describe('tavli-match.md edge cases (match and scoring)', () => {
   });
 
   it('tavli-match.md #6: after game 3 (Fevga) the rotation goes back to Portes', () => {
-    const match = createMatch({ targetPoints: 7, starter: 'white' });
+    const match = createMatch({ rules: TAVLI, targetPoints: 7, starter: 'white' });
     expect(nextVariantId(match)).toBe('portes');
     const after3 = play(match, win('white'), win('black'), win('white'));
     expect(after3.games.map((g) => g.variant)).toEqual(['portes', 'plakoto', 'fevga']);
@@ -102,7 +105,7 @@ describe('tavli-match.md edge cases (match and scoring)', () => {
   });
 
   it('tavli-match.md #8: match to 5, 3–3, a single → 4–3, the match goes on', () => {
-    const match = createMatch({ targetPoints: 5, starter: 'white' });
+    const match = createMatch({ rules: TAVLI, targetPoints: 5, starter: 'white' });
     const at33 = play(match, win('white', 2), win('black', 2), win('white'), win('black'));
     expect(at33.score).toEqual({ white: 3, black: 3 });
     const at43 = play(at33, win('white'));
@@ -129,9 +132,22 @@ describe('tavli-match.md edge cases (match and scoring)', () => {
     const match = createMatch();
     expect(match.targetPoints).toBe(3);
     expect(match.rules.match.targetPoints).toBe(3);
-    expect(match.rules.match.rotation).toEqual(['portes', 'plakoto', 'fevga']);
     expect(match).toMatchObject({ status: 'in-progress', score: { white: 0, black: 0 } });
     expect(match.nextStarter).toBeNull();
+    expect(createMatch({ rules: TAVLI }).targetPoints).toBe(3);
+  });
+
+  it('tavli-match.md flag rotation: the portes preset is Portes only; tavli is the rotation (PM)', () => {
+    expect(createMatch().rules.match.rotation).toEqual(['portes']);
+    expect(createMatch({ rules: TAVLI }).rules.match.rotation).toEqual([
+      'portes',
+      'plakoto',
+      'fevga',
+    ]);
+    // A default match plays Portes every game.
+    const match = play(createMatch({ starter: 'white' }), win('white'), win('black'));
+    expect(match.games.map((g) => g.variant)).toEqual(['portes', 'portes']);
+    expect(startNextGame(match, 'black').variant).toBe('portes');
   });
 
   it('tavli-match.md flag targetPoints: any positive integer; the rules follow it', () => {
@@ -350,12 +366,12 @@ describe('resignMatch and rematch', () => {
 
 describe('rotation and missing variants', () => {
   it('lists the games of the rotation that are not built yet', () => {
-    expect(missingVariants(createMatch())).toEqual(['plakoto', 'fevga']);
-    expect(missingVariants(portesMatch())).toEqual([]);
+    expect(missingVariants(createMatch({ rules: TAVLI }))).toEqual(['plakoto', 'fevga']);
+    expect(missingVariants(createMatch())).toEqual([]);
   });
 
   it('startNextGame fails with a clear error when the next game is not built yet', () => {
-    const match = play(createMatch({ starter: 'white' }), win('white'));
+    const match = play(createMatch({ rules: TAVLI, starter: 'white' }), win('white'));
     expect(nextVariantId(match)).toBe('plakoto');
     expect(() => startNextGame(match, 'white')).toThrow(
       expect.objectContaining({
@@ -375,8 +391,15 @@ describe('rotation and missing variants', () => {
   });
 
   it('gameRules: other games use their default preset with the match flags', () => {
-    const match = createMatch({ targetPoints: 5 });
-    expect(gameRules(match, 'portes')).toBe(match.rules);
+    const own = createMatch({ rules: rules({ match: { rotation: ['portes', 'plakoto'] } }) });
+    expect(gameRules(own, 'portes')).toBe(own.rules);
+    expect(gameRules(own, 'plakoto').presetId).toBe('plakoto');
+    // tavli is a match preset: every game uses its own default preset.
+    const match = createMatch({ rules: TAVLI, targetPoints: 5 });
+    const portesRules = gameRules(match, 'portes');
+    expect(portesRules.presetId).toBe('portes');
+    expect(portesRules.match).toEqual(match.rules.match);
+    expect(startNextGame(match, 'white').rules).toEqual(portesRules);
     const plakoto = gameRules(match, 'plakoto');
     expect(plakoto.presetId).toBe('plakoto');
     expect(plakoto.mother.motherRule).toBe('offerConcede');
@@ -387,7 +410,11 @@ describe('rotation and missing variants', () => {
 });
 
 describe('validateMatch', () => {
-  const played = play(createMatch({ targetPoints: 5, starter: 'black' }), win('white', 2), draw);
+  const played = play(
+    createMatch({ rules: TAVLI, targetPoints: 5, starter: 'black' }),
+    win('white', 2),
+    draw,
+  );
 
   it('round-trips a match through JSON', () => {
     expect(parseMatch(serializeMatch(played))).toEqual(played);
