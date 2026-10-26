@@ -21,6 +21,7 @@ export type { Direction, PointNumber } from './numbering';
 
 export {
   EMPTY_POINT,
+  applyMoveToBoard,
   checkersAt,
   checkersOnPoints,
   createBoard,
@@ -74,6 +75,7 @@ export type {
   GameResult,
   InitialStateOptions,
   Variant,
+  VariantPrompt,
   VariantRegistry,
 } from './variant';
 
@@ -111,3 +113,5 @@ export {
   serializeMatch,
   serializeRules,
 } from './serialize';
+
+export * from './flow';

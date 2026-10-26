@@ -8,7 +8,7 @@
 
 import type { Dice } from './dice';
 import { EngineError } from './errors';
-import type { Turn } from './move';
+import type { Move, Turn } from './move';
 import type { Direction } from './numbering';
 import type { PlayerId } from './player';
 import type { RuleSet } from './rules';
@@ -85,6 +85,23 @@ export interface Variant {
   legalTurns(state: GameState, dice: Dice): readonly Turn[];
 
   /**
+   * The single moves that may come next when a turn is played one move at
+   * a time (the turn flow, #25). `state` is the state at the start of the
+   * turn, `dice` the roll and `played` the moves already played this turn.
+   *
+   * A move is listed only when the turn can still be finished as a legal
+   * play: `played`, this move and some more moves must form a turn that
+   * `applyTurn` accepts. So a move that would leave part of the roll
+   * unplayable, when another order plays all of it, is never listed.
+   * Any order of a legal play works, not only the order `legalTurns` lists.
+   *
+   * Returns `[]` when `played` is already a full legal play (or the roll
+   * has no legal move). Throws `ILLEGAL_TURN` when `played` is not a
+   * prefix of a legal play, or the game is over.
+   */
+  nextMoves(state: GameState, dice: Dice, played: readonly Move[]): readonly Move[];
+
+  /**
    * Plays `turn` and returns the next state: the other player to move,
    * `dice: null`, `turnNumber + 1`. Throws `EngineError('ILLEGAL_TURN')` if
    * the turn is not legal. Never changes `state`.
@@ -102,6 +119,32 @@ export interface Variant {
    * adds it only when it scores a resignation in its own way.
    */
   resignResult?(state: GameState, player: PlayerId): GameResult;
+
+  /**
+   * Optional. A question the variant asks before play goes on, for example
+   * Plakoto "resign or play on" after a mother is pinned
+   * (`motherRule: "offerConcede"`). The variant keeps the question in
+   * `state.variantData` and reads it back here. `null` when there is none.
+   * The turn flow asks it after every turn.
+   */
+  prompt?(state: GameState): VariantPrompt | null;
+
+  /**
+   * Optional, with `prompt`. Applies the answer and returns the next state.
+   * If the answer ends the game, `result` of the new state says so.
+   * Throws `ILLEGAL_ACTION` for an answer that is not one of the choices.
+   */
+  answerPrompt?(state: GameState, player: PlayerId, choice: string): GameState;
+}
+
+/** A question a variant asks one player (see `Variant.prompt`). Plain JSON. */
+export interface VariantPrompt {
+  /** Who must answer. */
+  readonly player: PlayerId;
+  /** What is asked, for the UI text. For example `'motherPinned'`. */
+  readonly kind: string;
+  /** The answers the player can give. For example `['resign', 'playOn']`. */
+  readonly choices: readonly string[];
 }
 
 /** Variants by id. Holds functions, so it is not part of any saved state. */

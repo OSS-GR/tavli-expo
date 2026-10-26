@@ -23,8 +23,9 @@
 import { BAR_NUMBER, POINTS_ON_BOARD } from './constants';
 import { EngineError } from './errors';
 import { absoluteToOwn, ownToAbsolute } from './numbering';
+import type { Move } from './move';
 import type { Direction, PointNumber } from './numbering';
-import { PLAYERS } from './player';
+import { PLAYERS, opponent } from './player';
 import type { PerPlayer, PlayerId } from './player';
 import { validateBoard } from './validate';
 
@@ -146,4 +147,74 @@ export function pipCount(board: BoardState, player: PlayerId, direction: Directi
     if (count > 0) pips += count * absoluteToOwn(index + 1, player, direction);
   });
   return pips;
+}
+
+function boardError(message: string): never {
+  throw new EngineError('OUT_OF_RANGE', message);
+}
+
+/**
+ * Plays one move of `player` on a board and returns the new board. The
+ * turn flow uses it to show the board in the middle of a turn.
+ *
+ * It does not check the game rules. That is the variant's job
+ * (`Variant.nextMoves`). It only does what the move says, and throws
+ * `OUT_OF_RANGE` when the move does not fit the board:
+ *
+ * - `from`: an own point, `'bar'` or `'outside'`. A pinned checker cannot
+ *   move.
+ * - `to`: an own point or `'off'`.
+ * - `capture: 'hit'`: the lone opponent checker on `to` goes to the bar.
+ * - `capture: 'pin'`: the lone opponent checker on `to` stays, pinned.
+ * - When the last own checker leaves a point where it pinned an opponent
+ *   checker, the pin ends.
+ */
+export function applyMoveToBoard(
+  board: BoardState,
+  player: PlayerId,
+  move: Move,
+  direction: Direction,
+): BoardState {
+  const other = opponent(player);
+  const points = board.points.map((p) => ({ ...p }));
+  const bar = { ...board.bar };
+  const outside = { ...board.outside };
+  const off = { ...board.off };
+  const at = (own: PointNumber) => {
+    const point = points[ownToAbsolute(own, player, direction) - 1];
+    if (point === undefined) boardError(`bad point ${own}`);
+    return point;
+  };
+
+  if (move.from === 'bar' || move.from === 'outside') {
+    const from = move.from === 'bar' ? bar : outside;
+    if (from[player] < 1) boardError(`no ${player} checker on the ${move.from}`);
+    from[player] -= 1;
+  } else {
+    const point = at(move.from);
+    if (point[player] < 1) boardError(`no ${player} checker on point ${move.from}`);
+    if (point.pinned === player) boardError(`the ${player} checker on ${move.from} is pinned`);
+    point[player] -= 1;
+    if (point[player] === 0 && point.pinned === other) point.pinned = null;
+  }
+
+  if (move.to === 'off') {
+    off[player] += 1;
+  } else {
+    const point = at(move.to);
+    if (move.capture === 'none') {
+      if (point[other] > 0 && point.pinned !== other) {
+        boardError(`point ${move.to} has ${other} checkers`);
+      }
+    } else if (point[other] !== 1 || point.pinned !== null) {
+      boardError(`a ${move.capture} on ${move.to} needs one free ${other} checker there`);
+    } else if (move.capture === 'hit') {
+      point[other] = 0;
+      bar[other] += 1;
+    } else {
+      point.pinned = other;
+    }
+    point[player] += 1;
+  }
+  return { points, bar, outside, off };
 }

@@ -35,7 +35,9 @@ export type EngineErrorCode =
    * The action is not allowed now: the game or match is over, it is not this
    * player's turn, or the action does not fit the current phase.
    */
-  | 'ILLEGAL_ACTION';
+  | 'ILLEGAL_ACTION'
+  /** The turn flow got a checker move that is not one of the legal next moves. */
+  | 'ILLEGAL_MOVE';
 
 export class EngineError extends Error {
   readonly code: EngineErrorCode;

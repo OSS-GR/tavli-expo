@@ -14,7 +14,7 @@ import { CHECKERS_PER_PLAYER } from '../constants';
 import { diceMoves } from '../dice';
 import type { Dice } from '../dice';
 import { EngineError } from '../errors';
-import { sameTurn } from '../move';
+import { sameMove, sameTurn } from '../move';
 import type { Move, Turn } from '../move';
 import { absoluteToOwn, ownToAbsolute } from '../numbering';
 import { PLAYERS, opponent } from '../player';
@@ -111,6 +111,16 @@ export const raceVariant: Variant = {
   },
 
   legalTurns,
+
+  nextMoves(state: GameState, dice: Dice, played: readonly Move[]): readonly Move[] {
+    // There is only one legal play, so the next move is its next move.
+    const only = legalTurns(state, dice)[0]?.moves ?? [];
+    if (played.length > only.length || played.some((m, i) => !sameMove(m, only[i] as Move))) {
+      throw new EngineError('ILLEGAL_TURN', 'not a prefix of the legal play');
+    }
+    const next = only[played.length];
+    return next === undefined ? [] : [next];
+  },
 
   applyTurn(state: GameState, turn: Turn): GameState {
     const legal = legalTurns(state, turn.dice);
