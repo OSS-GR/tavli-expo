@@ -9,8 +9,8 @@
 | Q1 | What monthly budget is OK before we have users? (Suggested: $0–25/month, plus Apple $99/year and Google $25 once.) | Picks the backend tier and EAS plan | Backend ADR |
 | Q2 | Do you already have an **Apple Developer** account, a **Google Play Console** account, and an **Expo** account? Do you own an iPhone and an Android phone for testing? | Needed for test builds in MVP1 | M0 owner tasks |
 | Q3 | Online play: **live only** (both players in the app), or also **async** (play a move, close the app, get a push when it is your turn)? Recommended: both, live first. | Changes backend design and push needs | MVP2 |
-| Q4 | Which **house rules** does your group play? For example: does a backgammon (triple) count in Portes? Is the "mana" (mother) rule in Plakoto an instant win? Match to 3, 5, or 7 points? | Engine needs rule flags and defaults | Engine, `docs/rules/` |
-| Q5 | What do you know as **Asodio**? Sources differ. | We must spec it right | `docs/rules/asodio.md` |
+| Q4 | Which **house rules** does your group play? Defaults follow the Hellenic Federation (ΕΟΠΤ, 2025). Disputed points: (a) opening roll — use the deciding dice, or re-roll both? (b) Portes backgammon worth 2 or 3? (c) Plakoto mother rule — federation version, instant win, or none? (d) Fevga first checker must pass the opponent's start point, or only reach their starting quarter? (e) Match to 3, 5, or 7? | Engine rule flags and defaults | Engine, `docs/rules/` |
+| Q5 | **Asodio** = Greek Acey-Deucey (1-2 roll is special). It is rare and sources differ: do checkers start off the board? Does entry need a 1-2 or a double? Extra rolls? Scoring? Tell us how you play it. | We must spec it right | `docs/rules/asodio.md` |
 | Q6 | Art style: **traditional** (olive wood, inlay, kafeneio feel) or **modern clean** (flat, bright)? Recommended: traditional for the first theme. | Sets the art pipeline and first theme | Design |
 | Q7 | Money: free forever, ads, one-time "pro" purchase, or paid themes? | Store setup, privacy labels, ads SDK | v1.0 |
 | Q8 | App languages at launch: **Greek + English**? | i18n setup from day one is cheaper | MVP1 |
