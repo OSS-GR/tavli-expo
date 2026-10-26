@@ -68,7 +68,7 @@ export { DEFAULT_PRESET_BY_GAME, getPreset, resolveRules } from './presets';
 export { RULE_CONSTRAINTS, validateRules } from './rules-validate';
 export type { RuleConstraint } from './rules-validate';
 
-export { createVariantRegistry, getVariant } from './variant';
+export { GAME_END_REASONS, createVariantRegistry, getVariant } from './variant';
 export type {
   GameEndReason,
   GameResult,
@@ -80,5 +80,34 @@ export type {
 export { BUILT_IN_VARIANTS, VARIANT_REGISTRY, portes } from './variants';
 export { PORTES_START } from './variants/portes';
 
+export {
+  MATCH_SCHEMA_VERSION,
+  createMatch,
+  createRematch,
+  gameRules,
+  missingVariants,
+  nextVariantId,
+  pointsForLoss,
+  recordGameResult,
+  resignGame,
+  resignMatch,
+  startNextGame,
+  validateMatch,
+} from './match';
+export type {
+  CreateMatchOptions,
+  GameRecord,
+  Match,
+  MatchStatus,
+  RecordGameOptions,
+} from './match';
+
 export { validateBoard, validateGameState } from './validate';
-export { parseGameState, parseRules, serializeGameState, serializeRules } from './serialize';
+export {
+  parseGameState,
+  parseMatch,
+  parseRules,
+  serializeGameState,
+  serializeMatch,
+  serializeRules,
+} from './serialize';

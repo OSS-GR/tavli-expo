@@ -31,6 +31,9 @@ const vendorImports = {
     'firebase/*',
     '@firebase/*',
     '@react-native-firebase/*',
+    // Local storage: use the `Storage` port and `@tavli/storage-mmkv`.
+    'react-native-mmkv',
+    'react-native-mmkv/*',
   ],
   message:
     'Vendor SDKs belong in packages/adapters/* (or apps/server). Use a port from @tavli/contracts instead. See ADR-0002.',
@@ -70,6 +73,10 @@ export default defineConfig([
   {
     basePath: 'apps/mobile',
     extends: [expoConfig],
+    rules: {
+      // The `@/` alias comes from apps/mobile/tsconfig.json. tsc checks those imports.
+      'import/no-unresolved': ['error', { ignore: ['^@/'] }],
+    },
   },
 
   // Packages: plain TypeScript rules.

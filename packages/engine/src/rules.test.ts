@@ -52,6 +52,7 @@ describe('presets', () => {
   it('lists the built-in presets', () => {
     expect(PRESET_IDS).toEqual([
       'portes',
+      'tavli',
       'plakoto',
       'plakoto.federation',
       'fevga',
@@ -65,7 +66,8 @@ describe('presets', () => {
     const preset = getPreset(id);
     expect(validateRules(preset)).toEqual(preset);
     expect(preset.presetId).toBe(id);
-    expect(preset.version).toBe(1);
+    // portes is version 2: its rotation became Portes only (#24).
+    expect(preset.version).toBe(id === 'portes' ? 2 : 1);
     expect(Object.isFrozen(preset)).toBe(true);
     expect(Object.isFrozen(preset.match.rotation)).toBe(true);
     for (const group of RULE_GROUPS) expect(Object.isFrozen(preset[group])).toBe(true);
@@ -97,11 +99,21 @@ describe('presets', () => {
       return [r.board.startPosition, r.movement.direction, r.capture.captureMode];
     };
     expect(shape('portes')).toEqual(['portes', 'contrary', 'hit']);
+    expect(shape('tavli')).toEqual(['portes', 'contrary', 'hit']);
     expect(shape('plakoto')).toEqual(['allOnOwn24', 'contrary', 'pin']);
     expect(shape('fevga')).toEqual(['allOnOwn24', 'parallel', 'none']);
     expect(shape('asodio.kafeneio')).toEqual(['offBoard', 'contrary', 'pin']);
     expect(shape('asodio.aceyDeuceyGreek')).toEqual(['offBoard', 'contrary', 'hit']);
     expect(shape('asodio.aceyDeuceyAmerican')).toEqual(['offBoard', 'contrary', 'hit']);
+  });
+
+  it('tavli differs from portes only in the rotation', () => {
+    const { presetId: a, version: v1, match: m1, ...portes } = getPreset('portes');
+    const { presetId: b, version: v2, match: m2, ...tavli } = getPreset('tavli');
+    expect([a, b, v1, v2]).toEqual(['portes', 'tavli', 2, 1]);
+    expect(tavli).toEqual(portes);
+    expect(m1.rotation).toEqual(['portes']);
+    expect(m2).toEqual({ ...m1, rotation: ['portes', 'plakoto', 'fevga'] });
   });
 
   it('plakoto.federation differs from plakoto only in the mother rule', () => {
@@ -201,7 +213,7 @@ describe('resolveRules', () => {
   });
 
   it('rejects an unknown preset', () => {
-    expect(errorOf(() => resolveRules('tavli')).code).toBe('UNKNOWN_PRESET');
+    expect(errorOf(() => resolveRules('backgammon')).code).toBe('UNKNOWN_PRESET');
   });
 
   type Bad = [string, unknown, string];

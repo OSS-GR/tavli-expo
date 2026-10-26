@@ -447,7 +447,7 @@ describe('version 1 states are upgraded', () => {
   });
 
   it('rejects a rules version newer than the preset', () => {
-    const error = errorOf(() => validateGameState(v1State({ id: 'portes', version: 2 })));
+    const error = errorOf(() => validateGameState(v1State({ id: 'portes', version: 3 })));
     expect(error.code).toBe('INVALID_STATE');
     expect(error.path).toBe('state.rules.version');
   });

@@ -8,6 +8,8 @@
  */
 
 import { EngineError } from './errors';
+import { validateMatch } from './match';
+import type { Match } from './match';
 import type { RuleSet } from './rules';
 import { validateRules } from './rules-validate';
 import type { GameState } from './state';
@@ -48,4 +50,18 @@ export function serializeRules(rules: RuleSet): string {
  */
 export function parseRules(text: string): RuleSet {
   return validateRules(parseJson(text));
+}
+
+/** Turns a match into JSON text. Checks it first. */
+export function serializeMatch(match: Match): string {
+  return JSON.stringify(validateMatch(match));
+}
+
+/**
+ * Reads a match from JSON text. Throws `EngineError` with code
+ * `INVALID_JSON`, `UNSUPPORTED_SCHEMA_VERSION`, `INVALID_STATE`,
+ * `INVALID_RULES` or `RULES_CONFLICT`.
+ */
+export function parseMatch(text: string): Match {
+  return validateMatch(parseJson(text));
 }

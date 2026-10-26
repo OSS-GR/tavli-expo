@@ -11,3 +11,8 @@ apps/mobile/assets/
 # Written by hand or by other tools. Do not reformat them here.
 docs/
 .github/
+
+# Binary theme art and previews (pnpm --filter @tavli/themes build:assets / preview).
+packages/themes/**/*.webp
+packages/themes/**/*.png
+packages/themes/**/*.jpg

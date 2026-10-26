@@ -75,7 +75,16 @@ function preset(presetId: PresetId, version: number, changes: RuleOverrides): Ru
   return deepFreeze({ presetId, version, ...groups });
 }
 
-const PORTES = preset('portes', 1, {});
+/** A Portes match: Portes only (PM, #24). Version 2: rotation was P → Pl → F. */
+const PORTES = preset('portes', 2, { match: { rotation: ['portes'] } });
+
+/**
+ * A Tavli match: the federation rotation Portes → Plakoto → Fevga
+ * (`tavli-match.md`, "Match format"). A match preset: each game uses its
+ * own default preset with these `match` flags (`gameRules` in `match.ts`).
+ * Its other groups are the Portes values.
+ */
+const TAVLI = preset('tavli', 1, {});
 
 const PLAKOTO = preset('plakoto', 1, {
   board: { startPosition: 'allOnOwn24' },
@@ -116,6 +125,7 @@ const ACEY_DEUCEY_CHANGES = {
 
 const PRESETS: { readonly [P in PresetId]: RuleSet } = {
   portes: PORTES,
+  tavli: TAVLI,
   plakoto: PLAKOTO,
   // ΕΟΠΤ 3.3.iii: instant double, or a draw when both mothers are pinned.
   'plakoto.federation': preset('plakoto.federation', 1, {

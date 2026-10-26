@@ -14,3 +14,4 @@ export type GameId = (typeof GAME_IDS)[number];
 
 export { BOT_DIFFICULTIES, BotCancelledError, isBotCancelled, isDifficulty } from './bot-runner';
 export type { BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
+export { createMemoryStorage, type Storage } from './storage';
