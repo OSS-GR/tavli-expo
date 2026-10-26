@@ -1,6 +1,6 @@
 # Roadmap
 
-> Living document. Each milestone below is a **GitHub Milestone**. Each line item is a **GitHub issue**. Last review: 2026-10-26.
+> Living document. No dates: agents work as fast as they can (owner, 2026-10-26). Each milestone below is a **GitHub Milestone**. Each line item is a **GitHub issue**. Last review: 2026-10-26.
 
 ## Overview
 
@@ -43,7 +43,7 @@ Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checkl
 - Decide backend + auth (ADR), rendering approach (ADR), state management (ADR)
 - Monorepo setup: `apps/mobile`, `packages/engine`, `packages/bot`, `packages/ui`, `packages/adapters/*`
 - CI: lint, typecheck, unit tests on every pull request
-- Owner accounts: Apple Developer, Google Play Console, Expo (EAS)
+- Owner accounts: Expo (EAS). Apple Developer and Google Play move to v1.0.
 - Design direction: mood board, art style, first wireframes
 
 ## MVP1 — Portes Offline
@@ -54,7 +54,7 @@ Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checkl
 - UI: board screen with drag and tap-to-move, dice roll, undo within turn, highlight legal moves
 - UI: home screen, new game screen (vs bot / pass-and-play), match end screen
 - Art: first board theme (2D), checkers, dice, basic sounds and haptics
-- Release: EAS development and preview builds; TestFlight and Play internal track
+- Release: EAS development and preview builds; simulators, owner's iPhone (free Apple ID), Android APK
 - Usage analytics (PostHog) to see which modes and features testers use
 
 ## MVP2 — Play Friends Online
@@ -80,6 +80,7 @@ Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checkl
 - Themes (skins) system and 2–3 board themes
 - Greek + English, accessibility pass
 - Analytics review, crash reporting, privacy policy, store listings, screenshots
+- Owner accounts: Apple Developer Program and Google Play Console (14-day closed test with 12 testers)
 
 ## MVP4 — iMessage
 
