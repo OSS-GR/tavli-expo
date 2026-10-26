@@ -10,4 +10,8 @@ module.exports = {
     'node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|standard-navigation))',
   ],
   testPathIgnorePatterns: ['/node_modules/', '/.expo/', '/ios/', '/android/'],
+  // The first screen test in a file loads and transforms many modules on its
+  // first render. With a cold cache (always on CI) that takes about 5 s, so
+  // the 5 s default fails at random. 15 s still catches a test that hangs.
+  testTimeout: 15_000,
 };
