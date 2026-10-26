@@ -1,0 +1,9 @@
+[
+  { "title": "M0 Foundation", "description": "Repo, monorepo, CI, docs, decisions, design direction. See docs/roadmap.md" },
+  { "title": "MVP1 Portes Offline", "description": "Portes vs bot and pass-and-play on one phone. Internal test builds." },
+  { "title": "MVP2 Play Friends Online", "description": "Auth, friends, invites, online Portes, push notifications. Closed beta." },
+  { "title": "MVP3 Full Tavli Set", "description": "Plakoto, Fevga, Asodio, Tavli match mode, bots for each." },
+  { "title": "v1.0 Public Launch", "description": "Polish, themes, i18n, hard bot, store listings, analytics." },
+  { "title": "MVP4 iMessage", "description": "Play inside Apple Messages." },
+  { "title": "Later", "description": "Ranked play, leaderboards, chat, hints, web." }
+]
