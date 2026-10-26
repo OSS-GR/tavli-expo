@@ -102,7 +102,8 @@ interface GameState {
   - from a variant: `ILLEGAL_TURN`, and `NOT_SUPPORTED` for a flag that is
     not built yet;
   - from the match and turn flow: `ILLEGAL_ACTION` (the game or match is
-    over, wrong player, wrong phase).
+    over, wrong player, wrong phase) and `ILLEGAL_MOVE` (a checker move
+    that is not a legal next move).
 - Change the shape of `GameState` → bump `GAME_STATE_SCHEMA_VERSION`.
 - **Version 1 states are upgraded.** In version 1, `rules` was
   `{ id, version }`. The parser swaps it for the full preset with that id
@@ -264,10 +265,13 @@ const portes: Variant = {
   direction: 'contrary',
   initialState({ startingPlayer, rules }) { ... }, // rules: a RuleSet, default preset if left out
   legalTurns(state, dice) { ... },   // every legal full play; a pass is [{ moves: [] }]
+  nextMoves(state, dice, played) { ... }, // single moves that keep the turn finishable
   applyTurn(state, turn) { ... },    // returns a new state; throws ILLEGAL_TURN
   isGameOver(state) { ... },
   result(state) { ... },             // { winner, points, reason } or null
   resignResult(state, player) { ... }, // optional: own scoring for a resignation
+  prompt(state) { ... },             // optional: a question, e.g. "resign or play on"
+  answerPrompt(state, player, choice) { ... }, // optional, with prompt
 };
 
 const variant = getVariant(VARIANT_REGISTRY, state.variant); // the built-in variants
@@ -286,6 +290,14 @@ state = variant.applyTurn(state, turn);
 
 `src/testing/race-variant.ts` is a tiny fake variant used only in tests. It
 shows the whole flow.
+
+**Why `nextMoves` and not "a prefix of `legalTurns`".** `legalTurns` lists
+one play per end position. With 6-1, it lists `13/7 7/6` but not
+`13/12 12/6`. A player who moves the 1 first must still be allowed to. So
+the turn flow asks the variant: "after these moves, which single moves can
+still finish a legal play?" The rule is the same as "a prefix of some legal
+turn", for any order of the moves. A move that would leave part of the roll
+unplayable (when another order plays all of it) is never listed.
 
 A variant checks the `RuleSet` it gets with `validateRules`. It throws
 `RULES_CONFLICT` for rules it cannot play (for example `direction:
@@ -319,6 +331,14 @@ Code: `src/variants/portes/`. Rules: `docs/rules/portes.md` and
   A shorter turn is checked against the full search (most dice, higher die,
   end position). So any legal order of the moves is accepted, not only the
   listed one. Bad turns throw `ILLEGAL_TURN`.
+- `nextMoves(state, dice, played)`: plays `played` with the same checks as
+  `applyTurn`, then tries every single move with a die that is left. A
+  move is kept when the rest of the dice can still finish a legal play:
+  the search from the new position must use exactly the dice still needed,
+  and (when not all dice can be used) end in an end position of the full
+  search. With only one die playable it must be the higher die.
+  `portes-next-moves.test.ts` walks every move order in random positions
+  and checks that they reach exactly the end positions of `legalTurns`.
 - `result`: the winner bore off 15. Mono = 1 if the loser bore off at least
   one checker, else diplo = 2. A "backgammon" (loser also on the bar or in
   the winner's home) is 2, or 3 with `backgammonScores3`. The match adds
@@ -428,11 +448,108 @@ Tests: `src/match.test.ts`, one test per match and scoring edge case in
 `tavli-match.md #7: ...`, plus every match flag, resign cases and the
 validator. The opening-roll cases (#1–#3) belong to the turn flow (#25).
 
+## Turn flow
+
+Code: `src/flow/`. A pure reducer, no XState (the app may wrap it in
+XState if it wants). Everything is plain JSON. Dice come from an `Rng` in
+the context, never `Math.random`.
+
+### One game: `GameFlow`
+
+```
+opening-roll → awaiting-roll → moving → awaiting-confirm → awaiting-roll … → game-over
+```
+
+```ts
+interface GameFlow {
+  phase: GamePhase; // the phases above, plus 'awaiting-answer'
+  state: GameState; // at the start of the turn; state.dice = the roll
+  starter: PlayerId | null; // null until the opening roll decides
+  opening: OpeningRoll | null; // { white, black, ties }
+  played: Move[]; // moves of this turn, not confirmed yet
+  lastTurn: Turn | null; // the last finished turn, a pass too
+  result: GameResult | null;
+}
+```
+
+Actions (`player` is the player who acts):
+
+| Action          | Phase            | What it does                                                                                                                                                                                                                                |
+| --------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rollOpening`   | opening-roll     | One player rolls one die (`die` optional). A tie starts a new round. The higher die starts. `useOpeningDice` (default): the starter plays the two opening dice at once (phase `moving`). `rerollBoth`: the starter rolls (`awaiting-roll`). |
+| `chooseStarter` | opening-roll     | Only with `chosenStarterRolls`: `player` starts and rolls.                                                                                                                                                                                  |
+| `roll`          | awaiting-roll    | Rolls two dice (`dice` optional). No legal move → the turn passes by itself.                                                                                                                                                                |
+| `move`          | moving           | One checker move: `{ from, to, die }`. Only a legal next move (`nextMoves`). With `autoConfirm: true` a complete turn ends at once.                                                                                                         |
+| `undo`          | moving / confirm | Takes back the last move, down to the turn start.                                                                                                                                                                                           |
+| `confirm`       | awaiting-confirm | Plays the turn. Only when the moves are a full legal play.                                                                                                                                                                                  |
+| `answer`        | awaiting-answer  | Answers the variant's question (`Variant.prompt`).                                                                                                                                                                                          |
+| `resign`        | any but opening  | Ends the game. The result is `resignGame` on the board at the start of the turn: moves not confirmed do not count.                                                                                                                          |
+
+- `applyGameAction(flow, action, { rng, registry })` returns the next flow.
+  Bad actions throw `ILLEGAL_ACTION` or `ILLEGAL_MOVE`.
+- Dice: leave `die` / `dice` out and the flow rolls with `ctx.rng`. Fill
+  them in to play dice rolled elsewhere (the server, a replay).
+- Helpers for the UI, all computed: `legalNextMoves(flow)` (single moves
+  grouped by source, each with `to`, `die` and `capture`),
+  `remainingDice(flow)`, `canConfirm(flow)`, `canUndo(flow)`,
+  `currentBoard(flow)` (the board with the played moves, via
+  `applyMoveToBoard`) and `currentPrompt(flow)`.
+- Variant questions: after every turn the flow calls `Variant.prompt`. If
+  it returns a question, the phase is `awaiting-answer` until the player
+  sends `answer`. The variant keeps the question in `state.variantData`
+  (PM decision on #25). This is the hook for Plakoto "resign or play on".
+
+### The match: `MatchFlow`
+
+```ts
+interface MatchFlow {
+  schemaVersion: 1;
+  match: Match; // score, games, next starter (see "Match")
+  game: GameFlow; // the current game, or the last one
+  log: FlowEvent[]; // log[0] = { type: 'start', rules, targetPoints, players, starter }
+}
+```
+
+- `createMatchFlow(options)` takes the `createMatch` options. Game 1 starts
+  at once.
+- `applyMatchAction(flow, action, ctx)` takes every game action plus
+  `nextGame` (after `game-over`) and `resignMatch`. When a game ends, its
+  result goes into the match at once. `nextGame` starts the next game of
+  the rotation with the starter from the match rules (winner of the last
+  game; an opening roll after a draw). A game that is not built yet throws
+  `UNKNOWN_VARIANT` and leaves the flow as it was.
+- `matchPhase(flow)`: `playing`, `game-over` (between games) or
+  `match-over`.
+- `createRematchFlow(flow)`: a new flow for a rematch. The winner of the
+  last game starts (`rematchStarter`).
+- Event log: every action that worked is in `log`, with the dice that were
+  rolled and the full move. `replay(log)` builds the exact same flow. A log
+  without dice needs the same RNG: `replay(events, { seed })`. To load a
+  flow from outside, replay its log: every event is checked again.
+
+### Tests
+
+- `game-flow.test.ts`: the opening-roll cases (`tavli-match.md` #1–#3,
+  `portes.md` #15), every phase change, undo to the turn start, no confirm
+  of an incomplete turn, the prefix rule, auto-pass (#13), auto-confirm,
+  resign during a turn, the UI helpers and the prompt hook (with a fake
+  variant).
+- `match-flow.test.ts`: `tavli-match.md` #4–#6 through the flow (fake
+  Plakoto and Fevga variants stand in for the real ones), match over,
+  resign match, rematch, and random full matches with undos and
+  resignations that replay to the same JSON, with and without dice in the
+  log. `src/testing/random-flow.ts` picks the random actions.
+
 ## Not here yet
 
-- The turn state machine with the opening roll and Asodio roll chains
-  (#25). It reads its flags from `state.rules`.
 - Plakoto, Fevga and Asodio variants.
+- Extra rolls in one turn (Asodio roll chains, `extraRolls.*`). The flow
+  reads the player to move from the state `applyTurn` returns, so a variant
+  can give the same player another roll. A chained roll needs its own
+  data in `variantData`.
+- A question in the middle of a turn (`motherCheckTiming:
+"afterEachMove"`). Today the flow asks `Variant.prompt` only after a
+  turn.
 
 ## Commands
 

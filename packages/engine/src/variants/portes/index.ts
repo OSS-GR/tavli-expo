@@ -23,6 +23,7 @@ import type { GameResult, Variant } from '../../variant';
 import { generatePlays, isLegalMove, playMove } from './moves';
 import type { Generated, MoveOptions } from './moves';
 import { BAR, fromBoard, toBoard } from './position';
+import type { Position } from './position';
 import { checkPortesRules } from './rules-check';
 
 const DIRECTION = 'contrary';
@@ -88,6 +89,91 @@ function originNumber(move: Move): number | null {
   return null;
 }
 
+/**
+ * Plays `moves` one by one from `start` and checks each one where it is
+ * played: the die is still in `left`, the origin and landing point are
+ * legal, and `to` and `capture` are right. Removes the used dice from
+ * `left`. Throws `ILLEGAL_TURN`.
+ */
+function playEach(
+  start: Position,
+  left: DieValue[],
+  moves: readonly Move[],
+  options: MoveOptions,
+): Position {
+  let pos = start;
+  moves.forEach((move, i) => {
+    const at = left.indexOf(move.die);
+    if (at < 0) illegal(`move ${i + 1} uses die ${move.die}, which is not left`);
+    left.splice(at, 1);
+    const from = originNumber(move);
+    if (from === null || !isLegalMove(pos, from, move.die)) illegal(`move ${i + 1} is not legal`);
+    const played = playMove(pos, from, move.die, options);
+    if (played.move.to !== move.to || played.move.capture !== move.capture) {
+      illegal(`move ${i + 1} should be to ${played.move.to} (${played.move.capture})`);
+    }
+    pos = played.next;
+  });
+  return pos;
+}
+
+/**
+ * True when a play that is at `pos` with the dice `left` can still end as
+ * a legal play with `more` moves. This is the test `applyTurn` makes: a
+ * play that uses every die only needs legal moves; a shorter play must end
+ * in an end position of the full search (`legal.isFinal`).
+ */
+function canFinish(
+  pos: Position,
+  left: readonly DieValue[],
+  more: number,
+  legal: Generated,
+  usesAllDice: boolean,
+  options: MoveOptions,
+): boolean {
+  if (more === 0) return usesAllDice || legal.isFinal(pos);
+  const rest = generatePlays(pos, left, options);
+  if (rest.diceUsed !== more) return false;
+  return usesAllDice || rest.plays.some((play) => legal.isFinal(play.final));
+}
+
+function nextMoves(state: GameState, dice: Dice, played: readonly Move[]): readonly Move[] {
+  const player = state.toMove;
+  if (result(state) !== null) illegal('the game is over');
+  if (state.dice !== null && !sameDice(state.dice, dice)) {
+    illegal(`the dice are ${state.dice.join('-')}, not ${dice.join('-')}`);
+  }
+  const legal = generate(state, dice);
+  const options = moveOptions(state);
+  const all = diceMoves(dice);
+  const usesAllDice = legal.diceUsed === all.length;
+  if (played.length > legal.diceUsed) illegal(`this roll can use only ${legal.diceUsed} dice`);
+  if (legal.mustUseHighDie && played.length > 0 && played[0]?.die !== legal.highDie) {
+    illegal(`only one die can be played, so it must be the higher die (${legal.highDie})`);
+  }
+  const left: DieValue[] = [...all];
+  const pos = playEach(fromBoard(state.board, player), left, played, options);
+  const more = legal.diceUsed - played.length;
+  if (!canFinish(pos, left, more, legal, usesAllDice, options)) {
+    illegal('these moves cannot be finished as a legal play');
+  }
+  if (more === 0) return [];
+
+  const out: Move[] = [];
+  for (let i = 0; i < left.length; i += 1) {
+    const die = left[i] as DieValue;
+    if (i > 0 && left[i - 1] === die) continue; // the same die gives the same moves
+    if (legal.mustUseHighDie && die !== legal.highDie) continue;
+    const rest = left.filter((_, j) => j !== i);
+    for (let from = BAR; from >= 1; from -= 1) {
+      if (!isLegalMove(pos, from, die)) continue;
+      const { next, move } = playMove(pos, from, die, options);
+      if (canFinish(next, rest, more - 1, legal, usesAllDice, options)) out.push(move);
+    }
+  }
+  return out;
+}
+
 function applyTurn(state: GameState, turn: Turn): GameState {
   const player = state.toMove;
   if (result(state) !== null) illegal('the game is over');
@@ -101,19 +187,7 @@ function applyTurn(state: GameState, turn: Turn): GameState {
 
   // Play the moves one by one. Each one must be legal where it is played.
   const left: DieValue[] = [...dice];
-  let pos = fromBoard(state.board, player);
-  turn.moves.forEach((move, i) => {
-    const at = left.indexOf(move.die);
-    if (at < 0) illegal(`move ${i + 1} uses die ${move.die}, which is not left`);
-    left.splice(at, 1);
-    const from = originNumber(move);
-    if (from === null || !isLegalMove(pos, from, move.die)) illegal(`move ${i + 1} is not legal`);
-    const played = playMove(pos, from, move.die, options);
-    if (played.move.to !== move.to || played.move.capture !== move.capture) {
-      illegal(`move ${i + 1} should be to ${played.move.to} (${played.move.capture})`);
-    }
-    pos = played.next;
-  });
+  const pos = playEach(fromBoard(state.board, player), left, turn.moves, options);
 
   // A turn that uses every die, each move legal in turn, is a legal play.
   // A shorter turn is legal only if no play uses more dice (and the higher
@@ -157,6 +231,7 @@ export const portes: Variant = {
   },
 
   legalTurns,
+  nextMoves,
   applyTurn,
 
   isGameOver(state: GameState): boolean {
