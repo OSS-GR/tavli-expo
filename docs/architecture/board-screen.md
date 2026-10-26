@@ -32,12 +32,12 @@ The game itself lives in `apps/mobile/src/features/game/`:
 | `opening.ts`, `OpeningCard.tsx` | The opening roll card: one die per player, tie, result. |
 | `PlayerStrip.tsx` | A player strip: checker color, name, pip count, match score, turn pill. |
 | `GameCard.tsx`, `turnNotices.ts` | Cards over the board: no legal moves, game end, match end. |
-| `GameScreen.tsx` | The board screen: strips, board, cards and the controls row. |
+| `seats.ts` | How each player is named on screen (name, strip label, turn pill, "you"). |
+| `GameScreen.tsx` | The board screen: strips, board, cards and the controls row. Vs bot it also runs the bot turn (`features/bot/botTurn.ts`). |
 
-Dev routes (release builds redirect them to Home):
+The real route is `app/game/[id].tsx` (see [App shell](app-shell.md)). Dev route (release builds redirect it to Home):
 
 - `app/dev/board.tsx`: the fixed positions, from White's and from Black's side.
-- `app/dev/play.tsx`: a pass-and-play Portes match to 3 (temporary, until `app/game/[id]` exists).
 
 **Game flow and ADR-0003.** The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. ADR-0003 records this (updated in #29).
 
@@ -75,14 +75,14 @@ Dev routes (release builds redirect them to Home):
 - **Undo** takes back the last single move (`undo` action); the checker flies back, and a hit checker comes back from the bar. Disabled (dashed) when there is nothing to undo.
 - **Confirm** is enabled only when the engine says `canConfirm` (all dice used, or no move left). Then a hint shows: "All dice used. Confirm or undo."
 - **Auto-confirm** (Settings, default off): each move is sent with `autoConfirm`, so the engine ends a complete turn at once.
-- **Turn indicator:** the active player's strip gets a thick border and a "YOUR TURN" pill. Pip counts follow the moves of the turn; Settings → Show pip counts hides them.
+- **Turn indicator:** the active player's strip gets a thick border and a pill: "YOUR TURN", or "PLAYING" for the bot. Pip counts follow the moves of the turn; Settings → Show pip counts hides them.
 - **No legal moves:** the engine passes the turn by itself. The card says who rolled what and that the turn passes; the dice stay, faded. It closes on OK or after 3 s. Until then the board stays with the player who passed (flip).
 - **Game end:** winner, Mono / Diplo chip, score, "Next game" (the winner starts). **Match end:** winner, score, "Rematch" (the last winner starts, no opening roll).
 - The opening result closes after 1.5 s, or at once on a tap.
 
 ### Differences from the wireframes
 
-- The game-end and match-end screens are cards over the board on the dev route. The real routes (`app/game/[id]`, `match-end`) and the in-game menu (resign, exit) come with their own issues.
+- The game-end and match-end screens are cards over the board (no `match-end` route yet). The in-game menu is in [App shell](app-shell.md).
 - No dashed "last move" arrow and no double-tap shortcut yet.
 - The dice in the controls row are 40 pt (wireframe: about 44 pt), so Undo, the dice and Confirm fit on an iPhone SE.
 - In pass-and-play the pill says "YOUR TURN" for both players; the strip already shows the name.

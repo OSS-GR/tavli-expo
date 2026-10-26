@@ -199,6 +199,9 @@ importers:
       '@shopify/react-native-skia':
         specifier: 2.14.0
         version: 2.14.0(5aa890baaf257d7eea9fcc8c80e7143c)
+      '@tavli/bot':
+        specifier: workspace:*
+        version: link:../../packages/bot
       '@tavli/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

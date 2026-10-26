@@ -7,7 +7,7 @@ module.exports = {
   setupFiles: ['react-native-unistyles/mocks', '<rootDir>/jest.setup.ts'],
   // pnpm keeps packages in node_modules/.pnpm, so we use Expo's pnpm pattern.
   transformIgnorePatterns: [
-    'node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg))',
+    'node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|standard-navigation))',
   ],
   testPathIgnorePatterns: ['/node_modules/', '/.expo/', '/ios/', '/android/'],
 };
