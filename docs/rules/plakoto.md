@@ -92,7 +92,9 @@ counterclockwise on the diagram; Black clockwise.
 7. Six doors in a row cannot be jumped. Building a 6-prime is legal in
    Plakoto.
 
-### Mother (μάνα) rule — default (ΕΟΠΤ federation rule)
+### Mother (μάνα) rule — federation version
+
+> **App default is `offerConcede`** (owner's choice): the pinned player may resign for 2 points or play on. See the flags table. The federation version below is a preset.
 
 Let A's mother be pinned by B (B has a checker on A's point 24 = B's point 1,
 on top of A's last checker there).
@@ -172,7 +174,7 @@ There is no triple game and no cube.
 
 | Flag | Values | Default | Notes |
 |---|---|---|---|
-| `motherRule` | `"federation"`, `"instant"`, `"none"` | `"federation"` | `federation`: rule above (ΕΟΠΤ 3.3.iii, bkgm.com, EN Wikipedia agree). `instant`: pinning the mother ends the game double at once; no draw (Greek Wikipedia variant). `none`: no special result; the game simply continues (pinned mother can only be freed when the pinner leaves; Greek Wikipedia says this "almost always" ends as a double anyway). |
+| `motherRule` | `"offerConcede"`, `"federation"`, `"instant"`, `"none"` | `"offerConcede"` (owner) | `offerConcede` (owner, 2026-10-26): when a mother is pinned, the pinned player chooses **Resign** (opponent wins 2 points) or **Play on** (game continues as `none`). Vs bot and pass-and-play the human decides; online, only the pinned player decides. `federation`: rule above (ΕΟΠΤ 3.3.iii, bkgm.com, EN Wikipedia agree). `instant`: pinning the mother ends the game double at once; no draw (Greek Wikipedia variant). `none`: no special result; the game simply continues (pinned mother can only be freed when the pinner leaves; Greek Wikipedia says this "almost always" ends as a double anyway). |
 | `motherCheckTiming` | `"afterEachMove"`, `"endOfTurn"` | `"afterEachMove"` | ΕΟΠΤ says "the moment". |
 | `mutualMotherPin` | `"draw"`, `"replay"` | `"draw"` | Draw = 0 points. `replay` = replay the same Plakoto game (not seen in sources; offered for casual play only). |
 | `intermediatePinBlocks` | bool | `false` | See edge case 9. Sources are silent; default treats the jumped-on checker as unaffected. |

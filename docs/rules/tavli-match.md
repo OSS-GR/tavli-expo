@@ -76,6 +76,10 @@ Sources disagree on what happens next, so the engine needs a flag:
   for their first turn (no opening contest).
 - After a drawn game (only possible in Plakoto), the players do a new opening
   roll (ΕΟΠΤ 3.1.ii).
+- **Rematch (owner rule, 2026-10-26):** when the same two players play again
+  in the same session (a rematch), there is no opening roll. The winner of the
+  last game starts. Flag `rematchStarter: "lastGameWinner" | "openingRoll"`,
+  default `"lastGameWinner"`.
 
 ### Normal turn
 

@@ -3,12 +3,64 @@
 Shared rules (dice, forced moves, bearing off, match) are in
 `tavli-match.md`. This file lists only the Asodio rules.
 
-> **Status: low-confidence spec.** Asodio is rare. It is not part of the
-> Tavli rotation and has no federation rules. Sources disagree a lot. The
-> default below is a product decision, not a single authoritative ruleset.
-> All disputed points are flags.
+> **Status: owner version is the default (2026-10-26).** The owner plays the
+> Greek folk version with **pinning instead of hitting**. Source: the owner's
+> cheat sheet (see "Owner version" below). Other versions stay as presets.
+> Points marked **(confirm)** still need the owner's answer.
 
-## Summary
+## Owner version (default preset: `kafeneio`)
+
+Core idea: all 15 checkers move as **one army, quarter by quarter**, and you
+**pin** (trap) the opponent's lone checkers instead of hitting them.
+
+### Phase 1 — Entering (the loading lock)
+
+1. All 15 checkers start **off the board**.
+2. The board is **locked** for a player until they roll a **1-2 (ασόδυο)** or
+   any **double**. Before that, other rolls do nothing; the turn passes.
+3. **1-2:** enter one checker on spot 1 and one on spot 2 of the starting
+   quarter (spot `d` = own point `25 - d`).
+4. **Double `d-d`:** enter checkers on spot `d`. **(confirm)** Four checkers
+   (one per die move), like a normal double?
+5. After the lock breaks, each die `d` enters one checker on spot `d`.
+6. No checker may leave the starting quarter until **all 15** have entered.
+
+### Phase 2 — Quarter by quarter (the lock-in rule)
+
+1. When all 15 checkers are in the starting quarter, the army may advance.
+2. A checker that enters a **new quarter is frozen there**. It may not leave
+   that quarter until all 15 own checkers are in the same quarter.
+3. **(confirm)** Checkers may still move forward **inside** their current
+   quarter while they wait.
+4. If one checker lags behind, the whole front is frozen.
+
+### Phase 3 — Pinning (Plakoto style)
+
+1. No hitting. Checkers never go to a bar.
+2. Landing on a lone opponent checker **pins** it. The pinned checker cannot
+   move. Only the pinner's checkers may land on that point.
+3. Because of the lock-in rule, pinning a lagging checker freezes the
+   opponent's whole army.
+4. When the pinner leaves, the pinned checker is free again (as in Plakoto).
+5. Landing on 2+ opponent checkers is not allowed.
+
+### Bearing off and winning
+
+- **(confirm)** Bear off as in Portes once all 15 are in the home quarter.
+- **(confirm)** Score 1 point, or 2 (mars) if the loser has borne off none.
+
+### Open points for the owner
+
+| # | Question | Proposed default |
+|---|----------|------------------|
+| A1 | How many checkers does a double enter (e.g. 3-3)? | Four on spot 3 |
+| A2 | Can checkers move inside their current quarter while waiting? | Yes |
+| A3 | Does a 1-2 or a double give an extra roll, or a free double, as in Acey-Deucey? | No |
+| A4 | Bearing off and scoring the same as Portes? | Yes |
+| A5 | Deadlock: if neither player can ever move again, what happens? | Draw, 0 points |
+| A6 | Can a pinned checker block its owner's quarter advance forever, even if the pinner can never leave? | Yes; the pinned player passes until freed |
+
+## Summary (research on other versions)
 
 Asodio is the Greek name of **Acey-Deucey**. "Άσσος-δύο" = the roll 1-2.
 All checkers start off the board and are entered into the opponent's home,
@@ -156,17 +208,42 @@ or as an optional extra in a custom rotation.
 | `startPosition` | `"offBoard"`, `"opponentAcePoint"` | `"offBoard"` | |
 | `firstEntryGate` | bool | `true` | Greek folk sources. |
 | `firstEntryGateRolls` | `"aceDeuceOrDouble"`, `"doubleOnly"` | `"aceDeuceOrDouble"` | cardgamesgr uses doubles only. |
-| `mustEnterAllFirst` | bool | `false` | cardgamesgr: no moves until all 15 are entered. |
-| `aceDeuceExtraRoll` | bool | `true` | Frantzis/bkgm "Ace-Deo": `false`. |
-| `doublesGiveExtraRoll` | bool | `true` | Greek folk sources; American: `false`. |
+| `mustEnterAllFirst` | bool | `true` (owner) | cardgamesgr: no moves until all 15 are entered. |
+| `aceDeuceExtraRoll` | bool | `false` (owner, confirm A3) | Frantzis/bkgm "Ace-Deo": `false`. |
+| `doublesGiveExtraRoll` | bool | `false` (owner, confirm A3) | Greek folk sources; American: `false`. |
 | `complementaryDoubles` | bool | `false` | European Acey-Deucey: after a double, also play its complement (sum 7, e.g. 6-6 → 1-1), then roll again. |
 | `barEntryNeedsSpecial` | bool | `false` | Greek folk sources: `true`. |
+| `captureMode` | `"hit"`, `"pin"` | `"pin"` (owner) | Owner version pins like Plakoto. Acey-Deucey hits. |
+| `quarterLock` | bool | `true` (owner) | A checker that enters a new quarter is frozen until all 15 are in that quarter. |
 | `nominateBlot` | bool | `false` | Frantzis: at end of turn you may name an own blot; opponent must hit it if possible. |
-| `quarterGathering` | bool | `false` | Greek Wikipedia/cna.gr: all 15 must gather in one quarter before any checker advances to the next. Rule is unclear; off by default. |
+| `quarterGathering` | bool | `true` (owner) | Greek Wikipedia/cna.gr and the owner: all 15 gather in one quarter before advancing. See `quarterLock`. |
 | `exactBearOff` | bool | `false` | |
 | `scoring` | `"tavli"`, `"perChecker"`, `"singleOnly"` | `"tavli"` | |
 
+### Presets
+
+| Preset | Flags |
+|---|---|
+| `kafeneio` (default, owner) | `startPosition=offBoard`, `firstEntryGate=true`, `mustEnterAllFirst=true`, `quarterGathering=true`, `quarterLock=true`, `captureMode=pin`, no extra rolls |
+| `aceyDeuceyGreek` | `captureMode=hit`, `aceDeuceExtraRoll=true`, `doublesGiveExtraRoll=true`, `barEntryNeedsSpecial=true` |
+| `aceyDeuceyAmerican` | `captureMode=hit`, `firstEntryGate=false`, `scoring=perChecker` |
+
+Owner edge cases (add tests for each):
+
+14. `kafeneio`: first roll 5-3 → board locked, no move, turn passes.
+15. `kafeneio`: first roll 1-2 → one checker on spot 1, one on spot 2.
+16. `kafeneio`: 14 checkers in the starting quarter, 1 outside → no checker
+    may leave the starting quarter.
+17. `kafeneio`: a checker enters quarter 2 → it may not move to quarter 3
+    until all 15 are in quarter 2.
+18. `kafeneio`: landing on a lone opponent checker pins it; the pinned
+    checker has no legal moves.
+19. `kafeneio`: the opponent's last checker in a quarter is pinned → none of
+    the opponent's checkers may leave that quarter.
+
 ## Sources
+
+- Owner's cheat sheet "Greek Tavli Cheat Sheet: Asodio Variant" (shared 2026-10-26)
 
 - Wikipedia (EL), Ασσόδυο: https://el.wikipedia.org/wiki/%CE%91%CF%83%CF%83%CF%8C%CE%B4%CF%85%CE%BF
 - cna.gr, Το παιχνίδι «ασσόδυο»: https://www.cna.gr/authors/editorial/to-paichnidi-assodyo-gia-paiktes-me-ypsilo-iq/

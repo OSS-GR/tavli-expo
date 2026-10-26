@@ -19,12 +19,12 @@
 | Milestone | Epics |
 |-----------|-------|
 | M0 | #1 Foundation · #12 Design direction |
-| MVP1 | #16 Engine + Portes · #17 Bot v1 · #18 Board screen · #19 App shell · #20 Art v1 · #21 Test builds |
+| MVP1 | #16 Engine + Portes (incl. #57 rules as data) · #17 Bot v1 · #18 Board screen · #19 App shell · #20 Art v1 · #21 Test builds |
 | MVP2 | #44 Accounts · #45 Friends and invites · #46 Online game service · #47 Push notifications |
 | MVP3 | #48 Plakoto · #49 Fevga · #50 Asodio · #51 Tavli match mode |
 | v1.0 | #52 Hard bot · #53 Themes · #54 Launch readiness |
 | MVP4 | #55 iMessage |
-| Later | #56 Ranked and social |
+| Later | #56 Ranked and social · #58 Kafeneio mode (custom house rules) |
 
 Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checklist; the PM agent splits them when that milestone starts.
 
@@ -90,3 +90,4 @@ Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checkl
 - Chat and emotes
 - Hints and post-game analysis using the bot
 - Web version
+- Kafeneio mode: players build their own house-rule variants (#58)
