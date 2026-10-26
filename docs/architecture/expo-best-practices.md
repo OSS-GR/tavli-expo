@@ -606,3 +606,12 @@ Stores:
 - Google Play testing requirements for new personal accounts — https://support.google.com/googleplay/android-developer/answer/14151465
 
 Version numbers for npm packages were read from https://registry.npmjs.org on 2026-10-26.
+
+## Notes from the monorepo setup (#10, 2026-10-26)
+
+- **ESLint stays on 9.x.** `eslint-config-expo` 58 crashes on ESLint 10. Move to 10 when Expo supports it.
+- **pnpm 12** is pinned in `package.json` (`packageManager`). Corepack cannot run pnpm 12; pnpm 9.7+ switches to the pinned version by itself.
+- **Node 22** in `.nvmrc` (SDK 58 supports 22.13+, 24.3+, 26+). We may move to 24 later.
+- **Web is off.** `platforms` is iOS and Android only.
+- Shared config lives at the root (`tsconfig.base.json`, `eslint.config.mjs`, `.prettierrc.json`), not in a `packages/config` package.
+- Reanimated, Worklets, and Gesture Handler come with the SDK 58 template and stay installed.
