@@ -23,3 +23,17 @@ export {
 export { BOT_DIFFICULTIES, BotCancelledError, isBotCancelled, isDifficulty } from './bot-runner';
 export type { BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
 export { createMemoryStorage, type Storage } from './storage';
+export { isAnonymousInstallId } from './install-id';
+export {
+  ANALYTICS_EVENTS,
+  createConsentGate,
+  createNoopAnalytics,
+  createRecordingAnalytics,
+  type Analytics,
+  type AnalyticsEventName,
+  type AnalyticsEvents,
+  type AnalyticsPropsArg,
+  type GameMode,
+  type GameResultKind,
+  type SentAnalytics,
+} from './analytics';
