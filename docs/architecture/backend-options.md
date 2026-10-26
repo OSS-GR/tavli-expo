@@ -1,5 +1,7 @@
 # Backend options for online play
 
+> **Decision update (2026-10-26):** the owner chose **Convex** (the runner-up below) to make keeping phones in sync easier, with **Better Auth** for sign-in. See [ADR-0004](../decisions/0004-backend-auth.md). This doc keeps the original research; its Supabase recommendation is no longer the plan.
+
 Status: research and recommendation. Not a final decision.
 Date: 2026-10-26. Prices were checked on the official pricing pages on this date (see [Sources](#8-sources)).
 Prices change often. Check them again before you pay for anything.

@@ -14,7 +14,7 @@ The owner wants every part to be "plug and play". We must be able to swap the ba
    ```
    apps/
      mobile/            Expo app (iOS + Android)
-     server/            Online game service (if the backend needs custom code)
+     server/            Convex functions: online games, friends, invites (ADR-0004)
    packages/
      engine/            Pure TypeScript rules. No React, no network, no vendor code.
      bot/               Bot players. Depends only on engine.
