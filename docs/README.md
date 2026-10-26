@@ -35,6 +35,7 @@
 | Doc | Topic |
 |-----|-------|
 | [Art pipeline](design/art-pipeline.md) | Rendering choice, Blender, textures, themes, learning path |
+| [Board style concepts](design/style/README.md) | Two wooden concepts, palettes, mood board |
 
 ## Decisions (ADRs)
 
