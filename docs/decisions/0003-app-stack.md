@@ -18,7 +18,7 @@ We need a current, well-supported stack that fits a board game with smooth anima
 | Navigation | **Expo Router** with typed routes; Universal Links / App Links for invites |
 | Board drawing | **@shopify/react-native-skia** (ADR-0005) |
 | Animation and gestures | **Reanimated 4 + react-native-worklets**, **Gesture Handler 3** |
-| Game flow | **XState** state machine wrapping the engine |
+| Game flow | The engine's pure **`GameFlow` / `MatchFlow` reducer** (#25), held in a **Zustand** store in the app. XState was dropped (2026-10-26, #29): the engine reducer is already the one source of truth for phases, and a second state machine would duplicate it. |
 | UI state | **Zustand** |
 | Server data | **TanStack Query** |
 | Local storage | **MMKV**; tokens in **expo-secure-store** |

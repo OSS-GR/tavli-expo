@@ -33,7 +33,7 @@ Dev routes (release builds redirect them to Home):
 - `app/dev/board.tsx`: the fixed positions, from White's and from Black's side.
 - `app/dev/play.tsx`: a pass-and-play Portes match to 3 (temporary, until `app/game/[id]` exists).
 
-**Game flow and ADR-0003.** ADR-0003 lists XState for the game flow. The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. If we keep this, ADR-0003 needs a short update (owner decision).
+**Game flow and ADR-0003.** The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. ADR-0003 records this (updated in #29).
 
 ## Drawing
 
