@@ -11,4 +11,12 @@ export const GAME_IDS = ['portes', 'plakoto', 'fevga', 'asodio'] as const;
 
 export type GameId = (typeof GAME_IDS)[number];
 
+export {
+  HAPTIC_STYLES,
+  createNoopFeedback,
+  createRecordingFeedback,
+  gatedFeedback,
+  type Feedback,
+  type HapticStyle,
+} from './feedback';
 export { createMemoryStorage, type Storage } from './storage';

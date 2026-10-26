@@ -43,7 +43,8 @@ packages/engine/     Pure TypeScript game rules
 packages/bot/        Bot players (uses the engine)
 packages/contracts/  Interfaces (ports) and shared types
 packages/ui/         Design tokens and themes (plain data)
-packages/adapters/*  Vendor code behind ports (e.g. storage-mmkv)
+packages/themes/     Board themes: theme.json manifests and art
+packages/adapters/*  Vendor code behind ports (storage-mmkv, haptics-expo)
 ```
 
 See [ADR-0002](docs/decisions/0002-modular-architecture.md) for the full plan.
