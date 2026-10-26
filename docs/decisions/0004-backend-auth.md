@@ -1,6 +1,6 @@
 # ADR-0004: Backend, realtime, auth, and push vendors
 
-- **Status:** Proposed
+- **Status:** Accepted (owner accepts by merging the PR that adds it)
 - **Date:** 2026-10-26
 - **Issue:** #7
 

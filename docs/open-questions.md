@@ -9,8 +9,6 @@
 | Q1 | What monthly budget is OK before we have users? (Suggested: $0–25/month, plus Apple $99/year and Google $25 once.) | Picks the backend tier and EAS plan | Backend ADR |
 | Q3 | Online play: **live only** (both players in the app), or also **async** (play a move, close the app, get a push when it is your turn)? Recommended: both, live first. | Changes backend design and push needs | MVP2 |
 | Q7 | Money: free forever, ads, one-time "pro" purchase, or paid themes? | Store setup, privacy labels, ads SDK | v1.0 |
-| Q8 | App languages at launch: **Greek + English**? | i18n setup from day one is cheaper | MVP1 |
-| Q9 | Will the repo be **public (open source)** or private? | Bot licensing (GNU Backgammon is GPL), secrets, contributors | Bot ADR |
 | Q10 | How do friends find each other: username, invite link, QR code, phone contacts? Recommended: invite link + username for MVP2. | Friends feature scope | MVP2 |
 | Q11 | Can people play as a **guest** with no account? Recommended: yes for bot and pass-and-play; account needed for online. | Auth design | MVP2 |
 | Q12 | How many hours per week can you give? | Sets realistic dates for milestones | Roadmap |
@@ -35,4 +33,6 @@
 | Q5 follow-ups | A1 four checkers per double; A2 no moves while loading (not 100% sure); A3 no extra rolls; A4 bear-off and scoring as Portes; A5 deadlock = draw. | `docs/rules/asodio.md` |
 | Q13 | **Name: Tavlaki.** Store name "Tavlaki: Kafeneio Backgammon", Greek "Ταβλάκι: Τάβλι του Καφενείου", bundle ID **`com.tavlaki`**. | `docs/vision.md` → Name |
 | Q14 | Owner bought **`tavlaki.com`**. Bundle ID follows it: `com.tavlaki`. | `docs/vision.md` → Name |
+| Q8 | **Greek + English** from day one. | #37 (i18n setup) |
+| Q9 | Repo stays **private**. Note: private repos get 2,000 free GitHub Actions minutes per month; CI must stay lean. | ADR-0006, `docs/process/github-workflow.md` |
 | New | Players can make their **own house-rule variants** ("kafeneio mode"). | Backlog epic (Later) + engine rules-as-data task (MVP1) |

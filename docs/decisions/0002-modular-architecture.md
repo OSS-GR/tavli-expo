@@ -1,6 +1,6 @@
 # ADR-0002: Modular monorepo with ports and adapters
 
-- **Status:** Proposed
+- **Status:** Accepted (owner accepts by merging the PR that adds it)
 - **Date:** 2026-10-26
 
 ## Context
