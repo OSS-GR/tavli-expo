@@ -10,3 +10,5 @@
 export const GAME_IDS = ['portes', 'plakoto', 'fevga', 'asodio'] as const;
 
 export type GameId = (typeof GAME_IDS)[number];
+
+export { createMemoryStorage, type Storage } from './storage';
