@@ -84,6 +84,13 @@ jobs:
         if: steps.changes.outputs.code == 'true'
         run: pnpm install --frozen-lockfile
 
+      # Expo pins exact React / React Native versions per SDK. This fails when a
+      # dependency drifts from what the SDK expects (see #70).
+      - name: Expo dependency versions
+        if: steps.changes.outputs.code == 'true'
+        working-directory: apps/mobile
+        run: pnpm exec expo install --check
+
       - name: Lint
         if: steps.changes.outputs.code == 'true'
         run: pnpm lint
