@@ -30,3 +30,9 @@
 - ESLint stays on 9.x for now. `eslint-config-expo` 58 uses `eslint-plugin-react` 7.x, which crashes on ESLint 10.
 - The lint config is one file: `eslint.config.mjs`. It blocks vendor SDKs outside `packages/adapters/**` and `apps/server/**`, React/Expo in `engine`, `bot` and `contracts`, and `Math.random` in `engine`.
 - Workspace packages export TypeScript source (`"main": "./src/index.ts"`). There is no build step. Metro and Vitest read the source.
+- pnpm refuses packages published less than 24 hours ago (`minimumReleaseAge`). Pick the previous version. Do not add an exclusion.
+- Pure packages test with Vitest. The app tests with Jest (`jest-expo` + React Native Testing Library 14, where `render` and events are `async`). `apps/mobile/jest.setup.ts` loads the Unistyles mocks first, then swaps `@/services` for in-memory fakes and fixes the phone language to English.
+- Adapters are picked in one file: `apps/mobile/src/services.ts` (ADR-0002). `react-native-mmkv` is on the vendor list, so only `packages/adapters/storage-mmkv` may import it.
+- Styling is Unistyles 3. Its Babel plugin processes `apps/mobile/src` only. `apps/mobile/index.ts` configures Unistyles before Expo Router loads. Metro warns "invalid package.json configuration" for `react-native-unistyles/components/native/*`; it is harmless.
+- ESLint does not resolve the `@/` alias (`import/no-unresolved` ignores it). `tsc` checks those imports.
+- UI strings: see "Add a UI string" in `README.md`. Settings: see "Add a setting".

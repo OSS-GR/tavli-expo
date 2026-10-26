@@ -615,3 +615,13 @@ Version numbers for npm packages were read from https://registry.npmjs.org on 20
 - **Web is off.** `platforms` is iOS and Android only.
 - Shared config lives at the root (`tsconfig.base.json`, `eslint.config.mjs`, `.prettierrc.json`), not in a `packages/config` package.
 - Reanimated, Worklets, and Gesture Handler come with the SDK 58 template and stay installed.
+
+## Notes from the settings and i18n setup (#37, 2026-10-26)
+
+- **Unistyles 3.6.0** with `react-native-nitro-modules` **0.37.1** (pinned; Unistyles 3.4+ needs Nitro 0.37.1 or newer). We use the Babel plugin (`root: 'src'`), not the experimental Metro config. `react-native-edge-to-edge` is optional since Unistyles 3.1, and SDK 54+ turns edge-to-edge on, so we do not install it.
+- **Themes are data** in `packages/ui/src/themes`. The app registers them in `apps/mobile/src/theme/unistyles.ts`. Today there is one theme, `walnut-kafeneio` (Concept B, #13). It is a dark warm-brown UI, so `adaptiveThemes` is off and the saved theme id picks the theme.
+- **MMKV 4.3.2** (a Nitro module, no config plugin) sits behind the `Storage` port in `@tavli/contracts`. The adapter is `packages/adapters/storage-mmkv`. The port is synchronous, so settings load before the first frame.
+- **i18n:** `i18next` 26.5.10, `react-i18next` 17.1.9, `expo-localization` ~58.0.5 with `supportedLocales: ["el", "en"]` (per-app language in iOS and Android system settings). Keys are typed from `en.json`.
+- **Zustand 5.0.16** `persist` with a `version`, a `migrate` stub and a `merge` that cleans bad saved values.
+- **Jest:** `jest` 30.5, `jest-expo` ~58.0.12, `@testing-library/react-native` 14.1 (async `render` and events). Unistyles mocks come from `react-native-unistyles/mocks`.
+- Unistyles and MMKV need a **development build**. Expo Go cannot run them.
