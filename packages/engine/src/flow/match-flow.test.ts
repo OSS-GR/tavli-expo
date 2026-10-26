@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { nextVariantId } from '../match';
 import type { PlayerId } from '../player';
-import { resolveRules } from '../presets';
+import { getPreset, resolveRules } from '../presets';
 import { createSeededRng } from '../rng';
 import type { Rng } from '../rng';
 import type { RuleOverrides, RuleSet } from '../rules';
@@ -107,6 +107,7 @@ describe('match flow', () => {
     expect(matchPhase(flow)).toBe('playing');
     expect(flow.game.phase).toBe('opening-roll');
     expect(flow.match.targetPoints).toBe(3);
+    expect(flow.match.rules.match.rotation).toEqual(['portes']);
     expect(flow.log).toEqual([
       {
         type: 'start',
@@ -157,7 +158,10 @@ describe('match flow', () => {
   });
 
   it('tavli-match.md #6: after Fevga the rotation goes back to Portes', () => {
-    let flow = createMatchFlow({ targetPoints: 99, starter: 'white' }, fakes);
+    let flow = createMatchFlow(
+      { rules: getPreset('tavli'), targetPoints: 99, starter: 'white' },
+      fakes,
+    );
     const seen: string[] = [];
     for (let game = 0; game < 4; game += 1) {
       seen.push(flow.game.state.variant);
@@ -183,7 +187,7 @@ describe('match flow', () => {
   });
 
   it('a game that is not built yet fails with a clear error and leaves the flow as it was', () => {
-    let flow = createMatchFlow({ starter: 'white' });
+    let flow = createMatchFlow({ rules: getPreset('tavli'), starter: 'white' });
     flow = act(flow, [
       { type: 'roll', player: 'white', dice: [3, 1] },
       { type: 'resign', player: 'black' },
