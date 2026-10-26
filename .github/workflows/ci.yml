@@ -1,0 +1,101 @@
+name: CI
+
+# Lint, typecheck, test and format check on every pull request and on main.
+# The job is called `checks`. Require that name in the main branch ruleset.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Why there is no `paths-ignore` here:
+# `checks` is a required status check. If `paths-ignore` skips the whole
+# workflow on a docs-only PR, GitHub never reports `checks`, and the PR waits
+# for it forever. So the workflow always runs. The first step looks at the
+# changed files. If only docs changed, it skips the rest and the job passes.
+
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the old run. Runs on main are not cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Two commits are enough to diff against the parent (see next step).
+          fetch-depth: 2
+          persist-credentials: false
+
+      # Docs-only changes: files under docs/ and Markdown under .github/.
+      # Prettier ignores both (see .prettierignore), so no check can fail on them.
+      # Other Markdown files (README.md, CLAUDE.md) are checked by Prettier,
+      # so a change to them still runs everything.
+      #
+      # On a pull request, HEAD is GitHub's test merge commit. Its first parent
+      # is the tip of the base branch, so `HEAD^1..HEAD` is exactly the PR diff.
+      # On main, HEAD^1 is the old tip when one PR was merged. If the push held
+      # more commits, or anything goes wrong, we run all checks to be safe.
+      - name: Detect docs-only changes
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          run_all() { echo "code=true" >> "$GITHUB_OUTPUT"; echo "$1"; exit 0; }
+
+          parent=$(git rev-parse --verify --quiet HEAD^1) || run_all "No parent commit. Running all checks."
+          if [ "$EVENT" = "push" ] && [ "$parent" != "$BEFORE" ]; then
+            run_all "Push has more than one new commit. Running all checks."
+          fi
+
+          changed=$(git diff --name-only "$parent" HEAD) || run_all "git diff failed. Running all checks."
+          [ -n "$changed" ] || run_all "No changed files found. Running all checks."
+
+          echo "Changed files:"
+          echo "$changed"
+          while IFS= read -r file; do
+            case "$file" in
+              docs/*) ;;
+              .github/*.md) ;;
+              *) run_all "Code or config changed ($file). Running all checks." ;;
+            esac
+          done <<< "$changed"
+
+          echo "code=false" >> "$GITHUB_OUTPUT"
+          echo "Only docs changed. Skipping the checks. The job still passes."
+
+      # No `version` input: the action reads `packageManager` from package.json.
+      - uses: pnpm/action-setup@v6
+        if: steps.changes.outputs.code == 'true'
+
+      - uses: actions/setup-node@v7
+        if: steps.changes.outputs.code == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        if: steps.changes.outputs.code == 'true'
+        run: pnpm lint
+
+      - name: Typecheck
+        if: steps.changes.outputs.code == 'true'
+        run: pnpm typecheck
+
+      - name: Test
+        if: steps.changes.outputs.code == 'true'
+        run: pnpm test
+
+      - name: Format check
+        if: steps.changes.outputs.code == 'true'
+        run: pnpm format:check
