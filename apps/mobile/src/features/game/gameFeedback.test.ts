@@ -95,6 +95,27 @@ describe('flowEvents', () => {
     ]);
   });
 
+  it('plays no win jingle when the bot wins', () => {
+    const store = createGameStore({
+      players: { white: 'Ann', black: 'Bot' },
+      targetPoints: 5,
+      rng: createSeededRng(5),
+    });
+    const { dispatch } = store.getState();
+    dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+    dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+    const humans = ['white'] as const;
+    // White (the person) resigns: black (the bot) wins the game.
+    let before = store.getState().flow;
+    dispatch({ type: 'resign', player: 'white' });
+    expect(flowEvents(before, store.getState().flow, humans)).toEqual([]);
+    dispatch({ type: 'nextGame' });
+    // Black (the bot) resigns the match: the person wins it.
+    before = store.getState().flow;
+    dispatch({ type: 'resignMatch', player: 'black' });
+    expect(flowEvents(before, store.getState().flow, humans)).toEqual(['matchWin']);
+  });
+
   it('plays nothing for the same flow, an undo, or a new match', () => {
     const store = opened();
     const { dispatch, rematch } = store.getState();

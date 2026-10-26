@@ -8,7 +8,7 @@
  * theme's sounds. UI-only events (a die lands, a checker is picked up) go
  * through the `event` function it returns.
  */
-import { matchPhase, type MatchFlow } from '@tavli/engine';
+import { matchPhase, type MatchFlow, type PlayerId } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
 import { useEffect, useMemo } from 'react';
 
@@ -21,8 +21,20 @@ import {
 
 import type { GameStore, GameStoreState } from './gameStore';
 
-/** The game events between two flows of the same match, oldest first. */
-export function flowEvents(prev: MatchFlow, next: MatchFlow): FeedbackEvent[] {
+/** Both sides: in pass-and-play, every win is a person's win. */
+const BOTH: readonly PlayerId[] = ['white', 'black'];
+
+/**
+ * The game events between two flows of the same match, oldest first.
+ *
+ * `humans` are the sides a person plays. The win jingle plays only when one
+ * of them wins: a bot's win or a draw plays no jingle.
+ */
+export function flowEvents(
+  prev: MatchFlow,
+  next: MatchFlow,
+  humans: readonly PlayerId[] = BOTH,
+): FeedbackEvent[] {
   if (prev === next) return [];
   // A new match (rematch) has a new log: nothing to play.
   if (next.log[0] !== prev.log[0] || next.log.length < prev.log.length) return [];
@@ -39,10 +51,12 @@ export function flowEvents(prev: MatchFlow, next: MatchFlow): FeedbackEvent[] {
   }
   const before = matchPhase(prev);
   const after = matchPhase(next);
+  const humanWon = (winner: PlayerId | null | undefined) =>
+    winner != null && humans.includes(winner);
   if (after === 'match-over' && before !== 'match-over') {
-    out.push('matchWin');
+    if (humanWon(next.match.winner)) out.push('matchWin');
   } else if (after === 'game-over' && before !== 'game-over') {
-    out.push('gameWin');
+    if (humanWon(next.match.games.at(-1)?.winner)) out.push('gameWin');
   } else if (
     after === 'playing' &&
     next.game.phase === 'awaiting-roll' &&
@@ -54,16 +68,25 @@ export function flowEvents(prev: MatchFlow, next: MatchFlow): FeedbackEvent[] {
 }
 
 /** The events of one store update. A refused action (same flow, an error) is `invalidMove`. */
-export function storeEvents(prev: GameStoreState, next: GameStoreState): FeedbackEvent[] {
+export function storeEvents(
+  prev: GameStoreState,
+  next: GameStoreState,
+  humans: readonly PlayerId[] = BOTH,
+): FeedbackEvent[] {
   if (next.flow === prev.flow) return next.lastError !== null ? ['invalidMove'] : [];
-  return flowEvents(prev.flow, next.flow);
+  return flowEvents(prev.flow, next.flow, humans);
 }
 
 /**
  * Plays sound and haptics for every change of `store`, with `theme`'s
  * sounds. Returns `event` for UI-only events such as `diceLand`.
+ * `humans`: the sides a person plays (default both, for pass-and-play).
  */
-export function useGameFeedback(store: GameStore, theme: ThemeManifest): GameFeedback {
+export function useGameFeedback(
+  store: GameStore,
+  theme: ThemeManifest,
+  humans: readonly PlayerId[] = BOTH,
+): GameFeedback {
   const feedback = useMemo(() => createGameFeedback({ theme }), [theme]);
   useEffect(() => {
     loadThemeSounds(theme);
@@ -71,9 +94,9 @@ export function useGameFeedback(store: GameStore, theme: ThemeManifest): GameFee
   useEffect(
     () =>
       store.subscribe((next, prev) => {
-        for (const event of storeEvents(prev, next)) feedback.event(event);
+        for (const event of storeEvents(prev, next, humans)) feedback.event(event);
       }),
-    [store, feedback],
+    [store, feedback, humans],
   );
   return feedback;
 }
