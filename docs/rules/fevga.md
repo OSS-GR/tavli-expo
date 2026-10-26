@@ -173,7 +173,7 @@ No triple game, no cube.
 | Flag | Values | Default | Notes |
 |---|---|---|---|
 | `runnerRule` | bool | `true` | All sources have it. Gioul (Fevga variant) turns it off. |
-| `runnerTarget` | `"passMother"` (own ≤11), `"reachQuarter"` (own ≤12) | `"passMother"` | ΕΟΠΤ, bkgm.com, EN Wikipedia: pass the opponent's start. Greek Wikipedia, Condos, itavli: reach the opponent's starting quarter. They differ only if the opponent's start point is already empty. |
+| `runnerTarget` | `"passMother"` (own ≤11), `"reachQuarter"` (own ≤12) | `"passMother"` (confirmed 2026-10-26 from the ΕΟΠΤ text: «Κάθε παίκτης υποχρεούται να μετακινήσει μόνο ένα πούλι μέχρι αυτό να περάσει τη μάνα του αντιπάλου.») | ΕΟΠΤ, bkgm.com, EN Wikipedia: pass the opponent's start. Greek Wikipedia, Condos, itavli: reach the opponent's starting quarter. They differ only if the opponent's start point is already empty. |
 | `p1NoPrimeOwnStart` | bool | `true` | ΕΟΠΤ, bkgm.com, itavli, EN Wikipedia. |
 | `p2NoPrimeFrontOfMother` | bool | `true` | ΕΟΠΤ, Greek Wikipedia. Greek Wikipedia says some players allow it. |
 | `p2Window` | `"6-11"`, `"7-12"` | `"6-11"` | See interpretation note above. |

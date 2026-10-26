@@ -200,7 +200,7 @@ is skipped.
 
 | Flag | Values | Default | Notes |
 |---|---|---|---|
-| `targetPoints` | 1, 3, 5, 7, 9, 11 | 5 | Any positive integer is fine. |
+| `targetPoints` | 1, 3, 5, 7, 9, 11 | **3** (owner, 2026-10-26) | Any positive integer is fine. The federation rules set no match length. |
 | `rotation` | `["portes","plakoto","fevga"]`, `["fevga","plakoto","portes"]`, single game | P→Pl→F | Reverse order is played in some Greek regions (Greek Wikipedia). Single-game mode is useful for practice. |
 | `openingRoll` | `useOpeningDice`, `rerollBoth`, `chosenStarterRolls` | `useOpeningDice` | See above. Greek Wikipedia says the reverse rotation region requires `useOpeningDice`. |
 | `nextGameStarter` | `previousWinner`, `alternate`, `openingRoll` | `previousWinner` | `alternate` is used by some official events for the first roll (Greek Wikipedia). |

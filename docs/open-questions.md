@@ -8,7 +8,6 @@
 |---|----------|----------------|---------|
 | Q1 | What monthly budget is OK before we have users? (Suggested: $0–25/month, plus Apple $99/year and Google $25 once.) | Picks the backend tier and EAS plan | Backend ADR |
 | Q3 | Online play: **live only** (both players in the app), or also **async** (play a move, close the app, get a push when it is your turn)? Recommended: both, live first. | Changes backend design and push needs | MVP2 |
-| Q4 | Remaining **house rules**: (d) Fevga — must your first checker pass the opponent's starting point before you move a second one, or only reach their starting quarter? (e) Default match length: first to 3, 5, or 7 points? | Engine rule flags and defaults | Engine, `docs/rules/` |
 | Q7 | Money: free forever, ads, one-time "pro" purchase, or paid themes? | Store setup, privacy labels, ads SDK | v1.0 |
 | Q8 | App languages at launch: **Greek + English**? | i18n setup from day one is cheaper | MVP1 |
 | Q9 | Will the repo be **public (open source)** or private? | Bot licensing (GNU Backgammon is GPL), secrets, contributors | Bot ADR |
@@ -32,6 +31,8 @@
 | Q6 | **Traditional wooden style only.** No modern flat theme. | ADR-0005, #13 |
 | Q4 (a) | **Opening roll:** federation rule. The starter plays the two deciding dice. Other options live in Kafeneio mode. | `docs/rules/tavli-match.md` |
 | Q4 (b) | Scores are only **mono (1)** and **diplo (2)**. A "backgammon" counts as diplo. | `docs/rules/portes.md`, `tavli-match.md` |
+| Q4 (d) | Owner has not played Fevga; PM checked the federation text (ΕΟΠΤ 3.4.ii): the first checker must **pass the opponent's mother** before any other checker moves. | `docs/rules/fevga.md` → `runnerTarget="passMother"` |
+| Q4 (e) | Default match: **first to 3 points**. | `docs/rules/tavli-match.md` → `targetPoints=3` |
 | Q5 follow-ups | A1 four checkers per double; A2 no moves while loading (not 100% sure); A3 no extra rolls; A4 bear-off and scoring as Portes; A5 deadlock = draw. | `docs/rules/asodio.md` |
 | Q13 | **Name: Tavlaki.** Store name "Tavlaki: Kafeneio Backgammon", Greek "Ταβλάκι: Τάβλι του Καφενείου", bundle ID `app.tavlaki`. | `docs/vision.md` → Name |
 | New | Players can make their **own house-rule variants** ("kafeneio mode"). | Backlog epic (Later) + engine rules-as-data task (MVP1) |
