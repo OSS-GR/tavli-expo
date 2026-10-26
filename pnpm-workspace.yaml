@@ -10,3 +10,5 @@ packages:
 allowBuilds:
   # Its postinstall only checks the native binding. Prebuilt binaries ship as optional deps.
   unrs-resolver: false
+  # Pulled in by the Jest tool chain. Prebuilt binaries ship as optional deps.
+  '@parcel/watcher': false
