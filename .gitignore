@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build and cache output
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.eslintcache
+
+# Expo (more rules in apps/mobile/.gitignore)
+.expo/
+
+# Env files. Only commit .env.example files.
+.env
+.env*.local
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+*.log
+
+# OS and editors
+.DS_Store
+.idea/
+
+# Agent worktrees (local only)
+.claude/worktrees/

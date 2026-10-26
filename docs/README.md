@@ -36,6 +36,7 @@
 |-----|-------|
 | [Art pipeline](design/art-pipeline.md) | Rendering choice, Blender, textures, themes, learning path |
 | [Board style concepts](design/style/README.md) | Two wooden concepts, palettes, mood board |
+| [Wireframes](design/wireframes.md) | MVP1 screens, user flow, portrait board layout |
 
 ## Decisions (ADRs)
 
