@@ -2,7 +2,7 @@
   "name": "@tavli/bot",
   "version": "0.0.0",
   "private": true,
-  "description": "Bot players for tavli. Depends only on the engine.",
+  "description": "Bot players for tavli. Pure TypeScript. Depends only on the engine and the contracts.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -11,9 +11,11 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "simulate": "node --import ./scripts/register-ts.mjs ./scripts/simulate.ts"
   },
   "dependencies": {
+    "@tavli/contracts": "workspace:*",
     "@tavli/engine": "workspace:*"
   }
 }
