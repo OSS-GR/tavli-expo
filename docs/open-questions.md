@@ -15,7 +15,7 @@
 | Q15 | Turn **timer** lengths for live and async games, and what happens on timeout (lose the game, or auto-move)? | Server timer design | MVP2 |
 | Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
 | Q17 | **Provably fair dice** (commit-reveal, so players can check the server did not cheat) in MVP2, or later? Recommended: later. | Backend scope | MVP2 |
-| Q18 | Google Play account: **personal** or **organization**? A personal account must run a 14-day closed test with **12 testers on Android phones** before public release. An organization account needs a D-U-N-S number. The owner has no Android phone (emulator is fine for development). | Launch timeline | MVP1 / v1.0 |
+| Q18 | Google Play account: **personal** or **organization**? A personal account must run a 14-day closed test with **12 testers on Android phones** before public release, and identity checks can take days. **Open it about 4 weeks before launch** (not needed before). An organization account needs a D-U-N-S number. | Launch timeline | v1.0 |
 
 ## Answered
 
@@ -35,4 +35,7 @@
 | Q14 | Owner bought **`tavlaki.com`**. Bundle ID follows it: `com.tavlaki`. | `docs/vision.md` → Name |
 | Q8 | **Greek + English** from day one. | #37 (i18n setup) |
 | Q9 | Repo stays **private**. Note: private repos get 2,000 free GitHub Actions minutes per month; CI must stay lean. | ADR-0006, `docs/process/github-workflow.md` |
+| Design (#64) | **Both wooden themes.** First theme: **walnut kafeneio** (Concept B) with **ivory and black** checkers. Second theme: olive inlay (Concept A) in v1.0. | #38, #53 |
+| Wireframes (#63) | Accepted all defaults: board turned 90°; face-to-face mode after MVP1; resign gives mono or diplo by board state, plus "Resign match"; opening roll one tap vs bot, one tap per player in pass-and-play; auto-confirm off; pip counts on (can hide). | `docs/design/wireframes.md` |
+| Accounts | Not needed early. **Apple Developer**: when friends start testing via TestFlight (MVP2 beta). Before that: simulators on the Mac, and the owner's iPhone via a free Apple ID in Xcode (re-install every 7 days). **Google Play**: about 4 weeks before launch. | #3, #41 |
 | New | Players can make their **own house-rule variants** ("kafeneio mode"). | Backlog epic (Later) + engine rules-as-data task (MVP1) |
