@@ -74,7 +74,7 @@ function flagDefaults(doc: string): Map<string, DocValue> {
 }
 
 const ALL: readonly PresetId[] = PRESET_IDS;
-const STANDARD_ROTATION: readonly PresetId[] = ['portes', 'plakoto', 'plakoto.federation', 'fevga'];
+const STANDARD_ROTATION: readonly PresetId[] = ['tavli', 'plakoto', 'plakoto.federation', 'fevga'];
 
 /** Which presets must follow each doc's table, and the exceptions. */
 const DOCS: readonly {
@@ -89,7 +89,9 @@ const DOCS: readonly {
     doc: matchDoc,
     presets: ALL,
     // asodio.md: Asodio is not in the standard rotation; it is played alone.
+    // The `portes` preset is a single-game match (note in the rotation row).
     except: {
+      portes: ['rotation'],
       'asodio.kafeneio': ['rotation'],
       'asodio.aceyDeuceyGreek': ['rotation'],
       'asodio.aceyDeuceyAmerican': ['rotation'],
@@ -138,10 +140,15 @@ describe('presets match the flag tables in docs/rules', () => {
     for (const id of ALL) expect(getPreset(id).match.rematchStarter).toBe(match?.[1]);
   });
 
-  it('the Asodio presets play alone; the others use the standard rotation', () => {
+  it('portes and the Asodio presets play alone; the others use the standard rotation', () => {
     for (const id of STANDARD_ROTATION) {
       expect(getPreset(id).match.rotation).toEqual(['portes', 'plakoto', 'fevga']);
     }
+    const row = tableRows(section(matchDoc, '## House-rule variants (flags)')).find(
+      ([flag]) => flag === '`rotation`',
+    );
+    expect(row?.[3]).toContain('`portes` preset = single-game match; `tavli` preset = rotation');
+    expect(getPreset('portes').match.rotation).toEqual(['portes']);
     for (const id of ALL.filter((p) => p.startsWith('asodio.'))) {
       expect(getPreset(id).match.rotation).toEqual(['asodio']);
     }

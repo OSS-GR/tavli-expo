@@ -30,7 +30,12 @@ export type EngineErrorCode =
    */
   | 'RULES_CONFLICT'
   /** A flag is valid for this game, but the engine cannot play it yet (for example the doubling cube). */
-  | 'NOT_SUPPORTED';
+  | 'NOT_SUPPORTED'
+  /**
+   * The action is not allowed now: the game or match is over, it is not this
+   * player's turn, or the action does not fit the current phase.
+   */
+  | 'ILLEGAL_ACTION';
 
 export class EngineError extends Error {
   readonly code: EngineErrorCode;
