@@ -4,7 +4,7 @@
  */
 import type { Difficulty } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -21,6 +21,8 @@ export interface HomeScreenProps {
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). */
   continueCard?: ReactNode;
+  /** A one-time message, for example "Your saved game could not be opened." */
+  notice?: string | null;
 }
 
 export function HomeScreen({
@@ -29,9 +31,13 @@ export function HomeScreen({
   onHowToPlay,
   botLevels,
   continueCard,
+  notice = null,
 }: HomeScreenProps) {
   const { t } = useTranslation();
   const [toast, showToast] = useToast();
+  useEffect(() => {
+    if (notice !== null) showToast(notice);
+  }, [notice, showToast]);
   const hasMedium = botLevels.includes('medium');
 
   return (

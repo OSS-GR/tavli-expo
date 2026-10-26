@@ -3,11 +3,14 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useUnistyles } from 'react-native-unistyles';
 
+import { matchSessions } from '@/features/match/appSessions';
+import { useSaveOnBackground } from '@/features/match/useSaveOnBackground';
 import { useLanguageSync } from '@/i18n/useLanguageSync';
 
 export default function RootLayout() {
   const { theme } = useUnistyles();
   useLanguageSync();
+  useSaveOnBackground(matchSessions.saveNow);
 
   return (
     // Gesture Handler needs a root view (the board's drag gesture).

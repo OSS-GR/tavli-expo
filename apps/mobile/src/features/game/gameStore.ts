@@ -42,6 +42,8 @@ export interface GameStoreOptions {
   /** Default: the `portes` preset. */
   rules?: RuleSet;
   rng: Rng;
+  /** Go on with this flow (a saved match) instead of a new one. The other options are ignored. */
+  flow?: MatchFlow;
 }
 
 export interface GameStoreState {
@@ -61,16 +63,19 @@ export function createGameStore({
   targetPoints,
   rules,
   rng,
+  flow: saved,
 }: GameStoreOptions): GameStore {
   const ctx = { rng };
-  const flow = createMatchFlow(
-    {
-      rules: rules ?? getPreset('portes'),
-      players,
-      ...(targetPoints === undefined ? {} : { targetPoints }),
-    },
-    ctx,
-  );
+  const flow =
+    saved ??
+    createMatchFlow(
+      {
+        rules: rules ?? getPreset('portes'),
+        players,
+        ...(targetPoints === undefined ? {} : { targetPoints }),
+      },
+      ctx,
+    );
   return createStore<GameStoreState>()((set, get) => ({
     flow,
     lastError: null,
