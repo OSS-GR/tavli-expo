@@ -116,7 +116,8 @@
       "pipsLabel": "{{count}} pips to go",
       "scoreLabel": "{{score}} of {{target}} points",
       "turn": "Your turn",
-      "playing": "Playing"
+      "playing": "Playing",
+      "turnOf": "{{name}}’s turn"
     },
     "controls": {
       "undo": "↶ Undo",
@@ -238,7 +239,8 @@
       "whiteLabel": "Name of player 1, white checkers",
       "blackLabel": "Name of player 2, black checkers"
     },
-    "start": "Start game"
+    "start": "Start game",
+    "boardView": "Board view"
   },
   "rules": {
     "title": "How to play {{game}}",

@@ -108,6 +108,9 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textDim,
   },
   pill: {
+    // A long pass-and-play name may not push the score off the strip.
+    flexShrink: 1,
+    maxWidth: '50%',
     paddingHorizontal: theme.space.sm,
     paddingVertical: theme.space.xxs,
     borderRadius: theme.radii.pill,
