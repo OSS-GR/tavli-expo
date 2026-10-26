@@ -7,6 +7,7 @@ import { Redirect, Stack } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { createGameAnalytics } from '@/features/analytics/gameAnalytics';
 import { createGameStore } from '@/features/game/gameStore';
 import { GameScreen } from '@/features/game/GameScreen';
 import { createLocalRng } from '@/services';
@@ -18,6 +19,7 @@ export default function DevPlayRoute() {
       players: { white: t('game.players.white'), black: t('game.players.black') },
       targetPoints: 3,
       rng: createLocalRng(),
+      analytics: createGameAnalytics({ mode: 'local' }),
     }),
   );
 

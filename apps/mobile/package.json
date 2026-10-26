@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@shopify/react-native-skia": "2.14.0",
+    "@tavli/analytics-posthog": "workspace:*",
     "@tavli/contracts": "workspace:*",
     "@tavli/engine": "workspace:*",
     "@tavli/haptics-expo": "workspace:*",
@@ -30,6 +31,7 @@
     "expo-status-bar": "~58.0.4",
     "expo-system-ui": "~58.0.6",
     "i18next": "26.5.10",
+    "posthog-react-native": "4.83.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-i18next": "17.1.9",

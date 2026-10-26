@@ -358,7 +358,7 @@ Advice: start on **EAS Free**. Build dev clients rarely (only when native deps c
 - **Do** use **Sentry** for JS errors and native crashes. Run `npx @sentry/wizard@latest -i reactNative`. Upload source maps for both EAS Build and EAS Update (Expo guide covers both). Link Sentry to the EAS dashboard.
 - **Do** use **PostHog** for product analytics. Set it up with `eas integrations:posthog:connect` (new in SDK 58). Events then carry `eas/update_id`, `eas/channel` and `eas/runtime_version`.
 - **Do** consider **EAS Observe** (`expo-observe`) for startup and screen performance per release. It is free up to 100K events per month. Since SDK 58 it also records JS errors and native crashes. If we want one vendor fewer, Observe could replace Sentry later.
-- **Do** hide all of this behind `CrashReporter` and `Analytics` interfaces. A `ConsoleAnalytics` adapter is used in dev and tests.
+- **Do** hide all of this behind `CrashReporter` and `Analytics` interfaces. A no-op adapter (`createNoopAnalytics`) is used when there is no PostHog key, and a recording one in tests. Event plan: [analytics-events.md](analytics-events.md).
 - **Do** define a small event list (for example `match_started`, `match_finished`, `invite_sent`, `invite_opened`, `bot_level_chosen`). Use snake_case names.
 - **Do** ask for consent before analytics where the law needs it (GDPR, we are in the EU). Offer an opt-out in settings.
 - **Do not** send personal data (email, names) in analytics events or error messages.

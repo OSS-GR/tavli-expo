@@ -2,13 +2,15 @@ import { THEME_IDS } from '@tavli/ui';
 import Constants from 'expo-constants';
 import { useLocales } from 'expo-localization';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Text } from 'react-native';
+import { Linking, Pressable, ScrollView, Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ToggleRow } from '@/components/settings/ToggleRow';
+import { PRIVACY_POLICY_URL } from '@/features/analytics/consent';
+import { useConsent } from '@/features/analytics/store';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
 
 import type { BoardFlipMode } from './settings';
@@ -19,7 +21,8 @@ type BoardViewOption = BoardFlipMode | 'faceToFace';
 
 /**
  * Settings (wireframe 10, issue #37). Every change saves at once.
- * Layout follows `docs/design/wireframes.md`; the privacy section comes with #61.
+ * Layout follows `docs/design/wireframes.md`. Privacy (#61) saves the usage
+ * data answer in the consent store, not in Settings.
  */
 export function SettingsScreen() {
   const { t } = useTranslation();
@@ -33,6 +36,8 @@ export function SettingsScreen() {
   const boardFlipMode = useSettings((s) => s.boardFlipMode);
   const theme = useSettings((s) => s.theme);
   const setSetting = useSettings((s) => s.setSetting);
+  const shareUsageData = useConsent((s) => s.status === 'granted');
+  const setConsent = useConsent((s) => s.setConsent);
 
   const phoneLanguage = pickDeviceLanguage(locales.map((locale) => locale.languageCode));
 
@@ -141,6 +146,23 @@ export function SettingsScreen() {
         <Text style={styles.hint}>{t('settings.theme.hint')}</Text>
       </SettingsSection>
 
+      <SettingsSection title={t('settings.sections.privacy')}>
+        <ToggleRow
+          testID="settings-usage-data"
+          label={t('settings.usageData.label')}
+          hint={t('settings.usageData.hint')}
+          value={shareUsageData}
+          onValueChange={setConsent}
+        />
+        <Pressable
+          testID="settings-privacy-policy"
+          accessibilityRole="link"
+          onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
+          style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
+          <Text style={styles.linkText}>{`${t('settings.privacyPolicy')} ›`}</Text>
+        </Pressable>
+      </SettingsSection>
+
       <Text style={styles.footer}>{t('settings.version', { version })}</Text>
     </ScrollView>
   );
@@ -165,6 +187,18 @@ const styles = StyleSheet.create((theme, rt) => ({
     ...theme.type.caption,
     color: theme.colors.textDim,
     paddingTop: theme.space.xs,
+  },
+  link: {
+    minHeight: theme.touch.row,
+    justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  linkText: {
+    ...theme.type.body,
+    color: theme.colors.text,
+    textDecorationLine: 'underline',
   },
   footer: {
     ...theme.type.caption,

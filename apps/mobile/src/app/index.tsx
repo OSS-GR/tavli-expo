@@ -1,10 +1,17 @@
-import { Link } from 'expo-router';
+import { Link, Redirect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { needsWelcome } from '@/features/analytics/consent';
+import { useConsent } from '@/features/analytics/store';
+
 export default function HomeScreen() {
   const { t } = useTranslation();
+  const consent = useConsent((s) => s.status);
+
+  // First launch: language, then usage data consent (#61). Shown until answered.
+  if (needsWelcome(consent)) return <Redirect href="/welcome/language" />;
 
   return (
     <View style={styles.screen}>

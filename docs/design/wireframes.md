@@ -363,7 +363,7 @@ Notes:
   - **Sound and feel:** Sound (toggle). Haptics (toggle). Sound also follows the phone's silent switch.
   - **Language:** **Ελληνικά / English**. The app switches at once.
   - **Look:** Board theme (MVP1 has one wooden board; the row says "more boards later").
-  - **Privacy:** Share usage data (toggle; calls `optIn()` / `optOut()` on the Analytics port, #61). Privacy policy link.
+  - **Privacy:** Share anonymous usage data (toggle; calls `optIn()` / `optOut()` on the Analytics port, #61). Privacy policy link. Events: `docs/architecture/analytics-events.md`.
   - Footer: app version, build, licenses.
 - **States:** No loading or error states; everything is local.
 - **Goes to:** Back to where it came from (Home, or the game via the in-game menu).

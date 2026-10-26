@@ -13,7 +13,8 @@
       "game": "Game",
       "soundAndFeel": "Sound and feel",
       "language": "Language",
-      "look": "Look"
+      "look": "Look",
+      "privacy": "Privacy"
     },
     "autoConfirm": {
       "label": "Auto-confirm moves",
@@ -48,6 +49,11 @@
       "label": "Board theme",
       "hint": "More boards later"
     },
+    "usageData": {
+      "label": "Share anonymous usage data",
+      "hint": "Which modes you play and which settings you change. No names or emails."
+    },
+    "privacyPolicy": "Privacy policy",
     "version": "Tavlaki {{version}}"
   },
   "languages": {
@@ -95,6 +101,29 @@
     },
     "dice": {
       "label": "Dice {{values}}, {{left}} left to play"
+    }
+  },
+  "welcome": {
+    "language": {
+      "title": "Choose your language",
+      "phoneLanguage": "Phone language",
+      "note": "You can change this later in Settings.",
+      "continue": "Continue"
+    },
+    "privacy": {
+      "back": "Back",
+      "step": "Step {{step}} of {{total}}",
+      "title": "Help us make Tavlaki better",
+      "intro": "We would like to collect anonymous usage data, for example:",
+      "collect": {
+        "modes": "which modes and games you play",
+        "games": "when a game starts and ends",
+        "settings": "which settings you change"
+      },
+      "never": "We never collect your name, email or contacts. Nothing is sent until you choose. Change it any time in Settings.",
+      "policy": "Read the privacy policy",
+      "allow": "Allow usage data",
+      "deny": "Don't allow"
     }
   }
 }

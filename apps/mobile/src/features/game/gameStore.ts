@@ -35,6 +35,8 @@ import {
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
+import type { GameAnalytics } from '@/features/analytics/gameAnalytics';
+
 export interface GameStoreOptions {
   players: PerPlayer<string>;
   /** Points to win the match. Default: the rules' target (3). */
@@ -42,6 +44,14 @@ export interface GameStoreOptions {
   /** Default: the `portes` preset. */
   rules?: RuleSet;
   rng: Rng;
+  /**
+   * Game events (#61): start, finish, undo and resign are sent from here.
+   * Leave it out in tests.
+   * TODO(#61): send `game_abandoned` (`analytics.gameAbandoned(flow)`) when
+   * the player leaves an unfinished game. Do it in the real game route
+   * (`app/game/[id]`), once saved games (#36) say what "leaving" means.
+   */
+  analytics?: GameAnalytics;
 }
 
 export interface GameStoreState {
@@ -61,6 +71,7 @@ export function createGameStore({
   targetPoints,
   rules,
   rng,
+  analytics,
 }: GameStoreOptions): GameStore {
   const ctx = { rng };
   const flow = createMatchFlow(
@@ -71,12 +82,16 @@ export function createGameStore({
     },
     ctx,
   );
+  analytics?.gameStarted(flow);
   return createStore<GameStoreState>()((set, get) => ({
     flow,
     lastError: null,
     dispatch: (action) => {
       try {
-        set({ flow: applyMatchAction(get().flow, action, ctx), lastError: null });
+        const previous = get().flow;
+        const next = applyMatchAction(previous, action, ctx);
+        set({ flow: next, lastError: null });
+        analytics?.actionApplied(previous, next, action);
         return true;
       } catch (error) {
         if (!(error instanceof EngineError)) throw error;
@@ -84,7 +99,11 @@ export function createGameStore({
         return false;
       }
     },
-    rematch: () => set({ flow: createRematchFlow(get().flow, ctx), lastError: null }),
+    rematch: () => {
+      const next = createRematchFlow(get().flow, ctx);
+      set({ flow: next, lastError: null });
+      analytics?.gameStarted(next);
+    },
   }));
 }
 
