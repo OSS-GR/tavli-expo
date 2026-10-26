@@ -67,16 +67,15 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: jest-expo
         update-types: [version-update:semver-major]
-      # React Native is 0.x, so a "minor" bump is a breaking release. Expo pins
-      # React, React Native and native libraries per SDK. Block minor and major.
+      # Expo pins exact versions of React, React DOM and React Native per SDK
+      # (even patch bumps break `expo install --check`, see #70). Never bump
+      # them alone; `expo install --fix` sets them during an SDK upgrade.
       - dependency-name: react
-        update-types: [version-update:semver-major, version-update:semver-minor]
       - dependency-name: react-dom
-        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: react-native
       - dependency-name: '@types/react'
         update-types: [version-update:semver-major, version-update:semver-minor]
-      - dependency-name: react-native
-        update-types: [version-update:semver-major, version-update:semver-minor]
+      # React Native libraries are 0.x, so a "minor" bump is a breaking release.
       - dependency-name: react-native-*
         update-types: [version-update:semver-major, version-update:semver-minor]
       - dependency-name: '@react-native/*'
