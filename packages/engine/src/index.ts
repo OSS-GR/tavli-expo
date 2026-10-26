@@ -41,7 +41,32 @@ export { formatMove, formatTurn, locationNumber, sameMove, sameTurn } from './mo
 export type { Capture, Destination, Move, Origin, Turn } from './move';
 
 export { GAME_STATE_SCHEMA_VERSION, STANDARD_VARIANT_IDS, positionKey } from './state';
-export type { GameState, JsonObject, JsonValue, RulesRef, VariantId } from './state';
+export type { GameState, JsonObject, JsonValue, StandardVariantId, VariantId } from './state';
+
+export { PRESET_IDS, RULE_GROUPS, RULE_SCHEMA, isPresetId } from './rules';
+export type {
+  BearOffRules,
+  BoardRules,
+  CaptureRules,
+  EntryRules,
+  ExtraRollRules,
+  FieldSpec,
+  MatchRules,
+  MotherRules,
+  MovementRules,
+  PresetId,
+  PrimeRules,
+  QuarterRules,
+  RuleGroupName,
+  RuleGroups,
+  RuleOverrides,
+  RuleSet,
+  ScoringRules,
+  SpecialRollRules,
+} from './rules';
+export { DEFAULT_PRESET_BY_GAME, getPreset, resolveRules } from './presets';
+export { RULE_CONSTRAINTS, validateRules } from './rules-validate';
+export type { RuleConstraint } from './rules-validate';
 
 export { createVariantRegistry, getVariant } from './variant';
 export type {
@@ -53,4 +78,4 @@ export type {
 } from './variant';
 
 export { validateBoard, validateGameState } from './validate';
-export { parseGameState, serializeGameState } from './serialize';
+export { parseGameState, parseRules, serializeGameState, serializeRules } from './serialize';

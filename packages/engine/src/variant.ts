@@ -11,13 +11,22 @@ import { EngineError } from './errors';
 import type { Turn } from './move';
 import type { Direction } from './numbering';
 import type { PlayerId } from './player';
-import type { GameState, RulesRef, VariantId } from './state';
+import type { RuleSet } from './rules';
+import type { GameState, VariantId } from './state';
 
 export interface InitialStateOptions {
   /** Who plays first. The opening roll that decides it belongs to the turn state machine (#25). */
   readonly startingPlayer: PlayerId;
-  /** Rules to record in the state. Default: the variant's own default rules. */
-  readonly rules?: RulesRef;
+  /**
+   * The full rules for this game, for example `resolveRules('plakoto', {
+   * mother: { motherRule: 'instant' } })`. They are embedded in the state.
+   * Default: the variant's default preset (`DEFAULT_PRESET_BY_GAME`).
+   *
+   * The variant checks them with `validateRules` and throws
+   * `EngineError('RULES_CONFLICT')` if it cannot play them (for example a
+   * `'parallel'` direction in a contrary game).
+   */
+  readonly rules?: RuleSet;
 }
 
 /** Why a game ended. Variants add only the reasons they use. */

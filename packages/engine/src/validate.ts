@@ -15,8 +15,12 @@ import type { Dice } from './dice';
 import { EngineError } from './errors';
 import { PLAYERS, isPlayerId } from './player';
 import type { PerPlayer, PlayerId } from './player';
+import { DEFAULT_PRESET_BY_GAME, getPreset } from './presets';
+import type { RuleSet } from './rules';
+import { isPresetId } from './rules';
+import { validateRules } from './rules-validate';
 import { GAME_STATE_SCHEMA_VERSION } from './state';
-import type { GameState, JsonObject, JsonValue, RulesRef } from './state';
+import type { GameState, JsonObject, JsonValue } from './state';
 
 /** Deeper `variantData` is rejected, so bad input cannot blow the stack. */
 const MAX_JSON_DEPTH = 32;
@@ -127,13 +131,31 @@ function positiveInteger(value: unknown, path: string): number {
   return value as number;
 }
 
-function rules(value: unknown, path: string): RulesRef {
+/**
+ * Version 1 stored `rules` as `{ id, version }`. Version 2 stores the full
+ * `RuleSet`. We map the old id to today's preset. `'asodio'` (the bare game
+ * id) maps to `'asodio.kafeneio'`.
+ */
+function upgradeRulesRefV1(value: unknown, path: string): RuleSet {
   const raw = record(value, path, ['id', 'version']);
-  return {
-    id: nonEmptyString(raw['id'], `${path}.id`),
-    version: positiveInteger(raw['version'], `${path}.version`),
-  };
+  const id = nonEmptyString(raw['id'], `${path}.id`);
+  const version = positiveInteger(raw['version'], `${path}.version`);
+  const presetId = id === 'asodio' ? DEFAULT_PRESET_BY_GAME.asodio : id;
+  if (!isPresetId(presetId)) {
+    throw new EngineError('UNKNOWN_PRESET', `no rules preset with id "${id}"`, `${path}.id`);
+  }
+  const preset = getPreset(presetId);
+  if (version > preset.version) {
+    fail(
+      `${path}.version`,
+      `rules version ${version} is newer than preset "${presetId}" (version ${preset.version})`,
+    );
+  }
+  return validateRules(preset, path);
 }
+
+/** The schema versions `validateGameState` can read. Older ones are upgraded. */
+const READABLE_VERSIONS: readonly number[] = [1, GAME_STATE_SCHEMA_VERSION];
 
 function jsonValue(value: unknown, path: string, depth: number): JsonValue {
   if (depth > MAX_JSON_DEPTH) fail(path, 'JSON is nested too deep');
@@ -170,8 +192,14 @@ const STATE_KEYS = [
 
 /**
  * Checks a game state that came from outside and returns a typed copy.
- * Throws `EngineError` with code `UNSUPPORTED_SCHEMA_VERSION` for another
- * schema version, or `INVALID_STATE` for any other problem.
+ * Throws `EngineError` with code:
+ *
+ * - `UNSUPPORTED_SCHEMA_VERSION` for a schema version it cannot read;
+ * - `INVALID_RULES`, `RULES_CONFLICT` or `UNKNOWN_PRESET` for bad `rules`;
+ * - `INVALID_STATE` for any other problem.
+ *
+ * A version 1 state is upgraded: its rules reference becomes the full
+ * preset. The result is always the current version.
  *
  * It checks the shared model only. Variant rules (for example "Fevga has no
  * bar") are the variant's job.
@@ -179,15 +207,15 @@ const STATE_KEYS = [
 export function validateGameState(value: unknown): GameState {
   if (!isPlainObject(value)) fail('state', 'expected an object');
   const version = value['schemaVersion'];
-  if (typeof version === 'number' && version !== GAME_STATE_SCHEMA_VERSION) {
+  if (typeof version === 'number' && !READABLE_VERSIONS.includes(version)) {
     throw new EngineError(
       'UNSUPPORTED_SCHEMA_VERSION',
-      `schemaVersion ${version} is not supported (this engine reads ${GAME_STATE_SCHEMA_VERSION})`,
+      `schemaVersion ${version} is not supported (this engine reads ${READABLE_VERSIONS.join(' and ')})`,
       'state.schemaVersion',
     );
   }
   const raw = record(value, 'state', STATE_KEYS);
-  if (version !== GAME_STATE_SCHEMA_VERSION) fail('state.schemaVersion', 'expected a number');
+  if (typeof version !== 'number') fail('state.schemaVersion', 'expected a number');
 
   const toMove = raw['toMove'];
   if (!isPlayerId(toMove)) fail('state.toMove', 'expected "white" or "black"');
@@ -200,7 +228,10 @@ export function validateGameState(value: unknown): GameState {
   return {
     schemaVersion: GAME_STATE_SCHEMA_VERSION,
     variant: nonEmptyString(raw['variant'], 'state.variant'),
-    rules: rules(raw['rules'], 'state.rules'),
+    rules:
+      version === 1
+        ? upgradeRulesRefV1(raw['rules'], 'state.rules')
+        : validateRules(raw['rules'], 'state.rules'),
     board: validateBoard(raw['board'], 'state.board'),
     toMove,
     dice: dice(raw['dice'], 'state.dice'),

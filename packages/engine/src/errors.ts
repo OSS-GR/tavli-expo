@@ -19,7 +19,13 @@ export type EngineErrorCode =
   /** Two variants in one registry use the same id. */
   | 'DUPLICATE_VARIANT'
   /** A turn is not one of the legal turns for the state. */
-  | 'ILLEGAL_TURN';
+  | 'ILLEGAL_TURN'
+  /** No rules preset with this id (see `PRESET_IDS`). */
+  | 'UNKNOWN_PRESET'
+  /** A `RuleSet` or a set of overrides has the wrong shape (missing field, bad value, unknown key). */
+  | 'INVALID_RULES'
+  /** A `RuleSet` has the right shape, but two flags cannot work together. */
+  | 'RULES_CONFLICT';
 
 export class EngineError extends Error {
   readonly code: EngineErrorCode;
