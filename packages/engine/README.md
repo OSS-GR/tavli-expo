@@ -173,7 +173,8 @@ interface RuleSet {
 
 | Preset                      | What it is                                                                                                                                       |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `portes`                    | Portes. Hits, bar, mono 1 / diplo 2.                                                                                                             |
+| `portes`                    | Portes. Hits, bar, mono 1 / diplo 2. A Portes-only match (`rotation: ['portes']`).                                                               |
+| `tavli`                     | A Tavli match: Portes → Plakoto → Fevga (federation rotation). Each game uses its own default preset with these match flags.                     |
 | `plakoto`                   | Plakoto. Pins. Mother rule `offerConcede` (owner).                                                                                               |
 | `plakoto.federation`        | Plakoto with the ΕΟΠΤ mother rule (`motherRule: 'federation'`).                                                                                  |
 | `fevga`                     | Fevga. Parallel, runner rule (`passMother`), prime rules P1/P2/P3.                                                                               |
@@ -186,6 +187,9 @@ interface RuleSet {
   ΕΟΠΤ there.
 - The Asodio presets use `match.rotation: ['asodio']`, because Asodio is not
   in the standard rotation.
+- `portes` is a single-game match (PM, #24). `tavli` is the match preset
+  with the rotation (for #51). Until Plakoto and Fevga exist, a `tavli`
+  match fails at game 2 with `UNKNOWN_VARIANT`. That is expected.
 - The two Acey-Deucey presets turn the owner's army rules off
   (`mustEnterAllFirst`, `quarterGathering`, `quarterLock`).
 - `getPreset(id)` returns the frozen preset. Bump its `version` in
@@ -387,8 +391,9 @@ interface Match {
 ```
 
 - `createMatch({ rules, targetPoints, players, starter })`. Every option has
-  a default: the `portes` preset, its `targetPoints` (3), `white`/`black`,
-  and an opening roll for game 1.
+  a default: the `portes` preset (a Portes-only match), its `targetPoints`
+  (3), `white`/`black`, and an opening roll for game 1. Pass
+  `getPreset('tavli')` for the rotation Portes → Plakoto → Fevga.
 - `recordGameResult(match, result, { starter })` adds a finished game and
   returns the next match. Pass `starter` when an opening roll decided who
   started (`nextStarter` was `null`).
@@ -410,14 +415,14 @@ interface Match {
 - `createRematch(match)`: same rules and players, score 0–0. With
   `rematchStarter: "lastGameWinner"` (default, owner rule) the winner of the
   last game starts with no opening roll. That is always the match winner.
-- Rotation: `nextVariantId(match)` is the next game. `startNextGame(match,
-startingPlayer)` returns its start state. A game that is not built yet
-  (today: Plakoto, Fevga) throws `UNKNOWN_VARIANT` with a clear message and
-  the path of the rotation entry. `missingVariants(match)` lists them up
-  front, so the app can offer a Portes-only rotation (`['portes']`) until
-  the other games exist.
+- Rotation: `nextVariantId(match)` is the next game.
+  `startNextGame(match, startingPlayer)` returns its start state. A game
+  that is not built yet (today: Plakoto, Fevga, so game 2 of a `tavli`
+  match) throws `UNKNOWN_VARIANT` with a clear message and the path of the
+  rotation entry. `missingVariants(match)` lists them up front.
 - `gameRules(match, variant)`: the game of `match.rules` uses those rules.
   The other games use their default preset with the same `match` group.
+  With the `tavli` match preset, every game uses its default preset.
 - `validateMatch(value)` checks a match from outside. Besides the shape, it
   checks that `score`, `rotationIndex`, `status`, `winner` and
   `nextStarter` fit the list of games. So the stored totals can never drift
