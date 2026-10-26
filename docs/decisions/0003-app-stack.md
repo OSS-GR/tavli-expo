@@ -29,7 +29,7 @@ We need a current, well-supported stack that fits a board game with smooth anima
 | Tests | **Vitest** for pure packages; **Jest + jest-expo + RN Testing Library** for the app; **Maestro** for end-to-end |
 | CI / CD | GitHub Actions for checks; **EAS Build / Update / Submit / Workflows** for builds |
 | Crashes | **Sentry** (free tier) behind a `CrashReporter` port |
-| Analytics | **PostHog EU** behind an `Analytics` port — added in v1.0, not before |
+| Analytics | **PostHog EU** (free up to 1M events/month) behind an `Analytics` port — from **MVP1 testing** (owner, 2026-10-26), with a consent prompt |
 | Dev builds | Use **development builds**, not Expo Go (SDK 58 Expo Go may lag in stores) |
 
 ## Consequences

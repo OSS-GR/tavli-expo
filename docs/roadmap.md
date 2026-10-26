@@ -55,6 +55,7 @@ Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checkl
 - UI: home screen, new game screen (vs bot / pass-and-play), match end screen
 - Art: first board theme (2D), checkers, dice, basic sounds and haptics
 - Release: EAS development and preview builds; TestFlight and Play internal track
+- Usage analytics (PostHog) to see which modes and features testers use
 
 ## MVP2 — Play Friends Online
 
@@ -78,7 +79,7 @@ Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checkl
 - Bot hard level (trained neural net)
 - Themes (skins) system and 2–3 board themes
 - Greek + English, accessibility pass
-- Analytics, crash reporting, privacy policy, store listings, screenshots
+- Analytics review, crash reporting, privacy policy, store listings, screenshots
 
 ## MVP4 — iMessage
 
