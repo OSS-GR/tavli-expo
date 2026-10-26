@@ -19,6 +19,10 @@
 | Q11 | Can people play as a **guest** with no account? Recommended: yes for bot and pass-and-play; account needed for online. | Auth design | MVP2 |
 | Q12 | How many hours per week can you give? | Sets realistic dates for milestones | Roadmap |
 | Q13 | App name and bundle ID (e.g. `gr.oss.tavli`)? | Needed before the first build; hard to change later | M0 |
+| Q14 | Which **domain** do we use for invite links (e.g. `tavli.gr` or a free subdomain)? | Needed before the first build with universal links | MVP2 |
+| Q15 | Turn **timer** lengths for live and async games, and what happens on timeout (lose the game, or auto-move)? | Server timer design | MVP2 |
+| Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
+| Q17 | **Provably fair dice** (commit-reveal, so players can check the server did not cheat) in MVP2, or later? Recommended: later. | Backend scope | MVP2 |
 
 ## Answered
 
