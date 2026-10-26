@@ -35,6 +35,7 @@
 | Doc | Topic |
 |-----|-------|
 | [Art pipeline](design/art-pipeline.md) | Rendering choice, Blender, textures, themes, learning path |
+| [Wireframes](design/wireframes.md) | MVP1 screens, user flow, portrait board layout |
 
 ## Decisions (ADRs)
 
