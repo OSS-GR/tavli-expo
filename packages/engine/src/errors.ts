@@ -24,8 +24,13 @@ export type EngineErrorCode =
   | 'UNKNOWN_PRESET'
   /** A `RuleSet` or a set of overrides has the wrong shape (missing field, bad value, unknown key). */
   | 'INVALID_RULES'
-  /** A `RuleSet` has the right shape, but two flags cannot work together. */
-  | 'RULES_CONFLICT';
+  /**
+   * A `RuleSet` has the right shape, but two flags cannot work together, or
+   * a variant cannot play a flag that belongs to another game.
+   */
+  | 'RULES_CONFLICT'
+  /** A flag is valid for this game, but the engine cannot play it yet (for example the doubling cube). */
+  | 'NOT_SUPPORTED';
 
 export class EngineError extends Error {
   readonly code: EngineErrorCode;

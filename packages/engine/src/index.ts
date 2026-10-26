@@ -77,5 +77,8 @@ export type {
   VariantRegistry,
 } from './variant';
 
+export { BUILT_IN_VARIANTS, VARIANT_REGISTRY, portes } from './variants';
+export { PORTES_START } from './variants/portes';
+
 export { validateBoard, validateGameState } from './validate';
 export { parseGameState, parseRules, serializeGameState, serializeRules } from './serialize';

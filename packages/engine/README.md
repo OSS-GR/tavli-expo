@@ -98,7 +98,9 @@ interface GameState {
 - Bad input throws `EngineError` with a `code` and a `path` such as
   `state.board.points[3].white`. Unknown fields are rejected.
   - `INVALID_JSON`, `UNSUPPORTED_SCHEMA_VERSION`, `INVALID_STATE`;
-  - for `state.rules`: `INVALID_RULES`, `RULES_CONFLICT`, `UNKNOWN_PRESET`.
+  - for `state.rules`: `INVALID_RULES`, `RULES_CONFLICT`, `UNKNOWN_PRESET`;
+  - from a variant: `ILLEGAL_TURN`, and `NOT_SUPPORTED` for a flag that is
+    not built yet.
 - Change the shape of `GameState` → bump `GAME_STATE_SCHEMA_VERSION`.
 - **Version 1 states are upgraded.** In version 1, `rules` was
   `{ id, version }`. The parser swaps it for the full preset with that id
@@ -265,8 +267,8 @@ const portes: Variant = {
   result(state) { ... },             // { winner, points, reason } or null
 };
 
-const registry = createVariantRegistry([portes, plakoto, fevga]);
-const variant = getVariant(registry, state.variant);
+const variant = getVariant(VARIANT_REGISTRY, state.variant); // the built-in variants
+const custom = createVariantRegistry([portes, myTestVariant]); // or build your own
 ```
 
 The UI, the bot and the server only use this interface. A typical loop:
@@ -284,13 +286,87 @@ shows the whole flow.
 
 A variant checks the `RuleSet` it gets with `validateRules`. It throws
 `RULES_CONFLICT` for rules it cannot play (for example `direction:
-'parallel'` in a contrary game).
+'parallel'` in a contrary game), and `NOT_SUPPORTED` for a flag of its own
+game that is not built yet. It never ignores a flag in silence.
+
+`VARIANT_REGISTRY` holds `BUILT_IN_VARIANTS`. Today that is only `portes`.
+
+## Portes
+
+Code: `src/variants/portes/`. Rules: `docs/rules/portes.md` and
+`docs/rules/tavli-match.md`.
+
+- `initialState`: 2/5/3/5 on own 24/13/8/6 for both players
+  (`PORTES_START`), `dice: null`, `turnNumber: 1`.
+- `legalTurns(state, dice)`: every legal full play. Doubles give four moves.
+  Bar checkers enter first. No landing on a door (2+ opponent checkers).
+  Landing on a blot hits it to the bar. Bearing off needs all 15 home; a die
+  bears off from its own point, or from the highest point when the die is
+  larger; otherwise it must move a checker inside home. The middle point of
+  a combined move must be open too, because the search plays one die at a
+  time. Then the "use as much of the roll as possible" rules: most dice
+  first, then the higher die (`higherDieRule`). No legal move gives one pass
+  turn (`moves: []`). On a finished game it throws `ILLEGAL_TURN`.
+- **One play per end position.** Plays that end in the same position are
+  listed once. We keep the first one the search finds: higher die first,
+  then the bar, then own points from 24 down to 1. For a double the moves
+  are listed from the back checker to the front.
+- `applyTurn`: plays the moves one by one and checks each one (die left,
+  origin, landing point, hit mark). A turn that uses every die is then legal.
+  A shorter turn is checked against the full search (most dice, higher die,
+  end position). So any legal order of the moves is accepted, not only the
+  listed one. Bad turns throw `ILLEGAL_TURN`.
+- `result`: the winner bore off 15. Mono = 1 if the loser bore off at least
+  one checker, else diplo = 2. A "backgammon" (loser also on the bar or in
+  the winner's home) is 2, or 3 with `backgammonScores3`. Match scoring is
+  #24.
+
+Flags Portes reads: `movement.higherDieRule`, `capture.noHitAndRunInHome`
+(a checker that hits in its own home, points 1–6, may not move again this
+turn; the meaning is the proposal in `portes.md`), and
+`scoring.backgammonScores3`. `match.*` is for the match and turn flow
+(#24, #25). `scoring.doublingCube: true` throws `NOT_SUPPORTED`. Every other
+flag must keep the `portes` preset value, or the variant throws
+`RULES_CONFLICT` with the path of the flag.
+
+### How the search stays fast
+
+- It works on a private array (`position.ts`), not on `BoardState`, always
+  from the mover's side.
+- It remembers (position, dice left) pairs it has seen, so a double never
+  searches the same middle position twice. Keys are Zobrist hashes kept up
+  to date in the array (`PositionMap`); equal hashes are checked by
+  comparing the arrays, so the map is exact.
+- For a double, each move starts on the same point as the move before it,
+  or a lower one. Every legal play can be put in this order with the same
+  end position, so nothing is lost, and 4! orders become one.
+- Numbers on the dev container (Node 22): median 0.013 ms per position, the
+  worst of 2,000 random positions about 1 ms; 15 checkers on 15 points with
+  4-4 (1,882 plays) about 3.5 ms. `portes-perf.test.ts` checks median < 5 ms
+  and worst < 50 ms.
+- Plain arrays of small integers: V8 copies `array.slice()` far faster than
+  a typed array. That alone made the search 3 times faster.
+
+### Tests
+
+- `portes.test.ts`: one test per numbered edge case in `portes.md` and the
+  movement, dice and bear-off cases (#9–#17) in `tavli-match.md`, named like
+  `portes.md #7: ...`. Also flags, rules errors and `applyTurn` errors.
+- `portes-reference.test.ts`: a slow, simple generator (every order, no
+  pruning) must find the same end positions in random positions.
+- `portes-fuzz.test.ts`: 2,000 random games to the end, with checks after
+  every turn. It uses plain `if` checks, not `expect`, in the hot loop:
+  `expect` is far too slow for millions of calls.
+- Test helpers (not exported): `src/testing/position-notation.ts` reads and
+  writes positions like `w: 24x2 13x5 8x3 6x5 ; b: 6x15` (own numbering per
+  side; a missing `off` means "the rest are off") and turns like `13/8* 8/5`
+  or `4/0:6`. `src/testing/random-positions.ts` makes random positions.
 
 ## Not here yet
 
-- Portes move generation (#23), scoring (#24) and the turn state machine
-  with the opening roll and Asodio roll chains (#25). They will read their
-  flags from `state.rules`. Today no code acts on the flags yet.
+- Match scoring (#24) and the turn state machine with the opening roll and
+  Asodio roll chains (#25). They will read their flags from `state.rules`.
+- Plakoto, Fevga and Asodio variants.
 
 ## Commands
 
