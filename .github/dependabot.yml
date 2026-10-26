@@ -1,0 +1,108 @@
+# Dependabot: weekly dependency update PRs.
+# Each PR runs CI and uses Actions minutes, so we group updates into a few PRs.
+version: 2
+
+updates:
+  # npm packages for the whole pnpm workspace (root pnpm-lock.yaml).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Athens
+    # Wait a week after a release before proposing it.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - area:infra
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    groups:
+      # Expo SDK packages and the React / React Native versions they pin.
+      # Only patch updates come through here (see `ignore` below).
+      expo:
+        patterns:
+          - expo
+          - expo-*
+          - '@expo/*'
+          - eslint-config-expo
+          - jest-expo
+          - react
+          - react-dom
+          - react-native
+          - react-native-*
+          - '@react-native/*'
+          - '@types/react'
+      # Lint, format, type and test tools.
+      dev-tooling:
+        patterns:
+          - eslint
+          - eslint-*
+          - '@eslint/*'
+          - typescript
+          - typescript-eslint
+          - '@typescript-eslint/*'
+          - prettier
+          - vitest
+          - '@vitest/*'
+          - globals
+          - '@types/*'
+    ignore:
+      # Upgrade the Expo SDK by hand, all at once:
+      #   cd apps/mobile && npx expo install expo@^<sdk> --fix
+      # `expo install --fix` picks the React, React Native and native library
+      # versions that match the SDK. Dependabot does not know these pairings,
+      # so it must not propose SDK bumps.
+      - dependency-name: expo
+        update-types: [version-update:semver-major]
+      - dependency-name: expo-*
+        update-types: [version-update:semver-major]
+      - dependency-name: '@expo/*'
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint-config-expo
+        update-types: [version-update:semver-major]
+      - dependency-name: jest-expo
+        update-types: [version-update:semver-major]
+      # React Native is 0.x, so a "minor" bump is a breaking release. Expo pins
+      # React, React Native and native libraries per SDK. Block minor and major.
+      - dependency-name: react
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: '@types/react'
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: react-native
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: react-native-*
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: '@react-native/*'
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      # ESLint stays on 9.x: eslint-config-expo uses a plugin that crashes on
+      # ESLint 10. See the tooling notes in CLAUDE.md.
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+      - dependency-name: '@eslint/js'
+        update-types: [version-update:semver-major]
+
+  # Versions of the GitHub Actions used in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Athens
+    cooldown:
+      default-days: 7
+    labels:
+      - area:infra
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - '*'

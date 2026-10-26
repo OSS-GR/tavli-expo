@@ -60,6 +60,40 @@ Acceptance criteria
 - Commit style: **Conventional Commits** (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `refactor:`).
 - `main` is protected: merge only through PRs with green CI.
 
+## CI
+
+The workflow is `.github/workflows/ci.yml`. It has one job, called **`checks`**.
+
+**When it runs:** on every pull request (any base branch) and on every push to `main`.
+
+**What it runs**, in this order:
+
+1. `pnpm install --frozen-lockfile`
+2. `pnpm lint`
+3. `pnpm typecheck`
+4. `pnpm test`
+5. `pnpm format:check`
+
+Node comes from `.nvmrc`. pnpm comes from `packageManager` in `package.json`. The pnpm store is cached between runs.
+
+Run the same commands on your machine before you push. If they pass locally, they should pass in CI.
+
+**Docs-only changes:** if a PR only changes files in `docs/` or Markdown in `.github/`, the first step skips the rest and the job passes. Other Markdown files (like `README.md` and `CLAUDE.md`) still run all checks, because Prettier checks them. We do not use `paths-ignore`: it would skip the workflow, so a required check would never report and the PR would wait forever.
+
+**Saving minutes:** the repo is private, so we get 2,000 free Actions minutes a month. To keep runs cheap, CI uses one job, caches the pnpm store, stops after 15 minutes, and cancels an older run when you push again to the same PR.
+
+**Dependency updates:** Dependabot (`.github/dependabot.yml`) opens grouped PRs every Monday: one for Expo packages, one for dev tooling, one for GitHub Actions. It does not propose Expo SDK, React or React Native upgrades. Do those by hand in `apps/mobile`: run `npx expo install expo@^<sdk> --fix` (for example `expo@^59.0.0`). Expo then picks the React, React Native and native library versions that match the SDK.
+
+### Require the check on `main` (owner, one time)
+
+The check only shows in the list after CI has run once. Open any PR first.
+
+1. Repo → **Settings** → **Rules** → **Rulesets** → open the ruleset for `main` (or create one that targets the default branch).
+2. Turn on **Require status checks to pass**.
+3. Click **Add checks**, type `checks`, and pick the one from **GitHub Actions**.
+4. Optional: turn on **Require branches to be up to date before merging**.
+5. Click **Save changes**.
+
 ## One-time setup the owner does by hand
 
 The GitHub API we use cannot create Projects for a personal account. Do this once:

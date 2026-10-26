@@ -42,6 +42,7 @@ The owner's first idea was "Tavlaki: Greek Kafeneio Backgammon" (34 characters).
 ## Non-goals (for now)
 
 - **Real-money play** or gambling features.
+- **Ads.** Never. If we earn money, it is a one-time purchase or cosmetic extras (like themes) that do not change gameplay.
 - **Web version** (possible later; Expo makes it cheap to add).
 - **Doubling cube** in Portes (Greek play does not use it; we may add it as an option later).
 

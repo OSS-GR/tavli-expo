@@ -6,16 +6,7 @@
 
 | # | Question | Why it matters | Affects |
 |---|----------|----------------|---------|
-| Q1 | What monthly budget is OK before we have users? (Suggested: $0–25/month, plus Apple $99/year and Google $25 once.) | Picks the backend tier and EAS plan | Backend ADR |
-| Q3 | Online play: **live only** (both players in the app), or also **async** (play a move, close the app, get a push when it is your turn)? Recommended: both, live first. | Changes backend design and push needs | MVP2 |
-| Q7 | Money: free forever, ads, one-time "pro" purchase, or paid themes? | Store setup, privacy labels, ads SDK | v1.0 |
-| Q10 | How do friends find each other: username, invite link, QR code, phone contacts? Recommended: invite link + username for MVP2. | Friends feature scope | MVP2 |
-| Q11 | Can people play as a **guest** with no account? Recommended: yes for bot and pass-and-play; account needed for online. | Auth design | MVP2 |
-| Q12 | How many hours per week can you give? | Sets realistic dates for milestones | Roadmap |
-| Q15 | Turn **timer** lengths for live and async games, and what happens on timeout (lose the game, or auto-move)? | Server timer design | MVP2 |
 | Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
-| Q17 | **Provably fair dice** (commit-reveal, so players can check the server did not cheat) in MVP2, or later? Recommended: later. | Backend scope | MVP2 |
-| Q18 | Google Play account: **personal** or **organization**? A personal account must run a 14-day closed test with **12 testers on Android phones** before public release. An organization account needs a D-U-N-S number. The owner has no Android phone (emulator is fine for development). | Launch timeline | MVP1 / v1.0 |
 
 ## Answered
 
@@ -35,4 +26,15 @@
 | Q14 | Owner bought **`tavlaki.com`**. Bundle ID follows it: `com.tavlaki`. | `docs/vision.md` → Name |
 | Q8 | **Greek + English** from day one. | #37 (i18n setup) |
 | Q9 | Repo stays **private**. Note: private repos get 2,000 free GitHub Actions minutes per month; CI must stay lean. | ADR-0006, `docs/process/github-workflow.md` |
+| Design (#64) | **Both wooden themes.** First theme: **walnut kafeneio** (Concept B) with **ivory and black** checkers. Second theme: olive inlay (Concept A) in v1.0. | #38, #53 |
+| Wireframes (#63) | Accepted all defaults: board turned 90°; face-to-face mode after MVP1; resign gives mono or diplo by board state, plus "Resign match"; opening roll one tap vs bot, one tap per player in pass-and-play; auto-confirm off; pip counts on (can hide). | `docs/design/wireframes.md` |
+| Accounts | **All paid accounts move to the end (v1.0 launch).** Apple Developer and Google Play are opened just before store release. Until then: simulators on the Mac, the owner's iPhone via a free Apple ID in Xcode, and Android test builds (APK) installed directly. Note: friends on iPhones can only test once the Apple account exists. Google Play needs a 14-day closed test with 12 testers before release; the owner accepts that it adds time at the end. | #3, #41, #54 |
+| Q1 | **Budget:** use free plans only until launch. The PM asks the owner before adding anything paid. | ADR-0004 |
+| Q12 | **No time estimates.** Agents work as fast as they can; the roadmap has milestones, not dates. | `docs/roadmap.md` |
+| Q3 | Online: **both live and slow (async) games**. | #46 |
+| Q10 | Friends find each other by **invite link and username**. | #45 |
+| Q11 | **Guest play** for bot and pass-and-play; an **account is needed for online**. | #44 |
+| Q15 | Timers: **live 1 minute per turn, async 24 hours; time runs out = you lose that game.** | #46 |
+| Q17 | **Verifiable dice: later.** | Later |
+| Q7 | **Free at launch. No ads, ever.** If we earn money later: one-time purchase or cosmetic extras (e.g. themes) that never change gameplay. To discuss before v1.0. | `docs/vision.md`, #54 |
 | New | Players can make their **own house-rule variants** ("kafeneio mode"). | Backlog epic (Later) + engine rules-as-data task (MVP1) |
