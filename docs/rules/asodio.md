@@ -64,6 +64,8 @@ Core idea: all 15 checkers move as **one army, quarter by quarter**, and you
 
 ## Summary (research on other versions)
 
+> **Note:** the "default" values named in the sections below describe the **Acey-Deucey** research versions, not the app. The app default is the owner's `kafeneio` preset. When a value below and the flags table disagree, the **flags table wins** (for example `mustEnterAllFirst=true` and `doublesGiveExtraRoll=false` for `kafeneio`).
+
 Asodio is the Greek name of **Acey-Deucey**. "Άσσος-δύο" = the roll 1-2.
 All checkers start off the board and are entered into the opponent's home,
 then race around like Portes, with hitting. Rolling 1-2 is the best roll:
