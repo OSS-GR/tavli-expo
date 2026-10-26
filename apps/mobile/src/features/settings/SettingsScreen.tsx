@@ -1,0 +1,175 @@
+import { THEME_IDS } from '@tavli/ui';
+import Constants from 'expo-constants';
+import { useLocales } from 'expo-localization';
+import { useTranslation } from 'react-i18next';
+import { ScrollView, Text } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
+
+import { OptionList, type ListOption } from '@/components/settings/OptionList';
+import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
+import { SettingsSection } from '@/components/settings/SettingsSection';
+import { ToggleRow } from '@/components/settings/ToggleRow';
+import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
+
+import type { BoardFlipMode } from './settings';
+import { useSettings } from './store';
+
+/** Pass-and-play board views. Face-to-face is shown but locked until it ships. */
+type BoardViewOption = BoardFlipMode | 'faceToFace';
+
+/**
+ * Settings (wireframe 10, issue #37). Every change saves at once.
+ * Layout follows `docs/design/wireframes.md`; the privacy section comes with #61.
+ */
+export function SettingsScreen() {
+  const { t } = useTranslation();
+  const locales = useLocales();
+
+  const sound = useSettings((s) => s.sound);
+  const haptics = useSettings((s) => s.haptics);
+  const language = useSettings((s) => s.language);
+  const autoConfirmMoves = useSettings((s) => s.autoConfirmMoves);
+  const showPipCounts = useSettings((s) => s.showPipCounts);
+  const boardFlipMode = useSettings((s) => s.boardFlipMode);
+  const theme = useSettings((s) => s.theme);
+  const setSetting = useSettings((s) => s.setSetting);
+
+  const phoneLanguage = pickDeviceLanguage(locales.map((locale) => locale.languageCode));
+
+  const boardViewOptions: SegmentOption<BoardViewOption>[] = [
+    { value: 'flip', label: t('settings.boardView.flip') },
+    {
+      value: 'faceToFace',
+      label: t('settings.boardView.faceToFace'),
+      disabled: true,
+      accessibilityHint: t('common.comingSoon'),
+    },
+    { value: 'fixed', label: t('settings.boardView.fixed') },
+  ];
+
+  const languageOptions: ListOption<LanguagePreference>[] = [
+    {
+      value: 'system',
+      label: t('settings.language.system'),
+      hint: t('settings.language.systemHint', { language: t(`languages.${phoneLanguage}`) }),
+    },
+    { value: 'el', label: t('languages.el') },
+    { value: 'en', label: t('languages.en') },
+  ];
+
+  const themeOptions = THEME_IDS.map((id) => ({ value: id, label: t(`themes.${id}`) }));
+
+  const version = Constants.expoConfig?.version ?? '';
+
+  return (
+    <ScrollView
+      testID="settings-screen"
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic">
+      <SettingsSection title={t('settings.sections.game')}>
+        <ToggleRow
+          testID="settings-auto-confirm"
+          label={t('settings.autoConfirm.label')}
+          hint={t('settings.autoConfirm.hint')}
+          value={autoConfirmMoves}
+          onValueChange={(value) => setSetting('autoConfirmMoves', value)}
+        />
+        <ToggleRow
+          testID="settings-pip-counts"
+          label={t('settings.pipCounts.label')}
+          hint={t('settings.pipCounts.hint')}
+          value={showPipCounts}
+          onValueChange={(value) => setSetting('showPipCounts', value)}
+        />
+        <Text style={styles.label}>{t('settings.boardView.label')}</Text>
+        <SegmentedControl
+          testID="settings-board-view"
+          label={t('settings.boardView.label')}
+          options={boardViewOptions}
+          value={boardFlipMode}
+          onChange={(value) => {
+            if (value !== 'faceToFace') {
+              setSetting('boardFlipMode', value);
+            }
+          }}
+        />
+        <Text style={styles.hint}>
+          {boardFlipMode === 'flip'
+            ? t('settings.boardView.flipHint')
+            : t('settings.boardView.fixedHint')}
+        </Text>
+        <Text style={styles.hint}>{t('settings.boardView.faceToFaceSoon')}</Text>
+      </SettingsSection>
+
+      <SettingsSection title={t('settings.sections.soundAndFeel')}>
+        <ToggleRow
+          testID="settings-sound"
+          label={t('settings.sound.label')}
+          hint={t('settings.sound.hint')}
+          value={sound}
+          onValueChange={(value) => setSetting('sound', value)}
+        />
+        <ToggleRow
+          testID="settings-haptics"
+          label={t('settings.haptics.label')}
+          hint={t('settings.haptics.hint')}
+          value={haptics}
+          onValueChange={(value) => setSetting('haptics', value)}
+        />
+      </SettingsSection>
+
+      <SettingsSection title={t('settings.sections.language')}>
+        <OptionList
+          testID="settings-language"
+          label={t('settings.sections.language')}
+          options={languageOptions}
+          value={language}
+          onChange={(value) => setSetting('language', value)}
+        />
+      </SettingsSection>
+
+      <SettingsSection title={t('settings.sections.look')}>
+        <Text style={styles.label}>{t('settings.theme.label')}</Text>
+        <OptionList
+          testID="settings-theme"
+          label={t('settings.theme.label')}
+          options={themeOptions}
+          value={theme}
+          onChange={(value) => setSetting('theme', value)}
+        />
+        <Text style={styles.hint}>{t('settings.theme.hint')}</Text>
+      </SettingsSection>
+
+      <Text style={styles.footer}>{t('settings.version', { version })}</Text>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create((theme, rt) => ({
+  screen: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  content: {
+    paddingHorizontal: theme.space.xl,
+    paddingBottom: rt.insets.bottom + theme.space.xxl,
+  },
+  label: {
+    ...theme.type.body,
+    color: theme.colors.text,
+    paddingTop: theme.space.md,
+    paddingBottom: theme.space.xs,
+  },
+  hint: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
+    paddingTop: theme.space.xs,
+  },
+  footer: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
+    textAlign: 'center',
+    paddingTop: theme.space.xxl,
+  },
+}));
