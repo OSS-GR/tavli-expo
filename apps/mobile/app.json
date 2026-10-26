@@ -5,20 +5,24 @@
     "version": "1.0.0",
     "platforms": ["ios", "android"],
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icon/icon.png",
+    "backgroundColor": "#3B2A1D",
     "scheme": "tavlaki",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.tavlaki",
-      "icon": "./assets/expo.icon"
+      "icon": {
+        "light": "./assets/icon/icon.png",
+        "dark": "./assets/icon/icon-ios-dark.png",
+        "tinted": "./assets/icon/icon-ios-tinted.png"
+      }
     },
     "android": {
       "package": "com.tavlaki",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/icon/android-foreground.png",
+        "backgroundImage": "./assets/icon/android-background.png",
+        "monochromeImage": "./assets/icon/android-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -27,9 +31,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#3B2A1D",
+          "image": "./assets/icon/splash.png",
+          "imageWidth": 240,
+          "dark": {
+            "backgroundColor": "#120C07",
+            "image": "./assets/icon/splash-dark.png"
+          }
         }
       ],
       [
