@@ -257,11 +257,18 @@ importers:
 
   packages/bot:
     dependencies:
+      '@tavli/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@tavli/engine':
         specifier: workspace:*
         version: link:../engine
 
-  packages/contracts: {}
+  packages/contracts:
+    dependencies:
+      '@tavli/engine':
+        specifier: workspace:*
+        version: link:../engine
 
   packages/engine: {}
 
