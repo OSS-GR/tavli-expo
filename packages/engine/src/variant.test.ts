@@ -6,6 +6,7 @@ import { EngineError } from './errors';
 import { formatTurn } from './move';
 import type { Turn } from './move';
 import { PLAYERS } from './player';
+import { getPreset, resolveRules } from './presets';
 import { createSeededRng } from './rng';
 import { parseGameState, serializeGameState } from './serialize';
 import type { GameState } from './state';
@@ -58,20 +59,34 @@ describe('Variant interface with the stub race variant', () => {
     expect(playGame(raceVariant, 7)).toEqual(playGame(raceVariant, 7));
   });
 
-  it('initialState starts before the first roll', () => {
-    const state = raceVariant.initialState({
-      startingPlayer: 'black',
-      rules: { id: 'x', version: 2 },
-    });
+  it('initialState starts before the first roll and embeds the full rules', () => {
+    const rules = resolveRules('portes', { match: { targetPoints: 5 } });
+    const state = raceVariant.initialState({ startingPlayer: 'black', rules });
     expect(state).toMatchObject({
       toMove: 'black',
       dice: null,
       turnNumber: 1,
-      rules: { id: 'x', version: 2 },
       variant: 'test-race',
     });
+    expect(state.rules).toEqual(rules);
+    expect(state.rules.match.targetPoints).toBe(5);
     expect(raceVariant.isGameOver(state)).toBe(false);
     expect(raceVariant.result(state)).toBeNull();
+  });
+
+  it('initialState uses the default preset when no rules are given', () => {
+    const state = raceVariant.initialState({ startingPlayer: 'white' });
+    expect(state.rules).toEqual(getPreset('portes'));
+  });
+
+  it('initialState rejects rules the variant cannot play', () => {
+    expect(() =>
+      raceVariant.initialState({ startingPlayer: 'white', rules: getPreset('fevga') }),
+    ).toThrow(expect.objectContaining({ code: 'RULES_CONFLICT' }));
+    const broken = { ...getPreset('portes'), version: 0 };
+    expect(() => raceVariant.initialState({ startingPlayer: 'white', rules: broken })).toThrow(
+      expect.objectContaining({ code: 'INVALID_RULES' }),
+    );
   });
 
   it('applyTurn does not change its input and passes the turn', () => {

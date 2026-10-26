@@ -9,6 +9,7 @@
 import { createBoard } from '../board';
 import type { BoardState, SideLayout } from '../board';
 import type { Direction } from '../numbering';
+import { getPreset } from '../presets';
 import { GAME_STATE_SCHEMA_VERSION } from '../state';
 import type { GameState } from '../state';
 
@@ -36,7 +37,7 @@ export function makeState(overrides: Partial<GameState> = {}): GameState {
   return {
     schemaVersion: GAME_STATE_SCHEMA_VERSION,
     variant: 'portes',
-    rules: { id: 'portes', version: 1 },
+    rules: getPreset('portes'),
     board: startBoard('portes'),
     toMove: 'white',
     dice: null,

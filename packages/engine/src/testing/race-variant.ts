@@ -19,6 +19,8 @@ import type { Move, Turn } from '../move';
 import { absoluteToOwn, ownToAbsolute } from '../numbering';
 import { PLAYERS, opponent } from '../player';
 import type { PlayerId } from '../player';
+import { getPreset } from '../presets';
+import { validateRules } from '../rules-validate';
 import { GAME_STATE_SCHEMA_VERSION } from '../state';
 import type { GameState } from '../state';
 import type { GameResult, Variant } from '../variant';
@@ -87,11 +89,19 @@ export const raceVariant: Variant = {
   id: 'test-race',
   direction: DIRECTION,
 
-  initialState({ startingPlayer, rules = { id: 'test-race', version: 1 } }) {
+  initialState({ startingPlayer, rules = getPreset('portes') }) {
+    const checked = validateRules(rules);
+    if (checked.movement.direction !== DIRECTION) {
+      throw new EngineError(
+        'RULES_CONFLICT',
+        `test-race needs direction "${DIRECTION}"`,
+        'rules.movement.direction',
+      );
+    }
     return {
       schemaVersion: GAME_STATE_SCHEMA_VERSION,
       variant: 'test-race',
-      rules,
+      rules: checked,
       board: createBoard({ white: { points: { 6: 15 } }, black: { points: { 6: 15 } } }, DIRECTION),
       toMove: startingPlayer,
       dice: null,
