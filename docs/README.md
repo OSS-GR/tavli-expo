@@ -36,6 +36,7 @@
 |-----|-------|
 | [Art pipeline](design/art-pipeline.md) | Rendering choice, Blender, textures, themes, learning path |
 | [Board style concepts](design/style/README.md) | Two wooden concepts, palettes, mood board |
+| [Themes package](../packages/themes/README.md) | How a board theme is built (manifest, layouts, assets) and how to add one |
 | [Wireframes](design/wireframes.md) | MVP1 screens, user flow, portrait board layout |
 
 ## Decisions (ADRs)
