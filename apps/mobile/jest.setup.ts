@@ -19,3 +19,7 @@ jest.mock('expo-localization', () => {
     useLocales: () => locales,
   };
 });
+
+// Skia draws with native code. The mock turns every Skia component into a
+// plain element, so tests can count what the board draws.
+jest.mock('@shopify/react-native-skia', () => jest.requireActual('./test/skiaMock'));
