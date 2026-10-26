@@ -142,7 +142,7 @@ left→right). Black moves clockwise.
 
 | Flag | Values | Default | Notes |
 |---|---|---|---|
-| `backgammonScores3` | bool | `false` | `true` follows international rules. Zizanio.gr scores backgammon as 3. ΕΟΠΤ, bkgm.com, Greek Wikipedia, Condos, sfakia-crete: counts as 2. |
+| `backgammonScores3` | bool | `false` (owner confirmed 2026-10-26: only **mono** = 1 and **diplo** = 2) | `true` follows international rules. Zizanio.gr scores backgammon as 3. ΕΟΠΤ, bkgm.com, Greek Wikipedia, Condos, sfakia-crete: counts as 2. |
 | `doublingCube` | bool | `false` | Greek Portes uses no cube. Backgammon with cube is called "Βίδος/Vidos" in Greece. Only for an optional "international" mode. |
 | `noHitAndRunInHome` | bool | `false` | English Wikipedia ("Portes (game)") says hit-and-run in the home board is not allowed. No other source confirms it, and the exact meaning is unclear. Proposed meaning if enabled: a checker that hits an opponent checker inside the mover's own home (points 1–6) may not move again in the same turn. Treat as unverified. |
 | `openingRoll` | see `tavli-match.md` | `useOpeningDice` | |

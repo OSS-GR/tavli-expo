@@ -52,6 +52,13 @@ See each game file.
   directions.
 - Fevga: parallel. Both players move counterclockwise.
 
+## Score names
+
+- **Mono (μονό)** = single win = 1 point.
+- **Diplo (διπλό)** = mars / double win = 2 points.
+- There is no 3-point win in our default rules (owner, 2026-10-26).
+- The UI shows these Greek names (English: single / double).
+
 ## Turn & dice rules (shared)
 
 ### Who starts the first game (opening roll)
