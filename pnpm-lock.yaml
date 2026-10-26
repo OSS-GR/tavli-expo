@@ -205,6 +205,9 @@ importers:
       '@tavli/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@tavli/haptics-expo':
+        specifier: workspace:*
+        version: link:../../packages/adapters/haptics-expo
       '@tavli/storage-mmkv':
         specifier: workspace:*
         version: link:../../packages/adapters/storage-mmkv
@@ -311,6 +314,16 @@ importers:
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
+
+  packages/adapters/haptics-expo:
+    dependencies:
+      '@tavli/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+    devDependencies:
+      expo-haptics:
+        specifier: ~58.0.7
+        version: 58.0.7(expo@58.0.19)
 
   packages/adapters/storage-mmkv:
     dependencies:

@@ -16,8 +16,24 @@
 | `themeImages.ts` | The Metro `require` map for theme images (Metro only bundles literal requires). |
 | `StaticBoard.tsx` | A board that only shows a position. |
 | `positions.ts` | Fixed positions (start, mid-game, bear-off) for the dev screen, tests and screenshots. |
+| `diceMotion.ts` | The roll animation as pure math (worklets): tumble pose and face flips. |
+| `skia/DieShape.tsx`, `skia/AnimatedDie.tsx` | A die from the theme `DiceStyle`; the animated version tumbles and lands on the engine's value. |
+| `DiceRow.tsx` | The dice in the controls row: 2 side by side, or 4 in a 2 x 2 grid for a double. Used dice fade. |
 
-Dev route: `app/dev/board.tsx` shows the fixed positions and both views. Release builds redirect it to Home.
+The game itself lives in `apps/mobile/src/features/game/`:
+
+| File | What it does |
+|------|--------------|
+| `gameStore.ts` | A Zustand store around the engine `MatchFlow` reducer, with the injected `Rng`. `turnView(flow)` computes what the screen shows (board mid-turn, legal moves, dice, pips). |
+| `opening.ts`, `OpeningCard.tsx` | The opening roll card: one die per player, tie, result. |
+| `GameScreen.tsx` | The board screen: board, opening card and controls row. |
+
+Dev routes (release builds redirect them to Home):
+
+- `app/dev/board.tsx`: the fixed positions, from White's and from Black's side.
+- `app/dev/play.tsx`: a pass-and-play Portes match to 3 (temporary, until `app/game/[id]` exists).
+
+**Game flow and ADR-0003.** The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. ADR-0003 records this (updated in #29).
 
 ## Drawing
 
@@ -28,6 +44,13 @@ Dev route: `app/dev/board.tsx` shows the fixed positions and both views. Release
 - **Bar checkers shrink to fit the bar.** In Walnut Kafeneio the bar is 34 pt and a checker 40 pt, so bar checkers get a radius of 94% of half the bar height.
 - Checker colors stay with the player: White uses the theme's `light` style, Black the `dark` style.
 
+## Dice
+
+- The UI never picks dice. Every roll is an engine action (`roll`, `rollOpening`); the flow rolls with the `Rng` from `services.ts` (`createLocalRng`).
+- The animation (`diceMotion.ts`) is a 2D tumble on the UI thread: the die spins, hops and grows, and its face flips through the other numbers in a fixed order. From 78% of the roll on, it shows the engine's value.
+- **Opening roll:** a card with one die per player. In pass-and-play each player taps for their own die (`openingTaps="perPlayer"`); vs bot one tap rolls both (`"one"`). A tie says so and both roll again. The result stays 1.5 s; the starter then plays both opening dice.
+- A haptic plays when the last die lands: the theme's `haptics.diceLand` pattern through the `Feedback` port (`@tavli/contracts`, adapter `@tavli/haptics-expo`). `features/feedback/feedback.ts` skips it when Settings → Haptics is off.
+
 ## Board flip
 
 The theme numbers points from the view of the player at the bottom (the **viewer**). The engine numbers points in White's order. `boardModel.ts` maps each absolute point to the viewer's own number (`absoluteToOwn`). So the viewer always moves 24 → 1, with home at the bottom left. Turning the board to the other player is only a change of viewer: a left–right mirror, as the wireframes ask.
@@ -35,6 +58,8 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 ## Tests
 
 - `geometry.test.ts` and `boardModel.test.ts`: the layout math (point → rect, stacks, badge, bar, trays, hit-testing) and the engine → slot mapping.
+- `dice.test.ts`, `gameStore.test.ts`, `GameScreen.test.tsx`: the roll animation math, the dice layout, the store over the engine flow, and the dice and opening card on screen.
+- Jest fakes Reanimated with `apps/mobile/test/reanimatedMock.ts`: animations end at once and call their end callback.
 - `BoardScene.test.tsx`: a render smoke test. Jest replaces Skia with `apps/mobile/test/skiaMock.tsx`: every Skia component becomes a plain element, so the test counts what the board would draw.
 
 ## Screenshots

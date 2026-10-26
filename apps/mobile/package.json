@@ -15,6 +15,7 @@
     "@shopify/react-native-skia": "2.14.0",
     "@tavli/contracts": "workspace:*",
     "@tavli/engine": "workspace:*",
+    "@tavli/haptics-expo": "workspace:*",
     "@tavli/storage-mmkv": "workspace:*",
     "@tavli/themes": "workspace:*",
     "@tavli/ui": "workspace:*",

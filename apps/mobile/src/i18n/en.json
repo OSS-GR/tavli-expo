@@ -69,6 +69,32 @@
       "viewer": "Board view",
       "viewWhite": "White at the bottom",
       "viewBlack": "Black at the bottom"
+    },
+    "play": {
+      "title": "Pass-and-play (dev)"
+    }
+  },
+  "game": {
+    "players": {
+      "white": "Player 1",
+      "black": "Player 2"
+    },
+    "opening": {
+      "title": "Who starts?",
+      "body": "Each player rolls one die. The higher die starts and plays both.",
+      "tie": "Tie! Both rolled {{value}}. Roll again.",
+      "result": "{{name}} starts with {{high}}-{{low}}.",
+      "notRolled": "Not rolled yet",
+      "rolled": "Rolled {{value}}"
+    },
+    "roll": {
+      "opening": "Roll to start",
+      "openingFor": "{{name}}: roll",
+      "dice": "Roll dice",
+      "orTapBoard": "or tap the board"
+    },
+    "dice": {
+      "label": "Dice {{values}}, {{left}} left to play"
     }
   }
 }
