@@ -1,0 +1,192 @@
+/**
+ * The presets must match the "House-rule variants (flags)" tables in
+ * `docs/rules/`. This test reads the tables from the docs themselves, so it
+ * fails when someone changes a default in a doc but not in `presets.ts` (or
+ * the other way round), or adds a flag to a doc that `RuleSet` does not have.
+ */
+
+import { describe, expect, it } from 'vitest';
+
+import asodioDoc from '../../../docs/rules/asodio.md?raw';
+import fevgaDoc from '../../../docs/rules/fevga.md?raw';
+import plakotoDoc from '../../../docs/rules/plakoto.md?raw';
+import portesDoc from '../../../docs/rules/portes.md?raw';
+import matchDoc from '../../../docs/rules/tavli-match.md?raw';
+import { getPreset } from './presets';
+import { PRESET_IDS, RULE_GROUPS, RULE_SCHEMA } from './rules';
+import type { PresetId, RuleSet } from './rules';
+
+type DocValue = string | number | boolean | readonly string[];
+
+/** The text under a heading, up to the next heading of any level. */
+function section(doc: string, heading: string): string {
+  const start = doc.indexOf(`${heading}\n`);
+  if (start < 0) throw new Error(`no section "${heading}"`);
+  const rest = doc.slice(start + heading.length + 1);
+  const end = rest.search(/^#{1,6} /m);
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+/** The table rows of a section, as trimmed cells. Skips the header and `|---|` lines. */
+function tableRows(text: string): string[][] {
+  return text
+    .split('\n')
+    .filter((line) => line.startsWith('| `'))
+    .map((line) =>
+      line
+        .split('|')
+        .slice(1, -1)
+        .map((cell) => cell.trim()),
+    );
+}
+
+/** Reads a default cell: the first `code` or **bold** token, as a JSON-like value. */
+function docValue(cell: string): DocValue {
+  if (cell.startsWith('P→Pl→F')) return ['portes', 'plakoto', 'fevga'];
+  const match = /`([^`]+)`|\*\*([^*]+)\*\*/.exec(cell);
+  const token = (match?.[1] ?? match?.[2] ?? cell).replace(/^"|"$/g, '');
+  if (token === 'true') return true;
+  if (token === 'false') return false;
+  if (/^\d+$/.test(token)) return Number(token);
+  return token;
+}
+
+/** Doc flag name → `group.field` in a RuleSet. */
+function fieldOf(flag: string): string | null {
+  if (flag === 'scoring') return 'scoring.method';
+  for (const group of RULE_GROUPS) {
+    if (Object.hasOwn(RULE_SCHEMA[group], flag)) return `${group}.${flag}`;
+  }
+  return null;
+}
+
+function valueAt(rules: RuleSet, path: string): unknown {
+  const [group, key] = path.split('.') as [keyof RuleSet, string];
+  return (rules[group] as unknown as Record<string, unknown>)[key];
+}
+
+/** The flag table of a doc: flag → default value. */
+function flagDefaults(doc: string): Map<string, DocValue> {
+  const rows = tableRows(section(doc, '## House-rule variants (flags)'));
+  return new Map(
+    rows.map(([flag = '', , defaultCell = '']) => [flag.replace(/`/g, ''), docValue(defaultCell)]),
+  );
+}
+
+const ALL: readonly PresetId[] = PRESET_IDS;
+const STANDARD_ROTATION: readonly PresetId[] = ['portes', 'plakoto', 'plakoto.federation', 'fevga'];
+
+/** Which presets must follow each doc's table, and the exceptions. */
+const DOCS: readonly {
+  name: string;
+  doc: string;
+  presets: readonly PresetId[];
+  /** Flags a preset sets on purpose to another value. */
+  except?: Partial<Record<PresetId, readonly string[]>>;
+}[] = [
+  {
+    name: 'tavli-match.md',
+    doc: matchDoc,
+    presets: ALL,
+    // asodio.md: Asodio is not in the standard rotation; it is played alone.
+    except: {
+      'asodio.kafeneio': ['rotation'],
+      'asodio.aceyDeuceyGreek': ['rotation'],
+      'asodio.aceyDeuceyAmerican': ['rotation'],
+    },
+  },
+  { name: 'portes.md', doc: portesDoc, presets: ['portes'] },
+  {
+    name: 'plakoto.md',
+    doc: plakotoDoc,
+    presets: ['plakoto', 'plakoto.federation'],
+    except: { 'plakoto.federation': ['motherRule'] },
+  },
+  { name: 'fevga.md', doc: fevgaDoc, presets: ['fevga'] },
+  { name: 'asodio.md', doc: asodioDoc, presets: ['asodio.kafeneio'] },
+];
+
+describe('presets match the flag tables in docs/rules', () => {
+  for (const { name, doc, presets, except = {} } of DOCS) {
+    const defaults = flagDefaults(doc);
+
+    it(`${name}: the table has flags`, () => {
+      expect(defaults.size).toBeGreaterThan(3);
+    });
+
+    it(`${name}: every flag has a RuleSet field`, () => {
+      const missing = [...defaults.keys()].filter((flag) => fieldOf(flag) === null);
+      expect(missing).toEqual([]);
+    });
+
+    for (const presetId of presets) {
+      it(`${name}: ${presetId} uses the table defaults`, () => {
+        const rules = getPreset(presetId);
+        const skip = except[presetId] ?? [];
+        for (const [flag, value] of defaults) {
+          const path = fieldOf(flag);
+          if (path === null || skip.includes(flag)) continue;
+          expect({ flag, value: valueAt(rules, path) }).toEqual({ flag, value });
+        }
+      });
+    }
+  }
+
+  it('tavli-match.md: rematchStarter default (in the text, not the table)', () => {
+    const match = /`rematchStarter: [^`]*`,\s*default `"(\w+)"`/.exec(matchDoc);
+    expect(match?.[1]).toBe('lastGameWinner');
+    for (const id of ALL) expect(getPreset(id).match.rematchStarter).toBe(match?.[1]);
+  });
+
+  it('the Asodio presets play alone; the others use the standard rotation', () => {
+    for (const id of STANDARD_ROTATION) {
+      expect(getPreset(id).match.rotation).toEqual(['portes', 'plakoto', 'fevga']);
+    }
+    for (const id of ALL.filter((p) => p.startsWith('asodio.'))) {
+      expect(getPreset(id).match.rotation).toEqual(['asodio']);
+    }
+  });
+
+  it('every RuleSet field is in a doc table, or listed here with where the doc says it', () => {
+    const tableFields = new Set(
+      DOCS.flatMap(({ doc }) => [...flagDefaults(doc).keys()].map(fieldOf)),
+    );
+    const allFields = RULE_GROUPS.flatMap((group) =>
+      Object.keys(RULE_SCHEMA[group]).map((key) => `${group}.${key}`),
+    );
+    expect(allFields.filter((f) => !tableFields.has(f))).toEqual([
+      'movement.direction', // tavli-match.md, "Direction of movement"
+      'specialRolls.aceDeuceChoosesDouble', // asodio.md, "Turn & dice rules" 3.2 and A3
+      'match.rematchStarter', // tavli-match.md, "Who starts later games"
+    ]);
+  });
+});
+
+describe('asodio.md "Presets" table', () => {
+  const rows = tableRows(section(asodioDoc, '### Presets'));
+
+  it('has the three presets', () => {
+    expect(rows.map(([name = '']) => /`(\w+)`/.exec(name)?.[1])).toEqual([
+      'kafeneio',
+      'aceyDeuceyGreek',
+      'aceyDeuceyAmerican',
+    ]);
+  });
+
+  it.each(rows.map(([name = '', flags = '']) => [/`(\w+)`/.exec(name)?.[1] ?? '', flags]))(
+    'asodio.%s has the listed flags',
+    (name, flags) => {
+      const rules = getPreset(`asodio.${name}`);
+      const listed = [...flags.matchAll(/`(\w+)=(\w+)`/g)];
+      expect(listed.length).toBeGreaterThan(0);
+      for (const [, flag = '', raw = ''] of listed) {
+        const path = fieldOf(flag);
+        expect(path).not.toBeNull();
+        expect({ flag, value: valueAt(rules, path ?? '') }).toEqual({ flag, value: docValue(raw) });
+      }
+      if (flags.includes('no extra rolls')) {
+        expect(rules.extraRolls).toEqual({ aceDeuceExtraRoll: false, doublesGiveExtraRoll: false });
+      }
+    },
+  );
+});

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { createBoard } from './board';
 import { EngineError } from './errors';
 import type { EngineErrorCode } from './errors';
+import { getPreset, resolveRules } from './presets';
 import { parseGameState, serializeGameState } from './serialize';
+import { GAME_STATE_SCHEMA_VERSION } from './state';
 import type { GameState } from './state';
 import { makeState, startBoard } from './testing/fixtures';
 import { validateGameState } from './validate';
@@ -47,7 +49,18 @@ describe('round trip', () => {
       makeState({
         variant: 'asodio',
         board: startBoard('asodio'),
-        rules: { id: 'asodio.kafeneio', version: 3 },
+        rules: resolveRules('asodio.kafeneio'),
+      }),
+    ],
+    [
+      'house rules: Plakoto instant mother, match to 7',
+      makeState({
+        variant: 'plakoto',
+        board: startBoard('plakoto'),
+        rules: resolveRules('plakoto', {
+          mother: { motherRule: 'instant' },
+          match: { targetPoints: 7, rotation: ['plakoto'] },
+        }),
       }),
     ],
     [
@@ -65,7 +78,8 @@ describe('round trip', () => {
     expect(back).toEqual(state);
     expect(back).not.toBe(state);
     expect(serializeGameState(back)).toBe(text);
-    expect(text).toContain('"schemaVersion":1');
+    expect(text).toContain('"schemaVersion":2');
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(2);
   });
 
   it('validateGameState accepts a plain object (as Convex would return it)', () => {
@@ -82,7 +96,7 @@ describe('rejects bad input', () => {
 
   it('another schema version', () => {
     const raw = rawState();
-    raw['schemaVersion'] = 2;
+    raw['schemaVersion'] = 3;
     raw['somethingNew'] = true;
     const error = errorOf(() => parseGameState(JSON.stringify(raw)));
     expect(error.code).toBe('UNSUPPORTED_SCHEMA_VERSION');
@@ -142,18 +156,53 @@ describe('rejects bad input', () => {
     [
       'rules version 0',
       (r) => {
-        r['rules'] = { id: 'portes', version: 0 };
+        r['rules'] = { ...getPreset('portes'), version: 0 };
         return r;
       },
       'state.rules.version',
+      'INVALID_RULES',
     ],
     [
       'rules with an extra key',
       (r) => {
-        r['rules'] = { id: 'portes', version: 1, x: 1 };
+        r['rules'] = { ...getPreset('portes'), x: 1 };
         return r;
       },
       'state.rules.x',
+      'INVALID_RULES',
+    ],
+    [
+      'rules as an old reference in a version 2 state',
+      (r) => {
+        r['rules'] = { id: 'portes', version: 1 };
+        return r;
+      },
+      'state.rules.presetId',
+      'INVALID_RULES',
+    ],
+    [
+      'rules with a bad flag value',
+      (r) => {
+        r['rules'] = {
+          ...getPreset('portes'),
+          capture: { ...getPreset('portes').capture, captureMode: 'smash' },
+        };
+        return r;
+      },
+      'state.rules.capture.captureMode',
+      'INVALID_RULES',
+    ],
+    [
+      'rules with flags that conflict',
+      (r) => {
+        r['rules'] = {
+          ...getPreset('portes'),
+          mother: { ...getPreset('portes').mother, motherRule: 'federation' },
+        };
+        return r;
+      },
+      'state.rules.mother.motherRule',
+      'RULES_CONFLICT',
     ],
     [
       'toMove is not a player',
@@ -360,5 +409,68 @@ describe('rejects bad input', () => {
   it('serializeGameState refuses a broken state', () => {
     const broken = { ...makeState(), turnNumber: -3 } as GameState;
     expect(() => serializeGameState(broken)).toThrow(EngineError);
+  });
+});
+
+describe('version 1 states are upgraded', () => {
+  /** A version 1 state, as #22 wrote it: `rules` is `{ id, version }`. */
+  function v1State(rules: unknown, overrides: Partial<GameState> = {}): Record<string, unknown> {
+    return { ...rawState(overrides), schemaVersion: 1, rules };
+  }
+
+  it.each([
+    ['portes', 'portes'],
+    ['plakoto', 'plakoto'],
+    ['fevga', 'fevga'],
+    ['asodio', 'asodio.kafeneio'],
+    ['asodio.kafeneio', 'asodio.kafeneio'],
+    ['plakoto.federation', 'plakoto.federation'],
+  ] as const)('rules id "%s" becomes the full "%s" preset', (id, presetId) => {
+    const upgraded = validateGameState(v1State({ id, version: 1 }));
+    expect(upgraded.schemaVersion).toBe(2);
+    expect(upgraded.rules).toEqual(getPreset(presetId));
+    expect(upgraded.rules).not.toBe(getPreset(presetId));
+  });
+
+  it('keeps everything else and re-serializes as version 2', () => {
+    const raw = v1State({ id: 'portes', version: 1 }, { dice: [6, 1], turnNumber: 9 });
+    const upgraded = parseGameState(JSON.stringify(raw));
+    expect(upgraded).toEqual(makeState({ dice: [6, 1], turnNumber: 9 }));
+    expect(serializeGameState(upgraded)).toContain('"schemaVersion":2');
+    expect(parseGameState(serializeGameState(upgraded))).toEqual(upgraded);
+  });
+
+  it('rejects an unknown rules id', () => {
+    const error = errorOf(() => validateGameState(v1State({ id: 'test-race', version: 1 })));
+    expect(error.code).toBe('UNKNOWN_PRESET');
+    expect(error.path).toBe('state.rules.id');
+  });
+
+  it('rejects a rules version newer than the preset', () => {
+    const error = errorOf(() => validateGameState(v1State({ id: 'portes', version: 2 })));
+    expect(error.code).toBe('INVALID_STATE');
+    expect(error.path).toBe('state.rules.version');
+  });
+
+  it('rejects a bad version 1 rules reference', () => {
+    expect(errorOf(() => validateGameState(v1State({ id: '', version: 1 }))).path).toBe(
+      'state.rules.id',
+    );
+    expect(errorOf(() => validateGameState(v1State({ id: 'portes', version: 0 }))).path).toBe(
+      'state.rules.version',
+    );
+    expect(errorOf(() => validateGameState(v1State({ id: 'portes', version: 1, x: 1 }))).path).toBe(
+      'state.rules.x',
+    );
+    expect(errorOf(() => validateGameState(v1State(getPreset('portes')))).path).toBe(
+      'state.rules.id',
+    );
+  });
+
+  it('rejects schema versions 0 and 3', () => {
+    for (const schemaVersion of [0, 3]) {
+      const raw = { ...rawState(), schemaVersion };
+      expect(errorOf(() => validateGameState(raw)).code).toBe('UNSUPPORTED_SCHEMA_VERSION');
+    }
   });
 });
