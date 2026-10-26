@@ -1,0 +1,9 @@
+{
+  "//": "Node-only dev tools (screenshots). The app tsconfig leaves them out, so app code never sees Node types.",
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "**/*.tsx", "**/*.mts", "../src/**/*.ts", "../src/**/*.tsx"],
+  "exclude": ["../src/**/*.test.ts", "../src/**/*.test.tsx"]
+}

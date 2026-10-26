@@ -56,5 +56,19 @@
   },
   "themes": {
     "walnut-kafeneio": "Καρυδιά καφενείου"
+  },
+  "dev": {
+    "board": {
+      "title": "Προεπισκόπηση ταμπλό",
+      "position": "Θέση",
+      "positions": {
+        "start": "Αρχή",
+        "midgame": "Μέση",
+        "bearoff": "Μάζεμα"
+      },
+      "viewer": "Όψη ταμπλό",
+      "viewWhite": "Λευκά κάτω",
+      "viewBlack": "Μαύρα κάτω"
+    }
   }
 }

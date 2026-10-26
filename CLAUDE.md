@@ -37,3 +37,6 @@
 - Styling is Unistyles 3. Its Babel plugin processes `apps/mobile/src` only. `apps/mobile/index.ts` configures Unistyles before Expo Router loads. Metro warns "invalid package.json configuration" for `react-native-unistyles/components/native/*`; it is harmless.
 - ESLint does not resolve the `@/` alias (`import/no-unresolved` ignores it). `tsc` checks those imports.
 - UI strings: see "Add a UI string" in `README.md`. Settings: see "Add a setting".
+- The board is drawn with Skia (`apps/mobile/src/features/board/`, see `docs/architecture/board-screen.md`). Jest mocks Skia with `apps/mobile/test/skiaMock.tsx`. Add any new Skia component you use to that mock.
+- Theme images need a literal `require` in `apps/mobile/src/features/board/themeImages.ts`. A test fails if one is missing.
+- `pnpm --filter @tavli/mobile screenshots` renders board PNGs headless (CanvasKit) into `apps/mobile/docs/screenshots/`. Node-only tools in `apps/mobile/tools/` have their own `tsconfig.json`; the app tsconfig leaves them out.

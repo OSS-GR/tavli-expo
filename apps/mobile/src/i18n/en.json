@@ -56,5 +56,19 @@
   },
   "themes": {
     "walnut-kafeneio": "Walnut kafeneio"
+  },
+  "dev": {
+    "board": {
+      "title": "Board preview",
+      "position": "Position",
+      "positions": {
+        "start": "Start",
+        "midgame": "Mid-game",
+        "bearoff": "Bear-off"
+      },
+      "viewer": "Board view",
+      "viewWhite": "White at the bottom",
+      "viewBlack": "Black at the bottom"
+    }
   }
 }
