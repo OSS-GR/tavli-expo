@@ -1,15 +1,16 @@
-import type { createRecordingFeedback } from '@tavli/contracts';
+import type { createRecordingFeedback, createRecordingSoundPlayer } from '@tavli/contracts';
 import { createSeededRng, rollDie } from '@tavli/engine';
 import { act, render, screen, userEvent } from '@testing-library/react-native';
 
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
-import { feedback } from '@/services';
+import { feedback, sound } from '@/services';
 
 import { createGameStore } from './gameStore';
 import { GameScreen, OPENING_RESULT_MS } from './GameScreen';
 
 const haptics = feedback as ReturnType<typeof createRecordingFeedback>;
+const sounds = sound as ReturnType<typeof createRecordingSoundPlayer>;
 
 /** A seed whose first two opening dice differ (no tie). */
 function seedWithoutTie(): number {
@@ -29,6 +30,7 @@ function newStore(seed = seedWithoutTie()) {
 
 beforeEach(async () => {
   haptics.calls.length = 0;
+  sounds.played.length = 0;
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS });
   });
@@ -59,8 +61,12 @@ describe('<GameScreen /> dice', () => {
     expect(
       screen.getByLabelText(`Dice ${game.state.dice!.join('-')}, 2 left to play`),
     ).toBeOnTheScreen();
-    // A haptic for each die that landed.
+    // A haptic for each die that landed, and the dice sounds.
     expect(haptics.calls).toEqual(['light', 'light']);
+    expect(sounds.played).toContain('diceRoll');
+    expect(sounds.played.filter((s) => s === 'diceLand')).toHaveLength(2);
+    // The theme's sounds were preloaded.
+    expect(sounds.loaded.length).toBeGreaterThan(0);
   });
 
   it('rolls both opening dice with one tap (vs bot)', async () => {
@@ -103,11 +109,37 @@ describe('<GameScreen /> dice', () => {
     }
   });
 
-  it('rolls the dice of a later turn with the Roll button, and no haptic when it is off', async () => {
+  it('plays a checker click for a move and a cue for the next turn', async () => {
+    const store = newStore();
+    await render(<GameScreen store={store} />);
+    await act(async () => {
+      const { dispatch } = store.getState();
+      dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+      dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+    });
+    sounds.played.length = 0;
+    haptics.calls.length = 0;
+    await act(async () => {
+      store
+        .getState()
+        .dispatch({ type: 'move', player: 'white', move: { from: 13, to: 7, die: 6 } });
+    });
+    expect(sounds.played).toEqual(['checkerPlace']);
+    expect(haptics.calls).toEqual(['light']);
+    await act(async () => {
+      const { dispatch } = store.getState();
+      dispatch({ type: 'move', player: 'white', move: { from: 13, to: 1, die: 1 } });
+    });
+    expect(sounds.played).toEqual(['checkerPlace', 'invalidMove']);
+    expect(haptics.calls).toEqual(['light', 'warning']);
+  });
+
+  it('rolls the dice of a later turn with the Roll button, and no sound or haptic when off', async () => {
     const user = userEvent.setup();
     const store = newStore();
     await act(async () => {
       settingsStore.getState().setSetting('haptics', false);
+      settingsStore.getState().setSetting('sound', false);
     });
     await render(<GameScreen store={store} />);
     await act(async () => {
@@ -124,5 +156,6 @@ describe('<GameScreen /> dice', () => {
     expect(game.state.toMove).toBe('black');
     expect(game.state.dice).not.toBeNull();
     expect(haptics.calls).toEqual([]);
+    expect(sounds.played).toEqual([]);
   });
 });

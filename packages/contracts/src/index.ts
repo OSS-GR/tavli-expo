@@ -20,6 +20,14 @@ export {
   type Feedback,
   type HapticStyle,
 } from './feedback';
+export {
+  createNoopSoundPlayer,
+  createRecordingSoundPlayer,
+  gatedSoundPlayer,
+  type SoundBank,
+  type SoundPlayer,
+  type SoundSource,
+} from './sound';
 export { BOT_DIFFICULTIES, BotCancelledError, isBotCancelled, isDifficulty } from './bot-runner';
 export type { BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
 export { createMemoryStorage, type Storage } from './storage';

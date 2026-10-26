@@ -288,6 +288,8 @@ Recording tips:
 - Normalize loudness so all sounds feel the same volume.
 - Play sounds with `expo-audio`. Preload them at board start for low delay.
 
+Done for Walnut Kafeneio (issue #39): CC0 sounds from Kenney and OpenGameArt, built by `packages/themes/tools/walnut-kafeneio/build_sounds.py` into `walnut-kafeneio/sounds/` (about 54 KB). Sources and licenses: `packages/themes/LICENSES.md`. How the app plays them: `docs/architecture/board-screen.md` (Sound and haptics). Own recordings of a real board can replace them later.
+
 ### 5.2 Haptics
 
 Use `expo-haptics`.

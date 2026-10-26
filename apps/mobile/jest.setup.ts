@@ -5,14 +5,17 @@
 import './src/theme/unistyles';
 import './src/i18n';
 
-// Adapters: in-memory fakes instead of MMKV and expo-haptics. `feedback`
-// records every haptic; dice come from a fixed seed, so tests are repeatable.
+// Adapters: in-memory fakes instead of MMKV, expo-haptics and expo-audio.
+// `feedback` records every haptic and `sound` every sound; dice come from a
+// fixed seed, so tests are repeatable.
 jest.mock('@/services', () => {
-  const { createMemoryStorage, createRecordingFeedback } = jest.requireActual('@tavli/contracts');
+  const { createMemoryStorage, createRecordingFeedback, createRecordingSoundPlayer } =
+    jest.requireActual('@tavli/contracts');
   const { createSeededRng } = jest.requireActual('@tavli/engine');
   return {
     storage: createMemoryStorage(),
     feedback: createRecordingFeedback(),
+    sound: createRecordingSoundPlayer(),
     createLocalRng: () => createSeededRng(7),
   };
 });

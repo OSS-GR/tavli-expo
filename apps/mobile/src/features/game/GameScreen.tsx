@@ -14,9 +14,9 @@ import { useBoardTheme } from '@/features/board/BoardCanvas';
 import type { BoardView } from '@/features/board/boardModel';
 import { DiceRow } from '@/features/board/DiceRow';
 import { StaticBoard } from '@/features/board/StaticBoard';
-import { playHaptic } from '@/features/feedback/feedback';
 import { useSettings } from '@/features/settings/store';
 
+import { useGameFeedback } from './gameFeedback';
 import { turnView, useGameStore, type GameStore } from './gameStore';
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
@@ -39,6 +39,8 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
   const flow = useGameStore(store, (s) => s.flow);
   const dispatch = useGameStore(store, (s) => s.dispatch);
   const flipMode = useSettings((s) => s.boardFlipMode);
+  // Sound and haptics: moves, rolls and wins play by themselves (from the engine log).
+  const feedback = useGameFeedback(store, theme);
 
   const view = turnView(flow);
   const { game, phase } = view;
@@ -73,7 +75,7 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
       }
     }
   };
-  const onDiceLanded = () => playHaptic(theme, 'diceLand');
+  const onDiceLanded = () => feedback.event('diceLand');
 
   // The dice of the opening already rolled in the card: show them at rest.
   const fromOpening = game.opening !== null && game.lastTurn === null;

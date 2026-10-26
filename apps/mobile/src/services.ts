@@ -5,7 +5,8 @@
  *
  * Jest replaces this module with in-memory fakes (`jest.setup.ts`).
  */
-import type { Feedback, Storage } from '@tavli/contracts';
+import { createExpoSoundPlayer } from '@tavli/audio-expo';
+import type { Feedback, SoundPlayer, Storage } from '@tavli/contracts';
 import { createSeededRng, type Rng } from '@tavli/engine';
 import { createExpoFeedback } from '@tavli/haptics-expo';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
@@ -14,6 +15,9 @@ export const storage: Storage = createMmkvStorage({ id: 'tavlaki' });
 
 /** Haptics. Use `appFeedback` (features/feedback), which follows the Haptics setting. */
 export const feedback: Feedback = createExpoFeedback();
+
+/** Sound effects. Use `appSound` (features/feedback), which follows the Sound setting. */
+export const sound: SoundPlayer = createExpoSoundPlayer();
 
 /** A fresh 32-bit seed: from `crypto` when the runtime has it, else from the clock. */
 function randomSeed(): number {
