@@ -1,0 +1,60 @@
+{
+  "common": {
+    "comingSoon": "Coming soon"
+  },
+  "home": {
+    "title": "Tavlaki",
+    "tagline": "Greek tavli with friends",
+    "openSettings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "sections": {
+      "game": "Game",
+      "soundAndFeel": "Sound and feel",
+      "language": "Language",
+      "look": "Look"
+    },
+    "autoConfirm": {
+      "label": "Auto-confirm moves",
+      "hint": "End the turn when all dice are used"
+    },
+    "pipCounts": {
+      "label": "Show pip counts",
+      "hint": "How many pips each player needs to bear off"
+    },
+    "boardView": {
+      "label": "Board view (pass-and-play)",
+      "flip": "Flip",
+      "faceToFace": "Face-to-face",
+      "fixed": "Fixed",
+      "flipHint": "The board turns to the player whose turn it is.",
+      "fixedHint": "The board stays the same for both players.",
+      "faceToFaceSoon": "Face-to-face view comes in a later update."
+    },
+    "sound": {
+      "label": "Sound",
+      "hint": "Also follows the phone's silent switch"
+    },
+    "haptics": {
+      "label": "Haptics",
+      "hint": "Small vibrations when you move checkers"
+    },
+    "language": {
+      "system": "Phone language",
+      "systemHint": "Now: {{language}}"
+    },
+    "theme": {
+      "label": "Board theme",
+      "hint": "More boards later"
+    },
+    "version": "Tavlaki {{version}}"
+  },
+  "languages": {
+    "el": "Ελληνικά",
+    "en": "English"
+  },
+  "themes": {
+    "walnut-kafeneio": "Walnut kafeneio"
+  }
+}
