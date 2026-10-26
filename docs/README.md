@@ -42,5 +42,9 @@
 |---|----------|--------|
 | [0001](decisions/0001-record-decisions.md) | Record decisions as ADRs | Accepted |
 | [0002](decisions/0002-modular-architecture.md) | Modular monorepo with ports and adapters | Proposed |
+| [0003](decisions/0003-app-stack.md) | Expo SDK 58 app stack and tooling | Proposed |
+| [0004](decisions/0004-backend-auth.md) | Supabase backend + auth, Expo Push | Proposed |
+| [0005](decisions/0005-rendering.md) | 2D Skia board, themes as data, Blender art later | Proposed |
+| [0006](decisions/0006-bot.md) | Own TypeScript bot, TD self-play for hard level | Proposed |
 
 New ADRs: copy [0000-template.md](decisions/0000-template.md).
