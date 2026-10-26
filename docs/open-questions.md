@@ -23,6 +23,7 @@
 | Q15 | Turn **timer** lengths for live and async games, and what happens on timeout (lose the game, or auto-move)? | Server timer design | MVP2 |
 | Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
 | Q17 | **Provably fair dice** (commit-reveal, so players can check the server did not cheat) in MVP2, or later? Recommended: later. | Backend scope | MVP2 |
+| Q18 | Google Play account: **personal** or **organization**? A personal account must run a 14-day closed test with 12 testers before public release. An organization account needs a D-U-N-S number. | Launch timeline | MVP1 / v1.0 |
 
 ## Answered
 
