@@ -1,6 +1,7 @@
 # Bot AI
 
 > Living document. Research date: 2026-10-26. Owner: `packages/bot`.
+> **Implemented API (#27):** `createBot(...).chooseTurn(state, dice, difficulty, { rng })` in `@tavli/bot`; the app uses the `BotRunner` port from `@tavli/contracts` (`chooseMove(req)`, async, seed-based). See `packages/bot/README.md`. The sketch in section 7 is the original design.
 > Related: [ADR-0002 modular architecture](../decisions/0002-modular-architecture.md), [roadmap](../roadmap.md).
 
 ## 1. Summary and recommendation
@@ -242,7 +243,7 @@ export interface BotOptions {
 
 /** The main entry point. Pure and synchronous. */
 export interface Bot {
-  chooseMove(
+  chooseTurn(
     state: GameState,
     dice: Dice,
     difficulty: Difficulty,

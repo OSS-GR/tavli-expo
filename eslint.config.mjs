@@ -34,6 +34,8 @@ const vendorImports = {
     // Local storage: use the `Storage` port and `@tavli/storage-mmkv`.
     'react-native-mmkv',
     'react-native-mmkv/*',
+    // Haptics: use the `Feedback` port and `@tavli/haptics-expo`.
+    'expo-haptics',
   ],
   message:
     'Vendor SDKs belong in packages/adapters/* (or apps/server). Use a port from @tavli/contracts instead. See ADR-0002.',

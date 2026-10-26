@@ -118,5 +118,6 @@ describe('Portes nextMoves (one move at a time)', () => {
         });
       }
     });
-  });
+    // About 3 s on a fast machine. Give CI runners (2 cores, shared) room.
+  }, 30_000);
 });
