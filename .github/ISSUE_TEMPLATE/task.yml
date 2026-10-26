@@ -1,0 +1,30 @@
+name: Task
+description: A technical piece of work
+type: Task
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What must be true when this is done?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps / scope
+      value: |
+        - [ ]
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      value: |
+        - [ ] Tests pass in CI
+        - [ ] Docs updated if needed
+    validations:
+      required: true
+  - type: textarea
+    id: docs
+    attributes:
+      label: Related docs

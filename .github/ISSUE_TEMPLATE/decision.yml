@@ -1,0 +1,20 @@
+name: Decision (ADR)
+description: A choice we must make and record in docs/decisions
+type: Task
+labels: ["decision"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What do we need to decide?
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options known so far
+  - type: input
+    id: deadline
+    attributes:
+      label: Needed by (milestone)
