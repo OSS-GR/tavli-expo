@@ -1,0 +1,12 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'packages/adapters/*'
+
+# We use pnpm's default isolated installs. Expo supports them since SDK 54.
+# If a native library breaks, Expo's documented fallback is `nodeLinker: hoisted`.
+
+# Build scripts that pnpm may run during install.
+allowBuilds:
+  # Its postinstall only checks the native binding. Prebuilt binaries ship as optional deps.
+  unrs-resolver: false
