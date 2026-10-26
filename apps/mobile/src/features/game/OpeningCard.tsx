@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
-import { DIE_SIZE } from '@/features/board/DiceRow';
+import { DIE_SIZE } from '@/features/board/diceMotion';
 import { AnimatedDie } from '@/features/board/skia/AnimatedDie';
 
 import type { OpeningStatus } from './opening';

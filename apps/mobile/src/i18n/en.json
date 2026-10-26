@@ -95,6 +95,37 @@
     },
     "dice": {
       "label": "Dice {{values}}, {{left}} left to play"
+    },
+    "strip": {
+      "pips": "Pips {{count}}",
+      "pipsLabel": "{{count}} pips to go",
+      "scoreLabel": "{{score}} of {{target}} points",
+      "turn": "Your turn"
+    },
+    "controls": {
+      "undo": "↶ Undo",
+      "confirm": "Confirm",
+      "allUsed": "All dice used. Confirm or undo."
+    },
+    "pass": {
+      "title": "No legal moves",
+      "body": "{{name}} rolled {{dice}}. No checker can move.",
+      "next": "The turn passes to {{name}}.",
+      "ok": "OK",
+      "autoClose": "Closes by itself after 3 s."
+    },
+    "end": {
+      "gameWinner": "{{name}} wins the game!",
+      "draw": "The game is a draw",
+      "mono": "Mono · +1 point",
+      "diplo": "Diplo · +2 points",
+      "points": "+{{count}} points",
+      "score": "{{white}} {{whiteScore}} – {{blackScore}} {{black}}",
+      "target": "First to {{target}} points",
+      "next": "Next game",
+      "starts": "{{name}} starts",
+      "matchWinner": "{{name}} wins the match!",
+      "rematch": "Rematch"
     }
   }
 }

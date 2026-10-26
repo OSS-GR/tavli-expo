@@ -30,7 +30,9 @@ The game itself lives in `apps/mobile/src/features/game/`:
 |------|--------------|
 | `gameStore.ts` | A Zustand store around the engine `MatchFlow` reducer, with the injected `Rng`. `turnView(flow)` computes what the screen shows (board mid-turn, legal moves, dice, pips). |
 | `opening.ts`, `OpeningCard.tsx` | The opening roll card: one die per player, tie, result. |
-| `GameScreen.tsx` | The board screen: board, opening card and controls row. |
+| `PlayerStrip.tsx` | A player strip: checker color, name, pip count, match score, turn pill. |
+| `GameCard.tsx`, `turnNotices.ts` | Cards over the board: no legal moves, game end, match end. |
+| `GameScreen.tsx` | The board screen: strips, board, cards and the controls row. |
 
 Dev routes (release builds redirect them to Home):
 
@@ -67,6 +69,24 @@ Dev routes (release builds redirect them to Home):
 - Haptics from the theme: `checkerPickUp`, `checkerPlace`, `checkerHit`, `invalidMove`.
 - Not built: the optional double-tap shortcut (it would delay every single tap), and the dashed "last move" arrow from the wireframes.
 
+## Turn: undo, confirm, turn indicator
+
+- **Controls row** (wireframes 6b–6f): one big Roll button before the roll; then **Undo · dice · Confirm**.
+- **Undo** takes back the last single move (`undo` action); the checker flies back, and a hit checker comes back from the bar. Disabled (dashed) when there is nothing to undo.
+- **Confirm** is enabled only when the engine says `canConfirm` (all dice used, or no move left). Then a hint shows: "All dice used. Confirm or undo."
+- **Auto-confirm** (Settings, default off): each move is sent with `autoConfirm`, so the engine ends a complete turn at once.
+- **Turn indicator:** the active player's strip gets a thick border and a "YOUR TURN" pill. Pip counts follow the moves of the turn; Settings → Show pip counts hides them.
+- **No legal moves:** the engine passes the turn by itself. The card says who rolled what and that the turn passes; the dice stay, faded. It closes on OK or after 3 s. Until then the board stays with the player who passed (flip).
+- **Game end:** winner, Mono / Diplo chip, score, "Next game" (the winner starts). **Match end:** winner, score, "Rematch" (the last winner starts, no opening roll).
+- The opening result closes after 1.5 s, or at once on a tap.
+
+### Differences from the wireframes
+
+- The game-end and match-end screens are cards over the board on the dev route. The real routes (`app/game/[id]`, `match-end`) and the in-game menu (resign, exit) come with their own issues.
+- No dashed "last move" arrow and no double-tap shortcut yet.
+- The dice in the controls row are 40 pt (wireframe: about 44 pt), so Undo, the dice and Confirm fit on an iPhone SE.
+- In pass-and-play the pill says "YOUR TURN" for both players; the strip already shows the name.
+
 ## Board flip
 
 The theme numbers points from the view of the player at the bottom (the **viewer**). The engine numbers points in White's order. `boardModel.ts` maps each absolute point to the viewer's own number (`absoluteToOwn`). So the viewer always moves 24 → 1, with home at the bottom left. Turning the board to the other player is only a change of viewer: a left–right mirror, as the wireframes ask.
@@ -78,8 +98,13 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 - `interaction.test.ts`: sources and targets on the drawing rects, tap and drop rules, flights for a move, a hit and an undo. `GameScreen.moves.test.tsx`: drag, tap-tap, an illegal drop and tap-to-roll through the screen.
 - Jest fakes Gesture Handler with `apps/mobile/test/gestureHandlerMock.tsx`; `touch(testID, path)` drives the board's pan gesture like a finger.
 - Jest fakes Reanimated with `apps/mobile/test/reanimatedMock.ts`: animations end at once and call their end callback.
+- `GameScreen.turn.test.tsx`: undo, confirm, auto-confirm, the turn indicator (flip and fixed), pip counts on and off, the pass card (OK and 3 s), game end, next game, match end and rematch. `GameScreen.match.test.tsx` plays a whole match with taps only (to 1 by default; `FULL_MATCH=1` plays to 3).
 - `BoardScene.test.tsx`: a render smoke test. Jest replaces Skia with `apps/mobile/test/skiaMock.tsx`: every Skia component becomes a plain element, so the test counts what the board would draw.
 
 ## Screenshots
 
-`pnpm --filter @tavli/mobile screenshots` renders PNGs into `apps/mobile/docs/screenshots/` with Skia's headless CanvasKit build (Vitest config in `apps/mobile/tools/screenshots/`). It draws the real `BoardScene`. Each PNG must stay under 300 KB.
+`pnpm --filter @tavli/mobile screenshots` renders PNGs into `apps/mobile/docs/screenshots/` with Skia's headless CanvasKit build (Vitest config in `apps/mobile/tools/screenshots/`). It draws the real `BoardScene` and dice. Each PNG must stay under 300 KB.
+
+- `board-start.png`: the Portes start, White at the bottom.
+- `board-midgame-black-view.png`: Black's view (flip): count badge, bar, tray.
+- `play-moving.png`: a turn in progress (wireframe 6c): 13/7 played, the checker on 8 picked up, its target lit, the used 6 faded. The strips and buttons are React Native views, so they are not in the picture.

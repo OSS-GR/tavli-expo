@@ -9,60 +9,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { DieView } from '@/features/game/gameStore';
 
+import { DIE_SIZE, dicePlaces } from './diceMotion';
 import { AnimatedDie } from './skia/AnimatedDie';
-
-/** Size of one die when two are shown, in points. */
-export const DIE_SIZE = 44;
-/** Doubles show four dice at this fraction of the size. */
-const GRID_SCALE = 0.62;
-
-export interface DicePlace {
-  readonly x: number;
-  readonly y: number;
-  readonly size: number;
-}
-
-/** Where each die sits in the row. Pure, so tests can check it. */
-export function dicePlaces(
-  count: number,
-  size = DIE_SIZE,
-): {
-  places: DicePlace[];
-  width: number;
-  height: number;
-} {
-  const pad = size * 0.3; // room for the hop and the shadow
-  if (count === 4) {
-    const s = size * GRID_SCALE;
-    const gap = s * 0.18;
-    const cell = s + gap;
-    const width = 2 * cell + 2 * pad;
-    const height = Math.max(size + 2 * pad, 2 * cell + pad);
-    const x0 = width / 2 - cell / 2;
-    const y0 = height / 2 - cell / 2;
-    return {
-      places: [0, 1, 2, 3].map((i) => ({
-        x: x0 + (i % 2) * cell,
-        y: y0 + Math.floor(i / 2) * cell,
-        size: s,
-      })),
-      width,
-      height,
-    };
-  }
-  const gap = size * 0.3;
-  const width = count * size + (count - 1) * gap + 2 * pad;
-  const height = size + 2 * pad;
-  return {
-    places: Array.from({ length: count }, (_, i) => ({
-      x: pad + size / 2 + i * (size + gap),
-      y: height / 2,
-      size,
-    })),
-    width,
-    height,
-  };
-}
 
 export interface DiceRowProps {
   theme: ThemeManifest;

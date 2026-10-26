@@ -14,7 +14,7 @@
  */
 import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import { useSharedValue, withTiming } from 'react-native-reanimated';
@@ -60,6 +60,8 @@ export interface InteractiveBoardProps {
   /** A checker was picked up / dropped where it may not go. */
   onPickUp?: () => void;
   onIllegalDrop?: () => void;
+  /** Called with the board geometry after each layout (the screen needs it for undo flights). */
+  onGeometry?: (geo: BoardGeometry) => void;
   testID?: string;
 }
 
@@ -87,10 +89,17 @@ export function InteractiveBoard({
   onBoardTap,
   onPickUp,
   onIllegalDrop,
+  onGeometry,
   testID,
 }: InteractiveBoardProps) {
   const [size, onLayout] = useBoardSpace();
-  const geo = size ? fitBoardWithShadow(portraitLayout(theme), size) : null;
+  const geo = useMemo(
+    () => (size ? fitBoardWithShadow(portraitLayout(theme), size) : null),
+    [size, theme],
+  );
+  useEffect(() => {
+    if (geo) onGeometry?.(geo);
+  }, [geo, onGeometry]);
   const picture = geo ? layoutBoard(geo, board, view) : null;
   const sources = geo ? buildSources(geo, board, view, mover, legal) : [];
 
