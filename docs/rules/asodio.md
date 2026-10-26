@@ -6,7 +6,7 @@ Shared rules (dice, forced moves, bearing off, match) are in
 > **Status: owner version is the default (2026-10-26).** The owner plays the
 > Greek folk version with **pinning instead of hitting**. Source: the owner's
 > cheat sheet (see "Owner version" below). Other versions stay as presets.
-> Points marked **(confirm)** still need the owner's answer.
+> Owner answered A1–A5 on 2026-10-26. A2 is marked for playtest review.
 
 ## Owner version (default preset: `kafeneio`)
 
@@ -20,18 +20,20 @@ Core idea: all 15 checkers move as **one army, quarter by quarter**, and you
    any **double**. Before that, other rolls do nothing; the turn passes.
 3. **1-2:** enter one checker on spot 1 and one on spot 2 of the starting
    quarter (spot `d` = own point `25 - d`).
-4. **Double `d-d`:** enter checkers on spot `d`. **(confirm)** Four checkers
-   (one per die move), like a normal double?
+4. **Double `d-d`:** enter **four** checkers on spot `d` (owner, A1).
 5. After the lock breaks, each die `d` enters one checker on spot `d`.
 6. No checker may leave the starting quarter until **all 15** have entered.
+7. **While loading, entered checkers do not move** (owner, A2, "I believe").
+   Every die is used to enter. Flag `moveWhileLoading`, default `false`.
 
 ### Phase 2 — Quarter by quarter (the lock-in rule)
 
 1. When all 15 checkers are in the starting quarter, the army may advance.
 2. A checker that enters a **new quarter is frozen there**. It may not leave
    that quarter until all 15 own checkers are in the same quarter.
-3. **(confirm)** Checkers may still move forward **inside** their current
-   quarter while they wait.
+3. A checker that reached the new quarter is **frozen in place** (literal
+   reading of the owner's sheet, matches A2). Flag `moveInsideFrozenQuarter`,
+   default `false`. Confirm in playtests.
 4. If one checker lags behind, the whole front is frozen.
 
 ### Phase 3 — Pinning (Plakoto style)
@@ -46,19 +48,19 @@ Core idea: all 15 checkers move as **one army, quarter by quarter**, and you
 
 ### Bearing off and winning
 
-- **(confirm)** Bear off as in Portes once all 15 are in the home quarter.
-- **(confirm)** Score 1 point, or 2 (mars) if the loser has borne off none.
+- Bear off as in Portes once all 15 are in the home quarter (owner, A4).
+- Score 1 point, or 2 (mars) if the loser has borne off none (owner, A4).
 
-### Open points for the owner
+### Owner answers (2026-10-26)
 
-| # | Question | Proposed default |
-|---|----------|------------------|
-| A1 | How many checkers does a double enter (e.g. 3-3)? | Four on spot 3 |
-| A2 | Can checkers move inside their current quarter while waiting? | Yes |
-| A3 | Does a 1-2 or a double give an extra roll, or a free double, as in Acey-Deucey? | No |
-| A4 | Bearing off and scoring the same as Portes? | Yes |
-| A5 | Deadlock: if neither player can ever move again, what happens? | Draw, 0 points |
-| A6 | Can a pinned checker block its owner's quarter advance forever, even if the pinner can never leave? | Yes; the pinned player passes until freed |
+| # | Question | Answer |
+|---|----------|--------|
+| A1 | How many checkers does a double enter? | Four on that spot |
+| A2 | Can checkers move while waiting? | Not while loading (owner "not 100% sure"). After loading, frozen checkers stay in place (flag). |
+| A3 | Extra roll or free double after 1-2 or a double? | No |
+| A4 | Bearing off and scoring as in Portes? | Yes |
+| A5 | Deadlock (no one can ever move)? | Draw, 0 points |
+| A6 | Pinned lagging checker freezes its owner's army? | Yes; that player passes until freed (default, not asked) |
 
 ## Summary (research on other versions)
 
@@ -209,12 +211,15 @@ or as an optional extra in a custom rotation.
 | `firstEntryGate` | bool | `true` | Greek folk sources. |
 | `firstEntryGateRolls` | `"aceDeuceOrDouble"`, `"doubleOnly"` | `"aceDeuceOrDouble"` | cardgamesgr uses doubles only. |
 | `mustEnterAllFirst` | bool | `true` (owner) | cardgamesgr: no moves until all 15 are entered. |
-| `aceDeuceExtraRoll` | bool | `false` (owner, confirm A3) | Frantzis/bkgm "Ace-Deo": `false`. |
-| `doublesGiveExtraRoll` | bool | `false` (owner, confirm A3) | Greek folk sources; American: `false`. |
+| `aceDeuceExtraRoll` | bool | `false` (owner, A3) | Frantzis/bkgm "Ace-Deo": `false`. |
+| `doublesGiveExtraRoll` | bool | `false` (owner, A3) | Greek folk sources; American: `false`. |
 | `complementaryDoubles` | bool | `false` | European Acey-Deucey: after a double, also play its complement (sum 7, e.g. 6-6 → 1-1), then roll again. |
 | `barEntryNeedsSpecial` | bool | `false` | Greek folk sources: `true`. |
 | `captureMode` | `"hit"`, `"pin"` | `"pin"` (owner) | Owner version pins like Plakoto. Acey-Deucey hits. |
 | `quarterLock` | bool | `true` (owner) | A checker that enters a new quarter is frozen until all 15 are in that quarter. |
+| `moveWhileLoading` | bool | `false` (owner, A2) | Entered checkers may not move until all 15 are in. |
+| `moveInsideFrozenQuarter` | bool | `false` | Frozen checkers may not move inside their quarter. |
+| `deadlock` | `"draw"` | `"draw"` (owner, A5) | No one can ever move: draw, 0 points. |
 | `nominateBlot` | bool | `false` | Frantzis: at end of turn you may name an own blot; opponent must hit it if possible. |
 | `quarterGathering` | bool | `true` (owner) | Greek Wikipedia/cna.gr and the owner: all 15 gather in one quarter before advancing. See `quarterLock`. |
 | `exactBearOff` | bool | `false` | |

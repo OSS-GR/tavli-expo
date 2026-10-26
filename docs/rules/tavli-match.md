@@ -68,7 +68,8 @@ Sources disagree on what happens next, so the engine needs a flag:
 - `openingRoll: "chosenStarterRolls"` — players agree who starts; that player
   rolls both dice. (Greek Wikipedia "option 1".)
 
-**Default:** `useOpeningDice` (federation rule).
+**Default:** `useOpeningDice` (federation rule). Confirmed by the owner on
+2026-10-26. The other values stay available as options in Kafeneio mode (#58).
 
 ### Who starts later games
 

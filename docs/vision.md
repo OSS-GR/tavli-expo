@@ -6,6 +6,20 @@
 
 **Tavli** is a Greek backgammon app for iOS and Android. You play your friends online, a bot when no one is free, or a friend on the same phone.
 
+## Name (decided 2026-10-26)
+
+| Item | Value | Notes |
+|------|-------|-------|
+| App name (home screen) | **Tavlaki** | "Little tavli", a friendly Greek word |
+| Store name (English) | **Tavlaki: Kafeneio Backgammon** | 28 of 30 characters allowed |
+| Store name (Greek) | **Ταβλάκι: Τάβλι του Καφενείου** | 28 of 30 |
+| iOS subtitle / Play short text | "Greek Tavli with friends" or "Portes, Plakoto, Fevga, Asodio" | Both fit the 30-character limit |
+| Bundle ID / Android package | **`app.tavlaki`** | **Never changes** after the first store upload |
+| Expo slug / URL scheme | `tavlaki` | Deep links: `tavlaki://` |
+| Domain | `tavlaki.app` | Invite links (universal links). Owner buys it (#59). |
+
+The owner's first idea was "Tavlaki: Greek Kafeneio Backgammon" (34 characters). The App Store and Google Play allow only 30, so "Greek" moves into the subtitle.
+
 ## Why we build it
 
 - **Ownership:** We want our own version, built the right way, that we fully control.
