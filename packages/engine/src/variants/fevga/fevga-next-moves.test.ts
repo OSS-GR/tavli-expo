@@ -64,6 +64,25 @@ describe('Fevga nextMoves (one move at a time)', () => {
     ]);
   });
 
+  // #179: the same checker plays both dice, one move at a time (no hits in Fevga).
+  it('lets the checker that just moved play the other die, in both dice orders', () => {
+    const state = fevgaState('w: 24x2 13x13 ; b: 24x15');
+    const moves = (dice: Dice, played: readonly Move[]) =>
+      fevga.nextMoves(state, dice, played).map(formatMove);
+    for (const dice of [
+      [5, 3],
+      [3, 5],
+    ] as Dice[]) {
+      const first = fevga.nextMoves(state, dice, []);
+      const by5 = first.find((m) => m.from === 13 && m.to === 8);
+      const by3 = first.find((m) => m.from === 13 && m.to === 10);
+      expect(by5).toBeDefined();
+      expect(by3).toBeDefined();
+      expect(moves(dice, [by5!])).toContain('8/5');
+      expect(moves(dice, [by3!])).toContain('10/5');
+    }
+  });
+
   it('in random positions, step by step reaches exactly the end positions of legalTurns', () => {
     const quarter = resolveRules('fevga', { movement: { runnerTarget: 'reachQuarter' } });
     randomFevgaPositions(4242, 150, 3).forEach((position, i) => {
