@@ -13,6 +13,7 @@ import plakotoDoc from '../../../docs/rules/plakoto.md?raw';
 import portesDoc from '../../../docs/rules/portes.md?raw';
 import matchDoc from '../../../docs/rules/tavli-match.md?raw';
 import { getPreset } from './presets';
+import fevgaTests from './variants/fevga/fevga.test.ts?raw';
 import { PRESET_IDS, RULE_GROUPS, RULE_SCHEMA } from './rules';
 import type { PresetId, RuleSet } from './rules';
 
@@ -196,4 +197,28 @@ describe('asodio.md "Presets" table', () => {
       }
     },
   );
+});
+
+/** The numbers of the cases in a doc's "## Edge cases" list. */
+function edgeCaseNumbers(doc: string): number[] {
+  return [...section(doc, '## Edge cases').matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
+}
+
+/**
+ * CLAUDE.md rule 4: every numbered edge case in a rules doc needs a unit
+ * test. A doc listed here must have a test named `<doc> #N: ...` for each
+ * case `N`, in one of its test files (read as text with `?raw`).
+ */
+const EDGE_CASE_TESTS: readonly { name: string; doc: string; tests: readonly string[] }[] = [
+  { name: 'fevga.md', doc: fevgaDoc, tests: [fevgaTests] },
+];
+
+describe('every numbered edge case has a test', () => {
+  it.each(EDGE_CASE_TESTS.map((entry) => [entry.name, entry] as const))('%s', (name, entry) => {
+    const numbers = edgeCaseNumbers(entry.doc);
+    expect(numbers.length).toBeGreaterThan(0);
+    expect(numbers).toEqual(numbers.map((_, i) => i + 1));
+    const missing = numbers.filter((n) => !entry.tests.some((t) => t.includes(`'${name} #${n}:`)));
+    expect(missing).toEqual([]);
+  });
 });

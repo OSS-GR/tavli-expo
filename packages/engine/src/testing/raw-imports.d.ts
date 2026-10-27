@@ -4,3 +4,9 @@ declare module '*.md?raw' {
   const text: string;
   export default text;
 }
+
+// Test sources, so a test can check that every docs edge case has a test.
+declare module '*.ts?raw' {
+  const text: string;
+  export default text;
+}

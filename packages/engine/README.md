@@ -189,8 +189,8 @@ interface RuleSet {
 - The Asodio presets use `match.rotation: ['asodio']`, because Asodio is not
   in the standard rotation.
 - `portes` is a single-game match (PM, #24). `tavli` is the match preset
-  with the rotation (for #51). Until Plakoto and Fevga exist, a `tavli`
-  match fails at game 2 with `UNKNOWN_VARIANT`. That is expected.
+  with the rotation (for #51). Until Plakoto exists, a `tavli` match
+  fails at game 2 with `UNKNOWN_VARIANT`. That is expected.
 - The two Acey-Deucey presets turn the owner's army rules off
   (`mustEnterAllFirst`, `quarterGathering`, `quarterLock`).
 - `getPreset(id)` returns the frozen preset. Bump its `version` in
@@ -308,7 +308,8 @@ A variant checks the `RuleSet` it gets with `validateRules`. It throws
 'parallel'` in a contrary game), and `NOT_SUPPORTED` for a flag of its own
 game that is not built yet. It never ignores a flag in silence.
 
-`VARIANT_REGISTRY` holds `BUILT_IN_VARIANTS`. Today that is only `portes`.
+`VARIANT_REGISTRY` holds `BUILT_IN_VARIANTS`. Today that is `portes` and
+`fevga`.
 
 ## Portes
 
@@ -389,6 +390,78 @@ flag must keep the `portes` preset value, or the variant throws
   side; a missing `off` means "the rest are off") and turns like `13/8* 8/5`
   or `4/0:6`. `src/testing/random-positions.ts` makes random positions.
 
+## Fevga
+
+Code: `src/variants/fevga/`. Rules: `docs/rules/fevga.md` and
+`docs/rules/tavli-match.md`.
+
+- `initialState`: all 15 on own point 24 for both players (`FEVGA_START`).
+  The movement is parallel, so White's 24 is Black's 12 (diagonal corners).
+- Movement: a checker moves from `p` to `p - d` and may never land on a
+  point with any opponent checker. There is no hitting and no bar. The
+  middle points of a combined move must be free too, because the search
+  plays one die at a time. Bearing off follows the shared rules.
+- **Runner rule** (`movement.runnerRule`, default on): while a checker has
+  left 24 but no checker has reached the target, the other checkers stay on 24. The target is own point 11 or lower (`runnerTarget: "passMother"`,
+  the owner's choice from the ΕΟΠΤ text) or 12 or lower
+  (`"reachQuarter"`). The board tells us this, so the state stores
+  nothing. The rule ends in the middle of a turn: once the runner reaches
+  the target, the rest of the roll may move any checker. If the runner
+  cannot move, the roll is lost.
+- **Prime rules** (`primes.*`), in the "Order of checks" of `fevga.md`:
+  1. The search keeps every position it reaches as a candidate: full plays,
+     shorter plays and "no move".
+  2. P1 and P2 drop every candidate that ends holding all of own 19–24
+     (P1) or own 6–11 (P2; 7–12 with `p2Window: "7-12"`). So a shorter
+     play can become the longest legal one (edge case 12).
+  3. Most dice, then the higher die rule (`higherDieRule`).
+  4. P3: if some play leaves the opponent a single-die move (for any die
+     1–6, with the opponent's runner rule and bearing off), drop the plays
+     that do not. If none does, any play is legal and the opponent passes.
+     With `p3Priority: "beforeDiceRule"`, P3 runs before step 3.
+
+  `primeRulesOff` turns P1, P2 and P3 off.
+
+- `legalTurns` lists one play per end position, higher die first, back
+  checkers first. `applyTurn` accepts any legal order. A turn that uses
+  every die, breaks no prime ban and leaves the opponent a move is legal at
+  once; any other turn is checked against the full search.
+  `nextMoves` keeps a move only when the rest of the dice can still end in
+  a legal play (so it never offers a move that ends in a banned prime or an
+  avoidable full block).
+- `result`: the winner bore off 15. Single = 1 if the loser bore off at
+  least one checker, else double = 2. Resigning uses the shared rule.
+- Not built yet: `noPrimeOwnHome: true` and `primeCheckTiming:
+"afterEachMove"` throw `NOT_SUPPORTED`. `fevga.md` does not say where
+  they go in the order of checks. Flags of other games throw
+  `RULES_CONFLICT`, like in Portes.
+- The search works on a private array (`position.ts`) with a Zobrist hash,
+  like Portes. It remembers (position, dice left) pairs it has seen. It
+  cannot use the Portes "doubles in order" trick: in Fevga, moving the
+  runner can free the checkers on 24. On the dev container (Node 22): about
+  0.02 ms per position on average; 15 checkers on 15 points with a double
+  (about 1,100 plays) 2 to 6 ms.
+
+Tests:
+
+- `fevga.test.ts`: one test per numbered edge case in `fevga.md`, named
+  like `fevga.md #12: ...`, the shared dice and bear-off cases as they play
+  in Fevga, every flag and the errors. `rules-docs.test.ts` fails if an
+  edge case in `fevga.md` has no test with its number.
+- `fevga-reference.test.ts`: a slow, simple generator that follows the
+  order of checks step by step must find the same end positions, also in
+  random near-block positions where P3 decides.
+- `fevga-next-moves.test.ts`: every move order that `nextMoves` allows
+  reaches exactly the end positions of `legalTurns`.
+- `fevga-fuzz.test.ts`: 2,000 random games (and 100 per flag setting) to
+  the end. After every move: 15 checkers each, never two colors on a
+  point, pip count down by the die. After every turn: no P1 or P2 prime,
+  the runner rule, and P3 (a full block only when every play blocks).
+- `fevga-perf.test.ts`: median < 5 ms and worst < 50 ms.
+- Test helpers: `src/testing/fevga-notation.ts` (the position notation for
+  parallel movement: `fevgaState('w: 24x14 13 ; b: 24x15')`) and
+  `src/testing/random-fevga-positions.ts`.
+
 ## Match
 
 Code: `src/match.ts`. Rules: `docs/rules/tavli-match.md` ("Who starts later
@@ -437,8 +510,8 @@ interface Match {
   last game starts with no opening roll. That is always the match winner.
 - Rotation: `nextVariantId(match)` is the next game.
   `startNextGame(match, startingPlayer)` returns its start state. A game
-  that is not built yet (today: Plakoto, Fevga, so game 2 of a `tavli`
-  match) throws `UNKNOWN_VARIANT` with a clear message and the path of the
+  that is not built yet (today: Plakoto, so game 2 of a `tavli` match)
+  throws `UNKNOWN_VARIANT` with a clear message and the path of the
   rotation entry. `missingVariants(match)` lists them up front.
 - `gameRules(match, variant)`: the game of `match.rules` uses those rules.
   The other games use their default preset with the same `match` group.
@@ -547,7 +620,7 @@ interface MatchFlow {
 
 ## Not here yet
 
-- Plakoto, Fevga and Asodio variants.
+- Plakoto and Asodio variants.
 - Extra rolls in one turn (Asodio roll chains, `extraRolls.*`). The flow
   reads the player to move from the state `applyTurn` returns, so a variant
   can give the same player another roll. A chained roll needs its own
