@@ -623,3 +623,17 @@ describe('asodio: the turn flow', () => {
     expect(again).toBeGreaterThan(0);
   }, 30_000);
 });
+
+describe('move origins', () => {
+  it('takes only 1-24 as a numeric "from": entries must say "outside"', () => {
+    const state = asodio.initialState({ startingPlayer: 'white' });
+    const dice: Dice = [1, 2];
+    const [turn] = asodio.legalTurns(state, dice);
+    expect(turn?.moves.every((move) => move.from === 'outside')).toBe(true);
+    const raw = { ...turn!, moves: turn!.moves.map((move) => ({ ...move, from: 25 as const })) };
+    expect(codeOf(() => asodio.applyTurn({ ...state, dice }, raw as unknown as Turn))).toBe(
+      'ILLEGAL_TURN',
+    );
+    expect(() => asodio.applyTurn({ ...state, dice }, turn!)).not.toThrow();
+  });
+});

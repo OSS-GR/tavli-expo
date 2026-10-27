@@ -189,7 +189,16 @@ function checkPlayable(state: GameState, dice: Dice): void {
 function originNumber(move: Move): number | null {
   if (move.from === 'bar') return BAR;
   if (move.from === 'outside') return OUTSIDE;
-  if (typeof move.from === 'number' && Number.isInteger(move.from)) return move.from;
+  // A board point is 1-24. 25 and 26 are the inner codes of outside and
+  // the bar; they must come as 'outside' or 'bar', so the log stays canonical.
+  if (
+    typeof move.from === 'number' &&
+    Number.isInteger(move.from) &&
+    move.from >= 1 &&
+    move.from <= 24
+  ) {
+    return move.from;
+  }
   return null;
 }
 
