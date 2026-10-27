@@ -1,6 +1,6 @@
 import type { createRecordingFeedback, createRecordingSoundPlayer } from '@tavli/contracts';
 import { createSeededRng, rollDie } from '@tavli/engine';
-import { act, screen, userEvent } from '@testing-library/react-native';
+import { act, screen } from '@testing-library/react-native';
 
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -9,6 +9,7 @@ import { feedback, sound } from '@/services';
 import { createGameStore } from './gameStore';
 import { GameScreen, OPENING_RESULT_MS } from './GameScreen';
 
+import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot as render } from '../../../test/render';
 
 const haptics = feedback as ReturnType<typeof createRecordingFeedback>;
@@ -30,6 +31,9 @@ function newStore(seed = seedWithoutTie()) {
   });
 }
 
+// The opening result closes by itself after 1.5 s (a timer).
+runOnFakeTimers();
+
 beforeEach(async () => {
   haptics.calls.length = 0;
   sounds.played.length = 0;
@@ -40,7 +44,7 @@ beforeEach(async () => {
 
 describe('<GameScreen /> dice', () => {
   it('rolls the opening die of each player in turn (pass-and-play)', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const store = newStore();
     await render(<GameScreen store={store} />);
 
@@ -72,7 +76,7 @@ describe('<GameScreen /> dice', () => {
   });
 
   it('rolls both opening dice with one tap (vs bot)', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const store = newStore();
     await render(<GameScreen store={store} openingTaps="one" />);
     await user.press(screen.getByRole('button', { name: 'Roll to start, or tap the board' }));
@@ -93,22 +97,17 @@ describe('<GameScreen /> dice', () => {
   });
 
   it('closes the opening card after a moment', async () => {
-    jest.useFakeTimers();
-    try {
-      const store = newStore();
-      await render(<GameScreen store={store} />);
-      await act(async () => {
-        store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
-        store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
-      });
-      expect(screen.getByText('Ann starts with 5-3.')).toBeOnTheScreen();
-      await act(async () => {
-        jest.advanceTimersByTime(OPENING_RESULT_MS + 10);
-      });
-      expect(screen.queryByTestId('opening-card')).toBeNull();
-    } finally {
-      jest.useRealTimers();
-    }
+    const store = newStore();
+    await render(<GameScreen store={store} />);
+    await act(async () => {
+      store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+      store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+    });
+    expect(screen.getByText('Ann starts with 5-3.')).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(OPENING_RESULT_MS + 10);
+    });
+    expect(screen.queryByTestId('opening-card')).toBeNull();
   });
 
   it('plays a checker click for a move and a cue for the next turn', async () => {
@@ -137,7 +136,7 @@ describe('<GameScreen /> dice', () => {
   });
 
   it('rolls the dice of a later turn with the Roll button, and no sound or haptic when off', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const store = newStore();
     await act(async () => {
       settingsStore.getState().setSetting('haptics', false);

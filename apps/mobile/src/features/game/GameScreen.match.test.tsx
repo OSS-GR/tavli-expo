@@ -12,6 +12,7 @@ import { GameScreen, MATCH_END_DELAY_MS } from './GameScreen';
 import { openingStatus } from './opening';
 import { passNotice } from './turnNotices';
 
+import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
 
@@ -22,6 +23,9 @@ const center = (r: { x: number; y: number; width: number; height: number }) => (
   x: r.x + r.width / 2,
   y: r.y + r.height / 2,
 });
+
+// The game screen closes its cards on timers (see test/clock.ts).
+runOnFakeTimers();
 
 beforeEach(async () => {
   await act(async () => {
