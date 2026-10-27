@@ -1,6 +1,7 @@
 /**
  * Tutorial events for analytics (#128): `tutorial_started`,
- * `tutorial_step`, `tutorial_finished` and `tutorial_skipped`.
+ * `tutorial_step`, `tutorial_finished` and `tutorial_skipped`. Each one
+ * says which lesson set it is about (`game`, #149).
  *
  * They go through the `Analytics` port, which drops every call until the
  * user allows usage data. An analytics error never breaks the tutorial: it
@@ -8,7 +9,7 @@
  *
  * Event plan: `docs/architecture/analytics-events.md`.
  */
-import type { Analytics, TutorialSource } from '@tavli/contracts';
+import type { Analytics, TutorialGame, TutorialSource } from '@tavli/contracts';
 
 import { analytics as appAnalytics } from '@/services';
 
@@ -31,11 +32,16 @@ function quietly(send: () => void): void {
   }
 }
 
-export function createTutorialAnalytics(analytics: Analytics = appAnalytics): TutorialAnalytics {
+/** The events of one lesson set (`game`, default Portes). */
+export function createTutorialAnalytics(
+  analytics: Analytics = appAnalytics,
+  game: TutorialGame = 'portes',
+): TutorialAnalytics {
   return {
-    started: (source) => quietly(() => analytics.track('tutorial_started', { source })),
-    step: (step, lesson) => quietly(() => analytics.track('tutorial_step', { step, lesson })),
-    finished: () => quietly(() => analytics.track('tutorial_finished')),
-    skipped: (step, lesson) => quietly(() => analytics.track('tutorial_skipped', { step, lesson })),
+    started: (source) => quietly(() => analytics.track('tutorial_started', { source, game })),
+    step: (step, lesson) => quietly(() => analytics.track('tutorial_step', { game, step, lesson })),
+    finished: () => quietly(() => analytics.track('tutorial_finished', { game })),
+    skipped: (step, lesson) =>
+      quietly(() => analytics.track('tutorial_skipped', { game, step, lesson })),
   };
 }

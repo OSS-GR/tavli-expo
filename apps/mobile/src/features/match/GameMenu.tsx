@@ -1,5 +1,6 @@
 /**
- * The in-game menu (wireframe 7) and its resign dialogs (wireframe 13).
+ * The in-game menu (wireframe 7). Its resign dialogs (wireframe 13) use
+ * `ConfirmDialog` from `@/components`.
  * Resign sits at the top, far from the thumb; Resume at the bottom.
  */
 import { useTranslation } from 'react-i18next';
@@ -106,66 +107,9 @@ export function GameMenu(props: GameMenuProps) {
   );
 }
 
-export interface ConfirmDialogProps {
-  title: string;
-  lines: readonly string[];
-  /** A boxed line, for example the match score after a resign. */
-  note?: string;
-  confirmLabel: string;
-  cancelLabel: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  testID?: string;
-}
-
-/**
- * A yes / no dialog. The risky action is outlined; the safe one is the main
- * button, nearest the thumb (wireframe 13).
- */
-export function ConfirmDialog({
-  title,
-  lines,
-  note,
-  confirmLabel,
-  cancelLabel,
-  onConfirm,
-  onCancel,
-  testID,
-}: ConfirmDialogProps) {
-  return (
-    <View testID={testID} style={styles.dialog}>
-      <Text style={styles.heading} accessibilityRole="header">
-        {title}
-      </Text>
-      {lines.map((line, i) => (
-        <Text key={i} style={styles.summary}>
-          {line}
-        </Text>
-      ))}
-      {note ? (
-        <View style={styles.note}>
-          <Text style={styles.noteText}>{note}</Text>
-        </View>
-      ) : null}
-      <View style={styles.actions}>
-        <ActionButton
-          testID="dialog-confirm"
-          label={confirmLabel}
-          kind="secondary"
-          onPress={onConfirm}
-        />
-        <ActionButton testID="dialog-cancel" label={cancelLabel} onPress={onCancel} />
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create((theme) => ({
   menu: {
     gap: theme.space.xs,
-  },
-  dialog: {
-    gap: theme.space.sm,
   },
   heading: {
     ...theme.type.title,
@@ -217,18 +161,5 @@ const styles = StyleSheet.create((theme) => ({
   }),
   resume: {
     paddingTop: theme.space.md,
-  },
-  note: {
-    padding: theme.space.md,
-    borderRadius: theme.radii.md,
-    backgroundColor: theme.colors.surfaceSelected,
-  },
-  noteText: {
-    ...theme.type.bodyStrong,
-    color: theme.colors.text,
-  },
-  actions: {
-    gap: theme.space.sm,
-    paddingTop: theme.space.sm,
   },
 }));

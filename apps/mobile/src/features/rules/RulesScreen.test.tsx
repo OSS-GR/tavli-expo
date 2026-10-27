@@ -142,15 +142,24 @@ describe('<RulesScreen />', () => {
     }
   });
 
-  it('offers the tutorial on the Portes page only (#128)', async () => {
-    const onLearnToPlay = jest.fn();
-    const props = { onOpenRules: jest.fn(), onLearnToPlay };
-    const view = await render(<RulesScreen variant="portes" {...props} />);
-    await userEvent
-      .setup()
-      .press(screen.getByRole('button', { name: 'Learn to play on the board' }));
-    expect(onLearnToPlay).toHaveBeenCalledTimes(1);
-    await view.rerender(<RulesScreen variant="plakoto" {...props} />);
+  it.each(['portes', 'plakoto', 'fevga'] as const)(
+    'offers the lessons of %s on its page (#128, #149)',
+    async (game) => {
+      const onLearnToPlay = jest.fn();
+      await render(
+        <RulesScreen variant={game} onOpenRules={jest.fn()} onLearnToPlay={onLearnToPlay} />,
+      );
+      await userEvent
+        .setup()
+        .press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+      expect(onLearnToPlay).toHaveBeenCalledWith(game);
+    },
+  );
+
+  it.each(['tavli', 'asodio'] as const)('has no lessons on the %s page', async (variant) => {
+    await render(
+      <RulesScreen variant={variant} onOpenRules={jest.fn()} onLearnToPlay={jest.fn()} />,
+    );
     expect(screen.queryByTestId('rules-learn-to-play')).not.toBeOnTheScreen();
   });
 

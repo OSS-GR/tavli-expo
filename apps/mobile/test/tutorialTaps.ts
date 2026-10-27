@@ -1,4 +1,7 @@
-/** Plays the tutorial (#128) like a finger would: tap a lit checker, then its target. */
+/**
+ * Plays the tutorial (#128, #149) like a finger would: tap a lit checker,
+ * then its target. `game` picks the lesson set (default Portes).
+ */
 import { currentBoard } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
 import { act, fireEvent, screen } from '@testing-library/react-native';
@@ -6,7 +9,14 @@ import { act, fireEvent, screen } from '@testing-library/react-native';
 import type { BoardView } from '@/features/board/boardModel';
 import { fitBoardWithShadow, slotRect, type ScreenRect } from '@/features/board/geometry';
 import { buildSources } from '@/features/board/interaction';
-import { LESSONS, lessonMoves, playLessonMove, startLesson } from '@/features/tutorial/lessons';
+import {
+  LESSON_SETS,
+  lessonDirection,
+  lessonMoves,
+  playLessonMove,
+  startLesson,
+  type TutorialGame,
+} from '@/features/tutorial/lessons';
 
 import { touch } from './gestureHandlerMock';
 
@@ -15,7 +25,10 @@ export const tutorialGeo = fitBoardWithShadow(
   getLayout(getTheme('walnut-kafeneio'), 'portrait-rotated'),
   TUTORIAL_BOARD_SIZE,
 );
-const VIEW: BoardView = { viewer: 'white', direction: 'contrary' };
+const viewOf = (game: TutorialGame): BoardView => ({
+  viewer: 'white',
+  direction: lessonDirection(game),
+});
 const PAN = 'tutorial-board-pan';
 
 export const center = (r: ScreenRect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
@@ -30,21 +43,30 @@ export async function layoutTutorialBoard(): Promise<void> {
 }
 
 /** The lit checkers of lesson `index` at its start, in screen points. */
-export function tutorialSources(index: number) {
-  const lesson = LESSONS[index]!;
+export function tutorialSources(index: number, game: TutorialGame = 'portes') {
+  const lesson = LESSON_SETS[game][index]!;
   const flow = startLesson(lesson);
-  return buildSources(tutorialGeo, currentBoard(flow), VIEW, 'white', lessonMoves(lesson, flow));
+  return buildSources(
+    tutorialGeo,
+    currentBoard(flow),
+    viewOf(game),
+    'white',
+    lessonMoves(lesson, flow),
+  );
 }
 
 /** Plays lesson `index` to the end with taps only (the board must be laid out). */
-export async function playLessonByTaps(index: number): Promise<void> {
-  const lesson = LESSONS[index]!;
+export async function playLessonByTaps(
+  index: number,
+  game: TutorialGame = 'portes',
+): Promise<void> {
+  const lesson = LESSON_SETS[game][index]!;
   let flow = startLesson(lesson);
   while (!lesson.done(flow)) {
     const sources = buildSources(
       tutorialGeo,
       currentBoard(flow),
-      VIEW,
+      viewOf(game),
       'white',
       lessonMoves(lesson, flow),
     );
@@ -56,7 +78,7 @@ export async function playLessonByTaps(index: number): Promise<void> {
   }
 }
 
-/** Taps your checkers on point 6: not lit in lessons 1 to 6. */
-export async function tapWrongPlace(): Promise<void> {
-  await touch(PAN, [center(slotRect(tutorialGeo, { kind: 'point', index: 6 }))]);
+/** Taps point `index` (default 6: your checkers there are not lit in Portes lessons 1 to 6). */
+export async function tapWrongPlace(index = 6): Promise<void> {
+  await touch(PAN, [center(slotRect(tutorialGeo, { kind: 'point', index }))]);
 }

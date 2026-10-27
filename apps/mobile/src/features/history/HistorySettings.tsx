@@ -7,8 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Sheet } from '@/components/Sheet';
-import { ConfirmDialog } from '@/features/match/GameMenu';
 
 import { historyStore, useHistory } from './store';
 

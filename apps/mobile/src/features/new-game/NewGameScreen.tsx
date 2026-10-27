@@ -24,11 +24,11 @@ import {
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { Sheet } from '@/components/Sheet';
 import { Toast, useToast } from '@/components/Toast';
-import { ConfirmDialog } from '@/features/match/GameMenu';
 import { BoardViewPicker } from '@/features/settings/BoardViewPicker';
 import {
   GAME_CHOICES,

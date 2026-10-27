@@ -2,6 +2,7 @@
 
 > Living document. Research date: 2026-10-26. Owner: `packages/bot`.
 > **Implemented API (#27):** `createBot(...).chooseTurn(state, dice, difficulty, { rng })` in `@tavli/bot`; the app uses the `BotRunner` port from `@tavli/contracts` (`chooseMove(req)`, async, seed-based). See `packages/bot/README.md`. The sketch in section 7 is the original design.
+> **Hard level, Portes (#147):** a TD(λ)-trained net (`portes-net.ts`), 1-ply, registered as Portes `hard` in `DEFAULT_EVALUATORS`. See section 5.7 and `packages/bot/README.md`, "The Portes net".
 > **Variant questions (#106):** `createBot(...).chooseAnswer(state, difficulty, { rng })` answers `Variant.prompt` (Plakoto "resign or play on"); the port has an optional `chooseAnswer(req)`. See section 4.5.
 > Related: [ADR-0002 modular architecture](../decisions/0002-modular-architecture.md), [roadmap](../roadmap.md).
 
@@ -79,7 +80,7 @@ All levels use the same pipeline:
 |---|---|---|---|
 | Easy | Heuristic | 1-ply | Softmax over scores, temperature 0.15. About half of its moves are not the best, but most of those cost little. Never passes a winning turn (e.g. a bear-off that wins). |
 | Medium | Heuristic (tuned) | 1-ply | Softmax, temperature 0.01. Small, plausible mistakes only. |
-| Hard | Neural net | 1-ply + 2-ply on top 3–5 | Best move. A tiny chance of the 2nd best move, so the bot is not a perfect machine. |
+| Hard | Neural net (Portes today, #147) | 1-ply (2-ply was tried: no gain, much slower; see 5.7) | Softmax, temperature 0.01, like medium. |
 | (Later) Expert / Hints | Neural net | 2-ply, wider, longer time budget | None |
 
 Why softmax noise and not random moves: a softmax picks good moves more often and bad moves rarely. The bot then looks like a weaker human, not a broken program. Track the **average equity loss per move** of each level in bot-vs-bot tests. Tune temperature until the levels are clearly apart (e.g. Hard beats Medium ~70%+, Medium beats Easy ~70%+).
@@ -202,6 +203,19 @@ Outputs (sigmoid): **P(win)**, **P(win double/mars)**, **P(lose double/mars)**. 
 - **Portes only:** also play vs gnubg and wildbg on a laptop (dev only). Portes is close to backgammon without the cube. Rule differences (e.g. how gammons/backgammons score) must be handled in the harness.
 - Keep a set of test positions with known best moves per variant (we can write them with strong local players).
 - Version every net: `weights/<variant>-v<N>.bin` + a hash + training notes in git.
+
+### 5.7 What we built for Portes (#147)
+
+What differs from the plan above, and why:
+
+- **The net only scores contact.** A race uses the Portes heuristic (Keith count, Kleinman metric, exact bear-off table). Training games stop when contact breaks, with the race heuristic as the target. This is the gnubg idea of a separate race evaluator, without a second net.
+- **Inputs:** the TD-Gammon units (192), bar and off (4), pip counts (2), the shot counts of both sides (2), and the heuristic's contact score (1). 201 in all. The last input gives the net the hand-made features at once. With it, the net beat medium about 70% of the time after only 10,000 self-play games.
+- **Training in `packages/bot/src/train/`** (not `tools/bot-training`), with `scripts/train.ts` as the Node entry. No `worker_threads`: we ran separate processes with different settings and seeds, and kept the best.
+- **λ-returns computed backwards at the end of each game** (the "forward view"), not eligibility traces. A step only touches the weight rows of the inputs that are set, so it is cheap.
+- **Weights in a `.ts` file** (`portes-net-weights.ts`, base64 Float32), not a `.bin`, so Metro, Vitest and Node load it with no extra setup. The training notes are in the file and in the bot README.
+- **1-ply only.** 2-ply on the top 3 turns gave no measurable gain over 400 games and was 16 times slower.
+
+**Measured (Portes hard, #147):** the shipped net (`portes-net-v1`: 201 → 40 → 3, 44 KB file) beat medium in 742 of 1,000 games (`simulate`, seed 1), 734 of 1,000 paired games (seed 2026) and 1,535 of 2,000 (seed 99): 73–77%, above the 70% target. It took 150,000 self-play games, 58 minutes on one core. It decides in 0.14 ms median and 5 ms worst (Node, 300 random positions). Details and the training runs: `packages/bot/README.md`, "The Portes net".
 
 ## 6. On-device inference and threading
 

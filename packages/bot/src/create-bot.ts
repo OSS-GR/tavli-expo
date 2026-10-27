@@ -12,13 +12,14 @@
  * | random | none                | uniform over the legal turns     |
  * | easy   | variant heuristic   | high (many small mistakes)       |
  * | medium | variant heuristic   | low (mostly the best turn)       |
- * | hard   | none yet (#52)      | throws `NOT_IMPLEMENTED`         |
+ * | hard   | Portes net (#147)   | low (like medium)                |
  *
  * The variant heuristics: Portes (`portes-heuristic.ts`), Plakoto
  * (`plakoto-heuristic.ts`), Fevga (`fevga-heuristic.ts`) and Asodio
- * (`asodio-heuristic.ts`). Easy for a variant with no evaluator falls back to
- * a random turn, but still takes a turn that wins at once. Medium and hard
- * need an evaluator.
+ * (`asodio-heuristic.ts`). Hard has a trained net for Portes only
+ * (`portes-net.ts`); the other variants throw `NOT_IMPLEMENTED` for hard.
+ * Easy for a variant with no evaluator falls back to a random turn, but
+ * still takes a turn that wins at once. Medium and hard need an evaluator.
  */
 
 import { BOT_DIFFICULTIES } from '@tavli/contracts';
@@ -31,6 +32,7 @@ import { asodioHeuristic } from './evaluators/asodio-heuristic';
 import { fevgaHeuristic } from './evaluators/fevga-heuristic';
 import { plakotoHeuristic } from './evaluators/plakoto-heuristic';
 import { portesHeuristic } from './evaluators/portes-heuristic';
+import { portesNet } from './evaluators/portes-net';
 import { pickOne, randomUnit } from './random';
 import { scoreTurns, scoreWithEngine } from './score';
 import type {
@@ -49,9 +51,12 @@ export { scoreTurns };
 /** An empty registry: only `random` and the easy fallback work. */
 export const EMPTY_EVALUATOR_REGISTRY: EvaluatorRegistry = new Map();
 
-/** The built-in evaluators: one heuristic per variant, for easy and medium. */
+/**
+ * The built-in evaluators: one heuristic per variant, for easy and medium,
+ * and the trained Portes net for Portes hard.
+ */
 export const DEFAULT_EVALUATORS: EvaluatorRegistry = new Map([
-  ['portes', { easy: portesHeuristic, medium: portesHeuristic }],
+  ['portes', { easy: portesHeuristic, medium: portesHeuristic, hard: portesNet }],
   ['plakoto', { easy: plakotoHeuristic, medium: plakotoHeuristic }],
   ['fevga', { easy: fevgaHeuristic, medium: fevgaHeuristic }],
   ['asodio', { easy: asodioHeuristic, medium: asodioHeuristic }],
@@ -67,12 +72,13 @@ export const DEFAULT_EVALUATORS: EvaluatorRegistry = new Map([
  *   still beats random play about 99 % of the time.
  * - medium (0.01): small noise. It only mixes turns that are almost equal
  *   (average loss about 0.001 points per turn).
- * - hard: no noise yet (no hard evaluator before #52).
+ * - hard (0.01): the same small noise as medium. The strength comes from
+ *   the evaluator (the Portes net), not from less noise.
  */
 export const DEFAULT_LEVEL_POLICIES: Readonly<Record<Difficulty, LevelPolicy>> = {
   easy: { temperature: 0.15 },
   medium: { temperature: 0.01 },
-  hard: { temperature: 0 },
+  hard: { temperature: 0.01 },
 };
 
 /** `random`: one uniformly random turn from the legal list (a pass is a one-item list). */

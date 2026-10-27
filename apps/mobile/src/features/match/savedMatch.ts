@@ -14,6 +14,11 @@
  * The game (#109) is `setup.game`. The envelope did not change: version 1
  * saves always held `game: 'portes'`, and they still load as Portes. The
  * game must match the preset of the log's rules, else the save is broken.
+ *
+ * `matchNumber` (#150) is the match within its session: 1, then 2 after a
+ * rematch, and so on. With the session id it names one match, so a save
+ * of a match the history already holds can be told apart from a rematch.
+ * Older saves have none (`null`); the envelope version did not change.
  */
 import { MATCH_FLOW_SCHEMA_VERSION, replay, type FlowEvent, type MatchFlow } from '@tavli/engine';
 
@@ -39,6 +44,8 @@ interface SaveEnvelope {
   readonly setup: MatchSetup;
   /** When it was saved (ms since 1970), for "12 min ago". */
   readonly savedAt: number;
+  /** The match within the session (1, 2, …). Saves before #150 have none. */
+  readonly matchNumber: number;
   readonly log: readonly FlowEvent[];
 }
 
@@ -46,6 +53,8 @@ export interface SavedMatch {
   readonly id: string;
   readonly setup: MatchSetup;
   readonly savedAt: number;
+  /** `null` for a save made before #150. */
+  readonly matchNumber: number | null;
   readonly flow: MatchFlow;
 }
 
@@ -60,6 +69,7 @@ export function serializeSavedMatch(
   setup: MatchSetup,
   flow: MatchFlow,
   savedAt: number,
+  matchNumber: number = 1,
 ): string {
   const envelope: SaveEnvelope = {
     v: SAVE_VERSION,
@@ -67,6 +77,7 @@ export function serializeSavedMatch(
     id,
     setup,
     savedAt,
+    matchNumber,
     log: flow.log,
   };
   return JSON.stringify(envelope);
@@ -127,5 +138,10 @@ export function parseSavedMatch(text: string | undefined, levels: GameLevels): S
     return broken('setup and log differ');
   }
   if (flow.match.status === 'finished') return { kind: 'none' };
-  return { kind: 'ok', saved: { id, setup, savedAt, flow } };
+  // A save before #150 has no number. A bad one counts as none: it only
+  // turns off the stale check in `sessions.ts`.
+  const number = raw['matchNumber'];
+  const matchNumber =
+    typeof number === 'number' && Number.isSafeInteger(number) && number >= 1 ? number : null;
+  return { kind: 'ok', saved: { id, setup, savedAt, matchNumber, flow } };
 }

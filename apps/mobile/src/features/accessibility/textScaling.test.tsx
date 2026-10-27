@@ -1,6 +1,7 @@
 /**
  * Large system fonts (#134): Home, New game, the game screen, the end
- * screens and History (#142) follow the font size with no cut text. Jest
+ * screens, History (#142) and the tutorial's mother card (#149) follow the
+ * font size with no cut text. Jest
  * cannot measure text, so `textScalingProblems` checks the layout rules
  * that keep text whole (see `test/textScaling.ts`), in English and in Greek.
  */
@@ -19,10 +20,12 @@ import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import { TutorialScreen } from '@/features/tutorial/TutorialScreen';
 import i18n from '@/i18n';
 
 import { renderWithRoot } from '../../../test/render';
 import { textScalingProblems } from '../../../test/textScaling';
+import { layoutTutorialBoard, playLessonByTaps } from '../../../test/tutorialTaps';
 import type { JsonNode } from '../../../test/tree';
 
 const problems = () => textScalingProblems(screen.toJSON() as JsonNode | JsonNode[] | null);
@@ -44,6 +47,30 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     await act(async () => {
       await i18n.changeLanguage(language);
     });
+  });
+
+  it('Tutorial: the Plakoto mother card (#149)', async () => {
+    await renderWithRoot(
+      <TutorialScreen
+        game="plakoto"
+        onLessonDone={jest.fn()}
+        onFinished={jest.fn()}
+        onSkip={jest.fn()}
+        onPlay={jest.fn()}
+        onHome={jest.fn()}
+      />,
+    );
+    await layoutTutorialBoard();
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) {
+        await act(async () => {
+          fireEvent.press(screen.getByTestId('tutorial-next'));
+        });
+      }
+      await playLessonByTaps(i, 'plakoto');
+    }
+    expect(screen.getByTestId('tutorial-mother-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
   });
 
   it('Home: no text in a fixed-height box, none cut to a line count', async () => {
@@ -151,6 +178,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       games: 6,
       diploWins: { white: 1, black: 1 },
       draws: 1,
+      matchNumber: 1,
     };
     const bot: HistoryRecord = { ...record, id: 'b', mode: 'bot', botLevel: 'medium' };
     await renderWithRoot(<HistoryScreen records={[record, bot]} onPlay={jest.fn()} />);

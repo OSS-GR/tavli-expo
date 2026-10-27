@@ -88,10 +88,10 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Resign | You resigned a game or a match |
 | Setting changed | You changed a setting. Includes the setting's name only, not its value |
 | Theme changed | You picked another board theme. Includes the theme's name |
-| Tutorial started | You opened the tutorial. Includes where you opened it from (home, rules or settings) |
-| Tutorial step | You finished a lesson of the tutorial. Includes the lesson's number and name (for example "hit") |
-| Tutorial finished | You finished the last lesson of the tutorial |
-| Tutorial skipped | You tapped Skip in the tutorial. Includes the lesson's number and name on screen |
+| Tutorial started | You opened the tutorial. Includes where you opened it from (home, rules or settings) and its game (Portes, Plakoto or Fevga) |
+| Tutorial step | You finished a lesson of the tutorial. Includes the game, and the lesson's number and name (for example "hit") |
+| Tutorial finished | You finished the last lesson of the tutorial. Includes the game |
+| Tutorial skipped | You tapped Skip in the tutorial. Includes the game, and the lesson's number and name on screen |
 | Screen viewed | You opened a screen. Includes the screen's name (for example "settings"), never personal data |
 
 Each event also carries technical facts: the phone maker and model (for example "iPhone 15", never the name you gave your phone), the system and its version, screen size, the app name and version, language and time zone. It carries the install id, and random ids that PostHog keeps on your phone.

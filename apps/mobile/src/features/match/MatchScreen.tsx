@@ -11,6 +11,7 @@ import { opponent, type PlayerId } from '@tavli/engine';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Sheet } from '@/components/Sheet';
 import type { BotTiming } from '@/features/bot/botTurn';
 import { useGameStore } from '@/features/game/gameStore';
@@ -18,7 +19,7 @@ import { GameScreen, type BotSeat } from '@/features/game/GameScreen';
 import { winType } from '@/features/game/turnNotices';
 import { botRunner, createLocalRng } from '@/services';
 
-import { ConfirmDialog, GameMenu } from './GameMenu';
+import { GameMenu } from './GameMenu';
 import { canResignGame, previewResign, resigningPlayer } from './resign';
 import { seatsFor } from './seats';
 import type { MatchSession } from './sessions';
