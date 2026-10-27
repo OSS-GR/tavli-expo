@@ -18,7 +18,7 @@ export interface GameCardProps {
   title: string;
   /** Lines under the title. */
   lines?: readonly string[];
-  /** Small text at the bottom, e.g. "Closes by itself after 3 s." */
+  /** Small text at the bottom, e.g. "Closes by itself after 3.5 s." */
   footnote?: string;
   /** Buttons. */
   children?: ReactNode;
