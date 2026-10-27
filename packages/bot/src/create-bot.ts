@@ -16,9 +16,10 @@
  *
  * The variant heuristics: Portes (`portes-heuristic.ts`), Plakoto
  * (`plakoto-heuristic.ts`), Fevga (`fevga-heuristic.ts`) and Asodio
- * (`asodio-heuristic.ts`). Hard has a trained net for Portes
- * (`portes-net.ts`, #147), Plakoto (`plakoto-net.ts`) and Fevga
- * (`fevga-net.ts`, #156); Asodio throws `NOT_IMPLEMENTED` for hard.
+ * (`asodio-heuristic.ts`). Hard has a trained net for each: Portes
+ * (`portes-net.ts`, #147), Plakoto (`plakoto-net.ts`), Fevga
+ * (`fevga-net.ts`, #156) and Asodio (`asodio-net.ts`, #164). A custom
+ * registry with no hard evaluator throws `NOT_IMPLEMENTED` for hard.
  * Easy for a variant with no evaluator falls back to a random turn, but
  * still takes a turn that wins at once. Medium and hard need an evaluator.
  */
@@ -30,6 +31,7 @@ import { VARIANT_REGISTRY, getVariant } from '@tavli/engine';
 import { questionOf, scoreAnswers } from './answer';
 import { BotError } from './errors';
 import { asodioHeuristic } from './evaluators/asodio-heuristic';
+import { asodioNet } from './evaluators/asodio-net';
 import { fevgaHeuristic } from './evaluators/fevga-heuristic';
 import { fevgaNet } from './evaluators/fevga-net';
 import { plakotoHeuristic } from './evaluators/plakoto-heuristic';
@@ -56,13 +58,13 @@ export const EMPTY_EVALUATOR_REGISTRY: EvaluatorRegistry = new Map();
 
 /**
  * The built-in evaluators: one heuristic per variant, for easy and medium,
- * and a trained net for hard in Portes, Plakoto and Fevga.
+ * and a trained net for hard in every game.
  */
 export const DEFAULT_EVALUATORS: EvaluatorRegistry = new Map([
   ['portes', { easy: portesHeuristic, medium: portesHeuristic, hard: portesNet }],
   ['plakoto', { easy: plakotoHeuristic, medium: plakotoHeuristic, hard: plakotoNet }],
   ['fevga', { easy: fevgaHeuristic, medium: fevgaHeuristic, hard: fevgaNet }],
-  ['asodio', { easy: asodioHeuristic, medium: asodioHeuristic }],
+  ['asodio', { easy: asodioHeuristic, medium: asodioHeuristic, hard: asodioNet }],
 ]);
 
 /**

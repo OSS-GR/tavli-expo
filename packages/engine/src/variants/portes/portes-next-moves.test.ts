@@ -61,6 +61,33 @@ describe('Portes nextMoves (one move at a time)', () => {
     expect(next(state, [6, 1], done)).toEqual([]);
   });
 
+  // #179: a checker leaves a door (πόρτα), hits a blot, and plays the other die.
+  it('after a hit, the same checker may play the other die, in both dice orders', () => {
+    // White's door on 13. Black blots on White's 8 (Black's 17) or 10 (Black's 15).
+    const by5 = portesState('w: 13x2 6x13 ; b: 17 24x14');
+    const by3 = portesState('w: 13x2 6x13 ; b: 15 24x14');
+    for (const dice of [
+      [5, 3],
+      [3, 5],
+    ] as Dice[]) {
+      expect(portes.legalTurns(by5, dice).map(formatTurn)).toContain('13/8* 8/5');
+      expect(next(by5, dice)).toContain('13/8*');
+      expect(next(by5, dice, parseTurn('13/8*', 'white', dice).moves)).toContain('8/5');
+      expect(next(by5, dice, parseTurn('13/8* 8/5', 'white', dice).moves)).toEqual([]);
+
+      expect(portes.legalTurns(by3, dice).map(formatTurn)).toContain('13/10* 10/5');
+      expect(next(by3, dice)).toContain('13/10*');
+      expect(next(by3, dice, parseTurn('13/10*', 'white', dice).moves)).toContain('10/5');
+    }
+  });
+
+  it('after a hit from the bar, the entered checker may play the other die', () => {
+    // portes.md hitting rule 6: enter (and hit), then any checker may move.
+    const state = portesState('w: bar 6x14 ; b: 5 1x14');
+    expect(next(state, [5, 3])).toContain('25/20*');
+    expect(next(state, [5, 3], parseTurn('25/20*', 'white', [5, 3]).moves)).toContain('20/17');
+  });
+
   it('rejects a legal single move that would leave the rest of the roll unplayable', () => {
     // 7/1 (6) is legal alone, but then no 5 can be played. 20/14/9 plays both dice.
     const state = portesState('w: 24x13 20 7 ; b: 23x2 10x2 7x2 6x2 3x7');
