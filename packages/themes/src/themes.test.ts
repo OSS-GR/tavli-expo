@@ -85,6 +85,7 @@ describe('theme registry', () => {
   it('lists the bundled themes and has a valid default', () => {
     expect(listThemeIds()).toContain('walnut-kafeneio');
     expect(listThemeIds()).toContain('olive-inlay');
+    expect(listThemeIds()).toContain('kafeneio-night');
     expect(listThemeIds()).toContain(DEFAULT_THEME_ID);
   });
 
@@ -219,8 +220,9 @@ for (const id of listThemeIds()) {
       }
 
       it(`${side} checker vs the field is at least 3:1 (fill or outline)`, () => {
-        // A light field (Olive Inlay) and a cream checker are close in fill.
-        // Then the dark rim carries the contrast, as on points (palette.md).
+        // A light field (Olive Inlay) and a cream checker are close in fill,
+        // and so are a dark field (Kafeneio Night) and an ebony checker. Then
+        // the rim or the ring carries the contrast, as on points (palette.md).
         const field = p['board.field'] as string;
         const best = Math.max(...outlineColors(theme, side).map((c) => contrastRatio(c, field)));
         expect(best).toBeGreaterThanOrEqual(3);
@@ -249,6 +251,26 @@ for (const id of listThemeIds()) {
       expect(contrastRatio(select.color, select.halo.color)).toBeGreaterThanOrEqual(3);
       expect(contrastRatio(target.color, target.halo.color)).toBeGreaterThanOrEqual(3);
     });
+
+    for (const kind of ['select', 'target'] as const) {
+      it(`${kind} highlight stands out from the field and both points by at least 3:1 (ring or halo)`, () => {
+        // On a dark field (Kafeneio Night) the gold ring carries the contrast;
+        // on a light field or a pale point the dark halo does.
+        const h = theme.highlights[kind];
+        const grounds = {
+          field: p['board.field'] as string,
+          'dark point': theme.points.dark.fill,
+          'light point': theme.points.light.fill,
+        };
+        for (const [name, ground] of Object.entries(grounds)) {
+          const best = Math.max(
+            contrastRatio(h.color, ground),
+            contrastRatio(h.halo.color, ground),
+          );
+          expect(best, name).toBeGreaterThanOrEqual(3);
+        }
+      });
+    }
 
     it('text colors are at least 4.5:1 on their background', () => {
       // The count badge number, and the UI text tokens on the UI background.

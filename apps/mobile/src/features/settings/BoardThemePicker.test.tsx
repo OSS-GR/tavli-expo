@@ -1,5 +1,5 @@
 import { getTheme } from '@tavli/themes';
-import { act, fireEvent, render, screen, userEvent } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, userEvent, within } from '@testing-library/react-native';
 
 import i18n from '@/i18n';
 
@@ -11,6 +11,7 @@ import { settingsStore } from './store';
 
 const olive = getTheme('olive-inlay');
 const walnut = getTheme('walnut-kafeneio');
+const night = getTheme('kafeneio-night');
 
 /** Point fills drawn inside one canvas. */
 function pointFills(canvasTestID: string): string[] {
@@ -47,26 +48,34 @@ describe('Settings → Board', () => {
     await render(<SettingsScreen />);
 
     expect(screen.getByRole('header', { name: 'Board' })).toBeOnTheScreen();
+    expect(within(screen.getByTestId('settings-board-theme')).getAllByRole('radio')).toHaveLength(
+      3,
+    );
     const walnutRow = screen.getByRole('radio', { name: 'Walnut Kafeneio' });
     const oliveRow = screen.getByRole('radio', { name: 'Olive Inlay' });
+    const nightRow = screen.getByRole('radio', { name: 'Kafeneio Night' });
     expect(walnutRow).toBeChecked();
     expect(oliveRow).not.toBeChecked();
+    expect(nightRow).not.toBeChecked();
 
     // Each preview draws its own theme, whatever the saved choice is.
-    await layout('settings-board-theme-olive-inlay-preview');
-    await layout('settings-board-theme-walnut-kafeneio-preview');
     const sortedFills = (t: typeof olive) => [t.points.dark.fill, t.points.light.fill].sort();
-    expect(pointFills('settings-board-theme-olive-inlay-preview-canvas')).toEqual(
-      sortedFills(olive),
-    );
-    expect(pointFills('settings-board-theme-walnut-kafeneio-preview-canvas')).toEqual(
-      sortedFills(walnut),
-    );
+    for (const theme of [walnut, olive, night]) {
+      await layout(`settings-board-theme-${theme.id}-preview`);
+      expect(pointFills(`settings-board-theme-${theme.id}-preview-canvas`)).toEqual(
+        sortedFills(theme),
+      );
+    }
 
     await user.press(oliveRow);
     expect(settingsStore.getState().boardTheme).toBe('olive-inlay');
     expect(screen.getByRole('radio', { name: 'Olive Inlay' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Walnut Kafeneio' })).not.toBeChecked();
+
+    await user.press(nightRow);
+    expect(settingsStore.getState().boardTheme).toBe('kafeneio-night');
+    expect(screen.getByRole('radio', { name: 'Kafeneio Night' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Olive Inlay' })).not.toBeChecked();
     // The app colors are a separate setting.
     expect(settingsStore.getState().theme).toBe(DEFAULT_SETTINGS.theme);
   });
@@ -80,5 +89,6 @@ describe('Settings → Board', () => {
     expect(screen.getByRole('header', { name: 'Ταμπλό' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: olive.name.el })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: walnut.name.el })).toBeOnTheScreen();
+    expect(screen.getByRole('radio', { name: night.name.el })).toBeOnTheScreen();
   });
 });

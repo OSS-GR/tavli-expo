@@ -54,6 +54,15 @@ const SHOTS: BoardShot[] = [
     width: 320,
     height: 524,
   },
+  // The third board (#144), the dark one. Same position and size as the olive shot.
+  {
+    file: 'board-start-kafeneio-night.png',
+    theme: 'kafeneio-night',
+    position: 'start',
+    view: { viewer: 'white', direction: 'contrary' },
+    width: 320,
+    height: 524,
+  },
 ];
 
 it('renders the board screenshots', async () => {

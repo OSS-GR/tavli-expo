@@ -1,7 +1,7 @@
 # Board style: two wooden concepts
 
 > Issue #13. Owner decision (2026-10-26): **traditional wooden style only**, kafeneio feel. Last review: 2026-10-26.
-> Status: decided. Concept B shipped first as `walnut-kafeneio`. Concept A shipped as the second board, `olive-inlay` (issue #138). The player picks one in Settings → Board.
+> Status: decided. Concept B shipped first as `walnut-kafeneio`. Concept A shipped as the second board, `olive-inlay` (issue #138). A third, dark board, `kafeneio-night` (issue #144), came after the two concepts. The player picks one in Settings → Board.
 
 Both mockups show the same moment: a Portes game at the start position. You have the light checkers and rolled 5-3. You tapped the top checker on your point 13, so points 10 and 8 show as legal targets. Undo and Confirm are drawn enabled so you can see their style.
 
@@ -27,11 +27,18 @@ Both mockups show the same moment: a Portes game at the start position. You have
 | `concept-*@3x.webp` | Full-size mockups, 1179 × 2556 |
 | `orientation.png` | Sketch of the two orientation options |
 | `olive-inlay-theme.webp` | Concept A as built: the `olive-inlay` theme rendered from its manifest (`packages/themes/preview/olive-inlay.png`, 786 × 1292) |
+| `kafeneio-night-theme.webp` | The third board, `kafeneio-night` (issue #144), rendered from its manifest (`packages/themes/preview/kafeneio-night.png`, 786 × 1292). See below. |
 | `src/build.js` | Generates the SVGs and renders the PNGs (Node + Playwright Chromium) |
 | `src/concept-a.svg`, `src/concept-b.svg`, `src/orientation.svg` | Generated SVG sources |
 | `src/prepare_textures.py` | Downloads and grades the CC0 wood textures |
 | `src/contrast.py` | Contrast and color-blind numbers for `palette.md` |
 | `textures/` | 10 graded CC0 wood textures (650 KB total) |
+
+## Third board: Kafeneio Night
+
+Issue #144 adds a dark board for the evening, in the same wooden style: a deep mahogany field, a black walnut frame with brass corner plates, nails, hinges and stringing, rosewood and pale ash points, ivory and ebony checkers (a brass ring on the ebony ones) and dark dice with gold pips. It has no mockup; the theme render is the reference. Tokens and contrast are in [`palette.md`](palette.md#kafeneio-night) and in `packages/themes/README.md`.
+
+<img src="kafeneio-night-theme.webp" width="295" alt="Kafeneio Night: dark mahogany board with brass corner plates and nails, rosewood and pale ash points, ivory and ebony checkers, a selected checker and two legal targets in gold">
 
 ## Orientation: turn the board 90°
 

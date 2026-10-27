@@ -1,6 +1,6 @@
 # Licenses and sources for `@tavli/themes`
 
-> Last review: 2026-10-26. Every file that ships in a theme folder is listed here.
+> Last review: 2026-10-27. Every file that ships in a theme folder is listed here.
 
 ## Our own work
 
@@ -27,6 +27,15 @@ The Olive Inlay sources in `tools/olive-inlay/textures/` are copies of the Conce
 | `frame-olive-streak.jpg`                       | [Smoked Walnut Veneer](https://polyhaven.com/a/smoked_walnut_veneer) | Jenelle van Heerden | CC0 1.0 |
 | `point-wenge.jpg`                              | [Flamed Black Veneer](https://polyhaven.com/a/flamed_black_veneer)   | Jenelle van Heerden | CC0 1.0 |
 | `point-mahogany.jpg`                           | [Sapele Veneer](https://polyhaven.com/a/sapele_veneer)               | Jenelle van Heerden | CC0 1.0 |
+
+The Kafeneio Night sources in `tools/kafeneio-night/textures/` were downloaded from Poly Haven (2K diffuse JPGs) and graded by `tools/kafeneio-night/prepare_textures.py` for issue #144.
+
+| Graded source in `tools/kafeneio-night/textures/` | Poly Haven asset                                                         | Author(s)                                     | License |
+| ------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------- | ------- |
+| `field-mahogany.jpg`                              | [Dark Wood](https://polyhaven.com/a/dark_wood)                           | Dario Barresi, Dimitrios Savva, Rico Cilliers | CC0 1.0 |
+| `frame-black-walnut.jpg`                          | [Black Walnut Veneer 02](https://polyhaven.com/a/black_walnut_veneer_02) | Jenelle van Heerden                           | CC0 1.0 |
+| `point-rosewood.jpg`                              | [Rosewood Veneer 02](https://polyhaven.com/a/rosewood_veneer_02)         | Jenelle van Heerden                           | CC0 1.0 |
+| `point-ash.jpg`                                   | [Ash Veneer](https://polyhaven.com/a/ash_veneer)                         | Jenelle van Heerden                           | CC0 1.0 |
 
 ## Theme `walnut-kafeneio`
 
@@ -56,6 +65,21 @@ Each image ships as `name.webp` (@1x), `name@2x.webp` and `name@3x.webp`. All ar
 
 The meander (Greek key) and the dog-tooth banding are traditional patterns, drawn in code. No maker's design is copied.
 
+## Theme `kafeneio-night`
+
+Each image ships as `name.webp` (@1x), `name@2x.webp` and `name@3x.webp`. All are made by `pnpm --filter @tavli/themes build:assets -- kafeneio-night`.
+
+| Files in `kafeneio-night/`                      | What                                                                                     | Made from                                                              | License                   |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------- |
+| `theme.json`                                    | Manifest                                                                                 | Our own work                                                           | Project                   |
+| `board-portrait*.webp`, `board-landscape*.webp` | Frame, bar, trays, empty field; brass corner plates, nails, hinges, clasps and stringing | Our own drawing, filled with `field-mahogany` and `frame-black-walnut` | Project; textures CC0 1.0 |
+| `shade-portrait*.webp`, `shade-landscape*.webp` | Dark field edges and the frame's inner shadow, drawn over the points                     | Our own drawing (no third-party pixels)                                | Project                   |
+| `point-rosewood*.webp`                          | Tile for the dark points                                                                 | `point-rosewood.jpg`, resized                                          | CC0 1.0                   |
+| `point-ash*.webp`                               | Tile for the light points                                                                | `point-ash.jpg`, resized                                               | CC0 1.0                   |
+| `sounds/*.m4a`                                  | The game sounds                                                                          | Copies of the Walnut Kafeneio sounds (see [Sounds](#sounds))           | CC0 1.0                   |
+
+The brass work is drawn in code. No maker's design is copied.
+
 ## Previews
 
 `preview/*.png` are renders of the themes made by `tools/preview.mjs`. They are not shipped in the app. Same sources and licenses as the theme.
@@ -84,7 +108,7 @@ All third-party sounds are **CC0 1.0** ([deed](https://creativecommons.org/publi
 | [Casino Audio](https://kenney.nl/assets/casino-audio) 1.1                                                  | Kenney Vleugels (kenney.nl) | CC0 1.0 | `dice-grab-1.ogg`                                                                   |
 | [Music Jingles](https://kenney.nl/assets/music-jingles)                                                    | Kenney Vleugels (kenney.nl) | CC0 1.0 | `jingles_PIZZI10.ogg`, `jingles_STEEL10.ogg`                                        |
 
-### Files in `walnut-kafeneio/sounds/` (and the same files in `olive-inlay/sounds/`)
+### Files in `walnut-kafeneio/sounds/` (and the same files in `olive-inlay/sounds/` and `kafeneio-night/sounds/`)
 
 Mono AAC (`.m4a`), 44.1 kHz, 64 kbit/s. About 54 KB in total (the limit is 500 KB, checked by `themes.test.ts`).
 
