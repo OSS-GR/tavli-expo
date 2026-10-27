@@ -124,7 +124,10 @@ function runExport(options: Map<string, string>): void {
     `  id: ${quote(id)},\n` +
     `  inputs: ${net.inputs},\n` +
     `  hidden: ${net.hidden},\n` +
-    `  notes: ${quote(notes)},\n` +
+    // Prettier moves a long value to its own line (print width 100).
+    (`  notes: ${quote(notes)},`.length > 100
+      ? `  notes:\n    ${quote(notes)},\n`
+      : `  notes: ${quote(notes)},\n`) +
     `  data: '${net.data}',\n` +
     `};\n`;
   fs.writeFileSync(target, text);
