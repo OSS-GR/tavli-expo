@@ -166,6 +166,21 @@ describe('saving a local match', () => {
     expect(sessions.get(first.id)).toBeNull();
   });
 
+  it('keeps playing when the save fails (a storage error does not leave dispatch)', () => {
+    const storage = createMemoryStorage();
+    const s = registry(storage).start(botSetup);
+    openGame(s);
+    playMoves(s);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(storage, 'setString').mockImplementation(() => {
+      throw new Error('disk full');
+    });
+    expect(s.store.getState().dispatch({ type: 'confirm', player: 'white' })).toBe(true);
+    expect(flowOf(s).game.state.toMove).toBe('black');
+    expect(warn).toHaveBeenCalledWith('could not save the match', expect.any(Error));
+    jest.restoreAllMocks();
+  });
+
   it('end() forgets the match and clears its save', () => {
     const storage = createMemoryStorage();
     const sessions = registry(storage);

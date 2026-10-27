@@ -32,9 +32,10 @@ export default function HomeRoute() {
   // Read it again each time Home shows (back from a game).
   useFocusEffect(
     useCallback(() => {
-      // Keep `broken` once set: the notice shows once (the save is gone now).
-      const next = readSlot();
-      setSlot((old) => ({ ...next, broken: old.broken || next.broken }));
+      // `broken` goes back to false here (the save is gone now). The toast
+      // was shown already and keeps its own timer. A sticky `broken` would
+      // show it again whenever the text changes (a language switch).
+      setSlot(readSlot());
     }, []),
   );
   const { saved } = slot;

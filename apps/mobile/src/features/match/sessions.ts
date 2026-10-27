@@ -76,14 +76,21 @@ export function createSessionRegistry({
   let session: MatchSession | null = null;
   let unsubscribe: (() => void) | null = null;
 
+  // It runs inside the store's `set` (a subscriber), after the flow has
+  // changed. A storage error must not throw out of `dispatch`: the move is
+  // played, only the save failed. The next save tries again.
   const write = (s: MatchSession) => {
     if (!storage) return;
-    const { flow } = s.store.getState();
-    if (flow.match.status === 'finished') {
-      storage.remove(SAVED_MATCH_KEY);
-      return;
+    try {
+      const { flow } = s.store.getState();
+      if (flow.match.status === 'finished') {
+        storage.remove(SAVED_MATCH_KEY);
+        return;
+      }
+      storage.setString(SAVED_MATCH_KEY, serializeSavedMatch(s.id, s.setup, flow, now()));
+    } catch (error) {
+      console.warn('could not save the match', error);
     }
-    storage.setString(SAVED_MATCH_KEY, serializeSavedMatch(s.id, s.setup, flow, now()));
   };
 
   const savedId = (): string | null => {

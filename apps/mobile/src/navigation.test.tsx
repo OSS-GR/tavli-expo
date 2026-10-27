@@ -29,6 +29,10 @@ beforeEach(async () => {
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS });
   });
+  // Each test starts with no match and an empty save slot.
+  const current = matchSessions.current();
+  if (current) matchSessions.end(current.id);
+  storage.remove(SAVED_MATCH_KEY);
 });
 
 describe('app navigation', () => {
@@ -89,5 +93,11 @@ describe('app navigation', () => {
     expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');
     expect(screen.queryByRole('button', { name: /^Continue game/ })).toBeNull();
     expect(storage.getString(SAVED_MATCH_KEY)).toBeUndefined();
+
+    // A language switch does not show the notice again (in Greek).
+    await act(async () => {
+      settingsStore.setState({ language: 'el' });
+    });
+    expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');
   });
 });

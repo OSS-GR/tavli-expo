@@ -32,6 +32,7 @@
 - `features/match/sessions.ts` saves when a match starts and each time the flow comes to rest (`isRestPoint`: awaiting a roll, the opening roll, or game over). So a confirmed turn, a pass, a game end, the next game and a rematch all save. Moves in the middle of a turn wait for Confirm.
 - `saveNow()` saves at once, mid-turn too: when the app leaves the foreground (`useSaveOnBackground` in `app/_layout.tsx`) and on **Exit to home**.
 - A finished match is removed from the slot. A rematch is saved as a new match.
+- A save that fails (a storage error) only logs a warning. The move stays played, and the next save tries again.
 - After an app restart, `get(id)` loads the save into a new game store (`createGameStore({ flow })`); new dice come from a new local RNG. A saved bot level this build cannot play becomes Easy.
 - **Home** reads the slot each time it shows (`useFocusEffect`). With a save it shows **Continue game**: game, opponent, score, target and time since the save ("12 min ago"). A broken save shows the toast "Your saved game could not be opened." once.
 - **New game** with a save: Start asks "Start a new game? Your saved game will end." (Start new / Cancel).
