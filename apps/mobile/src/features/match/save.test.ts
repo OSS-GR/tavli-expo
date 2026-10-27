@@ -181,6 +181,28 @@ describe('saving a local match', () => {
     jest.restoreAllMocks();
   });
 
+  it('start, peek, get and end never throw when storage fails', () => {
+    const storage = createMemoryStorage();
+    const sessions = registry(storage);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fail = () => {
+      throw new Error('storage error');
+    };
+    jest.spyOn(storage, 'getString').mockImplementation(fail);
+    jest.spyOn(storage, 'remove').mockImplementation(fail);
+    jest.spyOn(storage, 'setString').mockImplementation(fail);
+
+    const s = sessions.start(botSetup);
+    expect(sessions.current()).toBe(s);
+    expect(sessions.peek()).toEqual({ kind: 'none' });
+    expect(sessions.get('some-other-id')).toBeNull();
+    expect(() => sessions.end(s.id)).not.toThrow();
+    expect(sessions.current()).toBeNull();
+    expect(warn).toHaveBeenCalledWith('could not read the saved match', expect.any(Error));
+    expect(warn).toHaveBeenCalledWith('could not remove the saved match', expect.any(Error));
+    jest.restoreAllMocks();
+  });
+
   it('end() forgets the match and clears its save', () => {
     const storage = createMemoryStorage();
     const sessions = registry(storage);

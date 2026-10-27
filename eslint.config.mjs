@@ -36,6 +36,8 @@ const vendorImports = {
     'react-native-mmkv/*',
     // Haptics: use the `Feedback` port and `@tavli/haptics-expo`.
     'expo-haptics',
+    // Sound: use the `SoundPlayer` port and `@tavli/audio-expo`.
+    'expo-audio',
   ],
   message:
     'Vendor SDKs belong in packages/adapters/* (or apps/server). Use a port from @tavli/contracts instead. See ADR-0002.',

@@ -93,6 +93,26 @@ export function createSessionRegistry({
     }
   };
 
+  // Reads and removes never throw either. A storage error (full disk, an MMKV
+  // failure) must not break Home, New game or the game route: a failed read
+  // counts as no save, and a failed remove only logs.
+  const readSaved = (): string | undefined => {
+    try {
+      return storage?.getString(SAVED_MATCH_KEY);
+    } catch (error) {
+      console.warn('could not read the saved match', error);
+      return undefined;
+    }
+  };
+
+  const removeSaved = () => {
+    try {
+      storage?.remove(SAVED_MATCH_KEY);
+    } catch (error) {
+      console.warn('could not remove the saved match', error);
+    }
+  };
+
   const savedId = (): string | null => {
     const result = peek();
     return result.kind === 'ok' ? result.saved.id : null;
@@ -100,8 +120,8 @@ export function createSessionRegistry({
 
   const peek = (): SavedMatchResult => {
     if (!storage) return { kind: 'none' };
-    const result = parseSavedMatch(storage.getString(SAVED_MATCH_KEY), levels);
-    if (result.kind !== 'ok') storage.remove(SAVED_MATCH_KEY);
+    const result = parseSavedMatch(readSaved(), levels);
+    if (result.kind !== 'ok') removeSaved();
     return result;
   };
 
@@ -123,7 +143,7 @@ export function createSessionRegistry({
   return {
     start: (setup) => {
       forget();
-      storage?.remove(SAVED_MATCH_KEY);
+      removeSaved();
       const store = createGameStore({
         players: enginePlayers(setup),
         targetPoints: setup.targetPoints,
@@ -151,7 +171,7 @@ export function createSessionRegistry({
     current: () => session,
     end: (id) => {
       if (session?.id === id) forget();
-      if (savedId() === id) storage?.remove(SAVED_MATCH_KEY);
+      if (savedId() === id) removeSaved();
     },
     saveNow: () => {
       if (session) write(session);

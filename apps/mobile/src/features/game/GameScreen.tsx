@@ -29,11 +29,11 @@ import { moveFlights, type Flight } from '@/features/board/flights';
 import type { BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
-import { playHaptic } from '@/features/feedback/feedback';
 import { useSettings } from '@/features/settings/store';
 
 import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
+import { isHumanWin, useGameFeedback } from './gameFeedback';
 import { diceView, turnView, useGameStore, type DieView, type GameStore } from './gameStore';
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
@@ -87,6 +87,7 @@ export interface GameScreenProps {
 }
 
 const other = (player: PlayerId): PlayerId => (player === 'white' ? 'black' : 'white');
+const BOTH_SIDES: readonly PlayerId[] = ['white', 'black'];
 
 export function GameScreen({
   store,
@@ -113,6 +114,10 @@ export function GameScreen({
   const gameKey = String(match.games.length);
   const direction = game.state.rules.movement.direction;
   const botPlayer = bot?.player ?? null;
+  // Sound and haptics: moves, rolls and wins play by themselves (from the engine
+  // log). Vs the bot only the person's side counts, so a bot win plays no jingle.
+  const humans = useMemo(() => (botPlayer === null ? BOTH_SIDES : [other(botPlayer)]), [botPlayer]);
+  const feedback = useGameFeedback(store, theme, humans);
 
   // "No legal moves": the flow has passed the turn already; the card says why.
   const pass = passNotice(flow);
@@ -182,7 +187,7 @@ export function GameScreen({
       }
     }
   };
-  const onDiceLanded = () => playHaptic(theme, 'diceLand');
+  const onDiceLanded = () => feedback.event('diceLand');
 
   // Checkers in the air. A flight belongs to the view it was made in.
   const [flights, setFlights] = useState<readonly Flight[]>([]);
@@ -207,7 +212,6 @@ export function GameScreen({
     const before = now.board;
     const ok = dispatch({ type: 'move', player: mover, move, autoConfirm: withAutoConfirm });
     if (!ok) return false;
-    playHaptic(theme, move.capture === 'hit' ? 'checkerHit' : 'checkerPlace');
     // The turn ended (auto-confirm) and the board turns: no flight, and the
     // flights still in the air belong to the old view.
     const next = store.getState().flow.game;
@@ -409,8 +413,8 @@ export function GameScreen({
         matchLabel={t('game.end.matchLabel')}
         score={scoreLine}
         target={t('game.end.target', { target: match.targetPoints })}
-        // Vs the bot, only a win by the human is celebrated.
-        celebrate={winner !== null && winner !== botPlayer}>
+        // Like the win jingle: only a win by a person is celebrated.
+        celebrate={isHumanWin(winner, humans)}>
         <ActionButton
           testID="next-game-button"
           label={t('game.end.next')}
@@ -528,8 +532,8 @@ export function GameScreen({
           onMove={onMove}
           onGeometry={onGeometry}
           onBoardTap={roll}
-          onPickUp={() => playHaptic(theme, 'checkerPickUp')}
-          onIllegalDrop={() => playHaptic(theme, 'invalidMove')}
+          onPickUp={() => feedback.event('checkerPickUp')}
+          onIllegalDrop={() => feedback.event('invalidMove')}
         />
         {view.canConfirm && !blocked && !botsTurn ? (
           <View style={styles.hintRow} pointerEvents="none">

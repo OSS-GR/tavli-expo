@@ -28,7 +28,7 @@
 - Run `pnpm install`, `pnpm lint`, `pnpm typecheck` and `pnpm test` from the repo root.
 - pnpm is pinned in `package.json` (`packageManager`). pnpm switches to that version by itself. Corepack 0.34 cannot run pnpm 12, so do not rely on Corepack.
 - ESLint stays on 9.x for now. `eslint-config-expo` 58 uses `eslint-plugin-react` 7.x, which crashes on ESLint 10.
-- The lint config is one file: `eslint.config.mjs`. It blocks vendor SDKs outside `packages/adapters/**` and `apps/server/**`, React/Expo in `engine`, `bot` and `contracts`, and `Math.random` in `engine`.
+- The lint config is one file: `eslint.config.mjs`. It blocks vendor SDKs (including `expo-haptics` and `expo-audio`) outside `packages/adapters/**` and `apps/server/**`, React/Expo in `engine`, `bot` and `contracts`, and `Math.random` in `engine`.
 - CI (`.github/workflows/ci.yml`) runs `lint`, `typecheck`, `test` and `format:check` in the job `checks`. Do not add `paths-ignore` to it: a skipped required check blocks the PR. See the CI section in `docs/process/github-workflow.md`.
 - Two required checks: `checks` (`.github/workflows/ci.yml`) and `claude-review` (`.github/workflows/claude-review.yml`). `claude-review` runs `/code-review high` on each PR and fails on a blocking finding (see `docs/process/github-workflow.md`). Fix blocking findings before you ask the owner to merge.
 - Workspace packages export TypeScript source (`"main": "./src/index.ts"`). There is no build step. Metro and Vitest read the source.
@@ -46,3 +46,4 @@
 - Never put tests (or any non-route file) in `apps/mobile/src/app/`: Expo Router treats every file there as a route. Route tests live in `apps/mobile/src/navigation.test.tsx` and use `renderRouter('./src/app')`. That file mocks `expo-router/build/testing-library/mocks`, because the library's own Reanimated mock replaces ours.
 - The app config is `apps/mobile/app.json` (base) plus `app.config.ts` (app variants by `APP_VARIANT`; default `development` = `com.tavlaki.dev`). Only `APP_VARIANT=production` uses `com.tavlaki`. Keep `app.config.ts` a function of `config` so EAS CLI can still write to `app.json`. EAS CLI rewrites `app.json` in its own style, so run `pnpm format` after `eas init` or `eas update:configure`.
 - We use CNG: `apps/mobile/ios` and `android` are generated and ignored. Never commit them. Build profiles live in `apps/mobile/eas.json`; how to run the app is in `docs/process/running-the-app.md`.
+- React Native Testing Library skips views hidden from screen readers (`importantForAccessibility="no-hide-descendants"`, e.g. the win `Celebration`). Pass `{ includeHiddenElements: true }` to find them.

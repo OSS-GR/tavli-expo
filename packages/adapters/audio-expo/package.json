@@ -1,0 +1,25 @@
+{
+  "name": "@tavli/audio-expo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SoundPlayer port adapter backed by expo-audio.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tavli/contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "expo-audio": "~58.0.10"
+  },
+  "devDependencies": {
+    "expo-audio": "~58.0.10"
+  }
+}

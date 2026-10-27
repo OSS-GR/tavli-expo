@@ -12,11 +12,12 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 import { Celebration } from '@/features/game/Celebration';
+import { isHumanWin } from '@/features/game/gameFeedback';
 import { winType } from '@/features/game/turnNotices';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 
 import { seatsFor } from './seats';
-import { BOT_SIDE, type MatchSetup } from './setup';
+import { HUMAN_SIDE, type MatchSetup } from './setup';
 import { matchLabel } from './summary';
 
 export interface MatchEndScreenProps {
@@ -39,8 +40,8 @@ export function MatchEndScreen({
   const seats = seatsFor(setup, t);
   const name = (player: PlayerId) => seats[player].name;
   const winner = match.winner ?? 'white';
-  // Vs the bot, only a win by the human is celebrated.
-  const celebrate = setup.mode === 'local' || winner !== BOT_SIDE;
+  // Like the win jingle (`matchWin`): only a win by a person is celebrated.
+  const celebrate = isHumanWin(winner, setup.mode === 'bot' ? [HUMAN_SIDE] : undefined);
 
   const title = seats[winner].you
     ? t('game.end.matchWinner_you')
