@@ -1,7 +1,7 @@
 /**
  * The board on screen: a Skia canvas that draws a `BoardScene`.
  *
- * `useBoardTheme` reads the theme from Settings. `useBoardSpace` measures
+ * `useBoardTheme` reads the board theme from Settings. `useBoardSpace` measures
  * the space the board may fill; `fitBoard` then gives the geometry.
  */
 import { Canvas } from '@shopify/react-native-skia';
@@ -16,9 +16,9 @@ import { checkerRadius, type BoardGeometry } from './geometry';
 import { BoardScene, type BoardHighlights } from './skia/BoardScene';
 import { useBoardImages, useNumberFont } from './useBoardAssets';
 
-/** The board theme picked in Settings (the default theme if it has no board art). */
+/** The board theme picked in Settings → Board (the default theme for an unknown id). */
 export function useBoardTheme(): ThemeManifest {
-  const id = useSettings((s) => s.theme);
+  const id = useSettings((s) => s.boardTheme);
   return getTheme(hasTheme(id) ? id : DEFAULT_THEME_ID);
 }
 

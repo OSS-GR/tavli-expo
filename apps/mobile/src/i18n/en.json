@@ -49,6 +49,7 @@
       "game": "Game",
       "soundAndFeel": "Sound and feel",
       "language": "Language",
+      "board": "Board",
       "look": "Look",
       "accessibility": "Accessibility",
       "privacy": "Privacy",
@@ -85,8 +86,12 @@
       "systemHint": "Now: {{language}}"
     },
     "theme": {
-      "label": "Board theme",
-      "hint": "More boards later"
+      "label": "App colors",
+      "hint": "The colors of menus and screens. More later."
+    },
+    "boardTheme": {
+      "label": "Board",
+      "hint": "The game, the tutorial and the rules use this board."
     },
     "moveList": {
       "label": "Move list",

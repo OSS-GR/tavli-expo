@@ -16,11 +16,10 @@ import { loadFont, loadSkia, loadThemeImages, writePng } from './render';
 /** Keep every PNG small enough for the repo. */
 const MAX_BYTES = 300 * 1024;
 
-const theme = getTheme('walnut-kafeneio');
-const layout = getLayout(theme, 'portrait-rotated');
-
 interface BoardShot {
   file: string;
+  /** Board theme id. Default: Walnut Kafeneio. */
+  theme?: string;
   position: SamplePositionId;
   view: BoardView;
   /** Canvas size in points: the board area of a phone. */
@@ -45,13 +44,24 @@ const SHOTS: BoardShot[] = [
     width: 360,
     height: 590,
   },
+  // The second board (#138), same position as board-start.png. A bit smaller:
+  // the light grain of the olive field makes a bigger PNG.
+  {
+    file: 'board-start-olive-inlay.png',
+    theme: 'olive-inlay',
+    position: 'start',
+    view: { viewer: 'white', direction: 'contrary' },
+    width: 320,
+    height: 524,
+  },
 ];
 
 it('renders the board screenshots', async () => {
   await loadSkia();
-  const images = loadThemeImages(theme, 1);
   for (const shot of SHOTS) {
-    const geo = fitBoardWithShadow(layout, shot);
+    const theme = getTheme(shot.theme ?? 'walnut-kafeneio');
+    const images = loadThemeImages(theme, 1);
+    const geo = fitBoardWithShadow(getLayout(theme, 'portrait-rotated'), shot);
     const font = loadFont(theme.checkers.badge.fontSize * checkerRadius(geo));
     const picture = layoutBoard(geo, SAMPLE_POSITIONS[shot.position], shot.view);
     const { file, bytes } = await writePng(
