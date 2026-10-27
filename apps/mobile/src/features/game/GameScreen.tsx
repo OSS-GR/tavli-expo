@@ -66,10 +66,11 @@ export const OPENING_RESULT_MS = 3000;
  * the card until the next roll.
  */
 export const OPENING_TIE_WAIT_MS = 1000;
-/** The "no legal moves" card closes by itself after this time (wireframe 6f). */
-export const PASS_NOTICE_MS = 3000;
-/** The same card when the bot cannot move (wireframe 6f: "closes after 2 s"). */
-export const BOT_PASS_NOTICE_MS = 2000;
+/**
+ * The "no legal moves" card when the bot cannot move closes by itself after
+ * this time (OK closes it sooner). A person's own pass card waits for OK (#178).
+ */
+export const BOT_PASS_NOTICE_MS = 3500;
 /** "Bot plays on." (the bot's answer to the mother question) shows this long. */
 export const BOT_ANSWER_NOTE_MS = 2000;
 /** The final position stays on screen this long before the match-end screen opens. */
@@ -160,13 +161,16 @@ export function GameScreen({
   const [passDismissed, setPassDismissed] = useState<string | null>(null);
   const passKey = pass?.key ?? null;
   const showPass = pass !== null && passDismissed !== pass.key;
-  const passMs = pass !== null && pass.player === botPlayer ? BOT_PASS_NOTICE_MS : PASS_NOTICE_MS;
+  // Your own pass (in pass-and-play: the player who passed) waits for OK, so
+  // there is time to read why. The bot's pass closes by itself, so the game
+  // goes on (#178). Not while paused: the menu covers the card.
+  const botPassed = pass !== null && pass.player === botPlayer;
   // Keyed on the pass, not the notice object (a new one on each render).
   useEffect(() => {
-    if (!showPass || passKey === null) return;
-    const timer = setTimeout(() => setPassDismissed(passKey), passMs);
+    if (!showPass || !botPassed || passKey === null || paused) return;
+    const timer = setTimeout(() => setPassDismissed(passKey), BOT_PASS_NOTICE_MS);
     return () => clearTimeout(timer);
-  }, [showPass, passKey, passMs]);
+  }, [showPass, botPassed, passKey, paused]);
 
   // Pass-and-play "flip": the player to move sits at the bottom. While the
   // pass card shows, the board stays with the player who passed.
@@ -602,9 +606,7 @@ export function GameScreen({
           isYou(pass.player) ? t(`game.pass.${reason}_you`, vars) : t(`game.pass.${reason}`, vars),
           isYou(next) ? t('game.pass.next_you') : t('game.pass.next', { name: nameOf(next) }),
         ]}
-        footnote={
-          passMs === BOT_PASS_NOTICE_MS ? t('game.pass.autoCloseShort') : t('game.pass.autoClose')
-        }>
+        {...(botPassed ? { footnote: t('game.pass.autoClose') } : {})}>
         <ActionButton
           testID="pass-ok-button"
           label={t('game.pass.ok')}
