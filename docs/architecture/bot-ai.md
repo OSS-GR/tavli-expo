@@ -76,12 +76,14 @@ All levels use the same pipeline:
 
 | Level | Evaluator | Search | Mistake policy |
 |---|---|---|---|
-| Easy | Heuristic | 1-ply | Softmax over scores with high temperature. About 1 in 3 moves is not the best. Never pass a forced win (e.g. a bear-off that wins). |
-| Medium | Heuristic (tuned) | 1-ply | Low temperature. Small, plausible mistakes only. |
+| Easy | Heuristic | 1-ply | Softmax over scores, temperature 0.15. About half of its moves are not the best, but most of those cost little. Never passes a winning turn (e.g. a bear-off that wins). |
+| Medium | Heuristic (tuned) | 1-ply | Softmax, temperature 0.01. Small, plausible mistakes only. |
 | Hard | Neural net | 1-ply + 2-ply on top 3–5 | Best move. A tiny chance of the 2nd best move, so the bot is not a perfect machine. |
 | (Later) Expert / Hints | Neural net | 2-ply, wider, longer time budget | None |
 
 Why softmax noise and not random moves: a softmax picks good moves more often and bad moves rarely. The bot then looks like a weaker human, not a broken program. Track the **average equity loss per move** of each level in bot-vs-bot tests. Tune temperature until the levels are clearly apart (e.g. Hard beats Medium ~70%+, Medium beats Easy ~70%+).
+
+**Measured (Portes, #28, 1,000 games, seed 1):** medium beats random 99.9%, medium beats easy 78.1%, and easy beats random 98.5%. Medium decides in 0.09 ms median and 3.9 ms worst (Node, 300 random positions). At "1 in 3 not best", medium beat easy only 57%, so easy uses more noise to keep the 70%+ gap.
 
 The bot gets its own injected RNG (seeded). It never uses `Math.random`. This keeps tests repeatable and matches the engine rule.
 

@@ -50,7 +50,7 @@ Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checkl
 
 - Engine: board model, dice, legal move generator, Portes rules, scoring, match to N points
 - Engine: full rules test suite from `docs/rules/portes.md` edge cases
-- Bot: easy (random legal) and medium (heuristic) levels
+- Bot: easy and medium levels (heuristic, with more noise for easy)
 - UI: board screen with drag and tap-to-move, dice roll, undo within turn, highlight legal moves
 - UI: home screen, new game screen (vs bot / pass-and-play), match end screen
 - Art: first board theme (2D), checkers, dice, basic sounds and haptics
