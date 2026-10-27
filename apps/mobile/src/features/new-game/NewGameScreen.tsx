@@ -136,7 +136,7 @@ export function NewGameScreen({
           onPress={onBack}
           hitSlop={8}
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-          <Text style={styles.backIcon} importantForAccessibility="no">
+          <Text style={styles.backIcon} importantForAccessibility="no" allowFontScaling={false}>
             {'‹'}
           </Text>
         </Pressable>

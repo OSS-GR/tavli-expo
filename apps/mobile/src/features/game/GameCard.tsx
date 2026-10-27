@@ -7,6 +7,8 @@ import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { useAnnouncement } from './useAnnouncement';
+
 export interface GameCardProps {
   title: string;
   /** Lines under the title. */
@@ -19,8 +21,10 @@ export interface GameCardProps {
 }
 
 export function GameCard({ title, lines = [], footnote, children, testID }: GameCardProps) {
+  // Read on both platforms (a live region works on Android only).
+  useAnnouncement([title, ...lines].join(' '));
   return (
-    <View testID={testID} style={styles.card} accessibilityLiveRegion="polite">
+    <View testID={testID} style={styles.card}>
       <Text style={styles.title} accessibilityRole="header">
         {title}
       </Text>

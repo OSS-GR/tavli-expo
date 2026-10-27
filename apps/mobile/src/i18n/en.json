@@ -49,6 +49,7 @@
       "soundAndFeel": "Sound and feel",
       "language": "Language",
       "look": "Look",
+      "accessibility": "Accessibility",
       "privacy": "Privacy",
       "help": "Help"
     },
@@ -84,6 +85,15 @@
     "theme": {
       "label": "Board theme",
       "hint": "More boards later"
+    },
+    "moveList": {
+      "label": "Move list",
+      "auto": "Automatic",
+      "on": "On",
+      "off": "Off",
+      "autoHint": "Shows a button for each move when a screen reader is on.",
+      "onHint": "Shows a button for each move under the board.",
+      "offHint": "Play on the board only."
     },
     "usageData": {
       "label": "Share anonymous usage data",
@@ -155,8 +165,31 @@
     },
     "controls": {
       "undo": "↶ Undo",
+      "undoLabel": "Undo",
       "confirm": "Confirm",
       "allUsed": "All dice used. Confirm or undo."
+    },
+    "moveList": {
+      "title": "Moves",
+      "move": "Checker from point {{from}} to point {{to}}",
+      "fromBar": "From the bar to point {{to}}",
+      "enter": "Enter on point {{to}}",
+      "bearOff": "Bear off from point {{from}}",
+      "hits": "{{move}}, hits",
+      "pins": "{{move}}, pins",
+      "short": {
+        "move": "{{from}} → {{to}}",
+        "fromBar": "Bar → {{to}}",
+        "enter": "Enter → {{to}}",
+        "bearOff": "{{from}} → Off",
+        "hit": "{{move}} · hit",
+        "pin": "{{move}} · pin"
+      }
+    },
+    "announce": {
+      "rolled": "{{name}} rolled {{dice}}.",
+      "rolled_you": "You rolled {{dice}}.",
+      "played": "{{name}} played: {{moves}}."
     },
     "pass": {
       "title": "No legal moves",

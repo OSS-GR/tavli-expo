@@ -41,7 +41,11 @@ export function MenuButton({
       style={({ pressed }) => [styles.button(kind), pressed && styles.pressed]}>
       {badge ? (
         <View style={styles.badge(kind)}>
-          <Text style={styles.badgeText(kind)} importantForAccessibility="no">
+          {/* A mark in a fixed circle: it keeps its size with a large system font. */}
+          <Text
+            style={styles.badgeText(kind)}
+            importantForAccessibility="no"
+            allowFontScaling={false}>
             {badge}
           </Text>
         </View>

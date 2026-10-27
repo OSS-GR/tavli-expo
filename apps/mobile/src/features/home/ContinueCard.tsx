@@ -25,7 +25,7 @@ export function ContinueCard({ summary, onPress }: ContinueCardProps) {
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <View style={styles.play}>
         {/* U+25B6 U+FE0E: a play triangle as text, not the emoji. */}
-        <Text style={styles.playIcon} importantForAccessibility="no">
+        <Text style={styles.playIcon} importantForAccessibility="no" allowFontScaling={false}>
           {'▶︎'}
         </Text>
       </View>

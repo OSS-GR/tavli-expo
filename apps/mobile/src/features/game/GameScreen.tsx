@@ -23,6 +23,8 @@ import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { MoveList } from '@/features/accessibility/MoveList';
+import { useMoveListShown } from '@/features/accessibility/screenReader';
 import { useBoardTheme } from '@/features/board/BoardCanvas';
 import {
   armyFrozen,
@@ -40,6 +42,7 @@ import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { useSettings } from '@/features/settings/store';
 
+import { turnAnnouncement } from './announcements';
 import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, useGameFeedback } from './gameFeedback';
@@ -49,6 +52,7 @@ import { OpeningCard } from './OpeningCard';
 import { PlayerStrip } from './PlayerStrip';
 import { plainSeats, type Seat } from './seats';
 import { passNotice, winType } from './turnNotices';
+import { useAnnouncement } from './useAnnouncement';
 
 /** How long the opening result stays on screen. */
 export const OPENING_RESULT_MS = 1500;
@@ -123,6 +127,7 @@ export function GameScreen({
   const flipMode = useSettings((s) => s.boardFlipMode);
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
   const showPips = useSettings((s) => s.showPipCounts);
+  const showMoveList = useMoveListShown();
 
   const view = useMemo(() => turnView(flow), [flow]);
   const { game, phase } = view;
@@ -256,6 +261,11 @@ export function GameScreen({
     if (botsTurn) return false;
     return playMove(move, geo, from, autoConfirm);
   };
+  /** A button of the move list: the same move as a tap-tap on the board. */
+  const onListMove = (move: Move) => {
+    if (botsTurn || blocked) return;
+    playMove(move, geoRef.current, null, autoConfirm);
+  };
 
   const undo = (): boolean => {
     const now = store.getState().flow;
@@ -342,6 +352,10 @@ export function GameScreen({
   const resignedLine = (loser: PlayerId) =>
     isYou(loser) ? t('game.end.resigned_you') : t('game.end.resigned', { name: nameOf(loser) });
 
+  // Screen readers hear each roll and the other player's moves (#134).
+  const announcement = turnAnnouncement(flow, t, { nameOf, isYou });
+  useAnnouncement(announcement?.text ?? null, announcement?.key);
+
   // Dice in the controls row: this turn's, or the faded dice of a pass.
   const passDice: DieView[] = pass ? diceView(pass.dice, []) : [];
   const dice = showPass ? passDice : view.dice;
@@ -367,7 +381,8 @@ export function GameScreen({
   } else if (botsTurn && !showPass && view.matchPhase === 'playing') {
     const rolled = game.state.dice;
     controls = (
-      <View testID="bot-turn" style={styles.botBox} accessibilityLiveRegion="polite">
+      // No live region: the roll and the bot's moves are announced (`turnAnnouncement`).
+      <View testID="bot-turn" style={styles.botBox}>
         {dice.length > 0 ? (
           <DiceRow
             testID="dice-row"
@@ -400,6 +415,7 @@ export function GameScreen({
         <ActionButton
           testID="undo-button"
           label={t('game.controls.undo')}
+          accessibilityLabel={t('game.controls.undoLabel')}
           kind="secondary"
           disabled={!view.canUndo || showPass}
           onPress={undo}
@@ -676,7 +692,7 @@ export function GameScreen({
             onPress={onOpenMenu}
             style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}>
             {/* U+2630: three lines ("hamburger"). */}
-            <Text style={styles.menuIcon} importantForAccessibility="no">
+            <Text style={styles.menuIcon} importantForAccessibility="no" allowFontScaling={false}>
               {'☰'}
             </Text>
           </Pressable>
@@ -733,6 +749,9 @@ export function GameScreen({
         {card ? <View style={styles.overlay}>{card}</View> : null}
       </View>
       {strip(viewer, 'strip-bottom')}
+      {showMoveList && !blocked && !botsTurn ? (
+        <MoveList legal={view.legal} onMove={onListMove} />
+      ) : null}
       <View style={styles.controls}>{controls}</View>
       {endSheet}
     </View>

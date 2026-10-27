@@ -12,6 +12,7 @@ import { DIE_SIZE } from '@/features/board/diceMotion';
 import { AnimatedDie } from '@/features/board/skia/AnimatedDie';
 
 import type { OpeningStatus } from './opening';
+import { useAnnouncement } from './useAnnouncement';
 
 export interface OpeningCardProps {
   theme: ThemeManifest;
@@ -43,7 +44,10 @@ function OpeningDie({
   if (value === null) {
     return (
       <View style={styles.placeholder} accessible accessibilityLabel={t('game.opening.notRolled')}>
-        <Text style={styles.question}>?</Text>
+        {/* A stand-in die in a fixed box: it keeps its size. The box has the label. */}
+        <Text style={styles.question} importantForAccessibility="no" allowFontScaling={false}>
+          ?
+        </Text>
       </View>
     );
   }
@@ -93,8 +97,10 @@ export function OpeningCard({
   } else {
     message = t('game.opening.body');
   }
+  // Read on both platforms (a live region works on Android only).
+  useAnnouncement(message);
   return (
-    <View testID="opening-card" style={styles.card} accessibilityLiveRegion="polite">
+    <View testID="opening-card" style={styles.card}>
       <Text style={styles.title} accessibilityRole="header">
         {t('game.opening.title')}
       </Text>
@@ -111,9 +117,7 @@ export function OpeningCard({
               index={index}
               {...(onDieLanded ? { onLand: onDieLanded } : {})}
             />
-            <Text style={styles.name} numberOfLines={1}>
-              {names[player]}
-            </Text>
+            <Text style={styles.name}>{names[player]}</Text>
           </View>
         ))}
       </View>

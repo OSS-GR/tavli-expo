@@ -15,6 +15,8 @@
 | Tutorial | `app/tutorial.tsx?from=home\|rules\|settings` | `features/tutorial/TutorialScreen.tsx` |
 | First launch | `app/welcome/language.tsx`, `app/welcome/privacy.tsx` | `features/welcome/` |
 
+Settings sections: Game (auto-confirm, pip counts, board view), Sound and feel, Language, Look (board theme), Accessibility (**Move list**: Automatic, On, Off; Automatic shows it while a screen reader is on, see [Board screen](board-screen.md#accessibility)), Help and Privacy. Every change saves at once.
+
 - **Welcome gate (#61, #116).** `app/_layout.tsx` wraps the routes in two `Stack.Protected` groups on the consent answer. Until the user answers, every app route redirects to `/welcome/language`, so a deep link or a restored route cannot skip consent. After the answer, the welcome routes redirect to Home. **A new route file must be listed in the app group**; `features/welcome/welcomeFlow.test.tsx` fails until it is.
 - Screens get callbacks (`onNewGame`, `onExit`, …). Only the route files call `router`.
 - **Start game** saves the choices (`lastSetup.ts`, per mode), starts a session and calls `router.replace` to the board. So "back" from the board goes Home, not to the form.

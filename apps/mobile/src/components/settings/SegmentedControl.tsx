@@ -21,7 +21,7 @@ interface SegmentedControlProps<T extends string> {
 
 /**
  * A row of equal segments. The selected one has a thick brass outline and
- * bold text, so color is not the only cue. Labels may wrap to two lines.
+ * bold text, so color is not the only cue. Labels may wrap.
  */
 export function SegmentedControl<T extends string>({
   label,
@@ -53,9 +53,7 @@ export function SegmentedControl<T extends string>({
               styles.segment(selected, disabled),
               pressed && !disabled && styles.pressed,
             ]}>
-            <Text numberOfLines={2} style={styles.label(selected, disabled)}>
-              {option.label}
-            </Text>
+            <Text style={styles.label(selected, disabled)}>{option.label}</Text>
           </Pressable>
         );
       })}

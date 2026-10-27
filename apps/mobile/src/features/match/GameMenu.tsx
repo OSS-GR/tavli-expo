@@ -28,7 +28,10 @@ export function MenuRow({ icon, title, hint, disabled = false, onPress, testID }
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.icon}>
-        <Text style={styles.iconText(disabled)} importantForAccessibility="no">
+        <Text
+          style={styles.iconText(disabled)}
+          importantForAccessibility="no"
+          allowFontScaling={false}>
           {icon}
         </Text>
       </View>

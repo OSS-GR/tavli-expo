@@ -83,11 +83,11 @@ describe('<GameScreen /> undo and confirm', () => {
   it('takes back one move at a time', async () => {
     const user = userEvent.setup();
     const store = await annMoves61();
-    expect(button('↶ Undo')).toBeDisabled();
+    expect(button('Undo')).toBeDisabled();
     await touch(PAN, [top(13, 5), point(7)]);
     await touch(PAN, [top(8, 3), point(7)]);
     expect(store.getState().flow.game.played).toHaveLength(2);
-    await user.press(button('↶ Undo'));
+    await user.press(button('Undo'));
     expect(store.getState().flow.game.played.map((m) => `${m.from}/${m.to}`)).toEqual(['13/7']);
     expect(phase(store)).toBe('moving');
   });

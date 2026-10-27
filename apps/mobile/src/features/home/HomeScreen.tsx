@@ -58,7 +58,7 @@ export function HomeScreen({
           onPress={onSettings}
           style={({ pressed }) => [styles.gear, pressed && styles.pressed]}>
           {/* U+FE0E asks for the text glyph, not the emoji. */}
-          <Text style={styles.gearIcon} importantForAccessibility="no">
+          <Text style={styles.gearIcon} importantForAccessibility="no" allowFontScaling={false}>
             {'⚙︎'}
           </Text>
         </Pressable>
