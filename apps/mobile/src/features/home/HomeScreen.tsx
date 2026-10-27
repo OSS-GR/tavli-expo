@@ -21,6 +21,8 @@ export interface HomeScreenProps {
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). */
   continueCard?: ReactNode;
+  /** The "Learn to play" card, until the tutorial is done or dismissed (#128). */
+  learnCard?: ReactNode;
   /** A one-time message, for example "Your saved game could not be opened." */
   notice?: string | null;
 }
@@ -31,6 +33,7 @@ export function HomeScreen({
   onHowToPlay,
   botLevels,
   continueCard,
+  learnCard,
   notice = null,
 }: HomeScreenProps) {
   const { t } = useTranslation();
@@ -66,6 +69,7 @@ export function HomeScreen({
           <Text style={styles.tagline}>{t('home.tagline')}</Text>
         </View>
         {continueCard}
+        {learnCard}
         <Text
           style={styles.section}
           accessibilityRole="header"

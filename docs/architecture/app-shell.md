@@ -1,6 +1,6 @@
 # App shell: Home, new game, local matches
 
-> How the app starts a local match (vs bot or pass-and-play) and what the screens around the board do. Code: `apps/mobile/src/app/` (routes) and `apps/mobile/src/features/{home,new-game,match,bot,rules}/`. Last review: 2026-10-27.
+> How the app starts a local match (vs bot or pass-and-play) and what the screens around the board do. Code: `apps/mobile/src/app/` (routes) and `apps/mobile/src/features/{home,new-game,match,bot,rules,tutorial}/`. Last review: 2026-10-27.
 
 ## Routes
 
@@ -12,6 +12,7 @@
 | Match end | `app/game/[id]/match-end.tsx` | `features/match/MatchEndScreen.tsx` |
 | Rules | `app/rules/[variant].tsx` | `features/rules/RulesScreen.tsx` |
 | Settings | `app/settings.tsx` | `features/settings/SettingsScreen.tsx` |
+| Tutorial | `app/tutorial.tsx?from=home\|rules\|settings` | `features/tutorial/TutorialScreen.tsx` |
 | First launch | `app/welcome/language.tsx`, `app/welcome/privacy.tsx` | `features/welcome/` |
 
 - **Welcome gate (#61, #116).** `app/_layout.tsx` wraps the routes in two `Stack.Protected` groups on the consent answer. Until the user answers, every app route redirects to `/welcome/language`, so a deep link or a restored route cannot skip consent. After the answer, the welcome routes redirect to Home. **A new route file must be listed in the app group**; `features/welcome/welcomeFlow.test.tsx` fails until it is.
@@ -30,6 +31,27 @@
 - The texts describe the **default presets** only (`DEFAULT_PRESET_BY_GAME`): Plakoto `motherRule: "offerConcede"` (resign for diplo or play on; both mothers pinned is a draw), Fevga runner rule to pass the opponent's mother and the prime bans P1, P2 (points 6–11) and P3, Asodio `asodio.kafeneio` (A1–A6: a 1-2 or a double opens the board, a double enters four, entered checkers wait until all 15 are in, the quarter lock, pins, no bearing off while pinned, a deadlock is a draw). When a default flag changes, update the page.
 - The start position is a small `StaticBoard` (60% of the width, at most 240 pt, the theme's aspect ratio) built from the engine's start layouts and the preset's direction, with White (light checkers) at the bottom. It is one image for screen readers ("The board at the start of Fevga"). The Asodio picture is an empty board with both "to enter" stacks (15 each).
 - Every section title is a header. Nothing has a fixed height, so the page works at large text sizes, and it scrolls.
+
+## Tutorial (#128)
+
+A one-minute lesson in Portes on the real board, before the first game.
+
+- **Where it opens.** After the welcome flow, Home shows a **Learn to play** card (`features/home/LearnCard.tsx`) under the Continue card: **Start the lesson** and **Not now**. The card shows until the tutorial is finished or dismissed. It always opens again from Settings → Help → **Learn to play** and from the top of the Portes rules page (**Learn to play on the board**). The `from` param says where it was opened (for `tutorial_started`).
+- **Lessons** (`features/tutorial/lessons.ts`), each on a fixed position with fixed dice, in the `portes` preset, White (you) at the bottom:
+  1. `move`: one checker, one die (13 → 9 with the 4).
+  2. `bothDice`: one checker with both dice (5 and 3).
+  3. `double`: 3-3 moves four times.
+  4. `makePoint`: two checkers to point 7 make a door, which blocks the opponent.
+  5. `hit`: hit Black's lone checker on 9.
+  6. `enter`: enter from the bar (the 5 lands on a door; the 3 enters).
+  7. `bearOff`: bear off the last two checkers.
+- **No RNG, no second rule book.** `startLesson` builds a `GameFlow` from the lesson's board and rolls the lesson's dice (`roll` with `dice`). The board offers the engine's `legalNextMoves`, filtered to the moves the lesson teaches (`lessonMoves`). So the board lights up only the checker to touch (`InteractiveBoard` `cue`), and after a tap only the right target. Taps and drags work as in a game.
+- **Each lesson**: a title, one line of text, the lit checker; a wrong touch (a tap on another checker, a miss after picking the checker, a drop on a wrong place) shakes the text and shows a hint, with the `invalidMove` haptic. After success: a success line and **Next**. **Skip** is always in the top bar. "Lesson 2 of 7" shows the progress.
+- **End card**: "You know the basics!", **Play your first game** (replaces the tutorial with `/new-game?mode=bot&first=1`: Portes vs the Easy bot, whatever was chosen last; `firstGameSetup` in `setup.ts`) and **Home**.
+- **State** (`features/tutorial/progress.ts`): `new`, `dismissed` (Not now, or Skip) or `done`, saved as `{ version, status }` under the key `tutorial` in the `Storage` port. It never leaves the phone, so it needs no consent. It is apart from Settings, so a settings reset does not bring the card back. `done` never goes back to `dismissed`.
+- **Analytics** (`tutorialAnalytics.ts`): `tutorial_started`, `tutorial_step`, `tutorial_finished`, `tutorial_skipped`, through the `Analytics` port, so only after **Allow usage data**. An analytics error is logged and dropped. See [Analytics events](analytics-events.md).
+- **Accessibility.** Titles are headers. The board's label says what the lesson asks ("Your checker on point 13 is lit. … Move it 4 points, to point 9."). The hint and the success line are a live region and are announced. With **Reduce motion** on there is no shake and no checker flight; the hint still shows.
+- No swipe back on the tutorial route (`gestureEnabled: false`), like the board: it would fight the drag. Skip goes back where it came from (Home after a deep link).
 
 ## Local matches
 
@@ -118,4 +140,5 @@
 - `MatchEndScreen.test.tsx`: the win with every game row (and the game of each row in a Tavli match), the celebration and the announcement; Rematch, Change settings and Home; a lost match (no celebration, the bot starts the rematch); a resigned match; pass-and-play names; reduce motion; Greek.
 - `features/match/save.test.ts`: the save format (round trip, ten kinds of bad data dropped; the saved game: Tavli after a restart, an old save without a game, a game the log does not have), when it saves, clearing a finished match, resume after a restart, the Continue texts and the background hook.
 - `features/rules/RulesScreen.test.tsx`: every page shows its sections in order with headers, the start pictures, the Tavli links (not Asodio), the Asodio page, unknown ids, Greek, and that `en` and `el` have the same `rules.*` keys (and the same number of lines), all used by a page.
-- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home → Continue, the replace dialog, the `mode` param, an unknown id, a broken save; match end → Rematch → match end → Change settings, and match end → Home with no Continue card; the rules pages from New game, the in-game menu and the Tavli page). It replaces the library's own Reanimated mock with ours.
+- `features/tutorial/lessons.test.ts`: every lesson starts in Portes with its fixed dice, offers only the moves it teaches, and can be finished. `progress.test.ts`: the saved status, bad data, a failing storage, and the four events (none before opt-in, an error dropped). `TutorialScreen.test.tsx`: the whole tutorial with taps only, the lit checker and its target, the hint and shake after a wrong touch, reduce motion, skip from any lesson, Greek.
+- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home → Continue, the replace dialog, the `mode` param, an unknown id, a broken save; match end → Rematch → match end → Change settings, and match end → Home with no Continue card; the rules pages from New game, the in-game menu and the Tavli page; the tutorial from Home, skipped, opened again from Settings and the rules page, and played to the end with taps into New game with Portes vs Easy). It replaces the library's own Reanimated mock with ours.

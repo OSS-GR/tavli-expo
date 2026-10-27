@@ -238,6 +238,9 @@ describe('recordGameResult', () => {
     expect(() => recordGameResult(match, { winner: null, points: 0, reason: 'resigned' })).toThrow(
       bad,
     );
+    expect(() => recordGameResult(match, { winner: null, points: 0, reason: 'timeout' })).toThrow(
+      bad,
+    );
     const odd = { winner: 'red', points: 1, reason: 'borneOff' } as unknown as GameResult;
     expect(() => recordGameResult(match, odd)).toThrow(bad);
   });

@@ -84,6 +84,10 @@ describe('event names', () => {
       'resign',
       'settings_changed',
       'theme_changed',
+      'tutorial_started',
+      'tutorial_step',
+      'tutorial_finished',
+      'tutorial_skipped',
     ]);
   });
 

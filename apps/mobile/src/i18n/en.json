@@ -34,6 +34,12 @@
       "local": "{{game}} · pass-and-play",
       "target": "first to {{target}}",
       "broken": "Your saved game could not be opened."
+    },
+    "learn": {
+      "title": "Learn to play",
+      "subtitle": "A one-minute lesson on the board: move, hit and bear off.",
+      "start": "Start the lesson",
+      "dismiss": "Not now"
     }
   },
   "settings": {
@@ -43,7 +49,8 @@
       "soundAndFeel": "Sound and feel",
       "language": "Language",
       "look": "Look",
-      "privacy": "Privacy"
+      "privacy": "Privacy",
+      "help": "Help"
     },
     "autoConfirm": {
       "label": "Auto-confirm moves",
@@ -83,7 +90,8 @@
       "hint": "Which modes you play, which settings you change, and crash reports. Off also stops crash reports. No names or emails."
     },
     "privacyPolicy": "Privacy policy",
-    "version": "Tavlaki {{version}}"
+    "version": "Tavlaki {{version}}",
+    "learnToPlay": "Learn to play"
   },
   "languages": {
     "el": "Ελληνικά",
@@ -481,5 +489,70 @@
     "hoursAgo_other": "{{count}} h ago",
     "daysAgo_one": "{{count}} day ago",
     "daysAgo_other": "{{count}} days ago"
+  },
+  "tutorial": {
+    "title": "Learn to play",
+    "progress": "Lesson {{step}} of {{count}}",
+    "skip": "Skip",
+    "skipHint": "Leave the lesson. You can open it again from Settings.",
+    "next": "Next",
+    "openFromRules": "Learn to play on the board",
+    "lessons": {
+      "move": {
+        "title": "Move a checker",
+        "body": "You play the light checkers. Tap the lit checker, then tap the ring. Or drag it there.",
+        "hint": "Move the lit checker 4 points, with the 4.",
+        "done": "Well done! A checker moves as many points as the die shows.",
+        "board": "Board. Your checker on point 13 is lit. Dice 4 and 2. Move it 4 points, to point 9."
+      },
+      "bothDice": {
+        "title": "Use both dice",
+        "body": "Each die is one move. Move the lit checker with the 5, then again with the 3.",
+        "hint": "Move the same checker again, with the other die.",
+        "done": "Good! You played both dice with one checker.",
+        "board": "Board. Your checker on point 13 is lit. Dice 5 and 3. Move it twice, one die each time."
+      },
+      "double": {
+        "title": "A double moves four times",
+        "body": "You rolled 3-3. A double plays four times. Move the lit checker four times.",
+        "hint": "Keep moving the same checker, 3 points each time.",
+        "done": "Four moves of 3. Doubles are strong!",
+        "board": "Board. Your checker on point 13 is lit. Dice 3-3. Move it 3 points, four times."
+      },
+      "makePoint": {
+        "title": "Make a door",
+        "body": "Two or more of your checkers on a point make a door. Your opponent cannot land there. Move both lit checkers to point 7.",
+        "hint": "Both lit checkers go to the same point: 7.",
+        "done": "Door made! Your opponent cannot land on point 7.",
+        "board": "Board. Your checkers on points 11 and 9 are lit. Dice 4 and 2. Move both to point 7."
+      },
+      "hit": {
+        "title": "Hit a lone checker",
+        "body": "A lone checker can be hit. Land on the dark checker on point 9 to send it to the bar.",
+        "hint": "Move the lit checker 4 points, onto the dark checker.",
+        "done": "Hit! That checker must come back in from the bar.",
+        "board": "Board. Your checker on point 13 is lit. Your opponent has a lone checker on point 9. Dice 4 and 1."
+      },
+      "enter": {
+        "title": "Enter from the bar",
+        "body": "Now your checker was hit and waits on the bar. It must come in, in your opponent's home, before any other move.",
+        "hint": "The 5 lands on a door, so it is blocked. Enter with the 3.",
+        "done": "You are back in! A door blocks your entry too.",
+        "board": "Board. Your checker is on the bar and lit. Dice 5 and 3. The 5 is blocked; the 3 enters on point 22."
+      },
+      "bearOff": {
+        "title": "Bear off",
+        "body": "When all your checkers are home, you take them off the board. Bear off your last two checkers.",
+        "hint": "Tap a lit checker, then tap the ring in the tray.",
+        "done": "All 15 are off. You win the game!",
+        "board": "Board. All your checkers are home. The last two are on points 6 and 4, and lit. Dice 6 and 4."
+      }
+    },
+    "end": {
+      "title": "You know the basics!",
+      "body": "Now play a real game of Portes against the Easy bot. The rules page has the rest.",
+      "play": "Play your first game",
+      "home": "Home"
+    }
   }
 }

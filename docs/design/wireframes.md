@@ -1,6 +1,6 @@
 # Wireframes: core MVP1 screens
 
-> Status: draft for owner review (issue #14). Last review: 2026-10-26.
+> Status: draft for owner review (issue #14). Last review: 2026-10-27.
 > These are low-detail, grayscale layouts. They are **not** final art. The wooden style comes from #13 and #38.
 
 ## How to read this doc
@@ -39,6 +39,7 @@
 | Game end | — | Overlay state inside the board screen, so the final position stays visible |
 | Match end | `app/game/[id]/match-end.tsx` | `router.replace`, so "back" does not return to a finished board |
 | Settings | `app/settings.tsx` | Push from Home; modal from the in-game menu |
+| Tutorial | `app/tutorial.tsx` | Push from the Home card, Settings or the Portes rules page (#128). Not drawn; see the note under Home. |
 | Rules | `app/rules/[variant].tsx` (e.g. `/rules/portes`) | Push. Not drawn here; a scrolling text page with a small start board (`docs/architecture/app-shell.md`, "Rules pages"). |
 | Dialogs (resign, no moves, mother pinned, replace saved game) | — | Components, not routes |
 
@@ -161,6 +162,7 @@ Notes:
   - Top bar: small logo, "Tavlaki", **gear** button (Settings).
   - Board art or mascot area (filled by the art task).
   - **Continue game** card (only when a saved game exists): game, opponent, match score, target and time since last move. The whole card is one target.
+  - **Learn to play** card (#128, not drawn): title, one line, **Start the lesson** (filled) and **Not now** (text). Shows until the tutorial is finished or dismissed.
   - "New game" section:
     - **Play vs bot** (main button, subtitle "Easy or Medium").
     - **Pass-and-play** (subtitle "2 players, 1 phone").
@@ -172,7 +174,18 @@ Notes:
   - *Loading:* the native splash stays until settings and the save are read. This is local and fast, so there is no spinner.
   - *Saved game broken or too old:* it is dropped safely (#36). A one-time toast says "Your saved game could not be opened."
   - *Play a friend tapped:* toast "Coming soon: play friends online." No navigation. The button keeps a full-size target so the tap gives feedback.
-- **Goes to:** Board (continue), New game (`mode=bot` or `mode=local`), Settings, Rules.
+- **Goes to:** Board (continue), New game (`mode=bot` or `mode=local`), Settings, Rules, Tutorial.
+
+### Note: first-run tutorial (#128, not drawn)
+
+Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Portes rules page. Same layout rules as the board screen:
+
+- Top bar: "Learn to play", "Lesson 2 of 7" under it, **Skip** (text button, at least 44 pt) on the right. Always shown.
+- A lesson card under the top bar: the lesson title, one line of text, then the hint (after a wrong touch) or the success line. A wrong touch shakes the card (not with Reduce motion).
+- The real board fills the middle. The checker to touch has the selected ring; after a tap, its target has the dashed ring and the ghost.
+- Controls row: the lesson's dice (used dice fade) and, after success, **Next** (main button, full width in the row).
+- End: "You know the basics!", **Play your first game** (main) and **Home** (text). The board is gone; a small celebration shows.
+- Details: [App shell, Tutorial](../architecture/app-shell.md#tutorial-128).
 
 ## 4. New game: vs bot
 
@@ -363,6 +376,7 @@ Notes:
   - **Sound and feel:** Sound (toggle). Haptics (toggle). Sound also follows the phone's silent switch.
   - **Language:** **Ελληνικά / English**. The app switches at once.
   - **Look:** Board theme (MVP1 has one wooden board; the row says "more boards later").
+  - **Help** (#128, not drawn): **Learn to play ›** opens the tutorial.
   - **Privacy:** Share anonymous usage data (toggle; calls `optIn()` / `optOut()` on the Analytics port, #61). Privacy policy link. Events: `docs/architecture/analytics-events.md`.
   - Footer: app version, build, licenses.
 - **States:** No loading or error states; everything is local.

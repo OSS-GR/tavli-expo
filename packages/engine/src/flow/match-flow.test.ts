@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { nextVariantId } from '../match';
+import { nextVariantId, validateMatch } from '../match';
 import type { PlayerId } from '../player';
 import { getPreset, resolveRules } from '../presets';
 import { createSeededRng } from '../rng';
@@ -212,6 +212,19 @@ describe('match flow', () => {
     expect(flow.game.result).toEqual({ winner: 'black', points: 2, reason: 'resigned' });
     expect(flow.match.score).toEqual({ white: 0, black: 2 });
     expect(flow.match.nextStarter).toBe('black');
+  });
+
+  it('timeout (#133): the game ends, the match records the reason, the log replays', () => {
+    const flow = act(createMatchFlow({ rules: portesOnly(), starter: 'white' }), [
+      { type: 'roll', player: 'white', dice: [3, 1] },
+      { type: 'timeout', player: 'white' },
+    ]);
+    expect(flow.game.result).toEqual({ winner: 'black', points: 2, reason: 'timeout' });
+    expect(flow.match.games[0]).toMatchObject({ winner: 'black', points: 2, reason: 'timeout' });
+    expect(flow.match.score).toEqual({ white: 0, black: 2 });
+    expect(flow.log.at(-1)).toEqual({ type: 'timeout', player: 'white' });
+    expect(validateMatch(JSON.parse(JSON.stringify(flow.match)))).toEqual(flow.match);
+    expect(replay(flow.log)).toEqual(flow);
   });
 
   it('resign match: the opponent wins the match at once', () => {

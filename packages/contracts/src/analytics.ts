@@ -30,6 +30,9 @@ export type GameMode = 'bot' | 'local' | 'online';
  */
 export type GameResultKind = 'mono' | 'diplo' | 'resign' | 'draw';
 
+/** Where the tutorial was opened: the Home card, a rules page, or Settings. */
+export type TutorialSource = 'home' | 'rules' | 'settings';
+
 /** Every event and its properties. Property values are short strings, numbers or booleans. */
 export interface AnalyticsEvents {
   app_opened: Record<string, never>;
@@ -65,6 +68,14 @@ export interface AnalyticsEvents {
   /** A setting changed. Only the key, never the value. Theme uses `theme_changed`. */
   settings_changed: { key: string };
   theme_changed: { theme: string };
+  /** The tutorial opened. */
+  tutorial_started: { source: TutorialSource };
+  /** A lesson of the tutorial was learnt. `step` counts from 1. */
+  tutorial_step: { step: number; lesson: string };
+  /** The last lesson was learnt. */
+  tutorial_finished: Record<string, never>;
+  /** Skip was tapped. `step` is the lesson on screen, from 1. */
+  tutorial_skipped: { step: number; lesson: string };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
@@ -79,6 +90,10 @@ export const ANALYTICS_EVENTS = [
   'resign',
   'settings_changed',
   'theme_changed',
+  'tutorial_started',
+  'tutorial_step',
+  'tutorial_finished',
+  'tutorial_skipped',
 ] as const satisfies readonly AnalyticsEventName[];
 
 type MissingEvent = Exclude<AnalyticsEventName, (typeof ANALYTICS_EVENTS)[number]>;

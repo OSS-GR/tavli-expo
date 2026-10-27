@@ -17,7 +17,13 @@
  * the new events.
  */
 
-import type { GameTransportErrorCode, OnlineGameChoice, OnlineGameView } from '@tavli/contracts';
+import { TURN_TIME_MS } from '@tavli/contracts';
+import type {
+  GameTransportErrorCode,
+  OnlineGameChoice,
+  OnlineGamePace,
+  OnlineGameView,
+} from '@tavli/contracts';
 import {
   DEFAULT_PRESET_BY_GAME,
   EngineError,
@@ -246,12 +252,42 @@ export function resign(flow: MatchFlow, player: PlayerId, rng: Rng): MatchFlow {
 }
 
 // ---------------------------------------------------------------------------
+// Turn timers (#133)
+//
+// The clock is an argument (`now`, epoch milliseconds), so this code stays
+// pure. The Convex functions pass `Date.now()`.
+
+/** When a turn that starts at `now` runs out. */
+export function deadlineAfter(pace: OnlineGamePace, now: number): number {
+  return now + TURN_TIME_MS[pace];
+}
+
+/** True when `deadline` has passed at `now`. At the deadline itself the time is up. */
+export function isTimedOut(deadline: number | null, now: number): boolean {
+  return deadline !== null && now >= deadline;
+}
+
+/**
+ * The player the server waits for ran out of time: they lose the current
+ * game (engine action `timeout`, scored like a resign of that game). Then
+ * the server rolls on: the next game starts, or the match ends.
+ */
+export function timeOut(flow: MatchFlow, rng: Rng): MatchFlow {
+  checkActive(flow);
+  const player = waitingFor(flow);
+  if (player === null) fail('GAME_OVER', 'the match is over');
+  return advance(apply(flow, { type: 'timeout', player }, rng), rng);
+}
+
+// ---------------------------------------------------------------------------
 // The client view
 
 export interface ViewInput {
   readonly gameId: string;
   readonly version: number;
   readonly choice: OnlineGameChoice;
+  readonly pace: OnlineGamePace;
+  readonly turnDeadline: number | null;
   readonly players: PerPlayer<string>;
   readonly flow: MatchFlow;
 }
@@ -260,12 +296,16 @@ export interface ViewInput {
  * What a client may see. The flow never holds future dice (the server
  * rolls each roll when its turn starts), and nothing about the RNG.
  */
-export function toView({ gameId, version, choice, players, flow }: ViewInput): OnlineGameView {
+export function toView(input: ViewInput): OnlineGameView {
+  const { gameId, version, choice, pace, turnDeadline, players, flow } = input;
+  const finished = matchPhase(flow) === 'match-over';
   return {
     gameId,
     version,
-    status: matchPhase(flow) === 'match-over' ? 'finished' : 'active',
+    status: finished ? 'finished' : 'active',
     choice,
+    pace,
+    turnDeadline: finished ? null : turnDeadline,
     players,
     match: flow.match,
     game: flow.game,

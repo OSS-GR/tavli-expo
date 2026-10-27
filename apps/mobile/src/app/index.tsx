@@ -4,10 +4,13 @@ import { useTranslation } from 'react-i18next';
 
 import { ContinueCard } from '@/features/home/ContinueCard';
 import { HomeScreen } from '@/features/home/HomeScreen';
+import { LearnCard } from '@/features/home/LearnCard';
 import { matchSessions } from '@/features/match/appSessions';
-import { gameHref, newGameHref, rulesHref } from '@/features/match/routes';
+import { gameHref, newGameHref, rulesHref, tutorialHref } from '@/features/match/routes';
 import type { SavedMatch } from '@/features/match/savedMatch';
 import { continueSummary } from '@/features/match/summary';
+import { offersTutorial } from '@/features/tutorial/progress';
+import { useTutorial } from '@/features/tutorial/store';
 import { botLevels } from '@/services';
 
 interface SlotState {
@@ -39,6 +42,8 @@ export default function HomeRoute() {
     }, []),
   );
   const { saved } = slot;
+  const showLearn = offersTutorial(useTutorial((s) => s.status));
+  const dismissLearn = useTutorial((s) => s.dismiss);
 
   return (
     <HomeScreen
@@ -50,6 +55,11 @@ export default function HomeRoute() {
             summary={continueSummary(saved, t, slot.now)}
             onPress={() => router.push(gameHref(saved.id))}
           />
+        ) : null
+      }
+      learnCard={
+        showLearn ? (
+          <LearnCard onStart={() => router.push(tutorialHref('home'))} onDismiss={dismissLearn} />
         ) : null
       }
       onNewGame={(mode) => router.push(newGameHref(mode))}

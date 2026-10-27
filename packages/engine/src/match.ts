@@ -241,8 +241,8 @@ function checkResult(result: GameResult, path: string): GameResult {
   if (winner !== null && points < 1) {
     throw new EngineError('OUT_OF_RANGE', 'a win is worth at least 1 point', `${path}.points`);
   }
-  if (winner === null && reason === 'resigned') {
-    throw new EngineError('OUT_OF_RANGE', 'a resigned game has a winner', `${path}.winner`);
+  if (winner === null && (reason === 'resigned' || reason === 'timeout')) {
+    throw new EngineError('OUT_OF_RANGE', `a ${reason} game has a winner`, `${path}.winner`);
   }
   return { winner, points, reason };
 }

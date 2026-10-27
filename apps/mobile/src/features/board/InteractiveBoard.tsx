@@ -60,6 +60,13 @@ export interface InteractiveBoardProps {
   onMove: (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => boolean;
   /** A tap that did not touch a movable checker (e.g. tap the board to roll). */
   onBoardTap?: () => void;
+  /** A checker was selected, and the next tap hit no target (the selection is dropped). */
+  onMissTap?: () => void;
+  /**
+   * Ring every movable checker while none is selected: "touch this one"
+   * (the tutorial). Off in a game, where most checkers can move.
+   */
+  cue?: boolean;
   /** A checker was picked up / dropped where it may not go. */
   onPickUp?: () => void;
   onIllegalDrop?: () => void;
@@ -72,8 +79,14 @@ export interface InteractiveBoardProps {
   testID?: string;
 }
 
-function highlightsFor(source: MovableSource | undefined): BoardHighlights | undefined {
-  if (source === undefined) return undefined;
+function highlightsFor(
+  source: MovableSource | undefined,
+  cues: readonly MovableSource[],
+): BoardHighlights | undefined {
+  if (source === undefined) {
+    if (cues.length === 0) return undefined;
+    return { select: null, targets: [], cues: cues.map((s) => s.checker) };
+  }
   const targets: Mark[] = source.targets.map((t) => ({
     key: t.key,
     x: t.landing.x,
@@ -94,6 +107,8 @@ export function InteractiveBoard({
   onFlightDone,
   onMove,
   onBoardTap,
+  onMissTap,
+  cue = false,
   onPickUp,
   onIllegalDrop,
   onGeometry,
@@ -186,6 +201,8 @@ export function InteractiveBoard({
     } else {
       setSelected(null);
       if (sources.length === 0 || selected === null) onBoardTap?.();
+      // A second tap on the selected checker only drops it; a tap elsewhere missed.
+      else if (pickSource(sources, x, y, 0) !== selected) onMissTap?.();
     }
   };
   const onDragStart = (source: number) => {
@@ -268,6 +285,7 @@ export function InteractiveBoard({
   });
 
   const current = selected === null ? undefined : sources[selected];
+  const highlights = highlightsFor(current, cue && !dragKey ? sources : []);
   const hidden = new Set<string>();
   for (const f of flights) if (f.hide) hidden.add(f.hide);
   if (dragKey) hidden.add(dragKey);
@@ -288,7 +306,7 @@ export function InteractiveBoard({
             size={size}
             picture={picture}
             hidden={hidden}
-            {...(current ? { highlights: highlightsFor(current) } : {})}
+            {...(highlights ? { highlights } : {})}
             testID={testID ? `${testID}-canvas` : undefined}>
             {flights.map((f) => (
               <FlightChecker key={f.id} theme={theme} flight={f} onDone={onFlightDone} />

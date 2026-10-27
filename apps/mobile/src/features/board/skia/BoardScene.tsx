@@ -49,6 +49,8 @@ export interface BoardHighlights {
   readonly select: Mark | null;
   /** Where the selected checker may go. */
   readonly targets: readonly Mark[];
+  /** Checkers to touch now (the tutorial's lit checkers). Drawn like the selected ring. */
+  readonly cues?: readonly Mark[];
 }
 
 export interface BoardSceneProps {
@@ -328,26 +330,29 @@ export function BoardScene({
           </Circle>
         </Group>
       ))}
-      {highlights.select ? (
-        <Group>
+      {[
+        ...(highlights.cues ?? []),
+        ...(highlights.select ? [{ ...highlights.select, key: 'select' }] : []),
+      ].map((m) => (
+        <Group key={`select:${m.key}`}>
           <Circle
-            cx={highlights.select.x}
-            cy={highlights.select.y}
-            r={hl.select.radius * highlights.select.r}
+            cx={m.x}
+            cy={m.y}
+            r={hl.select.radius * m.r}
             style="stroke"
-            strokeWidth={hl.select.halo.width * highlights.select.r}
+            strokeWidth={hl.select.halo.width * m.r}
             color={rgba(hl.select.halo.color, hl.select.halo.opacity)}
           />
           <Circle
-            cx={highlights.select.x}
-            cy={highlights.select.y}
-            r={hl.select.radius * highlights.select.r}
+            cx={m.x}
+            cy={m.y}
+            r={hl.select.radius * m.r}
             style="stroke"
-            strokeWidth={hl.select.width * highlights.select.r}
+            strokeWidth={hl.select.width * m.r}
             color={hl.select.color}
           />
         </Group>
-      ) : null}
+      ))}
 
       {children}
 
