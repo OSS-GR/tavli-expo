@@ -213,6 +213,32 @@ describe('<MatchScreen /> pass-and-play', () => {
       ),
     ).toBeOnTheScreen();
   });
+
+  it('screen readers skip the game under the menu and the resign dialog (#153)', async () => {
+    const user = userEvent.setup();
+    const s = session(defaultSetup('local'));
+    startWith(s, 'white');
+    await show(s).view;
+    expect(screen.getByTestId('game-board')).toBeOnTheScreen();
+
+    await user.press(button('Game menu'));
+    expect(screen.getByTestId('game-menu')).toBeOnTheScreen();
+    expect(screen.queryByTestId('game-board')).toBeNull();
+    expect(screen.queryByTestId('strip-bottom')).toBeNull();
+    expect(screen.getByTestId('game-content', { includeHiddenElements: true })).toHaveProp(
+      'importantForAccessibility',
+      'no-hide-descendants',
+    );
+
+    await user.press(screen.getByTestId('menu-resign-game'));
+    expect(screen.getByTestId('resign-game-dialog')).toBeOnTheScreen();
+    expect(screen.queryByTestId('game-board')).toBeNull();
+
+    await user.press(screen.getByTestId('dialog-cancel'));
+    expect(screen.queryByTestId('resign-game-dialog')).toBeNull();
+    expect(screen.getByTestId('game-board')).toBeOnTheScreen();
+    expect(screen.getByTestId('strip-bottom')).toBeOnTheScreen();
+  });
 });
 
 /** Plays one full turn for the player to move, through the store (like taps). */
@@ -295,8 +321,11 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
 
     let card = screen.getByTestId('game-end-card');
     expect(within(card).getByTestId('next-game-label')).toHaveTextContent('Next: game 2 · Plakoto');
-    // The finished game keeps its own label until Next game.
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 1 · Portes');
+    // The finished game keeps its own label until Next game (under the sheet,
+    // so screen readers skip it).
+    expect(screen.getByTestId('game-label', { includeHiddenElements: true })).toHaveTextContent(
+      'Game 1 · Portes',
+    );
     await user.press(within(card).getByRole('button', { name: /^Next game/ }));
 
     expect(game(s).state.variant).toBe('plakoto');

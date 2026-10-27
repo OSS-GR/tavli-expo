@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { useFocusOnShow } from '@/features/accessibility/focus';
 import { DIE_SIZE } from '@/features/board/diceMotion';
 import { AnimatedDie } from '@/features/board/skia/AnimatedDie';
 
@@ -97,11 +98,13 @@ export function OpeningCard({
   } else {
     message = t('game.opening.body');
   }
+  // Focus goes to the title when the card opens (#153), then the message is read.
+  const titleRef = useFocusOnShow();
   // Read on both platforms (a live region works on Android only).
   useAnnouncement(message);
   return (
     <View testID="opening-card" style={styles.card}>
-      <Text style={styles.title} accessibilityRole="header">
+      <Text ref={titleRef} style={styles.title} accessibilityRole="header">
         {t('game.opening.title')}
       </Text>
       <Text testID="opening-message" style={styles.body}>

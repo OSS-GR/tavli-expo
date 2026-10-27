@@ -45,7 +45,7 @@ describe('<GameScreen /> board theme', () => {
       });
       await renderWithRoot(<GameScreen store={store} />);
       await act(async () => {
-        fireEvent(screen.getByTestId('game-board'), 'layout', {
+        fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
           nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
         });
       });
