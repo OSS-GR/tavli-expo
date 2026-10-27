@@ -169,13 +169,39 @@ function barLayout(geo: BoardGeometry): BoardLayout {
 }
 
 /**
+ * How far a pinned checker (Plakoto) peeks out from under the checker that
+ * pins it, in checker radii. The pinned checker sits at the base of the
+ * point; the stack on top of it starts this much further along the point.
+ */
+export const PIN_PEEK = 0.6;
+
+/** The layout with the stack moved along by `PIN_PEEK`: room for a pinned checker under it. */
+function pinLayout(layout: BoardLayout): BoardLayout {
+  const { checker } = layout;
+  return {
+    ...layout,
+    checker: { ...checker, stackInset: checker.stackInset + PIN_PEEK * checker.radius },
+  };
+}
+
+/**
  * Where `count` checkers sit in a point or a bar half.
  * At most `maxVisible` are drawn; the last one then carries the count badge.
  * A tray has no round checkers: use `trayGeometry`.
+ *
+ * `pinned`: a pinned checker lies under this stack (Plakoto). The stack then
+ * starts `PIN_PEEK` radii further from the base, so the pinned checker
+ * peeks out under it (`pinnedCenter`). Only points hold pinned checkers.
  */
-export function stackGeometry(geo: BoardGeometry, slot: Slot, count: number): StackGeometry {
+export function stackGeometry(
+  geo: BoardGeometry,
+  slot: Slot,
+  count: number,
+  pinned = false,
+): StackGeometry {
   if (slot.kind === 'tray') throw new Error('Trays hold flat checkers: use trayGeometry');
-  const layout = slot.kind === 'bar' ? barLayout(geo) : geo.layout;
+  const base = slot.kind === 'bar' ? barLayout(geo) : geo.layout;
+  const layout = pinned && slot.kind === 'point' ? pinLayout(base) : base;
   const placement = stackCenters(layout, stackSlotOf(layout, slot), count);
   return {
     centers: placement.centers.map((v) => toScreenPoint(geo, v)),
@@ -190,11 +216,17 @@ export function stackPosition(
   slot: Slot,
   count: number,
   n: number,
+  pinned = false,
 ): ScreenPoint {
-  const { centers } = stackGeometry(geo, slot, count);
+  const { centers } = stackGeometry(geo, slot, count, pinned);
   const last = centers[Math.min(n, centers.length - 1)];
   if (last === undefined) throw new Error('Empty stack');
   return last;
+}
+
+/** Where a pinned checker sits on a point: at the base, where a lone checker would be. */
+export function pinnedCenter(geo: BoardGeometry, slot: Slot): ScreenPoint {
+  return stackPosition(geo, slot, 1, 0);
 }
 
 /** Borne-off checkers in a tray, seen from their edge: one rect each. */
