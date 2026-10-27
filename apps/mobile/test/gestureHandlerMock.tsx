@@ -2,31 +2,81 @@
  * A small stand-in for react-native-gesture-handler in Jest.
  *
  * Gesture Handler 3 needs native code and a real Reanimated. Here
- * `usePanGesture` only remembers its config by `testID`, and a test drives
- * it with `touch()`: begin, move, end, like a finger would.
+ * `usePanGesture` and `useTapGesture` only remember their config by
+ * `testID`, and a test drives them with `touch()`: down, move, up, like a
+ * finger would.
+ *
+ * The mock follows the native state machine of Gesture Handler 3.3 (see
+ * `PanGestureHandler.kt`, `TapGestureHandler.kt` and `eventHandler.ts`):
+ *
+ * - Pan begins on touch down. It activates only on a move of at least
+ *   `minDistance`. A finger that lifts before that makes the pan FAIL, so
+ *   its `onFinalize` gets `canceled: true` (#174).
+ * - Tap begins on touch down. It fails on a move of more than
+ *   `maxDistance`, or when the finger stays down longer than `maxDuration`
+ *   (default 500 ms). Otherwise it activates and ends when the finger lifts.
+ * - `useCompetingGestures` (Race): the first gesture to activate cancels the
+ *   others.
  */
 import { act } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { View, type ViewProps } from 'react-native';
 
-interface PanEvent {
+interface GestureEvent {
   x: number;
   y: number;
-  canceled?: boolean;
 }
 
-interface PanConfig {
+interface EndEvent extends GestureEvent {
+  canceled: boolean;
+}
+
+interface Callbacks {
   testID?: string;
-  onBegin?: (e: PanEvent) => void;
-  onUpdate?: (e: PanEvent) => void;
-  onFinalize?: (e: PanEvent) => void;
+  onBegin?: (e: GestureEvent) => void;
+  onActivate?: (e: GestureEvent) => void;
+  onUpdate?: (e: GestureEvent) => void;
+  onDeactivate?: (e: EndEvent) => void;
+  onFinalize?: (e: EndEvent) => void;
 }
 
-const pans = new Map<string, PanConfig>();
+interface PanConfig extends Callbacks {
+  minDistance?: number;
+}
 
-export function usePanGesture(config: PanConfig) {
-  if (config.testID) pans.set(config.testID, config);
-  return { config };
+interface TapConfig extends Callbacks {
+  maxDistance?: number;
+  maxDuration?: number;
+}
+
+type Gesture = { kind: 'pan'; config: PanConfig } | { kind: 'tap'; config: TapConfig };
+
+/** Gesture Handler's defaults. */
+const PAN_MIN_DISTANCE = 10;
+const TAP_MAX_DURATION = 500;
+
+/** The gestures a finger on `testID` drives: the gesture and the gestures it races. */
+const groups = new Map<string, Gesture[]>();
+
+function register(gestures: Gesture[]) {
+  for (const g of gestures) if (g.config.testID) groups.set(g.config.testID, gestures);
+}
+
+export function usePanGesture(config: PanConfig): Gesture {
+  const gesture: Gesture = { kind: 'pan', config };
+  register([gesture]);
+  return gesture;
+}
+
+export function useTapGesture(config: TapConfig): Gesture {
+  const gesture: Gesture = { kind: 'tap', config };
+  register([gesture]);
+  return gesture;
+}
+
+export function useCompetingGestures(...gestures: Gesture[]): Gesture[] {
+  register(gestures);
+  return gestures;
 }
 
 export function GestureDetector({ children }: { children: ReactNode }) {
@@ -42,23 +92,85 @@ export interface Point {
   y: number;
 }
 
+type State = 'began' | 'active' | 'done';
+
 /**
- * A finger on the pan gesture `testID`: down at `path[0]`, through the
- * other points, up at the last one. One point is a tap. `canceled`: the
- * system takes the touch away at the last point.
+ * A finger on the gesture `testID` (and the gestures it races): down at
+ * `path[0]`, through the other points, up at the last one. One point is a
+ * tap. `holdMs`: how long the finger stays down (default 100 ms, a quick
+ * tap). `canceled`: the system takes the touch away at the last point.
  */
 export async function touch(
   testID: string,
   path: Point[],
-  { canceled = false }: { canceled?: boolean } = {},
+  { canceled = false, holdMs = 100 }: { canceled?: boolean; holdMs?: number } = {},
 ): Promise<void> {
-  const pan = pans.get(testID);
-  if (pan === undefined) throw new Error(`No pan gesture with testID ${testID}`);
+  const gestures = groups.get(testID);
+  if (gestures === undefined) throw new Error(`No gesture with testID ${testID}`);
   const [first, ...rest] = path;
   if (first === undefined) throw new Error('A touch needs a point');
+  const last = rest[rest.length - 1] ?? first;
+  const states = new Map<Gesture, State>();
+
+  const fail = (g: Gesture, at: Point) => {
+    states.set(g, 'done');
+    g.config.onFinalize?.({ ...at, canceled: true });
+  };
+  const activate = (g: Gesture, at: Point) => {
+    states.set(g, 'active');
+    g.config.onActivate?.(at);
+    // Race: the others stop at once.
+    for (const other of gestures) if (other !== g && states.get(other) === 'began') fail(other, at);
+  };
+  const end = (g: Gesture, at: Point, wasCanceled: boolean) => {
+    states.set(g, 'done');
+    g.config.onDeactivate?.({ ...at, canceled: wasCanceled });
+    g.config.onFinalize?.({ ...at, canceled: wasCanceled });
+  };
+
   await act(async () => {
-    pan.onBegin?.(first);
-    for (const p of rest) pan.onUpdate?.(p);
-    pan.onFinalize?.({ ...(rest[rest.length - 1] ?? first), canceled });
+    for (const g of gestures) {
+      states.set(g, 'began');
+      g.config.onBegin?.(first);
+    }
+    for (const p of rest) {
+      const distance = Math.hypot(p.x - first.x, p.y - first.y);
+      for (const g of gestures) {
+        const state = states.get(g);
+        if (g.kind === 'tap') {
+          const max = g.config.maxDistance;
+          if (state === 'began' && max !== undefined && distance > max) fail(g, p);
+        } else if (state === 'began') {
+          if (distance >= (g.config.minDistance ?? PAN_MIN_DISTANCE)) {
+            activate(g, p);
+            g.config.onUpdate?.(p);
+          }
+        } else if (state === 'active') {
+          g.config.onUpdate?.(p);
+        }
+      }
+    }
+    // The finger stayed down too long for a tap.
+    for (const g of gestures) {
+      if (g.kind !== 'tap' || states.get(g) !== 'began') continue;
+      if (holdMs > (g.config.maxDuration ?? TAP_MAX_DURATION)) fail(g, last);
+    }
+    for (const g of gestures) {
+      const state = states.get(g);
+      if (state === 'done') continue;
+      if (canceled) {
+        if (state === 'active') end(g, last, true);
+        else fail(g, last);
+      } else if (state === 'active') {
+        end(g, last, false);
+      } else if (g.kind === 'tap') {
+        // A tap activates and ends when the finger lifts.
+        activate(g, last);
+        end(g, last, false);
+      } else {
+        // A pan that never moved far enough fails when the finger lifts.
+        fail(g, last);
+      }
+    }
   });
 }
