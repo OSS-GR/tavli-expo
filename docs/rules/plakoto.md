@@ -46,7 +46,9 @@ White's home point 1.
 ## Direction of movement
 
 Contrary. Each player moves from own point 24 to own point 1. White moves
-counterclockwise on the diagram; Black clockwise.
+counterclockwise on the diagram; Black clockwise. The app may draw the board
+turned or mirrored (for example, with the player's home at the bottom left).
+Only the path from own 24 to own 1 counts.
 
 ## Turn & dice rules
 
@@ -133,9 +135,18 @@ while the mother is pinned.
 | Mother win | Mother rule condition 1 (see above) | 2 |
 | Draw | Both mothers pinned | 0 / 0 |
 
+The "Mother win" and "Draw" rows are for `motherRule: "federation"`. The
+app default is `"offerConcede"`: when a mother is pinned, the pinned player
+chooses **Resign** (the opponent wins 2 points) or **Play on** (the game
+goes on as with `"none"`). See the flags table and open questions Q23 and
+Q24 in `docs/open-questions.md`.
+
 There is no triple game and no cube.
 
 ## Edge cases
+
+Edge cases 10–14 use `motherRule: "federation"`. The default
+`"offerConcede"` asks the pinned player instead (see "Winning & scoring").
 
 1. Start: 15 on own 24 for each side; first moves from 24 only.
 2. Landing on a single opponent checker pins it; it cannot move.
