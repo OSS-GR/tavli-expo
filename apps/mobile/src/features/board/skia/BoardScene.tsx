@@ -1,8 +1,8 @@
 /**
  * The board drawing (Skia), in the order the theme README gives:
  * shadow, image layers under the points, 24 vector points, image layers
- * over the points, checkers with count badges, trays, highlights, then the
- * lamp overlay.
+ * over the points, pinned checkers (Plakoto), checkers with count badges,
+ * trays, highlights, then the lamp overlay.
  *
  * Everything comes from props: the theme, the geometry and a picture made
  * by `layoutBoard`. No hooks, no state and no React Native imports, so the
@@ -65,6 +65,9 @@ export interface BoardSceneProps {
 }
 
 const NO_HIGHLIGHTS: BoardHighlights = { select: null, targets: [] };
+
+/** Width of the ring on a pinned checker, in checker radii. */
+export const PIN_RING_WIDTH = 0.16;
 
 export function BoardScene({
   theme,
@@ -171,7 +174,29 @@ export function BoardScene({
       {/* 4. Wear and the frame's inner shadow. */}
       {layers('overPoints')}
 
-      {/* 5. Checkers and count badges. */}
+      {/* 5. Pinned checkers (Plakoto) with a ring in the badge color, under the
+          checkers that pin them. They peek out on the base side of the point. */}
+      {picture.pins.map((p) => (
+        <Group key={p.key}>
+          <CheckerShape
+            cx={p.x}
+            cy={p.y}
+            r={p.r}
+            style={theme.checkers[toneOf(p.owner)]}
+            shadow={theme.checkers.shadow}
+          />
+          <Circle
+            cx={p.x}
+            cy={p.y}
+            r={p.r * (1 - PIN_RING_WIDTH / 2)}
+            style="stroke"
+            strokeWidth={PIN_RING_WIDTH * p.r}
+            color={badge.fill}
+          />
+        </Group>
+      ))}
+
+      {/* 6. Checkers and count badges. */}
       {picture.checkers.map((c) =>
         hidden?.has(c.key) ? null : (
           <CheckerShape
@@ -212,7 +237,7 @@ export function BoardScene({
         );
       })}
 
-      {/* 6. Borne-off checkers in the trays, seen from the edge. */}
+      {/* 7. Borne-off checkers in the trays, seen from the edge. */}
       {picture.trays.map((tray) => {
         const style = theme.checkers[toneOf(tray.owner)];
         return (
@@ -239,7 +264,7 @@ export function BoardScene({
         );
       })}
 
-      {/* 7. Highlights: legal targets, then the selected checker. */}
+      {/* 8. Highlights: legal targets, then the selected checker. */}
       {highlights.targets.map((t) => (
         <Group key={`target:${t.key}`}>
           <Circle
@@ -290,7 +315,7 @@ export function BoardScene({
 
       {children}
 
-      {/* 8. The lamp: soft light over everything. */}
+      {/* 9. The lamp: soft light over everything. */}
       {layout.overlay ? (
         <RoundedRect {...board} r={corner} blendMode={layout.overlay.blend}>
           <RadialGradient {...radialProps(layout.overlay.gradient, board)} />

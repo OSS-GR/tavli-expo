@@ -93,7 +93,10 @@
       "positions": {
         "start": "Start",
         "midgame": "Mid-game",
-        "bearoff": "Bear-off"
+        "bearoff": "Bear-off",
+        "plakotoStart": "Plakoto",
+        "plakotoPins": "Pins",
+        "fevgaStart": "Fevga"
       },
       "viewer": "Board view",
       "viewWhite": "White at the bottom",
@@ -204,6 +207,21 @@
     "missing": {
       "title": "This game could not be opened.",
       "home": "Home"
+    },
+    "mother": {
+      "chip": "Plakoto · mother pinned",
+      "title": "{{name}}, your mother is pinned",
+      "title_you": "Your mother is pinned",
+      "body": "{{opponent}} pinned your last checker on your start point (point 24).",
+      "question": "Resign now and {{opponent}} wins 2 points, or play on and try to free it.",
+      "resign": "Resign (lose 2)",
+      "playOn": "Play on",
+      "botPlaysOn": "{{name}} plays on."
+    },
+    "board": {
+      "label": "Board",
+      "pinned": "{{name}}’s checker on point {{point}} is pinned",
+      "pinned_you": "Your checker on point {{point}} is pinned"
     }
   },
   "games": {

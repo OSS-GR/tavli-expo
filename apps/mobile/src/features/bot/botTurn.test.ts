@@ -1,17 +1,20 @@
 import { BotCancelledError, type BotMoveRequest, type BotRunner } from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
+  createBoard,
   createGameFlow,
   createSeededRng,
   getVariant,
+  plakoto,
   portes,
+  resolveRules,
   type GameState,
   type Turn,
 } from '@tavli/engine';
 
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
 
-import { botStep, startBotTurn, type BotTurnActions } from './botTurn';
+import { botAnswer, botStep, startBotTurn, type BotTurnActions } from './botTurn';
 
 /** A fake runner: the first legal turn, or whatever `pick` returns. Records requests. */
 function fakeRunner(pick?: (req: BotMoveRequest) => Turn | Promise<Turn>) {
@@ -66,7 +69,43 @@ function actionsFor(store: GameStore, log: string[]): BotTurnActions {
       log.push('confirm');
       return d({ type: 'confirm', player: 'black' });
     },
+    answer: (choice) => {
+      log.push(`answer ${choice}`);
+      return d({ type: 'answer', player: 'black', choice });
+    },
   };
+}
+
+/**
+ * A Plakoto store where White is about to pin Black's mother: Black's last
+ * checker on own 24 (= White 1), a White checker on White 2, Black still on
+ * the board elsewhere. White rolls 1-6 and plays 2/1 and a 6.
+ */
+function blackMotherPinned(): GameStore {
+  const rules = resolveRules('plakoto', { match: { rotation: ['plakoto'] } });
+  const store = createGameStore({
+    players: { white: 'you', black: 'bot' },
+    targetPoints: 3,
+    rules,
+    rng: createSeededRng(4),
+  });
+  const board = createBoard(
+    {
+      white: { points: { 24: 10, 14: 2, 8: 2, 2: 1 } },
+      black: { points: { 24: 1, 20: 4, 16: 5, 12: 5 } },
+    },
+    'contrary',
+  );
+  const state: GameState = { ...plakoto.initialState({ startingPlayer: 'white', rules }), board };
+  store.setState({
+    flow: { ...store.getState().flow, game: createGameFlow({ state, starter: 'white' }) },
+  });
+  const d = store.getState().dispatch;
+  d({ type: 'roll', player: 'white', dice: [1, 6] });
+  d({ type: 'move', player: 'white', move: { from: 2, to: 1, die: 1 } });
+  d({ type: 'move', player: 'white', move: { from: 24, to: 18, die: 6 } });
+  d({ type: 'confirm', player: 'white' });
+  return store;
 }
 
 const fast = { beforeRollMs: 0, moveMs: 0, thinkMs: () => 0 };
@@ -79,6 +118,18 @@ describe('botStep', () => {
 
     store.getState().dispatch({ type: 'roll', player: 'black', dice: [6, 5] });
     expect(botStep(store.getState().flow, 'black')).toBe('play');
+  });
+
+  it('answers the Plakoto mother question when the bot is asked', () => {
+    const store = blackMotherPinned();
+    const { flow } = store.getState();
+    expect(flow.game.phase).toBe('awaiting-answer');
+    expect(botStep(flow, 'black')).toBe('answer');
+    expect(botStep(flow, 'white')).toBeNull();
+    // TODO(#106): the bot package decides; until then the bot plays on.
+    expect(botAnswer({ player: 'black', kind: 'motherPinned', choices: ['resign', 'playOn'] })).toBe(
+      'playOn',
+    );
   });
 
   it('leaves the opening roll to the human tap', () => {
@@ -290,6 +341,25 @@ describe('startBotTurn', () => {
       onError: quiet,
     }).done;
     expect(quiet).not.toHaveBeenCalled();
+  });
+
+  it('plays on when its mother is pinned, then plays its turn', async () => {
+    const store = blackMotherPinned();
+    const log: string[] = [];
+    await startBotTurn({
+      player: 'black',
+      difficulty: 'easy',
+      runner: fakeRunner(),
+      rng: createSeededRng(9),
+      getFlow: () => store.getState().flow,
+      actions: actionsFor(store, log),
+      timing: fast,
+    }).done;
+    expect(log.slice(0, 2)).toEqual(['answer playOn', 'roll']);
+    expect(log.at(-1)).toBe('confirm');
+    const { game } = store.getState().flow;
+    expect(game.lastTurn?.player).toBe('black');
+    expect(game.state.toMove).toBe('white');
   });
 
   it('does nothing when it is not the bot turn', async () => {

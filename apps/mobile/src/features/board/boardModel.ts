@@ -10,6 +10,12 @@
  * Checker colors stay with the player: White uses the theme's light style,
  * Black the dark style, whoever sits at the bottom.
  *
+ * Every game draws the same way. The direction of the game (`contrary` for
+ * Portes and Plakoto, `parallel` for Fevga) only changes where each
+ * player's points are. Plakoto adds pinned checkers: a pinned checker lies
+ * under the stack that pins it and peeks out (`PIN_PEEK`). Plakoto and Fevga
+ * never use the bar.
+ *
  * Pure TypeScript: no React, no Skia.
  */
 import {
@@ -24,6 +30,7 @@ import {
 } from '@tavli/engine';
 
 import {
+  pinnedCenter,
   stackGeometry,
   slotKey,
   trayGeometry,
@@ -63,7 +70,8 @@ export function absoluteOfLayout(index: number, view: BoardView): number {
 
 /** The slot of a move origin. Point numbers are the mover's own numbers. */
 export function slotOfOrigin(origin: Origin, mover: PlayerId, view: BoardView): Slot {
-  // 'outside' (Asodio, not built yet) waits on the bar too, for now.
+  // 'outside' is Asodio only (not built yet): it waits on the bar, for now.
+  // Of the built games only Portes has a bar; Plakoto and Fevga never use it.
   if (origin === 'bar' || origin === 'outside') return { kind: 'bar', side: sideOf(mover, view) };
   const absolute = ownToAbsolute(origin, mover, view.direction);
   return { kind: 'point', index: layoutIndexOf(absolute, view) };
@@ -84,6 +92,8 @@ export function slotOfDestination(
 export interface StackModel {
   readonly slot: Slot;
   readonly owners: readonly PlayerId[];
+  /** Plakoto: the owner of the pinned checker under the stack, or `null`. */
+  readonly pinned: PlayerId | null;
 }
 
 /** Every non-empty point and bar half of a board, in this view. */
@@ -94,14 +104,17 @@ export function boardStacks(board: BoardState, view: BoardView): StackModel[] {
     if (point === undefined) continue;
     const total = point.white + point.black;
     if (total === 0) continue;
-    // A pinned checker (Plakoto) lies under the checker that pins it.
-    const first: PlayerId = point.pinned ?? (point.white > 0 ? 'white' : 'black');
-    const second: PlayerId = first === 'white' ? 'black' : 'white';
-    const owners = [
-      ...Array<PlayerId>(point[first]).fill(first),
-      ...Array<PlayerId>(point[second]).fill(second),
-    ];
-    stacks.push({ slot: { kind: 'point', index: layoutIndexOf(absolute, view) }, owners });
+    const slot: Slot = { kind: 'point', index: layoutIndexOf(absolute, view) };
+    // A pinned checker (Plakoto) lies under the checkers that pin it. It is
+    // not part of the stack: the stack starts on top of it.
+    const pinned = point.pinned;
+    if (pinned !== null) {
+      const pinner = other(pinned);
+      stacks.push({ slot, owners: Array<PlayerId>(point[pinner]).fill(pinner), pinned });
+      continue;
+    }
+    const owner: PlayerId = point.white > 0 ? 'white' : 'black';
+    stacks.push({ slot, owners: Array<PlayerId>(total).fill(owner), pinned: null });
   }
   for (const player of ['white', 'black'] as const) {
     const count = board.bar[player] + board.outside[player];
@@ -109,18 +122,23 @@ export function boardStacks(board: BoardState, view: BoardView): StackModel[] {
       stacks.push({
         slot: { kind: 'bar', side: sideOf(player, view) },
         owners: Array<PlayerId>(count).fill(player),
+        pinned: null,
       });
     }
   }
   return stacks;
 }
 
-/** How many checkers sit in a slot now. */
+/**
+ * How many checkers sit in the stack of a slot now. A pinned checker
+ * (Plakoto) lies under the stack and does not count: see `pinnedIn`.
+ */
 export function countIn(board: BoardState, slot: Slot, view: BoardView): number {
   switch (slot.kind) {
     case 'point': {
       const point = board.points[absoluteOfLayout(slot.index, view) - 1];
-      return point === undefined ? 0 : point.white + point.black;
+      if (point === undefined) return 0;
+      return point.white + point.black - (point.pinned === null ? 0 : 1);
     }
     case 'bar': {
       const player = slot.side === 'player' ? view.viewer : other(view.viewer);
@@ -131,6 +149,29 @@ export function countIn(board: BoardState, slot: Slot, view: BoardView): number 
       return board.off[player];
     }
   }
+}
+
+/** True when a pinned checker (Plakoto) lies under the stack of this slot. */
+export function pinnedIn(board: BoardState, slot: Slot, view: BoardView): boolean {
+  if (slot.kind !== 'point') return false;
+  return (board.points[absoluteOfLayout(slot.index, view) - 1]?.pinned ?? null) !== null;
+}
+
+/** A pinned checker, in its owner's own numbering (for the screen reader). */
+export interface PinnedChecker {
+  readonly player: PlayerId;
+  /** The owner's own point number (24 = start). */
+  readonly point: number;
+}
+
+/** Every pinned checker of a board (Plakoto). Empty in Portes and Fevga. */
+export function pinnedCheckers(board: BoardState, direction: Direction): PinnedChecker[] {
+  const out: PinnedChecker[] = [];
+  board.points.forEach((point, i) => {
+    if (point.pinned === null) return;
+    out.push({ player: point.pinned, point: absoluteToOwn(i + 1, point.pinned, direction) });
+  });
+  return out;
 }
 
 function other(player: PlayerId): PlayerId {
@@ -159,6 +200,21 @@ export interface PlacedBadge {
   readonly count: number;
 }
 
+/**
+ * A pinned checker (Plakoto). It is drawn under the stack that pins it,
+ * with a ring, and peeks out on the base side. `key` is `<slot>:pinned`.
+ */
+export interface PlacedPin {
+  readonly key: string;
+  /** The owner of the pinned checker. */
+  readonly owner: PlayerId;
+  /** The owner of the checkers on top. */
+  readonly pinner: PlayerId;
+  readonly x: number;
+  readonly y: number;
+  readonly r: number;
+}
+
 /** Borne-off checkers of one player. */
 export interface PlacedTray {
   readonly key: string;
@@ -168,6 +224,8 @@ export interface PlacedTray {
 }
 
 export interface BoardPicture {
+  /** Pinned checkers. They are drawn before (under) the checkers. */
+  readonly pins: readonly PlacedPin[];
   readonly checkers: readonly PlacedChecker[];
   readonly badges: readonly PlacedBadge[];
   readonly trays: readonly PlacedTray[];
@@ -175,11 +233,22 @@ export interface BoardPicture {
 
 /** Places every checker of `board` on the drawn board. */
 export function layoutBoard(geo: BoardGeometry, board: BoardState, view: BoardView): BoardPicture {
+  const pins: PlacedPin[] = [];
   const checkers: PlacedChecker[] = [];
   const badges: PlacedBadge[] = [];
   for (const stack of boardStacks(board, view)) {
     const key = slotKey(stack.slot);
-    const { centers, radius, badge } = stackGeometry(geo, stack.slot, stack.owners.length);
+    const pinned = stack.pinned;
+    const { centers, radius, badge } = stackGeometry(
+      geo,
+      stack.slot,
+      stack.owners.length,
+      pinned !== null,
+    );
+    if (pinned !== null) {
+      const c = pinnedCenter(geo, stack.slot);
+      pins.push({ key: `${key}:pinned`, owner: pinned, pinner: other(pinned), ...c, r: radius });
+    }
     centers.forEach((c, n) => {
       const owner = stack.owners[n] ?? stack.owners[0] ?? 'white';
       checkers.push({ key: `${key}:${n}`, owner, x: c.x, y: c.y, r: radius });
@@ -196,10 +265,14 @@ export function layoutBoard(geo: BoardGeometry, board: BoardState, view: BoardVi
     const side = sideOf(owner, view);
     trays.push({ key: `tray:${side}`, owner, side, rects: trayGeometry(geo, side, count) });
   }
-  return { checkers, badges, trays };
+  return { pins, checkers, badges, trays };
 }
 
-/** The key of the top checker of a slot with `count` checkers, as `layoutBoard` names it. */
+/**
+ * The key of the top checker of a slot with `count` checkers in its stack,
+ * as `layoutBoard` names it. A pinned checker under the stack has its own
+ * key (`<slot>:pinned`) and never moves.
+ */
 export function topCheckerKey(geo: BoardGeometry, slot: Slot, count: number): string | null {
   if (slot.kind === 'tray' || count === 0) return null;
   const visible = Math.min(count, geo.layout.checker.maxVisible);

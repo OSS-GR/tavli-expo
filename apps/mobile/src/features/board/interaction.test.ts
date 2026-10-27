@@ -5,7 +5,9 @@ import {
   createGameFlow,
   currentBoard,
   legalNextMoves,
+  plakoto,
   portes,
+  resolveRules,
   type BoardState,
   type GameFlow,
   type Move,
@@ -237,5 +239,63 @@ describe('moveFlights', () => {
     expect(back!.from).toMatchObject(stackPosition(geo, { kind: 'point', index: 7 }, 1, 0));
     expect(back!.hide).toBeNull(); // 13 holds 15: the top place is under the badge
     expect(victim).toMatchObject({ owner: 'black', hide: 'p7:0', delay: 0 });
+  });
+});
+
+describe('Plakoto: pins on the board', () => {
+  const rules = resolveRules('plakoto', { match: { rotation: ['plakoto'] } });
+  // A Black blot on White 5 (Black's 20). White has 2 on 8 and 13 on 24.
+  const board = createBoard(
+    {
+      white: { points: { 24: 13, 8: 2 } },
+      black: { points: { 24: 14, 20: 1 } },
+    },
+    'contrary',
+  );
+  const p5 = { kind: 'point', index: 5 } as const;
+  const rolled = () => {
+    const state = { ...plakoto.initialState({ startingPlayer: 'white', rules }), board };
+    const flow = createGameFlow({ state, starter: 'white' });
+    return applyGameAction(flow, { type: 'roll', player: 'white', dice: [3, 1] });
+  };
+
+  it('lands a pin on top of the blot, which then peeks out under it', () => {
+    const flow = rolled();
+    const to5 = source(sourcesFor(flow), 'p8').targets.find((t) => t.key === 'p5')!;
+    expect(to5.move.capture).toBe('pin');
+    expect(to5.landing).toEqual(stackPosition(geo, p5, 1, 0, true));
+
+    const played = applyGameAction(flow, { type: 'move', player: 'white', move: to5.move });
+    const picture = layoutBoard(geo, currentBoard(played), WHITE);
+    const pinner = picture.checkers.find((c) => c.key === 'p5:0')!;
+    expect({ x: pinner.x, y: pinner.y }).toEqual(to5.landing);
+    expect(picture.pins).toEqual([expect.objectContaining({ key: 'p5:pinned', owner: 'black' })]);
+  });
+
+  it('flies the pinner only: no checker goes to the bar', () => {
+    const flow = rolled();
+    const move = source(sourcesFor(flow), 'p8').targets.find((t) => t.key === 'p5')!.move;
+    const before = currentBoard(flow);
+    const after = applyMoveToBoard(before, 'white', move, 'contrary');
+    const flights = moveFlights(geo, WHITE, 'white', move, before, after, { id: 'p' });
+    expect(flights).toHaveLength(1);
+    expect(flights[0]).toMatchObject({ owner: 'white', hide: 'p5:0' });
+    expect(flights[0]!.to).toMatchObject(stackPosition(geo, p5, 1, 0, true));
+    // Undo: the pinner flies back from its place on top of the blot.
+    const back = moveFlights(geo, WHITE, 'white', move, after, before, { id: 'u', undo: true });
+    expect(back).toHaveLength(1);
+    expect(back[0]!.from).toMatchObject(stackPosition(geo, p5, 1, 0, true));
+  });
+
+  it('lets the pinner move away from where it is drawn; the pinned checker never moves', () => {
+    const flow = rolled();
+    const pin = source(sourcesFor(flow), 'p8').targets.find((t) => t.key === 'p5')!.move;
+    const played = applyGameAction(flow, { type: 'move', player: 'white', move: pin });
+    const sources = sourcesFor(played);
+    const from5 = source(sources, 'p5');
+    expect(from5.checker.key).toBe('p5:0');
+    expect({ x: from5.checker.x, y: from5.checker.y }).toEqual(stackPosition(geo, p5, 1, 0, true));
+    // The pinned Black checker under it is never a source.
+    expect(sources.every((s) => s.checker.key !== 'p5:pinned')).toBe(true);
   });
 });

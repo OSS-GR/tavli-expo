@@ -6,6 +6,8 @@
  * animates each move like a human move. The dice come from the flow's `Rng`.
  *
  * Order of one bot turn:
+ * 0. Plakoto: if the engine asks the bot "resign or play on?" (its mother is
+ *    pinned), wait `beforeRollMs` and answer (`botAnswer`);
  * 1. wait `beforeRollMs`, then roll (a roll with no legal move passes by itself);
  * 2. ask the `BotRunner` for a turn and wait `thinkingDelayMs` at the same time;
  * 3. play the moves one by one, `moveMs` apart;
@@ -18,6 +20,7 @@ import { thinkingDelayMs } from '@tavli/bot';
 import { isBotCancelled, type BotRunner, type Difficulty } from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
+  currentPrompt,
   getVariant,
   matchPhase,
   sameMove,
@@ -25,6 +28,7 @@ import {
   type Move,
   type PlayerId,
   type Rng,
+  type VariantPrompt,
 } from '@tavli/engine';
 
 /** What the bot may do. Each returns `false` when the engine refuses it. */
@@ -33,6 +37,18 @@ export interface BotTurnActions {
   move: (move: Move) => boolean;
   undo: () => boolean;
   confirm: () => boolean;
+  /** Answers the variant's question (Plakoto: "resign or play on?"). */
+  answer: (choice: string) => boolean;
+}
+
+/**
+ * The bot's answer to a variant question. Plakoto mother pinned: always
+ * "play on" for now.
+ * TODO(#106): ask the bot package for its answer once it has one.
+ */
+export function botAnswer(prompt: VariantPrompt): string {
+  if (prompt.choices.includes('playOn')) return 'playOn';
+  return prompt.choices[0] ?? '';
 }
 
 export interface BotTiming {
@@ -60,12 +76,16 @@ export interface BotTurnOptions {
   readonly onError?: (error: unknown) => void;
 }
 
-export type BotStep = 'roll' | 'play' | 'confirm';
+export type BotStep = 'answer' | 'roll' | 'play' | 'confirm';
 
 /** What the bot should do now, or `null` when it is not the bot's move. Pure. */
 export function botStep(flow: MatchFlow, player: PlayerId): BotStep | null {
   if (matchPhase(flow) !== 'playing') return null;
   const game = flow.game;
+  // A question (Plakoto mother pinned) goes to the player it names.
+  if (game.phase === 'awaiting-answer') {
+    return currentPrompt(game)?.player === player ? 'answer' : null;
+  }
   if (game.state.toMove !== player) return null;
   switch (game.phase) {
     case 'awaiting-roll':
@@ -147,10 +167,15 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
   };
 
   const run = async () => {
-    for (let guard = 0; guard < 4 && !cancelled; guard++) {
+    // At most: answer, roll, play, confirm.
+    for (let guard = 0; guard < 5 && !cancelled; guard++) {
       const step = botStep(getFlow(), player);
       if (step === null) return;
-      if (step === 'roll') {
+      if (step === 'answer') {
+        const prompt = currentPrompt(getFlow().game);
+        await sleep(timing.beforeRollMs);
+        if (cancelled || prompt === null || !actions.answer(botAnswer(prompt))) return;
+      } else if (step === 'roll') {
         await sleep(timing.beforeRollMs);
         if (cancelled || !actions.roll()) return;
       } else if (step === 'play') {

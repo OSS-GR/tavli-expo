@@ -3,8 +3,8 @@ import { getLayout, getTheme } from '@tavli/themes';
 
 import { layoutBoard, type BoardView } from './boardModel';
 import { fitBoard } from './geometry';
-import { SAMPLE_POSITIONS } from './positions';
-import { BoardScene } from './skia/BoardScene';
+import { SAMPLE_DIRECTIONS, SAMPLE_POSITIONS } from './positions';
+import { BoardScene, PIN_RING_WIDTH } from './skia/BoardScene';
 import { StaticBoard } from './StaticBoard';
 import { THEME_IMAGES } from './themeImages';
 import { layoutImageKeys } from './useBoardAssets';
@@ -43,6 +43,38 @@ describe('<BoardScene />', () => {
       (n) => n.type === 'RoundedRect' && n.props.color === theme.checkers.dark.fill,
     );
     expect(fills).toHaveLength(4);
+  });
+
+  it('draws pinned checkers (Plakoto) with a ring, before the checkers on top', async () => {
+    const picture = layoutBoard(geo, SAMPLE_POSITIONS.plakotoPins, WHITE);
+    await render(<BoardScene theme={theme} geo={geo} images={{}} picture={picture} font={font} />);
+    const rings = find(
+      (n) =>
+        n.type === 'Circle' &&
+        n.props.style === 'stroke' &&
+        n.props.color === theme.checkers.badge.fill &&
+        n.props.strokeWidth === PIN_RING_WIDTH * picture.pins[0]!.r,
+    );
+    expect(rings).toHaveLength(2);
+    // Every checker has its rim: 15 light and 15 dark, the 2 pinned ones too.
+    const rims = (color: string) =>
+      find((n) => n.type === 'Circle' && n.props.style === 'stroke' && n.props.color === color);
+    expect(rims(theme.checkers.light.rim.color)).toHaveLength(
+      picture.checkers.filter((c) => c.owner === 'white').length + 1,
+    );
+    expect(rims(theme.checkers.dark.rim.color)).toHaveLength(
+      picture.checkers.filter((c) => c.owner === 'black').length + 1,
+    );
+  });
+
+  it('draws the Fevga start in opposite corners', async () => {
+    const picture = layoutBoard(geo, SAMPLE_POSITIONS.fevgaStart, {
+      viewer: 'white',
+      direction: SAMPLE_DIRECTIONS.fevgaStart,
+    });
+    await render(<BoardScene theme={theme} geo={geo} images={{}} picture={picture} font={font} />);
+    expect(find((n) => n.type === 'Text' && n.props.text === '15')).toHaveLength(2);
+    expect(picture.badges.map((b) => b.key).sort()).toEqual(['p12', 'p24']);
   });
 
   it('adds the wood texture and the image layers once images load', async () => {
