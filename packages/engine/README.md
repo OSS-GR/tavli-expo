@@ -189,8 +189,8 @@ interface RuleSet {
 - The Asodio presets use `match.rotation: ['asodio']`, because Asodio is not
   in the standard rotation.
 - `portes` is a single-game match (PM, #24). `tavli` is the match preset
-  with the rotation (for #51). Until Plakoto exists, a `tavli` match
-  fails at game 2 with `UNKNOWN_VARIANT`. That is expected.
+  with the rotation (for #51). Portes, Plakoto and Fevga are all built, so a
+  `tavli` match plays every game of the rotation.
 - The two Acey-Deucey presets turn the owner's army rules off
   (`mustEnterAllFirst`, `quarterGathering`, `quarterLock`).
 - `getPreset(id)` returns the frozen preset. Bump its `version` in
@@ -309,7 +309,7 @@ A variant checks the `RuleSet` it gets with `validateRules`. It throws
 game that is not built yet. It never ignores a flag in silence.
 
 `VARIANT_REGISTRY` holds `BUILT_IN_VARIANTS`. Today that is `portes` and
-`fevga`.
+`plakoto` and `fevga`.
 
 ## Portes
 
@@ -434,6 +434,137 @@ from `src/`. `portes-edge-cases.test.ts` reads this table.
 | 15   | Game 1 opening roll is never a double                      | `flow/game-flow.test.ts` (the roll), `variants/portes/portes.test.ts` (the flag) |
 | 16   | Doubles: 4 moves; enter and keep moving                    | `variants/portes/portes.test.ts`                                                 |
 
+## Plakoto
+
+Code: `src/variants/plakoto/`. Rules: `docs/rules/plakoto.md` and
+`docs/rules/tavli-match.md`.
+
+- `initialState`: 15 checkers on own 24 for both players (`PLAKOTO_START`).
+  Default rules: the `plakoto` preset.
+- Moves: no bar and no hits. Landing on one free opponent checker pins it
+  (`capture: 'pin'`, written `13/8*`). A point is closed when it holds 2+
+  opponent checkers, or when the opponent pins our checker there. We may
+  land on our own pin (the stack grows). A pinned checker cannot move. When
+  the last pinner leaves, the pin ends. No bearing off while one of our
+  checkers is pinned (`bearOffWhilePinned`). The "use as much of the roll
+  as possible" and higher-die rules work as in Portes.
+- `capture.intermediatePinBlocks: true` (edge case 9): a checker that pins
+  during a turn may not move on in the same turn, so a combined move
+  through a lone opponent checker is illegal. A second checker on that pin
+  may still move on (the pin stays).
+- The search is the Portes one (`moves.ts`): one die at a time, one play
+  per end position, (position, dice left) pruning for doubles. It moves
+  checkers in place and takes them back, and copies a position only when it
+  keeps it. Its map keys are small integers (30-bit hashes). It takes about
+  1.3 times the Portes time per position.
+- `resignResult` is not needed: the shared rule (`resignGame`) applies.
+
+### Mother rule
+
+Code: `mother.ts`. A player's mother is pinned when their lone checker on
+own 24 has opponent checkers on top. The result is read from the board.
+
+| `motherRule`             | One mother pinned                                                         | Both mothers pinned |
+| ------------------------ | ------------------------------------------------------------------------- | ------------------- |
+| `offerConcede` (default) | The pinned player is asked "resign or play on" (`Variant.prompt`).        | Draw, 0 points      |
+| `federation`             | The pinner wins 2 (`motherPinned`) once the pinner has nothing on own 24. | Draw, 0 points      |
+| `instant`                | The pinner wins 2 at once.                                                | Cannot happen       |
+| `none`                   | Nothing special.                                                          | Nothing special     |
+
+- `motherCheckTiming: "afterEachMove"` (default): the board is checked
+  after every single move. When the game ends (a federation or instant
+  win, or a draw), the turn stops at that move; the rest of the roll is not
+  played. The moves so far must still be the start of a play that the
+  normal rules allow. `legalTurns` then lists the cut plays (it tries every
+  order), `nextMoves` returns `[]` after the move that ends the game, and
+  the turn flow goes to `awaiting-confirm`.
+- `"endOfTurn"`: the board is checked after the whole turn.
+- `offerConcede` asks its question when the turn is over, with both
+  timings, because the flow asks only between turns. The answer cannot
+  change the rest of the turn, so the outcome is the same as with a
+  question in the middle of the turn. With `"afterEachMove"`, a mother that
+  was pinned after any move of the turn is asked about, even if the pin
+  ended later in that turn (the pinner bore off). With `"endOfTurn"`, only
+  a mother that is still pinned at the end is asked about.
+- `offerConcede` keeps `{ offer, playOn, conceded }` in
+  `state.variantData` (`null` when there is nothing to keep). `offer` is
+  the player who must answer now: `prompt` returns `{ player, kind:
+'motherPinned', choices: ['resign', 'playOn'] }`, and `legalTurns`,
+  `nextMoves` and `applyTurn` throw `ILLEGAL_TURN` until the answer comes.
+  `answerPrompt(state, player, 'resign')` ends the game: the opponent wins
+  2 (`reason: 'resigned'`). `'playOn'` adds the player to `playOn`; that
+  player is not asked again in this game.
+- `mutualMotherPin: "replay"` throws `NOT_SUPPORTED` with `offerConcede`
+  and `federation`.
+- With `none`, two pinned mothers can never move again, so that game
+  cannot end (an open question for the rules doc).
+
+Flags Plakoto reads: `movement.higherDieRule`,
+`capture.intermediatePinBlocks`, `bearOff.bearOffWhilePinned` and the three
+`mother.*` flags. `match.*` is for the match. Every other flag must keep
+the `plakoto` preset value, or the variant throws `RULES_CONFLICT`.
+
+### Tests
+
+- `plakoto.test.ts`: one test per numbered edge case in `plakoto.md`, named
+  `plakoto.md #N: ...`. Also flags, rules errors and `applyTurn` errors.
+- `plakoto-edge-cases.test.ts`: checks that the index below lists every
+  numbered edge case of `plakoto.md`, and that each listed file has a test
+  named `plakoto.md #N` (as for Portes).
+- `plakoto-mother.test.ts`: `offerConcede` (question, answers, timing,
+  draw), the mother rule through the turn flow, a real Plakoto game as game
+  2 of a Tavli match, and random Plakoto matches through the flow that
+  replay to the same JSON.
+- `plakoto-reference.test.ts`: the oracle (below) and the `nextMoves` walk
+  must find the same end positions as `legalTurns` in random positions, for
+  each mother rule.
+- `plakoto-fuzz.test.ts` (#98): 1,000 random games with every mother rule
+  and a mix of flags, built like the Portes fuzz test. After every move: 15
+  checkers per player, two colors on a point only as a pin, a pinned
+  checker never moves, the mover's pips drop by exactly the pips moved and
+  the opponent's never change. After every turn: `applyTurn` gives the same
+  board as the single moves, and a play is shorter than the others only
+  when the mother rule ended the game. Most plays are a random walk by the
+  oracle; stuck turns and one turn in 32 use `legalTurns`. About 1.5 s.
+  The engine tests run on one worker on a 2-core CI runner, so the game
+  counts are kept small; raise `GAMES` for a longer local run.
+- Test helpers (not exported):
+  - `src/testing/plakoto-notation.ts` marks a pinned checker with `!`:
+    `w: 24x14 8 ; b: 24x14 17!` means Black's 17 (White's 8) is pinned
+    under White. `*` in a move is a pin: `13/8*`.
+  - `src/testing/plakoto-oracle.ts`: a slow, simple Plakoto rules model
+    with no code shared with the variant: single moves (`canStep`, `step`),
+    the mid-turn mother end (`endsMidTurn`) and all end positions of a roll
+    (`referenceFinals`).
+
+### Plakoto edge-case index
+
+Where each numbered edge case in `docs/rules/plakoto.md` is tested. Paths
+are from `src/`. `plakoto-edge-cases.test.ts` reads this table.
+
+| Case | Rule                                                    | Test file                          |
+| ---- | ------------------------------------------------------- | ---------------------------------- |
+| 1    | Start: 15 on own 24 each; first moves from 24           | `variants/plakoto/plakoto.test.ts` |
+| 2    | Landing on a single opponent checker pins it            | `variants/plakoto/plakoto.test.ts` |
+| 3    | No landing on 2+ opponent checkers                      | `variants/plakoto/plakoto.test.ts` |
+| 4    | No landing where the opponent pins our checker          | `variants/plakoto/plakoto.test.ts` |
+| 5    | Landing on our own pin is legal                         | `variants/plakoto/plakoto.test.ts` |
+| 6    | Pinner leaves → the pinned checker moves next turn      | `variants/plakoto/plakoto.test.ts` |
+| 7    | Two pinners: one leaves → still pinned; both → free     | `variants/plakoto/plakoto.test.ts` |
+| 8    | A pinned checker does not count for the higher-die rule | `variants/plakoto/plakoto.test.ts` |
+| 9    | 6-5 through a lone checker; `intermediatePinBlocks`     | `variants/plakoto/plakoto.test.ts` |
+| 10   | Mother pinned, pinner's 24 empty → +2 at once, mid-turn | `variants/plakoto/plakoto.test.ts` |
+| 11   | Mother pinned, pinner still on own 24 → game goes on    | `variants/plakoto/plakoto.test.ts` |
+| 12   | Pinner then leaves own 24 → +2 at that moment           | `variants/plakoto/plakoto.test.ts` |
+| 13   | Both mothers pinned → draw                              | `variants/plakoto/plakoto.test.ts` |
+| 14   | The pinner leaves → mother free                         | `variants/plakoto/plakoto.test.ts` |
+| 15   | 2+ on own 24 → the mother cannot be pinned              | `variants/plakoto/plakoto.test.ts` |
+| 16   | All home, one pinned → no bearing off                   | `variants/plakoto/plakoto.test.ts` |
+| 17   | Pinned during bear-off → bearing off stops              | `variants/plakoto/plakoto.test.ts` |
+| 18   | Last checker off, loser has 0 off → 2                   | `variants/plakoto/plakoto.test.ts` |
+| 19   | No legal move → pass                                    | `variants/plakoto/plakoto.test.ts` |
+| 20   | `motherRule="instant"` → +2 at once; no draw            | `variants/plakoto/plakoto.test.ts` |
+
 ## Fevga
 
 Code: `src/variants/fevga/`. Rules: `docs/rules/fevga.md` and
@@ -546,7 +677,8 @@ interface Match {
   (2). With `backgammonScores3`, 3 when `player` is also on the bar or in
   the opponent's home. Other `scoring.method` values work too
   (`pointsForLoss`). A variant can score it its own way with
-  `resignResult` (Plakoto "resign or play on" later).
+  `resignResult`. Plakoto needs none: a player whose mother is pinned has
+  borne off nothing, so the shared rule already gives 2.
 - `resignMatch(match, player)` ends the match now. The opponent wins; the
   score stays as it is.
 - `createRematch(match)`: same rules and players, score 0–0. With
@@ -554,7 +686,7 @@ interface Match {
   last game starts with no opening roll. That is always the match winner.
 - Rotation: `nextVariantId(match)` is the next game.
   `startNextGame(match, startingPlayer)` returns its start state. A game
-  that is not built yet (today: Plakoto, so game 2 of a `tavli` match)
+  that is not built yet (today: Asodio, which is not in the `tavli` rotation)
   throws `UNKNOWN_VARIANT` with a clear message and the path of the
   rotation entry. `missingVariants(match)` lists them up front.
 - `gameRules(match, variant)`: the game of `match.rules` uses those rules.
@@ -619,7 +751,7 @@ Actions (`player` is the player who acts):
 - Variant questions: after every turn the flow calls `Variant.prompt`. If
   it returns a question, the phase is `awaiting-answer` until the player
   sends `answer`. The variant keeps the question in `state.variantData`
-  (PM decision on #25). This is the hook for Plakoto "resign or play on".
+  (PM decision on #25). Plakoto uses it for "resign or play on".
 
 ### The match: `MatchFlow`
 
@@ -664,14 +796,15 @@ interface MatchFlow {
 
 ## Not here yet
 
-- Plakoto and Asodio variants.
+- The Asodio variant.
 - Extra rolls in one turn (Asodio roll chains, `extraRolls.*`). The flow
   reads the player to move from the state `applyTurn` returns, so a variant
   can give the same player another roll. A chained roll needs its own
   data in `variantData`.
-- A question in the middle of a turn (`motherCheckTiming:
-"afterEachMove"`). Today the flow asks `Variant.prompt` only after a
-  turn.
+- A question in the middle of a turn. The flow asks `Variant.prompt` only
+  after a turn, so Plakoto `offerConcede` with `motherCheckTiming:
+"afterEachMove"` asks when the turn is over (see "Plakoto").
+- Plakoto `mutualMotherPin: "replay"` (throws `NOT_SUPPORTED`).
 
 ## Commands
 
