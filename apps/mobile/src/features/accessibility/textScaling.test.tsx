@@ -1,12 +1,14 @@
 /**
- * Large system fonts (#134): Home, New game, the game screen and the end
- * screens follow the font size with no cut text. Jest cannot measure text,
- * so `textScalingProblems` checks the layout rules that keep text whole
- * (see `test/textScaling.ts`), in English and in Greek.
+ * Large system fonts (#134): Home, New game, the game screen, the end
+ * screens and History (#142) follow the font size with no cut text. Jest
+ * cannot measure text, so `textScalingProblems` checks the layout rules
+ * that keep text whole (see `test/textScaling.ts`), in English and in Greek.
  */
 import { createMatch, createSeededRng, recordGameResult, type Match } from '@tavli/engine';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
+import { HistoryScreen } from '@/features/history/HistoryScreen';
+import type { HistoryRecord } from '@/features/history/records';
 import { ContinueCard } from '@/features/home/ContinueCard';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
@@ -50,6 +52,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
         onNewGame={jest.fn()}
         onSettings={jest.fn()}
         onHowToPlay={jest.fn()}
+        onHistory={jest.fn()}
         botLevels={['easy', 'medium']}
         continueCard={
           <ContinueCard
@@ -129,6 +132,30 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
         onHome={jest.fn()}
       />,
     );
+    expect(problems()).toEqual([]);
+  });
+
+  it('history: stats and rows, and the empty state (#142)', async () => {
+    const record: HistoryRecord = {
+      id: 'r',
+      endedAt: Date.UTC(2026, 9, 27),
+      mode: 'local',
+      game: 'tavli',
+      botLevel: null,
+      names: { white: 'Μαρία', black: 'Νίκος' },
+      targetPoints: 5,
+      score: { white: 5, black: 3 },
+      end: 'finished',
+      winner: 'white',
+      resignedBy: null,
+      games: 6,
+      diploWins: { white: 1, black: 1 },
+      draws: 1,
+    };
+    const bot: HistoryRecord = { ...record, id: 'b', mode: 'bot', botLevel: 'medium' };
+    await renderWithRoot(<HistoryScreen records={[record, bot]} onPlay={jest.fn()} />);
+    expect(problems()).toEqual([]);
+    await renderWithRoot(<HistoryScreen records={[]} onPlay={jest.fn()} />);
     expect(problems()).toEqual([]);
   });
 });
