@@ -11,7 +11,8 @@
  * So only `APP_VARIANT=production` builds use the real id.
  *
  * `app.json` holds the base config. EAS CLI writes there (for example the
- * project id from `eas init`). This file reads it through `config`.
+ * project id from `eas init`). This file reads it through `config`. Only
+ * settings that depend on build env vars belong here.
  * See docs/process/running-the-app.md.
  */
 import type { ConfigContext, ExpoConfig } from 'expo/config';
@@ -26,6 +27,28 @@ type Variant = keyof typeof VARIANTS;
 
 function isVariant(value: string): value is Variant {
   return Object.hasOwn(VARIANTS, value);
+}
+
+/**
+ * Sentry config plugin (`@sentry/react-native/expo`). It adds the steps
+ * that upload source maps and debug files during EAS Build.
+ *
+ * The upload needs `SENTRY_AUTH_TOKEN`, a secret. It is never in the repo:
+ * the owner adds it as an EAS environment variable (see
+ * packages/adapters/crash-sentry/README.md). Without it the upload is
+ * skipped, so builds still work.
+ */
+function sentryPlugin(): [string, Record<string, unknown>] {
+  const env = process.env;
+  return [
+    '@sentry/react-native/expo',
+    {
+      url: env.SENTRY_URL || 'https://sentry.io/',
+      ...(env.SENTRY_ORG ? { organization: env.SENTRY_ORG } : {}),
+      ...(env.SENTRY_PROJECT ? { project: env.SENTRY_PROJECT } : {}),
+      disableAutoUpload: !env.SENTRY_AUTH_TOKEN,
+    },
+  ];
 }
 
 function readVariant(): Variant {
@@ -50,5 +73,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     slug,
     ios: { ...config.ios, bundleIdentifier: `${bundleIdentifier}${idSuffix}` },
     android: { ...config.android, package: `${androidPackage}${idSuffix}` },
+    plugins: [...(config.plugins ?? []), sentryPlugin()],
   };
 };
