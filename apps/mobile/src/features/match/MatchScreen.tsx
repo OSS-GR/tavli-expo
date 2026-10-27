@@ -207,7 +207,9 @@ export function MatchScreen({
         visible={content !== null}
         onClose={close}
         closeLabel={t('game.menu.resume')}
-        look={overlay === 'menu' ? 'sheet' : 'dialog'}>
+        look={overlay === 'menu' ? 'sheet' : 'dialog'}
+        // The game screen turns with the phone (#185); its menu and dialogs too.
+        turns>
         {content}
       </Sheet>
     </>

@@ -11,6 +11,7 @@ import type { ReactNode } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { MAX_SHEET_WIDTH } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 
 import { CELEBRATION_HEIGHT, Celebration } from './Celebration';
@@ -98,6 +99,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   root: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
+    // In landscape (#185) the sheet keeps a readable width in the middle.
+    alignItems: 'center',
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
@@ -108,6 +111,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     // Never taller than the screen: the content scrolls instead.
     flexShrink: 1,
     maxHeight: '100%',
+    width: '100%',
+    maxWidth: MAX_SHEET_WIDTH,
     borderTopLeftRadius: theme.radii.xl,
     borderTopRightRadius: theme.radii.xl,
     backgroundColor: theme.colors.surface,

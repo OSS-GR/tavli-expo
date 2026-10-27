@@ -312,6 +312,26 @@ describe('<MatchScreen /> pass-and-play', () => {
     expect(screen.getByTestId('game-board')).toBeOnTheScreen();
     expect(screen.getByTestId('strip-bottom')).toBeOnTheScreen();
   });
+
+  it('the menu and the resign dialogs turn with the game screen (#185)', async () => {
+    const user = setupUser();
+    const s = session(defaultSetup('local'));
+    startWith(s, 'white');
+    await show(s).view;
+    /** The Modal around a sheet: on iOS it would turn the screen upright without landscape. */
+    const modalOf = (testID: string) => {
+      let node = screen.getByTestId(testID).parent;
+      while (node !== null && node.type !== 'Modal') node = node.parent;
+      return node;
+    };
+    await user.press(button('Game menu'));
+    expect(modalOf('game-menu')?.props.supportedOrientations).toEqual(['portrait', 'landscape']);
+    await user.press(screen.getByTestId('menu-resign-game'));
+    expect(modalOf('resign-game-dialog')?.props.supportedOrientations).toEqual([
+      'portrait',
+      'landscape',
+    ]);
+  });
 });
 
 /** Plays one full turn for the player to move, through the store (like taps). */

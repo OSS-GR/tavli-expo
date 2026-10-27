@@ -14,6 +14,11 @@ export interface ActionButtonProps {
   testID?: string;
   /** Grow to fill the row. */
   grow?: boolean;
+  /**
+   * Less side padding and no minimum width, for a narrow column (the side
+   * columns of the landscape game screen, #185). Still 52 pt tall.
+   */
+  compact?: boolean;
   /** What screen readers say, when the label has a symbol ("↶ Undo" → "Undo"). */
   accessibilityLabel?: string;
 }
@@ -31,6 +36,7 @@ export function ActionButton({
   onPress,
   testID,
   grow = false,
+  compact = false,
   accessibilityLabel = label,
 }: ActionButtonProps) {
   return (
@@ -44,6 +50,7 @@ export function ActionButton({
       style={({ pressed }) => [
         styles.button(kind, disabled),
         grow && styles.grow,
+        compact && styles.compact,
         pressed && !disabled && styles.pressed,
       ]}>
       {/* No line limit: with a large system font the text wraps, never cut. */}
@@ -81,6 +88,10 @@ const styles = StyleSheet.create((theme) => ({
   }),
   grow: {
     flex: 1,
+  },
+  compact: {
+    minWidth: 0,
+    paddingHorizontal: theme.space.xs,
   },
   pressed: {
     opacity: 0.75,
