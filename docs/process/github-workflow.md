@@ -94,6 +94,7 @@ After `checks` passes on a pull request, Claude Code reviews the PR at **high** 
 - **Severity:** a finding is **blocking** when it is a correctness bug, a crash, data loss, a security problem, a test that fails or tests nothing, or a break of a hard rule in `CLAUDE.md`. Everything else is **optional**.
 - **Gate:** the job fails when there is a blocking finding, or when the review does not finish. Fix the blocking findings and push again. Optional findings do not block.
 - **Skipped** (a skipped job counts as passed): drafts, Dependabot PRs (they get no secrets), and PRs from forks. A draft is reviewed when you mark it ready for review.
+- **Workflow changes:** the Claude action runs only when `.github/workflows/ci.yml` is the same as on `main` (a security rule). A PR that changes that file gets a "skipped" comment and passes. **A person must review the workflow change.**
 - **Cost:** each push to a PR runs one review. A newer push cancels the older run. With `CLAUDE_CODE_OAUTH_TOKEN` the review uses the owner's Claude plan, not API billing.
 
 **Secret (owner, one time).** Add one repository secret (Settings → Secrets and variables → Actions):

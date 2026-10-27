@@ -152,10 +152,26 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # The Claude action runs only when this workflow file is the same as on
+      # the default branch (a security rule). A PR that changes it gets no
+      # review: the job passes and says that a person must review it.
+      - name: Check for workflow changes
+        id: workflow
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if git diff --quiet "origin/$DEFAULT_BRANCH" HEAD -- .github/workflows/ci.yml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::This PR changes ci.yml, so the Claude action will not run. A person must review it."
+          fi
+
       # Runs Claude Code's /code-review at high effort on the PR's changes.
       # It follows CLAUDE.md. It cannot edit files or post: the next step posts.
       - name: Claude review
         id: review
+        if: steps.workflow.outputs.changed == 'false'
         uses: anthropics/claude-code-action@v1
         with:
           # The subscription token wins when both secrets are set.
@@ -181,10 +197,17 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW_CHANGED: ${{ steps.workflow.outputs.changed }}
         run: |
           marker='<!-- claude-review -->'
 
-          if [ -n "$OUT" ] && jq -e '.findings | type == "array"' <<< "$OUT" > /dev/null 2>&1; then
+          if [ "$WORKFLOW_CHANGED" = "true" ]; then
+            verdict=pass
+            body="$marker
+          ## Claude review: ⏭️ skipped
+
+          This PR changes \`.github/workflows/ci.yml\`. The Claude action runs only when that file is the same as on the default branch, so it did not review this PR. **A person must review the workflow change.**"
+          elif [ -n "$OUT" ] && jq -e '.findings | type == "array"' <<< "$OUT" > /dev/null 2>&1; then
             blocking=$(jq '[.findings[] | select(.severity == "blocking")] | length' <<< "$OUT")
             verdict=$(jq -r '.verdict' <<< "$OUT")
             [ "$blocking" -gt 0 ] && verdict=fail
@@ -225,4 +248,4 @@ jobs:
             echo "::error::Claude review failed. See the PR comment."
             exit 1
           fi
-          echo "Claude review passed."
+          echo "Claude review gate passed."
