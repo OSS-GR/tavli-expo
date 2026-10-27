@@ -23,7 +23,7 @@ import { choiceLabel, choiceShortLabel, listChoices } from './moveList';
 export interface MoveListHint {
   /** The text on the button: "Hint", or "Thinking…" while busy. */
   readonly label: string;
-  /** What a screen reader says: "Hint", or "Hide the hint" while one shows. */
+  /** What a screen reader says: "Hint", "Thinking…", or "Hide the hint" while one shows. */
   readonly accessibilityLabel: string;
   readonly busy: boolean;
   readonly onPress: () => void;

@@ -85,8 +85,8 @@ export function turnFinishes(
 
 /**
  * True when a hint can help: the game waits for a move, no question of the
- * variant is open, and there is more than one way to play the rest of the
- * turn. The screen also checks whose turn it is.
+ * variant is open, and the rest of the turn can end on more than one board
+ * (by `boardKey`). The screen also checks whose turn it is.
  */
 export function hintHasChoice(
   game: GameFlow,
@@ -96,7 +96,16 @@ export function hintHasChoice(
   if (dice === null) return false;
   // A question (Plakoto's mother, the Acey-Deucey double) waits for its answer.
   if (variant.prompt?.(game.state)) return false;
-  if (game.played.length === 0) return variant.legalTurns(game.state, dice).length > 1;
+  // Count end positions, before and after the first move alike: two plays
+  // that end on the same board are one choice.
+  if (game.played.length === 0) {
+    const ends = new Set<string>();
+    for (const turn of variant.legalTurns(game.state, dice)) {
+      ends.add(boardKey(boardAfter(game.state, turn.moves)));
+      if (ends.size > 1) return true;
+    }
+    return false;
+  }
   return turnFinishes(game, 2, variant).size > 1;
 }
 

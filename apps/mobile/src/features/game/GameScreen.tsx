@@ -33,8 +33,9 @@
  *
  * Hint (#209): with an `analyzer` (offline games) and Settings → Show
  * hints on, a Hint button shows on a person's turn once the dice are
- * rolled, when there is more than one way to play them. A tap ranks the
- * turns a moment later (off the render, the button says "Thinking…"), then
+ * rolled, when the rest of the turn can end on more than one board. A tap
+ * ranks the turns a moment later (still on the JS thread, in a timer after
+ * the button has painted "Thinking…"), then
  * rings the moves on the board and shows them in a line. A move, an undo or
  * a second tap takes the hint away. The move list has the same button.
  *
@@ -293,8 +294,8 @@ export function GameScreen({
   const groups = useRef<readonly MoveGroup[]>([]);
 
   // The Hint (#209): only on a person's turn with rolled dice, no question
-  // open (Plakoto's mother, the Acey-Deucey double), and more than one way
-  // to play the rest of the turn. Each hint belongs to one position (`flow`):
+  // open (Plakoto's mother, the Acey-Deucey double), and more than one end
+  // board for the rest of the turn. Each hint belongs to one position (`flow`):
   // a move or an undo makes a new flow, so the hint goes.
   const hintOpen =
     analyzer !== undefined &&
@@ -319,7 +320,8 @@ export function GameScreen({
   const shownHint = hintChoice && hint !== null && hint.flow === flow ? hint.moves : null;
   const hintBusy = hintChoice && hintAsked === flow;
   const hintShown = useEffectEvent(() => onHintShown?.());
-  // The ranking runs after the tap has drawn the busy button, not in the render.
+  // The ranking still runs on the JS thread, but in a timer after the tap,
+  // so "Thinking…" is painted first and the render itself stays quick.
   useEffect(() => {
     if (hintAsked === null || analyzer === undefined) return;
     const asked = hintAsked;
@@ -351,6 +353,20 @@ export function GameScreen({
     }
     if (hintChoice && !hintBusy) setHintAsked(flow);
   };
+  // The same button under the board and in the move list.
+  const hintProps = hintChoice
+    ? {
+        label: hintBusy ? t('game.hint.busy') : t('game.hint.button'),
+        accessibilityLabel:
+          shownHint !== null
+            ? t('game.hint.hide')
+            : hintBusy
+              ? t('game.hint.busy')
+              : t('game.hint.button'),
+        busy: hintBusy,
+        onPress: toggleHint,
+      }
+    : null;
 
   const roller = nextOpeningRoller(game);
   const canRoll =
@@ -660,14 +676,14 @@ export function GameScreen({
     );
   } else if (phase === 'moving' || phase === 'awaiting-confirm' || showPass) {
     showDice = true;
-    hintButton = hintChoice ? (
+    hintButton = hintProps ? (
       <ActionButton
         testID="hint-button"
-        label={hintBusy ? t('game.hint.busy') : t('game.hint.button')}
-        {...(shownHint !== null ? { accessibilityLabel: t('game.hint.hide') } : {})}
+        label={hintProps.label}
+        accessibilityLabel={hintProps.accessibilityLabel}
         kind="secondary"
-        disabled={hintBusy}
-        onPress={toggleHint}
+        disabled={hintProps.busy}
+        onPress={hintProps.onPress}
         compact
       />
     ) : null;
@@ -1168,17 +1184,7 @@ export function GameScreen({
         onMove={onListMove}
         paths={paths}
         onSteps={onListSteps}
-        {...(hintChoice
-          ? {
-              hint: {
-                label: hintBusy ? t('game.hint.busy') : t('game.hint.button'),
-                accessibilityLabel:
-                  shownHint !== null ? t('game.hint.hide') : t('game.hint.button'),
-                busy: hintBusy,
-                onPress: toggleHint,
-              },
-            }
-          : {})}
+        {...(hintProps ? { hint: hintProps } : {})}
       />
     ) : null;
 

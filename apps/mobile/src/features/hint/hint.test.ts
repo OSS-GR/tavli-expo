@@ -209,6 +209,17 @@ describe('hintHasChoice', () => {
     expect(hintHasChoice(next)).toBe(false);
   });
 
+  it('counts end boards, not plays: two plays that end the same way are one choice', () => {
+    // A variant whose list holds two entries with one end board.
+    const game = rolled(portes, [6, 5]);
+    const one = portes.legalTurns(game.state, [6, 5])[0]!;
+    const twice: Variant = { ...portes, legalTurns: () => [one, { ...one }] };
+    expect(hintHasChoice(game, twice)).toBe(false);
+    // Two different end boards are a choice.
+    const two = portes.legalTurns(game.state, [6, 5]).slice(0, 2);
+    expect(hintHasChoice(game, { ...portes, legalTurns: () => two })).toBe(true);
+  });
+
   it('is false once every die is played', () => {
     let game = rolled(portes, [6, 5]);
     for (let next = legalNextMoves(game)[0]; next; next = legalNextMoves(game)[0]) {

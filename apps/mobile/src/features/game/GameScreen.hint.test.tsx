@@ -31,7 +31,8 @@ import { AccessibilityInfo } from 'react-native';
 
 import { moveChoices, moveLabel } from '@/features/accessibility/moveList';
 import { BOT_TIMING } from '@/features/bot/botSpeed';
-import { bestRest, hintGroups, hintHasChoice } from '@/features/hint/hint';
+import { checkerRuns } from '@/features/board/hintMarks';
+import { bestRest, hintHasChoice } from '@/features/hint/hint';
 import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
 import { DEFAULT_SETTINGS, type Settings } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -171,6 +172,26 @@ describe('<GameScreen /> Hint button (#209)', () => {
     expect(screen.getByRole('button', { name: 'Hint' })).toBeOnTheScreen();
   });
 
+  it('hides when every turn of the list ends on the same board', async () => {
+    // The engine lists each end position once; a list with two entries for
+    // one end board is still one choice.
+    const real = portes.legalTurns.bind(portes);
+    const spy = jest.spyOn(portes, 'legalTurns').mockImplementation((state, dice) => {
+      const [one] = real(state, dice);
+      return [one!, { ...one! }];
+    });
+    try {
+      const store = await show();
+      await roll(store, [6, 5]);
+      expect(store.getState().flow.game.phase).toBe('moving');
+      expect(spy).toHaveBeenCalled();
+      expect(screen.getByTestId('undo-button')).toBeOnTheScreen();
+      expect(hintButton()).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('hides when the roll has only one turn', async () => {
     // One white checker can move: 24/18/13 and 24/19/13 end the same way.
     const board = createBoard(
@@ -236,7 +257,7 @@ describe('<GameScreen /> Hint button (#209)', () => {
     await user.press(hintButton()!);
     await tick();
     expect(screen.getByTestId('hint-text')).toHaveTextContent(hintShortText(i18n.t, moves));
-    expect(rings()).toBe(hintGroups(moves).length);
+    expect(rings()).toBe(checkerRuns(moves).length);
     expect(onHintShown).toHaveBeenCalledTimes(1);
     expect(announce).toHaveBeenCalledWith(hintSpokenText(i18n.t, moves));
     // Nothing was played.
@@ -380,7 +401,7 @@ describe('<GameScreen /> Hint button (#209)', () => {
     });
     await tick();
     expect(screen.getByTestId('hint-text')).toHaveTextContent(hintShortText(i18n.t, best(store)));
-    expect(rings()).toBe(hintGroups(best(store)).length);
+    expect(rings()).toBe(checkerRuns(best(store)).length);
   });
 
   it('screen readers get the Hint in the move list, and hear the hint', async () => {

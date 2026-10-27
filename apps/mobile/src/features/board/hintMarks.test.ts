@@ -10,7 +10,7 @@ import { getTheme } from '@tavli/themes';
 import { portraitLayout } from './BoardCanvas';
 import { slotOfDestination, slotOfOrigin, type BoardView } from './boardModel';
 import { fitBoardWithShadow, stackPosition } from './geometry';
-import { hintHighlights } from './hintMarks';
+import { checkerRuns, hintHighlights } from './hintMarks';
 
 const theme = getTheme('walnut-kafeneio');
 const geo = fitBoardWithShadow(portraitLayout(theme, 'right'), { width: 375, height: 500 });
@@ -62,5 +62,26 @@ describe('hintHighlights', () => {
     expect(at(marks.cues![1]!)).toEqual(
       at(stackPosition(geo, slotOfOrigin(13, 'white', view), 1, 0)),
     );
+  });
+
+  it('rings only checkers that are on the board now (3-3: 13/10, 13/10, 10/7, 10/7)', () => {
+    const moves = [m(13, 10, 3), m(13, 10, 3), m(10, 7, 3), m(10, 7, 3)];
+    expect(checkerRuns(moves)).toEqual([
+      [m(13, 10, 3), m(10, 7, 3)],
+      [m(13, 10, 3), m(10, 7, 3)],
+    ]);
+    const marks = hintHighlights(geo, board, view, 'white', moves);
+    const thirteen = slotOfOrigin(13, 'white', view);
+    // Both rings on the two checkers of 13; point 10 is empty, so no ring there.
+    expect(marks.cues!.map(at)).toEqual([
+      at(stackPosition(geo, thirteen, 2, 1)),
+      at(stackPosition(geo, thirteen, 1, 0)),
+    ]);
+    // Two combined targets stacked on 7.
+    expect(marks.targets.map((t) => t.steps)).toEqual([2, 2]);
+    expect(marks.targets.map(at)).toEqual([
+      at(stackPosition(geo, pointIndex(7), 1, 0)),
+      at(stackPosition(geo, pointIndex(7), 2, 1)),
+    ]);
   });
 });
