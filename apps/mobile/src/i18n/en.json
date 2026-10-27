@@ -360,7 +360,8 @@
       "deadlock": "No checker can ever move again.",
       "bothMothersPinned": "Both mothers are pinned.",
       "timeout": "{{name}} ran out of time.",
-      "timeout_you": "You ran out of time."
+      "timeout_you": "You ran out of time.",
+      "review": "Review"
     },
     "you": "You",
     "bot": {
@@ -836,5 +837,24 @@
       "resigned": "Resign: you win 2 points and the game ends.",
       "playedOn": "Play on: the game goes on. Their mother stays pinned until you leave it, and they cannot bear off."
     }
+  },
+  "review": {
+    "title": "Game review",
+    "busy": "Looking at the moves…",
+    "wellPlayed": "Well played! No mistakes found.",
+    "nothing": "No moves to review in this game.",
+    "intro_you": "Your biggest mistakes, the biggest first.",
+    "intro": "The biggest mistakes, the biggest first.",
+    "failed": "This game cannot be reviewed.",
+    "turn": "Turn {{number}} · roll {{dice}}",
+    "played_you": "You played: {{moves}}",
+    "played": "{{name}} played: {{moves}}",
+    "best": "Best: {{moves}}",
+    "band": {
+      "small": "Small mistake",
+      "medium": "Medium mistake",
+      "big": "Big mistake"
+    },
+    "note": "Best is the move the strongest bot would play."
   }
 }

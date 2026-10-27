@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { matchSessions } from '@/features/match/appSessions';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
 import { MissingGame } from '@/features/match/MissingGame';
-import { gameHref, newGameHref, parseIdParam } from '@/features/match/routes';
+import { gameHref, newGameHref, parseIdParam, reviewHref } from '@/features/match/routes';
 
 /** Back to Home: pops to it, or opens it when this was the first screen. */
 function goHome() {
@@ -41,6 +41,8 @@ export default function MatchEndRoute() {
         session.store.getState().rematch();
         router.replace(gameHref(session.id));
       }}
+      // The review of the last game (#215); Back returns here.
+      onReview={() => router.push(reviewHref(session.id))}
       onChangeSettings={() => {
         matchSessions.end(session.id);
         router.replace(newGameHref(session.setup.mode));

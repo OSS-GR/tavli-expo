@@ -10,6 +10,7 @@
 | New game | `app/new-game.tsx?mode=bot\|local` | `features/new-game/NewGameScreen.tsx` |
 | Board | `app/game/[id]/index.tsx` | `features/match/MatchScreen.tsx` (wraps `GameScreen`) |
 | Match end | `app/game/[id]/match-end.tsx` | `features/match/MatchEndScreen.tsx` |
+| Game review | `app/game/[id]/review.tsx` | `features/review/ReviewScreen.tsx` (#215, see [Board screen](board-screen.md#game-review-215)) |
 | Rules | `app/rules/[variant].tsx` | `features/rules/RulesScreen.tsx` |
 | Settings | `app/settings.tsx` | `features/settings/SettingsScreen.tsx` |
 | History | `app/history.tsx` | `features/history/HistoryScreen.tsx` |
@@ -24,7 +25,7 @@ Settings sections: Game (auto-confirm, pip counts, board view, **Bot speed**: Sl
 - The board route has `gestureEnabled: false`: an iOS edge swipe would fight the checker drag.
 - **Orientation (#185).** Every route stays upright (`orientation: 'portrait_up'` in the root `Stack`'s `screenOptions`), except the board and the tutorial, which follow the phone (`orientation: 'default'`). A new route stays upright by itself. See [Board screen → Landscape](board-screen.md#landscape-185).
 - An unknown id shows "This game could not be opened." with a Home button (`MissingGame.tsx`), on the board and on match end.
-- Links and params live in `features/match/routes.ts` (`newGameHref`, `gameHref`, `matchEndHref`, `parseModeParam`, `parseIdParam`).
+- Links and params live in `features/match/routes.ts` (`newGameHref`, `gameHref`, `matchEndHref`, `reviewHref`, `parseModeParam`, `parseIdParam`).
 
 ## Rules pages (#112, #124)
 

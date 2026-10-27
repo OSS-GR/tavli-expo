@@ -379,7 +379,7 @@ Tests the bot package must have:
 
 ### Phase 3 — Later
 
-- Hints and post-game review with the `Analyzer` (roadmap "Later"). The 1-ply `createAnalyzer` is built (#206); next are the Hint button in the app and 2-ply.
+- Hints and post-game review with the `Analyzer` (roadmap "Later"). The 1-ply `createAnalyzer` is built (#206), and the app's game review uses it (#215, `apps/mobile/src/features/review/`); next are the Hint button in the app and 2-ply.
 - Match-score-aware play (Tavli match to 5 or 7 points) using a match equity table.
 - Server-side move analysis for ranked anti-cheat.
 - Optional: stronger nets with rollouts + supervised training (wildbg style), or a port of the wildbg Portes evaluator if its licence and rules fit.

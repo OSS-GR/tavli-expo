@@ -29,7 +29,7 @@ Tick these four. Leave every other type empty.
 
 | Category | Data type | What it is in Tavlaki |
 |----------|-----------|-----------------------|
-| App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped |
+| App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, review opened |
 | App info and performance | **Crash logs** | Sentry crash and error reports |
 | App info and performance | **Diagnostics** | Device facts and breadcrumbs in crash reports; after Allow also app hangs / ANRs and Sentry sessions; device facts on PostHog events |
 | Device or other IDs | **Device or other IDs** | The random install id and PostHog's random ids |

@@ -38,6 +38,7 @@
 | In-game menu | `app/game/[id]/menu.tsx` | Modal, `presentation: "formSheet"` |
 | Game end | — | Overlay state inside the board screen, so the final position stays visible |
 | Match end | `app/game/[id]/match-end.tsx` | `router.replace`, so "back" does not return to a finished board |
+| Game review | `app/game/[id]/review.tsx` | Push from the game-end sheet or match end (#215). Not drawn here; see `docs/architecture/board-screen.md`, "Game review". |
 | Settings | `app/settings.tsx` | Push from Home; modal from the in-game menu |
 | Tutorial | `app/tutorial.tsx` | Push from the Home card, Settings or the Portes rules page (#128); the Plakoto, Fevga and Asodio rules pages open their own lessons (`?game=`, #149, #159), and Settings → Help lets the player pick the game (#159). Not drawn; see the note under Home. |
 | Rules | `app/rules/[variant].tsx` (e.g. `/rules/portes`) | Push. Not drawn here; a scrolling text page with a small start board (`docs/architecture/app-shell.md`, "Rules pages"). |

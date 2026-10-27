@@ -90,6 +90,6 @@ Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checkl
 
 - Matchmaking with strangers, Glicko ratings, leaderboards
 - Chat and emotes
-- Hints and post-game analysis using the bot
+- Hints and post-game analysis using the bot (the game review after an offline game is built: #215)
 - Web version
 - Kafeneio mode: players build their own house-rule variants (#58)

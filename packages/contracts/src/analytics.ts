@@ -97,6 +97,11 @@ export interface AnalyticsEvents {
   tutorial_finished: { game: TutorialGame };
   /** Skip was tapped. `step` is the lesson on screen, from 1. */
   tutorial_skipped: { game: TutorialGame; step: number; lesson: string };
+  /**
+   * The game review (#215) opened after a game. Only which game was picked
+   * for the match: never the position, the dice, the moves or the mistakes.
+   */
+  review_opened: { game: MatchGame };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
@@ -130,6 +135,7 @@ export const ANALYTICS_EVENTS = [
   'tutorial_step',
   'tutorial_finished',
   'tutorial_skipped',
+  'review_opened',
 ] as const satisfies readonly AnalyticsEventName[];
 
 type MissingEvent = Exclude<AnalyticsEventName, (typeof ANALYTICS_EVENTS)[number]>;

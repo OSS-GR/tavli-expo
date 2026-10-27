@@ -1,8 +1,8 @@
 /**
  * Large system fonts (#134): Home, New game, the game screen and its cards
  * (#153; choose a double, #205), the game menu and resign dialog, the end
- * screens, History (#142), the tutorial's mother card (#149) and the
- * Settings game picker (#159)
+ * screens, the game review (#215), History (#142), the tutorial's mother
+ * card (#149) and the Settings game picker (#159)
  * follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
@@ -38,6 +38,7 @@ import { MatchScreen } from '@/features/match/MatchScreen';
 import { createSessionRegistry } from '@/features/match/sessions';
 import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
+import { ReviewScreen } from '@/features/review/ReviewScreen';
 import {
   BOARD_LAYOUT_MODES,
   DEFAULT_SETTINGS,
@@ -50,6 +51,7 @@ import i18n from '@/i18n';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
+import { allBest, oneBadTurn } from '../../../test/reviewGame';
 import { textScalingProblems } from '../../../test/textScaling';
 import { layoutTutorialBoard, playLessonByTaps } from '../../../test/tutorialTaps';
 import type { JsonNode } from '../../../test/tree';
@@ -156,7 +158,9 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
   }
 
   async function showGame(store: GameStore) {
-    await renderWithRoot(<GameScreen store={store} onOpenMenu={jest.fn()} onHome={jest.fn()} />);
+    await renderWithRoot(
+      <GameScreen store={store} onOpenMenu={jest.fn()} onHome={jest.fn()} onReview={jest.fn()} />,
+    );
     await act(async () => {
       fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
         nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 520 } },
@@ -403,10 +407,26 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
         setup={defaultSetup('bot')}
         match={match}
         onRematch={jest.fn()}
+        onReview={jest.fn()}
         onChangeSettings={jest.fn()}
         onHome={jest.fn()}
       />,
     );
+    expect(problems()).toEqual([]);
+  });
+
+  it('the game review: busy, three mistakes, and "Well played" (#215)', async () => {
+    const local = {
+      ...defaultSetup('local'),
+      names: { white: 'Maria Papadopoulou', black: 'Bob' },
+    };
+    await renderWithRoot(<ReviewScreen setup={local} flow={oneBadTurn()} />);
+    expect(screen.getByTestId('review-busy')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await screen.findByTestId('review-mistake-3');
+    expect(problems()).toEqual([]);
+    await renderWithRoot(<ReviewScreen setup={defaultSetup('bot')} flow={allBest()} />);
+    await screen.findByTestId('review-status');
     expect(problems()).toEqual([]);
   });
 

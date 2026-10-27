@@ -135,6 +135,8 @@ export interface GameScreenProps {
   onOpenMenu?: () => void;
   /** Shows "Home" on the game-end sheet. */
   onHome?: () => void;
+  /** Shows "Review" on the game-end sheet: the biggest mistakes of the game (#215). */
+  onReview?: () => void;
   /**
    * The match is over: open the match-end screen. It is called
    * `MATCH_END_DELAY_MS` after the match ends (and the screen is not
@@ -164,6 +166,7 @@ export function GameScreen({
   covered = false,
   onOpenMenu,
   onHome,
+  onReview,
   onMatchOver,
   gameLabel,
   nextGameLabel,
@@ -670,6 +673,14 @@ export function GameScreen({
             dispatch({ type: 'nextGame' });
           }}
         />
+        {onReview ? (
+          <ActionButton
+            testID="end-review-button"
+            label={t('game.end.review')}
+            kind="secondary"
+            onPress={onReview}
+          />
+        ) : null}
         {onHome ? (
           <ActionButton
             testID="end-home-button"
