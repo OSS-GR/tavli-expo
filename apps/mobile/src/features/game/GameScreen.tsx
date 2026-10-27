@@ -39,8 +39,9 @@ import {
   toEnterCount,
 } from '@/features/board/asodio';
 import { pinnedCheckers, toneOf, type BoardView } from '@/features/board/boardModel';
+import { flowPaths } from '@/features/board/combined';
 import { DiceRow } from '@/features/board/DiceRow';
-import { moveFlights, type Flight } from '@/features/board/flights';
+import { moveFlights, pathFlights, type Flight } from '@/features/board/flights';
 import type { BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
@@ -51,6 +52,7 @@ import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, useGameFeedback } from './gameFeedback';
 import { diceView, turnView, useGameStore, type DieView, type GameStore } from './gameStore';
+import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
 import { PlayerStrip } from './PlayerStrip';
@@ -207,6 +209,11 @@ export function GameScreen({
     view.matchPhase === 'playing' &&
     view.toMove === botPlayer;
 
+  // One checker with several dice (#180): the "2+3" targets, from the engine.
+  const paths = useMemo(() => (botsTurn ? [] : flowPaths(game)), [game, botsTurn]);
+  // The combined moves of this turn, so one Undo takes back each one whole.
+  const groups = useRef<readonly MoveGroup[]>([]);
+
   const roller = nextOpeningRoller(game);
   const canRoll = !showPass && !botsTurn && (phase === 'awaiting-roll' || roller !== null);
 
@@ -263,30 +270,95 @@ export function GameScreen({
     return true;
   };
 
+  /**
+   * Plays one checker's steps in order (a combined target, #180) and lets
+   * it fly the whole path. If the engine refuses a step, the steps before it
+   * are taken back, so nothing is half played. Reads the store, not the render.
+   */
+  const playSteps = (
+    steps: readonly Move[],
+    geo: BoardGeometry | null,
+    from: { x: number; y: number } | null,
+    withAutoConfirm: boolean,
+  ): boolean => {
+    const now = turnView(store.getState().flow);
+    const mover = now.toMove;
+    const before = now.board;
+    let done = 0;
+    for (const move of steps) {
+      // Auto-confirm only on the last step: the turn goes on until then.
+      const last = done === steps.length - 1;
+      if (!dispatch({ type: 'move', player: mover, move, autoConfirm: withAutoConfirm && last })) {
+        break;
+      }
+      done += 1;
+    }
+    if (done < steps.length) {
+      for (let i = 0; i < done; i++) dispatch({ type: 'undo', player: mover });
+      return false;
+    }
+    const next = store.getState().flow.game;
+    const turnEnded = next.state.toMove !== mover || next.phase === 'awaiting-roll';
+    if (!turnEnded) groups.current = addGroup(groups.current, next, steps.length);
+    if (geo === null || (turnEnded && flipMode === 'flip')) {
+      setFlights([]);
+      return true;
+    }
+    const added = pathFlights(geo, boardView, mover, steps, before, {
+      id: `m${store.getState().flow.log.length}`,
+      direction,
+      ...(from ? { from } : {}),
+    });
+    setFlights((old) => [...old, ...added]);
+    return true;
+  };
+
   /** Returns whether the move was played; if not, the board flies the checker back. */
   const onMove = (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => {
     if (botsTurn) return false;
     return playMove(move, geo, from, autoConfirm);
+  };
+  const onSteps = (
+    steps: readonly Move[],
+    geo: BoardGeometry,
+    from: { x: number; y: number } | null,
+  ) => {
+    if (botsTurn) return false;
+    return playSteps(steps, geo, from, autoConfirm);
   };
   /** A button of the move list: the same move as a tap-tap on the board. */
   const onListMove = (move: Move) => {
     if (botsTurn || blocked) return;
     playMove(move, geoRef.current, null, autoConfirm);
   };
+  const onListSteps = (steps: readonly Move[]) => {
+    if (botsTurn || blocked) return;
+    playSteps(steps, geoRef.current, null, autoConfirm);
+  };
 
+  /**
+   * Takes back the last move, or the whole combined move on top (#180):
+   * one engine `undo` per step, and one flight back along the path.
+   */
   const undo = (): boolean => {
     const now = store.getState().flow;
-    const last = now.game.played[now.game.played.length - 1];
+    const size = undoSize(groups.current, now.game);
+    const taken = now.game.played.slice(now.game.played.length - size);
     const mover = now.game.state.toMove;
     const before = turnView(now).board;
-    if (!dispatch({ type: 'undo', player: mover }) || last === undefined) return false;
+    groups.current = dropTop(groups.current, now.game);
+    let done = 0;
+    while (done < size && dispatch({ type: 'undo', player: mover })) done += 1;
+    const [last] = taken.slice(-1);
+    if (done === 0 || last === undefined) return false;
     const geo = geoRef.current;
     if (geo === null) return true;
     const after = turnView(store.getState().flow).board;
-    const back = moveFlights(geo, boardView, mover, last, before, after, {
-      id: `u${store.getState().flow.log.length}`,
-      undo: true,
-    });
+    const id = `u${store.getState().flow.log.length}`;
+    const back =
+      taken.length > 1 && done === taken.length
+        ? pathFlights(geo, boardView, mover, taken, after, { id, undo: true, direction })
+        : moveFlights(geo, boardView, mover, last, before, after, { id, undo: true });
     setFlights(back);
     return true;
   };
@@ -764,6 +836,8 @@ export function GameScreen({
               flights={flights}
               onFlightDone={onFlightDone}
               onMove={onMove}
+              paths={blocked || botsTurn ? [] : paths}
+              onSteps={onSteps}
               onGeometry={onGeometry}
               onBoardTap={roll}
               onPickUp={() => feedback.event('checkerPickUp')}
@@ -807,7 +881,7 @@ export function GameScreen({
         </View>
         {strip(viewer, 'strip-bottom')}
         {showMoveList && !blocked && !botsTurn ? (
-          <MoveList legal={view.legal} onMove={onListMove} />
+          <MoveList legal={view.legal} onMove={onListMove} paths={paths} onSteps={onListSteps} />
         ) : null}
         <View style={styles.controls}>{controls}</View>
       </View>

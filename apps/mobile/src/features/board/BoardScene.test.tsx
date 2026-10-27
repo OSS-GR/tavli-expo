@@ -11,7 +11,7 @@ import { layoutBoard, type BoardView } from './boardModel';
 import { fitBoard, fitBoardWithShadow } from './geometry';
 import { rgba } from './paint';
 import { SAMPLE_DIRECTIONS, SAMPLE_POSITIONS } from './positions';
-import { BoardScene, FROZEN_MARK, PIN_RING_WIDTH } from './skia/BoardScene';
+import { BoardScene, COMBINED_MARK, FROZEN_MARK, PIN_RING_WIDTH } from './skia/BoardScene';
 import { StaticBoard } from './StaticBoard';
 import { THEME_IMAGES } from './themeImages';
 import { layoutImageKeys } from './useBoardAssets';
@@ -170,6 +170,50 @@ describe('<BoardScene />', () => {
     const rimR = c.r - theme.checkers.light.rim.inset * c.r;
     const rims = find((n) => n.type === 'Circle' && n.props.r === rimR);
     expect(rims).toHaveLength(all - 1);
+  });
+  // #180: a target for one checker with several dice looks different from
+  // a one-die target: no fill, a dotted ring, and one dot per die.
+  it('draws a combined target with a dotted ring and one dot per die', async () => {
+    const picture = layoutBoard(geo, SAMPLE_POSITIONS.start, WHITE);
+    const c = picture.checkers[0]!;
+    const hl = theme.highlights.target;
+    const fill = rgba(hl.color, hl.fillOpacity);
+    await render(
+      <BoardScene
+        theme={theme}
+        geo={geo}
+        images={{}}
+        picture={picture}
+        font={null}
+        highlights={{
+          select: { key: c.key, x: c.x, y: c.y, r: c.r },
+          targets: [
+            { key: 'p10', x: 10, y: 10, r: c.r },
+            { key: 'p5', x: 50, y: 10, r: c.r, steps: 2 },
+            { key: 'p1', x: 90, y: 10, r: c.r, steps: 4 },
+          ],
+        }}
+      />,
+    );
+    // Every target has its ring; only the one-die target has the fill.
+    expect(count('DashPathEffect')).toBe(3);
+    expect(find((n) => n.type === 'Circle' && n.props.color === fill)).toHaveLength(1);
+    const dashes = find((n) => n.type === 'DashPathEffect').map(
+      (n) => (n.props.intervals as number[])[0],
+    );
+    expect(dashes[0]).toBeCloseTo(hl.dash[0] * c.r);
+    expect(dashes[1]).toBeCloseTo(hl.dash[0] * COMBINED_MARK.dash * c.r);
+    // 2 + 4 dots, each filled in the target color.
+    const dots = find(
+      (n) => n.type === 'Circle' && n.props.r === COMBINED_MARK.dot * c.r && !n.props.style,
+    );
+    expect(dots).toHaveLength(6);
+    expect(dots.every((d) => d.props.color === hl.color)).toBe(true);
+    // The dots of one target sit in a row around its center.
+    const xs = dots.filter((d) => d.props.cy === 10 && (d.props.cx as number) < 70);
+    expect(xs.map((d) => d.props.cx as number).reduce((a, b) => a + b, 0) / xs.length).toBeCloseTo(
+      50,
+    );
   });
 });
 
