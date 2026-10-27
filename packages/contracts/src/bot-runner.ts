@@ -38,6 +38,21 @@ export interface BotMoveRequest {
   readonly timeBudgetMs?: number;
 }
 
+/**
+ * One "please answer" request: the state waits for the answer to a variant
+ * question (`Variant.prompt`), for example Plakoto "resign or play on" after
+ * the bot's mother is pinned. The bot answers for `prompt.player`. Plain JSON.
+ */
+export interface BotAnswerRequest {
+  /** Must match `state.variant`. */
+  readonly variant: VariantId;
+  /** A state whose `Variant.prompt` is not `null`. */
+  readonly state: GameState;
+  readonly difficulty: Difficulty;
+  /** Seeds the bot's own RNG, like `BotMoveRequest.seed`. */
+  readonly seed: number;
+}
+
 export interface BotRunner {
   /**
    * Resolves with the full turn for `req.dice` (an empty `moves` list is a
@@ -46,9 +61,16 @@ export interface BotRunner {
    */
   chooseMove(req: BotMoveRequest): Promise<Turn>;
   /**
-   * Stops every request that has not finished yet, for example when the user
-   * leaves the game. Their promises reject with `BotCancelledError`. The
-   * runner stays usable for new requests.
+   * Resolves with one of `prompt.choices` (for Plakoto `'resign'` or
+   * `'playOn'`). The app passes it to the flow as the `answer` action of
+   * `prompt.player`. Rejects like `chooseMove`, and with the bot's error when
+   * the state has no question.
+   */
+  chooseAnswer(req: BotAnswerRequest): Promise<string>;
+  /**
+   * Stops every request (moves and answers) that has not finished yet, for
+   * example when the user leaves the game. Their promises reject with
+   * `BotCancelledError`. The runner stays usable for new requests.
    */
   cancel(): void;
 }

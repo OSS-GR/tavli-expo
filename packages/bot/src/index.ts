@@ -47,13 +47,22 @@ export {
   portesHeuristic,
 } from './evaluators/portes-heuristic';
 export type { PortesWeights } from './evaluators/portes-heuristic';
-export { InlineBotRunner, runBotRequest } from './inline-runner';
+export {
+  PLAKOTO_DEFAULT_WEIGHTS,
+  PLAKOTO_HEURISTIC_ID,
+  createPlakotoHeuristic,
+  evaluatePlakotoSides,
+  plakotoHeuristic,
+} from './evaluators/plakoto-heuristic';
+export type { PlakotoWeights } from './evaluators/plakoto-heuristic';
+export { InlineBotRunner, runBotAnswer, runBotRequest } from './inline-runner';
 export { FORCED_DELAY_MS, THINKING_DELAY_MS, thinkingDelayMs } from './thinking-delay';
 export type { DelayRange } from './thinking-delay';
 export { pickOne, randomInt, randomIntBetween, randomUnit } from './random';
 
 export { playGame, simulate } from './simulate';
 export type {
+  AnswerEvent,
   GameFailure,
   GameOutcome,
   Pair,

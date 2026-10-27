@@ -25,6 +25,16 @@ export interface TurnEvent {
   readonly turn: Turn;
 }
 
+/** A bot answered a variant's question (`Variant.prompt`). */
+export interface AnswerEvent {
+  readonly game: number;
+  /** The state that waits for the answer. */
+  readonly state: GameState;
+  readonly player: PlayerId;
+  readonly kind: string;
+  readonly choice: string;
+}
+
 export interface SimulateOptions {
   readonly variant: Variant;
   /** Player A plays White, player B plays Black. */
@@ -36,6 +46,8 @@ export interface SimulateOptions {
   readonly maxTurns?: number;
   /** Called after each turn is checked. For logs and tests. */
   readonly onTurn?: (event: TurnEvent) => void;
+  /** Called after each answer to a question (Plakoto "resign or play on"). */
+  readonly onAnswer?: (event: AnswerEvent) => void;
 }
 
 /** A game that did not finish normally. */
@@ -99,13 +111,16 @@ function errorCode(error: unknown): string {
  * Plays one game. White starts on even `game` numbers, Black on odd ones.
  * The dice RNG and the two bot RNGs are separate streams from `gameSeed`.
  * Each turn is checked by `variant.applyTurn`, which throws on an illegal
- * turn. Errors do not escape: they come back as `ok: false`.
+ * turn. When the variant asks a question after a turn (`Variant.prompt`),
+ * the bot of the player asked answers it (`Bot.chooseAnswer`), and
+ * `variant.answerPrompt` checks the answer. Errors do not escape: they come
+ * back as `ok: false`.
  */
 export function playGame(
   options: Omit<SimulateOptions, 'games' | 'seed'> & { readonly game: number },
   gameSeed: number,
 ): GameOutcome {
-  const { variant, bots, game, onTurn } = options;
+  const { variant, bots, game, onTurn, onAnswer } = options;
   const maxTurns = options.maxTurns ?? DEFAULT_MAX_TURNS;
   const diceRng = createSeededRng(gameSeed);
   const botRngs = {
@@ -135,6 +150,20 @@ export function playGame(
       const next = variant.applyTurn(rolled, turn);
       onTurn?.({ game, state: rolled, turn });
       state = next;
+      // A question (Plakoto "resign or play on") waits for its answer.
+      for (let prompt = variant.prompt?.(state) ?? null; prompt !== null; ) {
+        const asked = players[prompt.player];
+        if (asked.bot.chooseAnswer === undefined || variant.answerPrompt === undefined) {
+          throw new BotError('NOT_IMPLEMENTED', `the ${prompt.player} bot cannot answer questions`);
+        }
+        const choice = asked.bot.chooseAnswer(state, asked.difficulty, {
+          rng: botRngs[prompt.player],
+        });
+        const answered = variant.answerPrompt(state, prompt.player, choice);
+        onAnswer?.({ game, state, player: prompt.player, kind: prompt.kind, choice });
+        state = answered;
+        prompt = variant.isGameOver(state) ? null : (variant.prompt?.(state) ?? null);
+      }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

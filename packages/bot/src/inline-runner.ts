@@ -8,7 +8,7 @@
  */
 
 import { BotCancelledError } from '@tavli/contracts';
-import type { BotMoveRequest, BotRunner } from '@tavli/contracts';
+import type { BotAnswerRequest, BotMoveRequest, BotRunner } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import type { Turn } from '@tavli/engine';
 
@@ -31,6 +31,23 @@ export function runBotRequest(bot: Bot, req: BotMoveRequest): Turn {
   return bot.chooseTurn(req.state, req.dice, req.difficulty, opts);
 }
 
+/**
+ * Answers one question synchronously (`Bot.chooseAnswer`). Throws
+ * `BotError('NOT_IMPLEMENTED')` for a bot without `chooseAnswer`.
+ */
+export function runBotAnswer(bot: Bot, req: BotAnswerRequest): string {
+  if (req.variant !== req.state.variant) {
+    throw new BotError(
+      'INVALID_REQUEST',
+      `the request is for "${req.variant}", the state is "${req.state.variant}"`,
+    );
+  }
+  if (bot.chooseAnswer === undefined) {
+    throw new BotError('NOT_IMPLEMENTED', 'this bot cannot answer questions');
+  }
+  return bot.chooseAnswer(req.state, req.difficulty, { rng: createSeededRng(req.seed) });
+}
+
 export class InlineBotRunner implements BotRunner {
   private readonly bot: Bot;
   /** The reject functions of requests that have not run yet. */
@@ -42,13 +59,22 @@ export class InlineBotRunner implements BotRunner {
   }
 
   chooseMove(req: BotMoveRequest): Promise<Turn> {
-    return new Promise<Turn>((resolve, reject) => {
+    return this.run(() => runBotRequest(this.bot, req));
+  }
+
+  chooseAnswer(req: BotAnswerRequest): Promise<string> {
+    return this.run(() => runBotAnswer(this.bot, req));
+  }
+
+  /** Runs `work` in a microtask, unless `cancel()` comes first. */
+  private run<T>(work: () => T): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
       this.pending.add(reject);
       void Promise.resolve().then(() => {
         // Gone from the set = cancelled. The promise is already rejected.
         if (!this.pending.delete(reject)) return;
         try {
-          resolve(runBotRequest(this.bot, req));
+          resolve(work());
         } catch (error) {
           reject(error);
         }
