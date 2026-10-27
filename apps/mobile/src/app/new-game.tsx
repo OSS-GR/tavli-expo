@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { matchSessions } from '@/features/match/appSessions';
 import { loadLastSetup, saveLastSetup } from '@/features/match/lastSetup';
-import { gameHref, parseModeParam } from '@/features/match/routes';
+import { gameHref, parseModeParam, rulesHref } from '@/features/match/routes';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
 import { botLevels, storage } from '@/services';
 
@@ -20,6 +20,7 @@ export default function NewGameRoute() {
       initial={initial}
       botLevels={botLevels}
       hasSavedGame={hasSavedGame}
+      onRules={(game) => router.push(rulesHref(game))}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       onStart={(setup) => {
         saveLastSetup(storage, setup);
