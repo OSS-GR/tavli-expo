@@ -3,6 +3,9 @@
     "name": "Tavlaki",
     "slug": "tavlaki",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "platforms": ["ios", "android"],
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
