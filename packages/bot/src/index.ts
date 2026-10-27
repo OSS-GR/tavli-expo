@@ -22,6 +22,7 @@ export type {
   EvaluatorRegistry,
   EvaluatorSet,
   LevelPolicy,
+  RankOptions,
   RankedTurn,
   TurnScore,
 } from './types';
@@ -39,8 +40,12 @@ export {
   pickTurn,
   scoreTurns,
 } from './create-bot';
-export { createAnalyzer } from './analyzer';
-export type { RankOptions } from './analyzer';
+export {
+  TWO_PLY_CANDIDATES,
+  TWO_PLY_MARGIN,
+  TWO_PLY_MAX_CANDIDATES,
+  createAnalyzer,
+} from './analyzer';
 export {
   PORTES_DEFAULT_WEIGHTS,
   PORTES_HEURISTIC_ID,

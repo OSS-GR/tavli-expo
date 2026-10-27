@@ -81,7 +81,7 @@ All levels use the same pipeline:
 | Easy | Heuristic | 1-ply | Softmax over scores, temperature 0.15. About half of its moves are not the best, but most of those cost little. Never passes a winning turn (e.g. a bear-off that wins). |
 | Medium | Heuristic (tuned) | 1-ply | Softmax, temperature 0.01. Small, plausible mistakes only. |
 | Hard | Neural net (Portes #147, Plakoto and Fevga #156, Asodio #164) | 1-ply (2-ply was tried: no gain, much slower; see 5.7) | Softmax, temperature 0.01, like medium. |
-| (Later) Expert / Hints | Neural net | 2-ply, wider, longer time budget | None |
+| Hints (`Analyzer`) | Neural net | 1-ply, or 2-ply on the best 8 (#212) | None |
 
 Why softmax noise and not random moves: a softmax picks good moves more often and bad moves rarely. The bot then looks like a weaker human, not a broken program. Track the **average equity loss per move** of each level in bot-vs-bot tests. Tune temperature until the levels are clearly apart (e.g. Hard beats Medium ~70%+, Medium beats Easy ~70%+). Asodio is the exception: about a quarter of its games end in a lock draw, so its bars count only the games someone wins. Hard must win at least 60% of those against Medium and score more points (owner decision, #164; see 5.9).
 
@@ -129,7 +129,7 @@ A position score = weighted sum of features. Weights start hand-picked, then get
 ### 4.4 Fairness and anti-cheating
 
 - **Dice fairness:** players often think bots cheat with dice. The bot never sees future dice. `chooseMove` only gets the current dice. The dice RNG and the bot RNG are separate objects. Later we can show dice statistics after a game.
-- **Hints and analysis:** the same `Analyzer` gives hints and post-game review. `createAnalyzer` (`packages/bot/src/analyzer.ts`, #206) ranks the legal turns for a roll with the variant's best evaluator (hard net, else medium) and the bot's 1-ply core (`scoreTurns`). Its best turn is what hard plays at temperature 0. It has no randomness. 2-ply throws `NOT_IMPLEMENTED` for now. See "The Analyzer" in `packages/bot/README.md`. Hints are **off in online games** (both players must agree for friendly games; never in ranked).
+- **Hints and analysis:** the same `Analyzer` gives hints and post-game review. `createAnalyzer` (`packages/bot/src/analyzer.ts`, #206) ranks the legal turns for a roll with the variant's best evaluator (hard net, else medium) and the bot's 1-ply core (`scoreTurns`). Its best turn is what hard plays at temperature 0. It has no randomness. `plies: 2` (#212) looks one roll deeper on the best 8 turns at 1 ply (plus near ties within 0.02 points, at most 16): for each, it averages over the next player's 21 rolls the result after their best 1-ply reply, and ranks by that. It follows `toMove` (an Asodio extra roll or chosen double makes the "reply" the mover's own next turn) and lets the engine handle questions (`prompt`). A middle-game Portes hint takes about 110 ms in Node; Acey-Deucey can take seconds (its heuristic is slow). See "The Analyzer" in `packages/bot/README.md`. Hints are **off in online games** (both players must agree for friendly games; never in ranked).
 - **Bot use in online games:** online, the server decides dice and checks moves, but it cannot stop a player from running a bot on a second device. For ranked play later, compare each player's moves with the hard bot on the server. Flag accounts with an error rate that is too low over many games. This is how chess sites detect engines.
 - **Do not ship the hard bot's weights as a server secret.** They will be in the app bundle. That is fine; a bot is not a secret.
 
@@ -307,13 +307,15 @@ export interface Bot {
   ): Turn; // a Turn = the full list of single moves (Move[]) for this roll
 }
 
-/** Same machinery, used for hints and post-game review. Built: `createAnalyzer` (#206), 1-ply only. */
+/** Same machinery, used for hints and post-game review. Built: `createAnalyzer` (#206, 2-ply #212). */
 export interface Analyzer {
   rankTurns(
     state: GameState,
     dice: Dice,
-    opts?: { plies?: 1 | 2; top?: number },
-  ): Array<{ turn: Turn; evaluation: Evaluation; equityLoss: number }>;
+    opts?: RankOptions, // { plies?: 1 | 2; top?: number }
+  ): readonly RankedTurn[]; // { turn, evaluation, equityLoss }, best first
+  // With plies: 2 only the first turns (the candidates) carry 2-ply values;
+  // the rest keep 1-ply values. Do not compare values across that boundary.
   evaluate(state: GameState): Evaluation;
 }
 ```
@@ -379,7 +381,7 @@ Tests the bot package must have:
 
 ### Phase 3 — Later
 
-- Hints and post-game review with the `Analyzer` (roadmap "Later"). The 1-ply `createAnalyzer` is built (#206), and the app's Hint button uses it in offline games (#209, `docs/architecture/board-screen.md`, "Hint"); next is 2-ply.
+- Hints and post-game review with the `Analyzer` (roadmap "Later"). `createAnalyzer` is built, 1-ply (#206) and 2-ply (#212). The app's Hint button uses 1 ply in offline games (#209, `docs/architecture/board-screen.md`, "Hint"); next is the post-game review (#215).
 - Match-score-aware play (Tavli match to 5 or 7 points) using a match equity table.
 - Server-side move analysis for ranked anti-cheat.
 - Optional: stronger nets with rollouts + supervised training (wildbg style), or a port of the wildbg Portes evaluator if its licence and rules fit.
