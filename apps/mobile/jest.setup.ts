@@ -5,16 +5,22 @@
 import './src/theme/unistyles';
 import './src/i18n';
 
-// Adapters: in-memory fakes instead of MMKV, expo-haptics and PostHog.
-// `feedback` records every haptic and `analytics` every event it would send
-// (it follows the opt-in rules); dice come from a fixed seed, so tests are repeatable.
+// Adapters: in-memory fakes instead of MMKV, expo-haptics, Sentry and PostHog.
+// `feedback` records every haptic, `crashReporter` every report and
+// `analytics` every event it would send (it follows the opt-in rules);
+// dice come from a fixed seed, so tests are repeatable.
 jest.mock('@/services', () => {
-  const { createMemoryStorage, createRecordingAnalytics, createRecordingFeedback } =
-    jest.requireActual('@tavli/contracts');
+  const {
+    createMemoryStorage,
+    createRecordingAnalytics,
+    createRecordingCrashReporter,
+    createRecordingFeedback,
+  } = jest.requireActual('@tavli/contracts');
   const { createSeededRng } = jest.requireActual('@tavli/engine');
   return {
     storage: createMemoryStorage(),
     feedback: createRecordingFeedback(),
+    crashReporter: createRecordingCrashReporter(),
     analytics: createRecordingAnalytics(),
     createLocalRng: () => createSeededRng(7),
   };
@@ -43,3 +49,7 @@ jest.mock('react-native-worklets', () => ({
     (...args: unknown[]) =>
       fn(...args),
 }));
+
+// Gesture Handler: a fake that lets tests drive the board's pan gesture
+// (`touch()` in test/gestureHandlerMock.tsx).
+jest.mock('react-native-gesture-handler', () => jest.requireActual('./test/gestureHandlerMock'));

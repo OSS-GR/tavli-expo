@@ -7,6 +7,7 @@
 | # | Question | Why it matters | Affects |
 |---|----------|----------------|---------|
 | Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
+| Q18 | **Sentry project:** create a free Sentry React Native project and add the DSN, org and project slugs, and an auth token to EAS (steps in `packages/adapters/crash-sentry/README.md`). Until then, builds send no crash reports. | We see crashes from test builds | #43 |
 | Q19 | **PostHog project:** create a free PostHog project in the **EU** region, turn on "Discard client IP data", and add the project API key as `EXPO_PUBLIC_POSTHOG_KEY` (`.env.local` and EAS). Steps in `docs/architecture/analytics-events.md`. Until then, builds send no usage data. Also: does `tavlaki.com/privacy` exist yet? The consent screen and Settings link to it. | We see which modes testers use | #61 |
 
 ## Answered

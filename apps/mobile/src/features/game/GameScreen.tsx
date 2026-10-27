@@ -3,8 +3,8 @@
  * controls row. Game logic stays in the engine; this screen only sends
  * actions to the game store and shows the result.
  */
-import type { PlayerId } from '@tavli/engine';
-import { useEffect, useState } from 'react';
+import { applyMoveToBoard, type Move, type PlayerId } from '@tavli/engine';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -13,7 +13,9 @@ import { ActionButton } from '@/components/ActionButton';
 import { useBoardTheme } from '@/features/board/BoardCanvas';
 import type { BoardView } from '@/features/board/boardModel';
 import { DiceRow } from '@/features/board/DiceRow';
-import { StaticBoard } from '@/features/board/StaticBoard';
+import { moveFlights, type Flight } from '@/features/board/flights';
+import type { BoardGeometry } from '@/features/board/geometry';
+import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { playHaptic } from '@/features/feedback/feedback';
 import { useSettings } from '@/features/settings/store';
 
@@ -39,8 +41,9 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
   const flow = useGameStore(store, (s) => s.flow);
   const dispatch = useGameStore(store, (s) => s.dispatch);
   const flipMode = useSettings((s) => s.boardFlipMode);
+  const autoConfirm = useSettings((s) => s.autoConfirmMoves);
 
-  const view = turnView(flow);
+  const view = useMemo(() => turnView(flow), [flow]);
   const { game, phase } = view;
   const names = flow.match.players;
   const gameKey = String(flow.match.games.length);
@@ -74,6 +77,31 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
     }
   };
   const onDiceLanded = () => playHaptic(theme, 'diceLand');
+
+  // Checkers in the air. A flight is only for the view it was made in.
+  const [flights, setFlights] = useState<readonly Flight[]>([]);
+  const onFlightDone = (id: string) => setFlights((old) => old.filter((f) => f.id !== id));
+
+  const onMove = (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => {
+    const mover = view.toMove;
+    const direction = game.state.rules.movement.direction;
+    const before = view.board;
+    const ok = dispatch({ type: 'move', player: mover, move, autoConfirm });
+    if (!ok) return false;
+    playHaptic(theme, move.capture === 'hit' ? 'checkerHit' : 'checkerPlace');
+    // The turn ended (auto-confirm) and the board turns: skip the flight.
+    const next = store.getState().flow.game;
+    const turnEnded = next.state.toMove !== mover || next.phase === 'awaiting-roll';
+    if (turnEnded && flipMode === 'flip') return true;
+    const after = applyMoveToBoard(before, mover, move, direction);
+    const id = `m${store.getState().flow.log.length}`;
+    const added = moveFlights(geo, boardView, mover, move, before, after, {
+      id,
+      ...(from ? { from } : {}),
+    });
+    setFlights((old) => [...old, ...added]);
+    return true;
+  };
 
   // The dice of the opening already rolled in the card: show them at rest.
   const fromOpening = game.opening !== null && game.lastTurn === null;
@@ -121,17 +149,30 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
   return (
     <View style={styles.screen}>
       <View style={styles.boardArea}>
-        <Pressable
-          testID="board-roll-area"
-          style={styles.board}
-          disabled={!canRoll}
-          onPress={roll}
-          accessibilityRole={canRoll ? 'button' : undefined}
-          accessibilityLabel={canRoll ? t('game.roll.dice') : undefined}>
-          <StaticBoard testID="game-board" board={view.board} view={boardView} />
-        </Pressable>
+        <InteractiveBoard
+          testID="game-board"
+          theme={theme}
+          board={view.board}
+          view={boardView}
+          mover={view.toMove}
+          legal={showOpening ? [] : view.legal}
+          positionKey={String(flow.log.length)}
+          flights={flights}
+          onFlightDone={onFlightDone}
+          onMove={onMove}
+          onBoardTap={() => {
+            if (canRoll) roll();
+          }}
+          onPickUp={() => playHaptic(theme, 'checkerPickUp')}
+          onIllegalDrop={() => playHaptic(theme, 'invalidMove')}
+        />
         {showOpening && opening ? (
-          <View style={styles.overlay} pointerEvents="box-none">
+          <Pressable
+            testID="opening-overlay"
+            style={styles.overlay}
+            // A tap closes the result early; while rolling, a tap rolls.
+            onPress={decided ? () => setDismissed(gameKey) : roll}
+            accessible={false}>
             <OpeningCard
               theme={theme}
               status={opening}
@@ -139,7 +180,7 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
               roundKey={`${gameKey}:${game.opening?.ties.length ?? 0}`}
               onDieLanded={onDiceLanded}
             />
-          </View>
+          </Pressable>
         ) : null}
       </View>
       <View style={styles.controls}>{controls}</View>
@@ -154,9 +195,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingBottom: Math.max(rt.insets.bottom, theme.space.sm),
   },
   boardArea: {
-    flex: 1,
-  },
-  board: {
     flex: 1,
   },
   overlay: {

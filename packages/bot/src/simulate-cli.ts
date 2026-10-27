@@ -5,18 +5,18 @@
  *   pnpm --filter @tavli/bot simulate -- --games 1000 --a easy --b easy
  */
 
-import { isDifficulty } from '@tavli/contracts';
 import { VARIANT_REGISTRY, getVariant } from '@tavli/engine';
 
 import { createBot } from './create-bot';
 import { simulate } from './simulate';
 import type { SimulationResult } from './simulate';
-import type { Difficulty } from './types';
+import { isBotLevel } from './types';
+import type { BotLevel } from './types';
 
 export interface SimulateArgs {
   readonly games: number;
-  readonly a: Difficulty;
-  readonly b: Difficulty;
+  readonly a: BotLevel;
+  readonly b: BotLevel;
   readonly seed: number;
   readonly variant: string;
 }
@@ -32,8 +32,8 @@ export const DEFAULT_SIMULATE_ARGS: SimulateArgs = {
 export const SIMULATE_USAGE = [
   'Usage: pnpm --filter @tavli/bot simulate -- [options]',
   '  --games N       games to play (default 1000)',
-  '  --a LEVEL       player A (White): easy | medium | hard (default easy)',
-  '  --b LEVEL       player B (Black): easy | medium | hard (default easy)',
+  '  --a LEVEL       player A (White): random | easy | medium | hard (default easy)',
+  '  --b LEVEL       player B (Black): random | easy | medium | hard (default easy)',
   '  --seed N        master seed (default 1)',
   '  --variant ID    variant id (default portes)',
 ].join('\n');
@@ -46,9 +46,9 @@ function parseInteger(flag: string, text: string | undefined, min: number): numb
   return value;
 }
 
-function parseLevel(flag: string, text: string | undefined): Difficulty {
-  if (!isDifficulty(text))
-    throw new Error(`${flag} needs easy, medium or hard, got ${text ?? 'nothing'}`);
+function parseLevel(flag: string, text: string | undefined): BotLevel {
+  if (!isBotLevel(text))
+    throw new Error(`${flag} needs random, easy, medium or hard, got ${text ?? 'nothing'}`);
   return text;
 }
 
@@ -96,7 +96,7 @@ export function formatSimulationReport(
   elapsedMs: number,
 ): string {
   const { completed } = result;
-  const side = (name: string, level: Difficulty, i: 0 | 1): string =>
+  const side = (name: string, level: BotLevel, i: 0 | 1): string =>
     `${name} (${level}): ${result.wins[i]} wins (${percent(result.wins[i], completed)}), ` +
     `mono ${result.mono[i]}, diplo ${result.diplo[i]}, points ${result.points[i]}`;
   return [

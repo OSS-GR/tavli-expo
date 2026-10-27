@@ -1,9 +1,6 @@
 /**
  * The anonymous install id check, shared by analytics (#61) and crash
  * reports (#43).
- *
- * Merge note: #43 defines the same function in `crash-reporter.ts`. When
- * both land, keep one copy and export it once from `index.ts`.
  */
 
 /**

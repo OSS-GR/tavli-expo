@@ -1,0 +1,25 @@
+{
+  "name": "@tavli/crash-sentry",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CrashReporter port adapter backed by Sentry (@sentry/react-native).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tavli/contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "@sentry/react-native": "~8.28.0"
+  },
+  "devDependencies": {
+    "@sentry/react-native": "~8.28.0"
+  }
+}

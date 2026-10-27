@@ -6,13 +6,31 @@
  * Jest replaces this module with in-memory fakes (`jest.setup.ts`).
  */
 import { createPostHogAnalytics } from '@tavli/analytics-posthog';
-import { createNoopAnalytics, type Analytics, type Feedback, type Storage } from '@tavli/contracts';
+import {
+  createNoopAnalytics,
+  createNoopCrashReporter,
+  type Analytics,
+  type CrashReporter,
+  type Feedback,
+  type Storage,
+} from '@tavli/contracts';
+import { createSentryCrashReporter } from '@tavli/crash-sentry';
 import { createSeededRng, type Rng } from '@tavli/engine';
 import { createExpoFeedback } from '@tavli/haptics-expo';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
 import Constants from 'expo-constants';
 
 export const storage: Storage = createMmkvStorage({ id: 'tavlaki' });
+
+/**
+ * Crash reports. Sentry in release builds that have `EXPO_PUBLIC_SENTRY_DSN`;
+ * a no-op in dev and in builds without a DSN. Started in
+ * `features/crash/start.ts`, which also follows the privacy setting.
+ */
+export const crashReporter: CrashReporter =
+  __DEV__ || !process.env.EXPO_PUBLIC_SENTRY_DSN
+    ? createNoopCrashReporter()
+    : createSentryCrashReporter();
 
 /** Haptics. Use `appFeedback` (features/feedback), which follows the Haptics setting. */
 export const feedback: Feedback = createExpoFeedback();

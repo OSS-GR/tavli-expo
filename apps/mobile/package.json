@@ -12,9 +12,11 @@
     "screenshots": "vitest run --config tools/screenshots/vitest.config.mts"
   },
   "dependencies": {
+    "@sentry/react-native": "~8.28.0",
     "@shopify/react-native-skia": "2.14.0",
     "@tavli/analytics-posthog": "workspace:*",
     "@tavli/contracts": "workspace:*",
+    "@tavli/crash-sentry": "workspace:*",
     "@tavli/engine": "workspace:*",
     "@tavli/haptics-expo": "workspace:*",
     "@tavli/storage-mmkv": "workspace:*",
