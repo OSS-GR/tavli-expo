@@ -89,7 +89,8 @@ describe('<TutorialScreen />', () => {
       expect(screen.getByTestId('tutorial-success')).toHaveTextContent(
         i18n.t(`tutorial.lessons.${lesson.id}.done`),
       );
-      expect(props.onFinished).not.toHaveBeenCalled();
+      // The last lesson counts as done at once, before Next (Back may leave now).
+      expect(props.onFinished).toHaveBeenCalledTimes(i === LESSONS.length - 1 ? 1 : 0);
       await press('tutorial-next');
     }
 

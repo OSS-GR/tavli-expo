@@ -53,7 +53,10 @@ const SHAKE_STEP_MS = 50;
 export interface TutorialScreenProps {
   /** Lesson `step` (from 1) was learnt. */
   onLessonDone: (step: number, lesson: LessonId) => void;
-  /** The last lesson was learnt: the end card shows. */
+  /**
+   * The last lesson was learnt. Runs at once, before Next, so leaving with
+   * Back after the last move still counts as done.
+   */
   onFinished: () => void;
   /** Skip was tapped on lesson `step`. */
   onSkip: (step: number, lesson: LessonId) => void;
@@ -132,7 +135,10 @@ export function TutorialScreen({
       });
       setFlights((old) => [...old, ...added]);
     }
-    if (lesson.done(next)) onLessonDone(index + 1, lesson.id);
+    if (lesson.done(next)) {
+      onLessonDone(index + 1, lesson.id);
+      if (index === LESSONS.length - 1) onFinished();
+    }
     return true;
   };
 
@@ -143,7 +149,6 @@ export function TutorialScreen({
     setWrong(0);
     setFlights([]);
     if (nextLesson) setFlow(startLesson(nextLesson));
-    else onFinished();
   };
 
   if (lesson === undefined) {
