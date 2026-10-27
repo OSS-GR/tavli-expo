@@ -230,3 +230,26 @@ describe('<TutorialScreen game="plakoto|fevga|asodio" />', () => {
     expect(screen.getByRole('header', { name: 'Προς την ίδια φορά' })).toBeOnTheScreen();
   });
 });
+
+// #175: with the home on the bottom left the lesson board is mirrored. The
+// taps (test/tutorialTaps.ts) follow the setting, like a finger on the
+// mirrored board would.
+describe('<TutorialScreen /> with the home board on the bottom left', () => {
+  it.each(['portes', 'plakoto', 'fevga', 'asodio'] as const)(
+    'runs the %s lessons with taps on the mirrored board',
+    async (game) => {
+      await act(async () => {
+        settingsStore.getState().setSetting('homeBoardSide', 'left');
+      });
+      const props = await open(game);
+      const lessons = LESSON_SETS[game];
+      for (const [i, lesson] of lessons.entries()) {
+        await playLessonByTaps(i, game);
+        expect(props.onLessonDone).toHaveBeenLastCalledWith(i + 1, lesson.id);
+        await press('tutorial-next');
+      }
+      expect(props.onFinished).toHaveBeenCalledTimes(1);
+    },
+    60_000,
+  );
+});

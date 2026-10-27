@@ -1,14 +1,25 @@
 /**
  * The board on screen: a Skia canvas that draws a `BoardScene`.
  *
- * `useBoardTheme` reads the board theme from Settings. `useBoardSpace` measures
- * the space the board may fill; `fitBoard` then gives the geometry.
+ * `useBoardTheme` reads the board theme from Settings, `useHomeBoardSide`
+ * the home board side. `portraitLayout` gives the layout for that side.
+ * `useBoardSpace` measures the space the board may fill; `fitBoard` then
+ * gives the geometry.
  */
 import { Canvas } from '@shopify/react-native-skia';
-import { getLayout, getTheme, hasTheme, DEFAULT_THEME_ID, type ThemeManifest } from '@tavli/themes';
+import {
+  getLayout,
+  getTheme,
+  hasTheme,
+  mirrorLayout,
+  DEFAULT_THEME_ID,
+  type BoardLayout,
+  type ThemeManifest,
+} from '@tavli/themes';
 import { useCallback, useState, type ReactNode } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 
+import type { HomeBoardSide } from '@/features/settings/settings';
 import { useSettings } from '@/features/settings/store';
 
 import type { BoardPicture } from './boardModel';
@@ -22,9 +33,29 @@ export function useBoardTheme(): ThemeManifest {
   return getTheme(hasTheme(id) ? id : DEFAULT_THEME_ID);
 }
 
-/** The portrait layout of a theme (wireframe option B). */
-export function portraitLayout(theme: ThemeManifest) {
-  return getLayout(theme, 'portrait-rotated');
+/** Where your home is, from Settings → Home board (#175). */
+export function useHomeBoardSide(): HomeBoardSide {
+  return useSettings((s) => s.homeBoardSide);
+}
+
+/** One mirrored layout per theme layout, so its identity stays the same between renders. */
+const mirrored = new WeakMap<BoardLayout, BoardLayout>();
+
+/**
+ * The portrait layout of a theme (wireframe option B). With `left` it is
+ * mirrored left to right (`mirrorLayout`): every point, bar half and tray
+ * moves to the other side, so drawing, hit tests, highlights and flights
+ * all follow. The art is not mirrored: the themes test checks it fits.
+ */
+export function portraitLayout(theme: ThemeManifest, side: HomeBoardSide = 'right'): BoardLayout {
+  const layout = getLayout(theme, 'portrait-rotated');
+  if (side === 'right') return layout;
+  let flipped = mirrored.get(layout);
+  if (flipped === undefined) {
+    flipped = mirrorLayout(layout);
+    mirrored.set(layout, flipped);
+  }
+  return flipped;
 }
 
 export interface Size {

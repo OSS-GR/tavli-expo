@@ -12,10 +12,10 @@
 | `paint.ts` | Theme gradients and colors → Skia props. |
 | `skia/BoardScene.tsx` | The Skia drawing. Props only: no hooks, no React Native. The same scene renders in the app, in Jest and headless. |
 | `skia/CheckerShape.tsx` | One checker from a theme `CheckerStyle`. |
-| `BoardCanvas.tsx` | The Skia `<Canvas>`, the board theme from Settings (`useBoardTheme`) and the space the board may fill. |
+| `BoardCanvas.tsx` | The Skia `<Canvas>`, the board theme and the home board side from Settings (`useBoardTheme`, `useHomeBoardSide`), the layout for that side (`portraitLayout`) and the space the board may fill. |
 | `useBoardAssets.ts` | Loads the theme images and the badge font. |
 | `themeImages.ts` | The Metro `require` map for theme images (Metro only bundles literal requires). |
-| `StaticBoard.tsx` | A board that only shows a position. An optional `theme` prop draws another theme (the board picker). |
+| `StaticBoard.tsx` | A board that only shows a position. Optional `theme` and `homeSide` props draw another theme or side (the Settings pickers). |
 | `positions.ts` | Fixed positions (start, mid-game, bear-off, Plakoto, Fevga, Asodio) for the dev screen, tests and screenshots. |
 | `diceMotion.ts` | The roll animation as pure math (worklets): tumble pose and face flips. |
 | `skia/DieShape.tsx`, `skia/AnimatedDie.tsx` | A die from the theme `DiceStyle`; the animated version tumbles and lands on the engine's value. |
@@ -189,6 +189,25 @@ The Skia board takes no screen reader actions, so a screen reader user plays wit
 
 The theme numbers points from the view of the player at the bottom (the **viewer**). The engine numbers points in White's order. `boardModel.ts` maps each absolute point to the viewer's own number (`absoluteToOwn`). So the viewer always moves 24 → 1, with home at the bottom left. Turning the board to the other player is only a change of viewer: a left–right mirror, as the wireframes ask.
 
+## Home board side (#175)
+
+**Settings → Board → Your home** (`homeBoardSide`) says where your home is on a real board, seen from your seat. The phone shows that board on its side (portrait), so on screen your home is always at the bottom.
+
+| Setting | Real board | On the phone | Your checkers go |
+|---|---|---|---|
+| `right` (default, as before #175) | home bottom right | start bottom right, home bottom left | counterclockwise |
+| `left` | home bottom left | start bottom left, home bottom right | clockwise |
+
+How the mirror works:
+
+- `portraitLayout(theme, side)` (`BoardCanvas.tsx`) gives the theme's portrait layout, or with `left` the same layout mirrored left to right (`mirrorLayout` in `packages/themes`). Every point rect, point base, bar half, tray, field and the dice area moves to the other side. Point numbers and point tones stay with their points. One mirrored layout is kept per theme layout, so its identity is stable.
+- Everything else reads the layout, so it all follows: the triangles, stacks, pinned checkers, the "to enter" stacks, trays, highlights, ghost targets, tap and drag hit tests (`interaction.ts`) and the flights (`flights.ts`). `boardModel.ts` does not know about the mirror.
+- `InteractiveBoard` (game, tutorial) and `StaticBoard` (rules pictures, board picker, dev board) read the setting through `useHomeBoardSide()`. `StaticBoard` takes a `homeSide` prop for the side picker's pictures. A change applies at once, also in a running game.
+- The board art is **not** mirrored: the image layers, the board shadow and the lamp stay as they are, so the light keeps coming from the same side. This works because every bundled portrait layout is left–right symmetric (`isMirrorSymmetric`; `packages/themes/src/themes.test.ts` checks each theme). A new theme must be symmetric too.
+- The flip (pass-and-play) still works on top of it: it changes the viewer, the mirror changes the layout.
+- The dice sit in the controls row under the board, so they do not move. The move list (#134) names moves by point numbers only, so its text does not change. The rules picture caption (`rules.picture.caption` / `captionMirrored`) tells the path the picture shows.
+- The side picker (`features/settings/HomeBoardSidePicker.tsx`) shows each side with a small start position, turned a quarter so it lies like a real board in front of you: home at the bottom right, or at the bottom left. Screenshot: `board-start-home-left.png`.
+
 ## Tests
 
 - `geometry.test.ts` and `boardModel.test.ts`: the layout math (point → rect, stacks, badge, bar, trays, hit-testing) and the engine → slot mapping.
@@ -202,6 +221,7 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 - Plakoto and Fevga: `boardModel.test.ts` (pins under their pinners, the Plakoto start, the Fevga start and its same-way movement, drawing and hit-testing in portrait and landscape), `interaction.test.ts` (a pin's ghost, landing and flights), `BoardScene.test.tsx` (pin rings, the Fevga start) and `botTurn.test.ts` (the bot plays on). `GameScreen.variants.test.tsx` plays a whole Plakoto game and a whole Fevga game with taps only, and tests the mother card (play on, resign, board label, vs bot both ways).
 - Asodio: `asodio.test.ts` (the loading lock, the quarter lock and A6 with the owner edge cases #14–#17 and #19, the "to enter" stacks and their badge, the frozen marks, entering by tap with a 1-2 and a double, flights to and from the stack), `BoardScene.test.tsx` (the stack counts, the frozen shade). `GameScreen.asodio.test.tsx` plays two whole games with taps only (one ends in a deadlock draw and checks the game-end sheet, one is borne off), and tests the locked opening, entering four with 3-3 and undo, a 1-2, the frozen army card and labels, and the real Easy bot entering.
 - Accessibility: `moveList.test.ts` (labels in en and el, one button per target, the order, the bar, bearing off, Asodio entering), `announcements.test.ts`, `GameScreen.moveList.test.tsx` (a whole Portes game and a Plakoto mother question with buttons only, `auto` with a screen reader, the announcements vs the bot), `TutorialScreen.test.tsx` (every lesson with the move list), `GameScreen.cards.test.tsx` (each card hides the board from screen readers and gives it back when it closes, focus moves to the card) and `textScaling.test.tsx`.
+- Home board side (#175): `packages/themes` tests `mirrorLayout` and that every theme is symmetric. `geometry.test.ts` and `interaction.test.ts` check the mirrored rects, triangles, stacks, pins, trays, hit tests, taps, drops, flights and the flip on top. `BoardScene.test.tsx` draws a mirrored `StaticBoard`. `GameScreen.homeSide.test.tsx` plays a whole Portes, Plakoto (fixed view), Fevga and Asodio game with taps on the mirrored board, a drag, and a change of the setting during a game. `TutorialScreen.variants.test.tsx` runs every lesson of the four games mirrored (`test/tutorialTaps.ts` follows the setting). `settings.test.ts`, `SettingsScreen.test.tsx` (labels, Greek, `settings_changed`) and `RulesScreen.test.tsx` (the mirrored caption).
 - `DiceRow.test.tsx` and the #173 test in `src/navigation.test.tsx`: the dice canvas keeps its native parent (and the board canvas its native views) through the menu, Settings and back, Resume, and the app going to the background and back.
 - `BoardScene.test.tsx`: a render smoke test. Jest replaces Skia with `apps/mobile/test/skiaMock.tsx`: every Skia component becomes a plain element, so the test counts what the board would draw.
 - The `GameScreen.*.test.tsx` files run on fake timers (`runOnFakeTimers()` from `apps/mobile/test/clock.ts`). The screen closes the opening result, the pass card and the bot's answer note on timers, so on a real clock a busy machine could close a card before the test taps it (#152). The other tests that render the game screen do the same: `MatchScreen.test.tsx`, `src/navigation.test.tsx` and `textScaling.test.tsx` (#160).
@@ -212,4 +232,5 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 
 - `board-start.png`: the Portes start, White at the bottom.
 - `board-midgame-black-view.png`: Black's view (flip): count badge, bar, tray.
+- `board-start-home-left.png`: the Portes start with Settings → Your home on the bottom left (#175): the board mirrored, the art not.
 - `play-moving.png`: a turn in progress (wireframe 6c): 13/7 played, the checker on 8 picked up, its target lit, the used 6 faded. The strips and buttons are React Native views, so they are not in the picture.

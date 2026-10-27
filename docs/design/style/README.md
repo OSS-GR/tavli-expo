@@ -66,7 +66,7 @@ What this decides for later work:
 
 - `theme.json` gets `"orientation": "portrait-rotated"` and a layout for it. Tablets and landscape phones can use a normal landscape layout. Layout is data (ADR-0005), so this is a second layout, not new code.
 - The Blender skin (v1.0) must be lit for this orientation. Both mockups use light from the top-left of the phone screen. Do not rotate a pre-rendered image.
-- A setting can mirror the board (home bottom-right) for players who learned that way.
+- A setting mirrors the board (on screen: home bottom-right) for players who learned on a board with the home on the bottom left: Settings → Board → Your home (#175). The art is not mirrored, so the light stays top-left; layouts must be left–right symmetric.
 
 ## Concept A: olive inlay
 
