@@ -64,7 +64,14 @@ import { turnAnnouncement } from './announcements';
 import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, useGameFeedback } from './gameFeedback';
-import { diceView, turnView, useGameStore, type DieView, type GameStore } from './gameStore';
+import {
+  diceChosen,
+  diceView,
+  turnView,
+  useGameStore,
+  type DieView,
+  type GameStore,
+} from './gameStore';
 import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
@@ -493,7 +500,10 @@ export function GameScreen({
   const dice = showPass ? passDice : view.dice;
   // The opening dice already rolled in the card: show them at rest.
   const fromOpening = game.opening !== null && game.lastTurn === null;
-  const rollKey = fromOpening || showPass ? null : `${gameKey}:${game.state.turnNumber}`;
+  // A chosen double (Acey-Deucey, after a 1-2) was never rolled: its four
+  // dice show at rest, with no roll, no split and no "Doubles!" (#202).
+  const chosen = diceChosen(flow);
+  const rollKey = fromOpening || showPass || chosen ? null : `${gameKey}:${game.state.turnNumber}`;
   // A double shows its two dice first, then splits into four (#177).
   const reveal = useDoubleReveal(rollKey, dice);
 

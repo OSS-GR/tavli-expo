@@ -276,6 +276,8 @@
       "rolled_you": "Έφερες {{dice}}.",
       "rolledDouble": "{{name}}: έφερε διπλές {{value}}: τέσσερις κινήσεις του {{value}}.",
       "rolledDouble_you": "Έφερες διπλές {{value}}: τέσσερις κινήσεις του {{value}}.",
+      "choseDouble": "{{name}}: διάλεξε διπλές {{value}}: τέσσερις κινήσεις του {{value}}.",
+      "choseDouble_you": "Διάλεξες διπλές {{value}}: τέσσερις κινήσεις του {{value}}.",
       "played": "{{name}}: έπαιξε {{moves}}."
     },
     "pass": {

@@ -4,6 +4,11 @@
  *
  * - After a roll: "Bob rolled 5-3." (or "You rolled 5-3."). A double:
  *   "You rolled double 4: four moves of 4." (#177).
+ * - A chosen double (Acey-Deucey Asodio, after a 1-2): "You chose double 4:
+ *   four moves of 4." Nothing was rolled (#202). For another player it
+ *   first reads the 1-2 they played: "Bob played: …. Bob chose double 4:
+ *   four moves of 4." The question comes between that turn and this one, so
+ *   that turn has no line of its own.
  * - After another player's turn: "Bob played: Checker from point 13 to
  *   point 8; …. Your turn." Vs the bot that is the bot's turn; in
  *   pass-and-play every turn, so the next player hears what happened.
@@ -16,6 +21,8 @@ import { isDouble, matchPhase, type MatchFlow, type PlayerId } from '@tavli/engi
 import type { TFunction } from 'i18next';
 
 import { moveLabel } from '@/features/accessibility/moveList';
+
+import { diceChosen } from './gameStore';
 
 export interface Announcement {
   /** One per event, so the same text is read again for a new event. */
@@ -43,6 +50,20 @@ export function turnAnnouncement(
   if (game.phase === 'moving' && game.played.length === 0 && dice !== null && !fromOpening) {
     const player = game.state.toMove;
     const name = nameOf(player);
+    // A chosen double (#202): the player picked these dice, nobody rolled.
+    if (diceChosen(flow) && isDouble(dice)) {
+      const vars = { name, value: dice[0] };
+      if (isYou(player)) {
+        return { key: `${key}:chosen`, text: t('game.announce.choseDouble_you', vars) };
+      }
+      const lines = [t('game.announce.choseDouble', vars)];
+      const last = game.lastTurn;
+      if (last !== null && last.player === player && last.moves.length > 0) {
+        const moves = last.moves.map((move) => moveLabel(t, move)).join('; ');
+        lines.unshift(t('game.announce.played', { name, moves }));
+      }
+      return { key: `${key}:chosen`, text: lines.join(' ') };
+    }
     // A double says that it plays four times (#177): the dice row shows the
     // two dice first and the four a moment later, but this is read once.
     if (isDouble(dice)) {
