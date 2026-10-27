@@ -34,8 +34,29 @@ import {
 
 /** A tap may miss its target by this much (wireframe: 22 pt). */
 export const SNAP_DISTANCE = 22;
-/** A touch that moves less than this is a tap, not a drag. */
+/** A touch that moves less than this is a tap. At this distance a drag starts. */
 export const TAP_SLOP = 8;
+/**
+ * A touch that stays put and lifts within this time is a tap. It is long,
+ * so a slow press (touch, wait, lift) still selects. Gesture Handler's
+ * default is 500 ms.
+ */
+export const TAP_MAX_MS = 1500;
+
+/**
+ * The board's two gestures (#174). They race: the first to activate wins.
+ *
+ * - The pan activates only once the finger moves `TAP_SLOP`: a drag.
+ * - The tap fails once the finger moves more than `TAP_SLOP`. So the two
+ *   never both fire, and no touch falls in a gap between them.
+ *
+ * A pan alone cannot see taps. When the finger lifts before the pan
+ * activates, the pan FAILS, and its `onFinalize` gets `canceled: true`.
+ */
+export const BOARD_GESTURES = {
+  pan: { minDistance: TAP_SLOP },
+  tap: { maxDistance: TAP_SLOP, maxDuration: TAP_MAX_MS },
+} as const;
 
 /** Where a picked-up checker may go. */
 export interface MoveTarget {
@@ -233,4 +254,36 @@ export function resolveDrop(
   if (pickRect([from.rect], x, y, 0) === 0) return { kind: 'cancel' };
   const target = pickTarget(from, x, y, snap);
   return target >= 0 ? { kind: 'move', target } : { kind: 'illegal' };
+}
+
+/** What the end of the board's pan means. */
+export type PanEnd = 'drop' | 'cancel' | 'none';
+
+/**
+ * The pan ended. `dragging`: it activated on a movable checker. `canceled`:
+ * the gesture failed, or the system took the touch away.
+ *
+ * - A drag that ends normally is a drop.
+ * - A drag the system cancels (a call, the app goes to the background)
+ *   flies back, with no move.
+ * - A pan that never dragged means nothing. The finger stayed put (the tap
+ *   gesture handles that), or it did not start on a movable checker.
+ */
+export function panEnd(dragging: boolean, canceled: boolean): PanEnd {
+  'worklet';
+  if (!dragging) return 'none';
+  return canceled ? 'cancel' : 'drop';
+}
+
+/**
+ * Where the dragged checker is drawn: it moves as far as the finger moved
+ * since touch down, so it does not jump to the finger.
+ */
+export function dragPoint(
+  checker: ScreenPoint,
+  start: ScreenPoint,
+  finger: ScreenPoint,
+): ScreenPoint {
+  'worklet';
+  return { x: checker.x + finger.x - start.x, y: checker.y + finger.y - start.y };
 }

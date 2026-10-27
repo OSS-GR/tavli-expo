@@ -18,8 +18,13 @@ import { layoutBoard, type BoardView } from './boardModel';
 import { moveFlights, HIT_DELAY_MS } from './flights';
 import { fitBoard, slotRect, stackPosition, type ScreenRect } from './geometry';
 import {
+  BOARD_GESTURES,
   SNAP_DISTANCE,
+  TAP_MAX_MS,
+  TAP_SLOP,
   buildSources,
+  dragPoint,
+  panEnd,
   pickSource,
   pickTarget,
   resolveDrop,
@@ -51,6 +56,36 @@ const source = (sources: MovableSource[], key: string) => {
   if (!s) throw new Error(`no source ${key}`);
   return s;
 };
+
+describe('tap or drag (#174)', () => {
+  it('starts a drag exactly where a tap stops', () => {
+    // The pan activates at a move of minDistance; the tap fails above
+    // maxDistance. Equal values: no touch fires both, and none falls between.
+    expect(BOARD_GESTURES.pan.minDistance).toBe(TAP_SLOP);
+    expect(BOARD_GESTURES.tap.maxDistance).toBe(TAP_SLOP);
+  });
+
+  it('lets a slow press count as a tap', () => {
+    // Gesture Handler's own limit is 500 ms; a slow press is longer.
+    expect(BOARD_GESTURES.tap.maxDuration).toBe(TAP_MAX_MS);
+    expect(TAP_MAX_MS).toBeGreaterThan(1000);
+  });
+
+  it('reads the end of the pan', () => {
+    expect(panEnd(true, false)).toBe('drop');
+    expect(panEnd(true, true)).toBe('cancel');
+    // The pan never dragged: the finger stayed put (the pan FAILED, so
+    // canceled is true) or it swiped off a checker. The tap decides.
+    expect(panEnd(false, true)).toBe('none');
+    expect(panEnd(false, false)).toBe('none');
+  });
+
+  it('moves the dragged checker as far as the finger moved', () => {
+    const checker = { x: 100, y: 200 };
+    expect(dragPoint(checker, { x: 105, y: 198 }, { x: 105, y: 198 })).toEqual(checker);
+    expect(dragPoint(checker, { x: 105, y: 198 }, { x: 90, y: 230 })).toEqual({ x: 85, y: 232 });
+  });
+});
 
 describe('buildSources', () => {
   const flow = whiteToMove([6, 1]);
