@@ -47,6 +47,7 @@
  * the rest of the roll move freely (like bearing off in the shared rules).
  */
 
+import { CHECKERS_PER_PLAYER } from '../../constants';
 import type { DieValue } from '../../dice';
 import type { Move } from '../../move';
 import {
@@ -148,7 +149,7 @@ export function rollBlocked(
 ): boolean {
   const double = dice.length === 4;
   const special = double || isAceDeuce(dice);
-  if (options.firstEntryGate && pos[OUTSIDE] === 15) {
+  if (options.firstEntryGate && pos[OUTSIDE] === CHECKERS_PER_PLAYER) {
     if (!(options.gateDoubleOnly ? double : special)) return true;
   }
   return options.barEntryNeedsSpecial && (pos[BAR] as number) > 0 && !special;
