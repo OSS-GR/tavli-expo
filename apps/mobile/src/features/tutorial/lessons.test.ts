@@ -1,9 +1,18 @@
-import { currentBoard, formatMove, getPreset, type GameFlow } from '@tavli/engine';
+import { currentBoard, formatMove, getPreset, legalNextMoves, type GameFlow } from '@tavli/engine';
 
-import { LESSONS, lessonMoves, playLessonMove, startLesson, type LessonId } from './lessons';
+import {
+  LESSONS,
+  LESSON_SETS,
+  lessonMoves,
+  playLessonMove,
+  startLesson,
+  type LessonId,
+} from './lessons';
+
+const ALL_LESSONS = Object.values(LESSON_SETS).flat();
 
 const lesson = (id: LessonId) => {
-  const found = LESSONS.find((l) => l.id === id);
+  const found = ALL_LESSONS.find((l) => l.id === id);
   if (!found) throw new Error(id);
   return found;
 };
@@ -11,6 +20,13 @@ const lesson = (id: LessonId) => {
 /** What the board offers now, as notation (`13/9`). */
 const offered = (id: LessonId, flow: GameFlow) =>
   lessonMoves(lesson(id), flow)
+    .flatMap((g) => g.moves)
+    .map(formatMove)
+    .sort();
+
+/** What the engine allows now, before the lesson filters it. */
+const engineMoves = (flow: GameFlow) =>
+  legalNextMoves(flow)
     .flatMap((g) => g.moves)
     .map(formatMove)
     .sort();
@@ -43,19 +59,45 @@ describe('tutorial lessons', () => {
     ]);
   });
 
-  it.each(LESSONS.map((l) => l.id))('%s starts in Portes, White to move, fixed dice', (id) => {
-    const flow = startLesson(lesson(id));
-    expect(flow.state.variant).toBe('portes');
-    expect(flow.state.rules).toEqual(getPreset('portes'));
-    expect(flow.phase).toBe('moving');
-    expect(flow.state.toMove).toBe('white');
-    expect(flow.state.dice).toEqual(lesson(id).dice);
-    // The same start every time: no RNG.
-    expect(startLesson(lesson(id))).toEqual(flow);
-    expect(lessonMoves(lesson(id), flow).length).toBeGreaterThan(0);
+  it('has four lessons each for Plakoto and Fevga (#149), with ids unique over all games', () => {
+    expect(LESSON_SETS.portes).toBe(LESSONS);
+    expect(LESSON_SETS.plakoto.map((l) => l.id)).toEqual([
+      'pin',
+      'pinned',
+      'mother',
+      'plakotoBearOff',
+    ]);
+    expect(LESSON_SETS.fevga.map((l) => l.id)).toEqual([
+      'sameWay',
+      'holdPoint',
+      'runner',
+      'sixInARow',
+    ]);
+    const ids = ALL_LESSONS.map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const [game, lessons] of Object.entries(LESSON_SETS)) {
+      for (const l of lessons) expect(l.game).toBe(game);
+    }
   });
 
-  it.each(LESSONS.map((l) => l.id))('%s can be finished with the moves it offers', (id) => {
+  it.each(ALL_LESSONS.map((l) => l.id))(
+    '%s starts in its game, White to move, fixed dice',
+    (id) => {
+      const flow = startLesson(lesson(id));
+      const { game } = lesson(id);
+      expect(flow.state.variant).toBe(game);
+      // The app's default preset: Plakoto offerConcede, Fevga runner rule and bans.
+      expect(flow.state.rules).toEqual(getPreset(game));
+      expect(flow.phase).toBe('moving');
+      expect(flow.state.toMove).toBe('white');
+      expect(flow.state.dice).toEqual(lesson(id).dice);
+      // The same start every time: no RNG.
+      expect(startLesson(lesson(id))).toEqual(flow);
+      expect(lessonMoves(lesson(id), flow).length).toBeGreaterThan(0);
+    },
+  );
+
+  it.each(ALL_LESSONS.map((l) => l.id))('%s can be finished with the moves it offers', (id) => {
     const { flow } = playThrough(id);
     expect(lesson(id).done(flow)).toBe(true);
     // Nothing more to touch once it is done.
@@ -107,5 +149,82 @@ describe('tutorial lessons', () => {
     expect(
       playLessonMove(lesson('move'), flow, { from: 6, to: 2, die: 4, capture: 'none' }),
     ).toBeNull();
+  });
+});
+
+describe('Plakoto lessons (#149)', () => {
+  it('1: pins the lone checker on 9; it stays on the board, under yours', () => {
+    expect(offered('pin', startLesson(lesson('pin')))).toEqual(['13/9*']);
+    const board = currentBoard(playThrough('pin').flow);
+    expect(board.points[8]).toEqual({ white: 1, black: 1, pinned: 'black' });
+    // No bar in Plakoto.
+    expect(board.bar.black).toBe(0);
+  });
+
+  it('2: the pinned checker on 16 cannot move, not even for the engine', () => {
+    const flow = startLesson(lesson('pinned'));
+    expect(currentBoard(flow).points[15]?.pinned).toBe('white');
+    expect(engineMoves(flow).some((m) => m.startsWith('16/'))).toBe(false);
+    expect(offered('pinned', flow)).toEqual(['13/11', '13/8']);
+    const { flow: end } = playThrough('pinned');
+    expect(currentBoard(end).points[5]?.white).toBe(5);
+    expect(currentBoard(end).points[15]?.pinned).toBe('white');
+  });
+
+  it('3: pins the mother on point 1; the mother question comes after the turn', () => {
+    expect(offered('mother', startLesson(lesson('mother')))).toEqual(['5/1*']);
+    const { flow } = playThrough('mother');
+    expect(currentBoard(flow).points[0]).toEqual({ white: 1, black: 1, pinned: 'black' });
+    // The rest of the roll could still be played: the lesson is done with the pin.
+    expect(flow.phase).toBe('moving');
+    expect(flow.state.rules.mother.motherRule).toBe('offerConcede');
+  });
+
+  it('4: bears off the last two checkers', () => {
+    expect(offered('plakotoBearOff', startLesson(lesson('plakotoBearOff')))).toEqual([
+      '3/0',
+      '5/0',
+    ]);
+    expect(currentBoard(playThrough('plakotoBearOff').flow).off.white).toBe(15);
+  });
+});
+
+describe('Fevga lessons (#149)', () => {
+  it('1: starts in opposite corners; only one checker leaves 24', () => {
+    const flow = startLesson(lesson('sameWay'));
+    const board = currentBoard(flow);
+    expect(board.points[23]?.white).toBe(15);
+    expect(board.points[11]?.black).toBe(15);
+    expect(offered('sameWay', flow)).toEqual(['24/19', '24/21']);
+    const { flow: end, moves } = playThrough('sameWay');
+    expect(moves).toEqual(['24/19', '19/16']);
+    // The runner rule: the other checkers stayed on 24.
+    expect(currentBoard(end).points[23]?.white).toBe(14);
+  });
+
+  it('2: a lone dark checker holds point 6, so the 4 is blocked', () => {
+    const flow = startLesson(lesson('holdPoint'));
+    expect(currentBoard(flow).points[5]).toEqual({ white: 0, black: 1, pinned: null });
+    expect(engineMoves(flow)).not.toContain('10/6');
+    expect(offered('holdPoint', flow)).toEqual(['10/7']);
+    expect(playThrough('holdPoint').moves).toEqual(['10/7', '7/3']);
+  });
+
+  it('3: the runner must pass 12 before a checker leaves 24', () => {
+    const flow = startLesson(lesson('runner'));
+    // The engine itself allows only 13/11: 13/12 lands on Black, 24 is locked.
+    expect(engineMoves(flow)).toEqual(['13/11']);
+    const { flow: end, moves } = playThrough('runner');
+    expect(moves).toEqual(['13/11', '24/23']);
+    expect(currentBoard(end).points[22]?.white).toBe(1);
+  });
+
+  it('4: six in a row on 19 to 24 is banned, so only the 6 is played', () => {
+    const flow = startLesson(lesson('sixInARow'));
+    // The lesson filters nothing: the engine allows only 8/2.
+    expect(engineMoves(flow)).toEqual(['8/2']);
+    const { flow: end } = playThrough('sixInARow');
+    expect(end.phase).toBe('awaiting-confirm');
+    expect(currentBoard(end).points[18]?.white).toBe(0);
   });
 });

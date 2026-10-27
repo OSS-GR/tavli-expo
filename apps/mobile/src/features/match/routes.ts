@@ -1,5 +1,5 @@
 /** Links and route params of the app shell (wireframes, "Route map"). Pure. */
-import type { TutorialSource } from '@tavli/contracts';
+import type { TutorialGame, TutorialSource } from '@tavli/contracts';
 
 import { isMatchMode, type MatchMode } from './setup';
 
@@ -15,16 +15,25 @@ export function newGameHref(mode: MatchMode) {
 }
 
 /**
- * New game vs bot for the first game after the tutorial (#128): Portes vs
- * the Easy bot, whatever was chosen last time.
+ * New game vs bot for the first game after the tutorial (#128): the game
+ * of the lessons (Portes: `first=1`; Plakoto, Fevga: `first=plakoto`, #149)
+ * vs the Easy bot, whatever was chosen last time.
  */
-export function firstGameHref() {
-  return { pathname: '/new-game', params: { mode: 'bot', first: '1' } } as const;
+export function firstGameHref(game: TutorialGame = 'portes') {
+  return {
+    pathname: '/new-game',
+    params: { mode: 'bot', first: game === 'portes' ? '1' : game },
+  } as const;
 }
 
-/** The tutorial, opened from Home, a rules page or Settings (#128). */
-export function tutorialHref(from: TutorialSource) {
-  return { pathname: '/tutorial', params: { from } } as const;
+/**
+ * The tutorial, opened from Home, a rules page or Settings (#128).
+ * `game` picks the lesson set (#149); Portes, the default, has no param.
+ */
+export function tutorialHref(from: TutorialSource, game: TutorialGame = 'portes') {
+  return game === 'portes'
+    ? ({ pathname: '/tutorial', params: { from } } as const)
+    : ({ pathname: '/tutorial', params: { from, game } } as const);
 }
 
 /** The board of a local match. */
@@ -54,9 +63,23 @@ export function parseIdParam(value: Param): string | null {
   return typeof id === 'string' && id.length > 0 ? id : null;
 }
 
-/** The `first` param of the new-game screen: the first game after the tutorial. */
-export function parseFirstGameParam(value: Param): boolean {
-  return first(value) === '1';
+const TUTORIAL_GAMES: readonly TutorialGame[] = ['portes', 'plakoto', 'fevga'];
+
+/**
+ * The `first` param of the new-game screen: the first game after the
+ * tutorial, in the game of its lessons (`1` = Portes). `null`: not after
+ * the tutorial.
+ */
+export function parseFirstGameParam(value: Param): TutorialGame | null {
+  const game = first(value);
+  if (game === '1') return 'portes';
+  return TUTORIAL_GAMES.find((g) => g === game && g !== 'portes') ?? null;
+}
+
+/** The `game` param of the tutorial (#149). Anything else is Portes. */
+export function parseTutorialGame(value: Param): TutorialGame {
+  const game = first(value);
+  return TUTORIAL_GAMES.find((g) => g === game) ?? 'portes';
 }
 
 const TUTORIAL_SOURCES: readonly TutorialSource[] = ['home', 'rules', 'settings'];
