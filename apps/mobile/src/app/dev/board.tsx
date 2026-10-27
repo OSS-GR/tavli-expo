@@ -1,6 +1,9 @@
 /**
  * Dev only: the board with a few fixed positions, so the owner can look at
  * the drawing on a phone. Not linked from the app. Release builds go home.
+ *
+ * Dice → "Throw on the board" turns on the dice throw spike (#183): swipe
+ * the board to throw two dice onto it (`features/dice-throw`).
  */
 import { getPreset, type PlayerId } from '@tavli/engine';
 import { Redirect, Stack } from 'expo-router';
@@ -18,11 +21,17 @@ import {
   type SamplePositionId,
 } from '@/features/board/positions';
 import { StaticBoard } from '@/features/board/StaticBoard';
+import { DiceThrowBoard } from '@/features/dice-throw/DiceThrowBoard';
+import { createLocalRng } from '@/services';
+
+type DiceMode = 'off' | 'throw';
 
 export default function DevBoardRoute() {
   const { t } = useTranslation();
   const [position, setPosition] = useState<SamplePositionId>('start');
   const [viewer, setViewer] = useState<PlayerId>('white');
+  const [dice, setDice] = useState<DiceMode>('off');
+  const [rng] = useState(createLocalRng);
 
   if (!__DEV__) return <Redirect href="/" />;
 
@@ -36,7 +45,11 @@ export default function DevBoardRoute() {
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: true, title: t('dev.board.title') }} />
-      <StaticBoard testID="dev-board" board={board} view={view} marks={marks} />
+      {dice === 'throw' ? (
+        <DiceThrowBoard testID="dev-throw" board={board} view={view} marks={marks} rng={rng} />
+      ) : (
+        <StaticBoard testID="dev-board" board={board} view={view} marks={marks} />
+      )}
       <View style={styles.controls}>
         <SegmentedControl
           testID="dev-board-position"
@@ -56,6 +69,16 @@ export default function DevBoardRoute() {
           options={[
             { value: 'white', label: t('dev.board.viewWhite') },
             { value: 'black', label: t('dev.board.viewBlack') },
+          ]}
+        />
+        <SegmentedControl
+          testID="dev-board-dice"
+          label={t('dev.board.dice')}
+          value={dice}
+          onChange={setDice}
+          options={[
+            { value: 'off', label: t('dev.board.diceOff') },
+            { value: 'throw', label: t('dev.board.diceThrow') },
           ]}
         />
       </View>
