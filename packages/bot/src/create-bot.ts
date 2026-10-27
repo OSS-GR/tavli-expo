@@ -32,8 +32,10 @@ import type {
 } from '@tavli/engine';
 import { VARIANT_REGISTRY, getVariant } from '@tavli/engine';
 
+import { questionOf, scoreAnswers } from './answer';
 import { BotError } from './errors';
 import { fevgaHeuristic } from './evaluators/fevga-heuristic';
+import { plakotoHeuristic } from './evaluators/plakoto-heuristic';
 import { portesHeuristic } from './evaluators/portes-heuristic';
 import { pickOne, randomUnit } from './random';
 import type {
@@ -54,6 +56,7 @@ export const EMPTY_EVALUATOR_REGISTRY: EvaluatorRegistry = new Map();
 /** The built-in evaluators: one heuristic per variant, for easy and medium. */
 export const DEFAULT_EVALUATORS: EvaluatorRegistry = new Map([
   ['portes', { easy: portesHeuristic, medium: portesHeuristic }],
+  ['plakoto', { easy: plakotoHeuristic, medium: plakotoHeuristic }],
   ['fevga', { easy: fevgaHeuristic, medium: fevgaHeuristic }],
 ]);
 
@@ -112,9 +115,9 @@ export function scoreTurns(
   return evaluator.scoreTurns?.(state, turns) ?? scoreWithEngine(variant, evaluator, state, turns);
 }
 
-/** The turns that win the game now with the most points, or `[]`. */
-function winningNow(turns: readonly Turn[], scores: readonly TurnScore[]): Turn[] {
-  let best: Turn[] = [];
+/** The turns (or answers) that win the game now with the most points, or `[]`. */
+function winningNow<T>(turns: readonly T[], scores: readonly TurnScore[]): T[] {
+  let best: T[] = [];
   let bestPoints = 0;
   scores.forEach((s, i) => {
     const turn = turns[i];
@@ -131,14 +134,15 @@ function winningNow(turns: readonly Turn[], scores: readonly TurnScore[]): Turn[
 
 /**
  * Picks a turn: one that wins now if any, else a softmax draw with
- * `temperature` (0 = the best turn, ties at random).
+ * `temperature` (0 = the best turn, ties at random). `chooseAnswer` uses
+ * it the same way for the choices of a question.
  */
-export function pickTurn(
-  turns: readonly Turn[],
+export function pickTurn<T = Turn>(
+  turns: readonly T[],
   scores: readonly TurnScore[],
   temperature: number,
   rng: Rng,
-): Turn {
+): T {
   const wins = winningNow(turns, scores);
   if (wins.length > 0) return pickOne(rng, wins);
   let max = -Infinity;
@@ -244,6 +248,22 @@ export function createBot(registry: BotRegistry = {}): ConfiguredBot {
       }
       const scores = scoreTurns(variant, evaluator, rolled, turns);
       return pickTurn(turns, scores, policies[level].temperature, opts.rng);
+    },
+    chooseAnswer(state: GameState, level: BotLevel, opts: BotOptions): string {
+      const variant = getVariant(variants, state.variant);
+      const prompt = questionOf(variant, state);
+      if (level === 'random') return pickOne(opts.rng, prompt.choices);
+      const evaluator = evaluators.get(state.variant)?.[level];
+      if (evaluator === undefined && level !== 'easy') {
+        throw new BotError(
+          'NOT_IMPLEMENTED',
+          `no ${level} bot for "${state.variant}" yet (no evaluator registered)`,
+        );
+      }
+      const scores = scoreAnswers(variant, evaluator, state, prompt);
+      // Easy with no evaluator: a random answer, but never miss a win.
+      const temperature = evaluator === undefined ? Infinity : policies[level].temperature;
+      return pickTurn(prompt.choices, scores, temperature, opts.rng);
     },
   };
 }

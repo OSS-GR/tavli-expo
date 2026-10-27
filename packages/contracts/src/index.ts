@@ -42,7 +42,7 @@ export {
   type RecordingCrashReporter,
 } from './crash-reporter';
 export { BOT_DIFFICULTIES, BotCancelledError, isBotCancelled, isDifficulty } from './bot-runner';
-export type { BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
+export type { BotAnswerRequest, BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
 export { createMemoryStorage, type Storage } from './storage';
 export { isAnonymousInstallId } from './install-id';
 export {
