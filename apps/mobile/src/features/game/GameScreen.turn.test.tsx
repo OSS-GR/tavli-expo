@@ -198,7 +198,10 @@ describe('<GameScreen /> no legal moves', () => {
     expect(store.getState().flow.game.state.toMove).toBe('black');
     expect(screen.getByText('No legal moves')).toBeOnTheScreen();
     expect(screen.getByText('Ann rolled 6-6. No checker can move.')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Dice 6-6-6-6, 0 left to play')).toBeOnTheScreen();
+    // The faded dice stay on the board, under the card (it says the roll).
+    expect(
+      screen.getByLabelText('Dice 6-6-6-6, 0 left to play', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
     // The board stays with Ann until the card closes.
     expect(within(screen.getByTestId('strip-bottom')).getByText('Ann')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Roll dice, or tap the board' })).toBeNull();

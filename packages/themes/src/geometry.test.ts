@@ -137,6 +137,22 @@ describe('mirrorLayout', () => {
     });
   });
 
+  it('keeps the art the right way round when it fits both ways', () => {
+    expect(mirrored.artMirrored).toBeUndefined();
+  });
+
+  // The classic board (#184) has its trays on one side, so its art is mirrored too.
+  it('mirrors the art of a layout that is not symmetric, and turns it back when mirrored twice', () => {
+    const landscape = getLayout(getTheme('walnut-kafeneio'), 'landscape');
+    expect(isMirrorSymmetric(landscape)).toBe(false);
+    expect(landscape.artMirrored).toBeUndefined();
+    const once = mirrorLayout(landscape);
+    expect(once.artMirrored).toBe(true);
+    expect(once.layers).toBe(landscape.layers);
+    expect(once.trays.player.rect).toEqual(mirrorRect(landscape.trays.player.rect));
+    expect(mirrorLayout(once).artMirrored).toBeUndefined();
+  });
+
   it('finds a layout whose art would not fit when mirrored', () => {
     expect(isMirrorSymmetric(portrait)).toBe(true);
     const lopsided: BoardLayout = {

@@ -33,7 +33,11 @@ import { MatchScreen } from '@/features/match/MatchScreen';
 import { createSessionRegistry } from '@/features/match/sessions';
 import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
-import { DEFAULT_SETTINGS } from '@/features/settings/settings';
+import {
+  BOARD_LAYOUT_MODES,
+  DEFAULT_SETTINGS,
+  type BoardLayoutMode,
+} from '@/features/settings/settings';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { settingsStore } from '@/features/settings/store';
 import { TutorialScreen } from '@/features/tutorial/TutorialScreen';
@@ -135,6 +139,13 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(problems()).toEqual([]);
   });
 
+  /** The game screen in the tall or the classic layout (#184). */
+  async function pickLayout(boardLayout: BoardLayoutMode) {
+    await act(async () => {
+      settingsStore.getState().setSetting('boardLayout', boardLayout);
+    });
+  }
+
   async function showGame(store: GameStore) {
     await renderWithRoot(<GameScreen store={store} onOpenMenu={jest.fn()} onHome={jest.fn()} />);
     await act(async () => {
@@ -144,51 +155,55 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     });
   }
 
-  it('the game screen: opening, a turn with the move list, the game-end sheet', async () => {
-    const store = createGameStore({
-      players: { white: 'Maria Papadopoulou', black: 'Bob' },
-      rng: createSeededRng(1),
-    });
-    await showGame(store);
-    // The opening card, with its Roll button (#176).
-    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
-    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
-    expect(problems()).toEqual([]);
+  it.each(BOARD_LAYOUT_MODES)(
+    'the game screen (%s layout): opening, a turn with the move list, the game-end sheet',
+    async (layout) => {
+      await pickLayout(layout);
+      const store = createGameStore({
+        players: { white: 'Maria Papadopoulou', black: 'Bob' },
+        rng: createSeededRng(1),
+      });
+      await showGame(store);
+      // The opening card, with its Roll button (#176).
+      expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+      expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
 
-    // One die rolled ("Maria Papadopoulou rolled 5."), then a tie that stays (#176).
-    await act(async () => {
-      store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
-    });
-    expect(screen.getByTestId('opening-message')).toHaveTextContent(/5/);
-    expect(problems()).toEqual([]);
-    await act(async () => {
-      store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 5 });
-    });
-    expect(store.getState().flow.game.opening?.ties).toEqual([5]);
-    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
-    expect(problems()).toEqual([]);
+      // One die rolled ("Maria Papadopoulou rolled 5."), then a tie that stays (#176).
+      await act(async () => {
+        store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+      });
+      expect(screen.getByTestId('opening-message')).toHaveTextContent(/5/);
+      expect(problems()).toEqual([]);
+      await act(async () => {
+        store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 5 });
+      });
+      expect(store.getState().flow.game.opening?.ties).toEqual([5]);
+      expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
 
-    // The opening result, then a turn: strips, move list, Undo · dice · Confirm.
-    await act(async () => {
-      store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
-      store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
-    });
-    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
-    expect(screen.getByTestId('opening-ok-button')).toBeOnTheScreen();
-    expect(problems()).toEqual([]);
-    await act(async () => {
-      jest.advanceTimersByTime(OPENING_RESULT_MS);
-    });
-    expect(screen.getByTestId('move-list')).toBeOnTheScreen();
-    expect(problems()).toEqual([]);
+      // The opening result, then a turn: strips, move list, Undo · dice · Confirm.
+      await act(async () => {
+        store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+        store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+      });
+      expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+      expect(screen.getByTestId('opening-ok-button')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
+      await act(async () => {
+        jest.advanceTimersByTime(OPENING_RESULT_MS);
+      });
+      expect(screen.getByTestId('move-list')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
 
-    // The game-end sheet.
-    await act(async () => {
-      store.getState().dispatch({ type: 'resign', player: 'black' });
-    });
-    expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
-    expect(problems()).toEqual([]);
-  });
+      // The game-end sheet.
+      await act(async () => {
+        store.getState().dispatch({ type: 'resign', player: 'black' });
+      });
+      expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
+    },
+  );
 
   /** A store whose game starts from `board`, White to roll. */
   function storeAt(board: BoardState, game: 'portes' | 'plakoto'): GameStore {
@@ -210,43 +225,48 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     return store;
   }
 
-  it('the game screen cards: no legal moves, the mother question (#153)', async () => {
-    // Maria is on the bar and Bob holds all six entry points.
-    const closed = createBoard(
-      {
-        white: { points: { 6: 14 }, bar: 1 },
-        black: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
-      },
-      'contrary',
-    );
-    const passing = storeAt(closed, 'portes');
-    passing.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
-    await showGame(passing);
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
-    expect(problems()).toEqual([]);
-
-    // Maria pins Bob's mother (his last checker, on his own 24).
-    const pinning = storeAt(
-      createBoard(
+  it.each(BOARD_LAYOUT_MODES)(
+    'the game screen cards (%s layout): no legal moves, the mother question (#153)',
+    async (layout) => {
+      await pickLayout(layout);
+      // Maria is on the bar and Bob holds all six entry points.
+      const closed = createBoard(
         {
-          white: { points: { 24: 10, 14: 2, 8: 2, 2: 1 } },
-          black: { points: { 24: 1, 20: 4, 16: 5, 12: 5 } },
+          white: { points: { 6: 14 }, bar: 1 },
+          black: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
         },
         'contrary',
-      ),
-      'plakoto',
-    );
-    const { dispatch } = pinning.getState();
-    dispatch({ type: 'roll', player: 'white', dice: [1, 6] });
-    dispatch({ type: 'move', player: 'white', move: { from: 2, to: 1, die: 1 } });
-    dispatch({ type: 'move', player: 'white', move: { from: 24, to: 18, die: 6 } });
-    dispatch({ type: 'confirm', player: 'white' });
-    await showGame(pinning);
-    expect(screen.getByTestId('mother-card')).toBeOnTheScreen();
-    expect(problems()).toEqual([]);
-  });
+      );
+      const passing = storeAt(closed, 'portes');
+      passing.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+      await showGame(passing);
+      expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
 
-  it('the game menu and the resign dialog', async () => {
+      // Maria pins Bob's mother (his last checker, on his own 24).
+      const pinning = storeAt(
+        createBoard(
+          {
+            white: { points: { 24: 10, 14: 2, 8: 2, 2: 1 } },
+            black: { points: { 24: 1, 20: 4, 16: 5, 12: 5 } },
+          },
+          'contrary',
+        ),
+        'plakoto',
+      );
+      const { dispatch } = pinning.getState();
+      dispatch({ type: 'roll', player: 'white', dice: [1, 6] });
+      dispatch({ type: 'move', player: 'white', move: { from: 2, to: 1, die: 1 } });
+      dispatch({ type: 'move', player: 'white', move: { from: 24, to: 18, die: 6 } });
+      dispatch({ type: 'confirm', player: 'white' });
+      await showGame(pinning);
+      expect(screen.getByTestId('mother-card')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
+    },
+  );
+
+  it.each(BOARD_LAYOUT_MODES)('the game menu and the resign dialog (%s layout)', async (layout) => {
+    await pickLayout(layout);
     const user = setupUser();
     const session = createSessionRegistry({ createRng: () => createSeededRng(1) }).start(
       defaultSetup('local'),

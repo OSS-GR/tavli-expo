@@ -15,7 +15,16 @@ import {
 
 import i18n from '@/i18n';
 
-import { moveChoices, moveLabel, moveShortLabel } from './moveList';
+import { flowPaths } from '@/features/board/combined';
+
+import {
+  choiceLabel,
+  choiceShortLabel,
+  listChoices,
+  moveChoices,
+  moveLabel,
+  moveShortLabel,
+} from './moveList';
 import { moveListShown } from './screenReader';
 
 const t = i18n.t;
@@ -119,6 +128,56 @@ describe('moveChoices', () => {
 
   it('is empty when nothing can move', () => {
     expect(moveChoices([])).toEqual([]);
+  });
+});
+
+// #180: one checker with several dice gets its own button.
+describe('listChoices', () => {
+  it('adds the combined moves of the Portes start, in board order', () => {
+    const start = portes.initialState({ startingPlayer: 'white', rules: getPreset('portes') });
+    const flow = flowWith(start.board, [5, 3]);
+    const choices = listChoices(legalNextMoves(flow), flowPaths(flow));
+    // 13/10/5 and 13/8/5 hit nothing, so the 3 goes first. 24/19 and 6/1
+    // land on Black's points, so 24/19/16 and 6/1 are not there.
+    expect(choices.map((c) => choiceShortLabel(t, c.moves))).toEqual([
+      '24 → 21',
+      '24 → 21 → 16',
+      '13 → 10',
+      '13 → 8',
+      '13 → 10 → 5',
+      '8 → 5',
+      '8 → 3',
+      '6 → 3',
+    ]);
+    expect(choices.map((c) => c.key)).toContain('13>5:3+5');
+    // Without paths: the single moves, as before.
+    expect(listChoices(legalNextMoves(flow)).map((c) => c.moves)).toEqual(
+      moveChoices(legalNextMoves(flow)).map((move) => [move]),
+    );
+  });
+
+  it('reads each step, with the hit where it happens', () => {
+    const steps = [m(13, 8, 5, 'hit'), m(8, 5, 3)];
+    expect(choiceLabel(t, steps)).toBe('Checker from point 13 to point 8, hits, then to point 5');
+    expect(choiceShortLabel(t, steps)).toBe('13 → 8 → 5 · hit');
+    expect(choiceLabel(t, [m(13, 10, 3), m(10, 5, 5, 'pin')])).toBe(
+      'Checker from point 13 to point 10, then to point 5, pins',
+    );
+    expect(choiceLabel(t, [m(5, 3, 2), m(3, 'off', 3)])).toBe(
+      'Checker from point 5 to point 3, then bear off',
+    );
+    expect(choiceShortLabel(t, [m(5, 3, 2), m(3, 'off', 3)])).toBe('5 → 3 → Off');
+    expect(choiceShortLabel(t, [m('bar', 22, 3), m(22, 17, 5)])).toBe('Bar → 22 → 17');
+    // One move reads as before.
+    expect(choiceLabel(t, [m(13, 8, 5)])).toBe(moveLabel(t, m(13, 8, 5)));
+  });
+
+  it('speaks Greek', async () => {
+    await i18n.changeLanguage('el');
+    expect(choiceLabel(t, [m(13, 10, 3), m(10, 5, 5)])).toBe(
+      'Πούλι από το σημείο 13 στο σημείο 10, μετά στο σημείο 5',
+    );
+    expect(choiceShortLabel(t, [m(5, 3, 2), m(3, 'off', 3)])).toBe('5 → 3 → Μάζεμα');
   });
 });
 

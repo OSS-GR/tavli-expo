@@ -1,6 +1,13 @@
 # Game screen layout: proposals
 
-> Issues #184 (portrait) and #185 (landscape), step 1. These are pictures for the owner to pick from. The app does not change yet. Last review: 2026-10-27.
+> Issues #184 (portrait) and #185 (landscape), step 1. These are pictures for the owner to pick from. Last review: 2026-10-27.
+
+## Decision (owner, 2026-10-27)
+
+- **Portrait: both layouts ship (#184).** **B, the tall board, is the default.** **A, the classic board, is a setting** (Settings → Board → Board layout: **Tall** / **Classic**), and it is **centred on the screen**, not pushed to the bottom.
+- Both layouts: one-line strips (36 pt), the dice on the board (in the theme's dice area, at least 32 pt so they are easy to read), one row of two big buttons (Undo · Confirm, or one Roll) at the bottom. Every text stays upright.
+- Tall: the menu sits in the top strip and the game label moves into the menu. Classic: the menu and the game label sit at the top; the strips hug the board.
+- How it is built: [Board screen → Board layouts](../architecture/board-screen.md#board-layouts-184). Landscape (#185) is still open.
 
 ## How to read the pictures
 
@@ -98,12 +105,12 @@ Points to solve when we build it:
 
 ## Open questions for the owner
 
-1. **Portrait:** A, B, or keep today's layout?
+1. **Portrait:** A, B, or keep today's layout? **Answered: B by default, A as a setting, centred (#184).**
 2. **Which screens turn in landscape?** (a) only the game board and the tutorial board, or (b) every screen. Suggestion: (a). Home, New game, Settings and Rules stay in portrait, so we test fewer layouts.
 3. **Landscape sides:** players on the left and the dice on the right, as drawn? Do left-handed players need a "swap sides" setting?
-4. **Dice:** on the board (A, B) or in the button row (today)? On the board they are smaller unless we raise the theme's dice size.
-5. **Proposal A only:** what goes into the free space: the match score, the last moves, the move list, or nothing?
-6. **Strips:** one line is enough (name, pips, checkers off, score, turn)? The match score and "checkers off" can also move to the menu.
+4. **Dice:** on the board (A, B) or in the button row (today)? On the board they are smaller unless we raise the theme's dice size. **Answered: on the board (#184); the app draws them at least 32 pt.**
+5. **Proposal A only:** what goes into the free space: the match score, the last moves, the move list, or nothing? **For now nothing (#184): the board is centred, so the free space is split above and below it.**
+6. **Strips:** one line is enough (name, pips, checkers off, score, turn)? The match score and "checkers off" can also move to the menu. **#184: one line with the name, pips, score and turn (no "checkers off": the trays show them). A long name, Greek or a large font wraps it to two lines.**
 7. **Rotation lock:** the phone's own rotation lock is always respected. Do we also want an in-app "keep portrait" setting?
 
 ## How the pictures were made
