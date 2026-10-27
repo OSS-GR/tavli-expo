@@ -34,7 +34,7 @@
 | First launch: usage data | `app/welcome/privacy.tsx` | Stack |
 | Home | `app/index.tsx` | Root of the stack |
 | New game | `app/new-game.tsx` | Push, with param `mode=bot` or `mode=local` |
-| Board | `app/game/[id]/index.tsx` | Push (this is `app/game/[id].tsx` until the folder has child routes) |
+| Board | `app/game/[id]/index.tsx` | Push |
 | In-game menu | `app/game/[id]/menu.tsx` | Modal, `presentation: "formSheet"` |
 | Game end | — | Overlay state inside the board screen, so the final position stays visible |
 | Match end | `app/game/[id]/match-end.tsx` | `router.replace`, so "back" does not return to a finished board |

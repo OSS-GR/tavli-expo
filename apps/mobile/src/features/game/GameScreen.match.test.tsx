@@ -1,6 +1,6 @@
 import { createSeededRng } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { fitBoardWithShadow } from '@/features/board/geometry';
 import { buildSources } from '@/features/board/interaction';
@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
 import { createGameStore, turnView } from './gameStore';
-import { GameScreen } from './GameScreen';
+import { GameScreen, MATCH_END_DELAY_MS } from './GameScreen';
 import { openingStatus } from './opening';
 import { passNotice } from './turnNotices';
 
@@ -31,7 +31,8 @@ beforeEach(async () => {
 
 /**
  * A whole match through the screen, as two players would play it: roll,
- * tap a checker, tap a target, confirm, close the cards, next game.
+ * tap a checker, tap a target, confirm, close the cards, next game, and
+ * at the end the screen asks for the match-end screen.
  * By default a match to 1 (about 15 s). `FULL_MATCH=1` plays to 3 (about 70 s).
  */
 const TARGET = process.env['FULL_MATCH'] === '1' ? 3 : 1;
@@ -42,7 +43,8 @@ it(`plays a pass-and-play match to ${TARGET} with taps only`, async () => {
     targetPoints: TARGET,
     rng: createSeededRng(2026),
   });
-  await renderWithRoot(<GameScreen store={store} />);
+  const onMatchOver = jest.fn();
+  await renderWithRoot(<GameScreen store={store} onMatchOver={onMatchOver} />);
   await act(async () => {
     fireEvent(screen.getByTestId('game-board'), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
@@ -83,6 +85,10 @@ it(`plays a pass-and-play match to ${TARGET} with taps only`, async () => {
   const { match } = store.getState().flow;
   expect(match.status).toBe('finished');
   expect(Math.max(match.score.white, match.score.black)).toBeGreaterThanOrEqual(TARGET);
-  expect(screen.getByTestId('match-end-card')).toBeOnTheScreen();
+  // No game-end sheet for the last game: the match-end screen opens.
+  expect(screen.queryByTestId('game-end-card')).toBeNull();
+  await waitFor(() => expect(onMatchOver).toHaveBeenCalledTimes(1), {
+    timeout: MATCH_END_DELAY_MS + 2000,
+  });
   expect(steps).toBeLessThan(3000);
 }, 120_000);

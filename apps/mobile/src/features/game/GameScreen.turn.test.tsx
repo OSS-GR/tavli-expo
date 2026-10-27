@@ -7,14 +7,16 @@ import {
   type PlayerId,
 } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
-import { act, fireEvent, screen, userEvent, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, userEvent, waitFor, within } from '@testing-library/react-native';
+import type { ComponentProps } from 'react';
+import { AccessibilityInfo } from 'react-native';
 
 import { fitBoardWithShadow, slotRect, stackPosition } from '@/features/board/geometry';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
 import { createGameStore, type GameStore } from './gameStore';
-import { GameScreen, PASS_NOTICE_MS } from './GameScreen';
+import { GameScreen, MATCH_END_DELAY_MS, PASS_NOTICE_MS } from './GameScreen';
 
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
@@ -46,8 +48,8 @@ function setPosition(store: GameStore, board: BoardState, player: PlayerId = 'wh
   store.setState({ flow: { ...flow, game: createGameFlow({ state, starter: player }) } });
 }
 
-async function show(store: GameStore) {
-  await renderWithRoot(<GameScreen store={store} />);
+async function show(store: GameStore, props: Partial<ComponentProps<typeof GameScreen>> = {}) {
+  await renderWithRoot(<GameScreen store={store} {...props} />);
   await act(async () => {
     fireEvent(screen.getByTestId('game-board'), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
@@ -251,11 +253,20 @@ describe('<GameScreen /> game and match end', () => {
     { white: { points: { 1: 1 }, off: 14 }, black: { points: { 6: 15 } } },
     'contrary',
   );
+  // The same, but Bob has borne off one checker: mono.
+  const lastCheckerMono = createBoard(
+    { white: { points: { 1: 1 }, off: 14 }, black: { points: { 6: 14 }, off: 1 } },
+    'contrary',
+  );
 
-  async function winGame(store: GameStore) {
+  async function winGame(
+    store: GameStore,
+    board = lastChecker,
+    props: Partial<ComponentProps<typeof GameScreen>> = {},
+  ) {
     const user = userEvent.setup();
-    setPosition(store, lastChecker);
-    await show(store);
+    setPosition(store, board);
+    await show(store, props);
     await act(async () => {
       store.getState().dispatch({ type: 'roll', player: 'white', dice: [3, 2] });
     });
@@ -266,58 +277,64 @@ describe('<GameScreen /> game and match end', () => {
     return user;
   }
 
-  it('shows the winner, diplo and the score, then starts the next game', async () => {
+  it('shows the winner, diplo, why, and the score, then starts the next game', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const store = newStore(3);
-    const user = await winGame(store);
-    expect(screen.getByText('Ann wins the game!')).toBeOnTheScreen();
-    expect(screen.getByText('Diplo · +2 points')).toBeOnTheScreen();
-    expect(screen.getByText('Ann 2 – 0 Bob')).toBeOnTheScreen();
+    const onHome = jest.fn();
+    const user = await winGame(store, lastChecker, { onHome });
+    const sheet = within(screen.getByTestId('game-end-card'));
+    expect(sheet.getByRole('header', { name: 'Ann wins the game!' })).toBeOnTheScreen();
+    expect(sheet.getByText('Diplo · +2 points')).toBeOnTheScreen();
+    expect(sheet.getByText('Bob did not bear off any checker.')).toBeOnTheScreen();
+    expect(sheet.getByText('Match')).toBeOnTheScreen();
+    expect(sheet.getByText('Ann 2 – 0 Bob')).toBeOnTheScreen();
+    expect(sheet.getByText('First to 3 points')).toBeOnTheScreen();
+    // Pass-and-play: the winner is a human, so the celebration plays.
+    // Screen readers skip it (hidden from accessibility).
+    expect(screen.queryByTestId('game-celebration')).toBeNull();
+    expect(
+      screen.getByTestId('game-celebration', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    // Screen readers hear the result.
+    expect(announce).toHaveBeenCalledWith(
+      'Ann wins the game! Diplo · +2 points Bob did not bear off any checker. Ann 2 – 0 Bob',
+    );
+    // No moves on the final board while the sheet shows.
+    expect(screen.queryByTestId('roll-button')).toBeNull();
+
+    await user.press(button('Home'));
+    expect(onHome).toHaveBeenCalled();
     await user.press(button('Next game, Ann starts'));
     const { game } = store.getState().flow;
     expect(game.phase).toBe('awaiting-roll');
     expect(game.state.toMove).toBe('white');
     expect(store.getState().flow.match.games).toHaveLength(1);
+    expect(screen.queryByTestId('game-end-card')).toBeNull();
+    announce.mockRestore();
   });
 
-  it('ends the match at the target and offers a rematch', async () => {
-    const store = newStore(2);
-    const user = await winGame(store);
-    expect(screen.getByText('Ann wins the match!')).toBeOnTheScreen();
-    await user.press(button('Rematch, Ann starts'));
-    const { flow } = store.getState();
-    expect(flow.match.score).toEqual({ white: 0, black: 0 });
-    expect(flow.game.phase).toBe('awaiting-roll');
-    expect(flow.game.state.toMove).toBe('white');
+  it('shows mono with no reason line when the loser has borne off', async () => {
+    const store = newStore(3);
+    await winGame(store, lastCheckerMono);
+    const sheet = within(screen.getByTestId('game-end-card'));
+    expect(sheet.getByText('Mono · +1 point')).toBeOnTheScreen();
+    expect(sheet.queryByText(/did not bear off/)).toBeNull();
+    expect(sheet.getByText('Ann 1 – 0 Bob')).toBeOnTheScreen();
+    // No Home button without `onHome`.
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull();
   });
 
-  it('shows the cards again after a rematch', async () => {
-    const user = userEvent.setup();
+  it('skips the game-end sheet at the target and asks for the match-end screen', async () => {
     const store = newStore(2);
-    // A pass in the first match, closed with OK.
-    setPosition(store, closedBoard);
-    await show(store);
-    await act(async () => {
-      store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+    const onMatchOver = jest.fn();
+    await winGame(store, lastChecker, { onMatchOver });
+    expect(store.getState().flow.match.status).toBe('finished');
+    expect(screen.queryByTestId('game-end-card')).toBeNull();
+    // The final position stays a moment, so the last checker lands first.
+    expect(onMatchOver).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('roll-button')).toBeNull();
+    await waitFor(() => expect(onMatchOver).toHaveBeenCalledTimes(1), {
+      timeout: MATCH_END_DELAY_MS + 2000,
     });
-    await user.press(button('OK'));
-    // Ann wins the match, then a rematch.
-    await act(async () => {
-      setPosition(store, lastChecker);
-    });
-    await act(async () => {
-      store.getState().dispatch({ type: 'roll', player: 'white', dice: [3, 2] });
-    });
-    await touch(PAN, [top(1, 1)]);
-    await touch(PAN, [center({ kind: 'tray', side: 'player' })]);
-    await user.press(button('Confirm'));
-    await user.press(button('Rematch, Ann starts'));
-    // The same pass in the new match (same game and turn number) shows its card.
-    await act(async () => {
-      setPosition(store, closedBoard);
-    });
-    await act(async () => {
-      store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
-    });
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
   });
 });

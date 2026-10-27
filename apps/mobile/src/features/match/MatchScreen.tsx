@@ -1,6 +1,7 @@
 /**
  * A local match on the board screen: the board (GameScreen), the bot vs
- * bot mode, the in-game menu and the resign dialogs.
+ * the human, the in-game menu and the resign dialogs. When the match is
+ * over it calls `onMatchOver` (the match-end screen, wireframe 9).
  *
  * Navigation stays in the route (`app/game/[id].tsx`); this screen only
  * calls the `on…` props.
@@ -30,7 +31,8 @@ export interface MatchScreenProps {
   onExit: () => void;
   onSettings: () => void;
   onRules: () => void;
-  onChangeSettings: () => void;
+  /** The match is over: open the match-end screen. */
+  onMatchOver: () => void;
   /** For tests: another runner or faster bot timing. */
   runner?: BotRunner;
   botTiming?: Partial<BotTiming>;
@@ -44,7 +46,7 @@ export function MatchScreen({
   onExit,
   onSettings,
   onRules,
-  onChangeSettings,
+  onMatchOver,
   runner = botRunner,
   botTiming,
 }: MatchScreenProps) {
@@ -182,7 +184,7 @@ export function MatchScreen({
         paused={paused || overlay !== 'none'}
         onOpenMenu={() => setOverlay('menu')}
         onHome={onExit}
-        onChangeSettings={onChangeSettings}
+        onMatchOver={onMatchOver}
       />
       <Sheet
         visible={content !== null}

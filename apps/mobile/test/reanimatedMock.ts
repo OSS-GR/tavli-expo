@@ -6,7 +6,8 @@
  * has landed, a checker has arrived). Add what you use from Reanimated here.
  */
 
-import { useState } from 'react';
+import { createElement, useState, type ComponentProps } from 'react';
+import { View } from 'react-native';
 
 type Callback = (finished: boolean) => void;
 
@@ -70,3 +71,16 @@ export const Easing = {
 export function useReducedMotion(): boolean {
   return false;
 }
+
+/** The style function runs once, on the final values. */
+export function useAnimatedStyle<T>(updater: () => T): T {
+  return updater();
+}
+
+/** `Animated.View` is a plain view. */
+function AnimatedView(props: ComponentProps<typeof View>) {
+  return createElement(View, props);
+}
+
+const Animated = { View: AnimatedView };
+export default Animated;

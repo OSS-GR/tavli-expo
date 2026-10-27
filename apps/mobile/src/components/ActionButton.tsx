@@ -1,7 +1,8 @@
 import { Pressable, Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
-export type ActionButtonKind = 'primary' | 'secondary';
+/** `primary`: filled. `secondary`: outlined. `text`: no frame, for a quiet last choice ("Home"). */
+export type ActionButtonKind = 'primary' | 'secondary' | 'text';
 
 export interface ActionButtonProps {
   label: string;
@@ -17,8 +18,8 @@ export interface ActionButtonProps {
 
 /**
  * A big game button (wireframe rules: main = filled brass, second =
- * outlined, disabled = dashed). At least 52 pt tall, and text may wrap
- * for longer Greek labels.
+ * outlined, quiet = text only, disabled = dashed). At least 52 pt tall,
+ * and text may wrap for longer Greek labels.
  */
 export function ActionButton({
   label,
@@ -69,12 +70,16 @@ const styles = StyleSheet.create((theme) => ({
       ? theme.colors.border
       : kind === 'primary'
         ? theme.colors.accent
-        : theme.colors.border,
+        : kind === 'text'
+          ? 'transparent'
+          : theme.colors.border,
     backgroundColor: disabled
       ? 'transparent'
       : kind === 'primary'
         ? theme.colors.accent
-        : theme.colors.surface,
+        : kind === 'text'
+          ? 'transparent'
+          : theme.colors.surface,
   }),
   grow: {
     flex: 1,

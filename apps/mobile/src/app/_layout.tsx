@@ -32,7 +32,7 @@ function RootStack() {
         <Stack.Screen name="welcome/language" options={{ gestureEnabled: false }} />
         <Stack.Screen name="rules/[variant]" options={{ headerShown: true }} />
         {/* No swipe back on the board: it would fight the checker drag. */}
-        <Stack.Screen name="game/[id]" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="game/[id]/index" options={{ gestureEnabled: false }} />
       </Stack>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
     </GestureHandlerRootView>

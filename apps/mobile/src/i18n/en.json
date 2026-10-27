@@ -170,7 +170,10 @@
       "resigned": "{{name}} resigned.",
       "resigned_you": "You resigned.",
       "home": "Home",
-      "changeSettings": "Change settings"
+      "changeSettings": "Change settings",
+      "matchLabel": "Match",
+      "noBearOff": "{{name}} did not bear off any checker.",
+      "noBearOff_you": "You did not bear off any checker."
     },
     "you": "You",
     "bot": {
@@ -235,6 +238,21 @@
       "allow": "Allow usage data",
       "deny": "Don't allow"
     }
+  },
+  "matchEnd": {
+    "finalScore": "Final score: {{score}}",
+    "game": "Game {{number}}",
+    "won": "{{name}} won",
+    "won_you": "You won",
+    "draw": "Draw",
+    "mono": "Mono",
+    "diplo": "Diplo",
+    "points": "+{{count}}",
+    "pointsLabel_one": "{{count}} point",
+    "pointsLabel_other": "{{count}} points",
+    "rematchHint": "Same settings · {{name}} starts",
+    "rematchHint_you": "Same settings · you start",
+    "rematchHintOpening": "Same settings"
   },
   "games": {
     "portes": "Portes",
