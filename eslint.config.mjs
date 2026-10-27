@@ -8,7 +8,8 @@ import prettierConfig from 'eslint-config-prettier/flat';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const PACKAGE_FILES = ['packages/**/*.{js,ts,tsx,cjs,mjs}'];
+// Packages and the Convex server: plain TypeScript.
+const PACKAGE_FILES = ['packages/**/*.{js,ts,tsx,cjs,mjs}', 'apps/server/**/*.{js,ts,cjs,mjs}'];
 
 // Pure packages: no React, React Native, Expo or vendor code.
 const PURE_PACKAGES = ['packages/engine/**', 'packages/bot/**', 'packages/contracts/**'];
@@ -70,6 +71,8 @@ export default defineConfig([
     'apps/mobile/ios/',
     'apps/mobile/android/',
     'apps/mobile/expo-env.d.ts',
+    // Written by `convex codegen` (see docs/architecture/online-game-service.md).
+    'apps/server/convex/_generated/',
     '.claude/',
   ]),
 
@@ -83,7 +86,7 @@ export default defineConfig([
     },
   },
 
-  // Packages: plain TypeScript rules.
+  // Packages and apps/server: plain TypeScript rules.
   {
     files: PACKAGE_FILES,
     extends: [js.configs.recommended, tseslint.configs.recommended],
@@ -116,6 +119,24 @@ export default defineConfig([
     files: VENDOR_ALLOWED,
     rules: {
       'no-restricted-imports': 'off',
+    },
+  },
+
+  // Convex server: vendor SDKs yes, React no. Dice come from the secure
+  // RNG (`createCryptoRng`), never from Math.random.
+  {
+    files: ['apps/server/**'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [reactImports] }],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message:
+            'Server dice come from createCryptoRng (apps/server/convex/model/crypto-rng.ts).',
+        },
+      ],
     },
   },
 

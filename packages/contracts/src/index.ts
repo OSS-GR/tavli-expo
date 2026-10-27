@@ -43,6 +43,22 @@ export {
 } from './crash-reporter';
 export { BOT_DIFFICULTIES, BotCancelledError, isBotCancelled, isDifficulty } from './bot-runner';
 export type { BotAnswerRequest, BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
+export {
+  GAME_TRANSPORT_ERROR_CODES,
+  ONLINE_GAME_CHOICES,
+  isGameTransportErrorData,
+  isOnlineGameChoice,
+} from './game-transport';
+export type {
+  GameTransport,
+  GameTransportErrorCode,
+  GameTransportErrorData,
+  OnlineGameChoice,
+  OnlineGameStatus,
+  OnlineGameView,
+  SendAnswerRequest,
+  SendTurnRequest,
+} from './game-transport';
 export { createMemoryStorage, type Storage } from './storage';
 export { isAnonymousInstallId } from './install-id';
 export {

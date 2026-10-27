@@ -1,0 +1,21 @@
+{
+  "name": "@tavli/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Convex functions for online games (ADR-0004). Tested offline with convex-test.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "codegen": "convex codegen --system-udfs --typecheck disable"
+  },
+  "dependencies": {
+    "@tavli/contracts": "workspace:*",
+    "@tavli/engine": "workspace:*",
+    "convex": "1.46.0"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "5.0.0",
+    "convex-test": "0.0.61"
+  }
+}

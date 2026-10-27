@@ -41,6 +41,7 @@ You need **Node 22** (see `.nvmrc`) and **pnpm**. The repo pins pnpm 12 in `pack
 
 ```
 apps/mobile/         Expo app (Expo Router)
+apps/server/         Convex functions for online games (tested offline with convex-test)
 packages/engine/     Pure TypeScript game rules
 packages/bot/        Bot players (uses the engine)
 packages/contracts/  Interfaces (ports) and shared types

@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The Convex runtime has Web APIs such as `crypto`.
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["convex", "vitest.config.ts"]
+}
