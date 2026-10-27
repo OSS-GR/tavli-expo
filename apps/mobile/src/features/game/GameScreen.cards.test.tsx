@@ -3,7 +3,9 @@
  * screen readers skip the board under it; while the game-end sheet shows,
  * they skip the whole screen under it. Focus moves to the card's title.
  * Each card comes and goes with direct store actions and presses (no full
- * games), so these tests stay fast.
+ * games), so these tests stay fast. They run on fake timers: on a real
+ * clock a busy machine can close a card (the opening result after 1.5 s,
+ * a pass after 3 s) before the test looks at it (#152).
  */
 import {
   asodio,
@@ -93,6 +95,7 @@ function expectBoardShown() {
 let focus: jest.SpyInstance;
 
 beforeEach(async () => {
+  jest.useFakeTimers();
   focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent').mockImplementation(() => {});
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS, moveList: 'on' });
@@ -101,37 +104,33 @@ beforeEach(async () => {
 
 afterEach(() => {
   focus.mockRestore();
+  jest.useRealTimers();
 });
 
 describe('<GameScreen /> cards hide the board from screen readers (#153)', () => {
   it('the opening card', async () => {
-    jest.useFakeTimers();
-    try {
-      const store = newStore();
-      await show(store);
-      expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
-      expectBoardHidden();
-      // Focus goes to the card; the Roll button below the board stays reachable.
-      expect(focus).toHaveBeenCalledTimes(1);
-      expect(focus).toHaveBeenCalledWith(expect.anything(), 'focus');
-      expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    const store = newStore();
+    await show(store);
+    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    expectBoardHidden();
+    // Focus goes to the card; the Roll button below the board stays reachable.
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledWith(expect.anything(), 'focus');
+    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
 
-      await act(async () => {
-        store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
-        store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
-      });
-      // The result shows a moment; the card does not take focus again.
-      expectBoardHidden();
-      expect(focus).toHaveBeenCalledTimes(1);
-      await act(async () => {
-        jest.advanceTimersByTime(OPENING_RESULT_MS + 10);
-      });
-      expect(screen.queryByTestId('opening-card')).toBeNull();
-      expectBoardShown();
-      expect(screen.getByTestId('move-list')).toBeOnTheScreen();
-    } finally {
-      jest.useRealTimers();
-    }
+    await act(async () => {
+      store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+      store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+    });
+    // The result shows a moment; the card does not take focus again.
+    expectBoardHidden();
+    expect(focus).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.advanceTimersByTime(OPENING_RESULT_MS + 10);
+    });
+    expect(screen.queryByTestId('opening-card')).toBeNull();
+    expectBoardShown();
+    expect(screen.getByTestId('move-list')).toBeOnTheScreen();
   });
 
   it('the pass card (no legal moves)', async () => {
