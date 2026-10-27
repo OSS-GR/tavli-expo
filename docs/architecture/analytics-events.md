@@ -53,7 +53,8 @@ Every property value is a number, or a short id from a fixed set (the lists belo
 | `tutorial_finished` | The last lesson is learnt and the end card shows. | `game` | same |
 | `tutorial_skipped` | **Skip** is tapped. | `game`; `step`: the lesson on screen, from 1; `lesson`: its id | same |
 | `hint_shown` | The Hint button (#209) showed the best turn in an offline game (vs bot or pass-and-play). Once per tap that shows a hint; a tap that hides it sends nothing. | `game`; `variant`. Never the position, the dice or the moves. | `features/hint/hintAnalytics.ts` (from `features/match/MatchScreen.tsx`) |
-| `$screen` | A route change. | screen name = route pattern: `/`, `/new-game`, `/game/[id]`, `/game/[id]/match-end`, `/history`, `/settings`, `/tutorial`, `/rules/[variant]`, `/welcome/language`, `/welcome/privacy` | `features/analytics/useAppAnalytics.ts` |
+| `review_opened` | The game review (#215) opens: **Review** on the game-end sheet or the match-end screen of an offline game (vs bot or pass-and-play). Once per open. | `game`: the game picked for the match (as in `game_started`). Never the position, the dice, the moves or the mistakes. | `app/game/[id]/review.tsx` through `features/review/reviewAnalytics.ts` |
+| `$screen` | A route change. | screen name = route pattern: `/`, `/new-game`, `/game/[id]`, `/game/[id]/match-end`, `/game/[id]/review`, `/history`, `/settings`, `/tutorial`, `/rules/[variant]`, `/welcome/language`, `/welcome/privacy` | `features/analytics/useAppAnalytics.ts` |
 
 Notes:
 
@@ -68,6 +69,7 @@ Notes:
 - `game_abandoned`: leaving the board (Home, the app in the background) is not abandoning, because the match is saved and can be continued (#36). Only a new match that replaces an unfinished one counts.
 - `theme_changed` with `kind: app` cannot fire yet: the app has one set of colors. It is ready for more. Before #163 the board theme sent only `settings_changed` with `key: boardTheme`, so the dashboards could not see which board theme players pick.
 - `hint_shown` (#209) says only which game the hint was for. Use it to see how many players ask for hints, and in which games.
+- `review_opened` (#215) says only which game was reviewed. The review itself (the mistakes, how big they are) stays on the phone. Use it to see how many players look back at their games.
 - The match history (#142) sends no event of its own. Only its screen view (`/history`) is sent.
 - Nothing is sent before **Allow usage data**. So the events cannot show drop-off in the welcome flow, and every number counts only the players who said yes.
 
@@ -76,7 +78,7 @@ Notes:
 | Question | Events, and what they tell |
 |----------|----------------------------|
 | **Mode use** | `game_started`: which games (`game`), modes (`mode`), bot levels (`botLevel`), match lengths (`matchLength`) and opening roll house rules (`openingRoll`) players pick. `tutorial_started`: how many players open a tutorial, and from where (`source`). `$screen`: which screens players open (history, rules, settings). |
-| **Feature use** | `undo_used`: how much players take back moves. `hint_shown`: how much players ask for hints, per game. `settings_changed`: which settings players change (`key`). `theme_changed`: which themes players pick (themes may become a paid extra, `docs/vision.md`). |
+| **Feature use** | `undo_used`: how much players take back moves. `hint_shown`: how much players ask for hints, per game. `review_opened`: how many players review their games, per game. `settings_changed`: which settings players change (`key`). `theme_changed`: which themes players pick (themes may become a paid extra, `docs/vision.md`). |
 | **Drop-off** | `game_started` → `game_finished`: how many games end. `game_abandoned`: which games players leave, and how early (`turn`). `resign` and `result: resign`: how often players give up. `tutorial_step`, `tutorial_finished`, `tutorial_skipped`: the lesson where players stop. |
 | **Return rate** | `app_opened`: active players per day and week, and how many come back (retention). `game_started` after `game_finished`: players who come back to play. |
 

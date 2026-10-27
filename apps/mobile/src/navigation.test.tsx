@@ -195,6 +195,69 @@ describe('app navigation', () => {
     expect(screen.queryByRole('button', { name: /^Continue game/ })).toBeNull();
   });
 
+  it('opens the game review from the game-end sheet and from match end (#215)', async () => {
+    const user = setupUser();
+    // Usage data allowed: the review sends `review_opened`.
+    await act(async () => consentStore.setState({ status: 'granted' }));
+    recorded.sent.length = 0;
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const session = matchSessions.current()!;
+    const board = `/game/${session.id}`;
+
+    // You start with 5-3; the bot resigns the game: the game-end sheet shows.
+    await act(async () => {
+      const { dispatch } = session.store.getState();
+      dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+      dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+      dispatch({ type: 'resign', player: 'black' });
+    });
+    await user.press(
+      within(screen.getByTestId('game-end-card')).getByRole('button', { name: 'Review' }),
+    );
+    expect(router.getPathname()).toBe(`${board}/review`);
+    expect(screen.getByRole('header', { name: 'Game 1 · Portes' })).toBeOnTheScreen();
+    // Nobody finished a turn in that game.
+    expect(await screen.findByText('No moves to review in this game.')).toBeOnTheScreen();
+
+    // Back: the board with its sheet.
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe(board);
+    expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
+
+    // The next game, then the bot resigns the match: Review from match end.
+    await act(async () => {
+      const { dispatch } = session.store.getState();
+      dispatch({ type: 'nextGame' });
+      dispatch({ type: 'resignMatch', player: 'black' });
+    });
+    await expectMatchEndAfterDelay(router, `${board}/match-end`);
+    await user.press(screen.getByRole('button', { name: 'Review' }));
+    expect(router.getPathname()).toBe(`${board}/review`);
+    expect(screen.getByRole('header', { name: 'Game 2 · Portes' })).toBeOnTheScreen();
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe(`${board}/match-end`);
+
+    const reviews = recorded.sent.filter((e) => e.type === 'track' && e.event === 'review_opened');
+    expect(reviews).toEqual([
+      { type: 'track', event: 'review_opened', props: { game: 'portes' } },
+      { type: 'track', event: 'review_opened', props: { game: 'portes' } },
+    ]);
+  });
+
+  it('the review of a game still in play goes to the board; an unknown game cannot be opened', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const session = matchSessions.current()!;
+    await act(async () => appRouter.push(`/game/${session.id}/review`));
+    expect(router.getPathname()).toBe(`/game/${session.id}`);
+    await act(async () => appRouter.push('/game/local-nope/review'));
+    expect(screen.getByText('This game could not be opened.')).toBeOnTheScreen();
+  });
+
   it('adds a finished match to History, opened from Home and Settings (#142)', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });

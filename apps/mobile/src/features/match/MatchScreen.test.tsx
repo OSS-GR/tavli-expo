@@ -171,6 +171,43 @@ describe('<MatchScreen /> vs bot', () => {
     expect(props.onExit).toHaveBeenCalled();
   });
 
+  it('offers Review on the game-end sheet when the route gives it (#215)', async () => {
+    const user = setupUser();
+    const s = session(defaultSetup('bot'));
+    startWith(s, 'white');
+    const onReview = jest.fn();
+    await renderWithRoot(
+      <MatchScreen
+        session={s}
+        botTiming={FAST}
+        onExit={jest.fn()}
+        onSettings={jest.fn()}
+        onRules={jest.fn()}
+        onMatchOver={jest.fn()}
+        onReview={onReview}
+      />,
+    );
+    await act(async () => {
+      s.store.getState().dispatch({ type: 'resign', player: 'black' });
+    });
+    const card = screen.getByTestId('game-end-card');
+    await user.press(within(card).getByRole('button', { name: 'Review' }));
+    expect(onReview).toHaveBeenCalledTimes(1);
+    // The sheet stays: Back from the review returns to it.
+    expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
+  });
+
+  it('has no Review button without a review to open', async () => {
+    const s = session(defaultSetup('bot'));
+    startWith(s, 'white');
+    await show(s).view;
+    await act(async () => {
+      s.store.getState().dispatch({ type: 'resign', player: 'black' });
+    });
+    expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull();
+  });
+
   it('resigns the match and asks for the match-end screen', async () => {
     const user = setupUser();
     const s = session(defaultSetup('bot'));

@@ -115,27 +115,58 @@ export interface ConfiguredBot extends Bot {
 /** One ranked turn, best first. */
 export interface RankedTurn {
   readonly turn: Turn;
+  /**
+   * The chances after the turn, from the mover's view. At 1 ply,
+   * `equity` is the turn's score (`scoreTurns`). At 2 plies, a candidate
+   * holds the average over the 21 replies (its 2-ply equity), and a turn
+   * that is not a candidate keeps its 1-ply evaluation. A turn that ends
+   * the game holds the true result.
+   */
   readonly evaluation: Evaluation;
-  /** Equity lost against the best turn (0 for the best one). */
+  /**
+   * Equity lost against the best turn (0 for the best one). At 2 plies the
+   * candidates and the other turns are on different scales: see
+   * `RankOptions.plies`.
+   */
   readonly equityLoss: number;
+}
+
+/** The options of `Analyzer.rankTurns`. */
+export interface RankOptions {
+  /**
+   * Search depth. 1 (the default) scores each turn like the bot. 2 also
+   * looks at each roll of the next player and their best reply, for the
+   * best candidates (see `createAnalyzer`).
+   *
+   * At 2 plies, the candidates (first in the list) carry a 2-ply
+   * `evaluation` and `equityLoss`. The other turns follow with their 1-ply
+   * evaluation, and their `equityLoss` is the 1-ply loss, raised to at
+   * least the last candidate's loss so the list stays sorted. So values
+   * across that boundary cannot be compared. A review that grades turns
+   * should use `plies: 1`, or grade with 2-ply values only within the
+   * candidates.
+   */
+  readonly plies?: 1 | 2;
+  /** Return only the best `top` turns (an integer >= 1). Default: all. */
+  readonly top?: number;
 }
 
 /**
  * Hints and post-game review. It uses the same evaluators as the bot (the
- * variant's best one) and the same 1-ply core (`scoreTurns`). Build one
- * with `createAnalyzer` (`analyzer.ts`). There is no randomness.
+ * variant's best one) and the same 1-ply core (`scoreTurns`), with an
+ * optional 2-ply look. Build one with `createAnalyzer` (`analyzer.ts`).
+ * There is no randomness.
  */
 export interface Analyzer {
   /**
    * Every legal turn for `dice`, best first, for `state.toMove`. `top`
-   * keeps only the best ones. `plies: 2` throws `BotError('NOT_IMPLEMENTED')`
-   * for now.
+   * keeps only the best ones. `plies: 2` looks one roll deeper for the
+   * best candidates; see `RankOptions.plies` for what the values then
+   * mean. Throws `BotError('INVALID_REQUEST')` when a question after a
+   * turn cannot be answered (the variant has `prompt` but no
+   * `answerPrompt`).
    */
-  rankTurns(
-    state: GameState,
-    dice: Dice,
-    opts?: { readonly plies?: 1 | 2; readonly top?: number },
-  ): readonly RankedTurn[];
+  rankTurns(state: GameState, dice: Dice, opts?: RankOptions): readonly RankedTurn[];
   /** The evaluation of a position for `state.toMove`, before the roll. */
   evaluate(state: GameState): Evaluation;
 }

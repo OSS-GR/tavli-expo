@@ -39,6 +39,8 @@ export interface MatchScreenProps {
   onRules: () => void;
   /** The match is over: open the match-end screen. */
   onMatchOver: () => void;
+  /** "Review" on the game-end sheet: the review of the game that just ended (#215). */
+  onReview?: () => void;
   /** For tests: another runner, or bot timing on top of the Bot speed setting. */
   runner?: BotRunner;
   botTiming?: Partial<BotTiming>;
@@ -55,6 +57,7 @@ export function MatchScreen({
   onSettings,
   onRules,
   onMatchOver,
+  onReview,
   runner = botRunner,
   botTiming,
   analyzer = appAnalyzer,
@@ -206,6 +209,7 @@ export function MatchScreen({
         onOpenMenu={() => setOverlay('menu')}
         onHome={onExit}
         onMatchOver={onMatchOver}
+        {...(onReview ? { onReview } : {})}
         gameLabel={gameLabel}
         {...(nextLabel ? { nextGameLabel: nextLabel } : {})}
         analyzer={analyzer}

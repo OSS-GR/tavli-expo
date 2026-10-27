@@ -115,6 +115,11 @@ export interface AnalyticsEvents {
     /** Engine variant id: the game in play. */
     variant: string;
   };
+  /**
+   * The game review (#215) opened after a game. Only which game was picked
+   * for the match: never the position, the dice, the moves or the mistakes.
+   */
+  review_opened: { game: MatchGame };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
@@ -149,6 +154,7 @@ export const ANALYTICS_EVENTS = [
   'tutorial_finished',
   'tutorial_skipped',
   'hint_shown',
+  'review_opened',
 ] as const satisfies readonly AnalyticsEventName[];
 
 type MissingEvent = Exclude<AnalyticsEventName, (typeof ANALYTICS_EVENTS)[number]>;

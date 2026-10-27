@@ -96,6 +96,32 @@ describe('<MatchEndScreen />', () => {
     expect(props.onHome).toHaveBeenCalledTimes(1);
   });
 
+  it('offers Review of the last game when the route gives it (#215)', async () => {
+    const user = userEvent.setup();
+    const match = playedMatch([
+      ['white', 2],
+      ['white', 1],
+    ]);
+    const onReview = jest.fn();
+    await renderWithRoot(
+      <MatchEndScreen
+        setup={botSetup}
+        match={match}
+        onRematch={jest.fn()}
+        onReview={onReview}
+        onChangeSettings={jest.fn()}
+        onHome={jest.fn()}
+      />,
+    );
+    await user.press(screen.getByRole('button', { name: 'Review' }));
+    expect(onReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no Review button without a review to open', async () => {
+    await show(botSetup, playedMatch([['white', 3]])).view;
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull();
+  });
+
   it('a lost match looks the same, with no celebration', async () => {
     await show(
       botSetup,
