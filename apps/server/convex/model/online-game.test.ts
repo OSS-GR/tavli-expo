@@ -13,17 +13,29 @@ import {
   OnlineGameError,
   answerPrompt,
   createOnlineMatch,
+  deadlineAfter,
+  isTimedOut,
   loadFlow,
   onlineGameRules,
   playTurn,
   resign,
   sideOf,
   storeFlow,
+  timeOut,
   toView,
   waitingFor,
 } from './online-game';
 
 const PLAYERS = { white: 'alice', black: 'bob' };
+
+/** The view fields these tests do not care about. */
+const VIEW = {
+  gameId: 'g',
+  version: 1,
+  pace: 'live',
+  turnDeadline: 1000,
+  players: PLAYERS,
+} as const;
 
 function create(choice: OnlineGameChoice = 'portes', seed = 1, targetPoints = 1) {
   const rng = createSeededRng(seed);
@@ -55,7 +67,7 @@ function playMatch(choice: OnlineGameChoice, seed: number, targetPoints: number)
   for (let i = 0; i < 5000 && flow.match.status !== 'finished'; i++) {
     const side = waitingFor(flow);
     if (side === null) throw new Error('nobody to wait for');
-    const view = toView({ gameId: 'g', version: i, choice, players: PLAYERS, flow });
+    const view = toView({ ...VIEW, version: i, choice, flow });
     flow =
       view.prompt === null
         ? playTurn(stored(flow), side, pickTurn(flow.game, picker), rng)
@@ -181,6 +193,39 @@ describe('resign', () => {
   });
 });
 
+describe('turn timers (#133)', () => {
+  it('a turn lasts 1 minute live and 24 hours async; at the deadline the time is up', () => {
+    expect(deadlineAfter('live', 5000)).toBe(5000 + 60_000);
+    expect(deadlineAfter('async', 5000)).toBe(5000 + 24 * 60 * 60 * 1000);
+    expect(isTimedOut(10_000, 9_999)).toBe(false);
+    expect(isTimedOut(10_000, 10_000)).toBe(true);
+    expect(isTimedOut(null, 10_000)).toBe(false);
+  });
+
+  it('timeOut: the player to move loses the game; the next game starts', () => {
+    const { flow, rng } = create('portes', 3, 5);
+    const late = waitingFor(flow);
+    if (late === null) throw new Error('nobody to wait for');
+    const next = timeOut(stored(flow), rng);
+    expect(next.match.games).toHaveLength(1);
+    expect(next.match.games[0]).toMatchObject({ winner: late === 'white' ? 'black' : 'white' });
+    expect(next.match.games[0]?.reason).toBe('timeout');
+    expect(next.log[0]).toEqual({ type: 'timeout', player: late });
+    expect(next.log.map((e) => e.type)).toContain('nextGame');
+    expect(next.game.phase).toBe('moving');
+    expect(next.match.status).toBe('in-progress');
+  });
+
+  it('timeOut: the match ends when that game reaches the target', () => {
+    const { flow, rng } = create('portes', 3, 1);
+    const done = timeOut(stored(flow), rng);
+    expect(done.match.status).toBe('finished');
+    expect(waitingFor(done)).toBeNull();
+    expect(toView({ ...VIEW, choice: 'portes', flow: done }).turnDeadline).toBeNull();
+    expect(code(() => timeOut(done, rng))).toBe('GAME_OVER');
+  });
+});
+
 describe('answerPrompt', () => {
   it('rejects an answer when there is no question', () => {
     const { flow, rng } = create();
@@ -198,7 +243,7 @@ describe('whole matches with server dice', () => {
       const again = replay(events);
       expect(again.match).toEqual(flow.match);
       expect(again.game).toEqual(flow.game);
-      const view = toView({ gameId: 'g', version: 1, choice, players: PLAYERS, flow });
+      const view = toView({ ...VIEW, choice, flow });
       expect(view.status).toBe('finished');
       expect(view.waitingFor).toBeNull();
       expect(view.prompt).toBeNull();

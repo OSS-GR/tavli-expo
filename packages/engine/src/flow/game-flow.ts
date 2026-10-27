@@ -119,7 +119,14 @@ export type GameAction =
   | { readonly type: 'undo'; readonly player: PlayerId }
   | { readonly type: 'confirm'; readonly player: PlayerId }
   | { readonly type: 'answer'; readonly player: PlayerId; readonly choice: string }
-  | { readonly type: 'resign'; readonly player: PlayerId };
+  | { readonly type: 'resign'; readonly player: PlayerId }
+  /**
+   * `player` ran out of time (online turn timers, #133). Only the player
+   * the game waits for can time out. The game ends as if they resigned it,
+   * with the reason `timeout`. The flow has no clock: the caller (the
+   * server) decides when time is up.
+   */
+  | { readonly type: 'timeout'; readonly player: PlayerId };
 
 export interface FlowContext {
   /** Where the variants come from. Default: `VARIANT_REGISTRY`. */
@@ -368,6 +375,19 @@ export function stepGame(
       return [
         { ...flow, played: [], phase: 'game-over', result },
         { type: 'resign', player },
+      ];
+    }
+
+    case 'timeout': {
+      if (flow.phase === 'opening-roll') illegal('the game has not started yet');
+      const waiting = currentPrompt(flow, ctx)?.player ?? flow.state.toMove;
+      if (player !== waiting) illegal(`the game waits for ${waiting}`);
+      // Scored like a resign of this game: the moves of an unfinished turn do not count.
+      const resigned = resignGame(flow.state, player, ctx.registry ?? VARIANT_REGISTRY);
+      const result: GameResult = { ...resigned, reason: 'timeout' };
+      return [
+        { ...flow, played: [], phase: 'game-over', result },
+        { type: 'timeout', player },
       ];
     }
 

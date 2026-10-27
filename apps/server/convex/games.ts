@@ -1,11 +1,17 @@
 /**
  * Online games (#126, ADR-0004): create a game, play a turn, answer a
- * question, resign, and watch a game.
+ * question, resign, and watch a game. Turn timers (#133): each turn has a
+ * deadline; when it passes, the player the server waits for loses the game.
  *
  * Each mutation is one Convex transaction: load the game, check the call,
  * run the engine (`model/online-game.ts`), roll the next dice on the
  * server, and save with a version bump. If anything throws, nothing is
  * saved.
+ *
+ * Timers: every save that leaves the match running sets a new
+ * `turnDeadline` and schedules `checkTimeout` for that version. A later
+ * change bumps the version, so an old check does nothing: no cancel is
+ * needed. `makeMove` and `answer` check the deadline too.
  *
  * Auth comes later: for now the caller passes its player id
  * (`callerId`). Each call checks that the caller may act.
@@ -14,26 +20,30 @@
 import { ConvexError, v } from 'convex/values';
 import type { Infer } from 'convex/values';
 
-import type { GameTransportErrorData, OnlineGameView } from '@tavli/contracts';
+import type { GameTransportErrorData, OnlineGamePace, OnlineGameView } from '@tavli/contracts';
 import { serializeRules } from '@tavli/engine';
 import type { FlowEvent, MatchFlow, MoveInput, PlayerId } from '@tavli/engine';
 
+import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
-import { mutation, query } from './_generated/server';
+import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { createCryptoRng } from './model/crypto-rng';
 import {
   OnlineGameError,
   answerPrompt,
   createOnlineMatch,
+  deadlineAfter,
+  isTimedOut,
   loadFlow,
   playTurn,
   resign as resignMatch,
   sideOf,
   storeFlow,
+  timeOut,
   toView,
 } from './model/online-game';
-import { gameChoice } from './schema';
+import { gameChoice, gamePace } from './schema';
 
 /** The `actor` of events the server plays itself. */
 const SERVER_ACTOR = 'server';
@@ -43,6 +53,7 @@ const SERVER_EVENTS: ReadonlySet<FlowEvent['type']> = new Set([
   'rollOpening',
   'roll',
   'nextGame',
+  'timeout',
 ]);
 
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
@@ -118,17 +129,88 @@ async function loadForCaller(
   return { game, side, flow: loadFlow(game.flow) };
 }
 
-/** Saves the flow after a step, with a version bump and its log rows. */
+/**
+ * Starts the clock for the turn that begins `now`: returns the deadline
+ * and schedules `checkTimeout` for `version` at that time. `null` (and no
+ * check) when the match is over.
+ */
+async function startClock(
+  ctx: MutationCtx,
+  gameId: Id<'games'>,
+  version: number,
+  pace: OnlineGamePace,
+  flow: MatchFlow,
+  now: number,
+): Promise<number | null> {
+  if (flow.match.status === 'finished') return null;
+  const deadline = deadlineAfter(pace, now);
+  await ctx.scheduler.runAt(deadline, internal.games.checkTimeout, { gameId, version });
+  return deadline;
+}
+
+/**
+ * Saves the flow after a step: a version bump, its log rows and a new
+ * turn deadline.
+ */
 async function save(
   ctx: MutationCtx,
   game: Doc<'games'>,
   callerId: string,
   flow: MatchFlow,
+  now: number,
 ): Promise<number> {
   const version = game.version + 1;
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
-  await ctx.db.patch(game._id, { ...gameFields(flow), version, eventCount });
+  const turnDeadline = await startClock(ctx, game._id, version, game.pace, flow, now);
+  await ctx.db.patch(game._id, { ...gameFields(flow), version, eventCount, turnDeadline });
   return version;
+}
+
+/** The player the server waits for loses the current game. Saves it; returns the new version. */
+async function applyTimeout(
+  ctx: MutationCtx,
+  game: Doc<'games'>,
+  flow: MatchFlow,
+  now: number,
+): Promise<number> {
+  const next = guarded(() => timeOut(flow, createCryptoRng()));
+  return await save(ctx, game, SERVER_ACTOR, next, now);
+}
+
+/**
+ * What `makeMove` and `answer` return. `ok: false` means the turn time ran
+ * out first: the server saved the time out (the late player lost the
+ * game) instead of the call. It is a return value, not a thrown error,
+ * because a thrown error would roll the time out back too. A client
+ * adapter turns it into a `TIMED_OUT` rejection.
+ */
+const writeResult = v.union(
+  v.object({ ok: v.literal(true), version: v.number() }),
+  v.object({
+    ok: v.literal(false),
+    version: v.number(),
+    error: v.object({ code: v.literal('TIMED_OUT'), message: v.string() }),
+  }),
+);
+
+type WriteResult = Infer<typeof writeResult>;
+
+/**
+ * Runs a player's call with `play`, unless the turn time has run out:
+ * then the time out is saved instead, and the call gets `TIMED_OUT`.
+ */
+async function onTime(
+  ctx: MutationCtx,
+  game: Doc<'games'>,
+  flow: MatchFlow,
+  play: (now: number) => Promise<number>,
+): Promise<WriteResult> {
+  const now = Date.now();
+  if (game.status === 'active' && isTimedOut(game.turnDeadline, now)) {
+    const version = await applyTimeout(ctx, game, flow, now);
+    return { ok: false, version, error: { code: 'TIMED_OUT', message: 'the turn time ran out' } };
+  }
+  return { ok: true, version: await play(now) };
 }
 
 const moveInput = v.object({
@@ -146,7 +228,8 @@ function toMoveInput(move: Infer<typeof moveInput>): MoveInput {
 
 /**
  * Creates a game between two players. The server rolls the opening at
- * once, so the game starts with the first player to move. Returns the id.
+ * once, so the game starts with the first player to move, and that
+ * player's clock runs. Returns the id.
  */
 export const createGame = mutation({
   args: {
@@ -154,9 +237,11 @@ export const createGame = mutation({
     players: v.object({ white: v.string(), black: v.string() }),
     choice: gameChoice,
     targetPoints: v.number(),
+    /** `live` (1 minute per turn) or `async` (24 hours per turn). */
+    pace: gamePace,
   },
   returns: v.id('games'),
-  handler: async (ctx, { callerId, players, choice, targetPoints }) => {
+  handler: async (ctx, { callerId, players, choice, targetPoints, pace }) => {
     if (sideOf(players, callerId) === null) {
       fail('BAD_REQUEST', 'the caller must be one of the players');
     }
@@ -171,14 +256,17 @@ export const createGame = mutation({
     const gameId = await ctx.db.insert('games', {
       players,
       choice,
+      pace,
       targetPoints,
       rules: serializeRules(flow.match.rules),
       ...gameFields(flow),
       version,
       eventCount: 0,
+      turnDeadline: null,
     });
     const eventCount = await writeEvents(ctx, gameId, 0, version, callerId, flow);
-    await ctx.db.patch(gameId, { eventCount });
+    const turnDeadline = await startClock(ctx, gameId, version, pace, flow, Date.now());
+    await ctx.db.patch(gameId, { eventCount, turnDeadline });
     return gameId;
   },
 });
@@ -187,7 +275,8 @@ export const createGame = mutation({
  * Plays one full turn for the caller: every move for the current roll.
  * Rejects a stale `expectedVersion`, a caller who is not to move, and an
  * illegal or incomplete turn. Then the server rolls the next dice.
- * Returns the new version.
+ * Returns the new version, or `TIMED_OUT` when the turn time ran out
+ * first (see `writeResult`).
  */
 export const makeMove = mutation({
   args: {
@@ -196,15 +285,20 @@ export const makeMove = mutation({
     expectedVersion: v.number(),
     moves: v.array(moveInput),
   },
-  returns: v.number(),
+  returns: writeResult,
   handler: async (ctx, { gameId, callerId, expectedVersion, moves }) => {
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
-    const next = guarded(() => playTurn(flow, side, moves.map(toMoveInput), createCryptoRng()));
-    return await save(ctx, game, callerId, next);
+    return await onTime(ctx, game, flow, async (now) => {
+      const next = guarded(() => playTurn(flow, side, moves.map(toMoveInput), createCryptoRng()));
+      return await save(ctx, game, callerId, next, now);
+    });
   },
 });
 
-/** Answers the current question (for example the Plakoto mother question). Returns the new version. */
+/**
+ * Answers the current question (for example the Plakoto mother question).
+ * Returns like `makeMove`.
+ */
 export const answer = mutation({
   args: {
     gameId: v.id('games'),
@@ -212,18 +306,20 @@ export const answer = mutation({
     expectedVersion: v.number(),
     choice: v.string(),
   },
-  returns: v.number(),
+  returns: writeResult,
   handler: async (ctx, { gameId, callerId, expectedVersion, choice }) => {
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
-    const next = guarded(() => answerPrompt(flow, side, choice, createCryptoRng()));
-    return await save(ctx, game, callerId, next);
+    return await onTime(ctx, game, flow, async (now) => {
+      const next = guarded(() => answerPrompt(flow, side, choice, createCryptoRng()));
+      return await save(ctx, game, callerId, next, now);
+    });
   },
 });
 
 /**
  * The caller resigns the match; the opponent wins. Allowed at any time,
  * so it takes no version: a resign never fails only because the opponent
- * just moved. Returns the new version.
+ * just moved. It does not look at the turn timer. Returns the new version.
  */
 export const resign = mutation({
   args: { gameId: v.id('games'), callerId: v.string() },
@@ -231,7 +327,34 @@ export const resign = mutation({
   handler: async (ctx, { gameId, callerId }) => {
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, null);
     const next = guarded(() => resignMatch(flow, side, createCryptoRng()));
-    return await save(ctx, game, callerId, next);
+    return await save(ctx, game, callerId, next, Date.now());
+  },
+});
+
+/**
+ * Runs at each turn deadline (scheduled by `startClock`). If the game is
+ * still at `version` and the time is up, the player the server waits for
+ * loses the current game. If the game changed since (a move, an answer, a
+ * resign), it does nothing.
+ */
+export const checkTimeout = internalMutation({
+  args: { gameId: v.id('games'), version: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { gameId, version }) => {
+    const game = await ctx.db.get(gameId);
+    if (game === null || game.version !== version || game.status !== 'active') return null;
+    if (game.turnDeadline === null) return null;
+    const now = Date.now();
+    if (!isTimedOut(game.turnDeadline, now)) {
+      // Too early (the scheduler ran before the deadline): check again then.
+      await ctx.scheduler.runAt(game.turnDeadline, internal.games.checkTimeout, {
+        gameId,
+        version,
+      });
+      return null;
+    }
+    await applyTimeout(ctx, game, loadFlow(game.flow), now);
+    return null;
   },
 });
 
@@ -249,6 +372,8 @@ export const getGame = query({
       gameId: game._id,
       version: game.version,
       choice: game.choice,
+      pace: game.pace,
+      turnDeadline: game.turnDeadline,
       players: game.players,
       flow: loadFlow(game.flow),
     });

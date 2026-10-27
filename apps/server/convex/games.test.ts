@@ -2,9 +2,15 @@
 // the server's own RNG (Web Crypto); the tests read them from `getGame`.
 
 import { convexTest } from 'convex-test';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { GameTransportErrorCode, OnlineGameChoice, OnlineGameView } from '@tavli/contracts';
+import { TURN_TIME_MS } from '@tavli/contracts';
+import type {
+  GameTransportErrorCode,
+  OnlineGameChoice,
+  OnlineGamePace,
+  OnlineGameView,
+} from '@tavli/contracts';
 import { createBoard, createSeededRng, plakoto, replay } from '@tavli/engine';
 import type { FlowEvent, GameFlow, GameState, PlayerId } from '@tavli/engine';
 
@@ -24,12 +30,31 @@ function setup() {
   return convexTest(schema, modules);
 }
 
-async function createGame(t: Tester, choice: OnlineGameChoice = 'portes', targetPoints = 1) {
+// Every game schedules a turn timer. Fake timers keep those checks from
+// firing on their own; the timer tests move the clock by hand.
+const START = Date.UTC(2026, 9, 27, 12, 0, 0);
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(START);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+async function createGame(
+  t: Tester,
+  choice: OnlineGameChoice = 'portes',
+  targetPoints = 1,
+  pace: OnlineGamePace = 'live',
+) {
   return await t.mutation(api.games.createGame, {
     callerId: ALICE,
     players: PLAYERS,
     choice,
     targetPoints,
+    pace,
   });
 }
 
@@ -85,6 +110,7 @@ describe('createGame', () => {
         players: PLAYERS,
         choice: 'portes',
         targetPoints: 1,
+        pace: 'live',
       }),
       'BAD_REQUEST',
     );
@@ -94,6 +120,7 @@ describe('createGame', () => {
         players: { white: ALICE, black: ALICE },
         choice: 'portes',
         targetPoints: 1,
+        pace: 'live',
       }),
       'BAD_REQUEST',
     );
@@ -107,6 +134,7 @@ describe('createGame', () => {
         players: { white: ALICE, black: 'server' },
         choice: 'portes',
         targetPoints: 1,
+        pace: 'live',
       }),
       'BAD_REQUEST',
     );
@@ -122,10 +150,12 @@ describe('createGame', () => {
       'choice',
       'eventCount',
       'flow',
+      'pace',
       'players',
       'rules',
       'status',
       'targetPoints',
+      'turnDeadline',
       'variant',
       'version',
       'winner',
@@ -144,13 +174,13 @@ describe('a full Portes game between two players', () => {
     while (v.status === 'active') {
       const side = v.waitingFor;
       if (side === null) throw new Error('nobody to wait for');
-      const version = await t.mutation(api.games.makeMove, {
+      const result = await t.mutation(api.games.makeMove, {
         gameId,
         callerId: idOf(side),
         expectedVersion: v.version,
         moves: pickTurn(v.game, picker),
       });
-      expect(version).toBe(v.version + 1);
+      expect(result).toEqual({ ok: true, version: v.version + 1 });
       v = await view(t, gameId);
       turns += 1;
       if (turns > 2000) throw new Error('the game does not end');
@@ -397,5 +427,183 @@ describe('the Plakoto mother question', () => {
     expect(after.status).toBe('finished');
     expect(after.match.winner).toBe('black');
     expect(after.match.score).toEqual({ white: 0, black: 2 });
+  });
+
+  it('a late answer gets TIMED_OUT: the pinned player loses the game on time', async () => {
+    const t = setup();
+    const gameId = await pinTheMother(t);
+    const v = await view(t, gameId);
+    expect(v.turnDeadline).toBe(START + TURN_TIME_MS.live);
+    vi.setSystemTime(START + TURN_TIME_MS.live);
+    const result = await t.mutation(api.games.answer, {
+      gameId,
+      callerId: ALICE,
+      expectedVersion: v.version,
+      choice: 'playOn',
+    });
+    expect(result).toMatchObject({ ok: false, error: { code: 'TIMED_OUT' } });
+    const after = await view(t, gameId);
+    expect(after.status).toBe('finished');
+    expect(after.match.games[0]).toMatchObject({ winner: 'black', points: 2, reason: 'timeout' });
+    expect(after.turnDeadline).toBeNull();
+  });
+});
+
+describe('turn timers (#133)', () => {
+  const LIVE = TURN_TIME_MS.live;
+  const ASYNC = TURN_TIME_MS.async;
+
+  /** Moves the clock and runs the checks that are due. */
+  async function wait(t: Tester, ms: number) {
+    vi.advanceTimersByTime(ms);
+    await t.finishInProgressScheduledFunctions();
+  }
+
+  /** The side the server waits for. */
+  function waiting(v: OnlineGameView): PlayerId {
+    if (v.waitingFor === null) throw new Error('nobody to wait for');
+    return v.waitingFor;
+  }
+
+  async function playOneTurn(t: Tester, gameId: Id<'games'>) {
+    const v = await view(t, gameId);
+    return await t.mutation(api.games.makeMove, {
+      gameId,
+      callerId: idOf(waiting(v)),
+      expectedVersion: v.version,
+      moves: pickTurn(v.game, createSeededRng(v.version)),
+    });
+  }
+
+  it('createGame sets the pace and the first deadline (live: 1 minute)', async () => {
+    const t = setup();
+    const v = await view(t, await createGame(t));
+    expect(v.pace).toBe('live');
+    expect(v.turnDeadline).toBe(START + LIVE);
+  });
+
+  it('a live time out loses the game, and the next game starts with a new deadline', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5);
+    const before = await view(t, gameId);
+    const late = waiting(before);
+    await wait(t, LIVE);
+    const v = await view(t, gameId);
+    expect(v.version).toBe(before.version + 1);
+    expect(v.status).toBe('active');
+    expect(v.match.games).toHaveLength(1);
+    expect(v.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
+    expect(v.match.score[otherSide(late)]).toBeGreaterThanOrEqual(1);
+    // The next game runs, and its first turn has its own minute.
+    expect(v.game.phase).toBe('moving');
+    expect(v.game.result).toBeNull();
+    expect(v.turnDeadline).toBe(START + 2 * LIVE);
+
+    // The server played the time out, and the log still replays.
+    const rows = await t.run(async (ctx) =>
+      ctx.db
+        .query('moves')
+        .withIndex('by_game', (q) => q.eq('gameId', gameId))
+        .collect(),
+    );
+    const timeout = rows.find((row) => row.event.includes('"timeout"'));
+    expect(timeout?.actor).toBe('server');
+    expect(JSON.parse(timeout?.event ?? 'null')).toEqual({ type: 'timeout', player: late });
+    const again = replay(await events(t, gameId));
+    expect(again.match).toEqual(v.match);
+    expect(again.game).toEqual(v.game);
+  });
+
+  it('the match ends when the time out gives the last point; no clock runs then', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 1);
+    const late = waiting(await view(t, gameId));
+    await wait(t, LIVE);
+    const v = await view(t, gameId);
+    expect(v.status).toBe('finished');
+    expect(v.match.winner).toBe(otherSide(late));
+    expect(v.turnDeadline).toBeNull();
+    expect(v.waitingFor).toBeNull();
+    const doc = await t.run(async (ctx) => ctx.db.get(gameId));
+    expect(doc?.turnDeadline).toBeNull();
+    // Nothing is scheduled any more.
+    await wait(t, 10 * ASYNC);
+    expect((await view(t, gameId)).version).toBe(v.version);
+  });
+
+  it('a move just in time is fine, and the old check after it does nothing', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5);
+    await wait(t, LIVE - 1);
+    const result = await playOneTurn(t, gameId);
+    expect(result).toEqual({ ok: true, version: 2 });
+    // The check for version 1 runs now, at the first deadline: it does nothing.
+    await wait(t, 1);
+    const v = await view(t, gameId);
+    expect(v.version).toBe(2);
+    expect(v.match.games).toHaveLength(0);
+    expect(v.turnDeadline).toBe(START + LIVE - 1 + LIVE);
+    // The new deadline holds for the next player.
+    const late = waiting(v);
+    await wait(t, LIVE - 1);
+    const after = await view(t, gameId);
+    expect(after.version).toBe(3);
+    expect(after.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
+  });
+
+  it('a move after the deadline gets TIMED_OUT, and the time out is saved', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5);
+    const before = await view(t, gameId);
+    const late = waiting(before);
+    // The clock reaches the deadline before the scheduled check runs.
+    vi.setSystemTime(START + LIVE);
+    const result = await t.mutation(api.games.makeMove, {
+      gameId,
+      callerId: idOf(late),
+      expectedVersion: before.version,
+      moves: pickTurn(before.game, createSeededRng(1)),
+    });
+    expect(result).toEqual({
+      ok: false,
+      version: before.version + 1,
+      error: { code: 'TIMED_OUT', message: expect.any(String) },
+    });
+    const v = await view(t, gameId);
+    expect(v.version).toBe(before.version + 1);
+    expect(v.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
+    // The scheduled check for the old version runs later and does nothing.
+    await wait(t, 0);
+    expect((await view(t, gameId)).version).toBe(v.version);
+  });
+
+  it('async games have 24 hours per turn', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5, 'async');
+    const before = await view(t, gameId);
+    expect(before.pace).toBe('async');
+    expect(before.turnDeadline).toBe(START + ASYNC);
+    await wait(t, ASYNC - 1);
+    expect((await view(t, gameId)).version).toBe(before.version);
+    await wait(t, 1);
+    const v = await view(t, gameId);
+    expect(v.version).toBe(before.version + 1);
+    expect(v.match.games[0]).toMatchObject({
+      winner: otherSide(waiting(before)),
+      reason: 'timeout',
+    });
+    expect(v.turnDeadline).toBe(START + 2 * ASYNC);
+  });
+
+  it('resign stops the clock: the check at the deadline does nothing', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5);
+    await t.mutation(api.games.resign, { gameId, callerId: BOB });
+    const v = await view(t, gameId);
+    expect(v.turnDeadline).toBeNull();
+    await wait(t, LIVE);
+    const after = await view(t, gameId);
+    expect(after.version).toBe(v.version);
+    expect(after.match).toEqual(v.match);
   });
 });

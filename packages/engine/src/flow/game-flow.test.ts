@@ -295,6 +295,43 @@ describe('resign during a turn', () => {
   });
 });
 
+describe('timeout (online turn timers, #133)', () => {
+  it('ends the game like a resign, with the reason timeout; unfinished moves do not count', () => {
+    const flow = run(at('w: 6x3 3x2 offx10 ; b: 24x14 offx1'), [
+      roll('white', [6, 3]),
+      move('6/0'),
+    ]);
+    const over = applyGameAction(flow, { type: 'timeout', player: 'white' });
+    // White has borne off ten checkers: Black wins a mono.
+    expect(over).toMatchObject({
+      phase: 'game-over',
+      played: [],
+      result: { winner: 'black', points: 1, reason: 'timeout' },
+    });
+    expect(over.state.board).toEqual(flow.state.board);
+  });
+
+  it('a player with nothing off gives a diplo', () => {
+    const flow = applyGameAction(at('w: 24x2 13x5 8x3 6x5 ; b: 6x15'), roll('white', [3, 1]));
+    const over = applyGameAction(flow, { type: 'timeout', player: 'white' });
+    expect(over.result).toEqual({ winner: 'black', points: 2, reason: 'timeout' });
+  });
+
+  it('only the player the game waits for can time out, and not before the game starts', () => {
+    const flow = applyGameAction(at('w: 24x2 13x5 8x3 6x5 ; b: 6x15'), roll('white', [3, 1]));
+    expect(() => applyGameAction(flow, { type: 'timeout', player: 'black' })).toThrow(
+      illegalAction,
+    );
+    expect(() => applyGameAction(opening(), { type: 'timeout', player: 'white' })).toThrow(
+      illegalAction,
+    );
+    const over = applyGameAction(flow, { type: 'timeout', player: 'white' });
+    expect(() => applyGameAction(over, { type: 'timeout', player: 'white' })).toThrow(
+      illegalAction,
+    );
+  });
+});
+
 describe('UI helpers', () => {
   it('legalNextMoves groups the single moves by source', () => {
     const flow = applyGameAction(at('w: 13x14 bar ; b: 3x15'), roll('white', [6, 1]));
@@ -378,6 +415,18 @@ describe('variant prompts (hook for Plakoto "resign or play on")', () => {
     const on = applyGameAction(flow, { type: 'answer', player: 'black', choice: 'playOn' }, ctx);
     expect(on.phase).toBe('awaiting-roll');
     expect(on.state.toMove).toBe('black');
+  });
+
+  it('the player asked the question can time out; the other player cannot', () => {
+    const flow = applyGameAction(start(), { type: 'confirm', player: 'white' }, ctx);
+    expect(() => applyGameAction(flow, { type: 'timeout', player: 'white' }, ctx)).toThrow(
+      illegalAction,
+    );
+    const over = applyGameAction(flow, { type: 'timeout', player: 'black' }, ctx);
+    expect(over).toMatchObject({
+      phase: 'game-over',
+      result: { winner: 'white', reason: 'timeout' },
+    });
   });
 
   it('an answer can end the game', () => {
