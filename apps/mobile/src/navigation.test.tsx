@@ -4,9 +4,11 @@
  * is a route.)
  */
 import type { createRecordingAnalytics } from '@tavli/contracts';
-import { within } from '@testing-library/react-native';
+import { createGameFlow, portes } from '@tavli/engine';
+import { fireEvent, within } from '@testing-library/react-native';
 import { router as appRouter } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { historyStore } from '@/features/history/store';
@@ -23,6 +25,7 @@ import { tutorialStore } from '@/features/tutorial/store';
 import { analytics, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../test/clock';
+import { nativePath } from '../test/nativeParent';
 import { layoutTutorialBoard, playLessonByTaps } from '../test/tutorialTaps';
 
 const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
@@ -304,6 +307,86 @@ describe('app navigation', () => {
       settingsStore.setState({ language: 'el' });
     });
     expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');
+  });
+
+  // On iOS a Skia canvas that moves to another native parent loses its
+  // drawing. The dice did, when the menu hid the screen from screen readers
+  // (#173). They stayed blank until a move drew them again.
+  it('keeps the dice drawn through the menu, Settings and back, and the background (#173)', async () => {
+    // React Native's Jest setup makes `AppState.addEventListener` a mock. The
+    // listeners the app adds from here on let the test send it to the background.
+    const addListener = jest.mocked(AppState.addEventListener);
+    expect(jest.isMockFunction(addListener)).toBe(true);
+    const firstCall = addListener.mock.calls.length;
+    const sendAppState = (state: AppStateStatus) => {
+      for (const [type, fn] of addListener.mock.calls.slice(firstCall)) {
+        if (type === 'change') (fn as (next: AppStateStatus) => void)(state);
+      }
+    };
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const session = matchSessions.current()!;
+    const board = `/game/${session.id}`;
+    // You (White) roll first; no opening roll.
+    await act(async () => {
+      const { flow } = session.store.getState();
+      const state = portes.initialState({ startingPlayer: 'white' });
+      session.store.setState({
+        flow: { ...flow, game: createGameFlow({ state, starter: 'white' }) },
+      });
+    });
+    await user.press(screen.getByRole('button', { name: 'Roll dice, or tap the board' }));
+    // The board draws once it knows its size.
+    await act(async () => {
+      fireEvent(screen.getByTestId('game-board'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 500 } },
+      });
+    });
+
+    const hidden = { includeHiddenElements: true };
+    const dice = screen.getByTestId('dice-row');
+    const label = dice.props.accessibilityLabel as string;
+    expect(label).toMatch(/^Dice \d-\d, \d left to play$/);
+    const path = nativePath(dice);
+    expect(path).not.toBe('');
+    const boardPath = nativePath(screen.getByTestId('game-board-canvas', hidden));
+    /**
+     * The dice are the same canvas, in the same native views, with the same
+     * values. The board canvas does not move either.
+     */
+    const expectSameDice = () => {
+      const now = screen.getByTestId('dice-row', hidden);
+      expect(now === dice).toBe(true);
+      expect(nativePath(now)).toBe(path);
+      expect(now).toHaveAccessibleName(label);
+      expect(nativePath(screen.getByTestId('game-board-canvas', hidden))).toBe(boardPath);
+    };
+
+    // The menu hides the screen from screen readers: the dice stay in place.
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    expectSameDice();
+    await user.press(screen.getByRole('button', { name: /^Settings/ }));
+    expect(router.getPathname()).toBe('/settings');
+    expectSameDice();
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe(board);
+    expectSameDice();
+    expect(screen.getByTestId('dice-row')).toBeOnTheScreen();
+
+    // Resume from the menu, then the app goes to the background and back.
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: /^Resume/ }));
+    expectSameDice();
+    expect(addListener.mock.calls.length).toBeGreaterThan(firstCall);
+    storage.remove(SAVED_MATCH_KEY);
+    await act(async () => sendAppState('background'));
+    // Going to the background saves the match (#36): the listeners ran.
+    expect(JSON.parse(storage.getString(SAVED_MATCH_KEY) ?? '{}').id).toBe(session.id);
+    await act(async () => sendAppState('active'));
+    expectSameDice();
+    expect(session.store.getState().flow.game.phase).toBe('moving');
   });
 });
 

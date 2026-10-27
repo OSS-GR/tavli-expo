@@ -6,6 +6,7 @@
 import { Canvas } from '@shopify/react-native-skia';
 import type { ThemeManifest } from '@tavli/themes';
 import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
 
 import type { DieView } from '@/features/game/gameStore';
 
@@ -32,31 +33,36 @@ export function DiceRow({ theme, dice, rollKey, onLanded, size = DIE_SIZE, testI
     left: dice.filter((d) => !d.used).length,
   });
   return (
-    <Canvas
-      testID={testID}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={label}
-      style={{ width, height }}>
-      {dice.map((d, i) => {
-        const place = places[i];
-        if (place === undefined) return null;
-        return (
-          <AnimatedDie
-            key={`${rollKey ?? 'rest'}:${i}`}
-            style={theme.dice}
-            x={place.x}
-            y={place.y}
-            size={place.size}
-            value={d.value}
-            index={i}
-            tilt={tilt[i % 2] ?? 0}
-            used={d.used}
-            rollKey={rollKey}
-            {...(i === dice.length - 1 && onLanded ? { onLand: onLanded } : {})}
-          />
-        );
-      })}
-    </Canvas>
+    // The canvas always sits in this native view (`collapsable={false}`), so
+    // it never moves to another native parent when a view around it changes.
+    // On iOS a Skia canvas that moves loses its drawing (#173).
+    <View collapsable={false} style={{ width, height }}>
+      <Canvas
+        testID={testID}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={label}
+        style={{ width, height }}>
+        {dice.map((d, i) => {
+          const place = places[i];
+          if (place === undefined) return null;
+          return (
+            <AnimatedDie
+              key={`${rollKey ?? 'rest'}:${i}`}
+              style={theme.dice}
+              x={place.x}
+              y={place.y}
+              size={place.size}
+              value={d.value}
+              index={i}
+              tilt={tilt[i % 2] ?? 0}
+              used={d.used}
+              rollKey={rollKey}
+              {...(i === dice.length - 1 && onLanded ? { onLand: onLanded } : {})}
+            />
+          );
+        })}
+      </Canvas>
+    </View>
   );
 }
