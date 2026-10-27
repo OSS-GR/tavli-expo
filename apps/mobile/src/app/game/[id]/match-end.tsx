@@ -1,0 +1,54 @@
+/**
+ * Match end (wireframe 9). The board route opens it with `router.replace`
+ * when the match is over. The finished match is no longer in the save slot
+ * (`sessions.ts`), so it comes from memory. After an app restart it is gone
+ * and the screen shows "This game could not be opened." with Home.
+ */
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+
+import { matchSessions } from '@/features/match/appSessions';
+import { MatchEndScreen } from '@/features/match/MatchEndScreen';
+import { MissingGame } from '@/features/match/MissingGame';
+import { gameHref, newGameHref, parseIdParam } from '@/features/match/routes';
+
+/** Back to Home: pops to it, or opens it when this was the first screen. */
+function goHome() {
+  router.dismissTo('/');
+}
+
+export default function MatchEndRoute() {
+  const params = useLocalSearchParams<{ id?: string }>();
+  const id = parseIdParam(params.id);
+  // Read once: Rematch starts a new match in the same session before this
+  // screen goes away, and the screen must not change under the user.
+  const [opened] = useState(() => {
+    const session = id === null ? null : matchSessions.get(id);
+    return session === null ? null : { session, match: session.store.getState().flow.match };
+  });
+
+  if (opened === null) return <MissingGame onHome={goHome} />;
+  const { session, match } = opened;
+  // A match that is not over yet belongs on the board.
+  if (match.status !== 'finished') return <Redirect href={gameHref(session.id)} />;
+
+  return (
+    <MatchEndScreen
+      setup={session.setup}
+      match={match}
+      onRematch={() => {
+        // The last winner starts (engine `createRematch`); it is saved as a new match.
+        session.store.getState().rematch();
+        router.replace(gameHref(session.id));
+      }}
+      onChangeSettings={() => {
+        matchSessions.end(session.id);
+        router.replace(newGameHref(session.setup.mode));
+      }}
+      onHome={() => {
+        matchSessions.end(session.id);
+        goHome();
+      }}
+    />
+  );
+}

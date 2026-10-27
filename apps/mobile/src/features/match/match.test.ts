@@ -68,10 +68,17 @@ describe('seats', () => {
 
   it('falls back to Player 1 / Player 2 in the app language', async () => {
     expect(seatsFor(localSetup, t).black.name).toBe('Player 2');
+    expect(seatsFor(localSetup, t).white).toEqual({
+      name: 'Maria',
+      label: 'Maria',
+      turnLabel: 'Maria’s turn',
+      you: false,
+    });
     await i18n.changeLanguage('el');
     try {
       expect(seatsFor(localSetup, t).black.name).toBe('Παίκτης 2');
       expect(seatsFor(botSetup, t).black.label).toBe('Υπολογιστής · Εύκολο');
+      expect(seatsFor(localSetup, t).black.turnLabel).toBe('Σειρά: Παίκτης 2');
     } finally {
       await i18n.changeLanguage('en');
     }

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { imageFileNames, imageFileName } from './assets';
+import { allSoundFiles, imageFileNames, imageFileName } from './assets';
 import { contrastRatio } from './color';
 import {
   diceCenters,
@@ -22,7 +22,29 @@ import { LAYOUT_IDS, validateTheme } from './validate';
 
 const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MAX_THEME_BYTES = 2 * 1024 * 1024;
+/** All sounds of one theme together (issue #39). */
+const MAX_SOUND_BYTES = 500 * 1024;
+/** One sound file. Short effects only; nothing streams. */
+const MAX_SOUND_FILE_BYTES = 48 * 1024;
 const EPS = 1e-6;
+
+/** Every file under `dir`, as paths relative to it, with `/` separators. */
+function listFiles(dir: string): string[] {
+  return fs
+    .readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(dir, path.join(e.parentPath, e.name)).split(path.sep).join('/'))
+    .sort();
+}
+
+/** True for an MP4/M4A file (an `ftyp` box with an audio brand) or an MP3 file. */
+function isAudioFile(buf: Buffer, file: string): boolean {
+  if (file.endsWith('.m4a')) {
+    const brand = buf.toString('ascii', 8, 12);
+    return buf.toString('ascii', 4, 8) === 'ftyp' && ['M4A ', 'isom', 'mp42'].includes(brand);
+  }
+  return buf.toString('ascii', 0, 3) === 'ID3' || (buf[0] === 0xff && (buf[1]! & 0xe0) === 0xe0);
+}
 
 /** Width and height of a WebP file, read from its header. */
 function webpSize(buf: Buffer): { width: number; height: number } {
@@ -112,18 +134,33 @@ for (const id of listThemeIds()) {
       }
     });
 
+    it('has every sound file on disk, as audio', () => {
+      for (const f of allSoundFiles(theme)) {
+        const file = path.join(dir, f);
+        expect(fs.existsSync(file), f).toBe(true);
+        expect(isAudioFile(fs.readFileSync(file), f), `${f} is not M4A/MP3`).toBe(true);
+        expect(fs.statSync(file).size, f).toBeLessThan(MAX_SOUND_FILE_BYTES);
+      }
+    });
+
+    it(`keeps its sounds under ${MAX_SOUND_BYTES / 1024} KB in total`, () => {
+      const total = allSoundFiles(theme).reduce(
+        (sum, f) => sum + fs.statSync(path.join(dir, f)).size,
+        0,
+      );
+      expect(total).toBeLessThan(MAX_SOUND_BYTES);
+    });
+
     it('has no files that the manifest does not use', () => {
-      const used = new Set(['theme.json']);
+      const used = new Set(['theme.json', ...allSoundFiles(theme)]);
       for (const asset of Object.values(theme.images)) {
         for (const f of imageFileNames(asset)) used.add(f);
       }
-      expect(fs.readdirSync(dir).filter((f) => !used.has(f))).toEqual([]);
+      expect(listFiles(dir).filter((f) => !used.has(f))).toEqual([]);
     });
 
     it(`stays under ${MAX_THEME_BYTES / 1024 / 1024} MB`, () => {
-      const total = fs
-        .readdirSync(dir)
-        .reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
+      const total = listFiles(dir).reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
       expect(total).toBeLessThan(MAX_THEME_BYTES);
     });
 

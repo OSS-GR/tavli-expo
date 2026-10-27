@@ -31,11 +31,14 @@ The game itself lives in `apps/mobile/src/features/game/`:
 | `gameStore.ts` | A Zustand store around the engine `MatchFlow` reducer, with the injected `Rng`. `turnView(flow)` computes what the screen shows (board mid-turn, legal moves, dice, pips). |
 | `opening.ts`, `OpeningCard.tsx` | The opening roll card: one die per player, tie, result. |
 | `PlayerStrip.tsx` | A player strip: checker color, name, pip count, match score, turn pill. |
-| `GameCard.tsx`, `turnNotices.ts` | Cards over the board: no legal moves, game end, match end. |
+| `GameCard.tsx`, `turnNotices.ts` | Cards over the board: no legal moves, "could not be opened". |
+| `GameEndSheet.tsx` | Game end (wireframe 8): a sheet over the final board. |
+| `Celebration.tsx` | The small win effect on the game-end sheet and the match-end screen. |
+| `useAnnouncement.ts` | Reads a result to screen readers (`AccessibilityInfo.announceForAccessibility`). |
 | `seats.ts` | How each player is named on screen (name, strip label, turn pill, "you"). |
 | `GameScreen.tsx` | The board screen: strips, board, cards and the controls row. Vs bot it also runs the bot turn (`features/bot/botTurn.ts`). |
 
-The real route is `app/game/[id].tsx` (see [App shell](app-shell.md)). Dev route (release builds redirect it to Home):
+The real route is `app/game/[id]/index.tsx`; match end is `app/game/[id]/match-end.tsx` (see [App shell](app-shell.md)). Dev route (release builds redirect it to Home):
 
 - `app/dev/board.tsx`: the fixed positions, from White's and from Black's side.
 
@@ -55,7 +58,15 @@ The real route is `app/game/[id].tsx` (see [App shell](app-shell.md)). Dev route
 - The UI never picks dice. Every roll is an engine action (`roll`, `rollOpening`); the flow rolls with the `Rng` from `services.ts` (`createLocalRng`).
 - The animation (`diceMotion.ts`) is a 2D tumble on the UI thread: the die spins, hops and grows, and its face flips through the other numbers in a fixed order. From 78% of the roll on, it shows the engine's value.
 - **Opening roll:** a card with one die per player. In pass-and-play each player taps for their own die (`openingTaps="perPlayer"`); vs bot one tap rolls both (`"one"`). A tie says so and both roll again. The result stays 1.5 s; the starter then plays both opening dice.
-- A haptic plays when the last die lands: the theme's `haptics.diceLand` pattern through the `Feedback` port (`@tavli/contracts`, adapter `@tavli/haptics-expo`). `features/feedback/feedback.ts` skips it when Settings → Haptics is off.
+- A haptic and a sound play when the last die lands (`feedback.event('diceLand')`).
+
+## Sound and haptics
+
+- One call per game event: `feedback.event('checkerPlace')`. `features/feedback/feedback.ts` (`createGameFeedback`) looks up the theme's `sounds[event]` and `haptics[event]` and plays both. It drops an event that comes too soon after the same one (`MIN_GAP_MS`, e.g. 70 ms for checker clicks).
+- Two ports: `SoundPlayer` (adapter `@tavli/audio-expo`, expo-audio) and `Feedback` (haptics, adapter `@tavli/haptics-expo`). `appSound` follows Settings → Sound, `appFeedback` follows Settings → Haptics.
+- `features/game/gameFeedback.ts` (`useGameFeedback`, used by `GameScreen`) reads the engine's event log after each store change: a roll plays `diceRoll`; a move plays `checkerPlace`, `checkerHit` (hit or pin) or `bearOff`; the next player's turn plays `turnStart`; the end plays `gameWin` or `matchWin`. An action the engine refuses plays `invalidMove`. So drag, tap, bot and replay all sound the same, and screens need no extra calls.
+- UI-only events (`diceLand`, `checkerPickUp`) use the `event` function that `useGameFeedback` returns.
+- The theme's sounds are preloaded when the game screen opens. Sounds mix with other apps' audio and follow the phone's silent switch.
 
 ## Moving checkers
 
@@ -75,18 +86,20 @@ The real route is `app/game/[id].tsx` (see [App shell](app-shell.md)). Dev route
 - **Undo** takes back the last single move (`undo` action); the checker flies back, and a hit checker comes back from the bar. Disabled (dashed) when there is nothing to undo.
 - **Confirm** is enabled only when the engine says `canConfirm` (all dice used, or no move left). Then a hint shows: "All dice used. Confirm or undo."
 - **Auto-confirm** (Settings, default off): each move is sent with `autoConfirm`, so the engine ends a complete turn at once.
-- **Turn indicator:** the active player's strip gets a thick border and a pill: "YOUR TURN", or "PLAYING" for the bot. Pip counts follow the moves of the turn; Settings → Show pip counts hides them.
+- **Turn indicator:** the active player's strip gets a thick border and a pill: "YOUR TURN", "PLAYING" for the bot, or the player's name in pass-and-play ("MARIA'S TURN"). Pip counts follow the moves of the turn; Settings → Show pip counts hides them.
 - **No legal moves:** the engine passes the turn by itself. The card says who rolled what and that the turn passes; the dice stay, faded. It closes on OK or after 3 s. Until then the board stays with the player who passed (flip).
-- **Game end:** winner, Mono / Diplo chip, score, "Next game" (the winner starts). **Match end:** winner, score, "Rematch" (the last winner starts, no opening roll).
+- **Game end** (`GameEndSheet`): a sheet over the final board, with a dim layer over the rest. Winner, Mono / Diplo chip (diplo filled), a reason line ("Bob did not bear off any checker." for a diplo, "Maria resigned."), the match box ("You 2 – 0 Bot", "First to 3 points"), **Next game** (the winner starts) and **Home** (a text button).
+- **Match end:** no sheet for the last game. The final position stays for `MATCH_END_DELAY_MS` (1 s), so the last checker lands, then `GameScreen` calls `onMatchOver` and the route opens the match-end screen ([App shell](app-shell.md)). It waits while the screen is paused (menu or Settings on top).
+- **Celebration** (`Celebration.tsx`): only when a person wins (`isHumanWin` in `gameFeedback.ts`, the same rule as the win jingle). Vs the bot, a bot win shows none. Fourteen confetti pieces fly out on one shared Reanimated value, and the icon pops (🎉 on game end, 🏆 on match end). With the system **Reduce motion** setting on (`useReducedMotion`), only the still icon shows. Screen readers skip it.
+- **Screen readers:** the game-end sheet and the match-end screen announce the result when they show ("Ann wins the game! Diplo · +2 points … Ann 2 – 0 Bob"). The sheet is modal for VoiceOver (`accessibilityViewIsModal`). Titles are headers; every button has a label and is at least 44 pt tall.
 - The opening result closes after 1.5 s, or at once on a tap anywhere on the board.
-- A rematch starts the game and turn numbers again, so the screen forgets which cards were closed.
+- A rematch opens a new board screen, so the closed cards of the last match are forgotten.
 
 ### Differences from the wireframes
 
-- The game-end and match-end screens are cards over the board (no `match-end` route yet). The in-game menu is in [App shell](app-shell.md).
+- The celebration is a small Reanimated effect, not a Lottie file (ADR-0005 says Lottie via Skia). It is a stand-in until the art task adds a Lottie win effect; the place and the "only a person's win" rule stay the same. The in-game menu is in [App shell](app-shell.md).
 - No dashed "last move" arrow and no double-tap shortcut yet.
 - The dice in the controls row are 40 pt (wireframe: about 44 pt), so Undo, the dice and Confirm fit on an iPhone SE.
-- In pass-and-play the pill says "YOUR TURN" for both players; the strip already shows the name.
 
 ## Board flip
 
@@ -98,8 +111,8 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 - `dice.test.ts`, `gameStore.test.ts`, `GameScreen.test.tsx`: the roll animation math, the dice layout, the store over the engine flow, and the dice and opening card on screen.
 - `interaction.test.ts`: sources and targets on the drawing rects, tap and drop rules, flights for a move, a hit and an undo. `GameScreen.moves.test.tsx`: drag, tap-tap, an illegal drop and tap-to-roll through the screen.
 - Jest fakes Gesture Handler with `apps/mobile/test/gestureHandlerMock.tsx`; `touch(testID, path)` drives the board's pan gesture like a finger.
-- Jest fakes Reanimated with `apps/mobile/test/reanimatedMock.ts`: animations end at once and call their end callback.
-- `GameScreen.turn.test.tsx`: undo, confirm, auto-confirm, the turn indicator (flip and fixed), pip counts on and off, the pass card (OK and 3 s), game end, next game, match end and rematch. `GameScreen.match.test.tsx` plays a whole match with taps only (to 1 by default; `FULL_MATCH=1` plays to 3).
+- Jest fakes Reanimated with `apps/mobile/test/reanimatedMock.ts`: animations end at once and call their end callback. `Animated.View` is a plain view and `useAnimatedStyle` runs once. Spy on `useReducedMotion` to test reduce motion.
+- `GameScreen.turn.test.tsx`: undo, confirm, auto-confirm, the turn indicator (flip and fixed), pip counts on and off, the pass card (OK and 3 s), the game-end sheet (diplo with reason, mono, celebration, announcement, Home), next game, and `onMatchOver` after the delay. `GameScreen.match.test.tsx` plays a whole match with taps only (to 1 by default; `FULL_MATCH=1` plays to 3) and ends on `onMatchOver`.
 - `BoardScene.test.tsx`: a render smoke test. Jest replaces Skia with `apps/mobile/test/skiaMock.tsx`: every Skia component becomes a plain element, so the test counts what the board would draw.
 
 ## Screenshots

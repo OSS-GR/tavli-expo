@@ -1,6 +1,8 @@
-import { render, screen, userEvent } from '@testing-library/react-native';
+import { act, render, screen, userEvent } from '@testing-library/react-native';
 
 import { defaultSetup, type MatchMode } from '@/features/match/setup';
+import { DEFAULT_SETTINGS } from '@/features/settings/settings';
+import { settingsStore } from '@/features/settings/store';
 
 import { NewGameScreen } from './NewGameScreen';
 
@@ -18,6 +20,12 @@ function show(mode: MatchMode, botLevels: readonly ('easy' | 'medium' | 'hard')[
   );
   return { ui, onStart, onBack };
 }
+
+beforeEach(async () => {
+  await act(async () => {
+    settingsStore.setState({ ...DEFAULT_SETTINGS });
+  });
+});
 
 describe('<NewGameScreen /> vs bot', () => {
   it('starts Portes to 3 vs an easy bot by default', async () => {
@@ -100,6 +108,7 @@ describe('<NewGameScreen /> pass-and-play', () => {
 
     expect(screen.getByRole('header', { name: 'Pass-and-play' })).toBeOnTheScreen();
     expect(screen.queryByText('Bot level')).toBeNull();
+    expect(screen.queryByText('Who starts?')).toBeNull();
     const white = screen.getByLabelText('Name of player 1, white checkers');
     expect(white.props.maxLength).toBe(16);
     expect(white.props.placeholder).toBe('Player 1 (white)');
@@ -110,5 +119,60 @@ describe('<NewGameScreen /> pass-and-play', () => {
       ...defaultSetup('local'),
       names: { white: 'Maria', black: '' },
     });
+  });
+});
+
+describe('<NewGameScreen /> board view', () => {
+  it('starts from Settings and changes Settings (face-to-face stays locked)', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      settingsStore.setState({ boardFlipMode: 'fixed' });
+    });
+    const { ui } = show('local');
+    await render(ui);
+
+    expect(screen.getByRole('radio', { name: 'Fixed' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Face-to-face' })).toBeDisabled();
+    expect(screen.getByText('The board stays the same for both players.')).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('radio', { name: 'Flip' }));
+    expect(settingsStore.getState().boardFlipMode).toBe('flip');
+    expect(screen.getByText('The board turns to the player whose turn it is.')).toBeOnTheScreen();
+    await user.press(screen.getByRole('radio', { name: 'Face-to-face' }));
+    expect(settingsStore.getState().boardFlipMode).toBe('flip');
+  });
+
+  it('is not shown vs the bot (the human always sits at the bottom)', async () => {
+    const { ui } = show('bot');
+    await render(ui);
+    expect(screen.queryByRole('radio', { name: 'Flip' })).toBeNull();
+  });
+});
+
+describe('<NewGameScreen /> with a saved game', () => {
+  it('asks before it ends the saved game', async () => {
+    const user = userEvent.setup();
+    const onStart = jest.fn();
+    await render(
+      <NewGameScreen
+        mode="bot"
+        initial={defaultSetup('bot')}
+        botLevels={['easy']}
+        onBack={jest.fn()}
+        onStart={onStart}
+        hasSavedGame
+      />,
+    );
+
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(screen.getByText('Start a new game?')).toBeOnTheScreen();
+    expect(screen.getByText('Your saved game will end.')).toBeOnTheScreen();
+    await user.press(screen.getByTestId('dialog-cancel'));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(screen.queryByText('Start a new game?')).toBeNull();
+
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    await user.press(screen.getByRole('button', { name: 'Start new' }));
+    expect(onStart).toHaveBeenCalledWith(defaultSetup('bot'));
   });
 });

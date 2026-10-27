@@ -9,7 +9,7 @@
   "kind": "image",
   "license": {
     "art": "Made for the Tavlaki project.",
-    "sources": "Wood textures: CC0 1.0 (Poly Haven).",
+    "sources": "Wood textures: CC0 1.0 (Poly Haven). Sounds: CC0 1.0 (Kenney, OpenGameArt).",
     "file": "LICENSES.md"
   },
   "defaultLayout": "portrait-rotated",
@@ -707,21 +707,30 @@
   },
   "sounds": {
     "checkerPickUp": null,
-    "checkerPlace": null,
-    "checkerHit": null,
+    "checkerPlace": [
+      "sounds/checker-place-1.m4a",
+      "sounds/checker-place-2.m4a",
+      "sounds/checker-place-3.m4a"
+    ],
+    "checkerHit": "sounds/checker-hit.m4a",
+    "bearOff": "sounds/bear-off.m4a",
     "diceShake": null,
-    "diceRoll": null,
-    "bearOff": null,
-    "invalidMove": null,
-    "win": null
+    "diceRoll": ["sounds/dice-roll-1.m4a", "sounds/dice-roll-2.m4a"],
+    "diceLand": "sounds/dice-land.m4a",
+    "invalidMove": "sounds/invalid-move.m4a",
+    "turnStart": "sounds/turn-start.m4a",
+    "gameWin": "sounds/game-win.m4a",
+    "matchWin": "sounds/match-win.m4a"
   },
   "haptics": {
     "checkerPickUp": "selection",
     "checkerPlace": "light",
     "checkerHit": "medium",
+    "bearOff": "light",
     "diceLand": "light",
     "invalidMove": "warning",
-    "win": "success"
+    "gameWin": "success",
+    "matchWin": "success"
   },
   "accessibility": {
     "checkerContrast": 13.42,

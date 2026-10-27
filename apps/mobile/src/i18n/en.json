@@ -27,7 +27,14 @@
       "subtitle": "Online",
       "soon": "Coming soon: play friends online."
     },
-    "howToPlay": "How to play"
+    "howToPlay": "How to play",
+    "continue": {
+      "title": "Continue game",
+      "vsBot": "{{game}} · vs Bot ({{level}})",
+      "local": "{{game}} · pass-and-play",
+      "target": "first to {{target}}",
+      "broken": "Your saved game could not be opened."
+    }
   },
   "settings": {
     "title": "Settings",
@@ -121,7 +128,8 @@
       "pipsLabel": "{{count}} pips to go",
       "scoreLabel": "{{score}} of {{target}} points",
       "turn": "Your turn",
-      "playing": "Playing"
+      "playing": "Playing",
+      "turnOf": "{{name}}’s turn"
     },
     "controls": {
       "undo": "↶ Undo",
@@ -156,7 +164,10 @@
       "resigned": "{{name}} resigned.",
       "resigned_you": "You resigned.",
       "home": "Home",
-      "changeSettings": "Change settings"
+      "changeSettings": "Change settings",
+      "matchLabel": "Match",
+      "noBearOff": "{{name}} did not bear off any checker.",
+      "noBearOff_you": "You did not bear off any checker."
     },
     "you": "You",
     "bot": {
@@ -177,7 +188,7 @@
       "rules": "How to play {{game}}",
       "settings": "Settings",
       "exit": "Exit to home",
-      "exitHint": "Your game stays open until you start a new one",
+      "exitHint": "Your game is saved",
       "resume": "Resume"
     },
     "resign": {
@@ -197,6 +208,21 @@
       "title": "This game could not be opened.",
       "home": "Home"
     }
+  },
+  "matchEnd": {
+    "finalScore": "Final score: {{score}}",
+    "game": "Game {{number}}",
+    "won": "{{name}} won",
+    "won_you": "You won",
+    "draw": "Draw",
+    "mono": "Mono",
+    "diplo": "Diplo",
+    "points": "+{{count}}",
+    "pointsLabel_one": "{{count}} point",
+    "pointsLabel_other": "{{count}} points",
+    "rematchHint": "Same settings · {{name}} starts",
+    "rematchHint_you": "Same settings · you start",
+    "rematchHintOpening": "Same settings"
   },
   "games": {
     "portes": "Portes",
@@ -243,11 +269,26 @@
       "whiteLabel": "Name of player 1, white checkers",
       "blackLabel": "Name of player 2, black checkers"
     },
-    "start": "Start game"
+    "start": "Start game",
+    "boardView": "Board view",
+    "replace": {
+      "title": "Start a new game?",
+      "body": "Your saved game will end.",
+      "confirm": "Start new"
+    }
   },
   "rules": {
     "title": "How to play {{game}}",
     "soon": "The full rules page is coming soon.",
     "portes": "Each player moves 15 checkers around the board and bears them off. The first to bear off all checkers wins: mono (1 point), or diplo (2 points) if the other player has borne off none."
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo_one": "{{count}} min ago",
+    "minutesAgo_other": "{{count}} min ago",
+    "hoursAgo_one": "{{count}} h ago",
+    "hoursAgo_other": "{{count}} h ago",
+    "daysAgo_one": "{{count}} day ago",
+    "daysAgo_other": "{{count}} days ago"
   }
 }

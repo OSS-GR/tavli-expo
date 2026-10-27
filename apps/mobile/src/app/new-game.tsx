@@ -11,6 +11,7 @@ export default function NewGameRoute() {
   const params = useLocalSearchParams<{ mode?: string }>();
   const mode = parseModeParam(params.mode);
   const [initial] = useState(() => loadLastSetup(storage, mode, botLevels));
+  const [hasSavedGame] = useState(() => matchSessions.peek().kind === 'ok');
 
   return (
     <NewGameScreen
@@ -18,6 +19,7 @@ export default function NewGameRoute() {
       mode={mode}
       initial={initial}
       botLevels={botLevels}
+      hasSavedGame={hasSavedGame}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       onStart={(setup) => {
         saveLastSetup(storage, setup);

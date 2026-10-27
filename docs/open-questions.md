@@ -1,6 +1,6 @@
 # Open Questions
 
-> Living list. When the owner answers, move the answer to **Answered** and update the doc it affects. Last review: 2026-10-26.
+> Living list. When the owner answers, move the answer to **Answered** and update the doc it affects. Last review: 2026-10-27.
 
 ## Waiting on the owner
 
@@ -9,6 +9,10 @@
 | Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
 | Q18 | **Sentry project:** create a free Sentry React Native project and add the DSN, org and project slugs, and an auth token to EAS (steps in `packages/adapters/crash-sentry/README.md`). Until then, builds send no crash reports. | We see crashes from test builds | #43 |
 | Q19 | Greek label for the **pip count** in the player strips: draft "Πόντοι 167". Other options: "Πιπς", "Δρόμος". Match points use "βαθμοί". | Clear Greek UI | #32 |
+| Q21 | **Fevga, P3 "the opponent's full rules":** the engine (#99) reads this as movement, the runner rule and bearing off. It does not apply the prime bans P1/P2 to the opponent's one test move, because those judge a whole turn's end position. OK? | Which plays count as "blocking the opponent" | `docs/rules/fevga.md`, #99 |
+| Q22 | **Fevga, both players blocked forever:** the rules doc gives no outcome. It never happened in 2,700 test games. Recommended: a draw. | A game that cannot end | `docs/rules/fevga.md` |
+| Q23 | **Plakoto, `motherRule: none` with both mothers pinned:** neither side can bear off, so the game never ends. Recommended: a draw, like the other mother rules. | A game that cannot end | `docs/rules/plakoto.md`, #98 |
+| Q24 | **Plakoto, the mother question with `afterEachMove`:** the engine (#98) checks after every move but asks "resign or play on?" when the turn ends. If a pin is made and lifted in the same turn, the question is still asked. Keep this, or ask only if the mother is still pinned at the end of the turn? Recommended: ask only if still pinned. | When the pinned player is asked | `docs/rules/plakoto.md`, #98 |
 
 ## Answered
 

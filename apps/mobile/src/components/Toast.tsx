@@ -2,7 +2,7 @@
  * A short message near the bottom of the screen, for example "Coming soon".
  * It closes by itself. Screen readers hear it at once.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -16,7 +16,10 @@ export function useToast(ms: number = TOAST_MS) {
     const timer = setTimeout(() => setToast(null), ms);
     return () => clearTimeout(timer);
   }, [toast, ms]);
-  const show = (text: string) => setToast((old) => ({ text, key: (old?.key ?? 0) + 1 }));
+  const show = useCallback(
+    (text: string) => setToast((old) => ({ text, key: (old?.key ?? 0) + 1 })),
+    [],
+  );
   return [toast?.text ?? null, show] as const;
 }
 

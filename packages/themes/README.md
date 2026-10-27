@@ -61,7 +61,7 @@ Multiply normalized values by the drawn board size: `x * boardWidth`, `y * board
 | `checkers`              | Light and dark checker styles (fill, rim, highlight, ring, dish, grooves), shadow, badge |
 | `highlights`            | Selected checker ring and legal target ring                                              |
 | `dice`                  | Face, pips (red ace pip), corner radius, shading, shadow                                 |
-| `sounds`, `haptics`     | Event names. Sounds are `null` for now (files come in #39, #40).                         |
+| `sounds`, `haptics`     | Per game event (`FeedbackEvent`): sound file(s) in `sounds/` and a haptic pattern        |
 | `accessibility`         | Checker contrast (the tests compute it again) and the color-blind checks done            |
 
 ### Units
@@ -134,11 +134,17 @@ Both tools need Node 22.18 or newer and Playwright with Chromium on the machine 
 
 To change a wood grade, run `tools/walnut-kafeneio/prepare_textures.py` (Python, numpy, Pillow). Its header says how.
 
+### Sounds
+
+`sounds` maps each game event (`checkerPlace`, `checkerHit`, `bearOff`, `diceRoll`, `diceLand`, `invalidMove`, `turnStart`, `gameWin`, `matchWin`, …) to one file, a list of takes, or `null` (silent). Files live in `<id>/sounds/`, kebab-case, `.m4a` (mono AAC) or `.mp3`. The app plays the takes in turn. The tests check that every file exists, is audio, is under 48 KB, and that all sounds of a theme stay under 500 KB.
+
+To change a Walnut Kafeneio sound, edit and run `tools/walnut-kafeneio/build_sounds.py` (Python, numpy, ffmpeg). Its header says how. The app needs a Metro `require` for each sound file: add it to `apps/mobile/src/features/feedback/themeSounds.ts` (a test checks this).
+
 ## Add a theme
 
 1. Make a folder `tools/<id>/` with a `design.mjs` that exports the geometry and the layer SVGs (copy `walnut-kafeneio`). Put its CC0 textures in `tools/<id>/textures/`.
 2. Add the id to `THEMES` in `tools/build-assets.mjs` and run `build:assets`. Or, for a Blender skin, export the images and the layout block from Blender (`docs/design/art-pipeline.md` §4.2).
 3. Write the rest of `<id>/theme.json` by hand: name, palette, points, checkers, highlights, dice, sounds, haptics.
 4. Add it to `BUNDLED` in `src/registry.ts`.
-5. Run `pnpm test`. The tests check every bundled theme: the manifest, 24 points with no overlaps, every rect inside 0..1, every file on disk at the right size, no unused files, the 2 MB budget, and contrast (checkers ≥ 7:1, checker vs point ≥ 3:1 by fill or outline, checker vs field ≥ 3:1).
+5. Run `pnpm test`. The tests check every bundled theme: the manifest, 24 points with no overlaps, every rect inside 0..1, every file on disk at the right size, every sound file, no unused files, the 2 MB budget, the 500 KB sound budget, and contrast (checkers ≥ 7:1, checker vs point ≥ 3:1 by fill or outline, checker vs field ≥ 3:1).
 6. Run `preview` and look at the PNG. Then list every new file in `LICENSES.md`.
