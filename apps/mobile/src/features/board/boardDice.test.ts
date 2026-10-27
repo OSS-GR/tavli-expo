@@ -2,7 +2,7 @@ import { getTheme } from '@tavli/themes';
 
 import { boardLayout } from './BoardCanvas';
 import { MIN_BOARD_DIE, boardDiceBox, columnDiceBox } from './boardDice';
-import { DIE_SIZE, dicePlaces } from './diceMotion';
+import { DIE_SIZE, dicePlaces, doublePlaces } from './diceMotion';
 import { fitBoardWithShadow, toScreenRect } from './geometry';
 
 const theme = getTheme('walnut-kafeneio');
@@ -22,7 +22,7 @@ describe('boardDiceBox (#184)', () => {
             const box = boardDiceBox(geo, count);
             expect(box.left + box.width / 2).toBeCloseTo(area.x + area.width / 2, 6);
             expect(box.top + box.height / 2).toBeCloseTo(area.y + area.height / 2, 6);
-            const row = dicePlaces(count, box.size);
+            const row = dicePlaces(count, box.size, box.pairSize);
             expect([box.width, box.height]).toEqual([row.width, row.height]);
             // The box stays on the board.
             expect(box.left).toBeGreaterThanOrEqual(geo.x);
@@ -45,6 +45,18 @@ describe('boardDiceBox (#184)', () => {
     const big = fitBoardWithShadow(boardLayout(theme, 'tall'), PHONES.proMax.tall);
     expect(boardDiceBox(big, 2).size).toBeCloseTo(big.layout.dice.size * big.width, 6);
   });
+
+  it('shows the two dice of a double at the size of any roll (#177)', () => {
+    for (const mode of ['tall', 'classic'] as const) {
+      const geo = fitBoardWithShadow(boardLayout(theme, mode), PHONES.se[mode]);
+      const two = boardDiceBox(geo, 2);
+      const four = boardDiceBox(geo, 4);
+      expect(four.pairSize).toBe(two.size);
+      expect(two.pairSize).toBe(two.size);
+      const { pair } = doublePlaces(four.size, four.pairSize);
+      expect(pair.map((p) => p.size)).toEqual([two.size, two.size]);
+    }
+  });
 });
 
 describe('columnDiceBox (#185)', () => {
@@ -63,7 +75,7 @@ describe('columnDiceBox (#185)', () => {
         for (const column of [128, 160]) {
           for (const count of [2, 4]) {
             const box = columnDiceBox(geo, column, count);
-            const row = dicePlaces(count, box.size);
+            const row = dicePlaces(count, box.size, box.pairSize);
             expect([box.width, box.height]).toEqual([row.width, row.height]);
             // Right of the board layer, inside the column, in the middle.
             expect(box.left).toBeGreaterThanOrEqual(space.width);
@@ -85,5 +97,8 @@ describe('columnDiceBox (#185)', () => {
     expect(columnDiceBox(geo, 60, 2).size).toBe(MIN_BOARD_DIE);
     // A double gets more room, as on the board.
     expect(columnDiceBox(geo, 128, 4).size).toBeGreaterThan(narrow);
+    // Its two rolled dice keep the size of any roll (#177).
+    expect(columnDiceBox(geo, 128, 4).pairSize).toBe(narrow);
+    expect(columnDiceBox(geo, 128, 2).pairSize).toBe(narrow);
   });
 });

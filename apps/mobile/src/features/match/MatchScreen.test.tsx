@@ -26,7 +26,15 @@ import { defaultSetup, type MatchSetup } from './setup';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 
-const FAST = { beforeRollMs: 20, afterRollMs: 5, moveMs: 5, hitMs: 0, landMs: 5, thinkMs: () => 5 };
+const FAST = {
+  beforeRollMs: 20,
+  afterRollMs: 5,
+  doubleMs: 5,
+  moveMs: 5,
+  hitMs: 0,
+  landMs: 5,
+  thinkMs: () => 5,
+};
 const WAIT = { timeout: 4000 };
 
 function session(setup: MatchSetup, seed = 11): MatchSession {

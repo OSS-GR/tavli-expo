@@ -55,6 +55,39 @@ describe('turnAnnouncement', () => {
     expect(announce()).toEqual({ key: '0:3:roll', text: 'You rolled 3-1.' });
   });
 
+  it('says that a double plays four times, once (#177)', () => {
+    const { store, dispatch, announce } = afterFirstTurn();
+    dispatch({ type: 'roll', player: 'black', dice: [4, 4] });
+    expect(announce()).toEqual({ key: '0:2:roll', text: 'Bot rolled double 4: four moves of 4.' });
+    // The same key while the dice split: `useAnnouncement` reads it once.
+    expect(announce()?.key).toBe('0:2:roll');
+    const nextMove = () => legalNextMoves(store.getState().flow.game)[0]?.moves[0];
+    dispatch({ type: 'move', player: 'black', move: nextMove()! });
+    expect(announce()).toBeNull();
+    for (let move = nextMove(); move !== undefined; move = nextMove()) {
+      dispatch({ type: 'move', player: 'black', move });
+    }
+    expect(store.getState().flow.game.played).toHaveLength(4);
+    dispatch({ type: 'confirm', player: 'black' });
+    dispatch({ type: 'roll', player: 'white', dice: [2, 2] });
+    expect(announce()?.text).toBe('You rolled double 2: four moves of 2.');
+  });
+
+  // Greek names each double by its value (the owner's words).
+  it.each([
+    [1, 'ασσάκια'],
+    [2, 'δυάρες'],
+    [3, 'τριάρες'],
+    [4, 'τεσσάρες'],
+    [5, 'πεντάρες'],
+    [6, 'εξάρες'],
+  ] as const)('reads %i-%i in Greek by its name: %s', async (value, name) => {
+    await i18n.changeLanguage('el');
+    const { dispatch, announce } = afterFirstTurn();
+    dispatch({ type: 'roll', player: 'black', dice: [value, value] });
+    expect(announce()?.text).toBe(`Bot: έφερε ${name}: τέσσερις κινήσεις του ${value}.`);
+  });
+
   it('pass-and-play: reads every turn, so the next player hears it', () => {
     const { store } = afterFirstTurn();
     expect(turnAnnouncement(store.getState().flow, i18n.t, passAndPlay)?.text).toBe(

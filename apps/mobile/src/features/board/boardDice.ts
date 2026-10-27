@@ -29,6 +29,11 @@ export interface BoardDiceBox {
   readonly height: number;
   /** The `size` to give `DiceRow`. */
   readonly size: number;
+  /**
+   * The `pairSize` to give `DiceRow`: a double first shows its two rolled
+   * dice at the size of any roll, then the four larger grid dice (#177).
+   */
+  readonly pairSize: number;
 }
 
 /** The dice box for `count` dice, centred on the dice area of the drawn board. */
@@ -36,13 +41,14 @@ export function boardDiceBox(geo: BoardGeometry, count: number): BoardDiceBox {
   const area = toScreenRect(geo, geo.layout.diceArea);
   const die = Math.max(MIN_BOARD_DIE, geo.layout.dice.size * geo.width);
   const size = count === 4 ? die * DOUBLE_GROW : die;
-  const { width, height } = dicePlaces(count, size);
+  const { width, height } = dicePlaces(count, size, die);
   return {
     left: area.x + area.width / 2 - width / 2,
     top: area.y + area.height / 2 - height / 2,
     width,
     height,
     size,
+    pairSize: die,
   };
 }
 
@@ -67,12 +73,13 @@ export function columnDiceBox(geo: BoardGeometry, column: number, count: number)
   const fit = (column - 2 * COLUMN_MARGIN) / dicePlaces(2, 1).width;
   const die = Math.min(DIE_SIZE, Math.max(MIN_BOARD_DIE, fit));
   const size = count === 4 ? die * DOUBLE_GROW : die;
-  const { width, height } = dicePlaces(count, size);
+  const { width, height } = dicePlaces(count, size, die);
   return {
     left: layerWidth + column / 2 - width / 2,
     top: layerHeight / 2 - height / 2,
     width,
     height,
     size,
+    pairSize: die,
   };
 }

@@ -12,9 +12,10 @@
  * 1. wait `beforeRollMs`, then roll (a roll with no legal move passes by itself);
  * 2. ask the `BotRunner` for a turn and wait at the same time: the think time
  *    (`thinkingDelayMs`). Right after its own roll, never less than
- *    `afterRollMs`, so the dice land and the player can read them. Dice that
- *    were already there (the opening roll, a turn that goes on after the
- *    menu) get only the think time;
+ *    `afterRollMs` (`doubleMs` more for a double, which splits into four
+ *    dice first, #177), so the dice land and the player can read them. Dice
+ *    that were already there (the opening roll, a turn that goes on after
+ *    the menu) get only the think time;
  * 3. play the moves one by one, `moveMs` apart, plus `hitMs` after a hit;
  * 4. after the last move wait `landMs` (and `HIT_DELAY_MS` more after a
  *    hit), so the checker lands, then confirm.
@@ -31,8 +32,10 @@ import {
   VARIANT_REGISTRY,
   currentPrompt,
   getVariant,
+  isDouble,
   matchPhase,
   sameMove,
+  type Dice,
   type MatchFlow,
   type Move,
   type PlayerId,
@@ -131,6 +134,10 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
       wakers.add(resolve);
     });
 
+  /** How long the bot's own roll stays on screen before its first move. */
+  const diceOnScreenMs = (dice: Dice) =>
+    timing.afterRollMs + (isDouble(dice) ? timing.doubleMs : 0);
+
   /** `rolled`: the bot rolled these dice just now, so they must stay on screen a moment. */
   const play = async (rolled: boolean) => {
     const game = getFlow().game;
@@ -146,7 +153,7 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
         difficulty,
         seed: rng.nextUint32(),
       }),
-      sleep(Math.max(thinkMs(difficulty, rng, forced), rolled ? timing.afterRollMs : 0)),
+      sleep(Math.max(thinkMs(difficulty, rng, forced), rolled ? diceOnScreenMs(dice) : 0)),
     ]);
     if (cancelled) return false;
 

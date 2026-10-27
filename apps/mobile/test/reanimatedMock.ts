@@ -34,8 +34,22 @@ export function useSharedValue<T>(initial: T): MockSharedValue<T> {
   return box;
 }
 
+/**
+ * Like the real hook, it follows its inputs: each read runs `processor`
+ * again. So a test sees a shared value that an effect set after the render
+ * (a die that slid into place, #177).
+ */
 export function useDerivedValue<T>(processor: () => T): MockSharedValue<T> {
-  return makeMutable(processor());
+  const box = {
+    get value() {
+      return processor();
+    },
+    get: () => processor(),
+    set: () => {
+      throw new Error('a derived value is read-only');
+    },
+  };
+  return box;
 }
 
 export function withTiming<T>(toValue: T, _config?: unknown, callback?: Callback): T {

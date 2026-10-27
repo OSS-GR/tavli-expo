@@ -68,6 +68,7 @@ import { moveFlights, pathFlights, type Flight } from '@/features/board/flights'
 import { boxRatioWithShadow, type BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { boardModeOf, useScreenLayout } from '@/features/board/screenLayout';
+import { useDoubleReveal } from '@/features/board/useDoubleReveal';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { useSettings } from '@/features/settings/store';
 
@@ -80,6 +81,7 @@ import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
 import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
+import { diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
 import { passNotice, winType } from './turnNotices';
 import { useAnnouncement } from './useAnnouncement';
@@ -520,9 +522,13 @@ export function GameScreen({
   // Dice in the controls row: this turn's, or the faded dice of a pass.
   const passDice: DieView[] = pass ? diceView(pass.dice, []) : [];
   const dice = showPass ? passDice : view.dice;
-  // The opening dice already rolled in the card: show them at rest.
+  // The opening dice already rolled in the card: show them at rest. So do
+  // dice that no roll gave: a double chosen after a 1-2 (Acey-Deucey, #177).
   const fromOpening = game.opening !== null && game.lastTurn === null;
-  const rollKey = fromOpening || showPass ? null : `${gameKey}:${game.state.turnNumber}`;
+  const atRest = fromOpening || showPass || (game.state.dice !== null && !diceWereRolled(flow));
+  const rollKey = atRest ? null : `${gameKey}:${game.state.turnNumber}`;
+  // A rolled double shows its two dice first, then splits into four (#177).
+  const reveal = useDoubleReveal(rollKey, dice);
 
   // The opening Roll button sits on the opening card, next to the dice (#176).
   const openingRollLabel =
@@ -864,6 +870,17 @@ export function GameScreen({
   // dice went blank after the menu or Settings (#173).
   const hideScreen = covered || endSheet !== null;
   const hideBoard = card !== null;
+  // "Doubles!" for a moment after the split. Another note over the board wins.
+  const confirmHint = view.canConfirm && !blocked && !botsTurn;
+  // The value of the double names it: Greek says «Εξάρες!» for 6-6.
+  const doubleValue = dice.length === 4 ? dice[0]?.value : undefined;
+  const showDoublesHint =
+    reveal.label &&
+    doubleValue !== undefined &&
+    !blocked &&
+    !confirmHint &&
+    botNote === null &&
+    gateToMove === null;
 
   const menuButton = onOpenMenu ? (
     <Pressable
@@ -931,8 +948,10 @@ export function GameScreen({
             theme={theme}
             dice={dice}
             rollKey={rollKey}
+            split={reveal.split}
             onLanded={onDiceLanded}
             size={diceBox.size}
+            pairSize={diceBox.pairSize}
           />
         </View>
       ) : null}
@@ -951,12 +970,26 @@ export function GameScreen({
           </Text>
         </View>
       ) : null}
-      {view.canConfirm && !blocked && !botsTurn ? (
+      {confirmHint ? (
         <View
           style={[styles.hintRow, landscape && styles.besideColumn(column)]}
           pointerEvents="none">
           <Text testID="confirm-hint" style={styles.hint}>
             {t('game.controls.allUsed')}
+          </Text>
+        </View>
+      ) : null}
+      {showDoublesHint ? (
+        // The roll announcement already says it is a double, so screen readers skip this.
+        <View
+          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
+          pointerEvents="none">
+          <Text
+            testID="doubles-hint"
+            style={styles.hint}
+            accessible={false}
+            importantForAccessibility="no">
+            {t(`game.doubles.label.${doubleValue}`)}
           </Text>
         </View>
       ) : null}

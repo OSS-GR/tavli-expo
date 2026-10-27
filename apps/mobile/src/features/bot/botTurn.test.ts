@@ -6,22 +6,30 @@ import {
 } from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
+  asodio,
   createBoard,
   createGameFlow,
   createSeededRng,
   getVariant,
+  legalNextMoves,
   plakoto,
   portes,
   resolveRules,
+  type DieValue,
   type GameState,
   type Turn,
 } from '@tavli/engine';
 
-import { ROLL_MS, ROLL_STAGGER_MS } from '@/features/board/diceMotion';
+import {
+  DICE_LAND_MS,
+  DOUBLE_BEAT_MS,
+  DOUBLE_SHOWN_MS,
+  DOUBLE_SPLIT_MS,
+} from '@/features/board/diceMotion';
 import { FLIGHT_MS, HIT_DELAY_MS } from '@/features/board/flights';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
 
-import { BOT_SPEEDS, BOT_SPEED_TIMING, BOT_TIMING, type BotTiming } from './botSpeed';
+import { BOT_SPEEDS, BOT_SPEED_TIMING, BOT_TIMING, DOUBLE_MS, type BotTiming } from './botSpeed';
 import { botAnswer, botStep, startBotTurn, type BotTurnActions } from './botTurn';
 
 import { runOnFakeTimers } from '../../../test/clock';
@@ -30,8 +38,6 @@ import { runOnFakeTimers } from '../../../test/clock';
 const MIN_PAUSE_MS = 200;
 /** The least beat after the last checker lands, before the confirm. */
 const MIN_BEAT_MS = 150;
-/** The last die of a double (four dice) lands this long after the roll. */
-const DICE_LAND_MS = ROLL_MS + 3 * ROLL_STAGGER_MS;
 
 /** A fake runner: the first legal turn, or whatever `pick` returns. Records requests. */
 function fakeRunner(pick?: (req: BotMoveRequest) => Turn | Promise<Turn>) {
@@ -125,7 +131,15 @@ function blackMotherPinned(): GameStore {
   return store;
 }
 
-const fast = { beforeRollMs: 0, afterRollMs: 0, moveMs: 0, hitMs: 0, landMs: 0, thinkMs: () => 0 };
+const fast = {
+  beforeRollMs: 0,
+  afterRollMs: 0,
+  doubleMs: 0,
+  moveMs: 0,
+  hitMs: 0,
+  landMs: 0,
+  thinkMs: () => 0,
+};
 
 describe('botStep', () => {
   it('rolls, plays and confirms only on the bot turn', () => {
@@ -395,11 +409,23 @@ describe('startBotTurn timing (#172)', () => {
   // The bot waits on timers: move the fake clock by the timing constants.
   runOnFakeTimers();
 
-  /** The actions, with the fake-clock time of each roll, move and confirm. */
-  function timed(store: GameStore) {
+  /**
+   * The actions, with the fake-clock time of each roll, move and confirm.
+   * With `dice`, the bot rolls those dice (a double waits longer, #177).
+   */
+  function timed(store: GameStore, dice?: readonly [DieValue, DieValue]) {
     const log: string[] = [];
     const at: { what: string; ms: number }[] = [];
-    const actions = actionsFor(store, log);
+    const plain = actionsFor(store, log);
+    const actions: BotTurnActions = dice
+      ? {
+          ...plain,
+          roll: () => {
+            log.push('roll');
+            return store.getState().dispatch({ type: 'roll', player: 'black', dice: [...dice] });
+          },
+        }
+      : plain;
     const stamp =
       <A extends unknown[]>(what: string, action: (...args: A) => boolean) =>
       (...args: A) => {
@@ -457,7 +483,8 @@ describe('startBotTurn timing (#172)', () => {
     '%s: rolls after beforeRollMs, keeps the dice on screen, moves moveMs apart, confirms landMs after the last move',
     async (speed) => {
       const store = botToRoll();
-      const { log, at, actions } = timed(store);
+      // Not a double: those wait longer (below).
+      const { log, at, actions } = timed(store, [6, 5]);
       const { beforeRollMs, afterRollMs, moveMs, landMs } = BOT_SPEED_TIMING[speed];
       const t0 = Date.now();
       const handle = start(store, actions, { ...BOT_SPEED_TIMING[speed], thinkMs: () => 0 });
@@ -485,9 +512,66 @@ describe('startBotTurn timing (#172)', () => {
     },
   );
 
+  it.each(BOT_SPEEDS)(
+    '%s: a double waits doubleMs more, so the four dice show before the first move (#177)',
+    async (speed) => {
+      const store = botToRoll();
+      const { log, at, actions } = timed(store, [4, 4]);
+      const { beforeRollMs, afterRollMs, doubleMs, moveMs } = BOT_SPEED_TIMING[speed];
+      const t0 = Date.now();
+      const handle = start(store, actions, { ...BOT_SPEED_TIMING[speed], thinkMs: () => 0 });
+
+      await jest.advanceTimersByTimeAsync(beforeRollMs + afterRollMs + doubleMs - 1);
+      expect(log).toEqual(['roll']);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(log).toHaveLength(2);
+      await jest.advanceTimersByTimeAsync(5 * moveMs);
+      await handle.done;
+      expect(at[1]).toEqual({ what: 'move', ms: t0 + beforeRollMs + afterRollMs + doubleMs });
+      expect(at.filter((s) => s.what === 'move')).toHaveLength(4);
+    },
+  );
+
+  it('a double it chose after a 1-2 (Acey-Deucey) gets no roll time: no dice were thrown (#177)', async () => {
+    const rules = resolveRules('asodio.aceyDeuceyGreek');
+    const store = createGameStore({
+      players: { white: 'you', black: 'bot' },
+      targetPoints: 1,
+      rules,
+      rng: createSeededRng(3),
+    });
+    const state: GameState = asodio.initialState({ startingPlayer: 'black', rules });
+    store.setState({
+      flow: { ...store.getState().flow, game: createGameFlow({ state, starter: 'black' }) },
+    });
+    // Black plays a 1-2 and must then choose a double.
+    const d = store.getState().dispatch;
+    d({ type: 'roll', player: 'black', dice: [1, 2] });
+    for (let next = legalNextMoves(store.getState().flow.game)[0]; next;) {
+      d({ type: 'move', player: 'black', move: next.moves[0]! });
+      next = legalNextMoves(store.getState().flow.game)[0];
+    }
+    d({ type: 'confirm', player: 'black' });
+    expect(store.getState().flow.game.phase).toBe('awaiting-answer');
+    const { log, at, actions } = timed(store);
+    const { beforeRollMs } = BOT_TIMING;
+    const t0 = Date.now();
+    const handle = start(store, actions, { ...BOT_TIMING, thinkMs: () => 0 });
+    await jest.advanceTimersByTimeAsync(10 * BOT_TIMING.moveMs);
+    // It answers after beforeRollMs and moves at once (the think time, 0
+    // here): no `afterRollMs`, no `doubleMs`. The four dice show at rest.
+    expect(log[0]).toMatch(/^answer [1-6]$/);
+    expect(log.filter((l) => l.startsWith('move'))).toHaveLength(4);
+    const first = at[0]!;
+    expect(first.what).toBe('move');
+    expect(first.ms - t0).toBeGreaterThanOrEqual(beforeRollMs);
+    expect(first.ms - t0).toBeLessThan(beforeRollMs + 10);
+    await handle.done;
+  });
+
   it('waits the think time when it is longer than afterRollMs', async () => {
     const store = botToRoll();
-    const { at, actions } = timed(store);
+    const { at, actions } = timed(store, [6, 5]);
     const { beforeRollMs, afterRollMs, moveMs } = BOT_TIMING;
     const think = afterRollMs + 300;
     const thinkMs = jest.fn(() => think);
@@ -608,11 +692,16 @@ describe('startBotTurn timing (#172)', () => {
   });
 
   it.each(BOT_SPEEDS)('%s: each move lands before the next step starts', (speed) => {
-    const { afterRollMs, moveMs, hitMs, landMs } = BOT_SPEED_TIMING[speed];
+    const { afterRollMs, doubleMs, moveMs, hitMs, landMs } = BOT_SPEED_TIMING[speed];
     // A hit checker flies last: it leaves HIT_DELAY_MS after the mover.
     expect(moveMs).toBeGreaterThanOrEqual(HIT_DELAY_MS + FLIGHT_MS + MIN_PAUSE_MS);
-    // The last die of a double lands, then the player gets a pause to read the dice.
+    // The dice land, then the player gets a pause to read them.
     expect(afterRollMs).toBeGreaterThanOrEqual(DICE_LAND_MS + MIN_PAUSE_MS);
+    // A double: the two dice land, stay a beat and split into four (#177).
+    // The four dice then get the same pause.
+    expect(doubleMs).toBe(DOUBLE_MS);
+    expect(DOUBLE_MS).toBe(DOUBLE_BEAT_MS + DOUBLE_SPLIT_MS);
+    expect(afterRollMs + doubleMs).toBeGreaterThanOrEqual(DOUBLE_SHOWN_MS + MIN_PAUSE_MS);
     expect(hitMs).toBeGreaterThan(0);
     // After the last move: the flight and a short beat, less than a full gap.
     expect(landMs).toBeGreaterThanOrEqual(FLIGHT_MS + MIN_BEAT_MS);

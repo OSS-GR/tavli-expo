@@ -1,4 +1,15 @@
-import { DIE_SIZE, dicePlaces, tumble, tumbleFace } from './diceMotion';
+import {
+  DICE_LAND_MS,
+  DIE_SIZE,
+  DOUBLE_SHOWN_MS,
+  DOUBLE_SPLIT_AT_MS,
+  ROLL_MS,
+  ROLL_STAGGER_MS,
+  dicePlaces,
+  doublePlaces,
+  tumble,
+  tumbleFace,
+} from './diceMotion';
 
 describe('tumble', () => {
   it('lands at rest: no hop, the resting tilt, full size', () => {
@@ -73,7 +84,33 @@ describe('dicePlaces', () => {
     }
   });
 
+  it('holds the pair and the grid of a double in one box (#177)', () => {
+    const { pair, grid, width, height } = doublePlaces();
+    const two = dicePlaces(2);
+    // The pair looks like any roll: full size, side by side.
+    expect(pair.map((p) => p.size)).toEqual([DIE_SIZE, DIE_SIZE]);
+    expect(pair[1].x - pair[0].x).toBe(two.places[1]!.x - two.places[0]!.x);
+    expect(pair[0].y).toBe(pair[1].y);
+    expect(dicePlaces(4)).toEqual({ places: grid, width, height });
+    for (const p of [...pair, ...grid]) {
+      expect(p.x - p.size / 2).toBeGreaterThan(0);
+      expect(p.x + p.size / 2).toBeLessThan(width);
+      expect(p.y - p.size / 2).toBeGreaterThan(0);
+      expect(p.y + p.size / 2).toBeLessThan(height);
+    }
+  });
+
   it('shows one die (opening roll)', () => {
     expect(dicePlaces(1).places).toHaveLength(1);
+  });
+});
+
+describe('the timing of a double (#177)', () => {
+  it('lands the two dice, waits a beat, then splits', () => {
+    expect(DICE_LAND_MS).toBe(ROLL_MS + ROLL_STAGGER_MS);
+    // "After a short beat (about 600 ms)."
+    expect(DOUBLE_SPLIT_AT_MS - DICE_LAND_MS).toBeGreaterThanOrEqual(500);
+    expect(DOUBLE_SPLIT_AT_MS - DICE_LAND_MS).toBeLessThanOrEqual(700);
+    expect(DOUBLE_SHOWN_MS).toBeGreaterThan(DOUBLE_SPLIT_AT_MS);
   });
 });
