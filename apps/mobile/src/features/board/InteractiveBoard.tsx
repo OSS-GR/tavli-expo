@@ -1,22 +1,28 @@
 /**
  * The playing board: drag a checker, or tap it and then tap a target.
  *
- * - Touch down on a movable checker picks it up (UI thread). Its legal
- *   targets light up: a dashed ring and a ghost checker (wireframe 6c).
+ * - A selected or dragged checker gets a ring. Its legal targets light up:
+ *   a dashed ring and a ghost checker (wireframe 6c).
  * - Drag and drop on a target moves it. A drop anywhere else flies back
  *   with a short animation and a warning haptic.
  * - A tap selects a checker; a tap on one of its targets moves it.
  * - Moves, hits and undos fly as short animations (`flights.ts`).
  *
- * Hit-testing uses the same rects that draw the points (`geometry.ts`).
- * The gesture and the animations run on the UI thread; only the result of
- * a touch (select, move, cancel) goes to the JS thread.
+ * Two gestures race (`BOARD_GESTURES`, #174): a pan for the drag and a tap
+ * for tap-tap. Hit-testing uses the same rects that draw the points
+ * (`geometry.ts`). The gestures and the animations run on the UI thread;
+ * only the result of a touch (select, move, cancel) goes to the JS thread.
  */
 import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
-import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import {
+  GestureDetector,
+  useCompetingGestures,
+  usePanGesture,
+  useTapGesture,
+} from 'react-native-gesture-handler';
 import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { StyleSheet } from 'react-native-unistyles';
@@ -26,8 +32,10 @@ import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
 import type { Flight } from './flights';
 import { fitBoardWithShadow, type BoardGeometry } from './geometry';
 import {
-  TAP_SLOP,
+  BOARD_GESTURES,
   buildSources,
+  dragPoint,
+  panEnd,
   pickSource,
   resolveDrop,
   resolveTap,
@@ -226,9 +234,12 @@ export function InteractiveBoard({
     flyBack(source);
   };
 
+  // The drag. It activates only after the finger moves `TAP_SLOP`, so a
+  // touch that stays put is left to the tap below.
   const pan = usePanGesture({
-    minDistance: 0,
-    // Lets tests drive the gesture (createGestureController).
+    // No spread here: the Worklets Babel plugin does not allow one in a gesture config.
+    minDistance: BOARD_GESTURES.pan.minDistance,
+    // Lets tests drive the gestures (`touch()` in test/gestureHandlerMock.tsx).
     testID: testID ? `${testID}-pan` : 'board-pan',
     onBegin: (e) => {
       'worklet';
@@ -244,45 +255,58 @@ export function InteractiveBoard({
         dragR.set(s.checker.r);
       }
     },
-    onUpdate: (e) => {
+    onActivate: (e) => {
       'worklet';
       const i = dragIndex.get();
       const s = sources[i];
+      // A swipe that does not start on a movable checker does nothing.
       if (s === undefined) return;
-      const dx = e.x - startX.get();
-      const dy = e.y - startY.get();
-      if (!dragging.get()) {
-        if (dx * dx + dy * dy < TAP_SLOP * TAP_SLOP) return;
-        dragging.set(true);
-        dragVisible.set(1);
-        scheduleOnRN(onDragStart, i);
-      }
-      dragX.set(s.checker.x + dx);
-      dragY.set(s.checker.y + dy);
+      const p = dragPoint(s.checker, { x: startX.get(), y: startY.get() }, e);
+      dragX.set(p.x);
+      dragY.set(p.y);
+      dragging.set(true);
+      dragVisible.set(1);
+      scheduleOnRN(onDragStart, i);
+    },
+    onUpdate: (e) => {
+      'worklet';
+      const s = sources[dragIndex.get()];
+      if (!dragging.get() || s === undefined) return;
+      const p = dragPoint(s.checker, { x: startX.get(), y: startY.get() }, e);
+      dragX.set(p.x);
+      dragY.set(p.y);
     },
     onFinalize: (e) => {
       'worklet';
-      const dx = e.x - startX.get();
-      const dy = e.y - startY.get();
-      if (dragging.get()) {
-        const i = dragIndex.get();
-        const s = sources[i];
-        if (e.canceled) {
-          scheduleOnRN(onDragCanceled, i);
-        } else {
-          // The drop point is where the checker is, not where the finger started.
-          const x = s ? s.checker.x + dx : e.x;
-          const y = s ? s.checker.y + dy : e.y;
-          scheduleOnRN(onDrop, i, x, y);
-        }
-      } else if (!e.canceled && dx * dx + dy * dy < TAP_SLOP * TAP_SLOP) {
-        // Only a touch that stayed put is a tap; a swipe does nothing.
-        scheduleOnRN(onTap, e.x, e.y);
+      const i = dragIndex.get();
+      const s = sources[i];
+      const end = panEnd(dragging.get(), e.canceled);
+      if (end === 'cancel') {
+        scheduleOnRN(onDragCanceled, i);
+      } else if (end === 'drop') {
+        // The drop point is where the checker is, not where the finger is.
+        const p = s ? dragPoint(s.checker, { x: startX.get(), y: startY.get() }, e) : e;
+        scheduleOnRN(onDrop, i, p.x, p.y);
       }
       dragging.set(false);
       dragIndex.set(-1);
     },
   });
+
+  // Tap-tap. It fails once the finger moves more than `TAP_SLOP` (then the
+  // pan above takes over) or stays down longer than `TAP_MAX_MS`.
+  const tap = useTapGesture({
+    maxDistance: BOARD_GESTURES.tap.maxDistance,
+    maxDuration: BOARD_GESTURES.tap.maxDuration,
+    testID: testID ? `${testID}-tap` : 'board-tap',
+    onDeactivate: (e) => {
+      'worklet';
+      if (!e.canceled) scheduleOnRN(onTap, e.x, e.y);
+    },
+  });
+
+  // Race: the first gesture to activate cancels the other.
+  const gesture = useCompetingGestures(pan, tap);
 
   const current = selected === null ? undefined : sources[selected];
   const highlights = highlightsFor(current, cue && !dragKey ? sources : []);
@@ -291,7 +315,7 @@ export function InteractiveBoard({
   if (dragKey) hidden.add(dragKey);
 
   return (
-    <GestureDetector gesture={pan}>
+    <GestureDetector gesture={gesture}>
       <View
         testID={testID}
         style={styles.space}
