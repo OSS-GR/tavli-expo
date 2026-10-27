@@ -33,29 +33,37 @@ beforeEach(async () => {
 });
 
 describe('<GameScreen /> board theme', () => {
-  it('draws the board picked in Settings → Board', async () => {
-    await act(async () => {
-      settingsStore.getState().setSetting('boardTheme', 'olive-inlay');
-    });
-    const store = createGameStore({
-      players: { white: 'Ann', black: 'Bob' },
-      rng: createSeededRng(5),
-    });
-    await renderWithRoot(<GameScreen store={store} />);
-    await act(async () => {
-      fireEvent(screen.getByTestId('game-board'), 'layout', {
-        nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
+  it.each(['olive-inlay', 'kafeneio-night'])(
+    'draws the board picked in Settings → Board (%s)',
+    async (id) => {
+      await act(async () => {
+        settingsStore.getState().setSetting('boardTheme', id);
       });
-    });
+      const store = createGameStore({
+        players: { white: 'Ann', black: 'Bob' },
+        rng: createSeededRng(5),
+      });
+      await renderWithRoot(<GameScreen store={store} />);
+      await act(async () => {
+        fireEvent(screen.getByTestId('game-board'), 'layout', {
+          nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
+        });
+      });
 
-    const olive = getTheme('olive-inlay');
-    const walnut = getTheme('walnut-kafeneio');
-    const colors = boardColors();
-    for (const c of [olive.points.dark.fill, olive.points.light.fill, olive.checkers.light.fill]) {
-      expect(colors.has(c)).toBe(true);
-    }
-    for (const c of [walnut.points.dark.fill, walnut.points.light.fill]) {
-      expect(colors.has(c)).toBe(false);
-    }
-  });
+      const picked = getTheme(id);
+      const walnut = getTheme('walnut-kafeneio');
+      const colors = boardColors();
+      for (const c of [
+        picked.points.dark.fill,
+        picked.points.light.fill,
+        picked.checkers.light.fill,
+        picked.checkers.dark.fill,
+      ]) {
+        expect(colors.has(c)).toBe(true);
+      }
+      for (const c of [walnut.points.dark.fill, walnut.points.light.fill]) {
+        expect(colors.has(c)).toBe(false);
+      }
+    },
+  );
 });
