@@ -46,12 +46,14 @@ export function MatchEndScreen({
   const title = seats[winner].you
     ? t('game.end.matchWinner_you')
     : t('game.end.matchWinner', { name: name(winner) });
+  // Resign match keeps the score as it was (docs/rules/tavli-match.md,
+  // "Resigning"), so the screen says why the match ended (#181).
   const resigned =
     match.resignedBy === null
       ? null
       : seats[match.resignedBy].you
-        ? t('game.end.resigned_you')
-        : t('game.end.resigned', { name: name(match.resignedBy) });
+        ? t('game.end.resignedMatch_you')
+        : t('game.end.resignedMatch', { name: name(match.resignedBy) });
   const scoreLine = t('game.end.score', {
     white: name('white'),
     black: name('black'),

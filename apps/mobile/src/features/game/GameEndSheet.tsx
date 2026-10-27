@@ -23,7 +23,7 @@ export interface GameEndSheetProps {
   chip: string;
   /** Diplo (or more) gets a filled chip, mono an outlined one. */
   strongChip: boolean;
-  /** "Bot did not bear off any checker." or "Maria resigned." */
+  /** "Bot did not bear off any checker." or "Mono: Maria resigned the game." */
   reason: string | null;
   /** The game that comes next: "Next: game 3 · Fevga" (#109). */
   next?: string;

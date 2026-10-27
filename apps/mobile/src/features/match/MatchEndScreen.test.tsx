@@ -108,12 +108,46 @@ describe('<MatchEndScreen />', () => {
     ).toBeOnTheScreen();
   });
 
-  it('says who resigned', async () => {
+  it('says who resigned the match and keeps the score', async () => {
     const match = resignMatch(playedMatch([['white', 1]]), 'white');
     await show(botSetup, match).view;
     expect(screen.getByText('Bot wins the match!')).toBeOnTheScreen();
-    expect(screen.getByText('You resigned.')).toBeOnTheScreen();
+    expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
     expect(screen.getByText('1 – 0')).toBeOnTheScreen();
+  });
+
+  // #181: Resign match never resets the score and never gives the target.
+  it('a match resigned at the start shows 0 – 0 and says why', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    await show(botSetup, resignMatch(playedMatch([]), 'white')).view;
+    expect(screen.getByRole('header', { name: 'Bot wins the match!' })).toBeOnTheScreen();
+    expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
+    expect(screen.getByText('0 – 0')).toBeOnTheScreen();
+    expect(screen.queryByTestId('match-games')).toBeNull();
+    expect(announce).toHaveBeenCalledWith(
+      'Bot wins the match! You resigned the match. You 0 – 0 Bot',
+    );
+  });
+
+  it('a match resigned after a resigned game keeps its 0 – 2', async () => {
+    let match = playedMatch([]);
+    match = recordGameResult(
+      match,
+      { winner: 'black', points: 2, reason: 'resigned' },
+      { starter: 'white' },
+    );
+    await show(botSetup, resignMatch(match, 'white')).view;
+    expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
+    expect(screen.getByText('0 – 2')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Final score: You 0 – 2 Bot')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Game 1 · Portes, Bot won, Diplo, 2 points')).toBeOnTheScreen();
+  });
+
+  it('pass-and-play: names the player who resigned the match', async () => {
+    await show(localSetup, resignMatch(playedMatch([['white', 2]]), 'white')).view;
+    expect(screen.getByText('Player 2 wins the match!')).toBeOnTheScreen();
+    expect(screen.getByText('Maria resigned the match.')).toBeOnTheScreen();
+    expect(screen.getByText('2 – 0')).toBeOnTheScreen();
   });
 
   it('pass-and-play: names, and the winner is always celebrated', async () => {

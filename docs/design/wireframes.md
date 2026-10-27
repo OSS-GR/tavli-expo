@@ -338,7 +338,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - Celebration effect area (Lottie). Only when a human wins.
   - Title: "You win the game!" / "Bot wins the game" / "Maria wins the game!".
   - Win type chip: **Mono · +1 point** or **Diplo · +2 points**. The English UI keeps the Greek names (`tavli-match.md`). The rules page explains them ("single" and "double").
-  - Reason line, for example "Bot did not bear off any checker." or "Maria resigned."
+  - Reason line, for example "Bot did not bear off any checker." or, after a resign, why it gives these points: "Diplo: Maria resigned before bearing off a checker." / "Mono: you resigned the game." (#181)
   - Match box: "You 2 – 0 Bot", "first to 3".
   - **Next game** (main button, "You start (winner starts)").
   - **Home** (text button). The match is saved, so Home shows "Continue game".
@@ -353,6 +353,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 - **Elements:**
   - Celebration area (cup and confetti) when a human wins.
   - "You won the match!" / "Bot won the match" / "Maria won the match!".
+  - After **Resign match**: "You resigned the match." / "Maria resigned the match." The score stays as it was (#181).
   - Big final score "3 – 1", with the names under it.
   - Line: game, opponent, target.
   - Game list: one row per game with winner, **Mono / Diplo** chip and points.

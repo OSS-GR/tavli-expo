@@ -356,8 +356,13 @@ export function GameScreen({
   });
   const startsLine = (player: PlayerId) =>
     isYou(player) ? t('game.end.starts_you') : t('game.end.starts', { name: nameOf(player) });
-  const resignedLine = (loser: PlayerId) =>
-    isYou(loser) ? t('game.end.resigned_you') : t('game.end.resigned', { name: nameOf(loser) });
+  // A resigned game says why it gives these points (#181): "Diplo: you
+  // resigned before you bore off a checker."
+  const resignedLine = (loser: PlayerId, type: ReturnType<typeof winType>) => {
+    const key =
+      type === 'diplo' ? 'resignedDiplo' : type === 'mono' ? 'resignedMono' : 'resignedGame';
+    return isYou(loser) ? t(`game.end.${key}_you`) : t(`game.end.${key}`, { name: nameOf(loser) });
+  };
 
   // Screen readers hear each roll and the other player's moves (#134).
   const announcement = turnAnnouncement(flow, t, { nameOf, isYou });
@@ -456,7 +461,7 @@ export function GameScreen({
     const type = winType(result);
     let reason: string | null = null;
     if (result.reason === 'resigned' && loser !== null) {
-      reason = resignedLine(loser);
+      reason = resignedLine(loser, type);
     } else if (result.reason === 'borneOff' && type === 'diplo' && loser !== null) {
       reason = isYou(loser)
         ? t('game.end.noBearOff_you')
