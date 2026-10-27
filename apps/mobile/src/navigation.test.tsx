@@ -4,6 +4,7 @@
  * is a route.)
  */
 import type { createRecordingAnalytics } from '@tavli/contracts';
+import { within } from '@testing-library/react-native';
 import { router as appRouter } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
@@ -60,10 +61,13 @@ beforeEach(async () => {
     consentStore.setState({ status: 'denied' });
   });
   // The tutorial was not seen yet: Home offers it.
-  for (const game of ['portes', 'plakoto', 'fevga'] as const)
+  for (const game of ['portes', 'plakoto', 'fevga', 'asodio'] as const)
     storage.remove(tutorialStorageKey(game));
   await act(async () =>
-    tutorialStore.setState({ status: 'new', variants: { plakoto: 'new', fevga: 'new' } }),
+    tutorialStore.setState({
+      status: 'new',
+      variants: { plakoto: 'new', fevga: 'new', asodio: 'new' },
+    }),
   );
   // Each test starts with no match and an empty save slot.
   const current = matchSessions.current();
@@ -281,9 +285,12 @@ describe('tutorial (#128)', () => {
       },
     ]);
 
-    // Reopen from Settings → Help.
+    // Reopen from Settings → Help: pick the game first.
     await user.press(screen.getByRole('button', { name: 'Settings' }));
     await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(
+      within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Portes' }),
+    );
     expect(router.getPathname()).toBe('/tutorial');
     expect(router.getSearchParams()).toEqual({ from: 'settings' });
     await user.press(screen.getByRole('button', { name: 'Skip' }));
@@ -382,7 +389,107 @@ describe('tutorial (#128)', () => {
     expect(screen.getByText('Lesson 1 of 4')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Skip' }));
     expect(router.getPathname()).toBe('/rules/fevga');
-    expect(tutorialStore.getState().variants).toEqual({ plakoto: 'new', fevga: 'dismissed' });
+    expect(tutorialStore.getState().variants).toEqual({
+      plakoto: 'new',
+      fevga: 'dismissed',
+      asodio: 'new',
+    });
     expect(tutorialStore.getState().status).toBe('new');
+  });
+});
+
+describe('tutorial from Settings (#159)', () => {
+  const GAMES = [
+    ['portes', 'Portes', 'Learn to play', 7],
+    ['plakoto', 'Plakoto', 'Learn Plakoto', 4],
+    ['fevga', 'Fevga', 'Learn Fevga', 4],
+    ['asodio', 'Asodio', 'Learn Asodio', 4],
+  ] as const;
+
+  it.each(GAMES)('Settings → Help opens the %s lessons', async (game, label, title, count) => {
+    const user = setupUser();
+    await act(async () => consentStore.setState({ status: 'granted' }));
+    recorded.sent.length = 0;
+    const router = await renderRouter('./src/app', { initialUrl: '/settings' });
+
+    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    const picker = within(screen.getByTestId('tutorial-picker'));
+    expect(picker.getByRole('header', { name: 'Learn to play' })).toBeOnTheScreen();
+    expect(picker.getAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual([
+      'Portes',
+      'Plakoto',
+      'Fevga',
+      'Asodio',
+      'Cancel',
+    ]);
+    await user.press(picker.getByRole('button', { name: label }));
+
+    expect(router.getPathname()).toBe('/tutorial');
+    expect(router.getSearchParams()).toEqual(
+      game === 'portes' ? { from: 'settings' } : { from: 'settings', game },
+    );
+    expect(screen.getByRole('header', { name: title })).toBeOnTheScreen();
+    expect(screen.getByText(`Lesson 1 of ${count}`)).toBeOnTheScreen();
+    expect(recorded.sent.filter((e) => e.type === 'track')).toEqual([
+      { type: 'track', event: 'tutorial_started', props: { source: 'settings', game } },
+    ]);
+
+    // Skip goes back to Settings and saves only that game.
+    await user.press(screen.getByRole('button', { name: 'Skip' }));
+    expect(router.getPathname()).toBe('/settings');
+    expect(storage.getString(tutorialStorageKey(game))).toContain('dismissed');
+    for (const [other] of GAMES) {
+      if (other !== game) expect(storage.getString(tutorialStorageKey(other))).toBeUndefined();
+    }
+  });
+
+  it('Cancel closes the picker and stays in Settings', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/settings' });
+    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(
+      within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Cancel' }),
+    );
+    expect(screen.queryByTestId('tutorial-picker')).not.toBeOnTheScreen();
+    expect(router.getPathname()).toBe('/settings');
+  });
+
+  it('plays the Asodio lessons from Settings, saves them apart, then plays Asodio', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/settings' });
+    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(
+      within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Asodio' }),
+    );
+    await layoutTutorialBoard();
+
+    for (const [i] of LESSON_SETS.asodio.entries()) {
+      await playLessonByTaps(i, 'asodio');
+      await user.press(screen.getByRole('button', { name: 'Next' }));
+    }
+    expect(screen.getByRole('header', { name: 'You know Asodio!' })).toBeOnTheScreen();
+    // Saved for Asodio only.
+    expect(tutorialStore.getState().variants).toEqual({
+      plakoto: 'new',
+      fevga: 'new',
+      asodio: 'done',
+    });
+    expect(tutorialStore.getState().status).toBe('new');
+    expect(storage.getString('tutorial.asodio')).toContain('done');
+
+    await user.press(screen.getByRole('button', { name: 'Play Asodio' }));
+    expect(router.getPathname()).toBe('/new-game');
+    expect(router.getSearchParams()).toEqual({ mode: 'bot', first: 'asodio' });
+    expect(screen.getByRole('radio', { name: /^Asodio/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Easy' })).toBeChecked();
+  });
+
+  it('opens the Asodio lessons from its rules page', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/rules/asodio' });
+    await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+    expect(router.getPathname()).toBe('/tutorial');
+    expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'asodio' });
+    expect(screen.getByRole('header', { name: 'Learn Asodio' })).toBeOnTheScreen();
   });
 });

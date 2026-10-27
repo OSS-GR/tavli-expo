@@ -169,7 +169,8 @@ export function defaultSetup(mode: MatchMode): MatchSetup {
 
 /**
  * The setup of the first game after the tutorial (#128): the game of the
- * lessons (Portes, or Plakoto or Fevga after their lessons, #149) vs the
+ * lessons (Portes, or Plakoto, Fevga or Asodio after their lessons, #149,
+ * #159) vs the
  * Easy bot (or the easiest level this build has). The match length comes
  * from `base` (the last choices).
  */

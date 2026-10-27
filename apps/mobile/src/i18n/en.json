@@ -109,6 +109,10 @@
     "privacyPolicy": "Privacy policy",
     "version": "Tavlaki {{version}}",
     "learnToPlay": "Learn to play",
+    "learnToPlayPicker": {
+      "title": "Learn to play",
+      "body": "Pick a game. Each one has a few short lessons on the board."
+    },
     "history": {
       "open": "Match history",
       "clear": "Clear history",
@@ -676,6 +680,34 @@
         "hint": "A 5 from point 24 makes six in a row. Move the lit checker with the 6.",
         "done": "The 5 is lost. Six in a row is not allowed on your points 6 to 11 either, right in front of your opponent's mother.",
         "board": "Board. You hold points 20 to 24. Your checker on point 8 is lit. The dark checkers hold points 13 to 18. Dice 6 and 5."
+      },
+      "aceDeuce": {
+        "title": "Open the board with 1-2 (ασόδυο)",
+        "body": "In Asodio all 15 checkers start off the board. The board stays locked until you roll a 1-2 or a double. You rolled 1-2: the 1 enters a checker on point 24, the 2 on point 23. Tap the lit stack of waiting checkers, then a ring.",
+        "hint": "Tap the lit stack of waiting checkers, then the ring on point 24 or 23.",
+        "done": "The board is open! Any other first roll would have done nothing, and the turn would pass.",
+        "board": "Board. All 15 of your checkers wait off the board, and are lit. Dice 1 and 2."
+      },
+      "enterAll": {
+        "title": "Enter all 15 first",
+        "body": "Now each die enters one more checker. A double enters four, all on the same point. Your checkers on the board wait until all 15 are in. You rolled 3-3: enter your last four checkers on point 22.",
+        "hint": "The checkers on the board cannot move yet. Enter a waiting checker on point 22.",
+        "done": "All 15 are in! Now your army may move on.",
+        "board": "Board. 11 of your checkers are on points 20 to 24. 4 more wait off the board, and are lit. Dice 3-3."
+      },
+      "quarterLock": {
+        "title": "Quarter by quarter",
+        "body": "Your path has four quarters of six points. A checker that moves into a new quarter is frozen there until all 15 have reached it. Your 14 checkers on points 14 to 18 are frozen: your last checker, on point 20, holds them back. Move it up with one die. Then move any checker with the other.",
+        "hint": "The darker checkers are frozen. First move the lit checker on point 20.",
+        "done": "All 15 were in one quarter again, so your army could move on. Your last checker sets the pace.",
+        "board": "Board. Your last checker, on point 20, is lit. Your other 14 checkers are on points 14 to 18, frozen. Dice 4 and 3."
+      },
+      "pinLast": {
+        "title": "Pin the last checker",
+        "body": "There is no hitting in Asodio: you pin, as in Plakoto. Your opponent’s last checker sits alone on point 10, and the rest of their army waits for it, frozen. Pin it with the lit checker.",
+        "hint": "Move the lit checker 6 points, onto the dark checker on point 10.",
+        "done": "Pinned! Your opponent’s last checker cannot move, so their whole army is frozen. They pass until you leave point 10.",
+        "board": "Board. Your checker on point 16 is lit. Your opponent’s last checker sits alone on point 10. Their other checkers are on points 13 and 14, frozen. Dice 6 and 2."
       }
     },
     "end": {
@@ -687,17 +719,24 @@
     "games": {
       "plakoto": {
         "title": "Learn Plakoto",
-        "skipHint": "Leave the lesson. You can open it again from the Plakoto rules page.",
+        "skipHint": "Leave the lesson. You can open it again from Settings or the Plakoto rules page.",
         "endTitle": "You know Plakoto!",
         "endBody": "Now play a game of Plakoto against the Easy bot. The rules page has the rest.",
         "play": "Play Plakoto"
       },
       "fevga": {
         "title": "Learn Fevga",
-        "skipHint": "Leave the lesson. You can open it again from the Fevga rules page.",
+        "skipHint": "Leave the lesson. You can open it again from Settings or the Fevga rules page.",
         "endTitle": "You know Fevga!",
         "endBody": "Now play a game of Fevga against the Easy bot. The rules page has the rest.",
         "play": "Play Fevga"
+      },
+      "asodio": {
+        "title": "Learn Asodio",
+        "skipHint": "Leave the lesson. You can open it again from Settings or the Asodio rules page.",
+        "endTitle": "You know Asodio!",
+        "endBody": "Now play a game of Asodio against the Easy bot. The rules page has the rest.",
+        "play": "Play Asodio"
       }
     },
     "motherCard": {

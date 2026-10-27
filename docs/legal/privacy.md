@@ -81,14 +81,14 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Event | When |
 |-------|------|
 | App opened | Once each time the app starts |
-| Game started | A game begins. Includes: against the bot or pass-and-play; which game (Portes, Plakoto, Fevga, Asodio); points to win; bot level |
+| Game started | A game begins. Includes: against the bot or pass-and-play; which game (Portes, Plakoto, Fevga, Asodio, or Tavli: all three in turn); points to win; bot level |
 | Game finished | A game ends. Includes: the game; how it ended (single, double, resign, draw); number of turns; length in seconds |
 | Game left | You start a new match while a game is not over. Includes: against the bot or pass-and-play; the game; the turn number |
 | Undo used | You took back a move |
 | Resign | You resigned a game or a match |
 | Setting changed | You changed a setting. Includes the setting's name only, not its value |
-| Theme changed | You picked another board theme. Includes the theme's name |
-| Tutorial started | You opened the tutorial. Includes where you opened it from (home, rules or settings) and its game (Portes, Plakoto or Fevga) |
+| Theme changed | You picked another board theme or other app colors. Includes which of the two, and the theme's name |
+| Tutorial started | You opened the tutorial. Includes where you opened it from (home, rules or settings) and its game (Portes, Plakoto, Fevga or Asodio) |
 | Tutorial step | You finished a lesson of the tutorial. Includes the game, and the lesson's number and name (for example "hit") |
 | Tutorial finished | You finished the last lesson of the tutorial. Includes the game |
 | Tutorial skipped | You tapped Skip in the tutorial. Includes the game, and the lesson's number and name on screen |
