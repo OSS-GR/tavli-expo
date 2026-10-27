@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useUnistyles } from 'react-native-unistyles';
 
+import { useAppAnalytics } from '@/features/analytics/useAppAnalytics';
 import { CrashBoundary } from '@/features/crash/CrashBoundary';
 import { matchSessions } from '@/features/match/appSessions';
 import { useSaveOnBackground } from '@/features/match/useSaveOnBackground';
@@ -12,6 +13,7 @@ import { crashReporter } from '@/services';
 function RootStack() {
   const { theme } = useUnistyles();
   useLanguageSync();
+  useAppAnalytics();
   useSaveOnBackground(matchSessions.saveNow);
 
   return (
@@ -26,6 +28,8 @@ function RootStack() {
           headerShadowVisible: false,
         }}>
         <Stack.Screen name="settings" options={{ headerShown: true }} />
+        {/* First launch (#61): no swipe back to Home before the user answers. */}
+        <Stack.Screen name="welcome/language" options={{ gestureEnabled: false }} />
         <Stack.Screen name="rules/[variant]" options={{ headerShown: true }} />
         {/* No swipe back on the board: it would fight the checker drag. */}
         <Stack.Screen name="game/[id]/index" options={{ gestureEnabled: false }} />

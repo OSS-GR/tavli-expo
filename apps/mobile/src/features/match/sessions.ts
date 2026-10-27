@@ -10,10 +10,15 @@
  * - on `saveNow()` (the app goes to the background, the user exits);
  * - a finished match is removed from the slot.
  * `get(id)` loads the saved match after an app restart.
+ *
+ * With `createAnalytics`, every match sends game events (#61): a new one
+ * sends `game_started`; a resumed one does not (it started before). A new
+ * match that replaces an unfinished one sends `game_abandoned` for it.
  */
 import type { Difficulty, Storage } from '@tavli/contracts';
 import type { MatchFlow, Rng } from '@tavli/engine';
 
+import type { GameAnalytics } from '@/features/analytics/gameAnalytics';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
 
 import {
@@ -54,6 +59,8 @@ export interface SessionDeps {
   /** The bot levels this build can play (a saved level it cannot play becomes Easy). */
   readonly levels?: readonly Difficulty[];
   readonly now?: () => number;
+  /** Game events for a match (#61). Leave it out in tests that do not check them. */
+  readonly createAnalytics?: (setup: MatchSetup) => GameAnalytics;
 }
 
 /** A new local match id. Not a secret; it only has to be unique on this phone. */
@@ -72,9 +79,11 @@ export function createSessionRegistry({
   storage,
   levels = ['easy'],
   now = Date.now,
+  createAnalytics,
 }: SessionDeps): SessionRegistry {
   let session: MatchSession | null = null;
   let unsubscribe: (() => void) | null = null;
+  let sessionAnalytics: GameAnalytics | null = null;
 
   // It runs inside the store's `set` (a subscriber), after the flow has
   // changed. A storage error must not throw out of `dispatch`: the move is
@@ -125,9 +134,10 @@ export function createSessionRegistry({
     return result;
   };
 
-  const attach = (next: MatchSession) => {
+  const attach = (next: MatchSession, analytics: GameAnalytics | undefined) => {
     unsubscribe?.();
     session = next;
+    sessionAnalytics = analytics ?? null;
     unsubscribe = next.store.subscribe((state, prev) => {
       if (state.flow === prev.flow) return;
       if (state.flow.match.status === 'finished' || isRestPoint(state.flow)) write(next);
@@ -138,19 +148,36 @@ export function createSessionRegistry({
     unsubscribe?.();
     unsubscribe = null;
     session = null;
+    sessionAnalytics = null;
+  };
+
+  // A new match replaces the one before it. If that one was not over (in
+  // memory, or only in the save slot after a restart), the player left it:
+  // `game_abandoned`. `gameAbandoned` ignores a finished game or match.
+  const abandonPrevious = () => {
+    if (!createAnalytics) return;
+    if (session) {
+      sessionAnalytics?.gameAbandoned(session.store.getState().flow);
+      return;
+    }
+    const result = peek();
+    if (result.kind === 'ok') createAnalytics(result.saved.setup).gameAbandoned(result.saved.flow);
   };
 
   return {
     start: (setup) => {
+      abandonPrevious();
       forget();
       removeSaved();
+      const analytics = createAnalytics?.(setup);
       const store = createGameStore({
         players: enginePlayers(setup),
         targetPoints: setup.targetPoints,
         rng: createRng(),
+        ...(analytics ? { analytics } : {}),
       });
       const next = { id: newMatchId(createRng(), now()), setup, store };
-      attach(next);
+      attach(next, analytics);
       write(next);
       return next;
     },
@@ -159,13 +186,17 @@ export function createSessionRegistry({
       const result = peek();
       if (result.kind !== 'ok' || result.saved.id !== id) return null;
       const { setup, flow } = result.saved;
+      // A resumed match gets game events too, but no new `game_started`:
+      // the game started before the app closed.
+      const analytics = createAnalytics?.(setup);
       const store = createGameStore({
         players: enginePlayers(setup),
         rng: createRng(),
         flow,
+        ...(analytics ? { analytics } : {}),
       });
       const restored = { id, setup, store };
-      attach(restored);
+      attach(restored, analytics);
       return restored;
     },
     current: () => session,

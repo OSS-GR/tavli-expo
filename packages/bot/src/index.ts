@@ -48,6 +48,14 @@ export {
 } from './evaluators/portes-heuristic';
 export type { PortesWeights } from './evaluators/portes-heuristic';
 export {
+  FEVGA_DEFAULT_WEIGHTS,
+  FEVGA_HEURISTIC_ID,
+  createFevgaHeuristic,
+  evaluateFevgaSides,
+  fevgaHeuristic,
+} from './evaluators/fevga-heuristic';
+export type { FevgaWeights } from './evaluators/fevga-heuristic';
+export {
   PLAKOTO_DEFAULT_WEIGHTS,
   PLAKOTO_HEURISTIC_ID,
   createPlakotoHeuristic,

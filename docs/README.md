@@ -40,6 +40,7 @@
 | [Board screen](architecture/board-screen.md) | How the app draws the board (Skia), board flip, tests and screenshots |
 | [App shell](architecture/app-shell.md) | Home, new game, local matches, the bot turn, in-game menu |
 | [iMessage version](architecture/imessage.md) | How a GamePigeon-style version works |
+| [Analytics events](architecture/analytics-events.md) | Usage events, consent rules (GDPR), PostHog EU setup |
 
 ## Design
 

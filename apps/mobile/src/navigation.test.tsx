@@ -8,6 +8,7 @@ import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { matchSessions } from '@/features/match/appSessions';
+import { consentStore } from '@/features/privacy/consentStore';
 import { SAVED_MATCH_KEY } from '@/features/match/savedMatch';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -29,6 +30,8 @@ jest.mock('expo-router/build/testing-library/mocks', () => {
 beforeEach(async () => {
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS });
+    // The user already answered the first-launch consent, so Home shows.
+    consentStore.setState({ status: 'denied' });
   });
   // Each test starts with no match and an empty save slot.
   const current = matchSessions.current();

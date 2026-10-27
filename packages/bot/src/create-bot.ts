@@ -10,12 +10,14 @@
  * | Level  | Evaluator           | Temperature                      |
  * | ------ | ------------------- | -------------------------------- |
  * | random | none                | uniform over the legal turns     |
- * | easy   | Portes heuristic    | high (many small mistakes)       |
- * | medium | Portes heuristic    | low (mostly the best turn)       |
+ * | easy   | variant heuristic   | high (many small mistakes)       |
+ * | medium | variant heuristic   | low (mostly the best turn)       |
  * | hard   | none yet (#52)      | throws `NOT_IMPLEMENTED`         |
  *
- * Easy for a variant with no evaluator falls back to a random turn, but
- * still takes a turn that wins at once. Medium and hard need an evaluator.
+ * The variant heuristics: Portes (`portes-heuristic.ts`) and Fevga
+ * (`fevga-heuristic.ts`). Easy for a variant with no evaluator falls back to
+ * a random turn, but still takes a turn that wins at once. Medium and hard
+ * need an evaluator.
  */
 
 import { BOT_DIFFICULTIES } from '@tavli/contracts';
@@ -32,6 +34,7 @@ import { VARIANT_REGISTRY, getVariant } from '@tavli/engine';
 
 import { questionOf, scoreAnswers } from './answer';
 import { BotError } from './errors';
+import { fevgaHeuristic } from './evaluators/fevga-heuristic';
 import { plakotoHeuristic } from './evaluators/plakoto-heuristic';
 import { portesHeuristic } from './evaluators/portes-heuristic';
 import { pickOne, randomUnit } from './random';
@@ -50,10 +53,11 @@ import type {
 /** An empty registry: only `random` and the easy fallback work. */
 export const EMPTY_EVALUATOR_REGISTRY: EvaluatorRegistry = new Map();
 
-/** The built-in evaluators: the Portes and Plakoto heuristics for easy and medium. */
+/** The built-in evaluators: one heuristic per variant, for easy and medium. */
 export const DEFAULT_EVALUATORS: EvaluatorRegistry = new Map([
   ['portes', { easy: portesHeuristic, medium: portesHeuristic }],
   ['plakoto', { easy: plakotoHeuristic, medium: plakotoHeuristic }],
+  ['fevga', { easy: fevgaHeuristic, medium: fevgaHeuristic }],
 ]);
 
 /**

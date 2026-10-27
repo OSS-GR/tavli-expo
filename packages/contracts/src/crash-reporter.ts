@@ -12,6 +12,7 @@
  * Adapters: `@tavli/crash-sentry` (the app), `createNoopCrashReporter` and
  * `createRecordingCrashReporter` (tests and local dev).
  */
+import { isAnonymousInstallId } from './install-id';
 
 /** How serious a message is. Same names as Sentry's levels. */
 export const CRASH_LEVELS = ['fatal', 'error', 'warning', 'info', 'debug'] as const;
@@ -74,14 +75,6 @@ export interface CrashReporter {
   addBreadcrumb(breadcrumb: CrashBreadcrumb): void;
   /** Turns sending on or off, for example after a privacy opt-out. */
   setEnabled(enabled: boolean): void;
-}
-
-/**
- * True for a random install id: 8 to 64 letters, digits, `-` or `_`.
- * This rejects emails, names with spaces and other personal data.
- */
-export function isAnonymousInstallId(id: unknown): id is string {
-  return typeof id === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(id);
 }
 
 /** A CrashReporter that does nothing. */
