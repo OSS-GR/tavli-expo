@@ -29,7 +29,7 @@ import { opponent } from '@tavli/engine';
 
 import type { Evaluation, Evaluator, TurnScore } from '../types';
 import { bearoffRolls, bearoffWinChance } from './bearoff';
-import { BAR, OFF, hasContact, pips, playTurn, sideOf } from './portes-board';
+import { BAR, OFF, hasContact, pips, playTurn, portesTurnPoints, sideOf } from './portes-board';
 import type { Side } from './portes-board';
 import { effectiveRacePips, kleinmanWinChance, raceDoubleChance } from './race';
 import { countShots } from './shots';
@@ -256,13 +256,6 @@ export function evaluateSides(roller: Side, waiter: Side, w: PortesWeights): Eva
   return { win, winDouble, loseDouble, equity: 2 * win - 1 + winDouble - loseDouble };
 }
 
-/** True if `loser` has a checker on the bar or in the winner's home (own 19–24). */
-function isBackgammon(loser: Side): boolean {
-  if (at(loser, BAR) > 0) return true;
-  for (let p = 19; p <= 24; p += 1) if (at(loser, p) > 0) return true;
-  return false;
-}
-
 /** Builds the evaluator. Weights default to `PORTES_DEFAULT_WEIGHTS`. */
 export function createPortesHeuristic(weights: PortesWeights = PORTES_DEFAULT_WEIGHTS): Evaluator {
   return {
@@ -281,11 +274,8 @@ export function createPortesHeuristic(weights: PortesWeights = PORTES_DEFAULT_WE
       const triple = state.rules.scoring.backgammonScores3;
       return turns.map((turn) => {
         const [mine, theirs] = playTurn(me, them, turn);
-        if (at(mine, OFF) === 15) {
-          let points = 1;
-          if (at(theirs, OFF) === 0) points = triple && isBackgammon(theirs) ? 3 : 2;
-          return { score: points, gameOver: true };
-        }
+        const points = portesTurnPoints(mine, theirs, triple);
+        if (points !== null) return { score: points, gameOver: true };
         // The opponent rolls next: their equity is our loss.
         return { score: -evaluateSides(theirs, mine, weights).equity, gameOver: false };
       });

@@ -300,11 +300,13 @@ describe('a win now is never missed', () => {
 });
 
 describe('registry', () => {
-  it('reports easy, medium and hard as supported for Portes', () => {
+  it('reports easy, medium and hard for Portes, Plakoto and Fevga', () => {
     const bot = createBot();
     expect(bot.supportedLevels('portes')).toEqual(['easy', 'medium', 'hard']);
-    // The other variants have no hard evaluator yet.
-    expect(bot.supportedLevels('plakoto')).toEqual(['easy', 'medium']);
+    expect(bot.supportedLevels('plakoto')).toEqual(['easy', 'medium', 'hard']);
+    expect(bot.supportedLevels('fevga')).toEqual(['easy', 'medium', 'hard']);
+    // Asodio has no hard evaluator yet.
+    expect(bot.supportedLevels('asodio')).toEqual(['easy', 'medium']);
     expect(bot.supportedLevels('nope')).toEqual([]);
     expect(createBot({ evaluators: EMPTY_EVALUATOR_REGISTRY }).supportedLevels('portes')).toEqual([
       'easy',

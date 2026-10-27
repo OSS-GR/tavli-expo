@@ -36,6 +36,8 @@ export function encodeFloat32(values: ArrayLike<number>): string {
 /** Decodes `encodeFloat32` text. Throws on a bad character or length. */
 export function decodeFloat32(text: string): Float32Array {
   const clean = text.replace(/=+$/, '');
+  // One base64 character left over holds only 6 bits: no whole byte.
+  if (clean.length % 4 === 1) throw new RangeError('base64 text has a bad length');
   const byteLength = Math.floor((clean.length * 3) / 4);
   if (byteLength % 4 !== 0) throw new RangeError('base64 text is not a Float32 array');
   const bytes = new Uint8Array(byteLength);

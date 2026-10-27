@@ -158,8 +158,8 @@ export interface BotRegistry {
   readonly variants?: VariantRegistry;
   /**
    * Evaluators by variant and level. Default: `DEFAULT_EVALUATORS` (a
-   * heuristic per variant for easy and medium, the Portes net for Portes
-   * hard), for the variants in `variants`.
+   * heuristic per variant for easy and medium, a trained net for Portes,
+   * Plakoto and Fevga hard), for the variants in `variants`.
    */
   readonly evaluators?: EvaluatorRegistry;
   /** Override the noise of a level. Default: `DEFAULT_LEVEL_POLICIES`. */

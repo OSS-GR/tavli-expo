@@ -1,7 +1,9 @@
 import { act, render, screen, userEvent } from '@testing-library/react-native';
 
+import { createBot } from '@tavli/bot';
 import type { Difficulty } from '@tavli/contracts';
 
+import { botLevelsByGame } from '@/features/bot/levels';
 import { defaultSetup, gameLevels, type GameLevels, type MatchMode } from '@/features/match/setup';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -294,6 +296,22 @@ describe('<NewGameScreen /> game picker (#109)', () => {
     expect(screen.getByText('Hard is coming soon.')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     expect(onStart.mock.calls[1][0]).toMatchObject({ game: 'tavli', botLevel: 'easy' });
+  });
+
+  it('offers Hard for Tavli with the real bot: Portes, Plakoto and Fevga all have it (#156)', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('bot', botLevelsByGame(createBot()));
+    await render(ui);
+
+    await user.press(screen.getByRole('radio', { name: /^Tavli/ }));
+    expect(screen.getByRole('radio', { name: 'Hard' })).toBeEnabled();
+    await user.press(screen.getByRole('radio', { name: 'Hard' }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart.mock.calls[0][0]).toMatchObject({ game: 'tavli', botLevel: 'hard' });
+
+    // Asodio has no Hard yet.
+    await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
+    expect(screen.getByRole('radio', { name: 'Hard' })).toBeDisabled();
   });
 
   it('opens every built game in pass-and-play, even with no bot for them', async () => {

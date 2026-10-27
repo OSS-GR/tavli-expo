@@ -1,12 +1,25 @@
 /**
- * Large system fonts (#134): Home, New game, the game screen, the end
- * screens, History (#142), the tutorial's mother card (#149) and the
- * Settings game picker (#159) follow the font size with no cut text. Jest
+ * Large system fonts (#134): Home, New game, the game screen and its cards
+ * (#153), the game menu and resign dialog, the end screens, History (#142),
+ * the tutorial's mother card (#149) and the Settings game picker (#159)
+ * follow the font size with no cut text. Cards and sheets scroll when they
+ * get taller than the screen. Jest
  * cannot measure text, so `textScalingProblems` checks the layout rules
  * that keep text whole (see `test/textScaling.ts`), in English and in Greek.
  */
-import { createMatch, createSeededRng, recordGameResult, type Match } from '@tavli/engine';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import {
+  createBoard,
+  createGameFlow,
+  createMatch,
+  createSeededRng,
+  plakoto,
+  portes,
+  recordGameResult,
+  resolveRules,
+  type BoardState,
+  type Match,
+} from '@tavli/engine';
+import { act, fireEvent, screen } from '@testing-library/react-native';
 
 import { HistoryScreen } from '@/features/history/HistoryScreen';
 import type { HistoryRecord } from '@/features/history/records';
@@ -14,8 +27,10 @@ import { ContinueCard } from '@/features/home/ContinueCard';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
-import { GameScreen } from '@/features/game/GameScreen';
+import { GameScreen, OPENING_RESULT_MS } from '@/features/game/GameScreen';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
+import { MatchScreen } from '@/features/match/MatchScreen';
+import { createSessionRegistry } from '@/features/match/sessions';
 import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
@@ -24,6 +39,7 @@ import { settingsStore } from '@/features/settings/store';
 import { TutorialScreen } from '@/features/tutorial/TutorialScreen';
 import i18n from '@/i18n';
 
+import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 import { textScalingProblems } from '../../../test/textScaling';
 import { layoutTutorialBoard, playLessonByTaps } from '../../../test/tutorialTaps';
@@ -32,6 +48,9 @@ import type { JsonNode } from '../../../test/tree';
 const problems = () => textScalingProblems(screen.toJSON() as JsonNode | JsonNode[] | null);
 
 const LANGUAGES = ['en', 'el'] as const;
+
+// The game screen closes the opening result on a timer (see test/clock.ts).
+runOnFakeTimers();
 
 beforeEach(async () => {
   await act(async () => {
@@ -119,7 +138,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
   async function showGame(store: GameStore) {
     await renderWithRoot(<GameScreen store={store} onOpenMenu={jest.fn()} onHome={jest.fn()} />);
     await act(async () => {
-      fireEvent(screen.getByTestId('game-board'), 'layout', {
+      fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
         nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 520 } },
       });
     });
@@ -135,14 +154,17 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
 
-    // A turn: strips, move list, Undo · dice · Confirm.
+    // The opening result, then a turn: strips, move list, Undo · dice · Confirm.
     await act(async () => {
       store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
       store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
     });
-    await waitFor(() => expect(screen.getByTestId('move-list')).toBeOnTheScreen(), {
-      timeout: 3000,
+    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await act(async () => {
+      jest.advanceTimersByTime(OPENING_RESULT_MS);
     });
+    expect(screen.getByTestId('move-list')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
 
     // The game-end sheet.
@@ -150,6 +172,89 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       store.getState().dispatch({ type: 'resign', player: 'black' });
     });
     expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
+
+  /** A store whose game starts from `board`, White to roll. */
+  function storeAt(board: BoardState, game: 'portes' | 'plakoto'): GameStore {
+    const rules = resolveRules(game, { match: { rotation: [game] } });
+    const store = createGameStore({
+      players: { white: 'Maria Papadopoulou', black: 'Bob' },
+      rules,
+      rng: createSeededRng(1),
+    });
+    const options = { startingPlayer: 'white' as const, rules };
+    const initial =
+      game === 'portes' ? portes.initialState(options) : plakoto.initialState(options);
+    store.setState({
+      flow: {
+        ...store.getState().flow,
+        game: createGameFlow({ state: { ...initial, board }, starter: 'white' }),
+      },
+    });
+    return store;
+  }
+
+  it('the game screen cards: no legal moves, the mother question (#153)', async () => {
+    // Maria is on the bar and Bob holds all six entry points.
+    const closed = createBoard(
+      {
+        white: { points: { 6: 14 }, bar: 1 },
+        black: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
+      },
+      'contrary',
+    );
+    const passing = storeAt(closed, 'portes');
+    passing.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+    await showGame(passing);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+
+    // Maria pins Bob's mother (his last checker, on his own 24).
+    const pinning = storeAt(
+      createBoard(
+        {
+          white: { points: { 24: 10, 14: 2, 8: 2, 2: 1 } },
+          black: { points: { 24: 1, 20: 4, 16: 5, 12: 5 } },
+        },
+        'contrary',
+      ),
+      'plakoto',
+    );
+    const { dispatch } = pinning.getState();
+    dispatch({ type: 'roll', player: 'white', dice: [1, 6] });
+    dispatch({ type: 'move', player: 'white', move: { from: 2, to: 1, die: 1 } });
+    dispatch({ type: 'move', player: 'white', move: { from: 24, to: 18, die: 6 } });
+    dispatch({ type: 'confirm', player: 'white' });
+    await showGame(pinning);
+    expect(screen.getByTestId('mother-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
+
+  it('the game menu and the resign dialog', async () => {
+    const user = setupUser();
+    const session = createSessionRegistry({ createRng: () => createSeededRng(1) }).start(
+      defaultSetup('local'),
+    );
+    // Past the opening roll, so the player to move can resign.
+    const state = portes.initialState({ startingPlayer: 'white' });
+    session.store.setState({
+      flow: { ...session.store.getState().flow, game: createGameFlow({ state, starter: 'white' }) },
+    });
+    await renderWithRoot(
+      <MatchScreen
+        session={session}
+        onExit={jest.fn()}
+        onSettings={jest.fn()}
+        onRules={jest.fn()}
+        onMatchOver={jest.fn()}
+      />,
+    );
+    await user.press(screen.getByTestId('menu-button'));
+    expect(screen.getByTestId('game-menu')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await user.press(screen.getByTestId('menu-resign-match'));
+    expect(screen.getByTestId('resign-match-dialog')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   });
 

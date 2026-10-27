@@ -66,10 +66,8 @@ describe('simulator command line', () => {
     expect(runSimulateCli(['--help'], help)).toBe(0);
     expect(help.out[0]).toContain('Usage');
     const failing = io();
-    // Plakoto has no hard bot yet.
-    expect(runSimulateCli(['--games', '1', '--variant', 'plakoto', '--b', 'hard'], failing)).toBe(
-      1,
-    );
+    // Asodio has no hard bot yet.
+    expect(runSimulateCli(['--games', '1', '--variant', 'asodio', '--b', 'hard'], failing)).toBe(1);
     expect(failing.err[0]).toContain('NOT_IMPLEMENTED');
   });
 });

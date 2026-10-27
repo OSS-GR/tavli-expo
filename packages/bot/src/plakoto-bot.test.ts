@@ -68,12 +68,10 @@ const enginePath: Evaluator = {
 };
 
 describe('plakoto levels', () => {
-  it('plays easy and medium (hard not yet)', () => {
-    expect(bot.supportedLevels('plakoto')).toEqual(['easy', 'medium']);
+  it('plays easy, medium and hard (the Plakoto net)', () => {
+    expect(bot.supportedLevels('plakoto')).toEqual(['easy', 'medium', 'hard']);
     const start = plakoto.initialState({ startingPlayer: 'white' });
-    expect(() => bot.chooseTurn(start, [1, 2], 'hard', { rng: createSeededRng(1) })).toThrow(
-      expect.objectContaining({ code: 'NOT_IMPLEMENTED' }),
-    );
+    expect(() => bot.chooseTurn(start, [1, 2], 'hard', { rng: createSeededRng(1) })).not.toThrow();
     // A turn cannot start while the mother question waits (the engine says so).
     expect(() =>
       bot.chooseTurn(askedState(), [1, 2], 'medium', { rng: createSeededRng(1) }),
@@ -197,9 +195,14 @@ describe('the mother question (offerConcede)', () => {
     expect(() =>
       bot.chooseAnswer(portes.initialState({ startingPlayer: 'white' }), 'easy', { rng }),
     ).toThrow(expect.objectContaining({ code: 'INVALID_REQUEST' }));
-    expect(() => bot.chooseAnswer(asked, 'hard', { rng })).toThrow(
+    const noHard = createBot({
+      evaluators: new Map([['plakoto', { easy: plakotoHeuristic, medium: plakotoHeuristic }]]),
+    });
+    expect(() => noHard.chooseAnswer(asked, 'hard', { rng })).toThrow(
       expect.objectContaining({ code: 'NOT_IMPLEMENTED' }),
     );
+    // Hard plays on, like medium: playing on never loses more than resigning.
+    expect(bot.chooseAnswer(asked, 'hard', { rng })).toBe('playOn');
   });
 
   it('the inline runner answers like the bot, and can be cancelled', async () => {

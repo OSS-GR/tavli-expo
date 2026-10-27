@@ -7,7 +7,7 @@ import {
   type Dice,
   type PlayerId,
 } from '@tavli/engine';
-import { act, screen, userEvent, waitFor, within } from '@testing-library/react-native';
+import { act, screen, waitFor, within } from '@testing-library/react-native';
 
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
@@ -17,6 +17,7 @@ import { MatchScreen } from './MatchScreen';
 import { createSessionRegistry, type MatchSession } from './sessions';
 import { defaultSetup, type MatchSetup } from './setup';
 
+import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 
 const FAST = { beforeRollMs: 20, moveMs: 5, thinkMs: () => 5 };
@@ -48,6 +49,10 @@ function show(s: MatchSession, timing = FAST) {
 const button = (name: string | RegExp) => screen.getByRole('button', { name });
 const game = (s: MatchSession) => s.store.getState().flow.game;
 
+// The bot waits and thinks on timers, and the game screen closes its cards
+// on timers (see test/clock.ts).
+runOnFakeTimers();
+
 beforeEach(async () => {
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS });
@@ -56,7 +61,7 @@ beforeEach(async () => {
 
 describe('<MatchScreen /> vs bot', () => {
   it('rolls both opening dice with one tap', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const s = session(defaultSetup('bot'));
     await show(s).view;
 
@@ -86,17 +91,19 @@ describe('<MatchScreen /> vs bot', () => {
   });
 
   it('waits while the menu is open and goes on after Resume', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const s = session(defaultSetup('bot'));
     startWith(s, 'black');
-    // The bot waits 600 ms before it rolls. Opening the menu takes much less,
-    // even on a cold cache, and the menu stays open longer than that.
+    // The bot waits 600 ms before it rolls. On the fake clock the tap on the
+    // menu takes 130 ms (setupUser), so the menu opens before the bot rolls.
     await show(s, { beforeRollMs: 600, moveMs: 5, thinkMs: () => 5 }).view;
 
     await user.press(button('Game menu'));
     expect(screen.getByTestId('game-menu')).toBeOnTheScreen();
+    expect(game(s).phase).toBe('awaiting-roll');
+    // The menu stays open much longer than the bot's wait.
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 900));
+      jest.advanceTimersByTime(5000);
     });
     expect(game(s).phase).toBe('awaiting-roll');
     expect(game(s).state.toMove).toBe('black');
@@ -106,7 +113,7 @@ describe('<MatchScreen /> vs bot', () => {
   });
 
   it('resigns the game after the confirm dialog (diplo at the start)', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const s = session(defaultSetup('bot'));
     startWith(s, 'white');
     const { props, view } = show(s);
@@ -146,7 +153,7 @@ describe('<MatchScreen /> vs bot', () => {
   });
 
   it('resigns the match and asks for the match-end screen', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const s = session(defaultSetup('bot'));
     startWith(s, 'white');
     const { props, view } = show(s);
@@ -160,13 +167,15 @@ describe('<MatchScreen /> vs bot', () => {
     expect(s.store.getState().flow.match.winner).toBe('black');
     // No card over the board: the match-end screen opens after a moment.
     expect(screen.queryByTestId('game-end-card')).toBeNull();
-    await waitFor(() => expect(props.onMatchOver).toHaveBeenCalledTimes(1), {
-      timeout: MATCH_END_DELAY_MS + 2000,
+    expect(props.onMatchOver).not.toHaveBeenCalled();
+    await act(async () => {
+      jest.advanceTimersByTime(MATCH_END_DELAY_MS);
     });
+    expect(props.onMatchOver).toHaveBeenCalledTimes(1);
   });
 
   it('opens rules, settings and home from the menu', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const s = session(defaultSetup('bot'));
     startWith(s, 'white');
     const { props, view } = show(s);
@@ -196,7 +205,7 @@ describe('<MatchScreen /> pass-and-play', () => {
   });
 
   it('lets the player to move resign; no game resign during the opening roll', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const s = session({ ...defaultSetup('local'), names: { white: 'Maria', black: 'Nikos' } });
     await show(s).view;
 
@@ -212,6 +221,32 @@ describe('<MatchScreen /> pass-and-play', () => {
         'Maria wins 2 points (diplo), because Nikos has not borne off any checker yet.',
       ),
     ).toBeOnTheScreen();
+  });
+
+  it('screen readers skip the game under the menu and the resign dialog (#153)', async () => {
+    const user = setupUser();
+    const s = session(defaultSetup('local'));
+    startWith(s, 'white');
+    await show(s).view;
+    expect(screen.getByTestId('game-board')).toBeOnTheScreen();
+
+    await user.press(button('Game menu'));
+    expect(screen.getByTestId('game-menu')).toBeOnTheScreen();
+    expect(screen.queryByTestId('game-board')).toBeNull();
+    expect(screen.queryByTestId('strip-bottom')).toBeNull();
+    expect(screen.getByTestId('game-content', { includeHiddenElements: true })).toHaveProp(
+      'importantForAccessibility',
+      'no-hide-descendants',
+    );
+
+    await user.press(screen.getByTestId('menu-resign-game'));
+    expect(screen.getByTestId('resign-game-dialog')).toBeOnTheScreen();
+    expect(screen.queryByTestId('game-board')).toBeNull();
+
+    await user.press(screen.getByTestId('dialog-cancel'));
+    expect(screen.queryByTestId('resign-game-dialog')).toBeNull();
+    expect(screen.getByTestId('game-board')).toBeOnTheScreen();
+    expect(screen.getByTestId('strip-bottom')).toBeOnTheScreen();
   });
 });
 
@@ -276,7 +311,7 @@ describe('<MatchScreen /> pass-and-play turns', () => {
 
 describe('<MatchScreen /> the chosen game (#109)', () => {
   it('names the game of the Tavli rotation on the board and the next one after each game', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const s = session({ ...defaultSetup('local'), game: 'tavli', targetPoints: 5 });
     expect(s.store.getState().flow.match.rules.presetId).toBe('tavli');
     startWith(s, 'white');
@@ -295,8 +330,11 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
 
     let card = screen.getByTestId('game-end-card');
     expect(within(card).getByTestId('next-game-label')).toHaveTextContent('Next: game 2 · Plakoto');
-    // The finished game keeps its own label until Next game.
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 1 · Portes');
+    // The finished game keeps its own label until Next game (under the sheet,
+    // so screen readers skip it).
+    expect(screen.getByTestId('game-label', { includeHiddenElements: true })).toHaveTextContent(
+      'Game 1 · Portes',
+    );
     await user.press(within(card).getByRole('button', { name: /^Next game/ }));
 
     expect(game(s).state.variant).toBe('plakoto');
@@ -316,7 +354,7 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
   });
 
   it('plays a one-game match of Fevga: every game is Fevga', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const s = session({ ...defaultSetup('local'), game: 'fevga' });
     expect(game(s).state.variant).toBe('fevga');
     expect(s.store.getState().flow.match.rules.match.rotation).toEqual(['fevga']);

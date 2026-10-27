@@ -42,6 +42,9 @@ export interface CelebrationProps {
   testID?: string;
 }
 
+/** The height of the celebration area, by kind. */
+export const CELEBRATION_HEIGHT = { game: 64, match: 120 } as const;
+
 export function Celebration({ kind, testID }: CelebrationProps) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(reduceMotion ? 1 : 0);
@@ -97,7 +100,7 @@ function Piece({
 
 const styles = StyleSheet.create((theme) => ({
   area: (kind: 'game' | 'match') => ({
-    height: kind === 'match' ? 120 : 64,
+    height: CELEBRATION_HEIGHT[kind],
     alignItems: 'center',
     justifyContent: 'center',
   }),

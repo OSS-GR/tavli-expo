@@ -3,13 +3,13 @@
  * every game that has lessons: Portes, Plakoto, Fevga and Asodio. Picking
  * one closes the sheet and opens that game's lessons.
  *
- * The sheet scrolls, so with a large font or on a small phone no button
- * falls off the screen.
+ * The sheet scrolls (`Sheet` holds the `ScrollView`), so with a large font
+ * or on a small phone no button falls off the screen.
  */
 import type { TutorialGame } from '@tavli/contracts';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -36,10 +36,7 @@ export function TutorialSettings({ onOpen }: TutorialSettingsProps) {
         <Text style={styles.linkText}>{`${t('settings.learnToPlay')} ›`}</Text>
       </Pressable>
       <Sheet visible={picking} onClose={close} closeLabel={t('common.cancel')}>
-        <ScrollView
-          testID="tutorial-picker"
-          style={styles.scroll}
-          contentContainerStyle={styles.picker}>
+        <View testID="tutorial-picker" style={styles.picker}>
           <Text style={styles.heading} accessibilityRole="header">
             {t('settings.learnToPlayPicker.title')}
           </Text>
@@ -62,7 +59,7 @@ export function TutorialSettings({ onOpen }: TutorialSettingsProps) {
             label={t('common.cancel')}
             onPress={close}
           />
-        </ScrollView>
+        </View>
       </Sheet>
     </>
   );
@@ -80,9 +77,6 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.body,
     color: theme.colors.text,
     textDecorationLine: 'underline',
-  },
-  scroll: {
-    flexGrow: 0,
   },
   picker: {
     gap: theme.space.sm,

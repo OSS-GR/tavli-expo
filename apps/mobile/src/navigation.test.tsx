@@ -4,7 +4,7 @@
  * is a route.)
  */
 import type { createRecordingAnalytics } from '@tavli/contracts';
-import { userEvent, waitFor, within } from '@testing-library/react-native';
+import { within } from '@testing-library/react-native';
 import { router as appRouter } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
@@ -40,6 +40,20 @@ jest.mock('expo-router/build/testing-library/mocks', () => {
   return {};
 });
 
+// The game screen and Home's notice close on timers (see test/clock.ts).
+// `renderRouter` turns on fake timers by itself too, but never turns them
+// off; this turns them on before each test and off after it.
+runOnFakeTimers();
+
+/** The match-end screen opens `MATCH_END_DELAY_MS` after the match is over. */
+async function expectMatchEndAfterDelay(router: { getPathname: () => string }, path: string) {
+  expect(router.getPathname()).not.toBe(path);
+  await act(async () => {
+    jest.advanceTimersByTime(MATCH_END_DELAY_MS);
+  });
+  expect(router.getPathname()).toBe(path);
+}
+
 beforeEach(async () => {
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS });
@@ -64,7 +78,7 @@ beforeEach(async () => {
 
 describe('app navigation', () => {
   it('starts a game vs the bot and goes back home from the menu', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     expect(router.getPathname()).toBe('/');
 
@@ -102,7 +116,7 @@ describe('app navigation', () => {
   });
 
   it('opens match end when the match is over, then rematch, change settings or home', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
     await user.press(screen.getByRole('button', { name: 'Start game' }));
@@ -116,9 +130,7 @@ describe('app navigation', () => {
         session.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
       });
     await botResigns();
-    await waitFor(() => expect(router.getPathname()).toBe(end), {
-      timeout: MATCH_END_DELAY_MS + 2000,
-    });
+    await expectMatchEndAfterDelay(router, end);
     expect(screen.getByRole('header', { name: 'You won the match!' })).toBeOnTheScreen();
     // A finished match is not in the save slot.
     expect(storage.getString(SAVED_MATCH_KEY)).toBeUndefined();
@@ -132,9 +144,7 @@ describe('app navigation', () => {
 
     // Change settings: the new-game form of the same mode; the match is gone.
     await botResigns();
-    await waitFor(() => expect(router.getPathname()).toBe(end), {
-      timeout: MATCH_END_DELAY_MS + 2000,
-    });
+    await expectMatchEndAfterDelay(router, end);
     await user.press(screen.getByRole('button', { name: 'Change settings' }));
     expect(router.getPathname()).toBe('/new-game');
     expect(router.getSearchParams()).toEqual({ mode: 'bot' });
@@ -146,9 +156,7 @@ describe('app navigation', () => {
     await act(async () => {
       next.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
     });
-    await waitFor(() => expect(router.getPathname()).toBe(`/game/${next.id}/match-end`), {
-      timeout: MATCH_END_DELAY_MS + 2000,
-    });
+    await expectMatchEndAfterDelay(router, `/game/${next.id}/match-end`);
     expect(screen.getByRole('header', { name: 'Bot wins the match!' })).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Home' }));
     expect(router.getPathname()).toBe('/');
@@ -156,7 +164,7 @@ describe('app navigation', () => {
   });
 
   it('adds a finished match to History, opened from Home and Settings (#142)', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
 
     // No match yet: the empty state's Play opens New game.
@@ -170,9 +178,7 @@ describe('app navigation', () => {
     await act(async () => {
       session.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
     });
-    await waitFor(() => expect(router.getPathname()).toBe(`/game/${session.id}/match-end`), {
-      timeout: MATCH_END_DELAY_MS + 2000,
-    });
+    await expectMatchEndAfterDelay(router, `/game/${session.id}/match-end`);
     await user.press(screen.getByRole('button', { name: 'Home' }));
     await user.press(screen.getByRole('link', { name: 'History' }));
     expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
@@ -190,7 +196,7 @@ describe('app navigation', () => {
   });
 
   it('opens pass-and-play with the local mode param', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     await user.press(screen.getByRole('button', { name: /^Pass-and-play/ }));
     expect(router.getSearchParams()).toEqual({ mode: 'local' });
@@ -198,7 +204,7 @@ describe('app navigation', () => {
   });
 
   it('opens the rules from New game and from the in-game menu', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/new-game?mode=bot' });
     await user.press(screen.getByRole('button', { name: 'How to play Portes' }));
     expect(router.getPathname()).toBe('/rules/portes');
@@ -217,7 +223,7 @@ describe('app navigation', () => {
   });
 
   it('opens the Fevga rules from the Tavli page', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/rules/tavli' });
     await user.press(screen.getByRole('button', { name: 'How to play Fevga' }));
     expect(router.getPathname()).toBe('/rules/fevga');
@@ -251,7 +257,7 @@ describe('app navigation', () => {
 
 describe('tutorial (#128)', () => {
   it('is offered on Home, skipped, and opened again from Settings and the rules page', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     // Usage data allowed: the tutorial events go out.
     await act(async () => consentStore.setState({ status: 'granted' }));
     recorded.sent.length = 0;
@@ -298,7 +304,7 @@ describe('tutorial (#128)', () => {
   });
 
   it('"Not now" on Home hides the card for good', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderRouter('./src/app', { initialUrl: '/' });
     await user.press(screen.getByRole('button', { name: 'Not now' }));
     expect(screen.queryByTestId('home-learn')).not.toBeOnTheScreen();
@@ -306,7 +312,7 @@ describe('tutorial (#128)', () => {
   });
 
   it('plays the whole tutorial with taps, then opens the first game: Portes vs Easy', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     // The last choices were another game and level: the first game ignores them.
     saveLastSetup(storage, { ...defaultSetup('bot'), game: 'plakoto', botLevel: 'medium' });
     const router = await renderRouter('./src/app', { initialUrl: '/' });
@@ -332,7 +338,7 @@ describe('tutorial (#128)', () => {
   });
 
   it('opens the Plakoto lessons from its rules page, saves them apart, then plays Plakoto (#149)', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     await act(async () => consentStore.setState({ status: 'granted' }));
     recorded.sent.length = 0;
     const router = await renderRouter('./src/app', { initialUrl: '/rules/plakoto' });
@@ -376,7 +382,7 @@ describe('tutorial (#128)', () => {
   });
 
   it('opens the Fevga lessons from its rules page, and Skip saves only Fevga', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/rules/fevga' });
     await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
     expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'fevga' });
@@ -393,8 +399,6 @@ describe('tutorial (#128)', () => {
 });
 
 describe('tutorial from Settings (#159)', () => {
-  runOnFakeTimers();
-
   const GAMES = [
     ['portes', 'Portes', 'Learn to play', 7],
     ['plakoto', 'Plakoto', 'Learn Plakoto', 4],
