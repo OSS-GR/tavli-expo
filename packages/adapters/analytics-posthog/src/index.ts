@@ -70,6 +70,8 @@ export function postHogOptions({
     host,
     defaultOptIn: false,
     persistence: 'file',
+    // Keep `getItem` sync: PostHog then loads its saved data in the
+    // constructor (a Promise would load it later, over newer changes).
     customStorage: {
       getItem: (key) => storage.getString(key) ?? null,
       setItem: (key, value) => storage.setString(key, value),
@@ -114,7 +116,9 @@ export function fromPostHogClient(client: PostHogClient): Analytics {
       gate.set(false);
       // Each step on its own, so one failure does not skip the others.
       attempt(() => client.optOut());
-      // Events captured before the opt-out must not upload after it.
+      // Events captured before the opt-out must not upload after it. Safe at
+      // any time: our `customStorage.getItem` is sync, so PostHog loads its
+      // saved data in the constructor and no later load can bring the queue back.
       attempt(() => client.setPersistedProperty(PostHogPersistedProperty.Queue, null));
       attempt(() => client.reset());
     },

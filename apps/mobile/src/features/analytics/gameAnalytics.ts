@@ -68,36 +68,57 @@ export function createGameAnalytics(
   /** The game already reported as finished or abandoned. */
   let closed: MatchFlow['game'] | null = null;
 
+  /**
+   * Sends one event. An error drops only that event: the next events of the
+   * same action still go out. Returns `false` when the send threw.
+   */
+  const send = (track: () => void): boolean => {
+    try {
+      track();
+      return true;
+    } catch (error) {
+      console.warn('analytics failed', error);
+      return false;
+    }
+  };
+
   const finished = (flow: MatchFlow, result: GameResultKind) => {
     if (closed === flow.game) return;
-    closed = flow.game;
-    analytics.track('game_finished', {
-      mode,
-      variant: flow.game.state.variant,
-      result,
-      turns: turnsPlayed(flow),
-      ...(startedAt === null
-        ? {}
-        : { durationSec: Math.max(0, Math.round((now() - startedAt) / 1000)) }),
-    });
+    const sent = send(() =>
+      analytics.track('game_finished', {
+        mode,
+        variant: flow.game.state.variant,
+        result,
+        turns: turnsPlayed(flow),
+        ...(startedAt === null
+          ? {}
+          : { durationSec: Math.max(0, Math.round((now() - startedAt) / 1000)) }),
+      }),
+    );
+    // Only a game whose event went out counts as reported.
+    if (sent) closed = flow.game;
   };
 
   const gameStarted = (flow: MatchFlow) => {
     startedAt = now();
     closed = null;
-    analytics.track('game_started', {
-      mode,
-      variant: flow.game.state.variant,
-      matchLength: flow.match.targetPoints,
-      ...(mode === 'bot' && botLevel !== undefined ? { botLevel } : {}),
-    });
+    send(() =>
+      analytics.track('game_started', {
+        mode,
+        variant: flow.game.state.variant,
+        matchLength: flow.match.targetPoints,
+        ...(mode === 'bot' && botLevel !== undefined ? { botLevel } : {}),
+      }),
+    );
   };
 
   return {
     gameStarted,
     actionApplied: (previous, next, action) => {
-      if (action.type === 'undo') analytics.track('undo_used');
-      if (action.type === 'resign' || action.type === 'resignMatch') analytics.track('resign');
+      if (action.type === 'undo') send(() => analytics.track('undo_used'));
+      if (action.type === 'resign' || action.type === 'resignMatch') {
+        send(() => analytics.track('resign'));
+      }
 
       if (!gameIsOver(previous) && gameIsOver(next) && next.game.result !== null) {
         finished(next, resultKind(next.game.result));
@@ -110,12 +131,14 @@ export function createGameAnalytics(
     },
     gameAbandoned: (flow) => {
       if (gameIsOver(flow) || flow.match.status === 'finished' || closed === flow.game) return;
-      closed = flow.game;
-      analytics.track('game_abandoned', {
-        mode,
-        variant: flow.game.state.variant,
-        turn: flow.game.state.turnNumber,
-      });
+      const sent = send(() =>
+        analytics.track('game_abandoned', {
+          mode,
+          variant: flow.game.state.variant,
+          turn: flow.game.state.turnNumber,
+        }),
+      );
+      if (sent) closed = flow.game;
     },
   };
 }

@@ -15,8 +15,9 @@ See which modes and features players use, from the first test builds. Nothing mo
   | Not answered yet | none | sent, with no user id |
   | **Allow usage data** | sent, with the install ID | sent, with the install ID |
   | **Don't allow** | none | none |
+  | **Don't allow** to an older consent text, not answered again yet | none | none |
 
-- **New consent text asks again.** The answer is saved with `CONSENT_VERSION`. An answer saved for another version loads as "not answered yet", so the welcome flow shows again (and the first row of the table applies until the user answers). Raise it only when the text changes so much that users must answer again.
+- **New consent text asks again.** The answer is saved with `CONSENT_VERSION`. An answer saved for another version shows the welcome flow again. Until the new answer, an old **Allow** counts as "not answered yet" (`unset`: anonymous crash reports, no usage data). An old **Don't allow** stays a "no" (`stale-denied`: no crash reports, no usage data). Raise it only when the text changes so much that users must answer again.
 - **No events before opt-in.** The first launch asks (wireframe 02). Until the user taps **Allow usage data**, the `Analytics` port drops every call. Closing the app without an answer counts as "no".
 - **Opt-out stops everything at once.** Settings → Privacy → **Share anonymous usage data** calls `optOut()`. Nothing new is captured, and the PostHog adapter empties the event queue, so events captured before the opt-out are not uploaded after it. (A batch already on its way to the server when the user taps the switch cannot be stopped.)
 - **No personal data.** No names, emails, usernames or contacts. Player names in pass-and-play are never sent. Settings events send the **key only**, never the value.

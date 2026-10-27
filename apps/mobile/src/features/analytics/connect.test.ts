@@ -56,12 +56,14 @@ describe('consent store', () => {
   });
 
   it('asks again when the answer was saved for another consent text', () => {
+    const expected = { granted: 'unset', denied: 'stale-denied' } as const;
     for (const version of [CONSENT_VERSION - 1, CONSENT_VERSION + 1, undefined, '1']) {
-      for (const status of ['granted', 'denied']) {
+      for (const status of ['granted', 'denied'] as const) {
         const raw = JSON.stringify({ version, status });
         const store = createConsentStore(createMemoryStorage({ [CONSENT_STORAGE_KEY]: raw }));
-        expect(store.getState().status).toBe('unset');
+        expect(store.getState().status).toBe(expected[status]);
         expect(needsWelcome(store.getState().status)).toBe(true);
+        expect(usageDataAllowed(store.getState().status)).toBe(false);
       }
     }
     const current = JSON.stringify({ version: CONSENT_VERSION, status: 'granted' });
