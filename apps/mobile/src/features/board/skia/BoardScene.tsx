@@ -1,8 +1,9 @@
 /**
  * The board drawing (Skia), in the order the theme README gives:
  * shadow, image layers under the points, 24 vector points, image layers
- * over the points, pinned checkers (Plakoto), checkers with count badges,
- * trays, highlights, then the lamp overlay.
+ * over the points, pinned checkers (Plakoto, Asodio), checkers (frozen ones
+ * with a quiet shade, Asodio) with count badges, trays, highlights, then the
+ * lamp overlay.
  *
  * Everything comes from props: the theme, the geometry and a picture made
  * by `layoutBoard`. No hooks, no state and no React Native imports, so the
@@ -68,6 +69,15 @@ const NO_HIGHLIGHTS: BoardHighlights = { select: null, targets: [] };
 
 /** Width of the ring on a pinned checker, in checker radii. */
 export const PIN_RING_WIDTH = 0.16;
+
+/**
+ * Asodio: a checker frozen by the quarter lock gets a soft shade and a thin
+ * frost ring. Quiet on purpose: it says "waits", not "danger".
+ */
+export const FROZEN_MARK = {
+  shade: { color: '#0E1A2A', opacity: 0.32 },
+  ring: { color: '#DCEBFF', opacity: 0.55, radius: 0.62, width: 0.08 },
+} as const;
 
 export function BoardScene({
   theme,
@@ -198,9 +208,33 @@ export function BoardScene({
         </Group>
       ))}
 
-      {/* 6. Checkers and count badges. */}
+      {/* 6. Checkers (frozen ones shaded, Asodio) and count badges. */}
       {picture.checkers.map((c) =>
-        hidden?.has(c.key) ? null : (
+        hidden?.has(c.key) ? null : c.frozen ? (
+          <Group key={c.key}>
+            <CheckerShape
+              cx={c.x}
+              cy={c.y}
+              r={c.r}
+              style={theme.checkers[toneOf(c.owner)]}
+              shadow={theme.checkers.shadow}
+            />
+            <Circle
+              cx={c.x}
+              cy={c.y}
+              r={c.r}
+              color={rgba(FROZEN_MARK.shade.color, FROZEN_MARK.shade.opacity)}
+            />
+            <Circle
+              cx={c.x}
+              cy={c.y}
+              r={c.r * FROZEN_MARK.ring.radius}
+              style="stroke"
+              strokeWidth={c.r * FROZEN_MARK.ring.width}
+              color={rgba(FROZEN_MARK.ring.color, FROZEN_MARK.ring.opacity)}
+            />
+          </Group>
+        ) : (
           <CheckerShape
             key={c.key}
             cx={c.x}

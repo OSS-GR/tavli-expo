@@ -1,6 +1,6 @@
 /**
- * How to play a game (#112): one page each for Portes, Plakoto and Fevga,
- * a short Tavli page (the match rotation), and "coming later" for Asodio.
+ * How to play a game (#112, #124): one page each for Portes, Plakoto, Fevga
+ * and Asodio, and a short Tavli page (the match rotation).
  *
  * Each section has a header, so screen readers can jump between them, and
  * reads top to bottom. Nothing has a fixed height: the text wraps at large
@@ -13,8 +13,8 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 
 import {
-  RULES_GAMES,
   RULES_PAGES,
+  TAVLI_GAMES,
   TAVLI_SECTION,
   isRulesGame,
   paragraphs,
@@ -48,7 +48,7 @@ export function RulesScreen({ variant, onOpenRules }: RulesScreenProps) {
         <>
           <Section section={TAVLI_SECTION} />
           <View style={styles.links}>
-            {RULES_GAMES.map((game) => (
+            {TAVLI_GAMES.map((game) => (
               <ActionButton
                 key={game}
                 testID={`rules-open-${game}`}
@@ -60,8 +60,8 @@ export function RulesScreen({ variant, onOpenRules }: RulesScreenProps) {
           </View>
         </>
       ) : (
-        <Text testID="rules-later" style={styles.body}>
-          {t(variant === 'asodio' ? 'rules.later' : 'rules.unknown')}
+        <Text testID="rules-unknown" style={styles.body}>
+          {t('rules.unknown')}
         </Text>
       )}
     </ScrollView>

@@ -89,12 +89,7 @@ describe('rules texts', () => {
     for (const id of ['portes', 'plakoto', 'fevga', 'asodio', 'tavli', null] as const) {
       used.add(rulesTitleKey(id));
     }
-    for (const key of [
-      'rules.later',
-      'rules.unknown',
-      'rules.picture.label',
-      'rules.picture.caption',
-    ]) {
+    for (const key of ['rules.unknown', 'rules.picture.label', 'rules.picture.caption']) {
       used.add(key);
     }
     expect(enRules.filter((key) => !used.has(key))).toEqual([]);
@@ -125,6 +120,10 @@ describe('content', () => {
     expect(rulesDirection('fevga')).toBe('parallel');
     expect(startBoard('fevga').points[11]).toMatchObject({ black: 15, white: 0 });
     expect(startBoard('fevga').points[23]).toMatchObject({ white: 15, black: 0 });
+    // Asodio: the board is empty, all 15 of each player are still to enter.
+    const asodio = startBoard('asodio');
+    expect(asodio.outside).toEqual({ white: 15, black: 15 });
+    expect(asodio.points.every((p) => p.white === 0 && p.black === 0)).toBe(true);
   });
 });
 
@@ -150,6 +149,9 @@ describe('<RulesScreen />', () => {
     expect(ids('plakoto')).toEqual(expect.arrayContaining([...shared, 'pinning', 'mother']));
     expect(ids('fevga')).toEqual(
       expect.arrayContaining([...shared, 'noHitting', 'runner', 'primes']),
+    );
+    expect(ids('asodio')).toEqual(
+      expect.arrayContaining([...shared, 'entering', 'quarters', 'pinning', 'draw']),
     );
   });
 
@@ -195,12 +197,35 @@ describe('<RulesScreen />', () => {
     expect(onOpenRules).toHaveBeenCalledWith('plakoto');
   });
 
-  it('says Asodio comes later', async () => {
+  it('explains the owner rules of Asodio: the loading lock, quarters and the draw', async () => {
     await show('asodio').view;
+    const entering = screen.getByTestId('rules-section-entering');
     expect(
-      screen.getByText('Asodio comes in a later update, together with its rules.'),
+      within(entering).getByText(
+        'The board is locked until you roll a 1-2 (ασόδυο) or a double. Any other roll does nothing, and the turn passes.',
+      ),
     ).toBeOnTheScreen();
-    expect(screen.queryAllByRole('header')).toHaveLength(0);
+    expect(
+      within(entering).getByText(
+        'A double enters four checkers on the same point: with 3-3, four checkers enter on point 22.',
+      ),
+    ).toBeOnTheScreen();
+    expect(
+      within(screen.getByTestId('rules-section-quarters')).getByText(/is frozen there/),
+    ).toBeOnTheScreen();
+    expect(
+      within(screen.getByTestId('rules-section-draw')).getByText(/the game is a draw/),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByRole('image', { name: 'The board at the start of Asodio' }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByTestId('rules-unknown')).toBeNull();
+  });
+
+  it('links only the three Tavli games from the Tavli page (not Asodio)', async () => {
+    await show('tavli').view;
+    expect(screen.queryByRole('button', { name: 'How to play Asodio' })).toBeNull();
+    expect(screen.getAllByRole('button')).toHaveLength(3);
   });
 
   it('handles an unknown game', async () => {
