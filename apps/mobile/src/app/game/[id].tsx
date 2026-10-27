@@ -1,6 +1,7 @@
 /**
  * The board of a local match (wireframe 6). `id` is a local match id
- * (`local-…`). An unknown id shows "This game could not be opened."
+ * (`local-…`). After an app restart it comes from the save slot. An
+ * unknown id or a broken save shows "This game could not be opened."
  */
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -40,7 +41,10 @@ export default function GameRoute() {
       <MatchScreen
         session={session}
         paused={!focused}
-        onExit={goHome}
+        onExit={() => {
+          matchSessions.saveNow();
+          goHome();
+        }}
         onSettings={() => router.push('/settings')}
         onRules={() => router.push(rulesHref(session.setup.game))}
         onChangeSettings={() => {

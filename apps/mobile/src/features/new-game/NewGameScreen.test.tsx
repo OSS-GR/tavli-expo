@@ -148,3 +148,31 @@ describe('<NewGameScreen /> board view', () => {
     expect(screen.queryByRole('radio', { name: 'Flip' })).toBeNull();
   });
 });
+
+describe('<NewGameScreen /> with a saved game', () => {
+  it('asks before it ends the saved game', async () => {
+    const user = userEvent.setup();
+    const onStart = jest.fn();
+    await render(
+      <NewGameScreen
+        mode="bot"
+        initial={defaultSetup('bot')}
+        botLevels={['easy']}
+        onBack={jest.fn()}
+        onStart={onStart}
+        hasSavedGame
+      />,
+    );
+
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(screen.getByText('Start a new game?')).toBeOnTheScreen();
+    expect(screen.getByText('Your saved game will end.')).toBeOnTheScreen();
+    await user.press(screen.getByTestId('dialog-cancel'));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(screen.queryByText('Start a new game?')).toBeNull();
+
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    await user.press(screen.getByRole('button', { name: 'Start new' }));
+    expect(onStart).toHaveBeenCalledWith(defaultSetup('bot'));
+  });
+});

@@ -25,6 +25,18 @@
 - Vs bot the human plays **White** (bottom), the bot **Black**. The board never flips.
 - Names come from the setup, in the app language (`features/match/seats.ts`): "You" / "Bot · Easy", or the typed names with "Player 1" / "Player 2" as the default. The engine only stores labels (`enginePlayers`). Texts about the human use `_you` strings ("You win the game!").
 
+## Save and resume (#36)
+
+- One save slot (`savedMatch` key) in the `Storage` port (MMKV). `features/match/savedMatch.ts` writes `{ v, flowSchema, id, setup, savedAt, log }` as JSON.
+- **Load = replay.** `parseSavedMatch` checks the versions (`SAVE_VERSION`, the engine's `MATCH_FLOW_SCHEMA_VERSION`) and rebuilds the flow with the engine's `replay(log)`, which checks every event again. The log holds every die, so no RNG is needed. Anything wrong (bad JSON, another version, an edited log, setup and log that differ) gives `broken`: the save is removed and never throws.
+- `features/match/sessions.ts` saves when a match starts and each time the flow comes to rest (`isRestPoint`: awaiting a roll, the opening roll, or game over). So a confirmed turn, a pass, a game end, the next game and a rematch all save. Moves in the middle of a turn wait for Confirm.
+- `saveNow()` saves at once, mid-turn too: when the app leaves the foreground (`useSaveOnBackground` in `app/_layout.tsx`) and on **Exit to home**.
+- A finished match is removed from the slot. A rematch is saved as a new match.
+- A save that fails (a storage error) only logs a warning. The move stays played, and the next save tries again.
+- After an app restart, `get(id)` loads the save into a new game store (`createGameStore({ flow })`); new dice come from a new local RNG. A saved bot level this build cannot play becomes Easy.
+- **Home** reads the slot each time it shows (`useFocusEffect`). With a save it shows **Continue game**: game, opponent, score, target and time since the save ("12 min ago"). A broken save shows the toast "Your saved game could not be opened." once.
+- **New game** with a save: Start asks "Start a new game? Your saved game will end." (Start new / Cancel).
+
 ## Pass-and-play (#35)
 
 - Two optional names (max 16 characters, trimmed). Empty names show "Player 1" / "Player 2" in the app language, so they follow a language switch.
@@ -56,7 +68,8 @@
 - Match end is still a card over the board, not `match-end.tsx`.
 - Home has no board art yet (art task); the art area shows the tagline.
 - "Play vs bot" says "Easy for now. Medium is coming soon." until Medium works.
-- No "Continue game" card yet (#36), and no "Start a new game? Your saved game will end." dialog yet.
+- A broken save on the board route shows the "could not be opened" card (not a dialog), with a Home button.
+- The game also saves mid-turn when the app goes to the background or the user exits (the wireframe accepts losing those moves; we keep them).
 
 ## Tests
 
@@ -64,4 +77,5 @@
 - `features/bot/levels.test.ts`: the level check.
 - `features/match/match.test.ts`: setup, seats, routes and params, last choices, sessions, resign.
 - `HomeScreen.test.tsx`, `NewGameScreen.test.tsx`, `MatchScreen.test.tsx`: the screens (vs bot turn, pause while the menu is open, resign game and match, pass-and-play names).
-- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home, the `mode` param, an unknown id). It replaces the library's own Reanimated mock with ours.
+- `features/match/save.test.ts`: the save format (round trip, ten kinds of bad data dropped), when it saves, clearing a finished match, resume after a restart, the Continue texts and the background hook.
+- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home → Continue, the replace dialog, the `mode` param, an unknown id, a broken save). It replaces the library's own Reanimated mock with ours.

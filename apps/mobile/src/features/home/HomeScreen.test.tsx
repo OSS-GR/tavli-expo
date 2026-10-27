@@ -2,6 +2,7 @@ import { act, render, screen, userEvent } from '@testing-library/react-native';
 
 import i18n from '@/i18n';
 
+import { ContinueCard } from './ContinueCard';
 import { HomeScreen } from './HomeScreen';
 
 function setup(botLevels: readonly ('easy' | 'medium' | 'hard')[] = ['easy']) {
@@ -74,5 +75,35 @@ describe('<HomeScreen />', () => {
         await i18n.changeLanguage('en');
       });
     }
+  });
+
+  it('shows the Continue card with game, opponent, score and time', async () => {
+    const user = userEvent.setup();
+    const onPress = jest.fn();
+    await render(
+      <HomeScreen
+        {...setup()}
+        continueCard={
+          <ContinueCard
+            summary={{
+              game: 'Portes · vs Bot (Easy)',
+              status: 'You 1 – 0 Bot · first to 3 · 12 min ago',
+            }}
+            onPress={onPress}
+          />
+        }
+      />,
+    );
+    await user.press(
+      screen.getByRole('button', {
+        name: 'Continue game, Portes · vs Bot (Easy), You 1 – 0 Bot · first to 3 · 12 min ago',
+      }),
+    );
+    expect(onPress).toHaveBeenCalled();
+  });
+
+  it('shows a notice once, for example a broken save', async () => {
+    await render(<HomeScreen {...setup()} notice="Your saved game could not be opened." />);
+    expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');
   });
 });

@@ -22,7 +22,9 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
+import { Sheet } from '@/components/Sheet';
 import { Toast, useToast } from '@/components/Toast';
+import { ConfirmDialog } from '@/features/match/GameMenu';
 import { BoardViewPicker } from '@/features/settings/BoardViewPicker';
 import {
   GAME_CHOICES,
@@ -43,9 +45,18 @@ export interface NewGameScreenProps {
   botLevels: readonly Difficulty[];
   onBack: () => void;
   onStart: (setup: MatchSetup) => void;
+  /** A saved game exists: Start asks first, because it ends that game (wireframe 4). */
+  hasSavedGame?: boolean;
 }
 
-export function NewGameScreen({ mode, initial, botLevels, onBack, onStart }: NewGameScreenProps) {
+export function NewGameScreen({
+  mode,
+  initial,
+  botLevels,
+  onBack,
+  onStart,
+  hasSavedGame = false,
+}: NewGameScreenProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
   const [toast, showToast] = useToast();
@@ -67,7 +78,8 @@ export function NewGameScreen({ mode, initial, botLevels, onBack, onStart }: New
   });
   const lockedLevels = BOT_DIFFICULTIES.some((level) => !botLevels.includes(level));
 
-  const start = () =>
+  const [asking, setAsking] = useState(false);
+  const startNow = () =>
     onStart({
       mode,
       game: 'portes',
@@ -75,6 +87,7 @@ export function NewGameScreen({ mode, initial, botLevels, onBack, onStart }: New
       botLevel,
       names: { white: cleanName(names.white), black: cleanName(names.black) },
     });
+  const start = () => (hasSavedGame ? setAsking(true) : startNow());
 
   const nameField = (player: PlayerId) => (
     <View style={styles.nameRow}>
@@ -199,6 +212,24 @@ export function NewGameScreen({ mode, initial, botLevels, onBack, onStart }: New
         <ActionButton testID="new-game-start" label={t('newGame.start')} onPress={start} />
       </View>
       <Toast text={toast} />
+      <Sheet
+        visible={asking}
+        onClose={() => setAsking(false)}
+        closeLabel={t('common.cancel')}
+        look="dialog">
+        <ConfirmDialog
+          testID="replace-dialog"
+          title={t('newGame.replace.title')}
+          lines={[t('newGame.replace.body')]}
+          confirmLabel={t('newGame.replace.confirm')}
+          cancelLabel={t('common.cancel')}
+          onConfirm={() => {
+            setAsking(false);
+            startNow();
+          }}
+          onCancel={() => setAsking(false)}
+        />
+      </Sheet>
     </KeyboardAvoidingView>
   );
 }
