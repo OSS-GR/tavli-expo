@@ -5,11 +5,13 @@
 import './src/theme/unistyles';
 import './src/i18n';
 
-// Adapters: in-memory fakes instead of MMKV and expo-haptics. `feedback`
-// records every haptic; dice come from a fixed seed, so tests are repeatable.
-// The bot is the real inline runner (it is pure TypeScript).
+// Adapters: in-memory fakes instead of MMKV, expo-haptics and Sentry.
+// `feedback` records every haptic and `crashReporter` every report; dice
+// come from a fixed seed, so tests are repeatable. The bot is the real
+// inline runner (it is pure TypeScript).
 jest.mock('@/services', () => {
-  const { createMemoryStorage, createRecordingFeedback } = jest.requireActual('@tavli/contracts');
+  const { createMemoryStorage, createRecordingCrashReporter, createRecordingFeedback } =
+    jest.requireActual('@tavli/contracts');
   const { createSeededRng } = jest.requireActual('@tavli/engine');
   const { InlineBotRunner, createBot } = jest.requireActual('@tavli/bot');
   const { supportedBotLevels } = jest.requireActual('@/features/bot/levels');
@@ -17,6 +19,7 @@ jest.mock('@/services', () => {
   return {
     storage: createMemoryStorage(),
     feedback: createRecordingFeedback(),
+    crashReporter: createRecordingCrashReporter(),
     createLocalRng: () => createSeededRng(7),
     botRunner: new InlineBotRunner(bot),
     botLevels: supportedBotLevels(bot),

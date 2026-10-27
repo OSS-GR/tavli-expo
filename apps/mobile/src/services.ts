@@ -6,7 +6,15 @@
  * Jest replaces this module with in-memory fakes (`jest.setup.ts`).
  */
 import { InlineBotRunner, createBot } from '@tavli/bot';
-import type { BotRunner, Difficulty, Feedback, Storage } from '@tavli/contracts';
+import {
+  createNoopCrashReporter,
+  type BotRunner,
+  type CrashReporter,
+  type Difficulty,
+  type Feedback,
+  type Storage,
+} from '@tavli/contracts';
+import { createSentryCrashReporter } from '@tavli/crash-sentry';
 import { createSeededRng, type Rng } from '@tavli/engine';
 import { createExpoFeedback } from '@tavli/haptics-expo';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
@@ -14,6 +22,16 @@ import { createMmkvStorage } from '@tavli/storage-mmkv';
 import { supportedBotLevels } from '@/features/bot/levels';
 
 export const storage: Storage = createMmkvStorage({ id: 'tavlaki' });
+
+/**
+ * Crash reports. Sentry in release builds that have `EXPO_PUBLIC_SENTRY_DSN`;
+ * a no-op in dev and in builds without a DSN. Started in
+ * `features/crash/start.ts`, which also follows the privacy setting.
+ */
+export const crashReporter: CrashReporter =
+  __DEV__ || !process.env.EXPO_PUBLIC_SENTRY_DSN
+    ? createNoopCrashReporter()
+    : createSentryCrashReporter();
 
 /** Haptics. Use `appFeedback` (features/feedback), which follows the Haptics setting. */
 export const feedback: Feedback = createExpoFeedback();

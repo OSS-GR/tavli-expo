@@ -10,6 +10,7 @@
 | [Roadmap](roadmap.md) | Milestones M0 → MVP1 → MVP2 → MVP3 → v1.0 → MVP4 |
 | [Open questions](open-questions.md) | Things the owner must answer or decide |
 | [How we work on GitHub](process/github-workflow.md) | Labels, issue types, board, Definition of Done |
+| [Running the app](process/running-the-app.md) | Simulator, iPhone (free Apple ID), Android emulator, EAS builds, dev routes, common errors |
 
 ## Game rules (the engine spec)
 

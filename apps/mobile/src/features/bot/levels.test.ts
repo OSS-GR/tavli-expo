@@ -3,8 +3,8 @@ import { BotError, createBot, type Bot } from '@tavli/bot';
 import { supportedBotLevels } from './levels';
 
 describe('supportedBotLevels', () => {
-  it('finds only easy in the bot package today (medium throws NOT_IMPLEMENTED)', () => {
-    expect(supportedBotLevels(createBot())).toEqual(['easy']);
+  it('finds easy and medium in the bot package today (hard throws NOT_IMPLEMENTED)', () => {
+    expect(supportedBotLevels(createBot())).toEqual(['easy', 'medium']);
   });
 
   it('lists every level a bot can play', () => {
