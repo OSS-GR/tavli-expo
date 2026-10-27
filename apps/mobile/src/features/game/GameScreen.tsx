@@ -11,6 +11,7 @@
 import type { BotRunner, Difficulty } from '@tavli/contracts';
 import {
   applyMoveToBoard,
+  currentPrompt,
   type Move,
   type PerPlayer,
   type PlayerId,
@@ -23,7 +24,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 import { useBoardTheme } from '@/features/board/BoardCanvas';
-import { toneOf, type BoardView } from '@/features/board/boardModel';
+import { pinnedCheckers, toneOf, type BoardView } from '@/features/board/boardModel';
 import { DiceRow } from '@/features/board/DiceRow';
 import { moveFlights, type Flight } from '@/features/board/flights';
 import type { BoardGeometry } from '@/features/board/geometry';
@@ -47,6 +48,8 @@ export const OPENING_RESULT_MS = 1500;
 export const PASS_NOTICE_MS = 3000;
 /** The same card when the bot cannot move (wireframe 6f: "closes after 2 s"). */
 export const BOT_PASS_NOTICE_MS = 2000;
+/** "Bot plays on." (the bot's answer to the mother question) shows this long. */
+export const BOT_ANSWER_NOTE_MS = 2000;
 /** The final position stays on screen this long before the match-end screen opens. */
 export const MATCH_END_DELAY_MS = 1000;
 
@@ -162,7 +165,11 @@ export function GameScreen({
 
   const matchOver = view.matchPhase === 'match-over' && match.winner !== null;
   const gameOver = view.matchPhase === 'game-over' && game.result !== null;
-  const blocked = matchOver || gameOver || showPass || showOpening;
+  // Plakoto "resign or play on?" (mother pinned). The pinned player answers;
+  // vs the bot, the bot answers its own question in its turn.
+  const prompt = view.matchPhase === 'playing' ? currentPrompt(game) : null;
+  const askHuman = prompt !== null && prompt.player !== botPlayer;
+  const blocked = matchOver || gameOver || showPass || showOpening || askHuman;
 
   // Match over: the final position stays a moment, then the match-end
   // screen opens. Not while paused: the menu or another screen is on top.
@@ -275,6 +282,20 @@ export function GameScreen({
   const botMove = useEffectEvent((move: Move) => playMove(move, geoRef.current, null, false));
   const botUndo = useEffectEvent(() => undo());
   const botConfirm = useEffectEvent(() => confirm());
+  // The bot's answer to the mother question; a short note says what it chose.
+  const [botChoice, setBotChoice] = useState<{ key: string; choice: string } | null>(null);
+  const botAnswer = useEffectEvent((choice: string) => {
+    if (botPlayer === null) return false;
+    if (!dispatch({ type: 'answer', player: botPlayer, choice })) return false;
+    setBotChoice({ key: botKey, choice });
+    return true;
+  });
+  // The note goes after a short time (the answer does not change the turn).
+  useEffect(() => {
+    if (botChoice === null) return;
+    const timer = setTimeout(() => setBotChoice(null), BOT_ANSWER_NOTE_MS);
+    return () => clearTimeout(timer);
+  }, [botChoice]);
   const botOptions = useEffectEvent(() => bot);
   useEffect(() => {
     const seat = botOptions();
@@ -286,7 +307,13 @@ export function GameScreen({
       rng: seat.rng,
       ...(seat.timing ? { timing: seat.timing } : {}),
       getFlow: () => store.getState().flow,
-      actions: { roll: botRoll, move: botMove, undo: botUndo, confirm: botConfirm },
+      actions: {
+        roll: botRoll,
+        move: botMove,
+        undo: botUndo,
+        confirm: botConfirm,
+        answer: botAnswer,
+      },
       onError: (error) => console.error('bot turn failed', error),
     });
     return handle.cancel;
@@ -446,7 +473,40 @@ export function GameScreen({
   // Cards over the board, at most one at a time, and none once the game is over.
   const over = gameOver || matchOver;
   let card = null;
-  if (!over && showPass && pass) {
+  if (!over && askHuman && prompt) {
+    // Wireframe 17: two buttons of equal weight; no way to close it without a choice.
+    const pinned = prompt.player;
+    const opponentName = nameOf(other(pinned));
+    const answer = (choice: string) => () => {
+      if (dispatch({ type: 'answer', player: pinned, choice })) setFlights([]);
+    };
+    card = (
+      <GameCard
+        testID="mother-card"
+        title={
+          isYou(pinned)
+            ? t('game.mother.title_you')
+            : t('game.mother.title', { name: nameOf(pinned) })
+        }
+        lines={[
+          t('game.mother.body', { opponent: opponentName }),
+          t('game.mother.question', { opponent: opponentName }),
+        ]}>
+        <ActionButton
+          testID="mother-resign-button"
+          label={t('game.mother.resign')}
+          kind="secondary"
+          onPress={answer('resign')}
+        />
+        <ActionButton
+          testID="mother-play-on-button"
+          label={t('game.mother.playOn')}
+          kind="secondary"
+          onPress={answer('playOn')}
+        />
+      </GameCard>
+    );
+  } else if (!over && showPass && pass) {
     card = (
       <GameCard
         testID="pass-card"
@@ -491,6 +551,20 @@ export function GameScreen({
     );
   }
 
+  // The screen reader hears the board's pinned checkers (Plakoto).
+  const boardLabel = [
+    t('game.board.label'),
+    ...pinnedCheckers(view.board, direction).map(({ player, point }) =>
+      isYou(player)
+        ? t('game.board.pinned_you', { point })
+        : t('game.board.pinned', { name: nameOf(player), point }),
+    ),
+  ].join('. ');
+  const botNote =
+    botChoice !== null && botChoice.key === botKey && botChoice.choice === 'playOn' && botsTurn
+      ? t('game.mother.botPlaysOn', { name: botPlayer === null ? '' : nameOf(botPlayer) })
+      : null;
+
   const playing = phase !== 'opening-roll' && view.matchPhase === 'playing';
   const top = other(viewer);
   const strip = (player: PlayerId, testID: string) => (
@@ -533,6 +607,7 @@ export function GameScreen({
       <View style={styles.boardArea}>
         <InteractiveBoard
           testID="game-board"
+          accessibilityLabel={boardLabel}
           theme={theme}
           board={view.board}
           view={boardView}
@@ -551,6 +626,13 @@ export function GameScreen({
           <View style={styles.hintRow} pointerEvents="none">
             <Text testID="confirm-hint" style={styles.hint}>
               {t('game.controls.allUsed')}
+            </Text>
+          </View>
+        ) : null}
+        {botNote !== null ? (
+          <View style={styles.hintRow} pointerEvents="none">
+            <Text testID="bot-answer-note" style={styles.hint} accessibilityLiveRegion="polite">
+              {botNote}
             </Text>
           </View>
         ) : null}

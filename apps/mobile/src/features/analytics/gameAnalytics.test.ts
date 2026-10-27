@@ -1,4 +1,8 @@
-import { createRecordingAnalytics } from '@tavli/contracts';
+import {
+  createRecordingAnalytics,
+  type Analytics,
+  type AnalyticsEventName,
+} from '@tavli/contracts';
 import { createSeededRng, type MatchFlow } from '@tavli/engine';
 
 import { createGameStore, turnView } from '@/features/game/gameStore';
@@ -117,6 +121,38 @@ describe('gameAnalytics with the game store', () => {
     ]);
   });
 
+  it('leaves durationSec out for a resumed game, and counts it again from the next game', () => {
+    const first = setup();
+    finishOpening(first.store);
+    const saved = first.store.getState().flow;
+
+    // The app restarts: a new helper and a store for the saved flow.
+    const analytics = createRecordingAnalytics();
+    analytics.optIn();
+    let clock = 5_000_000;
+    const gameAnalytics = createGameAnalytics({ mode: 'local' }, { analytics, now: () => clock });
+    const store = createGameStore({
+      players: { white: 'Ann', black: 'Bob' },
+      rng: createSeededRng(3),
+      flow: saved,
+      analytics: gameAnalytics,
+    });
+    clock += 30_000;
+    store.getState().dispatch({ type: 'resign', player: 'white' });
+    const resumed = events(analytics).find((e) => e.event === 'game_finished');
+    expect(resumed).toMatchObject({ event: 'game_finished', result: 'resign' });
+    expect(resumed).not.toHaveProperty('durationSec');
+
+    analytics.sent.length = 0;
+    store.getState().dispatch({ type: 'nextGame' });
+    finishOpening(store);
+    clock += 42_000;
+    store.getState().dispatch({ type: 'resign', player: 'black' });
+    expect(events(analytics).find((e) => e.event === 'game_finished')).toMatchObject({
+      durationSec: 42,
+    });
+  });
+
   it('sends game_started for a rematch', () => {
     const { analytics, store } = setup();
     store.getState().dispatch({ type: 'resignMatch', player: 'black' });
@@ -169,6 +205,66 @@ describe('gameAnalytics with the game store', () => {
     const move = { type: 'confirm', player: 'white' } as const;
     gameAnalytics.actionApplied(previous, won(2), move);
     expect(events(analytics)).toMatchObject([{ event: 'game_finished', result: 'diplo' }]);
+  });
+});
+
+describe('gameAnalytics when a send throws', () => {
+  /** Recording analytics whose `track` throws once for each named event. */
+  function flaky(...failOnce: AnalyticsEventName[]) {
+    const analytics = createRecordingAnalytics();
+    analytics.optIn();
+    const pending = new Set(failOnce);
+    const port: Analytics = {
+      ...analytics,
+      track: (event, ...props) => {
+        if (pending.delete(event)) throw new Error(`${event} failed`);
+        analytics.track(event, ...props);
+      },
+    };
+    return { analytics, port };
+  }
+
+  function play({ analytics, port }: ReturnType<typeof flaky>) {
+    const gameAnalytics = createGameAnalytics({ mode: 'local' }, { analytics: port });
+    const store = createGameStore({
+      players: { white: 'Ann', black: 'Bob' },
+      targetPoints: 3,
+      rng: createSeededRng(3),
+      analytics: gameAnalytics,
+    });
+    finishOpening(store);
+    analytics.sent.length = 0;
+    return { gameAnalytics, store };
+  }
+
+  beforeEach(() => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('still sends game_finished when resign fails', () => {
+    const subject = flaky('resign');
+    const { analytics } = subject;
+    const { store } = play(subject);
+
+    store.getState().dispatch({ type: 'resign', player: 'white' });
+    expect(events(analytics)).toMatchObject([{ event: 'game_finished', result: 'resign' }]);
+  });
+
+  it('does not mark a game as reported when its event failed', () => {
+    const subject = flaky('game_abandoned');
+    const { analytics } = subject;
+    const { gameAnalytics, store } = play(subject);
+
+    gameAnalytics.gameAbandoned(store.getState().flow);
+    expect(events(analytics)).toEqual([]);
+    // The failed event did not close the game, so a later call sends it.
+    gameAnalytics.gameAbandoned(store.getState().flow);
+    expect(events(analytics)).toEqual([
+      { event: 'game_abandoned', mode: 'local', variant: 'portes', turn: 1 },
+    ]);
   });
 });
 

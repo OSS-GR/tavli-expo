@@ -65,6 +65,8 @@ export interface InteractiveBoardProps {
   onIllegalDrop?: () => void;
   /** Called with the board geometry after each layout (the screen needs it for undo flights). */
   onGeometry?: (geo: BoardGeometry) => void;
+  /** What a screen reader says for the board, e.g. which checkers are pinned. */
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -93,6 +95,7 @@ export function InteractiveBoard({
   onPickUp,
   onIllegalDrop,
   onGeometry,
+  accessibilityLabel,
   testID,
 }: InteractiveBoardProps) {
   const [size, onLayout] = useBoardSpace();
@@ -268,7 +271,13 @@ export function InteractiveBoard({
 
   return (
     <GestureDetector gesture={pan}>
-      <View testID={testID} style={styles.space} onLayout={onLayout}>
+      <View
+        testID={testID}
+        style={styles.space}
+        onLayout={onLayout}
+        {...(accessibilityLabel
+          ? { accessible: true, accessibilityLabel, accessibilityRole: 'image' as const }
+          : {})}>
         {size && geo && picture ? (
           <BoardCanvas
             theme={theme}

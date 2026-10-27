@@ -4,13 +4,14 @@
  *
  * - Before an answer (`unset`): send, but anonymously (no install id).
  * - "Allow" (`granted`): send, with the anonymous install id.
- * - "Don't allow" (`denied`): send nothing.
+ * - "Don't allow" (`denied`), also to an older consent text
+ *   (`stale-denied`, until the new answer): send nothing.
  */
 import { usageDataAllowed, type ConsentStatus } from '@/features/privacy/consent';
 
 /** May the app send crash reports? */
 export function crashReportingAllowed(status: ConsentStatus): boolean {
-  return status !== 'denied';
+  return status !== 'denied' && status !== 'stale-denied';
 }
 
 /** May crash reports carry the install id? Only after "Allow". */

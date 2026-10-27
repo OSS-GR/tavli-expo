@@ -52,6 +52,38 @@ describe('createGameStore', () => {
     expect(store.getState().flow).toBe(before);
     expect(store.getState().lastError).toMatch(/phase/);
   });
+
+  it('keeps a played move, a new match and a rematch when analytics throws', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const boom = () => {
+      throw new Error('analytics down');
+    };
+    const store = createGameStore({
+      players,
+      targetPoints: 1,
+      rng: createSeededRng(3),
+      analytics: { gameStarted: boom, actionApplied: boom, gameAbandoned: boom },
+    });
+
+    const before = store.getState().flow;
+    expect(store.getState().dispatch({ type: 'rollOpening', player: 'white' })).toBe(true);
+    expect(store.getState().flow).not.toBe(before);
+    expect(store.getState().lastError).toBeNull();
+
+    // A refused action still reports the engine's error, not analytics'.
+    expect(store.getState().dispatch({ type: 'roll', player: 'white' })).toBe(false);
+    expect(store.getState().lastError).toMatch(/phase/);
+
+    store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    expect(store.getState().flow.match.status).toBe('finished');
+    const finished = store.getState().flow;
+    expect(() => store.getState().rematch()).not.toThrow();
+    expect(store.getState().flow).not.toBe(finished);
+    expect(store.getState().flow.match.status).not.toBe('finished');
+
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });
 
 describe('turnView', () => {

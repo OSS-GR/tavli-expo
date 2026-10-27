@@ -11,6 +11,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { SegmentedControl } from '@/components/settings/SegmentedControl';
 import {
+  SAMPLE_DIRECTIONS,
   SAMPLE_POSITION_IDS,
   SAMPLE_POSITIONS,
   type SamplePositionId,
@@ -30,7 +31,7 @@ export default function DevBoardRoute() {
       <StaticBoard
         testID="dev-board"
         board={SAMPLE_POSITIONS[position]}
-        view={{ viewer, direction: 'contrary' }}
+        view={{ viewer, direction: SAMPLE_DIRECTIONS[position] }}
       />
       <View style={styles.controls}>
         <SegmentedControl

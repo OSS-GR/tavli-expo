@@ -2,6 +2,9 @@
  * Checkers in the air: a move, a hit and an undo as short flights from one
  * place to another. Pure TypeScript; `FlightChecker` animates them.
  *
+ * A pin (Plakoto) is a plain move: the pinned checker stays where it is and
+ * the pinner lands on top. Only a hit (Portes) sends a checker to the bar.
+ *
  * While a checker flies, the checker at its landing place is hidden, so the
  * player sees one checker travel, not one that jumps and one that flies.
  */
@@ -9,6 +12,7 @@ import type { BoardState, Move, PlayerId } from '@tavli/engine';
 
 import {
   countIn,
+  pinnedIn,
   slotOfDestination,
   slotOfOrigin,
   topCheckerKey,
@@ -76,9 +80,10 @@ export function moveFlights(
   // An undo flies the checker back: from the destination to the origin.
   const start = undo ? destination : origin;
   const end = undo ? origin : destination;
-  const from = slotTop(geo, start, countIn(before, start, view));
+  // A pinned checker (Plakoto) under a stack moves the stack along a little.
+  const from = slotTop(geo, start, countIn(before, start, view), pinnedIn(before, start, view));
   const endCount = countIn(after, end, view);
-  const to = slotTop(geo, end, endCount);
+  const to = slotTop(geo, end, endCount, pinnedIn(after, end, view));
   const flights: Flight[] = [];
   if (from && to) {
     flights.push({

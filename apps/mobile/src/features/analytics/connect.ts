@@ -53,6 +53,10 @@ export function connectAnalytics({
       sendAppOpened();
     } else {
       // The install ID stays (crash reports use it too). PostHog forgets its own IDs.
+      // This also runs at every start for "unset" and "denied", on purpose:
+      // it is cheap, and the PostHog adapter then empties any event queue
+      // left on disk (the app was killed before PostHog saved the opt-out,
+      // or the consent text changed and the old answer no longer counts).
       analytics.optOut();
     }
   };
