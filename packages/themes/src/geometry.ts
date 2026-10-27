@@ -181,11 +181,24 @@ function mirrorSlot<T extends StackSlot>(slot: T): T {
  * dice area. Point numbers and point tones stay with their points, so the
  * player's path runs the other way round.
  *
- * The image layers, the board shadow and the lamp do not change: the light
- * still comes from the same side of the screen. So the art must fit both
- * ways. `isMirrorSymmetric` checks that the layout allows it.
+ * The board shadow and the lamp do not change: the light still comes from
+ * the same side of the screen. When the art fits both ways
+ * (`isMirrorSymmetric`, every portrait layout) the image layers stay as
+ * they are too. When it does not (the classic board, with its trays on one
+ * side, #184), the layout says so with `artMirrored`, and the renderer
+ * draws the image layers mirrored.
  */
 export function mirrorLayout(layout: BoardLayout): BoardLayout {
+  const mirrored = mirrorSlots(layout);
+  // Mirrored twice, the art is back the right way round.
+  const artMirrored = !isMirrorSymmetric(layout) !== (layout.artMirrored === true);
+  if (artMirrored) mirrored.artMirrored = true;
+  else delete mirrored.artMirrored;
+  return mirrored;
+}
+
+/** The layout with every slot mirrored; the art flag is left as it was. */
+function mirrorSlots(layout: BoardLayout): BoardLayout {
   return {
     ...layout,
     fields: layout.fields.map(mirrorRect),
@@ -226,7 +239,7 @@ const sameRect = (p: Rect, q: Rect, epsilon: number): boolean =>
  */
 export function isMirrorSymmetric(layout: BoardLayout, epsilon = 1e-4): boolean {
   const own = artRects(layout);
-  return artRects(mirrorLayout(layout)).every((m) => own.some((r) => sameRect(m, r, epsilon)));
+  return artRects(mirrorSlots(layout)).every((m) => own.some((r) => sameRect(m, r, epsilon)));
 }
 
 /** True when two rects share area (touching edges do not count). */

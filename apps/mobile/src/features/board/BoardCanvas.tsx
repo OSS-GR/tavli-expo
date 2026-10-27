@@ -2,9 +2,10 @@
  * The board on screen: a Skia canvas that draws a `BoardScene`.
  *
  * `useBoardTheme` reads the board theme from Settings, `useHomeBoardSide`
- * the home board side. `portraitLayout` gives the layout for that side.
- * `useBoardSpace` measures the space the board may fill; `fitBoard` then
- * gives the geometry.
+ * the home board side and `useBoardLayoutMode` the game screen layout
+ * (#184). `boardLayout` gives the theme layout for both: the tall board on
+ * its side (`portraitLayout`) or the classic wide board. `useBoardSpace`
+ * measures the space the board may fill; `fitBoard` then gives the geometry.
  */
 import { Canvas } from '@shopify/react-native-skia';
 import {
@@ -19,7 +20,7 @@ import {
 import { useCallback, useState, type ReactNode } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 
-import type { HomeBoardSide } from '@/features/settings/settings';
+import type { BoardLayoutMode, HomeBoardSide } from '@/features/settings/settings';
 import { useSettings } from '@/features/settings/store';
 
 import type { BoardPicture } from './boardModel';
@@ -38,17 +39,15 @@ export function useHomeBoardSide(): HomeBoardSide {
   return useSettings((s) => s.homeBoardSide);
 }
 
+/** The game screen layout from Settings → Board → Board layout (#184). */
+export function useBoardLayoutMode(): BoardLayoutMode {
+  return useSettings((s) => s.boardLayout);
+}
+
 /** One mirrored layout per theme layout, so its identity stays the same between renders. */
 const mirrored = new WeakMap<BoardLayout, BoardLayout>();
 
-/**
- * The portrait layout of a theme (wireframe option B). With `left` it is
- * mirrored left to right (`mirrorLayout`): every point, bar half and tray
- * moves to the other side, so drawing, hit tests, highlights and flights
- * all follow. The art is not mirrored: the themes test checks it fits.
- */
-export function portraitLayout(theme: ThemeManifest, side: HomeBoardSide = 'right'): BoardLayout {
-  const layout = getLayout(theme, 'portrait-rotated');
+function forSide(layout: BoardLayout, side: HomeBoardSide): BoardLayout {
   if (side === 'right') return layout;
   let flipped = mirrored.get(layout);
   if (flipped === undefined) {
@@ -56,6 +55,34 @@ export function portraitLayout(theme: ThemeManifest, side: HomeBoardSide = 'righ
     mirrored.set(layout, flipped);
   }
   return flipped;
+}
+
+/**
+ * The theme layout for a board layout and a home board side. This is the
+ * one place that picks it: drawing, hit tests, highlights, flights,
+ * combined targets and the dice on the board all read the layout it gives.
+ *
+ * - `tall`: the theme's portrait layout (wireframe option B), the board on
+ *   its side. Your home is at the bottom left of the screen.
+ * - `classic`: the theme's landscape layout, the board as on a table seen
+ *   from your seat. Your home is at the bottom right, as on a real board.
+ *
+ * With `left` the layout is mirrored left to right (`mirrorLayout`): every
+ * point, bar half and tray moves to the other side. The tall art fits both
+ * ways; the classic art has its trays on one side, so it is mirrored too
+ * (`artMirrored`).
+ */
+export function boardLayout(
+  theme: ThemeManifest,
+  mode: BoardLayoutMode = 'tall',
+  side: HomeBoardSide = 'right',
+): BoardLayout {
+  return forSide(getLayout(theme, mode === 'classic' ? 'landscape' : 'portrait-rotated'), side);
+}
+
+/** The tall (portrait) layout of a theme for a home board side. See `boardLayout`. */
+export function portraitLayout(theme: ThemeManifest, side: HomeBoardSide = 'right'): BoardLayout {
+  return boardLayout(theme, 'tall', side);
 }
 
 export interface Size {

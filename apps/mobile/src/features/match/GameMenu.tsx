@@ -48,6 +48,11 @@ export function MenuRow({ icon, title, hint, disabled = false, onPress, testID }
 }
 
 export interface GameMenuProps {
+  /**
+   * The game on the board: "Game 2 · Plakoto" (#109). The tall game screen
+   * has no room for it, so the menu shows it (#184).
+   */
+  gameLabel?: string;
   summary: string;
   /** `null` hides the hint and disables the row. */
   resignGameHint: string | null;
@@ -69,6 +74,11 @@ export function GameMenu(props: GameMenuProps) {
       <Text style={styles.heading} accessibilityRole="header">
         {t('game.menu.title')}
       </Text>
+      {props.gameLabel ? (
+        <Text testID="menu-game-label" style={styles.gameLabel}>
+          {props.gameLabel}
+        </Text>
+      ) : null}
       <Text style={styles.summary}>{props.summary}</Text>
       <MenuRow
         testID="menu-resign-game"
@@ -113,6 +123,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   heading: {
     ...theme.type.title,
+    color: theme.colors.text,
+  },
+  gameLabel: {
+    ...theme.type.bodyStrong,
     color: theme.colors.text,
   },
   summary: {

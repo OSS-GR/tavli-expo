@@ -102,6 +102,7 @@ export function MatchScreen({
   if (overlay === 'menu') {
     content = (
       <GameMenu
+        gameLabel={gameLabel}
         summary={summary}
         resignGameHint={
           gameResignable ? t('game.menu.resignGameHint', { name: name(opponent(resigner)) }) : null

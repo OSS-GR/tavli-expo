@@ -1,8 +1,19 @@
 /**
- * The board screen (wireframe 6): the player strips, the board, the cards
- * over it (opening roll, no legal moves), the game-end sheet (wireframe 8)
- * and the controls row (Roll, or Undo · dice · Confirm). Match end is its
- * own screen (wireframe 9): this screen calls `onMatchOver`.
+ * The board screen (wireframe 6): the player strips, the board with the
+ * dice on it, the cards over it (opening roll, no legal moves), the
+ * game-end sheet (wireframe 8) and one row of big buttons (Roll, or Undo ·
+ * Confirm). Match end is its own screen (wireframe 9): this screen calls
+ * `onMatchOver`.
+ *
+ * Two portrait layouts (#184, Settings → Board → Board layout):
+ * - `tall` (default): the board on its side, as large as the screen allows.
+ *   One-line strips above and below it, the menu in the top strip, the
+ *   game label in the menu.
+ * - `classic`: the board as on a table, as wide as the screen, with its
+ *   strips right above and below it, centred on the screen. The menu and
+ *   the game label sit at the top.
+ * Both keep the buttons at the bottom, in thumb reach. The board layout
+ * comes from one place (`boardLayout`), so touches and flights follow it.
  *
  * Screen readers (#153): while a card covers the board, they skip the
  * board; while the game-end sheet or a menu covers the screen, they skip
@@ -29,7 +40,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { MoveList } from '@/features/accessibility/MoveList';
 import { useMoveListShown } from '@/features/accessibility/screenReader';
-import { useBoardTheme } from '@/features/board/BoardCanvas';
+import { useBoardLayoutMode, useBoardTheme } from '@/features/board/BoardCanvas';
 import {
   armyFrozen,
   asodioMarks,
@@ -38,11 +49,12 @@ import {
   opensGate,
   toEnterCount,
 } from '@/features/board/asodio';
+import { boardDiceBox } from '@/features/board/boardDice';
 import { pinnedCheckers, toneOf, type BoardView } from '@/features/board/boardModel';
 import { flowPaths } from '@/features/board/combined';
 import { DiceRow } from '@/features/board/DiceRow';
 import { moveFlights, pathFlights, type Flight } from '@/features/board/flights';
-import type { BoardGeometry } from '@/features/board/geometry';
+import { boxRatioWithShadow, type BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { useSettings } from '@/features/settings/store';
@@ -55,7 +67,7 @@ import { diceView, turnView, useGameStore, type DieView, type GameStore } from '
 import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
-import { PlayerStrip } from './PlayerStrip';
+import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
 import { plainSeats, type Seat } from './seats';
 import { passNotice, winType } from './turnNotices';
 import { useAnnouncement } from './useAnnouncement';
@@ -114,7 +126,10 @@ export interface GameScreenProps {
    * for the last game: match end replaces it (wireframe 8).
    */
   onMatchOver?: () => void;
-  /** The game on the board, shown over it: "Game 2 · Plakoto" (#109). */
+  /**
+   * The game on the board: "Game 2 · Plakoto" (#109). The classic layout
+   * shows it at the top; the tall one leaves it to the menu (#184).
+   */
   gameLabel?: string;
   /** The game after this one, on the game-end sheet: "Next: game 3 · Fevga" (#109). */
   nextGameLabel?: string;
@@ -144,6 +159,7 @@ export function GameScreen({
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
   const showPips = useSettings((s) => s.showPipCounts);
   const showMoveList = useMoveListShown();
+  const classic = useBoardLayoutMode() === 'classic';
 
   const view = useMemo(() => turnView(flow), [flow]);
   const { game, phase } = view;
@@ -258,8 +274,11 @@ export function GameScreen({
     [],
   );
   const geoRef = useRef<BoardGeometry | null>(null);
+  // The drawn board, for the dice on it. The flights read `geoRef`.
+  const [boardGeo, setBoardGeo] = useState<BoardGeometry | null>(null);
   const onGeometry = useCallback((geo: BoardGeometry) => {
     geoRef.current = geo;
+    setBoardGeo(geo);
   }, []);
 
   /** Plays one move (human or bot) and lets the checker fly. Reads the store, not the render. */
@@ -481,23 +500,17 @@ export function GameScreen({
       ? t('game.roll.openingFor', { name: nameOf(roller) })
       : t('game.roll.opening');
 
+  // The dice lie on the board (#184), in the theme's dice area.
+  let showDice = false;
   let controls;
   if (phase === 'opening-roll') {
     controls = null;
   } else if (botsTurn && !showPass && view.matchPhase === 'playing') {
     const rolled = game.state.dice;
+    showDice = dice.length > 0;
     controls = (
       // No live region: the roll and the bot's moves are announced (`turnAnnouncement`).
       <View testID="bot-turn" style={styles.botBox}>
-        {dice.length > 0 ? (
-          <DiceRow
-            testID="dice-row"
-            theme={theme}
-            dice={dice}
-            rollKey={rollKey}
-            onLanded={onDiceLanded}
-          />
-        ) : null}
         <Text style={styles.botText}>
           {rolled !== null && phase !== 'awaiting-roll'
             ? t('game.bot.moving', { dice: rolled.join('-') })
@@ -516,6 +529,7 @@ export function GameScreen({
       />
     );
   } else if (phase === 'moving' || phase === 'awaiting-confirm' || showPass) {
+    showDice = true;
     controls = (
       <>
         <ActionButton
@@ -525,25 +539,19 @@ export function GameScreen({
           kind="secondary"
           disabled={!view.canUndo || showPass}
           onPress={undo}
+          grow
         />
-        <View style={styles.diceSlot}>
-          <DiceRow
-            testID="dice-row"
-            theme={theme}
-            dice={dice}
-            rollKey={rollKey}
-            onLanded={onDiceLanded}
-          />
-        </View>
         <ActionButton
           testID="confirm-button"
           label={t('game.controls.confirm')}
           disabled={!view.canConfirm || showPass}
           onPress={confirm}
+          grow
         />
       </>
     );
   }
+  const diceBox = showDice && boardGeo !== null ? boardDiceBox(boardGeo, dice.length) : null;
 
   // Game end (wireframe 8): a sheet over the final board. Match end is
   // another screen (`onMatchOver`), so nothing covers the board then.
@@ -804,6 +812,109 @@ export function GameScreen({
   const hideScreen = covered || endSheet !== null;
   const hideBoard = card !== null;
 
+  const menuButton = onOpenMenu ? (
+    <Pressable
+      testID="menu-button"
+      accessibilityRole="button"
+      accessibilityLabel={t('game.menu.open')}
+      // The circle is as tall as a strip; the slop makes the target 44 pt.
+      hitSlop={MENU_SLOP}
+      onPress={onOpenMenu}
+      style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}>
+      {/* U+2630: three lines ("hamburger"). */}
+      <Text style={styles.menuIcon} importantForAccessibility="no" allowFontScaling={false}>
+        {'☰'}
+      </Text>
+    </Pressable>
+  ) : null;
+
+  const boardLayer = (
+    <View
+      testID="game-board-layer"
+      style={styles.boardLayer}
+      collapsable={false}
+      importantForAccessibility={hideBoard ? 'no-hide-descendants' : 'auto'}
+      accessibilityElementsHidden={hideBoard}>
+      <InteractiveBoard
+        testID="game-board"
+        accessibilityLabel={boardLabel}
+        theme={theme}
+        layout={classic ? 'classic' : 'tall'}
+        board={view.board}
+        view={boardView}
+        mover={view.toMove}
+        legal={blocked || botsTurn ? [] : view.legal}
+        positionKey={String(flow.log.length)}
+        flights={flights}
+        onFlightDone={onFlightDone}
+        onMove={onMove}
+        paths={blocked || botsTurn ? [] : paths}
+        onSteps={onSteps}
+        onGeometry={onGeometry}
+        onBoardTap={roll}
+        onPickUp={() => feedback.event('checkerPickUp')}
+        onIllegalDrop={() => feedback.event('invalidMove')}
+        marks={marks}
+      />
+      {diceBox ? (
+        // The dice lie on the board, in the theme's dice area (#184). Touches
+        // go through to the board. The dice canvas keeps its own native view
+        // (`DiceRow`, #173), and this box is a native view too (`pointerEvents`).
+        <View
+          testID="board-dice"
+          pointerEvents="none"
+          collapsable={false}
+          style={[styles.boardDice, { left: diceBox.left, top: diceBox.top }]}>
+          <DiceRow
+            testID="dice-row"
+            theme={theme}
+            dice={dice}
+            rollKey={rollKey}
+            onLanded={onDiceLanded}
+            size={diceBox.size}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+
+  // Status notes stay outside the hidden layer: screen readers still hear them.
+  const hints = (
+    <>
+      {gateToMove !== null ? (
+        <View style={styles.hintRow} pointerEvents="none">
+          <Text testID="loading-lock-hint" style={styles.hint} accessibilityLiveRegion="polite">
+            {gateToMove === 'doubleOnly' ? t('game.asodio.lockedDouble') : t('game.asodio.locked')}
+          </Text>
+        </View>
+      ) : null}
+      {view.canConfirm && !blocked && !botsTurn ? (
+        <View style={styles.hintRow} pointerEvents="none">
+          <Text testID="confirm-hint" style={styles.hint}>
+            {t('game.controls.allUsed')}
+          </Text>
+        </View>
+      ) : null}
+      {botNote !== null ? (
+        <View style={styles.hintRow} pointerEvents="none">
+          <Text testID="bot-answer-note" style={styles.hint} accessibilityLiveRegion="polite">
+            {botNote}
+          </Text>
+        </View>
+      ) : null}
+    </>
+  );
+
+  const cardOverlay = card ? (
+    // Scrolls when a small phone or a large font makes the card taller than its space.
+    <ScrollView
+      testID="game-card-overlay"
+      style={styles.overlay}
+      contentContainerStyle={styles.overlayContent}>
+      {card}
+    </ScrollView>
+  ) : null;
+
   return (
     <View style={styles.screen}>
       <View
@@ -812,91 +923,48 @@ export function GameScreen({
         collapsable={false}
         importantForAccessibility={hideScreen ? 'no-hide-descendants' : 'auto'}
         accessibilityElementsHidden={hideScreen}>
-        <View style={styles.topRow}>
-          {onOpenMenu ? (
-            <Pressable
-              testID="menu-button"
-              accessibilityRole="button"
-              accessibilityLabel={t('game.menu.open')}
-              hitSlop={4}
-              onPress={onOpenMenu}
-              style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}>
-              {/* U+2630: three lines ("hamburger"). */}
-              <Text style={styles.menuIcon} importantForAccessibility="no" allowFontScaling={false}>
-                {'☰'}
-              </Text>
-            </Pressable>
-          ) : null}
-          <View style={styles.topStrip}>{strip(top, 'strip-top')}</View>
-        </View>
-        {gameLabel ? (
-          <Text testID="game-label" style={styles.gameLabel}>
-            {gameLabel}
-          </Text>
-        ) : null}
-        <View style={styles.boardArea}>
-          <View
-            testID="game-board-layer"
-            style={styles.boardLayer}
-            collapsable={false}
-            importantForAccessibility={hideBoard ? 'no-hide-descendants' : 'auto'}
-            accessibilityElementsHidden={hideBoard}>
-            <InteractiveBoard
-              testID="game-board"
-              accessibilityLabel={boardLabel}
-              theme={theme}
-              board={view.board}
-              view={boardView}
-              mover={view.toMove}
-              legal={blocked || botsTurn ? [] : view.legal}
-              positionKey={String(flow.log.length)}
-              flights={flights}
-              onFlightDone={onFlightDone}
-              onMove={onMove}
-              paths={blocked || botsTurn ? [] : paths}
-              onSteps={onSteps}
-              onGeometry={onGeometry}
-              onBoardTap={roll}
-              onPickUp={() => feedback.event('checkerPickUp')}
-              onIllegalDrop={() => feedback.event('invalidMove')}
-              marks={marks}
-            />
-          </View>
-          {/* Status notes stay outside the hidden layer: screen readers still hear them. */}
-          {gateToMove !== null ? (
-            <View style={styles.hintRow} pointerEvents="none">
-              <Text testID="loading-lock-hint" style={styles.hint} accessibilityLiveRegion="polite">
-                {gateToMove === 'doubleOnly'
-                  ? t('game.asodio.lockedDouble')
-                  : t('game.asodio.locked')}
-              </Text>
+        {classic ? (
+          <>
+            {/* Classic (#184): the menu and the game label at the top, then
+                the board with its strips, centred in the space that is left.
+                A card covers that whole space, so it has room. */}
+            {menuButton !== null || gameLabel ? (
+              <View style={styles.topRow}>
+                {menuButton}
+                {gameLabel ? (
+                  <Text testID="game-label" style={styles.gameLabel}>
+                    {gameLabel}
+                  </Text>
+                ) : null}
+                {/* Keeps the label in the middle of the screen. */}
+                {menuButton !== null ? <View style={styles.menuSpacer} /> : null}
+              </View>
+            ) : null}
+            <View testID="game-middle" style={styles.middle}>
+              {strip(top, 'strip-top')}
+              <View style={styles.classicBoard(boxRatioWithShadow(theme.layouts.landscape))}>
+                {boardLayer}
+              </View>
+              {strip(viewer, 'strip-bottom')}
+              {hints}
+              {cardOverlay}
             </View>
-          ) : null}
-          {view.canConfirm && !blocked && !botsTurn ? (
-            <View style={styles.hintRow} pointerEvents="none">
-              <Text testID="confirm-hint" style={styles.hint}>
-                {t('game.controls.allUsed')}
-              </Text>
+          </>
+        ) : (
+          <>
+            {/* Tall (#184): the menu inside the top strip, the board as large as it gets. */}
+            <View style={styles.topRow}>
+              {menuButton}
+              <View style={styles.topStrip}>{strip(top, 'strip-top')}</View>
             </View>
-          ) : null}
-          {botNote !== null ? (
-            <View style={styles.hintRow} pointerEvents="none">
-              <Text testID="bot-answer-note" style={styles.hint} accessibilityLiveRegion="polite">
-                {botNote}
-              </Text>
+            <View style={styles.boardArea}>
+              {boardLayer}
+              {hints}
+              {cardOverlay}
             </View>
-          ) : null}
-          {card ? (
-            // Scrolls when a small phone or a large font makes the card taller than the board.
-            <ScrollView
-              testID="game-card-overlay"
-              style={styles.overlay}
-              contentContainerStyle={styles.overlayContent}>
-              {card}
-            </ScrollView>
-          ) : null}
-        </View>
-        {strip(viewer, 'strip-bottom')}
+            {strip(viewer, 'strip-bottom')}
+          </>
+        )}
         {showMoveList && !blocked && !botsTurn ? (
           <MoveList legal={view.legal} onMove={onListMove} paths={paths} onSteps={onListSteps} />
         ) : null}
@@ -906,6 +974,9 @@ export function GameScreen({
     </View>
   );
 }
+
+/** The menu circle is as tall as a strip; this slop makes its target 44 pt. */
+const MENU_SLOP = (44 - STRIP_HEIGHT) / 2;
 
 const styles = StyleSheet.create((theme, rt) => ({
   screen: {
@@ -928,22 +999,26 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   gameLabel: {
     ...theme.type.caption,
+    flex: 1,
     color: theme.colors.textDim,
     textAlign: 'center',
   },
   menuButton: {
-    width: theme.touch.minTarget,
-    height: theme.touch.minTarget,
-    borderRadius: theme.touch.minTarget / 2,
+    width: STRIP_HEIGHT,
+    height: STRIP_HEIGHT,
+    borderRadius: STRIP_HEIGHT / 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
+  menuSpacer: {
+    width: STRIP_HEIGHT + theme.space.sm,
+  },
   menuIcon: {
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 20,
+    lineHeight: 24,
     color: theme.colors.text,
   },
   pressed: {
@@ -952,8 +1027,23 @@ const styles = StyleSheet.create((theme, rt) => ({
   boardArea: {
     flex: 1,
   },
+  middle: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: theme.space.xs,
+  },
+  // As wide as the screen, as tall as the board needs. A large font may
+  // squeeze it; the board then fits the space it has.
+  classicBoard: (ratio: number) => ({
+    width: '100%',
+    aspectRatio: ratio,
+    flexShrink: 1,
+  }),
   boardLayer: {
     flex: 1,
+  },
+  boardDice: {
+    position: 'absolute',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -983,16 +1073,13 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
     backgroundColor: theme.colors.backgroundDeep,
   },
+  // One row of big buttons in thumb reach (#184): Roll, or Undo · Confirm.
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space.sm,
-    minHeight: theme.touch.button + theme.space.lg,
-    paddingHorizontal: theme.space.lg,
-  },
-  diceSlot: {
-    flex: 1,
-    alignItems: 'center',
+    minHeight: theme.touch.button + theme.space.sm,
+    paddingHorizontal: theme.space.md,
   },
   botBox: {
     flex: 1,
@@ -1010,6 +1097,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   botText: {
     ...theme.type.body,
     flex: 1,
+    textAlign: 'center',
     color: theme.colors.textDim,
   },
 }));

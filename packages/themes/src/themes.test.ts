@@ -458,5 +458,20 @@ for (const id of listThemeIds()) {
       expect(l.trays.player.rect.y).toBeGreaterThan(l.trays.opponent.rect.y);
       expect(getPoint(l, 1).rect.x).toBeGreaterThan(getPoint(l, 6).rect.x);
     });
+
+    // The classic board (#184) with Settings → Your home on the bottom left.
+    // Its trays sit on one side, so the art is mirrored with the slots.
+    it('landscape, mirrored: your home is bottom-left, trays on the left edge, art mirrored', () => {
+      const l = mirrorLayout(theme.layouts.landscape);
+      expect(isMirrorSymmetric(theme.layouts.landscape)).toBe(false);
+      expect(l.artMirrored).toBe(true);
+      for (const n of [1, 2, 3, 4, 5, 6]) {
+        const r = getPoint(l, n).rect;
+        expect(r.x + r.w).toBeLessThan(l.bar.rect.x + EPS);
+        expect(r.y).toBeGreaterThanOrEqual(0.5 - EPS);
+        expect(l.trays.player.rect.x + l.trays.player.rect.w).toBeLessThanOrEqual(r.x + EPS);
+      }
+      expect(getPoint(l, 1).rect.x).toBeLessThan(getPoint(l, 6).rect.x);
+    });
   });
 }
