@@ -15,8 +15,8 @@
     "newGame": "New game",
     "vsBot": {
       "title": "Play vs bot",
-      "subtitle": "Easy or Medium",
-      "subtitleEasy": "Easy for now. Medium is coming soon."
+      "levels": "{{first}} or {{last}}",
+      "levelsSeparator": ", "
     },
     "local": {
       "title": "Pass-and-play",

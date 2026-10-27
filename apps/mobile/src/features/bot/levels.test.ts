@@ -2,7 +2,9 @@ import { BotError, createBot, type Bot } from '@tavli/bot';
 import type { Difficulty } from '@tavli/contracts';
 import type { VariantId } from '@tavli/engine';
 
-import { botLevelsByGame, supportedBotLevels, type LevelBot } from './levels';
+import { gameLevels } from '@/features/match/setup';
+
+import { anyGameLevels, botLevelsByGame, supportedBotLevels, type LevelBot } from './levels';
 
 /** A bot with no `supportedLevels`: it plays `levels` in `variants`, else throws NOT_IMPLEMENTED. */
 function probedBot(variants: readonly VariantId[], levels: readonly Difficulty[]): LevelBot {
@@ -92,5 +94,19 @@ describe('botLevelsByGame', () => {
     );
     expect(levels.tavli).toEqual(['easy']);
     expect(levels.portes).toEqual(['easy', 'medium', 'hard']);
+  });
+});
+
+describe('anyGameLevels', () => {
+  it('lists each level that works in at least one game, easiest first', () => {
+    expect(anyGameLevels(gameLevels(['easy'], { fevga: ['hard', 'easy'] }))).toEqual([
+      'easy',
+      'hard',
+    ]);
+    expect(anyGameLevels(gameLevels([]))).toEqual([]);
+  });
+
+  it('has Easy, Medium and Hard with the real bot', () => {
+    expect(anyGameLevels(botLevelsByGame(createBot()))).toEqual(['easy', 'medium', 'hard']);
   });
 });

@@ -153,7 +153,7 @@ The player's past local matches and simple stats, offline.
 - The menu is a `Modal` sheet inside the board route, not a `menu.tsx` form-sheet route. So the board folder has no `menu.tsx`, and Settings from the menu is a push, not a modal.
 - The celebration is a small Reanimated effect, not Lottie (see [Board screen](board-screen.md)).
 - Home has no board art yet (art task); the art area shows the tagline.
-- "Play vs bot" says "Easy for now. Medium is coming soon." until Medium works.
+- The "Play vs bot" subtitle lists the bot levels: "Easy, Medium or Hard" (Greek: "Εύκολο, Μέτριο ή Δύσκολο"). `levelList` in `HomeScreen.tsx` builds it from the levels the bot plays in at least one game (`anyGameLevels` in `features/bot/levels.ts`), so it changes when the bot gets a level (#182).
 - A broken save on the board route shows the "could not be opened" card (not a dialog), with a Home button.
 - The game also saves mid-turn when the app goes to the background or the user exits (the wireframe accepts losing those moves; we keep them).
 - New game has a small **i** button on each game card that opens its rules page (not in wireframe 4).
