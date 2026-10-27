@@ -96,12 +96,14 @@ export interface PlakotoWeights {
 }
 
 /**
- * The default weights. Hand-picked, then checked by self-play (results in
- * the README).
+ * The default weights. Hand-picked, then tuned by self-play: two rounds of
+ * a coordinate search (medium vs medium, 1,000 paired games per candidate;
+ * results in the README). The tuned weights beat the hand-picked ones by
+ * 0.27 points per game.
  */
 export const PLAKOTO_DEFAULT_WEIGHTS: PlakotoWeights = {
-  race: 0.4,
-  madePoint: 1,
+  race: 0.2,
+  madePoint: 0.5,
   // Own point:   0  1     2     3     4     5     6     7     8     9     10    11    12
   pointShape: [
     0, 0.12, 0.2, 0.26, 0.3, 0.32, 0.3, 0.25, 0.2, 0.15, 0.12, 0.1, 0.08,
@@ -112,19 +114,19 @@ export const PLAKOTO_DEFAULT_WEIGHTS: PlakotoWeights = {
   prime: 1,
   // Length:    0  1  2     3     4    5    6
   primeShape: [0, 0, 0.1, 0.25, 0.5, 0.9, 1.5],
-  pinBase: 0.4,
-  pinPips: 0.8,
+  pinBase: 0.2,
+  pinPips: 0.56,
   pinHome: 0.2,
   motherPinned: 4.5,
   motherDouble: 0.95,
   blotShare: 0.6,
   motherShot: 3,
-  anyShot: 0.2,
+  anyShot: 0.26,
   rollerBlot: 0.08,
   rollerMother: 0.5,
   borneOff: 0.04,
   stack: 0.05,
-  double: 0.65,
+  double: 0.975,
 };
 
 export const PLAKOTO_HEURISTIC_ID = 'plakoto-heuristic-v1';

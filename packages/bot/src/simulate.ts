@@ -151,7 +151,7 @@ export function playGame(
       onTurn?.({ game, state: rolled, turn });
       state = next;
       // A question (Plakoto "resign or play on") waits for its answer.
-      for (let prompt = variant.prompt?.(state) ?? null; prompt !== null; ) {
+      for (let prompt = variant.prompt?.(state) ?? null; prompt !== null;) {
         const asked = players[prompt.player];
         if (asked.bot.chooseAnswer === undefined || variant.answerPrompt === undefined) {
           throw new BotError('NOT_IMPLEMENTED', `the ${prompt.player} bot cannot answer questions`);

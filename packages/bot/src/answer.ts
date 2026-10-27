@@ -27,7 +27,10 @@ import type { Evaluator, TurnScore } from './types';
 export function questionOf(variant: Variant, state: GameState): VariantPrompt {
   const prompt = variant.prompt?.(state) ?? null;
   if (prompt === null || variant.answerPrompt === undefined || prompt.choices.length === 0) {
-    throw new BotError('INVALID_REQUEST', `this "${state.variant}" state has no question to answer`);
+    throw new BotError(
+      'INVALID_REQUEST',
+      `this "${state.variant}" state has no question to answer`,
+    );
   }
   return prompt;
 }

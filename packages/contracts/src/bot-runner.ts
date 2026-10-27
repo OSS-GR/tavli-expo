@@ -65,8 +65,11 @@ export interface BotRunner {
    * `'playOn'`). The app passes it to the flow as the `answer` action of
    * `prompt.player`. Rejects like `chooseMove`, and with the bot's error when
    * the state has no question.
+   *
+   * Optional, so older runners and test fakes still fit the port.
+   * `InlineBotRunner` (`@tavli/bot`) has it.
    */
-  chooseAnswer(req: BotAnswerRequest): Promise<string>;
+  chooseAnswer?(req: BotAnswerRequest): Promise<string>;
   /**
    * Stops every request (moves and answers) that has not finished yet, for
    * example when the user leaves the game. Their promises reject with
