@@ -121,16 +121,22 @@ export interface RankedTurn {
 }
 
 /**
- * Hints and post-game review (later). It uses the same evaluators as the
- * bot. Not built yet; `scoreTurns` (in `create-bot.ts`) is the 1-ply core it
- * will use.
+ * Hints and post-game review. It uses the same evaluators as the bot (the
+ * variant's best one) and the same 1-ply core (`scoreTurns`). Build one
+ * with `createAnalyzer` (`analyzer.ts`). There is no randomness.
  */
 export interface Analyzer {
+  /**
+   * Every legal turn for `dice`, best first, for `state.toMove`. `top`
+   * keeps only the best ones. `plies: 2` throws `BotError('NOT_IMPLEMENTED')`
+   * for now.
+   */
   rankTurns(
     state: GameState,
     dice: Dice,
     opts?: { readonly plies?: 1 | 2; readonly top?: number },
   ): readonly RankedTurn[];
+  /** The evaluation of a position for `state.toMove`, before the roll. */
   evaluate(state: GameState): Evaluation;
 }
 

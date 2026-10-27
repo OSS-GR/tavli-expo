@@ -39,6 +39,8 @@ export {
   pickTurn,
   scoreTurns,
 } from './create-bot';
+export { createAnalyzer } from './analyzer';
+export type { RankOptions } from './analyzer';
 export {
   PORTES_DEFAULT_WEIGHTS,
   PORTES_HEURISTIC_ID,
