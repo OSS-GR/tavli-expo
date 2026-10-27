@@ -549,14 +549,22 @@ Tried and dropped (offline scripts, not in the repo):
 | 1,000 paired games, seed 1 (`train -- eval`)                             | 515 (51.5 %) | 243    | 242   | +0.54             |
 | 1,000 paired games, seed 2026                                            | 488 (48.8 %) | 257    | 255   | +0.47             |
 | 1,000 paired games, seed 99 (used to pick the checkpoint)                | 517 (51.7 %) | 227    | 256   | +0.57             |
-| 200 paired games, seed 2029                                              | 102 (51.0 %) | 43     | 55    | +0.57             |
+| `asodio-strength.test.ts`: 200 paired games, seed 2029                   | 102 (51.0 %) | 43     | 55    | +0.57 (187 : 73)  |
 
 For comparison, medium against medium wins 34.6 % and draws 30.5 % ("Asodio
 strength and speed"). So hard wins about half of its games against medium,
-and about two thirds of the games that someone wins. That is **below the
-bar of #164** (60 % of 200 CI games; the epic target is 70 %), so
-`asodio-strength.test.ts` has no hard-vs-medium test yet. Seeds 1 and 2026
-are fresh: no checkpoint was picked on them.
+and about two thirds of the games that someone wins. Seeds 1 and 2026 are
+fresh: no checkpoint was picked on them.
+
+**The Asodio bar (owner decision, #164).** The other games ask hard to win
+60 % of all 200 CI games against medium. Asodio does not: about a quarter
+of its games end in a lock draw (see below), so 60 % of all games is out of
+reach. In Asodio, hard must win **at least 60 % of the games that someone
+wins** (wins / (wins + losses)) **and score more points than medium**, in
+200 paired games. Draws are reported but do not count. The CI match
+(`asodio-strength.test.ts`, seed 2029) gives 102 wins, 43 losses and 55
+draws: 70 % of the decided games, 187 points against 73. The epic target
+of 70 % of all games (#52) is not met in Asodio.
 
 **Why the bar is hard to reach:** about a quarter of the games end in a
 deadlock draw. In 300 games of an early net (B at 10,000 games) against
@@ -1098,7 +1106,7 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
 ## Tests
 
 `pnpm test` from the repo root, or `pnpm --filter @tavli/bot test` (about
-45 s in the dev container; the Asodio strength test takes about 20 s and
+45 s in the dev container; the Asodio strength test takes about 40 s with hard vs medium, and
 the Plakoto one about 15 s with hard vs medium; the files run in parallel).
 
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for
@@ -1166,7 +1174,8 @@ the Plakoto one about 15 s with hard vs medium; the files run in parallel).
   trainer's scores; the mother question is answered "play
   on"; game-end targets; save and load; the train script's flag parser.
 - `strength.test.ts` (300 games per match; hard vs medium 200 games),
-  hard vs medium in `plakoto-strength.test.ts` and `fevga-strength.test.ts`
-  (200 games each), `perf.test.ts`, `hard-perf.test.ts` (all four nets),
+  hard vs medium in `plakoto-strength.test.ts`, `fevga-strength.test.ts`
+  and `asodio-strength.test.ts` (200 games each; Asodio counts only the
+  decided games, see "The Asodio net"), `perf.test.ts`, `hard-perf.test.ts` (all four nets),
   `simulate.test.ts` (1,000 random-vs-random games), `tune.test.ts` (a tiny
   search), and the runner and the command line.

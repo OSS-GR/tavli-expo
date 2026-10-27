@@ -233,7 +233,9 @@ What differs from the plan above, and why:
 - **Inputs:** the TD-Gammon units (192), pin units (48), loading (outside checkers, the first-entry gate: 4), off and pips (4), the quarter lock (rear quarter and lowest pinned quarter, one-hot: 16; frozen checkers and a pinned rear: 4), dead dice and a frozen army (4), pin shots and lock shots (4), the heuristic's mars shares (2) and contact score (1): 279.
 - **Training:** TD(λ) as in 5.7, 40 hidden units, λ 0.5, α 0.05 → 0.005, no warm start: 35,000 games (58 minutes). Runs with λ 0.7, 60 hidden units, a longer run, training against medium, and 2-ply with the heuristic gave no more.
 
-**Measured (#164):** Asodio hard (`asodio-net-v1`, 279 → 40 → 3, 61 KB file) beat medium in 489 of 1,000 games (`simulate`, seed 1: 261 losses, 250 draws, +0.47 points per game) and 488 of 1,000 paired games (seed 2026). That is about 50%, **below the 60% bar of the issue** and the 70% target: about a quarter of the games end in a deadlock draw, and most of those draws come from the dice (the quarter lock leaves few choices). Medium against medium wins 35% and draws 30%. Median decision time 0.006 ms, p99 7 ms. Details: `packages/bot/README.md`, "The Asodio net".
+**Measured (#164):** Asodio hard (`asodio-net-v1`, 279 → 40 → 3, 61 KB file) beat medium in 489 of 1,000 games (`simulate`, seed 1: 261 losses, 250 draws, +0.47 points per game) and 488 of 1,000 paired games (seed 2026). That is about 50% of all games, below the 70% target: about a quarter of the games end in a deadlock draw, and most of those draws come from the dice (the quarter lock leaves few choices). Medium against medium wins 35% and draws 30%.
+
+**The Asodio bar (owner decision, #164).** Because of the lock draws, the Asodio test does not ask for 60% of all games, like the other games. Hard must win at least 60% of the games that someone wins (wins / (wins + losses)) and score more points than medium, in 200 paired games; draws are reported but do not count. The CI match (seed 2029): 102 wins, 43 losses, 55 draws, so 70% of the decided games, and 187 points against 73. Median decision time 0.006 ms, p99 7 ms. Details: `packages/bot/README.md`, "The Asodio net".
 
 ## 6. On-device inference and threading
 
@@ -372,7 +374,7 @@ Tests the bot package must have:
 3. 2-ply search on top candidates, with a time budget and a position cache.
 4. Bearoff table for the race end.
 5. `WorkletBotRunner` (react-native-worklets, Bundle Mode) so hard mode never blocks the UI.
-6. Train and ship nets for Plakoto, Fevga, Asodio. Measure each vs medium and vs the previous net. (Plakoto and Fevga: done, #156. Asodio: shipped in #164, but it wins only about 50% against medium, below the 60% bar.)
+6. Train and ship nets for Plakoto, Fevga, Asodio. Measure each vs medium and vs the previous net. (Plakoto and Fevga: done, #156. Asodio: done, #164, with its own bar: 60% of the decided games, see 5.9.)
 7. Benchmark the Portes net vs gnubg and wildbg locally (dev only).
 
 ### Phase 3 — Later

@@ -29,7 +29,7 @@ Do **not** claim:
 
 - **A tutorial for every game.** The lesson teaches Portes only. Plakoto, Fevga and Asodio have rules pages.
 - **Online play, friends, invites, push.** Not built (MVP2). Home shows "Play a friend · Coming soon".
-- **A Hard bot that wins most Asodio games.** Hard works in every game, but in Asodio it wins only about half of its games against Medium (many games end in a deadlock draw; `packages/bot/README.md`, "The Asodio net").
+- **That Hard in Asodio wins most games.** Hard works in every game. In Asodio it wins about half of its games against Medium, and about 70 % of the games that someone wins; about a quarter of the games end in a deadlock draw (`packages/bot/README.md`, "The Asodio net"). Say "Hard in every game", not how often it wins.
 - **More themes, face-to-face view.** Not built.
 - **Dark mode, iPad, accessibility claims.** Not checked for the store.
 
