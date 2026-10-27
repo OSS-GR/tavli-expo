@@ -30,6 +30,7 @@ describe('<SettingsScreen />', () => {
     expect(screen.getByRole('switch', { name: 'Haptics' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Auto-confirm moves' })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: 'Show pip counts' })).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Show hints' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Phone language' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Flip' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Face-to-face' })).toBeDisabled();
@@ -62,6 +63,25 @@ describe('<SettingsScreen />', () => {
 
     expect(settingsStore.getState().sound).toBe(false);
     expect(screen.getByRole('switch', { name: 'Sound' })).not.toBeChecked();
+  });
+
+  it('turns the Hint button off and on (#209), and sends only the key', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      consentStore.setState({ status: 'granted' });
+    });
+    await render(<SettingsScreen />);
+
+    await user.press(screen.getByRole('switch', { name: 'Show hints' }));
+    expect(settingsStore.getState().showHints).toBe(false);
+    expect(screen.getByRole('switch', { name: 'Show hints' })).not.toBeChecked();
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'showHints' },
+    });
+    await user.press(screen.getByRole('switch', { name: 'Show hints' }));
+    expect(settingsStore.getState().showHints).toBe(true);
   });
 
   it('changes the board view and ignores the locked option', async () => {

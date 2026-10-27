@@ -1,11 +1,13 @@
 /**
  * A local match on the board screen: the board (GameScreen), the bot vs
- * the human, the in-game menu and the resign dialogs. When the match is
+ * the human, the in-game menu and the resign dialogs. Both modes get the
+ * Hint button (#209): the screen passes the bot's Analyzer. When the match is
  * over it calls `onMatchOver` (the match-end screen, wireframe 9).
  *
  * Navigation stays in the route (`app/game/[id].tsx`); this screen only
  * calls the `on…` props.
  */
+import type { Analyzer } from '@tavli/bot';
 import type { BotRunner } from '@tavli/contracts';
 import { opponent, type PlayerId } from '@tavli/engine';
 import { useState } from 'react';
@@ -17,8 +19,9 @@ import { BOT_SPEED_TIMING, type BotTiming } from '@/features/bot/botTurn';
 import { useGameStore } from '@/features/game/gameStore';
 import { GameScreen, type BotSeat } from '@/features/game/GameScreen';
 import { winType } from '@/features/game/turnNotices';
+import { sendHintShown } from '@/features/hint/hintAnalytics';
 import { useSettings } from '@/features/settings/store';
-import { botRunner, createLocalRng } from '@/services';
+import { analyzer as appAnalyzer, botRunner, createLocalRng } from '@/services';
 
 import { GameMenu } from './GameMenu';
 import { canResignGame, previewResign, resigningPlayer } from './resign';
@@ -41,6 +44,8 @@ export interface MatchScreenProps {
   /** For tests: another runner, or bot timing on top of the Bot speed setting. */
   runner?: BotRunner;
   botTiming?: Partial<BotTiming>;
+  /** For tests: another Analyzer for the Hint button. */
+  analyzer?: Analyzer;
 }
 
 type Overlay = 'none' | 'menu' | 'resignGame' | 'resignMatch';
@@ -55,6 +60,7 @@ export function MatchScreen({
   onReview,
   runner = botRunner,
   botTiming,
+  analyzer = appAnalyzer,
 }: MatchScreenProps) {
   const { t } = useTranslation();
   const { setup, store } = session;
@@ -206,6 +212,8 @@ export function MatchScreen({
         {...(onReview ? { onReview } : {})}
         gameLabel={gameLabel}
         {...(nextLabel ? { nextGameLabel: nextLabel } : {})}
+        analyzer={analyzer}
+        onHintShown={() => sendHintShown(setup.game, flow.game.state.variant)}
       />
       <Sheet
         visible={content !== null}

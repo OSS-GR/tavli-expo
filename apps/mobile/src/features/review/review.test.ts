@@ -14,6 +14,7 @@ import {
   type Turn,
 } from '@tavli/engine';
 
+import { movesShortText } from '@/features/hint/hintText';
 import i18n from '@/i18n';
 
 import {
@@ -42,7 +43,7 @@ import {
   type GradedTurn,
 } from './review';
 import { sendReviewOpened } from './reviewAnalytics';
-import { mistakeText, moveRuns, turnShortText } from './reviewText';
+import { mistakeText, turnShortText } from './reviewText';
 
 describe('mistakeBand', () => {
   it('names the loss with fixed bands', () => {
@@ -218,13 +219,11 @@ describe('the review text', () => {
     await i18n.changeLanguage('en');
   });
 
-  it('joins the moves of one checker run', () => {
-    const m = (from: number, to: number, die: 1 | 2 | 3 | 4 | 5 | 6) =>
-      ({ from, to, die, capture: 'none' }) as const;
-    expect(moveRuns([m(13, 8, 5), m(8, 5, 3), m(24, 18, 6)])).toEqual([
-      [m(13, 8, 5), m(8, 5, 3)],
-      [m(24, 18, 6)],
-    ]);
+  it('names the moves like the Hint: one group per checker run', () => {
+    const [mistake] = reviewGame(oneBadTurn(), ['white'], testAnalyzer);
+    // 24/18*/13 is one checker with both dice.
+    expect(turnShortText(i18n.t, mistake!.best)).toBe('24 → 18 → 13 · hit');
+    expect(turnShortText(i18n.t, mistake!.best)).toBe(movesShortText(i18n.t, mistake!.best.moves));
   });
 
   it('says who played what, the best turn and the band, in English and Greek', async () => {

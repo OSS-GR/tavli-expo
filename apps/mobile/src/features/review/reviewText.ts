@@ -1,44 +1,21 @@
 /**
  * The words of the game review (#215), in the move list's notation:
  * "13 → 8, 6 → 5" on screen, and the move list's full sentences for
- * screen readers. Pure.
+ * screen readers. The moves use the Hint's helpers (`hintText.ts`), so the
+ * two read the same. Pure.
  */
-import type { Dice, Move, Turn } from '@tavli/engine';
+import type { Dice, Turn } from '@tavli/engine';
 import type { TFunction } from 'i18next';
 
-import { choiceLabel, choiceShortLabel } from '@/features/accessibility/moveList';
+import { movesShortText, movesSpokenText } from '@/features/hint/hintText';
 
 import type { Mistake } from './review';
 
-/**
- * The moves of a turn, one group per checker run: a move that goes on from
- * where the move before it landed joins it ("13 → 10 → 5"). The order stays
- * the order of the turn.
- */
-export function moveRuns(moves: readonly Move[]): Move[][] {
-  const runs: Move[][] = [];
-  for (const move of moves) {
-    const last = runs[runs.length - 1];
-    const before = last?.[last.length - 1];
-    if (last !== undefined && before !== undefined && before.to === move.from) last.push(move);
-    else runs.push([move]);
-  }
-  return runs;
-}
+/** The moves of a turn on screen: "13 → 8, 6 → 5". */
+export const turnShortText = (t: TFunction, turn: Turn) => movesShortText(t, turn.moves);
 
-/** The moves on screen: "13 → 8, 6 → 5". */
-export function turnShortText(t: TFunction, turn: Turn): string {
-  return moveRuns(turn.moves)
-    .map((run) => choiceShortLabel(t, run))
-    .join(', ');
-}
-
-/** The moves for a screen reader: "Checker from point 13 to point 8; …". */
-export function turnSpokenText(t: TFunction, turn: Turn): string {
-  return moveRuns(turn.moves)
-    .map((run) => choiceLabel(t, run))
-    .join('; ');
-}
+/** The moves of a turn for a screen reader: "Checker from point 13 to point 8; …". */
+export const turnSpokenText = (t: TFunction, turn: Turn) => movesSpokenText(t, turn.moves);
 
 /** The roll: "6-5". */
 export const diceText = (dice: Dice) => dice.join('-');

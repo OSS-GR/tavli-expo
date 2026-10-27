@@ -51,6 +51,7 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
   const language = useSettings((s) => s.language);
   const autoConfirmMoves = useSettings((s) => s.autoConfirmMoves);
   const showPipCounts = useSettings((s) => s.showPipCounts);
+  const showHints = useSettings((s) => s.showHints);
   const boardFlipMode = useSettings((s) => s.boardFlipMode);
   const theme = useSettings((s) => s.theme);
   const moveList = useSettings((s) => s.moveList);
@@ -118,6 +119,13 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
           hint={t('settings.pipCounts.hint')}
           value={showPipCounts}
           onValueChange={(value) => setSetting('showPipCounts', value)}
+        />
+        <ToggleRow
+          testID="settings-hints"
+          label={t('settings.hints.label')}
+          hint={t('settings.hints.hint')}
+          value={showHints}
+          onValueChange={(value) => setSetting('showHints', value)}
         />
         <Text style={styles.label}>{t('settings.boardView.label')}</Text>
         <SegmentedControl

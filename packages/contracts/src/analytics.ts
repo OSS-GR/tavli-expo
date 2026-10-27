@@ -98,6 +98,15 @@ export interface AnalyticsEvents {
   /** Skip was tapped. `step` is the lesson on screen, from 1. */
   tutorial_skipped: { game: TutorialGame; step: number; lesson: string };
   /**
+   * The Hint button (#209) showed the best turn. Only which game: never the
+   * position, the dice or the moves.
+   */
+  hint_shown: {
+    game: MatchGame;
+    /** Engine variant id: the game in play. */
+    variant: string;
+  };
+  /**
    * The game review (#215) opened after a game. Only which game was picked
    * for the match: never the position, the dice, the moves or the mistakes.
    */
@@ -135,6 +144,7 @@ export const ANALYTICS_EVENTS = [
   'tutorial_step',
   'tutorial_finished',
   'tutorial_skipped',
+  'hint_shown',
   'review_opened',
 ] as const satisfies readonly AnalyticsEventName[];
 
