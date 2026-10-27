@@ -432,7 +432,7 @@ describe('startBotTurn timing (#172)', () => {
   }
 
   /** A Portes store where Black can hit White's blot: own 8 to 6 with the 2 of a 2-1. */
-  function blackCanHit(): { store: GameStore; turns: Turn[] } {
+  function blackCanHit(): { store: GameStore; turns: readonly Turn[] } {
     const store = botToRoll();
     const board = createBoard(
       { white: { points: { 24: 14, 19: 1 } }, black: { points: { 8: 15 } } },
