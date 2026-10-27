@@ -18,6 +18,7 @@ Checked in the code on 2026-10-27:
 | The bot plays on the phone. Local games need no network | `InlineBotRunner` in `services.ts`; App shell, "Pass-and-play" |
 | Pass-and-play on one phone, optional names, the board turns to the player | `features/match/seats.ts`, `settings.boardView.*` |
 | A "How to play" page for each game, with the start position | `features/rules/` |
+| "Learn to play": a one-minute Portes lesson on the real board, 7 lessons (move, both dice, a double, make a door, hit, enter from the bar, bear off). Opens from a Home card, Settings → Help and the Portes rules page | `features/tutorial/` (`lessons.ts`), [App shell](../architecture/app-shell.md#tutorial-128) |
 | Greek and English | `apps/mobile/src/i18n/` |
 | The game saves by itself; Continue on Home | `features/match/savedMatch.ts` |
 | Undo, Confirm, auto-confirm, pip counts, sound, haptics | `features/settings/settings.ts` |
@@ -26,7 +27,7 @@ Checked in the code on 2026-10-27:
 
 Do **not** claim:
 
-- **A tutorial.** The app has rules pages, but no step-by-step tutorial. Issue #137 lists "the tutorial"; it does not exist yet.
+- **A tutorial for every game.** The lesson teaches Portes only. Plakoto, Fevga and Asodio have rules pages.
 - **Online play, friends, invites, push.** Not built (MVP2). Home shows "Play a friend · Coming soon".
 - **Hard bot, more themes, face-to-face view.** The app shows them as "coming soon".
 - **Dark mode, iPad, accessibility claims.** Not checked for the store.
@@ -106,8 +107,9 @@ Two levels. Easy plays a random legal move, so it is good for learning. Medium p
 PASS-AND-PLAY
 Two players, one phone. Type your names if you like. The board turns to the player whose turn it is.
 
-LEARN THE RULES
-Every game has a "How to play" page: the start position, how checkers move, and the special rules. Open it from Home, from the game menu or from the New game screen.
+LEARN TO PLAY
+New to tavli? A one-minute lesson on the real board teaches Portes in 7 short steps: move a checker, use both dice, play a double, make a door, hit, enter from the bar and bear off. Then play your first game against the Easy bot.
+Every game also has a "How to play" page: the start position, how checkers move, and the special rules. Open it from Home, from the game menu or from the New game screen.
 
 MADE FOR TAVLI PLAYERS
 • Greek and English
@@ -122,7 +124,7 @@ No ads. No sign-in. Your games stay on your phone. You choose if the app may sen
 Privacy policy: https://tavlaki.com/privacy
 ```
 
-1,693 characters.
+1,926 characters.
 
 Optional line (only if the owner wants it, see above). Put it before "NO ADS, NO ACCOUNT":
 
@@ -140,11 +142,12 @@ The first release of Tavlaki.
 • Portes, Plakoto, Fevga and Asodio, and full Tavli matches
 • Easy and Medium bot
 • Pass-and-play on one phone
+• Learn to play: a one-minute lesson on the board
 • How to play pages for every game
 • Greek and English
 ```
 
-195 characters.
+245 characters.
 
 ## Other store fields
 

@@ -14,10 +14,10 @@ The first two or three matter most: the stores show them first, in search result
 | 2 | New game | vs bot | The game picker with all five cards (Portes, Plakoto, Fevga, Tavli, Asodio), match length 3, level Medium | Portes, Plakoto, Fevga, Asodio | Πόρτες, Πλακωτό, Φεύγα, Ασόδιο |
 | 3 | Board | Plakoto, pass-and-play, names "Maria" and "Nikos" | One or two pinned checkers on the board, the pill says "Maria's turn". Other option: the "Your mother is pinned" dialog (wireframe 17). | Pin, don't hit | Πλακώνεις, δεν χτυπάς |
 | 4 | Board | Asodio, vs bot | Loading: both "to enter" stacks with counts, a few checkers entered after a 1-2 or a double | Roll a 1-2 to open the board | Φέρε ασόδυο για να ανοίξει το ταμπλό |
-| 5 | Board | Fevga, vs bot | Mid-game: both armies on the way, points held in front of the other player | Play the bot, even offline | Παίξε με τον υπολογιστή, και χωρίς internet |
+| 5 | Learn to play | Portes lesson (tutorial) | Lesson 5 of 7, "Hit a lone checker": the lesson text, the lit checker and its target ring. Open it from Settings → Help → **Learn to play**. | Learn in one minute | Μάθε να παίζεις σε ένα λεπτό |
 | 6 | Match end | Tavli, pass-and-play, first to 5 | The cup and the final score, one row per game: Portes, Plakoto, Fevga, with Mono / Diplo chips | Two players, one phone | Δύο παίκτες, ένα κινητό |
 
-Spare shots, if you want more (the App Store allows 10, Google Play 8): the **How to play** page of Plakoto with its start picture; **Home** with the Continue card.
+Spare shots, if you want more (the App Store allows 10, Google Play 8): **Fevga** vs bot in mid-game (caption "Play the bot, even offline" / "Παίξε με τον υπολογιστή, και χωρίς internet"); the **How to play** page of Plakoto with its start picture; **Home** with the Continue card.
 
 Do not show: "coming soon" items (Hard level, Play a friend, Face-to-face), the welcome consent screen, dev screens.
 
@@ -87,7 +87,7 @@ On the first launch, pick the language, then tap **Don't allow**. So the screens
 
 ### 4. Getting each state
 
-The dice are random, so you play to each state. Tips:
+The dice are random, so you play to each state (the tutorial is the exception: its dice are fixed). Tips:
 
 - **Pins (shot 3):** use pass-and-play, so you move both sides and can leave a lone checker to pin.
 - **Asodio loading (shot 4):** it is the start of every Asodio game. Roll until a 1-2 or a double opens the board.
