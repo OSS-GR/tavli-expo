@@ -449,7 +449,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(problems()).toEqual([]);
   });
 
-  it('history: stats and rows, and the empty state (#142)', async () => {
+  it('history: stats and rows, a house rule, and the empty state (#142, #221)', async () => {
     const record: HistoryRecord = {
       id: 'r',
       endedAt: Date.UTC(2026, 9, 27),
@@ -470,7 +470,9 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       openingRoll: 'useOpeningDice',
     };
     const bot: HistoryRecord = { ...record, id: 'b', mode: 'bot', botLevel: 'medium' };
-    await renderWithRoot(<HistoryScreen records={[record, bot]} onPlay={jest.fn()} />);
+    // A house rule adds to the score line (#221).
+    const houseRule: HistoryRecord = { ...bot, id: 'h', openingRoll: 'chosenStarterRolls' };
+    await renderWithRoot(<HistoryScreen records={[record, bot, houseRule]} onPlay={jest.fn()} />);
     expect(problems()).toEqual([]);
     await renderWithRoot(<HistoryScreen records={[]} onPlay={jest.fn()} />);
     expect(problems()).toEqual([]);
