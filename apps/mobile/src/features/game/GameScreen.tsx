@@ -358,6 +358,8 @@ export function GameScreen({
     isYou(player) ? t('game.end.starts_you') : t('game.end.starts', { name: nameOf(player) });
   const resignedLine = (loser: PlayerId) =>
     isYou(loser) ? t('game.end.resigned_you') : t('game.end.resigned', { name: nameOf(loser) });
+  const timeoutLine = (loser: PlayerId) =>
+    isYou(loser) ? t('game.end.timeout_you') : t('game.end.timeout', { name: nameOf(loser) });
 
   // Screen readers hear each roll and the other player's moves (#134).
   const announcement = turnAnnouncement(flow, t, { nameOf, isYou });
@@ -457,6 +459,9 @@ export function GameScreen({
     let reason: string | null = null;
     if (result.reason === 'resigned' && loser !== null) {
       reason = resignedLine(loser);
+    } else if (result.reason === 'timeout' && loser !== null) {
+      // An online turn timer ran out (#170). The sheet reads this line too.
+      reason = timeoutLine(loser);
     } else if (result.reason === 'borneOff' && type === 'diplo' && loser !== null) {
       reason = isYou(loser)
         ? t('game.end.noBearOff_you')

@@ -3,6 +3,7 @@ import {
   getPreset,
   recordGameResult,
   resignMatch,
+  type GameEndReason,
   type GameResult,
   type Match,
   type PlayerId,
@@ -21,11 +22,14 @@ import { renderWithRoot } from '../../../test/render';
 const botSetup = defaultSetup('bot');
 const localSetup: MatchSetup = { ...defaultSetup('local'), names: { white: 'Maria', black: '' } };
 
-/** A match to 3 with these games (winner, points), each won by bearing off. */
-function playedMatch(games: readonly [PlayerId, number][], target = 3): Match {
+/** A match to 3 with these games (winner, points, reason: bear-off by default). */
+function playedMatch(
+  games: readonly (readonly [PlayerId, number, GameEndReason?])[],
+  target = 3,
+): Match {
   let match = createMatch({ targetPoints: target, players: { white: 'a', black: 'b' } });
-  for (const [winner, points] of games) {
-    const result: GameResult = { winner, points, reason: 'borneOff' };
+  for (const [winner, points, reason = 'borneOff'] of games) {
+    const result: GameResult = { winner, points, reason };
     match = recordGameResult(match, result, { starter: match.nextStarter ?? 'white' });
   }
   return match;
@@ -114,6 +118,68 @@ describe('<MatchEndScreen />', () => {
     expect(screen.getByText('Bot wins the match!')).toBeOnTheScreen();
     expect(screen.getByText('You resigned.')).toBeOnTheScreen();
     expect(screen.getByText('1 – 0')).toBeOnTheScreen();
+  });
+
+  it('says who ran out of time, and which games were won on time (#170)', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    const match = playedMatch([
+      ['black', 1, 'timeout'],
+      ['white', 1],
+      ['white', 2, 'timeout'],
+    ]);
+    await show(botSetup, match).view;
+    expect(screen.getByRole('header', { name: 'You won the match!' })).toBeOnTheScreen();
+    // The last game ended the match on time: the Bot ran out of time.
+    expect(screen.getByText('Bot ran out of time.')).toBeOnTheScreen();
+    const rows = within(screen.getByTestId('match-games'));
+    expect(
+      rows.getByLabelText('Game 1 · Portes, Bot won on time, Mono, 1 point'),
+    ).toBeOnTheScreen();
+    expect(rows.getByLabelText('Game 2 · Portes, You won, Mono, 1 point')).toBeOnTheScreen();
+    expect(
+      rows.getByLabelText('Game 3 · Portes, You won on time, Diplo, 2 points'),
+    ).toBeOnTheScreen();
+    // The reason is read once, with the title and the score.
+    expect(announce.mock.calls.filter(([text]) => String(text).includes('out of time'))).toEqual([
+      ['You won the match! Bot ran out of time. You 3 – 1 Bot'],
+    ]);
+  });
+
+  it('a time-out before the last game is not why the match ended', async () => {
+    const match = playedMatch([
+      ['white', 1, 'timeout'],
+      ['white', 2],
+    ]);
+    await show(localSetup, match).view;
+    expect(screen.queryByText(/ran out of time/)).toBeNull();
+    expect(
+      screen.getByLabelText('Game 1 · Portes, Maria won on time, Mono, 1 point'),
+    ).toBeOnTheScreen();
+  });
+
+  it('a resign of the match after a time-out names the resign only', async () => {
+    await show(localSetup, resignMatch(playedMatch([['black', 1, 'timeout']]), 'black')).view;
+    expect(screen.getByText('Player 2 resigned.')).toBeOnTheScreen();
+    expect(screen.queryByText(/ran out of time/)).toBeNull();
+  });
+
+  it('says a loss on time in Greek', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    try {
+      await show(botSetup, playedMatch([['black', 2, 'timeout']], 1)).view;
+      expect(screen.getByText('Τελείωσε ο χρόνος σου.')).toBeOnTheScreen();
+      expect(
+        screen.getByLabelText(
+          'Παρτίδα 1 · Πόρτες, Υπολογιστής: κέρδισε λόγω χρόνου, Διπλό, 2 βαθμοί',
+        ),
+      ).toBeOnTheScreen();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
   });
 
   it('pass-and-play: names, and the winner is always celebrated', async () => {
