@@ -15,9 +15,9 @@
  * checkers the quarter lock freezes, as in a real game.
  *
  * Landscape (#185): the screen turns with the phone. The lesson text, the
- * dice and Next sit in a column on the left; the classic wide board fills
- * the rest. The board keeps its place in the tree, so turning the phone
- * keeps a picked-up checker.
+ * dice and Next (under the dice) sit in a column on the left that scrolls;
+ * the classic wide board fills the rest. The board keeps its place in the
+ * tree, so turning the phone keeps a picked-up checker.
  *
  * The lessons and their rules live in `lessons.ts`; the engine decides
  * what is legal. This screen only shows them. The route sends analytics
@@ -52,7 +52,7 @@ import { DiceRow } from '@/features/board/DiceRow';
 import { moveFlights, type Flight } from '@/features/board/flights';
 import type { BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
-import { isLandscapeWindow } from '@/features/board/screenLayout';
+import { isLandscapeWindow, spaceKeyFor } from '@/features/board/screenLayout';
 import { createGameFeedback, loadThemeSounds } from '@/features/feedback/feedback';
 import { Celebration } from '@/features/game/Celebration';
 import { diceView } from '@/features/game/gameStore';
@@ -144,7 +144,9 @@ export function TutorialScreen({
 
   const showMoveList = useMoveListShown();
   // Portrait: the tall board, as before. Landscape: the classic wide board.
-  const landscape = isLandscapeWindow(useWindowDimensions());
+  const windowSize = useWindowDimensions();
+  const landscape = isLandscapeWindow(windowSize);
+  const spaceKey = spaceKeyFor(landscape ? 'landscape' : 'tall', windowSize);
   // A checker in the air flies in the board's old place: it just lands.
   const [flightLandscape, setFlightLandscape] = useState(landscape);
   if (flightLandscape !== landscape) {
@@ -297,13 +299,20 @@ export function TutorialScreen({
     />
   ) : null;
 
+  // Portrait: the dice and Next side by side. Landscape: Next under the
+  // dice, as wide as the column, so a long label or a large font has room.
   const controls = (
-    <View style={styles.controls}>
+    <View testID="tutorial-controls" style={styles.controls(landscape)}>
       <View style={styles.diceSlot}>
         <DiceRow testID="tutorial-dice" theme={theme} dice={dice} rollKey={null} />
       </View>
       {done ? (
-        <ActionButton testID="tutorial-next" label={t('tutorial.next')} onPress={goNext} grow />
+        <ActionButton
+          testID="tutorial-next"
+          label={t('tutorial.next')}
+          onPress={goNext}
+          grow={!landscape}
+        />
       ) : null}
     </View>
   );
@@ -311,16 +320,18 @@ export function TutorialScreen({
   return (
     <View testID="tutorial-screen" style={styles.screen(landscape)}>
       {landscape ? (
-        // The left column: the lesson scrolls when it is longer than the
-        // screen is tall; the dice and Next stay at the bottom.
-        <View testID="tutorial-side" style={styles.side}>
+        // The left column scrolls when the lesson, the move list or a large
+        // font make it taller than the screen; the dice and Next sit at its end.
+        <ScrollView
+          testID="tutorial-side"
+          style={styles.side}
+          contentContainerStyle={styles.sideContent}
+          alwaysBounceVertical={false}>
           {topBar}
-          <ScrollView style={styles.sideScroll} alwaysBounceVertical={false}>
-            {card}
-          </ScrollView>
+          {card}
           {moveList}
           {controls}
-        </View>
+        </ScrollView>
       ) : (
         <View style={styles.lead}>
           {topBar}
@@ -342,6 +353,7 @@ export function TutorialScreen({
             accessibilityLabel={t(`tutorial.lessons.${lesson.id}.board`)}
             theme={theme}
             layout={landscape ? 'classic' : 'tall'}
+            spaceKey={spaceKey}
             board={board}
             view={view}
             mover="white"
@@ -396,11 +408,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     width: '38%',
     minWidth: 240,
     maxWidth: 340,
-    gap: theme.space.sm,
-  },
-  sideScroll: {
     flexGrow: 0,
-    flexShrink: 1,
+  },
+  sideContent: {
+    flexGrow: 1,
+    gap: theme.space.sm,
   },
   topBar: {
     flexDirection: 'row',
@@ -472,14 +484,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: 'center',
     paddingVertical: theme.space.sm,
   },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.md,
+  controls: (landscape: boolean) => ({
+    flexDirection: landscape ? 'column' : 'row',
+    alignItems: landscape ? 'stretch' : 'center',
+    gap: landscape ? theme.space.sm : theme.space.md,
     minHeight: theme.touch.button + theme.space.lg,
     paddingHorizontal: theme.space.lg,
+    paddingBottom: landscape ? theme.space.xs : 0,
     marginTop: 'auto',
-  },
+  }),
   diceSlot: {
     alignItems: 'center',
   },

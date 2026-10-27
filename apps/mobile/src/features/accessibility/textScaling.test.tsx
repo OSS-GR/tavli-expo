@@ -20,7 +20,8 @@ import {
   type BoardState,
   type Match,
 } from '@tavli/engine';
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { HistoryScreen } from '@/features/history/HistoryScreen';
 import type { HistoryRecord } from '@/features/history/records';
@@ -331,7 +332,20 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     it('the game menu and the resign dialog', gameMenu);
     it('the tutorial: the Plakoto mother card', async () => {
       await tutorialMotherCard();
-      expect(screen.getByTestId('tutorial-side')).toBeOnTheScreen();
+      // The lesson column scrolls as a whole, and Next sits under the dice
+      // as wide as the column, so a long label or a large font has room.
+      const side = screen.getByTestId('tutorial-side');
+      expect(side.type).toBe('RCTScrollView');
+      const controls = within(side).getByTestId('tutorial-controls');
+      expect(StyleSheet.flatten(controls.props.style)).toMatchObject({
+        flexDirection: 'column',
+        alignItems: 'stretch',
+      });
+      expect(within(controls).getByTestId('tutorial-next')).toBeOnTheScreen();
+      expect(StyleSheet.flatten(screen.getByTestId('tutorial-next').props.style).flex).toBe(
+        undefined,
+      );
+      expect(problems()).toEqual([]);
     });
   });
 

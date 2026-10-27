@@ -15,16 +15,17 @@ import {
 } from '@tavli/engine';
 import { getTheme } from '@tavli/themes';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { boardLayout } from '@/features/board/BoardCanvas';
-import { columnDiceBox } from '@/features/board/boardDice';
+import { boardDiceBox, columnDiceBox, type BoardDiceBox } from '@/features/board/boardDice';
 import {
   fitBoardWithShadow,
   slotRect,
   stackPosition,
   type BoardGeometry,
 } from '@/features/board/geometry';
-import { SIDE_COLUMN } from '@/features/board/screenLayout';
+import { SIDE_COLUMN, sideColumnWidth } from '@/features/board/screenLayout';
 import { DEFAULT_SETTINGS, type HomeBoardSide } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
@@ -93,6 +94,11 @@ async function whiteToMove61(space = LANDSCAPE_SPACE) {
   await press('opening-overlay');
   return store;
 }
+
+/** Where a dice box sits: what the screen puts in the box's style. */
+const pick = (box: BoardDiceBox) => ({ left: box.left, top: box.top });
+/** Two dice on the tall board, in its dice area. */
+const boardDiceBoxAt = (geo: BoardGeometry) => pick(boardDiceBox(geo, 2));
 
 const played = (store: GameStore) =>
   store.getState().flow.game.played.map((m) => `${m.from}/${m.to}`);
@@ -175,6 +181,67 @@ describe('<GameScreen /> in landscape (#185)', () => {
     120_000,
   );
 
+  it.each([1, 2])(
+    'keeps a free slot for the dice in the right column (font scale %s)',
+    async (fontScale) => {
+      await setWindow({ ...LANDSCAPE_SE, fontScale });
+      const column = sideColumnWidth(fontScale);
+      const space = { width: 667 - 2 * 4 - 2 * column, height: 360 };
+      const store = createGameStore({
+        players: { white: 'Maria Papadopoulou', black: 'Bob' },
+        rng: createSeededRng(5),
+      });
+      store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+      store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+      await renderWithRoot(
+        <GameScreen
+          store={store}
+          onOpenMenu={() => {}}
+          gameLabel="Game 2 of the match · Plakoto, first to 5 points"
+        />,
+      );
+      await layoutBoard(space);
+      await press('opening-overlay');
+      const geo = fitBoardWithShadow(boardLayout(theme, 'classic'), space);
+      const box = columnDiceBox(geo, column, 2);
+      const flat = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style);
+
+      // The board layer reaches under the right column, so the dice box lies inside it.
+      expect(flat('game-board-layer')).toMatchObject({ paddingRight: column });
+      expect(box.left).toBeGreaterThanOrEqual(space.width);
+      expect(box.left + box.width).toBeLessThanOrEqual(space.width + column);
+      expect(flat('board-dice')).toMatchObject({ left: box.left, top: box.top });
+
+      // The right column: its top part ends where the dice start, then an
+      // empty slot as tall as the dice, then the buttons. Both parts scroll,
+      // so a large font never pushes text over the dice.
+      const right = screen.getByTestId('game-right');
+      expect(flat('game-right')).toMatchObject({ position: 'absolute', right: 0, width: column });
+      const parts = right.children.map((c) => (typeof c === 'string' ? c : c.props.testID));
+      expect(parts).toEqual(['game-right-top', 'game-dice-slot', 'game-right-bottom']);
+      expect(screen.getByTestId('game-right-top').type).toBe('RCTScrollView');
+      expect(screen.getByTestId('game-right-bottom').type).toBe('RCTScrollView');
+      expect(flat('game-right-top')).toMatchObject({ height: box.top });
+      expect(flat('game-dice-slot')).toMatchObject({ height: box.height });
+      expect(
+        within(screen.getByTestId('game-right-top')).getByTestId('game-label'),
+      ).toBeOnTheScreen();
+      expect(
+        within(screen.getByTestId('game-right-bottom')).getByTestId('confirm-button'),
+      ).toBeOnTheScreen();
+      expect(within(screen.getByTestId('game-dice-slot')).queryAllByText(/./)).toHaveLength(0);
+      // The slot keeps its place before the roll too: Roll does not move.
+      await tapMove(geo, 8, 3, 7);
+      await tapMove(geo, 13, 5, 7);
+      await press('confirm-button');
+      expect(
+        within(screen.getByTestId('game-right-bottom')).getByTestId('roll-button'),
+      ).toBeOnTheScreen();
+      expect(flat('game-dice-slot')).toMatchObject({ height: box.height });
+      expect(flat('game-right-top')).toMatchObject({ height: box.top });
+    },
+  );
+
   it('puts the dice in the right column, next to the board, in the board layer', async () => {
     const store = await whiteToMove61();
     const box = screen.getByTestId('board-dice');
@@ -235,6 +302,42 @@ describe('<GameScreen /> turning the phone mid-turn (#185)', () => {
     expect(screen.getByTestId('dice-row')).toBe(dice);
     await press('undo-button');
     expect(played(store)).toEqual(['13/7']);
+  });
+
+  it('hides the dice until the board has its new place, then puts them there (#185)', async () => {
+    await whiteToMove61(TALL_SPACE);
+    const dice = screen.getByTestId('dice-row');
+    const styleOf = () => StyleSheet.flatten(screen.getByTestId('board-dice').props.style);
+    expect(styleOf()).toMatchObject(boardDiceBoxAt(tallGeo()));
+    expect(styleOf().opacity).toBeUndefined();
+
+    // The phone turns. The board has not measured its new space yet: the
+    // dice stay mounted (no new roll) but hide, at no new place.
+    await setWindow(LANDSCAPE_SE);
+    expect(screen.getByTestId('dice-row')).toBe(dice);
+    expect(styleOf().opacity).toBe(0);
+    // The first render after the board's layout puts them in the right column.
+    await layoutBoard(LANDSCAPE_SPACE);
+    const want = columnDiceBox(landscapeGeo(), SIDE_COLUMN, 2);
+    expect(styleOf()).toMatchObject({ left: want.left, top: want.top });
+    expect(styleOf().opacity).toBeUndefined();
+    expect(screen.getByTestId('dice-row')).toBe(dice);
+
+    // A window that changes size in landscape (split screen): hidden again until measured.
+    const narrow = { width: LANDSCAPE_SPACE.width - 40, height: LANDSCAPE_SPACE.height - 20 };
+    await setWindow({ width: LANDSCAPE_SE.width - 40, height: LANDSCAPE_SE.height - 20 });
+    expect(styleOf().opacity).toBe(0);
+    await layoutBoard(narrow);
+    const geo = fitBoardWithShadow(boardLayout(theme, 'classic'), narrow);
+    expect(styleOf()).toMatchObject(pick(columnDiceBox(geo, SIDE_COLUMN, 2)));
+    expect(styleOf().opacity).toBeUndefined();
+
+    // Back upright: on the tall board again, in its dice area.
+    await setWindow(PORTRAIT_SE);
+    expect(styleOf().opacity).toBe(0);
+    await layoutBoard(TALL_SPACE);
+    expect(styleOf()).toMatchObject(boardDiceBoxAt(tallGeo()));
+    expect(screen.getByTestId('dice-row')).toBe(dice);
   });
 
   it('keeps the classic layout setting for portrait', async () => {

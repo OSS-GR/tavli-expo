@@ -54,14 +54,29 @@ export interface ScreenLayoutInfo {
   readonly layout: ScreenLayout;
   /** The side column width in landscape (see `sideColumnWidth`). */
   readonly column: number;
+  /**
+   * Names the board's space: it changes when the phone turns or the window
+   * (or the font size) changes. The board measures again for a new key.
+   */
+  readonly spaceKey: string;
+}
+
+/** The key of the board's space for a layout and a window (see `ScreenLayoutInfo`). */
+export function spaceKeyFor(
+  layout: ScreenLayout,
+  window: WindowSize & { readonly fontScale?: number },
+): string {
+  return `${layout}:${window.width}x${window.height}@${window.fontScale ?? 1}`;
 }
 
 /** The layout of the game screen now. It changes when the phone turns. */
 export function useScreenLayout(): ScreenLayoutInfo {
   const window = useWindowDimensions();
   const mode = useSettings((s) => s.boardLayout);
+  const layout = screenLayoutFor(window, mode);
   return {
-    layout: screenLayoutFor(window, mode),
+    layout,
     column: sideColumnWidth(window.fontScale),
+    spaceKey: spaceKeyFor(layout, window),
   };
 }

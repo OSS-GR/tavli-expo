@@ -19,9 +19,12 @@
  * with it (`useScreenLayout`). The classic board sits in the middle and
  * fills the height. The left column holds the menu, the two players and
  * Undo (under the left thumb); the right column the game label, the dice
- * and Roll or Confirm (under the right thumb). Turning the phone keeps
- * everything: the views keep their place in the tree, so the board (and a
- * selected checker), the dice canvas and an open card stay mounted.
+ * and Roll or Confirm (under the right thumb). The right column lies over
+ * the right edge of the board layer, so the dice box stays inside that
+ * layer; the column keeps an empty slot where the dice lie. Turning the
+ * phone keeps everything: the views keep their place in the tree, so the
+ * board (and a selected checker), the dice canvas and an open card stay
+ * mounted. Until the board has measured its new space, the dice hide.
  *
  * Screen readers (#153): while a card covers the board, they skip the
  * board; while the game-end sheet or a menu covers the screen, they skip
@@ -169,7 +172,7 @@ export function GameScreen({
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
   const showPips = useSettings((s) => s.showPipCounts);
   const showMoveList = useMoveListShown();
-  const { layout, column } = useScreenLayout();
+  const { layout, column, spaceKey } = useScreenLayout();
   const landscape = layout === 'landscape';
   const classic = layout === 'classic';
   const tall = layout === 'tall';
@@ -286,20 +289,27 @@ export function GameScreen({
     (id: string) => setFlights((old) => old.filter((f) => f.id !== id)),
     [],
   );
-  // A flight flies in the board's old place: when the layout changes (the
-  // phone turns, or the setting), the checkers in the air just land.
-  const [flightLayout, setFlightLayout] = useState(layout);
-  if (flightLayout !== layout) {
-    setFlightLayout(layout);
+  // A flight flies in the board's old place: when the board's space changes
+  // (the phone turns, the window or the setting changes), the checkers in
+  // the air just land.
+  const [flightSpace, setFlightSpace] = useState(spaceKey);
+  if (flightSpace !== spaceKey) {
+    setFlightSpace(spaceKey);
     setFlights([]);
   }
   const geoRef = useRef<BoardGeometry | null>(null);
-  // The drawn board, for the dice on it. The flights read `geoRef`.
-  const [boardGeo, setBoardGeo] = useState<BoardGeometry | null>(null);
-  const onGeometry = useCallback((geo: BoardGeometry) => {
-    geoRef.current = geo;
-    setBoardGeo(geo);
-  }, []);
+  // The drawn board, for the dice. The flights read `geoRef`. It belongs to
+  // the space it was measured in (`spaceKey`): after a turn of the phone it
+  // is old until the board measures again (`InteractiveBoard`).
+  const [boardGeo, setBoardGeo] = useState<{ geo: BoardGeometry; key: string } | null>(null);
+  const onGeometry = useCallback(
+    (geo: BoardGeometry) => {
+      geoRef.current = geo;
+      setBoardGeo({ geo, key: spaceKey });
+    },
+    [spaceKey],
+  );
+  const freshGeo = boardGeo !== null && boardGeo.key === spaceKey ? boardGeo.geo : null;
 
   /** Plays one move (human or bot) and lets the checker fly. Reads the store, not the render. */
   const playMove = (
@@ -578,11 +588,21 @@ export function GameScreen({
       />
     );
   }
+  // The dice stay mounted while the board measures its new space (so a roll
+  // does not start again), but hide until they have their new place.
+  const placeGeo = freshGeo ?? boardGeo?.geo ?? null;
   const diceBox =
-    showDice && boardGeo !== null
+    showDice && placeGeo !== null
       ? landscape
-        ? columnDiceBox(boardGeo, column, dice.length)
-        : boardDiceBox(boardGeo, dice.length)
+        ? columnDiceBox(placeGeo, column, dice.length)
+        : boardDiceBox(placeGeo, dice.length)
+      : null;
+  const diceHidden = freshGeo === null;
+  // Landscape: the right column keeps this slot free for the dice (two, or
+  // four for a double), also before a roll, so its buttons never move.
+  const diceSlot =
+    landscape && freshGeo !== null
+      ? columnDiceBox(freshGeo, column, dice.length === 4 ? 4 : 2)
       : null;
 
   // Game end (wireframe 8): a sheet over the final board. Match end is
@@ -864,7 +884,7 @@ export function GameScreen({
   const boardLayer = (
     <View
       testID="game-board-layer"
-      style={styles.boardLayer}
+      style={styles.boardLayer(landscape ? column : 0)}
       collapsable={false}
       importantForAccessibility={hideBoard ? 'no-hide-descendants' : 'auto'}
       accessibilityElementsHidden={hideBoard}>
@@ -873,6 +893,7 @@ export function GameScreen({
         accessibilityLabel={boardLabel}
         theme={theme}
         layout={boardModeOf(layout)}
+        spaceKey={spaceKey}
         board={view.board}
         view={boardView}
         mover={view.toMove}
@@ -891,15 +912,20 @@ export function GameScreen({
       />
       {diceBox ? (
         // The dice lie on the board, in the theme's dice area (#184); in
-        // landscape just right of the board, over the right column (#185).
-        // Touches go through. The dice canvas keeps its own native view
-        // (`DiceRow`, #173), and this box is a native view too (`pointerEvents`),
-        // always in the board layer, so turning the phone does not move it.
+        // landscape in the layer's right part, in the slot the right column
+        // keeps free (#185). Touches go through. The dice canvas keeps its
+        // own native view (`DiceRow`, #173), and this box is a native view
+        // too (`pointerEvents`), always in the board layer, so turning the
+        // phone does not move it.
         <View
           testID="board-dice"
           pointerEvents="none"
           collapsable={false}
-          style={[styles.boardDice, { left: diceBox.left, top: diceBox.top }]}>
+          style={[
+            styles.boardDice,
+            { left: diceBox.left, top: diceBox.top },
+            diceHidden && styles.diceHidden,
+          ]}>
           <DiceRow
             testID="dice-row"
             theme={theme}
@@ -917,21 +943,27 @@ export function GameScreen({
   const hints = (
     <>
       {gateToMove !== null ? (
-        <View style={styles.hintRow} pointerEvents="none">
+        <View
+          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
+          pointerEvents="none">
           <Text testID="loading-lock-hint" style={styles.hint} accessibilityLiveRegion="polite">
             {gateToMove === 'doubleOnly' ? t('game.asodio.lockedDouble') : t('game.asodio.locked')}
           </Text>
         </View>
       ) : null}
       {view.canConfirm && !blocked && !botsTurn ? (
-        <View style={styles.hintRow} pointerEvents="none">
+        <View
+          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
+          pointerEvents="none">
           <Text testID="confirm-hint" style={styles.hint}>
             {t('game.controls.allUsed')}
           </Text>
         </View>
       ) : null}
       {botNote !== null ? (
-        <View style={styles.hintRow} pointerEvents="none">
+        <View
+          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
+          pointerEvents="none">
           <Text testID="bot-answer-note" style={styles.hint} accessibilityLiveRegion="polite">
             {botNote}
           </Text>
@@ -944,7 +976,7 @@ export function GameScreen({
     // Scrolls when a small phone or a large font makes the card taller than its space.
     <ScrollView
       testID="game-card-overlay"
-      style={styles.overlay}
+      style={[styles.overlay, landscape && styles.besideColumn(column)]}
       contentContainerStyle={styles.overlayContent}>
       {card}
     </ScrollView>
@@ -1002,16 +1034,27 @@ export function GameScreen({
   }
 
   // After the board: the buttons row in portrait, the right column in landscape.
+  // The right column lies over the board layer's right part (the layer keeps
+  // it free, `boardLayer`). Its top and bottom scroll on their own, around an
+  // empty slot where the dice lie, so no text ever covers the dice.
   const trail = landscape ? (
-    <ScrollView
-      testID="game-right"
-      style={styles.side(column)}
-      contentContainerStyle={styles.sideContent}
-      alwaysBounceVertical={false}>
-      {/* The dice lie in the free middle of this column (`columnDiceBox`). */}
-      <View style={styles.sideGroup}>{gameLabelText}</View>
-      <View style={styles.sideGroup}>{mainButton}</View>
-    </ScrollView>
+    <View testID="game-right" style={styles.rightColumn(column)} collapsable={false}>
+      <ScrollView
+        testID="game-right-top"
+        style={diceSlot ? { height: diceSlot.top, flexGrow: 0 } : styles.rightPart}
+        contentContainerStyle={styles.rightTop}
+        alwaysBounceVertical={false}>
+        {gameLabelText}
+      </ScrollView>
+      <View testID="game-dice-slot" style={{ height: diceSlot?.height ?? 0 }} />
+      <ScrollView
+        testID="game-right-bottom"
+        style={styles.rightPart}
+        contentContainerStyle={styles.rightBottom}
+        alwaysBounceVertical={false}>
+        {mainButton}
+      </ScrollView>
+    </View>
   ) : (
     <View style={styles.controls}>
       {undoButton}
@@ -1035,7 +1078,8 @@ export function GameScreen({
         {lead}
         {/* Classic: the board with its strips, centred in the space that is
             left; a card covers that whole space, so it has room. Tall: the
-            board as large as it gets. Landscape: the board between the columns. */}
+            board as large as it gets. Landscape: the board between the
+            columns; the layer reaches under the right column for the dice. */}
         <View
           testID="game-middle"
           style={tall ? styles.boardArea : styles.middle}
@@ -1051,7 +1095,9 @@ export function GameScreen({
             {boardLayer}
           </View>
           {classic ? strip(viewer, 'strip-bottom') : null}
-          {landscape ? moveList : null}
+          {landscape && moveList ? (
+            <View style={styles.besideColumnFlow(column)}>{moveList}</View>
+          ) : null}
           {hints}
           {cardOverlay}
         </View>
@@ -1153,8 +1199,41 @@ const styles = StyleSheet.create((theme, rt) => ({
     aspectRatio: ratio,
     flexShrink: 1,
   }),
-  boardLayer: {
+  // Landscape: the layer also spans the right column (`right`), so the dice
+  // box in that part stays inside it; the board itself keeps clear of it.
+  boardLayer: (right: number) => ({
     flex: 1,
+    paddingRight: right,
+  }),
+  diceHidden: {
+    opacity: 0,
+  },
+  // Landscape: keeps a view over the board clear of the right column.
+  besideColumn: (column: number) => ({
+    right: column,
+  }),
+  besideColumnFlow: (column: number) => ({
+    marginRight: column,
+  }),
+  rightColumn: (width: number) => ({
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width,
+  }),
+  rightPart: {
+    flex: 1,
+  },
+  rightTop: {
+    paddingHorizontal: theme.space.xs,
+    paddingTop: theme.space.xxs,
+  },
+  rightBottom: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: theme.space.xs,
+    paddingBottom: theme.space.xxs,
   },
   boardDice: {
     position: 'absolute',
