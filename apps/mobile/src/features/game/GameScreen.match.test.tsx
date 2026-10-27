@@ -46,7 +46,7 @@ it(`plays a pass-and-play match to ${TARGET} with taps only`, async () => {
   const onMatchOver = jest.fn();
   await renderWithRoot(<GameScreen store={store} onMatchOver={onMatchOver} />);
   await act(async () => {
-    fireEvent(screen.getByTestId('game-board'), 'layout', {
+    fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
     });
   });

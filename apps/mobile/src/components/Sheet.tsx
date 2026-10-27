@@ -1,9 +1,12 @@
 /**
  * A bottom sheet over a dimmed screen (wireframes 7 and 13). A tap on the
  * dimmed part, or the Android back button, calls `onClose`.
+ *
+ * It is a `Modal`, so screen readers stay in it. The content scrolls when a
+ * large font makes it taller than the screen (#153).
  */
 import type { ReactNode } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 export interface SheetProps {
@@ -35,7 +38,9 @@ export function Sheet({
           accessibilityLabel={closeLabel}
         />
         <View testID={testID} style={styles.sheet(look)} accessibilityViewIsModal>
-          {children}
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.content(look)}>
+            {children}
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -53,9 +58,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     opacity: 0.7,
   },
   sheet: (look: 'sheet' | 'dialog') => ({
-    gap: theme.space.sm,
-    padding: theme.space.xl,
-    paddingBottom: look === 'sheet' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
+    // Never taller than the screen: the content scrolls instead.
+    flexShrink: 1,
+    maxHeight: '100%',
+    overflow: 'hidden',
+    marginTop: rt.insets.top,
     marginHorizontal: look === 'dialog' ? theme.space.lg : 0,
     marginBottom: look === 'dialog' ? rt.insets.bottom + theme.space.lg : 0,
     borderTopLeftRadius: theme.radii.xl,
@@ -65,5 +72,13 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
+  }),
+  scroll: {
+    flexGrow: 0,
+  },
+  content: (look: 'sheet' | 'dialog') => ({
+    gap: theme.space.sm,
+    padding: theme.space.xl,
+    paddingBottom: look === 'sheet' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
   }),
 }));

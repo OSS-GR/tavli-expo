@@ -60,7 +60,7 @@ function newStore(game: Game, seed: number, targetPoints = 1): GameStore {
 async function show(store: GameStore, props: Partial<GameScreenProps> = {}) {
   await renderWithRoot(<GameScreen store={store} {...props} />);
   await act(async () => {
-    fireEvent(screen.getByTestId('game-board'), 'layout', {
+    fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
     });
   });
@@ -230,11 +230,13 @@ describe('<GameScreen /> Plakoto mother question', () => {
     // Flip: Bob, who must answer, is at the bottom. No Roll button yet.
     expect(within(screen.getByTestId('strip-bottom')).getByText('Bob')).toBeOnTheScreen();
     expect(screen.queryByTestId('roll-button')).toBeNull();
-    // The screen reader hears the pin.
-    expect(screen.getByLabelText(/Bob’s checker on point 24 is pinned/)).toBeOnTheScreen();
+    // The board says the pin, but screen readers skip the board under the card (#153).
+    expect(screen.queryByLabelText(/Bob’s checker on point 24 is pinned/)).toBeNull();
 
     await press('mother-play-on-button');
     expect(screen.queryByTestId('mother-card')).toBeNull();
+    // The card is gone: the screen reader hears the pin.
+    expect(screen.getByLabelText(/Bob’s checker on point 24 is pinned/)).toBeOnTheScreen();
     const { game } = store.getState().flow;
     expect(game.phase).toBe('awaiting-roll');
     expect(game.state.toMove).toBe('black');
@@ -342,8 +344,9 @@ describe('<GameScreen /> Plakoto mother question vs the bot', () => {
       timeout: 3000,
     });
     expect(screen.getByText('Your mother is pinned')).toBeOnTheScreen();
-    expect(screen.getByLabelText(/Your checker on point 24 is pinned/)).toBeOnTheScreen();
+    expect(screen.queryByLabelText(/Your checker on point 24 is pinned/)).toBeNull();
     await press('mother-play-on-button');
+    expect(screen.getByLabelText(/Your checker on point 24 is pinned/)).toBeOnTheScreen();
     expect(store.getState().flow.game.phase).toBe('awaiting-roll');
     expect(store.getState().flow.game.state.toMove).toBe('white');
   });

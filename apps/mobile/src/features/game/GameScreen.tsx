@@ -4,6 +4,10 @@
  * and the controls row (Roll, or Undo · dice · Confirm). Match end is its
  * own screen (wireframe 9): this screen calls `onMatchOver`.
  *
+ * Screen readers (#153): while a card covers the board, they skip the
+ * board; while the game-end sheet or a menu covers the screen, they skip
+ * everything under it. Each card moves focus to its title when it opens.
+ *
  * Game logic stays in the engine. This screen sends actions to the game
  * store and shows the result. Vs bot, the bot's turn runs here too
  * (`startBotTurn`), so its moves fly like a human's.
@@ -19,7 +23,7 @@ import {
 } from '@tavli/engine';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -88,6 +92,8 @@ export interface GameScreenProps {
   bot?: BotSeat;
   /** Stops the bot (the menu is open, or another screen is on top). */
   paused?: boolean;
+  /** A menu or dialog covers this screen: screen readers skip it (#153). */
+  covered?: boolean;
   /** Shows the menu button (wireframe 7). */
   onOpenMenu?: () => void;
   /** Shows "Home" on the game-end sheet. */
@@ -114,6 +120,7 @@ export function GameScreen({
   seats: givenSeats,
   bot,
   paused = false,
+  covered = false,
   onOpenMenu,
   onHome,
   onMatchOver,
@@ -680,79 +687,107 @@ export function GameScreen({
     />
   );
 
+  // Screen readers skip what a card or sheet covers (#153), as the tutorial
+  // does for its mother card (#151).
+  const hideScreen = covered || endSheet !== null;
+  const hideBoard = card !== null;
+
   return (
     <View style={styles.screen}>
-      <View style={styles.topRow}>
-        {onOpenMenu ? (
-          <Pressable
-            testID="menu-button"
-            accessibilityRole="button"
-            accessibilityLabel={t('game.menu.open')}
-            hitSlop={4}
-            onPress={onOpenMenu}
-            style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}>
-            {/* U+2630: three lines ("hamburger"). */}
-            <Text style={styles.menuIcon} importantForAccessibility="no" allowFontScaling={false}>
-              {'☰'}
-            </Text>
-          </Pressable>
+      <View
+        testID="game-content"
+        style={styles.content}
+        importantForAccessibility={hideScreen ? 'no-hide-descendants' : 'auto'}
+        accessibilityElementsHidden={hideScreen}>
+        <View style={styles.topRow}>
+          {onOpenMenu ? (
+            <Pressable
+              testID="menu-button"
+              accessibilityRole="button"
+              accessibilityLabel={t('game.menu.open')}
+              hitSlop={4}
+              onPress={onOpenMenu}
+              style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}>
+              {/* U+2630: three lines ("hamburger"). */}
+              <Text style={styles.menuIcon} importantForAccessibility="no" allowFontScaling={false}>
+                {'☰'}
+              </Text>
+            </Pressable>
+          ) : null}
+          <View style={styles.topStrip}>{strip(top, 'strip-top')}</View>
+        </View>
+        {gameLabel ? (
+          <Text testID="game-label" style={styles.gameLabel}>
+            {gameLabel}
+          </Text>
         ) : null}
-        <View style={styles.topStrip}>{strip(top, 'strip-top')}</View>
+        <View style={styles.boardArea}>
+          <View
+            testID="game-board-layer"
+            style={styles.boardLayer}
+            importantForAccessibility={hideBoard ? 'no-hide-descendants' : 'auto'}
+            accessibilityElementsHidden={hideBoard}>
+            <InteractiveBoard
+              testID="game-board"
+              accessibilityLabel={boardLabel}
+              theme={theme}
+              board={view.board}
+              view={boardView}
+              mover={view.toMove}
+              legal={blocked || botsTurn ? [] : view.legal}
+              positionKey={String(flow.log.length)}
+              flights={flights}
+              onFlightDone={onFlightDone}
+              onMove={onMove}
+              onGeometry={onGeometry}
+              onBoardTap={roll}
+              onPickUp={() => feedback.event('checkerPickUp')}
+              onIllegalDrop={() => feedback.event('invalidMove')}
+              marks={marks}
+            />
+            {gateToMove !== null ? (
+              <View style={styles.hintRow} pointerEvents="none">
+                <Text
+                  testID="loading-lock-hint"
+                  style={styles.hint}
+                  accessibilityLiveRegion="polite">
+                  {gateToMove === 'doubleOnly'
+                    ? t('game.asodio.lockedDouble')
+                    : t('game.asodio.locked')}
+                </Text>
+              </View>
+            ) : null}
+            {view.canConfirm && !blocked && !botsTurn ? (
+              <View style={styles.hintRow} pointerEvents="none">
+                <Text testID="confirm-hint" style={styles.hint}>
+                  {t('game.controls.allUsed')}
+                </Text>
+              </View>
+            ) : null}
+            {botNote !== null ? (
+              <View style={styles.hintRow} pointerEvents="none">
+                <Text testID="bot-answer-note" style={styles.hint} accessibilityLiveRegion="polite">
+                  {botNote}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          {card ? (
+            // Scrolls when a small phone or a large font makes the card taller than the board.
+            <ScrollView
+              testID="game-card-overlay"
+              style={styles.overlay}
+              contentContainerStyle={styles.overlayContent}>
+              {card}
+            </ScrollView>
+          ) : null}
+        </View>
+        {strip(viewer, 'strip-bottom')}
+        {showMoveList && !blocked && !botsTurn ? (
+          <MoveList legal={view.legal} onMove={onListMove} />
+        ) : null}
+        <View style={styles.controls}>{controls}</View>
       </View>
-      {gameLabel ? (
-        <Text testID="game-label" style={styles.gameLabel}>
-          {gameLabel}
-        </Text>
-      ) : null}
-      <View style={styles.boardArea}>
-        <InteractiveBoard
-          testID="game-board"
-          accessibilityLabel={boardLabel}
-          theme={theme}
-          board={view.board}
-          view={boardView}
-          mover={view.toMove}
-          legal={blocked || botsTurn ? [] : view.legal}
-          positionKey={String(flow.log.length)}
-          flights={flights}
-          onFlightDone={onFlightDone}
-          onMove={onMove}
-          onGeometry={onGeometry}
-          onBoardTap={roll}
-          onPickUp={() => feedback.event('checkerPickUp')}
-          onIllegalDrop={() => feedback.event('invalidMove')}
-          marks={marks}
-        />
-        {gateToMove !== null ? (
-          <View style={styles.hintRow} pointerEvents="none">
-            <Text testID="loading-lock-hint" style={styles.hint} accessibilityLiveRegion="polite">
-              {gateToMove === 'doubleOnly'
-                ? t('game.asodio.lockedDouble')
-                : t('game.asodio.locked')}
-            </Text>
-          </View>
-        ) : null}
-        {view.canConfirm && !blocked && !botsTurn ? (
-          <View style={styles.hintRow} pointerEvents="none">
-            <Text testID="confirm-hint" style={styles.hint}>
-              {t('game.controls.allUsed')}
-            </Text>
-          </View>
-        ) : null}
-        {botNote !== null ? (
-          <View style={styles.hintRow} pointerEvents="none">
-            <Text testID="bot-answer-note" style={styles.hint} accessibilityLiveRegion="polite">
-              {botNote}
-            </Text>
-          </View>
-        ) : null}
-        {card ? <View style={styles.overlay}>{card}</View> : null}
-      </View>
-      {strip(viewer, 'strip-bottom')}
-      {showMoveList && !blocked && !botsTurn ? (
-        <MoveList legal={view.legal} onMove={onListMove} />
-      ) : null}
-      <View style={styles.controls}>{controls}</View>
       {endSheet}
     </View>
   );
@@ -761,10 +796,13 @@ export function GameScreen({
 const styles = StyleSheet.create((theme, rt) => ({
   screen: {
     flex: 1,
-    gap: theme.space.xs,
     paddingTop: theme.space.xs,
     backgroundColor: theme.colors.background,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.sm),
+  },
+  content: {
+    flex: 1,
+    gap: theme.space.xs,
   },
   topRow: {
     flexDirection: 'row',
@@ -800,8 +838,15 @@ const styles = StyleSheet.create((theme, rt) => ({
   boardArea: {
     flex: 1,
   },
+  boardLayer: {
+    flex: 1,
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
+  },
+  overlayContent: {
+    // No padding: the opening card takes taps on the whole board area.
+    flexGrow: 1,
     justifyContent: 'center',
   },
   tapArea: {

@@ -37,7 +37,7 @@ const SIZE = { width: 375, height: 520 };
 async function show(store: GameStore, props: Partial<GameScreenProps> = {}) {
   await renderWithRoot(<GameScreen store={store} {...props} />);
   await act(async () => {
-    fireEvent(screen.getByTestId('game-board'), 'layout', {
+    fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
     });
   });

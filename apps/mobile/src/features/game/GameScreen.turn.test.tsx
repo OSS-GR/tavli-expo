@@ -51,7 +51,7 @@ function setPosition(store: GameStore, board: BoardState, player: PlayerId = 'wh
 async function show(store: GameStore, props: Partial<ComponentProps<typeof GameScreen>> = {}) {
   await renderWithRoot(<GameScreen store={store} {...props} />);
   await act(async () => {
-    fireEvent(screen.getByTestId('game-board'), 'layout', {
+    fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
     });
   });

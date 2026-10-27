@@ -190,6 +190,8 @@ export function MatchScreen({
         openingTaps={setup.mode === 'bot' ? 'one' : 'perPlayer'}
         {...(bot ? { bot } : {})}
         paused={paused || overlay !== 'none'}
+        // The menu or a dialog is open: screen readers skip the game under it.
+        covered={content !== null}
         onOpenMenu={() => setOverlay('menu')}
         onHome={onExit}
         onMatchOver={onMatchOver}

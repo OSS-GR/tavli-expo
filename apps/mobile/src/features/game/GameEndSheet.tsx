@@ -2,12 +2,16 @@
  * Game end (wireframe 8): a sheet over the final board. Who won, how
  * (Mono / Diplo chip), why, the match score, then Next game and Home.
  *
- * The result is read to screen readers when the sheet shows. On iOS the
- * sheet is modal for VoiceOver, so focus stays in it.
+ * The result is read to screen readers when the sheet shows, and focus
+ * moves to its title (#153). The game screen hides everything under the
+ * sheet from screen readers. The sheet scrolls when a large font makes it
+ * taller than the screen.
  */
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+
+import { useFocusOnShow } from '@/features/accessibility/focus';
 
 import { Celebration } from './Celebration';
 import { useAnnouncement } from './useAnnouncement';
@@ -49,32 +53,35 @@ export function GameEndSheet({
   children,
   testID,
 }: GameEndSheetProps) {
+  const titleRef = useFocusOnShow();
   useAnnouncement([title, chip, reason, score, next].filter(Boolean).join(' '));
   return (
     <View style={styles.root}>
       <View style={styles.scrim} />
       <View testID={testID} style={styles.sheet} accessibilityViewIsModal>
-        {celebrate ? <Celebration testID="game-celebration" kind="game" /> : null}
-        <Text style={styles.title} accessibilityRole="header">
-          {title}
-        </Text>
-        <View style={styles.chip(strongChip)}>
-          <Text style={styles.chipText(strongChip)}>{chip}</Text>
-        </View>
-        {reason ? <Text style={styles.reason}>{reason}</Text> : null}
-        <View style={styles.matchBox} accessible>
-          <View>
-            <Text style={styles.matchLabel}>{matchLabel}</Text>
-            <Text style={styles.matchScore}>{score}</Text>
-          </View>
-          <Text style={styles.matchTarget}>{target}</Text>
-        </View>
-        {next ? (
-          <Text testID="next-game-label" style={styles.next}>
-            {next}
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+          {celebrate ? <Celebration testID="game-celebration" kind="game" /> : null}
+          <Text ref={titleRef} style={styles.title} accessibilityRole="header">
+            {title}
           </Text>
-        ) : null}
-        <View style={styles.actions}>{children}</View>
+          <View style={styles.chip(strongChip)}>
+            <Text style={styles.chipText(strongChip)}>{chip}</Text>
+          </View>
+          {reason ? <Text style={styles.reason}>{reason}</Text> : null}
+          <View style={styles.matchBox} accessible>
+            <View>
+              <Text style={styles.matchLabel}>{matchLabel}</Text>
+              <Text style={styles.matchScore}>{score}</Text>
+            </View>
+            <Text style={styles.matchTarget}>{target}</Text>
+          </View>
+          {next ? (
+            <Text testID="next-game-label" style={styles.next}>
+              {next}
+            </Text>
+          ) : null}
+          <View style={styles.actions}>{children}</View>
+        </ScrollView>
       </View>
     </View>
   );
@@ -91,17 +98,26 @@ const styles = StyleSheet.create((theme, rt) => ({
     opacity: 0.5,
   },
   sheet: {
-    alignItems: 'center',
-    gap: theme.space.sm,
-    paddingHorizontal: theme.space.xl,
-    paddingTop: theme.space.lg,
-    paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
+    // Never taller than the screen: the content scrolls instead.
+    flexShrink: 1,
+    maxHeight: '100%',
+    overflow: 'hidden',
     borderTopLeftRadius: theme.radii.xl,
     borderTopRightRadius: theme.radii.xl,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderBottomWidth: 0,
     borderColor: theme.colors.border,
+  },
+  scroll: {
+    flexGrow: 0,
+  },
+  content: {
+    alignItems: 'center',
+    gap: theme.space.sm,
+    paddingHorizontal: theme.space.xl,
+    paddingTop: theme.space.lg,
+    paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
   },
   title: {
     ...theme.type.title,

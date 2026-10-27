@@ -70,7 +70,7 @@ function storeAt(
 async function show(store: GameStore, props: Partial<GameScreenProps> = {}) {
   await renderWithRoot(<GameScreen store={store} {...props} />);
   await act(async () => {
-    fireEvent(screen.getByTestId('game-board'), 'layout', {
+    fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
       nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
     });
   });
@@ -163,7 +163,10 @@ describe('<GameScreen /> plays Asodio with taps only', () => {
     // Both stacks wait to enter, with their counts.
     expect(within(screen.getByTestId('strip-top')).getByText(/15 to enter/)).toBeOnTheScreen();
     expect(within(screen.getByTestId('strip-bottom')).getByText(/15 to enter/)).toBeOnTheScreen();
-    expect(screen.getByLabelText(/Ann has 15 checkers to enter/)).toBeOnTheScreen();
+    // The board label (screen readers reach it once the opening card is gone).
+    expect(
+      screen.getByLabelText(/Ann has 15 checkers to enter/, { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
 
     const { steps, seen } = await playToTheEnd(store);
     const { flow } = store.getState();
