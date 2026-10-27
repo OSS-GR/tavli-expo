@@ -275,7 +275,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 - The bot's strip is active ("PLAYING").
 - The controls area turns into a locked box: the bot's dice and "Bot rolled 4-2 and is moving…".
-- The bot's moves animate one by one, about 0.4 s each. The bot waits at least 0.6 s before it moves, so it feels natural.
+- The bot's moves animate one by one. The bot's dice stay on screen before its first move, and each move lands before the next one starts (#172: about 0.9 s per move at Normal speed). Settings → Bot speed makes it slower or faster. Numbers: [Bot turn timing](../architecture/board-screen.md#bot-turn-timing-172).
 - The bot's last move arrows stay until you roll.
 - **Pass-and-play:** there is no locked state. After Confirm, the board flips (Flip mode) and the other player sees 6b with their name in the pill.
 
@@ -372,7 +372,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 - **Route:** `app/settings.tsx`
 - **Purpose:** Change app options (#37). All settings save on the phone at once (MMKV). There is no Save button.
 - **Elements:**
-  - **Game:** Auto-confirm moves (toggle, default off). Board view for pass-and-play (**Flip / Face-to-face / Fixed**, default Flip).
+  - **Game:** Auto-confirm moves (toggle, default off). Board view for pass-and-play (**Flip / Face-to-face / Fixed**, default Flip). Bot speed (**Slow / Normal / Fast**, default Normal; #172, not drawn).
   - **Sound and feel:** Sound (toggle). Haptics (toggle). Sound also follows the phone's silent switch.
   - **Language:** **Ελληνικά / English**. The app switches at once.
   - **Look:** Board theme (MVP1 has one wooden board; the row says "more boards later").

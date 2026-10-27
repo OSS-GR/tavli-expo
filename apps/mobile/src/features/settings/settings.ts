@@ -37,6 +37,14 @@ export type MoveListMode = 'auto' | 'on' | 'off';
 
 export const MOVE_LIST_MODES: readonly MoveListMode[] = ['auto', 'on', 'off'];
 
+/**
+ * How fast the bot plays its turn (#172). The timings for each speed are
+ * in `features/bot/botTurn.ts` (`BOT_SPEED_TIMING`).
+ */
+export type BotSpeed = 'slow' | 'normal' | 'fast';
+
+export const BOT_SPEEDS: readonly BotSpeed[] = ['slow', 'normal', 'fast'];
+
 export interface Settings {
   sound: boolean;
   haptics: boolean;
@@ -46,6 +54,8 @@ export interface Settings {
   showPipCounts: boolean;
   boardFlipMode: BoardFlipMode;
   moveList: MoveListMode;
+  /** How fast the bot plays its turn. */
+  botSpeed: BotSpeed;
   /** The app colors (`@tavli/ui`). */
   theme: ThemeId;
   /** The board theme (`@tavli/themes`): the game, the tutorial and the rules pictures use it. */
@@ -60,6 +70,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   showPipCounts: true,
   boardFlipMode: 'flip',
   moveList: 'auto',
+  botSpeed: 'normal',
   theme: DEFAULT_THEME_ID,
   boardTheme: DEFAULT_BOARD_THEME_ID,
 };
@@ -103,6 +114,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     showPipCounts: bool(input['showPipCounts'], d.showPipCounts),
     boardFlipMode: oneOf(BOARD_FLIP_MODES, input['boardFlipMode'], d.boardFlipMode),
     moveList: oneOf(MOVE_LIST_MODES, input['moveList'], d.moveList),
+    // Saves from before #172 have no bot speed: they load as Normal.
+    botSpeed: oneOf(BOT_SPEEDS, input['botSpeed'], d.botSpeed),
     theme: isThemeId(input['theme']) ? input['theme'] : d.theme,
     boardTheme:
       typeof input['boardTheme'] === 'string' && hasTheme(input['boardTheme'])
@@ -144,6 +157,7 @@ function pickSettings(state: SettingsState): Settings {
     showPipCounts: state.showPipCounts,
     boardFlipMode: state.boardFlipMode,
     moveList: state.moveList,
+    botSpeed: state.botSpeed,
     theme: state.theme,
     boardTheme: state.boardTheme,
   };

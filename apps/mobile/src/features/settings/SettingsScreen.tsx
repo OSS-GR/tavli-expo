@@ -17,7 +17,7 @@ import { TutorialSettings } from '@/features/tutorial/TutorialSettings';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
 
 import { BoardThemePicker } from './BoardThemePicker';
-import type { BoardFlipMode, MoveListMode } from './settings';
+import type { BoardFlipMode, BotSpeed, MoveListMode } from './settings';
 import { useSettings } from './store';
 
 /** Pass-and-play board views. Face-to-face is shown but locked until it ships. */
@@ -51,6 +51,7 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
   const boardFlipMode = useSettings((s) => s.boardFlipMode);
   const theme = useSettings((s) => s.theme);
   const moveList = useSettings((s) => s.moveList);
+  const botSpeed = useSettings((s) => s.botSpeed);
   const setSetting = useSettings((s) => s.setSetting);
   const shareUsageData = useConsent((s) => s.status === 'granted');
   const setConsent = useConsent((s) => s.setConsent);
@@ -82,6 +83,12 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
     { value: 'auto', label: t('settings.moveList.auto') },
     { value: 'on', label: t('settings.moveList.on') },
     { value: 'off', label: t('settings.moveList.off') },
+  ];
+
+  const botSpeedOptions: SegmentOption<BotSpeed>[] = [
+    { value: 'slow', label: t('settings.botSpeed.slow') },
+    { value: 'normal', label: t('settings.botSpeed.normal') },
+    { value: 'fast', label: t('settings.botSpeed.fast') },
   ];
 
   const themeOptions = THEME_IDS.map((id) => ({ value: id, label: t(`themes.${id}`) }));
@@ -127,6 +134,15 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
             : t('settings.boardView.fixedHint')}
         </Text>
         <Text style={styles.hint}>{t('settings.boardView.faceToFaceSoon')}</Text>
+        <Text style={styles.label}>{t('settings.botSpeed.label')}</Text>
+        <SegmentedControl
+          testID="settings-bot-speed"
+          label={t('settings.botSpeed.label')}
+          options={botSpeedOptions}
+          value={botSpeed}
+          onChange={(value) => setSetting('botSpeed', value)}
+        />
+        <Text style={styles.hint}>{t(`settings.botSpeed.${botSpeed}Hint`)}</Text>
       </SettingsSection>
 
       <SettingsSection title={t('settings.sections.soundAndFeel')}>

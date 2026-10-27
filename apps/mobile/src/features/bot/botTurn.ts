@@ -10,9 +10,13 @@
  *    pinned), ask the runner (`chooseAnswer`, or `botAnswer` for a runner
  *    without it), wait `beforeRollMs` and answer;
  * 1. wait `beforeRollMs`, then roll (a roll with no legal move passes by itself);
- * 2. ask the `BotRunner` for a turn and wait `thinkingDelayMs` at the same time;
- * 3. play the moves one by one, `moveMs` apart;
+ * 2. ask the `BotRunner` for a turn and wait at the same time: the think time
+ *    (`thinkingDelayMs`), but never less than `afterRollMs`, so the dice
+ *    land and the player can read them;
+ * 3. play the moves one by one, `moveMs` apart, plus `hitMs` after a hit;
  * 4. confirm.
+ *
+ * The timings come from the Bot speed setting (`BOT_SPEED_TIMING`, #172).
  *
  * `startBotTurn` returns a handle; `cancel()` stops the turn at the next
  * step (the user opened the menu or left the game).
@@ -31,6 +35,9 @@ import {
   type Rng,
   type VariantPrompt,
 } from '@tavli/engine';
+
+import { ROLL_MS, ROLL_STAGGER_MS } from '@/features/board/diceMotion';
+import type { BotSpeed } from '@/features/settings/settings';
 
 /** What the bot may do. Each returns `false` when the engine refuses it. */
 export interface BotTurnActions {
@@ -54,13 +61,38 @@ export function botAnswer(prompt: VariantPrompt): string {
 export interface BotTiming {
   /** Pause before the bot rolls, so the turn change is easy to see. */
   readonly beforeRollMs: number;
-  /** Time between two moves (wireframe: about 0.4 s each). */
+  /**
+   * The least time from the roll to the first move. The dice land and stay
+   * on screen for a moment before a checker moves.
+   */
+  readonly afterRollMs: number;
+  /**
+   * Time from one move to the next. It is longer than a checker flight
+   * (`FLIGHT_MS`, and `HIT_DELAY_MS` more for a hit), so each move lands
+   * before the next one starts.
+   */
   readonly moveMs: number;
+  /** Extra pause after a hit (a checker goes to the bar). */
+  readonly hitMs: number;
   /** Think time before the first move. Default: `thinkingDelayMs` from the bot package. */
   readonly thinkMs?: (difficulty: Difficulty, rng: Rng, forced: boolean) => number;
 }
 
-export const BOT_TIMING: BotTiming = { beforeRollMs: 500, moveMs: 400 };
+/** The last die of a double (four dice) lands this long after the roll. */
+export const DICE_LAND_MS = ROLL_MS + 3 * ROLL_STAGGER_MS;
+
+/**
+ * The timings of each Bot speed (#172). Normal is the default. Before #172
+ * the bot rolled after 0.5 s and moved every 0.4 s: too fast to follow.
+ */
+export const BOT_SPEED_TIMING: Readonly<Record<BotSpeed, BotTiming>> = {
+  slow: { beforeRollMs: 1300, afterRollMs: DICE_LAND_MS + 1000, moveMs: 1300, hitMs: 700 },
+  normal: { beforeRollMs: 900, afterRollMs: DICE_LAND_MS + 600, moveMs: 900, hitMs: 500 },
+  fast: { beforeRollMs: 600, afterRollMs: DICE_LAND_MS + 250, moveMs: 550, hitMs: 300 },
+};
+
+/** The default timing: Normal speed. */
+export const BOT_TIMING: BotTiming = BOT_SPEED_TIMING.normal;
 
 export interface BotTurnOptions {
   /** The bot's side. */
@@ -142,7 +174,7 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
         difficulty,
         seed: rng.nextUint32(),
       }),
-      sleep(thinkMs(difficulty, rng, forced)),
+      sleep(Math.max(thinkMs(difficulty, rng, forced), timing.afterRollMs)),
     ]);
     if (cancelled) return false;
 
@@ -161,7 +193,7 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
     for (const move of turn.moves.slice(next)) {
       if (cancelled) return false;
       if (!actions.move(move)) return false;
-      await sleep(timing.moveMs);
+      await sleep(timing.moveMs + (move.capture === 'hit' ? timing.hitMs : 0));
     }
     return true;
   };

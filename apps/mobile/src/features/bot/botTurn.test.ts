@@ -17,9 +17,25 @@ import {
   type Turn,
 } from '@tavli/engine';
 
+import { ROLL_MS, ROLL_STAGGER_MS } from '@/features/board/diceMotion';
+import { FLIGHT_MS, HIT_DELAY_MS } from '@/features/board/flights';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
+import { BOT_SPEEDS } from '@/features/settings/settings';
 
-import { botAnswer, botStep, startBotTurn, type BotTurnActions } from './botTurn';
+import {
+  BOT_SPEED_TIMING,
+  BOT_TIMING,
+  DICE_LAND_MS,
+  botAnswer,
+  botStep,
+  startBotTurn,
+  type BotTurnActions,
+} from './botTurn';
+
+import { runOnFakeTimers } from '../../../test/clock';
+
+/** The least pause the player gets after a checker lands, before the next step. */
+const MIN_PAUSE_MS = 200;
 
 /** A fake runner: the first legal turn, or whatever `pick` returns. Records requests. */
 function fakeRunner(pick?: (req: BotMoveRequest) => Turn | Promise<Turn>) {
@@ -113,7 +129,7 @@ function blackMotherPinned(): GameStore {
   return store;
 }
 
-const fast = { beforeRollMs: 0, moveMs: 0, thinkMs: () => 0 };
+const fast = { beforeRollMs: 0, afterRollMs: 0, moveMs: 0, hitMs: 0, thinkMs: () => 0 };
 
 describe('botStep', () => {
   it('rolls, plays and confirms only on the bot turn', () => {
@@ -181,47 +197,6 @@ describe('startBotTurn', () => {
     expect(Number.isSafeInteger(req.seed)).toBe(true);
   });
 
-  it('waits the think time, then about 0.4 s per move', async () => {
-    jest.useFakeTimers();
-    try {
-      const store = botToRoll();
-      const log: string[] = [];
-      const stamps: number[] = [];
-      const actions = actionsFor(store, log);
-      const timed: BotTurnActions = {
-        ...actions,
-        move: (m) => {
-          stamps.push(Date.now());
-          return actions.move(m);
-        },
-      };
-      const start = Date.now();
-      const thinkMs = jest.fn(() => 700);
-      const handle = startBotTurn({
-        player: 'black',
-        difficulty: 'easy',
-        runner: fakeRunner(),
-        rng: createSeededRng(9),
-        getFlow: () => store.getState().flow,
-        actions: timed,
-        timing: { beforeRollMs: 500, moveMs: 400, thinkMs },
-      });
-      await jest.advanceTimersByTimeAsync(499);
-      expect(log).toEqual([]);
-      await jest.advanceTimersByTimeAsync(1);
-      expect(log).toEqual(['roll']);
-      await jest.advanceTimersByTimeAsync(5000);
-      await handle.done;
-
-      expect(thinkMs).toHaveBeenCalledWith('easy', expect.anything(), expect.any(Boolean));
-      expect(stamps[0]! - start).toBe(1200);
-      for (let i = 1; i < stamps.length; i++) expect(stamps[i]! - stamps[i - 1]!).toBe(400);
-      expect(log.at(-1)).toBe('confirm');
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
   it('marks a forced turn (a single legal play) for the short think time', async () => {
     const store = botToRoll();
     const thinkMs = jest.fn(() => 0);
@@ -239,35 +214,6 @@ describe('startBotTurn', () => {
       timing: { ...fast, thinkMs },
     }).done;
     expect(thinkMs).toHaveBeenCalledWith('easy', expect.anything(), count === 1);
-  });
-
-  it('stops at once on cancel and cancels the runner', async () => {
-    jest.useFakeTimers();
-    try {
-      const store = botToRoll();
-      const log: string[] = [];
-      const runner = fakeRunner();
-      const handle = startBotTurn({
-        player: 'black',
-        difficulty: 'easy',
-        runner,
-        rng: createSeededRng(9),
-        getFlow: () => store.getState().flow,
-        actions: actionsFor(store, log),
-        timing: { beforeRollMs: 500, moveMs: 400, thinkMs: () => 600 },
-      });
-      await jest.advanceTimersByTimeAsync(800);
-      expect(log).toEqual(['roll']);
-      handle.cancel();
-      await jest.advanceTimersByTimeAsync(5000);
-      await handle.done;
-      expect(log).toEqual(['roll']);
-      expect(runner.cancels()).toBe(1);
-      expect(jest.getTimerCount()).toBe(0);
-      expect(store.getState().flow.game.phase).toBe('moving');
-    } finally {
-      jest.useRealTimers();
-    }
   });
 
   it('goes on from moves already played when they start its plan', async () => {
@@ -446,5 +392,186 @@ describe('startBotTurn', () => {
       timing: fast,
     }).done;
     expect(log).toEqual([]);
+  });
+});
+
+describe('startBotTurn timing (#172)', () => {
+  // The bot waits on timers: move the fake clock by the timing constants.
+  runOnFakeTimers();
+
+  /** The actions, with the fake-clock time of each roll, move and confirm. */
+  function timed(store: GameStore) {
+    const log: string[] = [];
+    const at: { what: string; ms: number }[] = [];
+    const actions = actionsFor(store, log);
+    const stamp =
+      <A extends unknown[]>(what: string, action: (...args: A) => boolean) =>
+      (...args: A) => {
+        at.push({ what, ms: Date.now() });
+        return action(...args);
+      };
+    const withTimes: BotTurnActions = {
+      ...actions,
+      roll: stamp('roll', actions.roll),
+      move: stamp('move', actions.move),
+      confirm: stamp('confirm', actions.confirm),
+    };
+    return { log, at, actions: withTimes };
+  }
+
+  /** The time from each stamp to the next one. */
+  const gaps = (at: readonly { ms: number }[]) => at.slice(1).map((s, i) => s.ms - at[i]!.ms);
+
+  it.each(BOT_SPEEDS)(
+    '%s: rolls after beforeRollMs, keeps the dice on screen, then moves moveMs apart',
+    async (speed) => {
+      const store = botToRoll();
+      const { log, at, actions } = timed(store);
+      const { beforeRollMs, afterRollMs, moveMs } = BOT_SPEED_TIMING[speed];
+      const start = Date.now();
+      const handle = startBotTurn({
+        player: 'black',
+        difficulty: 'easy',
+        runner: fakeRunner(),
+        rng: createSeededRng(9),
+        getFlow: () => store.getState().flow,
+        actions,
+        timing: { ...BOT_SPEED_TIMING[speed], thinkMs: () => 0 },
+      });
+
+      await jest.advanceTimersByTimeAsync(beforeRollMs - 1);
+      expect(log).toEqual([]);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(log).toEqual(['roll']);
+      // The bot is done thinking at once, but the dice stay on screen.
+      await jest.advanceTimersByTimeAsync(afterRollMs - 1);
+      expect(log).toEqual(['roll']);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(log).toHaveLength(2);
+      await jest.advanceTimersByTimeAsync(5 * moveMs);
+      await handle.done;
+
+      expect(at[0]).toEqual({ what: 'roll', ms: start + beforeRollMs });
+      expect(at[1]).toEqual({ what: 'move', ms: start + beforeRollMs + afterRollMs });
+      expect(at.at(-1)?.what).toBe('confirm');
+      // The start position has no blot, so no hit: each next step is moveMs later.
+      const steps = at.slice(1);
+      expect(gaps(steps)).toEqual(steps.slice(1).map(() => moveMs));
+    },
+  );
+
+  it('waits the think time when it is longer than afterRollMs', async () => {
+    const store = botToRoll();
+    const { at, actions } = timed(store);
+    const { beforeRollMs, afterRollMs, moveMs } = BOT_TIMING;
+    const think = afterRollMs + 300;
+    const thinkMs = jest.fn(() => think);
+    const start = Date.now();
+    const handle = startBotTurn({
+      player: 'black',
+      difficulty: 'easy',
+      runner: fakeRunner(),
+      rng: createSeededRng(9),
+      getFlow: () => store.getState().flow,
+      actions,
+      timing: { thinkMs },
+    });
+    await jest.advanceTimersByTimeAsync(beforeRollMs + think + 5 * moveMs);
+    await handle.done;
+
+    expect(thinkMs).toHaveBeenCalledWith('easy', expect.anything(), expect.any(Boolean));
+    expect(at[1]).toEqual({ what: 'move', ms: start + beforeRollMs + think });
+  });
+
+  it('pauses hitMs longer after a hit', async () => {
+    // Black's own 8 to 6 with the 2 hits White's blot (White's own 19).
+    const store = botToRoll();
+    const board = createBoard(
+      { white: { points: { 24: 14, 19: 1 } }, black: { points: { 8: 15 } } },
+      'contrary',
+    );
+    const { flow } = store.getState();
+    store.setState({
+      flow: {
+        ...flow,
+        game: createGameFlow({ state: { ...flow.game.state, board }, starter: 'black' }),
+      },
+    });
+    store.getState().dispatch({ type: 'roll', player: 'black', dice: [2, 1] });
+    const turns = getVariant(VARIANT_REGISTRY, 'portes').legalTurns(
+      store.getState().flow.game.state,
+      [2, 1],
+    );
+    const hitFirst = turns.find(
+      (t) =>
+        t.moves.length === 2 && t.moves[0]!.capture === 'hit' && t.moves[1]!.capture === 'none',
+    );
+    expect(hitFirst).toBeDefined();
+
+    const { at, actions } = timed(store);
+    const { afterRollMs, moveMs, hitMs } = BOT_TIMING;
+    const handle = startBotTurn({
+      player: 'black',
+      difficulty: 'easy',
+      runner: fakeRunner(() => hitFirst!),
+      rng: createSeededRng(9),
+      getFlow: () => store.getState().flow,
+      actions,
+      timing: { thinkMs: () => 0 },
+    });
+    await jest.advanceTimersByTimeAsync(afterRollMs + 3 * (moveMs + hitMs));
+    await handle.done;
+
+    expect(at.map((s) => s.what)).toEqual(['move', 'move', 'confirm']);
+    expect(gaps(at)).toEqual([moveMs + hitMs, moveMs]);
+    expect(store.getState().flow.game.lastTurn?.moves).toEqual(hitFirst!.moves);
+  });
+
+  it.each(BOT_SPEEDS)('%s: each move lands before the next step starts', (speed) => {
+    const { afterRollMs, moveMs, hitMs } = BOT_SPEED_TIMING[speed];
+    // A hit checker flies last: it leaves HIT_DELAY_MS after the mover.
+    expect(moveMs).toBeGreaterThanOrEqual(HIT_DELAY_MS + FLIGHT_MS + MIN_PAUSE_MS);
+    // The last die of a double lands, then the player gets a pause to read the dice.
+    expect(DICE_LAND_MS).toBe(ROLL_MS + 3 * ROLL_STAGGER_MS);
+    expect(afterRollMs).toBeGreaterThanOrEqual(DICE_LAND_MS + MIN_PAUSE_MS);
+    expect(hitMs).toBeGreaterThan(0);
+  });
+
+  it('plays at Normal speed by default; Slow is slower and Fast is faster', () => {
+    expect(BOT_TIMING).toBe(BOT_SPEED_TIMING.normal);
+    // The owner's play test (#172): about 0.9 s before the roll and per move.
+    expect(BOT_TIMING.beforeRollMs).toBeGreaterThanOrEqual(900);
+    expect(BOT_TIMING.moveMs).toBeGreaterThanOrEqual(900);
+    const { slow, normal, fast: quick } = BOT_SPEED_TIMING;
+    for (const key of ['beforeRollMs', 'afterRollMs', 'moveMs', 'hitMs'] as const) {
+      expect(slow[key]).toBeGreaterThan(normal[key]);
+      expect(normal[key]).toBeGreaterThan(quick[key]);
+    }
+  });
+
+  it('stops at once on cancel and cancels the runner', async () => {
+    const store = botToRoll();
+    const log: string[] = [];
+    const runner = fakeRunner();
+    const { beforeRollMs, afterRollMs, moveMs } = BOT_TIMING;
+    const handle = startBotTurn({
+      player: 'black',
+      difficulty: 'easy',
+      runner,
+      rng: createSeededRng(9),
+      getFlow: () => store.getState().flow,
+      actions: actionsFor(store, log),
+      timing: { thinkMs: () => 0 },
+    });
+    // Rolled, and the dice are still on screen.
+    await jest.advanceTimersByTimeAsync(beforeRollMs + afterRollMs - 1);
+    expect(log).toEqual(['roll']);
+    handle.cancel();
+    await jest.advanceTimersByTimeAsync(afterRollMs + 5 * moveMs);
+    await handle.done;
+    expect(log).toEqual(['roll']);
+    expect(runner.cancels()).toBe(1);
+    expect(jest.getTimerCount()).toBe(0);
+    expect(store.getState().flow.game.phase).toBe('moving');
   });
 });
