@@ -110,7 +110,7 @@ describe('random level', () => {
 
 describe('every level', () => {
   const bot = createBot();
-  const levels: readonly BotLevel[] = ['random', 'easy', 'medium'];
+  const levels: readonly BotLevel[] = ['random', 'easy', 'medium', 'hard'];
 
   it('plays legal turns and repeats itself for the same seed', () => {
     for (const state of randomPositions(5, 60)) {
@@ -300,24 +300,29 @@ describe('a win now is never missed', () => {
 });
 
 describe('registry', () => {
-  it('reports easy and medium as supported for Portes, hard not yet', () => {
+  it('reports easy, medium and hard as supported for Portes', () => {
     const bot = createBot();
-    expect(bot.supportedLevels('portes')).toEqual(['easy', 'medium']);
+    expect(bot.supportedLevels('portes')).toEqual(['easy', 'medium', 'hard']);
+    // The other variants have no hard evaluator yet.
+    expect(bot.supportedLevels('plakoto')).toEqual(['easy', 'medium']);
     expect(bot.supportedLevels('nope')).toEqual([]);
     expect(createBot({ evaluators: EMPTY_EVALUATOR_REGISTRY }).supportedLevels('portes')).toEqual([
       'easy',
     ]);
-    // The app's level picker may also probe `chooseTurn`: medium no longer throws.
+    // The app's level picker may also probe `chooseTurn`: no level throws for Portes.
     const dice: Dice = [3, 1];
     const probe = (level: 'easy' | 'medium' | 'hard') => () =>
       bot.chooseTurn({ ...start, dice }, dice, level, { rng: createSeededRng(1) });
     expect(probe('easy')).not.toThrow();
     expect(probe('medium')).not.toThrow();
-    expect(probe('hard')).toThrow(expect.objectContaining({ code: 'NOT_IMPLEMENTED' }));
+    expect(probe('hard')).not.toThrow();
   });
 
-  it('hard throws NOT_IMPLEMENTED until it has an evaluator', () => {
-    const bot = createBot();
+  it('throws NOT_IMPLEMENTED for a level with no evaluator', () => {
+    const noHard: EvaluatorRegistry = new Map([
+      ['portes', { easy: portesHeuristic, medium: portesHeuristic }],
+    ]);
+    const bot = createBot({ evaluators: noHard });
     expect(() => bot.chooseTurn(start, [3, 1], 'hard', { rng: createSeededRng(1) })).toThrow(
       expect.objectContaining({ name: 'BotError', code: 'NOT_IMPLEMENTED' }),
     );

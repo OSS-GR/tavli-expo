@@ -195,8 +195,11 @@ function sideScore(me: Side, them: Side, w: PortesWeights): number {
   return score;
 }
 
-/** The contact score, in logits, for the roller. */
-function contactScore(roller: Side, waiter: Side, w: PortesWeights): number {
+/**
+ * The contact score, in logits, for the roller. The Portes net
+ * (`portes-net.ts`) uses it as one of its inputs.
+ */
+export function contactScore(roller: Side, waiter: Side, w: PortesWeights): number {
   let score = w.race * logit(kleinmanWinChance(pips(roller), pips(waiter)));
   score += sideScore(roller, waiter, w) - sideScore(waiter, roller, w);
 

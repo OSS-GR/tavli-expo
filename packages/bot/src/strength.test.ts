@@ -1,6 +1,7 @@
 /**
  * How far apart the levels are (bot-ai.md, section 4.1). Fixed seeds, so the
- * numbers never change between runs. 300 games per match keep the test fast;
+ * numbers never change between runs. 300 games per match (200 for hard vs
+ * medium) keep the test fast;
  * the README has the 1,000-game numbers from `pnpm --filter @tavli/bot simulate`.
  *
  * Each match is played twice with the colours swapped, on the same seed.
@@ -16,9 +17,9 @@ import type { BotLevel } from './index';
 const bot = createBot();
 const GAMES = 300;
 
-/** Games won by `a` against `b` over `GAMES` games, half with each colour. */
-function winsOf(a: BotLevel, b: BotLevel, seed: number): number {
-  const half = GAMES / 2;
+/** Games won by `a` against `b` over `games` games, half with each colour. */
+function winsOf(a: BotLevel, b: BotLevel, seed: number, games = GAMES): number {
+  const half = games / 2;
   const first = simulate({
     variant: portes,
     bots: [
@@ -55,5 +56,10 @@ describe('level strength (300 games each)', () => {
 
   it('medium beats easy at least 70% of the time', { timeout: 30_000 }, () => {
     expect(winsOf('medium', 'easy', 2028)).toBeGreaterThanOrEqual(0.7 * GAMES);
+  });
+
+  // The Portes net (#147). 200 games keep the test fast; the epic target is 70 %.
+  it('hard beats medium at least 60% of the time (200 games)', { timeout: 30_000 }, () => {
+    expect(winsOf('hard', 'medium', 2029, 200)).toBeGreaterThanOrEqual(0.6 * 200);
   });
 });
