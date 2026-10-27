@@ -46,14 +46,18 @@ export type { BotAnswerRequest, BotMoveRequest, BotRunner, Difficulty } from './
 export {
   GAME_TRANSPORT_ERROR_CODES,
   ONLINE_GAME_CHOICES,
+  ONLINE_GAME_PACES,
+  TURN_TIME_MS,
   isGameTransportErrorData,
   isOnlineGameChoice,
+  isOnlineGamePace,
 } from './game-transport';
 export type {
   GameTransport,
   GameTransportErrorCode,
   GameTransportErrorData,
   OnlineGameChoice,
+  OnlineGamePace,
   OnlineGameStatus,
   OnlineGameView,
   SendAnswerRequest,

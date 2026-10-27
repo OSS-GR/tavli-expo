@@ -36,6 +36,7 @@ export const GAME_END_REASONS = [
   'bothMothersPinned',
   'deadlock',
   'resigned',
+  'timeout',
 ] as const satisfies readonly GameEndReason[];
 
 /** Why a game ended. Variants add only the reasons they use. */
@@ -49,7 +50,9 @@ export type GameEndReason =
   /** Asodio: no one can ever move again (draw). */
   | 'deadlock'
   /** A player resigned (for example Plakoto "offerConcede"). */
-  | 'resigned';
+  | 'resigned'
+  /** A player ran out of time on their turn (online turn timers). Scored like a resign. */
+  | 'timeout';
 
 // Typecheck fails if the list has a reason the type does not, or misses one.
 type MissingReason = Exclude<GameEndReason, (typeof GAME_END_REASONS)[number]>;

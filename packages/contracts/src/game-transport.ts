@@ -24,6 +24,27 @@ export function isOnlineGameChoice(value: unknown): value is OnlineGameChoice {
   return typeof value === 'string' && (ONLINE_GAME_CHOICES as readonly string[]).includes(value);
 }
 
+/**
+ * How fast an online game is played (owner answers Q3 and Q15): `live`
+ * (both players at the board) or `async` (slow, a turn now and then).
+ */
+export const ONLINE_GAME_PACES = ['live', 'async'] as const;
+
+export type OnlineGamePace = (typeof ONLINE_GAME_PACES)[number];
+
+export function isOnlineGamePace(value: unknown): value is OnlineGamePace {
+  return typeof value === 'string' && (ONLINE_GAME_PACES as readonly string[]).includes(value);
+}
+
+/**
+ * The time for one turn, in milliseconds (owner answer Q15): 1 minute
+ * live, 24 hours async. When it runs out, the player loses that game.
+ */
+export const TURN_TIME_MS: { readonly [P in OnlineGamePace]: number } = {
+  live: 60 * 1000,
+  async: 24 * 60 * 60 * 1000,
+};
+
 /** `active` while the match runs, `finished` once it has a winner. */
 export type OnlineGameStatus = 'active' | 'finished';
 
@@ -40,6 +61,13 @@ export interface OnlineGameView {
   readonly version: number;
   readonly status: OnlineGameStatus;
   readonly choice: OnlineGameChoice;
+  /** Live (1 minute per turn) or async (24 hours per turn). */
+  readonly pace: OnlineGamePace;
+  /**
+   * When the turn of `waitingFor` runs out, in epoch milliseconds (server
+   * clock). Then `waitingFor` loses the current game. `null` when finished.
+   */
+  readonly turnDeadline: number | null;
   /** The player id (account) on each side. */
   readonly players: PerPlayer<string>;
   /** The match: rules, score, finished games and the winner. */
@@ -72,6 +100,11 @@ export const GAME_TRANSPORT_ERROR_CODES = [
   'ILLEGAL_ACTION',
   /** The match is over. */
   'GAME_OVER',
+  /**
+   * The turn time ran out before the call. The server has ended the game
+   * for the player it waited for (they lose it). Load the game again.
+   */
+  'TIMED_OUT',
   /** Bad arguments (for example the same player on both sides). */
   'BAD_REQUEST',
 ] as const;
@@ -127,7 +160,8 @@ export interface GameTransport {
   ): () => void;
   /**
    * Sends one full turn. Resolves once the server saved it (the next roll
-   * comes through `subscribe`). Rejects with `GameTransportErrorData`.
+   * comes through `subscribe`). Rejects with `GameTransportErrorData`;
+   * `TIMED_OUT` when the turn time ran out first.
    */
   sendTurn(request: SendTurnRequest): Promise<void>;
   /** Answers the current question. Rejects like `sendTurn`. */

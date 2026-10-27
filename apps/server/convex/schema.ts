@@ -11,9 +11,11 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
-import { ONLINE_GAME_CHOICES } from '@tavli/contracts';
+import { ONLINE_GAME_CHOICES, ONLINE_GAME_PACES } from '@tavli/contracts';
 
 export const gameChoice = v.union(...ONLINE_GAME_CHOICES.map((choice) => v.literal(choice)));
+
+export const gamePace = v.union(...ONLINE_GAME_PACES.map((pace) => v.literal(pace)));
 
 export const side = v.union(v.literal('white'), v.literal('black'));
 
@@ -23,6 +25,8 @@ export default defineSchema({
     players: v.object({ white: v.string(), black: v.string() }),
     /** The game the players picked (one game, or `tavli` for the rotation). */
     choice: gameChoice,
+    /** `live` (1 minute per turn) or `async` (24 hours per turn). */
+    pace: gamePace,
     /** Match length in points. */
     targetPoints: v.number(),
     /** The match `RuleSet`, JSON text (`serializeRules`). */
@@ -38,6 +42,11 @@ export default defineSchema({
     version: v.number(),
     /** Rows in `moves` for this game. The next row gets this `seq`. */
     eventCount: v.number(),
+    /**
+     * When the current turn runs out, epoch ms (server clock). `null` once
+     * the match is finished. `checkTimeout` runs at this time.
+     */
+    turnDeadline: v.union(v.number(), v.null()),
   })
     .index('by_white', ['players.white'])
     .index('by_black', ['players.black']),
