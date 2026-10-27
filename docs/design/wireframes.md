@@ -39,7 +39,7 @@
 | Game end | — | Overlay state inside the board screen, so the final position stays visible |
 | Match end | `app/game/[id]/match-end.tsx` | `router.replace`, so "back" does not return to a finished board |
 | Settings | `app/settings.tsx` | Push from Home; modal from the in-game menu |
-| Rules | `app/rules/[variant].tsx` (e.g. `/rules/portes`) | Push. Not drawn here; a simple text page. |
+| Rules | `app/rules/[variant].tsx` (e.g. `/rules/portes`) | Push. Not drawn here; a scrolling text page with a small start board (`docs/architecture/app-shell.md`, "Rules pages"). |
 | Dialogs (resign, no moves, mother pinned, replace saved game) | — | Components, not routes |
 
 `[id]` is a local game id in MVP1 (for example `local-<uuid>`). Online games in MVP2 use the server id with the same route.
@@ -182,7 +182,7 @@ Notes:
 - **Purpose:** Choose game, match length and bot level, then start.
 - **Elements:**
   - Back button, title "Play vs bot".
-  - **Game:** Portes card (selected). Locked chips: Plakoto, Fevga, Asodio, Tavli (all three in rotation). A tap on a locked chip shows "Coming soon".
+  - **Game:** one card per open game: Portes (selected by default), Plakoto, Fevga, Tavli (all three in rotation) (#109). A game the bot cannot play yet, and Asodio (not built), show as locked chips. A tap on a locked chip shows "Coming soon".
   - **Match length:** segmented control **1 / 3 / 5 / 7**, default **3**. Helper text: "First to 3 points. Mono = 1, diplo = 2."
   - **Bot level:** **Easy / Medium**, with Hard locked (v1.0). Helper text explains the selected level.
   - Info box "Who starts? Each player rolls one die. High die starts."

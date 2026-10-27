@@ -1,6 +1,6 @@
 # App shell: Home, new game, local matches
 
-> How the app starts a local match (vs bot or pass-and-play) and what the screens around the board do. Code: `apps/mobile/src/app/` (routes) and `apps/mobile/src/features/{home,new-game,match,bot}/`. Last review: 2026-10-27.
+> How the app starts a local match (vs bot or pass-and-play) and what the screens around the board do. Code: `apps/mobile/src/app/` (routes) and `apps/mobile/src/features/{home,new-game,match,bot,rules}/`. Last review: 2026-10-27.
 
 ## Routes
 
@@ -10,7 +10,7 @@
 | New game | `app/new-game.tsx?mode=bot\|local` | `features/new-game/NewGameScreen.tsx` |
 | Board | `app/game/[id]/index.tsx` | `features/match/MatchScreen.tsx` (wraps `GameScreen`) |
 | Match end | `app/game/[id]/match-end.tsx` | `features/match/MatchEndScreen.tsx` |
-| Rules (stub) | `app/rules/[variant].tsx` | a short text page |
+| Rules | `app/rules/[variant].tsx` | `features/rules/RulesScreen.tsx` |
 | Settings | `app/settings.tsx` | `features/settings/SettingsScreen.tsx` |
 
 - Screens get callbacks (`onNewGame`, `onExit`, …). Only the route files call `router`.
@@ -19,12 +19,35 @@
 - An unknown id shows "This game could not be opened." with a Home button (`MissingGame.tsx`), on the board and on match end.
 - Links and params live in `features/match/routes.ts` (`newGameHref`, `gameHref`, `matchEndHref`, `parseModeParam`, `parseIdParam`).
 
+## Rules pages (#112)
+
+- `/rules/portes`, `/rules/plakoto` and `/rules/fevga` each show a full page. `/rules/tavli` explains the match rotation and links to the three pages. `/rules/asodio` says "coming later"; any other id says there are no rules.
+- Opened from Home (**How to play**), the in-game menu (**How to play Plakoto**: the game on the board, in Tavli the game of the rotation) and New game (the **i** button on each game card). Only the route files call `router`.
+- `features/rules/content.ts` lists each page's sections in reading order: goal, start position, dice and turns, how checkers move, hitting / pinning / no hitting, the special rules (Plakoto mother, Fevga first checker and six-in-a-row bans), bearing off and points. Shared sections (`rules.common.*`) appear on every page; a game can add its own line to a shared section (for example Plakoto: no bearing off while pinned).
+- The texts live in one i18n group, `rules.*`. Each body is a few short lines split by `\n`; each line shows as one bullet paragraph. Greek uses tavli words: πόρτα, πλάκωμα, μάνα, εξάπορτο, μάζεμα, μονό / διπλό, βαθμοί.
+- The texts describe the **default presets** only (`DEFAULT_PRESET_BY_GAME`): Plakoto `motherRule: "offerConcede"` (resign for diplo or play on; both mothers pinned is a draw), Fevga runner rule to pass the opponent's mother and the prime bans P1, P2 (points 6–11) and P3. When a default flag changes, update the page.
+- The start position is a small `StaticBoard` (60% of the width, at most 240 pt, the theme's aspect ratio) built from the engine's start layouts and the preset's direction, with White (light checkers) at the bottom. It is one image for screen readers ("The board at the start of Fevga").
+- Every section title is a header. Nothing has a fixed height, so the page works at large text sizes, and it scrolls.
+
 ## Local matches
 
-- `features/match/setup.ts`: the new-game choices (`MatchSetup`): mode, game (Portes), match length 1 / 3 / 5 / 7 (default 3), bot level, names. `sanitizeSetup` turns any saved value into a valid setup.
-- `features/match/sessions.ts`: a session is the setup plus a game store (`createGameStore`). MVP1 keeps **one** match at a time; `start` replaces the one before. Ids are `local-<time>-<random>`.
+- `features/match/setup.ts`: the new-game choices (`MatchSetup`): mode, game (default Portes, see [Choosing the game](#choosing-the-game-109)), match length 1 / 3 / 5 / 7 (default 3), bot level, names. `sanitizeSetup` turns any saved value into a valid setup: a game that is locked in this mode becomes Portes, a bot level the game has no bot for becomes the easiest one it has.
+- `features/match/sessions.ts`: a session is the setup plus a game store (`createGameStore`, with `rules: gameRuleSet(setup.game)`). MVP1 keeps **one** match at a time; `start` replaces the one before. Ids are `local-<time>-<random>`.
 - Vs bot the human plays **White** (bottom), the bot **Black**. The board never flips.
 - Names come from the setup, in the app language (`features/match/seats.ts`): "You" / "Bot · Easy", or the typed names with "Player 1" / "Player 2" as the default. The engine only stores labels (`enginePlayers`). Texts about the human use `_you` strings ("You win the game!").
+
+## Choosing the game (#109)
+
+- The game picker on New game lists the games that are open as radio cards: **Portes**, **Plakoto**, **Fevga** and **Tavli** (all three in rotation). Default: Portes, or the last game chosen in this mode. Locked games are dashed chips; a tap shows the toast "Coming soon: Asodio".
+- Each game uses its engine preset (`gamePreset`, `gameRuleSet` in `setup.ts`):
+  - Portes, Plakoto, Fevga: a **one-game match**. The engine's Plakoto and Fevga presets keep the shared rotation Portes → Plakoto → Fevga, so the app sets `match.rotation` to the one game ("single game" in `tavli-match.md`).
+  - Tavli: the `tavli` preset, Portes → Plakoto → Fevga → Portes → … Each game uses its own default preset and the match flags of `tavli`; the engine scores every game the same way (mono 1, diplo 2) per `docs/rules/tavli-match.md`.
+- **When a game is locked** (`isGameOpen`): when the engine has not built every game of its rotation (`isGameBuilt`: today Asodio), and, vs bot, when the bot has no level for it. Pass-and-play needs no bot, so every built game is open there.
+- **Bot levels per game** (`features/bot/levels.ts`, `botLevelsByGame`): for each variant the app asks the bot `supportedLevels(variant)` (bots from `createBot` have it), or else plays a probe turn from that variant's start at each level and drops the levels that throw `NOT_IMPLEMENTED`. Tavli gets the levels that work in all three games, because one match has one bot level. `services.ts` keeps the result in `botLevels` (a `GameLevels` record). A new bot variant or level shows up by itself when the bot package gets it.
+- Each game card has an **i** button that opens its rules page (`/rules/<game>`) without choosing the game.
+- The level control shows the levels of the chosen game. Switching to a game without the chosen level shows that level locked and plays the easiest level; switching back brings the choice back.
+- The board shows which game is being played, in a line under the top strip: "Game 2 · Plakoto" (`currentGameLabel` in `summary.ts`). It stays on the finished game until **Next game**. The menu's **How to play** opens the rules of the game on the board.
+- The game-end sheet names the next game: "Next: game 3 · Fevga" (`nextGameLabel`). The match-end rows name each game: "Game 2 · Plakoto".
 
 ## Save and resume (#36)
 
@@ -33,6 +56,7 @@
 - `features/match/sessions.ts` saves when a match starts and each time the flow comes to rest (`isRestPoint`: awaiting a roll, the opening roll, or game over). So a confirmed turn, a pass, a game end, the next game and a rematch all save. Moves in the middle of a turn wait for Confirm.
 - `saveNow()` saves at once, mid-turn too: when the app leaves the foreground (`useSaveOnBackground` in `app/_layout.tsx`) and on **Exit to home**.
 - A finished match is removed from the slot. A rematch is saved as a new match (a new log, the same id).
+- The game (#109) is `setup.game`. The save shape did not change, so `SAVE_VERSION` stays 1: older saves always held `game: 'portes'`, and a save with no game loads as Portes. `parseSavedMatch` checks that the game is built and that the log's rules are that game's preset and rotation; else the save is `broken`. A saved game the bot cannot play any more keeps its game (the log already holds it) and plays the easiest level.
 - A save that fails (a storage error) only logs a warning. The move stays played, and the next save tries again.
 - After an app restart, `get(id)` loads the save into a new game store (`createGameStore({ flow })`); new dice come from a new local RNG. A saved bot level this build cannot play becomes Easy.
 - **Home** reads the slot each time it shows (`useFocusEffect`). With a save it shows **Continue game**: game, opponent, score, target and time since the save ("12 min ago"). A broken save shows the toast "Your saved game could not be opened." once.
@@ -49,7 +73,7 @@
 
 ## The bot turn
 
-- The app reaches the bot only through the `BotRunner` port. `services.ts` wires `InlineBotRunner` and lists the levels the bot can play (`botLevels`, from `features/bot/levels.ts`): it asks the bot once and drops levels that throw `NOT_IMPLEMENTED`. Today only **Easy** works, so Medium and Hard show locked ("coming soon").
+- The app reaches the bot only through the `BotRunner` port. `services.ts` wires `InlineBotRunner` and lists the levels the bot can play per game (`botLevels`, from `features/bot/levels.ts`, see [Choosing the game](#choosing-the-game-109)). Today Easy and Medium work in Portes, Plakoto and Fevga, so only Hard shows locked ("coming soon").
 - `features/bot/botTurn.ts` plays one bot turn: wait 0.5 s, **roll** (the flow's `Rng` rolls), ask the runner and wait `thinkingDelayMs` at the same time (the short "forced" range when there is only one legal play), play the moves **one by one, 0.4 s apart**, then **confirm**. It sends the same actions as a human, so each move flies on the board.
 - `GameScreen` starts the bot turn when nothing covers the board (opening result, pass card, end cards) and the screen is not paused. The menu and screens on top (Settings) pause it; `cancel()` clears the timers and cancels the runner. On resume the bot keeps moves that start its plan, or takes them back.
 - During the bot turn the board takes no touches and the controls row is a locked box: "Bot's turn…", then the bot's dice and "Bot rolled 4-2 and is moving…".
@@ -68,7 +92,7 @@
 - The wireframes make match end a route, and the route map says the board opens it with `router.replace`, so "back" does not return to a finished board. So the board route is now a folder: `app/game/[id]/index.tsx` and `app/game/[id]/match-end.tsx`. Game end stays a sheet inside the board screen, so the final position stays visible.
 - When the match ends (the last game, a resigned game that reaches the target, or Resign match), `GameScreen` waits 1 s and calls `onMatchOver`. The board route calls `router.replace(matchEndHref(id))`.
 - The finished match is not in the save slot any more, so the match-end route finds the session in memory (`matchSessions.get`). It reads the match once, when it opens. After an app restart it is gone: "This game could not be opened." with Home. A match that is not over redirects to the board.
-- `MatchEndScreen` (wireframe 9): the cup and confetti when a person wins (none when the bot wins), the title ("You won the match!", "Bot wins the match!", "Maria wins the match!"), "You resigned." when someone resigned, the big final score "3 – 1" with the names under it, "Portes · vs Bot (Easy) · first to 3" (`matchLabel` in `summary.ts`), and one row per game: winner, **Mono / Diplo** chip and points. Each row and the score are one element for screen readers ("Game 3, You won, Diplo, 2 points"). The result is announced when the screen opens.
+- `MatchEndScreen` (wireframe 9): the cup and confetti when a person wins (none when the bot wins), the title ("You won the match!", "Bot wins the match!", "Maria wins the match!"), "You resigned." when someone resigned, the big final score "3 – 1" with the names under it, "Portes · vs Bot (Easy) · first to 3" (`matchLabel` in `summary.ts`), and one row per game: the game ("Game 2 · Plakoto"), winner, **Mono / Diplo** chip and points. Each row and the score are one element for screen readers ("Game 3 · Fevga, You won, Diplo, 2 points"). The result is announced when the screen opens.
 - **Rematch** (main button, "Same settings · you start"): the engine's `createRematch` says who starts (owner rule: the last winner, no opening roll). The route calls the store's `rematch()` and `router.replace` back to the board.
 - **Change settings** ends the session and opens the new-game screen of the same mode, filled with the last choices. **Home** ends the session and goes Home (no Continue card: the match is over).
 - The win jingle (`matchWin`, `useGameFeedback`) plays on the board when the match ends. The match-end screen adds no sound.
@@ -81,13 +105,15 @@
 - "Play vs bot" says "Easy for now. Medium is coming soon." until Medium works.
 - A broken save on the board route shows the "could not be opened" card (not a dialog), with a Home button.
 - The game also saves mid-turn when the app goes to the background or the user exits (the wireframe accepts losing those moves; we keep them).
+- New game has a small **i** button on each game card that opens its rules page (not in wireframe 4).
 
 ## Tests
 
 - `features/bot/botTurn.test.ts`: the bot turn with a fake `BotRunner` (roll, moves, confirm, timing with fake timers, forced think time, cancel, resume, errors).
-- `features/bot/levels.test.ts`: the level check.
-- `features/match/match.test.ts`: setup, seats, routes and params, last choices, sessions, resign.
-- `HomeScreen.test.tsx`, `NewGameScreen.test.tsx`, `MatchScreen.test.tsx`: the screens (vs bot turn, pause while the menu is open, resign game and match, pass-and-play names).
-- `MatchEndScreen.test.tsx`: the win with every game row, the celebration and the announcement; Rematch, Change settings and Home; a lost match (no celebration, the bot starts the rematch); a resigned match; pass-and-play names; reduce motion; Greek.
-- `features/match/save.test.ts`: the save format (round trip, ten kinds of bad data dropped), when it saves, clearing a finished match, resume after a restart, the Continue texts and the background hook.
-- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home → Continue, the replace dialog, the `mode` param, an unknown id, a broken save; match end → Rematch → match end → Change settings, and match end → Home with no Continue card). It replaces the library's own Reanimated mock with ours.
+- `features/bot/levels.test.ts`: the level check per variant (`supportedLevels` or a probe), with fake bots that support chosen variants; Tavli gets the levels of all three games.
+- `features/match/match.test.ts`: setup (games, presets, locked games, levels per game), seats, routes and params, last choices, sessions (the rules of the chosen game), game labels, resign.
+- `HomeScreen.test.tsx`, `NewGameScreen.test.tsx`, `MatchScreen.test.tsx`: the screens (the game picker vs bot and in pass-and-play, locked games, levels per game; vs bot turn, pause while the menu is open, resign game and match, pass-and-play names; a Tavli match through Portes → Plakoto → Fevga with the game label and the next game).
+- `MatchEndScreen.test.tsx`: the win with every game row (and the game of each row in a Tavli match), the celebration and the announcement; Rematch, Change settings and Home; a lost match (no celebration, the bot starts the rematch); a resigned match; pass-and-play names; reduce motion; Greek.
+- `features/match/save.test.ts`: the save format (round trip, ten kinds of bad data dropped; the saved game: Tavli after a restart, an old save without a game, a game the log does not have), when it saves, clearing a finished match, resume after a restart, the Continue texts and the background hook.
+- `features/rules/RulesScreen.test.tsx`: every page shows its sections in order with headers, the start pictures, the Tavli links, Asodio and unknown ids, Greek, and that `en` and `el` have the same `rules.*` keys (and the same number of lines), all used by a page.
+- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home → Continue, the replace dialog, the `mode` param, an unknown id, a broken save; match end → Rematch → match end → Change settings, and match end → Home with no Continue card; the rules pages from New game, the in-game menu and the Tavli page). It replaces the library's own Reanimated mock with ours.

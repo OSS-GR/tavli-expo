@@ -10,11 +10,22 @@
  * `MATCH_FLOW_SCHEMA_VERSION` is the engine's flow shape. A save with
  * another version is dropped (MVP1 has no migrations yet). Add a step in
  * `parseSavedMatch` when a version changes and old saves should live on.
+ *
+ * The game (#109) is `setup.game`. The envelope did not change: version 1
+ * saves always held `game: 'portes'`, and they still load as Portes. The
+ * game must match the preset of the log's rules, else the save is broken.
  */
-import type { Difficulty } from '@tavli/contracts';
 import { MATCH_FLOW_SCHEMA_VERSION, replay, type FlowEvent, type MatchFlow } from '@tavli/engine';
 
-import { isMatchMode, sanitizeSetup, type MatchSetup } from './setup';
+import {
+  gamePreset,
+  gameRotation,
+  isGameChoice,
+  isMatchMode,
+  sanitizeSetup,
+  type GameLevels,
+  type MatchSetup,
+} from './setup';
 
 export const SAVED_MATCH_KEY = 'savedMatch';
 
@@ -71,10 +82,7 @@ const broken = (reason: string): SavedMatchResult => ({ kind: 'broken', reason }
  * Reads a save. Never throws. A finished match counts as no save (it is
  * cleared when the match ends; this catches an older app version).
  */
-export function parseSavedMatch(
-  text: string | undefined,
-  levels: readonly Difficulty[],
-): SavedMatchResult {
+export function parseSavedMatch(text: string | undefined, levels: GameLevels): SavedMatchResult {
   if (text === undefined) return { kind: 'none' };
   let raw: unknown;
   try {
@@ -93,7 +101,14 @@ export function parseSavedMatch(
   if (typeof savedAt !== 'number' || !Number.isFinite(savedAt)) return broken('bad time');
   if (!Array.isArray(log)) return broken('no log');
   if (!isRecord(setupRaw) || !isMatchMode(setupRaw['mode'])) return broken('bad setup');
-  const setup = sanitizeSetup(setupRaw, setupRaw['mode'], levels);
+  // A save with no game is Portes (the only game before #109).
+  const game = setupRaw['game'] ?? 'portes';
+  if (!isGameChoice(game)) return broken('bad game');
+  // The match is already under way: keep its game even if the bot lost it.
+  const setup = sanitizeSetup({ ...setupRaw, game }, setupRaw['mode'], levels, {
+    keepBuiltGame: true,
+  });
+  if (setup.game !== game) return broken('game not built');
 
   let flow: MatchFlow;
   try {
@@ -102,6 +117,15 @@ export function parseSavedMatch(
     return broken(error instanceof Error ? error.message : 'replay failed');
   }
   if (flow.match.targetPoints !== setup.targetPoints) return broken('setup and log differ');
+  const { rules } = flow.match;
+  const rotation = gameRotation(setup.game);
+  if (
+    rules.presetId !== gamePreset(setup.game) ||
+    rules.match.rotation.length !== rotation.length ||
+    rules.match.rotation.some((variant, i) => variant !== rotation[i])
+  ) {
+    return broken('setup and log differ');
+  }
   if (flow.match.status === 'finished') return { kind: 'none' };
   return { kind: 'ok', saved: { id, setup, savedAt, flow } };
 }
