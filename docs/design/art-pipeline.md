@@ -203,7 +203,7 @@ React Native uses points. Phones are @2x or @3x. The widest phones are about 440
 | Board (long side, landscape) | 900 px | 1800 px | 2700 px | 2800 px | WebP q85 |
 | Checker | 64 px | 128 px | 192 px | 256 px | WebP with alpha |
 | Die face / dice frame | 64 px | 128 px | 192 px | 256 px | WebP in an atlas |
-| App icon | 1024 px master | | | | PNG (store needs PNG) |
+| App icon | 1024 px master | | | | PNG (store needs PNG). See [app-icon.md](app-icon.md) |
 
 Rules:
 - Load only the scale the device needs. Do not ship 4096 px masters in the app.

@@ -40,6 +40,7 @@
 | [Board style concepts](design/style/README.md) | Two wooden concepts, palettes, mood board |
 | [Themes package](../packages/themes/README.md) | How a board theme is built (manifest, layouts, assets) and how to add one |
 | [Wireframes](design/wireframes.md) | MVP1 screens, user flow, portrait board layout |
+| [App icon and splash](design/app-icon.md) | Three icon concepts, the pick, files and rebuild |
 
 ## Decisions (ADRs)
 
