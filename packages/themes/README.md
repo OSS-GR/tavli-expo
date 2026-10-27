@@ -4,7 +4,20 @@ Board themes ("skins") for Tavlaki. A theme is **data**: a `theme.json` manifest
 
 This package is pure TypeScript plus assets. It has no React, no network and no vendor code.
 
-![Walnut Kafeneio, Portes start position, rendered from the manifest](preview/walnut-kafeneio.png)
+## Bundled themes
+
+| Id                          | Name                                | Look                                                                                                      | Size    |
+| --------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- | ------- |
+| `walnut-kafeneio` (default) | Walnut Kafeneio / Καρυδιά Καφενείου | Worn dark walnut, ebony and bone points, brass hinges, a warm lamp (Concept B)                            | ~1.1 MB |
+| `olive-inlay`               | Olive Inlay / Ελιά με ένθετα        | Light olive wood, inlaid wenge and mahogany points, dog-tooth banding, a Greek key on the bar (Concept A) | ~1.1 MB |
+
+Both themes share **one geometry**: the same points, bar, trays, dice area and checker size (`themes.test.ts` checks it). Olive Inlay imports the geometry from `tools/walnut-kafeneio/design.mjs`. Only the art differs, so the hit test, the tutorial and the rules pictures work the same on every board.
+
+The player picks a board in Settings → Board (`boardTheme` setting). See `docs/architecture/board-screen.md`.
+
+| Walnut Kafeneio                                                                                    | Olive Inlay                                                                                |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| ![Walnut Kafeneio, Portes start position, rendered from the manifest](preview/walnut-kafeneio.png) | ![Olive Inlay, Portes start position, rendered from the manifest](preview/olive-inlay.png) |
 
 ## Folder layout
 
@@ -15,11 +28,13 @@ packages/themes/
     theme.json             The manifest
     board-portrait.webp    Image layers, @1x, @2x and @3x
     ...
+  olive-inlay/             The second theme, same layout of files
   tools/
     build-assets.mjs       Builds the images and the layout block of theme.json
     preview.mjs            Renders preview/*.png from the manifest
     lib/                   Geometry, Chromium and canvas helpers
     walnut-kafeneio/       Art source of one theme: design.mjs, textures/, prepare_textures.py
+    olive-inlay/           Art source of Olive Inlay: design.mjs, textures/
   preview/                 Preview renders (not shipped)
   LICENSES.md              Source and license of every asset
 ```
@@ -117,7 +132,8 @@ The "shade" layer then puts wear and the frame shadow over the points, so they s
 
 - WebP, file names in the React Native style: `board.webp` (@1x), `board@2x.webp`, `board@3x.webp`. Metro picks the right scale. `scales` lists the files on disk.
 - @1x pixels = points at the layout's `referenceSize`. For a bigger board, pass `pixelRatio × drawnWidth / referenceWidth` to `pickScale`.
-- Budget: **under 2 MB per theme** (a test checks it). Walnut Kafeneio is about 1.1 MB.
+- Budget: **under 2 MB per theme** (a test checks it). Each bundled theme is about 1.1 MB with its sounds.
+- Every bundled theme ships in the app (Metro bundles each `require` in `themeImages.ts`), even when the player never picks it. Keep themes small. A much bigger theme (a Blender skin) should be a download, loaded on demand, not a bundled theme.
 
 ## Scripts
 
@@ -127,6 +143,8 @@ pnpm --filter @tavli/themes preview        # preview/*.png from theme.json
 pnpm --filter @tavli/themes preview -- --debug   # *-debug.png with every layout rect outlined (not committed)
 pnpm --filter @tavli/themes test
 ```
+
+The app's own Skia renderer can also draw a theme headless: `pnpm --filter @tavli/mobile screenshots` writes `apps/mobile/docs/screenshots/board-start*.png` (one per board).
 
 Both tools need Node 22.18 or newer and Playwright with Chromium on the machine (`require('playwright')` must work). Chromium draws the SVG art and encodes the WebP, so no native image library is needed. The build gives the same bytes on every run with the same Chromium.
 
@@ -138,13 +156,22 @@ To change a wood grade, run `tools/walnut-kafeneio/prepare_textures.py` (Python,
 
 `sounds` maps each game event (`checkerPlace`, `checkerHit`, `bearOff`, `diceRoll`, `diceLand`, `invalidMove`, `turnStart`, `gameWin`, `matchWin`, …) to one file, a list of takes, or `null` (silent). Files live in `<id>/sounds/`, kebab-case, `.m4a` (mono AAC) or `.mp3`. The app plays the takes in turn. The tests check that every file exists, is audio, is under 48 KB, and that all sounds of a theme stay under 500 KB.
 
+Olive Inlay uses the same sound files as Walnut Kafeneio (a copy in `olive-inlay/sounds/`, about 54 KB): both boards are wood on wood.
+
 To change a Walnut Kafeneio sound, edit and run `tools/walnut-kafeneio/build_sounds.py` (Python, numpy, ffmpeg). Its header says how. The app needs a Metro `require` for each sound file: add it to `apps/mobile/src/features/feedback/themeSounds.ts` (a test checks this).
+
+### Olive Inlay notes
+
+- The **inlaid core** of each point (a smaller triangle of the other wood with maple stringing) is part of the `shade-*` layer. It is drawn from the same geometry as the vector points, so the two always line up.
+- The dog-tooth banding and the meander are drawn as SVG paths and patterns in `tools/olive-inlay/design.mjs`. They are flat inlay, so the landscape images turn them with the board; the bevels and shadows are drawn again for the light at the top-left.
+- Light is soft daylight from the top-left (`overlay`), not a lamp.
+- The cream checker is close to the light field in fill (1.38:1). Its dark rim carries the contrast (3.92:1). The tests allow this "fill or outline" rule for the field, as for the points, and ask for a rim of at least 0.05 radius. The dark checker fill stands out from the field on its own (6.64:1).
 
 ## Add a theme
 
-1. Make a folder `tools/<id>/` with a `design.mjs` that exports the geometry and the layer SVGs (copy `walnut-kafeneio`). Put its CC0 textures in `tools/<id>/textures/`.
+1. Make a folder `tools/<id>/` with a `design.mjs` that exports the geometry and the layer SVGs (copy `olive-inlay`: it reuses the shared geometry). Put its CC0 textures in `tools/<id>/textures/`.
 2. Add the id to `THEMES` in `tools/build-assets.mjs` and run `build:assets`. Or, for a Blender skin, export the images and the layout block from Blender (`docs/design/art-pipeline.md` §4.2).
 3. Write the rest of `<id>/theme.json` by hand: name, palette, points, checkers, highlights, dice, sounds, haptics.
-4. Add it to `BUNDLED` in `src/registry.ts`.
-5. Run `pnpm test`. The tests check every bundled theme: the manifest, 24 points with no overlaps, every rect inside 0..1, every file on disk at the right size, every sound file, no unused files, the 2 MB budget, the 500 KB sound budget, and contrast (checkers ≥ 7:1, checker vs point ≥ 3:1 by fill or outline, checker vs field ≥ 3:1).
+4. Add it to `BUNDLED` in `src/registry.ts` and to `exports` in `package.json`. In the app, add its images to `apps/mobile/src/features/board/themeImages.ts` and its sounds to `apps/mobile/src/features/feedback/themeSounds.ts` (tests check both). Settings → Board lists it by itself.
+5. Run `pnpm test`. The tests check every bundled theme: the manifest, 24 points with no overlaps, every rect inside 0..1, every file on disk at the right size, every sound file, no unused files, the 2 MB budget, the 500 KB sound budget, the same geometry as the default theme, and contrast (checkers ≥ 7:1; checker vs point and checker vs field ≥ 3:1 by fill or outline; one checker fill ≥ 3:1 from the field; badge text and UI text ≥ 4.5:1).
 6. Run `preview` and look at the PNG. Then list every new file in `LICENSES.md`.

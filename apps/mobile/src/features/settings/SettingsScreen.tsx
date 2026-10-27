@@ -13,6 +13,7 @@ import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
 
+import { BoardThemePicker } from './BoardThemePicker';
 import type { BoardFlipMode, MoveListMode } from './settings';
 import { useSettings } from './store';
 
@@ -144,6 +145,10 @@ export function SettingsScreen({ onLearnToPlay }: SettingsScreenProps = {}) {
           value={language}
           onChange={(value) => setSetting('language', value)}
         />
+      </SettingsSection>
+
+      <SettingsSection title={t('settings.sections.board')}>
+        <BoardThemePicker testID="settings-board-theme" />
       </SettingsSection>
 
       <SettingsSection title={t('settings.sections.look')}>

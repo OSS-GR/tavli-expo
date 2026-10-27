@@ -3,6 +3,7 @@
  * keeps the theme's aspect ratio, so it fits an iPhone SE and a large phone.
  */
 import type { BoardState } from '@tavli/engine';
+import type { ThemeManifest } from '@tavli/themes';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -15,11 +16,14 @@ export interface StaticBoardProps {
   view: BoardView;
   /** Extra marks: Asodio checkers frozen by the quarter lock. */
   marks?: BoardMarks;
+  /** Draw with this theme instead of the one picked in Settings (the board picker). */
+  theme?: ThemeManifest;
   testID?: string;
 }
 
-export function StaticBoard({ board, view, marks, testID }: StaticBoardProps) {
-  const theme = useBoardTheme();
+export function StaticBoard({ board, view, marks, theme: themeProp, testID }: StaticBoardProps) {
+  const picked = useBoardTheme();
+  const theme = themeProp ?? picked;
   const [size, onLayout] = useBoardSpace();
   const geo = size ? fitBoardWithShadow(portraitLayout(theme), size) : null;
   return (
