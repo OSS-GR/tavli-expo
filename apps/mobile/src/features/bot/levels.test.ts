@@ -34,7 +34,7 @@ describe('supportedBotLevels', () => {
     expect(supportedBotLevels(bot, 'fevga')).toEqual(['easy', 'medium']);
   });
 
-  it('has no level for a game the engine does not have yet', () => {
+  it('has no level for a game the board cannot play yet', () => {
     expect(supportedBotLevels(createBot(), 'asodio')).toEqual([]);
     expect(supportedBotLevels(probedBot(['asodio'], ['easy']), 'asodio')).toEqual([]);
   });

@@ -17,7 +17,7 @@ import {
   type VariantId,
 } from '@tavli/engine';
 
-import { GAME_CHOICES, gameRotation, type GameLevels } from '@/features/match/setup';
+import { BOARD_GAMES, GAME_CHOICES, gameRotation, type GameLevels } from '@/features/match/setup';
 
 /** A bot that may also list its levels (`ConfiguredBot` does). */
 export type LevelBot = Pick<Bot, 'chooseTurn'> & {
@@ -25,14 +25,15 @@ export type LevelBot = Pick<Bot, 'chooseTurn'> & {
 };
 
 /**
- * The levels `bot` can play in `variant`, easiest first. An unknown
- * variant gives `[]`. Other bot errors are bugs and throw.
+ * The levels `bot` can play in `variant`, easiest first. A variant the
+ * engine or the board does not have yet (`BOARD_GAMES`) gives `[]`. Other
+ * bot errors are bugs and throw.
  */
 export function supportedBotLevels(
   bot: LevelBot,
   variant: StandardVariantId = 'portes',
 ): Difficulty[] {
-  if (!VARIANT_REGISTRY.has(variant)) return [];
+  if (!VARIANT_REGISTRY.has(variant) || !BOARD_GAMES.has(variant)) return [];
   if (typeof bot.supportedLevels === 'function') {
     const levels = bot.supportedLevels(variant);
     return BOT_DIFFICULTIES.filter((level) => levels.includes(level));

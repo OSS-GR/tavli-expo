@@ -1,5 +1,11 @@
 import { createMemoryStorage } from '@tavli/contracts';
-import { createGameFlow, createSeededRng, portes, type BoardState } from '@tavli/engine';
+import {
+  VARIANT_REGISTRY,
+  createGameFlow,
+  createSeededRng,
+  portes,
+  type BoardState,
+} from '@tavli/engine';
 
 import { SAMPLE_POSITIONS } from '@/features/board/positions';
 import i18n from '@/i18n';
@@ -206,6 +212,9 @@ describe('the chosen game (#109)', () => {
       'tavli',
     ]);
     expect(gameRotation('tavli')).toEqual(['portes', 'plakoto', 'fevga']);
+    // Asodio is in the engine, but the board cannot draw it yet.
+    expect(VARIANT_REGISTRY.has('asodio')).toBe(true);
+    expect(isGameBuilt('asodio')).toBe(false);
     for (const game of ['portes', 'plakoto', 'fevga'] as const) {
       const rules = gameRuleSet(game);
       expect(rules.presetId).toBe(game);

@@ -17,7 +17,12 @@
  * - `awaiting-confirm`: the moves form a full legal play. `confirm` ends
  *   the turn; `undo` goes back to `moving`.
  * - `awaiting-answer`: the variant asks a question (`Variant.prompt`), for
- *   example Plakoto "resign or play on". Not used by Portes.
+ *   example Plakoto "resign or play on" or the Asodio chosen double. Not
+ *   used by Portes. When the answer sets `state.dice` (the chosen double),
+ *   the next turn starts with those dice (`moving`), with no roll.
+ * - A variant may give the same player another roll: the flow reads the
+ *   player to move from the state that `applyTurn` returns (Asodio extra
+ *   rolls).
  * - `game-over`: `result` holds the winner and the points.
  *
  * A roll with no legal move passes by itself: the flow plays the empty turn
@@ -345,7 +350,14 @@ export function stepGame(
         illegal(`answer one of ${prompt.choices.join(', ')}`);
       }
       const next = variant.answerPrompt(flow.state, player, choice);
-      return [settle(flow, next, variant), { type: 'answer', player, choice }];
+      const settled = settle(flow, next, variant);
+      // The answer may set the next dice itself (Asodio: the chosen double
+      // after a 1-2). Then that turn starts at once, with no roll.
+      const begun =
+        settled.phase === 'awaiting-roll' && next.dice !== null
+          ? beginTurn(settled, next.dice, variant)
+          : settled;
+      return [begun, { type: 'answer', player, choice }];
     }
 
     case 'resign': {

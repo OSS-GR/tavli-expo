@@ -103,8 +103,10 @@ export interface Variant {
 
   /**
    * Plays `turn` and returns the next state: the other player to move,
-   * `dice: null`, `turnNumber + 1`. Throws `EngineError('ILLEGAL_TURN')` if
-   * the turn is not legal. Never changes `state`.
+   * `dice: null`, `turnNumber + 1`. A variant may keep the same player to
+   * move when the roll gives another roll (Asodio extra rolls). Throws
+   * `EngineError('ILLEGAL_TURN')` if the turn is not legal. Never changes
+   * `state`.
    */
   applyTurn(state: GameState, turn: Turn): GameState;
 
@@ -131,7 +133,9 @@ export interface Variant {
 
   /**
    * Optional, with `prompt`. Applies the answer and returns the next state.
-   * If the answer ends the game, `result` of the new state says so.
+   * If the answer ends the game, `result` of the new state says so. If it
+   * sets `dice` (Asodio: the chosen double), the turn flow starts that turn
+   * with those dice, with no roll.
    * Throws `ILLEGAL_ACTION` for an answer that is not one of the choices.
    */
   answerPrompt?(state: GameState, player: PlayerId, choice: string): GameState;
@@ -141,7 +145,7 @@ export interface Variant {
 export interface VariantPrompt {
   /** Who must answer. */
   readonly player: PlayerId;
-  /** What is asked, for the UI text. For example `'motherPinned'`. */
+  /** What is asked, for the UI text. For example `'motherPinned'` or `'chooseDouble'`. */
   readonly kind: string;
   /** The answers the player can give. For example `['resign', 'playOn']`. */
   readonly choices: readonly string[];
