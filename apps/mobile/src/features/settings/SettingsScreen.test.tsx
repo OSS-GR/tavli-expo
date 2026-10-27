@@ -1,5 +1,5 @@
 import type { createRecordingAnalytics } from '@tavli/contracts';
-import { act, render, screen, userEvent } from '@testing-library/react-native';
+import { act, render, screen, userEvent, within } from '@testing-library/react-native';
 
 // The analytics wiring, which the root layout loads in the app.
 import '@/features/analytics/store';
@@ -125,5 +125,60 @@ describe('<SettingsScreen />', () => {
     const count = recorded.sent.length;
     await user.press(screen.getByRole('switch', { name: 'Haptics' }));
     expect(recorded.sent).toHaveLength(count);
+  });
+
+  it('has no Help section without a way to open the tutorial', async () => {
+    await render(<SettingsScreen />);
+    expect(screen.queryByRole('header', { name: 'Help' })).not.toBeOnTheScreen();
+    expect(screen.queryByTestId('settings-learn-to-play')).not.toBeOnTheScreen();
+  });
+
+  it.each([
+    ['Portes', 'portes'],
+    ['Plakoto', 'plakoto'],
+    ['Fevga', 'fevga'],
+    ['Asodio', 'asodio'],
+  ] as const)('Help → Learn to play lets the player pick %s (#159)', async (label, game) => {
+    const user = userEvent.setup();
+    const onLearnToPlay = jest.fn();
+    await render(<SettingsScreen onLearnToPlay={onLearnToPlay} />);
+    expect(screen.queryByTestId('tutorial-picker')).not.toBeOnTheScreen();
+
+    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    const picker = within(screen.getByTestId('tutorial-picker'));
+    expect(picker.getByRole('header', { name: 'Learn to play' })).toBeOnTheScreen();
+    await user.press(picker.getByRole('button', { name: label }));
+
+    expect(onLearnToPlay).toHaveBeenCalledTimes(1);
+    expect(onLearnToPlay).toHaveBeenCalledWith(game);
+    expect(screen.queryByTestId('tutorial-picker')).not.toBeOnTheScreen();
+  });
+
+  it('closes the game picker with Cancel, and opens nothing', async () => {
+    const user = userEvent.setup();
+    const onLearnToPlay = jest.fn();
+    await render(<SettingsScreen onLearnToPlay={onLearnToPlay} />);
+    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(
+      within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Cancel' }),
+    );
+    expect(screen.queryByTestId('tutorial-picker')).not.toBeOnTheScreen();
+    expect(onLearnToPlay).not.toHaveBeenCalled();
+  });
+
+  it('names the games in Greek in the picker', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      settingsStore.setState({ language: 'el' });
+    });
+    await render(<SettingsScreen onLearnToPlay={jest.fn()} />);
+    await user.press(screen.getByRole('button', { name: 'Μάθε να παίζεις ›' }));
+    const picker = within(screen.getByTestId('tutorial-picker'));
+    for (const name of ['Πόρτες', 'Πλακωτό', 'Φεύγα', 'Ασόδιο', 'Άκυρο']) {
+      expect(picker.getByRole('button', { name })).toBeOnTheScreen();
+    }
+    await act(async () => {
+      settingsStore.setState({ language: 'system' });
+    });
   });
 });

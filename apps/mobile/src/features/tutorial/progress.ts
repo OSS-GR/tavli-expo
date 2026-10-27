@@ -1,7 +1,7 @@
 /**
  * Has the player seen the tutorial? Saved per lesson set: Portes (#128),
- * Plakoto and Fevga (#149). Home offers "Learn to play" (Portes only)
- * until they finish it or say no.
+ * Plakoto and Fevga (#149), Asodio (#159). Home offers "Learn to play"
+ * (Portes only) until they finish it or say no.
  *
  * - `new`: not seen yet. Home shows the card.
  * - `dismissed`: closed the card on Home, or skipped the tutorial.
@@ -12,9 +12,10 @@
  * so "reset settings" does not bring the card back.
  *
  * Storage: Portes keeps the key it had before #149 (`tutorial`), so a
- * saved status stays valid. Plakoto and Fevga each have their own key
- * (`tutorial.plakoto`, `tutorial.fevga`) with the same `{ version, status }`
- * JSON.
+ * saved status stays valid. The other games each have their own key
+ * (`tutorial.plakoto`, `tutorial.fevga`, `tutorial.asodio`) with the same
+ * `{ version, status }` JSON. A new game only adds a key, so the keys saved
+ * before it still load.
  */
 import type { Storage, TutorialGame } from '@tavli/contracts';
 import { createStore } from 'zustand/vanilla';
@@ -36,7 +37,7 @@ export type VariantTutorialGame = Exclude<TutorialGame, 'portes'>;
 export interface TutorialState {
   /** The Portes tutorial: the one the Home card offers. */
   readonly status: TutorialStatus;
-  /** The Plakoto and Fevga lessons (#149). */
+  /** The Plakoto and Fevga lessons (#149), and Asodio (#159). */
   readonly variants: { readonly [G in VariantTutorialGame]: TutorialStatus };
   /** The card was closed, or the tutorial skipped. Never undoes `done`. Default: Portes. */
   dismiss: (game?: TutorialGame) => void;
@@ -49,12 +50,20 @@ export function statusOf(state: Pick<TutorialState, 'status' | 'variants'>, game
   return game === 'portes' ? state.status : state.variants[game];
 }
 
+/** The lesson sets with their own key, in the order of the games. */
+export const VARIANT_TUTORIAL_GAMES: readonly VariantTutorialGame[] = [
+  'plakoto',
+  'fevga',
+  'asodio',
+];
+
 /**
- * The lesson set a call is about. Anything but Plakoto or Fevga is Portes,
- * so `onPress={dismiss}` (a press event as the argument) still means Portes.
+ * The lesson set a call is about. Anything but another lesson set is
+ * Portes, so `onPress={dismiss}` (a press event as the argument) still
+ * means Portes.
  */
 function gameOf(game: unknown): TutorialGame {
-  return game === 'plakoto' || game === 'fevga' ? game : 'portes';
+  return VARIANT_TUTORIAL_GAMES.find((g) => g === game) ?? 'portes';
 }
 
 /** The saved status. A missing or broken save is `new`. */
@@ -88,7 +97,11 @@ export function createTutorialStore(storage: Storage) {
     };
     return {
       status: load(storage, 'portes'),
-      variants: { plakoto: load(storage, 'plakoto'), fevga: load(storage, 'fevga') },
+      variants: {
+        plakoto: load(storage, 'plakoto'),
+        fevga: load(storage, 'fevga'),
+        asodio: load(storage, 'asodio'),
+      },
       dismiss: (game) => {
         const which = gameOf(game);
         if (statusOf(get(), which) === 'new') save(which, 'dismissed');

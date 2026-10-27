@@ -44,7 +44,7 @@ describe('tutorial status', () => {
   it('saves Plakoto and Fevga apart from Portes (#149)', () => {
     const storage = createMemoryStorage();
     const store = createTutorialStore(storage);
-    expect(store.getState().variants).toEqual({ plakoto: 'new', fevga: 'new' });
+    expect(store.getState().variants).toEqual({ plakoto: 'new', fevga: 'new', asodio: 'new' });
     store.getState().finish('plakoto');
     store.getState().dismiss('fevga');
     // Portes, and so the Home card, did not change.
@@ -60,11 +60,36 @@ describe('tutorial status', () => {
     expect(statusOf(again, 'fevga')).toBe('dismissed');
   });
 
+  it('saves Asodio under its own key (#159)', () => {
+    const storage = createMemoryStorage();
+    const store = createTutorialStore(storage);
+    store.getState().finish('asodio');
+    expect(tutorialStorageKey('asodio')).toBe('tutorial.asodio');
+    expect(JSON.parse(storage.getString('tutorial.asodio') ?? '')).toEqual({
+      version: 1,
+      status: 'done',
+    });
+    // The other games did not change.
+    expect(store.getState().status).toBe('new');
+    expect(store.getState().variants).toEqual({ plakoto: 'new', fevga: 'new', asodio: 'done' });
+    expect(statusOf(createTutorialStore(storage).getState(), 'asodio')).toBe('done');
+  });
+
+  it('loads the keys saved before Asodio had lessons (#159)', () => {
+    const storage = createMemoryStorage();
+    storage.setString('tutorial', JSON.stringify({ version: 1, status: 'dismissed' }));
+    storage.setString('tutorial.plakoto', JSON.stringify({ version: 1, status: 'done' }));
+    storage.setString('tutorial.fevga', JSON.stringify({ version: 1, status: 'dismissed' }));
+    const state = createTutorialStore(storage).getState();
+    expect(state.status).toBe('dismissed');
+    expect(state.variants).toEqual({ plakoto: 'done', fevga: 'dismissed', asodio: 'new' });
+  });
+
   it('takes anything but a lesson set as Portes (a press event as the argument)', () => {
     const store = createTutorialStore(createMemoryStorage());
     store.getState().dismiss({ nativeEvent: {} } as never);
     expect(store.getState().status).toBe('dismissed');
-    expect(store.getState().variants).toEqual({ plakoto: 'new', fevga: 'new' });
+    expect(store.getState().variants).toEqual({ plakoto: 'new', fevga: 'new', asodio: 'new' });
   });
 
   it('reads a Portes status saved before #149 (same key, same format)', () => {
@@ -72,7 +97,7 @@ describe('tutorial status', () => {
     storage.setString('tutorial', JSON.stringify({ version: 1, status: 'done' }));
     const state = createTutorialStore(storage).getState();
     expect(state.status).toBe('done');
-    expect(state.variants).toEqual({ plakoto: 'new', fevga: 'new' });
+    expect(state.variants).toEqual({ plakoto: 'new', fevga: 'new', asodio: 'new' });
     expect(tutorialStorageKey('portes')).toBe(TUTORIAL_STORAGE_KEY);
     expect(tutorialStorageKey('fevga')).toBe('tutorial.fevga');
   });
@@ -136,6 +161,22 @@ describe('tutorial analytics', () => {
         props: { game: 'fevga', step: 3, lesson: 'runner' },
       },
       { type: 'track', event: 'tutorial_finished', props: { game: 'fevga' } },
+    ]);
+  });
+
+  it('names Asodio in its events (#159)', () => {
+    const analytics = createRecordingAnalytics();
+    analytics.optIn();
+    const events = createTutorialAnalytics(analytics, 'asodio');
+    events.started('settings');
+    events.skipped(2, 'enterAll');
+    expect(analytics.sent).toEqual([
+      { type: 'track', event: 'tutorial_started', props: { source: 'settings', game: 'asodio' } },
+      {
+        type: 'track',
+        event: 'tutorial_skipped',
+        props: { game: 'asodio', step: 2, lesson: 'enterAll' },
+      },
     ]);
   });
 

@@ -1,25 +1,31 @@
 /**
  * The tutorial: seven short lessons in Portes (#128, the first-run
- * tutorial), and four each for what is new in Plakoto and Fevga (#149).
- * Each lesson has a fixed position with fixed dice. Pure TypeScript.
+ * tutorial), and four each for what is new in Plakoto and Fevga (#149)
+ * and Asodio (#159). Each lesson has a fixed position with fixed dice.
+ * Pure TypeScript.
  *
  * The engine decides what is legal (`legalNextMoves`). A lesson only keeps
  * the legal moves that teach its point (`accepts`), so the board lights up
  * only the checker and the target to touch. No RNG: the dice are part of
  * the lesson.
  *
- * Each lesson plays in its game's default preset (`getPreset`), so the
+ * Each lesson plays in its game's default preset (`lessonRules`), so the
  * rules are the ones of a real game: Plakoto with the mother question
- * (`offerConcede`), Fevga with the runner rule and the six-in-a-row bans.
+ * (`offerConcede`), Fevga with the runner rule and the six-in-a-row bans,
+ * Asodio in the owner version (`asodio.kafeneio`: the loading lock, the
+ * quarter lock, pins).
  *
  * Positions are written in each player's own numbering (24 = start, 1 =
  * the last point of home). White (you) sits at the bottom and moves
- * 24 → 1. Black's own point `p` is White's `25 - p` in Portes and Plakoto
- * (contrary), and `p ± 12` in Fevga (parallel).
+ * 24 → 1. Black's own point `p` is White's `25 - p` in Portes, Plakoto and
+ * Asodio (contrary), and `p ± 12` in Fevga (parallel).
  */
 import type { TutorialGame } from '@tavli/contracts';
 import {
+  ASODIO_START,
+  DEFAULT_PRESET_BY_GAME,
   applyGameAction,
+  asodio,
   createBoard,
   createGameFlow,
   currentBoard,
@@ -33,6 +39,7 @@ import {
   type Direction,
   type GameFlow,
   type Move,
+  type RuleSet,
   type SideLayout,
   type SourceMoves,
   type Variant,
@@ -44,8 +51,9 @@ export type PortesLessonId =
   'move' | 'bothDice' | 'double' | 'makePoint' | 'hit' | 'enter' | 'bearOff';
 export type PlakotoLessonId = 'pin' | 'pinned' | 'mother' | 'plakotoBearOff';
 export type FevgaLessonId = 'sameWay' | 'holdPoint' | 'runner' | 'sixInARow';
+export type AsodioLessonId = 'aceDeuce' | 'enterAll' | 'quarterLock' | 'pinLast';
 /** Lesson ids are unique over all games: they name the strings and the analytics. */
-export type LessonId = PortesLessonId | PlakotoLessonId | FevgaLessonId;
+export type LessonId = PortesLessonId | PlakotoLessonId | FevgaLessonId | AsodioLessonId;
 
 export interface Lesson {
   readonly id: LessonId;
@@ -263,26 +271,97 @@ export const FEVGA_LESSONS: readonly Lesson[] = [
   },
 ];
 
+const asodioBoard = (white: SideLayout, black: SideLayout) =>
+  createBoard({ white, black }, 'contrary');
+
+/**
+ * The Asodio lessons (#159), in the owner version (`asodio.md`, preset
+ * `kafeneio`): the loading lock, the quarter lock, and pins instead of hits.
+ */
+export const ASODIO_LESSONS: readonly Lesson[] = [
+  {
+    // 1. The loading lock (phase 1.2–1.3): all 15 wait off the board, and
+    //    only a 1-2 or a double opens it. You rolled 1-2: the 1 enters on
+    //    24 (spot 1), the 2 on 23 (spot 2).
+    id: 'aceDeuce',
+    game: 'asodio',
+    board: asodioBoard(ASODIO_START, ASODIO_START),
+    dice: [1, 2],
+    accepts: (move) => move.from === 'outside',
+    done: allDiceUsed,
+  },
+  {
+    // 2. Load all 15 (phase 1.4–1.7, A1): 4 still wait. The double 3-3
+    //    enters all four on 22 (spot 3). The 11 on the board may not move
+    //    while a checker waits, so every die enters.
+    id: 'enterAll',
+    game: 'asodio',
+    board: asodioBoard(
+      { points: { 24: 3, 23: 3, 21: 3, 20: 2 }, outside: 4 },
+      { points: { 24: 1, 23: 1 }, outside: 13 },
+    ),
+    dice: [3, 3],
+    accepts: (move) => move.from === 'outside',
+    done: allDiceUsed,
+  },
+  {
+    // 3. The quarter lock (phase 2): 14 checkers reached 13 to 18 and are
+    //    frozen there, because the last one still sits on 20. Bring it up
+    //    with one die (20 → 16 or 20 → 17); then the army is free, and the
+    //    other die moves any checker.
+    id: 'quarterLock',
+    game: 'asodio',
+    board: asodioBoard(
+      { points: { 20: 1, 18: 3, 17: 3, 16: 3, 15: 3, 14: 2 } },
+      { points: { 24: 3, 23: 3, 22: 3, 21: 3, 20: 3 } },
+    ),
+    dice: [4, 3],
+    accepts: (move, played) => played.length > 0 || move.from === 20,
+    done: allDiceUsed,
+  },
+  {
+    // 4. Pin, do not hit (phase 3, A6): Black's last checker sits alone on
+    //    your 10 (Black's own 15); the rest of its army waits, frozen, on
+    //    your 13 and 14. Pin it: 16 → 10 with the 6. Now Black's whole army
+    //    is frozen until you leave.
+    id: 'pinLast',
+    game: 'asodio',
+    board: asodioBoard(
+      { points: { 18: 4, 17: 4, 16: 4, 15: 3 } },
+      { points: { 15: 1, 12: 7, 11: 7 } },
+    ),
+    dice: [6, 2],
+    accepts: (move) => move.to === 10 && move.capture === 'pin',
+    done: pinnedOn(10, 'black'),
+  },
+];
+
 /** The lesson set of each game. */
 export const LESSON_SETS: { readonly [G in TutorialGame]: readonly Lesson[] } = {
   portes: PORTES_LESSONS,
   plakoto: PLAKOTO_LESSONS,
   fevga: FEVGA_LESSONS,
+  asodio: ASODIO_LESSONS,
 };
 
 /** The Portes lessons, the default set. */
 export const LESSONS = PORTES_LESSONS;
 
-const VARIANTS: { readonly [G in TutorialGame]: Variant } = { portes, plakoto, fevga };
+const VARIANTS: { readonly [G in TutorialGame]: Variant } = { portes, plakoto, fevga, asodio };
+
+/** The rules of `game`'s lessons: its default preset (Asodio: `asodio.kafeneio`). */
+export function lessonRules(game: TutorialGame): RuleSet {
+  return getPreset(DEFAULT_PRESET_BY_GAME[game]);
+}
 
 /** How the players move in `game`: contrary, or parallel in Fevga. */
 export function lessonDirection(game: TutorialGame): Direction {
-  return getPreset(game).movement.direction;
+  return lessonRules(game).movement.direction;
 }
 
 /** The flow of a lesson: White to move with the lesson's dice, in the game's default preset. */
 export function startLesson(lesson: Lesson): GameFlow {
-  const rules = getPreset(lesson.game);
+  const rules = lessonRules(lesson.game);
   const start = VARIANTS[lesson.game].initialState({ startingPlayer: 'white', rules });
   const flow = createGameFlow({ state: { ...start, board: lesson.board }, starter: 'white' });
   return applyGameAction(flow, { type: 'roll', player: 'white', dice: lesson.dice });

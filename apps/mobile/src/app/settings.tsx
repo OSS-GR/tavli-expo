@@ -10,7 +10,7 @@ export default function SettingsRoute() {
     <>
       <Stack.Screen options={{ title: t('settings.title') }} />
       <SettingsScreen
-        onLearnToPlay={() => router.push(tutorialHref('settings'))}
+        onLearnToPlay={(game) => router.push(tutorialHref('settings', game))}
         onHistory={() => router.push('/history')}
       />
     </>

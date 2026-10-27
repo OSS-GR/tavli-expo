@@ -1,6 +1,6 @@
 /**
  * How to play a game: `/rules/portes`, `/rules/plakoto`, `/rules/fevga`,
- * `/rules/tavli`; `/rules/asodio` says "coming later".
+ * `/rules/asodio` and `/rules/tavli`. Each game's page opens its lessons.
  */
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
