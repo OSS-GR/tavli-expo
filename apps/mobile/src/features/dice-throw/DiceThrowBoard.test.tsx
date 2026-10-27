@@ -5,16 +5,19 @@ import { act, fireEvent, screen } from '@testing-library/react-native';
 import { SAMPLE_DIRECTIONS, SAMPLE_POSITIONS } from '@/features/board/positions';
 import type { FeedbackEvent } from '@/features/feedback/feedback';
 
+import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
 import { countNodes, type JsonNode } from '../../../test/tree';
+
+import type { BoardLayoutMode } from '@/features/settings/settings';
 
 import { DiceThrowBoard } from './DiceThrowBoard';
 
 const SEED = 11;
 const SIZE = { width: 360, height: 590 };
 
-async function setup() {
+async function setup(layout: BoardLayoutMode = 'tall') {
   const events: FeedbackEvent[] = [];
   const feedback = { event: (e: FeedbackEvent) => events.push(e) };
   await renderWithRoot(
@@ -23,6 +26,7 @@ async function setup() {
       view={{ viewer: 'white', direction: SAMPLE_DIRECTIONS.start }}
       rng={createSeededRng(SEED)}
       theme={getTheme('walnut-kafeneio')}
+      layout={layout}
       feedback={feedback}
     />,
   );
@@ -41,8 +45,8 @@ function expectedRolls(n: number) {
 const resultText = () => screen.getByTestId('dice-throw-result').props.children as string;
 
 describe('DiceThrowBoard (dice throw spike, #183)', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // The throw plays on timers (the knocks); keep them on a fake clock.
+  runOnFakeTimers();
 
   it('asks for a swipe before the first throw', async () => {
     await setup();
@@ -107,5 +111,12 @@ describe('DiceThrowBoard (dice throw spike, #183)', () => {
     const before = shadows();
     await fireEvent.press(screen.getByTestId('dice-throw-roll'));
     expect(shadows() - before).toBe(2);
+  });
+
+  it('throws on the classic board too', async () => {
+    await setup('classic');
+    await fireEvent.press(screen.getByTestId('dice-throw-roll'));
+    const [first] = expectedRolls(1);
+    expect(resultText()).toBe(`Rolled ${first![0]} and ${first![1]}.`);
   });
 });

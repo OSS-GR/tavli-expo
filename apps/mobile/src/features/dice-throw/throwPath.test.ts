@@ -83,8 +83,9 @@ describe('dampSpeed and stopTime', () => {
     expect(stopTime(0, 1, 1)).toBe(0);
   });
 
-  it('stops the fastest throw in well under two seconds', () => {
-    expect(stopTime(THROW_TUNING.maxSpeed, drag, friction)).toBeLessThan(1.2);
+  it('stops the fastest throw in under two seconds, before the hard limit', () => {
+    expect(stopTime(THROW_TUNING.maxSpeed, drag, friction)).toBeLessThan(2);
+    expect(stopTime(THROW_TUNING.maxSpeed, drag, friction) * 1000).toBeLessThan(THROW_TUNING.maxMs);
   });
 });
 
@@ -213,7 +214,9 @@ describe('planThrow', () => {
   });
 
   it('bounces off the far wall on a hard throw, and the hit is in the plan', () => {
-    const plan = planThrow(input({ start: { at: { x: 180, y: 510 }, velocity: { x: 0, y: -2600 } } }));
+    const plan = planThrow(
+      input({ start: { at: { x: 180, y: 510 }, velocity: { x: 0, y: -2600 } } }),
+    );
     const wall = plan.hits.filter((h) => h.kind === 'wall');
     expect(wall.length).toBeGreaterThan(0);
     expect(wall[0]!.atMs).toBeGreaterThan(0);
@@ -229,8 +232,9 @@ describe('planThrow', () => {
     expect(last(y)!).toBeGreaterThan(top);
   });
 
-  it('has no hits on a soft throw down the middle', () => {
-    const plan = planThrow(input({ start: { at: { x: 180, y: 510 }, velocity: { x: 0, y: -600 } } }));
+  it('has no hits on the softest throw down the middle', () => {
+    const velocity = { x: 0, y: -THROW_TUNING.minSpeed };
+    const plan = planThrow(input({ start: { at: { x: 180, y: 510 }, velocity } }));
     expect(plan.hits).toEqual([]);
   });
 
@@ -248,14 +252,17 @@ describe('planThrow', () => {
   });
 
   it('stops before the hard limit, and a faster throw takes longer', () => {
-    const soft = planThrow(input({ start: { at: { x: 180, y: 510 }, velocity: { x: 0, y: -700 } } }));
+    const soft = planThrow(
+      input({ start: { at: { x: 180, y: 510 }, velocity: { x: 0, y: -700 } } }),
+    );
     const hard = planThrow(input());
     expect(soft.durationMs).toBeGreaterThan(0);
     expect(hard.durationMs).toBeGreaterThan(soft.durationMs);
     expect(hard.durationMs).toBeLessThan(THROW_TUNING.maxMs);
     expect(hard.samples).toBe(Math.round(hard.durationMs / hard.sampleMs) + 1);
     for (const d of hard.dice) {
-      for (const track of [d.x, d.y, d.angle, d.scale, d.face]) expect(track).toHaveLength(hard.samples);
+      for (const track of [d.x, d.y, d.angle, d.scale, d.face])
+        expect(track).toHaveLength(hard.samples);
     }
   });
 
@@ -284,7 +291,13 @@ describe('restPlan', () => {
 });
 
 describe('sampleAt', () => {
-  const track = { x: [0, 10, 20], y: [0, 0, 10], angle: [0, 1, 2], scale: [1.2, 1.1, 1], face: [2, 3, 5] };
+  const track = {
+    x: [0, 10, 20],
+    y: [0, 0, 10],
+    angle: [0, 1, 2],
+    scale: [1.2, 1.1, 1],
+    face: [2, 3, 5],
+  };
 
   it('mixes two samples', () => {
     const p = sampleAt(track, 10, 15);

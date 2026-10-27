@@ -43,12 +43,7 @@ const FACES = [1, 2, 3, 4, 5, 6];
 export function ThrownDie({ style, track, sampleMs, size, clock }: ThrownDieProps) {
   const transform = useDerivedValue(() => {
     const p = sampleAt(track, sampleMs, clock.get());
-    return [
-      { translateX: p.x },
-      { translateY: p.y },
-      { rotate: p.angle },
-      { scale: p.scale },
-    ];
+    return [{ translateX: p.x }, { translateY: p.y }, { rotate: p.angle }, { scale: p.scale }];
   });
   const face = useDerivedValue(() => sampleAt(track, sampleMs, clock.get()).face);
   return (

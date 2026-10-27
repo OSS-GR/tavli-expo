@@ -191,7 +191,7 @@ The first Android build asks to make a **keystore** (the signing key). Say **yes
 | `/game/<id>` | The board for a match (opened from New game or Continue) |
 | `/rules/<variant>` | How to play (a stub for now) |
 | `/settings` | Settings (language, sound, haptics, board options) |
-| `/dev/board` | **Dev only.** The board with sample positions. You can flip the board. |
+| `/dev/board` | **Dev only.** The board with sample positions. You can flip the board. **Dice → Throw on the board** turns on the dice throw spike (#183, [findings](../design/dice-throw-spike.md)). |
 | `/_sitemap` | Expo Router's list of all routes. Tap one to open it. |
 
 Dev routes only work in development builds. Release builds (the `preview` profile) send them back home.

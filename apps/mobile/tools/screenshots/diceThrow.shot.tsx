@@ -2,8 +2,8 @@
  * Preview of the dice throw spike (#183): one throw, drawn headless with the
  * same `planThrow` the dev screen plays. Writes to `docs/design/dice-throw/`:
  *
- * - `throw-strip.png`: five frames side by side (start, two in flight, the
- *   bounce, the rest pose). Faint ghosts show where each die just was.
+ * - `throw-strip.png`: five frames side by side (the throw, in flight, the
+ *   first bounce, a second bounce, the rest pose). Faint ghosts show where each die just was.
  * - `throw.gif`: the whole throw at 30 fps, only if `ffmpeg` is installed.
  *
  * Run: `pnpm --filter @tavli/mobile screenshots`.
@@ -33,12 +33,7 @@ import { SAMPLE_DIRECTIONS, SAMPLE_POSITIONS } from '@/features/board/positions'
 import { BoardScene, type BoardImages } from '@/features/board/skia/BoardScene';
 import { DieBody, DiePips } from '@/features/board/skia/DieShape';
 import { boardThrowBox, throwDieSize, throwField } from '@/features/dice-throw/throwField';
-import {
-  planThrow,
-  sampleAt,
-  swipeToThrow,
-  type ThrowPlan,
-} from '@/features/dice-throw/throwPath';
+import { planThrow, sampleAt, swipeToThrow, type ThrowPlan } from '@/features/dice-throw/throwPath';
 
 import { loadFont, loadSkia, loadThemeImages } from './render';
 
@@ -85,10 +80,19 @@ function dice(scene: Scene, ms: number, opacity = 1): ReactElement[] {
 /** One frame: the cropped board, the dice at `ms`, ghosts, and a label. */
 function frame(scene: Scene, ms: number, text: string | null, ghosts: boolean): ReactElement {
   const { theme, geo, images, font, label, crop, plan } = scene;
-  const ghostTimes = ghosts ? [3, 6, 9].map((k) => ms - k * plan.sampleMs).filter((t) => t > 0) : [];
+  const ghostTimes = ghosts
+    ? [3, 6, 9].map((k) => ms - k * plan.sampleMs).filter((t) => t > 0)
+    : [];
   return (
-    <Group>
-      <Fill color={theme.palette['ui.bg'] ?? theme.points.dark.fill} />
+    <Group clip={{ x: 0, y: 0, width: BOARD.width, height: crop.height + LABEL_H }}>
+      {/* A Rect, not a Fill: a Fill paints the whole strip and hides the frames before it. */}
+      <Rect
+        x={0}
+        y={0}
+        width={BOARD.width}
+        height={crop.height + LABEL_H}
+        color={theme.palette['ui.bg'] ?? theme.points.dark.fill}
+      />
       <Group transform={[{ translateY: -crop.y }]}>
         <BoardScene
           theme={theme}
@@ -132,10 +136,10 @@ it('renders the dice throw preview', async () => {
   const box = boardThrowBox(geo);
 
   // 1. The RNG rolls first. 2. The path is planned to land on that roll.
-  const values = rollDice(createSeededRng(183));
+  const values = rollDice(createSeededRng(184));
   const start = swipeToThrow(
     { x: box.left + 30, y: box.bottom - 10 },
-    { x: 1500, y: -2200 }, // a quick flick up and to the right, in pt/s
+    { x: 1100, y: -1400 }, // a quick flick up and to the right, in pt/s
     { x: 0, y: 0 },
     box,
   );

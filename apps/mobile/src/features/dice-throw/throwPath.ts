@@ -63,11 +63,11 @@ export interface ThrowTuning {
 }
 
 export const THROW_TUNING: ThrowTuning = {
-  minSpeed: 600,
-  maxSpeed: 2600,
-  drag: 3,
-  friction: 500,
-  restitution: 0.6,
+  minSpeed: 450,
+  maxSpeed: 1800,
+  drag: 1,
+  friction: 350,
+  restitution: 0.5,
   wallGrip: 0.85,
   quietHit: 90,
   sampleMs: 1000 / 60,
@@ -192,7 +192,11 @@ export function swipeToThrow(
  * the box, up into the field, a bit to the left or right. `turn` picks the
  * side, so two button throws in a row look different.
  */
-export function buttonThrow(box: Box, turn: number, tuning: ThrowTuning = THROW_TUNING): ThrowStart {
+export function buttonThrow(
+  box: Box,
+  turn: number,
+  tuning: ThrowTuning = THROW_TUNING,
+): ThrowStart {
   const side = turn % 2 === 0 ? 1 : -1;
   const angle = (side * 18 * Math.PI) / 180;
   const speed = (tuning.minSpeed + tuning.maxSpeed) / 2;
@@ -285,7 +289,13 @@ function hitWalls(b: Body, box: Box, t: ThrowTuning): number {
   let hardest = 0;
   for (const [i, wall] of WALLS.entries()) {
     const out =
-      i === 0 ? box.left - b.x : i === 1 ? b.x - box.right : i === 2 ? box.top - b.y : b.y - box.bottom;
+      i === 0
+        ? box.left - b.x
+        : i === 1
+          ? b.x - box.right
+          : i === 2
+            ? box.top - b.y
+            : b.y - box.bottom;
     if (out <= 0) continue;
     const into = -(b.vx * wall.normal.x + b.vy * wall.normal.y);
     if (i < 2) b.x += 2 * out * wall.normal.x;

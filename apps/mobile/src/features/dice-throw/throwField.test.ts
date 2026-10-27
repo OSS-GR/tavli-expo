@@ -30,4 +30,14 @@ describe('throwField', () => {
     expect(box.top - half).toBeGreaterThanOrEqual(field.y);
     expect(box.bottom + half).toBeLessThanOrEqual(field.y + field.height);
   });
+
+  it('is the field with the dice area on the classic board: the right one', () => {
+    const wide = getLayout(getTheme('walnut-kafeneio'), 'landscape');
+    const wideGeo = fitBoardWithShadow(wide, { width: 390, height: 260 });
+    const field = throwField(wideGeo);
+    expect(field).toEqual(toScreenRect(wideGeo, wide.fields[1]!));
+    const dice = toScreenRect(wideGeo, wide.diceArea);
+    expect(dice.x).toBeGreaterThan(field.x);
+    expect(dice.x + dice.width).toBeLessThan(field.x + field.width);
+  });
 });

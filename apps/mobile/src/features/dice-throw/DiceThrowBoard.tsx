@@ -13,8 +13,9 @@
  * path for screen readers and for players who do not want to swipe. With
  * Reduce Motion on, the dice show at rest at once.
  *
- * Gestures follow the board rules (#174): a pan and a tap race, so one
- * touch is never both.
+ * Gestures follow the board rules (#174, #186): a pan and a tap race, so
+ * one touch is never both. The dice roll in the field that holds the
+ * theme's dice area, on the tall or the classic board (`throwField`).
  */
 import { rollDice, type BoardState, type Dice, type Rng } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
@@ -27,19 +28,15 @@ import {
   usePanGesture,
   useTapGesture,
 } from 'react-native-gesture-handler';
-import {
-  Easing,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import { Easing, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { ActionButton } from '@/components/ActionButton';
 import {
   BoardCanvas,
-  portraitLayout,
+  boardLayout,
+  useBoardLayoutMode,
   useBoardSpace,
   useBoardTheme,
   useHomeBoardSide,
@@ -47,8 +44,13 @@ import {
 import { layoutBoard, type BoardMarks, type BoardView } from '@/features/board/boardModel';
 import { fitBoardWithShadow } from '@/features/board/geometry';
 import { BOARD_GESTURES } from '@/features/board/interaction';
-import { createGameFeedback, loadThemeSounds, type GameFeedback } from '@/features/feedback/feedback';
+import {
+  createGameFeedback,
+  loadThemeSounds,
+  type GameFeedback,
+} from '@/features/feedback/feedback';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
+import type { BoardLayoutMode } from '@/features/settings/settings';
 
 import { boardThrowBox, throwDieSize } from './throwField';
 import {
@@ -70,6 +72,8 @@ export interface DiceThrowBoardProps {
   rng: Rng;
   /** Draw with this theme instead of the one in Settings. */
   theme?: ThemeManifest;
+  /** The tall or the classic board. Default: the one picked in Settings (#184). */
+  layout?: BoardLayoutMode;
   /** Sound and haptics. Default: the theme's, through `createGameFeedback`. */
   feedback?: GameFeedback;
   testID?: string;
@@ -87,6 +91,7 @@ export function DiceThrowBoard({
   marks,
   rng,
   theme: themeProp,
+  layout: layoutProp,
   feedback: feedbackProp,
   testID = 'dice-throw',
 }: DiceThrowBoardProps) {
@@ -94,8 +99,10 @@ export function DiceThrowBoard({
   const picked = useBoardTheme();
   const theme = themeProp ?? picked;
   const homeSide = useHomeBoardSide();
+  const pickedLayout = useBoardLayoutMode();
+  const layout = layoutProp ?? pickedLayout;
   const [size, onLayout] = useBoardSpace();
-  const geo = size ? fitBoardWithShadow(portraitLayout(theme, homeSide), size) : null;
+  const geo = size ? fitBoardWithShadow(boardLayout(theme, layout, homeSide), size) : null;
   const reduceMotion = useReducedMotion();
   const feedback = useMemo(
     () => feedbackProp ?? createGameFeedback({ theme }),
@@ -237,7 +244,8 @@ export function DiceThrowBoard({
         </View>
       </GestureDetector>
       <View style={styles.row}>
-        <Text testID={`${testID}-result`} style={styles.result} accessibilityLiveRegion="polite">
+        {/* Read out by `useAnnouncement` (both platforms), not by a live region. */}
+        <Text testID={`${testID}-result`} style={styles.result}>
           {result ?? t('dev.board.throw.hint')}
         </Text>
         <ActionButton

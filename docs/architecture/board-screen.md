@@ -45,7 +45,7 @@ The game itself lives in `apps/mobile/src/features/game/`:
 
 The real route is `app/game/[id]/index.tsx`; match end is `app/game/[id]/match-end.tsx` (see [App shell](app-shell.md)). Dev route (release builds redirect it to Home):
 
-- `app/dev/board.tsx`: the fixed positions (`positions.ts`: Portes start, mid-game, bear-off, Plakoto start, Plakoto pins, Fevga start, Asodio start, Asodio loading, Asodio frozen army), from White's and from Black's side. Each position has its direction (`SAMPLE_DIRECTIONS`). The Asodio positions show the frozen marks.
+- `app/dev/board.tsx`: the fixed positions (`positions.ts`: Portes start, mid-game, bear-off, Plakoto start, Plakoto pins, Fevga start, Asodio start, Asodio loading, Asodio frozen army), from White's and from Black's side. Each position has its direction (`SAMPLE_DIRECTIONS`). The Asodio positions show the frozen marks. The dice switch turns on the dice throw spike (`features/dice-throw`, #183, see [Dice throw spike](../design/dice-throw-spike.md)).
 
 **Game flow and ADR-0003.** The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. ADR-0003 records this (updated in #29).
 
