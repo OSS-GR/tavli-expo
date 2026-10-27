@@ -248,13 +248,18 @@
       "bearOff": "Μάζεμα από το σημείο {{from}}",
       "hits": "{{move}}, χτυπάει",
       "pins": "{{move}}, πλακώνει",
+      "then": "{{move}}, {{next}}",
+      "thenTo": "μετά στο σημείο {{to}}",
+      "thenOff": "μετά μάζεμα",
       "short": {
         "move": "{{from}} → {{to}}",
         "fromBar": "Μέση → {{to}}",
         "enter": "Μπαίνει → {{to}}",
         "bearOff": "{{from}} → Μάζεμα",
         "hit": "{{move}} · χτύπημα",
-        "pin": "{{move}} · πλάκωμα"
+        "pin": "{{move}} · πλάκωμα",
+        "then": "{{move}} → {{to}}",
+        "thenOff": "{{move}} → Μάζεμα"
       }
     },
     "announce": {
