@@ -14,12 +14,17 @@
  * With `createAnalytics`, every match sends game events (#61): a new one
  * sends `game_started`; a resumed one does not (it started before). A new
  * match that replaces an unfinished one sends `game_abandoned` for it.
+ *
+ * With `history`, every match adds a record to the match history (#142):
+ * when it is over (won or resigned), and when a new match replaces one
+ * that had started (`abandoned`). A history error never breaks a move.
  */
 import type { Storage } from '@tavli/contracts';
 import type { MatchFlow, Rng } from '@tavli/engine';
 
 import type { GameAnalytics } from '@/features/analytics/gameAnalytics';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
+import { historyRecord, type HistoryRecord, type MatchEnd } from '@/features/history/records';
 
 import {
   SAVED_MATCH_KEY,
@@ -67,6 +72,8 @@ export interface SessionDeps {
   readonly now?: () => number;
   /** Game events for a match (#61). Leave it out in tests that do not check them. */
   readonly createAnalytics?: (setup: MatchSetup) => GameAnalytics;
+  /** The match history (#142). Leave it out in tests that do not check it. */
+  readonly history?: { readonly add: (record: HistoryRecord) => void };
 }
 
 /** A new local match id. Not a secret; it only has to be unique on this phone. */
@@ -80,12 +87,23 @@ export function isRestPoint(flow: MatchFlow): boolean {
   return phase === 'awaiting-roll' || phase === 'opening-roll' || phase === 'game-over';
 }
 
+/**
+ * Has anyone played in this match? A game finished, or someone rolled or
+ * moved. A match left before that gets no history record.
+ */
+export function hasStarted(flow: MatchFlow): boolean {
+  return (
+    flow.match.games.length > 0 || flow.log.some((e) => e.type === 'roll' || e.type === 'move')
+  );
+}
+
 export function createSessionRegistry({
   createRng,
   storage,
   levels = ALL_GAME_LEVELS,
   now = Date.now,
   createAnalytics,
+  history,
 }: SessionDeps): SessionRegistry {
   let session: MatchSession | null = null;
   let unsubscribe: (() => void) | null = null;
@@ -128,6 +146,17 @@ export function createSessionRegistry({
     }
   };
 
+  // Like a save, a history error must not throw out of `dispatch`.
+  const record = (id: string, setup: MatchSetup, flow: MatchFlow, end: MatchEnd) => {
+    if (!history) return;
+    if (end === 'abandoned' && (flow.match.status === 'finished' || !hasStarted(flow))) return;
+    try {
+      history.add(historyRecord(id, setup, flow.match, now(), end));
+    } catch (error) {
+      console.warn('could not add the match to the history', error);
+    }
+  };
+
   const savedId = (): string | null => {
     const result = peek();
     return result.kind === 'ok' ? result.saved.id : null;
@@ -146,6 +175,10 @@ export function createSessionRegistry({
     sessionAnalytics = analytics ?? null;
     unsubscribe = next.store.subscribe((state, prev) => {
       if (state.flow === prev.flow) return;
+      // Once per match: a rematch starts a new one in the same session.
+      if (state.flow.match.status === 'finished' && prev.flow.match.status !== 'finished') {
+        record(next.id, next.setup, state.flow, 'finished');
+      }
       if (state.flow.match.status === 'finished' || isRestPoint(state.flow)) write(next);
     });
   };
@@ -159,15 +192,21 @@ export function createSessionRegistry({
 
   // A new match replaces the one before it. If that one was not over (in
   // memory, or only in the save slot after a restart), the player left it:
-  // `game_abandoned`. `gameAbandoned` ignores a finished game or match.
+  // `game_abandoned`, and an `abandoned` history record. `gameAbandoned`
+  // ignores a finished game or match; so does `record`.
   const abandonPrevious = () => {
-    if (!createAnalytics) return;
+    if (!createAnalytics && !history) return;
     if (session) {
-      sessionAnalytics?.gameAbandoned(session.store.getState().flow);
+      const { flow } = session.store.getState();
+      sessionAnalytics?.gameAbandoned(flow);
+      record(session.id, session.setup, flow, 'abandoned');
       return;
     }
     const result = peek();
-    if (result.kind === 'ok') createAnalytics(result.saved.setup).gameAbandoned(result.saved.flow);
+    if (result.kind !== 'ok') return;
+    const { id, setup, flow } = result.saved;
+    createAnalytics?.(setup).gameAbandoned(flow);
+    record(id, setup, flow, 'abandoned');
   };
 
   return {

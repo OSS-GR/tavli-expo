@@ -9,6 +9,7 @@ import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ToggleRow } from '@/components/settings/ToggleRow';
+import { HistorySettings } from '@/features/history/HistorySettings';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
@@ -27,9 +28,11 @@ type BoardViewOption = BoardFlipMode | 'faceToFace';
 export interface SettingsScreenProps {
   /** Opens the tutorial (#128). The Help section shows only with it. */
   onLearnToPlay?: () => void;
+  /** Opens the match history (#142). The History section shows only with it. */
+  onHistory?: () => void;
 }
 
-export function SettingsScreen({ onLearnToPlay }: SettingsScreenProps = {}) {
+export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
   const locales = useLocales();
 
@@ -179,6 +182,12 @@ export function SettingsScreen({ onLearnToPlay }: SettingsScreenProps = {}) {
             style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
             <Text style={styles.linkText}>{`${t('settings.learnToPlay')} ›`}</Text>
           </Pressable>
+        </SettingsSection>
+      ) : null}
+
+      {onHistory ? (
+        <SettingsSection title={t('settings.sections.history')}>
+          <HistorySettings onOpen={onHistory} />
         </SettingsSection>
       ) : null}
 

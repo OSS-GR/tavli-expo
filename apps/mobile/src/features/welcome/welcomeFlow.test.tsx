@@ -31,6 +31,7 @@ const routes = {
   'welcome/language': WelcomeLanguageRoute,
   'welcome/privacy': WelcomePrivacyRoute,
   'new-game': stub('new game'),
+  history: stub('history'),
   'rules/[variant]': stub('rules'),
   tutorial: stub('tutorial'),
   'game/[id]/index': stub('board'),

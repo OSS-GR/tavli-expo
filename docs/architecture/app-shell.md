@@ -1,6 +1,6 @@
 # App shell: Home, new game, local matches
 
-> How the app starts a local match (vs bot or pass-and-play) and what the screens around the board do. Code: `apps/mobile/src/app/` (routes) and `apps/mobile/src/features/{home,new-game,match,bot,rules,tutorial}/`. Last review: 2026-10-27.
+> How the app starts a local match (vs bot or pass-and-play) and what the screens around the board do. Code: `apps/mobile/src/app/` (routes) and `apps/mobile/src/features/{home,new-game,match,bot,rules,tutorial,history}/`. Last review: 2026-10-27.
 
 ## Routes
 
@@ -12,10 +12,11 @@
 | Match end | `app/game/[id]/match-end.tsx` | `features/match/MatchEndScreen.tsx` |
 | Rules | `app/rules/[variant].tsx` | `features/rules/RulesScreen.tsx` |
 | Settings | `app/settings.tsx` | `features/settings/SettingsScreen.tsx` |
+| History | `app/history.tsx` | `features/history/HistoryScreen.tsx` |
 | Tutorial | `app/tutorial.tsx?from=home\|rules\|settings` | `features/tutorial/TutorialScreen.tsx` |
 | First launch | `app/welcome/language.tsx`, `app/welcome/privacy.tsx` | `features/welcome/` |
 
-Settings sections: Game (auto-confirm, pip counts, board view), Sound and feel, Language, Look (board theme), Accessibility (**Move list**: Automatic, On, Off; Automatic shows it while a screen reader is on, see [Board screen](board-screen.md#accessibility)), Help and Privacy. Every change saves at once.
+Settings sections: Game (auto-confirm, pip counts, board view), Sound and feel, Language, Look (board theme), Accessibility (**Move list**: Automatic, On, Off; Automatic shows it while a screen reader is on, see [Board screen](board-screen.md#accessibility)), Help, History (**Match history**, **Clear history**) and Privacy. Every change saves at once.
 
 - **Welcome gate (#61, #116).** `app/_layout.tsx` wraps the routes in two `Stack.Protected` groups on the consent answer. Until the user answers, every app route redirects to `/welcome/language`, so a deep link or a restored route cannot skip consent. After the answer, the welcome routes redirect to Home. **A new route file must be listed in the app group**; `features/welcome/welcomeFlow.test.tsx` fails until it is.
 - Screens get callbacks (`onNewGame`, `onExit`, …). Only the route files call `router`.
@@ -88,6 +89,20 @@ A one-minute lesson in Portes on the real board, before the first game.
 - **Home** reads the slot each time it shows (`useFocusEffect`). With a save it shows **Continue game**: game, opponent, score, target and time since the save ("12 min ago"). A broken save shows the toast "Your saved game could not be opened." once.
 - **New game** with a save: Start asks "Start a new game? Your saved game will end." (Start new / Cancel).
 
+## History (#142)
+
+The player's past local matches and simple stats, offline.
+
+- **Records** (`features/history/records.ts`). `sessions.ts` adds one record through its `history` dep (`appSessions.ts` wires `historyStore`):
+  - when a match is over (`end: 'finished'`): won to the target, a resigned game that reaches it, or **Resign match** (`resignedBy`). Once per match: a rematch in the same session is a new record. The id is `<session id>@<time>`.
+  - when a new match replaces one that had started (`end: 'abandoned'`, no winner), in memory or only in the save slot after a restart. "Started" (`hasStarted`): a game finished, or someone rolled or moved. A match left before that gets no record.
+- A record holds: `id`, `endedAt`, `mode`, `game`, `botLevel` (vs bot; `null` in pass-and-play), `names` (pass-and-play names as typed), `targetPoints`, the final `score`, `end`, `winner`, `resignedBy`, the number of `games`, `diploWins` per player (games won with 2 points or more, mars) and drawn games (`draws`).
+- **Storage**: `{ v: 1, records }` JSON under the key `history` in the `Storage` port, newest first, at most 200 (`MAX_HISTORY_RECORDS`). It never leaves the phone, so it needs no consent. The save slot of the match in play (`savedMatch`) did not change. Bad JSON or another version reads as an empty history; a bad record is dropped. A storage error, or a history error inside `dispatch`, only logs.
+- **Screen** (`/history`, header shown, in the app group of `_layout.tsx`). With no record: "No matches yet" and **Play** (New game vs bot). Else **Stats**, then **Matches**, newest first. Each row is one element for screen readers: "Portes · vs Bot (Easy), You 3 – 1 Bot · first to 3, Won, Oct 27, 2026". The badge is **Won** / **Lost** vs the bot, "Maria won" in pass-and-play, **Not finished** for a left match. The date uses the phone locale when it speaks the app language (`dateLocale`), else the app language.
+- **Stats** (`features/history/stats.ts`), per game (Portes, Plakoto, Fevga, Tavli, Asodio; only games with a match) and per bot level: played (finished and left), won, win rate (`won / played`, whole percent), diplo (mars) wins and draws. A left match is neither won nor lost ("Not finished"). A drawn game counts on its own, not as a loss. Pass-and-play has no "you", so its line has only played and draws.
+- **Entry points**: a small **History** link on Home under **How to play**, and Settings → History: **Match history ›** and **Clear history**, which asks first (Clear / Cancel). Clear is off while the history is empty.
+- No numbers in fixed boxes and no line limits: `textScaling.test.tsx` checks the screen.
+
 ## Pass-and-play (#35)
 
 - Two optional names (max 16 characters, trimmed). Empty names show "Player 1" / "Player 2" in the app language, so they follow a language switch.
@@ -143,4 +158,5 @@ A one-minute lesson in Portes on the real board, before the first game.
 - `features/match/save.test.ts`: the save format (round trip, ten kinds of bad data dropped; the saved game: Tavli after a restart, an old save without a game, a game the log does not have), when it saves, clearing a finished match, resume after a restart, the Continue texts and the background hook.
 - `features/rules/RulesScreen.test.tsx`: every page shows its sections in order with headers, the start pictures, the Tavli links (not Asodio), the Asodio page, unknown ids, Greek, and that `en` and `el` have the same `rules.*` keys (and the same number of lines), all used by a page.
 - `features/tutorial/lessons.test.ts`: every lesson starts in Portes with its fixed dice, offers only the moves it teaches, and can be finished. `progress.test.ts`: the saved status, bad data, a failing storage, and the four events (none before opt-in, an error dropped). `TutorialScreen.test.tsx`: the whole tutorial with taps only, the lit checker and its target, the hint and shake after a wrong touch, reduce motion, skip from any lesson, Greek.
-- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home → Continue, the replace dialog, the `mode` param, an unknown id, a broken save; match end → Rematch → match end → Change settings, and match end → Home with no Continue card; the rules pages from New game, the in-game menu and the Tavli page; the tutorial from Home, skipped, opened again from Settings and the rules page, and played to the end with taps into New game with Portes vs Easy). It replaces the library's own Reanimated mock with ours.
+- `features/history/history.test.ts`: a record at match end (vs bot, pass-and-play, a resigned game with a diplo, Resign match), once per match and again after a rematch, a left match (in memory and from the save slot; none when nobody played), the save slot unchanged, a history error that does not break the move; the list order, the cap, clear, a failing storage, bad data; the stats math; the row texts, dates and locales. `HistoryScreen.test.tsx`: the empty state, the rows and their labels, the stats rows, Greek, and Settings → History (open, clear with confirm and cancel).
+- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home → Continue, the replace dialog, the `mode` param, an unknown id, a broken save; match end → Rematch → match end → Change settings, and match end → Home with no Continue card; History from Home (empty → Play → a won match) and from Settings (clear); the rules pages from New game, the in-game menu and the Tavli page; the tutorial from Home, skipped, opened again from Settings and the rules page, and played to the end with taps into New game with Portes vs Easy). It replaces the library's own Reanimated mock with ours.
