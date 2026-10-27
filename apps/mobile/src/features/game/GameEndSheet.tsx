@@ -13,7 +13,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { useFocusOnShow } from '@/features/accessibility/focus';
 
-import { Celebration } from './Celebration';
+import { CELEBRATION_HEIGHT, Celebration } from './Celebration';
 import { useAnnouncement } from './useAnnouncement';
 
 export interface GameEndSheetProps {
@@ -60,7 +60,8 @@ export function GameEndSheet({
       <View style={styles.scrim} />
       <View testID={testID} style={styles.sheet} accessibilityViewIsModal>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-          {celebrate ? <Celebration testID="game-celebration" kind="game" /> : null}
+          {/* Room for the celebration, which is drawn over the sheet (below). */}
+          {celebrate ? <View style={styles.celebrationSpace} /> : null}
           <Text ref={titleRef} style={styles.title} accessibilityRole="header">
             {title}
           </Text>
@@ -82,6 +83,12 @@ export function GameEndSheet({
           ) : null}
           <View style={styles.actions}>{children}</View>
         </ScrollView>
+        {/* Outside the scroll view, so nothing clips the confetti: it flies over the board. */}
+        {celebrate ? (
+          <View style={styles.celebration} pointerEvents="none">
+            <Celebration testID="game-celebration" kind="game" />
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -101,7 +108,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     // Never taller than the screen: the content scrolls instead.
     flexShrink: 1,
     maxHeight: '100%',
-    overflow: 'hidden',
     borderTopLeftRadius: theme.radii.xl,
     borderTopRightRadius: theme.radii.xl,
     backgroundColor: theme.colors.surface,
@@ -111,6 +117,15 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   scroll: {
     flexGrow: 0,
+  },
+  celebrationSpace: {
+    height: CELEBRATION_HEIGHT.game,
+  },
+  celebration: {
+    position: 'absolute',
+    top: theme.space.lg,
+    left: 0,
+    right: 0,
   },
   content: {
     alignItems: 'center',

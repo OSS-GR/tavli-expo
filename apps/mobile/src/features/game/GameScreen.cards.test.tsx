@@ -15,7 +15,7 @@ import {
   resolveRules,
   type BoardState,
 } from '@tavli/engine';
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
@@ -170,6 +170,48 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
     await press('pass-ok-button');
     expect(screen.queryByTestId('pass-card')).toBeNull();
     expectBoardShown();
+    // The status notes over the board sit outside the layer a card hides.
+    expect(screen.getByTestId('loading-lock-hint')).toBeOnTheScreen();
+    const layer = within(screen.getByTestId('game-board-layer'));
+    expect(layer.queryByTestId('loading-lock-hint', hidden)).toBeNull();
+  });
+
+  it('two passes in a row: each card takes focus and is read', async () => {
+    const announce = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .mockImplementation(() => {});
+    try {
+      const store = newStore();
+      // Both players are on the bar, and each home board is closed.
+      const home = { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2 };
+      startAt(
+        store,
+        createBoard(
+          { white: { points: home, bar: 3 }, black: { points: home, bar: 3 } },
+          'contrary',
+        ),
+        'portes',
+      );
+      await show(store);
+      focus.mockClear();
+      await act(async () => {
+        store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+      });
+      expect(screen.getByText('Ann rolled 6-6. No checker can move.')).toBeOnTheScreen();
+      expect(focus).toHaveBeenCalledTimes(1);
+      // Bob rolls while the first card still shows (the store, not the screen).
+      await act(async () => {
+        store.getState().dispatch({ type: 'roll', player: 'black', dice: [5, 5] });
+      });
+      expect(screen.getByText('Bob rolled 5-5. No checker can move.')).toBeOnTheScreen();
+      expect(focus).toHaveBeenCalledTimes(2);
+      expect(announce).toHaveBeenLastCalledWith(
+        expect.stringContaining('Bob rolled 5-5. No checker can move.'),
+      );
+      expectBoardHidden();
+    } finally {
+      announce.mockRestore();
+    }
   });
 
   it('the "Army frozen" card (Asodio)', async () => {
@@ -235,6 +277,13 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
     expect(screen.queryByTestId('strip-bottom')).toBeNull();
     expect(screen.queryByTestId('game-board')).toBeNull();
     expect(focus).toHaveBeenCalledTimes(1);
+    // The confetti is not inside the scroll view, so nothing clips it.
+    let node = screen.getByTestId('game-celebration', hidden).parent;
+    while (node && node.props.testID !== 'game-end-card') {
+      expect(node.type).not.toBe('RCTScrollView');
+      node = node.parent;
+    }
+    expect(node).not.toBeNull();
 
     await press('next-game-button');
     expect(screen.queryByTestId('game-end-card')).toBeNull();

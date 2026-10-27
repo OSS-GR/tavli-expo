@@ -562,6 +562,8 @@ export function GameScreen({
     const next = game.state.toMove;
     card = (
       <GameCard
+        // A new pass is a new card: focus moves and it is read again.
+        key={pass.key}
         testID="pass-card"
         title={
           reason === 'body'
@@ -745,33 +747,31 @@ export function GameScreen({
               onIllegalDrop={() => feedback.event('invalidMove')}
               marks={marks}
             />
-            {gateToMove !== null ? (
-              <View style={styles.hintRow} pointerEvents="none">
-                <Text
-                  testID="loading-lock-hint"
-                  style={styles.hint}
-                  accessibilityLiveRegion="polite">
-                  {gateToMove === 'doubleOnly'
-                    ? t('game.asodio.lockedDouble')
-                    : t('game.asodio.locked')}
-                </Text>
-              </View>
-            ) : null}
-            {view.canConfirm && !blocked && !botsTurn ? (
-              <View style={styles.hintRow} pointerEvents="none">
-                <Text testID="confirm-hint" style={styles.hint}>
-                  {t('game.controls.allUsed')}
-                </Text>
-              </View>
-            ) : null}
-            {botNote !== null ? (
-              <View style={styles.hintRow} pointerEvents="none">
-                <Text testID="bot-answer-note" style={styles.hint} accessibilityLiveRegion="polite">
-                  {botNote}
-                </Text>
-              </View>
-            ) : null}
           </View>
+          {/* Status notes stay outside the hidden layer: screen readers still hear them. */}
+          {gateToMove !== null ? (
+            <View style={styles.hintRow} pointerEvents="none">
+              <Text testID="loading-lock-hint" style={styles.hint} accessibilityLiveRegion="polite">
+                {gateToMove === 'doubleOnly'
+                  ? t('game.asodio.lockedDouble')
+                  : t('game.asodio.locked')}
+              </Text>
+            </View>
+          ) : null}
+          {view.canConfirm && !blocked && !botsTurn ? (
+            <View style={styles.hintRow} pointerEvents="none">
+              <Text testID="confirm-hint" style={styles.hint}>
+                {t('game.controls.allUsed')}
+              </Text>
+            </View>
+          ) : null}
+          {botNote !== null ? (
+            <View style={styles.hintRow} pointerEvents="none">
+              <Text testID="bot-answer-note" style={styles.hint} accessibilityLiveRegion="polite">
+                {botNote}
+              </Text>
+            </View>
+          ) : null}
           {card ? (
             // Scrolls when a small phone or a large font makes the card taller than the board.
             <ScrollView
