@@ -10,7 +10,14 @@ import { setupCrashReporting } from '@/features/crash/setup';
 import { INSTALL_ID_STORAGE_KEY } from '@/features/install-id/installId';
 import { createSettingsStore } from '@/features/settings/settings';
 
-import { createConsentStore } from './consent';
+import { CONSENT_STORAGE_KEY, CONSENT_VERSION, createConsentStore, needsWelcome } from './consent';
+
+/** A storage with an answer saved for an older consent text. */
+function oldAnswer(status: 'granted' | 'denied'): Storage {
+  return createMemoryStorage({
+    [CONSENT_STORAGE_KEY]: JSON.stringify({ version: CONSENT_VERSION - 1, status }),
+  });
+}
 
 /** Starts crash reports and analytics on one consent store, like the app does. */
 function startApp(storage: Storage = createMemoryStorage()) {
@@ -79,5 +86,36 @@ describe('the one privacy switch', () => {
     expect(crash.config?.enabled).toBe(false);
     expect(crash.enabled).toBe(false);
     expect(analytics.isOptedIn()).toBe(false);
+  });
+
+  it('new consent text after "Don\'t allow": asks again, and crash reports stay off', () => {
+    const { consent, crash, analytics, storage } = startApp(oldAnswer('denied'));
+
+    expect(needsWelcome(consent.getState().status)).toBe(true);
+    expect(crash.config?.enabled).toBe(false);
+    expect(crash.enabled).toBe(false);
+    expect(crash.user).toBeNull();
+    crash.captureException(new Error('boom'));
+    expect(crash.reports).toEqual([]);
+    expect(analytics.isOptedIn()).toBe(false);
+    expect(analytics.sent).toEqual([]);
+
+    // The new answer counts from now on.
+    consent.getState().setConsent(true);
+    expect(needsWelcome(consent.getState().status)).toBe(false);
+    expect(crash.enabled).toBe(true);
+    expect(crash.user).toBe(storage.getString(INSTALL_ID_STORAGE_KEY));
+    expect(analytics.isOptedIn()).toBe(true);
+  });
+
+  it('new consent text after "Allow": asks again, as before any answer', () => {
+    const { consent, crash, analytics } = startApp(oldAnswer('granted'));
+
+    expect(needsWelcome(consent.getState().status)).toBe(true);
+    // The "not answered yet" row: anonymous crash reports, no usage data.
+    expect(crash.enabled).toBe(true);
+    expect(crash.user).toBeNull();
+    expect(analytics.isOptedIn()).toBe(false);
+    expect(analytics.sent).toEqual([]);
   });
 });

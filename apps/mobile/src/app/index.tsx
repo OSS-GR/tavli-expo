@@ -1,4 +1,4 @@
-import { Redirect, router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,8 +8,6 @@ import { matchSessions } from '@/features/match/appSessions';
 import { gameHref, newGameHref, rulesHref } from '@/features/match/routes';
 import type { SavedMatch } from '@/features/match/savedMatch';
 import { continueSummary } from '@/features/match/summary';
-import { needsWelcome } from '@/features/privacy/consent';
-import { useConsent } from '@/features/privacy/consentStore';
 import { botLevels } from '@/services';
 
 interface SlotState {
@@ -41,11 +39,6 @@ export default function HomeRoute() {
     }, []),
   );
   const { saved } = slot;
-  const consent = useConsent((s) => s.status);
-
-  // First launch: language, then usage data consent (#61). Shown until
-  // answered. After all hooks, so the hook order never changes.
-  if (needsWelcome(consent)) return <Redirect href="/welcome/language" />;
 
   return (
     <HomeScreen

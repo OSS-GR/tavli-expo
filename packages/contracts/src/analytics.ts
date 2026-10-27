@@ -48,7 +48,11 @@ export interface AnalyticsEvents {
     result: GameResultKind;
     /** Turns played in this game. */
     turns: number;
-    durationSec: number;
+    /**
+     * Seconds since `game_started`. Left out when the start is not known:
+     * the game in play of a match resumed from a save.
+     */
+    durationSec?: number;
   };
   game_abandoned: {
     mode: GameMode;

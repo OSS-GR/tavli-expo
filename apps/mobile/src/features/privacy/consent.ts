@@ -7,6 +7,9 @@
  *   welcome flow shows on next launch.
  * - `granted`: usage data and crash reports, both with the install id.
  * - `denied`: nothing at all, not even crash reports.
+ * - `stale-denied`: "Don't allow" to an older consent text
+ *   (`CONSENT_VERSION`). The welcome flow asks again, but until the new
+ *   answer nothing is sent, as for `denied`: an old "no" stays a "no".
  *
  * Saved through the `Storage` port. Kept apart from Settings, so "reset
  * settings" can never turn analytics on or off by accident.
@@ -14,13 +17,19 @@
 import type { Storage } from '@tavli/contracts';
 import { createStore } from 'zustand/vanilla';
 
-export type ConsentStatus = 'unset' | 'granted' | 'denied';
+export type ConsentStatus = 'unset' | 'granted' | 'denied' | 'stale-denied';
 
 /** The privacy policy page (wireframe 02, Settings → Privacy). */
 export const PRIVACY_POLICY_URL = 'https://tavlaki.com/privacy';
 
 /** Storage key. The saved value is `{ version, status }` JSON. */
 export const CONSENT_STORAGE_KEY = 'analyticsConsent';
+/**
+ * The version of the consent text. Raise it when the text changes in a way
+ * the user must agree to again: an answer saved for another version asks
+ * again. An old "Allow" loads as `unset`, an old "Don't allow" as
+ * `stale-denied` (crash reports stay off until the new answer).
+ */
 export const CONSENT_VERSION = 1;
 
 export interface ConsentState {
@@ -29,14 +38,20 @@ export interface ConsentState {
   setConsent: (granted: boolean) => void;
 }
 
+/**
+ * The saved answer. A missing or broken save is `unset`. A save for another
+ * version is `unset`, or `stale-denied` if it was "Don't allow".
+ */
 function load(storage: Storage): ConsentStatus {
   const raw = storage.getString(CONSENT_STORAGE_KEY);
   if (raw === undefined) return 'unset';
   try {
     const saved: unknown = JSON.parse(raw);
-    const status =
-      typeof saved === 'object' && saved !== null ? (saved as { status?: unknown }).status : null;
-    return status === 'granted' || status === 'denied' ? status : 'unset';
+    if (typeof saved !== 'object' || saved === null) return 'unset';
+    const { version, status } = saved as { version?: unknown; status?: unknown };
+    if (status !== 'granted' && status !== 'denied') return 'unset';
+    if (version === CONSENT_VERSION) return status;
+    return status === 'denied' ? 'stale-denied' : 'unset';
   } catch {
     return 'unset';
   }
@@ -67,5 +82,5 @@ export function usageDataAllowed(status: ConsentStatus): boolean {
 
 /** The welcome flow (language, then usage data) shows until the user answers. */
 export function needsWelcome(status: ConsentStatus): boolean {
-  return status === 'unset';
+  return status === 'unset' || status === 'stale-denied';
 }

@@ -30,12 +30,15 @@ describe('crash consent rules', () => {
     expect(crashReportingAllowed('unset')).toBe(true);
     expect(crashReportingAllowed('granted')).toBe(true);
     expect(crashReportingAllowed('denied')).toBe(false);
+    // "Don't allow" to an older consent text stays a "no" until the new answer.
+    expect(crashReportingAllowed('stale-denied')).toBe(false);
   });
 
   it('adds the install id only after "Allow"', () => {
     expect(crashUserAllowed('unset')).toBe(false);
     expect(crashUserAllowed('granted')).toBe(true);
     expect(crashUserAllowed('denied')).toBe(false);
+    expect(crashUserAllowed('stale-denied')).toBe(false);
   });
 });
 
