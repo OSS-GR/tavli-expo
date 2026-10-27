@@ -2,7 +2,8 @@
  * Large system fonts (#134): Home, New game, the game screen and its cards
  * (#153), the game menu and resign dialog, the end screens, History (#142),
  * the tutorial's mother card (#149) and the Settings game picker (#159)
- * follow the font size with no cut text. Cards and sheets scroll when they
+ * follow the font size with no cut text. The game screen, its cards and
+ * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
  * cannot measure text, so `textScalingProblems` checks the layout rules
  * that keep text whole (see `test/textScaling.ts`), in English and in Greek.
@@ -19,7 +20,8 @@ import {
   type BoardState,
   type Match,
 } from '@tavli/engine';
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { HistoryScreen } from '@/features/history/HistoryScreen';
 import type { HistoryRecord } from '@/features/history/records';
@@ -48,6 +50,7 @@ import { renderWithRoot } from '../../../test/render';
 import { textScalingProblems } from '../../../test/textScaling';
 import { layoutTutorialBoard, playLessonByTaps } from '../../../test/tutorialTaps';
 import type { JsonNode } from '../../../test/tree';
+import { LANDSCAPE_SE, resetWindow, setWindow } from '../../../test/window';
 
 const problems = () => textScalingProblems(screen.toJSON() as JsonNode | JsonNode[] | null);
 
@@ -73,7 +76,8 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     });
   });
 
-  it('Tutorial: the Plakoto mother card (#149)', async () => {
+  /** The tutorial up to the Plakoto mother card. */
+  async function tutorialMotherCard() {
     await renderWithRoot(
       <TutorialScreen
         game="plakoto"
@@ -95,7 +99,9 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     }
     expect(screen.getByTestId('tutorial-mother-card')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
-  });
+  }
+
+  it('Tutorial: the Plakoto mother card (#149)', tutorialMotherCard);
 
   it('Settings: the "Learn to play" game picker (#159)', async () => {
     await renderWithRoot(<SettingsScreen onLearnToPlay={jest.fn()} />);
@@ -155,53 +161,58 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     });
   }
 
+  /** The game screen: opening, a turn with the move list, the game-end sheet. */
+  async function gameScreenFlow() {
+    const store = createGameStore({
+      players: { white: 'Maria Papadopoulou', black: 'Bob' },
+      rng: createSeededRng(1),
+    });
+    await showGame(store);
+    // The opening card, with its Roll button (#176).
+    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+
+    // One die rolled ("Maria Papadopoulou rolled 5."), then a tie that stays (#176).
+    await act(async () => {
+      store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+    });
+    expect(screen.getByTestId('opening-message')).toHaveTextContent(/5/);
+    expect(problems()).toEqual([]);
+    await act(async () => {
+      store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 5 });
+    });
+    expect(store.getState().flow.game.opening?.ties).toEqual([5]);
+    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+
+    // The opening result, then a turn: strips, move list, Undo · dice · Confirm.
+    await act(async () => {
+      store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+      store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+    });
+    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('opening-ok-button')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await act(async () => {
+      jest.advanceTimersByTime(OPENING_RESULT_MS);
+    });
+    expect(screen.getByTestId('move-list')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+
+    // The game-end sheet.
+    await act(async () => {
+      store.getState().dispatch({ type: 'resign', player: 'black' });
+    });
+    expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  }
+
   it.each(BOARD_LAYOUT_MODES)(
     'the game screen (%s layout): opening, a turn with the move list, the game-end sheet',
     async (layout) => {
       await pickLayout(layout);
-      const store = createGameStore({
-        players: { white: 'Maria Papadopoulou', black: 'Bob' },
-        rng: createSeededRng(1),
-      });
-      await showGame(store);
-      // The opening card, with its Roll button (#176).
-      expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
-      expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
-      expect(problems()).toEqual([]);
-
-      // One die rolled ("Maria Papadopoulou rolled 5."), then a tie that stays (#176).
-      await act(async () => {
-        store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
-      });
-      expect(screen.getByTestId('opening-message')).toHaveTextContent(/5/);
-      expect(problems()).toEqual([]);
-      await act(async () => {
-        store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 5 });
-      });
-      expect(store.getState().flow.game.opening?.ties).toEqual([5]);
-      expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
-      expect(problems()).toEqual([]);
-
-      // The opening result, then a turn: strips, move list, Undo · dice · Confirm.
-      await act(async () => {
-        store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
-        store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
-      });
-      expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
-      expect(screen.getByTestId('opening-ok-button')).toBeOnTheScreen();
-      expect(problems()).toEqual([]);
-      await act(async () => {
-        jest.advanceTimersByTime(OPENING_RESULT_MS);
-      });
-      expect(screen.getByTestId('move-list')).toBeOnTheScreen();
-      expect(problems()).toEqual([]);
-
-      // The game-end sheet.
-      await act(async () => {
-        store.getState().dispatch({ type: 'resign', player: 'black' });
-      });
-      expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
-      expect(problems()).toEqual([]);
+      await gameScreenFlow();
     },
   );
 
@@ -225,48 +236,53 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     return store;
   }
 
+  /** The game screen cards: no legal moves, the mother question. */
+  async function gameScreenCards() {
+    // Maria is on the bar and Bob holds all six entry points.
+    const closed = createBoard(
+      {
+        white: { points: { 6: 14 }, bar: 1 },
+        black: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
+      },
+      'contrary',
+    );
+    const passing = storeAt(closed, 'portes');
+    passing.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+    await showGame(passing);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+
+    // Maria pins Bob's mother (his last checker, on his own 24).
+    const pinning = storeAt(
+      createBoard(
+        {
+          white: { points: { 24: 10, 14: 2, 8: 2, 2: 1 } },
+          black: { points: { 24: 1, 20: 4, 16: 5, 12: 5 } },
+        },
+        'contrary',
+      ),
+      'plakoto',
+    );
+    const { dispatch } = pinning.getState();
+    dispatch({ type: 'roll', player: 'white', dice: [1, 6] });
+    dispatch({ type: 'move', player: 'white', move: { from: 2, to: 1, die: 1 } });
+    dispatch({ type: 'move', player: 'white', move: { from: 24, to: 18, die: 6 } });
+    dispatch({ type: 'confirm', player: 'white' });
+    await showGame(pinning);
+    expect(screen.getByTestId('mother-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  }
+
   it.each(BOARD_LAYOUT_MODES)(
     'the game screen cards (%s layout): no legal moves, the mother question (#153)',
     async (layout) => {
       await pickLayout(layout);
-      // Maria is on the bar and Bob holds all six entry points.
-      const closed = createBoard(
-        {
-          white: { points: { 6: 14 }, bar: 1 },
-          black: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
-        },
-        'contrary',
-      );
-      const passing = storeAt(closed, 'portes');
-      passing.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
-      await showGame(passing);
-      expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
-      expect(problems()).toEqual([]);
-
-      // Maria pins Bob's mother (his last checker, on his own 24).
-      const pinning = storeAt(
-        createBoard(
-          {
-            white: { points: { 24: 10, 14: 2, 8: 2, 2: 1 } },
-            black: { points: { 24: 1, 20: 4, 16: 5, 12: 5 } },
-          },
-          'contrary',
-        ),
-        'plakoto',
-      );
-      const { dispatch } = pinning.getState();
-      dispatch({ type: 'roll', player: 'white', dice: [1, 6] });
-      dispatch({ type: 'move', player: 'white', move: { from: 2, to: 1, die: 1 } });
-      dispatch({ type: 'move', player: 'white', move: { from: 24, to: 18, die: 6 } });
-      dispatch({ type: 'confirm', player: 'white' });
-      await showGame(pinning);
-      expect(screen.getByTestId('mother-card')).toBeOnTheScreen();
-      expect(problems()).toEqual([]);
+      await gameScreenCards();
     },
   );
 
-  it.each(BOARD_LAYOUT_MODES)('the game menu and the resign dialog (%s layout)', async (layout) => {
-    await pickLayout(layout);
+  /** The game menu, then the resign dialog. */
+  async function gameMenu() {
     const user = setupUser();
     const session = createSessionRegistry({ createRng: () => createSeededRng(1) }).start(
       defaultSetup('local'),
@@ -291,6 +307,46 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     await user.press(screen.getByTestId('menu-resign-match'));
     expect(screen.getByTestId('resign-match-dialog')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
+  }
+
+  it.each(BOARD_LAYOUT_MODES)('the game menu and the resign dialog (%s layout)', async (layout) => {
+    await pickLayout(layout);
+    await gameMenu();
+  });
+
+  // The phone on its side, with a large font (#185): the side columns and
+  // every card and sheet scroll instead of cutting text.
+  describe('in a landscape window (#185)', () => {
+    beforeEach(async () => {
+      await setWindow({ ...LANDSCAPE_SE, fontScale: 2 });
+    });
+    afterEach(async () => {
+      await resetWindow();
+    });
+
+    it('the game screen: opening, a turn with the move list, the game-end sheet', async () => {
+      await gameScreenFlow();
+      expect(screen.getByTestId('game-left', { includeHiddenElements: true })).toBeTruthy();
+    });
+    it('the game screen cards: no legal moves, the mother question', gameScreenCards);
+    it('the game menu and the resign dialog', gameMenu);
+    it('the tutorial: the Plakoto mother card', async () => {
+      await tutorialMotherCard();
+      // The lesson column scrolls as a whole, and Next sits under the dice
+      // as wide as the column, so a long label or a large font has room.
+      const side = screen.getByTestId('tutorial-side');
+      expect(side.type).toBe('RCTScrollView');
+      const controls = within(side).getByTestId('tutorial-controls');
+      expect(StyleSheet.flatten(controls.props.style)).toMatchObject({
+        flexDirection: 'column',
+        alignItems: 'stretch',
+      });
+      expect(within(controls).getByTestId('tutorial-next')).toBeOnTheScreen();
+      expect(StyleSheet.flatten(screen.getByTestId('tutorial-next').props.style).flex).toBe(
+        undefined,
+      );
+      expect(problems()).toEqual([]);
+    });
   });
 
   it('match end', async () => {

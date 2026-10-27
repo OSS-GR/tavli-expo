@@ -12,6 +12,13 @@ import { useConsent } from '@/features/privacy/consentStore';
 import { useLanguageSync } from '@/i18n/useLanguageSync';
 import { crashReporter } from '@/services';
 
+/**
+ * The game board and the tutorial board follow the phone (#185): portrait
+ * or landscape, never upside down on an iPhone. The phone's own rotation
+ * lock still wins.
+ */
+const TURNS_WITH_PHONE = { orientation: 'default' } as const;
+
 function RootStack() {
   const { theme } = useUnistyles();
   useLanguageSync();
@@ -30,6 +37,11 @@ function RootStack() {
       <Stack
         screenOptions={{
           headerShown: false,
+          // Every screen stays upright (#185). Only the game board and the
+          // tutorial board turn with the phone (`TURNS_WITH_PHONE`). The app
+          // config allows every orientation (`orientation: "default"`), so
+          // these screens can turn; react-native-screens applies the lock.
+          orientation: 'portrait_up',
           contentStyle: { backgroundColor: theme.colors.background },
           headerStyle: { backgroundColor: theme.colors.background },
           headerTintColor: theme.colors.text,
@@ -43,9 +55,12 @@ function RootStack() {
           <Stack.Screen name="history" options={{ headerShown: true }} />
           <Stack.Screen name="rules/[variant]" options={{ headerShown: true }} />
           {/* The tutorial board: no swipe back either (Skip is on screen). */}
-          <Stack.Screen name="tutorial" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="tutorial" options={{ gestureEnabled: false, ...TURNS_WITH_PHONE }} />
           {/* No swipe back on the board: it would fight the checker drag. */}
-          <Stack.Screen name="game/[id]/index" options={{ gestureEnabled: false }} />
+          <Stack.Screen
+            name="game/[id]/index"
+            options={{ gestureEnabled: false, ...TURNS_WITH_PHONE }}
+          />
           <Stack.Screen name="game/[id]/match-end" />
           <Stack.Screen name="dev/board" />
         </Stack.Protected>

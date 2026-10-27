@@ -5,6 +5,9 @@
  * cue. Asodio adds a short note after the pips: the checkers still to
  * enter, or "Army frozen". A long name or a large font wraps the line; the
  * strip then grows.
+ *
+ * `stacked` (landscape, #185): a small card for a side column, one part per
+ * line: the color and the score, the turn pill, the name, the pips.
  */
 import type { CheckerStyle } from '@tavli/themes';
 import { displayCaps } from '@tavli/ui';
@@ -35,6 +38,8 @@ export interface PlayerStripProps {
   active: boolean;
   /** The pill text while active. Default: "Your turn". */
   turnLabel?: string;
+  /** One part per line, for the narrow side columns in landscape (#185). */
+  stacked?: boolean;
   testID?: string;
 }
 
@@ -47,6 +52,7 @@ export function PlayerStrip({
   target,
   active,
   turnLabel,
+  stacked = false,
   testID,
 }: PlayerStripProps) {
   const { t } = useTranslation();
@@ -63,6 +69,42 @@ export function PlayerStrip({
   ]
     .filter((part) => part !== null)
     .join(', ');
+  const swatch = (
+    <View
+      style={[styles.swatch, { backgroundColor: checker.fill, borderColor: checker.rim.color }]}
+    />
+  );
+  const scoreText = (
+    <Text style={styles.score}>
+      {score}
+      <Text style={styles.target}>{` /${target}`}</Text>
+    </Text>
+  );
+  const pillView = active ? (
+    <View style={[styles.pill, stacked && styles.pillStacked]}>
+      <Text style={styles.pillText}>{displayCaps(pill)}</Text>
+    </View>
+  ) : null;
+  if (stacked) {
+    return (
+      <View
+        testID={testID}
+        style={styles.stacked(active)}
+        accessible
+        accessibilityLabel={label}
+        accessibilityState={{ selected: active }}>
+        <View style={styles.stackedTop}>
+          {swatch}
+          {scoreText}
+        </View>
+        {pillView}
+        <Text style={styles.name}>{name}</Text>
+        {details.length === 0 ? null : (
+          <Text style={styles.pips}>{details.map(keepTogether).join(`${NBSP}· `)}</Text>
+        )}
+      </View>
+    );
+  }
   return (
     <View
       testID={testID}
@@ -70,9 +112,7 @@ export function PlayerStrip({
       accessible
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}>
-      <View
-        style={[styles.swatch, { backgroundColor: checker.fill, borderColor: checker.rim.color }]}
-      />
+      {swatch}
       <Text style={styles.who}>
         <Text style={styles.name}>{name}</Text>
         {details.length === 0 ? null : (
@@ -82,15 +122,8 @@ export function PlayerStrip({
           </>
         )}
       </Text>
-      {active ? (
-        <View style={styles.pill}>
-          <Text style={styles.pillText}>{displayCaps(pill)}</Text>
-        </View>
-      ) : null}
-      <Text style={styles.score}>
-        {score}
-        <Text style={styles.target}>{` /${target}`}</Text>
-      </Text>
+      {pillView}
+      {scoreText}
     </View>
   );
 }
@@ -109,6 +142,22 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: active ? 3 : 1,
     borderColor: active ? theme.colors.turn : theme.colors.border,
   }),
+  stacked: (active: boolean) => ({
+    gap: theme.space.xxs,
+    minHeight: STRIP_HEIGHT,
+    paddingHorizontal: theme.space.sm,
+    paddingVertical: theme.space.xs,
+    borderRadius: theme.radii.lg,
+    backgroundColor: theme.colors.surface,
+    borderWidth: active ? 3 : 1,
+    borderColor: active ? theme.colors.turn : theme.colors.border,
+  }),
+  stackedTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.space.sm,
+  },
   swatch: {
     width: 20,
     height: 20,
@@ -134,6 +183,10 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.space.xxs,
     borderRadius: theme.radii.pill,
     backgroundColor: theme.colors.turn,
+  },
+  pillStacked: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   pillText: {
     ...theme.type.section,

@@ -202,7 +202,16 @@
       },
       "viewer": "Board view",
       "viewWhite": "White at the bottom",
-      "viewBlack": "Black at the bottom"
+      "viewBlack": "Black at the bottom",
+      "dice": "Dice",
+      "diceOff": "No dice",
+      "diceThrow": "Throw on the board",
+      "throw": {
+        "roll": "Roll",
+        "hint": "Swipe the board to throw the dice.",
+        "result": "Rolled {{first}} and {{second}}.",
+        "boardLabel": "Board. Swipe to throw the dice, or use the Roll button."
+      }
     }
   },
   "game": {

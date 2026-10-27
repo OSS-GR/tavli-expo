@@ -14,14 +14,27 @@
  * for tap-tap. Hit-testing uses the same rects that draw the points
  * (`geometry.ts`). The layout comes from `boardLayout`: the tall or the
  * classic board (`layout`, #184), mirrored with Settings → Home board on
- * the bottom left (#175), so the touches follow it. The gestures and the
+ * the bottom left (#175), so the touches follow it.
+ *
+ * When the phone turns (#185) the space changes (`spaceKey`). Until the
+ * board has measured its new space, it keeps drawing the old layout at the
+ * old size and reports no geometry, so nothing is placed with a new layout
+ * on an old size. The gestures and the
  * animations run on the UI thread; only the result of a touch (select,
  * move, cancel) goes to the JS thread.
  */
 import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentRef,
+} from 'react';
+import { View, type LayoutChangeEvent } from 'react-native';
 import {
   GestureDetector,
   useCompetingGestures,
@@ -34,7 +47,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import type { BoardLayoutMode } from '@/features/settings/settings';
 
-import { BoardCanvas, boardLayout, useBoardSpace, useHomeBoardSide } from './BoardCanvas';
+import { BoardCanvas, boardLayout, useHomeBoardSide, type Size } from './BoardCanvas';
 import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
 import type { MovePath } from './combined';
 import type { Flight } from './flights';
@@ -62,6 +75,12 @@ export interface InteractiveBoardProps {
    * board (the game screen with Settings → Board layout → Classic, #184).
    */
   layout?: BoardLayoutMode;
+  /**
+   * Names the space the board gets: it changes when the phone turns or the
+   * window changes size (#185). After a change the board waits for its new
+   * size before it draws the new layout and calls `onGeometry`.
+   */
+  spaceKey?: string;
   /** The board as it is now (with the moves of this turn). */
   board: BoardState;
   view: BoardView;
@@ -105,7 +124,11 @@ export interface InteractiveBoardProps {
   /** A checker was picked up / dropped where it may not go. */
   onPickUp?: () => void;
   onIllegalDrop?: () => void;
-  /** Called with the board geometry after each layout (the screen needs it for undo flights). */
+  /**
+   * Called with the board geometry after each layout (the screen needs it
+   * for undo flights and the dice). Only with a size measured for the
+   * current `spaceKey`.
+   */
   onGeometry?: (geo: BoardGeometry) => void;
   /** Extra marks: Asodio checkers frozen by the quarter lock. */
   marks?: BoardMarks;
@@ -135,6 +158,7 @@ function highlightsFor(
 export function InteractiveBoard({
   theme,
   layout = 'tall',
+  spaceKey = '',
   board,
   view,
   mover,
@@ -155,15 +179,49 @@ export function InteractiveBoard({
   accessibilityLabel,
   testID,
 }: InteractiveBoardProps) {
-  const [size, onLayout] = useBoardSpace();
+  // The measured space, with the space key and the layout it was measured for.
+  const [measured, setMeasured] = useState<{
+    size: Size;
+    key: string;
+    mode: BoardLayoutMode;
+  } | null>(null);
+  const keep = (width: number, height: number) =>
+    setMeasured((old) =>
+      old &&
+      old.size.width === width &&
+      old.size.height === height &&
+      old.key === spaceKey &&
+      old.mode === layout
+        ? old
+        : { size: { width, height }, key: spaceKey, mode: layout },
+    );
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    keep(width, height);
+  };
+  // A new space may keep its size, and then no layout event comes: measure
+  // it at once (on the phone `measure` answers before the frame is drawn).
+  const spaceRef = useRef<ComponentRef<typeof View>>(null);
+  const measureNow = useEffectEvent(() => {
+    spaceRef.current?.measure((_x, _y, width, height) => {
+      if (width > 0 && height > 0) keep(width, height);
+    });
+  });
+  useLayoutEffect(() => {
+    measureNow();
+  }, [spaceKey]);
+  const fresh = measured !== null && measured.key === spaceKey;
+  // Not measured for this space yet: the old layout at the old size, as drawn before.
+  const drawn = measured === null || fresh ? layout : measured.mode;
+  const size = measured?.size ?? null;
   const homeSide = useHomeBoardSide();
   const geo = useMemo(
-    () => (size ? fitBoardWithShadow(boardLayout(theme, layout, homeSide), size) : null),
-    [size, theme, layout, homeSide],
+    () => (size ? fitBoardWithShadow(boardLayout(theme, drawn, homeSide), size) : null),
+    [size, theme, drawn, homeSide],
   );
   useEffect(() => {
-    if (geo) onGeometry?.(geo);
-  }, [geo, onGeometry]);
+    if (geo && fresh) onGeometry?.(geo);
+  }, [geo, fresh, onGeometry]);
   const picture = geo ? layoutBoard(geo, board, view, marks) : null;
   const combined = onSteps && legal.length > 0 ? (paths ?? []) : [];
   const sources = geo ? buildSources(geo, board, view, mover, legal, combined) : [];
@@ -355,6 +413,7 @@ export function InteractiveBoard({
   return (
     <GestureDetector gesture={gesture}>
       <View
+        ref={spaceRef}
         testID={testID}
         style={styles.space}
         onLayout={onLayout}
