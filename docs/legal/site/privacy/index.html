@@ -71,12 +71,12 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <tr class="odd">
 <td>Not answered yet</td>
 <td>none</td>
-<td>sent, with no install id</td>
+<td>sent, with no id at all (errors in the app's own code only)</td>
 </tr>
 <tr class="even">
 <td><strong>Allow usage data</strong></td>
 <td>sent, with the install id</td>
-<td>sent, with the install id</td>
+<td>sent, with the install id (all crashes, and app sessions)</td>
 </tr>
 <tr class="odd">
 <td><strong>Don't allow</strong></td>
@@ -94,9 +94,11 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>technical facts, such as the phone model, the system and its version, the app version, memory and screen details, and language and time zone;</li>
 <li>a short trail of what happened just before the error, such as the app going to the background and back, network requests, and some system events.</li>
 </ul>
+<p><strong>Before you answer</strong>, the app reports only errors in its own code. It does not report crashes deep in the phone's system layer ("native" crashes) or freezes, and it does not count app sessions. Sentry's system part always adds its own random id to those, so the app keeps that part off until you tap <strong>Allow usage data</strong>. A report before your answer holds no id at all, and fewer technical facts (for example no phone model).</p>
+<p><strong>After you tap Allow usage data</strong>, the app also reports native crashes and freezes. Sentry also counts app sessions (when the app starts and stops, and if it crashed), so we can see how often the app crashes. These carry the install id. Sentry makes its own random id on your phone too. It is not your name or a hardware id. A native crash report may carry it instead of the install id.</p>
 <p>Before a report leaves your phone, the app removes personal data:</p>
 <ul>
-<li>No name, email, username or IP address in the report. The only id is the install id, and only after you tap <strong>Allow usage data</strong>.</li>
+<li>No name, email, username or IP address in the report. Before you answer, there is no id. After you tap <strong>Allow usage data</strong>, the id is the install id (or, in a native crash report, Sentry's random id).</li>
 <li>The name you gave your phone (for example "Maria's iPhone") is removed.</li>
 <li>App log lines are removed, because a log line could hold anything.</li>
 <li>Web addresses lose the part after <code>?</code> or <code>#</code>, because that part can hold ids.</li>
@@ -127,7 +129,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 </tr>
 <tr class="even">
 <td>Game left</td>
-<td>You leave a game before it ends. Includes: the game and the turn number. (Planned, not sent yet.)</td>
+<td>You start a new match while a game is not over. Includes: against the bot or pass-and-play; the game; the turn number</td>
 </tr>
 <tr class="odd">
 <td>Undo used</td>
@@ -144,6 +146,22 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <tr class="even">
 <td>Theme changed</td>
 <td>You picked another board theme. Includes the theme's name</td>
+</tr>
+<tr class="odd">
+<td>Tutorial started</td>
+<td>You opened the tutorial. Includes where you opened it from (home, rules or settings)</td>
+</tr>
+<tr class="even">
+<td>Tutorial step</td>
+<td>You finished a lesson of the tutorial. Includes the lesson's number and name (for example "hit")</td>
+</tr>
+<tr class="odd">
+<td>Tutorial finished</td>
+<td>You finished the last lesson of the tutorial</td>
+</tr>
+<tr class="even">
+<td>Tutorial skipped</td>
+<td>You tapped Skip in the tutorial. Includes the lesson's number and name on screen</td>
 </tr>
 <tr class="odd">
 <td>Screen viewed</td>
@@ -197,7 +215,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <h2 id="why-we-may-use-the-data-legal-basis">Why we may use the data (legal basis)</h2>
 <ul>
 <li><strong>Usage data:</strong> your consent (GDPR Article 6(1)(a)). You can withdraw it at any time in Settings. Withdrawing does not undo what was lawful before.</li>
-<li><strong>Crash reports before you answer:</strong> these hold no install id, and we do not think they identify you. If they still count as personal data, we rely on our legitimate interest in finding and fixing crashes (GDPR Article 6(1)(f)). You can object at any time: tap <strong>Don't allow</strong>, or turn off the switch in Settings.</li>
+<li><strong>Crash reports before you answer:</strong> these hold no id at all, and we do not think they identify you. If they still count as personal data, we rely on our legitimate interest in finding and fixing crashes (GDPR Article 6(1)(f)). You can object at any time: tap <strong>Don't allow</strong>, or turn off the switch in Settings.</li>
 <li><strong>Crash reports after Allow:</strong> your consent, as for usage data.</li>
 </ul>
 <h2 id="your-rights">Your rights</h2>

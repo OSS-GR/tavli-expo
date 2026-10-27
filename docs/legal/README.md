@@ -30,7 +30,7 @@ Any Markdown-to-HTML tool works. With [pandoc](https://pandoc.org):
 pandoc -f gfm -t html --wrap=none docs/legal/privacy.md
 ```
 
-Remove the `<!-- ... -->` comments first. Paste the output between `<main>` and `<footer>` in the HTML page. Keep the `<head>`, the inline CSS and the footer as they are.
+Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<div class="table">…</div>` (it scrolls on small screens). Paste the output between `<main>` and `<footer>` in the HTML page. Keep the `<head>`, the inline CSS and the footer as they are.
 
 ## How to publish
 
