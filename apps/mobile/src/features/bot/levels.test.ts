@@ -34,9 +34,9 @@ describe('supportedBotLevels', () => {
     expect(supportedBotLevels(bot, 'fevga')).toEqual(['easy', 'medium']);
   });
 
-  it('has no level for a game the board cannot play yet', () => {
-    expect(supportedBotLevels(createBot(), 'asodio')).toEqual([]);
-    expect(supportedBotLevels(probedBot(['asodio'], ['easy']), 'asodio')).toEqual([]);
+  it('plays Asodio at Easy (no Asodio evaluator yet, #125)', () => {
+    expect(supportedBotLevels(createBot(), 'asodio')).toEqual(['easy']);
+    expect(supportedBotLevels(probedBot(['asodio'], ['easy']), 'asodio')).toEqual(['easy']);
   });
 
   it('asks the bot for its levels when it can list them (easiest first)', () => {
@@ -63,13 +63,13 @@ describe('supportedBotLevels', () => {
 });
 
 describe('botLevelsByGame', () => {
-  it('opens every built game in the bot package today, Asodio stays locked', () => {
+  it('opens every built game in the bot package today, Asodio at Easy', () => {
     expect(botLevelsByGame(createBot())).toEqual({
       portes: ['easy', 'medium'],
       plakoto: ['easy', 'medium'],
       fevga: ['easy', 'medium'],
       tavli: ['easy', 'medium'],
-      asodio: [],
+      asodio: ['easy'],
     });
   });
 

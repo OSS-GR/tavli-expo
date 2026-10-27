@@ -1,7 +1,8 @@
 /**
  * A player strip above or below the board (wireframe 6): checker color,
  * name, pip count and match score. The player to move gets a thick border
- * and a "Your turn" pill, so color is never the only cue.
+ * and a "Your turn" pill, so color is never the only cue. Asodio adds a
+ * short note under the name: the checkers still to enter, or "Army frozen".
  */
 import type { CheckerStyle } from '@tavli/themes';
 import { displayCaps } from '@tavli/ui';
@@ -15,6 +16,8 @@ export interface PlayerStripProps {
   checker: CheckerStyle;
   /** `null` hides the pip count (Settings → Show pip counts). */
   pips: number | null;
+  /** A short note under the name, e.g. "12 to enter" (Asodio). `null`: none. */
+  note?: string | null;
   score: number;
   target: number;
   active: boolean;
@@ -27,6 +30,7 @@ export function PlayerStrip({
   name,
   checker,
   pips,
+  note = null,
   score,
   target,
   active,
@@ -38,6 +42,7 @@ export function PlayerStrip({
   const label = [
     name,
     pips === null ? null : t('game.strip.pipsLabel', { count: pips }),
+    note,
     t('game.strip.scoreLabel', { score, target }),
     active ? pill : null,
   ]
@@ -57,8 +62,12 @@ export function PlayerStrip({
         <Text style={styles.name} numberOfLines={1}>
           {name}
         </Text>
-        {pips === null ? null : (
-          <Text style={styles.pips}>{t('game.strip.pips', { count: pips })}</Text>
+        {pips === null && note === null ? null : (
+          <Text style={styles.pips} numberOfLines={1}>
+            {[pips === null ? null : t('game.strip.pips', { count: pips }), note]
+              .filter((part) => part !== null)
+              .join(' · ')}
+          </Text>
         )}
       </View>
       {active ? (

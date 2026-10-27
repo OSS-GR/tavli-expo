@@ -2,11 +2,12 @@
  * Fixed positions for the dev board screen, tests and screenshots.
  * Each side is written in that player's own numbering (24 = start).
  *
- * Portes and Plakoto number Black's points the other way round from
+ * Portes, Plakoto and Asodio number Black's points the other way round from
  * White's (`contrary`); Fevga numbers them the same way round (`parallel`).
  * `SAMPLE_DIRECTIONS` says which one each position uses.
  */
 import {
+  ASODIO_START,
   FEVGA_START,
   PLAKOTO_START,
   createBoard,
@@ -15,7 +16,15 @@ import {
 } from '@tavli/engine';
 
 export type SamplePositionId =
-  'start' | 'midgame' | 'bearoff' | 'plakotoStart' | 'plakotoPins' | 'fevgaStart';
+  | 'start'
+  | 'midgame'
+  | 'bearoff'
+  | 'plakotoStart'
+  | 'plakotoPins'
+  | 'fevgaStart'
+  | 'asodioStart'
+  | 'asodioLoading'
+  | 'asodioFrozen';
 
 export const SAMPLE_POSITION_IDS: readonly SamplePositionId[] = [
   'start',
@@ -24,6 +33,9 @@ export const SAMPLE_POSITION_IDS: readonly SamplePositionId[] = [
   'plakotoStart',
   'plakotoPins',
   'fevgaStart',
+  'asodioStart',
+  'asodioLoading',
+  'asodioFrozen',
 ];
 
 export const SAMPLE_DIRECTIONS: Readonly<Record<SamplePositionId, Direction>> = {
@@ -33,6 +45,9 @@ export const SAMPLE_DIRECTIONS: Readonly<Record<SamplePositionId, Direction>> = 
   plakotoStart: 'contrary',
   plakotoPins: 'contrary',
   fevgaStart: 'parallel',
+  asodioStart: 'contrary',
+  asodioLoading: 'contrary',
+  asodioFrozen: 'contrary',
 };
 
 export const SAMPLE_POSITIONS: Readonly<Record<SamplePositionId, BoardState>> = {
@@ -74,4 +89,24 @@ export const SAMPLE_POSITIONS: Readonly<Record<SamplePositionId, BoardState>> = 
   // The Fevga start: 15 on own 24, in diagonally opposite corners
   // (White 24 = Black 12).
   fevgaStart: createBoard({ white: FEVGA_START, black: FEVGA_START }, 'parallel'),
+  // The Asodio start: the board is empty, all 15 of each player wait to enter.
+  asodioStart: createBoard({ white: ASODIO_START, black: ASODIO_START }, 'contrary'),
+  // White is loading: 7 entered on spots 1-3 (own 24-22), 8 still to enter.
+  asodioLoading: createBoard(
+    {
+      white: { points: { 24: 2, 23: 1, 22: 4 }, outside: 8 },
+      black: { outside: 15 },
+    },
+    'contrary',
+  ),
+  // A6: Black pins White's lagging checker on White 20 (Black 5). White's
+  // other 14 are in the next quarter, so they are frozen: White passes.
+  // Black's checker on own 5 is in front of Black's rear quarter: frozen too.
+  asodioFrozen: createBoard(
+    {
+      white: { points: { 20: 1, 18: 5, 16: 5, 14: 4 }, pinned: [20] },
+      black: { points: { 12: 4, 10: 5, 8: 5, 5: 1 } },
+    },
+    'contrary',
+  ),
 };

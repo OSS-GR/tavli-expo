@@ -1,10 +1,14 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { getLayout, getTheme } from '@tavli/themes';
 
+import { getPreset } from '@tavli/engine';
+
+import { asodioMarks } from './asodio';
 import { layoutBoard, type BoardView } from './boardModel';
 import { fitBoard } from './geometry';
+import { rgba } from './paint';
 import { SAMPLE_DIRECTIONS, SAMPLE_POSITIONS } from './positions';
-import { BoardScene, PIN_RING_WIDTH } from './skia/BoardScene';
+import { BoardScene, FROZEN_MARK, PIN_RING_WIDTH } from './skia/BoardScene';
 import { StaticBoard } from './StaticBoard';
 import { THEME_IMAGES } from './themeImages';
 import { layoutImageKeys } from './useBoardAssets';
@@ -96,6 +100,37 @@ describe('<BoardScene />', () => {
     await render(<BoardScene theme={theme} geo={geo} images={{}} picture={picture} font={font} />);
     expect(find((n) => n.type === 'Text' && n.props.text === '15')).toHaveLength(2);
     expect(picture.badges.map((b) => b.key).sort()).toEqual(['p12', 'p24']);
+  });
+
+  it('draws the Asodio "to enter" stacks with their counts', async () => {
+    const picture = layoutBoard(geo, SAMPLE_POSITIONS.asodioStart, WHITE);
+    await render(<BoardScene theme={theme} geo={geo} images={{}} picture={picture} font={font} />);
+    expect(find((n) => n.type === 'Text' && n.props.text === '15')).toHaveLength(2);
+    expect(picture.badges.map((b) => b.key).sort()).toEqual(['bar:opponent', 'bar:player']);
+  });
+
+  it('shades the checkers the Asodio quarter lock freezes, and only those', async () => {
+    const board = SAMPLE_POSITIONS.asodioFrozen;
+    const marks = asodioMarks(board, getPreset('asodio.kafeneio'), WHITE);
+    const picture = layoutBoard(geo, board, WHITE, marks);
+    await render(<BoardScene theme={theme} geo={geo} images={{}} picture={picture} font={font} />);
+    const shade = rgba(FROZEN_MARK.shade.color, FROZEN_MARK.shade.opacity);
+    const ring = rgba(FROZEN_MARK.ring.color, FROZEN_MARK.ring.opacity);
+    const frozen = picture.checkers.filter((c) => c.frozen).length;
+    expect(frozen).toBeGreaterThan(0);
+    expect(find((n) => n.type === 'Circle' && n.props.color === shade)).toHaveLength(frozen);
+    expect(find((n) => n.type === 'Circle' && n.props.color === ring)).toHaveLength(frozen);
+    // Without marks nothing is shaded.
+    await render(
+      <BoardScene
+        theme={theme}
+        geo={geo}
+        images={{}}
+        picture={layoutBoard(geo, board, WHITE)}
+        font={font}
+      />,
+    );
+    expect(find((n) => n.type === 'Circle' && n.props.color === shade)).toHaveLength(0);
   });
 
   it('adds the wood texture and the image layers once images load', async () => {

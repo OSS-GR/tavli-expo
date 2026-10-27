@@ -7,6 +7,7 @@
  * page never describes a flag the default preset leaves off. Pure: no React.
  */
 import {
+  ASODIO_START,
   DEFAULT_PRESET_BY_GAME,
   FEVGA_START,
   PLAKOTO_START,
@@ -28,9 +29,12 @@ export const RULES_VARIANTS = ['portes', 'plakoto', 'fevga', 'asodio', 'tavli'] 
 export type RulesVariant = (typeof RULES_VARIANTS)[number];
 
 /** The games with a full rules page. */
-export const RULES_GAMES = ['portes', 'plakoto', 'fevga'] as const;
+export const RULES_GAMES = ['portes', 'plakoto', 'fevga', 'asodio'] as const;
 
 export type RulesGame = (typeof RULES_GAMES)[number];
+
+/** The games of a Tavli match, linked from the Tavli page. Asodio is not one of them. */
+export const TAVLI_GAMES = ['portes', 'plakoto', 'fevga'] as const satisfies readonly RulesGame[];
 
 export function isRulesGame(value: unknown): value is RulesGame {
   return (RULES_GAMES as readonly unknown[]).includes(value);
@@ -127,6 +131,28 @@ export const RULES_PAGES: { readonly [G in RulesGame]: readonly RulesSection[] }
     bearOff(),
     scoring,
   ],
+  // The owner version, `asodio.kafeneio` (A1–A6): load all 15 first, quarter
+  // lock, pins, no extra rolls, a draw when no one can move.
+  asodio: [
+    goal('rules.asodio.goal'),
+    start('rules.asodio.start'),
+    dice,
+    { id: 'moves', title: 'rules.asodio.moves.title', body: ['rules.asodio.moves.body'] },
+    {
+      id: 'entering',
+      title: 'rules.asodio.entering.title',
+      body: ['rules.asodio.entering.body'],
+    },
+    {
+      id: 'quarters',
+      title: 'rules.asodio.quarters.title',
+      body: ['rules.asodio.quarters.body'],
+    },
+    { id: 'pinning', title: 'rules.asodio.pinning.title', body: ['rules.asodio.pinning.body'] },
+    bearOff('rules.asodio.bearOff'),
+    scoring,
+    { id: 'draw', title: 'rules.asodio.draw.title', body: ['rules.asodio.draw.body'] },
+  ],
 };
 
 /** The Tavli page: the match rotation, with links to the three games. */
@@ -140,6 +166,7 @@ const START_LAYOUTS: { readonly [G in RulesGame]: SideLayout } = {
   portes: PORTES_START,
   plakoto: PLAKOTO_START,
   fevga: FEVGA_START,
+  asodio: ASODIO_START,
 };
 
 /** How the game's default preset moves (Fevga: parallel). */
@@ -147,7 +174,7 @@ export function rulesDirection(game: RulesGame): Direction {
   return getPreset(DEFAULT_PRESET_BY_GAME[game]).movement.direction;
 }
 
-/** The start position of a game, for the picture. */
+/** The start position of a game, for the picture. Asodio: an empty board, 15 to enter each. */
 export function startBoard(game: RulesGame): BoardState {
   const layout = START_LAYOUTS[game];
   return createBoard({ white: layout, black: layout }, rulesDirection(game));

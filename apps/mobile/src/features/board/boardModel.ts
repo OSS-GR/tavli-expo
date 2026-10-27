@@ -11,10 +11,13 @@
  * Black the dark style, whoever sits at the bottom.
  *
  * Every game draws the same way. The direction of the game (`contrary` for
- * Portes and Plakoto, `parallel` for Fevga) only changes where each
- * player's points are. Plakoto adds pinned checkers: a pinned checker lies
- * under the stack that pins it and peeks out (`PIN_PEEK`). Plakoto and Fevga
- * never use the bar.
+ * Portes, Plakoto and Asodio, `parallel` for Fevga) only changes where each
+ * player's points are. Plakoto and Asodio add pinned checkers: a pinned
+ * checker lies under the stack that pins it and peeks out (`PIN_PEEK`).
+ * Plakoto and Fevga never use the bar. Asodio (owner version) has no hits:
+ * its checkers that are not entered yet wait on the player's half of the
+ * bar, the "to enter" stack, right next to the starting quarter, with a
+ * count badge. Checkers frozen by the quarter lock are marked (`frozen`).
  *
  * Pure TypeScript: no React, no Skia.
  */
@@ -70,8 +73,8 @@ export function absoluteOfLayout(index: number, view: BoardView): number {
 
 /** The slot of a move origin. Point numbers are the mover's own numbers. */
 export function slotOfOrigin(origin: Origin, mover: PlayerId, view: BoardView): Slot {
-  // 'outside' is Asodio only (not built yet): it waits on the bar, for now.
-  // Of the built games only Portes has a bar; Plakoto and Fevga never use it.
+  // 'outside' is Asodio only: the "to enter" stack on the player's bar half.
+  // Only Portes hits; the owner's Asodio pins, so its bar holds only these.
   if (origin === 'bar' || origin === 'outside') return { kind: 'bar', side: sideOf(mover, view) };
   const absolute = ownToAbsolute(origin, mover, view.direction);
   return { kind: 'point', index: layoutIndexOf(absolute, view) };
@@ -92,8 +95,10 @@ export function slotOfDestination(
 export interface StackModel {
   readonly slot: Slot;
   readonly owners: readonly PlayerId[];
-  /** Plakoto: the owner of the pinned checker under the stack, or `null`. */
+  /** Plakoto, Asodio: the owner of the pinned checker under the stack, or `null`. */
   readonly pinned: PlayerId | null;
+  /** Asodio: a bar half that holds checkers not entered yet (the "to enter" stack). */
+  readonly toEnter: boolean;
 }
 
 /** Every non-empty point and bar half of a board, in this view. */
@@ -110,11 +115,21 @@ export function boardStacks(board: BoardState, view: BoardView): StackModel[] {
     const pinned = point.pinned;
     if (pinned !== null) {
       const pinner = other(pinned);
-      stacks.push({ slot, owners: Array<PlayerId>(point[pinner]).fill(pinner), pinned });
+      stacks.push({
+        slot,
+        owners: Array<PlayerId>(point[pinner]).fill(pinner),
+        pinned,
+        toEnter: false,
+      });
       continue;
     }
     const owner: PlayerId = point.white > 0 ? 'white' : 'black';
-    stacks.push({ slot, owners: Array<PlayerId>(total).fill(owner), pinned: null });
+    stacks.push({
+      slot,
+      owners: Array<PlayerId>(total).fill(owner),
+      pinned: null,
+      toEnter: false,
+    });
   }
   for (const player of ['white', 'black'] as const) {
     const count = board.bar[player] + board.outside[player];
@@ -123,6 +138,7 @@ export function boardStacks(board: BoardState, view: BoardView): StackModel[] {
         slot: { kind: 'bar', side: sideOf(player, view) },
         owners: Array<PlayerId>(count).fill(player),
         pinned: null,
+        toEnter: board.outside[player] > 0,
       });
     }
   }
@@ -188,6 +204,8 @@ export interface PlacedChecker {
   readonly x: number;
   readonly y: number;
   readonly r: number;
+  /** Asodio: frozen by the quarter lock. Drawn a little dimmer. */
+  readonly frozen?: true;
 }
 
 /** A count badge on the last visible checker of a tall stack. */
@@ -231,8 +249,41 @@ export interface BoardPicture {
   readonly trays: readonly PlacedTray[];
 }
 
-/** Places every checker of `board` on the drawn board. */
-export function layoutBoard(geo: BoardGeometry, board: BoardState, view: BoardView): BoardPicture {
+/** Extra marks on the picture. */
+export interface BoardMarks {
+  /** Asodio: slots (`slotKey`) whose checkers the quarter lock freezes. */
+  readonly frozen?: ReadonlySet<string>;
+}
+
+/**
+ * The layout slot keys of the points with frozen checkers (Asodio quarter
+ * lock), for both players. `frozen` lists each player's own point numbers
+ * (from `frozenPoints` in `asodio.ts`).
+ */
+export function frozenSlotKeys(
+  frozen: { readonly [P in PlayerId]: readonly number[] },
+  view: BoardView,
+): Set<string> {
+  const keys = new Set<string>();
+  for (const player of ['white', 'black'] as const) {
+    for (const point of frozen[player]) {
+      const slot = slotOfOrigin(point, player, view);
+      keys.add(slotKey(slot));
+    }
+  }
+  return keys;
+}
+
+/**
+ * Places every checker of `board` on the drawn board. A "to enter" stack
+ * (Asodio) always shows its count badge, even when every checker is drawn.
+ */
+export function layoutBoard(
+  geo: BoardGeometry,
+  board: BoardState,
+  view: BoardView,
+  marks: BoardMarks = {},
+): BoardPicture {
   const pins: PlacedPin[] = [];
   const checkers: PlacedChecker[] = [];
   const badges: PlacedBadge[] = [];
@@ -249,13 +300,22 @@ export function layoutBoard(geo: BoardGeometry, board: BoardState, view: BoardVi
       const c = pinnedCenter(geo, stack.slot);
       pins.push({ key: `${key}:pinned`, owner: pinned, pinner: other(pinned), ...c, r: radius });
     }
+    const frozen = marks.frozen?.has(key) === true;
     centers.forEach((c, n) => {
       const owner = stack.owners[n] ?? stack.owners[0] ?? 'white';
-      checkers.push({ key: `${key}:${n}`, owner, x: c.x, y: c.y, r: radius });
+      checkers.push({
+        key: `${key}:${n}`,
+        owner,
+        x: c.x,
+        y: c.y,
+        r: radius,
+        ...(frozen ? { frozen: true as const } : {}),
+      });
     });
     const last = centers[centers.length - 1];
-    if (badge !== null && last !== undefined) {
-      badges.push({ key, x: last.x, y: last.y, r: radius, count: badge });
+    const shown = stack.toEnter ? stack.owners.length : badge;
+    if (shown !== null && last !== undefined) {
+      badges.push({ key, x: last.x, y: last.y, r: radius, count: shown });
     }
   }
   const trays: PlacedTray[] = [];

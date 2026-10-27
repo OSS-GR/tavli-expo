@@ -7,16 +7,18 @@ import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { BoardCanvas, portraitLayout, useBoardSpace, useBoardTheme } from './BoardCanvas';
-import { layoutBoard, type BoardView } from './boardModel';
+import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
 import { fitBoardWithShadow } from './geometry';
 
 export interface StaticBoardProps {
   board: BoardState;
   view: BoardView;
+  /** Extra marks: Asodio checkers frozen by the quarter lock. */
+  marks?: BoardMarks;
   testID?: string;
 }
 
-export function StaticBoard({ board, view, testID }: StaticBoardProps) {
+export function StaticBoard({ board, view, marks, testID }: StaticBoardProps) {
   const theme = useBoardTheme();
   const [size, onLayout] = useBoardSpace();
   const geo = size ? fitBoardWithShadow(portraitLayout(theme), size) : null;
@@ -27,7 +29,7 @@ export function StaticBoard({ board, view, testID }: StaticBoardProps) {
           theme={theme}
           geo={geo}
           size={size}
-          picture={layoutBoard(geo, board, view)}
+          picture={layoutBoard(geo, board, view, marks)}
           testID={testID ? `${testID}-canvas` : undefined}
         />
       ) : null}
