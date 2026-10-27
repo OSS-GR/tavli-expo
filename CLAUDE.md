@@ -36,6 +36,7 @@
 - Analytics calls from the game store go through `quietly()`: an analytics error must never fail or undo a move.
 - `@tavli/contracts/testing` holds port contract checks. The analytics checks are plain functions, so Vitest and Jest can both run them.
 - App tests that need navigation use `renderRouter` from `expo-router/testing-library`. Render it once per test: a second `renderRouter` in the same test leaves the next test with an empty tree.
+- In Asodio a turn can keep the same player to move (extra rolls, the chosen double after a 1-2 in the Acey-Deucey presets). Code that drives turns (bot scoring, `simulate`, the app) must follow `state.toMove`, play `state.dice` when the state already holds dice, and never assume the players alternate.
 - Workspace packages export TypeScript source (`"main": "./src/index.ts"`). There is no build step. Metro and Vitest read the source.
 - `apps/server` holds the Convex functions (`convex/`). Its tests use `convex-test` in Vitest's `edge-runtime` environment and need no Convex account. `convex/_generated/` is committed. After you add or rename a file in `convex/`, run `pnpm --filter @tavli/server codegen` (works offline, see `docs/architecture/online-game-service.md`). Files with two dots (`*.test.ts`, `test.setup.ts`) are not deployed. Lint blocks `Math.random` and React there; dice use `createCryptoRng`.
 - pnpm build scripts: `esbuild` (from `convex`) is listed as `false` in `pnpm-workspace.yaml` `allowBuilds`. A new dependency with a build script fails `pnpm install` until you list it there.

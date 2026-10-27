@@ -5,7 +5,8 @@
  *   pnpm --filter @tavli/bot simulate -- --games 1000 --a easy --b easy
  */
 
-import { VARIANT_REGISTRY, getVariant } from '@tavli/engine';
+import { VARIANT_REGISTRY, getPreset, getVariant } from '@tavli/engine';
+import type { RuleSet } from '@tavli/engine';
 
 import { createBot } from './create-bot';
 import { simulate } from './simulate';
@@ -19,6 +20,8 @@ export interface SimulateArgs {
   readonly b: BotLevel;
   readonly seed: number;
   readonly variant: string;
+  /** A rules preset id, for example `asodio.aceyDeuceyGreek`. Default: the variant's default preset. */
+  readonly preset?: string;
 }
 
 export const DEFAULT_SIMULATE_ARGS: SimulateArgs = {
@@ -36,6 +39,7 @@ export const SIMULATE_USAGE = [
   '  --b LEVEL       player B (Black): random | easy | medium | hard (default easy)',
   '  --seed N        master seed (default 1)',
   '  --variant ID    variant id (default portes)',
+  '  --preset ID     rules preset, e.g. asodio.aceyDeuceyGreek (default: the variant default)',
 ].join('\n');
 
 function parseInteger(flag: string, text: string | undefined, min: number): number {
@@ -78,6 +82,10 @@ export function parseSimulateArgs(argv: readonly string[]): SimulateArgs {
         if (value === undefined) throw new Error('--variant needs a variant id');
         args = { ...args, variant: value };
         break;
+      case '--preset':
+        if (value === undefined) throw new Error('--preset needs a preset id');
+        args = { ...args, preset: value };
+        break;
       default:
         throw new Error(`unknown option ${flag ?? ''}`);
     }
@@ -100,7 +108,7 @@ export function formatSimulationReport(
     `${name} (${level}): ${result.wins[i]} wins (${percent(result.wins[i], completed)}), ` +
     `mono ${result.mono[i]}, diplo ${result.diplo[i]}, points ${result.points[i]}`;
   return [
-    `${args.variant}: ${result.games} games, seed ${args.seed}`,
+    `${args.variant}${args.preset === undefined ? '' : ` (${args.preset})`}: ${result.games} games, seed ${args.seed}`,
     side('A, White', args.a, 0),
     side('B, Black', args.b, 1),
     `draws: ${result.draws}`,
@@ -120,13 +128,19 @@ export interface CliIo {
 /** Runs the command. Returns the exit code: 0 ok, 1 failed games, 2 bad input. */
 export function runSimulateCli(argv: readonly string[], io: CliIo): number {
   let args: SimulateArgs;
+  let rules: RuleSet | undefined;
   try {
     if (argv.includes('--help') || argv.includes('-h')) {
       io.log(SIMULATE_USAGE);
       return 0;
     }
     args = parseSimulateArgs(argv);
-    getVariant(VARIANT_REGISTRY, args.variant);
+    const variant = getVariant(VARIANT_REGISTRY, args.variant);
+    if (args.preset !== undefined) {
+      rules = getPreset(args.preset);
+      // Throws when the variant cannot play the preset.
+      variant.initialState({ startingPlayer: 'white', rules });
+    }
   } catch (error) {
     io.error(`${error instanceof Error ? error.message : String(error)}\n\n${SIMULATE_USAGE}`);
     return 2;
@@ -135,6 +149,7 @@ export function runSimulateCli(argv: readonly string[], io: CliIo): number {
   const start = io.now();
   const result = simulate({
     variant: getVariant(VARIANT_REGISTRY, args.variant),
+    ...(rules === undefined ? {} : { rules }),
     bots: [
       { bot, difficulty: args.a },
       { bot, difficulty: args.b },

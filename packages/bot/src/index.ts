@@ -63,6 +63,14 @@ export {
   plakotoHeuristic,
 } from './evaluators/plakoto-heuristic';
 export type { PlakotoWeights } from './evaluators/plakoto-heuristic';
+export {
+  ASODIO_DEFAULT_WEIGHTS,
+  ASODIO_HEURISTIC_ID,
+  asodioHeuristic,
+  createAsodioHeuristic,
+  evaluateAsodioSides,
+} from './evaluators/asodio-heuristic';
+export type { AsodioWeights } from './evaluators/asodio-heuristic';
 export { InlineBotRunner, runBotAnswer, runBotRequest } from './inline-runner';
 export { FORCED_DELAY_MS, THINKING_DELAY_MS, thinkingDelayMs } from './thinking-delay';
 export type { DelayRange } from './thinking-delay';
