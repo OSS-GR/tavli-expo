@@ -4,7 +4,7 @@
  * they skip the whole screen under it. Focus moves to the card's title.
  * Each card comes and goes with direct store actions and presses (no full
  * games), so these tests stay fast. They run on fake timers: on a real
- * clock a busy machine can close a card (the opening result after 1.5 s,
+ * clock a busy machine can close a card (the opening result after 3 s,
  * a pass after 3 s) before the test looks at it (#152).
  */
 import {
@@ -114,7 +114,7 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
     await show(store);
     expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
     expectBoardHidden();
-    // Focus goes to the card; the Roll button below the board stays reachable.
+    // Focus goes to the card; its Roll button stays reachable (#176).
     expect(focus).toHaveBeenCalledTimes(1);
     expect(focus).toHaveBeenCalledWith(expect.anything(), 'focus');
     expect(screen.getByTestId('roll-button')).toBeOnTheScreen();

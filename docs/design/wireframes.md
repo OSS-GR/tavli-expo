@@ -94,7 +94,7 @@ flowchart TD
   FlipQ -->|no| Roll
   Flip --> Roll[Tap Roll or the board]
   Roll --> Legal{Any legal move?}
-  Legal -->|no| NoMove[Notice: no legal moves<br/>turn passes after 3 s]
+  Legal -->|no| NoMove[Notice: no legal moves<br/>turn passes on OK]
   Legal -->|yes| Move[Drag or tap-tap a checker<br/>Undo at any time]
   Move --> Used{All dice used<br/>or no move left?}
   Used -->|no| Move
@@ -238,8 +238,8 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 - Card over the dimmed starting position: "Who starts?", two empty dice for **You** and **Bot**.
 - One tap on **Roll to start** (or on the board) rolls one die for each player.
-- *Tie:* "Tie! Roll again." The card stays.
-- *Result:* "You rolled 5, Bot rolled 3. You start with 5-3." After about 1.5 s the card closes. The starter plays those two dice (`useOpeningDice`, so the first roll is never a double).
+- *Tie:* "Tie: both rolled 4. Roll again." Both dice stay on the card until the next roll (#176).
+- *Result:* "You start with 5-3." The card closes on OK, on a tap, or after 3 s (#176). The starter plays those two dice (`useOpeningDice`, so the first roll is never a double).
 
 ### 6b. Your turn: roll
 
@@ -285,8 +285,8 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 - The dice still show (faded) and are recorded (`tavli-match.md`, edge case 13).
 - A card explains why in plain words: "You rolled 6-6. Your checker on the bar cannot enter: point 19 is blocked. Your turn passes."
-- **OK** closes it. It also closes by itself after 3 s.
-- When the bot cannot move: "Bot cannot move. Your turn." It closes after 2 s.
+- **OK** closes it. Your own pass waits for OK, so there is time to read why (#178). The image still shows the old "Closes by itself after 3 s." line.
+- When the bot cannot move: "Bot cannot move. Your turn." It closes by itself after 3.5 s; OK closes it sooner.
 
 ### Board: other states
 

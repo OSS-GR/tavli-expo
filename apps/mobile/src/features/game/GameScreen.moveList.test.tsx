@@ -25,7 +25,7 @@ import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';
 
 import { createGameStore, turnView, type GameStore } from './gameStore';
-import { GameScreen, type GameScreenProps } from './GameScreen';
+import { GameScreen, OPENING_RESULT_MS, type GameScreenProps } from './GameScreen';
 import { openingStatus } from './opening';
 import type { Seat } from './seats';
 import { passNotice } from './turnNotices';
@@ -86,9 +86,9 @@ async function playWithButtons(store: GameStore) {
     } else if (passNotice(flow) && shows('pass-card')) await pressButton('OK');
     else if (view.phase === 'opening-roll') await pressButton(/: roll, or tap the board$/);
     else if (openingStatus(view.game) && shows('opening-card')) {
-      // The result closes by itself (1.5 s); a screen reader user waits.
+      // The result closes by itself (3 s); a screen reader user waits.
       await waitFor(() => expect(screen.queryByTestId('opening-card')).toBeNull(), {
-        timeout: 3000,
+        timeout: OPENING_RESULT_MS + 1000,
       });
     } else if (view.phase === 'awaiting-roll') await pressButton('Roll dice, or tap the board');
     else if (view.phase === 'awaiting-confirm') await pressButton('Confirm');
@@ -171,7 +171,9 @@ describe('<GameScreen /> move list', () => {
       return { remove: jest.fn() };
     }) as never);
     await show(store);
-    await waitFor(() => expect(screen.queryByTestId('opening-card')).toBeNull(), { timeout: 3000 });
+    await waitFor(() => expect(screen.queryByTestId('opening-card')).toBeNull(), {
+      timeout: OPENING_RESULT_MS + 1000,
+    });
     expect(screen.queryByTestId('move-list')).toBeNull();
     // VoiceOver or TalkBack turns on: the list shows.
     await act(async () => {
