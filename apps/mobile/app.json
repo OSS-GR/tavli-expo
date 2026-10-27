@@ -7,7 +7,7 @@
       "policy": "fingerprint"
     },
     "platforms": ["ios", "android"],
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon/icon.png",
     "backgroundColor": "#3B2A1D",
     "scheme": "tavlaki",

@@ -4,9 +4,14 @@
  *
  * It is a `Modal`, so screen readers stay in it. The content scrolls when a
  * large font makes it taller than the screen (#153).
+ *
+ * Landscape (#185): a sheet over the game screen passes `turns`, so the
+ * Modal may stay sideways with the game (on iOS a Modal turns the screen
+ * back to portrait if it does not list landscape). On a wide screen the
+ * sheet keeps a readable width (`MAX_SHEET_WIDTH`) in the middle.
  */
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View, type ModalProps } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 export interface SheetProps {
@@ -16,6 +21,8 @@ export interface SheetProps {
   closeLabel: string;
   /** `dialog`: a card with side margins (13). `sheet`: full width (7). */
   look?: 'sheet' | 'dialog';
+  /** The screen under it turns with the phone (the game screen): the sheet turns too. */
+  turns?: boolean;
   children: ReactNode;
   testID?: string;
 }
@@ -25,12 +32,18 @@ export function Sheet({
   onClose,
   closeLabel,
   look = 'sheet',
+  turns = false,
   children,
   testID,
 }: SheetProps) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.root}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      supportedOrientations={turns ? TURNS : UPRIGHT}>
+      <View style={styles.root(look)}>
         <Pressable
           style={styles.scrim}
           onPress={onClose}
@@ -47,11 +60,20 @@ export function Sheet({
   );
 }
 
+/** iOS only: the orientations the Modal allows. Android follows the screen under it. */
+const UPRIGHT: ModalProps['supportedOrientations'] = ['portrait'];
+const TURNS: ModalProps['supportedOrientations'] = ['portrait', 'landscape'];
+
+/** The widest a sheet gets (a phone on its side is about 950 pt wide). */
+export const MAX_SHEET_WIDTH = 560;
+
 const styles = StyleSheet.create((theme, rt) => ({
-  root: {
+  root: (look: 'sheet' | 'dialog') => ({
     flex: 1,
     justifyContent: 'flex-end',
-  },
+    alignItems: 'center',
+    paddingHorizontal: look === 'dialog' ? theme.space.lg : 0,
+  }),
   scrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: theme.colors.backgroundDeep,
@@ -61,9 +83,10 @@ const styles = StyleSheet.create((theme, rt) => ({
     // Never taller than the screen: the content scrolls instead.
     flexShrink: 1,
     maxHeight: '100%',
+    width: '100%',
+    maxWidth: MAX_SHEET_WIDTH,
     overflow: 'hidden',
     marginTop: rt.insets.top,
-    marginHorizontal: look === 'dialog' ? theme.space.lg : 0,
     marginBottom: look === 'dialog' ? rt.insets.bottom + theme.space.lg : 0,
     borderTopLeftRadius: theme.radii.xl,
     borderTopRightRadius: theme.radii.xl,
