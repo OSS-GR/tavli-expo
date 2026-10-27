@@ -5,6 +5,7 @@
  *
  * Jest replaces this module with in-memory fakes (`jest.setup.ts`).
  */
+import { createExpoSoundPlayer } from '@tavli/audio-expo';
 import { InlineBotRunner, createBot } from '@tavli/bot';
 import {
   createNoopCrashReporter,
@@ -12,6 +13,7 @@ import {
   type CrashReporter,
   type Difficulty,
   type Feedback,
+  type SoundPlayer,
   type Storage,
 } from '@tavli/contracts';
 import { createSentryCrashReporter } from '@tavli/crash-sentry';
@@ -35,6 +37,9 @@ export const crashReporter: CrashReporter =
 
 /** Haptics. Use `appFeedback` (features/feedback), which follows the Haptics setting. */
 export const feedback: Feedback = createExpoFeedback();
+
+/** Sound effects. Use `appSound` (features/feedback), which follows the Sound setting. */
+export const sound: SoundPlayer = createExpoSoundPlayer();
 
 /** A fresh 32-bit seed: from `crypto` when the runtime has it, else from the clock. */
 function randomSeed(): number {

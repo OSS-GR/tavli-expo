@@ -1,11 +1,27 @@
 /**
- * Image file names and scale picking.
+ * Asset file names: image scales and sound takes.
  *
- * File names follow the React Native convention, so Metro can pick the
+ * Image file names follow the React Native convention, so Metro can pick the
  * right scale by itself: `board.webp` (@1x), `board@2x.webp`, `board@3x.webp`.
  */
 
-import type { ImageAsset, Scale } from './types';
+import type { ImageAsset, Scale, SoundKey, ThemeManifest } from './types';
+
+/** The takes of one sound, as a list. Empty when the theme has no sound for `key`. */
+export function soundFiles(theme: Pick<ThemeManifest, 'sounds'>, key: SoundKey): string[] {
+  const v = theme.sounds[key];
+  if (v === null || v === undefined) return [];
+  return typeof v === 'string' ? [v] : [...v];
+}
+
+/** Every sound file of a theme, once each, in manifest order. */
+export function allSoundFiles(theme: Pick<ThemeManifest, 'sounds'>): string[] {
+  const out = new Set<string>();
+  for (const key of Object.keys(theme.sounds) as SoundKey[]) {
+    for (const f of soundFiles(theme, key)) out.add(f);
+  }
+  return [...out];
+}
 
 /** The file name of one scale of an image, relative to the theme folder. */
 export function imageFileName(asset: ImageAsset, scale: Scale): string {
