@@ -209,11 +209,12 @@ function parseRecord(raw: unknown): HistoryRecord | null {
   const number = raw['matchNumber'];
   const matchNumber = number === undefined || number === null ? null : number;
   if (matchNumber !== null && (!isCount(matchNumber) || matchNumber < 1)) return null;
-  // Records before #170 have no time-out. Only the loser of a finished match can have one.
+  // Records before #170 have no time-out. Only the loser of a finished match can have one,
+  // and a match ends one way: on time or by a resign, never both.
   const lostOnTime = raw['timedOutBy'] ?? null;
   if (
     lostOnTime !== null &&
-    (!isPlayer(lostOnTime) || end !== 'finished' || lostOnTime === winner)
+    (!isPlayer(lostOnTime) || end !== 'finished' || lostOnTime === winner || resignedBy !== null)
   ) {
     return null;
   }

@@ -701,6 +701,7 @@ describe('history list', () => {
       { ...rec(), timedOutBy: 'red' },
       { ...rec(), timedOutBy: 'white' },
       { ...rec(), end: 'abandoned', winner: null, timedOutBy: 'black' },
+      { ...rec({ winner: 'black' }), resignedBy: 'white', timedOutBy: 'white' },
       // Times that make no valid date: they would crash the date text.
       { ...rec(), endedAt: 1e20 },
       { ...rec(), endedAt: -1 },
