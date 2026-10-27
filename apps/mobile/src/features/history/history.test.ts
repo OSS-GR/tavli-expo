@@ -1,8 +1,24 @@
 import { createMemoryStorage, type Storage } from '@tavli/contracts';
-import { VARIANT_REGISTRY, createSeededRng, getVariant, type Dice } from '@tavli/engine';
+import {
+  VARIANT_REGISTRY,
+  createSeededRng,
+  gameRules,
+  getVariant,
+  type Dice,
+  type GameEndReason,
+  type GameRecord,
+  type PlayerId,
+} from '@tavli/engine';
 
 import { createSessionRegistry, hasStarted, type MatchSession } from '@/features/match/sessions';
-import { defaultSetup, gameLevels, type MatchSetup } from '@/features/match/setup';
+import {
+  GAME_CHOICES,
+  MATCH_LENGTHS,
+  defaultSetup,
+  gameLevels,
+  gameRotation,
+  type MatchSetup,
+} from '@/features/match/setup';
 import i18n from '@/i18n';
 
 import { dateLocale, formatDate, historyRow, statParts } from './format';
@@ -12,7 +28,10 @@ import {
   HISTORY_VERSION,
   MAX_HISTORY_RECORDS,
   addRecord,
+  historyRecord,
+  isDiplo,
   parseHistory,
+  hasMatchRecord,
   serializeHistory,
   type HistoryRecord,
 } from './records';
@@ -39,12 +58,17 @@ function rec(over: Partial<HistoryRecord> = {}): HistoryRecord {
     games: 3,
     diploWins: { white: 1, black: 0 },
     draws: 0,
+    matchNumber: 1,
     ...over,
   };
 }
 
-function registry(storage: Storage = createMemoryStorage(), clock = { now: 1_000 }) {
-  const history = createHistoryStore(createMemoryStorage());
+function registry(
+  storage: Storage = createMemoryStorage(),
+  clock = { now: 1_000 },
+  historyStorage: Storage = createMemoryStorage(),
+) {
+  const history = createHistoryStore(historyStorage);
   let seed = 1;
   const sessions = createSessionRegistry({
     createRng: () => createSeededRng(seed++),
@@ -54,6 +78,24 @@ function registry(storage: Storage = createMemoryStorage(), clock = { now: 1_000
     history: history.getState(),
   });
   return { sessions, history, clock, storage };
+}
+
+/** A storage whose writes and removes can be made to fail. */
+function flakyStorage() {
+  const memory = createMemoryStorage();
+  const failing = { writes: false, removes: false };
+  const storage: Storage = {
+    getString: (key) => memory.getString(key),
+    setString: (key, value) => {
+      if (failing.writes) throw new Error('write');
+      memory.setString(key, value);
+    },
+    remove: (key) => {
+      if (failing.removes) throw new Error('remove');
+      memory.remove(key);
+    },
+  };
+  return { storage, failing };
 }
 
 /** Rolls the opening (White wins it) so White is to move. */
@@ -96,6 +138,7 @@ describe('a record is saved when a match ends', () => {
         games: 0,
         diploWins: { white: 0, black: 0 },
         draws: 0,
+        matchNumber: 1,
       },
     ]);
   });
@@ -154,14 +197,25 @@ describe('a record is saved when a match ends', () => {
     const records = history.getState().records;
     expect(records.map((r) => r.winner)).toEqual(['white', 'black']);
     expect(records[0]!.id).not.toBe(records[1]!.id);
+    // The rematch is the second match of the session.
+    expect(records.map((r) => r.matchNumber)).toEqual([2, 1]);
   });
 
-  it('does not change the save slot format of a match in play', () => {
+  it('adds only the match number to the save slot of a match in play', () => {
     const { sessions, storage } = registry();
     const s = sessions.start(oneGameBot);
     openGame(s);
     const saved = JSON.parse(storage.getString('savedMatch')!) as Record<string, unknown>;
-    expect(Object.keys(saved).sort()).toEqual(['flowSchema', 'id', 'log', 'savedAt', 'setup', 'v']);
+    expect(Object.keys(saved).sort()).toEqual([
+      'flowSchema',
+      'id',
+      'log',
+      'matchNumber',
+      'savedAt',
+      'setup',
+      'v',
+    ]);
+    expect(saved['matchNumber']).toBe(1);
     expect(storage.getString(HISTORY_STORAGE_KEY)).toBeUndefined();
   });
 
@@ -172,6 +226,7 @@ describe('a record is saved when a match ends', () => {
         add: () => {
           throw new Error('disk full');
         },
+        hasMatch: () => false,
       },
     });
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -240,6 +295,257 @@ describe('a left match', () => {
     s.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
     sessions.start(defaultSetup('bot'));
     expect(history.getState().records.map((r) => r.end)).toEqual(['finished']);
+  });
+});
+
+describe('rare cases (#150)', () => {
+  let warn: jest.SpyInstance;
+  beforeEach(() => {
+    warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+  afterEach(() => warn.mockRestore());
+
+  it('records a left match once, even when its save could not be removed', () => {
+    const { storage, failing } = flakyStorage();
+    const historyStorage = createMemoryStorage();
+    const clock = { now: 1_000 };
+    const first = registry(storage, clock, historyStorage);
+    const old = first.sessions.start(defaultSetup('bot'));
+    openGame(old);
+    playTurn(old);
+
+    // A new match replaces it, but the slot can be neither cleared nor written.
+    failing.writes = true;
+    failing.removes = true;
+    clock.now = 2_000;
+    const next = first.sessions.start(defaultSetup('local'));
+    expect(storage.getString('savedMatch')).toContain(old.id);
+    // The old save is stale now: it is not offered again.
+    expect(first.sessions.peek()).toEqual({ kind: 'none' });
+    first.sessions.end(next.id);
+    clock.now = 3_000;
+    first.sessions.start(defaultSetup('local'));
+
+    // After a restart, the storage works again.
+    failing.writes = false;
+    failing.removes = false;
+    clock.now = 4_000;
+    const second = registry(storage, clock, historyStorage);
+    expect(second.sessions.peek()).toEqual({ kind: 'none' });
+    // `peek` only reads; `start` deletes the stale save.
+    expect(storage.getString('savedMatch')).toContain(old.id);
+    second.sessions.start(defaultSetup('bot'));
+    expect(second.history.getState().records.map((r) => r.id)).toEqual([`${old.id}@2000`]);
+    expect(storage.getString('savedMatch')).not.toContain(old.id);
+  });
+
+  it('does not record a match as left when it finished just before the app died', () => {
+    const { storage, failing } = flakyStorage();
+    const historyStorage = createMemoryStorage();
+    const clock = { now: 1_000 };
+    const first = registry(storage, clock, historyStorage);
+    const s = first.sessions.start(oneGameBot);
+    openGame(s);
+    playTurn(s);
+    // The match ends and is recorded; the app dies before the slot is cleared.
+    failing.removes = true;
+    clock.now = 2_000;
+    s.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
+    expect(storage.getString('savedMatch')).toContain(s.id);
+
+    failing.removes = false;
+    clock.now = 3_000;
+    const second = registry(storage, clock, historyStorage);
+    expect(second.sessions.peek()).toEqual({ kind: 'none' });
+    expect(second.sessions.get(s.id)).toBeNull();
+    // Lookups do not delete it; `end` (the player is done with it) does.
+    expect(storage.getString('savedMatch')).toContain(s.id);
+    second.sessions.end(s.id);
+    expect(storage.getString('savedMatch')).toBeUndefined();
+    second.sessions.start(defaultSetup('local'));
+    expect(second.history.getState().records.map((r) => [r.id, r.end])).toEqual([
+      [`${s.id}@2000`, 'finished'],
+    ]);
+  });
+
+  it('keeps a live rematch save when the clock moved back after the match ended', () => {
+    const storage = createMemoryStorage();
+    const historyStorage = createMemoryStorage();
+    const clock = { now: 5_000 };
+    const first = registry(storage, clock, historyStorage);
+    const s = first.sessions.start(oneGameBot);
+    openGame(s);
+    s.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
+    // The phone clock is set back before the rematch is saved.
+    clock.now = 1_000;
+    s.store.getState().rematch();
+    const player = s.store.getState().flow.game.state.toMove;
+    s.store.getState().dispatch({ type: 'roll', player, dice: [6, 1] });
+    playTurn(s);
+    const live = storage.getString('savedMatch');
+
+    // After a restart the rematch is still there to continue.
+    const second = registry(storage, clock, historyStorage);
+    expect(second.sessions.peek()).toMatchObject({
+      kind: 'ok',
+      saved: { id: s.id, savedAt: 1_000, matchNumber: 2 },
+    });
+    expect(second.sessions.get(s.id)).not.toBeNull();
+    expect(storage.getString('savedMatch')).toBe(live);
+  });
+
+  it('reads a save from before #150 (no match number) as a live match', () => {
+    const storage = createMemoryStorage();
+    const historyStorage = createMemoryStorage();
+    const first = registry(storage, { now: 1_000 }, historyStorage);
+    const s = first.sessions.start(defaultSetup('bot'));
+    openGame(s);
+    playTurn(s);
+    const old = JSON.parse(storage.getString('savedMatch')!) as Record<string, unknown>;
+    delete old['matchNumber'];
+    storage.setString('savedMatch', JSON.stringify(old));
+
+    const second = registry(storage, { now: 2_000 }, historyStorage);
+    expect(second.sessions.peek()).toMatchObject({ kind: 'ok', saved: { matchNumber: null } });
+    second.sessions.start(defaultSetup('local'));
+    expect(second.history.getState().records).toEqual([
+      expect.objectContaining({ id: `${s.id}@2000`, end: 'abandoned', matchNumber: null }),
+    ]);
+  });
+
+  it('still records a rematch that was left, after the app restarts', () => {
+    const storage = createMemoryStorage();
+    const historyStorage = createMemoryStorage();
+    const clock = { now: 1_000 };
+    const first = registry(storage, clock, historyStorage);
+    const s = first.sessions.start(oneGameBot);
+    openGame(s);
+    clock.now = 2_000;
+    s.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
+    // The rematch keeps the session id; it is saved after the record.
+    clock.now = 3_000;
+    s.store.getState().rematch();
+    // The winner starts the rematch: no opening roll.
+    const player = s.store.getState().flow.game.state.toMove;
+    expect(s.store.getState().dispatch({ type: 'roll', player, dice: [6, 1] })).toBe(true);
+    playTurn(s);
+
+    const second = registry(storage, clock, historyStorage);
+    expect(second.sessions.peek()).toMatchObject({ kind: 'ok', saved: { id: s.id } });
+    clock.now = 4_000;
+    second.sessions.start(defaultSetup('local'));
+    expect(second.history.getState().records.map((r) => [r.id, r.end])).toEqual([
+      [`${s.id}@4000`, 'abandoned'],
+      [`${s.id}@2000`, 'finished'],
+    ]);
+  });
+
+  it('records the match in memory as left when get(id) loads a saved one', () => {
+    const { storage, failing } = flakyStorage();
+    const history = createHistoryStore(createMemoryStorage());
+    const gameAbandoned = jest.fn();
+    let seed = 1;
+    const sessions = createSessionRegistry({
+      createRng: () => createSeededRng(seed++),
+      storage,
+      levels: LEVELS,
+      now: () => 1_000,
+      history: history.getState(),
+      createAnalytics: () => ({
+        gameStarted: () => undefined,
+        actionApplied: () => undefined,
+        gameAbandoned,
+      }),
+    });
+    // Not started yet (opening roll only), so replacing it records nothing.
+    const saved = sessions.start(defaultSetup('bot'));
+    openGame(saved);
+    failing.writes = true;
+    failing.removes = true;
+    const live = sessions.start(defaultSetup('local'));
+    openGame(live);
+    playTurn(live);
+    expect(history.getState().records).toEqual([]);
+    gameAbandoned.mockClear();
+
+    // The slot still holds the first match; loading it drops the live one.
+    expect(sessions.get(saved.id)?.id).toBe(saved.id);
+    expect(sessions.current()?.id).toBe(saved.id);
+    expect(gameAbandoned).toHaveBeenCalledWith(live.store.getState().flow);
+    expect(history.getState().records).toEqual([
+      expect.objectContaining({ id: `${live.id}@1000`, end: 'abandoned', mode: 'local' }),
+    ]);
+  });
+
+  it('finds a match of a session by its number, not by a time', () => {
+    const records = [
+      rec({ id: 'local-a@5', endedAt: 5, matchNumber: 1 }),
+      rec({ id: 'local-ab@9', endedAt: 9, matchNumber: 2 }),
+      rec({ id: 'local-c@1', endedAt: 1, matchNumber: null }),
+    ];
+    expect(hasMatchRecord(records, 'local-a', 1)).toBe(true);
+    expect(hasMatchRecord(records, 'local-a', 2)).toBe(false);
+    // `local-ab` is another session.
+    expect(hasMatchRecord(records, 'local-ab', 2)).toBe(true);
+    expect(hasMatchRecord(records, 'local-a', 2)).toBe(false);
+    // A record from before #150 names no match.
+    expect(hasMatchRecord(records, 'local-c', 1)).toBe(false);
+  });
+});
+
+describe('diplo wins', () => {
+  const game = (winner: PlayerId | null, points: number, reason: GameEndReason): GameRecord => ({
+    variant: 'portes',
+    starter: 'white',
+    winner,
+    points,
+    reason,
+  });
+
+  it('counts won games worth 2 points or more, as the rules score them', () => {
+    const { sessions } = registry();
+    const { match } = sessions.start(defaultSetup('bot')).store.getState().flow;
+    const games = [
+      game('white', 1, 'borneOff'), // mono: Black bore off a checker
+      game('white', 2, 'borneOff'), // diplo: Black bore off none
+      game('black', 2, 'motherPinned'), // Plakoto: a pinned mother is a double
+      game('black', 2, 'resigned'), // a resign scores the position: here a double
+      game('white', 1, 'resigned'), // ... and here a single
+      game('white', 2, 'timeout'), // a timeout scores like a resign
+      game('white', 3, 'borneOff'), // `backgammonScores3` (off by default): still a double
+      game(null, 0, 'bothMothersPinned'), // a draw
+    ];
+    const record = historyRecord(
+      'local-x',
+      defaultSetup('bot'),
+      { ...match, games },
+      1,
+      'finished',
+      1,
+    );
+    expect(record.diploWins).toEqual({ white: 3, black: 2 });
+    expect(record.draws).toBe(1);
+    expect(games.map(isDiplo)).toEqual([false, true, true, true, false, true, true, false]);
+  });
+
+  it('holds because every game of the app uses Tavli scoring: single 1, double 2', () => {
+    // `perChecker` scoring (an Acey-Deucey preset the app does not offer)
+    // would give 2+ points for a single win. Then `isDiplo` must change.
+    const { sessions } = registry();
+    for (const choice of GAME_CHOICES) {
+      const { match } = sessions
+        .start({ ...defaultSetup('bot'), game: choice })
+        .store.getState().flow;
+      for (const variant of gameRotation(choice)) {
+        const { method, backgammonScores3 } = gameRules(match, variant).scoring;
+        expect({ choice, variant, method, backgammonScores3 }).toEqual({
+          choice,
+          variant,
+          method: 'tavli',
+          backgammonScores3: false,
+        });
+      }
+    }
   });
 });
 
@@ -354,6 +660,10 @@ describe('history list', () => {
       { ...rec(), diploWins: null },
       { ...rec(), games: 1.5 },
       { ...rec(), targetPoints: 0 },
+      { ...rec(), targetPoints: 1.5 },
+      { ...rec(), targetPoints: '3' },
+      { ...rec(), matchNumber: 0 },
+      { ...rec(), matchNumber: '1' },
       // Times that make no valid date: they would crash the date text.
       { ...rec(), endedAt: 1e20 },
       { ...rec(), endedAt: -1 },
@@ -363,6 +673,19 @@ describe('history list', () => {
     const text = JSON.stringify({ v: HISTORY_VERSION, records: [...bad, good] });
     expect(parseHistory(text)).toEqual([good]);
     expect(parseHistory(serializeHistory([good]))).toEqual([good]);
+  });
+
+  it('keeps any positive match length, so an old record is never dropped for it', () => {
+    const records = [...MATCH_LENGTHS, 2, 9, 15].map((targetPoints) =>
+      rec({ id: `m${targetPoints}`, targetPoints }),
+    );
+    expect(parseHistory(serializeHistory(records))).toEqual(records);
+  });
+
+  it('reads a record from before #150 (no match number)', () => {
+    const { matchNumber: _, ...old } = rec();
+    const text = JSON.stringify({ v: HISTORY_VERSION, records: [old] });
+    expect(parseHistory(text)).toEqual([rec({ matchNumber: null })]);
   });
 
   it('keeps one record per id, the first (newest)', () => {
@@ -454,6 +777,10 @@ describe('stats', () => {
     expect(winRate({ ...EMPTY_LINE, played: 1, lost: 1 })).toBe(0);
   });
 
+  it('gives the same stats in any record order', () => {
+    expect(historyStats([...records].reverse())).toEqual(historyStats(records));
+  });
+
   it('has no stats with no records', () => {
     expect(historyStats([])).toEqual([]);
   });
@@ -486,6 +813,16 @@ describe('history texts', () => {
     });
   });
 
+  it('shows a match length the new-game screen does not offer as it is', () => {
+    expect(
+      historyRow(rec({ targetPoints: 9, score: { white: 9, black: 4 } }), t, 'en'),
+    ).toMatchObject({
+      title: 'Portes · vs Bot (Easy)',
+      score: 'You 9 – 4 Bot · first to 9',
+      result: 'Won',
+    });
+  });
+
   it('formats the date in the locale', () => {
     const ms = Date.UTC(2026, 9, 27, 12);
     expect(formatDate(ms, 'en-US')).toBe('Oct 27, 2026');
@@ -497,6 +834,18 @@ describe('history texts', () => {
     expect(historyRow(rec({ endedAt: 1e20 }), t, 'en').label).toBe(
       'Portes · vs Bot (Easy), You 3 – 1 Bot · first to 3, Won',
     );
+  });
+
+  it('makes one date formatter per locale', () => {
+    const make = jest.spyOn(Intl, 'DateTimeFormat');
+    const ms = Date.UTC(2026, 9, 27, 12);
+    expect(formatDate(ms, 'en-AU')).toBe('27 Oct 2026');
+    expect(formatDate(ms + 86_400_000, 'en-AU')).toBe('28 Oct 2026');
+    // A locale that fails is tried once too.
+    expect(formatDate(ms, 'also not a locale!')).toBe('2026-10-27');
+    expect(formatDate(ms, 'also not a locale!')).toBe('2026-10-27');
+    expect(make).toHaveBeenCalledTimes(2);
+    make.mockRestore();
   });
 
   it('uses the phone locale when it speaks the app language', () => {

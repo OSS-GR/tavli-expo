@@ -178,6 +178,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       games: 6,
       diploWins: { white: 1, black: 1 },
       draws: 1,
+      matchNumber: 1,
     };
     const bot: HistoryRecord = { ...record, id: 'b', mode: 'bot', botLevel: 'medium' };
     await renderWithRoot(<HistoryScreen records={[record, bot]} onPlay={jest.fn()} />);
