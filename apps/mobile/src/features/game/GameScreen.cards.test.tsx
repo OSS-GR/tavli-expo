@@ -28,6 +28,7 @@ import { settingsStore } from '@/features/settings/store';
 import { createGameStore, type GameStore } from './gameStore';
 import { GameScreen, OPENING_RESULT_MS } from './GameScreen';
 
+import { runOnFakeTimers } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 
 const SIZE = { width: 375, height: 520 };
@@ -94,8 +95,9 @@ function expectBoardShown() {
 
 let focus: jest.SpyInstance;
 
+runOnFakeTimers();
+
 beforeEach(async () => {
-  jest.useFakeTimers();
   focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent').mockImplementation(() => {});
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS, moveList: 'on' });
@@ -104,7 +106,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   focus.mockRestore();
-  jest.useRealTimers();
 });
 
 describe('<GameScreen /> cards hide the board from screen readers (#153)', () => {
