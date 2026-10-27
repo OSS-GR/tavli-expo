@@ -10,6 +10,10 @@
  * The flow log has the dice of every roll. The dice were rolled when the
  * last roll of this game has the dice the state holds now. A chosen double
  * follows a 1-2, so its last roll is that 1-2.
+ *
+ * `diceWereChosen` asks the other way round, for dice the state may no
+ * longer hold: a chosen double that no checker can play passes at once
+ * (#205), so the pass card has the dice and the state has none.
  */
 import type { Dice, FlowEvent, MatchFlow } from '@tavli/engine';
 
@@ -25,6 +29,23 @@ export function diceWereRolled(flow: MatchFlow): boolean {
   for (let i = flow.log.length - 1; i >= 0; i--) {
     const event = flow.log[i]!;
     if (event.type === 'roll') return event.dice !== undefined && sameDice(event.dice, dice);
+    if (GAME_START.has(event.type)) return false;
+  }
+  return false;
+}
+
+/**
+ * Were these dice a double chosen after a 1-2 (Acey-Deucey, #205)? True
+ * when the last event that gave dice is the answer that chose this value.
+ * A roll or an opening roll after it gave new dice. Works while the dice
+ * are in play and for a pass, whose dice the state no longer holds.
+ */
+export function diceWereChosen(flow: MatchFlow, dice: Dice): boolean {
+  if (dice[0] !== dice[1]) return false;
+  for (let i = flow.log.length - 1; i >= 0; i--) {
+    const event = flow.log[i]!;
+    if (event.type === 'answer') return event.choice === String(dice[0]);
+    if (event.type === 'roll' || event.type === 'rollOpening') return false;
     if (GAME_START.has(event.type)) return false;
   }
   return false;
