@@ -114,6 +114,8 @@ export function createGameAnalytics(
         variant: flow.game.state.variant,
         matchLength: flow.match.targetPoints,
         ...(mode === 'bot' && botLevel !== undefined ? { botLevel } : {}),
+        // The house rule (#207), from the match rules: a value id only.
+        openingRoll: flow.match.rules.match.openingRoll,
       }),
     );
   };

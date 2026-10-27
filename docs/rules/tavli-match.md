@@ -77,6 +77,7 @@ Sources disagree on what happens next, so the engine needs a flag:
 
 **Default:** `useOpeningDice` (federation rule). Confirmed by the owner on
 2026-10-26. The other values stay available as options in Kafeneio mode (#58).
+The app offers all three on New game → House rules → Opening roll (#207).
 
 ### Who starts later games
 

@@ -41,7 +41,7 @@ Every property value is a number, or a short id from a fixed set (the lists belo
 | Event | When it fires | Properties | Sent from |
 |-------|---------------|------------|-----------|
 | `app_opened` | Once per cold start, after consent. On the first launch it fires right after **Allow**. | none | `features/analytics/connect.ts` (`appOpened`, root layout) |
-| `game_started` | A game begins: a new match, the next game of a match, or a rematch. Not sent when a saved match is resumed (it started before). | `mode`: `bot` \| `local` (`online` is kept for MVP2; nothing sends it yet); `game`: the game picked for the match, `portes` \| `plakoto` \| `fevga` \| `tavli` (Portes, Plakoto and Fevga in turn) \| `asodio`; `variant`: the game in play, engine id `portes` \| `plakoto` \| `fevga` \| `asodio`; `matchLength`: points to win (1, 3, 5, 7); `botLevel`: `easy` \| `medium` \| `hard` (only for `bot`) | game store (`createGameStore({ analytics })`), set for every match in `features/match/appSessions.ts` |
+| `game_started` | A game begins: a new match, the next game of a match, or a rematch. Not sent when a saved match is resumed (it started before). | `mode`: `bot` \| `local` (`online` is kept for MVP2; nothing sends it yet); `game`: the game picked for the match, `portes` \| `plakoto` \| `fevga` \| `tavli` (Portes, Plakoto and Fevga in turn) \| `asodio`; `variant`: the game in play, engine id `portes` \| `plakoto` \| `fevga` \| `asodio`; `matchLength`: points to win (1, 3, 5, 7); `botLevel`: `easy` \| `medium` \| `hard` (only for `bot`); `openingRoll`: the opening roll house rule of the match (#207), `useOpeningDice` (the federation rule, default) \| `rerollBoth` \| `chosenStarterRolls` | game store (`createGameStore({ analytics })`), set for every match in `features/match/appSessions.ts` |
 | `game_finished` | A game ends: last checker borne off, mother pinned, a resign, a draw, a time-out (an online turn timer ran out), or the match is resigned mid-game. | `mode`; `game`; `variant`; `result`: `mono` \| `diplo` \| `resign` \| `draw` \| `timeout`; `turns`: turns played; `durationSec`: seconds since `game_started` (left out for the game in play of a resumed match: its start time is not saved) | game store |
 | `game_abandoned` | The player starts a new match while a game is not over (in memory or saved). | `mode`; `game`; `variant`; `turn`: turn number when they left | `features/match/sessions.ts` (`start`) |
 | `undo_used` | The engine accepted an undo. | none | game store |
@@ -57,6 +57,7 @@ Every property value is a number, or a short id from a fixed set (the lists belo
 Notes:
 
 - `game` and `variant`: for a one-game match they are the same. In a Tavli match `game` is `tavli` and `variant` is the game in play, so it changes from game to game. Use `game` to count Tavli matches, and `variant` to see how each of the four games plays. (`game` was added in #163: before it, a Tavli match looked like a Portes match.)
+- `openingRoll` (#207) is a value id from the fixed list, read from the match rules (`flow.match.rules.match.openingRoll`), so a rematch and the next game of a match send the same value. Games started before #207 have no `openingRoll`: they all used `useOpeningDice`.
 - `game_started` counts **games**, not matches. A 5-point match sends one `game_started` per game, and the first game of a match looks the same as the next one.
 - `result`: `mono` is 1 point, `diplo` is 2 or more (a "backgammon" counts as diplo, `docs/rules/portes.md`). `draw` was added to the plan for Plakoto "both mothers pinned" and Asodio deadlock. `timeout` (#170) is a game lost because an online turn timer ran out, whatever its points; it sends no `resign` event. Nothing sends it until online play is wired to the app. The events do not say who won.
 - `turns` counts finished turns. A resign in the middle of turn 5 gives `turns: 4`.
@@ -72,7 +73,7 @@ Notes:
 
 | Question | Events, and what they tell |
 |----------|----------------------------|
-| **Mode use** | `game_started`: which games (`game`), modes (`mode`), bot levels (`botLevel`) and match lengths (`matchLength`) players pick. `tutorial_started`: how many players open a tutorial, and from where (`source`). `$screen`: which screens players open (history, rules, settings). |
+| **Mode use** | `game_started`: which games (`game`), modes (`mode`), bot levels (`botLevel`), match lengths (`matchLength`) and opening roll house rules (`openingRoll`) players pick. `tutorial_started`: how many players open a tutorial, and from where (`source`). `$screen`: which screens players open (history, rules, settings). |
 | **Feature use** | `undo_used`: how much players take back moves. `settings_changed`: which settings players change (`key`). `theme_changed`: which themes players pick (themes may become a paid extra, `docs/vision.md`). |
 | **Drop-off** | `game_started` → `game_finished`: how many games end. `game_abandoned`: which games players leave, and how early (`turn`). `resign` and `result: resign`: how often players give up. `tutorial_step`, `tutorial_finished`, `tutorial_skipped`: the lesson where players stop. |
 | **Return rate** | `app_opened`: active players per day and week, and how many come back (retention). `game_started` after `game_finished`: players who come back to play. |
@@ -90,6 +91,7 @@ Make three dashboards in PostHog (Dashboards → New dashboard). Each line below
 | Vs bot or pass-and-play | Trends (pie) | Event `game_started`, breakdown by `mode` |
 | Bot levels | Trends (bar) | Event `game_started`, filter `mode = bot`, breakdown by `botLevel` |
 | Match lengths | Trends (bar) | Event `game_started`, breakdown by `matchLength` |
+| Opening roll rules | Trends (bar) | Event `game_started`, breakdown by `openingRoll` |
 | Tutorial opens | Trends | Event `tutorial_started`, breakdown by `game`; a copy by `source` |
 | Board themes | Trends (bar) | Event `theme_changed`, filter `kind = board`, breakdown by `theme` |
 | Settings | Trends (bar) | Event `settings_changed`, breakdown by `key` |

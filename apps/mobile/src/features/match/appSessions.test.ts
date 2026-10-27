@@ -39,21 +39,41 @@ describe('game events for real matches (#61)', () => {
         variant: 'portes',
         matchLength: 5,
         botLevel: 'easy',
+        openingRoll: 'useOpeningDice',
       },
     ]);
+  });
+
+  it('sends the opening roll house rule as a value id (#207)', () => {
+    matchSessions.start({ ...localSetup, openingRoll: 'rerollBoth' });
+    expect(tracked()[0]).toMatchObject({ event: 'game_started', openingRoll: 'rerollBoth' });
   });
 
   it('sends game: tavli for a Tavli match, and the game in play as variant', () => {
     matchSessions.start({ ...localSetup, game: 'tavli' });
     expect(tracked()).toEqual([
-      { event: 'game_started', mode: 'local', game: 'tavli', variant: 'portes', matchLength: 3 },
+      {
+        event: 'game_started',
+        mode: 'local',
+        game: 'tavli',
+        variant: 'portes',
+        matchLength: 3,
+        openingRoll: 'useOpeningDice',
+      },
     ]);
   });
 
   it('sends game_started for pass-and-play, with no player names', () => {
     matchSessions.start(localSetup);
     expect(tracked()).toEqual([
-      { event: 'game_started', mode: 'local', game: 'portes', variant: 'portes', matchLength: 3 },
+      {
+        event: 'game_started',
+        mode: 'local',
+        game: 'portes',
+        variant: 'portes',
+        matchLength: 3,
+        openingRoll: 'useOpeningDice',
+      },
     ]);
     expect(JSON.stringify(recorded.sent)).not.toContain('Maria');
   });

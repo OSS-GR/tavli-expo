@@ -6,6 +6,10 @@
  * Game (#109): Portes, Plakoto, Fevga or Tavli (all three in rotation).
  * A game shows locked ("Coming soon") when the engine does not have it, or
  * vs the bot when the bot has no level for it (`botLevels`).
+ *
+ * House rules (#207, a first part of Kafeneio mode #58): one choice, the
+ * opening roll (`match.openingRoll` in the engine). The hint under it says
+ * who starts and how.
  */
 import type { Difficulty } from '@tavli/contracts';
 import { BOT_DIFFICULTIES } from '@tavli/contracts';
@@ -34,6 +38,7 @@ import {
   GAME_CHOICES,
   MATCH_LENGTHS,
   MAX_NAME_LENGTH,
+  OPENING_ROLL_RULES,
   cleanName,
   isGameOpen,
   type GameChoice,
@@ -41,6 +46,7 @@ import {
   type MatchLength,
   type MatchMode,
   type MatchSetup,
+  type OpeningRollRule,
 } from '@/features/match/setup';
 
 export interface NewGameScreenProps {
@@ -73,6 +79,7 @@ export function NewGameScreen({
   const [targetPoints, setTargetPoints] = useState<MatchLength>(initial.targetPoints);
   const [chosenLevel, setBotLevel] = useState<Difficulty>(initial.botLevel);
   const [names, setNames] = useState(initial.names);
+  const [openingRoll, setOpeningRoll] = useState<OpeningRollRule>(initial.openingRoll);
 
   const openGames = GAME_CHOICES.filter((choice) => isGameOpen(choice, mode, levelsByGame));
   const lockedGames = GAME_CHOICES.filter((choice) => !openGames.includes(choice));
@@ -93,6 +100,14 @@ export function NewGameScreen({
     };
   });
   const lockedLevels = BOT_DIFFICULTIES.some((level) => !botLevels.includes(level));
+  const openingOptions: SegmentOption<OpeningRollRule>[] = OPENING_ROLL_RULES.map((rule) => ({
+    value: rule,
+    label: t(`newGame.houseRules.${rule}`),
+  }));
+  const openingHint =
+    openingRoll === 'chosenStarterRolls' && mode === 'bot'
+      ? t('newGame.houseRules.chosenStarterRollsHintBot')
+      : t(`newGame.houseRules.${openingRoll}Hint`);
 
   const [asking, setAsking] = useState(false);
   const startNow = () =>
@@ -102,6 +117,7 @@ export function NewGameScreen({
       targetPoints,
       botLevel,
       names: { white: cleanName(names.white), black: cleanName(names.black) },
+      openingRoll,
     });
   const start = () => (hasSavedGame ? setAsking(true) : startNow());
 
@@ -224,29 +240,23 @@ export function NewGameScreen({
         </SettingsSection>
 
         {mode === 'bot' ? (
-          <>
-            <SettingsSection title={t('newGame.botLevel.label')}>
-              <SegmentedControl
-                testID="new-game-level"
-                label={t('newGame.botLevel.label')}
-                options={levelOptions}
-                value={botLevel}
-                onChange={setBotLevel}
-              />
-              <Text style={styles.hint}>{t(`newGame.botLevel.${botLevel}Hint`)}</Text>
-              {lockedLevels ? (
-                <Text style={styles.hint}>
-                  {botLevels.includes('medium')
-                    ? t('newGame.botLevel.hardSoon')
-                    : t('newGame.botLevel.soon')}
-                </Text>
-              ) : null}
-            </SettingsSection>
-            <View style={styles.info}>
-              <Text style={styles.infoTitle}>{t('newGame.whoStarts.title')}</Text>
-              <Text style={styles.hint}>{t('newGame.whoStarts.body')}</Text>
-            </View>
-          </>
+          <SettingsSection title={t('newGame.botLevel.label')}>
+            <SegmentedControl
+              testID="new-game-level"
+              label={t('newGame.botLevel.label')}
+              options={levelOptions}
+              value={botLevel}
+              onChange={setBotLevel}
+            />
+            <Text style={styles.hint}>{t(`newGame.botLevel.${botLevel}Hint`)}</Text>
+            {lockedLevels ? (
+              <Text style={styles.hint}>
+                {botLevels.includes('medium')
+                  ? t('newGame.botLevel.hardSoon')
+                  : t('newGame.botLevel.soon')}
+              </Text>
+            ) : null}
+          </SettingsSection>
         ) : (
           <>
             <SettingsSection title={t('newGame.players.label')}>
@@ -258,6 +268,20 @@ export function NewGameScreen({
             </SettingsSection>
           </>
         )}
+
+        {/* House rules (#207): who starts the first game. It replaces the
+            "Who starts?" info box: the hint says what the chosen rule does. */}
+        <SettingsSection title={t('newGame.houseRules.label')}>
+          <Text style={styles.subLabel}>{t('newGame.houseRules.openingRoll')}</Text>
+          <SegmentedControl
+            testID="new-game-opening-roll"
+            label={t('newGame.houseRules.openingRoll')}
+            options={openingOptions}
+            value={openingRoll}
+            onChange={setOpeningRoll}
+          />
+          <Text style={styles.hint}>{openingHint}</Text>
+        </SettingsSection>
       </ScrollView>
       <View style={styles.footer}>
         <ActionButton testID="new-game-start" label={t('newGame.start')} onPress={start} />
@@ -415,13 +439,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.textDim,
     paddingTop: theme.space.xs,
   },
-  info: {
-    marginTop: theme.space.xl,
-    padding: theme.space.lg,
-    borderRadius: theme.radii.lg,
-    backgroundColor: theme.colors.surface,
-  },
-  infoTitle: {
+  subLabel: {
     ...theme.type.bodyStrong,
     color: theme.colors.text,
   },

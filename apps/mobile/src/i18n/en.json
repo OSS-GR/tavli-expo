@@ -230,7 +230,16 @@
       "rolled": "Rolled {{value}}",
       "result_you": "You start with {{high}}-{{low}}.",
       "ok": "OK",
-      "autoClose": "Closes by itself after 3 s."
+      "autoClose": "Closes by itself after 3 s.",
+      "bodyReroll": "Each player rolls one die. The higher die starts and rolls both dice again.",
+      "resultReroll": "{{name}} starts ({{high}}-{{low}}) and rolls again.",
+      "resultReroll_you": "You start ({{high}}-{{low}}). Roll again."
+    },
+    "chooser": {
+      "title": "Who starts?",
+      "body": "Choose who starts. That player rolls both dice.",
+      "pick": "{{name}} starts",
+      "pick_you": "I start"
     },
     "roll": {
       "opening": "Roll to start",
@@ -302,7 +311,9 @@
       "rolled_you": "You rolled {{dice}}.",
       "rolledDouble": "{{name}} rolled {{double}}: four moves of {{value}}.",
       "rolledDouble_you": "You rolled {{double}}: four moves of {{value}}.",
-      "played": "{{name}} played: {{moves}}."
+      "played": "{{name}} played: {{moves}}.",
+      "chosenStarter": "{{name}} starts.",
+      "chosenStarter_you": "You start."
     },
     "pass": {
       "title": "No legal moves",
@@ -504,16 +515,23 @@
       "soon": "Medium and Hard are coming soon.",
       "hardSoon": "Hard is coming soon."
     },
-    "whoStarts": {
-      "title": "Who starts?",
-      "body": "Each player rolls one die. High die starts."
-    },
     "players": {
       "label": "Players (optional)",
       "white": "Player 1 (white)",
       "black": "Player 2 (black)",
       "whiteLabel": "Name of player 1, white checkers",
       "blackLabel": "Name of player 2, black checkers"
+    },
+    "houseRules": {
+      "label": "House rules",
+      "openingRoll": "Opening roll",
+      "useOpeningDice": "Standard",
+      "rerollBoth": "Roll again",
+      "chosenStarterRolls": "Choose",
+      "useOpeningDiceHint": "Each player rolls one die. The higher die starts and plays both dice. The federation rule.",
+      "rerollBothHint": "Each player rolls one die. The higher die starts and rolls both dice again, so a double is possible.",
+      "chosenStarterRollsHint": "You choose who starts. That player rolls both dice.",
+      "chosenStarterRollsHintBot": "You choose who starts: you or the bot. That player rolls both dice."
     },
     "start": "Start game",
     "boardView": "Board view",

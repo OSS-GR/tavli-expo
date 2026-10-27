@@ -2,7 +2,9 @@
  * The opening roll as the screen shows it (wireframe 6a, #176). Pure.
  *
  * Each player rolls one die; a tie is rolled again; the higher die starts
- * and plays both dice (`useOpeningDice`).
+ * and plays both dice (`useOpeningDice`), or rolls both dice again (the
+ * house rule `rerollBoth`, #207). With `chosenStarterRolls` there is no
+ * roll: the players pick the starter (`isChoosingStarter`).
  *
  * - `rolling`: a round is under way. A die that is not rolled yet is `null`.
  * - `tie`: the last round was a tie. The engine has already cleared the
@@ -75,6 +77,15 @@ export function openingDice(status: OpeningStatus): {
 } {
   if (status.kind === 'tie') return { white: status.value, black: status.value };
   return { white: status.white, black: status.black };
+}
+
+/**
+ * The house rule `chosenStarterRolls` (#207): the game waits for the
+ * players to pick who starts (the engine's `chooseStarter`). The engine
+ * keeps no opening roll then (`opening: null`).
+ */
+export function isChoosingStarter(game: GameFlow): boolean {
+  return game.phase === 'opening-roll' && game.opening === null;
 }
 
 /** In pass-and-play each player taps for their own die: White first, then Black. */

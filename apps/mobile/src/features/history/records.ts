@@ -19,11 +19,14 @@ import { type GameRecord, type Match, type PerPlayer, type PlayerId } from '@tav
 
 import { timedOutBy } from '@/features/match/summary';
 import {
+  DEFAULT_OPENING_ROLL,
   isGameChoice,
   isMatchMode,
+  isOpeningRollRule,
   type GameChoice,
   type MatchMode,
   type MatchSetup,
+  type OpeningRollRule,
 } from '@/features/match/setup';
 
 export const HISTORY_STORAGE_KEY = 'history';
@@ -78,6 +81,12 @@ export interface HistoryRecord {
    * `savedMatch.ts`). `null` in records made before #150.
    */
   readonly matchNumber: number | null;
+  /**
+   * The opening roll house rule of the match (#207), from its rules.
+   * Records made before #207 load with the federation rule
+   * (`useOpeningDice`), the only rule the app had then.
+   */
+  readonly openingRoll: OpeningRollRule;
 }
 
 /**
@@ -129,6 +138,7 @@ export function historyRecord(
     diploWins,
     draws,
     matchNumber,
+    openingRoll: match.rules.match.openingRoll,
   };
 }
 
@@ -218,6 +228,9 @@ function parseRecord(raw: unknown): HistoryRecord | null {
   ) {
     return null;
   }
+  // Records before #207 have no opening roll rule: the federation rule.
+  const opening = raw['openingRoll'] ?? DEFAULT_OPENING_ROLL;
+  if (!isOpeningRollRule(opening)) return null;
   return {
     id,
     endedAt,
@@ -235,6 +248,7 @@ function parseRecord(raw: unknown): HistoryRecord | null {
     diploWins,
     draws,
     matchNumber,
+    openingRoll: opening,
   };
 }
 

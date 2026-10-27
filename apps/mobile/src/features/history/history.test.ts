@@ -60,6 +60,7 @@ function rec(over: Partial<HistoryRecord> = {}): HistoryRecord {
     diploWins: { white: 1, black: 0 },
     draws: 0,
     matchNumber: 1,
+    openingRoll: 'useOpeningDice',
     ...over,
   };
 }
@@ -141,8 +142,17 @@ describe('a record is saved when a match ends', () => {
         diploWins: { white: 0, black: 0 },
         draws: 0,
         matchNumber: 1,
+        openingRoll: 'useOpeningDice',
       },
     ]);
+  });
+
+  it('keeps the opening roll house rule of the match (#207)', () => {
+    const { sessions, history } = registry();
+    const s = sessions.start({ ...defaultSetup('local'), openingRoll: 'chosenStarterRolls' });
+    s.store.getState().dispatch({ type: 'chooseStarter', player: 'black' });
+    s.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    expect(history.getState().records[0]?.openingRoll).toBe('chosenStarterRolls');
   });
 
   it('vs bot: you resign the only game at the start, the bot wins a diplo', () => {
@@ -724,6 +734,8 @@ describe('history list', () => {
       { ...rec(), endedAt: 1e20 },
       { ...rec(), endedAt: -1 },
       { ...rec(), endedAt: Number.MAX_VALUE },
+      // An opening roll rule the engine does not have (#207).
+      { ...rec(), openingRoll: 'coinFlip' },
     ];
     const good = rec({ id: 'good' });
     const text = JSON.stringify({ v: HISTORY_VERSION, records: [...bad, good] });
@@ -750,6 +762,17 @@ describe('history list', () => {
     const { matchNumber: _, ...old } = rec();
     const text = JSON.stringify({ v: HISTORY_VERSION, records: [old] });
     expect(parseHistory(text)).toEqual([rec({ matchNumber: null })]);
+  });
+
+  it('saves and loads the opening roll rule; a record from before #207 has the federation rule', () => {
+    const records = [
+      rec({ id: 'a', openingRoll: 'rerollBoth' }),
+      rec({ id: 'b', openingRoll: 'chosenStarterRolls' }),
+    ];
+    expect(parseHistory(serializeHistory(records))).toEqual(records);
+    const { openingRoll: _, ...old } = rec();
+    const text = JSON.stringify({ v: HISTORY_VERSION, records: [old] });
+    expect(parseHistory(text)).toEqual([rec({ openingRoll: 'useOpeningDice' })]);
   });
 
   it('keeps one record per id, the first (newest)', () => {

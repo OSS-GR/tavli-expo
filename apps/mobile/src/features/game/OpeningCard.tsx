@@ -8,6 +8,9 @@
  *   until the next roll.
  * - The result ("Maria starts with 6-3.") has an OK button; the screen
  *   also closes it after a moment.
+ * - With the house rule `rerollBoth` (#207) the starter does not play the
+ *   opening dice but rolls both dice again: "Maria starts (6-3) and rolls
+ *   again." The engine decides; `rollsAgain` only picks the words.
  *
  * Each step is read to screen reader users (`useAnnouncement`); focus moves
  * to the title when the card opens (#153).
@@ -34,6 +37,8 @@ export interface OpeningCardProps {
   names: PerPlayer<string>;
   /** The human vs the bot: the result says "You start". */
   you?: PlayerId | null;
+  /** The starter rolls both dice again (`openingRoll: "rerollBoth"`, #207). */
+  rollsAgain?: boolean;
   /** The game in the match. With `status.round` it keys each die's roll. */
   gameKey: string;
   /** The Roll button's label ("Maria: roll"). Shown while the dice are not decided. */
@@ -117,6 +122,7 @@ export function OpeningCard({
   status,
   names,
   you = null,
+  rollsAgain = false,
   gameKey,
   rollLabel,
   rollDisabled = false,
@@ -134,10 +140,18 @@ export function OpeningCard({
   if (status.kind === 'decided') {
     const high = Math.max(status.white, status.black);
     const low = Math.min(status.white, status.black);
-    message =
-      status.starter === you
-        ? t('game.opening.result_you', { high, low })
-        : t('game.opening.result', { name: names[status.starter], high, low });
+    const vars = { name: names[status.starter], high, low };
+    if (rollsAgain) {
+      message =
+        status.starter === you
+          ? t('game.opening.resultReroll_you', vars)
+          : t('game.opening.resultReroll', vars);
+    } else {
+      message =
+        status.starter === you
+          ? t('game.opening.result_you', vars)
+          : t('game.opening.result', vars);
+    }
   } else if (status.kind === 'tie') {
     message = t('game.opening.tie', { value: status.value });
   } else {
@@ -153,7 +167,9 @@ export function OpeningCard({
     quiet = value === null;
     message =
       rolled === null || value === null
-        ? t('game.opening.body')
+        ? rollsAgain
+          ? t('game.opening.bodyReroll')
+          : t('game.opening.body')
         : rolled === you
           ? t('game.opening.rolledBy_you', { value })
           : t('game.opening.rolledBy', { name: names[rolled], value });

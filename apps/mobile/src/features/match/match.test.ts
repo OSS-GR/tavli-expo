@@ -17,6 +17,7 @@ import { seatsFor } from './seats';
 import { createSessionRegistry, newMatchId } from './sessions';
 import {
   GAME_CHOICES,
+  OPENING_ROLL_RULES,
   cleanName,
   defaultSetup,
   enginePlayers,
@@ -43,7 +44,28 @@ describe('match setup', () => {
       targetPoints: 3,
       botLevel: 'easy',
       names: { white: '', black: '' },
+      openingRoll: 'useOpeningDice',
     });
+  });
+
+  it('keeps the opening roll house rule (#207); a bad or missing one is the federation rule', () => {
+    expect(sanitizeSetup({ openingRoll: 'rerollBoth' }, 'bot').openingRoll).toBe('rerollBoth');
+    expect(sanitizeSetup({ openingRoll: 'chosenStarterRolls' }, 'local').openingRoll).toBe(
+      'chosenStarterRolls',
+    );
+    expect(sanitizeSetup({ openingRoll: 'coinFlip' }, 'bot').openingRoll).toBe('useOpeningDice');
+    expect(sanitizeSetup({ game: 'plakoto' }, 'local').openingRoll).toBe('useOpeningDice');
+  });
+
+  it('puts the opening roll rule into the rules of every game (#207)', () => {
+    expect(gameRuleSet('portes').match.openingRoll).toBe('useOpeningDice');
+    for (const rule of OPENING_ROLL_RULES) {
+      for (const game of GAME_CHOICES) {
+        const rules = gameRuleSet(game, rule);
+        expect(rules.match.openingRoll).toBe(rule);
+        expect(rules.match.rotation).toEqual(gameRotation(game));
+      }
+    }
   });
 
   it('cleans names: trims and cuts to 16 characters (Greek too)', () => {
@@ -131,6 +153,16 @@ describe('last choices', () => {
     saveLastSetup(storage, botSetup);
     expect(loadLastSetup(storage, 'bot', gameLevels(['easy']))).toEqual(botSetup);
     expect(loadLastSetup(storage, 'local', gameLevels(['easy']))).toEqual(defaultSetup('local'));
+  });
+
+  it('remembers the opening roll house rule per mode (#207)', () => {
+    const storage = createMemoryStorage();
+    const local: MatchSetup = { ...defaultSetup('local'), openingRoll: 'chosenStarterRolls' };
+    saveLastSetup(storage, local);
+    expect(loadLastSetup(storage, 'local', gameLevels(['easy'])).openingRoll).toBe(
+      'chosenStarterRolls',
+    );
+    expect(loadLastSetup(storage, 'bot', gameLevels(['easy'])).openingRoll).toBe('useOpeningDice');
   });
 
   it('gives the defaults for broken data', () => {

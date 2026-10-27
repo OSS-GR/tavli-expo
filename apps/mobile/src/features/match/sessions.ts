@@ -272,8 +272,9 @@ export function createSessionRegistry({
       const store = createGameStore({
         players: enginePlayers(setup),
         targetPoints: setup.targetPoints,
-        // The chosen game (#109): one game, or the Tavli rotation.
-        rules: gameRuleSet(setup.game),
+        // The chosen game (#109): one game, or the Tavli rotation; and the
+        // opening roll house rule (#207).
+        rules: gameRuleSet(setup.game, setup.openingRoll),
         rng: createRng(),
         ...(analytics ? { analytics } : {}),
       });
