@@ -37,6 +37,8 @@
 - `@tavli/contracts/testing` holds port contract checks. The analytics checks are plain functions, so Vitest and Jest can both run them.
 - App tests that need navigation use `renderRouter` from `expo-router/testing-library`. Render it once per test: a second `renderRouter` in the same test leaves the next test with an empty tree.
 - Workspace packages export TypeScript source (`"main": "./src/index.ts"`). There is no build step. Metro and Vitest read the source.
+- `apps/server` holds the Convex functions (`convex/`). Its tests use `convex-test` in Vitest's `edge-runtime` environment and need no Convex account. `convex/_generated/` is committed. After you add or rename a file in `convex/`, run `pnpm --filter @tavli/server codegen` (works offline, see `docs/architecture/online-game-service.md`). Files with two dots (`*.test.ts`, `test.setup.ts`) are not deployed. Lint blocks `Math.random` and React there; dice use `createCryptoRng`.
+- pnpm build scripts: `esbuild` (from `convex`) is listed as `false` in `pnpm-workspace.yaml` `allowBuilds`. A new dependency with a build script fails `pnpm install` until you list it there.
 - pnpm refuses packages published less than 24 hours ago (`minimumReleaseAge`). Pick the previous version. Do not add an exclusion.
 - Pure packages test with Vitest. The app tests with Jest (`jest-expo` + React Native Testing Library 14, where `render` and events are `async`). `apps/mobile/jest.setup.ts` loads the Unistyles mocks first, then swaps `@/services` for in-memory fakes and fixes the phone language to English.
 - Adapters are picked in one file: `apps/mobile/src/services.ts` (ADR-0002). `react-native-mmkv` is on the vendor list, so only `packages/adapters/storage-mmkv` may import it.
