@@ -97,5 +97,8 @@ describe('columnDiceBox (#185)', () => {
     expect(columnDiceBox(geo, 60, 2).size).toBe(MIN_BOARD_DIE);
     // A double gets more room, as on the board.
     expect(columnDiceBox(geo, 128, 4).size).toBeGreaterThan(narrow);
+    // Its two rolled dice keep the size of any roll (#177).
+    expect(columnDiceBox(geo, 128, 4).pairSize).toBe(narrow);
+    expect(columnDiceBox(geo, 128, 2).pairSize).toBe(narrow);
   });
 });
