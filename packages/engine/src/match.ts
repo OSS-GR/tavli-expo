@@ -184,10 +184,9 @@ export function gameRules(match: Match, variant: StandardVariantId): RuleSet {
  *
  * Throws `EngineError`:
  * - `ILLEGAL_ACTION` when the match is over;
- * - `UNKNOWN_VARIANT` when the next game is not built yet (today Portes,
- *   Plakoto and Fevga are; Asodio is not, and it is not in the `tavli`
- *   rotation). The message names the game and the path points at the
- *   rotation entry.
+ * - `UNKNOWN_VARIANT` when `registry` cannot play the next game (the
+ *   built-in registry plays all four games). The message names the game
+ *   and the path points at the rotation entry.
  */
 export function startNextGame(
   match: Match,
@@ -196,7 +195,7 @@ export function startNextGame(
 ): GameState {
   if (match.status !== 'in-progress') illegal('the match is over');
   const id = nextVariantId(match);
-  // Only a custom rotation or registry can miss a game now (Asodio, #50).
+  // Only a custom registry can miss a game now: all four games are built.
   const variant = registry.get(id);
   if (variant === undefined) {
     throw new EngineError(

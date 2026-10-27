@@ -308,8 +308,8 @@ A variant checks the `RuleSet` it gets with `validateRules`. It throws
 'parallel'` in a contrary game), and `NOT_SUPPORTED` for a flag of its own
 game that is not built yet. It never ignores a flag in silence.
 
-`VARIANT_REGISTRY` holds `BUILT_IN_VARIANTS`. Today that is `portes` and
-`plakoto` and `fevga`.
+`VARIANT_REGISTRY` holds `BUILT_IN_VARIANTS`: `portes`, `plakoto`, `fevga`
+and `asodio`.
 
 ## Portes
 
@@ -637,6 +637,98 @@ Tests:
   parallel movement: `fevgaState('w: 24x14 13 ; b: 24x15')`) and
   `src/testing/random-fevga-positions.ts`.
 
+## Asodio
+
+Code: `src/variants/asodio/`. Rules: `docs/rules/asodio.md` and
+`docs/rules/tavli-match.md`. Default rules: the owner version,
+`asodio.kafeneio`.
+
+- `initialState`: all 15 checkers outside for both players
+  (`ASODIO_START`), or all 15 on own 24 with `startPosition: "allOnOwn24"`
+  (the doc's `"opponentAcePoint"`, `ASODIO_STACK_START`).
+- Entering: a die `d` enters one checker (from outside or the bar) on own
+  point `25 - d` (spot `d`). A double enters four on spot `d` (A1) because
+  each of its four moves enters one. Moves from outside are written
+  `from: 'outside'`, from the bar `from: 'bar'` (both `25/…` in notation).
+- The roll gates, judged on the whole roll: `firstEntryGate` (all 15 still
+  outside: only a 1-2 or a double moves; `"doubleOnly"`: only a double) and
+  `barEntryNeedsSpecial` (a hit checker waits for a 1-2 or a double). A
+  gated roll is a pass.
+- The single-move rules, checked after every move (so a lock that ends in
+  the middle of a roll frees the rest of it; open question Q26):
+  1. Hit checkers enter before anything else moves. Checkers that never
+     entered have no such priority.
+  2. A pinned checker cannot move.
+  3. While checkers are outside: `moveWhileLoading: false` (owner, A2) lets
+     only entries move; `mustEnterAllFirst` keeps every checker in the
+     starting quarter (own 19–24).
+  4. `quarterLock` (owner): the rear quarter is the quarter of the last
+     checker (outside or bar count as the starting quarter). A checker in
+     front of it is frozen; with `moveInsideFrozenQuarter` it may move
+     inside its own quarter. So a pinned lagging checker freezes the whole
+     army and that player passes (A6).
+  5. Landing: not on 2+ opponent checkers. `captureMode: "pin"` (owner):
+     one free opponent checker is pinned, and a point where the opponent
+     pins our checker is closed; `"hit"`: the checker goes to the bar.
+  6. Bearing off: nothing outside or on the bar, all home, and (pins) none
+     pinned unless `bearOffWhilePinned` (open question Q25). `exactBearOff`:
+     only the exact die bears off.
+- Then "use as much of the roll as possible" and the higher-die rule, as in
+  Portes. `legalTurns` lists one play per end position; `applyTurn` accepts
+  any legal order; `nextMoves` keeps a move only when the play can still
+  be finished.
+- **Roll chains** (`roll-chain.ts`). `applyTurn` keeps the same player to
+  move when the roll gives another roll: a fully played double with
+  `doublesGiveExtraRoll`; a 1-2 with both dice played and
+  `aceDeuceExtraRoll`. With `aceDeuceChoosesDouble`, a 1-2 with both dice
+  played asks a question: `prompt` returns `{ kind: 'chooseDouble',
+choices: ['1', …, '6'] }` (`variantData: { chooseDouble: true }`).
+  `answerPrompt(state, player, '4')` sets `dice: [4, 4]` and `variantData:
+{ chosenDouble: 4 }`; the turn flow then starts that turn at once. The
+  chosen double gives a new roll (with `aceDeuceExtraRoll`) only when all
+  four moves were played. The owner version has no chain (A3).
+- `result`: the winner bore off 15. `scoring.method`: `"tavli"` 1, or 2
+  when the loser bore off none (A4); `"perChecker"` 1 per checker the loser
+  has not borne off; `"singleOnly"` 1. **Deadlock** (A5): when neither
+  player has a single legal move with any die, every roll passes forever,
+  so the game is a draw (`reason: 'deadlock'`, 0 points). Resigning uses
+  the shared rule (`pointsForLoss` follows `scoring.method`).
+- Not built yet (`NOT_SUPPORTED`): `nominateBlot`, `complementaryDoubles`,
+  `quarterGathering` without `quarterLock` (open question Q27) and the
+  doubling cube. Flags of other games throw `RULES_CONFLICT`, as do
+  `captureMode: "none"` and `startPosition: "portes"`.
+- A board that cannot happen under the rules (a bar checker with pins, a
+  pin with hits, checkers outside without `"offBoard"`) throws
+  `INVALID_STATE`.
+- The search is the Plakoto one on a private array (`position.ts`) with a
+  Zobrist hash, including the "doubles in order" trick: a move from a
+  higher origin (bar, then outside, then own 24 down to 1) only ever
+  makes more moves legal for lower ones, so every play can be put in that
+  order (proof in `moves.ts`).
+
+Tests:
+
+- `asodio.test.ts`: one test per numbered edge case in `asodio.md`, named
+  `asodio.md #N: ...`. Cases 1–13 (the research version) run with the
+  Acey-Deucey presets whose flags they name; cases 14–19 with
+  `asodio.kafeneio`. Also the deadlock, every flag, the errors, and the
+  turn flow (chosen double, a gated roll that passes, random matches that
+  replay to the same JSON). `rules-docs.test.ts` fails if a case in the doc
+  (also the owner cases under "Presets") has no test.
+- `asodio-reference.test.ts`: in random positions of every preset and a
+  mix of flags, `legalTurns` must find the same end positions as the slow
+  rules model `src/testing/asodio-oracle.ts`, and the `nextMoves` walk
+  must reach exactly those positions.
+- `asodio-fuzz.test.ts`: 300 random owner-version games and 40 per flag
+  mix, checked after every move (15 checkers each, stacking, pins never
+  move, pip counts, the army rules, every move against the oracle) and
+  after every turn (`applyTurn` board, the roll chain). About 3 s. In
+  random play most owner-version games end in a deadlock (open question
+  Q28).
+- Test helpers: `src/testing/asodio-notation.ts` (`out`, `bar` and `!` for
+  pins: `asodioState('w: 24 23 outx13 ; b: outx15')`, turns like
+  `out/22 13/8*`) and `src/testing/random-asodio.ts`.
+
 ## Match
 
 Code: `src/match.ts`. Rules: `docs/rules/tavli-match.md` ("Who starts later
@@ -751,7 +843,12 @@ Actions (`player` is the player who acts):
 - Variant questions: after every turn the flow calls `Variant.prompt`. If
   it returns a question, the phase is `awaiting-answer` until the player
   sends `answer`. The variant keeps the question in `state.variantData`
-  (PM decision on #25). Plakoto uses it for "resign or play on".
+  (PM decision on #25). Plakoto uses it for "resign or play on", Asodio
+  for the chosen double. When an answer sets `state.dice`, the flow starts
+  that turn at once (`moving`, or a pass), with no roll.
+- Extra rolls: the flow reads the player to move from the state that
+  `applyTurn` returns, so a variant can give the same player another roll
+  (Asodio).
 
 ### The match: `MatchFlow`
 
@@ -796,11 +893,7 @@ interface MatchFlow {
 
 ## Not here yet
 
-- The Asodio variant.
-- Extra rolls in one turn (Asodio roll chains, `extraRolls.*`). The flow
-  reads the player to move from the state `applyTurn` returns, so a variant
-  can give the same player another roll. A chained roll needs its own
-  data in `variantData`.
+- Asodio `nominateBlot` and `complementaryDoubles` (throw `NOT_SUPPORTED`).
 - A question in the middle of a turn. The flow asks `Variant.prompt` only
   after a turn, so Plakoto `offerConcede` with `motherCheckTiming:
 "afterEachMove"` asks when the turn is over (see "Plakoto").

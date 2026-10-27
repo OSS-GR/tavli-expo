@@ -84,6 +84,8 @@ export { PORTES_START } from './variants/portes';
 export { PLAKOTO_START, plakoto } from './variants/plakoto';
 export { fevga } from './variants';
 export { FEVGA_START } from './variants/fevga';
+export { asodio } from './variants';
+export { ASODIO_STACK_START, ASODIO_START } from './variants/asodio';
 
 export {
   MATCH_SCHEMA_VERSION,
