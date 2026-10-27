@@ -24,6 +24,8 @@ describe('settings store', () => {
     expect(state.language).toBe('system');
     expect(state.autoConfirmMoves).toBe(false);
     expect(state.showPipCounts).toBe(true);
+    // Hints (#209) start on.
+    expect(state.showHints).toBe(true);
     expect(state.boardFlipMode).toBe('flip');
     expect(state.homeBoardSide).toBe('right');
     // The move list follows the screen reader until the player picks On or Off.
@@ -50,6 +52,7 @@ describe('settings store', () => {
     first.getState().setSetting('autoConfirmMoves', true);
     first.getState().setSetting('boardFlipMode', 'fixed');
     first.getState().setSetting('showPipCounts', false);
+    first.getState().setSetting('showHints', false);
     first.getState().setSetting('moveList', 'on');
 
     const second = createSettingsStore(storage);
@@ -57,6 +60,7 @@ describe('settings store', () => {
       autoConfirmMoves: true,
       boardFlipMode: 'fixed',
       showPipCounts: false,
+      showHints: false,
       moveList: 'on',
     });
   });

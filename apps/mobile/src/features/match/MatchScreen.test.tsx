@@ -1,3 +1,4 @@
+import type { createRecordingAnalytics } from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
   createGameFlow,
@@ -7,7 +8,7 @@ import {
   type Dice,
   type PlayerId,
 } from '@tavli/engine';
-import { act, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 
 import { BOT_SPEED_TIMING, type BotTiming } from '@/features/bot/botTurn';
 import { SAMPLE_POSITIONS } from '@/features/board/positions';
@@ -18,6 +19,7 @@ import {
   type BoardLayoutMode,
 } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import { analytics } from '@/services';
 
 import { MatchScreen } from './MatchScreen';
 import { createSessionRegistry, type MatchSession } from './sessions';
@@ -505,4 +507,38 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
     expect(screen.getByTestId('menu-game-label')).toHaveTextContent('Game 1 · Fevga');
     expect(button('How to play Fevga')).toBeOnTheScreen();
   });
+});
+
+describe('<MatchScreen /> Hint (#209)', () => {
+  const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
+
+  beforeEach(() => {
+    recorded.optIn();
+    recorded.sent.length = 0;
+  });
+  afterEach(() => {
+    recorded.optOut();
+  });
+
+  it.each(['bot', 'local'] as const)(
+    'shows the best turn in a %s match and sends hint_shown with the game only',
+    async (mode) => {
+      const s = session({ ...defaultSetup(mode), game: 'tavli' });
+      startWith(s, 'white');
+      await show(s).view;
+      await act(async () => {
+        s.store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 5] });
+      });
+      await act(async () => {
+        fireEvent.press(button('Hint'));
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(0);
+      });
+      expect(screen.getByTestId('hint-text')).toHaveTextContent(/^Hint: /);
+      expect(recorded.sent.filter((e) => e.type === 'track' && e.event === 'hint_shown')).toEqual([
+        { type: 'track', event: 'hint_shown', props: { game: 'tavli', variant: 'portes' } },
+      ]);
+    },
+  );
 });
