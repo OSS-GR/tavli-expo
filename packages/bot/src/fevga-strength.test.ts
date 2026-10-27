@@ -59,4 +59,9 @@ describe(`fevga level strength (${GAMES} games each)`, () => {
   it('medium beats easy at least 70% of the time', { timeout: 60_000 }, () => {
     expect(winsOf('medium', 'easy', 3028)).toBeGreaterThanOrEqual(0.7 * GAMES);
   });
+
+  // The Fevga net (#156). The epic target is 70 %.
+  it('hard beats medium at least 60% of the time', { timeout: 60_000 }, () => {
+    expect(winsOf('hard', 'medium', 3029)).toBeGreaterThanOrEqual(0.6 * GAMES);
+  });
 });

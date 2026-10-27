@@ -271,8 +271,16 @@ function featureWeights(w: FevgaWeights): number[] {
 
 const weightCache = new WeakMap<FevgaWeights, number[]>();
 
-/** The contact score, in logits, for the roller. */
-function contactScore(roller: Side, waiter: Side, target: number | null, w: FevgaWeights): number {
+/**
+ * The contact score, in logits, for the roller. The Fevga net
+ * (`fevga-net.ts`) uses it as one of its inputs.
+ */
+export function contactScore(
+  roller: Side,
+  waiter: Side,
+  target: number | null,
+  w: FevgaWeights,
+): number {
   let weights = weightCache.get(w);
   if (weights === undefined) {
     weights = featureWeights(w);

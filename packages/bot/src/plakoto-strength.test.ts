@@ -60,4 +60,9 @@ describe(`plakoto level strength (${GAMES} games each)`, () => {
   it('medium beats easy at least 70% of the time', { timeout: TIMEOUT }, () => {
     expect(winsOf('medium', 'easy', 2028)).toBeGreaterThanOrEqual(0.7 * GAMES);
   });
+
+  // The Plakoto net (#156). A draw is not a win. The epic target is 70 %.
+  it('hard beats medium at least 60% of the time', { timeout: TIMEOUT }, () => {
+    expect(winsOf('hard', 'medium', 2029)).toBeGreaterThanOrEqual(0.6 * GAMES);
+  });
 });

@@ -2,7 +2,7 @@
 
 > Living document. Research date: 2026-10-26. Owner: `packages/bot`.
 > **Implemented API (#27):** `createBot(...).chooseTurn(state, dice, difficulty, { rng })` in `@tavli/bot`; the app uses the `BotRunner` port from `@tavli/contracts` (`chooseMove(req)`, async, seed-based). See `packages/bot/README.md`. The sketch in section 7 is the original design.
-> **Hard level, Portes (#147):** a TD(λ)-trained net (`portes-net.ts`), 1-ply, registered as Portes `hard` in `DEFAULT_EVALUATORS`. See section 5.7 and `packages/bot/README.md`, "The Portes net".
+> **Hard level, Portes (#147), Plakoto and Fevga (#156):** a TD(λ)-trained net per game (`portes-net.ts`, `plakoto-net.ts`, `fevga-net.ts`, shared code in `net.ts`), 1-ply, registered as `hard` in `DEFAULT_EVALUATORS`. See sections 5.7 and 5.8 and `packages/bot/README.md`, "The Portes net" and "The Plakoto and Fevga nets".
 > **Variant questions (#106):** `createBot(...).chooseAnswer(state, difficulty, { rng })` answers `Variant.prompt` (Plakoto "resign or play on"); the port has an optional `chooseAnswer(req)`. See section 4.5.
 > Related: [ADR-0002 modular architecture](../decisions/0002-modular-architecture.md), [roadmap](../roadmap.md).
 
@@ -80,7 +80,7 @@ All levels use the same pipeline:
 |---|---|---|---|
 | Easy | Heuristic | 1-ply | Softmax over scores, temperature 0.15. About half of its moves are not the best, but most of those cost little. Never passes a winning turn (e.g. a bear-off that wins). |
 | Medium | Heuristic (tuned) | 1-ply | Softmax, temperature 0.01. Small, plausible mistakes only. |
-| Hard | Neural net (Portes today, #147) | 1-ply (2-ply was tried: no gain, much slower; see 5.7) | Softmax, temperature 0.01, like medium. |
+| Hard | Neural net (Portes #147, Plakoto and Fevga #156; not Asodio yet) | 1-ply (2-ply was tried: no gain, much slower; see 5.7) | Softmax, temperature 0.01, like medium. |
 | (Later) Expert / Hints | Neural net | 2-ply, wider, longer time budget | None |
 
 Why softmax noise and not random moves: a softmax picks good moves more often and bad moves rarely. The bot then looks like a weaker human, not a broken program. Track the **average equity loss per move** of each level in bot-vs-bot tests. Tune temperature until the levels are clearly apart (e.g. Hard beats Medium ~70%+, Medium beats Easy ~70%+).
@@ -216,6 +216,15 @@ What differs from the plan above, and why:
 - **1-ply only.** 2-ply on the top 3 turns gave no measurable gain over 400 games and was 16 times slower.
 
 **Measured (Portes hard, #147):** the shipped net (`portes-net-v1`: 201 → 40 → 3, 44 KB file) beat medium in 742 of 1,000 games (`simulate`, seed 1), 734 of 1,000 paired games (seed 2026) and 1,535 of 2,000 (seed 99): 73–77%, above the 70% target. It took 150,000 self-play games, 58 minutes on one core. It decides in 0.14 ms median and 5 ms worst (Node, 300 random positions). Details and the training runs: `packages/bot/README.md`, "The Portes net".
+
+### 5.8 Plakoto and Fevga (#156)
+
+- **One trainer and one evaluator for every game.** A game plugs in through a `NetGame` (`packages/bot/src/evaluators/net.ts`): its fast board arrays, its game end, its inputs, and the positions the net leaves to the heuristic. The bot's evaluator and the trainer share the 1-ply scoring (`scoreNetCandidates`) and the pick (`pickTurn`), so training and play cannot drift. The Portes net runs on the same code, with the same numbers as before.
+- **Plakoto leaves a pinned mother to the heuristic**, as well as the race. A pinned mother nearly decides the game, and the heuristic's value for it is close to the true one, so training games stop there. Inputs: the TD-Gammon units (192), pin units per point and side (48), lone mothers (2), off and pips (4), pin shots and mother shots (4), the heuristic's contact score (1): 251.
+- **Fevga** has no pins or bar. Inputs: the TD-Gammon units (192), off and pips (4), the heuristic's block features per side (prime, trapped checkers, points ahead, blocked landings, dead dice, runner lock and distance, home points, start checkers, stacks: 20), and the contact score (1): 217.
+- **Training:** TD(λ) as in 5.7, λ 0.7, 40 hidden units, no warm start, one core per run. Plakoto: 45,000 games (28 minutes). Fevga: 100,000 games in two runs (about 43 minutes). Self-play answers the Plakoto mother question with "play on". A game longer than 1,000 turns is dropped. Each match against medium uses its own seed, and the best checkpoints were played again on a fresh seed.
+
+**Measured (#156):** Plakoto hard (`plakoto-net-v1`, 251 → 40 → 3, 55 KB file) beat medium in 732 of 1,000 games (`simulate`, seed 1, 6 draws) and 736 of 1,000 paired games (seed 2026): about 73%. Fevga hard (`fevga-net-v1`, 217 → 40 → 3, 48 KB file) won 810 and 807 of 1,000: about 81%. Both are above the 70% target. Median decision time 0.20 ms (Plakoto) and 0.07 ms (Fevga), worst 3 ms. Details: `packages/bot/README.md`, "The Plakoto and Fevga nets". With all three games of a Tavli match at Hard, the app now offers Hard for Tavli too. Asodio has no net yet.
 
 ## 6. On-device inference and threading
 
@@ -354,7 +363,7 @@ Tests the bot package must have:
 3. 2-ply search on top candidates, with a time budget and a position cache.
 4. Bearoff table for the race end.
 5. `WorkletBotRunner` (react-native-worklets, Bundle Mode) so hard mode never blocks the UI.
-6. Train and ship nets for Plakoto, Fevga, Asodio. Measure each vs medium and vs the previous net.
+6. Train and ship nets for Plakoto, Fevga, Asodio. Measure each vs medium and vs the previous net. (Plakoto and Fevga: done, #156.)
 7. Benchmark the Portes net vs gnubg and wildbg locally (dev only).
 
 ### Phase 3 — Later

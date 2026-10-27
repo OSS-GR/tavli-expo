@@ -1,7 +1,7 @@
 /**
  * `portes-net`: a small neural net for Portes, trained by TD(λ) self-play
- * (docs/architecture/bot-ai.md, section 5; the training code is in
- * `src/train/`).
+ * (docs/architecture/bot-ai.md, section 5; the shared net code is in
+ * `net.ts`, the training code in `src/train/`).
  *
  * It scores a position before the roll, from the view of the player to
  * roll (the "roller"), like the heuristic. The net only scores **contact**
@@ -21,76 +21,46 @@
  * - pip counts / 100 (2);
  * - the rolls out of 36 that hit a blot, for each side (`shots.ts`) (2);
  * - the heuristic's contact score in logits / 4 (`contactScore`) (1).
- *
- * The first layer is sparse: most inputs are 0, so the hidden sums only add
- * the weight rows of the inputs that are not 0.
  */
 
 import type { GameState, Turn } from '@tavli/engine';
-import { opponent } from '@tavli/engine';
+import { opponent, portes } from '@tavli/engine';
 
 import type { Evaluation, Evaluator, TurnScore } from '../types';
-import { decodeFloat32 } from './float-codec';
-import { BAR, OFF, hasContact, pips, playTurn, sideOf } from './portes-board';
+import {
+  NET_OUTPUTS,
+  createNetEvaluator,
+  createScratch,
+  createSparseInput as createInput,
+  evaluateNet,
+  loadNet,
+  pushInput,
+  pushPointUnits,
+  scoreNetCandidates,
+} from './net';
+import type { Net, NetFile, NetGame, NetScratch, SparseInput } from './net';
+import { BAR, OFF, hasContact, pips, playTurn, portesTurnPoints, sideOf } from './portes-board';
 import type { Side } from './portes-board';
 import { PORTES_DEFAULT_WEIGHTS, contactScore, evaluateSides } from './portes-heuristic';
 import { PORTES_NET_V1 } from './portes-net-weights';
 import { countShots } from './shots';
 
+export { createScratch, forward, toEvaluation } from './net';
+export type { NetArray, NetScratch, SparseInput } from './net';
+
 /** Number of inputs. */
 export const PORTES_NET_INPUTS = 201;
 /** Number of outputs: P(win), P(win a diplo), P(lose a diplo). */
-export const PORTES_NET_OUTPUTS = 3;
+export const PORTES_NET_OUTPUTS = NET_OUTPUTS;
 
-/** A typed array of weights: Float32 to ship and play, Float64 to train. */
-export type NetArray = Float32Array | Float64Array;
+/** The weights of a net with one hidden layer (`net.ts`). */
+export type PortesNet = Net;
+/** The shipped form of a net (`net.ts`). */
+export type PortesNetFile = NetFile;
 
-/**
- * The weights of a net with one hidden layer.
- *
- * - `w1[i * hidden + h]`: from input `i` to hidden unit `h` (rows by input,
- *   so a sparse input adds one row);
- * - `b1[h]`, `w2[k * hidden + h]` (hidden `h` to output `k`), `b2[k]`.
- */
-export interface PortesNet {
-  readonly inputs: number;
-  readonly hidden: number;
-  readonly w1: NetArray;
-  readonly b1: NetArray;
-  readonly w2: NetArray;
-  readonly b2: NetArray;
-}
-
-/** The shipped form of a net: the sizes and the weights as base64 Float32. */
-export interface PortesNetFile {
-  readonly id: string;
-  readonly inputs: number;
-  readonly hidden: number;
-  /** `w1`, `b1`, `w2`, `b2` in that order, little-endian Float32, base64. */
-  readonly data: string;
-  /** How it was trained, for people. */
-  readonly notes?: string;
-}
-
-/** The inputs of one position that are not 0: `index[k]` has `value[k]`. */
-export interface SparseInput {
-  readonly index: Int32Array;
-  readonly value: Float64Array;
-  count: number;
-}
-
+/** Room for the Portes inputs. */
 export function createSparseInput(): SparseInput {
-  return {
-    index: new Int32Array(PORTES_NET_INPUTS),
-    value: new Float64Array(PORTES_NET_INPUTS),
-    count: 0,
-  };
-}
-
-function push(input: SparseInput, index: number, value: number): void {
-  input.index[input.count] = index;
-  input.value[input.count] = value;
-  input.count += 1;
+  return createInput(PORTES_NET_INPUTS);
 }
 
 function at(values: readonly number[], i: number): number {
@@ -103,105 +73,38 @@ export function encodePortes(roller: Side, waiter: Side, input: SparseInput): vo
   for (let s = 0; s < 2; s += 1) {
     const side = s === 0 ? roller : waiter;
     const base = s * 96;
-    for (let p = 1; p <= 24; p += 1) {
-      const n = at(side, p);
-      if (n === 0) continue;
-      const i = base + (p - 1) * 4;
-      push(input, i, 1);
-      if (n > 1) push(input, i + 1, 1);
-      if (n > 2) push(input, i + 2, 1);
-      if (n > 3) push(input, i + 3, (n - 3) / 2);
-    }
+    for (let p = 1; p <= 24; p += 1) pushPointUnits(input, base + (p - 1) * 4, at(side, p));
   }
-  if (at(roller, BAR) > 0) push(input, 192, at(roller, BAR) / 2);
-  if (at(waiter, BAR) > 0) push(input, 193, at(waiter, BAR) / 2);
-  if (at(roller, OFF) > 0) push(input, 194, at(roller, OFF) / 15);
-  if (at(waiter, OFF) > 0) push(input, 195, at(waiter, OFF) / 15);
-  push(input, 196, pips(roller) / 100);
-  push(input, 197, pips(waiter) / 100);
+  if (at(roller, BAR) > 0) pushInput(input, 192, at(roller, BAR) / 2);
+  if (at(waiter, BAR) > 0) pushInput(input, 193, at(waiter, BAR) / 2);
+  if (at(roller, OFF) > 0) pushInput(input, 194, at(roller, OFF) / 15);
+  if (at(waiter, OFF) > 0) pushInput(input, 195, at(waiter, OFF) / 15);
+  pushInput(input, 196, pips(roller) / 100);
+  pushInput(input, 197, pips(waiter) / 100);
   const rollerShots = countShots(roller, waiter).any;
-  if (rollerShots > 0) push(input, 198, rollerShots / 36);
+  if (rollerShots > 0) pushInput(input, 198, rollerShots / 36);
   const waiterShots = countShots(waiter, roller).any;
-  if (waiterShots > 0) push(input, 199, waiterShots / 36);
-  push(input, 200, contactScore(roller, waiter, PORTES_DEFAULT_WEIGHTS) / 4);
+  if (waiterShots > 0) pushInput(input, 199, waiterShots / 36);
+  pushInput(input, 200, contactScore(roller, waiter, PORTES_DEFAULT_WEIGHTS) / 4);
 }
 
-function sigmoid(x: number): number {
-  return 1 / (1 + Math.exp(-x));
-}
-
-/**
- * The forward pass. Writes the hidden activations into `hiddenOut` and the
- * 3 outputs into `out`.
- */
-export function forward(
-  net: PortesNet,
-  input: SparseInput,
-  hiddenOut: Float64Array,
-  out: Float64Array,
-): void {
-  const { hidden: size, w1, b1, w2, b2 } = net;
-  for (let h = 0; h < size; h += 1) hiddenOut[h] = b1[h] ?? 0;
-  for (let k = 0; k < input.count; k += 1) {
-    const v = input.value[k] ?? 0;
-    const row = (input.index[k] ?? 0) * size;
-    for (let h = 0; h < size; h += 1) {
-      hiddenOut[h] = (hiddenOut[h] ?? 0) + v * (w1[row + h] ?? 0);
-    }
-  }
-  for (let h = 0; h < size; h += 1) hiddenOut[h] = sigmoid(hiddenOut[h] ?? 0);
-  for (let o = 0; o < PORTES_NET_OUTPUTS; o += 1) {
-    let sum = b2[o] ?? 0;
-    const row = o * size;
-    for (let h = 0; h < size; h += 1) sum += (w2[row + h] ?? 0) * (hiddenOut[h] ?? 0);
-    out[o] = sigmoid(sum);
-  }
-}
-
-/** Turns the 3 outputs into an `Evaluation`. A diplo is at most the win (or loss) chance. */
-export function toEvaluation(win: number, winDouble: number, loseDouble: number): Evaluation {
-  const wd = Math.min(win, winDouble);
-  const ld = Math.min(1 - win, loseDouble);
-  return { win, winDouble: wd, loseDouble: ld, equity: 2 * win - 1 + wd - ld };
-}
+/** Portes for the shared net code. The context is `backgammonScores3`. */
+export const portesNetGame: NetGame<Side, boolean> = {
+  variant: portes,
+  inputs: PORTES_NET_INPUTS,
+  context: (rules) => rules.scoring.backgammonScores3,
+  sideOf,
+  play: playTurn,
+  endPoints: portesTurnPoints,
+  usesNet: (roller, waiter) =>
+    at(roller, OFF) < 15 && at(waiter, OFF) < 15 && hasContact(roller, waiter),
+  encode: (roller, waiter, _triple, input) => encodePortes(roller, waiter, input),
+  fallback: (roller, waiter) => evaluateSides(roller, waiter, PORTES_DEFAULT_WEIGHTS),
+};
 
 /** Builds a `PortesNet` from its shipped form. Throws if the sizes do not match. */
 export function loadPortesNet(file: PortesNetFile): PortesNet {
-  const { inputs, hidden } = file;
-  if (inputs !== PORTES_NET_INPUTS) {
-    throw new RangeError(
-      `net "${file.id}" has ${inputs} inputs, the code needs ${PORTES_NET_INPUTS}`,
-    );
-  }
-  const all = decodeFloat32(file.data);
-  const sizes = [inputs * hidden, hidden, PORTES_NET_OUTPUTS * hidden, PORTES_NET_OUTPUTS];
-  const total = sizes.reduce((a, b) => a + b, 0);
-  if (all.length !== total) {
-    throw new RangeError(`net "${file.id}" has ${all.length} weights, expected ${total}`);
-  }
-  let start = 0;
-  const parts = sizes.map((n) => {
-    const part = all.subarray(start, start + n);
-    start += n;
-    return part;
-  });
-  const [w1, b1, w2, b2] = parts as [Float32Array, Float32Array, Float32Array, Float32Array];
-  return { inputs, hidden, w1, b1, w2, b2 };
-}
-
-/** A reusable scratch space for one net, so scoring allocates nothing per position. */
-export interface NetScratch {
-  readonly input: SparseInput;
-  readonly hidden: Float64Array;
-  readonly out: Float64Array;
-}
-
-export function createScratch(net: PortesNet): NetScratch {
-  return {
-    input: createSparseInput(),
-    hidden: new Float64Array(net.hidden),
-    out: new Float64Array(PORTES_NET_OUTPUTS),
-  };
+  return loadNet(file, PORTES_NET_INPUTS);
 }
 
 /**
@@ -214,19 +117,7 @@ export function evaluateNetSides(
   waiter: Side,
   scratch: NetScratch = createScratch(net),
 ): Evaluation {
-  if (at(roller, OFF) === 15 || at(waiter, OFF) === 15 || !hasContact(roller, waiter)) {
-    return evaluateSides(roller, waiter, PORTES_DEFAULT_WEIGHTS);
-  }
-  encodePortes(roller, waiter, scratch.input);
-  forward(net, scratch.input, scratch.hidden, scratch.out);
-  return toEvaluation(scratch.out[0] ?? 0, scratch.out[1] ?? 0, scratch.out[2] ?? 0);
-}
-
-/** True if `loser` has a checker on the bar or in the winner's home (own 19–24). */
-function isBackgammon(loser: Side): boolean {
-  if (at(loser, BAR) > 0) return true;
-  for (let p = 19; p <= 24; p += 1) if (at(loser, p) > 0) return true;
-  return false;
+  return evaluateNet(portesNetGame, net, roller, waiter, false, scratch);
 }
 
 /**
@@ -242,15 +133,9 @@ export function scoreNetTurns(
   const me = sideOf(state, state.toMove);
   const them = sideOf(state, opponent(state.toMove));
   const triple = state.rules.scoring.backgammonScores3;
-  return turns.map((turn) => {
-    const [mine, theirs] = playTurn(me, them, turn);
-    if (at(mine, OFF) === 15) {
-      let points = 1;
-      if (at(theirs, OFF) === 0) points = triple && isBackgammon(theirs) ? 3 : 2;
-      return { score: points, gameOver: true };
-    }
-    return { score: -evaluateNetSides(net, theirs, mine, scratch).equity, gameOver: false };
-  });
+  return scoreNetCandidates(portesNetGame, net, me, them, triple, turns, scratch).map(
+    (c) => c.score,
+  );
 }
 
 /**
@@ -261,31 +146,7 @@ export function createPortesNetEvaluator(
   net: PortesNet | (() => PortesNet),
   id: string,
 ): Evaluator {
-  let loaded: { net: PortesNet; scratch: NetScratch } | undefined;
-  const get = (): { net: PortesNet; scratch: NetScratch } => {
-    if (loaded === undefined) {
-      const value = typeof net === 'function' ? net() : net;
-      loaded = { net: value, scratch: createScratch(value) };
-    }
-    return loaded;
-  };
-  return {
-    id,
-    variant: 'portes',
-    evaluate(state: GameState): Evaluation {
-      const { net: value, scratch } = get();
-      return evaluateNetSides(
-        value,
-        sideOf(state, state.toMove),
-        sideOf(state, opponent(state.toMove)),
-        scratch,
-      );
-    },
-    scoreTurns(state: GameState, turns: readonly Turn[]): TurnScore[] {
-      const { net: value, scratch } = get();
-      return scoreNetTurns(value, state, turns, scratch);
-    },
-  };
+  return createNetEvaluator(portesNetGame, net, id);
 }
 
 let shipped: PortesNet | undefined;

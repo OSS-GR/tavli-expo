@@ -109,3 +109,22 @@ export function hasContact(a: Side, b: Side): boolean {
   }
   return backA > backB;
 }
+
+/** True if `loser` has a checker on the bar or in the winner's home (own 19–24). */
+export function isBackgammon(loser: Side): boolean {
+  if ((loser[BAR] ?? 0) > 0) return true;
+  for (let p = 19; p <= 24; p += 1) if ((loser[p] ?? 0) > 0) return true;
+  return false;
+}
+
+/**
+ * The points for the mover if the turn ends the game (the mover's last
+ * checker is off), else `null`: 1, 2 for a diplo (the loser has none off),
+ * or 3 for a backgammon when `triple` (`backgammonScores3`). The heuristic,
+ * the net and the trainer all use it, so they score a game end the same.
+ */
+export function portesTurnPoints(mine: Side, theirs: Side, triple: boolean): number | null {
+  if ((mine[OFF] ?? 0) !== 15) return null;
+  if ((theirs[OFF] ?? 0) > 0) return 1;
+  return triple && isBackgammon(theirs) ? 3 : 2;
+}
