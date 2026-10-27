@@ -1,6 +1,6 @@
 # Tavli — Project Docs
 
-> This folder is the **live documentation** for the project. Every pull request that changes behavior or a decision also updates the matching doc. Last review: 2026-10-26.
+> This folder is the **live documentation** for the project. Every pull request that changes behavior or a decision also updates the matching doc. Last review: 2026-10-27.
 
 ## Start here
 
@@ -11,6 +11,14 @@
 | [Open questions](open-questions.md) | Things the owner must answer or decide |
 | [How we work on GitHub](process/github-workflow.md) | Labels, issue types, board, Definition of Done |
 | [Running the app](process/running-the-app.md) | Simulator, iPhone (free Apple ID), Android emulator, EAS builds, dev routes, common errors |
+
+## Legal
+
+| Doc | What it holds |
+|-----|---------------|
+| [Privacy policy (English)](legal/privacy.md) | What data the app uses, published at `tavlaki.com/privacy` |
+| [Privacy policy (Greek)](legal/privacy.el.md) | Πολιτική απορρήτου, published at `tavlaki.com/el/privacy` |
+| [How to publish the legal pages](legal/README.md) | Static HTML pages, how to host them, owner checklist |
 
 ## Game rules (the engine spec)
 
@@ -30,6 +38,7 @@
 | [Backend, multiplayer, auth options](architecture/backend-options.md) | Vendors, costs, recommended design |
 | [Bot AI](architecture/bot-ai.md) | Bot levels, training, on-device play |
 | [Board screen](architecture/board-screen.md) | How the app draws the board (Skia), board flip, tests and screenshots |
+| [App shell](architecture/app-shell.md) | Home, new game, local matches, the bot turn, in-game menu |
 | [iMessage version](architecture/imessage.md) | How a GamePigeon-style version works |
 
 ## Design
@@ -40,6 +49,7 @@
 | [Board style concepts](design/style/README.md) | Two wooden concepts, palettes, mood board |
 | [Themes package](../packages/themes/README.md) | How a board theme is built (manifest, layouts, assets) and how to add one |
 | [Wireframes](design/wireframes.md) | MVP1 screens, user flow, portrait board layout |
+| [App icon and splash](design/app-icon.md) | Three icon concepts, the pick, files and rebuild |
 
 ## Decisions (ADRs)
 

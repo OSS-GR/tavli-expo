@@ -18,6 +18,8 @@ export interface PlayerStripProps {
   score: number;
   target: number;
   active: boolean;
+  /** The pill text while active. Default: "Your turn". */
+  turnLabel?: string;
   testID?: string;
 }
 
@@ -28,14 +30,16 @@ export function PlayerStrip({
   score,
   target,
   active,
+  turnLabel,
   testID,
 }: PlayerStripProps) {
   const { t } = useTranslation();
+  const pill = turnLabel ?? t('game.strip.turn');
   const label = [
     name,
     pips === null ? null : t('game.strip.pipsLabel', { count: pips }),
     t('game.strip.scoreLabel', { score, target }),
-    active ? t('game.strip.turn') : null,
+    active ? pill : null,
   ]
     .filter((part) => part !== null)
     .join(', ');
@@ -60,7 +64,7 @@ export function PlayerStrip({
       {active ? (
         <View style={styles.pill}>
           <Text style={styles.pillText} numberOfLines={1}>
-            {displayCaps(t('game.strip.turn'))}
+            {displayCaps(pill)}
           </Text>
         </View>
       ) : null}

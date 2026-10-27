@@ -1,6 +1,7 @@
 {
   "common": {
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "cancel": "Cancel"
   },
   "crash": {
     "title": "Something went wrong",
@@ -10,7 +11,23 @@
   "home": {
     "title": "Tavlaki",
     "tagline": "Greek tavli with friends",
-    "openSettings": "Settings"
+    "openSettings": "Settings",
+    "newGame": "New game",
+    "vsBot": {
+      "title": "Play vs bot",
+      "subtitle": "Easy or Medium",
+      "subtitleEasy": "Easy for now. Medium is coming soon."
+    },
+    "local": {
+      "title": "Pass-and-play",
+      "subtitle": "2 players, 1 phone"
+    },
+    "friend": {
+      "title": "Play a friend",
+      "subtitle": "Online",
+      "soon": "Coming soon: play friends online."
+    },
+    "howToPlay": "How to play"
   },
   "settings": {
     "title": "Settings",
@@ -74,9 +91,6 @@
       "viewer": "Board view",
       "viewWhite": "White at the bottom",
       "viewBlack": "Black at the bottom"
-    },
-    "play": {
-      "title": "Pass-and-play (dev)"
     }
   },
   "game": {
@@ -90,7 +104,8 @@
       "tie": "Tie! Both rolled {{value}}. Roll again.",
       "result": "{{name}} starts with {{high}}-{{low}}.",
       "notRolled": "Not rolled yet",
-      "rolled": "Rolled {{value}}"
+      "rolled": "Rolled {{value}}",
+      "result_you": "You start with {{high}}-{{low}}."
     },
     "roll": {
       "opening": "Roll to start",
@@ -105,7 +120,8 @@
       "pips": "Pips {{count}}",
       "pipsLabel": "{{count}} pips to go",
       "scoreLabel": "{{score}} of {{target}} points",
-      "turn": "Your turn"
+      "turn": "Your turn",
+      "playing": "Playing"
     },
     "controls": {
       "undo": "↶ Undo",
@@ -117,7 +133,10 @@
       "body": "{{name}} rolled {{dice}}. No checker can move.",
       "next": "The turn passes to {{name}}.",
       "ok": "OK",
-      "autoClose": "Closes by itself after 3 s."
+      "autoClose": "Closes by itself after 3 s.",
+      "body_you": "You rolled {{dice}}. No checker can move.",
+      "next_you": "Your turn.",
+      "autoCloseShort": "Closes by itself after 2 s."
     },
     "end": {
       "gameWinner": "{{name}} wins the game!",
@@ -130,7 +149,105 @@
       "next": "Next game",
       "starts": "{{name}} starts",
       "matchWinner": "{{name}} wins the match!",
-      "rematch": "Rematch"
+      "rematch": "Rematch",
+      "gameWinner_you": "You win the game!",
+      "matchWinner_you": "You won the match!",
+      "starts_you": "You start (winner starts)",
+      "resigned": "{{name}} resigned.",
+      "resigned_you": "You resigned.",
+      "home": "Home",
+      "changeSettings": "Change settings"
+    },
+    "you": "You",
+    "bot": {
+      "name": "Bot",
+      "strip": "Bot · {{level}}",
+      "waiting": "Bot's turn…",
+      "moving": "Bot rolled {{dice}} and is moving…"
+    },
+    "menu": {
+      "open": "Game menu",
+      "title": "Game menu",
+      "summaryBot": "{{game}} · vs Bot ({{level}}) · {{score}}",
+      "summaryLocal": "{{game}} · pass-and-play · {{score}}",
+      "resignGame": "Resign game",
+      "resignGameHint": "{{name}} wins this game",
+      "resignMatch": "Resign match",
+      "resignMatchHint": "{{name}} wins the match",
+      "rules": "How to play {{game}}",
+      "settings": "Settings",
+      "exit": "Exit to home",
+      "exitHint": "Your game stays open until you start a new one",
+      "resume": "Resume"
+    },
+    "resign": {
+      "gameTitle": "Resign this game?",
+      "diplo": "{{winner}} wins 2 points (diplo), because {{loser}} has not borne off any checker yet.",
+      "diplo_you": "{{winner}} wins 2 points (diplo), because you have not borne off any checker yet.",
+      "mono": "{{winner}} wins 1 point (mono), because {{loser}} has borne off a checker.",
+      "mono_you": "{{winner}} wins 1 point (mono), because you have borne off a checker.",
+      "points": "{{winner}} wins {{count}} points.",
+      "after": "Match after resign: {{score}} (to {{target}})",
+      "matchTitle": "Resign the match?",
+      "matchBody": "{{winner}} wins the match. The match ends now.",
+      "confirm": "Resign",
+      "keep": "Keep playing"
+    },
+    "missing": {
+      "title": "This game could not be opened.",
+      "home": "Home"
     }
+  },
+  "games": {
+    "portes": "Portes",
+    "portesSubtitle": "Πόρτες · Greek backgammon",
+    "plakoto": "Plakoto",
+    "fevga": "Fevga",
+    "asodio": "Asodio",
+    "tavli": "Tavli"
+  },
+  "bot": {
+    "levels": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    }
+  },
+  "newGame": {
+    "titleBot": "Play vs bot",
+    "titleLocal": "Pass-and-play",
+    "back": "Back",
+    "game": "Game",
+    "lockedGames": "More games are coming soon.",
+    "gameSoon": "Coming soon: {{game}}",
+    "length": {
+      "label": "Match length",
+      "hint_one": "First to {{count}} point. Mono = 1, diplo = 2.",
+      "hint_other": "First to {{count}} points. Mono = 1, diplo = 2."
+    },
+    "botLevel": {
+      "label": "Bot level",
+      "easyHint": "Easy plays a random legal move. Good for learning.",
+      "mediumHint": "Medium plays like a casual player.",
+      "hardHint": "Hard plays like a strong player.",
+      "soon": "Medium and Hard are coming soon."
+    },
+    "whoStarts": {
+      "title": "Who starts?",
+      "body": "Each player rolls one die. High die starts."
+    },
+    "players": {
+      "label": "Players (optional)",
+      "white": "Player 1 (white)",
+      "black": "Player 2 (black)",
+      "whiteLabel": "Name of player 1, white checkers",
+      "blackLabel": "Name of player 2, black checkers"
+    },
+    "start": "Start game"
+  },
+  "rules": {
+    "title": "How to play {{game}}",
+    "soon": "The full rules page is coming soon.",
+    "portes": "Each player moves 15 checkers around the board and bears them off. The first to bear off all checkers wins: mono (1 point), or diplo (2 points) if the other player has borne off none."
   }
 }

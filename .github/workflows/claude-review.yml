@@ -1,9 +1,7 @@
 name: Claude review
 
 # Claude code review at high effort on every pull request (#96). It is a
-# required check: it fails when Claude finds a blocking problem. It lives in
-# its own file so that a change to ci.yml does not switch it off (the Claude
-# action runs only when this file is the same as on the default branch).
+# required check: it fails when Claude finds a blocking problem.
 # See docs/process/github-workflow.md.
 on:
   pull_request:
@@ -38,8 +36,6 @@ jobs:
       # Post and update the findings comment.
       issues: write
       pull-requests: write
-      # The Claude action signs in to GitHub as the Claude app through OIDC.
-      id-token: write
     steps:
       - name: Check the Claude secret
         id: secret
@@ -59,48 +55,33 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # The Claude action runs only when this workflow file is the same as on
-      # the default branch (a security rule). A PR that changes it gets no
-      # review: the job passes and says that a person must review it.
-      #
-      # Three dots: only the PR's own changes count. A branch made before
-      # this file changed on main has an older copy, but the run uses the
-      # merge commit, which has main's copy, so the action still runs.
-      # Any git error fails the step (and so the job): it must not skip the review.
-      - name: Check for workflow changes
-        id: workflow
-        env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: |
-          status=0
-          git diff --quiet "origin/$DEFAULT_BRANCH...HEAD" -- .github/workflows/claude-review.yml || status=$?
-          case "$status" in
-            0) echo "changed=false" >> "$GITHUB_OUTPUT" ;;
-            1)
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-              echo "::warning::This PR changes claude-review.yml, so the Claude action will not run. A person must review it."
-              ;;
-            *)
-              echo "::error::Could not compare claude-review.yml with origin/$DEFAULT_BRANCH (git exit code $status)."
-              exit 1
-              ;;
-          esac
-
       # Runs Claude Code's /code-review at high effort on the PR's changes.
       # It follows CLAUDE.md. It cannot edit files or post: the next step posts.
       - name: Claude review
         id: review
-        if: steps.workflow.outputs.changed == 'false'
         uses: anthropics/claude-code-action@v1
         with:
+          # The workflow's own token, read-only for code. With it the action
+          # skips the Claude app sign-in, which only runs when this file is
+          # the same as on main, so a change to this file is reviewed too.
+          github_token: ${{ github.token }}
+          # Private repo: show Claude's full output in the run log, so a
+          # failed review is easy to debug.
+          show_full_output: true
           # The subscription token wins when both secrets are set.
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN == '' && secrets.ANTHROPIC_API_KEY || '' }}
-          prompt: /code-review high origin/${{ github.event.pull_request.base.ref }}...HEAD
+          prompt: |
+            Review this pull request. Its changes are `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`.
+
+            1. Use the Skill tool to run the `code-review` skill with the arguments `high origin/${{ github.event.pull_request.base.ref }}...HEAD`. Let it finish.
+            2. Then call the StructuredOutput tool exactly once, with every finding the review reported. Use an empty findings list when there are none.
+
+            Do not edit files and do not post anything: the workflow posts your findings.
           claude_args: |
             --effort high
-            --allowedTools "Read,Glob,Grep,Agent,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git merge-base:*),Bash(git rev-parse:*),Bash(git status:*)"
-            --disallowedTools "Edit,Write,NotebookEdit"
+            --allowedTools "Read,Glob,Grep,Agent,Task,Skill,TodoWrite,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git merge-base:*),Bash(git rev-parse:*),Bash(git status:*),Bash(git ls-files:*),Bash(git branch:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(rg:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch"
             --append-system-prompt "You are the required review gate for this pull request. Do not edit files and do not post anything: the workflow posts your findings. Put every finding you report in the structured output. Mark a finding blocking when it is a correctness bug, a crash, data loss, a security problem, a test that fails or tests nothing, or a break of a hard rule in CLAUDE.md. Mark every other finding optional. Set verdict to fail when there is at least one blocking finding, else pass. Write in simple English: short sentences, active voice."
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","fail"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","properties":{"severity":{"type":"string","enum":["blocking","optional"]},"file":{"type":"string"},"line":{"type":"integer"},"title":{"type":"string"},"detail":{"type":"string"}},"required":["severity","file","title","detail"]}}},"required":["verdict","summary","findings"]}'
 
@@ -116,17 +97,10 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          WORKFLOW_CHANGED: ${{ steps.workflow.outputs.changed }}
         run: |
           marker='<!-- claude-review -->'
 
-          if [ "$WORKFLOW_CHANGED" = "true" ]; then
-            verdict=pass
-            body="$marker
-          ## Claude review: ⏭️ skipped
-
-          This PR changes \`.github/workflows/claude-review.yml\`. The Claude action runs only when that file is the same as on the default branch, so it did not review this PR. **A person must review the workflow change.**"
-          elif [ -n "$OUT" ] && jq -e '.findings | type == "array"' <<< "$OUT" > /dev/null 2>&1; then
+          if [ -n "$OUT" ] && jq -e '.findings | type == "array"' <<< "$OUT" > /dev/null 2>&1; then
             blocking=$(jq '[.findings[] | select(.severity == "blocking")] | length' <<< "$OUT")
             verdict=$(jq -r '.verdict' <<< "$OUT")
             # Pass only on an explicit "pass" with no blocking finding.

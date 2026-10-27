@@ -373,6 +373,8 @@ describe('rotation and missing variants', () => {
       'plakoto',
       'fevga',
     ]);
+    // The real registry has every game of the tavli rotation now.
+    expect(missingVariants(createMatch({ rules: TAVLI }))).toEqual([]);
     expect(missingVariants(createMatch())).toEqual([]);
   });
 

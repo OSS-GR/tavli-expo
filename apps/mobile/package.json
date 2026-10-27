@@ -9,11 +9,13 @@
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tools",
     "test": "jest",
-    "screenshots": "vitest run --config tools/screenshots/vitest.config.mts"
+    "screenshots": "vitest run --config tools/screenshots/vitest.config.mts",
+    "build:icons": "node assets/icon/tools/build-icons.mjs"
   },
   "dependencies": {
     "@sentry/react-native": "~8.28.0",
     "@shopify/react-native-skia": "2.14.0",
+    "@tavli/bot": "workspace:*",
     "@tavli/contracts": "workspace:*",
     "@tavli/crash-sentry": "workspace:*",
     "@tavli/engine": "workspace:*",

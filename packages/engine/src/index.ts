@@ -82,6 +82,8 @@ export type {
 export { BUILT_IN_VARIANTS, VARIANT_REGISTRY, portes } from './variants';
 export { PORTES_START } from './variants/portes';
 export { PLAKOTO_START, plakoto } from './variants/plakoto';
+export { fevga } from './variants';
+export { FEVGA_START } from './variants/fevga';
 
 export {
   MATCH_SCHEMA_VERSION,
