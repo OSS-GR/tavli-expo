@@ -6,6 +6,7 @@
  * reads top to bottom. Nothing has a fixed height: the text wraps at large
  * font sizes and the page scrolls.
  */
+import type { TutorialGame } from '@tavli/contracts';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -30,24 +31,33 @@ export interface RulesScreenProps {
   variant: RulesVariant | null;
   /** Opens the page of one game (links on the Tavli page). */
   onOpenRules: (game: RulesGame) => void;
-  /** Opens the tutorial (#128). Shown on the Portes page, which the tutorial teaches. */
-  onLearnToPlay?: () => void;
+  /**
+   * Opens the lessons of a game: Portes (#128), Plakoto or Fevga (#149).
+   * Shown on those three pages.
+   */
+  onLearnToPlay?: (game: TutorialGame) => void;
+}
+
+/** The rules pages that have lessons on the board. */
+function tutorialGameOf(variant: RulesVariant | null): TutorialGame | null {
+  return variant === 'portes' || variant === 'plakoto' || variant === 'fevga' ? variant : null;
 }
 
 export function RulesScreen({ variant, onOpenRules, onLearnToPlay }: RulesScreenProps) {
   const { t } = useTranslation();
+  const lessons = tutorialGameOf(variant);
   return (
     <ScrollView
       testID="rules-screen"
       style={styles.screen}
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic">
-      {variant === 'portes' && onLearnToPlay ? (
+      {lessons !== null && onLearnToPlay ? (
         <ActionButton
           testID="rules-learn-to-play"
           kind="secondary"
           label={t('tutorial.openFromRules')}
-          onPress={onLearnToPlay}
+          onPress={() => onLearnToPlay(lessons)}
         />
       ) : null}
       {isRulesGame(variant) ? (

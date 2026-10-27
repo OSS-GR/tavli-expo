@@ -1,6 +1,7 @@
 /**
- * The first-run tutorial (#128): seven short lessons in Portes on the real
- * board (`InteractiveBoard`), with fixed positions and fixed dice.
+ * The tutorial on the real board (`InteractiveBoard`), with fixed
+ * positions and fixed dice: seven short lessons in Portes (#128, the
+ * first-run tutorial), or four in Plakoto or Fevga (#149, `game`).
  *
  * Each lesson has one line of text, a ring on the checker to touch and,
  * after the checker is picked, the target ring. A wrong touch shakes the
@@ -8,6 +9,8 @@
  * **Next**. **Skip** is always there. The end card offers the first game.
  * With the move list on (a screen reader, or Settings), each lesson can
  * be played from its buttons too; they offer only the lesson's moves.
+ * The Plakoto mother lesson ends with the "resign or play on" card
+ * (`MotherLessonCard`) over the board.
  *
  * The lessons and their rules live in `lessons.ts`; the engine decides
  * what is legal. This screen only shows them. The route sends analytics
@@ -46,15 +49,24 @@ import { Celebration } from '@/features/game/Celebration';
 import { diceView } from '@/features/game/gameStore';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 
-import { LESSONS, lessonMoves, playLessonMove, startLesson, type LessonId } from './lessons';
+import {
+  LESSON_SETS,
+  lessonDirection,
+  lessonMoves,
+  playLessonMove,
+  startLesson,
+  type LessonId,
+  type TutorialGame,
+} from './lessons';
+import { MotherLessonCard } from './MotherLessonCard';
 
-/** You play White, at the bottom. The board never turns. */
-const VIEW: BoardView = { viewer: 'white', direction: 'contrary' };
 /** One shake of the lesson text: left, right, left, back. */
 const SHAKE = [-8, 8, -5, 0] as const;
 const SHAKE_STEP_MS = 50;
 
 export interface TutorialScreenProps {
+  /** The lesson set. Default: Portes. */
+  game?: TutorialGame;
   /** Lesson `step` (from 1) was learnt. */
   onLessonDone: (step: number, lesson: LessonId) => void;
   /**
@@ -70,7 +82,28 @@ export interface TutorialScreenProps {
   onHome: () => void;
 }
 
+/** The texts that differ per lesson set. Portes keeps its first keys. */
+function setTexts(game: TutorialGame) {
+  if (game === 'portes') {
+    return {
+      title: 'tutorial.title',
+      skipHint: 'tutorial.skipHint',
+      endTitle: 'tutorial.end.title',
+      endBody: 'tutorial.end.body',
+      play: 'tutorial.end.play',
+    } as const;
+  }
+  return {
+    title: `tutorial.games.${game}.title`,
+    skipHint: `tutorial.games.${game}.skipHint`,
+    endTitle: `tutorial.games.${game}.endTitle`,
+    endBody: `tutorial.games.${game}.endBody`,
+    play: `tutorial.games.${game}.play`,
+  } as const;
+}
+
 export function TutorialScreen({
+  game = 'portes',
   onLessonDone,
   onFinished,
   onSkip,
@@ -85,8 +118,14 @@ export function TutorialScreen({
     loadThemeSounds(theme);
   }, [theme]);
 
+  const lessons = LESSON_SETS[game];
+  const texts = setTexts(game);
+  // You play White, at the bottom. The board never turns.
+  const direction = lessonDirection(game);
+  const view: BoardView = useMemo(() => ({ viewer: 'white', direction }), [direction]);
+
   const [index, setIndex] = useState(0);
-  const [flow, setFlow] = useState<GameFlow>(() => startLesson(LESSONS[0]!));
+  const [flow, setFlow] = useState<GameFlow>(() => startLesson(lessons[0]!));
   const [wrong, setWrong] = useState(0);
   const [flights, setFlights] = useState<readonly Flight[]>([]);
   const onFlightDone = useCallback(
@@ -103,7 +142,7 @@ export function TutorialScreen({
   const shake = useSharedValue(0);
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.get() }] }));
 
-  const lesson = LESSONS[index];
+  const lesson = lessons[index];
   const done = lesson !== undefined && lesson.done(flow);
   // What a screen reader hears when it changes: the hint, or the success line.
   const status =
@@ -114,7 +153,7 @@ export function TutorialScreen({
         : wrong > 0
           ? t(`tutorial.lessons.${lesson.id}.hint`)
           : null;
-  useAnnouncement(lesson === undefined ? t('tutorial.end.title') : status);
+  useAnnouncement(lesson === undefined ? t(texts.endTitle) : status);
 
   const showWrong = () => {
     if (done) return;
@@ -139,8 +178,8 @@ export function TutorialScreen({
     );
     // With Reduce motion on, checkers jump to their place: no flight.
     if (!reduceMotion && geo !== null) {
-      const after = applyMoveToBoard(before, 'white', move, 'contrary');
-      const added = moveFlights(geo, VIEW, 'white', move, before, after, {
+      const after = applyMoveToBoard(before, 'white', move, direction);
+      const added = moveFlights(geo, view, 'white', move, before, after, {
         id: `t${index}:${next.played.length}`,
         ...(from ? { from } : {}),
       });
@@ -148,14 +187,14 @@ export function TutorialScreen({
     }
     if (lesson.done(next)) {
       onLessonDone(index + 1, lesson.id);
-      if (index === LESSONS.length - 1) onFinished();
+      if (index === lessons.length - 1) onFinished();
     }
     return true;
   };
 
   const goNext = () => {
     const nextIndex = index + 1;
-    const nextLesson = LESSONS[nextIndex];
+    const nextLesson = lessons[nextIndex];
     setIndex(nextIndex);
     setWrong(0);
     setFlights([]);
@@ -168,11 +207,11 @@ export function TutorialScreen({
         <View testID="tutorial-end" style={styles.end}>
           <Celebration kind="game" />
           <Text style={styles.endTitle} accessibilityRole="header">
-            {t('tutorial.end.title')}
+            {t(texts.endTitle)}
           </Text>
-          <Text style={styles.body}>{t('tutorial.end.body')}</Text>
+          <Text style={styles.body}>{t(texts.endBody)}</Text>
           <View style={styles.endButtons}>
-            <ActionButton testID="tutorial-play" label={t('tutorial.end.play')} onPress={onPlay} />
+            <ActionButton testID="tutorial-play" label={t(texts.play)} onPress={onPlay} />
             <ActionButton
               testID="tutorial-home"
               kind="text"
@@ -193,17 +232,17 @@ export function TutorialScreen({
       <View style={styles.topBar}>
         <View style={styles.titles}>
           <Text style={styles.title} accessibilityRole="header">
-            {t('tutorial.title')}
+            {t(texts.title)}
           </Text>
           <Text testID="tutorial-progress" style={styles.progress}>
-            {t('tutorial.progress', { step: index + 1, count: LESSONS.length })}
+            {t('tutorial.progress', { step: index + 1, count: lessons.length })}
           </Text>
         </View>
         <Pressable
           testID="tutorial-skip"
           accessibilityRole="button"
           accessibilityLabel={t('tutorial.skip')}
-          accessibilityHint={t('tutorial.skipHint')}
+          accessibilityHint={t(texts.skipHint)}
           hitSlop={8}
           onPress={() => onSkip(index + 1, lesson.id)}
           style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
@@ -232,7 +271,7 @@ export function TutorialScreen({
           accessibilityLabel={t(`tutorial.lessons.${lesson.id}.board`)}
           theme={theme}
           board={currentBoard(flow)}
-          view={VIEW}
+          view={view}
           mover="white"
           legal={legal}
           positionKey={`${index}:${flow.played.length}`}
@@ -246,6 +285,11 @@ export function TutorialScreen({
           onGeometry={onGeometry}
           cue
         />
+        {done && lesson.id === 'mother' ? (
+          <View style={styles.overlay}>
+            <MotherLessonCard />
+          </View>
+        ) : null}
       </View>
 
       {showMoveList ? (
@@ -334,6 +378,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   boardArea: {
     flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
   },
   controls: {
     flexDirection: 'row',

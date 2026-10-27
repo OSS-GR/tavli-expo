@@ -4,7 +4,7 @@
  *
  * Vs bot: the human plays White (at the bottom), the bot plays Black.
  */
-import { BOT_DIFFICULTIES, type Difficulty } from '@tavli/contracts';
+import { BOT_DIFFICULTIES, type Difficulty, type TutorialGame } from '@tavli/contracts';
 import {
   DEFAULT_PRESET_BY_GAME,
   VARIANT_REGISTRY,
@@ -168,12 +168,17 @@ export function defaultSetup(mode: MatchMode): MatchSetup {
 }
 
 /**
- * The setup of the first game after the tutorial (#128): Portes vs the
+ * The setup of the first game after the tutorial (#128): the game of the
+ * lessons (Portes, or Plakoto or Fevga after their lessons, #149) vs the
  * Easy bot (or the easiest level this build has). The match length comes
  * from `base` (the last choices).
  */
-export function firstGameSetup(base: MatchSetup, levels: GameLevels = ALL_GAME_LEVELS): MatchSetup {
-  return sanitizeSetup({ ...base, mode: 'bot', game: 'portes', botLevel: 'easy' }, 'bot', levels);
+export function firstGameSetup(
+  base: MatchSetup,
+  levels: GameLevels = ALL_GAME_LEVELS,
+  game: TutorialGame = 'portes',
+): MatchSetup {
+  return sanitizeSetup({ ...base, mode: 'bot', game, botLevel: 'easy' }, 'bot', levels);
 }
 
 /** Trims a typed name and cuts it to `MAX_NAME_LENGTH` characters. */

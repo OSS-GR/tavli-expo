@@ -16,8 +16,8 @@ import { consentStore } from '@/features/privacy/consentStore';
 import { SAVED_MATCH_KEY } from '@/features/match/savedMatch';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
-import { LESSONS } from '@/features/tutorial/lessons';
-import { TUTORIAL_STORAGE_KEY } from '@/features/tutorial/progress';
+import { LESSON_SETS, LESSONS } from '@/features/tutorial/lessons';
+import { TUTORIAL_STORAGE_KEY, tutorialStorageKey } from '@/features/tutorial/progress';
 import { tutorialStore } from '@/features/tutorial/store';
 import { analytics, storage } from '@/services';
 
@@ -45,8 +45,11 @@ beforeEach(async () => {
     consentStore.setState({ status: 'denied' });
   });
   // The tutorial was not seen yet: Home offers it.
-  storage.remove(TUTORIAL_STORAGE_KEY);
-  await act(async () => tutorialStore.setState({ status: 'new' }));
+  for (const game of ['portes', 'plakoto', 'fevga'] as const)
+    storage.remove(tutorialStorageKey(game));
+  await act(async () =>
+    tutorialStore.setState({ status: 'new', variants: { plakoto: 'new', fevga: 'new' } }),
+  );
   // Each test starts with no match and an empty save slot.
   const current = matchSessions.current();
   if (current) matchSessions.end(current.id);
@@ -228,8 +231,12 @@ describe('tutorial (#128)', () => {
     expect(storage.getString(TUTORIAL_STORAGE_KEY)).toContain('dismissed');
     const tracked = recorded.sent.filter((e) => e.type === 'track');
     expect(tracked).toEqual([
-      { type: 'track', event: 'tutorial_started', props: { source: 'home' } },
-      { type: 'track', event: 'tutorial_skipped', props: { step: 1, lesson: 'move' } },
+      { type: 'track', event: 'tutorial_started', props: { source: 'home', game: 'portes' } },
+      {
+        type: 'track',
+        event: 'tutorial_skipped',
+        props: { game: 'portes', step: 1, lesson: 'move' },
+      },
     ]);
 
     // Reopen from Settings → Help.
@@ -279,5 +286,61 @@ describe('tutorial (#128)', () => {
     await act(async () => appRouter.back());
     expect(router.getPathname()).toBe('/');
     expect(screen.queryByTestId('home-learn')).not.toBeOnTheScreen();
+  });
+
+  it('opens the Plakoto lessons from its rules page, saves them apart, then plays Plakoto (#149)', async () => {
+    const user = userEvent.setup();
+    await act(async () => consentStore.setState({ status: 'granted' }));
+    recorded.sent.length = 0;
+    const router = await renderRouter('./src/app', { initialUrl: '/rules/plakoto' });
+    await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+    expect(router.getPathname()).toBe('/tutorial');
+    expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'plakoto' });
+    expect(screen.getByRole('header', { name: 'Learn Plakoto' })).toBeOnTheScreen();
+    await layoutTutorialBoard();
+
+    for (const [i] of LESSON_SETS.plakoto.entries()) {
+      await playLessonByTaps(i, 'plakoto');
+      await user.press(screen.getByRole('button', { name: 'Next' }));
+    }
+    // Saved for Plakoto only: Portes (the Home card) is still new.
+    expect(tutorialStore.getState().variants.plakoto).toBe('done');
+    expect(tutorialStore.getState().status).toBe('new');
+    expect(storage.getString(tutorialStorageKey('plakoto'))).toContain('done');
+    expect(storage.getString(TUTORIAL_STORAGE_KEY)).toBeUndefined();
+    const tracked = recorded.sent.filter((e) => e.type === 'track');
+    expect(tracked[0]).toEqual({
+      type: 'track',
+      event: 'tutorial_started',
+      props: { source: 'rules', game: 'plakoto' },
+    });
+    expect(tracked).toContainEqual({
+      type: 'track',
+      event: 'tutorial_step',
+      props: { game: 'plakoto', step: 3, lesson: 'mother' },
+    });
+    expect(tracked).toContainEqual({
+      type: 'track',
+      event: 'tutorial_finished',
+      props: { game: 'plakoto' },
+    });
+
+    await user.press(screen.getByRole('button', { name: 'Play Plakoto' }));
+    expect(router.getPathname()).toBe('/new-game');
+    expect(router.getSearchParams()).toEqual({ mode: 'bot', first: 'plakoto' });
+    expect(screen.getByRole('radio', { name: /^Plakoto/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Easy' })).toBeChecked();
+  });
+
+  it('opens the Fevga lessons from its rules page, and Skip saves only Fevga', async () => {
+    const user = userEvent.setup();
+    const router = await renderRouter('./src/app', { initialUrl: '/rules/fevga' });
+    await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+    expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'fevga' });
+    expect(screen.getByText('Lesson 1 of 4')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Skip' }));
+    expect(router.getPathname()).toBe('/rules/fevga');
+    expect(tutorialStore.getState().variants).toEqual({ plakoto: 'new', fevga: 'dismissed' });
+    expect(tutorialStore.getState().status).toBe('new');
   });
 });

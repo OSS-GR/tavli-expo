@@ -40,10 +40,10 @@ Every event also carries PostHog's standard properties (`$lib`, `$os_name`, `$os
 | `resign` | A player resigned the game or the match. | none | game store |
 | `settings_changed` | A setting changed, except the theme. | `key`: the setting name (`sound`, `haptics`, `language`, `autoConfirmMoves`, `showPipCounts`, `boardFlipMode`, `moveList`, `boardTheme`) | `features/analytics/connect.ts` |
 | `theme_changed` | The app colors changed (the `theme` setting; the board is `boardTheme`). | `theme`: theme id | `features/analytics/connect.ts` |
-| `tutorial_started` | The tutorial (#128) opens. | `source`: `home` \| `rules` \| `settings` (where it was opened) | `app/tutorial.tsx` through `features/tutorial/tutorialAnalytics.ts` |
-| `tutorial_step` | A lesson of the tutorial is learnt (before **Next**). | `step`: 1–7; `lesson`: lesson id (`move`, `bothDice`, `double`, `makePoint`, `hit`, `enter`, `bearOff`) | same |
-| `tutorial_finished` | The last lesson is learnt and the end card shows. | none | same |
-| `tutorial_skipped` | **Skip** is tapped. | `step`: the lesson on screen, 1–7; `lesson`: its id | same |
+| `tutorial_started` | The tutorial (#128) opens. | `source`: `home` \| `rules` \| `settings` (where it was opened); `game`: `portes` \| `plakoto` \| `fevga` (the lesson set, #149) | `app/tutorial.tsx` through `features/tutorial/tutorialAnalytics.ts` |
+| `tutorial_step` | A lesson of the tutorial is learnt (before **Next**). | `game`; `step`: 1–7 (Portes) or 1–4 (Plakoto, Fevga); `lesson`: lesson id (Portes: `move`, `bothDice`, `double`, `makePoint`, `hit`, `enter`, `bearOff`; Plakoto: `pin`, `pinned`, `mother`, `plakotoBearOff`; Fevga: `sameWay`, `holdPoint`, `runner`, `sixInARow`) | same |
+| `tutorial_finished` | The last lesson is learnt and the end card shows. | `game` | same |
+| `tutorial_skipped` | **Skip** is tapped. | `game`; `step`: the lesson on screen, from 1; `lesson`: its id | same |
 | `$screen` | A route change. | screen name = route pattern | `features/analytics/useAppAnalytics.ts` |
 
 Notes:

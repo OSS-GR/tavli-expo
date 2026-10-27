@@ -76,6 +76,7 @@ export {
   type AnalyticsPropsArg,
   type GameMode,
   type GameResultKind,
+  type TutorialGame,
   type TutorialSource,
   type SentAnalytics,
 } from './analytics';
