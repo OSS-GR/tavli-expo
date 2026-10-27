@@ -3,6 +3,11 @@
     "comingSoon": "Coming soon",
     "cancel": "Cancel"
   },
+  "crash": {
+    "title": "Something went wrong",
+    "body": "Sorry, Tavlaki hit a problem. Restart the app to keep playing.",
+    "restart": "Restart"
+  },
   "home": {
     "title": "Tavlaki",
     "tagline": "Greek tavli with friends",

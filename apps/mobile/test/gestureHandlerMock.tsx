@@ -44,9 +44,14 @@ export interface Point {
 
 /**
  * A finger on the pan gesture `testID`: down at `path[0]`, through the
- * other points, up at the last one. One point is a tap.
+ * other points, up at the last one. One point is a tap. `canceled`: the
+ * system takes the touch away at the last point.
  */
-export async function touch(testID: string, path: Point[]): Promise<void> {
+export async function touch(
+  testID: string,
+  path: Point[],
+  { canceled = false }: { canceled?: boolean } = {},
+): Promise<void> {
   const pan = pans.get(testID);
   if (pan === undefined) throw new Error(`No pan gesture with testID ${testID}`);
   const [first, ...rest] = path;
@@ -54,6 +59,6 @@ export async function touch(testID: string, path: Point[]): Promise<void> {
   await act(async () => {
     pan.onBegin?.(first);
     for (const p of rest) pan.onUpdate?.(p);
-    pan.onFinalize?.({ ...(rest[rest.length - 1] ?? first), canceled: false });
+    pan.onFinalize?.({ ...(rest[rest.length - 1] ?? first), canceled });
   });
 }

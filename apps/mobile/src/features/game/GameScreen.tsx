@@ -109,13 +109,15 @@ export function GameScreen({
   // "No legal moves": the flow has passed the turn already; the card says why.
   const pass = passNotice(flow);
   const [passDismissed, setPassDismissed] = useState<string | null>(null);
+  const passKey = pass?.key ?? null;
   const showPass = pass !== null && passDismissed !== pass.key;
   const passMs = pass !== null && pass.player === botPlayer ? BOT_PASS_NOTICE_MS : PASS_NOTICE_MS;
+  // Keyed on the pass, not the notice object (a new one on each render).
   useEffect(() => {
-    if (!showPass || pass === null) return;
-    const timer = setTimeout(() => setPassDismissed(pass.key), passMs);
+    if (!showPass || passKey === null) return;
+    const timer = setTimeout(() => setPassDismissed(passKey), passMs);
     return () => clearTimeout(timer);
-  }, [showPass, pass, passMs]);
+  }, [showPass, passKey, passMs]);
 
   // Pass-and-play "flip": the player to move sits at the bottom. While the
   // pass card shows, the board stays with the player who passed.
@@ -188,9 +190,11 @@ export function GameScreen({
     const ok = dispatch({ type: 'move', player: mover, move, autoConfirm: withAutoConfirm });
     if (!ok) return false;
     playHaptic(theme, move.capture === 'hit' ? 'checkerHit' : 'checkerPlace');
-    // The turn ended (auto-confirm): the board may turn, so no flight.
+    // The turn ended (auto-confirm) and the board turns: no flight, and the
+    // flights still in the air belong to the old view.
     const next = store.getState().flow.game;
-    if (geo === null || next.state.toMove !== mover || next.phase === 'awaiting-roll') {
+    const turnEnded = next.state.toMove !== mover || next.phase === 'awaiting-roll';
+    if (geo === null || (turnEnded && flipMode === 'flip')) {
       setFlights([]);
       return true;
     }
@@ -203,9 +207,10 @@ export function GameScreen({
     return true;
   };
 
+  /** Returns whether the move was played; if not, the board flies the checker back. */
   const onMove = (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => {
-    if (botsTurn) return;
-    playMove(move, geo, from, autoConfirm);
+    if (botsTurn) return false;
+    return playMove(move, geo, from, autoConfirm);
   };
 
   const undo = (): boolean => {
@@ -386,6 +391,9 @@ export function GameScreen({
           subtitle={startsLine(winner)}
           onPress={() => {
             setFlights([]);
+            // Game and turn numbers start again: forget the closed cards.
+            setPassDismissed(null);
+            setOpeningDismissed(null);
             rematch();
           }}
         />
@@ -460,7 +468,9 @@ export function GameScreen({
     card = (
       <Pressable
         testID="opening-overlay"
-        // A tap closes the result early; while rolling, a tap rolls.
+        // The whole board area: a tap anywhere closes the result early;
+        // while rolling, a tap rolls ("or tap the board").
+        style={styles.tapArea}
         onPress={decided ? () => setOpeningDismissed(gameKey) : roll}
         accessible={false}>
         <OpeningCard
@@ -580,6 +590,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+  },
+  tapArea: {
+    flex: 1,
     justifyContent: 'center',
   },
   hintRow: {

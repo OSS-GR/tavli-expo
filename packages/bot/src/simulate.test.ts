@@ -6,15 +6,15 @@ import type { Turn } from '@tavli/engine';
 import { createBot, playGame, simulate } from './index';
 import type { Bot, SimulationPlayer } from './index';
 
-const easy: SimulationPlayer = { bot: createBot(), difficulty: 'easy' };
+const random: SimulationPlayer = { bot: createBot(), difficulty: 'random' };
 
 describe('simulate', () => {
-  it('plays 1,000 easy-vs-easy Portes games with no illegal turn', { timeout: 30_000 }, () => {
+  it('plays 1,000 random-vs-random Portes games with no illegal turn', { timeout: 30_000 }, () => {
     let turns = 0;
     let passes = 0;
     const result = simulate({
       variant: portes,
-      bots: [easy, easy],
+      bots: [random, random],
       games: 1000,
       seed: 2026,
       onTurn: ({ turn }) => {
@@ -42,7 +42,7 @@ describe('simulate', () => {
       const log: string[] = [];
       simulate({
         variant: portes,
-        bots: [easy, easy],
+        bots: [random, random],
         games: 5,
         seed,
         onTurn: ({ game, state, turn }) => {
@@ -54,7 +54,7 @@ describe('simulate', () => {
     const first = record(77);
     expect(record(77)).toEqual(first);
     expect(record(78)).not.toEqual(first);
-    const options = { variant: portes, bots: [easy, easy] as const, games: 20, seed: 5 };
+    const options = { variant: portes, bots: [random, random] as const, games: 20, seed: 5 };
     expect(simulate(options)).toEqual(simulate(options));
   });
 
@@ -65,7 +65,7 @@ describe('simulate', () => {
     };
     const result = simulate({
       variant: portes,
-      bots: [easy, { bot: lazy, difficulty: 'easy' }],
+      bots: [random, { bot: lazy, difficulty: 'random' }],
       games: 3,
       seed: 1,
     });
@@ -76,7 +76,7 @@ describe('simulate', () => {
     const failure = result.failures[1];
     if (failure === undefined) throw new Error('missing failure');
     const replay = playGame(
-      { variant: portes, bots: [easy, { bot: lazy, difficulty: 'easy' }], game: failure.game },
+      { variant: portes, bots: [random, { bot: lazy, difficulty: 'random' }], game: failure.game },
       failure.gameSeed,
     );
     expect(replay).toMatchObject({
@@ -87,11 +87,17 @@ describe('simulate', () => {
   });
 
   it('stops games that run too long, and reports bot errors', () => {
-    const short = simulate({ variant: portes, bots: [easy, easy], games: 2, seed: 1, maxTurns: 5 });
+    const short = simulate({
+      variant: portes,
+      bots: [random, random],
+      games: 2,
+      seed: 1,
+      maxTurns: 5,
+    });
     expect(short.failures.map((f) => f.code)).toEqual(['TOO_LONG', 'TOO_LONG']);
     const notYet = simulate({
       variant: portes,
-      bots: [easy, { bot: createBot(), difficulty: 'medium' }],
+      bots: [random, { bot: createBot(), difficulty: 'hard' }],
       games: 1,
       seed: 1,
     });
@@ -101,7 +107,7 @@ describe('simulate', () => {
   });
 
   it('rejects a bad game count', () => {
-    expect(() => simulate({ variant: portes, bots: [easy, easy], games: -1, seed: 1 })).toThrow(
+    expect(() => simulate({ variant: portes, bots: [random, random], games: -1, seed: 1 })).toThrow(
       RangeError,
     );
   });
