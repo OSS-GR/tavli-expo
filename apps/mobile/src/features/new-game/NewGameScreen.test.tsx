@@ -298,7 +298,7 @@ describe('<NewGameScreen /> game picker (#109)', () => {
     expect(onStart.mock.calls[1][0]).toMatchObject({ game: 'tavli', botLevel: 'easy' });
   });
 
-  it('offers Hard for Tavli with the real bot: Portes, Plakoto and Fevga all have it (#156)', async () => {
+  it('offers Hard for Tavli and Asodio with the real bot: every game has it (#156, #164)', async () => {
     const user = userEvent.setup();
     const { ui, onStart } = show('bot', botLevelsByGame(createBot()));
     await render(ui);
@@ -309,9 +309,13 @@ describe('<NewGameScreen /> game picker (#109)', () => {
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     expect(onStart.mock.calls[0][0]).toMatchObject({ game: 'tavli', botLevel: 'hard' });
 
-    // Asodio has no Hard yet.
+    // Asodio has Hard too (#164).
     await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
-    expect(screen.getByRole('radio', { name: 'Hard' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'Hard' })).toBeEnabled();
+    expect(screen.queryByText('Hard is coming soon.')).toBeNull();
+    await user.press(screen.getByRole('radio', { name: 'Hard' }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart.mock.calls[1][0]).toMatchObject({ game: 'asodio', botLevel: 'hard' });
   });
 
   it('opens every built game in pass-and-play, even with no bot for them', async () => {

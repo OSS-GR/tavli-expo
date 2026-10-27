@@ -169,8 +169,8 @@ function pipsToHome(side: AsodioSide): number {
   return total;
 }
 
-/** The share of losses that are doubles (mars), in contact. */
-function doubleShare(loser: AsodioSide, winner: AsodioSide, w: AsodioWeights): number {
+/** The share of losses that are doubles (mars), in contact. Exported for the net's inputs. */
+export function doubleShare(loser: AsodioSide, winner: AsodioSide, w: AsodioWeights): number {
   if (at(loser, OFF) > 0) return 0;
   const share = Math.min(0.9, (w.double * pipsToHome(loser)) / (pips(winner) + 20));
   return pinnedInRear(loser) ? Math.max(share, w.pinnedDouble) : share;
@@ -237,24 +237,32 @@ function shotScore(
   return { value, any: shots.any / 36, lock: shots.lock / 36 };
 }
 
-interface Contact {
+/** The contact score and the shot chances behind it. */
+export interface AsodioContact {
   /** Logits for the roller. */
   readonly score: number;
   /** The roller's chance to lock both armies next roll. */
   readonly rollerLock: number;
   /** The waiter's chance to lock both armies on its next roll. */
   readonly waiterLock: number;
+  /** The roller's chance to pin at least one checker next roll. */
+  readonly rollerAny: number;
+  /** The waiter's chance to pin at least one checker on its next roll. */
+  readonly waiterAny: number;
 }
 
-/** The contact score, in logits, for the roller. */
-function contactScore(
+/**
+ * The contact score, in logits, for the roller. `rollerDice` and
+ * `waiterDice` come from `movableDice`. Exported for the net's inputs.
+ */
+export function contactScore(
   roller: AsodioSide,
   waiter: AsodioSide,
   rollerDice: readonly boolean[],
   waiterDice: readonly boolean[],
   w: AsodioWeights,
   options: AsodioOptions,
-): Contact {
+): AsodioContact {
   const chance = kleinmanWinChance(racePips(roller, w, options), racePips(waiter, w, options));
   let score = w.race * logit(chance);
   score += sideScore(roller, waiter, rollerDice, w, options);
@@ -263,7 +271,13 @@ function contactScore(
   score += w.blotShare * mine.value + w.anyShot * mine.any;
   const theirs = shotScore(waiter, roller, w, options);
   score -= w.rollerShare * theirs.value;
-  return { score, rollerLock: mine.lock, waiterLock: theirs.lock };
+  return {
+    score,
+    rollerLock: mine.lock,
+    waiterLock: theirs.lock,
+    rollerAny: mine.any,
+    waiterAny: theirs.any,
+  };
 }
 
 const DRAW: Evaluation = { win: 0, winDouble: 0, loseDouble: 0, equity: 0 };

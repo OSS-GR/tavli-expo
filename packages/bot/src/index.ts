@@ -67,6 +67,15 @@ export {
   shippedPlakotoNet,
 } from './evaluators/plakoto-net';
 export {
+  ASODIO_NET_INPUTS,
+  asodioNet,
+  asodioNetGame,
+  createAsodioNetEvaluator,
+  isAsodioNetRules,
+  loadAsodioNet,
+  shippedAsodioNet,
+} from './evaluators/asodio-net';
+export {
   FEVGA_NET_INPUTS,
   createFevgaNetEvaluator,
   fevgaNet,

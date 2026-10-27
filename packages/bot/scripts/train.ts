@@ -5,7 +5,8 @@
 //   pnpm --filter @tavli/bot train -- eval --game plakoto --file /tmp/plakoto-net/best.json --games 1000 --seed 99
 //   pnpm --filter @tavli/bot train -- export --game plakoto --file /tmp/plakoto-net/best.json
 //
-// Every mode takes --game portes|plakoto|fevga (default portes).
+// Every mode takes --game portes|plakoto|fevga|asodio (default portes). A net file
+// records its game; eval and export refuse a file for another game.
 //
 // `train` options: --out DIR (required), --hidden N (80), --games N (100000),
 // --lambda X (0.7), --alpha X (0.1), --alpha-end X (0.02), --seed N (1),
@@ -21,6 +22,7 @@
 //
 // All the logic is in `src/train/`. This file only connects it to Node.
 
+import { asodioNetGame } from '../src/evaluators/asodio-net';
 import { fevgaNetGame } from '../src/evaluators/fevga-net';
 import { loadNet } from '../src/evaluators/net';
 import type { NetFile, NetGame } from '../src/evaluators/net';
@@ -46,8 +48,13 @@ const fs = (await import(fsModule)) as Fs;
 
 const number = numberFlag;
 
-function readNet(path: string): NetFile {
-  return JSON.parse(fs.readFileSync(path, 'utf8')) as NetFile;
+/** Reads a net file. Throws if the file says it is for another game. */
+function readNet(path: string, game: string): NetFile {
+  const file = JSON.parse(fs.readFileSync(path, 'utf8')) as NetFile;
+  if (file.game !== undefined && file.game !== game) {
+    throw new Error(`${path} is a net for ${file.game}, not for ${game} (check --game)`);
+  }
+  return file;
 }
 
 /** Runs `run` with the `NetGame` named by `--game`. */
@@ -56,7 +63,8 @@ function withGame(options: Map<string, string>, run: <S, C>(game: NetGame<S, C>)
   if (name === 'portes') run(portesNetGame);
   else if (name === 'plakoto') run(plakotoNetGame);
   else if (name === 'fevga') run(fevgaNetGame);
-  else throw new Error(`--game must be portes, plakoto or fevga, got ${name}`);
+  else if (name === 'asodio') run(asodioNetGame);
+  else throw new Error(`--game must be portes, plakoto, fevga or asodio, got ${name}`);
 }
 
 function runTrain<S, C>(game: NetGame<S, C>, options: Map<string, string>): void {
@@ -64,7 +72,8 @@ function runTrain<S, C>(game: NetGame<S, C>, options: Map<string, string>): void
   if (out === undefined) throw new Error('--out DIR is required');
   fs.mkdirSync(out, { recursive: true });
   const from = options.get('from');
-  const start = from === undefined ? undefined : loadNet(readNet(from), game.inputs);
+  const start =
+    from === undefined ? undefined : loadNet(readNet(from, game.variant.id), game.inputs);
   const base: TrainOptions = {
     hidden: number(options, 'hidden', 80),
     games: number(options, 'games', 100_000),
@@ -95,7 +104,7 @@ function runEval<S, C>(game: NetGame<S, C>, options: Map<string, string>): void 
   const vs = options.get('vs') ?? 'medium';
   if (!isBotLevel(vs)) throw new Error(`unknown level ${vs}`);
   const started = Date.now();
-  const net = loadNet(readNet(file), game.inputs);
+  const net = loadNet(readNet(file, game.variant.id), game.inputs);
   const games = number(options, 'games', 1000);
   const result = netVsLevel(game, net, games, number(options, 'seed', 1), vs);
   console.log(
@@ -114,9 +123,9 @@ function quote(text: string): string {
 function runExport<S, C>(game: NetGame<S, C>, options: Map<string, string>): void {
   const file = options.get('file');
   if (file === undefined) throw new Error('--file FILE is required');
-  const net = readNet(file);
-  loadNet(net, game.inputs); // Throws if the sizes are wrong.
   const name = game.variant.id;
+  const net = readNet(file, name);
+  loadNet(net, game.inputs); // Throws if the sizes are wrong.
   const title = name.charAt(0).toUpperCase() + name.slice(1);
   const id = options.get('id') ?? `${name}-net-v1`;
   const notes = options.get('notes') ?? net.notes ?? '';
@@ -129,6 +138,7 @@ function runExport<S, C>(game: NetGame<S, C>, options: Map<string, string>): voi
     `import type { NetFile } from './net';\n\n` +
     `export const ${name.toUpperCase()}_NET_V1: NetFile = {\n` +
     `  id: ${quote(id)},\n` +
+    `  game: ${quote(name)},\n` +
     `  inputs: ${net.inputs},\n` +
     `  hidden: ${net.hidden},\n` +
     // Prettier moves a long value to its own line (print width 100).

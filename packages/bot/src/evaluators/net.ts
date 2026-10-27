@@ -1,5 +1,5 @@
 /**
- * The shared code of the trained nets (Portes, Plakoto, Fevga;
+ * The shared code of the trained nets (Portes, Plakoto, Fevga, Asodio;
  * docs/architecture/bot-ai.md, section 5).
  *
  * Each net has one hidden layer (sigmoid) and 3 outputs (sigmoid):
@@ -9,7 +9,7 @@
  *
  * A game plugs in through `NetGame`: its fast board arrays, its game end,
  * its input encoding, and the positions the net does not score (a race, a
- * game end, a pinned Plakoto mother). Those use the game's heuristic. One
+ * game end, a pinned Plakoto mother, an Asodio lock). Those use the game's heuristic. One
  * evaluator (`createNetEvaluator`) and one trainer (`src/train/`) then work
  * for every game, so the bot and the trainer score turns the same way.
  *
@@ -48,6 +48,11 @@ export interface Net {
 /** The shipped form of a net: the sizes and the weights as base64 Float32. */
 export interface NetFile {
   readonly id: string;
+  /**
+   * The game the net was trained for (a variant id). The train script
+   * writes it and refuses a file for another game. Older files have none.
+   */
+  readonly game?: string;
   readonly inputs: number;
   readonly hidden: number;
   /** `w1`, `b1`, `w2`, `b2` in that order, little-endian Float32, base64. */
@@ -66,6 +71,11 @@ export interface SparseInput {
 /** Room for `size` inputs (the net's input count). */
 export function createSparseInput(size: number): SparseInput {
   return { index: new Int32Array(size), value: new Float64Array(size), count: 0 };
+}
+
+/** `values[i]`, or 0 when it is missing (the side arrays of every game). */
+export function at(values: readonly number[], i: number): number {
+  return values[i] ?? 0;
 }
 
 /** Adds one input that is not 0. */
@@ -183,7 +193,7 @@ export interface NetGame<S, C> {
    */
   endPoints(mover: S, other: S, context: C): number | null;
   /** True when the net scores this position. Else `fallback` does. */
-  usesNet(roller: S, waiter: S): boolean;
+  usesNet(roller: S, waiter: S, context: C): boolean;
   /** Writes the inputs of a position the net scores into `input` (it is reused). */
   encode(roller: S, waiter: S, context: C, input: SparseInput): void;
   /** The heuristic's evaluation: for the positions the net does not score. */
@@ -199,7 +209,7 @@ export function evaluateNet<S, C>(
   context: C,
   scratch: NetScratch,
 ): Evaluation {
-  if (!game.usesNet(roller, waiter)) return game.fallback(roller, waiter, context);
+  if (!game.usesNet(roller, waiter, context)) return game.fallback(roller, waiter, context);
   game.encode(roller, waiter, context, scratch.input);
   forward(net, scratch.input, scratch.hidden, scratch.out);
   return toEvaluation(scratch.out[0] ?? 0, scratch.out[1] ?? 0, scratch.out[2] ?? 0);
@@ -244,6 +254,30 @@ export function scoreNetCandidates<S, C>(
 }
 
 /**
+ * The scores only, for the bot: the same numbers as `scoreNetCandidates`,
+ * without the sides and evaluations the trainer keeps.
+ */
+export function scoreNetTurns<S, C>(
+  game: NetGame<S, C>,
+  net: Net,
+  me: S,
+  them: S,
+  context: C,
+  turns: readonly Turn[],
+  scratch: NetScratch,
+): TurnScore[] {
+  return turns.map((turn) => {
+    const [mine, theirs] = game.play(me, them, turn);
+    const points = game.endPoints(mine, theirs, context);
+    if (points !== null) return { score: points, gameOver: true };
+    return {
+      score: -evaluateNet(game, net, theirs, mine, context, scratch).equity,
+      gameOver: false,
+    };
+  });
+}
+
+/**
  * Builds the evaluator for a net. `net` may be a function: it then runs on
  * the first use, so the app does not decode the weights at start-up.
  */
@@ -278,15 +312,7 @@ export function createNetEvaluator<S, C>(
       const { net: value, scratch } = get();
       const me = game.sideOf(state, state.toMove);
       const them = game.sideOf(state, opponent(state.toMove));
-      return scoreNetCandidates(
-        game,
-        value,
-        me,
-        them,
-        game.context(state.rules),
-        turns,
-        scratch,
-      ).map((c) => c.score);
+      return scoreNetTurns(game, value, me, them, game.context(state.rules), turns, scratch);
     },
   };
 }

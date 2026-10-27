@@ -29,6 +29,7 @@ import { opponent, portes } from '@tavli/engine';
 import type { Evaluation, Evaluator, TurnScore } from '../types';
 import {
   NET_OUTPUTS,
+  at,
   createNetEvaluator,
   createScratch,
   createSparseInput as createInput,
@@ -36,7 +37,7 @@ import {
   loadNet,
   pushInput,
   pushPointUnits,
-  scoreNetCandidates,
+  scoreNetTurns as scoreTurnsWithNet,
 } from './net';
 import type { Net, NetFile, NetGame, NetScratch, SparseInput } from './net';
 import { BAR, OFF, hasContact, pips, playTurn, portesTurnPoints, sideOf } from './portes-board';
@@ -61,10 +62,6 @@ export type PortesNetFile = NetFile;
 /** Room for the Portes inputs. */
 export function createSparseInput(): SparseInput {
   return createInput(PORTES_NET_INPUTS);
-}
-
-function at(values: readonly number[], i: number): number {
-  return values[i] ?? 0;
 }
 
 /** Writes the inputs of a contact position into `input` (it is reused). */
@@ -133,9 +130,7 @@ export function scoreNetTurns(
   const me = sideOf(state, state.toMove);
   const them = sideOf(state, opponent(state.toMove));
   const triple = state.rules.scoring.backgammonScores3;
-  return scoreNetCandidates(portesNetGame, net, me, them, triple, turns, scratch).map(
-    (c) => c.score,
-  );
+  return scoreTurnsWithNet(portesNetGame, net, me, them, triple, turns, scratch);
 }
 
 /**

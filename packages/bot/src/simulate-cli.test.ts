@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_SIMULATE_ARGS, parseSimulateArgs, runSimulateCli } from './index';
+import {
+  DEFAULT_SIMULATE_ARGS,
+  EMPTY_EVALUATOR_REGISTRY,
+  createBot,
+  parseSimulateArgs,
+  runSimulateCli,
+} from './index';
 import type { CliIo } from './index';
 
 function io(): CliIo & { out: string[]; err: string[] } {
@@ -66,8 +72,9 @@ describe('simulator command line', () => {
     expect(runSimulateCli(['--help'], help)).toBe(0);
     expect(help.out[0]).toContain('Usage');
     const failing = io();
-    // Asodio has no hard bot yet.
-    expect(runSimulateCli(['--games', '1', '--variant', 'asodio', '--b', 'hard'], failing)).toBe(1);
+    // A bot with no hard evaluator: every game fails.
+    const noHard = createBot({ evaluators: EMPTY_EVALUATOR_REGISTRY });
+    expect(runSimulateCli(['--games', '1', '--b', 'hard'], failing, noHard)).toBe(1);
     expect(failing.err[0]).toContain('NOT_IMPLEMENTED');
   });
 });

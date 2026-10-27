@@ -85,7 +85,7 @@ export function train<S, C>(game: NetGame<S, C>, options: TrainOptions, io: Trai
   let best: MatchResult | undefined;
   const evalSeed = options.evalSeed ?? 1_000_000;
   const check = (games: number): void => {
-    const file = toNetFile(net, `${id}-net-${games}`, notes(games));
+    const file = toNetFile(net, `${id}-net-${games}`, notes(games), id);
     if (options.evalEvery <= 0) {
       io.save(`games-${games}`, file, false);
       return;

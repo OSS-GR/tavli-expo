@@ -68,15 +68,21 @@ export function toTrainable(net: Net): TrainableNet {
   };
 }
 
-/** The shipped form of a net (Float32, base64). */
-export function toNetFile(net: Net, id: string, notes?: string): NetFile {
+/** The shipped form of a net (Float32, base64). `game` is the variant id it was trained for. */
+export function toNetFile(net: Net, id: string, notes?: string, game?: string): NetFile {
   const all = new Float32Array(net.w1.length + net.b1.length + net.w2.length + net.b2.length);
   let at = 0;
   for (const part of [net.w1, net.b1, net.w2, net.b2]) {
     all.set(part, at);
     at += part.length;
   }
-  const file = { id, inputs: net.inputs, hidden: net.hidden, data: encodeFloat32(all) };
+  const file: NetFile = {
+    id,
+    ...(game === undefined ? {} : { game }),
+    inputs: net.inputs,
+    hidden: net.hidden,
+    data: encodeFloat32(all),
+  };
   return notes === undefined ? file : { ...file, notes };
 }
 
@@ -235,7 +241,7 @@ export function trainEpisode<S, C>(
       break;
     }
     const value: Triple = [pick.next.win, pick.next.winDouble, pick.next.loseDouble];
-    if (!game.usesNet(pick.theirs, pick.mine)) {
+    if (!game.usesNet(pick.theirs, pick.mine, context)) {
       handOff = true;
       last = flip(value);
       break;
@@ -305,7 +311,7 @@ export function heuristicPositions<S, C>(
     let roller = game.sideOf(state, state.toMove);
     let waiter = game.sideOf(state, opponent(state.toMove));
     for (let turnCount = 0; turnCount < DEFAULT_MAX_TURNS; turnCount += 1) {
-      if (out.length >= count || !game.usesNet(roller, waiter)) break;
+      if (out.length >= count || !game.usesNet(roller, waiter, context)) break;
       const e = game.fallback(roller, waiter, context);
       out.push({ roller, waiter, target: [e.win, e.winDouble, e.loseDouble] });
       const dice = rollDice(rng);

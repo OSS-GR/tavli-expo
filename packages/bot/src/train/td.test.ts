@@ -1,15 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
-import { createBoard, createSeededRng, plakoto, portes } from '@tavli/engine';
-import type { Dice } from '@tavli/engine';
+import { createBoard, createSeededRng, opponent, plakoto, portes, rollDice } from '@tavli/engine';
+import type { Dice, GameState } from '@tavli/engine';
 
+import { asodioNetGame } from '../evaluators/asodio-net';
 import { fevgaNetGame } from '../evaluators/fevga-net';
-import { createScratch, evaluateNet, forward } from '../evaluators/net';
+import {
+  createScratch,
+  evaluateNet,
+  forward,
+  scoreNetCandidates,
+  scoreNetTurns,
+} from '../evaluators/net';
 import type { NetGame } from '../evaluators/net';
 import { PINNED } from '../evaluators/plakoto-board';
 import { plakotoNetGame } from '../evaluators/plakoto-net';
 import { sideOf } from '../evaluators/portes-board';
 import { encodePortes, loadPortesNet, portesNetGame } from '../evaluators/portes-net';
+import { pickOne } from '../random';
 import { numberFlag, parseFlags } from './args';
 import {
   createTrainScratch,
@@ -68,18 +76,37 @@ function episodeTest<S, C>(name: string, game: NetGame<S, C>): void {
   it(`${name}: labels positions the net scores, from heuristic play`, () => {
     const positions = heuristicPositions(game, 150, 4);
     expect(positions).toHaveLength(150);
+    const context = game.context(game.variant.initialState({ startingPlayer: 'white' }).rules);
     for (const p of positions) {
-      expect(game.usesNet(p.roller, p.waiter)).toBe(true);
+      expect(game.usesNet(p.roller, p.waiter, context)).toBe(true);
       expect(p.target[0]).toBeGreaterThanOrEqual(0);
       expect(p.target[0]).toBeLessThanOrEqual(1);
     }
     const net = createTrainableNet(game.inputs, 8, createSeededRng(5));
     const rng = createSeededRng(6);
-    const context = game.context(game.variant.initialState({ startingPlayer: 'white' }).rules);
     const first = supervisedEpoch(game, net, positions, context, 0.05, rng);
     let last = first;
     for (let i = 0; i < 5; i += 1) last = supervisedEpoch(game, net, positions, context, 0.05, rng);
     expect(last).toBeLessThan(first);
+  });
+
+  it(`${name}: the bot's score-only path gives the trainer's scores`, () => {
+    const net = createTrainableNet(game.inputs, 8, createSeededRng(8));
+    const scratch = createScratch(net);
+    const rng = createSeededRng(9);
+    let state: GameState = game.variant.initialState({ startingPlayer: 'white' });
+    const context = game.context(state.rules);
+    for (let turn = 0; turn < 40 && !game.variant.isGameOver(state); turn += 1) {
+      const dice = rollDice(rng);
+      const rolled: GameState = { ...state, dice };
+      const turns = game.variant.legalTurns(rolled, dice);
+      const me = game.sideOf(state, state.toMove);
+      const them = game.sideOf(state, opponent(state.toMove));
+      const full = scoreNetCandidates(game, net, me, them, context, turns, scratch);
+      const fast = scoreNetTurns(game, net, me, them, context, turns, scratch);
+      expect(fast).toEqual(full.map((c) => c.score));
+      state = playOn(game.variant, game.variant.applyTurn(rolled, pickOne(rng, turns)));
+    }
   });
 }
 
@@ -101,6 +128,7 @@ describe('training (dev only)', () => {
   episodeTest('portes', portesNetGame);
   episodeTest('plakoto', plakotoNetGame);
   episodeTest('fevga', fevgaNetGame);
+  episodeTest('asodio', asodioNetGame);
 
   it('heuristic positions have valid sides', () => {
     for (const p of heuristicPositions(portesNetGame, 100, 4)) {
@@ -112,6 +140,11 @@ describe('training (dev only)', () => {
       expect(isValidSide(checkersOf(p.waiter))).toBe(true);
     }
     for (const p of heuristicPositions(fevgaNetGame, 100, 4)) {
+      expect(isValidSide(p.roller)).toBe(true);
+      expect(isValidSide(p.waiter)).toBe(true);
+    }
+    // Asodio: index 25 holds the waiting checkers; the pin flags come after.
+    for (const p of heuristicPositions(asodioNetGame, 100, 4)) {
       expect(isValidSide(p.roller)).toBe(true);
       expect(isValidSide(p.waiter)).toBe(true);
     }
@@ -155,7 +188,10 @@ describe('training (dev only)', () => {
 
   it('saves a net that loads back with the same (Float32) outputs', () => {
     const net = createTrainableNet(portesNetGame.inputs, 8, createSeededRng(7));
-    const loaded = loadPortesNet(toNetFile(net, 'test', 'notes'));
+    const file = toNetFile(net, 'test', 'notes', 'portes');
+    expect(file.game).toBe('portes');
+    expect(toNetFile(net, 'test').game).toBeUndefined();
+    const loaded = loadPortesNet(file);
     const a = evaluateNet(portesNetGame, net, roller, waiter, false, createScratch(net));
     const b = evaluateNet(portesNetGame, loaded, roller, waiter, false, createScratch(loaded));
     expect(b.equity).toBeCloseTo(a.equity, 5);

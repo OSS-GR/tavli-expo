@@ -1,6 +1,6 @@
 /**
- * Decision time of the hard bot (a net, 1-ply) for Portes, Plakoto and
- * Fevga. The issue budget (#147, #156) is a median under 50 ms and a worst
+ * Decision time of the hard bot (a net, 1-ply) for Portes, Plakoto, Fevga
+ * and Asodio. The issue budget (#147, #156, #164) is a median under 50 ms and a worst
  * case under 300 ms in Node. The real numbers are far lower (see the
  * README), so the test is safe on a slow CI machine. It checks the 99th
  * percentile against 300 ms, not the single slowest position, so one pause
@@ -13,6 +13,7 @@ import { createSeededRng } from '@tavli/engine';
 import type { GameState } from '@tavli/engine';
 
 import { createBot } from './index';
+import { randomAsodioPositions } from './testing/random-asodio-positions';
 import { randomFevgaPositions } from './testing/random-fevga-positions';
 import { randomPlakotoPositions } from './testing/random-plakoto-positions';
 import { randomPositions } from './testing/random-positions';
@@ -24,6 +25,7 @@ const games: readonly [string, () => GameState[]][] = [
   ['Portes', () => randomPositions(2026, 300)],
   ['Plakoto', () => randomPlakotoPositions(2026, 300)],
   ['Fevga', () => randomFevgaPositions(2026, 300)],
+  ['Asodio', () => randomAsodioPositions(2026, 300)],
 ];
 
 describe('hard decision time', () => {

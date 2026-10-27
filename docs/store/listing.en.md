@@ -14,7 +14,7 @@ Checked in the code on 2026-10-27:
 |-------|-------------------------|
 | Portes, Plakoto, Fevga, Asodio, and a Tavli match (Portes → Plakoto → Fevga) | `features/match/setup.ts`, [App shell](../architecture/app-shell.md#choosing-the-game-109) |
 | Match to 1, 3, 5 or 7 points; mono = 1, diplo = 2 | `features/match/setup.ts`, `newGame.length.*` texts |
-| Bot: Easy and Medium in all four games, Hard in Portes, Plakoto, Fevga and the Tavli match. Hard in Asodio is "coming soon" | `features/bot/levels.ts`, `services.ts` (`botLevels`) |
+| Bot: Easy, Medium and Hard in all four games and the Tavli match | `features/bot/levels.ts`, `services.ts` (`botLevels`) |
 | The bot plays on the phone. Local games need no network | `InlineBotRunner` in `services.ts`; App shell, "Pass-and-play" |
 | Pass-and-play on one phone, optional names, the board turns to the player | `features/match/seats.ts`, `settings.boardView.*` |
 | A "How to play" page for each game, with the start position | `features/rules/` |
@@ -29,7 +29,8 @@ Do **not** claim:
 
 - **A tutorial for every game.** The lesson teaches Portes only. Plakoto, Fevga and Asodio have rules pages.
 - **Online play, friends, invites, push.** Not built (MVP2). Home shows "Play a friend · Coming soon".
-- **Hard bot in every game, more themes, face-to-face view.** Hard works in Portes, Plakoto, Fevga and Tavli, not in Asodio; the app shows Asodio Hard as "coming soon".
+- **A Hard bot that wins most Asodio games.** Hard works in every game, but in Asodio it wins only about half of its games against Medium (many games end in a deadlock draw; `packages/bot/README.md`, "The Asodio net").
+- **More themes, face-to-face view.** Not built.
 - **Dark mode, iPad, accessibility claims.** Not checked for the store.
 
 **Owner:** decide if the listing mentions online play as "coming soon". The default here is **no**. Apple can reject metadata that names features the app does not have (App Review Guideline 2.3). An optional line is at the end of the description section.

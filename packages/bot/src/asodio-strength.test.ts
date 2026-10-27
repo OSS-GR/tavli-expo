@@ -12,6 +12,10 @@
  *
  * CI runs `GAMES` games per match. Raise `GAMES` locally for tighter
  * numbers.
+ *
+ * Hard (the Asodio net, #164) has no test here yet: it wins about 50 % of
+ * its games against medium, below the issue's bar of 60 % (README, "The
+ * Asodio net").
  */
 
 import { describe, expect, it } from 'vitest';

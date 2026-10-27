@@ -4,7 +4,7 @@ import { BotCancelledError, isBotCancelled } from '@tavli/contracts';
 import type { BotMoveRequest } from '@tavli/contracts';
 import { asodio, createSeededRng, portes, sameTurn } from '@tavli/engine';
 
-import { InlineBotRunner, createBot } from './index';
+import { EMPTY_EVALUATOR_REGISTRY, InlineBotRunner, createBot } from './index';
 import type { Bot } from './index';
 
 const state = portes.initialState({ startingPlayer: 'black' });
@@ -62,10 +62,11 @@ describe('InlineBotRunner', () => {
     await expect(runner.chooseMove({ ...request, variant: 'plakoto' })).rejects.toMatchObject({
       code: 'INVALID_REQUEST',
     });
-    // Asodio has no hard bot yet.
+    // A bot with no hard evaluator.
     const asodioStart = asodio.initialState({ startingPlayer: 'black' });
+    const noHard = new InlineBotRunner(createBot({ evaluators: EMPTY_EVALUATOR_REGISTRY }));
     await expect(
-      runner.chooseMove({
+      noHard.chooseMove({
         ...request,
         variant: 'asodio',
         state: asodioStart,
