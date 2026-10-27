@@ -99,6 +99,19 @@ describe('createGame', () => {
     );
   });
 
+  it('rejects the player id "server", which marks server events in the log', async () => {
+    const t = setup();
+    await rejectsWith(
+      t.mutation(api.games.createGame, {
+        callerId: ALICE,
+        players: { white: ALICE, black: 'server' },
+        choice: 'portes',
+        targetPoints: 1,
+      }),
+      'BAD_REQUEST',
+    );
+  });
+
   it('stores no RNG state: the next dice do not exist before they are rolled', async () => {
     const t = setup();
     const gameId = await createGame(t);

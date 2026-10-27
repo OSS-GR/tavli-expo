@@ -160,6 +160,10 @@ export const createGame = mutation({
     if (sideOf(players, callerId) === null) {
       fail('BAD_REQUEST', 'the caller must be one of the players');
     }
+    // The move log marks server events with SERVER_ACTOR, so no player may use that id.
+    if (players.white === SERVER_ACTOR || players.black === SERVER_ACTOR) {
+      fail('BAD_REQUEST', `"${SERVER_ACTOR}" is not a valid player id`);
+    }
     const flow = guarded(() =>
       createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
     );
