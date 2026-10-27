@@ -23,6 +23,7 @@ import { canResignGame, previewResign, resigningPlayer } from './resign';
 import { seatsFor } from './seats';
 import type { MatchSession } from './sessions';
 import { BOT_SIDE } from './setup';
+import { currentGameLabel, nextGameLabel, variantName } from './summary';
 
 export interface MatchScreenProps {
   session: MatchSession;
@@ -71,6 +72,13 @@ export function MatchScreen({
       : undefined;
 
   const game = t(`games.${setup.game}`);
+  // The game on the board: the chosen game, or this game of the Tavli rotation.
+  const playing = variantName(flow.game.state.variant, t);
+  const gameLabel = currentGameLabel(flow, t);
+  const nextLabel =
+    flow.game.phase === 'game-over' && flow.match.status !== 'finished'
+      ? nextGameLabel(flow.match, t)
+      : undefined;
   const score = t('game.end.score', {
     white: name('white'),
     black: name('black'),
@@ -99,7 +107,7 @@ export function MatchScreen({
             ? t('game.menu.resignMatchHint', { name: name(opponent(resigner)) })
             : null
         }
-        rulesLabel={t('game.menu.rules', { game })}
+        rulesLabel={t('game.menu.rules', { game: playing })}
         onResignGame={() => setOverlay('resignGame')}
         onResignMatch={() => setOverlay('resignMatch')}
         onRules={() => {
@@ -185,6 +193,8 @@ export function MatchScreen({
         onOpenMenu={() => setOverlay('menu')}
         onHome={onExit}
         onMatchOver={onMatchOver}
+        gameLabel={gameLabel}
+        {...(nextLabel ? { nextGameLabel: nextLabel } : {})}
       />
       <Sheet
         visible={content !== null}

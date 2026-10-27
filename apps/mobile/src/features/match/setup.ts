@@ -5,7 +5,18 @@
  * Vs bot: the human plays White (at the bottom), the bot plays Black.
  */
 import { BOT_DIFFICULTIES, type Difficulty } from '@tavli/contracts';
-import type { PerPlayer, PlayerId } from '@tavli/engine';
+import {
+  DEFAULT_PRESET_BY_GAME,
+  VARIANT_REGISTRY,
+  getPreset,
+  resolveRules,
+  type PerPlayer,
+  type PlayerId,
+  type PresetId,
+  type RuleSet,
+  type StandardVariantId,
+  type VariantRegistry,
+} from '@tavli/engine';
 
 /** `bot`: vs the bot. `local`: pass-and-play on one phone. */
 export type MatchMode = 'bot' | 'local';
@@ -25,12 +36,97 @@ export function isMatchLength(value: unknown): value is MatchLength {
   return (MATCH_LENGTHS as readonly unknown[]).includes(value);
 }
 
-/** The games of the picker. Only Portes is playable in MVP1. */
-export const GAME_CHOICES = ['portes', 'plakoto', 'fevga', 'asodio', 'tavli'] as const;
+/**
+ * The games of the picker (#109). `tavli` is a full Tavli match: Portes →
+ * Plakoto → Fevga in rotation (`docs/rules/tavli-match.md`). A game is
+ * open when the engine has every game of its rotation (`isGameBuilt`);
+ * Asodio is not built yet, so it shows locked.
+ */
+export const GAME_CHOICES = ['portes', 'plakoto', 'fevga', 'tavli', 'asodio'] as const;
 
 export type GameChoice = (typeof GAME_CHOICES)[number];
 
-export const PLAYABLE_GAMES: readonly GameChoice[] = ['portes'];
+export function isGameChoice(value: unknown): value is GameChoice {
+  return (GAME_CHOICES as readonly unknown[]).includes(value);
+}
+
+/** The engine preset of each game. */
+const GAME_PRESETS: { readonly [G in GameChoice]: PresetId } = {
+  portes: DEFAULT_PRESET_BY_GAME.portes,
+  plakoto: DEFAULT_PRESET_BY_GAME.plakoto,
+  fevga: DEFAULT_PRESET_BY_GAME.fevga,
+  tavli: 'tavli',
+  asodio: DEFAULT_PRESET_BY_GAME.asodio,
+};
+
+export function gamePreset(game: GameChoice): PresetId {
+  return GAME_PRESETS[game];
+}
+
+/** The game itself for a one-game match; `null` for the Tavli rotation. */
+function singleGame(game: GameChoice): StandardVariantId | null {
+  return game === 'tavli' ? null : game;
+}
+
+/**
+ * The rules of a new match of `game`: its preset (`resolveRules`). A
+ * one-game match plays only that game: the Plakoto and Fevga presets keep
+ * the shared rotation Portes → Plakoto → Fevga (`NEUTRAL` in the engine), so
+ * we set `match.rotation` to the game ("single game" in `tavli-match.md`).
+ * Tavli keeps its rotation.
+ */
+export function gameRuleSet(game: GameChoice): RuleSet {
+  const only = singleGame(game);
+  return resolveRules(gamePreset(game), only === null ? {} : { match: { rotation: [only] } });
+}
+
+/** The games one match of `game` plays, in order: one entry, or three for Tavli. */
+export function gameRotation(game: GameChoice): readonly StandardVariantId[] {
+  const only = singleGame(game);
+  return only === null ? getPreset(gamePreset(game)).match.rotation : [only];
+}
+
+/** True when the engine can play every game of the rotation. */
+export function isGameBuilt(
+  game: GameChoice,
+  registry: VariantRegistry = VARIANT_REGISTRY,
+): boolean {
+  return gameRotation(game).every((variant) => registry.has(variant));
+}
+
+/**
+ * The bot levels this build can play, per game. A game with no level is
+ * locked vs the bot. Tavli needs a level for each game of its rotation.
+ * See `features/bot/levels.ts`.
+ */
+export type GameLevels = { readonly [G in GameChoice]: readonly Difficulty[] };
+
+/**
+ * `levels` for every built game, then `overrides` per game. A game that
+ * is not built gets none. Handy for tests and fakes.
+ */
+export function gameLevels(
+  levels: readonly Difficulty[],
+  overrides: { readonly [G in GameChoice]?: readonly Difficulty[] } = {},
+): GameLevels {
+  const entries = GAME_CHOICES.map((game) => [
+    game,
+    overrides[game] ?? (isGameBuilt(game) ? levels : []),
+  ]);
+  return Object.fromEntries(entries) as GameLevels;
+}
+
+/** Every built game at every level (the default). */
+export const ALL_GAME_LEVELS: GameLevels = gameLevels(BOT_DIFFICULTIES);
+
+/**
+ * Can the player start `game` in this mode? Pass-and-play needs only the
+ * engine. Vs bot also needs a bot level for the game.
+ */
+export function isGameOpen(game: GameChoice, mode: MatchMode, levels: GameLevels): boolean {
+  if (!isGameBuilt(game)) return false;
+  return mode === 'local' || levels[game].length > 0;
+}
 
 /** Names longer than this are cut (wireframe 5). */
 export const MAX_NAME_LENGTH = 16;
@@ -40,7 +136,8 @@ export const BOT_SIDE: PlayerId = 'black';
 
 export interface MatchSetup {
   readonly mode: MatchMode;
-  readonly game: 'portes';
+  /** The game (#109). Default: Portes. */
+  readonly game: GameChoice;
   readonly targetPoints: MatchLength;
   /** Used vs bot only. */
   readonly botLevel: Difficulty;
@@ -68,27 +165,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+export interface SanitizeOptions {
+  /**
+   * Keep any built game, even one the bot cannot play now (a saved match:
+   * its log already holds the game). Default: a locked game becomes Portes.
+   */
+  readonly keepBuiltGame?: boolean;
+}
+
 /**
  * Turns any saved value into a valid setup for `mode`. Bad fields fall
- * back to the defaults. A bot level this build cannot play becomes the
- * easiest one it can (`levels`).
+ * back to the defaults. A game that is locked in this mode becomes Portes.
+ * A bot level this build cannot play for the game becomes the easiest one
+ * it can (`levels`).
  */
 export function sanitizeSetup(
   raw: unknown,
   mode: MatchMode,
-  levels: readonly Difficulty[] = BOT_DIFFICULTIES,
+  levels: GameLevels = ALL_GAME_LEVELS,
+  options: SanitizeOptions = {},
 ): MatchSetup {
   const d = defaultSetup(mode);
   const input = isRecord(raw) ? raw : {};
   const names = isRecord(input['names']) ? input['names'] : {};
   const level = input['botLevel'];
+  const wanted = input['game'];
+  const game =
+    isGameChoice(wanted) &&
+    (options.keepBuiltGame ? isGameBuilt(wanted) : isGameOpen(wanted, mode, levels))
+      ? wanted
+      : d.game;
+  const gameLevels = levels[game];
   return {
     mode,
-    game: 'portes',
+    game,
     targetPoints: isMatchLength(input['targetPoints']) ? input['targetPoints'] : d.targetPoints,
-    botLevel: levels.includes(level as Difficulty)
+    botLevel: gameLevels.includes(level as Difficulty)
       ? (level as Difficulty)
-      : (levels[0] ?? d.botLevel),
+      : (gameLevels[0] ?? d.botLevel),
     names: { white: cleanName(names['white']), black: cleanName(names['black']) },
   };
 }

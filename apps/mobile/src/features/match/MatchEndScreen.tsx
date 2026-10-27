@@ -18,7 +18,7 @@ import { useAnnouncement } from '@/features/game/useAnnouncement';
 
 import { seatsFor } from './seats';
 import { HUMAN_SIDE, type MatchSetup } from './setup';
-import { matchLabel } from './summary';
+import { matchLabel, variantName } from './summary';
 
 export interface MatchEndScreenProps {
   setup: MatchSetup;
@@ -97,7 +97,8 @@ export function MatchEndScreen({
         {match.games.length > 0 ? (
           <View testID="match-games" style={styles.games}>
             {match.games.map((record, i) => {
-              const game = t('matchEnd.game', { number: i + 1 });
+              // Each game names its variant (#109): "Game 2 · Plakoto".
+              const game = t('game.round', { number: i + 1, game: variantName(record.variant, t) });
               const result =
                 record.winner === null
                   ? t('matchEnd.draw')

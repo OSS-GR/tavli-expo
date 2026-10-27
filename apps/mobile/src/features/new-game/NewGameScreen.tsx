@@ -2,6 +2,10 @@
  * New game (wireframes 4 and 5): game, match length, and the bot level
  * (vs bot) or the player names (pass-and-play). Start sits at the bottom,
  * near the thumb.
+ *
+ * Game (#109): Portes, Plakoto, Fevga or Tavli (all three in rotation).
+ * A game shows locked ("Coming soon") when the engine does not have it, or
+ * vs the bot when the bot has no level for it (`botLevels`).
  */
 import type { Difficulty } from '@tavli/contracts';
 import { BOT_DIFFICULTIES } from '@tavli/contracts';
@@ -30,8 +34,10 @@ import {
   GAME_CHOICES,
   MATCH_LENGTHS,
   MAX_NAME_LENGTH,
-  PLAYABLE_GAMES,
   cleanName,
+  isGameOpen,
+  type GameChoice,
+  type GameLevels,
   type MatchLength,
   type MatchMode,
   type MatchSetup,
@@ -41,20 +47,20 @@ export interface NewGameScreenProps {
   mode: MatchMode;
   /** The last choices (or the defaults). */
   initial: MatchSetup;
-  /** The bot levels this build can play. The others show locked. */
-  botLevels: readonly Difficulty[];
+  /** The bot levels this build can play, per game. The others show locked. */
+  botLevels: GameLevels;
   onBack: () => void;
   onStart: (setup: MatchSetup) => void;
   /** A saved game exists: Start asks first, because it ends that game (wireframe 4). */
   hasSavedGame?: boolean;
-  /** Opens the rules of a game (the info button next to its name). */
-  onRules?: (game: MatchSetup['game']) => void;
+  /** Opens the rules of a game (the info button on its card). */
+  onRules?: (game: GameChoice) => void;
 }
 
 export function NewGameScreen({
   mode,
   initial,
-  botLevels,
+  botLevels: levelsByGame,
   onBack,
   onStart,
   hasSavedGame = false,
@@ -63,9 +69,16 @@ export function NewGameScreen({
   const { t } = useTranslation();
   const { theme } = useUnistyles();
   const [toast, showToast] = useToast();
+  const [game, setGame] = useState<GameChoice>(initial.game);
   const [targetPoints, setTargetPoints] = useState<MatchLength>(initial.targetPoints);
-  const [botLevel, setBotLevel] = useState<Difficulty>(initial.botLevel);
+  const [chosenLevel, setBotLevel] = useState<Difficulty>(initial.botLevel);
   const [names, setNames] = useState(initial.names);
+
+  const openGames = GAME_CHOICES.filter((choice) => isGameOpen(choice, mode, levelsByGame));
+  const lockedGames = GAME_CHOICES.filter((choice) => !openGames.includes(choice));
+  const botLevels = levelsByGame[game];
+  // A level the new game cannot play falls back to the easiest one it can.
+  const botLevel = botLevels.includes(chosenLevel) ? chosenLevel : (botLevels[0] ?? chosenLevel);
 
   const lengthOptions: SegmentOption<`${MatchLength}`>[] = MATCH_LENGTHS.map((n) => ({
     value: `${n}`,
@@ -85,7 +98,7 @@ export function NewGameScreen({
   const startNow = () =>
     onStart({
       mode,
-      game: 'portes',
+      game,
       targetPoints,
       botLevel,
       names: { white: cleanName(names.white), black: cleanName(names.black) },
@@ -137,52 +150,66 @@ export function NewGameScreen({
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
         <SettingsSection title={t('newGame.game')}>
-          <View style={styles.gameCard}>
-            <View
-              testID="new-game-portes"
-              style={styles.gameChoice}
-              accessible
-              accessibilityRole="radio"
-              accessibilityState={{ checked: true }}
-              accessibilityLabel={`${t('games.portes')}, ${t('games.portesSubtitle')}`}>
-              <View style={styles.radio}>
-                <View style={styles.radioDot} />
-              </View>
-              <View style={styles.gameTexts}>
-                <Text style={styles.gameName}>{t('games.portes')}</Text>
-                <Text style={styles.hint}>{t('games.portesSubtitle')}</Text>
-              </View>
+          <View style={styles.gameList} accessibilityRole="radiogroup">
+            {openGames.map((choice) => {
+              const selected = choice === game;
+              return (
+                <View key={choice} style={styles.gameCard(selected)}>
+                  <Pressable
+                    testID={`new-game-${choice}`}
+                    style={({ pressed }) => [
+                      styles.gameChoice,
+                      pressed && !selected && styles.pressed,
+                    ]}
+                    onPress={() => setGame(choice)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    accessibilityLabel={`${t(`games.${choice}`)}, ${t(`games.${choice}Subtitle`)}`}>
+                    <View style={styles.radio}>
+                      {selected ? <View style={styles.radioDot} /> : null}
+                    </View>
+                    <View style={styles.gameTexts}>
+                      <Text style={styles.gameName}>{t(`games.${choice}`)}</Text>
+                      <Text style={styles.hint}>{t(`games.${choice}Subtitle`)}</Text>
+                    </View>
+                  </Pressable>
+                  {onRules ? (
+                    <Pressable
+                      testID={`new-game-rules-${choice}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={t(`rules.title.${choice}`)}
+                      onPress={() => onRules(choice)}
+                      hitSlop={4}
+                      style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
+                      <Text style={styles.rulesIcon} importantForAccessibility="no">
+                        {'i'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+          {lockedGames.length > 0 ? (
+            <View style={styles.chips}>
+              {lockedGames.map((choice) => (
+                <Pressable
+                  key={choice}
+                  testID={`new-game-locked-${choice}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(`games.${choice}`)}
+                  accessibilityHint={t('common.comingSoon')}
+                  accessibilityState={{ disabled: true }}
+                  onPress={() => showToast(t('newGame.gameSoon', { game: t(`games.${choice}`) }))}
+                  style={({ pressed }) => [styles.chip, pressed && styles.pressed]}>
+                  <Text style={styles.chipText}>{t(`games.${choice}`)}</Text>
+                </Pressable>
+              ))}
             </View>
-            {onRules ? (
-              <Pressable
-                testID="new-game-rules-portes"
-                accessibilityRole="button"
-                accessibilityLabel={t('rules.title.portes')}
-                onPress={() => onRules('portes')}
-                hitSlop={4}
-                style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
-                <Text style={styles.rulesIcon} importantForAccessibility="no">
-                  {'i'}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-          <View style={styles.chips}>
-            {GAME_CHOICES.filter((game) => !PLAYABLE_GAMES.includes(game)).map((game) => (
-              <Pressable
-                key={game}
-                testID={`new-game-locked-${game}`}
-                accessibilityRole="button"
-                accessibilityLabel={t(`games.${game}`)}
-                accessibilityHint={t('common.comingSoon')}
-                accessibilityState={{ disabled: true }}
-                onPress={() => showToast(t('newGame.gameSoon', { game: t(`games.${game}`) }))}
-                style={({ pressed }) => [styles.chip, pressed && styles.pressed]}>
-                <Text style={styles.chipText}>{t(`games.${game}`)}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.hint}>{t('newGame.lockedGames')}</Text>
+          ) : null}
+          {lockedGames.length > 0 ? (
+            <Text style={styles.hint}>{t('newGame.lockedGames')}</Text>
+          ) : null}
         </SettingsSection>
 
         <SettingsSection title={t('newGame.length.label')}>
@@ -207,7 +234,13 @@ export function NewGameScreen({
                 onChange={setBotLevel}
               />
               <Text style={styles.hint}>{t(`newGame.botLevel.${botLevel}Hint`)}</Text>
-              {lockedLevels ? <Text style={styles.hint}>{t('newGame.botLevel.soon')}</Text> : null}
+              {lockedLevels ? (
+                <Text style={styles.hint}>
+                  {botLevels.includes('medium')
+                    ? t('newGame.botLevel.hardSoon')
+                    : t('newGame.botLevel.soon')}
+                </Text>
+              ) : null}
             </SettingsSection>
             <View style={styles.info}>
               <Text style={styles.infoTitle}>{t('newGame.whoStarts.title')}</Text>
@@ -299,15 +332,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.space.lg,
     paddingBottom: theme.space.xl,
   },
-  gameCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  gameList: {
     gap: theme.space.sm,
-    padding: theme.space.lg,
-    borderRadius: theme.radii.lg,
-    borderWidth: 3,
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.surfaceSelected,
   },
   gameChoice: {
     flex: 1,
@@ -329,6 +355,17 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontStyle: 'italic',
     color: theme.colors.text,
   },
+  gameCard: (selected: boolean) => ({
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: theme.space.sm,
+    padding: theme.space.lg,
+    borderRadius: theme.radii.lg,
+    // The same border width either way, so the text does not move.
+    borderWidth: 3,
+    borderColor: selected ? theme.colors.accent : theme.colors.border,
+    backgroundColor: selected ? theme.colors.surfaceSelected : theme.colors.surface,
+  }),
   radio: {
     width: 24,
     height: 24,

@@ -13,12 +13,12 @@ import i18n from '@/i18n';
 
 import { SAVED_MATCH_KEY, SAVE_VERSION, parseSavedMatch, serializeSavedMatch } from './savedMatch';
 import { createSessionRegistry, isRestPoint, type MatchSession } from './sessions';
-import { defaultSetup, type MatchSetup } from './setup';
+import { defaultSetup, gameLevels, type MatchSetup } from './setup';
 import { continueSummary, timeAgo } from './summary';
 import { useSaveOnBackground } from './useSaveOnBackground';
 
 const t = i18n.t.bind(i18n);
-const LEVELS = ['easy'] as const;
+const LEVELS = gameLevels(['easy']);
 const botSetup: MatchSetup = { ...defaultSetup('bot'), targetPoints: 5 };
 
 function registry(storage: Storage, clock = { now: 1_000_000 }) {
@@ -107,7 +107,7 @@ describe('saved match format', () => {
 
   it('plays a saved Medium bot as Easy when this build has no Medium', () => {
     const medium = serializeSavedMatch(s.id, { ...botSetup, botLevel: 'medium' }, flowOf(s), 1);
-    const result = parseSavedMatch(medium, ['easy']);
+    const result = parseSavedMatch(medium, LEVELS);
     expect(result.kind === 'ok' && result.saved.setup.botLevel).toBe('easy');
   });
 });
@@ -296,5 +296,65 @@ describe('useSaveOnBackground', () => {
     await unmount();
     expect(remove).toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe('the saved game (#109)', () => {
+  const tavliSetup: MatchSetup = { ...defaultSetup('local'), game: 'tavli', targetPoints: 5 };
+
+  function savedText(setup: MatchSetup) {
+    const s = registry(createMemoryStorage()).start(setup);
+    openGame(s);
+    return { s, text: serializeSavedMatch(s.id, s.setup, flowOf(s), 42) };
+  }
+
+  it('keeps the game and the Tavli rotation after a restart', () => {
+    const storage = createMemoryStorage();
+    const s = registry(storage).start(tavliSetup);
+    openGame(s);
+    s.store.getState().dispatch({ type: 'resign', player: flowOf(s).game.state.toMove });
+    s.store.getState().dispatch({ type: 'nextGame' });
+    expect(flowOf(s).game.state.variant).toBe('plakoto');
+
+    const restored = registry(storage).get(s.id);
+    expect(restored?.setup.game).toBe('tavli');
+    expect(restored && flowOf(restored).game.state.variant).toBe('plakoto');
+    expect(restored && flowOf(restored).match.games.map((g) => g.variant)).toEqual(['portes']);
+  });
+
+  it('keeps a game the bot cannot play any more (the match is under way)', () => {
+    const { text } = savedText({ ...defaultSetup('bot'), game: 'fevga' });
+    const result = parseSavedMatch(text, gameLevels(['easy'], { fevga: [] }));
+    expect(result.kind === 'ok' && result.saved.setup).toMatchObject({
+      game: 'fevga',
+      botLevel: 'easy',
+    });
+  });
+
+  it('loads a version 1 save from before #109 (Portes, maybe with no game) as Portes', () => {
+    const { text } = savedText(botSetup);
+    const old = JSON.parse(text);
+    expect(old.v).toBe(1);
+    expect(parseSavedMatch(text, LEVELS).kind).toBe('ok');
+    delete old.setup.game;
+    const result = parseSavedMatch(JSON.stringify(old), LEVELS);
+    expect(result.kind === 'ok' && result.saved.setup.game).toBe('portes');
+  });
+
+  it.each([
+    ['a game the log does not have', 'plakoto'],
+    ['a game that is not built', 'asodio'],
+    ['an unknown game', 'chess'],
+  ])('drops a save with %s', (_name, game) => {
+    const { text } = savedText(tavliSetup);
+    const bad = JSON.parse(text);
+    bad.setup.game = game;
+    expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
+  });
+
+  it('drops a one-game save whose log plays the Tavli rotation', () => {
+    const tavli = JSON.parse(savedText(tavliSetup).text);
+    const bad = { ...tavli, setup: { ...tavliSetup, game: 'portes' } };
+    expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
   });
 });

@@ -1,9 +1,10 @@
 /** Texts about a match: the "Continue game" card (wireframe 3) and match end (9). Pure. */
+import { nextVariantId, type Match, type MatchFlow, type VariantId } from '@tavli/engine';
 import type { TFunction } from 'i18next';
 
 import type { SavedMatch } from './savedMatch';
 import { seatsFor } from './seats';
-import type { MatchSetup } from './setup';
+import { isGameChoice, type MatchSetup } from './setup';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -48,4 +49,31 @@ export function continueSummary(saved: SavedMatch, t: TFunction, now: number): C
       timeAgo(Math.max(0, now - saved.savedAt), t),
     ].join(' · '),
   };
+}
+
+/** "Plakoto". An id the app does not know shows as it is. */
+export function variantName(variant: VariantId, t: TFunction): string {
+  return isGameChoice(variant) ? t(`games.${variant}`) : variant;
+}
+
+/** The number of the game on the board, from 1. A finished game is in `match.games` already. */
+export function currentGameNumber(flow: MatchFlow): number {
+  const { games } = flow.match;
+  return flow.game.phase === 'game-over' ? games.length : games.length + 1;
+}
+
+/** The game on the board (#109): "Game 2 · Plakoto". */
+export function currentGameLabel(flow: MatchFlow, t: TFunction): string {
+  return t('game.round', {
+    number: currentGameNumber(flow),
+    game: variantName(flow.game.state.variant, t),
+  });
+}
+
+/** After a game end, the game that comes next: "Next: game 3 · Fevga". */
+export function nextGameLabel(match: Match, t: TFunction): string {
+  return t('game.end.nextGame', {
+    number: match.games.length + 1,
+    game: variantName(nextVariantId(match), t),
+  });
 }
