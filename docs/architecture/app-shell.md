@@ -128,7 +128,7 @@ The player's past local matches and simple stats, offline.
 - `features/bot/botTurn.ts` plays one bot turn: wait 0.5 s, **roll** (the flow's `Rng` rolls), ask the runner and wait `thinkingDelayMs` at the same time (the short "forced" range when there is only one legal play), play the moves **one by one, 0.4 s apart**, then **confirm**. It sends the same actions as a human, so each move flies on the board.
 - `GameScreen` starts the bot turn when nothing covers the board (opening result, pass card, end cards) and the screen is not paused. The menu and screens on top (Settings) pause it; `cancel()` clears the timers and cancels the runner. On resume the bot keeps moves that start its plan, or takes them back.
 - During the bot turn the board takes no touches and the controls row is a locked box: "Bot's turn…", then the bot's dice and "Bot rolled 4-2 and is moving…".
-- Opening roll vs bot: one tap rolls both dice. A bot that cannot move shows the pass card for 2 s ("Bot cannot move. Your turn." in the wireframe).
+- Opening roll vs bot: one tap rolls both dice. A bot that cannot move shows the pass card for 3.5 s, or until you tap OK ("Bot cannot move. Your turn." in the wireframe). Your own pass card waits for OK; the bot starts its turn after that (#178).
 
 ## In-game menu and resign
 

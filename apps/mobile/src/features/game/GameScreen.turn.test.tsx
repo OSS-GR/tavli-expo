@@ -1,13 +1,15 @@
+import { InlineBotRunner, createBot } from '@tavli/bot';
 import {
   createBoard,
   createGameFlow,
   createSeededRng,
   portes,
   type BoardState,
+  type PerPlayer,
   type PlayerId,
 } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
-import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
@@ -16,7 +18,8 @@ import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
 import { createGameStore, type GameStore } from './gameStore';
-import { GameScreen, MATCH_END_DELAY_MS, PASS_NOTICE_MS } from './GameScreen';
+import { BOT_PASS_NOTICE_MS, GameScreen, MATCH_END_DELAY_MS, type BotSeat } from './GameScreen';
+import type { Seat } from './seats';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
@@ -206,37 +209,123 @@ describe('<GameScreen /> no legal moves', () => {
     expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
   });
 
-  it('closes by itself after 3 s', async () => {
+  it('your own pass waits for OK: it does not close by itself (#178)', async () => {
+    const user = setupUser();
     const store = newStore();
     setPosition(store, closed);
     await show(store);
     await act(async () => {
       store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
     });
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    // A settings change draws the screen again meanwhile.
     await act(async () => {
-      jest.advanceTimersByTime(PASS_NOTICE_MS + 10);
+      jest.advanceTimersByTime(30_000);
     });
-    expect(screen.queryByTestId('pass-card')).toBeNull();
-  });
-
-  it('closes after 3 s even when the screen draws again meanwhile', async () => {
-    const store = newStore();
-    setPosition(store, closed);
-    await show(store);
-    await act(async () => {
-      store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
-    });
-    await act(async () => {
-      jest.advanceTimersByTime(PASS_NOTICE_MS - 1000);
-    });
-    // A settings change draws the screen again; the timer keeps running.
     await act(async () => {
       settingsStore.setState({ showPipCounts: false });
     });
     await act(async () => {
-      jest.advanceTimersByTime(1010);
+      jest.advanceTimersByTime(30_000);
     });
+    const card = within(screen.getByTestId('pass-card'));
+    expect(card.getByText('Ann rolled 5-2. No checker can move.')).toBeOnTheScreen();
+    expect(card.queryByText(/Closes by itself/)).toBeNull();
+    await user.press(button('OK'));
+    expect(screen.queryByTestId('pass-card')).toBeNull();
+  });
+});
+
+describe('<GameScreen /> no legal moves vs the bot (#178)', () => {
+  const seats: PerPlayer<Seat> = {
+    white: { name: 'You', label: 'You', turnLabel: 'Your turn', you: true },
+    black: { name: 'Bot', label: 'Bot · Easy', turnLabel: 'Playing', you: false },
+  };
+  const bot: BotSeat = {
+    player: 'black',
+    difficulty: 'easy',
+    runner: new InlineBotRunner(createBot()),
+    rng: createSeededRng(1),
+    timing: { beforeRollMs: 0, moveMs: 0, thinkMs: () => 0 },
+  };
+  // The bot (Black) is on the bar and you hold all six entry points.
+  const botClosed = createBoard(
+    {
+      white: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
+      black: { points: { 6: 14 }, bar: 1 },
+    },
+    'contrary',
+  );
+  const tick = async (ms: number) => {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+    });
+  };
+  /** The bot rolls (no wait before the roll) and passes; its card shows. */
+  async function botPasses(paused = false) {
+    const store = newStore();
+    setPosition(store, botClosed, 'black');
+    await show(store, { seats, bot });
+    await tick(0);
+    expect(store.getState().flow.game.state.toMove).toBe('white');
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    if (paused) await screen.rerender(<GameScreen store={store} seats={seats} bot={bot} paused />);
+    return store;
+  }
+
+  it('your pass waits for OK; then the bot plays its turn', async () => {
+    const user = setupUser();
+    const store = newStore();
+    setPosition(store, closedBoard);
+    await show(store, { seats, bot });
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+    });
+    expect(screen.getByText('You rolled 6-6. No checker can move.')).toBeOnTheScreen();
+    expect(screen.getByText('The turn passes to Bot.')).toBeOnTheScreen();
+    // The bot waits while the card shows: it has not rolled.
+    await tick(30_000);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    expect(store.getState().flow.game.state.dice).toBeNull();
+    expect(screen.queryByText(/Closes by itself/)).toBeNull();
+
+    await user.press(button('OK'));
+    expect(screen.queryByTestId('pass-card')).toBeNull();
+    await waitFor(() => expect(store.getState().flow.game.state.toMove).toBe('white'));
+    const rolls = store.getState().flow.log.filter((e) => e.type === 'roll');
+    expect(rolls.length).toBeGreaterThan(1);
+  });
+
+  it('the bot’s pass shows 3.5 s, then you can roll', async () => {
+    await botPasses();
+    const card = within(screen.getByTestId('pass-card'));
+    expect(card.getByText(/^Bot rolled \d-\d\. No checker can move\.$/)).toBeOnTheScreen();
+    expect(card.getByText('Your turn.')).toBeOnTheScreen();
+    expect(card.getByText('Closes by itself after 3.5 s.')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Roll dice, or tap the board' })).toBeNull();
+    await tick(BOT_PASS_NOTICE_MS - 100);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    await tick(110);
+    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
+  });
+
+  it('OK closes the bot’s pass sooner', async () => {
+    const user = setupUser();
+    await botPasses();
+    await user.press(button('OK'));
+    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
+  });
+
+  it('the bot’s pass does not close while the screen is paused (menu open)', async () => {
+    const store = await botPasses(true);
+    await tick(BOT_PASS_NOTICE_MS * 3);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    // Back from the menu: the card shows its full time again.
+    await screen.rerender(<GameScreen store={store} seats={seats} bot={bot} />);
+    await tick(BOT_PASS_NOTICE_MS - 100);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    await tick(110);
     expect(screen.queryByTestId('pass-card')).toBeNull();
   });
 });
