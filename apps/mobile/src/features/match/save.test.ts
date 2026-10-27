@@ -343,7 +343,7 @@ describe('the saved game (#109)', () => {
 
   it.each([
     ['a game the log does not have', 'plakoto'],
-    ['a game that is not built', 'asodio'],
+    ['another built game the log does not play', 'asodio'],
     ['an unknown game', 'chess'],
   ])('drops a save with %s', (_name, game) => {
     const { text } = savedText(tavliSetup);

@@ -8,6 +8,7 @@
 |------|--------------|
 | `geometry.ts` | Layout math in screen points: fit the board, point rects and triangles, stacks, bar, trays, hit-testing. Pure TypeScript. |
 | `boardModel.ts` | Engine `BoardState` → what to draw: stacks per slot, placed checkers, badges, trays. Board flip lives here. |
+| `asodio.ts` | Asodio for the screen: checkers to enter, the loading lock, the checkers the quarter lock freezes, a frozen army (A6). Pure TypeScript. |
 | `paint.ts` | Theme gradients and colors → Skia props. |
 | `skia/BoardScene.tsx` | The Skia drawing. Props only: no hooks, no React Native. The same scene renders in the app, in Jest and headless. |
 | `skia/CheckerShape.tsx` | One checker from a theme `CheckerStyle`. |
@@ -15,7 +16,7 @@
 | `useBoardAssets.ts` | Loads the theme images and the badge font. |
 | `themeImages.ts` | The Metro `require` map for theme images (Metro only bundles literal requires). |
 | `StaticBoard.tsx` | A board that only shows a position. |
-| `positions.ts` | Fixed positions (start, mid-game, bear-off) for the dev screen, tests and screenshots. |
+| `positions.ts` | Fixed positions (start, mid-game, bear-off, Plakoto, Fevga, Asodio) for the dev screen, tests and screenshots. |
 | `diceMotion.ts` | The roll animation as pure math (worklets): tumble pose and face flips. |
 | `skia/DieShape.tsx`, `skia/AnimatedDie.tsx` | A die from the theme `DiceStyle`; the animated version tumbles and lands on the engine's value. |
 | `DiceRow.tsx` | The dice in the controls row: 2 side by side, or 4 in a 2 x 2 grid for a double. Used dice fade. |
@@ -30,7 +31,7 @@ The game itself lives in `apps/mobile/src/features/game/`:
 |------|--------------|
 | `gameStore.ts` | A Zustand store around the engine `MatchFlow` reducer, with the injected `Rng`. `turnView(flow)` computes what the screen shows (board mid-turn, legal moves, dice, pips). |
 | `opening.ts`, `OpeningCard.tsx` | The opening roll card: one die per player, tie, result. |
-| `PlayerStrip.tsx` | A player strip: checker color, name, pip count, match score, turn pill. |
+| `PlayerStrip.tsx` | A player strip: checker color, name, pip count, an optional note (Asodio: "12 to enter", "Army frozen"), match score, turn pill. |
 | `GameCard.tsx`, `turnNotices.ts` | Cards over the board: no legal moves, "could not be opened". |
 | `GameEndSheet.tsx` | Game end (wireframe 8): a sheet over the final board. |
 | `Celebration.tsx` | The small win effect on the game-end sheet and the match-end screen. |
@@ -40,28 +41,43 @@ The game itself lives in `apps/mobile/src/features/game/`:
 
 The real route is `app/game/[id]/index.tsx`; match end is `app/game/[id]/match-end.tsx` (see [App shell](app-shell.md)). Dev route (release builds redirect it to Home):
 
-- `app/dev/board.tsx`: the fixed positions (`positions.ts`: Portes start, mid-game, bear-off, Plakoto start, Plakoto pins, Fevga start), from White's and from Black's side. Each position has its direction (`SAMPLE_DIRECTIONS`).
+- `app/dev/board.tsx`: the fixed positions (`positions.ts`: Portes start, mid-game, bear-off, Plakoto start, Plakoto pins, Fevga start, Asodio start, Asodio loading, Asodio frozen army), from White's and from Black's side. Each position has its direction (`SAMPLE_DIRECTIONS`). The Asodio positions show the frozen marks.
 
 **Game flow and ADR-0003.** The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. ADR-0003 records this (updated in #29).
 
 ## Drawing
 
 - The board uses the theme's **portrait-rotated** layout (wireframe option B). `fitBoardWithShadow` keeps the aspect ratio and leaves room for the shadow, so the board fits an iPhone SE and large phones.
-- Draw order follows `packages/themes/README.md`: shadow, image layers under the points, 24 vector points (color, wood tile, seam), image layers over the points, pinned checkers (Plakoto), checkers and count badges, trays, highlights, lamp overlay.
+- Draw order follows `packages/themes/README.md`: shadow, image layers under the points, 24 vector points (color, wood tile, seam), image layers over the points, pinned checkers (Plakoto, Asodio), checkers (frozen ones shaded, Asodio) and count badges, trays, highlights, lamp overlay.
 - Until the images load, the board draws with the theme colors, so the first frame is never empty.
 - A stack shows at most `checker.maxVisible` (5) checkers. The last one carries a count badge.
 - **Bar checkers shrink to fit the bar.** In Walnut Kafeneio the bar is 34 pt and a checker 40 pt, so bar checkers get a radius of 94% of half the bar height.
 - Checker colors stay with the player: White uses the theme's `light` style, Black the `dark` style.
 
-## Plakoto and Fevga
+## Plakoto, Fevga and Asodio
 
-The board reads the game from the engine state: `rules.movement.direction` gives the direction (`turnView`, `GameScreen`), and the legal moves come from the engine (`legalNextMoves`) as in Portes. So drag, tap, hints, undo and confirm work the same in every game. Plakoto and Fevga never use the bar; only Portes does. (`outside`, the Asodio start, would wait on the bar; Asodio is not built yet.)
+The board reads the game from the engine state: `rules.movement.direction` gives the direction (`turnView`, `GameScreen`), and the legal moves come from the engine (`legalNextMoves`) as in Portes. So drag, tap, hints, undo and confirm work the same in every game. Plakoto and Fevga never use the bar; only Portes hits. Asodio uses the bar halves for its checkers that are not entered yet (see [Asodio](#asodio)).
 
 - **Plakoto pins.** A pinned checker lies under the checkers that pin it. It sits at the base of the point, where a lone checker would be; the stack on top starts `PIN_PEEK` (0.6) checker radii further along the point, so the pinned checker peeks out on the base side (wireframe 17's small picture). It also gets a ring in the theme's badge color (`PIN_RING_WIDTH`), so a pin never looks like a normal stack. The pinned checker is not part of the stack: `countIn` does not count it, `pinnedIn` says it is there, and `layoutBoard` returns it in `pins` (key `<slot>:pinned`). Touch, ghost targets and flights use the same pinned stack positions (`stackGeometry(…, pinned)`), so a pin lands exactly where it is drawn. A pin is a plain move: no checker flies to the bar.
-- **Screen readers:** the board has a label, "Board", plus one line per pinned checker ("Bob's checker on point 24 is pinned", in the owner's own numbers).
+- **Screen readers:** the board has a label, "Board", plus one line per pinned checker ("Bob's checker on point 24 is pinned", in the owner's own numbers). Asodio adds its own lines (below).
 - **Fevga** (`direction: "parallel"`): both players start on their own point 24, in diagonally opposite corners (for White at the bottom: White on layout 24, Black on layout 12), and both move the same way round. This is only the point mapping in `boardModel.ts` (`absoluteToOwn`); the drawing and hit-testing rects are the same as in Portes. Tests check it in the portrait and the landscape layout.
 - The `plakoto` and `fevga` presets keep the Tavli rotation (Portes → Plakoto → Fevga), so a match of the `plakoto` preset starts with Portes. For a match of one game only, override the rotation: `resolveRules('plakoto', { match: { rotation: ['plakoto'] } })` (the tests do this).
 - The trays stay where the theme puts them. In Fevga the top player's home is the top right, but its tray stays at the bottom right.
+
+### Asodio
+
+The owner version (`asodio.kafeneio`, `docs/rules/asodio.md` A1–A6). The engine decides every move; `features/board/asodio.ts` only reads the board and the rules, so the screen can say why a checker does not move.
+
+- **The "to enter" stacks.** A checker that is not entered yet (`board.outside`) waits on its player's half of the bar. In the portrait layout each half sits right above that player's starting quarter (spot 6, own point 19), so a checker enters a short hop away. The stack always shows its count badge, even when every checker is drawn (`StackModel.toEnter`). The owner version pins and never hits, so nothing else uses the bar. The strip under the name says "12 to enter".
+- **Entering.** Tap or drag from the stack to spot `d` (own point `25 - d`), like any other move: the engine's moves come `from: 'outside'`, and `slotOfOrigin('outside')` is the bar half. A double enters four on one spot, one tap pair each (A1). Undo flies the checker back to the stack. While loading, only the stack has moves (A2), because the engine lists only entries.
+- **Loading lock.** While all 15 are still outside (`firstEntryGate`), a note over the board says "Roll 1-2 or a double to start" before the roll (`loading-lock-hint`; "Roll a double to start" with `firstEntryGateRolls: "doubleOnly"`). A roll that does not open the board is a pass; the pass card says "Board locked" and what opens it. An opening roll is never a double, so most games start with a pass (the pass card then replaces the opening result).
+- **Frozen checkers.** The quarter lock freezes every checker in front of the player's rear quarter (`frozenPoints`). They get a soft dark shade and a thin frost ring (`FROZEN_MARK` in `BoardScene.tsx`), quiet on purpose: "waits", not "danger". Both players' frozen checkers are marked, all the time (`asodioMarks` → `layoutBoard(…, marks)` → `PlacedChecker.frozen`). Nothing is marked while loading: every checker is still in the starting quarter.
+- **Frozen army (A6).** When every checker in the rear quarter is pinned (`armyFrozen`), the player passes until it is free. The strip says "Army frozen", the pinned checker shows the Plakoto pin ring, the rest are shaded, and the pass card is titled "Army frozen" and says the last checker is pinned.
+- **Pins** use the Plakoto drawing (`PIN_PEEK`, `PIN_RING_WIDTH`).
+- **Draw** (A5, `reason: 'deadlock'`): the game-end sheet says "The game is a draw", the chip "Draw · 0 points" and the reason "No checker can ever move again." The next game starts with a new opening roll. A Plakoto draw (both mothers pinned) uses the same chip with its own reason.
+- **Screen readers:** the board label adds "Ann has 12 checkers to enter" (or "You have …"), "Bob's checkers on points 18, 16 are frozen" and "Ann's last checker is pinned: the whole army is frozen". The strips read their notes too.
+- **Next player:** the pass card names the player to move from the engine (`state.toMove`), never "the other one", because some Asodio presets give the same player another roll.
+- The app plays only the owner version. Other presets (hits, a chosen double after 1-2, extra rolls) work in the engine, but the screen has no card for the `chooseDouble` question yet.
 
 ### The mother question (Plakoto)
 
@@ -104,8 +120,8 @@ With `motherRule: "offerConcede"` (the app default) the engine flow stops in `aw
 - **Confirm** is enabled only when the engine says `canConfirm` (all dice used, or no move left). Then a hint shows: "All dice used. Confirm or undo."
 - **Auto-confirm** (Settings, default off): each move is sent with `autoConfirm`, so the engine ends a complete turn at once.
 - **Turn indicator:** the active player's strip gets a thick border and a pill: "YOUR TURN", "PLAYING" for the bot, or the player's name in pass-and-play ("MARIA'S TURN"). Pip counts follow the moves of the turn; Settings → Show pip counts hides them.
-- **No legal moves:** the engine passes the turn by itself. The card says who rolled what and that the turn passes; the dice stay, faded. It closes on OK or after 3 s. Until then the board stays with the player who passed (flip).
-- **Game end** (`GameEndSheet`): a sheet over the final board, with a dim layer over the rest. Winner, Mono / Diplo chip (diplo filled), a reason line ("Bob did not bear off any checker." for a diplo, "Maria resigned."), the match box ("You 2 – 0 Bot", "First to 3 points"), **Next game** (the winner starts) and **Home** (a text button).
+- **No legal moves:** the engine passes the turn by itself. The card says who rolled what and that the turn passes; the dice stay, faded. It closes on OK or after 3 s. Until then the board stays with the player who passed (flip). Asodio has two more titles: "Board locked" (the loading lock) and "Army frozen" (A6).
+- **Game end** (`GameEndSheet`): a sheet over the final board, with a dim layer over the rest. Winner (or "The game is a draw"), Mono / Diplo chip (diplo filled; "Draw · 0 points" for a draw), a reason line ("Bob did not bear off any checker." for a diplo, "Maria resigned.", "No checker can ever move again." for an Asodio deadlock), the match box ("You 2 – 0 Bot", "First to 3 points"), **Next game** (the winner starts) and **Home** (a text button).
 - **Match end:** no sheet for the last game. The final position stays for `MATCH_END_DELAY_MS` (1 s), so the last checker lands, then `GameScreen` calls `onMatchOver` and the route opens the match-end screen ([App shell](app-shell.md)). It waits while the screen is paused (menu or Settings on top).
 - **Celebration** (`Celebration.tsx`): only when a person wins (`isHumanWin` in `gameFeedback.ts`, the same rule as the win jingle). Vs the bot, a bot win shows none. Fourteen confetti pieces fly out on one shared Reanimated value, and the icon pops (🎉 on game end, 🏆 on match end). With the system **Reduce motion** setting on (`useReducedMotion`), only the still icon shows. Screen readers skip it.
 - **Screen readers:** the game-end sheet and the match-end screen announce the result when they show ("Ann wins the game! Diplo · +2 points … Ann 2 – 0 Bob"). The sheet is modal for VoiceOver (`accessibilityViewIsModal`). Titles are headers; every button has a label and is at least 44 pt tall.
@@ -131,6 +147,7 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 - Jest fakes Reanimated with `apps/mobile/test/reanimatedMock.ts`: animations end at once and call their end callback. `Animated.View` is a plain view and `useAnimatedStyle` runs once. Spy on `useReducedMotion` to test reduce motion.
 - `GameScreen.turn.test.tsx`: undo, confirm, auto-confirm, the turn indicator (flip and fixed), pip counts on and off, the pass card (OK and 3 s), the game-end sheet (diplo with reason, mono, celebration, announcement, Home), next game, and `onMatchOver` after the delay. `GameScreen.match.test.tsx` plays a whole match with taps only (to 1 by default; `FULL_MATCH=1` plays to 3) and ends on `onMatchOver`.
 - Plakoto and Fevga: `boardModel.test.ts` (pins under their pinners, the Plakoto start, the Fevga start and its same-way movement, drawing and hit-testing in portrait and landscape), `interaction.test.ts` (a pin's ghost, landing and flights), `BoardScene.test.tsx` (pin rings, the Fevga start) and `botTurn.test.ts` (the bot plays on). `GameScreen.variants.test.tsx` plays a whole Plakoto game and a whole Fevga game with taps only, and tests the mother card (play on, resign, board label, vs bot both ways).
+- Asodio: `asodio.test.ts` (the loading lock, the quarter lock and A6 with the owner edge cases #14–#17 and #19, the "to enter" stacks and their badge, the frozen marks, entering by tap with a 1-2 and a double, flights to and from the stack), `BoardScene.test.tsx` (the stack counts, the frozen shade). `GameScreen.asodio.test.tsx` plays two whole games with taps only (one ends in a deadlock draw and checks the game-end sheet, one is borne off), and tests the locked opening, entering four with 3-3 and undo, a 1-2, the frozen army card and labels, and the real Easy bot entering.
 - `BoardScene.test.tsx`: a render smoke test. Jest replaces Skia with `apps/mobile/test/skiaMock.tsx`: every Skia component becomes a plain element, so the test counts what the board would draw.
 
 ## Screenshots

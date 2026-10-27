@@ -10,7 +10,7 @@ import { NewGameScreen } from './NewGameScreen';
 
 /** Portes only, like the bot before #109 (Plakoto and Fevga have no level). */
 const PORTES_ONLY = (levels: readonly Difficulty[]) =>
-  gameLevels(levels, { plakoto: [], fevga: [], tavli: [] });
+  gameLevels(levels, { plakoto: [], fevga: [], tavli: [], asodio: [] });
 
 function show(
   mode: MatchMode,
@@ -213,7 +213,7 @@ describe('<NewGameScreen /> with a saved game', () => {
 describe('<NewGameScreen /> game picker (#109)', () => {
   const EVERY_GAME = gameLevels(['easy', 'medium']);
 
-  it('offers Portes, Plakoto, Fevga and Tavli vs a bot that plays them all', async () => {
+  it('offers every game vs a bot that plays them all', async () => {
     const user = userEvent.setup();
     const { ui, onStart } = show('bot', EVERY_GAME);
     await render(ui);
@@ -227,8 +227,9 @@ describe('<NewGameScreen /> game picker (#109)', () => {
         name: 'Tavli, Τάβλι · all three in turn: Portes, Plakoto, Fevga',
       }),
     ).toBeOnTheScreen();
-    // Asodio is not built yet.
-    expect(screen.getByRole('button', { name: 'Asodio' })).toBeDisabled();
+    // Asodio is on the board since #124.
+    expect(screen.getByRole('radio', { name: /^Asodio/ })).not.toBeChecked();
+    expect(screen.queryByText('More games are coming soon.')).toBeNull();
 
     await user.press(screen.getByRole('radio', { name: /^Tavli/ }));
     expect(screen.getByRole('radio', { name: /^Tavli/ })).toBeChecked();
@@ -279,13 +280,15 @@ describe('<NewGameScreen /> game picker (#109)', () => {
     const { ui, onStart } = show('local', PORTES_ONLY(['easy']));
     await render(ui);
 
-    for (const name of [/^Portes/, /^Plakoto/, /^Fevga/, /^Tavli/]) {
+    for (const name of [/^Portes/, /^Plakoto/, /^Fevga/, /^Tavli/, /^Asodio/]) {
       expect(screen.getByRole('radio', { name })).toBeOnTheScreen();
     }
-    expect(screen.getByRole('button', { name: 'Asodio' })).toBeDisabled();
     await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     expect(onStart).toHaveBeenCalledWith({ ...defaultSetup('local'), game: 'plakoto' });
+    await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart).toHaveBeenLastCalledWith({ ...defaultSetup('local'), game: 'asodio' });
   });
 
   it('starts from the last game', async () => {

@@ -22,7 +22,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { BoardCanvas, portraitLayout, useBoardSpace } from './BoardCanvas';
-import { layoutBoard, type BoardView } from './boardModel';
+import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
 import type { Flight } from './flights';
 import { fitBoardWithShadow, type BoardGeometry } from './geometry';
 import {
@@ -65,6 +65,8 @@ export interface InteractiveBoardProps {
   onIllegalDrop?: () => void;
   /** Called with the board geometry after each layout (the screen needs it for undo flights). */
   onGeometry?: (geo: BoardGeometry) => void;
+  /** Extra marks: Asodio checkers frozen by the quarter lock. */
+  marks?: BoardMarks;
   /** What a screen reader says for the board, e.g. which checkers are pinned. */
   accessibilityLabel?: string;
   testID?: string;
@@ -95,6 +97,7 @@ export function InteractiveBoard({
   onPickUp,
   onIllegalDrop,
   onGeometry,
+  marks,
   accessibilityLabel,
   testID,
 }: InteractiveBoardProps) {
@@ -106,7 +109,7 @@ export function InteractiveBoard({
   useEffect(() => {
     if (geo) onGeometry?.(geo);
   }, [geo, onGeometry]);
-  const picture = geo ? layoutBoard(geo, board, view) : null;
+  const picture = geo ? layoutBoard(geo, board, view, marks) : null;
   const sources = geo ? buildSources(geo, board, view, mover, legal) : [];
 
   // JS state: the selected source (tap-tap, or the one being dragged) and
