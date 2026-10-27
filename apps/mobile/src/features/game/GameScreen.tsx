@@ -357,10 +357,15 @@ export function GameScreen({
   const startsLine = (player: PlayerId) =>
     isYou(player) ? t('game.end.starts_you') : t('game.end.starts', { name: nameOf(player) });
   // A resigned game says why it gives these points (#181): "Diplo: you
-  // resigned before you bore off a checker."
-  const resignedLine = (loser: PlayerId, type: ReturnType<typeof winType>) => {
+  // resigned before you bore off a checker." The diplo reason shows only when
+  // it is true: a variant may score a resign 2 for another reason.
+  const resignedLine = (loser: PlayerId, type: ReturnType<typeof winType>, off: number) => {
     const key =
-      type === 'diplo' ? 'resignedDiplo' : type === 'mono' ? 'resignedMono' : 'resignedGame';
+      type === 'diplo' && off === 0
+        ? 'resignedDiplo'
+        : type === 'mono'
+          ? 'resignedMono'
+          : 'resignedGame';
     return isYou(loser) ? t(`game.end.${key}_you`) : t(`game.end.${key}`, { name: nameOf(loser) });
   };
   const timeoutLine = (loser: PlayerId) =>
@@ -463,7 +468,7 @@ export function GameScreen({
     const type = winType(result);
     let reason: string | null = null;
     if (result.reason === 'resigned' && loser !== null) {
-      reason = resignedLine(loser, type);
+      reason = resignedLine(loser, type, game.state.board.off[loser]);
     } else if (result.reason === 'timeout' && loser !== null) {
       // An online turn timer ran out (#170). The sheet reads this line too.
       reason = timeoutLine(loser);
