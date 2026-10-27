@@ -179,6 +179,7 @@ The first Android build asks to make a **keystore** (the signing key). Say **yes
 
 - Builds from each profile listen on the **channel** with the same name: `development`, `preview`, `production`.
 - `runtimeVersion` uses the **`fingerprint`** policy. EAS makes a hash of everything native. An update only reaches builds with the same native code, so a JS update can never crash a build that misses a native module.
+- The hash also includes the app name and app id, so each variant has its own runtime version. Publish an update with the same `APP_VARIANT` as the builds it is for.
 - No updates are published yet. Dev builds get their code from Metro anyway.
 
 ## 5. Where things are in the app

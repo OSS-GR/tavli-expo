@@ -315,7 +315,7 @@ Rules:
 - **Do** use the simple flow from Expo docs: one **channel** per build profile: `development`, `preview`, `production`. Ignore branches.
 - **Do** use `runtimeVersion: { policy: "fingerprint" }` (set in `app.json`). The hash covers all native code, so an update never reaches a build that lacks a native module. Expo's SDK 58 docs no longer call it experimental (checked 2026-10-26). The cost: any native change needs a new build before updates reach it.
 - **Do** roll out production updates in steps: `eas update --channel production --rollout-percentage 10`, then raise it.
-- **Do** test an update on `preview` first, then promote with `eas update:republish --destination-channel production`.
+- **Do** test an update on `preview` first, then promote with `eas update:republish --destination-channel production`. **Not yet possible:** the fingerprint includes the app name and app id, so each variant has its own runtime version, and a preview update does not reach production builds. Fix this (for example, skip names and ids in a `fingerprint.config.js`) before the first OTA update.
 - **Do not** ship native changes or new permissions in an OTA update. Those need a store build.
 - **Do not** use OTA to change the app's main purpose. Both stores forbid it.
 
