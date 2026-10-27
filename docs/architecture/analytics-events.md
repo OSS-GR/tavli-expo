@@ -12,11 +12,12 @@ See which modes and features players use, from the first test builds. Nothing mo
 
   | Answer | Usage events | Crash reports |
   |--------|--------------|---------------|
-  | Not answered yet | none | sent, with no user id |
-  | **Allow usage data** | sent, with the install ID | sent, with the install ID |
+  | Not answered yet | none | JS errors only, with no user id and no other id (no native crash reports, no sessions) |
+  | **Allow usage data** | sent, with the install ID | sent, with the install ID, plus native crash reports and Sentry release-health sessions |
   | **Don't allow** | none | none |
   | **Don't allow** to an older consent text, not answered again yet | none | none |
 
+- **Crash reports before the answer are JS only (#139).** Sentry's native SDKs put their own installation id on every native event and session, and the app cannot strip it. So before "Allow" the Sentry adapter does not start them. Details: `packages/adapters/crash-sentry/README.md` ("Anonymous mode").
 - **New consent text asks again.** The answer is saved with `CONSENT_VERSION`. An answer saved for another version shows the welcome flow again. Until the new answer, an old **Allow** counts as "not answered yet" (`unset`: anonymous crash reports, no usage data). An old **Don't allow** stays a "no" (`stale-denied`: no crash reports, no usage data). Raise it only when the text changes so much that users must answer again.
 - **No events before opt-in.** The first launch asks (wireframe 02). Until the user taps **Allow usage data**, the `Analytics` port drops every call. Closing the app without an answer counts as "no".
 - **Opt-out stops everything at once.** Settings → Privacy → **Share anonymous usage data** calls `optOut()`. Nothing new is captured, and the PostHog adapter empties the event queue, so events captured before the opt-out are not uploaded after it. (A batch already on its way to the server when the user taps the switch cannot be stopped.)
