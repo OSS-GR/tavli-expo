@@ -36,8 +36,10 @@ export function useDoubleReveal(rollKey: string | null, dice: readonly DieView[]
   const [stage, setStage] = useState<{ key: string; stage: Stage } | null>(null);
   useEffect(() => {
     if (!double || rollKey === null) return;
+    // A quick move split the dice already ('early'): no late label over a
+    // turn that is nearly done.
     const atSplit = setTimeout(
-      () => setStage({ key: rollKey, stage: 'label' }),
+      () => setStage((now) => (now?.key === rollKey ? now : { key: rollKey, stage: 'label' })),
       DOUBLE_SPLIT_AT_MS,
     );
     const atEnd = setTimeout(

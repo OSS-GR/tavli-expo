@@ -216,6 +216,28 @@ describe('<GameScreen /> doubles (#177)', () => {
     expect(doublesHint()).toBeNull();
   });
 
+  it('a move before the split shows no late "Doubles!" label', async () => {
+    const store = newStore();
+    toRoll(store, 'white');
+    await show(store);
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [3, 3] });
+    });
+    await tick(DOUBLE_SPLIT_AT_MS - 200);
+    const move = legalNextMoves(store.getState().flow.game)[0]!.moves[0]!;
+    await act(async () => {
+      store.getState().dispatch({ type: 'move', player: 'white', move });
+    });
+    expect(diceDrawn()).toBe(4);
+    // Three dice are left, so no other note shows. The label must not come late.
+    for (let ms = 0; ms <= 200 + DOUBLE_LABEL_MS; ms += 100) {
+      expect(doublesHint()).toBeNull();
+      await tick(100);
+    }
+    expect(screen.queryByTestId('confirm-hint')).toBeNull();
+    expect(diceDrawn()).toBe(4);
+  });
+
   it('a roll that is not a double shows its two dice and no label', async () => {
     const store = newStore();
     toRoll(store, 'white');

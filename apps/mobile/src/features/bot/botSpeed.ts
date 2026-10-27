@@ -48,17 +48,25 @@ export interface BotTiming {
 }
 
 /**
+ * The extra wait after a double (#177), the same at every speed: the beat
+ * and the split of the dice (`DOUBLE_BEAT_MS` + `DOUBLE_SPLIT_MS` in
+ * `diceMotion.ts`). A plain number, so this module stays a leaf;
+ * `botTurn.test.ts` checks that it matches.
+ */
+export const DOUBLE_MS = 900;
+
+/**
  * The timings of each Bot speed. Normal is the default. Before #172 the
  * bot rolled after 0.5 s and moved every 0.4 s: too fast to follow.
  * `afterRollMs` is the dice landing (740 ms) plus 1180, 780 or 430 ms.
- * `doubleMs` is the same at every speed: the split of a double takes 900 ms.
+ * `doubleMs` is `DOUBLE_MS` at every speed: the split of a double takes 900 ms.
  * `landMs` is the flight (200 ms) plus 400, 250 or 150 ms.
  */
 export const BOT_SPEED_TIMING: Readonly<Record<BotSpeed, BotTiming>> = {
   slow: {
     beforeRollMs: 1300,
     afterRollMs: 1920,
-    doubleMs: 900,
+    doubleMs: DOUBLE_MS,
     moveMs: 1300,
     hitMs: 700,
     landMs: 600,
@@ -66,7 +74,7 @@ export const BOT_SPEED_TIMING: Readonly<Record<BotSpeed, BotTiming>> = {
   normal: {
     beforeRollMs: 900,
     afterRollMs: 1520,
-    doubleMs: 900,
+    doubleMs: DOUBLE_MS,
     moveMs: 900,
     hitMs: 500,
     landMs: 450,
@@ -74,7 +82,7 @@ export const BOT_SPEED_TIMING: Readonly<Record<BotSpeed, BotTiming>> = {
   fast: {
     beforeRollMs: 600,
     afterRollMs: 1170,
-    doubleMs: 900,
+    doubleMs: DOUBLE_MS,
     moveMs: 550,
     hitMs: 300,
     landMs: 350,

@@ -27,7 +27,7 @@ import {
 import { FLIGHT_MS, HIT_DELAY_MS } from '@/features/board/flights';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
 
-import { BOT_SPEEDS, BOT_SPEED_TIMING, BOT_TIMING, type BotTiming } from './botSpeed';
+import { BOT_SPEEDS, BOT_SPEED_TIMING, BOT_TIMING, DOUBLE_MS, type BotTiming } from './botSpeed';
 import { botAnswer, botStep, startBotTurn, type BotTurnActions } from './botTurn';
 
 import { runOnFakeTimers } from '../../../test/clock';
@@ -660,7 +660,8 @@ describe('startBotTurn timing (#172)', () => {
     expect(afterRollMs).toBeGreaterThanOrEqual(DICE_LAND_MS + MIN_PAUSE_MS);
     // A double: the two dice land, stay a beat and split into four (#177).
     // The four dice then get the same pause.
-    expect(doubleMs).toBeGreaterThanOrEqual(DOUBLE_BEAT_MS + DOUBLE_SPLIT_MS);
+    expect(doubleMs).toBe(DOUBLE_MS);
+    expect(DOUBLE_MS).toBe(DOUBLE_BEAT_MS + DOUBLE_SPLIT_MS);
     expect(afterRollMs + doubleMs).toBeGreaterThanOrEqual(DOUBLE_SHOWN_MS + MIN_PAUSE_MS);
     expect(hitMs).toBeGreaterThan(0);
     // After the last move: the flight and a short beat, less than a full gap.
