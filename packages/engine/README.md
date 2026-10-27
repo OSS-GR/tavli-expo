@@ -830,6 +830,7 @@ Actions (`player` is the player who acts):
 | `confirm`       | awaiting-confirm | Plays the turn. Only when the moves are a full legal play.                                                                                                                                                                                  |
 | `answer`        | awaiting-answer  | Answers the variant's question (`Variant.prompt`).                                                                                                                                                                                          |
 | `resign`        | any but opening  | Ends the game. The result is `resignGame` on the board at the start of the turn: moves not confirmed do not count.                                                                                                                          |
+| `timeout`       | any but opening  | The player the game waits for (to move or to answer) ran out of time (online turn timers, #133). Scored like `resign`, with `reason: 'timeout'`. The flow has no clock: the server decides when time is up.                                 |
 
 - `applyGameAction(flow, action, { rng, registry })` returns the next flow.
   Bad actions throw `ILLEGAL_ACTION` or `ILLEGAL_MOVE`.
