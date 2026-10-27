@@ -879,8 +879,15 @@ export function GameScreen({
   const hideBoard = card !== null;
   // "Doubles!" for a moment after the split. Another note over the board wins.
   const confirmHint = view.canConfirm && !blocked && !botsTurn;
+  // The value of the double names it: Greek says «Εξάρες!» for 6-6.
+  const doubleValue = dice.length === 4 ? dice[0]?.value : undefined;
   const showDoublesHint =
-    reveal.label && !blocked && !confirmHint && botNote === null && gateToMove === null;
+    reveal.label &&
+    doubleValue !== undefined &&
+    !blocked &&
+    !confirmHint &&
+    botNote === null &&
+    gateToMove === null;
 
   const menuButton = onOpenMenu ? (
     <Pressable
@@ -989,7 +996,7 @@ export function GameScreen({
             style={styles.hint}
             accessible={false}
             importantForAccessibility="no">
-            {t('game.dice.doubles')}
+            {t(`game.doubles.label.${doubleValue}`)}
           </Text>
         </View>
       ) : null}

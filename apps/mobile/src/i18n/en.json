@@ -239,8 +239,25 @@
       "orTapBoard": "or tap the board"
     },
     "dice": {
-      "label": "Dice {{values}}, {{left}} left to play",
-      "doubles": "Doubles!"
+      "label": "Dice {{values}}, {{left}} left to play"
+    },
+    "doubles": {
+      "name": {
+        "1": "double 1",
+        "2": "double 2",
+        "3": "double 3",
+        "4": "double 4",
+        "5": "double 5",
+        "6": "double 6"
+      },
+      "label": {
+        "1": "Doubles!",
+        "2": "Doubles!",
+        "3": "Doubles!",
+        "4": "Doubles!",
+        "5": "Doubles!",
+        "6": "Doubles!"
+      }
     },
     "strip": {
       "pips": "Pips {{count}}",
@@ -283,10 +300,10 @@
     "announce": {
       "rolled": "{{name}} rolled {{dice}}.",
       "rolled_you": "You rolled {{dice}}.",
-      "rolledDouble": "{{name}} rolled double {{value}}: four moves of {{value}}.",
-      "rolledDouble_you": "You rolled double {{value}}: four moves of {{value}}.",
-      "choseDouble": "{{name}} chose double {{value}}: four moves of {{value}}.",
-      "choseDouble_you": "You chose double {{value}}: four moves of {{value}}.",
+      "rolledDouble": "{{name}} rolled {{double}}: four moves of {{value}}.",
+      "rolledDouble_you": "You rolled {{double}}: four moves of {{value}}.",
+      "choseDouble": "{{name}} chose {{double}}: four moves of {{value}}.",
+      "choseDouble_you": "You chose {{double}}: four moves of {{value}}.",
       "played": "{{name}} played: {{moves}}."
     },
     "pass": {

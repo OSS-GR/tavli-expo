@@ -80,11 +80,19 @@ describe('turnAnnouncement', () => {
     expect(announce()?.text).toBe('You rolled double 2: four moves of 2.');
   });
 
-  it('reads a double in Greek', async () => {
+  // Greek names each double by its value (the owner's words).
+  it.each([
+    [1, 'ασσάκια'],
+    [2, 'δυάρες'],
+    [3, 'τριάρες'],
+    [4, 'τεσσάρες'],
+    [5, 'πεντάρες'],
+    [6, 'εξάρες'],
+  ] as const)('reads %i-%i in Greek by its name: %s', async (value, name) => {
     await i18n.changeLanguage('el');
     const { dispatch, announce } = afterFirstTurn();
-    dispatch({ type: 'roll', player: 'black', dice: [4, 4] });
-    expect(announce()?.text).toBe('Bot: έφερε διπλές 4: τέσσερις κινήσεις του 4.');
+    dispatch({ type: 'roll', player: 'black', dice: [value, value] });
+    expect(announce()?.text).toBe(`Bot: έφερε ${name}: τέσσερις κινήσεις του ${value}.`);
   });
 
   it('pass-and-play: reads every turn, so the next player hears it', () => {
@@ -177,10 +185,24 @@ describe('turnAnnouncement: a chosen double (#202)', () => {
     await i18n.changeLanguage('el');
     const you = afterAceDeuce('white');
     you.dispatch({ type: 'answer', player: 'white', choice: '4' });
-    expect(you.announce()?.text).toBe('Διάλεξες διπλές 4: τέσσερις κινήσεις του 4.');
+    expect(you.announce()?.text).toBe('Διάλεξες τεσσάρες: τέσσερις κινήσεις του 4.');
     const bot = afterAceDeuce('black');
     bot.dispatch({ type: 'answer', player: 'black', choice: '4' });
-    expect(bot.announce()?.text).toMatch(/ Bot: διάλεξε διπλές 4: τέσσερις κινήσεις του 4\.$/);
+    expect(bot.announce()?.text).toMatch(/ Bot: διάλεξε τεσσάρες: τέσσερις κινήσεις του 4\.$/);
+  });
+
+  it.each([
+    ['1', 'ασσάκια'],
+    ['2', 'δυάρες'],
+    ['3', 'τριάρες'],
+    ['4', 'τεσσάρες'],
+    ['5', 'πεντάρες'],
+    ['6', 'εξάρες'],
+  ])('names the chosen double %s in Greek by its value: %s', async (value, name) => {
+    await i18n.changeLanguage('el');
+    const { dispatch, announce } = afterAceDeuce('white');
+    dispatch({ type: 'answer', player: 'white', choice: value });
+    expect(announce()?.text).toBe(`Διάλεξες ${name}: τέσσερις κινήσεις του ${value}.`);
   });
 });
 

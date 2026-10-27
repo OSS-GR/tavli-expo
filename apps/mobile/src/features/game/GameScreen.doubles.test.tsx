@@ -292,18 +292,34 @@ describe('<GameScreen /> doubles (#177)', () => {
     expect(screen.getByLabelText('Dice 4-4-4-4, 3 left to play')).toBeOnTheScreen();
   });
 
-  it('says "Doubles!" in Greek', async () => {
+  // Greek names each double by its value (the owner's words), in the label
+  // and in what screen readers hear.
+  it.each([
+    [1, 'Ασσάκια!', 'ασσάκια'],
+    [2, 'Δυάρες!', 'δυάρες'],
+    [3, 'Τριάρες!', 'τριάρες'],
+    [4, 'Τεσσάρες!', 'τεσσάρες'],
+    [5, 'Πεντάρες!', 'πεντάρες'],
+    [6, 'Εξάρες!', 'εξάρες'],
+  ] as const)('names %i-%i in Greek: «%s»', async (value, label, name) => {
     await i18n.changeLanguage('el');
     const store = newStore();
     toRoll(store, 'white');
-    await show(store);
+    const seats: PerPlayer<Seat> = {
+      white: { name: 'Εσύ', label: 'Εσύ', turnLabel: 'Σειρά σου', you: true },
+      black: { name: 'Bob', label: 'Bob', turnLabel: 'Παίζει', you: false },
+    };
+    await show(store, { seats });
     await act(async () => {
-      store.getState().dispatch({ type: 'roll', player: 'white', dice: [2, 2] });
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [value, value] });
     });
+    expect(screen.queryByText(label)).toBeNull();
     await tick(DOUBLE_SPLIT_AT_MS);
-    expect(screen.getByText('Διπλές!')).toBeOnTheScreen();
-    expect(announce).toHaveBeenCalledWith('Ann: έφερε διπλές 2: τέσσερις κινήσεις του 2.');
+    expect(screen.getByTestId('doubles-hint')).toHaveTextContent(label);
+    expect(announce).toHaveBeenCalledWith(`Έφερες ${name}: τέσσερις κινήσεις του ${value}.`);
+    expect(announce.mock.calls.filter(([t]) => /διπλ/i.test(String(t)))).toHaveLength(0);
   });
+
   describe.each(['tall', 'classic'] as const)('on the %s board (#184)', (layout) => {
     it('splits on the board, in a box that does not move, with the canvas in place', async () => {
       await act(async () => {
@@ -496,7 +512,7 @@ describe('<GameScreen /> a chosen double (#202)', () => {
     await act(async () => {
       dispatch({ type: 'answer', player: 'white', choice: '5' });
     });
-    expect(announce).toHaveBeenCalledWith('Διάλεξες διπλές 5: τέσσερις κινήσεις του 5.');
+    expect(announce).toHaveBeenCalledWith('Διάλεξες πεντάρες: τέσσερις κινήσεις του 5.');
     await expectFourAtRest();
   });
 });
