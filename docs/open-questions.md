@@ -7,7 +7,7 @@
 | # | Question | Why it matters | Affects |
 |---|----------|----------------|---------|
 | Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
-| Q18 | ADR-0003 lists **XState** for the game flow. The engine turn flow (#25) is already a pure reducer, so the board screen wraps it in a small **Zustand** store. Keep it and update ADR-0003? Recommended: yes. | Avoid two state machines for one game | ADR-0003, #29–#32 |
+| Q18 | **Sentry project:** create a free Sentry React Native project and add the DSN, org and project slugs, and an auth token to EAS (steps in `packages/adapters/crash-sentry/README.md`). Until then, builds send no crash reports. | We see crashes from test builds | #43 |
 | Q19 | Greek label for the **pip count** in the player strips: draft "Πόντοι 167". Other options: "Πιπς", "Δρόμος". Match points use "βαθμοί". | Clear Greek UI | #32 |
 
 ## Answered

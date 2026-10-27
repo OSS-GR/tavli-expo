@@ -36,7 +36,7 @@ export class InlineBotRunner implements BotRunner {
   /** The reject functions of requests that have not run yet. */
   private readonly pending = new Set<(error: Error) => void>();
 
-  /** Default bot: `createBot()` (built-in variants, no evaluators). */
+  /** Default bot: `createBot()` (built-in variants and evaluators). */
   constructor(bot: Bot = createBot()) {
     this.bot = bot;
   }

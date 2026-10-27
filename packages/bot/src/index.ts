@@ -12,24 +12,45 @@ export { BOT_DIFFICULTIES, isDifficulty } from '@tavli/contracts';
 export type {
   Analyzer,
   Bot,
+  BotLevel,
   BotOptions,
   BotRegistry,
+  ConfiguredBot,
   Difficulty,
   Evaluation,
   Evaluator,
   EvaluatorRegistry,
   EvaluatorSet,
+  LevelPolicy,
   RankedTurn,
+  TurnScore,
 } from './types';
+export { BOT_LEVELS, isBotLevel } from './types';
 
 export { BotError } from './errors';
 export type { BotErrorCode } from './errors';
 
-export { EMPTY_EVALUATOR_REGISTRY, chooseRandomTurn, createBot } from './create-bot';
+export {
+  DEFAULT_EVALUATORS,
+  DEFAULT_LEVEL_POLICIES,
+  EMPTY_EVALUATOR_REGISTRY,
+  chooseRandomTurn,
+  createBot,
+  pickTurn,
+  scoreTurns,
+} from './create-bot';
+export {
+  PORTES_DEFAULT_WEIGHTS,
+  PORTES_HEURISTIC_ID,
+  createPortesHeuristic,
+  evaluateSides,
+  portesHeuristic,
+} from './evaluators/portes-heuristic';
+export type { PortesWeights } from './evaluators/portes-heuristic';
 export { InlineBotRunner, runBotRequest } from './inline-runner';
 export { FORCED_DELAY_MS, THINKING_DELAY_MS, thinkingDelayMs } from './thinking-delay';
 export type { DelayRange } from './thinking-delay';
-export { pickOne, randomInt, randomIntBetween } from './random';
+export { pickOne, randomInt, randomIntBetween, randomUnit } from './random';
 
 export { playGame, simulate } from './simulate';
 export type {

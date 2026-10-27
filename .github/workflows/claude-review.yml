@@ -1,0 +1,147 @@
+name: Claude review
+
+# Claude code review at high effort on every pull request (#96). It is a
+# required check: it fails when Claude finds a blocking problem.
+# See docs/process/github-workflow.md.
+on:
+  pull_request:
+    # The default types plus `ready_for_review`. A draft skips the review, and
+    # a skipped job counts as passed, so marking the PR ready must run it.
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the old review.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Claude only reads the code. It returns its findings as JSON, and the
+  # last step posts them as one PR comment (updated on each push).
+  #
+  # Skipped (a skipped job counts as passed): drafts, Dependabot PRs (they get
+  # no secrets), and PRs from forks. A draft is reviewed when it is marked
+  # ready for review.
+  claude-review:
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # Post and update the findings comment.
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Check the Claude secret
+        id: secret
+        env:
+          OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$OAUTH_TOKEN" ] && [ -z "$API_KEY" ]; then
+            echo "::error::No Claude secret. Add CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY (docs/process/github-workflow.md)."
+            exit 1
+          fi
+
+      # The PR head, with full history, so `git diff origin/<base>...HEAD` works.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Runs Claude Code's /code-review at high effort on the PR's changes.
+      # It follows CLAUDE.md. It cannot edit files or post: the next step posts.
+      - name: Claude review
+        id: review
+        uses: anthropics/claude-code-action@v1
+        with:
+          # The workflow's own token, read-only for code. With it the action
+          # skips the Claude app sign-in, which only runs when this file is
+          # the same as on main, so a change to this file is reviewed too.
+          github_token: ${{ github.token }}
+          # Private repo: show Claude's full output in the run log, so a
+          # failed review is easy to debug.
+          show_full_output: true
+          # The subscription token wins when both secrets are set.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN == '' && secrets.ANTHROPIC_API_KEY || '' }}
+          prompt: |
+            Review this pull request. Its changes are `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`.
+
+            1. Use the Skill tool to run the `code-review` skill with the arguments `high origin/${{ github.event.pull_request.base.ref }}...HEAD`. Let it finish.
+            2. Then call the StructuredOutput tool exactly once, with every finding the review reported. Use an empty findings list when there are none.
+
+            Do not edit files and do not post anything: the workflow posts your findings.
+          claude_args: |
+            --effort high
+            --allowedTools "Read,Glob,Grep,Agent,Task,Skill,TodoWrite,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git merge-base:*),Bash(git rev-parse:*),Bash(git status:*),Bash(git ls-files:*),Bash(git branch:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(rg:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch"
+            --append-system-prompt "You are the required review gate for this pull request. Do not edit files and do not post anything: the workflow posts your findings. Put every finding you report in the structured output. Mark a finding blocking when it is a correctness bug, a crash, data loss, a security problem, a test that fails or tests nothing, or a break of a hard rule in CLAUDE.md. Mark every other finding optional. Set verdict to fail when there is at least one blocking finding, else pass. Write in simple English: short sentences, active voice."
+            --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","fail"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","properties":{"severity":{"type":"string","enum":["blocking","optional"]},"file":{"type":"string"},"line":{"type":"integer"},"title":{"type":"string"},"detail":{"type":"string"}},"required":["severity","file","title","detail"]}}},"required":["verdict","summary","findings"]}'
+
+      # Posts the findings as one comment and fails on a blocking finding.
+      # The review output is model text, so it goes in through `env`, never
+      # straight into the script.
+      - name: Post findings and gate
+        # Not when the secret is missing: that step already explains the failure.
+        if: ${{ !cancelled() && steps.secret.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUT: ${{ steps.review.outputs.structured_output }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          marker='<!-- claude-review -->'
+
+          if [ -n "$OUT" ] && jq -e '.findings | type == "array"' <<< "$OUT" > /dev/null 2>&1; then
+            blocking=$(jq '[.findings[] | select(.severity == "blocking")] | length' <<< "$OUT")
+            verdict=$(jq -r '.verdict' <<< "$OUT")
+            # Pass only on an explicit "pass" with no blocking finding.
+            if [ "$blocking" -gt 0 ] || [ "$verdict" != "pass" ]; then
+              verdict=fail
+            fi
+            body=$(jq -r --arg marker "$marker" --arg sha "${SHA:0:7}" --arg run "$RUN_URL" \
+              --arg verdict "$verdict" --argjson blocking "$blocking" '
+              def loc: "`" + .file + (if .line then ":" + (.line | tostring) else "" end) + "`";
+              def item: (if .severity == "blocking" then "🔴 **Blocking**" else "🟡 Optional" end)
+                + ": **" + .title + "** " + loc + "\n\n" + .detail + "\n";
+              $marker + "\n## Claude review: "
+              + (if $verdict == "fail"
+                 then "❌ failed (\($blocking) blocking)"
+                 else "✅ passed" end)
+              + "\n\n" + .summary + "\n\n"
+              + (if (.findings | length) == 0 then "No findings.\n"
+                 else ([.findings | sort_by(.severity != "blocking") | to_entries[]
+                        | "### \(.key + 1). " + (.value | item)] | join("\n")) end)
+              + "\n---\n_High-effort review of commit \($sha). [Run log](\($run)). "
+              + "Each push re-runs the review._"
+              ' <<< "$OUT")
+          else
+            verdict=fail
+            body="$marker
+          ## Claude review: ⚠️ did not finish
+
+          The review returned no findings list, so this check fails. Open the [run log]($RUN_URL), fix the cause, and push again."
+          fi
+
+          # Update our earlier comment if there is one, so the PR keeps one comment.
+          id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | tail -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" > /dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
+
+          if [ "$verdict" = "fail" ]; then
+            echo "::error::Claude review failed. See the PR comment."
+            exit 1
+          fi
+          echo "Claude review gate passed."

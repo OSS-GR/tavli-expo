@@ -14,7 +14,7 @@
  */
 import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import { useSharedValue, withTiming } from 'react-native-reanimated';
@@ -53,8 +53,11 @@ export interface InteractiveBoardProps {
   /** Checkers in the air (from the screen). */
   flights: readonly Flight[];
   onFlightDone: (id: string) => void;
-  /** A legal move was made. `from` is the drop point, or `null` for a tap. */
-  onMove: (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => void;
+  /**
+   * A legal move was made. `from` is the drop point, or `null` for a tap.
+   * Returns `false` if the move was not played (the checker flies back).
+   */
+  onMove: (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => boolean;
   /** A tap that did not touch a movable checker (e.g. tap the board to roll). */
   onBoardTap?: () => void;
   /** A checker was picked up / dropped where it may not go. */
@@ -125,23 +128,45 @@ export function InteractiveBoard({
   const dragR = useSharedValue(1);
   const dragVisible = useSharedValue(0);
 
-  // The dropped checker is replaced by its flight: hide the drag copy then.
+  // A dropped checker is replaced by its flight, or just lands (the move
+  // that ends a turn has no flight). Hide the drag copy once the new
+  // position shows. Only after a drop: a flight that lands while another
+  // checker is dragged must not hide that one.
+  const dropped = useRef(false);
   useEffect(() => {
-    if (flights.length > 0) dragVisible.set(0);
-  }, [flights, dragVisible]);
+    if (!dropped.current) return;
+    dropped.current = false;
+    dragVisible.set(0);
+  }, [positionKey, flights, dragVisible]);
 
   const onReturned = () => {
     dragVisible.set(0);
     setDragKey(null);
   };
 
+  // Fly the dragged checker back to where it came from, then show it again.
+  const flyBack = (source: number) => {
+    const home = sources[source]?.checker;
+    if (home) {
+      dragX.set(withTiming(home.x, { duration: RETURN_MS }));
+      dragY.set(
+        withTiming(home.y, { duration: RETURN_MS }, (finished) => {
+          if (finished) scheduleOnRN(onReturned);
+        }),
+      );
+    } else {
+      onReturned();
+    }
+  };
+
   const doMove = (source: number, target: number, from: { x: number; y: number } | null) => {
     const move = sources[source]?.targets[target]?.move;
     setSelected(null);
-    if (move && geo) {
-      onMove(move, geo, from);
-    } else {
-      onReturned();
+    if (move && geo && onMove(move, geo, from)) {
+      if (from) dropped.current = true;
+      setDragKey(null);
+    } else if (from) {
+      flyBack(source);
     }
   };
 
@@ -168,19 +193,14 @@ export function InteractiveBoard({
       doMove(source, result.target, { x, y });
       return;
     }
-    // Fly back to where it came from, then show the checker again.
-    const home = sources[source]?.checker;
     if (result.kind === 'illegal') onIllegalDrop?.();
-    if (home) {
-      dragX.set(withTiming(home.x, { duration: RETURN_MS }));
-      dragY.set(
-        withTiming(home.y, { duration: RETURN_MS }, (finished) => {
-          if (finished) scheduleOnRN(onReturned);
-        }),
-      );
-    } else {
-      onReturned();
-    }
+    flyBack(source);
+  };
+  // The system took the touch away (a call, the app went to the background):
+  // no move, the checker flies back.
+  const onDragCanceled = (source: number) => {
+    setSelected(null);
+    flyBack(source);
   };
 
   const pan = usePanGesture({
@@ -219,14 +239,21 @@ export function InteractiveBoard({
     },
     onFinalize: (e) => {
       'worklet';
+      const dx = e.x - startX.get();
+      const dy = e.y - startY.get();
       if (dragging.get()) {
         const i = dragIndex.get();
         const s = sources[i];
-        // The drop point is where the checker is, not where the finger started.
-        const x = s ? s.checker.x + (e.x - startX.get()) : e.x;
-        const y = s ? s.checker.y + (e.y - startY.get()) : e.y;
-        scheduleOnRN(onDrop, i, x, y);
-      } else if (!e.canceled) {
+        if (e.canceled) {
+          scheduleOnRN(onDragCanceled, i);
+        } else {
+          // The drop point is where the checker is, not where the finger started.
+          const x = s ? s.checker.x + dx : e.x;
+          const y = s ? s.checker.y + dy : e.y;
+          scheduleOnRN(onDrop, i, x, y);
+        }
+      } else if (!e.canceled && dx * dx + dy * dy < TAP_SLOP * TAP_SLOP) {
+        // Only a touch that stayed put is a tap; a swipe does nothing.
         scheduleOnRN(onTap, e.x, e.y);
       }
       dragging.set(false);

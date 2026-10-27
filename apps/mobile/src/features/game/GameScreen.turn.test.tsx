@@ -60,6 +60,8 @@ async function annMoves61(store = newStore()) {
   store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 6 });
   store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 1 });
   await show(store);
+  // The opening card takes taps on the whole board area, not only on the card.
+  expect(screen.getByTestId('opening-overlay')).toHaveStyle({ flex: 1 });
   await act(async () => {
     fireEvent.press(screen.getByTestId('opening-overlay'));
   });
@@ -164,15 +166,17 @@ describe('<GameScreen /> turn indicator', () => {
   });
 });
 
+// Ann is on the bar and Bob holds all six entry points.
+const closedBoard = createBoard(
+  {
+    white: { points: { 6: 14 }, bar: 1 },
+    black: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
+  },
+  'contrary',
+);
+
 describe('<GameScreen /> no legal moves', () => {
-  // Ann is on the bar and Bob holds all six entry points.
-  const closed = createBoard(
-    {
-      white: { points: { 6: 14 }, bar: 1 },
-      black: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
-    },
-    'contrary',
-  );
+  const closed = closedBoard;
 
   it('explains the pass, keeps the faded dice and closes on OK', async () => {
     const user = userEvent.setup();
@@ -208,6 +212,31 @@ describe('<GameScreen /> no legal moves', () => {
       expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
       await act(async () => {
         jest.advanceTimersByTime(PASS_NOTICE_MS + 10);
+      });
+      expect(screen.queryByTestId('pass-card')).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('closes after 3 s even when the screen draws again meanwhile', async () => {
+    jest.useFakeTimers();
+    try {
+      const store = newStore();
+      setPosition(store, closed);
+      await show(store);
+      await act(async () => {
+        store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(PASS_NOTICE_MS - 1000);
+      });
+      // A settings change draws the screen again; the timer keeps running.
+      await act(async () => {
+        settingsStore.setState({ showPipCounts: false });
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(1010);
       });
       expect(screen.queryByTestId('pass-card')).toBeNull();
     } finally {
@@ -259,5 +288,36 @@ describe('<GameScreen /> game and match end', () => {
     expect(flow.match.score).toEqual({ white: 0, black: 0 });
     expect(flow.game.phase).toBe('awaiting-roll');
     expect(flow.game.state.toMove).toBe('white');
+  });
+
+  it('shows the cards again after a rematch', async () => {
+    const user = userEvent.setup();
+    const store = newStore(2);
+    // A pass in the first match, closed with OK.
+    setPosition(store, closedBoard);
+    await show(store);
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+    });
+    await user.press(button('OK'));
+    // Ann wins the match, then a rematch.
+    await act(async () => {
+      setPosition(store, lastChecker);
+    });
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [3, 2] });
+    });
+    await touch(PAN, [top(1, 1)]);
+    await touch(PAN, [center({ kind: 'tray', side: 'player' })]);
+    await user.press(button('Confirm'));
+    await user.press(button('Rematch, Ann starts'));
+    // The same pass in the new match (same game and turn number) shows its card.
+    await act(async () => {
+      setPosition(store, closedBoard);
+    });
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+    });
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
   });
 });

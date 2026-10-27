@@ -22,6 +22,10 @@ describe('simulator command line', () => {
     expect(
       parseSimulateArgs(['--', '--games', '10', '--a', 'easy', '--b', 'hard', '--seed', '3']),
     ).toEqual({ games: 10, a: 'easy', b: 'hard', seed: 3, variant: 'portes' });
+    expect(parseSimulateArgs(['--a', 'medium', '--b', 'random'])).toMatchObject({
+      a: 'medium',
+      b: 'random',
+    });
   });
 
   it('rejects bad flags', () => {
@@ -48,7 +52,7 @@ describe('simulator command line', () => {
     expect(runSimulateCli(['--help'], help)).toBe(0);
     expect(help.out[0]).toContain('Usage');
     const failing = io();
-    expect(runSimulateCli(['--games', '1', '--b', 'medium'], failing)).toBe(1);
+    expect(runSimulateCli(['--games', '1', '--b', 'hard'], failing)).toBe(1);
     expect(failing.err[0]).toContain('NOT_IMPLEMENTED');
   });
 });

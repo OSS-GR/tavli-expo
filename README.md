@@ -24,7 +24,9 @@ You need **Node 22** (see `.nvmrc`) and **pnpm**. The repo pins pnpm 12 in `pack
    pnpm start
    ```
 
-   The app uses native modules (Unistyles, MMKV), so it needs a **development build**, not Expo Go. Build one with `npx expo run:ios` or `npx expo run:android` in `apps/mobile` (or EAS Build). Then press `i` or `a`.
+   The app uses native modules (Skia, Unistyles, MMKV, Reanimated), so it needs a **development build**, not Expo Go. Build one with `npx expo run:ios` or `npx expo run:android` in `apps/mobile` (or EAS Build). Then press `i` or `a`.
+
+   Step by step (iOS simulator, your iPhone with a free Apple ID, Android emulator, EAS cloud builds, dev routes, common errors): **[Running the app](docs/process/running-the-app.md)**.
 
 3. Run the checks from the repo root:
 
@@ -44,7 +46,7 @@ packages/bot/        Bot players (uses the engine)
 packages/contracts/  Interfaces (ports) and shared types
 packages/ui/         Design tokens and themes (plain data)
 packages/themes/     Board themes: theme.json manifests and art
-packages/adapters/*  Vendor code behind ports (storage-mmkv, haptics-expo)
+packages/adapters/*  Vendor code behind ports (storage-mmkv, haptics-expo, crash-sentry)
 ```
 
 See [ADR-0002](docs/decisions/0002-modular-architecture.md) for the full plan.
