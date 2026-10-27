@@ -1,0 +1,148 @@
+/**
+ * Game end (wireframe 8): a sheet over the final board. Who won, how
+ * (Mono / Diplo chip), why, the match score, then Next game and Home.
+ *
+ * The result is read to screen readers when the sheet shows. On iOS the
+ * sheet is modal for VoiceOver, so focus stays in it.
+ */
+import type { ReactNode } from 'react';
+import { Text, View } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
+
+import { Celebration } from './Celebration';
+import { useAnnouncement } from './useAnnouncement';
+
+export interface GameEndSheetProps {
+  /** "You win the game!" */
+  title: string;
+  /** "Diplo · +2 points". */
+  chip: string;
+  /** Diplo (or more) gets a filled chip, mono an outlined one. */
+  strongChip: boolean;
+  /** "Bot did not bear off any checker." or "Maria resigned." */
+  reason: string | null;
+  /** "Match", over the score. */
+  matchLabel: string;
+  /** "You 2 – 0 Bot". */
+  score: string;
+  /** "First to 3 points". */
+  target: string;
+  /** A human won: show the celebration. */
+  celebrate: boolean;
+  /** Next game and Home. */
+  children: ReactNode;
+  testID?: string;
+}
+
+export function GameEndSheet({
+  title,
+  chip,
+  strongChip,
+  reason,
+  matchLabel,
+  score,
+  target,
+  celebrate,
+  children,
+  testID,
+}: GameEndSheetProps) {
+  useAnnouncement([title, chip, reason, score].filter(Boolean).join(' '));
+  return (
+    <View style={styles.root}>
+      <View style={styles.scrim} />
+      <View testID={testID} style={styles.sheet} accessibilityViewIsModal>
+        {celebrate ? <Celebration testID="game-celebration" kind="game" /> : null}
+        <Text style={styles.title} accessibilityRole="header">
+          {title}
+        </Text>
+        <View style={styles.chip(strongChip)}>
+          <Text style={styles.chipText(strongChip)}>{chip}</Text>
+        </View>
+        {reason ? <Text style={styles.reason}>{reason}</Text> : null}
+        <View style={styles.matchBox} accessible>
+          <View>
+            <Text style={styles.matchLabel}>{matchLabel}</Text>
+            <Text style={styles.matchScore}>{score}</Text>
+          </View>
+          <Text style={styles.matchTarget}>{target}</Text>
+        </View>
+        <View style={styles.actions}>{children}</View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme, rt) => ({
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+  },
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.backgroundDeep,
+    opacity: 0.5,
+  },
+  sheet: {
+    alignItems: 'center',
+    gap: theme.space.sm,
+    paddingHorizontal: theme.space.xl,
+    paddingTop: theme.space.lg,
+    paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
+    borderTopLeftRadius: theme.radii.xl,
+    borderTopRightRadius: theme.radii.xl,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: theme.colors.border,
+  },
+  title: {
+    ...theme.type.title,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  chip: (strong: boolean) => ({
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.xs,
+    borderRadius: theme.radii.pill,
+    borderWidth: 2,
+    borderColor: theme.colors.accent,
+    backgroundColor: strong ? theme.colors.accent : 'transparent',
+  }),
+  chipText: (strong: boolean) => ({
+    ...theme.type.bodyStrong,
+    color: strong ? theme.colors.onAccent : theme.colors.text,
+  }),
+  reason: {
+    ...theme.type.body,
+    color: theme.colors.textDim,
+    textAlign: 'center',
+  },
+  matchBox: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: theme.space.sm,
+    padding: theme.space.md,
+    borderRadius: theme.radii.lg,
+    backgroundColor: theme.colors.background,
+  },
+  matchLabel: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
+  },
+  matchScore: {
+    ...theme.type.title,
+    color: theme.colors.text,
+  },
+  matchTarget: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
+  },
+  actions: {
+    alignSelf: 'stretch',
+    gap: theme.space.xs,
+    paddingTop: theme.space.sm,
+  },
+}));

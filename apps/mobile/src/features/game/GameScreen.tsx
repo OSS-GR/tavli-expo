@@ -1,7 +1,8 @@
 /**
  * The board screen (wireframe 6): the player strips, the board, the cards
- * over it (opening roll, no legal moves, game and match end) and the
- * controls row (Roll, or Undo · dice · Confirm).
+ * over it (opening roll, no legal moves), the game-end sheet (wireframe 8)
+ * and the controls row (Roll, or Undo · dice · Confirm). Match end is its
+ * own screen (wireframe 9): this screen calls `onMatchOver`.
  *
  * Game logic stays in the engine. This screen sends actions to the game
  * store and shows the result. Vs bot, the bot's turn runs here too
@@ -31,7 +32,8 @@ import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { useSettings } from '@/features/settings/store';
 
 import { GameCard } from './GameCard';
-import { useGameFeedback } from './gameFeedback';
+import { GameEndSheet } from './GameEndSheet';
+import { isHumanWin, useGameFeedback } from './gameFeedback';
 import { diceView, turnView, useGameStore, type DieView, type GameStore } from './gameStore';
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
@@ -45,6 +47,8 @@ export const OPENING_RESULT_MS = 1500;
 export const PASS_NOTICE_MS = 3000;
 /** The same card when the bot cannot move (wireframe 6f: "closes after 2 s"). */
 export const BOT_PASS_NOTICE_MS = 2000;
+/** The final position stays on screen this long before the match-end screen opens. */
+export const MATCH_END_DELAY_MS = 1000;
 
 /** The bot's side in a game vs the bot. */
 export interface BotSeat {
@@ -71,10 +75,15 @@ export interface GameScreenProps {
   paused?: boolean;
   /** Shows the menu button (wireframe 7). */
   onOpenMenu?: () => void;
-  /** Shows "Home" on the game-end and match-end cards. */
+  /** Shows "Home" on the game-end sheet. */
   onHome?: () => void;
-  /** Shows "Change settings" on the match-end card. */
-  onChangeSettings?: () => void;
+  /**
+   * The match is over: open the match-end screen. It is called
+   * `MATCH_END_DELAY_MS` after the match ends (and the screen is not
+   * paused), so the last checker lands first. There is no game-end sheet
+   * for the last game: match end replaces it (wireframe 8).
+   */
+  onMatchOver?: () => void;
 }
 
 const other = (player: PlayerId): PlayerId => (player === 'white' ? 'black' : 'white');
@@ -88,13 +97,12 @@ export function GameScreen({
   paused = false,
   onOpenMenu,
   onHome,
-  onChangeSettings,
+  onMatchOver,
 }: GameScreenProps) {
   const { t } = useTranslation();
   const theme = useBoardTheme();
   const flow = useGameStore(store, (s) => s.flow);
   const dispatch = useGameStore(store, (s) => s.dispatch);
-  const rematch = useGameStore(store, (s) => s.rematch);
   const flipMode = useSettings((s) => s.boardFlipMode);
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
   const showPips = useSettings((s) => s.showPipCounts);
@@ -149,6 +157,16 @@ export function GameScreen({
   const matchOver = view.matchPhase === 'match-over' && match.winner !== null;
   const gameOver = view.matchPhase === 'game-over' && game.result !== null;
   const blocked = matchOver || gameOver || showPass || showOpening;
+
+  // Match over: the final position stays a moment, then the match-end
+  // screen opens. Not while paused: the menu or another screen is on top.
+  const matchOverEvent = useEffectEvent(() => onMatchOver?.());
+  useEffect(() => {
+    if (!matchOver || paused) return;
+    const timer = setTimeout(matchOverEvent, MATCH_END_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [matchOver, paused]);
+
   const botsTurn =
     botPlayer !== null &&
     phase !== 'opening-roll' &&
@@ -363,61 +381,24 @@ export function GameScreen({
     );
   }
 
-  const homeButton = onHome ? (
-    <ActionButton
-      testID="end-home-button"
-      label={t('game.end.home')}
-      kind="secondary"
-      onPress={onHome}
-    />
-  ) : null;
-
-  // Cards over the board, at most one at a time.
-  let card = null;
-  if (matchOver && match.winner !== null) {
-    const winner = match.winner;
-    card = (
-      <GameCard
-        testID="match-end-card"
-        title={
-          isYou(winner)
-            ? t('game.end.matchWinner_you')
-            : t('game.end.matchWinner', { name: nameOf(winner) })
-        }
-        lines={[
-          ...(match.resignedBy !== null ? [resignedLine(match.resignedBy)] : []),
-          scoreLine,
-          t('game.end.target', { target: match.targetPoints }),
-        ]}>
-        <ActionButton
-          testID="rematch-button"
-          label={t('game.end.rematch')}
-          subtitle={startsLine(winner)}
-          onPress={() => {
-            setFlights([]);
-            // Game and turn numbers start again: forget the closed cards.
-            setPassDismissed(null);
-            setOpeningDismissed(null);
-            rematch();
-          }}
-        />
-        {onChangeSettings ? (
-          <ActionButton
-            testID="change-settings-button"
-            label={t('game.end.changeSettings')}
-            kind="secondary"
-            onPress={onChangeSettings}
-          />
-        ) : null}
-        {homeButton}
-      </GameCard>
-    );
-  } else if (gameOver && game.result !== null) {
+  // Game end (wireframe 8): a sheet over the final board. Match end is
+  // another screen (`onMatchOver`), so nothing covers the board then.
+  let endSheet = null;
+  if (gameOver && game.result !== null) {
     const { result } = game;
     const winner = result.winner;
+    const loser = winner === null ? null : other(winner);
     const type = winType(result);
-    card = (
-      <GameCard
+    let reason: string | null = null;
+    if (result.reason === 'resigned' && loser !== null) {
+      reason = resignedLine(loser);
+    } else if (result.reason === 'borneOff' && type === 'diplo' && loser !== null) {
+      reason = isYou(loser)
+        ? t('game.end.noBearOff_you')
+        : t('game.end.noBearOff', { name: nameOf(loser) });
+    }
+    endSheet = (
+      <GameEndSheet
         testID="game-end-card"
         title={
           winner === null
@@ -427,11 +408,13 @@ export function GameScreen({
               : t('game.end.gameWinner', { name: nameOf(winner) })
         }
         chip={t(`game.end.${type}`, { count: result.points })}
-        lines={[
-          ...(result.reason === 'resigned' && winner !== null ? [resignedLine(other(winner))] : []),
-          scoreLine,
-          t('game.end.target', { target: match.targetPoints }),
-        ]}>
+        strongChip={result.points >= 2}
+        reason={reason}
+        matchLabel={t('game.end.matchLabel')}
+        score={scoreLine}
+        target={t('game.end.target', { target: match.targetPoints })}
+        // Like the win jingle: only a win by a person is celebrated.
+        celebrate={isHumanWin(winner, humans)}>
         <ActionButton
           testID="next-game-button"
           label={t('game.end.next')}
@@ -441,10 +424,22 @@ export function GameScreen({
             dispatch({ type: 'nextGame' });
           }}
         />
-        {homeButton}
-      </GameCard>
+        {onHome ? (
+          <ActionButton
+            testID="end-home-button"
+            label={t('game.end.home')}
+            kind="text"
+            onPress={onHome}
+          />
+        ) : null}
+      </GameEndSheet>
     );
-  } else if (showPass && pass) {
+  }
+
+  // Cards over the board, at most one at a time, and none once the game is over.
+  const over = gameOver || matchOver;
+  let card = null;
+  if (!over && showPass && pass) {
     card = (
       <GameCard
         testID="pass-card"
@@ -468,7 +463,7 @@ export function GameScreen({
         />
       </GameCard>
     );
-  } else if (showOpening && opening) {
+  } else if (!over && showOpening && opening) {
     card = (
       <Pressable
         testID="opening-overlay"
@@ -551,6 +546,7 @@ export function GameScreen({
       </View>
       {strip(viewer, 'strip-bottom')}
       <View style={styles.controls}>{controls}</View>
+      {endSheet}
     </View>
   );
 }

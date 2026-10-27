@@ -4,8 +4,8 @@ import {
   CRASH_LEVELS,
   createNoopCrashReporter,
   createRecordingCrashReporter,
-  isAnonymousInstallId,
 } from './crash-reporter';
+import { isAnonymousInstallId } from './install-id';
 import { runCrashReporterContract } from './testing/crash-reporter-contract';
 
 runCrashReporterContract('no-op', createNoopCrashReporter);

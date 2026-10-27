@@ -43,19 +43,19 @@ interface Evaluation {
 - `chooseTurn` returns one full turn for the roll. A pass is a turn with
   empty `moves`. If `state.dice` is set, it must equal `dice`.
 - `createBot({ variants?, evaluators?, policies? })` builds a bot. Default:
-  the engine's `VARIANT_REGISTRY`, `DEFAULT_EVALUATORS` (the Portes
-  heuristic for easy and medium) and `DEFAULT_LEVEL_POLICIES`.
-- `bot.supportedLevels('portes')` is `['easy', 'medium']` today. Easy works
-  for every known variant; medium and hard need an evaluator. The app's
-  level picker can use it, or probe `chooseTurn` and catch
-  `NOT_IMPLEMENTED`: both give the same answer.
+  the engine's `VARIANT_REGISTRY`, `DEFAULT_EVALUATORS` (the Portes and
+  Fevga heuristics for easy and medium) and `DEFAULT_LEVEL_POLICIES`.
+- `bot.supportedLevels('portes')` and `bot.supportedLevels('fevga')` are
+  `['easy', 'medium']` today. Easy works for every known variant; medium
+  and hard need an evaluator. The app's level picker can use it, or probe
+  `chooseTurn` and catch `NOT_IMPLEMENTED`: both give the same answer.
 - `scoreTurns(variant, evaluator, state, turns)` and `pickTurn` are the
   1-ply core. `Analyzer` (hints, post-game review) is only a type for now.
 
 Errors:
 
 - `BotError('NOT_IMPLEMENTED')`: no evaluator for this level and variant
-  (today: hard, and medium for every variant but Portes).
+  (today: hard, and medium for every variant but Portes and Fevga).
 - `BotError('INVALID_REQUEST')`: `dice` differs from `state.dice`, or a
   runner request names another variant than its state.
 - `BotError('INVALID_REGISTRY')`: an evaluator sits under the wrong variant,
@@ -88,6 +88,9 @@ Every level but `random` runs the same pipeline (bot-ai.md, section 4.1):
 - Easy for a variant with no evaluator plays a random turn, but still takes
   a turn that wins now.
 - Same state, dice, level and seed → the same turn.
+- Each variant uses its own heuristic (Portes, Fevga) with the same
+  temperatures. The "How it plays" numbers are for Portes; Fevga's are in
+  "Fevga strength and speed".
 
 ## The Portes heuristic
 
@@ -229,6 +232,123 @@ random positions. Both bounds are far above the real numbers, so the test
 is safe on a slow or busy CI machine. Hermes on a phone is many times
 slower than Node, and the budget there is 200 ms.
 
+## The Fevga heuristic
+
+Code: `src/evaluators/fevga-heuristic.ts` and `fevga-board.ts`. Rules:
+`docs/rules/fevga.md`. Fevga has no hitting: one checker holds a point, and
+nobody may land on it. So the game is a race in which each side slows the
+other down with blocks. The evaluator scores a position before the roll,
+from the view of the player to roll, in the same way as Portes: a weighted
+sum of features in logits, `win = sigmoid(score)`.
+
+It works on its own side arrays (same layout as `portes-board.ts`, but with
+parallel numbering: own point `p` of one side is `p > 12 ? p − 12 : p + 12`
+of the other). The `scoreTurns` fast path plays each turn on a copy; a test
+checks it gives the same scores as `applyTurn` + `evaluate`.
+
+**Contact** (some checker still has an opponent checker in front of it).
+The features, for both sides (`sideFeatures`, names in `FEVGA_FEATURES`):
+
+- **Race**: the Kleinman chance of the pip counts, as a logit, × `race`.
+- **Prime**: the best run of opponent points in front of the side's
+  checkers, by a shape table, plus a share for each checker trapped behind
+  it.
+- **Points ahead**: opponent points in front of the side's last checker.
+- **Blocked landings**: for each own point with checkers, the dice (1–6)
+  whose landing point the opponent holds, × min(checkers, 3).
+- **Stuck dice**: die values with no legal single move now (lost dice).
+- **Runner**: until the runner passes its target (own point 11 by default,
+  from the rules), only the runner may move. A cost, more when the runner
+  is far from the target.
+- **Home points** (own 1–6), **mother** (checkers still on own 24, which
+  hold the opponent's point 12), **stacking** (each checker past the third
+  on a point) and **borne off**.
+- **Diplo estimate**: as in Portes, the share of losses that are diplos
+  grows with the pips the loser needs to bear off one checker.
+
+**No contact** (a pure race): the Portes race code (`race.ts`, Keith count
+and Kleinman) and, at the very end, the exact bear-off table (`bearoff.ts`).
+The bear-off rules are the shared ones, so both work for Fevga as is.
+
+### Fevga weights
+
+All weights are in `FEVGA_DEFAULT_WEIGHTS`. Build a variant with
+`createFevgaHeuristic({ ...FEVGA_DEFAULT_WEIGHTS, pointAhead: 0.3 })`.
+
+| Weight           | Default | What it does (score in logits)                               |
+| ---------------- | ------- | ------------------------------------------------------------ |
+| `race`           | 0.3     | × logit of the Kleinman chance of the pip counts             |
+| `prime`          | 1       | × `primeShape[length]` of the best prime in front            |
+| `primeShape`     | table   | 0.05, 0.15, 0.35, 0.7, 1.2 for 2–6                           |
+| `trapped`        | 1       | × `primeShape[length]` × checkers behind the prime / 15      |
+| `pointAhead`     | 0.2     | per opponent point in front of the side's last checker       |
+| `blockedLanding` | 0.05    | per blocked (point, die) × min(checkers, 3) / 6              |
+| `stuckDie`       | 0.15    | per die value with no legal move                             |
+| `runnerLock`     | 0.3     | while the runner is not through                              |
+| `runnerDistance` | 0.3     | × (runner point − target) / (24 − target), while not through |
+| `homePoint`      | 0.05    | per held own home point (1–6)                                |
+| `startChecker`   | 0.1     | per checker still on own 24 (the mother)                     |
+| `stack`          | 0.04    | per checker past the third on a point                        |
+| `borneOff`       | 0.02    | per checker off                                              |
+| `double`         | 0.4     | diplo share: × pips the loser needs to save it / (pips + 20) |
+
+How we set them: hand-picked, then a coordinate search like `src/tune.ts`
+(which is Portes-only), with paired medium-vs-medium Fevga games (same dice
+seeds, colours swapped):
+
+- `race` 0.8 → 0.3 won +0.23 points per game (349 of 600). Every play of a
+  roll moves the same pips, so a big race weight only drowns the block
+  features. 0.15 and 0 were no better than 0.3.
+- `pointAhead` (new, 0 → 0.2) won +0.11 points per game (440 of 800);
+  0.4 and 0.7 were worse. `startChecker` 0.1 beats 0 by +0.04 points per
+  game (2,000 games).
+- Two more features (all held points; checkers in home) only lost and were
+  dropped.
+- A last round over all weights (`× 1.5` and `× 0.5`, 1,000 games each)
+  changed nothing: every change was within ±0.06 points per game.
+
+A check against the results of 400 medium-vs-medium games (during
+tuning) shows the score is too confident: the best fit is
+`win = sigmoid(k · score)` with `k` about 0.35 overall and 0.2 before
+turn 70. This does not change medium's choices (only the order of the
+scores counts), but the win numbers are rough, and easy's noise acts on
+these inflated scores.
+
+### Fevga strength and speed
+
+1,000 games per match, seed 1,
+`pnpm --filter @tavli/bot simulate -- --variant fevga` (A plays White):
+
+| Match            | A wins       | A points : B points | Diplo wins (A) |
+| ---------------- | ------------ | ------------------- | -------------- |
+| medium vs random | 944 (94.4 %) | 1,319 : 57          | 375            |
+| medium vs easy   | 814 (81.4 %) | 1,044 : 197         | 230            |
+| easy vs random   | 740 (74.0 %) | 928 : 276           | 188            |
+| medium vs medium | 494 (49.4 %) | 553 : 556           | 59             |
+| random vs random | 485 (48.5 %) | 564 : 604           | 79             |
+
+Fevga has more luck than Portes: a bot that only knows the pip count beats
+random play only 56 % of the time (400 games), because every play moves the
+same pips. Blocks are the skill. Per turn (7,900 turns from medium games),
+easy plays a turn that is not the best 71 % of the time and loses 0.075
+points on average (27 % of turns lose more than 0.1); medium loses 0.002.
+
+`src/fevga-strength.test.ts` plays 200 games per match (fixed seeds,
+colours swapped halfway; raise `GAMES` for a local check). It asks for
+medium ≥ 85 % against random (gets 189/200), easy ≥ 60 % against random
+(153/200), and medium ≥ 70 % against easy (170/200). The three matches take
+about 6 s in all.
+
+Decision time of the medium bot (Node 22, dev container, best of 3 runs,
+after warm-up):
+
+| Positions                                   | Median  | p90     | p99     | Max     |
+| ------------------------------------------- | ------- | ------- | ------- | ------- |
+| 300 random positions (the perf test set)    | 0.03 ms | 0.15 ms | 0.42 ms | 1.19 ms |
+| 5,000 positions from medium-vs-medium games | 0.03 ms | 0.14 ms | 0.66 ms | 1.73 ms |
+
+`src/fevga-perf.test.ts` checks median < 20 ms and worst < 200 ms.
+
 ## The runner (for the app)
 
 The app never calls the bot directly. It uses the `BotRunner` port from
@@ -314,7 +434,7 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
 ## Tests
 
 `pnpm test` from the repo root, or `pnpm --filter @tavli/bot test` (about
-6 s).
+10 s on 4 cores; the files run in parallel).
 
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for
   a seed; passes; a win now is never missed (easy, medium, the fallback,
@@ -327,6 +447,14 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
   Kleinman.
 - `evaluators/bearoff.test.ts`: known bear-off values, moves equal the
   engine's, and the evaluator agrees with played-out races.
+- `evaluators/fevga-heuristic.test.ts`: the parallel numbering, contact
+  and the runner rule agree with the engine; colours are mirrors; the fast
+  path equals the engine path; primes, a runner that is through, lost dice
+  and a race lead score as they should.
+- `fevga-bot.test.ts`: `supportedLevels('fevga')`, every turn comes from
+  `legalTurns` and repeats for a seed, a win now is never missed, and
+  medium loses much less per turn than easy. `fevga-strength.test.ts`
+  (200 games per match) and `fevga-perf.test.ts`.
 - `strength.test.ts` (300 games per match), `perf.test.ts`,
   `simulate.test.ts` (1,000 random-vs-random games), `tune.test.ts` (a tiny
   search), and the runner and the command line.

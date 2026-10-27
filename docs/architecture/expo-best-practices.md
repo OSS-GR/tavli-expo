@@ -357,7 +357,7 @@ Advice: start on **EAS Free**. Build dev clients rarely (only when native deps c
 - **Do** use **Sentry** for JS errors and native crashes. Run `npx @sentry/wizard@latest -i reactNative`. Upload source maps for both EAS Build and EAS Update (Expo guide covers both). Link Sentry to the EAS dashboard.
 - **Do** use **PostHog** for product analytics. Set it up with `eas integrations:posthog:connect` (new in SDK 58). Events then carry `eas/update_id`, `eas/channel` and `eas/runtime_version`.
 - **Do** consider **EAS Observe** (`expo-observe`) for startup and screen performance per release. It is free up to 100K events per month. Since SDK 58 it also records JS errors and native crashes. If we want one vendor fewer, Observe could replace Sentry later.
-- **Do** hide all of this behind `CrashReporter` and `Analytics` interfaces. A `ConsoleAnalytics` adapter is used in dev and tests.
+- **Do** hide all of this behind `CrashReporter` and `Analytics` interfaces. A no-op adapter (`createNoopAnalytics`) is used when there is no PostHog key, and a recording one in tests. Event plan: [analytics-events.md](analytics-events.md).
 - **Do** define a small event list (for example `match_started`, `match_finished`, `invite_sent`, `invite_opened`, `bot_level_chosen`). Use snake_case names.
 - **Do** ask for consent before analytics where the law needs it (GDPR, we are in the EU). Offer an opt-out in settings.
 - **Do not** send personal data (email, names) in analytics events or error messages.
@@ -631,6 +631,6 @@ Version numbers for npm packages were read from https://registry.npmjs.org on 20
 - We set Sentry up by hand, not with `@sentry/wizard`: the wizard would put `Sentry.init` and `Sentry.wrap` in app code, which ADR-0002 forbids.
 - `apps/mobile/app.config.ts` adds the `@sentry/react-native/expo` plugin on top of `app.json`. It reads `SENTRY_ORG` and `SENTRY_PROJECT` from the build env, and sets `disableAutoUpload` while `SENTRY_AUTH_TOKEN` is missing, so EAS builds pass before the token exists. `expo config` warns about the missing org and project until they are set.
 - `apps/mobile/metro.config.js` uses `getSentryExpoConfig` (Debug IDs for source maps).
-- `app.json` has `ios.privacyManifests` with the "required reason" APIs Sentry uses (UserDefaults, SystemBootTime, FileTimestamp) and the data it collects (crash, performance, diagnostics; not linked, no tracking). Update this when the analytics SDK (#61) lands.
+- `app.json` has `ios.privacyManifests` with the "required reason" APIs Sentry uses (UserDefaults, SystemBootTime, FileTimestamp) and the data it collects (crash, performance, diagnostics; not linked, no tracking). #61 added PostHog's data: product interaction and the install ID (device ID), both for analytics, not linked, no tracking.
 - `@sentry/cli` is in `allowBuilds: false`: its postinstall only downloads a binary the optional deps already ship.
-- Dev builds use the no-op reporter. Release builds send only when `EXPO_PUBLIC_SENTRY_DSN` is set. The anonymous install id (`features/install-id`) is the only user id; #61 should reuse it.
+- Dev builds use the no-op reporter. Release builds send only when `EXPO_PUBLIC_SENTRY_DSN` is set. The anonymous install id (`features/install-id`) is the only user id, shared with analytics (#61). Crash reports carry it only after "Allow usage data".

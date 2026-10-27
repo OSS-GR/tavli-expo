@@ -42,7 +42,8 @@
       "game": "Game",
       "soundAndFeel": "Sound and feel",
       "language": "Language",
-      "look": "Look"
+      "look": "Look",
+      "privacy": "Privacy"
     },
     "autoConfirm": {
       "label": "Auto-confirm moves",
@@ -77,6 +78,11 @@
       "label": "Board theme",
       "hint": "More boards later"
     },
+    "usageData": {
+      "label": "Share anonymous usage data",
+      "hint": "Which modes you play, which settings you change, and crash reports. Off also stops crash reports. No names or emails."
+    },
+    "privacyPolicy": "Privacy policy",
     "version": "Tavlaki {{version}}"
   },
   "languages": {
@@ -164,7 +170,10 @@
       "resigned": "{{name}} resigned.",
       "resigned_you": "You resigned.",
       "home": "Home",
-      "changeSettings": "Change settings"
+      "changeSettings": "Change settings",
+      "matchLabel": "Match",
+      "noBearOff": "{{name}} did not bear off any checker.",
+      "noBearOff_you": "You did not bear off any checker."
     },
     "you": "You",
     "bot": {
@@ -205,6 +214,45 @@
       "title": "This game could not be opened.",
       "home": "Home"
     }
+  },
+  "welcome": {
+    "language": {
+      "title": "Choose your language",
+      "phoneLanguage": "Phone language",
+      "note": "You can change this later in Settings.",
+      "continue": "Continue"
+    },
+    "privacy": {
+      "back": "Back",
+      "step": "Step {{step}} of {{total}}",
+      "title": "Help us make Tavlaki better",
+      "intro": "We would like to collect anonymous usage data, for example:",
+      "collect": {
+        "modes": "which modes and games you play",
+        "games": "when a game starts and ends",
+        "settings": "which settings you change",
+        "crashes": "crash reports, so we can fix bugs"
+      },
+      "never": "We never collect your name, email or contacts. Until you choose, we only send anonymous crash reports. \"Don't allow\" turns off usage data and crash reports. Change it any time in Settings.",
+      "policy": "Read the privacy policy",
+      "allow": "Allow usage data",
+      "deny": "Don't allow"
+    }
+  },
+  "matchEnd": {
+    "finalScore": "Final score: {{score}}",
+    "game": "Game {{number}}",
+    "won": "{{name}} won",
+    "won_you": "You won",
+    "draw": "Draw",
+    "mono": "Mono",
+    "diplo": "Diplo",
+    "points": "+{{count}}",
+    "pointsLabel_one": "{{count}} point",
+    "pointsLabel_other": "{{count}} points",
+    "rematchHint": "Same settings · {{name}} starts",
+    "rematchHint_you": "Same settings · you start",
+    "rematchHintOpening": "Same settings"
   },
   "games": {
     "portes": "Portes",

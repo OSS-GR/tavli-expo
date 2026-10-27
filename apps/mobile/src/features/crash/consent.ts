@@ -1,16 +1,19 @@
 /**
- * May the app send crash reports? This is the one place that decides.
+ * What crash reports may do, from the one privacy switch (#61,
+ * `features/privacy/consent.ts`).
  *
- * Crash reports carry no personal data (see the `CrashReporter` port), but
- * the player can still opt out of usage data. When they do, this returns
- * `false` and the reporter stops sending.
+ * - Before an answer (`unset`): send, but anonymously (no install id).
+ * - "Allow" (`granted`): send, with the anonymous install id.
+ * - "Don't allow" (`denied`): send nothing.
  */
-import type { SettingsState } from '@/features/settings/settings';
+import { usageDataAllowed, type ConsentStatus } from '@/features/privacy/consent';
 
-export function crashReportingAllowed(settings: SettingsState): boolean {
-  // TODO(#61): there is no usage-data setting yet. When the analytics
-  // consent lands, read its flag here, e.g. `return settings.usageData;`.
-  // Until then crash reports are on by default.
-  void settings;
-  return true;
+/** May the app send crash reports? */
+export function crashReportingAllowed(status: ConsentStatus): boolean {
+  return status !== 'denied';
+}
+
+/** May crash reports carry the install id? Only after "Allow". */
+export function crashUserAllowed(status: ConsentStatus): boolean {
+  return usageDataAllowed(status);
 }

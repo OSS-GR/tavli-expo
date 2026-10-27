@@ -17,6 +17,11 @@ export function gameHref(id: string) {
   return { pathname: '/game/[id]', params: { id } } as const;
 }
 
+/** The match-end screen of a finished local match (wireframe 9). */
+export function matchEndHref(id: string) {
+  return { pathname: '/game/[id]/match-end', params: { id } } as const;
+}
+
 /** The rules page of a game (`/rules/portes`, …). */
 export function rulesHref(variant: string) {
   return { pathname: '/rules/[variant]', params: { variant } } as const;

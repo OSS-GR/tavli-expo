@@ -1,27 +1,46 @@
-import { createMemoryStorage, createRecordingCrashReporter } from '@tavli/contracts';
+import { createMemoryStorage, createRecordingCrashReporter, type Storage } from '@tavli/contracts';
 
 import { INSTALL_ID_STORAGE_KEY } from '@/features/install-id/installId';
-import { createSettingsStore } from '@/features/settings/settings';
+import { createConsentStore } from '@/features/privacy/consent';
 
-import * as consent from './consent';
+import { crashReportingAllowed, crashUserAllowed } from './consent';
 import { setupCrashReporting } from './setup';
 
 const DSN = 'https://public@example.ingest.sentry.io/1';
 
-afterEach(() => {
-  jest.restoreAllMocks();
-});
-
-function setup({ dsn = DSN as string | undefined } = {}) {
+function setup({
+  dsn = DSN as string | undefined,
+  storage = createMemoryStorage() as Storage,
+} = {}) {
   const reporter = createRecordingCrashReporter();
-  const storage = createMemoryStorage();
-  const settings = createSettingsStore(storage);
-  const stop = setupCrashReporting({ reporter, settings, storage, dsn, environment: 'test' });
-  return { reporter, storage, settings, stop };
+  const consent = createConsentStore(storage);
+  const stop = setupCrashReporting({ reporter, consent, storage, dsn, environment: 'test' });
+  return { reporter, storage, consent, stop };
 }
 
+/** A storage where the user already answered. */
+function answered(granted: boolean): Storage {
+  const storage = createMemoryStorage();
+  createConsentStore(storage).getState().setConsent(granted);
+  return storage;
+}
+
+describe('crash consent rules', () => {
+  it('sends before an answer and after "Allow", never after "Don\'t allow"', () => {
+    expect(crashReportingAllowed('unset')).toBe(true);
+    expect(crashReportingAllowed('granted')).toBe(true);
+    expect(crashReportingAllowed('denied')).toBe(false);
+  });
+
+  it('adds the install id only after "Allow"', () => {
+    expect(crashUserAllowed('unset')).toBe(false);
+    expect(crashUserAllowed('granted')).toBe(true);
+    expect(crashUserAllowed('denied')).toBe(false);
+  });
+});
+
 describe('setupCrashReporting', () => {
-  it('starts the reporter with the DSN, enabled by default', () => {
+  it('starts the reporter with the DSN, enabled before an answer', () => {
     const { reporter } = setup();
     expect(reporter.config).toEqual({ dsn: DSN, environment: 'test', enabled: true });
     expect(reporter.enabled).toBe(true);
@@ -32,34 +51,52 @@ describe('setupCrashReporting', () => {
     expect(reporter.config).toEqual({ environment: 'test', enabled: true });
   });
 
-  it('sets a saved anonymous install id as the user', () => {
+  it('stays anonymous before an answer: no user, and no install id is made', () => {
     const { reporter, storage } = setup();
+    expect(reporter.user).toBeNull();
+    expect(storage.getString(INSTALL_ID_STORAGE_KEY)).toBeUndefined();
+  });
+
+  it('sets the saved anonymous install id as the user after "Allow"', () => {
+    const { reporter, storage } = setup({ storage: answered(true) });
     expect(reporter.user).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
     expect(storage.getString(INSTALL_ID_STORAGE_KEY)).toBe(reporter.user);
   });
 
-  it('starts disabled when the player opted out', () => {
-    jest.spyOn(consent, 'crashReportingAllowed').mockReturnValue(false);
-    const { reporter } = setup();
+  it('starts disabled, with no user, when the player said "Don\'t allow"', () => {
+    const { reporter } = setup({ storage: answered(false) });
     expect(reporter.config?.enabled).toBe(false);
     expect(reporter.enabled).toBe(false);
+    expect(reporter.user).toBeNull();
   });
 
-  it('follows the privacy setting while the app runs', () => {
-    const allowed = jest.spyOn(consent, 'crashReportingAllowed');
-    const { reporter, settings, stop } = setup();
+  it('follows the consent answer while the app runs', () => {
+    const { reporter, consent, storage, stop } = setup();
 
-    allowed.mockReturnValue(false);
-    settings.getState().setSetting('sound', false);
-    expect(reporter.enabled).toBe(false);
-
-    allowed.mockReturnValue(true);
-    settings.getState().setSetting('sound', true);
+    consent.getState().setConsent(true);
     expect(reporter.enabled).toBe(true);
+    const id = storage.getString(INSTALL_ID_STORAGE_KEY);
+    expect(reporter.user).toBe(id);
+
+    consent.getState().setConsent(false);
+    expect(reporter.enabled).toBe(false);
+    expect(reporter.user).toBeNull();
+
+    consent.getState().setConsent(true);
+    expect(reporter.enabled).toBe(true);
+    expect(reporter.user).toBe(id);
 
     stop();
-    allowed.mockReturnValue(false);
-    settings.getState().setSetting('sound', false);
+    consent.getState().setConsent(false);
+    expect(reporter.enabled).toBe(true);
+  });
+
+  it('clears the user when the answer moves away from "Allow"', () => {
+    const { reporter, consent } = setup({ storage: answered(true) });
+    expect(reporter.user).not.toBeNull();
+
+    consent.setState({ status: 'unset' });
+    expect(reporter.user).toBeNull();
     expect(reporter.enabled).toBe(true);
   });
 });
