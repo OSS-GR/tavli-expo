@@ -117,7 +117,7 @@ export function slotTop(geo: BoardGeometry, slot: Slot, count: number, pinned = 
  * pinned checker under it if `pinned`). A hit lands on the blot. A pin
  * (Plakoto) lands on top of the blot, which then peeks out under it.
  */
-function landingOn(
+export function landingOn(
   geo: BoardGeometry,
   slot: Slot,
   count: number,

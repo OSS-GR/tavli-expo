@@ -9,6 +9,8 @@
  * - With `paths` (#180) a checker also lights the targets it reaches with
  *   several dice ("2+3"). A tap or a drop there plays each step in order.
  * - Moves, hits and undos fly as short animations (`flights.ts`).
+ * - With `hint` (#209) the hint's checkers and targets get the same rings
+ *   while no checker is selected (`hintMarks.ts`).
  *
  * Two gestures race (`BOARD_GESTURES`, #174): a pan for the drag and a tap
  * for tap-tap. Hit-testing uses the same rects that draw the points
@@ -52,6 +54,7 @@ import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
 import type { MovePath } from './combined';
 import type { Flight } from './flights';
 import { fitBoardWithShadow, type BoardGeometry } from './geometry';
+import { hintHighlights } from './hintMarks';
 import {
   BOARD_GESTURES,
   buildSources,
@@ -132,6 +135,11 @@ export interface InteractiveBoardProps {
   onGeometry?: (geo: BoardGeometry) => void;
   /** Extra marks: Asodio checkers frozen by the quarter lock. */
   marks?: BoardMarks;
+  /**
+   * The moves of a hint (#209), the rest of the turn in order: their
+   * checkers and targets get rings while no checker is selected.
+   */
+  hint?: readonly Move[] | null;
   /** What a screen reader says for the board, e.g. which checkers are pinned. */
   accessibilityLabel?: string;
   testID?: string;
@@ -176,6 +184,7 @@ export function InteractiveBoard({
   onIllegalDrop,
   onGeometry,
   marks,
+  hint,
   accessibilityLabel,
   testID,
 }: InteractiveBoardProps) {
@@ -405,7 +414,11 @@ export function InteractiveBoard({
   const gesture = useCompetingGestures(pan, tap);
 
   const current = selected === null ? undefined : sources[selected];
-  const highlights = highlightsFor(current, cue && !dragKey ? sources : []);
+  // A selected checker wins over the hint; the hint comes back when it is dropped.
+  const highlights =
+    current === undefined && hint && hint.length > 0 && geo
+      ? hintHighlights(geo, board, view, mover, hint)
+      : highlightsFor(current, cue && !dragKey ? sources : []);
   const hidden = new Set<string>();
   for (const f of flights) if (f.hide) hidden.add(f.hide);
   if (dragKey) hidden.add(dragKey);

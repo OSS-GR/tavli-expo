@@ -31,14 +31,24 @@
  * board; while the game-end sheet or a menu covers the screen, they skip
  * everything under it. Each card moves focus to its title when it opens.
  *
+ * Hint (#209): with an `analyzer` (offline games) and Settings → Show
+ * hints on, a Hint button shows on a person's turn once the dice are
+ * rolled, when the rest of the turn can end on more than one board. A tap
+ * ranks the turns a moment later (still on the JS thread, in a timer after
+ * the button has painted "Thinking…"), then
+ * rings the moves on the board and shows them in a line. A move, an undo or
+ * a second tap takes the hint away. The move list has the same button.
+ *
  * Game logic stays in the engine. This screen sends actions to the game
  * store and shows the result. Vs bot, the bot's turn runs here too
  * (`startBotTurn`), so its moves fly like a human's.
  */
+import type { Analyzer } from '@tavli/bot';
 import type { BotRunner, Difficulty } from '@tavli/contracts';
 import {
   applyMoveToBoard,
   currentPrompt,
+  type MatchFlow,
   type Move,
   type PerPlayer,
   type PlayerId,
@@ -71,6 +81,8 @@ import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { boardModeOf, useScreenLayout } from '@/features/board/screenLayout';
 import { useDoubleReveal } from '@/features/board/useDoubleReveal';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
+import { bestRest, hintHasChoice } from '@/features/hint/hint';
+import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
 import { useSettings } from '@/features/settings/store';
 
 import { turnAnnouncement } from './announcements';
@@ -150,6 +162,13 @@ export interface GameScreenProps {
   gameLabel?: string;
   /** The game after this one, on the game-end sheet: "Next: game 3 · Fevga" (#109). */
   nextGameLabel?: string;
+  /**
+   * Hints (#209): the bot's Analyzer. Offline games pass it; without it
+   * there is no Hint button.
+   */
+  analyzer?: Analyzer;
+  /** A hint was shown (for the `hint_shown` event). */
+  onHintShown?: () => void;
 }
 
 const other = (player: PlayerId): PlayerId => (player === 'white' ? 'black' : 'white');
@@ -167,6 +186,8 @@ export function GameScreen({
   onMatchOver,
   gameLabel,
   nextGameLabel,
+  analyzer,
+  onHintShown,
 }: GameScreenProps) {
   const { t } = useTranslation();
   const theme = useBoardTheme();
@@ -175,6 +196,7 @@ export function GameScreen({
   const flipMode = useSettings((s) => s.boardFlipMode);
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
   const showPips = useSettings((s) => s.showPipCounts);
+  const showHints = useSettings((s) => s.showHints);
   const showMoveList = useMoveListShown();
   const { layout, column, spaceKey } = useScreenLayout();
   const landscape = layout === 'landscape';
@@ -270,6 +292,81 @@ export function GameScreen({
   const paths = useMemo(() => (botsTurn ? [] : flowPaths(game)), [game, botsTurn]);
   // The combined moves of this turn, so one Undo takes back each one whole.
   const groups = useRef<readonly MoveGroup[]>([]);
+
+  // The Hint (#209): only on a person's turn with rolled dice, no question
+  // open (Plakoto's mother, the Acey-Deucey double), and more than one end
+  // board for the rest of the turn. Each hint belongs to one position (`flow`):
+  // a move or an undo makes a new flow, so the hint goes.
+  const hintOpen =
+    analyzer !== undefined &&
+    showHints &&
+    !blocked &&
+    !botsTurn &&
+    prompt === null &&
+    view.matchPhase === 'playing' &&
+    phase === 'moving';
+  const hintChoice = useMemo(() => {
+    if (!hintOpen) return false;
+    try {
+      return hintHasChoice(game);
+    } catch (error) {
+      // A hint must never break the game: no button.
+      console.error('hint check failed', error);
+      return false;
+    }
+  }, [hintOpen, game]);
+  const [hint, setHint] = useState<{ flow: MatchFlow; moves: readonly Move[] } | null>(null);
+  const [hintAsked, setHintAsked] = useState<MatchFlow | null>(null);
+  const shownHint = hintChoice && hint !== null && hint.flow === flow ? hint.moves : null;
+  const hintBusy = hintChoice && hintAsked === flow;
+  const hintShown = useEffectEvent(() => onHintShown?.());
+  // The ranking still runs on the JS thread, but in a timer after the tap,
+  // so "Thinking…" is painted first and the render itself stays quick.
+  useEffect(() => {
+    if (hintAsked === null || analyzer === undefined) return;
+    const asked = hintAsked;
+    const timer = setTimeout(() => {
+      // The player moved (or undid) in the meantime: this hint is old.
+      if (store.getState().flow !== asked) {
+        setHintAsked(null);
+        return;
+      }
+      let moves: readonly Move[] | null = null;
+      try {
+        moves = bestRest(asked.game, analyzer);
+      } catch (error) {
+        console.error('hint failed', error);
+      }
+      setHintAsked(null);
+      if (moves !== null && moves.length > 0) {
+        setHint({ flow: asked, moves });
+        hintShown();
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [hintAsked, analyzer, store]);
+  // A tap shows the hint, or takes it away.
+  const toggleHint = () => {
+    if (shownHint !== null) {
+      setHint(null);
+      return;
+    }
+    if (hintChoice && !hintBusy) setHintAsked(flow);
+  };
+  // The same button under the board and in the move list.
+  const hintProps = hintChoice
+    ? {
+        label: hintBusy ? t('game.hint.busy') : t('game.hint.button'),
+        accessibilityLabel:
+          shownHint !== null
+            ? t('game.hint.hide')
+            : hintBusy
+              ? t('game.hint.busy')
+              : t('game.hint.button'),
+        busy: hintBusy,
+        onPress: toggleHint,
+      }
+    : null;
 
   const roller = nextOpeningRoller(game);
   const canRoll =
@@ -521,6 +618,8 @@ export function GameScreen({
   // Screen readers hear each roll and the other player's moves (#134).
   const announcement = turnAnnouncement(flow, t, { nameOf, isYou });
   useAnnouncement(announcement?.text ?? null, announcement?.key);
+  // The hint is read out once it shows (#209).
+  useAnnouncement(shownHint === null ? null : hintSpokenText(t, shownHint));
 
   // Dice in the controls row: this turn's, or the faded dice of a pass.
   const passDice: DieView[] = pass ? diceView(pass.dice, []) : [];
@@ -545,6 +644,7 @@ export function GameScreen({
   // landscape, next to Confirm in portrait.
   let showDice = false;
   let undoButton = null;
+  let hintButton = null;
   let mainButton = null;
   if (phase === 'opening-roll') {
     mainButton = null;
@@ -576,6 +676,17 @@ export function GameScreen({
     );
   } else if (phase === 'moving' || phase === 'awaiting-confirm' || showPass) {
     showDice = true;
+    hintButton = hintProps ? (
+      <ActionButton
+        testID="hint-button"
+        label={hintProps.label}
+        accessibilityLabel={hintProps.accessibilityLabel}
+        kind="secondary"
+        disabled={hintProps.busy}
+        onPress={hintProps.onPress}
+        compact
+      />
+    ) : null;
     undoButton = (
       <ActionButton
         testID="undo-button"
@@ -914,7 +1025,8 @@ export function GameScreen({
     !blocked &&
     !confirmHint &&
     botNote === null &&
-    gateToMove === null;
+    gateToMove === null &&
+    shownHint === null;
 
   const menuButton = onOpenMenu ? (
     <Pressable
@@ -960,6 +1072,7 @@ export function GameScreen({
         onPickUp={() => feedback.event('checkerPickUp')}
         onIllegalDrop={() => feedback.event('invalidMove')}
         marks={marks}
+        hint={blocked || botsTurn ? null : shownHint}
       />
       {diceBox ? (
         // The dice lie on the board, in the theme's dice area (#184); in
@@ -1027,6 +1140,16 @@ export function GameScreen({
           </Text>
         </View>
       ) : null}
+      {shownHint !== null ? (
+        // Read out once when it shows (`useAnnouncement`); it stays for a second look.
+        <View
+          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
+          pointerEvents="none">
+          <Text testID="hint-text" style={styles.hint}>
+            {hintShortText(t, shownHint)}
+          </Text>
+        </View>
+      ) : null}
       {botNote !== null ? (
         <View
           style={[styles.hintRow, landscape && styles.besideColumn(column)]}
@@ -1056,7 +1179,13 @@ export function GameScreen({
   ) : null;
   const moveList =
     showMoveList && !blocked && !botsTurn ? (
-      <MoveList legal={view.legal} onMove={onListMove} paths={paths} onSteps={onListSteps} />
+      <MoveList
+        legal={view.legal}
+        onMove={onListMove}
+        paths={paths}
+        onSteps={onListSteps}
+        {...(hintProps ? { hint: hintProps } : {})}
+      />
     ) : null;
 
   // Before the board: the top row in portrait, the left column in landscape.
@@ -1075,6 +1204,7 @@ export function GameScreen({
         </View>
         <View style={styles.sideGroup}>
           {strip(viewer, 'strip-bottom')}
+          {hintButton}
           {undoButton}
         </View>
       </ScrollView>
@@ -1124,6 +1254,7 @@ export function GameScreen({
     </View>
   ) : (
     <View style={styles.controls}>
+      {hintButton}
       {undoButton}
       {mainButton}
     </View>

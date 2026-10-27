@@ -70,9 +70,10 @@ export type GameStore = StoreApi<GameStoreState>;
 
 /**
  * Runs an analytics call and drops its errors. The move is already played
- * when it runs: analytics must never fail or undo it.
+ * when it runs: analytics must never fail or undo it. The Hint button uses
+ * it too (#209).
  */
-function quietly(send: () => void): void {
+export function quietly(send: () => void): void {
   try {
     send();
   } catch (error) {
