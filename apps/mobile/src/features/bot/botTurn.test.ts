@@ -376,6 +376,44 @@ describe('startBotTurn', () => {
     expect(store.getState().flow.game.result).toMatchObject({ winner: 'white', points: 2 });
   });
 
+  it('falls back to "play on" when the runner answers a choice that is not offered', async () => {
+    const store = blackMotherPinned();
+    const log: string[] = [];
+    const onError = jest.fn();
+    await startBotTurn({
+      player: 'black',
+      difficulty: 'medium',
+      runner: { ...fakeRunner(), chooseAnswer: async () => 'maybe' },
+      rng: createSeededRng(9),
+      getFlow: () => store.getState().flow,
+      actions: actionsFor(store, log),
+      timing: fast,
+      onError,
+    }).done;
+    expect(log.slice(0, 2)).toEqual(['answer playOn', 'roll']);
+    expect(onError).not.toHaveBeenCalled();
+    expect(store.getState().flow.game.state.toMove).toBe('white');
+  });
+
+  it('reports an error instead of stalling when no answer is taken', async () => {
+    const store = blackMotherPinned();
+    const onError = jest.fn();
+    const refused: BotTurnActions = { ...actionsFor(store, []), answer: () => false };
+    await startBotTurn({
+      player: 'black',
+      difficulty: 'easy',
+      runner: fakeRunner(),
+      rng: createSeededRng(9),
+      getFlow: () => store.getState().flow,
+      actions: refused,
+      timing: fast,
+      onError,
+    }).done;
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('could not answer') }),
+    );
+  });
+
   it('plays on when its mother is pinned (a runner without chooseAnswer), then plays', async () => {
     const store = blackMotherPinned();
     const log: string[] = [];

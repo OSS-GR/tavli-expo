@@ -186,7 +186,17 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
             : Promise.resolve(botAnswer(prompt)),
           sleep(timing.beforeRollMs),
         ]);
-        if (cancelled || !actions.answer(choice)) return;
+        if (cancelled) return;
+        // A choice the question does not offer would stall the game: fall
+        // back to the default answer, and report it if that fails too.
+        const tries = [choice, botAnswer(prompt)].filter(
+          (c, i, all) => prompt.choices.includes(c) && all.indexOf(c) === i,
+        );
+        if (!tries.some((c) => actions.answer(c))) {
+          throw new Error(
+            `the bot could not answer "${prompt.kind}" (got ${JSON.stringify(choice)})`,
+          );
+        }
       } else if (step === 'roll') {
         await sleep(timing.beforeRollMs);
         if (cancelled || !actions.roll()) return;

@@ -67,6 +67,27 @@ describe('<BoardScene />', () => {
     );
   });
 
+  it('drops the pin ring while the pinner is in the air', async () => {
+    const picture = layoutBoard(geo, SAMPLE_POSITIONS.plakotoPins, WHITE);
+    await render(
+      <BoardScene
+        theme={theme}
+        geo={geo}
+        images={{}}
+        picture={picture}
+        font={font}
+        hidden={new Set(['p24:0'])}
+      />,
+    );
+    const rings = find(
+      (n) =>
+        n.type === 'Circle' &&
+        n.props.color === theme.checkers.badge.fill &&
+        n.props.strokeWidth === PIN_RING_WIDTH * picture.pins[0]!.r,
+    );
+    expect(rings.map((n) => n.props.opacity).sort()).toEqual([0, 1]);
+  });
+
   it('draws the Fevga start in opposite corners', async () => {
     const picture = layoutBoard(geo, SAMPLE_POSITIONS.fevgaStart, {
       viewer: 'white',

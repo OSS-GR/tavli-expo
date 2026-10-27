@@ -185,7 +185,9 @@ export function BoardScene({
             style={theme.checkers[toneOf(p.owner)]}
             shadow={theme.checkers.shadow}
           />
+          {/* No ring while the pinner is still in the air (its key is hidden). */}
           <Circle
+            opacity={hidden?.has(p.key.replace(/:pinned$/, ':0')) ? 0 : 1}
             cx={p.x}
             cy={p.y}
             r={p.r * (1 - PIN_RING_WIDTH / 2)}

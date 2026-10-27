@@ -48,6 +48,8 @@ export const OPENING_RESULT_MS = 1500;
 export const PASS_NOTICE_MS = 3000;
 /** The same card when the bot cannot move (wireframe 6f: "closes after 2 s"). */
 export const BOT_PASS_NOTICE_MS = 2000;
+/** "Bot plays on." (the bot's answer to the mother question) shows this long. */
+export const BOT_ANSWER_NOTE_MS = 2000;
 /** The final position stays on screen this long before the match-end screen opens. */
 export const MATCH_END_DELAY_MS = 1000;
 
@@ -282,6 +284,12 @@ export function GameScreen({
     setBotChoice({ key: botKey, choice });
     return true;
   });
+  // The note goes after a short time (the answer does not change the turn).
+  useEffect(() => {
+    if (botChoice === null) return;
+    const timer = setTimeout(() => setBotChoice(null), BOT_ANSWER_NOTE_MS);
+    return () => clearTimeout(timer);
+  }, [botChoice]);
   const botOptions = useEffectEvent(() => bot);
   useEffect(() => {
     const seat = botOptions();
@@ -463,8 +471,7 @@ export function GameScreen({
     const pinned = prompt.player;
     const opponentName = nameOf(other(pinned));
     const answer = (choice: string) => () => {
-      setFlights([]);
-      dispatch({ type: 'answer', player: pinned, choice });
+      if (dispatch({ type: 'answer', player: pinned, choice })) setFlights([]);
     };
     card = (
       <GameCard

@@ -68,7 +68,7 @@ The board reads the game from the engine state: `rules.movement.direction` gives
 With `motherRule: "offerConcede"` (the app default) the engine flow stops in `awaiting-answer` after a turn that pins a mother, and `currentPrompt` names the pinned player.
 
 - **A person answers** (pass-and-play, or you vs the bot): a card over the board (wireframe 17), "Bob, your mother is pinned" (or "Your mother is pinned"), what happened and what Resign costs, and two buttons of equal weight: **Resign (lose 2)** and **Play on**. It cannot be closed without a choice. In pass-and-play the pinned player answers; with Flip on, the board turns to them first. The answer is the engine action `answer`.
-- **The bot answers** its own question in its turn (`botStep` → `'answer'` in `features/bot/botTurn.ts`). It asks the runner (`BotRunner.chooseAnswer`, #106; easy and medium play on). A runner without `chooseAnswer` (the method is optional) plays on (`botAnswer`). A note over the board says "Bot plays on." until the bot's turn ends. If the bot resigns, the game-end sheet says so.
+- **The bot answers** its own question in its turn (`botStep` → `'answer'` in `features/bot/botTurn.ts`). It asks the runner (`BotRunner.chooseAnswer`, #106; easy and medium play on). A runner without `chooseAnswer` (the method is optional), or an answer the question does not offer, falls back to "play on" (`botAnswer`); if the engine still refuses, the bot turn reports an error instead of waiting forever. A note over the board says "Bot plays on." for 2 s (`BOT_ANSWER_NOTE_MS`). If the bot resigns, the game-end sheet says so.
 
 ## Dice
 

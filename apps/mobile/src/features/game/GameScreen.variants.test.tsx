@@ -26,7 +26,7 @@ import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
 import { createGameStore, turnView, type GameStore } from './gameStore';
-import { GameScreen, type GameScreenProps } from './GameScreen';
+import { BOT_ANSWER_NOTE_MS, GameScreen, type GameScreenProps } from './GameScreen';
 import { openingStatus } from './opening';
 import type { Seat } from './seats';
 import { passNotice } from './turnNotices';
@@ -295,6 +295,20 @@ describe('<GameScreen /> Plakoto mother question vs the bot', () => {
     expect(answers).toEqual([{ type: 'answer', player: 'black', choice: 'playOn' }]);
     expect(screen.queryByTestId('bot-answer-note')).toBeNull();
   });
+
+  it('hides "Bot plays on." after a short time, while the bot still thinks', async () => {
+    const store = motherStore({ white: 'You', black: 'Bot' });
+    const slow = { ...bot, timing: { ...bot.timing, thinkMs: () => BOT_ANSWER_NOTE_MS + 2000 } };
+    await show(store, { seats, bot: slow });
+    await whitePinsTheMother(store);
+    await waitFor(() => expect(screen.getByTestId('bot-answer-note')).toBeOnTheScreen());
+    await waitFor(() => expect(screen.queryByTestId('bot-answer-note')).toBeNull(), {
+      timeout: BOT_ANSWER_NOTE_MS + 1000,
+    });
+    // Still the bot's turn: it has rolled and is thinking.
+    expect(store.getState().flow.game.state.toMove).toBe('black');
+    expect(store.getState().flow.game.phase).toBe('moving');
+  }, 15_000);
 
   it('asks you when the bot pins your mother', async () => {
     // The same position with the colors swapped: Black (the bot) pins White.
