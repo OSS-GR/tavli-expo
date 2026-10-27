@@ -324,3 +324,78 @@ describe('<GameScreen /> announcements vs the bot', () => {
     expect(screen.getByTestId('move-list')).toBeOnTheScreen();
   });
 });
+
+describe('<GameScreen /> announcements after a remount (#216)', () => {
+  // React Native's Jest setup makes it a `jest.fn` that keeps calls between tests.
+  const spyOnAnnounce = () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    announce.mockClear();
+    return announce;
+  };
+  const newStore = () =>
+    createGameStore({ players: { white: 'Ann', black: 'Bob' }, rng: createSeededRng(5) });
+
+  /** Plays the moves of this turn with the move list, then Confirm. */
+  async function playTurn(store: GameStore) {
+    while (store.getState().flow.game.phase === 'moving') {
+      await pressButton(firstMoveName(store));
+    }
+    await pressButton('Confirm');
+  }
+
+  /** Ann starts with 5-3 and plays it, then Bob rolls. Returns what was read for the roll. */
+  async function bobRolls(store: GameStore, announce: jest.SpyInstance): Promise<string> {
+    const { dispatch } = store.getState();
+    dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+    dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+    await show(store);
+    await act(async () => {
+      jest.advanceTimersByTime(OPENING_RESULT_MS);
+    });
+    await playTurn(store);
+    await pressButton('Roll dice, or tap the board');
+    const said: unknown = announce.mock.calls.at(-1)?.[0];
+    expect(said).toMatch(/^Bob rolled \d-\d\.$/);
+    return String(said);
+  }
+
+  it('does not read the roll again when the screen mounts again', async () => {
+    const announce = spyOnAnnounce();
+    const store = newStore();
+    const roll = await bobRolls(store, announce);
+    expect(announce.mock.calls.filter(([text]) => text === roll)).toHaveLength(1);
+    await screen.unmount();
+    announce.mockClear();
+
+    await show(store);
+    expect(screen.getByTestId('move-list')).toBeOnTheScreen();
+    expect(announce).not.toHaveBeenCalledWith(roll);
+    // The next event is read as before.
+    await playTurn(store);
+    expect(announce).toHaveBeenLastCalledWith(
+      expect.stringMatching(/^Bob played: .+\. The turn passes to Ann\.$/),
+    );
+  });
+
+  it('reads the last event once when the match opens in a new store (a saved match)', async () => {
+    const announce = spyOnAnnounce();
+    const first = newStore();
+    const roll = await bobRolls(first, announce);
+    await screen.unmount();
+    announce.mockClear();
+
+    // A saved match loads into a new game store, so it is a new visit.
+    const loaded = createGameStore({
+      players: { white: 'Ann', black: 'Bob' },
+      rng: createSeededRng(5),
+      flow: first.getState().flow,
+    });
+    await show(loaded);
+    expect(announce.mock.calls.filter(([text]) => text === roll)).toHaveLength(1);
+    // A remount of that board does not read it again.
+    await screen.unmount();
+    announce.mockClear();
+    await show(loaded);
+    expect(announce).not.toHaveBeenCalledWith(roll);
+  });
+});

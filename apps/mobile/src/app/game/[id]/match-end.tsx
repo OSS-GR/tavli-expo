@@ -24,11 +24,13 @@ export default function MatchEndRoute() {
   // screen goes away, and the screen must not change under the user.
   const [opened] = useState(() => {
     const session = id === null ? null : matchSessions.get(id);
-    return session === null ? null : { session, match: session.store.getState().flow.match };
+    if (session === null) return null;
+    const { flow, matchKey } = session.store.getState();
+    return { session, match: flow.match, matchKey };
   });
 
   if (opened === null) return <MissingGame onHome={goHome} />;
-  const { session, match } = opened;
+  const { session, match, matchKey } = opened;
   // A match that is not over yet belongs on the board.
   if (match.status !== 'finished') return <Redirect href={gameHref(session.id)} />;
 
@@ -36,6 +38,8 @@ export default function MatchEndRoute() {
     <MatchEndScreen
       setup={session.setup}
       match={match}
+      // The result is read once per app run, not again on a remount (#216).
+      announceKey={matchKey}
       onRematch={() => {
         // The last winner starts (engine `createRematch`); it is saved as a new match.
         session.store.getState().rematch();

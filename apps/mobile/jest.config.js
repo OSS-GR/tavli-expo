@@ -24,6 +24,8 @@ module.exports = {
   transform,
   // The Unistyles mocks must load before our Unistyles config (unistyl.es/v3/start/testing).
   setupFiles: ['react-native-unistyles/mocks', '<rootDir>/jest.setup.ts'],
+  // Resets per-test state that lives in app modules (test/afterEnv.ts).
+  setupFilesAfterEnv: ['<rootDir>/test/afterEnv.ts'],
   // pnpm keeps packages in node_modules/.pnpm, so we use Expo's pnpm pattern.
   // `standard-navigation` is ESM that expo-router/testing-library loads.
   transformIgnorePatterns: [
