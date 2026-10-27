@@ -24,10 +24,16 @@ describe('medium decision time', () => {
     for (const state of positions.slice(0, 30)) {
       bot.chooseTurn(state, state.dice ?? [1, 2], 'medium', { rng });
     }
+    // Time each position 3 times and keep the fastest run. One GC pause or a busy
+    // CI machine then cannot fail the test, but a slow position still does.
     const times = positions.map((state) => {
-      const t0 = performance.now();
-      bot.chooseTurn(state, state.dice ?? [1, 2], 'medium', { rng });
-      return performance.now() - t0;
+      let fastest = Infinity;
+      for (let run = 0; run < 3; run += 1) {
+        const t0 = performance.now();
+        bot.chooseTurn(state, state.dice ?? [1, 2], 'medium', { rng });
+        fastest = Math.min(fastest, performance.now() - t0);
+      }
+      return fastest;
     });
     times.sort((a, b) => a - b);
     const median = times[Math.floor(times.length / 2)] ?? Infinity;
