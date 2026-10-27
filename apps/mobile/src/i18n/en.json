@@ -302,6 +302,8 @@
       "rolled_you": "You rolled {{dice}}.",
       "rolledDouble": "{{name}} rolled {{double}}: four moves of {{value}}.",
       "rolledDouble_you": "You rolled {{double}}: four moves of {{value}}.",
+      "choseDouble": "{{name}} chose {{double}}: four moves of {{value}}.",
+      "choseDouble_you": "You chose {{double}}: four moves of {{value}}.",
       "played": "{{name}} played: {{moves}}."
     },
     "pass": {
