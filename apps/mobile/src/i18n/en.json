@@ -176,7 +176,8 @@
       "changeSettings": "Change settings",
       "matchLabel": "Match",
       "noBearOff": "{{name}} did not bear off any checker.",
-      "noBearOff_you": "You did not bear off any checker."
+      "noBearOff_you": "You did not bear off any checker.",
+      "nextGame": "Next: game {{number}} · {{game}}"
     },
     "you": "You",
     "bot": {
@@ -230,7 +231,8 @@
       "label": "Board",
       "pinned": "{{name}}’s checker on point {{point}} is pinned",
       "pinned_you": "Your checker on point {{point}} is pinned"
-    }
+    },
+    "round": "Game {{number}} · {{game}}"
   },
   "welcome": {
     "language": {
@@ -258,7 +260,6 @@
   },
   "matchEnd": {
     "finalScore": "Final score: {{score}}",
-    "game": "Game {{number}}",
     "won": "{{name}} won",
     "won_you": "You won",
     "draw": "Draw",
@@ -275,9 +276,13 @@
     "portes": "Portes",
     "portesSubtitle": "Πόρτες · Greek backgammon",
     "plakoto": "Plakoto",
+    "plakotoSubtitle": "Πλακωτό · pin, do not hit",
     "fevga": "Fevga",
+    "fevgaSubtitle": "Φεύγα · a race with no hitting",
+    "tavli": "Tavli",
+    "tavliSubtitle": "Τάβλι · all three in turn: Portes, Plakoto, Fevga",
     "asodio": "Asodio",
-    "tavli": "Tavli"
+    "asodioSubtitle": "Ασόδιο · enter all checkers first"
   },
   "bot": {
     "levels": {
@@ -303,7 +308,8 @@
       "easyHint": "Easy plays a random legal move. Good for learning.",
       "mediumHint": "Medium plays like a casual player.",
       "hardHint": "Hard plays like a strong player.",
-      "soon": "Medium and Hard are coming soon."
+      "soon": "Medium and Hard are coming soon.",
+      "hardSoon": "Hard is coming soon."
     },
     "whoStarts": {
       "title": "Who starts?",

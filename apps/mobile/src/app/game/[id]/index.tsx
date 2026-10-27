@@ -38,7 +38,8 @@ export default function GameRoute() {
           goHome();
         }}
         onSettings={() => router.push('/settings')}
-        onRules={() => router.push(rulesHref(session.setup.game))}
+        // The rules of the game on the board (in Tavli, this game of the rotation).
+        onRules={() => router.push(rulesHref(session.store.getState().flow.game.state.variant))}
         onMatchOver={() => router.replace(matchEndHref(session.id))}
       />
     </View>

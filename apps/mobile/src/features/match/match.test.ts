@@ -9,7 +9,20 @@ import { canResignGame, previewResign, resigningPlayer } from './resign';
 import { gameHref, newGameHref, parseIdParam, parseModeParam, rulesHref } from './routes';
 import { seatsFor } from './seats';
 import { createSessionRegistry, newMatchId } from './sessions';
-import { cleanName, defaultSetup, enginePlayers, sanitizeSetup, type MatchSetup } from './setup';
+import {
+  GAME_CHOICES,
+  cleanName,
+  defaultSetup,
+  enginePlayers,
+  gameLevels,
+  gameRotation,
+  gameRuleSet,
+  isGameBuilt,
+  isGameOpen,
+  sanitizeSetup,
+  type MatchSetup,
+} from './setup';
+import { currentGameLabel, nextGameLabel, variantName } from './summary';
 
 const t = i18n.t.bind(i18n);
 
@@ -39,13 +52,13 @@ describe('match setup', () => {
       sanitizeSetup(
         { targetPoints: 7, botLevel: 'medium', names: { white: ' Ann ', black: 5 } },
         'bot',
-        ['easy'],
+        gameLevels(['easy']),
       ),
     ).toEqual({ ...defaultSetup('bot'), targetPoints: 7, names: { white: 'Ann', black: '' } });
     expect(sanitizeSetup({ targetPoints: 4, botLevel: 'hard' }, 'bot').targetPoints).toBe(3);
-    expect(sanitizeSetup({ botLevel: 'medium' }, 'bot', ['easy', 'medium']).botLevel).toBe(
-      'medium',
-    );
+    expect(
+      sanitizeSetup({ botLevel: 'medium' }, 'bot', gameLevels(['easy', 'medium'])).botLevel,
+    ).toBe('medium');
   });
 
   it('gives the engine non-empty player labels', () => {
@@ -110,13 +123,13 @@ describe('last choices', () => {
   it('remembers the setup per mode', () => {
     const storage = createMemoryStorage();
     saveLastSetup(storage, botSetup);
-    expect(loadLastSetup(storage, 'bot', ['easy'])).toEqual(botSetup);
-    expect(loadLastSetup(storage, 'local', ['easy'])).toEqual(defaultSetup('local'));
+    expect(loadLastSetup(storage, 'bot', gameLevels(['easy']))).toEqual(botSetup);
+    expect(loadLastSetup(storage, 'local', gameLevels(['easy']))).toEqual(defaultSetup('local'));
   });
 
   it('gives the defaults for broken data', () => {
     const storage = createMemoryStorage({ [lastSetupKey('bot')]: '{not json' });
-    expect(loadLastSetup(storage, 'bot', ['easy'])).toEqual(defaultSetup('bot'));
+    expect(loadLastSetup(storage, 'bot', gameLevels(['easy']))).toEqual(defaultSetup('bot'));
   });
 });
 
@@ -179,5 +192,86 @@ describe('resign', () => {
     // White has borne off a checker.
     const mono = previewResign(startedFlow(SAMPLE_POSITIONS.bearoff).getState().flow, 'white');
     expect(mono.result.points).toBe(1);
+  });
+});
+
+describe('the chosen game (#109)', () => {
+  const PORTES_ONLY = gameLevels(['easy', 'medium'], { plakoto: [], fevga: [], tavli: [] });
+
+  it('uses the engine presets, one game or the Tavli rotation', () => {
+    expect(GAME_CHOICES.filter((game) => isGameBuilt(game))).toEqual([
+      'portes',
+      'plakoto',
+      'fevga',
+      'tavli',
+    ]);
+    expect(gameRotation('tavli')).toEqual(['portes', 'plakoto', 'fevga']);
+    for (const game of ['portes', 'plakoto', 'fevga'] as const) {
+      const rules = gameRuleSet(game);
+      expect(rules.presetId).toBe(game);
+      // A one-game match plays only that game.
+      expect(rules.match.rotation).toEqual([game]);
+      expect(gameRotation(game)).toEqual([game]);
+    }
+    expect(gameRuleSet('tavli').presetId).toBe('tavli');
+    expect(gameRuleSet('plakoto').capture.captureMode).toBe('pin');
+    expect(gameRuleSet('fevga').movement.direction).toBe('parallel');
+  });
+
+  it('opens a game vs the bot only with a bot level; pass-and-play needs none', () => {
+    expect(isGameOpen('plakoto', 'bot', PORTES_ONLY)).toBe(false);
+    expect(isGameOpen('plakoto', 'local', PORTES_ONLY)).toBe(true);
+    expect(isGameOpen('portes', 'bot', PORTES_ONLY)).toBe(true);
+    expect(isGameOpen('asodio', 'local', PORTES_ONLY)).toBe(false);
+    expect(isGameOpen('asodio', 'bot', gameLevels(['easy'], { asodio: ['easy'] }))).toBe(false);
+  });
+
+  it('keeps the saved game when it is open, else Portes', () => {
+    expect(sanitizeSetup({ game: 'tavli' }, 'bot').game).toBe('tavli');
+    expect(sanitizeSetup({ game: 'fevga' }, 'local', PORTES_ONLY).game).toBe('fevga');
+    expect(sanitizeSetup({ game: 'fevga' }, 'bot', PORTES_ONLY).game).toBe('portes');
+    expect(sanitizeSetup({ game: 'asodio' }, 'local').game).toBe('portes');
+    expect(sanitizeSetup({ game: 'chess' }, 'local').game).toBe('portes');
+    // A saved match keeps any built game.
+    expect(sanitizeSetup({ game: 'fevga' }, 'bot', PORTES_ONLY, { keepBuiltGame: true }).game).toBe(
+      'fevga',
+    );
+  });
+
+  it('picks the bot level from the levels of the game', () => {
+    const levels = gameLevels(['easy', 'medium'], { tavli: ['easy'] });
+    expect(sanitizeSetup({ game: 'tavli', botLevel: 'medium' }, 'bot', levels).botLevel).toBe(
+      'easy',
+    );
+    expect(sanitizeSetup({ game: 'portes', botLevel: 'medium' }, 'bot', levels).botLevel).toBe(
+      'medium',
+    );
+  });
+
+  it('starts the match with the rules of the game', () => {
+    const sessions = createSessionRegistry({ createRng: () => createSeededRng(3) });
+    const tavli = sessions.start({ ...defaultSetup('local'), game: 'tavli' });
+    expect(tavli.store.getState().flow.match.rules.presetId).toBe('tavli');
+    expect(tavli.store.getState().flow.game.state.variant).toBe('portes');
+    const plakoto = sessions.start({ ...defaultSetup('bot'), game: 'plakoto' });
+    const { match, game } = plakoto.store.getState().flow;
+    expect(match.rules.match.rotation).toEqual(['plakoto']);
+    expect(game.state.variant).toBe('plakoto');
+  });
+
+  it('names the game on the board and the next one', () => {
+    const sessions = createSessionRegistry({ createRng: () => createSeededRng(3) });
+    const s = sessions.start({ ...defaultSetup('local'), game: 'tavli', targetPoints: 7 });
+    s.store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+    s.store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+    expect(currentGameLabel(s.store.getState().flow, t)).toBe('Game 1 · Portes');
+    s.store.getState().dispatch({ type: 'resign', player: 'white' });
+    const flow = s.store.getState().flow;
+    expect(currentGameLabel(flow, t)).toBe('Game 1 · Portes');
+    expect(nextGameLabel(flow.match, t)).toBe('Next: game 2 · Plakoto');
+    s.store.getState().dispatch({ type: 'nextGame' });
+    expect(currentGameLabel(s.store.getState().flow, t)).toBe('Game 2 · Plakoto');
+    expect(variantName('fevga', i18n.getFixedT('el'))).toBe('Φεύγα');
+    expect(variantName('asodio', i18n.getFixedT('el'))).toBe('Ασόδιο');
   });
 });
