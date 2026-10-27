@@ -70,6 +70,11 @@ export interface CrashReporter {
   /**
    * Links reports to an anonymous install id (see `isAnonymousInstallId`).
    * Pass `null` to clear it. Adapters ignore ids that fail the check.
+   *
+   * No user means "anonymous": an adapter must then send no id of its own
+   * either (the Sentry adapter keeps its native SDK and sessions off). Call
+   * it before `init` when the id is known, so the reporter starts in the
+   * right mode.
    */
   setUser(anonId: string | null): void;
   addBreadcrumb(breadcrumb: CrashBreadcrumb): void;

@@ -3,6 +3,8 @@
  * `features/privacy/consent.ts`).
  *
  * - Before an answer (`unset`): send, but anonymously (no install id).
+ *   The Sentry adapter then runs JS only: no native crash reports and no
+ *   sessions, because the native SDKs add their own id (#139).
  * - "Allow" (`granted`): send, with the anonymous install id.
  * - "Don't allow" (`denied`), also to an older consent text
  *   (`stale-denied`, until the new answer): send nothing.

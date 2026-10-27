@@ -37,22 +37,31 @@ export function setupCrashReporting({
 
   const status = consent.getState().status;
   let allowed = crashReportingAllowed(status);
+  // The user first: the reporter starts anonymous (JS only, no sessions)
+  // or identified, by whether it has a user when `init` runs.
+  applyUser(status);
   reporter.init({
     ...(dsn ? { dsn } : {}),
     environment,
     enabled: allowed,
   });
-  applyUser(status);
 
   return consent.subscribe((state, previous) => {
     if (state.status === previous.status) return;
     const next = crashReportingAllowed(state.status);
-    // Clear the user before turning off, set it after turning on.
-    if (!next) applyUser(state.status);
-    if (next !== allowed) {
-      allowed = next;
-      reporter.setEnabled(next);
+    if (next === allowed) {
+      applyUser(state.status);
+      return;
     }
-    if (next) applyUser(state.status);
+    allowed = next;
+    // Change the user while the reporter is off, so it starts (or would
+    // start again) in the right mode and does not restart for nothing.
+    if (next) {
+      applyUser(state.status);
+      reporter.setEnabled(true);
+    } else {
+      reporter.setEnabled(false);
+      applyUser(state.status);
+    }
   });
 }

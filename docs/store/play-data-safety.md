@@ -31,7 +31,7 @@ Tick these four. Leave every other type empty.
 |----------|-----------|-----------------------|
 | App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped |
 | App info and performance | **Crash logs** | Sentry crash and error reports |
-| App info and performance | **Diagnostics** | Device facts and breadcrumbs in crash reports, app hangs / ANRs, Sentry sessions, device facts on PostHog events |
+| App info and performance | **Diagnostics** | Device facts and breadcrumbs in crash reports; after Allow also app hangs / ANRs and Sentry sessions; device facts on PostHog events |
 | Device or other IDs | **Device or other IDs** | The random install id and PostHog's random ids |
 
 Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is set not to store IPs), Personal info (name, email, user IDs, address, phone, and the rest), Financial info, Health and fitness, Messages, Photos and videos, Audio files, Files and docs, Calendar, Contacts, App activity → In-app search, Installed apps, Other user-generated content (pass-and-play names stay on the phone), Other actions, Web browsing, App info and performance → Other app performance data.
@@ -46,8 +46,8 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 | Device or other IDs | Yes | No | No | **Optional** | **Analytics** |
 
 - **Purposes.** Google's "Analytics" includes "monitor app health, diagnose and fix bugs or crashes". So crash logs and diagnostics go under Analytics, not App functionality. (Apple puts crash data under App Functionality. That is a difference in the two forms, not in the facts.) No data is used for App functionality, Developer communications, Advertising or marketing, Fraud prevention, Personalization or Account management.
-- **Required or optional.** Usage data and the install id are sent only after **Allow usage data**, so App interactions and Device or other IDs are **Optional**. Crash reports and diagnostics are sent **before** the first answer, so users cannot fully opt out of them: answer **Required**, even though **Don't allow** and the Settings switch turn them off later. Issue #139 changes what is sent before the answer; check this again when it is merged.
-- **Device or other IDs** before an answer: the app sends no install id. Sentry's native SDK may add its own random id to native crash reports and sessions (see [app-privacy.md → Points to check](app-privacy.md#points-to-check-in-the-code)). This is unverified (see app-privacy.md). If a build shows such an id before the answer, change Device or other IDs to **Required**.
+- **Required or optional.** Usage data and the install id are sent only after **Allow usage data**, so App interactions and Device or other IDs are **Optional**. Crash reports (JS errors, with their device facts and breadcrumbs) are sent **before** the first answer, so users cannot fully opt out of them: answer **Required**, even though **Don't allow** and the Settings switch turn them off later.
+- **Device or other IDs** before an answer: none. The app sends no install id, and since #139 Sentry's native SDK (which adds its own random id to native events and sessions) does not start before **Allow** (see [app-privacy.md → Pre-consent crash reports](app-privacy.md#pre-consent-crash-reports-139)). So **Optional** is right. If a build shows an id before the answer, open a bug and change this to **Required** until it is fixed.
 
 ## What the Play listing will show
 

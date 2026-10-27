@@ -44,8 +44,8 @@ Only two things: crash reports and usage data. Both follow **one switch**.
 
 | Your answer | Usage data | Crash reports |
 |-------------|------------|---------------|
-| Not answered yet | none | sent, with no install id |
-| **Allow usage data** | sent, with the install id | sent, with the install id |
+| Not answered yet | none | sent, with no id at all (errors in the app's own code only) |
+| **Allow usage data** | sent, with the install id | sent, with the install id (all crashes, and app sessions) |
 | **Don't allow** | none | none |
 
 If you close the app before you answer, that counts as "not answered yet". The app asks again on the next launch.
@@ -60,9 +60,13 @@ A report holds:
 - technical facts, such as the phone model, the system and its version, the app version, memory and screen details, and language and time zone;
 - a short trail of what happened just before the error, such as the app going to the background and back, network requests, and some system events.
 
+**Before you answer**, the app reports only errors in its own code. It does not report crashes deep in the phone's system layer ("native" crashes) or freezes, and it does not count app sessions. Sentry's system part always adds its own random id to those, so the app keeps that part off until you tap **Allow usage data**. A report before your answer holds no id at all, and fewer technical facts (for example no phone model).
+
+**After you tap Allow usage data**, the app also reports native crashes and freezes. Sentry also counts app sessions (when the app starts and stops, and if it crashed), so we can see how often the app crashes. These carry the install id. Sentry makes its own random id on your phone too. It is not your name or a hardware id. A native crash report may carry it instead of the install id.
+
 Before a report leaves your phone, the app removes personal data:
 
-- No name, email, username or IP address in the report. The only id is the install id, and only after you tap **Allow usage data**.
+- No name, email, username or IP address in the report. Before you answer, there is no id. After you tap **Allow usage data**, the id is the install id (or, in a native crash report, Sentry's random id).
 - The name you gave your phone (for example "Maria's iPhone") is removed.
 - App log lines are removed, because a log line could hold anything.
 - Web addresses lose the part after `?` or `#`, because that part can hold ids.
@@ -79,11 +83,15 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | App opened | Once each time the app starts |
 | Game started | A game begins. Includes: against the bot or pass-and-play; which game (Portes, Plakoto, Fevga, Asodio); points to win; bot level |
 | Game finished | A game ends. Includes: the game; how it ended (single, double, resign, draw); number of turns; length in seconds |
-| Game left | You leave a game before it ends. Includes: the game and the turn number. (Planned, not sent yet.) |
+| Game left | You start a new match while a game is not over. Includes: against the bot or pass-and-play; the game; the turn number |
 | Undo used | You took back a move |
 | Resign | You resigned a game or a match |
 | Setting changed | You changed a setting. Includes the setting's name only, not its value |
 | Theme changed | You picked another board theme. Includes the theme's name |
+| Tutorial started | You opened the tutorial. Includes where you opened it from (home, rules or settings) |
+| Tutorial step | You finished a lesson of the tutorial. Includes the lesson's number and name (for example "hit") |
+| Tutorial finished | You finished the last lesson of the tutorial |
+| Tutorial skipped | You tapped Skip in the tutorial. Includes the lesson's number and name on screen |
 | Screen viewed | You opened a screen. Includes the screen's name (for example "settings"), never personal data |
 
 Each event also carries technical facts: the phone maker and model (for example "iPhone 15", never the name you gave your phone), the system and its version, screen size, the app name and version, language and time zone. It carries the install id, and random ids that PostHog keeps on your phone.
@@ -120,7 +128,7 @@ Both companies are based in the USA. Their staff or sub-processors may reach the
 ## Why we may use the data (legal basis)
 
 - **Usage data:** your consent (GDPR Article 6(1)(a)). You can withdraw it at any time in Settings. Withdrawing does not undo what was lawful before.
-- **Crash reports before you answer:** these hold no install id, and we do not think they identify you. If they still count as personal data, we rely on our legitimate interest in finding and fixing crashes (GDPR Article 6(1)(f)). You can object at any time: tap **Don't allow**, or turn off the switch in Settings.
+- **Crash reports before you answer:** these hold no id at all, and we do not think they identify you. If they still count as personal data, we rely on our legitimate interest in finding and fixing crashes (GDPR Article 6(1)(f)). You can object at any time: tap **Don't allow**, or turn off the switch in Settings.
 - **Crash reports after Allow:** your consent, as for usage data.
 
 ## Your rights
