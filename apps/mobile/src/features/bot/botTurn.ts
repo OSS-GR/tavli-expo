@@ -7,7 +7,8 @@
  *
  * Order of one bot turn:
  * 0. Plakoto: if the engine asks the bot "resign or play on?" (its mother is
- *    pinned), wait `beforeRollMs` and answer (`botAnswer`);
+ *    pinned), ask the runner (`chooseAnswer`, or `botAnswer` for a runner
+ *    without it), wait `beforeRollMs` and answer;
  * 1. wait `beforeRollMs`, then roll (a roll with no legal move passes by itself);
  * 2. ask the `BotRunner` for a turn and wait `thinkingDelayMs` at the same time;
  * 3. play the moves one by one, `moveMs` apart;
@@ -42,9 +43,8 @@ export interface BotTurnActions {
 }
 
 /**
- * The bot's default answer to a variant question. Plakoto mother pinned:
- * "play on". TODO(#106): the `BotRunner` port gets `chooseAnswer`; this
- * stays the fallback for a runner without it.
+ * The answer for a runner without `chooseAnswer` (the port makes it
+ * optional). Plakoto mother pinned: "play on".
  */
 export function botAnswer(prompt: VariantPrompt): string {
   if (prompt.choices.includes('playOn')) return 'playOn';
@@ -172,12 +172,20 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
       const step = botStep(getFlow(), player);
       if (step === null) return;
       if (step === 'answer') {
-        const prompt = currentPrompt(getFlow().game);
+        const game = getFlow().game;
+        const prompt = currentPrompt(game);
         if (prompt === null) return;
-        // TODO(#106): use the runner's answer once the port has one:
-        // `(await runner.chooseAnswer?.({ ...request })) ?? botAnswer(prompt)`.
-        const choice = botAnswer(prompt);
-        await sleep(timing.beforeRollMs);
+        const [choice] = await Promise.all([
+          runner.chooseAnswer
+            ? runner.chooseAnswer({
+                variant: game.state.variant,
+                state: game.state,
+                difficulty,
+                seed: rng.nextUint32(),
+              })
+            : Promise.resolve(botAnswer(prompt)),
+          sleep(timing.beforeRollMs),
+        ]);
         if (cancelled || !actions.answer(choice)) return;
       } else if (step === 'roll') {
         await sleep(timing.beforeRollMs);

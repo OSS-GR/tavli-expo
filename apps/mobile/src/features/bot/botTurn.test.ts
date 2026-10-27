@@ -1,4 +1,9 @@
-import { BotCancelledError, type BotMoveRequest, type BotRunner } from '@tavli/contracts';
+import {
+  BotCancelledError,
+  type BotAnswerRequest,
+  type BotMoveRequest,
+  type BotRunner,
+} from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
   createBoard,
@@ -126,7 +131,7 @@ describe('botStep', () => {
     expect(flow.game.phase).toBe('awaiting-answer');
     expect(botStep(flow, 'black')).toBe('answer');
     expect(botStep(flow, 'white')).toBeNull();
-    // TODO(#106): the bot package decides; until then the bot plays on.
+    // A runner without `chooseAnswer` plays on.
     expect(
       botAnswer({ player: 'black', kind: 'motherPinned', choices: ['resign', 'playOn'] }),
     ).toBe('playOn');
@@ -343,7 +348,35 @@ describe('startBotTurn', () => {
     expect(quiet).not.toHaveBeenCalled();
   });
 
-  it('plays on when its mother is pinned, then plays its turn', async () => {
+  it('asks the runner for its answer when it has chooseAnswer', async () => {
+    const store = blackMotherPinned();
+    const log: string[] = [];
+    const requests: BotAnswerRequest[] = [];
+    const runner = {
+      ...fakeRunner(),
+      chooseAnswer: async (req: BotAnswerRequest) => {
+        requests.push(req);
+        return 'resign';
+      },
+    };
+    await startBotTurn({
+      player: 'black',
+      difficulty: 'medium',
+      runner,
+      rng: createSeededRng(9),
+      getFlow: () => store.getState().flow,
+      actions: actionsFor(store, log),
+      timing: fast,
+    }).done;
+    expect(log).toEqual(['answer resign']);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ variant: 'plakoto', difficulty: 'medium' });
+    // The request holds the state with the question in it.
+    expect(requests[0]!.state.variantData).toMatchObject({ offer: 'black' });
+    expect(store.getState().flow.game.result).toMatchObject({ winner: 'white', points: 2 });
+  });
+
+  it('plays on when its mother is pinned (a runner without chooseAnswer), then plays', async () => {
     const store = blackMotherPinned();
     const log: string[] = [];
     await startBotTurn({
