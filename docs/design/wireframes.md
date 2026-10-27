@@ -39,7 +39,7 @@
 | Game end | — | Overlay state inside the board screen, so the final position stays visible |
 | Match end | `app/game/[id]/match-end.tsx` | `router.replace`, so "back" does not return to a finished board |
 | Settings | `app/settings.tsx` | Push from Home; modal from the in-game menu |
-| Tutorial | `app/tutorial.tsx` | Push from the Home card, Settings or the Portes rules page (#128). Not drawn; see the note under Home. |
+| Tutorial | `app/tutorial.tsx` | Push from the Home card, Settings or the Portes rules page (#128); the Plakoto and Fevga rules pages open their own lessons (`?game=`, #149). Not drawn; see the note under Home. |
 | Rules | `app/rules/[variant].tsx` (e.g. `/rules/portes`) | Push. Not drawn here; a scrolling text page with a small start board (`docs/architecture/app-shell.md`, "Rules pages"). |
 | Dialogs (resign, no moves, mother pinned, replace saved game) | — | Components, not routes |
 
@@ -178,7 +178,7 @@ Notes:
 
 ### Note: first-run tutorial (#128, not drawn)
 
-Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Portes rules page. Same layout rules as the board screen:
+Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Portes rules page (the Plakoto and Fevga rules pages open their own four lessons, #149). Same layout rules as the board screen:
 
 - Top bar: "Learn to play", "Lesson 2 of 7" under it, **Skip** (text button, at least 44 pt) on the right. Always shown.
 - A lesson card under the top bar: the lesson title, one line of text, then the hint (after a wrong touch) or the success line. A wrong touch shakes the card (not with Reduce motion).

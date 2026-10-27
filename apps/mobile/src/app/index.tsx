@@ -59,12 +59,16 @@ export default function HomeRoute() {
       }
       learnCard={
         showLearn ? (
-          <LearnCard onStart={() => router.push(tutorialHref('home'))} onDismiss={dismissLearn} />
+          <LearnCard
+            onStart={() => router.push(tutorialHref('home'))}
+            onDismiss={() => dismissLearn()}
+          />
         ) : null
       }
       onNewGame={(mode) => router.push(newGameHref(mode))}
       onSettings={() => router.push('/settings')}
       onHowToPlay={() => router.push(rulesHref('portes'))}
+      onHistory={() => router.push('/history')}
     />
   );
 }

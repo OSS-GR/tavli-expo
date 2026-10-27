@@ -1,0 +1,744 @@
+{
+  "id": "kafeneio-night",
+  "version": "1.0.0",
+  "name": { "en": "Kafeneio Night", "el": "Νυχτερινό Καφενείο" },
+  "description": {
+    "en": "A dark mahogany board for the evening: brass corner plates and nails, rosewood and pale ash points, ivory and ebony checkers.",
+    "el": "Σκούρο ταβλί από μαόνι για το βράδυ: μπρούντζινες γωνίες και καρφιά, τρίγωνα από παλίσανδρο και ανοιχτό φράξο, πούλια ιβουάρ και έβενου."
+  },
+  "kind": "image",
+  "license": {
+    "art": "Made for the Tavlaki project.",
+    "sources": "Wood textures: CC0 1.0 (Poly Haven). Sounds: CC0 1.0 (Kenney, OpenGameArt).",
+    "file": "LICENSES.md"
+  },
+  "defaultLayout": "portrait-rotated",
+  "palette": {
+    "board.frame": "#2A160E",
+    "board.field": "#4C2015",
+    "board.point.dark": "#341917",
+    "board.point.light": "#D9CDB2",
+    "board.point.seam": "#B08A3E",
+    "board.brass": "#C99A3E",
+    "board.brass.light": "#F3D58A",
+    "board.brass.dark": "#6E4A16",
+    "board.seam": "#070302",
+    "light.lamp": "#FFB860",
+    "checker.light": "#EEE4CD",
+    "checker.light.edge": "#5C4630",
+    "checker.dark": "#17110E",
+    "checker.dark.edge": "#000000",
+    "checker.dark.ring": "#C99A3E",
+    "highlight.select": "#F6C858",
+    "highlight.target": "#F6C858",
+    "highlight.halo": "#0A0403",
+    "dice.face": "#2A1A14",
+    "dice.side": "#140B07",
+    "dice.edge": "#8A6526",
+    "dice.pip": "#E9C46A",
+    "dice.pip.ace": "#E8735A",
+    "ui.bg": "#2A1712",
+    "ui.bg.outer": "#0D0705",
+    "ui.text": "#F1E6CF",
+    "ui.textDim": "#C4AA88",
+    "ui.turn": "#F2C14E",
+    "ui.turnText": "#F6D27A",
+    "ui.button.primary": "#C89B45",
+    "ui.button.primary.text": "#22160C",
+    "ui.button.secondary": "#24140E",
+    "ui.button.secondary.border": "#6A4630",
+    "ui.button.secondary.text": "#EADCC0"
+  },
+  "images": {
+    "boardPortrait": {
+      "file": "board-portrait.webp",
+      "scales": [1, 2, 3],
+      "width": 377,
+      "height": 630
+    },
+    "shadePortrait": {
+      "file": "shade-portrait.webp",
+      "scales": [1, 2, 3],
+      "width": 377,
+      "height": 630
+    },
+    "boardLandscape": {
+      "file": "board-landscape.webp",
+      "scales": [1, 2, 3],
+      "width": 630,
+      "height": 377
+    },
+    "shadeLandscape": {
+      "file": "shade-landscape.webp",
+      "scales": [1, 2, 3],
+      "width": 630,
+      "height": 377
+    },
+    "pointRosewood": {
+      "file": "point-rosewood.webp",
+      "scales": [1, 2, 3],
+      "width": 160,
+      "height": 160
+    },
+    "pointAsh": { "file": "point-ash.webp", "scales": [1, 2, 3], "width": 160, "height": 160 }
+  },
+  "layouts": {
+    "portrait-rotated": {
+      "orientation": "portrait",
+      "aspectRatio": 0.598413,
+      "referenceSize": { "width": 377, "height": 630 },
+      "layers": [
+        { "id": "board", "image": "boardPortrait", "z": "underPoints", "blend": "srcOver" },
+        { "id": "shade", "image": "shadePortrait", "z": "overPoints", "blend": "srcOver" }
+      ],
+      "fields": [
+        { "x": 0.034483, "y": 0.020635, "w": 0.931034, "h": 0.40873 },
+        { "x": 0.034483, "y": 0.483333, "w": 0.931034, "h": 0.40873 }
+      ],
+      "points": [
+        {
+          "index": 1,
+          "rect": { "x": 0.034483, "y": 0.823942, "w": 0.465517, "h": 0.068121 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 2,
+          "rect": { "x": 0.034483, "y": 0.75582, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 3,
+          "rect": { "x": 0.034483, "y": 0.687698, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 4,
+          "rect": { "x": 0.034483, "y": 0.619577, "w": 0.465517, "h": 0.068121 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 5,
+          "rect": { "x": 0.034483, "y": 0.551455, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 6,
+          "rect": { "x": 0.034483, "y": 0.483333, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 7,
+          "rect": { "x": 0.034483, "y": 0.361243, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 8,
+          "rect": { "x": 0.034483, "y": 0.293122, "w": 0.465517, "h": 0.068121 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 9,
+          "rect": { "x": 0.034483, "y": 0.225, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 10,
+          "rect": { "x": 0.034483, "y": 0.156878, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 11,
+          "rect": { "x": 0.034483, "y": 0.088757, "w": 0.465517, "h": 0.068121 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 12,
+          "rect": { "x": 0.034483, "y": 0.020635, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 13,
+          "rect": { "x": 0.5, "y": 0.020635, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 14,
+          "rect": { "x": 0.5, "y": 0.088757, "w": 0.465517, "h": 0.068121 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 15,
+          "rect": { "x": 0.5, "y": 0.156878, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 16,
+          "rect": { "x": 0.5, "y": 0.225, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 17,
+          "rect": { "x": 0.5, "y": 0.293122, "w": 0.465517, "h": 0.068121 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 18,
+          "rect": { "x": 0.5, "y": 0.361243, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 19,
+          "rect": { "x": 0.5, "y": 0.483333, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 20,
+          "rect": { "x": 0.5, "y": 0.551455, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 21,
+          "rect": { "x": 0.5, "y": 0.619577, "w": 0.465517, "h": 0.068121 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 22,
+          "rect": { "x": 0.5, "y": 0.687698, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 23,
+          "rect": { "x": 0.5, "y": 0.75582, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 24,
+          "rect": { "x": 0.5, "y": 0.823942, "w": 0.465517, "h": 0.068121 },
+          "base": "right",
+          "tone": "dark"
+        }
+      ],
+      "pointShape": {
+        "depth": 0.888889,
+        "baseInset": 0.00466,
+        "seam": { "color": "{board.point.seam}", "opacity": 0.85, "width": 0.001857 },
+        "tileSize": 0.424403,
+        "tileRotation": 0
+      },
+      "bar": {
+        "rect": { "x": 0.034483, "y": 0.429365, "w": 0.931034, "h": 0.053968 },
+        "player": {
+          "rect": { "x": 0.5, "y": 0.429365, "w": 0.465517, "h": 0.053968 },
+          "base": "left"
+        },
+        "opponent": {
+          "rect": { "x": 0.034483, "y": 0.429365, "w": 0.465517, "h": 0.053968 },
+          "base": "right"
+        }
+      },
+      "trays": {
+        "player": {
+          "rect": { "x": 0.034483, "y": 0.906349, "w": 0.460212, "h": 0.073016 },
+          "base": "left"
+        },
+        "opponent": {
+          "rect": { "x": 0.505305, "y": 0.906349, "w": 0.460212, "h": 0.073016 },
+          "base": "right"
+        }
+      },
+      "diceArea": { "x": 0.367374, "y": 0.619577, "w": 0.265252, "h": 0.136243 },
+      "checker": {
+        "radius": 0.05305,
+        "stackSpacing": 0.106101,
+        "stackInset": 0.003183,
+        "maxStackDepth": 0.945869,
+        "maxVisible": 5,
+        "trayThickness": 0.026525
+      },
+      "dice": { "size": 0.087533, "tilt": [-11, 9] },
+      "shadow": { "dx": 0, "dy": 0.013263, "blur": 0.013263, "color": "#000000", "opacity": 0.5 },
+      "overlay": {
+        "gradient": {
+          "type": "radial",
+          "cx": 0.5,
+          "cy": 0.36,
+          "rx": 0.73,
+          "ry": 0.95,
+          "stops": [
+            { "offset": 0, "color": "{light.lamp}", "opacity": 0.3 },
+            { "offset": 0.6, "color": "#FF8A30", "opacity": 0.08 },
+            { "offset": 1, "color": "#000000", "opacity": 0.4 }
+          ]
+        },
+        "blend": "softLight"
+      }
+    },
+    "landscape": {
+      "orientation": "landscape",
+      "aspectRatio": 1.671088,
+      "referenceSize": { "width": 630, "height": 377 },
+      "layers": [
+        { "id": "board", "image": "boardLandscape", "z": "underPoints", "blend": "srcOver" },
+        { "id": "shade", "image": "shadeLandscape", "z": "overPoints", "blend": "srcOver" }
+      ],
+      "fields": [
+        { "x": 0.020635, "y": 0.034483, "w": 0.40873, "h": 0.931034 },
+        { "x": 0.483333, "y": 0.034483, "w": 0.40873, "h": 0.931034 }
+      ],
+      "points": [
+        {
+          "index": 1,
+          "rect": { "x": 0.823942, "y": 0.5, "w": 0.068121, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 2,
+          "rect": { "x": 0.75582, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 3,
+          "rect": { "x": 0.687698, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 4,
+          "rect": { "x": 0.619577, "y": 0.5, "w": 0.068121, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 5,
+          "rect": { "x": 0.551455, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 6,
+          "rect": { "x": 0.483333, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 7,
+          "rect": { "x": 0.361243, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 8,
+          "rect": { "x": 0.293122, "y": 0.5, "w": 0.068121, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 9,
+          "rect": { "x": 0.225, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 10,
+          "rect": { "x": 0.156878, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 11,
+          "rect": { "x": 0.088757, "y": 0.5, "w": 0.068121, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 12,
+          "rect": { "x": 0.020635, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 13,
+          "rect": { "x": 0.020635, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 14,
+          "rect": { "x": 0.088757, "y": 0.034483, "w": 0.068121, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 15,
+          "rect": { "x": 0.156878, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 16,
+          "rect": { "x": 0.225, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 17,
+          "rect": { "x": 0.293122, "y": 0.034483, "w": 0.068121, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 18,
+          "rect": { "x": 0.361243, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 19,
+          "rect": { "x": 0.483333, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 20,
+          "rect": { "x": 0.551455, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 21,
+          "rect": { "x": 0.619577, "y": 0.034483, "w": 0.068121, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 22,
+          "rect": { "x": 0.687698, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 23,
+          "rect": { "x": 0.75582, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 24,
+          "rect": { "x": 0.823942, "y": 0.034483, "w": 0.068121, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        }
+      ],
+      "pointShape": {
+        "depth": 0.888889,
+        "baseInset": 0.00466,
+        "seam": { "color": "{board.point.seam}", "opacity": 0.85, "width": 0.001111 },
+        "tileSize": 0.253968,
+        "tileRotation": 90
+      },
+      "bar": {
+        "rect": { "x": 0.429365, "y": 0.034483, "w": 0.053968, "h": 0.931034 },
+        "player": {
+          "rect": { "x": 0.429365, "y": 0.034483, "w": 0.053968, "h": 0.465517 },
+          "base": "bottom"
+        },
+        "opponent": {
+          "rect": { "x": 0.429365, "y": 0.5, "w": 0.053968, "h": 0.465517 },
+          "base": "top"
+        }
+      },
+      "trays": {
+        "player": {
+          "rect": { "x": 0.906349, "y": 0.505305, "w": 0.073016, "h": 0.460212 },
+          "base": "bottom"
+        },
+        "opponent": {
+          "rect": { "x": 0.906349, "y": 0.034483, "w": 0.073016, "h": 0.460212 },
+          "base": "top"
+        }
+      },
+      "diceArea": { "x": 0.619577, "y": 0.367374, "w": 0.136243, "h": 0.265252 },
+      "checker": {
+        "radius": 0.031746,
+        "stackSpacing": 0.063492,
+        "stackInset": 0.001905,
+        "maxStackDepth": 0.945869,
+        "maxVisible": 5,
+        "trayThickness": 0.015873
+      },
+      "dice": { "size": 0.052381, "tilt": [-11, 9] },
+      "shadow": { "dx": 0, "dy": 0.007937, "blur": 0.007937, "color": "#000000", "opacity": 0.5 },
+      "overlay": {
+        "gradient": {
+          "type": "radial",
+          "cx": 0.5,
+          "cy": 0.4,
+          "rx": 0.8,
+          "ry": 1.1,
+          "stops": [
+            { "offset": 0, "color": "{light.lamp}", "opacity": 0.3 },
+            { "offset": 0.6, "color": "#FF8A30", "opacity": 0.08 },
+            { "offset": 1, "color": "#000000", "opacity": 0.4 }
+          ]
+        },
+        "blend": "softLight"
+      }
+    }
+  },
+  "points": {
+    "dark": {
+      "name": { "en": "Rosewood", "el": "Παλίσανδρος" },
+      "fill": "{board.point.dark}",
+      "texture": "pointRosewood"
+    },
+    "light": {
+      "name": { "en": "Pale ash", "el": "Ανοιχτός φράξος" },
+      "fill": "{board.point.light}",
+      "texture": "pointAsh"
+    }
+  },
+  "checkers": {
+    "light": {
+      "name": { "en": "Ivory", "el": "Ιβουάρ" },
+      "fill": "{checker.light}",
+      "highlight": {
+        "type": "radial",
+        "cx": 0.36,
+        "cy": 0.32,
+        "rx": 0.75,
+        "ry": 0.75,
+        "stops": [
+          { "offset": 0, "color": "#FFFFFF", "opacity": 0.42 },
+          { "offset": 0.45, "color": "#FFFFFF", "opacity": 0.06 },
+          { "offset": 0.8, "color": "#000000", "opacity": 0.08 },
+          { "offset": 1, "color": "#000000", "opacity": 0.38 }
+        ]
+      },
+      "dish": {
+        "radius": 0.56,
+        "gradient": {
+          "type": "radial",
+          "cx": 0.62,
+          "cy": 0.66,
+          "rx": 0.8,
+          "ry": 0.8,
+          "stops": [
+            { "offset": 0, "color": "#FFFFFF", "opacity": 0.3 },
+            { "offset": 0.55, "color": "#FFFFFF", "opacity": 0 },
+            { "offset": 1, "color": "#000000", "opacity": 0.3 }
+          ]
+        },
+        "groove": {
+          "radius": 0.56,
+          "width": 0.04,
+          "color": "#000000",
+          "opacity": 0.28,
+          "light": { "opacity": 0.6, "width": 0.03, "dx": 0.025, "dy": 0.03 }
+        }
+      },
+      "grooves": [
+        {
+          "radius": 0.86,
+          "width": 0.035,
+          "color": "#000000",
+          "opacity": 0.28,
+          "light": { "opacity": 0.6, "width": 0.025, "dx": 0.0225, "dy": 0.025 }
+        }
+      ],
+      "bevel": {
+        "inset": 0.05,
+        "width": 0.07,
+        "opacity": 0.65,
+        "gradient": {
+          "type": "linear",
+          "x1": 0,
+          "y1": 0,
+          "x2": 1,
+          "y2": 1,
+          "stops": [
+            { "offset": 0, "color": "#FFFFFF", "opacity": 0.85 },
+            { "offset": 0.5, "color": "#FFFFFF", "opacity": 0 },
+            { "offset": 1, "color": "#000000", "opacity": 0.6 }
+          ]
+        }
+      },
+      "rim": { "color": "{checker.light.edge}", "inset": 0.0175, "width": 0.055 }
+    },
+    "dark": {
+      "name": { "en": "Ebony", "el": "Έβενος" },
+      "fill": "{checker.dark}",
+      "highlight": {
+        "type": "radial",
+        "cx": 0.3,
+        "cy": 0.26,
+        "rx": 0.75,
+        "ry": 0.75,
+        "stops": [
+          { "offset": 0, "color": "#FFFFFF", "opacity": 0.2 },
+          { "offset": 0.25, "color": "#FFFFFF", "opacity": 0.05 },
+          { "offset": 0.45, "color": "#FFFFFF", "opacity": 0.03 },
+          { "offset": 0.8, "color": "#000000", "opacity": 0.08 },
+          { "offset": 1, "color": "#000000", "opacity": 0.3 }
+        ]
+      },
+      "dish": {
+        "radius": 0.56,
+        "gradient": {
+          "type": "radial",
+          "cx": 0.62,
+          "cy": 0.66,
+          "rx": 0.8,
+          "ry": 0.8,
+          "stops": [
+            { "offset": 0, "color": "#FFFFFF", "opacity": 0.05 },
+            { "offset": 0.55, "color": "#FFFFFF", "opacity": 0 },
+            { "offset": 1, "color": "#000000", "opacity": 0.35 }
+          ]
+        },
+        "groove": {
+          "radius": 0.56,
+          "width": 0.04,
+          "color": "#000000",
+          "opacity": 0.6,
+          "light": { "opacity": 0.2, "width": 0.03, "dx": 0.025, "dy": 0.03 }
+        }
+      },
+      "grooves": [
+        {
+          "radius": 0.86,
+          "width": 0.035,
+          "color": "#000000",
+          "opacity": 0.6,
+          "light": { "opacity": 0.2, "width": 0.025, "dx": 0.0225, "dy": 0.025 }
+        }
+      ],
+      "bevel": {
+        "inset": 0.05,
+        "width": 0.07,
+        "opacity": 1,
+        "gradient": {
+          "type": "linear",
+          "x1": 0,
+          "y1": 0,
+          "x2": 1,
+          "y2": 1,
+          "stops": [
+            { "offset": 0, "color": "#FFFFFF", "opacity": 0.85 },
+            { "offset": 0.5, "color": "#FFFFFF", "opacity": 0 },
+            { "offset": 1, "color": "#000000", "opacity": 0.6 }
+          ]
+        }
+      },
+      "ring": { "color": "{checker.dark.ring}", "inset": 0.06, "width": 0.075 },
+      "rim": { "color": "{checker.dark.edge}", "inset": 0.0175, "width": 0.055 }
+    },
+    "shadow": { "dx": 0.065, "dy": 0.12, "blur": 0.08, "color": "#000000", "opacity": 0.6 },
+    "badge": {
+      "fill": "{board.brass}",
+      "text": "{ui.button.primary.text}",
+      "border": "{board.brass.dark}",
+      "radius": 0.5,
+      "borderWidth": 0.06,
+      "fontSize": 0.55
+    }
+  },
+  "highlights": {
+    "select": {
+      "color": "{highlight.select}",
+      "radius": 1.11,
+      "width": 0.11,
+      "halo": { "color": "{highlight.halo}", "opacity": 0.8, "width": 0.21 }
+    },
+    "target": {
+      "color": "{highlight.target}",
+      "radius": 0.9,
+      "width": 0.09,
+      "dash": [0.2, 0.15],
+      "fillOpacity": 0.3,
+      "halo": { "color": "{highlight.halo}", "opacity": 0.75, "width": 0.18 }
+    }
+  },
+  "dice": {
+    "face": "{dice.face}",
+    "side": "{dice.side}",
+    "edge": "{dice.edge}",
+    "pip": "{dice.pip}",
+    "acePip": "{dice.pip.ace}",
+    "cornerRadius": 0.197,
+    "faceInset": 0.036,
+    "edgeWidth": 0.03,
+    "pipRadius": 0.1,
+    "pipSpacing": 0.245,
+    "highlight": {
+      "type": "radial",
+      "cx": 0.36,
+      "cy": 0.32,
+      "rx": 0.75,
+      "ry": 0.75,
+      "stops": [
+        { "offset": 0, "color": "#FFFFFF", "opacity": 0.22 },
+        { "offset": 0.45, "color": "#FFFFFF", "opacity": 0.04 },
+        { "offset": 0.8, "color": "#000000", "opacity": 0.08 },
+        { "offset": 1, "color": "#000000", "opacity": 0.4 }
+      ]
+    },
+    "highlightOpacity": 0.6,
+    "shadow": { "dx": 0.079, "dy": 0.121, "blur": 0.079, "color": "#000000", "opacity": 0.5 }
+  },
+  "sounds": {
+    "checkerPickUp": null,
+    "checkerPlace": [
+      "sounds/checker-place-1.m4a",
+      "sounds/checker-place-2.m4a",
+      "sounds/checker-place-3.m4a"
+    ],
+    "checkerHit": "sounds/checker-hit.m4a",
+    "bearOff": "sounds/bear-off.m4a",
+    "diceShake": null,
+    "diceRoll": ["sounds/dice-roll-1.m4a", "sounds/dice-roll-2.m4a"],
+    "diceLand": "sounds/dice-land.m4a",
+    "invalidMove": "sounds/invalid-move.m4a",
+    "turnStart": "sounds/turn-start.m4a",
+    "gameWin": "sounds/game-win.m4a",
+    "matchWin": "sounds/match-win.m4a"
+  },
+  "haptics": {
+    "checkerPickUp": "selection",
+    "checkerPlace": "light",
+    "checkerHit": "medium",
+    "bearOff": "light",
+    "diceLand": "light",
+    "invalidMove": "warning",
+    "gameWin": "success",
+    "matchWin": "success"
+  },
+  "accessibility": {
+    "checkerContrast": 14.8,
+    "colorBlindChecked": ["protanopia", "deuteranopia", "tritanopia"]
+  }
+}

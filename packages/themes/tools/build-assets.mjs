@@ -22,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { launch, renderPng, svgPage, toWebp } from './lib/render.mjs';
 
-const THEMES = ['walnut-kafeneio', 'olive-inlay'];
+const THEMES = ['walnut-kafeneio', 'olive-inlay', 'kafeneio-night'];
 const SCALES = [1, 2, 3];
 
 const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

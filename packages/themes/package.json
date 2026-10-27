@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./walnut-kafeneio/*": "./walnut-kafeneio/*",
-    "./olive-inlay/*": "./olive-inlay/*"
+    "./olive-inlay/*": "./olive-inlay/*",
+    "./kafeneio-night/*": "./kafeneio-night/*"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

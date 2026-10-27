@@ -102,6 +102,14 @@ describe('<HomeScreen />', () => {
     expect(onPress).toHaveBeenCalled();
   });
 
+  it('opens the match history from a small link (#142)', async () => {
+    const user = userEvent.setup();
+    const onHistory = jest.fn();
+    await render(<HomeScreen {...setup()} onHistory={onHistory} />);
+    await user.press(screen.getByRole('link', { name: 'History' }));
+    expect(onHistory).toHaveBeenCalled();
+  });
+
   it('shows a notice once, for example a broken save', async () => {
     await render(<HomeScreen {...setup()} notice="Your saved game could not be opened." />);
     expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');

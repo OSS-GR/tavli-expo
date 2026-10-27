@@ -17,6 +17,8 @@ export interface HomeScreenProps {
   onNewGame: (mode: MatchMode) => void;
   onSettings: () => void;
   onHowToPlay: () => void;
+  /** Opens the match history (#142). The link shows only with it. */
+  onHistory?: () => void;
   /** The bot levels this build can play (for the "Play vs bot" subtitle). */
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). */
@@ -31,6 +33,7 @@ export function HomeScreen({
   onNewGame,
   onSettings,
   onHowToPlay,
+  onHistory,
   botLevels,
   continueCard,
   learnCard,
@@ -110,6 +113,16 @@ export function HomeScreen({
           style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
           <Text style={styles.linkText}>{t('home.howToPlay')}</Text>
         </Pressable>
+        {onHistory ? (
+          <Pressable
+            testID="home-history"
+            accessibilityRole="link"
+            onPress={onHistory}
+            hitSlop={8}
+            style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
+            <Text style={styles.linkText}>{t('home.history')}</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
       <Toast text={toast} />
     </View>

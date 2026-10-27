@@ -19,7 +19,7 @@ export default function RulesRoute() {
       <RulesScreen
         variant={variant}
         onOpenRules={(game) => router.push(rulesHref(game))}
-        onLearnToPlay={() => router.push(tutorialHref('rules'))}
+        onLearnToPlay={(game) => router.push(tutorialHref('rules', game))}
       />
     </>
   );

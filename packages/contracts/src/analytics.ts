@@ -33,6 +33,9 @@ export type GameResultKind = 'mono' | 'diplo' | 'resign' | 'draw';
 /** Where the tutorial was opened: the Home card, a rules page, or Settings. */
 export type TutorialSource = 'home' | 'rules' | 'settings';
 
+/** Which lesson set of the tutorial: Portes (the first-run tutorial), Plakoto or Fevga (#149). */
+export type TutorialGame = 'portes' | 'plakoto' | 'fevga';
+
 /** Every event and its properties. Property values are short strings, numbers or booleans. */
 export interface AnalyticsEvents {
   app_opened: Record<string, never>;
@@ -68,14 +71,14 @@ export interface AnalyticsEvents {
   /** A setting changed. Only the key, never the value. Theme uses `theme_changed`. */
   settings_changed: { key: string };
   theme_changed: { theme: string };
-  /** The tutorial opened. */
-  tutorial_started: { source: TutorialSource };
+  /** The tutorial opened. `game` is the lesson set. */
+  tutorial_started: { source: TutorialSource; game: TutorialGame };
   /** A lesson of the tutorial was learnt. `step` counts from 1. */
-  tutorial_step: { step: number; lesson: string };
+  tutorial_step: { game: TutorialGame; step: number; lesson: string };
   /** The last lesson was learnt. */
-  tutorial_finished: Record<string, never>;
+  tutorial_finished: { game: TutorialGame };
   /** Skip was tapped. `step` is the lesson on screen, from 1. */
-  tutorial_skipped: { step: number; lesson: string };
+  tutorial_skipped: { game: TutorialGame; step: number; lesson: string };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
