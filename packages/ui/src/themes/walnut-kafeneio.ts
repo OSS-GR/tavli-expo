@@ -18,7 +18,8 @@ export const walnutKafeneio = {
     separator: '#4E3927',
     text: '#F1E6CF',
     textDim: '#BFA987',
-    textDisabled: '#8A7559',
+    // Raised from #8A7559 (3.1:1) in #134: locked labels like "Coming soon" must stay readable.
+    textDisabled: '#A89274',
     accent: '#C89B45',
     onAccent: '#22160C',
     turn: '#F2C14E',

@@ -25,6 +25,8 @@ describe('settings store', () => {
     expect(state.autoConfirmMoves).toBe(false);
     expect(state.showPipCounts).toBe(true);
     expect(state.boardFlipMode).toBe('flip');
+    // The move list follows the screen reader until the player picks On or Off.
+    expect(state.moveList).toBe('auto');
     expect(state.theme).toBe('walnut-kafeneio');
   });
 
@@ -47,12 +49,14 @@ describe('settings store', () => {
     first.getState().setSetting('autoConfirmMoves', true);
     first.getState().setSetting('boardFlipMode', 'fixed');
     first.getState().setSetting('showPipCounts', false);
+    first.getState().setSetting('moveList', 'on');
 
     const second = createSettingsStore(storage);
     expect(second.getState()).toMatchObject({
       autoConfirmMoves: true,
       boardFlipMode: 'fixed',
       showPipCounts: false,
+      moveList: 'on',
     });
   });
 
@@ -75,7 +79,13 @@ describe('settings store', () => {
     const storage = createMemoryStorage({
       [SETTINGS_STORAGE_KEY]: JSON.stringify({
         version: SETTINGS_VERSION,
-        state: { sound: 'yes', language: 'de', boardFlipMode: 'faceToFace', theme: 'neon' },
+        state: {
+          sound: 'yes',
+          language: 'de',
+          boardFlipMode: 'faceToFace',
+          moveList: true,
+          theme: 'neon',
+        },
       }),
     });
 

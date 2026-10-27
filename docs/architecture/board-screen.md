@@ -36,6 +36,7 @@ The game itself lives in `apps/mobile/src/features/game/`:
 | `GameEndSheet.tsx` | Game end (wireframe 8): a sheet over the final board. |
 | `Celebration.tsx` | The small win effect on the game-end sheet and the match-end screen. |
 | `useAnnouncement.ts` | Reads a result to screen readers (`AccessibilityInfo.announceForAccessibility`). |
+| `announcements.ts` | What the screen reads as the game goes on: each roll, and the other player's moves. |
 | `seats.ts` | How each player is named on screen (name, strip label, turn pill, "you"). |
 | `GameScreen.tsx` | The board screen: strips, board, cards and the controls row. Vs bot it also runs the bot turn (`features/bot/botTurn.ts`). |
 
@@ -143,6 +144,19 @@ With `motherRule: "offerConcede"` (the app default) the engine flow stops in `aw
 - No dashed "last move" arrow and no double-tap shortcut yet.
 - The dice in the controls row are 40 pt (wireframe: about 44 pt), so Undo, the dice and Confirm fit on an iPhone SE.
 
+## Accessibility
+
+The Skia board takes no screen reader actions, so a screen reader user plays with buttons (#134). Code: `apps/mobile/src/features/accessibility/`.
+
+- **Move list** (`MoveList.tsx`, `moveList.ts`): a row of buttons under the bottom strip, one per legal next move. The moves are the board's moves (`legal`, from `legalNextMoves`), so the list never decides what is legal. Two dice that reach the same target give one button, with the lower die (the tap-tap rule). The checker furthest back comes first.
+- **Labels** use the mover's own point numbers, like the rest of the screen: "Checker from point 13 to point 8, hits", "From the bar to point 22", "Enter on point 22" (Asodio, from `outside`), "Bear off from point 6", ", pins" for a pin. The button shows the short form ("13 → 8 · hit"); the screen reader reads the full one. Strings are in `game.moveList` (en and el).
+- A button plays the move like a tap-tap: same `playMove`, same auto-confirm, same flight (none before the board has its size). **Undo** and **Confirm** stay the normal buttons ("↶ Undo" reads "Undo"). The list hides while a card covers the board, during the bot's turn and when no move is left.
+- **When it shows** (`screenReader.ts`): Settings → Accessibility → Move list. `auto` (default) shows it while a screen reader is on (`AccessibilityInfo.isScreenReaderEnabled` and the `screenReaderChanged` event); `on` shows it for everyone; `off` never.
+- **Tutorial:** the lesson's own moves (`lessonMoves`) feed the list, so it offers only the moves the lesson teaches, and each lesson can be finished with it.
+- **Announcements** (`announceForAccessibility`, `features/game/announcements.ts`): after a roll, "Bob rolled 5-3." (or "You rolled 5-3."); after another player's turn, "Bob played: Checker from point 13 to point 8; …. Your turn." Vs the bot only the bot's turns are read; in pass-and-play every turn, for the next player. Each event has a key, so the same text is read again for a new roll. The opening card, the cards over the board (pass, mother question) and the game-end sheet read themselves (no more Android-only live regions), so nothing is read twice: the dice line skips the opening dice and a pass (the pass card says the roll).
+- **Text size:** text follows the system font. No text has a line limit (`numberOfLines`) or sits in a fixed-height box. Only decorative glyphs in fixed circles (menu, gear, back, the "2P" badge, the opening "?") keep their size (`allowFontScaling={false}`, hidden from screen readers). `apps/mobile/test/textScaling.ts` checks these rules on Home, New game, the game screen, the game-end sheet and match end, in English and Greek.
+- **Contrast:** `packages/ui/src/themes.test.ts` checks every text and background pair the app uses against WCAG AA (4.5:1). `textDisabled` was raised to `#A89274` (it was 3.1:1), so locked labels like "Coming soon" stay readable.
+
 ## Board flip
 
 The theme numbers points from the view of the player at the bottom (the **viewer**). The engine numbers points in White's order. `boardModel.ts` maps each absolute point to the viewer's own number (`absoluteToOwn`). So the viewer always moves 24 → 1, with home at the bottom left. Turning the board to the other player is only a change of viewer: a left–right mirror, as the wireframes ask.
@@ -157,6 +171,7 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 - `GameScreen.turn.test.tsx`: undo, confirm, auto-confirm, the turn indicator (flip and fixed), pip counts on and off, the pass card (OK and 3 s), the game-end sheet (diplo with reason, mono, celebration, announcement, Home), next game, and `onMatchOver` after the delay. `GameScreen.match.test.tsx` plays a whole match with taps only (to 1 by default; `FULL_MATCH=1` plays to 3) and ends on `onMatchOver`.
 - Plakoto and Fevga: `boardModel.test.ts` (pins under their pinners, the Plakoto start, the Fevga start and its same-way movement, drawing and hit-testing in portrait and landscape), `interaction.test.ts` (a pin's ghost, landing and flights), `BoardScene.test.tsx` (pin rings, the Fevga start) and `botTurn.test.ts` (the bot plays on). `GameScreen.variants.test.tsx` plays a whole Plakoto game and a whole Fevga game with taps only, and tests the mother card (play on, resign, board label, vs bot both ways).
 - Asodio: `asodio.test.ts` (the loading lock, the quarter lock and A6 with the owner edge cases #14–#17 and #19, the "to enter" stacks and their badge, the frozen marks, entering by tap with a 1-2 and a double, flights to and from the stack), `BoardScene.test.tsx` (the stack counts, the frozen shade). `GameScreen.asodio.test.tsx` plays two whole games with taps only (one ends in a deadlock draw and checks the game-end sheet, one is borne off), and tests the locked opening, entering four with 3-3 and undo, a 1-2, the frozen army card and labels, and the real Easy bot entering.
+- Accessibility: `moveList.test.ts` (labels in en and el, one button per target, the order, the bar, bearing off, Asodio entering), `announcements.test.ts`, `GameScreen.moveList.test.tsx` (a whole Portes game and a Plakoto mother question with buttons only, `auto` with a screen reader, the announcements vs the bot), `TutorialScreen.test.tsx` (every lesson with the move list) and `textScaling.test.tsx`.
 - `BoardScene.test.tsx`: a render smoke test. Jest replaces Skia with `apps/mobile/test/skiaMock.tsx`: every Skia component becomes a plain element, so the test counts what the board would draw.
 
 ## Screenshots

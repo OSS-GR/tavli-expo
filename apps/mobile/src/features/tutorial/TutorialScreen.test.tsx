@@ -1,14 +1,15 @@
 import type { createRecordingFeedback } from '@tavli/contracts';
 import { getTheme } from '@tavli/themes';
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import * as Reanimated from 'react-native-reanimated';
 
+import { moveChoices, moveLabel } from '@/features/accessibility/moveList';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';
 import { feedback } from '@/services';
 
-import { LESSONS } from './lessons';
+import { LESSONS, lessonMoves, playLessonMove, startLesson } from './lessons';
 import { TutorialScreen, type TutorialScreenProps } from './TutorialScreen';
 
 import { touch } from '../../../test/gestureHandlerMock';
@@ -102,6 +103,54 @@ describe('<TutorialScreen />', () => {
     await press('tutorial-home');
     expect(props.onHome).toHaveBeenCalledTimes(1);
     expect(props.onSkip).not.toHaveBeenCalled();
+  });
+
+  it('runs every lesson with the move list, which offers only the lesson’s moves', async () => {
+    await act(async () => {
+      settingsStore.setState({ ...DEFAULT_SETTINGS, moveList: 'on' });
+    });
+    const props = await open();
+
+    for (const [i, lesson] of LESSONS.entries()) {
+      let flow = startLesson(lesson);
+      while (!lesson.done(flow)) {
+        const offered = moveChoices(lessonMoves(lesson, flow));
+        const list = within(screen.getByTestId('tutorial-move-list'));
+        // Only the lesson's moves: as many buttons as moves the lesson takes.
+        expect(list.getAllByRole('button')).toHaveLength(offered.length);
+        const move = offered[0]!;
+        await act(async () => {
+          fireEvent.press(list.getByRole('button', { name: moveLabel(i18n.t, move) }));
+        });
+        flow = playLessonMove(lesson, flow, move)!;
+      }
+      expect(props.onLessonDone).toHaveBeenLastCalledWith(i + 1, lesson.id);
+      // Done: no moves left to offer.
+      expect(screen.queryByTestId('tutorial-move-list')).not.toBeOnTheScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByRole('button', { name: 'Next' }));
+      });
+    }
+    expect(props.onFinished).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('header', { name: 'You know the basics!' })).toBeOnTheScreen();
+  });
+
+  it('names the lesson moves in plain words', async () => {
+    await act(async () => {
+      settingsStore.setState({ ...DEFAULT_SETTINGS, moveList: 'on' });
+    });
+    await open();
+    // Lesson 1: only 13 → 9 with the 4 (the 2 is not part of the lesson).
+    const list = within(screen.getByTestId('tutorial-move-list'));
+    expect(list.getAllByRole('button')).toHaveLength(1);
+    expect(
+      list.getByRole('button', { name: 'Checker from point 13 to point 9' }),
+    ).toBeOnTheScreen();
+  });
+
+  it('hides the move list by default (no screen reader)', async () => {
+    await open();
+    expect(screen.queryByTestId('tutorial-move-list')).not.toBeOnTheScreen();
   });
 
   it('rings the checker to touch, then shows its target', async () => {

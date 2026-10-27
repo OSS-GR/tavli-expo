@@ -76,6 +76,25 @@ describe('<SettingsScreen />', () => {
     expect(settingsStore.getState().boardFlipMode).toBe('fixed');
   });
 
+  it('picks the move list: automatic by default, then on or off (#134)', async () => {
+    const user = userEvent.setup();
+    await render(<SettingsScreen />);
+
+    expect(screen.getByRole('header', { name: 'Accessibility' })).toBeOnTheScreen();
+    expect(screen.getByRole('radio', { name: 'Automatic' })).toBeChecked();
+    expect(
+      screen.getByText('Shows a button for each move when a screen reader is on.'),
+    ).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('radio', { name: 'On' }));
+    expect(settingsStore.getState().moveList).toBe('on');
+    expect(screen.getByText('Shows a button for each move under the board.')).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('radio', { name: 'Off' }));
+    expect(settingsStore.getState().moveList).toBe('off');
+    expect(screen.getByText('Play on the board only.')).toBeOnTheScreen();
+  });
+
   it('turns usage data on and off from Privacy (one switch for the Analytics port)', async () => {
     const user = userEvent.setup();
     await render(<SettingsScreen />);

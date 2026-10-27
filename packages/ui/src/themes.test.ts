@@ -42,6 +42,21 @@ describe('themes', () => {
         expect(contrastRatio(colors.onAccent, colors.accent)).toBeGreaterThanOrEqual(4.5);
       });
 
+      // Every other text and background pair the app uses (#134).
+      it.each([
+        ['textDim', 'surfaceSelected'], // a picked option's hint
+        ['text', 'backgroundDeep'], // hints over the board, toasts, the sheet
+        ['textDim', 'backgroundDeep'], // the tagline on Home
+        ['accent', 'surface'], // the tutorial hint
+        ['onAccent', 'turn'], // the turn pill
+        // Locked or disabled labels ("Coming soon", a disabled Undo). WCAG lets
+        // disabled controls be fainter, but locked labels still carry meaning.
+        ['textDisabled', 'background'],
+        ['textDisabled', 'surface'],
+      ] as const)('keeps %s on %s readable (WCAG AA, 4.5:1)', (fg, bg) => {
+        expect(contrastRatio(theme.colors[fg], theme.colors[bg])).toBeGreaterThanOrEqual(4.5);
+      });
+
       it('keeps controls visible (WCAG 1.4.11, 3:1)', () => {
         const { colors } = theme;
         expect(contrastRatio(colors.accent, colors.background)).toBeGreaterThanOrEqual(3);

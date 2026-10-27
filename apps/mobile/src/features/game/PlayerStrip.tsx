@@ -59,11 +59,9 @@ export function PlayerStrip({
         style={[styles.swatch, { backgroundColor: checker.fill, borderColor: checker.rim.color }]}
       />
       <View style={styles.who}>
-        <Text style={styles.name} numberOfLines={1}>
-          {name}
-        </Text>
+        <Text style={styles.name}>{name}</Text>
         {pips === null && note === null ? null : (
-          <Text style={styles.pips} numberOfLines={1}>
+          <Text style={styles.pips}>
             {[pips === null ? null : t('game.strip.pips', { count: pips }), note]
               .filter((part) => part !== null)
               .join(' · ')}
@@ -72,9 +70,7 @@ export function PlayerStrip({
       </View>
       {active ? (
         <View style={styles.pill}>
-          <Text style={styles.pillText} numberOfLines={1}>
-            {displayCaps(pill)}
-          </Text>
+          <Text style={styles.pillText}>{displayCaps(pill)}</Text>
         </View>
       ) : null}
       <Text style={styles.score}>

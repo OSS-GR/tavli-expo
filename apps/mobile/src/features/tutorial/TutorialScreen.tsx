@@ -6,6 +6,8 @@
  * after the checker is picked, the target ring. A wrong touch shakes the
  * text and shows a hint (no shake with Reduce motion on). After success,
  * **Next**. **Skip** is always there. The end card offers the first game.
+ * With the move list on (a screen reader, or Settings), each lesson can
+ * be played from its buttons too; they offer only the lesson's moves.
  *
  * The lessons and their rules live in `lessons.ts`; the engine decides
  * what is legal. This screen only shows them. The route sends analytics
@@ -18,7 +20,7 @@ import {
   type GameFlow,
   type Move,
 } from '@tavli/engine';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import Animated, {
@@ -31,6 +33,8 @@ import Animated, {
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { MoveList } from '@/features/accessibility/MoveList';
+import { useMoveListShown } from '@/features/accessibility/screenReader';
 import { useBoardTheme } from '@/features/board/BoardCanvas';
 import type { BoardView } from '@/features/board/boardModel';
 import { DiceRow } from '@/features/board/DiceRow';
@@ -90,6 +94,12 @@ export function TutorialScreen({
     [],
   );
 
+  const showMoveList = useMoveListShown();
+  const geoRef = useRef<BoardGeometry | null>(null);
+  const onGeometry = useCallback((geo: BoardGeometry) => {
+    geoRef.current = geo;
+  }, []);
+
   const shake = useSharedValue(0);
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.get() }] }));
 
@@ -114,7 +124,8 @@ export function TutorialScreen({
     shake.set(withSequence(...SHAKE.map((x) => withTiming(x, { duration: SHAKE_STEP_MS }))));
   };
 
-  const onMove = (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => {
+  /** A move from the board (`geo`) or from the move list (`geo` may be `null`: no flight). */
+  const onMove = (move: Move, geo: BoardGeometry | null, from: { x: number; y: number } | null) => {
     if (lesson === undefined) return false;
     const next = playLessonMove(lesson, flow, move);
     if (next === null) {
@@ -127,7 +138,7 @@ export function TutorialScreen({
       move.capture === 'hit' ? 'checkerHit' : move.to === 'off' ? 'bearOff' : 'checkerPlace',
     );
     // With Reduce motion on, checkers jump to their place: no flight.
-    if (!reduceMotion) {
+    if (!reduceMotion && geo !== null) {
       const after = applyMoveToBoard(before, 'white', move, 'contrary');
       const added = moveFlights(geo, VIEW, 'white', move, before, after, {
         id: `t${index}:${next.played.length}`,
@@ -232,9 +243,18 @@ export function TutorialScreen({
           onMissTap={showWrong}
           onIllegalDrop={showWrong}
           onPickUp={() => feedback.event('checkerPickUp')}
+          onGeometry={onGeometry}
           cue
         />
       </View>
+
+      {showMoveList ? (
+        <MoveList
+          testID="tutorial-move-list"
+          legal={legal}
+          onMove={(move) => onMove(move, geoRef.current, null)}
+        />
+      ) : null}
 
       <View style={styles.controls}>
         <View style={styles.diceSlot}>
