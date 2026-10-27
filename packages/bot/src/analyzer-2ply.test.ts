@@ -341,4 +341,19 @@ describe('rankTurns with plies: 2', () => {
       expect.objectContaining({ name: 'BotError', code: 'INVALID_REQUEST' }),
     );
   });
+
+  it('throws INVALID_REQUEST when a variant keeps asking after its answers', () => {
+    // A stub Portes whose answer never closes the question.
+    const asksForever: Variant = Object.assign(Object.create(portes) as Variant, {
+      prompt: (state: GameState) => ({ player: state.toMove, kind: 'stub', choices: ['ok'] }),
+      answerPrompt: (state: GameState) => state,
+    });
+    const stub = createAnalyzer({
+      variants: createVariantRegistry([asksForever]),
+      evaluators: new Map([['portes', { medium: portesHeuristic }]]),
+    });
+    expect(() => stub.rankTurns(start, [3, 1], TWO)).toThrow(
+      expect.objectContaining({ name: 'BotError', code: 'INVALID_REQUEST' }),
+    );
+  });
 });

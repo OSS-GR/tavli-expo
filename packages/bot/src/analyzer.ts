@@ -100,6 +100,9 @@ function winsNow(score: TurnScore): boolean {
  * first), then the rest by score. Ties keep the engine's order of
  * `legalTurns`, so the ranking is always the same.
  */
+/** The most questions `twoPly` answers in a row after one turn. The shipped variants ask at most one. */
+const MAX_ANSWERS = 8;
+
 function compareScores(a: TurnScore, b: TurnScore): number {
   const wins = Number(winsNow(b)) - Number(winsNow(a));
   if (wins !== 0) return wins;
@@ -228,7 +231,14 @@ export function createAnalyzer(registry: BotRegistry = {}): Analyzer {
    */
   function twoPly(variant: Variant, evaluator: Evaluator, after: GameState, me: PlayerId): Valued {
     let state = after;
-    while ((variant.prompt?.(state) ?? null) !== null) {
+    for (let asked = 0; (variant.prompt?.(state) ?? null) !== null; asked += 1) {
+      // A variant that keeps asking after its answers would loop forever.
+      if (asked >= MAX_ANSWERS) {
+        throw new BotError(
+          'INVALID_REQUEST',
+          `the variant still asks after ${MAX_ANSWERS} answers`,
+        );
+      }
       // `questionOf` throws INVALID_REQUEST when the variant cannot take the answer.
       const prompt = questionOf(variant, state);
       const scores = scoreAnswers(variant, evaluator, state, prompt);

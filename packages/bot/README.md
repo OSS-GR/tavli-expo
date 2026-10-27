@@ -116,7 +116,8 @@ analyzer.evaluate(state); // the chances of state.toMove, before the roll
 - Errors: `NOT_IMPLEMENTED` (no hard or medium evaluator),
   `INVALID_REQUEST` (`dice` differs from `state.dice`, a bad `top` or
   `plies`, or at 2 plies a question the variant cannot take an answer
-  for: `prompt` with no `answerPrompt`), `INVALID_REGISTRY` like
+  for: `prompt` with no `answerPrompt`, or a variant that still asks after
+  8 answers in a row), `INVALID_REGISTRY` like
   `createBot`, and the engine's errors
   (a finished game in `rankTurns`, an unknown variant).
 

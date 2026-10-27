@@ -312,8 +312,10 @@ export interface Analyzer {
   rankTurns(
     state: GameState,
     dice: Dice,
-    opts?: { plies?: 1 | 2; top?: number },
-  ): Array<{ turn: Turn; evaluation: Evaluation; equityLoss: number }>;
+    opts?: RankOptions, // { plies?: 1 | 2; top?: number }
+  ): readonly RankedTurn[]; // { turn, evaluation, equityLoss }, best first
+  // With plies: 2 only the first turns (the candidates) carry 2-ply values;
+  // the rest keep 1-ply values. Do not compare values across that boundary.
   evaluate(state: GameState): Evaluation;
 }
 ```
