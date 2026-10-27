@@ -1,5 +1,6 @@
 import {
   createMatch,
+  getPreset,
   recordGameResult,
   resignMatch,
   type GameResult,
@@ -58,9 +59,9 @@ describe('<MatchEndScreen />', () => {
     expect(screen.getByText('Portes · vs Bot (Easy) · first to 3')).toBeOnTheScreen();
 
     const rows = within(screen.getByTestId('match-games'));
-    expect(rows.getByLabelText('Game 1, You won, Mono, 1 point')).toBeOnTheScreen();
-    expect(rows.getByLabelText('Game 2, Bot won, Mono, 1 point')).toBeOnTheScreen();
-    expect(rows.getByLabelText('Game 3, You won, Diplo, 2 points')).toBeOnTheScreen();
+    expect(rows.getByLabelText('Game 1 · Portes, You won, Mono, 1 point')).toBeOnTheScreen();
+    expect(rows.getByLabelText('Game 2 · Portes, Bot won, Mono, 1 point')).toBeOnTheScreen();
+    expect(rows.getByLabelText('Game 3 · Portes, You won, Diplo, 2 points')).toBeOnTheScreen();
     expect(within(screen.getByTestId('match-game-3')).getByText('+2')).toBeOnTheScreen();
 
     // The human won: cup and confetti, hidden from screen readers.
@@ -125,7 +126,9 @@ describe('<MatchEndScreen />', () => {
     ).view;
     expect(screen.getByText('Player 2 wins the match!')).toBeOnTheScreen();
     expect(screen.getByText('Portes · pass-and-play · first to 3')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Game 1, Player 2 won, Diplo, 2 points')).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText('Game 1 · Portes, Player 2 won, Diplo, 2 points'),
+    ).toBeOnTheScreen();
     expect(screen.getByTestId('match-celebration', hidden)).toBeOnTheScreen();
     expect(
       screen.getByRole('button', { name: 'Rematch, Same settings · Player 2 starts' }),
@@ -161,12 +164,30 @@ describe('<MatchEndScreen />', () => {
         ]),
       ).view;
       expect(screen.getByText('Κέρδισες το ματς!')).toBeOnTheScreen();
-      expect(screen.getByLabelText('Παρτίδα 1, Κέρδισες, Διπλό, 2 βαθμοί')).toBeOnTheScreen();
+      expect(
+        screen.getByLabelText('Παρτίδα 1 · Πόρτες, Κέρδισες, Διπλό, 2 βαθμοί'),
+      ).toBeOnTheScreen();
       expect(screen.getByRole('button', { name: /^Ρεβάνς/ })).toBeOnTheScreen();
     } finally {
       await act(async () => {
         await i18n.changeLanguage('en');
       });
     }
+  });
+
+  it('names the game of each row in a Tavli match (#109)', async () => {
+    let match = createMatch({ rules: getPreset('tavli'), players: { white: 'a', black: 'b' } });
+    for (const winner of ['white', 'black', 'white', 'white'] as const) {
+      const result: GameResult = { winner, points: 1, reason: 'borneOff' };
+      match = recordGameResult(match, result, { starter: match.nextStarter ?? 'white' });
+    }
+    await show({ ...botSetup, game: 'tavli' }, match).view;
+
+    expect(screen.getByText('Tavli · vs Bot (Easy) · first to 3')).toBeOnTheScreen();
+    const rows = within(screen.getByTestId('match-games'));
+    expect(rows.getByText('Game 1 · Portes')).toBeOnTheScreen();
+    expect(rows.getByText('Game 2 · Plakoto')).toBeOnTheScreen();
+    expect(rows.getByText('Game 3 · Fevga')).toBeOnTheScreen();
+    expect(rows.getByLabelText('Game 4 · Portes, You won, Mono, 1 point')).toBeOnTheScreen();
   });
 });

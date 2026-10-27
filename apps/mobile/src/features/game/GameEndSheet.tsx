@@ -21,6 +21,8 @@ export interface GameEndSheetProps {
   strongChip: boolean;
   /** "Bot did not bear off any checker." or "Maria resigned." */
   reason: string | null;
+  /** The game that comes next: "Next: game 3 · Fevga" (#109). */
+  next?: string;
   /** "Match", over the score. */
   matchLabel: string;
   /** "You 2 – 0 Bot". */
@@ -39,6 +41,7 @@ export function GameEndSheet({
   chip,
   strongChip,
   reason,
+  next,
   matchLabel,
   score,
   target,
@@ -46,7 +49,7 @@ export function GameEndSheet({
   children,
   testID,
 }: GameEndSheetProps) {
-  useAnnouncement([title, chip, reason, score].filter(Boolean).join(' '));
+  useAnnouncement([title, chip, reason, score, next].filter(Boolean).join(' '));
   return (
     <View style={styles.root}>
       <View style={styles.scrim} />
@@ -66,6 +69,11 @@ export function GameEndSheet({
           </View>
           <Text style={styles.matchTarget}>{target}</Text>
         </View>
+        {next ? (
+          <Text testID="next-game-label" style={styles.next}>
+            {next}
+          </Text>
+        ) : null}
         <View style={styles.actions}>{children}</View>
       </View>
     </View>
@@ -139,6 +147,11 @@ const styles = StyleSheet.create((theme, rt) => ({
   matchTarget: {
     ...theme.type.caption,
     color: theme.colors.textDim,
+  },
+  next: {
+    ...theme.type.bodyStrong,
+    color: theme.colors.text,
+    textAlign: 'center',
   },
   actions: {
     alignSelf: 'stretch',

@@ -2,19 +2,15 @@
  * The new-game screen remembers the last choices per mode (wireframe 4).
  * Saved as JSON through the `Storage` port. Bad data gives the defaults.
  */
-import type { Difficulty, Storage } from '@tavli/contracts';
+import type { Storage } from '@tavli/contracts';
 
-import { sanitizeSetup, type MatchMode, type MatchSetup } from './setup';
+import { sanitizeSetup, type GameLevels, type MatchMode, type MatchSetup } from './setup';
 
 export function lastSetupKey(mode: MatchMode): string {
   return `newGame.${mode}`;
 }
 
-export function loadLastSetup(
-  storage: Storage,
-  mode: MatchMode,
-  levels: readonly Difficulty[],
-): MatchSetup {
+export function loadLastSetup(storage: Storage, mode: MatchMode, levels: GameLevels): MatchSetup {
   const text = storage.getString(lastSetupKey(mode));
   let raw: unknown = null;
   if (text !== undefined) {

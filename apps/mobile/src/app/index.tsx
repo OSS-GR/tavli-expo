@@ -49,7 +49,7 @@ export default function HomeRoute() {
 
   return (
     <HomeScreen
-      botLevels={botLevels}
+      botLevels={botLevels.portes}
       notice={slot.broken ? t('home.continue.broken') : null}
       continueCard={
         saved ? (

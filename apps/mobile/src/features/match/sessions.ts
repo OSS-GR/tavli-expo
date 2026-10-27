@@ -15,7 +15,7 @@
  * sends `game_started`; a resumed one does not (it started before). A new
  * match that replaces an unfinished one sends `game_abandoned` for it.
  */
-import type { Difficulty, Storage } from '@tavli/contracts';
+import type { Storage } from '@tavli/contracts';
 import type { MatchFlow, Rng } from '@tavli/engine';
 
 import type { GameAnalytics } from '@/features/analytics/gameAnalytics';
@@ -27,7 +27,13 @@ import {
   serializeSavedMatch,
   type SavedMatchResult,
 } from './savedMatch';
-import { enginePlayers, type MatchSetup } from './setup';
+import {
+  ALL_GAME_LEVELS,
+  enginePlayers,
+  gameRuleSet,
+  type GameLevels,
+  type MatchSetup,
+} from './setup';
 
 export interface MatchSession {
   /** `local-<random>`. Online games (MVP2) use the server id. */
@@ -56,8 +62,8 @@ export interface SessionDeps {
   readonly createRng: () => Rng;
   /** Where the match is saved. Without it, matches live in memory only. */
   readonly storage?: Storage;
-  /** The bot levels this build can play (a saved level it cannot play becomes Easy). */
-  readonly levels?: readonly Difficulty[];
+  /** The bot levels this build can play, per game (a saved level it cannot play becomes Easy). */
+  readonly levels?: GameLevels;
   readonly now?: () => number;
   /** Game events for a match (#61). Leave it out in tests that do not check them. */
   readonly createAnalytics?: (setup: MatchSetup) => GameAnalytics;
@@ -77,7 +83,7 @@ export function isRestPoint(flow: MatchFlow): boolean {
 export function createSessionRegistry({
   createRng,
   storage,
-  levels = ['easy'],
+  levels = ALL_GAME_LEVELS,
   now = Date.now,
   createAnalytics,
 }: SessionDeps): SessionRegistry {
@@ -173,6 +179,8 @@ export function createSessionRegistry({
       const store = createGameStore({
         players: enginePlayers(setup),
         targetPoints: setup.targetPoints,
+        // The chosen game (#109): one game, or the Tavli rotation.
+        rules: gameRuleSet(setup.game),
         rng: createRng(),
         ...(analytics ? { analytics } : {}),
       });

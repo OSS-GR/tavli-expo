@@ -1,18 +1,28 @@
 import { act, render, screen, userEvent } from '@testing-library/react-native';
 
-import { defaultSetup, type MatchMode } from '@/features/match/setup';
+import type { Difficulty } from '@tavli/contracts';
+
+import { defaultSetup, gameLevels, type GameLevels, type MatchMode } from '@/features/match/setup';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
 import { NewGameScreen } from './NewGameScreen';
 
-function show(mode: MatchMode, botLevels: readonly ('easy' | 'medium' | 'hard')[] = ['easy']) {
+/** Portes only, like the bot before #109 (Plakoto and Fevga have no level). */
+const PORTES_ONLY = (levels: readonly Difficulty[]) =>
+  gameLevels(levels, { plakoto: [], fevga: [], tavli: [] });
+
+function show(
+  mode: MatchMode,
+  botLevels: GameLevels = PORTES_ONLY(['easy']),
+  initial = defaultSetup(mode),
+) {
   const onStart = jest.fn();
   const onBack = jest.fn();
   const ui = (
     <NewGameScreen
       mode={mode}
-      initial={defaultSetup(mode)}
+      initial={initial}
       botLevels={botLevels}
       onBack={onBack}
       onStart={onStart}
@@ -45,7 +55,7 @@ describe('<NewGameScreen /> vs bot', () => {
 
   it('locks Medium and Hard while the bot cannot play them', async () => {
     const user = userEvent.setup();
-    const { ui, onStart } = show('bot', ['easy']);
+    const { ui, onStart } = show('bot', PORTES_ONLY(['easy']));
     await render(ui);
 
     expect(screen.getByRole('radio', { name: 'Medium' })).toBeDisabled();
@@ -58,8 +68,9 @@ describe('<NewGameScreen /> vs bot', () => {
 
   it('lets the player pick Medium once the bot supports it', async () => {
     const user = userEvent.setup();
-    const { ui, onStart } = show('bot', ['easy', 'medium']);
+    const { ui, onStart } = show('bot', PORTES_ONLY(['easy', 'medium']));
     await render(ui);
+    expect(screen.getByText('Hard is coming soon.')).toBeOnTheScreen();
 
     await user.press(screen.getByRole('radio', { name: 'Medium' }));
     expect(screen.getByText('Medium plays like a casual player.')).toBeOnTheScreen();
@@ -157,7 +168,7 @@ describe('<NewGameScreen /> with a saved game', () => {
       <NewGameScreen
         mode="bot"
         initial={defaultSetup('bot')}
-        botLevels={['easy']}
+        botLevels={PORTES_ONLY(['easy'])}
         onBack={jest.fn()}
         onStart={onStart}
         hasSavedGame
@@ -174,5 +185,108 @@ describe('<NewGameScreen /> with a saved game', () => {
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     await user.press(screen.getByRole('button', { name: 'Start new' }));
     expect(onStart).toHaveBeenCalledWith(defaultSetup('bot'));
+  });
+});
+
+describe('<NewGameScreen /> game picker (#109)', () => {
+  const EVERY_GAME = gameLevels(['easy', 'medium']);
+
+  it('offers Portes, Plakoto, Fevga and Tavli vs a bot that plays them all', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('bot', EVERY_GAME);
+    await render(ui);
+
+    expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
+    for (const name of [/^Plakoto/, /^Fevga/, /^Tavli/]) {
+      expect(screen.getByRole('radio', { name })).not.toBeChecked();
+    }
+    expect(
+      screen.getByRole('radio', {
+        name: 'Tavli, Τάβλι · all three in turn: Portes, Plakoto, Fevga',
+      }),
+    ).toBeOnTheScreen();
+    // Asodio is not built yet.
+    expect(screen.getByRole('button', { name: 'Asodio' })).toBeDisabled();
+
+    await user.press(screen.getByRole('radio', { name: /^Tavli/ }));
+    expect(screen.getByRole('radio', { name: /^Tavli/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /^Portes/ })).not.toBeChecked();
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart).toHaveBeenCalledWith({ ...defaultSetup('bot'), game: 'tavli' });
+  });
+
+  it('locks a game the bot has no level for, and Tavli with it', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('bot', gameLevels(['easy'], { plakoto: [], tavli: [] }));
+    await render(ui);
+
+    expect(screen.getByRole('radio', { name: /^Fevga/ })).toBeOnTheScreen();
+    expect(screen.queryByRole('radio', { name: /^Plakoto/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Plakoto' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Tavli' })).toBeDisabled();
+    expect(screen.getByText('More games are coming soon.')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Tavli' }));
+    expect(screen.getByTestId('toast')).toHaveTextContent('Coming soon: Tavli');
+
+    await user.press(screen.getByRole('radio', { name: /^Fevga/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart.mock.calls[0][0].game).toBe('fevga');
+  });
+
+  it('shows the bot levels of the chosen game', async () => {
+    const user = userEvent.setup();
+    const levels = gameLevels(['easy', 'medium'], { plakoto: ['easy'], tavli: ['easy'] });
+    const { ui, onStart } = show('bot', levels, { ...defaultSetup('bot'), botLevel: 'medium' });
+    await render(ui);
+
+    expect(screen.getByRole('radio', { name: 'Medium' })).toBeChecked();
+    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
+    // Plakoto has no Medium bot: it shows locked and Easy plays.
+    expect(screen.getByRole('radio', { name: 'Medium' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'Easy' })).toBeChecked();
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart.mock.calls[0][0]).toMatchObject({ game: 'plakoto', botLevel: 'easy' });
+
+    // Back to Portes: Medium comes back, as the player chose it.
+    await user.press(screen.getByRole('radio', { name: /^Portes/ }));
+    expect(screen.getByRole('radio', { name: 'Medium' })).toBeChecked();
+  });
+
+  it('opens every built game in pass-and-play, even with no bot for them', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('local', PORTES_ONLY(['easy']));
+    await render(ui);
+
+    for (const name of [/^Portes/, /^Plakoto/, /^Fevga/, /^Tavli/]) {
+      expect(screen.getByRole('radio', { name })).toBeOnTheScreen();
+    }
+    expect(screen.getByRole('button', { name: 'Asodio' })).toBeDisabled();
+    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart).toHaveBeenCalledWith({ ...defaultSetup('local'), game: 'plakoto' });
+  });
+
+  it('starts from the last game', async () => {
+    const { ui } = show('local', EVERY_GAME, { ...defaultSetup('local'), game: 'fevga' });
+    await render(ui);
+    expect(screen.getByRole('radio', { name: /^Fevga/ })).toBeChecked();
+  });
+
+  it('opens the rules of a game from its card, without choosing it', async () => {
+    const user = userEvent.setup();
+    const onRules = jest.fn();
+    await render(
+      <NewGameScreen
+        mode="local"
+        initial={defaultSetup('local')}
+        botLevels={EVERY_GAME}
+        onBack={jest.fn()}
+        onStart={jest.fn()}
+        onRules={onRules}
+      />,
+    );
+    await user.press(screen.getByRole('button', { name: 'How to play Tavli' }));
+    expect(onRules).toHaveBeenCalledWith('tavli');
+    expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
   });
 });

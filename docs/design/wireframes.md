@@ -182,7 +182,7 @@ Notes:
 - **Purpose:** Choose game, match length and bot level, then start.
 - **Elements:**
   - Back button, title "Play vs bot".
-  - **Game:** Portes card (selected). Locked chips: Plakoto, Fevga, Asodio, Tavli (all three in rotation). A tap on a locked chip shows "Coming soon".
+  - **Game:** one card per open game: Portes (selected by default), Plakoto, Fevga, Tavli (all three in rotation) (#109). A game the bot cannot play yet, and Asodio (not built), show as locked chips. A tap on a locked chip shows "Coming soon".
   - **Match length:** segmented control **1 / 3 / 5 / 7**, default **3**. Helper text: "First to 3 points. Mono = 1, diplo = 2."
   - **Bot level:** **Easy / Medium**, with Hard locked (v1.0). Helper text explains the selected level.
   - Info box "Who starts? Each player rolls one die. High die starts."

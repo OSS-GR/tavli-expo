@@ -20,7 +20,7 @@ jest.mock('@/services', () => {
   } = jest.requireActual('@tavli/contracts');
   const { createSeededRng } = jest.requireActual('@tavli/engine');
   const { InlineBotRunner, createBot } = jest.requireActual('@tavli/bot');
-  const { supportedBotLevels } = jest.requireActual('@/features/bot/levels');
+  const { botLevelsByGame } = jest.requireActual('@/features/bot/levels');
   const bot = createBot();
   return {
     storage: createMemoryStorage(),
@@ -30,7 +30,7 @@ jest.mock('@/services', () => {
     analytics: createRecordingAnalytics(),
     createLocalRng: () => createSeededRng(7),
     botRunner: new InlineBotRunner(bot),
-    botLevels: supportedBotLevels(bot),
+    botLevels: botLevelsByGame(bot),
   };
 });
 
