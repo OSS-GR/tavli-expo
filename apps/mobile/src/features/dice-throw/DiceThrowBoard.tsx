@@ -36,13 +36,13 @@ import { ActionButton } from '@/components/ActionButton';
 import {
   BoardCanvas,
   boardLayout,
-  useBoardLayoutMode,
   useBoardSpace,
   useBoardTheme,
   useHomeBoardSide,
 } from '@/features/board/BoardCanvas';
 import { layoutBoard, type BoardMarks, type BoardView } from '@/features/board/boardModel';
 import { fitBoardWithShadow } from '@/features/board/geometry';
+import { boardModeOf, useScreenLayout } from '@/features/board/screenLayout';
 import { BOARD_GESTURES } from '@/features/board/interaction';
 import {
   createGameFeedback,
@@ -99,7 +99,8 @@ export function DiceThrowBoard({
   const picked = useBoardTheme();
   const theme = themeProp ?? picked;
   const homeSide = useHomeBoardSide();
-  const pickedLayout = useBoardLayoutMode();
+  // The Board layout setting; landscape draws the classic board (#185).
+  const pickedLayout = boardModeOf(useScreenLayout().layout);
   const layout = layoutProp ?? pickedLayout;
   const [size, onLayout] = useBoardSpace();
   const geo = size ? fitBoardWithShadow(boardLayout(theme, layout, homeSide), size) : null;
