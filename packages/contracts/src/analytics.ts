@@ -31,6 +31,13 @@ export type GameMode = 'bot' | 'local' | 'online';
  */
 export type MatchGame = 'portes' | 'plakoto' | 'fevga' | 'tavli' | 'asodio';
 
+/**
+ * The opening roll house rule of the match (#207), the engine flag
+ * `match.openingRoll`: `useOpeningDice` (the federation rule, default),
+ * `rerollBoth` or `chosenStarterRolls`. A value id only.
+ */
+export type OpeningRollRule = 'useOpeningDice' | 'rerollBoth' | 'chosenStarterRolls';
+
 /** What a `theme_changed` event is about: the app colors or the board. */
 export type ThemeKind = 'app' | 'board';
 
@@ -62,6 +69,8 @@ export interface AnalyticsEvents {
     matchLength: number;
     /** Only for `mode: 'bot'`. */
     botLevel?: Difficulty;
+    /** The opening roll house rule (#207). */
+    openingRoll: OpeningRollRule;
   };
   game_finished: {
     mode: GameMode;

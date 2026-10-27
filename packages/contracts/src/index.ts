@@ -77,6 +77,7 @@ export {
   type GameMode,
   type GameResultKind,
   type MatchGame,
+  type OpeningRollRule,
   type ThemeKind,
   type TutorialGame,
   type TutorialSource,

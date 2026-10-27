@@ -92,7 +92,7 @@ import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, useGameFeedback } from './gameFeedback';
 import { diceView, turnView, useGameStore, type DieView, type GameStore } from './gameStore';
 import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
-import { nextOpeningRoller, openingStatus } from './opening';
+import { isChoosingStarter, nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
 import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
 import { diceWereChosen, diceWereRolled } from './rolledDice';
@@ -274,7 +274,10 @@ export function GameScreen({
   // asks answers; vs the bot, the bot answers its own question in its turn.
   const prompt = view.matchPhase === 'playing' ? currentPrompt(game) : null;
   const askHuman = prompt !== null && prompt.player !== botPlayer;
-  const blocked = matchOver || gameOver || showPass || showOpening || askHuman;
+  // House rule `chosenStarterRolls` (#207): a card asks who starts. In
+  // pass-and-play either player picks; vs the bot, the human does.
+  const choosing = view.matchPhase === 'playing' && isChoosingStarter(game);
+  const blocked = matchOver || gameOver || showPass || showOpening || askHuman || choosing;
 
   // Match over: the final position stays a moment, then the match-end
   // screen opens. Not while paused: the menu or another screen is on top.
@@ -372,8 +375,12 @@ export function GameScreen({
     : null;
 
   const roller = nextOpeningRoller(game);
+  // With `rerollBoth` (#207) the starter rolls after the opening result closes.
   const canRoll =
-    !showPass && !botsTurn && (phase === 'awaiting-roll' || (roller !== null && !tieWait));
+    !showPass &&
+    !botsTurn &&
+    !(decided && showOpening) &&
+    (phase === 'awaiting-roll' || (roller !== null && !tieWait));
 
   const roll = () => {
     if (!canRoll) return;
@@ -629,8 +636,12 @@ export function GameScreen({
   const dice = showPass ? passDice : view.dice;
   // The opening dice already rolled in the card: show them at rest. So do
   // dice that no roll gave: a double chosen after a 1-2 (Acey-Deucey, #177).
-  const fromOpening = game.opening !== null && game.lastTurn === null;
-  const atRest = fromOpening || showPass || (game.state.dice !== null && !diceWereRolled(flow));
+  // Both have no roll in the log. With `rerollBoth` (#207) the starter's
+  // first dice are a roll of their own: they tumble.
+  // Before a roll the key names the coming turn, as in every turn: no dice
+  // row is drawn and the reveal waits for a double, so nothing plays until
+  // the dice come (the opening roll too).
+  const atRest = showPass || (game.state.dice !== null && !diceWereRolled(flow));
   const rollKey = atRest ? null : `${gameKey}:${game.state.turnNumber}`;
   // A rolled double shows its two dice first, then splits into four (#177).
   const reveal = useDoubleReveal(rollKey, dice);
@@ -666,7 +677,8 @@ export function GameScreen({
         </Text>
       </View>
     );
-  } else if (phase === 'awaiting-roll' && !showPass) {
+  } else if (phase === 'awaiting-roll' && !showPass && !showOpening) {
+    // While the `rerollBoth` result shows (#207), Roll waits for it to close.
     mainButton = (
       <ActionButton
         testID="roll-button"
@@ -909,6 +921,34 @@ export function GameScreen({
         />
       </GameCard>
     );
+  } else if (!over && choosing) {
+    // `chosenStarterRolls` (#207): one button per player, the person first
+    // vs the bot. The engine's `chooseStarter` sets who rolls first.
+    const order = isYou('black') ? (['black', 'white'] as const) : (['white', 'black'] as const);
+    card = (
+      <GameCard
+        // A new game (after a draw) is a new card: focus moves and it is read again.
+        key={`choose:${gameKey}`}
+        testID="starter-card"
+        title={t('game.chooser.title')}
+        lines={[t('game.chooser.body')]}>
+        {order.map((player) => (
+          <ActionButton
+            key={player}
+            testID={`starter-${player}-button`}
+            label={
+              isYou(player)
+                ? t('game.chooser.pick_you')
+                : t('game.chooser.pick', { name: nameOf(player) })
+            }
+            kind="secondary"
+            onPress={() => {
+              if (dispatch({ type: 'chooseStarter', player })) setFlights([]);
+            }}
+          />
+        ))}
+      </GameCard>
+    );
   } else if (!over && showOpening && opening) {
     card = (
       <Pressable
@@ -923,6 +963,7 @@ export function GameScreen({
           status={opening}
           names={{ white: nameOf('white'), black: nameOf('black') }}
           you={isYou('white') ? 'white' : isYou('black') ? 'black' : null}
+          rollsAgain={rules.match.openingRoll === 'rerollBoth'}
           gameKey={gameKey}
           rollLabel={openingRollLabel}
           rollDisabled={tieWait}

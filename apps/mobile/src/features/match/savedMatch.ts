@@ -19,6 +19,10 @@
  * rematch, and so on. With the session id it names one match, so a save
  * of a match the history already holds can be told apart from a rematch.
  * Older saves have none (`null`); the envelope version did not change.
+ *
+ * The opening roll house rule (#207) is `setup.openingRoll`; the log's
+ * rules hold it too, and the two must agree. Saves before #207 have none:
+ * they load with the federation rule, which their logs hold.
  */
 import { MATCH_FLOW_SCHEMA_VERSION, replay, type FlowEvent, type MatchFlow } from '@tavli/engine';
 
@@ -133,7 +137,8 @@ export function parseSavedMatch(text: string | undefined, levels: GameLevels): S
   if (
     rules.presetId !== gamePreset(setup.game) ||
     rules.match.rotation.length !== rotation.length ||
-    rules.match.rotation.some((variant, i) => variant !== rotation[i])
+    rules.match.rotation.some((variant, i) => variant !== rotation[i]) ||
+    rules.match.openingRoll !== setup.openingRoll
   ) {
     return broken('setup and log differ');
   }

@@ -199,7 +199,8 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - **Game:** one card per open game: Portes (selected by default), Plakoto, Fevga, Tavli (all three in rotation) (#109). A game the bot cannot play yet, and Asodio (not built), show as locked chips. A tap on a locked chip shows "Coming soon".
   - **Match length:** segmented control **1 / 3 / 5 / 7**, default **3**. Helper text: "First to 3 points. Mono = 1, diplo = 2."
   - **Bot level:** **Easy / Medium / Hard**. A level the bot cannot play in the chosen game shows locked, with "coming soon" under it. Helper text explains the selected level.
-  - Info box "Who starts? Each player rolls one die. High die starts."
+  - Info box "Who starts? Each player rolls one die. High die starts." Since #207 the **House rules** part (below) replaces it: its hint says who starts under the chosen rule.
+  - **House rules** (#207, both modes): **Opening roll**: **Standard** (default, the federation rule: the starter plays the two opening dice) / **Roll again** (the starter rolls both dice again) / **Choose** (the players pick who starts). Helper text explains the selected rule.
   - **Start game** (main button, bottom).
 - **States:**
   - The screen remembers the last choices. On the very first game the bot level is Easy.

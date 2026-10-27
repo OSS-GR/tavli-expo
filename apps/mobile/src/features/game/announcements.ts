@@ -15,6 +15,9 @@
  *   point 8; …. Your turn." Vs the bot that is the bot's turn; in
  *   pass-and-play every turn, so the next player hears what happened.
  *
+ * - After the players picked who starts (house rule `chosenStarterRolls`,
+ *   #207): "Maria starts." (or "You start.").
+ *
  * Other parts read themselves, so nothing here says it twice: the opening
  * card (who starts), the pass card (the roll and why nothing moved), the
  * mother question, the game-end sheet and the match-end screen.
@@ -24,6 +27,7 @@ import type { TFunction } from 'i18next';
 
 import { moveLabel } from '@/features/accessibility/moveList';
 
+import { openingDiceInPlay } from './opening';
 import { diceWereRolled } from './rolledDice';
 
 export interface Announcement {
@@ -48,7 +52,8 @@ export function turnAnnouncement(
   const key = `${flow.match.games.length}:${game.state.turnNumber}`;
   const dice = game.state.dice;
   // The opening dice: the opening card already said who starts and with what.
-  const fromOpening = game.opening !== null && game.lastTurn === null;
+  // With `rerollBoth` (#207) the starter rolls again: that roll is read.
+  const fromOpening = openingDiceInPlay(flow);
   if (game.phase === 'moving' && game.played.length === 0 && dice !== null && !fromOpening) {
     const player = game.state.toMove;
     const name = nameOf(player);
@@ -83,6 +88,16 @@ export function turnAnnouncement(
     return {
       key: `${key}:roll`,
       text: isYou(player) ? t('game.announce.rolled_you', vars) : t('game.announce.rolled', vars),
+    };
+  }
+  // The starter card (`chosenStarterRolls`, #207) closed: say who starts.
+  if (game.phase === 'awaiting-roll' && flow.log[flow.log.length - 1]?.type === 'chooseStarter') {
+    const player = game.state.toMove;
+    return {
+      key: `${key}:starter`,
+      text: isYou(player)
+        ? t('game.announce.chosenStarter_you')
+        : t('game.announce.chosenStarter', { name: nameOf(player) }),
     };
   }
   const last = game.lastTurn;
