@@ -58,7 +58,12 @@ function where(state: GameState, dice: Dice): string {
   return `${formatAsodio(state.board)}, ${state.toMove} to move, dice ${dice.join('-')}`;
 }
 
-describe('Asodio generator against the rules oracle', () => {
+// The walk tries every move order, so one rule mix takes about 1.2 s alone.
+// On a busy machine (CI, or the whole repo's tests at once) that can pass the
+// 5 s default, so this suite gets more time. The checks stay the same.
+const ORACLE_TIMEOUT_MS = 30_000;
+
+describe('Asodio generator against the rules oracle', { timeout: ORACLE_TIMEOUT_MS }, () => {
   it.each(ASODIO_RULE_MIX.map(([name, preset, overrides]) => [name, preset, overrides] as const))(
     '%s: legalTurns finds the same end positions',
     (_name, preset, overrides) => {
