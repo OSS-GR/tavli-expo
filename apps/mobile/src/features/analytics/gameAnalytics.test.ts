@@ -117,6 +117,38 @@ describe('gameAnalytics with the game store', () => {
     ]);
   });
 
+  it('leaves durationSec out for a resumed game, and counts it again from the next game', () => {
+    const first = setup();
+    finishOpening(first.store);
+    const saved = first.store.getState().flow;
+
+    // The app restarts: a new helper and a store for the saved flow.
+    const analytics = createRecordingAnalytics();
+    analytics.optIn();
+    let clock = 5_000_000;
+    const gameAnalytics = createGameAnalytics({ mode: 'local' }, { analytics, now: () => clock });
+    const store = createGameStore({
+      players: { white: 'Ann', black: 'Bob' },
+      rng: createSeededRng(3),
+      flow: saved,
+      analytics: gameAnalytics,
+    });
+    clock += 30_000;
+    store.getState().dispatch({ type: 'resign', player: 'white' });
+    const resumed = events(analytics).find((e) => e.event === 'game_finished');
+    expect(resumed).toMatchObject({ event: 'game_finished', result: 'resign' });
+    expect(resumed).not.toHaveProperty('durationSec');
+
+    analytics.sent.length = 0;
+    store.getState().dispatch({ type: 'nextGame' });
+    finishOpening(store);
+    clock += 42_000;
+    store.getState().dispatch({ type: 'resign', player: 'black' });
+    expect(events(analytics).find((e) => e.event === 'game_finished')).toMatchObject({
+      durationSec: 42,
+    });
+  });
+
   it('sends game_started for a rematch', () => {
     const { analytics, store } = setup();
     store.getState().dispatch({ type: 'resignMatch', player: 'black' });

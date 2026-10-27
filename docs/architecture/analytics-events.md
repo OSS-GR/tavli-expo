@@ -1,6 +1,6 @@
 # Analytics events
 
-> Event plan for usage analytics (issue #61, ADR-0003). The names and properties are typed in `packages/contracts/src/analytics.ts` (`AnalyticsEvents`). Change both together. A test checks that every event in the code is listed here. Last review: 2026-10-26.
+> Event plan for usage analytics (issue #61, ADR-0003). The names and properties are typed in `packages/contracts/src/analytics.ts` (`AnalyticsEvents`). Change both together. A test checks that every event in the code is listed here. Last review: 2026-10-27.
 
 ## Goal
 
@@ -16,8 +16,9 @@ See which modes and features players use, from the first test builds. Nothing mo
   | **Allow usage data** | sent, with the install ID | sent, with the install ID |
   | **Don't allow** | none | none |
 
+- **New consent text asks again.** The answer is saved with `CONSENT_VERSION`. An answer saved for another version loads as "not answered yet", so the welcome flow shows again (and the first row of the table applies until the user answers). Raise it only when the text changes so much that users must answer again.
 - **No events before opt-in.** The first launch asks (wireframe 02). Until the user taps **Allow usage data**, the `Analytics` port drops every call. Closing the app without an answer counts as "no".
-- **Opt-out stops everything at once.** Settings → Privacy → **Share anonymous usage data** calls `optOut()`. Events already queued from before the opt-out may still upload. Nothing new is captured.
+- **Opt-out stops everything at once.** Settings → Privacy → **Share anonymous usage data** calls `optOut()`. Nothing new is captured, and the PostHog adapter empties the event queue, so events captured before the opt-out are not uploaded after it. (A batch already on its way to the server when the user taps the switch cannot be stopped.)
 - **No personal data.** No names, emails, usernames or contacts. Player names in pass-and-play are never sent. Settings events send the **key only**, never the value.
 - **Random install ID.** `identify()` gets the anonymous install ID (`features/install-id`, shared with crash reports, #43). It is a random UUID, not linked to an account or the device. Adapters drop any ID that fails `isAnonymousInstallId` (an email, a name).
 - **Screen names are route patterns** (`/settings`, `/game/[id]`), never URLs with IDs.
@@ -31,7 +32,7 @@ Every event also carries PostHog's standard properties (`$lib`, `$os_name`, `$os
 |-------|---------------|------------|-----------|
 | `app_opened` | Once per cold start, after consent. On the first launch it fires right after **Allow**. | none | `features/analytics/connect.ts` (`appOpened`, root layout) |
 | `game_started` | A game begins: a new match, the next game of a match, or a rematch. Not sent when a saved match is resumed (it started before). | `mode`: `bot` \| `local` \| `online`; `variant`: engine id (`portes`, `plakoto`, `fevga`, `asodio`); `matchLength`: points to win; `botLevel`: `easy` \| `medium` \| `hard` (only for `bot`) | game store (`createGameStore({ analytics })`), set for every match in `features/match/appSessions.ts` |
-| `game_finished` | A game ends: last checker borne off, mother pinned, a resign, a draw, or the match is resigned mid-game. | `mode`; `variant`; `result`: `mono` \| `diplo` \| `resign` \| `draw`; `turns`: turns played; `durationSec`: seconds since `game_started`, or since the resume for a resumed match | game store |
+| `game_finished` | A game ends: last checker borne off, mother pinned, a resign, a draw, or the match is resigned mid-game. | `mode`; `variant`; `result`: `mono` \| `diplo` \| `resign` \| `draw`; `turns`: turns played; `durationSec`: seconds since `game_started` (left out for the game in play of a resumed match: its start time is not saved) | game store |
 | `game_abandoned` | The player starts a new match while a game is not over (in memory or saved). | `mode`; `variant`; `turn`: turn number when they left | `features/match/sessions.ts` (`start`) |
 | `undo_used` | The engine accepted an undo. | none | game store |
 | `resign` | A player resigned the game or the match. | none | game store |
@@ -43,6 +44,7 @@ Notes:
 
 - `result`: `mono` is 1 point, `diplo` is 2 or more (a "backgammon" counts as diplo, `docs/rules/portes.md`). `draw` was added to the plan for Plakoto "both mothers pinned" and Asodio deadlock.
 - `turns` counts finished turns. A resign in the middle of turn 5 gives `turns: 4`.
+- `durationSec` is wall-clock time from `game_started`, so it includes time in the background. A match resumed after an app restart sends no `game_started`, and the save has no start time, so that game's `game_finished` has no `durationSec`. The next game of the match has it again.
 - The "Share usage data" switch is **not** a setting in this sense: changing it sends no event.
 - `game_abandoned`: leaving the board (Home, the app in the background) is not abandoning, because the match is saved and can be continued (#36). Only a new match that replaces an unfinished one counts.
 

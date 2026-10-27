@@ -12,7 +12,9 @@
 | Match end | `app/game/[id]/match-end.tsx` | `features/match/MatchEndScreen.tsx` |
 | Rules (stub) | `app/rules/[variant].tsx` | a short text page |
 | Settings | `app/settings.tsx` | `features/settings/SettingsScreen.tsx` |
+| First launch | `app/welcome/language.tsx`, `app/welcome/privacy.tsx` | `features/welcome/` |
 
+- **Welcome gate (#61, #116).** `app/_layout.tsx` wraps the routes in two `Stack.Protected` groups on the consent answer. Until the user answers, every app route redirects to `/welcome/language`, so a deep link or a restored route cannot skip consent. After the answer, the welcome routes redirect to Home. **A new route file must be listed in the app group**; `features/welcome/welcomeFlow.test.tsx` fails until it is.
 - Screens get callbacks (`onNewGame`, `onExit`, …). Only the route files call `router`.
 - **Start game** saves the choices (`lastSetup.ts`, per mode), starts a session and calls `router.replace` to the board. So "back" from the board goes Home, not to the form.
 - The board route has `gestureEnabled: false`: an iOS edge swipe would fight the checker drag.

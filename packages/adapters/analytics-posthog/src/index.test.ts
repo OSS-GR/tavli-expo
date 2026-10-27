@@ -37,9 +37,16 @@ class FakePostHog {
   reset() {
     this.calls.push('reset');
   }
+  setPersistedProperty(key: string, value: unknown) {
+    this.calls.push(`set:${key}:${JSON.stringify(value)}`);
+  }
 }
 
-vi.mock('posthog-react-native', () => ({ PostHog: FakePostHog }));
+// The real enum value of `PostHogPersistedProperty.Queue` in @posthog/core.
+vi.mock('posthog-react-native', () => ({
+  PostHog: FakePostHog,
+  PostHogPersistedProperty: { Queue: 'queue' },
+}));
 
 const { createPostHogAnalytics, fromPostHogClient, POSTHOG_EU_HOST } = await import('./index');
 
@@ -115,11 +122,13 @@ describe('createPostHogAnalytics', () => {
     expect(custom({ $os_name: 'iOS' })).toEqual({ $os_name: 'iOS', $app_version: '1.2.3' });
   });
 
-  it('forgets the PostHog IDs on opt-out', () => {
+  it('empties the event queue and forgets the PostHog IDs on opt-out', () => {
     const analytics = createPostHogAnalytics({ apiKey: 'k', storage: createMemoryStorage() });
     analytics.optIn();
     analytics.optOut();
-    expect(created[0]!.calls).toEqual(['optOut', 'optIn', 'optOut', 'reset']);
+    // PostHog's optOut() keeps queued events, and reset() keeps the queue,
+    // so the adapter clears it: nothing captured before is sent after.
+    expect(created[0]!.calls).toEqual(['optOut', 'optIn', 'optOut', 'set:queue:null', 'reset']);
   });
 });
 
@@ -138,6 +147,7 @@ describe('fromPostHogClient', () => {
         throw new Error('boom');
       },
       reset: () => undefined,
+      setPersistedProperty: () => undefined,
     };
     const analytics = fromPostHogClient(broken);
     expect(() => {
@@ -151,5 +161,27 @@ describe('fromPostHogClient', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(analytics.isOptedIn()).toBe(false);
+  });
+
+  it('still empties the queue and resets when the SDK optOut() throws', () => {
+    const calls: string[] = [];
+    const analytics = fromPostHogClient({
+      capture: () => undefined,
+      identify: () => undefined,
+      screen: () => Promise.resolve(),
+      optIn: () => Promise.resolve(),
+      optOut: () => {
+        throw new Error('boom');
+      },
+      reset: () => {
+        calls.push('reset');
+      },
+      setPersistedProperty: (key, value) => {
+        calls.push(`set:${String(key)}:${JSON.stringify(value)}`);
+      },
+    });
+    analytics.optIn();
+    analytics.optOut();
+    expect(calls).toEqual(['set:queue:null', 'reset']);
   });
 });

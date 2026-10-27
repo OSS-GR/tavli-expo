@@ -51,6 +51,7 @@ export interface GameStoreOptions {
    * A saved flow sends no `game_started` (the game started before).
    * The app sets it for every match (`features/match/appSessions.ts`,
    * which also sends `game_abandoned`). Leave it out in tests.
+   * An error from it never fails or undoes a move: it is logged and dropped.
    */
   analytics?: GameAnalytics;
 }
@@ -66,6 +67,18 @@ export interface GameStoreState {
 }
 
 export type GameStore = StoreApi<GameStoreState>;
+
+/**
+ * Runs an analytics call and drops its errors. The move is already played
+ * when it runs: analytics must never fail or undo it.
+ */
+function quietly(send: () => void): void {
+  try {
+    send();
+  } catch (error) {
+    console.warn('analytics failed', error);
+  }
+}
 
 export function createGameStore({
   players,
@@ -86,27 +99,28 @@ export function createGameStore({
       },
       ctx,
     );
-  if (!saved) analytics?.gameStarted(flow);
+  if (!saved && analytics) quietly(() => analytics.gameStarted(flow));
   return createStore<GameStoreState>()((set, get) => ({
     flow,
     lastError: null,
     dispatch: (action) => {
+      const previous = get().flow;
+      let next: MatchFlow;
       try {
-        const previous = get().flow;
-        const next = applyMatchAction(previous, action, ctx);
-        set({ flow: next, lastError: null });
-        analytics?.actionApplied(previous, next, action);
-        return true;
+        next = applyMatchAction(previous, action, ctx);
       } catch (error) {
         if (!(error instanceof EngineError)) throw error;
         set({ lastError: error.message });
         return false;
       }
+      set({ flow: next, lastError: null });
+      if (analytics) quietly(() => analytics.actionApplied(previous, next, action));
+      return true;
     },
     rematch: () => {
       const next = createRematchFlow(get().flow, ctx);
       set({ flow: next, lastError: null });
-      analytics?.gameStarted(next);
+      if (analytics) quietly(() => analytics.gameStarted(next));
     },
   }));
 }

@@ -3,8 +3,14 @@
  * `game_abandoned`, `undo_used` and `resign`.
  *
  * The game store calls this after every action the engine accepts
- * (`createGameStore({ analytics })`), so screens do not have to. Only a
- * screen knows when a player leaves a game, so it calls `gameAbandoned`.
+ * (`createGameStore({ analytics })`), so screens do not have to. The
+ * session registry (`features/match/sessions.ts`) calls `gameAbandoned`
+ * when a new match replaces one that is not over.
+ *
+ * `durationSec` counts from the `game_started` this helper sent. A resumed
+ * match (from the save slot) sends no `game_started`, so its game in play
+ * has no `durationSec`: its start time was not saved. The next games of
+ * that match have one again.
  *
  * Event plan: `docs/architecture/analytics-events.md`.
  */
@@ -57,7 +63,8 @@ export function createGameAnalytics(
   { mode, botLevel }: GameAnalyticsSetup,
   { analytics = appAnalytics, now = Date.now }: GameAnalyticsDeps = {},
 ): GameAnalytics {
-  let startedAt = now();
+  /** When the game in play started, or `null` for a resumed game (unknown). */
+  let startedAt: number | null = null;
   /** The game already reported as finished or abandoned. */
   let closed: MatchFlow['game'] | null = null;
 
@@ -69,7 +76,9 @@ export function createGameAnalytics(
       variant: flow.game.state.variant,
       result,
       turns: turnsPlayed(flow),
-      durationSec: Math.max(0, Math.round((now() - startedAt) / 1000)),
+      ...(startedAt === null
+        ? {}
+        : { durationSec: Math.max(0, Math.round((now() - startedAt) / 1000)) }),
     });
   };
 

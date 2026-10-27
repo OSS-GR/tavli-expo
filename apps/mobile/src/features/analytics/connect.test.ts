@@ -11,6 +11,7 @@ import { createSettingsStore } from '@/features/settings/settings';
 import { connectAnalytics } from './connect';
 import {
   CONSENT_STORAGE_KEY,
+  CONSENT_VERSION,
   createConsentStore,
   needsWelcome,
   usageDataAllowed,
@@ -52,6 +53,20 @@ describe('consent store', () => {
       const store = createConsentStore(createMemoryStorage({ [CONSENT_STORAGE_KEY]: raw }));
       expect(store.getState().status).toBe('unset');
     }
+  });
+
+  it('asks again when the answer was saved for another consent text', () => {
+    for (const version of [CONSENT_VERSION - 1, CONSENT_VERSION + 1, undefined, '1']) {
+      for (const status of ['granted', 'denied']) {
+        const raw = JSON.stringify({ version, status });
+        const store = createConsentStore(createMemoryStorage({ [CONSENT_STORAGE_KEY]: raw }));
+        expect(store.getState().status).toBe('unset');
+        expect(needsWelcome(store.getState().status)).toBe(true);
+      }
+    }
+    const current = JSON.stringify({ version: CONSENT_VERSION, status: 'granted' });
+    const store = createConsentStore(createMemoryStorage({ [CONSENT_STORAGE_KEY]: current }));
+    expect(store.getState().status).toBe('granted');
   });
 });
 
