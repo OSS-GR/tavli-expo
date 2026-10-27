@@ -20,10 +20,12 @@
  * that `get(id)` loads) replaces one that had started (`abandoned`). A
  * history error never breaks a move.
  *
- * A save older than a history record of its session is stale (#150): the
- * match ended but the app died before the slot was cleared, or the match
- * was left but the remove failed. `peek()` drops it, so the match is not
- * resumed or recorded twice.
+ * A save of a match the history already holds is stale (#150): the match
+ * ended but the app died before the slot was cleared, or it was left but
+ * the remove failed. A match is named by its session id and its
+ * `matchNumber` (1, then +1 per rematch), never by a time, so a clock set
+ * back cannot make a live save look stale. `peek()` and `get(id)` treat a
+ * stale save as no save but do not delete it; `start()` and `end(id)` do.
  */
 import type { Storage } from '@tavli/contracts';
 import type { MatchFlow, Rng } from '@tavli/engine';
@@ -86,8 +88,8 @@ export interface SessionDeps {
 /** What the registry needs from the match history (#142). */
 export interface MatchHistory {
   readonly add: (record: HistoryRecord) => void;
-  /** Has a record of session `sessionId` ended after `since` (ms since 1970)? */
-  readonly recordedAfter: (sessionId: string, since: number) => boolean;
+  /** Is match `matchNumber` of session `sessionId` in the history (finished or left)? */
+  readonly hasMatch: (sessionId: string, matchNumber: number) => boolean;
 }
 
 /** A new local match id. Not a secret; it only has to be unique on this phone. */
@@ -123,6 +125,8 @@ export function createSessionRegistry({
   let session: MatchSession | null = null;
   let unsubscribe: (() => void) | null = null;
   let sessionAnalytics: GameAnalytics | null = null;
+  // The match within the session in memory: 1, then +1 per rematch.
+  let matchNumber = 1;
 
   // It runs inside the store's `set` (a subscriber), after the flow has
   // changed. A storage error must not throw out of `dispatch`: the move is
@@ -135,7 +139,10 @@ export function createSessionRegistry({
         storage.remove(SAVED_MATCH_KEY);
         return;
       }
-      storage.setString(SAVED_MATCH_KEY, serializeSavedMatch(s.id, s.setup, flow, now()));
+      storage.setString(
+        SAVED_MATCH_KEY,
+        serializeSavedMatch(s.id, s.setup, flow, now(), matchNumber),
+      );
     } catch (error) {
       console.warn('could not save the match', error);
     }
@@ -162,49 +169,62 @@ export function createSessionRegistry({
   };
 
   // Like a save, a history error must not throw out of `dispatch`.
-  const record = (id: string, setup: MatchSetup, flow: MatchFlow, end: MatchEnd) => {
+  const record = (
+    id: string,
+    setup: MatchSetup,
+    flow: MatchFlow,
+    end: MatchEnd,
+    number: number | null,
+  ) => {
     if (!history) return;
     if (end === 'abandoned' && (flow.match.status === 'finished' || !hasStarted(flow))) return;
     try {
-      history.add(historyRecord(id, setup, flow.match, now(), end));
+      history.add(historyRecord(id, setup, flow.match, now(), end, number));
     } catch (error) {
       console.warn('could not add the match to the history', error);
     }
   };
 
-  // A save older than a record of its session is stale (see the top).
-  const isStale = ({ id, savedAt }: SavedMatch): boolean => {
-    if (!history) return false;
+  // A save of a match the history holds is stale (see the top). A save
+  // from before #150 has no number: it is never stale.
+  const isStale = (saved: SavedMatch): boolean => {
+    if (!history || saved.matchNumber === null) return false;
     try {
-      return history.recordedAfter(id, savedAt);
+      return history.hasMatch(saved.id, saved.matchNumber);
     } catch (error) {
       console.warn('could not read the match history', error);
       return false;
     }
   };
 
-  const savedId = (): string | null => {
-    const result = peek();
-    return result.kind === 'ok' ? result.saved.id : null;
-  };
-
-  const peek = (): SavedMatchResult => {
+  // The slot as it is, stale or not. As before #150, a broken save (or a
+  // finished one from an older app) is removed, so Home reports it once.
+  const readSlot = (): SavedMatchResult => {
     if (!storage) return { kind: 'none' };
     const result = parseSavedMatch(readSaved(), levels);
-    if (result.kind === 'ok' && !isStale(result.saved)) return result;
-    removeSaved();
-    return result.kind === 'ok' ? { kind: 'none' } : result;
+    if (result.kind !== 'ok') removeSaved();
+    return result;
   };
 
-  const attach = (next: MatchSession, analytics: GameAnalytics | undefined) => {
+  // Reads only: a stale save counts as none here; `start` and `end` delete it.
+  const peek = (): SavedMatchResult => {
+    const result = readSlot();
+    return result.kind === 'ok' && isStale(result.saved) ? { kind: 'none' } : result;
+  };
+
+  const attach = (next: MatchSession, analytics: GameAnalytics | undefined, number: number) => {
     unsubscribe?.();
     session = next;
     sessionAnalytics = analytics ?? null;
+    matchNumber = number;
     unsubscribe = next.store.subscribe((state, prev) => {
       if (state.flow === prev.flow) return;
       // Once per match: a rematch starts a new one in the same session.
       if (state.flow.match.status === 'finished' && prev.flow.match.status !== 'finished') {
-        record(next.id, next.setup, state.flow, 'finished');
+        record(next.id, next.setup, state.flow, 'finished', matchNumber);
+      }
+      if (prev.flow.match.status === 'finished' && state.flow.match.status !== 'finished') {
+        matchNumber += 1;
       }
       if (state.flow.match.status === 'finished' || isRestPoint(state.flow)) write(next);
     });
@@ -223,12 +243,12 @@ export function createSessionRegistry({
   const abandonSession = (s: MatchSession) => {
     const { flow } = s.store.getState();
     sessionAnalytics?.gameAbandoned(flow);
-    record(s.id, s.setup, flow, 'abandoned');
+    record(s.id, s.setup, flow, 'abandoned', matchNumber);
   };
 
   // A new match replaces the one before it. If that one was not over (in
   // memory, or only in the save slot after a restart), the player left it.
-  // A stale save is not recorded again: `peek` drops it.
+  // A stale save is not recorded again: `peek` hides it.
   const abandonPrevious = () => {
     if (!createAnalytics && !history) return;
     if (session) {
@@ -239,13 +259,14 @@ export function createSessionRegistry({
     if (result.kind !== 'ok') return;
     const { id, setup, flow } = result.saved;
     createAnalytics?.(setup).gameAbandoned(flow);
-    record(id, setup, flow, 'abandoned');
+    record(id, setup, flow, 'abandoned', result.saved.matchNumber);
   };
 
   return {
     start: (setup) => {
       abandonPrevious();
       forget();
+      // This also deletes a stale save.
       removeSaved();
       const analytics = createAnalytics?.(setup);
       const store = createGameStore({
@@ -257,7 +278,7 @@ export function createSessionRegistry({
         ...(analytics ? { analytics } : {}),
       });
       const next = { id: newMatchId(createRng(), now()), setup, store };
-      attach(next, analytics);
+      attach(next, analytics, 1);
       write(next);
       return next;
     },
@@ -265,10 +286,12 @@ export function createSessionRegistry({
       if (session?.id === id) return session;
       const result = peek();
       if (result.kind !== 'ok' || result.saved.id !== id) return null;
-      // The saved match replaces the one in memory (rare: that one's save
-      // failed), so the player left that one.
+      // Only here does `get` replace the match in memory with another one
+      // (rare: that one's save failed, so the slot still holds this one).
+      // That one leaves memory for good, so the player left it. A lookup
+      // that finds nothing, or the match in memory, changes nothing.
       if (session) abandonSession(session);
-      const { setup, flow } = result.saved;
+      const { setup, flow, matchNumber: number } = result.saved;
       // A resumed match gets game events too, but no new `game_started`:
       // the game started before the app closed.
       const analytics = createAnalytics?.(setup);
@@ -279,13 +302,16 @@ export function createSessionRegistry({
         ...(analytics ? { analytics } : {}),
       });
       const restored = { id, setup, store };
-      attach(restored, analytics);
+      // A save from before #150 has no number: count it as the first match.
+      attach(restored, analytics, number ?? 1);
       return restored;
     },
     current: () => session,
     end: (id) => {
       if (session?.id === id) forget();
-      if (savedId() === id) removeSaved();
+      // Stale or not, the player is done with this match.
+      const slot = readSlot();
+      if (slot.kind === 'ok' && slot.saved.id === id) removeSaved();
     },
     saveNow: () => {
       if (session) write(session);

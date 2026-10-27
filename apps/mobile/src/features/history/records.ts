@@ -18,10 +18,8 @@ import { type GameRecord, type Match, type PerPlayer, type PlayerId } from '@tav
 
 import {
   isGameChoice,
-  isMatchLength,
   isMatchMode,
   type GameChoice,
-  type MatchLength,
   type MatchMode,
   type MatchSetup,
 } from '@/features/match/setup';
@@ -48,8 +46,12 @@ export interface HistoryRecord {
   readonly botLevel: Difficulty | null;
   /** Pass-and-play names as typed. Empty = "Player 1" / "Player 2". Empty vs bot. */
   readonly names: PerPlayer<string>;
-  /** One of the lengths of the new-game screen (`MATCH_LENGTHS`). */
-  readonly targetPoints: MatchLength;
+  /**
+   * The match length. Usually one of the new-game lengths, but any positive
+   * whole number loads, so an old record is never dropped for it. The texts
+   * check it (`format.ts`).
+   */
+  readonly targetPoints: number;
   /** The final score (or the score when the match was left). */
   readonly score: PerPlayer<number>;
   readonly end: MatchEnd;
@@ -63,6 +65,11 @@ export interface HistoryRecord {
   readonly diploWins: PerPlayer<number>;
   /** Games that ended in a draw (Plakoto: both mothers pinned; Asodio: deadlock). */
   readonly draws: number;
+  /**
+   * The match within its session (1, then 2 after a rematch, …; see
+   * `savedMatch.ts`). `null` in records made before #150.
+   */
+  readonly matchNumber: number | null;
 }
 
 /**
@@ -78,13 +85,17 @@ export function isDiplo(game: GameRecord): boolean {
   return game.winner !== null && game.points >= 2;
 }
 
-/** The record of a match that ends now (`end: 'finished'`) or is left (`'abandoned'`). */
+/**
+ * The record of a match that ends now (`end: 'finished'`) or is left
+ * (`'abandoned'`). `matchNumber` is the match within the session.
+ */
 export function historyRecord(
   sessionId: string,
   setup: MatchSetup,
   match: Match,
   endedAt: number,
   end: MatchEnd,
+  matchNumber: number | null,
 ): HistoryRecord {
   const diploWins = { white: 0, black: 0 };
   let draws = 0;
@@ -100,8 +111,7 @@ export function historyRecord(
     game: setup.game,
     botLevel: bot ? setup.botLevel : null,
     names: bot ? { white: '', black: '' } : { ...setup.names },
-    // The same as `match.targetPoints`, but typed as a match length.
-    targetPoints: setup.targetPoints,
+    targetPoints: match.targetPoints,
     score: { ...match.score },
     end,
     winner: end === 'finished' ? match.winner : null,
@@ -109,6 +119,7 @@ export function historyRecord(
     games: match.games.length,
     diploWins,
     draws,
+    matchNumber,
   };
 }
 
@@ -122,16 +133,17 @@ export function addRecord(
 }
 
 /**
- * Has a record of session `sessionId` ended after `since`? The record id is
- * `<session id>@<endedAt>` (`historyRecord`).
+ * Is match `matchNumber` of session `sessionId` in the history (finished or
+ * left)? The record id is `<session id>@<endedAt>` (`historyRecord`). No
+ * clock is compared: a set-back clock cannot make a rematch look recorded.
  */
-export function recordedAfter(
+export function hasMatchRecord(
   records: readonly HistoryRecord[],
   sessionId: string,
-  since: number,
+  matchNumber: number,
 ): boolean {
   const prefix = `${sessionId}@`;
-  return records.some((r) => r.id.startsWith(prefix) && r.endedAt > since);
+  return records.some((r) => r.matchNumber === matchNumber && r.id.startsWith(prefix));
 }
 
 export function serializeHistory(records: readonly HistoryRecord[]): string {
@@ -178,12 +190,16 @@ function parseRecord(raw: unknown): HistoryRecord | null {
   if (!isDateMs(endedAt)) return null;
   if (!isMatchMode(mode) || !isGameChoice(game)) return null;
   if (mode === 'bot' ? !isDifficulty(botLevel) : botLevel !== null) return null;
-  if (!isMatchLength(targetPoints)) return null;
+  if (!isCount(targetPoints) || targetPoints < 1) return null;
   if (end !== 'finished' && end !== 'abandoned') return null;
   if (end === 'finished' ? !isPlayer(winner) : winner !== null) return null;
   if (resignedBy !== null && !isPlayer(resignedBy)) return null;
   if (!isCount(games) || !isCount(draws)) return null;
   if (names === null || score === null || diploWins === null) return null;
+  // Records before #150 have no match number.
+  const number = raw['matchNumber'];
+  const matchNumber = number === undefined || number === null ? null : number;
+  if (matchNumber !== null && (!isCount(matchNumber) || matchNumber < 1)) return null;
   return {
     id,
     endedAt,
@@ -199,6 +215,7 @@ function parseRecord(raw: unknown): HistoryRecord | null {
     games,
     diploWins,
     draws,
+    matchNumber,
   };
 }
 

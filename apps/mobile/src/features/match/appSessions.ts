@@ -18,6 +18,6 @@ export const matchSessions = createSessionRegistry({
     ),
   history: {
     add: (record) => historyStore.getState().add(record),
-    recordedAfter: (sessionId, since) => historyStore.getState().recordedAfter(sessionId, since),
+    hasMatch: (sessionId, matchNumber) => historyStore.getState().hasMatch(sessionId, matchNumber),
   },
 });

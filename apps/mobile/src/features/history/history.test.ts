@@ -31,7 +31,7 @@ import {
   historyRecord,
   isDiplo,
   parseHistory,
-  recordedAfter,
+  hasMatchRecord,
   serializeHistory,
   type HistoryRecord,
 } from './records';
@@ -58,6 +58,7 @@ function rec(over: Partial<HistoryRecord> = {}): HistoryRecord {
     games: 3,
     diploWins: { white: 1, black: 0 },
     draws: 0,
+    matchNumber: 1,
     ...over,
   };
 }
@@ -137,6 +138,7 @@ describe('a record is saved when a match ends', () => {
         games: 0,
         diploWins: { white: 0, black: 0 },
         draws: 0,
+        matchNumber: 1,
       },
     ]);
   });
@@ -195,14 +197,25 @@ describe('a record is saved when a match ends', () => {
     const records = history.getState().records;
     expect(records.map((r) => r.winner)).toEqual(['white', 'black']);
     expect(records[0]!.id).not.toBe(records[1]!.id);
+    // The rematch is the second match of the session.
+    expect(records.map((r) => r.matchNumber)).toEqual([2, 1]);
   });
 
-  it('does not change the save slot format of a match in play', () => {
+  it('adds only the match number to the save slot of a match in play', () => {
     const { sessions, storage } = registry();
     const s = sessions.start(oneGameBot);
     openGame(s);
     const saved = JSON.parse(storage.getString('savedMatch')!) as Record<string, unknown>;
-    expect(Object.keys(saved).sort()).toEqual(['flowSchema', 'id', 'log', 'savedAt', 'setup', 'v']);
+    expect(Object.keys(saved).sort()).toEqual([
+      'flowSchema',
+      'id',
+      'log',
+      'matchNumber',
+      'savedAt',
+      'setup',
+      'v',
+    ]);
+    expect(saved['matchNumber']).toBe(1);
     expect(storage.getString(HISTORY_STORAGE_KEY)).toBeUndefined();
   });
 
@@ -213,7 +226,7 @@ describe('a record is saved when a match ends', () => {
         add: () => {
           throw new Error('disk full');
         },
-        recordedAfter: () => false,
+        hasMatch: () => false,
       },
     });
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -319,9 +332,11 @@ describe('rare cases (#150)', () => {
     clock.now = 4_000;
     const second = registry(storage, clock, historyStorage);
     expect(second.sessions.peek()).toEqual({ kind: 'none' });
-    expect(storage.getString('savedMatch')).toBeUndefined();
+    // `peek` only reads; `start` deletes the stale save.
+    expect(storage.getString('savedMatch')).toContain(old.id);
     second.sessions.start(defaultSetup('bot'));
     expect(second.history.getState().records.map((r) => r.id)).toEqual([`${old.id}@2000`]);
+    expect(storage.getString('savedMatch')).not.toContain(old.id);
   });
 
   it('does not record a match as left when it finished just before the app died', () => {
@@ -343,9 +358,58 @@ describe('rare cases (#150)', () => {
     const second = registry(storage, clock, historyStorage);
     expect(second.sessions.peek()).toEqual({ kind: 'none' });
     expect(second.sessions.get(s.id)).toBeNull();
+    // Lookups do not delete it; `end` (the player is done with it) does.
+    expect(storage.getString('savedMatch')).toContain(s.id);
+    second.sessions.end(s.id);
+    expect(storage.getString('savedMatch')).toBeUndefined();
     second.sessions.start(defaultSetup('local'));
     expect(second.history.getState().records.map((r) => [r.id, r.end])).toEqual([
       [`${s.id}@2000`, 'finished'],
+    ]);
+  });
+
+  it('keeps a live rematch save when the clock moved back after the match ended', () => {
+    const storage = createMemoryStorage();
+    const historyStorage = createMemoryStorage();
+    const clock = { now: 5_000 };
+    const first = registry(storage, clock, historyStorage);
+    const s = first.sessions.start(oneGameBot);
+    openGame(s);
+    s.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
+    // The phone clock is set back before the rematch is saved.
+    clock.now = 1_000;
+    s.store.getState().rematch();
+    const player = s.store.getState().flow.game.state.toMove;
+    s.store.getState().dispatch({ type: 'roll', player, dice: [6, 1] });
+    playTurn(s);
+    const live = storage.getString('savedMatch');
+
+    // After a restart the rematch is still there to continue.
+    const second = registry(storage, clock, historyStorage);
+    expect(second.sessions.peek()).toMatchObject({
+      kind: 'ok',
+      saved: { id: s.id, savedAt: 1_000, matchNumber: 2 },
+    });
+    expect(second.sessions.get(s.id)).not.toBeNull();
+    expect(storage.getString('savedMatch')).toBe(live);
+  });
+
+  it('reads a save from before #150 (no match number) as a live match', () => {
+    const storage = createMemoryStorage();
+    const historyStorage = createMemoryStorage();
+    const first = registry(storage, { now: 1_000 }, historyStorage);
+    const s = first.sessions.start(defaultSetup('bot'));
+    openGame(s);
+    playTurn(s);
+    const old = JSON.parse(storage.getString('savedMatch')!) as Record<string, unknown>;
+    delete old['matchNumber'];
+    storage.setString('savedMatch', JSON.stringify(old));
+
+    const second = registry(storage, { now: 2_000 }, historyStorage);
+    expect(second.sessions.peek()).toMatchObject({ kind: 'ok', saved: { matchNumber: null } });
+    second.sessions.start(defaultSetup('local'));
+    expect(second.history.getState().records).toEqual([
+      expect.objectContaining({ id: `${s.id}@2000`, end: 'abandoned', matchNumber: null }),
     ]);
   });
 
@@ -413,13 +477,19 @@ describe('rare cases (#150)', () => {
     ]);
   });
 
-  it('finds the records of a session after a time', () => {
-    const records = [rec({ id: 'local-a@5', endedAt: 5 }), rec({ id: 'local-ab@9', endedAt: 9 })];
-    expect(recordedAfter(records, 'local-a', 4)).toBe(true);
-    expect(recordedAfter(records, 'local-a', 5)).toBe(false);
+  it('finds a match of a session by its number, not by a time', () => {
+    const records = [
+      rec({ id: 'local-a@5', endedAt: 5, matchNumber: 1 }),
+      rec({ id: 'local-ab@9', endedAt: 9, matchNumber: 2 }),
+      rec({ id: 'local-c@1', endedAt: 1, matchNumber: null }),
+    ];
+    expect(hasMatchRecord(records, 'local-a', 1)).toBe(true);
+    expect(hasMatchRecord(records, 'local-a', 2)).toBe(false);
     // `local-ab` is another session.
-    expect(recordedAfter(records, 'local-a', 6)).toBe(false);
-    expect(recordedAfter(records, 'local-ab', 6)).toBe(true);
+    expect(hasMatchRecord(records, 'local-ab', 2)).toBe(true);
+    expect(hasMatchRecord(records, 'local-a', 2)).toBe(false);
+    // A record from before #150 names no match.
+    expect(hasMatchRecord(records, 'local-c', 1)).toBe(false);
   });
 });
 
@@ -451,6 +521,7 @@ describe('diplo wins', () => {
       { ...match, games },
       1,
       'finished',
+      1,
     );
     expect(record.diploWins).toEqual({ white: 3, black: 2 });
     expect(record.draws).toBe(1);
@@ -589,10 +660,10 @@ describe('history list', () => {
       { ...rec(), diploWins: null },
       { ...rec(), games: 1.5 },
       { ...rec(), targetPoints: 0 },
-      // Only the lengths of the new-game screen (#150).
-      { ...rec(), targetPoints: 2 },
-      { ...rec(), targetPoints: 9 },
+      { ...rec(), targetPoints: 1.5 },
       { ...rec(), targetPoints: '3' },
+      { ...rec(), matchNumber: 0 },
+      { ...rec(), matchNumber: '1' },
       // Times that make no valid date: they would crash the date text.
       { ...rec(), endedAt: 1e20 },
       { ...rec(), endedAt: -1 },
@@ -604,11 +675,17 @@ describe('history list', () => {
     expect(parseHistory(serializeHistory([good]))).toEqual([good]);
   });
 
-  it('keeps every match length of the new-game screen', () => {
-    const records = MATCH_LENGTHS.map((targetPoints) =>
+  it('keeps any positive match length, so an old record is never dropped for it', () => {
+    const records = [...MATCH_LENGTHS, 2, 9, 15].map((targetPoints) =>
       rec({ id: `m${targetPoints}`, targetPoints }),
     );
     expect(parseHistory(serializeHistory(records))).toEqual(records);
+  });
+
+  it('reads a record from before #150 (no match number)', () => {
+    const { matchNumber: _, ...old } = rec();
+    const text = JSON.stringify({ v: HISTORY_VERSION, records: [old] });
+    expect(parseHistory(text)).toEqual([rec({ matchNumber: null })]);
   });
 
   it('keeps one record per id, the first (newest)', () => {
@@ -733,6 +810,16 @@ describe('history texts', () => {
       score: 'Maria 3 – 1 Player 2 · first to 3',
       badge: 'winner',
       result: 'Player 2 won',
+    });
+  });
+
+  it('shows a match length the new-game screen does not offer as it is', () => {
+    expect(
+      historyRow(rec({ targetPoints: 9, score: { white: 9, black: 4 } }), t, 'en'),
+    ).toMatchObject({
+      title: 'Portes · vs Bot (Easy)',
+      score: 'You 9 – 4 Bot · first to 9',
+      result: 'Won',
     });
   });
 

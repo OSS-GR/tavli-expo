@@ -2,18 +2,23 @@
 import type { TFunction } from 'i18next';
 
 import { seatsFor } from '@/features/match/seats';
-import { HUMAN_SIDE, defaultSetup, type MatchSetup } from '@/features/match/setup';
+import { HUMAN_SIDE, defaultSetup, isMatchLength, type MatchSetup } from '@/features/match/setup';
 import { matchLabel } from '@/features/match/summary';
 
 import type { HistoryRecord } from './records';
 import { winRate, type StatLine } from './stats';
 
-/** The setup a record came from, for the texts the app already has (seats, labels). */
+/**
+ * The setup a record came from, for the texts the app already has (seats,
+ * labels). A length the new-game screen does not offer gets the default
+ * here; the row still shows the real one ("first to 9").
+ */
 function recordSetup(record: HistoryRecord): MatchSetup {
+  const base = defaultSetup(record.mode);
   return {
-    ...defaultSetup(record.mode),
+    ...base,
     game: record.game,
-    targetPoints: record.targetPoints,
+    targetPoints: isMatchLength(record.targetPoints) ? record.targetPoints : base.targetPoints,
     botLevel: record.botLevel ?? 'easy',
     names: record.names,
   };
