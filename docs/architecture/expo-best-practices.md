@@ -287,36 +287,35 @@ Rules:
 
 ### EAS Build profiles
 
-Use three profiles (Expo default) plus an iOS simulator profile:
+Our real file is [`apps/mobile/eas.json`](../../apps/mobile/eas.json) (#39). It follows the Expo default three profiles plus an iOS simulator profile. Until v1.0 we have **no paid Apple or Google account**, so every profile except iOS `development` and `production` works with only the Expo account:
 
-```json
-{
-  "cli": { "appVersionSource": "remote" },
-  "build": {
-    "development": { "developmentClient": true, "distribution": "internal", "channel": "development" },
-    "development-simulator": { "extends": "development", "ios": { "simulator": true } },
-    "preview": { "distribution": "internal", "channel": "preview" },
-    "production": { "channel": "production", "autoIncrement": true }
-  },
-  "submit": { "production": {} }
-}
-```
+| Profile | Android | iOS | Channel |
+| --- | --- | --- | --- |
+| `development` | Dev client APK | Dev client, ad hoc (needs paid Apple account) | `development` |
+| `development-simulator` | (same as `development`) | Dev client for the simulator | `development` |
+| `preview` | Release **APK** for direct install | Release build for the **simulator** | `preview` |
+| `production` | Store AAB, `autoIncrement` | App Store build, `autoIncrement` | `production` |
+
+`cli.version` is pinned to `>= 25.0.0` and `cli.appVersionSource` is `remote`. A `base` profile pins pnpm 12. There is no `projectId` in the repo yet: the owner links it once with `eas init` (see [Running the app](../process/running-the-app.md), part 4).
 
 Rules:
 
-- **Do** use **app variants** so dev, preview and production can be installed side by side. Change the bundle id and app name in `app.config.ts` based on an env var ([app variants](https://docs.expo.dev/build-reference/variants/)).
-- **Do** use the `remote` version source with `autoIncrement` on production. EAS then manages `buildNumber` and `versionCode`. Duplicate build numbers are a common store rejection.
+- **Do** use **app variants** so dev, preview and production can be installed side by side ([app variants](https://docs.expo.dev/build-reference/variants/)). Done in `apps/mobile/app.config.ts`: `APP_VARIANT` picks `com.tavlaki.dev`, `com.tavlaki.preview` or `com.tavlaki`. The default is `development`, so a local build signed with a free Apple ID never reserves `com.tavlaki` (a bundle id used by a free Personal Team can block the paid team later).
+- **Do** keep `app.json` as the base config and make `app.config.ts` a function of `config`. Then `eas init` and `eas update:configure` can still write to `app.json`.
+- **Do** use the `remote` version source with `autoIncrement` on production. EAS then manages `buildNumber` and `versionCode`. Duplicate build numbers are a common store rejection. Do not put build numbers in `app.json`.
 - **Do** set the user-facing `version` (for example `1.2.0`) by hand for each store release.
 - **Do** let EAS manage signing credentials (`eas credentials`).
-- **Do not** commit `ios/` or `android/`. They are generated. SDK 57+ `expo prebuild` cleans and regenerates them by default.
+- **Do not** commit `ios/` or `android/`. We use **CNG** (Continuous Native Generation); `apps/mobile/.gitignore` ignores both. SDK 57+ `expo prebuild` cleans and regenerates them by default.
 - **Do** write a config plugin for any native change instead of editing native files. This includes the future iMessage extension.
 
 ### EAS Update (OTA)
 
-- **Do** use the simple flow from Expo docs: **channels** `preview`, `staging`, `production`; ignore branches.
-- **Do** use `runtimeVersion: { policy: "appVersion" }`. Expo still calls the `fingerprint` policy experimental.
+`expo-updates` is installed, but **no update is published yet**. `updates.url` is added by `eas update:configure` when the owner links the project.
+
+- **Do** use the simple flow from Expo docs: one **channel** per build profile: `development`, `preview`, `production`. Ignore branches.
+- **Do** use `runtimeVersion: { policy: "fingerprint" }` (set in `app.json`). The hash covers all native code, so an update never reaches a build that lacks a native module. Expo's SDK 58 docs no longer call it experimental (checked 2026-10-26). The cost: any native change needs a new build before updates reach it.
 - **Do** roll out production updates in steps: `eas update --channel production --rollout-percentage 10`, then raise it.
-- **Do** test an update on `staging` first, then promote with `eas update:republish --destination-channel production`.
+- **Do** test an update on `preview` first, then promote with `eas update:republish --destination-channel production`. **Not yet possible:** the fingerprint includes the app name and app id, so each variant has its own runtime version, and a preview update does not reach production builds. Fix this (for example, skip names and ids in a `fingerprint.config.js`) before the first OTA update.
 - **Do not** ship native changes or new permissions in an OTA update. Those need a store build.
 - **Do not** use OTA to change the app's main purpose. Both stores forbid it.
 

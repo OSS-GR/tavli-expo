@@ -216,7 +216,7 @@ Notes:
   3. **Your strip**: name, pip count, match score, turn pill.
   4. **Controls**: Undo · dice · Confirm, or one big Roll button.
 - **Turn indicator:** the active player's strip gets a thick border and a pill ("YOUR TURN", "PLAYING", or the player's name in pass-and-play).
-- **Pip counts:** always visible in both strips (#32).
+- **Pip counts:** shown in both strips by default; Settings → Show pip counts hides them (#32).
 - **Count badge:** a stack of more than 5 checkers shows 5 checkers and a number badge on the last one (#29).
 
 ### 6a. Opening roll

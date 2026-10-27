@@ -1,5 +1,4 @@
-import { dicePlaces, DIE_SIZE } from './DiceRow';
-import { tumble, tumbleFace } from './diceMotion';
+import { DIE_SIZE, dicePlaces, tumble, tumbleFace } from './diceMotion';
 
 describe('tumble', () => {
   it('lands at rest: no hop, the resting tilt, full size', () => {

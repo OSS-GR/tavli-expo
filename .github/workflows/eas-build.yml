@@ -1,0 +1,84 @@
+name: EAS build
+
+# Manual only. Start it from the Actions tab ("Run workflow").
+# It asks EAS to build in the cloud and does not wait for the result
+# (--no-wait), so it uses only a few GitHub Actions minutes.
+# Watch the build on expo.dev. EAS Free has a monthly build limit.
+#
+# Needs, once:
+# - the EAS project linked (`eas init` and `eas update:configure` in
+#   apps/mobile, the app.json changes committed)
+# - an `EXPO_TOKEN` repo secret (expo.dev > Account settings > Access tokens)
+# See docs/process/running-the-app.md, part 4.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Build profile from apps/mobile/eas.json
+        type: choice
+        default: preview
+        options:
+          - preview
+          - development-simulator
+          - development
+          - production
+      platform:
+        description: Platform
+        type: choice
+        default: android
+        options:
+          - android
+          - ios
+          - all
+
+permissions:
+  contents: read
+
+# One group per profile and platform. GitHub keeps only one pending run per
+# group, so a shared group would drop a queued build for another profile.
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.profile }}-${{ inputs.platform }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check EXPO_TOKEN
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add the EXPO_TOKEN repo secret first (see docs/process/running-the-app.md)."
+            exit 1
+          fi
+
+      # No `version` input: the action reads `packageManager` from package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          packager: pnpm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # EAS CLI reads the app config, so the app's packages must be installed.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Start EAS build
+        working-directory: apps/mobile
+        env:
+          PROFILE: ${{ inputs.profile }}
+          PLATFORM: ${{ inputs.platform }}
+        run: eas build --profile "$PROFILE" --platform "$PLATFORM" --non-interactive --no-wait
