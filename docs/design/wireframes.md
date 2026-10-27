@@ -39,7 +39,7 @@
 | Game end | — | Overlay state inside the board screen, so the final position stays visible |
 | Match end | `app/game/[id]/match-end.tsx` | `router.replace`, so "back" does not return to a finished board |
 | Settings | `app/settings.tsx` | Push from Home; modal from the in-game menu |
-| Rules | `app/rules/[variant].tsx` (e.g. `/rules/portes`) | Push. Not drawn here; a simple text page. |
+| Rules | `app/rules/[variant].tsx` (e.g. `/rules/portes`) | Push. Not drawn here; a scrolling text page with a small start board (`docs/architecture/app-shell.md`, "Rules pages"). |
 | Dialogs (resign, no moves, mother pinned, replace saved game) | — | Components, not routes |
 
 `[id]` is a local game id in MVP1 (for example `local-<uuid>`). Online games in MVP2 use the server id with the same route.
