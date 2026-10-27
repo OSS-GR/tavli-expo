@@ -1,9 +1,13 @@
 name: CI
 
-# Lint, typecheck, test and format check on every pull request and on main.
-# The job is called `checks`. Require that name in the main branch ruleset.
+# Lint, typecheck, test and format check on every pull request and on main
+# (job `checks`), then a Claude review on pull requests (job `claude-review`).
+# Require both names in the main branch ruleset.
 on:
   pull_request:
+    # The default types plus `ready_for_review`. A draft skips `claude-review`,
+    # and a skipped job counts as passed, so marking the PR ready must run it.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -155,17 +159,29 @@ jobs:
       # The Claude action runs only when this workflow file is the same as on
       # the default branch (a security rule). A PR that changes it gets no
       # review: the job passes and says that a person must review it.
+      #
+      # Three dots: only the PR's own changes count. A branch made before
+      # ci.yml changed on main has an older ci.yml, but the run uses the merge
+      # commit, which has main's copy, so the action still runs.
+      # Any git error fails the step (and so the job): it must not skip the review.
       - name: Check for workflow changes
         id: workflow
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          if git diff --quiet "origin/$DEFAULT_BRANCH" HEAD -- .github/workflows/ci.yml; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::This PR changes ci.yml, so the Claude action will not run. A person must review it."
-          fi
+          status=0
+          git diff --quiet "origin/$DEFAULT_BRANCH...HEAD" -- .github/workflows/ci.yml || status=$?
+          case "$status" in
+            0) echo "changed=false" >> "$GITHUB_OUTPUT" ;;
+            1)
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              echo "::warning::This PR changes ci.yml, so the Claude action will not run. A person must review it."
+              ;;
+            *)
+              echo "::error::Could not compare ci.yml with origin/$DEFAULT_BRANCH (git exit code $status)."
+              exit 1
+              ;;
+          esac
 
       # Runs Claude Code's /code-review at high effort on the PR's changes.
       # It follows CLAUDE.md. It cannot edit files or post: the next step posts.
@@ -210,7 +226,10 @@ jobs:
           elif [ -n "$OUT" ] && jq -e '.findings | type == "array"' <<< "$OUT" > /dev/null 2>&1; then
             blocking=$(jq '[.findings[] | select(.severity == "blocking")] | length' <<< "$OUT")
             verdict=$(jq -r '.verdict' <<< "$OUT")
-            [ "$blocking" -gt 0 ] && verdict=fail
+            # Pass only on an explicit "pass" with no blocking finding.
+            if [ "$blocking" -gt 0 ] || [ "$verdict" != "pass" ]; then
+              verdict=fail
+            fi
             body=$(jq -r --arg marker "$marker" --arg sha "${SHA:0:7}" --arg run "$RUN_URL" \
               --arg verdict "$verdict" --argjson blocking "$blocking" '
               def loc: "`" + .file + (if .line then ":" + (.line | tostring) else "" end) + "`";

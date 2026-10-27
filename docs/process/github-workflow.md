@@ -65,7 +65,7 @@ Acceptance criteria
 
 The workflow is `.github/workflows/ci.yml`. It has two jobs: **`checks`** and **`claude-review`**.
 
-**When it runs:** on every pull request (any base branch) and on every push to `main`.
+**When it runs:** on every pull request (any base branch: opened, new pushes, reopened, and marked ready for review) and on every push to `main`.
 
 **What it runs**, in this order:
 
