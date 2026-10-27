@@ -10,7 +10,7 @@ import { nextOpeningRoller } from '@/features/game/opening';
 
 import { createGameAnalytics, resultKind, type GameAnalyticsSetup } from './gameAnalytics';
 
-function setup(game: GameAnalyticsSetup = { mode: 'local' }, optedIn = true) {
+function setup(game: GameAnalyticsSetup = { mode: 'local', game: 'portes' }, optedIn = true) {
   const analytics = createRecordingAnalytics();
   if (optedIn) analytics.optIn();
   let clock = 1_000_000;
@@ -47,15 +47,16 @@ describe('gameAnalytics with the game store', () => {
   it('sends game_started when the store starts a match', () => {
     const { analytics } = setup();
     expect(events(analytics)).toEqual([
-      { event: 'game_started', mode: 'local', variant: 'portes', matchLength: 3 },
+      { event: 'game_started', mode: 'local', game: 'portes', variant: 'portes', matchLength: 3 },
     ]);
   });
 
   it('adds the bot level for games vs the bot', () => {
-    const { analytics } = setup({ mode: 'bot', botLevel: 'easy' });
+    const { analytics } = setup({ mode: 'bot', game: 'portes', botLevel: 'easy' });
     expect(events(analytics)[0]).toEqual({
       event: 'game_started',
       mode: 'bot',
+      game: 'portes',
       variant: 'portes',
       matchLength: 3,
       botLevel: 'easy',
@@ -90,6 +91,7 @@ describe('gameAnalytics with the game store', () => {
       {
         event: 'game_finished',
         mode: 'local',
+        game: 'portes',
         variant: 'portes',
         result: 'resign',
         turns: 0,
@@ -103,6 +105,7 @@ describe('gameAnalytics with the game store', () => {
       {
         event: 'game_started',
         mode: 'local',
+        game: 'portes',
         variant: store.getState().flow.game.state.variant,
         matchLength: 3,
       },
@@ -130,7 +133,10 @@ describe('gameAnalytics with the game store', () => {
     const analytics = createRecordingAnalytics();
     analytics.optIn();
     let clock = 5_000_000;
-    const gameAnalytics = createGameAnalytics({ mode: 'local' }, { analytics, now: () => clock });
+    const gameAnalytics = createGameAnalytics(
+      { mode: 'local', game: 'portes' },
+      { analytics, now: () => clock },
+    );
     const store = createGameStore({
       players: { white: 'Ann', black: 'Bob' },
       rng: createSeededRng(3),
@@ -170,7 +176,7 @@ describe('gameAnalytics with the game store', () => {
     gameAnalytics.gameAbandoned(store.getState().flow);
     gameAnalytics.gameAbandoned(store.getState().flow);
     expect(events(analytics)).toEqual([
-      { event: 'game_abandoned', mode: 'local', variant: 'portes', turn: 1 },
+      { event: 'game_abandoned', mode: 'local', game: 'portes', variant: 'portes', turn: 1 },
     ]);
 
     const other = setup();
@@ -182,7 +188,7 @@ describe('gameAnalytics with the game store', () => {
   });
 
   it('sends nothing while the user has not opted in', () => {
-    const { analytics, store } = setup({ mode: 'local' }, false);
+    const { analytics, store } = setup({ mode: 'local', game: 'portes' }, false);
     finishOpening(store);
     store.getState().dispatch({ type: 'resign', player: 'white' });
     expect(analytics.sent).toEqual([]);
@@ -225,7 +231,10 @@ describe('gameAnalytics when a send throws', () => {
   }
 
   function play({ analytics, port }: ReturnType<typeof flaky>) {
-    const gameAnalytics = createGameAnalytics({ mode: 'local' }, { analytics: port });
+    const gameAnalytics = createGameAnalytics(
+      { mode: 'local', game: 'portes' },
+      { analytics: port },
+    );
     const store = createGameStore({
       players: { white: 'Ann', black: 'Bob' },
       targetPoints: 3,
@@ -263,7 +272,7 @@ describe('gameAnalytics when a send throws', () => {
     // The failed event did not close the game, so a later call sends it.
     gameAnalytics.gameAbandoned(store.getState().flow);
     expect(events(analytics)).toEqual([
-      { event: 'game_abandoned', mode: 'local', variant: 'portes', turn: 1 },
+      { event: 'game_abandoned', mode: 'local', game: 'portes', variant: 'portes', turn: 1 },
     ]);
   });
 });

@@ -76,6 +76,8 @@ export {
   type AnalyticsPropsArg,
   type GameMode,
   type GameResultKind,
+  type MatchGame,
+  type ThemeKind,
   type TutorialGame,
   type TutorialSource,
   type SentAnalytics,

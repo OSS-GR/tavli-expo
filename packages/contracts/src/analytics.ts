@@ -21,8 +21,18 @@
 import type { Difficulty } from './bot-runner';
 import { isAnonymousInstallId } from './install-id';
 
-/** How a game is played. */
+/** How a game is played. `online` is for online play (MVP2): no screen sends it yet. */
 export type GameMode = 'bot' | 'local' | 'online';
+
+/**
+ * The game picked on the new-game screen (#109): one game, or `tavli`, a full
+ * Tavli match (Portes, Plakoto and Fevga in rotation). `variant` on the game
+ * events is the game in play, so only this property tells a Tavli match apart.
+ */
+export type MatchGame = 'portes' | 'plakoto' | 'fevga' | 'tavli' | 'asodio';
+
+/** What a `theme_changed` event is about: the app colors or the board. */
+export type ThemeKind = 'app' | 'board';
 
 /**
  * How a game ended: 1 point (mono), 2 or more points (diplo), a resign, or a
@@ -41,6 +51,7 @@ export interface AnalyticsEvents {
   app_opened: Record<string, never>;
   game_started: {
     mode: GameMode;
+    game: MatchGame;
     /** Engine variant id, for example `portes`. */
     variant: string;
     /** Points to win the match. */
@@ -50,6 +61,7 @@ export interface AnalyticsEvents {
   };
   game_finished: {
     mode: GameMode;
+    game: MatchGame;
     variant: string;
     result: GameResultKind;
     /** Turns played in this game. */
@@ -62,15 +74,17 @@ export interface AnalyticsEvents {
   };
   game_abandoned: {
     mode: GameMode;
+    game: MatchGame;
     variant: string;
     /** The turn number when the player left. */
     turn: number;
   };
   undo_used: Record<string, never>;
   resign: Record<string, never>;
-  /** A setting changed. Only the key, never the value. Theme uses `theme_changed`. */
+  /** A setting changed. Only the key, never the value. The themes use `theme_changed`. */
   settings_changed: { key: string };
-  theme_changed: { theme: string };
+  /** The app colors (`kind: 'app'`) or the board theme (`kind: 'board'`) changed. `theme` is its id. */
+  theme_changed: { kind: ThemeKind; theme: string };
   /** The tutorial opened. `game` is the lesson set. */
   tutorial_started: { source: TutorialSource; game: TutorialGame };
   /** A lesson of the tutorial was learnt. `step` counts from 1. */
@@ -83,7 +97,22 @@ export interface AnalyticsEvents {
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
 
-/** Every event name, for run-time checks and docs tests. */
+/**
+ * A property value: never an object or a list. A string is an id from a
+ * fixed set, never a name or free text.
+ */
+type AnalyticsValue = string | number | boolean | undefined;
+type EventWithBadProps = {
+  [E in AnalyticsEventName]: AnalyticsEvents[E] extends Record<string, AnalyticsValue> ? never : E;
+}[AnalyticsEventName];
+const NO_BAD_PROPS: EventWithBadProps extends never ? true : false = true;
+void NO_BAD_PROPS;
+
+/**
+ * Every event name: the one list in code. Tests check it against the code
+ * that sends events (`apps/mobile/src/features/analytics/eventPlan.test.ts`)
+ * and against the event plan doc.
+ */
 export const ANALYTICS_EVENTS = [
   'app_opened',
   'game_started',
