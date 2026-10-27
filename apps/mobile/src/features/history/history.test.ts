@@ -734,8 +734,6 @@ describe('history list', () => {
       { ...rec(), endedAt: 1e20 },
       { ...rec(), endedAt: -1 },
       { ...rec(), endedAt: Number.MAX_VALUE },
-      // An opening roll rule the engine does not have (#207).
-      { ...rec(), openingRoll: 'coinFlip' },
     ];
     const good = rec({ id: 'good' });
     const text = JSON.stringify({ v: HISTORY_VERSION, records: [...bad, good] });
@@ -773,6 +771,20 @@ describe('history list', () => {
     const { openingRoll: _, ...old } = rec();
     const text = JSON.stringify({ v: HISTORY_VERSION, records: [old] });
     expect(parseHistory(text)).toEqual([rec({ openingRoll: 'useOpeningDice' })]);
+  });
+
+  it('keeps a record with an unknown opening roll rule, with the federation rule (#207)', () => {
+    const text = JSON.stringify({
+      v: HISTORY_VERSION,
+      records: [
+        { ...rec({ id: 'a' }), openingRoll: 'coinFlip' },
+        { ...rec({ id: 'b' }), openingRoll: 42 },
+      ],
+    });
+    expect(parseHistory(text)).toEqual([
+      rec({ id: 'a', openingRoll: 'useOpeningDice' }),
+      rec({ id: 'b', openingRoll: 'useOpeningDice' }),
+    ]);
   });
 
   it('keeps one record per id, the first (newest)', () => {

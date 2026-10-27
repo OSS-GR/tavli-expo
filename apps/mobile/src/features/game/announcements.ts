@@ -27,6 +27,7 @@ import type { TFunction } from 'i18next';
 
 import { moveLabel } from '@/features/accessibility/moveList';
 
+import { openingDiceInPlay } from './opening';
 import { diceWereRolled } from './rolledDice';
 
 export interface Announcement {
@@ -52,7 +53,7 @@ export function turnAnnouncement(
   const dice = game.state.dice;
   // The opening dice: the opening card already said who starts and with what.
   // With `rerollBoth` (#207) the starter rolls again: that roll is read.
-  const fromOpening = game.opening !== null && game.lastTurn === null && !diceWereRolled(flow);
+  const fromOpening = openingDiceInPlay(flow);
   if (game.phase === 'moving' && game.played.length === 0 && dice !== null && !fromOpening) {
     const player = game.state.toMove;
     const name = nameOf(player);

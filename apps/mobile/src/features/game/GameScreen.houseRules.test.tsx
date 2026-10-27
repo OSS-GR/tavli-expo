@@ -4,16 +4,18 @@
  * engine actions. On fake timers: the cards close on timers.
  */
 import { InlineBotRunner, createBot } from '@tavli/bot';
+import { createMemoryStorage } from '@tavli/contracts';
 import { createSeededRng, type DieValue, type PerPlayer, type PlayerId } from '@tavli/engine';
 import { act, screen, waitFor, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
-import { gameRuleSet, type OpeningRollRule } from '@/features/match/setup';
+import { createSessionRegistry } from '@/features/match/sessions';
+import { defaultSetup, gameRuleSet, type OpeningRollRule } from '@/features/match/setup';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';
 
-import { createGameStore, type GameStore } from './gameStore';
+import { createGameStore, turnView, type GameStore } from './gameStore';
 import { GameScreen, OPENING_RESULT_MS, type BotSeat } from './GameScreen';
 import type { Seat } from './seats';
 
@@ -125,6 +127,53 @@ describe('<GameScreen /> opening roll house rule (#207)', () => {
       expect(dice).not.toBeNull();
       expect(store.getState().flow.log.filter((e) => e.type === 'roll')).toHaveLength(1);
       expect(announced().some((text) => text.startsWith('Nikos rolled'))).toBe(true);
+    });
+
+    /** Nikos won the opening and rolled his own first dice. */
+    async function rolledAgain(store: GameStore) {
+      await rollDie(store, 'white', 2);
+      await rollDie(store, 'black', 5);
+      await act(async () => {
+        store.getState().dispatch({ type: 'roll', player: 'black', dice: [4, 1] });
+      });
+      expect(game(store).phase).toBe('moving');
+    }
+
+    /** No opening card over the board, and the rolled dice can be played. */
+    function expectPlayable(store: GameStore) {
+      expect(screen.queryByTestId('opening-card')).toBeNull();
+      expect(screen.getByTestId('game-board-layer')).toHaveProp(
+        'importantForAccessibility',
+        'auto',
+      );
+      expect(screen.getByTestId('confirm-button')).toBeOnTheScreen();
+      const move = turnView(store.getState().flow).legal[0]!.moves[0]!;
+      expect(store.getState().dispatch({ type: 'move', player: 'black', move })).toBe(true);
+    }
+
+    it('a remount after the starter rolled does not bring the result back', async () => {
+      const store = newStore('rerollBoth');
+      await render(<GameScreen store={store} />);
+      await rolledAgain(store);
+      await screen.unmount();
+      await render(<GameScreen store={store} />);
+      expectPlayable(store);
+    });
+
+    it('a resume after the starter rolled does not bring the result back', async () => {
+      const storage = createMemoryStorage();
+      const sessions = () =>
+        createSessionRegistry({ createRng: () => createSeededRng(3), storage });
+      const setup = { ...defaultSetup('local'), openingRoll: 'rerollBoth' as const };
+      const first = sessions();
+      const { id, store: played } = first.start(setup);
+      await rolledAgain(played);
+      first.saveNow();
+
+      const resumed = sessions().get(id);
+      expect(resumed).not.toBeNull();
+      await render(<GameScreen store={resumed!.store} />);
+      expectPlayable(resumed!.store);
     });
 
     it('the result also closes by itself', async () => {

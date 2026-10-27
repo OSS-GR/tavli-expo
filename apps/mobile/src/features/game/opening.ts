@@ -16,7 +16,9 @@
  * `round` counts the rounds from 0 (each tie starts a new one). The card
  * keys each die on it, so a die rolls again only in a new round.
  */
-import type { DieValue, GameFlow, PlayerId } from '@tavli/engine';
+import type { DieValue, GameFlow, MatchFlow, PlayerId } from '@tavli/engine';
+
+import { diceWereRolled } from './rolledDice';
 
 export type OpeningStatus =
   | {
@@ -52,12 +54,18 @@ export function openingStatus(game: GameFlow): OpeningStatus | null {
     }
     return { kind: 'rolling', white: opening.white, black: opening.black, round };
   }
-  // Decided. Show it during the starter's first turn only.
+  // Decided. Show it during the starter's first turn only. With
+  // `rerollBoth` (#207) the opening gives no dice: dice in play came from
+  // the starter's own roll, so the opening is over (a remount or a resume
+  // must not bring the card back over them).
+  const rolledAgain =
+    game.state.dice !== null && game.state.rules.match.openingRoll !== 'useOpeningDice';
   if (
     game.starter === null ||
     opening.white === null ||
     opening.black === null ||
-    game.lastTurn !== null
+    game.lastTurn !== null ||
+    rolledAgain
   ) {
     return null;
   }
@@ -77,6 +85,22 @@ export function openingDice(status: OpeningStatus): {
 } {
   if (status.kind === 'tie') return { white: status.value, black: status.value };
   return { white: status.white, black: status.black };
+}
+
+/**
+ * The dice in play are the two opening dice (`useOpeningDice`): the
+ * starter's first turn, and no roll in this game yet. The opening card
+ * already showed them, so they lie still and are not read again. With
+ * `rerollBoth` (#207) the starter's first dice are a roll of their own.
+ */
+export function openingDiceInPlay(flow: MatchFlow): boolean {
+  const game = flow.game;
+  return (
+    game.opening !== null &&
+    game.lastTurn === null &&
+    game.state.dice !== null &&
+    !diceWereRolled(flow)
+  );
 }
 
 /**

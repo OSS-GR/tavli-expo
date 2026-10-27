@@ -83,8 +83,8 @@ export interface HistoryRecord {
   readonly matchNumber: number | null;
   /**
    * The opening roll house rule of the match (#207), from its rules.
-   * Records made before #207 load with the federation rule
-   * (`useOpeningDice`), the only rule the app had then.
+   * Records made before #207 (or with an unknown rule) load with the
+   * federation rule (`useOpeningDice`), the only rule the app had then.
    */
   readonly openingRoll: OpeningRollRule;
 }
@@ -228,9 +228,9 @@ function parseRecord(raw: unknown): HistoryRecord | null {
   ) {
     return null;
   }
-  // Records before #207 have no opening roll rule: the federation rule.
-  const opening = raw['openingRoll'] ?? DEFAULT_OPENING_ROLL;
-  if (!isOpeningRollRule(opening)) return null;
+  // Records before #207 have no opening roll rule: the federation rule. An
+  // unknown one gets it too: the rule is a detail, never a reason to lose a match.
+  const opening = isOpeningRollRule(raw['openingRoll']) ? raw['openingRoll'] : DEFAULT_OPENING_ROLL;
   return {
     id,
     endedAt,

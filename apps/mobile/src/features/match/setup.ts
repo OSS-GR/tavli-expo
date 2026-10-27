@@ -4,7 +4,12 @@
  *
  * Vs bot: the human plays White (at the bottom), the bot plays Black.
  */
-import { BOT_DIFFICULTIES, type Difficulty, type TutorialGame } from '@tavli/contracts';
+import {
+  BOT_DIFFICULTIES,
+  type Difficulty,
+  type OpeningRollRule,
+  type TutorialGame,
+} from '@tavli/contracts';
 import {
   DEFAULT_PRESET_BY_GAME,
   VARIANT_REGISTRY,
@@ -75,7 +80,13 @@ function singleGame(game: GameChoice): StandardVariantId | null {
  * `match.openingRoll` (`docs/rules/tavli-match.md`, "Who starts the first
  * game"). `useOpeningDice` is the federation rule and the default.
  */
-export type OpeningRollRule = MatchRules['openingRoll'];
+export type { OpeningRollRule };
+
+// `OpeningRollRule` lives in contracts (it is an analytics value id too);
+// it must name exactly the engine's values. A type error here says they differ.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const SAME_AS_ENGINE: Same<OpeningRollRule, MatchRules['openingRoll']> = true;
+void SAME_AS_ENGINE;
 
 /** The choices on the new-game screen, default first. */
 export const OPENING_ROLL_RULES = [
