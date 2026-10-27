@@ -17,7 +17,7 @@ export function gameHref(id: string) {
   return { pathname: '/game/[id]', params: { id } } as const;
 }
 
-/** The rules page of a game (a stub for now). */
+/** The rules page of a game (`/rules/portes`, …). */
 export function rulesHref(variant: string) {
   return { pathname: '/rules/[variant]', params: { variant } } as const;
 }

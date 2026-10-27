@@ -260,9 +260,93 @@
     }
   },
   "rules": {
-    "title": "How to play {{game}}",
-    "soon": "The full rules page is coming soon.",
-    "portes": "Each player moves 15 checkers around the board and bears them off. The first to bear off all checkers wins: mono (1 point), or diplo (2 points) if the other player has borne off none."
+    "title": {
+      "portes": "How to play Portes",
+      "plakoto": "How to play Plakoto",
+      "fevga": "How to play Fevga",
+      "asodio": "How to play Asodio",
+      "tavli": "How to play Tavli",
+      "other": "How to play"
+    },
+    "later": "Asodio comes in a later update, together with its rules.",
+    "unknown": "There are no rules for this game.",
+    "picture": {
+      "label": "The board at the start of {{game}}",
+      "caption": "In the picture you play the light checkers. You start at the bottom right, go up the right side, cross the top and come down the left side. Your home is the bottom-left quarter."
+    },
+    "common": {
+      "goal": {
+        "title": "Goal",
+        "body": "Bring all 15 of your checkers into your home, then bear them off.\nThe first player to bear off all 15 checkers wins the game."
+      },
+      "start": "Start position",
+      "numbering": "We count the points along your own path: point 24 is your starting point, and point 1 is the last point in your home.",
+      "dice": {
+        "title": "Dice and turns",
+        "body": "To start, each player rolls one die. The higher die starts and plays those two dice. On a tie, you both roll again.\nOn your turn you roll two dice. Each die moves one checker forward by that many points.\nYou can move one checker with both dice, or two checkers with one die each.\nA double counts twice: with 4-4 you play four moves of 4.\nYou must play both dice if you can. If you can play only one of them, play the higher one when you can.\nIf you have no move, your turn passes.\nThe winner of a game starts the next one."
+      },
+      "bearOff": {
+        "title": "Bearing off",
+        "body": "When all 15 of your checkers are in your home, you can bear them off.\nA die bears off a checker from the point with the same number: a 4 bears off from point 4.\nIf that point is empty, you must move a checker from a higher point.\nIf you have no checker on a higher point, you bear off from your highest point.\nYou can also use a die to move a checker inside your home instead."
+      },
+      "scoring": {
+        "title": "Points",
+        "body": "Mono (μονό): you win 1 point if the other player has borne off at least one checker.\nDiplo (διπλό): you win 2 points if the other player has not borne off any checker.\nThe match ends when a player reaches the points you picked on New game: 1, 3, 5 or 7."
+      }
+    },
+    "portes": {
+      "start": "Each player has 15 checkers: 2 on point 24, 5 on point 13, 3 on point 8 and 5 on point 6.\nThe other player sets up the same way on their side.",
+      "moves": {
+        "title": "How checkers move",
+        "body": "Your checkers move toward your home. The other player moves the opposite way.\nA checker can land on an empty point, on your own checkers, or on a single checker of the other player.\nIt cannot land on a point with 2 or more of the other player's checkers. That point is a door (πόρτα).\nWhen one checker plays both dice, it must also be able to land on the point in between.\nSix doors in a row close the way completely."
+      },
+      "hitting": {
+        "title": "Hitting",
+        "body": "If you land on a single checker of the other player, you hit it. It goes out to the bar in the middle of the board.\nA player with a checker on the bar must bring it back in before moving any other checker.\nIt enters in the other player's home: a 1 enters on your point 24, a 6 on your point 19.\nIt cannot enter on a door. If no die can bring it in, you lose the whole turn.\nWhen you come in, you can hit a single checker too."
+      },
+      "bearOff": "If one of your checkers is hit while you bear off, bring it back home before you bear off again."
+    },
+    "plakoto": {
+      "goal": "There is no hitting in Plakoto. You pin the other player's checkers instead.",
+      "start": "Each player starts with all 15 checkers on point 24, their starting point.\nThe other player's stack sits on your point 1, inside your home.",
+      "moves": {
+        "title": "How checkers move",
+        "body": "Your checkers move toward your home. The other player moves the opposite way.\nA checker can land on an empty point, on your own checkers, or on a single checker of the other player.\nIt cannot land on 2 or more of the other player's checkers, or where the other player pins one of yours. Those points are doors (πόρτες).\nWhen one checker plays both dice, it must also be able to land on the point in between.\nCheckers never leave the board and never move back."
+      },
+      "pinning": {
+        "title": "Pinning (πλάκωμα)",
+        "body": "If you land on a single checker of the other player, you pin it: your checker sits on top.\nA pinned checker cannot move. It is free again only when all checkers on top of it have left.\nYou can move off the pinned checker at any time, or put more checkers on top.\nA checker that pins cannot be pinned."
+      },
+      "bearOff": "You cannot bear off while any of your checkers is pinned, even one inside your home.",
+      "mother": {
+        "title": "The mother (μάνα)",
+        "body": "Your mother is your last checker on point 24, once all the others have left.\nIf the other player pins your mother, you choose at the end of their turn: resign or play on.\nResign: the other player wins 2 points (diplo) and the game ends.\nPlay on: the game goes on as normal. You are not asked again in this game.\nYour mother is free again only when the other player's checkers leave it. Until then you cannot bear off.\nIf both mothers are pinned at the same time, the game is a draw. Nobody gets points.\nKeep 2 or more checkers on point 24, and nobody can pin your mother."
+      }
+    },
+    "fevga": {
+      "goal": "There is no hitting and no pinning in Fevga. It is a race.",
+      "start": "Each player starts with all 15 checkers on point 24, their starting point.\nThe two stacks sit in opposite corners. The other player's stack is on your point 12.",
+      "moves": {
+        "title": "How checkers move",
+        "body": "Both players move the same way around the board, each toward their own home.\nA checker can land only on an empty point or on your own checkers.\nWhen one checker plays both dice, it must also be able to land on the point in between."
+      },
+      "noHitting": {
+        "title": "No hitting",
+        "body": "You never hit or pin in Fevga.\nOne checker is enough to hold a point: the other player can never land there.\nSo you block the other player by holding the points in front of them."
+      },
+      "runner": {
+        "title": "The first checker",
+        "body": "At the start you may move only one checker: your runner.\nNo other checker can leave point 24 until the runner has passed the other player's mother (μάνα), on your point 12. Then you can move any checker.\nThis can happen in the middle of your turn: once the runner has passed, your other dice can move any checker.\nIf the runner cannot move, you lose the rest of the roll."
+      },
+      "primes": {
+        "title": "Six in a row (εξάπορτο)",
+        "body": "You may not hold six points in a row in your starting quarter (points 19 to 24).\nYou may not hold six points in a row right in front of the other player's mother (your points 6 to 11).\nThis counts at the end of your turn. If the only way to play both dice breaks it, you play one die only.\nSix in a row anywhere else is fine, but you must leave the other player a move if you can.\nIf every play you have blocks the other player, you can play any of them, and they pass."
+      }
+    },
+    "tavli": {
+      "title": "A Tavli match",
+      "body": "A Tavli match plays three games in turn: Portes, then Plakoto, then Fevga, and then Portes again.\nEach game gives 1 or 2 points, as its own rules say.\nThe first player to reach the match points wins."
+    }
   },
   "time": {
     "justNow": "just now",

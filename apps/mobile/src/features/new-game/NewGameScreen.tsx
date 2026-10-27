@@ -47,6 +47,8 @@ export interface NewGameScreenProps {
   onStart: (setup: MatchSetup) => void;
   /** A saved game exists: Start asks first, because it ends that game (wireframe 4). */
   hasSavedGame?: boolean;
+  /** Opens the rules of a game (the info button next to its name). */
+  onRules?: (game: MatchSetup['game']) => void;
 }
 
 export function NewGameScreen({
@@ -56,6 +58,7 @@ export function NewGameScreen({
   onBack,
   onStart,
   hasSavedGame = false,
+  onRules,
 }: NewGameScreenProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
@@ -134,20 +137,35 @@ export function NewGameScreen({
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
         <SettingsSection title={t('newGame.game')}>
-          <View
-            testID="new-game-portes"
-            style={styles.gameCard}
-            accessible
-            accessibilityRole="radio"
-            accessibilityState={{ checked: true }}
-            accessibilityLabel={`${t('games.portes')}, ${t('games.portesSubtitle')}`}>
-            <View style={styles.radio}>
-              <View style={styles.radioDot} />
+          <View style={styles.gameCard}>
+            <View
+              testID="new-game-portes"
+              style={styles.gameChoice}
+              accessible
+              accessibilityRole="radio"
+              accessibilityState={{ checked: true }}
+              accessibilityLabel={`${t('games.portes')}, ${t('games.portesSubtitle')}`}>
+              <View style={styles.radio}>
+                <View style={styles.radioDot} />
+              </View>
+              <View style={styles.gameTexts}>
+                <Text style={styles.gameName}>{t('games.portes')}</Text>
+                <Text style={styles.hint}>{t('games.portesSubtitle')}</Text>
+              </View>
             </View>
-            <View style={styles.gameTexts}>
-              <Text style={styles.gameName}>{t('games.portes')}</Text>
-              <Text style={styles.hint}>{t('games.portesSubtitle')}</Text>
-            </View>
+            {onRules ? (
+              <Pressable
+                testID="new-game-rules-portes"
+                accessibilityRole="button"
+                accessibilityLabel={t('rules.title.portes')}
+                onPress={() => onRules('portes')}
+                hitSlop={4}
+                style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
+                <Text style={styles.rulesIcon} importantForAccessibility="no">
+                  {'i'}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
           <View style={styles.chips}>
             {GAME_CHOICES.filter((game) => !PLAYABLE_GAMES.includes(game)).map((game) => (
@@ -284,12 +302,32 @@ const styles = StyleSheet.create((theme, rt) => ({
   gameCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.md,
+    gap: theme.space.sm,
     padding: theme.space.lg,
     borderRadius: theme.radii.lg,
     borderWidth: 3,
     borderColor: theme.colors.accent,
     backgroundColor: theme.colors.surfaceSelected,
+  },
+  gameChoice: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+  },
+  rulesButton: {
+    minWidth: theme.touch.minTarget,
+    minHeight: theme.touch.minTarget,
+    borderRadius: theme.touch.minTarget / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.text,
+  },
+  rulesIcon: {
+    ...theme.type.bodyStrong,
+    fontStyle: 'italic',
+    color: theme.colors.text,
   },
   radio: {
     width: 24,
