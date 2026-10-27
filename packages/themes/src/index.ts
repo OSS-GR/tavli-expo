@@ -13,6 +13,9 @@ export { contrastRatio, isHexColor, relativeLuminance, resolvePalette, tokenRef 
 export {
   diceCenters,
   getPoint,
+  isMirrorSymmetric,
+  mirrorLayout,
+  mirrorRect,
   pointTriangle,
   rectInsideUnit,
   rectsOverlap,

@@ -10,7 +10,8 @@
  *
  * Two gestures race (`BOARD_GESTURES`, #174): a pan for the drag and a tap
  * for tap-tap. Hit-testing uses the same rects that draw the points
- * (`geometry.ts`). The gestures and the animations run on the UI thread;
+ * (`geometry.ts`). With Settings → Home board on the bottom left (#175) the
+ * layout is mirrored (`portraitLayout`), so the touches follow it. The gestures and the animations run on the UI thread;
  * only the result of a touch (select, move, cancel) goes to the JS thread.
  */
 import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
@@ -27,7 +28,7 @@ import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { StyleSheet } from 'react-native-unistyles';
 
-import { BoardCanvas, portraitLayout, useBoardSpace } from './BoardCanvas';
+import { BoardCanvas, portraitLayout, useBoardSpace, useHomeBoardSide } from './BoardCanvas';
 import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
 import type { Flight } from './flights';
 import { fitBoardWithShadow, type BoardGeometry } from './geometry';
@@ -125,9 +126,10 @@ export function InteractiveBoard({
   testID,
 }: InteractiveBoardProps) {
   const [size, onLayout] = useBoardSpace();
+  const homeSide = useHomeBoardSide();
   const geo = useMemo(
-    () => (size ? fitBoardWithShadow(portraitLayout(theme), size) : null),
-    [size, theme],
+    () => (size ? fitBoardWithShadow(portraitLayout(theme, homeSide), size) : null),
+    [size, theme, homeSide],
   );
   useEffect(() => {
     if (geo) onGeometry?.(geo);

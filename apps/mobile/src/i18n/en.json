@@ -102,6 +102,14 @@
       "label": "Board",
       "hint": "The game, the tutorial and the rules use this board."
     },
+    "homeBoard": {
+      "label": "Your home",
+      "right": "Bottom right",
+      "left": "Bottom left",
+      "rightHint": "Your checkers go round counterclockwise.",
+      "leftHint": "Your checkers go round clockwise.",
+      "hint": "Pick it as on a real board, seen from your seat. The phone shows the board on its side, so your home is always at the bottom of the screen."
+    },
     "moveList": {
       "label": "Move list",
       "auto": "Automatic",
@@ -486,7 +494,8 @@
     "unknown": "There are no rules for this game.",
     "picture": {
       "label": "The board at the start of {{game}}",
-      "caption": "In the picture you play the light checkers. You start at the bottom right, go up the right side, cross the top and come down the left side. Your home is the bottom-left quarter."
+      "caption": "In the picture you play the light checkers. You start at the bottom right, go up the right side, cross the top and come down the left side. Your home is the bottom-left quarter.",
+      "captionMirrored": "In the picture you play the light checkers. You start at the bottom left, go up the left side, cross the top and come down the right side. Your home is the bottom-right quarter."
     },
     "common": {
       "goal": {

@@ -38,6 +38,20 @@ export type MoveListMode = 'auto' | 'on' | 'off';
 
 export const MOVE_LIST_MODES: readonly MoveListMode[] = ['auto', 'on', 'off'];
 
+/**
+ * Where your home is, as on a real board seen from your seat (#175).
+ * The phone shows the board on its side (portrait), so on screen your home
+ * is always at the bottom.
+ * - `right` (default): home on the bottom right of a real board. Checkers go
+ *   round counterclockwise. On screen: home bottom left, start bottom right.
+ * - `left`: home on the bottom left of a real board. The board is mirrored
+ *   left to right, so checkers go round clockwise. On screen: home bottom
+ *   right, start bottom left.
+ */
+export type HomeBoardSide = 'right' | 'left';
+
+export const HOME_BOARD_SIDES: readonly HomeBoardSide[] = ['right', 'left'];
+
 export interface Settings {
   sound: boolean;
   haptics: boolean;
@@ -46,6 +60,8 @@ export interface Settings {
   autoConfirmMoves: boolean;
   showPipCounts: boolean;
   boardFlipMode: BoardFlipMode;
+  /** Where your home is (a real board seen from your seat). `left` mirrors the board. */
+  homeBoardSide: HomeBoardSide;
   moveList: MoveListMode;
   /** How fast the bot plays its turn (#172, timings in `features/bot/botSpeed.ts`). */
   botSpeed: BotSpeed;
@@ -62,6 +78,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   autoConfirmMoves: false,
   showPipCounts: true,
   boardFlipMode: 'flip',
+  homeBoardSide: 'right',
   moveList: 'auto',
   botSpeed: 'normal',
   theme: DEFAULT_THEME_ID,
@@ -106,6 +123,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     autoConfirmMoves: bool(input['autoConfirmMoves'], d.autoConfirmMoves),
     showPipCounts: bool(input['showPipCounts'], d.showPipCounts),
     boardFlipMode: oneOf(BOARD_FLIP_MODES, input['boardFlipMode'], d.boardFlipMode),
+    // Saves from before #175 have no value: they load as `right`, the board as it was.
+    homeBoardSide: oneOf(HOME_BOARD_SIDES, input['homeBoardSide'], d.homeBoardSide),
     moveList: oneOf(MOVE_LIST_MODES, input['moveList'], d.moveList),
     // Saves from before #172 have no bot speed: they load as Normal.
     botSpeed: oneOf(BOT_SPEEDS, input['botSpeed'], d.botSpeed),
@@ -149,6 +168,7 @@ function pickSettings(state: SettingsState): Settings {
     autoConfirmMoves: state.autoConfirmMoves,
     showPipCounts: state.showPipCounts,
     boardFlipMode: state.boardFlipMode,
+    homeBoardSide: state.homeBoardSide,
     moveList: state.moveList,
     botSpeed: state.botSpeed,
     theme: state.theme,

@@ -31,6 +31,7 @@ import { passNotice } from './turnNotices';
 
 import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
+import { pressOpeningRoll } from '../../../test/openingRoll';
 import { renderWithRoot } from '../../../test/render';
 
 const SIZE = { width: 375, height: 520 };
@@ -130,7 +131,7 @@ async function playToTheEnd(store: GameStore) {
     if (passNotice(flow) && card('pass-ok-button')) {
       if (screen.queryByText('Board locked') !== null) seen.lockedPasses++;
       await press('pass-ok-button');
-    } else if (view.phase === 'opening-roll') await press('roll-button');
+    } else if (view.phase === 'opening-roll') await pressOpeningRoll();
     else if (openingStatus(view.game) && card('opening-overlay')) await press('opening-overlay');
     else if (view.phase === 'awaiting-roll') {
       // The loading lock: a note says what opens the board.

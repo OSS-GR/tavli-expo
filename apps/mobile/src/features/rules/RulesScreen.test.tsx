@@ -89,7 +89,12 @@ describe('rules texts', () => {
     for (const id of ['portes', 'plakoto', 'fevga', 'asodio', 'tavli', null] as const) {
       used.add(rulesTitleKey(id));
     }
-    for (const key of ['rules.unknown', 'rules.picture.label', 'rules.picture.caption']) {
+    for (const key of [
+      'rules.unknown',
+      'rules.picture.label',
+      'rules.picture.caption',
+      'rules.picture.captionMirrored',
+    ]) {
       used.add(key);
     }
     expect(enRules.filter((key) => !used.has(key))).toEqual([]);
@@ -186,6 +191,18 @@ describe('<RulesScreen />', () => {
       });
     });
     expect(within(picture).getByTestId('rules-board-fevga-canvas')).toBeOnTheScreen();
+  });
+
+  // #175: with the home on the bottom left the picture is mirrored, and so
+  // is the path the caption tells.
+  it('tells the mirrored path under the picture when the home is bottom left', async () => {
+    await show('portes').view;
+    expect(screen.getByText(tr('rules.picture.caption'))).toBeOnTheScreen();
+    await act(async () => {
+      settingsStore.getState().setSetting('homeBoardSide', 'left');
+    });
+    expect(screen.getByText(/Your home is the bottom-right quarter/)).toBeOnTheScreen();
+    expect(screen.queryByText(tr('rules.picture.caption'))).toBeNull();
   });
 
   it('explains the owner mother rule in Plakoto', async () => {

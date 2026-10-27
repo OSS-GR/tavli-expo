@@ -14,6 +14,7 @@ import {
 } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
 
+import { portraitLayout } from './BoardCanvas';
 import { layoutBoard, type BoardView } from './boardModel';
 import { moveFlights, HIT_DELAY_MS } from './flights';
 import { fitBoard, slotRect, stackPosition, type ScreenRect } from './geometry';
@@ -371,5 +372,94 @@ describe('Plakoto: pins on the board', () => {
     expect({ x: from5.checker.x, y: from5.checker.y }).toEqual(stackPosition(geo, p5, 1, 0, true));
     // The pinned Black checker under it is never a source.
     expect(sources.every((s) => s.checker.key !== 'p5:pinned')).toBe(true);
+  });
+});
+
+// Settings → Home board: bottom left (#175). Same moves, mirrored places.
+describe('home board on the bottom left (mirrored layout)', () => {
+  const mirrored = fitBoard(portraitLayout(getTheme('walnut-kafeneio'), 'left'), {
+    width: 377,
+    height: 630,
+  });
+  const flipX = (x: number) => 2 * geo.x + geo.width - x;
+  const flow = whiteToMove([6, 1]);
+  const normal = sourcesFor(flow);
+  const flipped = buildSources(mirrored, currentBoard(flow), WHITE, 'white', legalNextMoves(flow));
+
+  it('gives the same sources and targets, at mirrored places', () => {
+    expect(flipped.map((s) => s.key)).toEqual(normal.map((s) => s.key));
+    flipped.forEach((s, i) => {
+      const n = normal[i]!;
+      expect(s.checker.x).toBeCloseTo(flipX(n.checker.x), 6);
+      expect(s.checker.y).toBeCloseTo(n.checker.y, 6);
+      expect(s.rect.x).toBeCloseTo(flipX(n.rect.x + n.rect.width), 6);
+      expect(s.targets.map((t) => t.move)).toEqual(n.targets.map((t) => t.move));
+      s.targets.forEach((t, j) => {
+        expect(t.landing.x).toBeCloseTo(flipX(n.targets[j]!.landing.x), 6);
+      });
+    });
+  });
+
+  it('tap-tap: selects 13 and moves it to 7 at their mirrored places', () => {
+    const s13 = flipped.findIndex((s) => s.key === 'p13');
+    const target7 = flipped[s13]!.targets.findIndex((t) => t.key === 'p7');
+    const from = center(slotRect(mirrored, { kind: 'point', index: 13 }));
+    // Point 13 now sits at the top left.
+    expect(from.x).toBeLessThan(mirrored.x + mirrored.width / 2);
+    expect(resolveTap(flipped, null, from.x, from.y)).toEqual({ kind: 'select', source: s13 });
+    const to = center(slotRect(mirrored, { kind: 'point', index: 7 }));
+    expect(resolveTap(flipped, s13, to.x, to.y)).toEqual({
+      kind: 'move',
+      source: s13,
+      target: target7,
+    });
+    // A drop where 7 sits on the normal board is point 18: not a target.
+    const old7 = center(slotRect(geo, { kind: 'point', index: 7 }));
+    expect(resolveDrop(flipped, s13, old7.x, old7.y)).toEqual({ kind: 'illegal' });
+  });
+
+  it('works with the pass-and-play flip (Black at the bottom)', () => {
+    const black = buildSources(mirrored, currentBoard(flow), BLACK, 'white', legalNextMoves(flow));
+    // White's 13 is Black's 12 from the bottom player's side.
+    const s = source(black, 'p12');
+    expect(s.rect).toEqual(slotRect(mirrored, { kind: 'point', index: 12 }));
+    expect(s.rect.x).toBeGreaterThan(mirrored.x + mirrored.width / 2 - 1);
+  });
+
+  it('flies moves and hits between the mirrored places', () => {
+    const board = createBoard(
+      { white: { points: { 13: 15 } }, black: { points: { 18: 1, 1: 14 } } },
+      'contrary',
+    );
+    const move: Move = { from: 13, to: 7, die: 6, capture: 'hit' };
+    const after = applyMoveToBoard(board, 'white', move, 'contrary');
+    const plain = moveFlights(geo, WHITE, 'white', move, board, after, { id: 'h' });
+    const mirror = moveFlights(mirrored, WHITE, 'white', move, board, after, { id: 'h' });
+    expect(mirror).toHaveLength(2);
+    mirror.forEach((f, i) => {
+      const p = plain[i]!;
+      expect(f.hide).toBe(p.hide);
+      expect(f.from.x).toBeCloseTo(flipX(p.from.x), 6);
+      expect(f.to.x).toBeCloseTo(flipX(p.to.x), 6);
+      expect(f.to.y).toBeCloseTo(p.to.y, 6);
+    });
+  });
+
+  it('bears off into your tray at the bottom right', () => {
+    const board = createBoard(
+      { white: { points: { 2: 1, 1: 1 }, off: 13 }, black: { points: { 1: 15 } } },
+      'contrary',
+    );
+    const bear = whiteToMove([5, 2], board);
+    const sources = buildSources(
+      mirrored,
+      currentBoard(bear),
+      WHITE,
+      'white',
+      legalNextMoves(bear),
+    );
+    const off = source(sources, 'p2').targets.find((t) => t.key === 'tray:player')!;
+    expect(off.rect).toEqual(slotRect(mirrored, { kind: 'tray', side: 'player' }));
+    expect(off.rect.x).toBeGreaterThan(mirrored.x + mirrored.width / 2 - 1);
   });
 });

@@ -440,7 +440,7 @@ Why B:
 - Checkers and points are big enough to drag with a thumb. This is the core of the game, and we play it hundreds of times per match.
 - The board fills the screen. There is no dead space.
 - Roll, move, bear off and confirm all happen in the lower half.
-- Flip mode is simple. To turn the board to the other player we mirror it left to right. The current player's home is then always at the bottom left, and their path is always the same U shape.
+- Flip mode is simple. To turn the board to the other player we mirror it left to right. The current player's home is then always at the bottom left, and their path is always the same U shape. (Settings → Board → Your home → Bottom left mirrors the whole board, #175: the home is then always at the bottom right.)
 
 Costs and follow-ups:
 

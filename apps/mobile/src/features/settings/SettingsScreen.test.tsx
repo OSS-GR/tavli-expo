@@ -76,6 +76,58 @@ describe('<SettingsScreen />', () => {
     expect(settingsStore.getState().boardFlipMode).toBe('fixed');
   });
 
+  it('picks where your home is: bottom right by default, or bottom left (#175)', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      consentStore.setState({ status: 'granted' });
+    });
+    await render(<SettingsScreen />);
+
+    const group = screen.getByTestId('settings-home-board');
+    expect(group).toHaveAccessibleName('Your home');
+    expect(within(group).getByRole('radio', { name: 'Bottom right' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Bottom left' })).not.toBeChecked();
+    expect(screen.getByText('Your checkers go round counterclockwise.')).toBeOnTheScreen();
+    expect(screen.getByText('Your checkers go round clockwise.')).toBeOnTheScreen();
+    // A small board picture for each side, hidden from screen readers.
+    for (const side of ['right', 'left']) {
+      const preview = `settings-home-board-${side}-preview`;
+      expect(screen.queryByTestId(preview)).toBeNull();
+      expect(screen.getByTestId(preview, { includeHiddenElements: true })).toBeTruthy();
+    }
+
+    await user.press(within(group).getByRole('radio', { name: 'Bottom left' }));
+    expect(settingsStore.getState().homeBoardSide).toBe('left');
+    expect(within(group).getByRole('radio', { name: 'Bottom left' })).toBeChecked();
+    // Only the key goes out, never the value.
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'homeBoardSide' },
+    });
+
+    await user.press(within(group).getByRole('radio', { name: 'Bottom right' }));
+    expect(settingsStore.getState().homeBoardSide).toBe('right');
+  });
+
+  it('names the home board sides in Greek', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    try {
+      await render(<SettingsScreen />);
+      const group = screen.getByTestId('settings-home-board');
+      expect(group).toHaveAccessibleName('Το σπίτι σου');
+      expect(within(group).getByRole('radio', { name: 'Κάτω δεξιά' })).toBeChecked();
+      expect(within(group).getByRole('radio', { name: 'Κάτω αριστερά' })).toBeOnTheScreen();
+      expect(screen.getByText('Τα πούλια σου γυρίζουν δεξιόστροφα.')).toBeOnTheScreen();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
   it('picks the move list: automatic by default, then on or off (#134)', async () => {
     const user = userEvent.setup();
     await render(<SettingsScreen />);

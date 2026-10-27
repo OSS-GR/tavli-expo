@@ -16,6 +16,7 @@ import { createGameStore, type GameStore } from './gameStore';
 import { GameScreen, OPENING_RESULT_MS, OPENING_TIE_WAIT_MS } from './GameScreen';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { nativeParent, nativePath } from '../../../test/nativeParent';
 import { renderWithRoot as render } from '../../../test/render';
 
 const hidden = { includeHiddenElements: true };
@@ -96,20 +97,26 @@ describe('<GameScreen /> opening roll (#176)', () => {
       screen.getByTestId('opening-die-black'),
     ];
     const canvasBefore = dice();
+    const pathsBefore = canvasBefore.map(nativePath);
     await user.press(screen.getByRole('button', { name: 'Ann: roll, or tap the board' }));
     const white = store.getState().flow.game.opening!.white!;
     expect(message()).toHaveTextContent(`Ann rolled ${white}.`);
     expect(card().getByLabelText(`Rolled ${white}`)).toBeOnTheScreen();
     expect(card().getAllByLabelText('Not rolled yet')).toHaveLength(1);
     expect(announced()).toContain(`Ann rolled ${white}. Bob: roll.`);
-    // The dice canvases stay the same views: each sits in a view that never flattens (#173).
-    dice().forEach((canvas, i) => {
-      expect(canvas === canvasBefore[i]).toBe(true);
-      expect(canvas.parent?.props.collapsable).toBe(false);
-    });
+    // The dice canvases stay the same views, in the same native views (#173):
+    // each sits in its own view that never flattens.
+    const expectSameCanvases = () =>
+      dice().forEach((canvas, i) => {
+        expect(canvas === canvasBefore[i]).toBe(true);
+        expect(nativeParent(canvas)?.props.collapsable).toBe(false);
+        expect(nativePath(canvas)).toBe(pathsBefore[i]);
+      });
+    expectSameCanvases();
     // A tap on the board rolls for Bob.
     await user.press(screen.getByTestId('opening-overlay'));
     expect(store.getState().flow.game.opening!.black).not.toBeNull();
+    expectSameCanvases();
   });
 
   it('a tie keeps both dice and says so until the next roll; Roll waits for the dice to land', async () => {
