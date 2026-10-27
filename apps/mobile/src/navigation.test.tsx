@@ -155,11 +155,13 @@ describe('app navigation', () => {
     expect(router.getPathname()).toBe('/rules/portes');
   });
 
-  it('opens the Plakoto page, and Fevga from the Tavli page', async () => {
-    const user = userEvent.setup();
+  it('opens the Plakoto rules page', async () => {
     await renderRouter('./src/app', { initialUrl: '/rules/plakoto' });
     expect(screen.getByTestId('rules-section-mother')).toBeOnTheScreen();
+  });
 
+  it('opens the Fevga rules from the Tavli page', async () => {
+    const user = userEvent.setup();
     const router = await renderRouter('./src/app', { initialUrl: '/rules/tavli' });
     await user.press(screen.getByRole('button', { name: 'How to play Fevga' }));
     expect(router.getPathname()).toBe('/rules/fevga');

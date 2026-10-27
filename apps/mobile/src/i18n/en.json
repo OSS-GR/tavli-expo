@@ -331,7 +331,7 @@
       "numbering": "We count the points along your own path: point 24 is your starting point, and point 1 is the last point in your home.",
       "dice": {
         "title": "Dice and turns",
-        "body": "To start, each player rolls one die. The higher die starts and plays those two dice. On a tie, you both roll again.\nOn your turn you roll two dice. Each die moves one checker forward by that many points.\nYou can move one checker with both dice, or two checkers with one die each.\nA double counts twice: with 4-4 you play four moves of 4.\nYou must play both dice if you can. If you can play only one of them, play the higher one when you can.\nIf you have no move, your turn passes.\nThe winner of a game starts the next one."
+        "body": "The first game of a match starts with one die each. The higher die starts and plays those two dice. On a tie, you both roll again.\nOn your turn you roll two dice. Each die moves one checker forward by that many points.\nYou can move one checker with both dice, or two checkers with one die each.\nA double counts twice: with 4-4 you play four moves of 4.\nYou must play both dice if you can. If you can play only one of them, play the higher one when you can.\nIf you have no move, your turn passes.\nAfter that, the winner of each game starts the next one and rolls both dice."
       },
       "bearOff": {
         "title": "Bearing off",
@@ -368,7 +368,7 @@
       "bearOff": "You cannot bear off while any of your checkers is pinned, even one inside your home.",
       "mother": {
         "title": "The mother (μάνα)",
-        "body": "Your mother is your last checker on point 24, once all the others have left.\nIf the other player pins your mother, you choose at the end of their turn: resign or play on.\nResign: the other player wins 2 points (diplo) and the game ends.\nPlay on: the game goes on as normal. You are not asked again in this game.\nYour mother is free again only when the other player's checkers leave it. Until then you cannot bear off.\nIf both mothers are pinned at the same time, the game is a draw. Nobody gets points.\nKeep 2 or more checkers on point 24, and nobody can pin your mother."
+        "body": "Your mother is your last checker on point 24, once all the others have left.\nIf the other player pins your mother, you choose at the end of their turn: resign or play on.\nResign: the other player wins 2 points (diplo) and the game ends.\nPlay on: the game goes on as normal. You are not asked again in this game.\nYour mother is free again only when the other player's checkers leave it. Until then you cannot bear off.\nIf both mothers are pinned at the same time, the game is a draw. Nobody gets points, and the next game starts again with one die each.\nKeep 2 or more checkers on point 24, and nobody can pin your mother."
       }
     },
     "fevga": {
@@ -393,7 +393,7 @@
     },
     "tavli": {
       "title": "A Tavli match",
-      "body": "A Tavli match plays three games in turn: Portes, then Plakoto, then Fevga, and then Portes again.\nEach game gives 1 or 2 points, as its own rules say.\nThe first player to reach the match points wins."
+      "body": "A Tavli match plays three games in turn: Portes, then Plakoto, then Fevga, and then Portes again.\nEach game gives 1 or 2 points, as its own rules say. A Plakoto game can also end in a draw (both mothers pinned): nobody gets points, and the match goes on with the next game.\nThe first player to reach the match points wins."
     }
   },
   "time": {
