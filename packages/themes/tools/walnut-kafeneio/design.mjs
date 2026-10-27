@@ -8,6 +8,16 @@
 // theme.json.
 
 import { normRect, rect, rng, round, toLandscape } from '../lib/geometry.mjs';
+import {
+  f2,
+  framePieces,
+  grainFor,
+  lineSvg,
+  poly,
+  rectAttrs,
+  svgDoc,
+  texPattern,
+} from '../lib/svg.mjs';
 
 export const THEME_ID = 'walnut-kafeneio';
 
@@ -285,16 +295,6 @@ export function geometries() {
 
 // ------------------------------------------------------------------ SVG ---
 
-const f2 = (n) => Math.round(n * 100) / 100;
-const poly = (pts) => pts.map(([x, y]) => `${f2(x)},${f2(y)}`).join(' ');
-const rectAttrs = (r) => `x="${f2(r.x)}" y="${f2(r.y)}" width="${f2(r.w)}" height="${f2(r.h)}"`;
-
-function texPattern(id, href, size, rotate = 0, dx = 0, dy = 0) {
-  return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${size}" height="${size}"
-    patternTransform="translate(${dx} ${dy}) rotate(${rotate})">
-    <image href="${href}" width="${size}" height="${size}" preserveAspectRatio="none"/></pattern>`;
-}
-
 function defs(g, tex) {
   const portrait = g.orientation === 'portrait';
   // Field grain runs along the long side of the board; tray grain along the tray.
@@ -334,28 +334,6 @@ function defs(g, tex) {
     <stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#1a0c02" stop-opacity="0.45"/></radialGradient>
   <clipPath id="boardClip"><rect x="0" y="0" width="${g.width}" height="${g.height}" rx="${g.corner}"/></clipPath>`;
 }
-
-function framePieces(o, i) {
-  const x0 = o.x;
-  const y0 = o.y;
-  const x1 = o.x + o.w;
-  const y1 = o.y + o.h;
-  const ix0 = i.x;
-  const iy0 = i.y;
-  const ix1 = i.x + i.w;
-  const iy1 = i.y + i.h;
-  // prettier-ignore
-  return [
-    ['frameH', [[x0, y0], [x1, y0], [ix1, iy0], [ix0, iy0]]],
-    ['frameH', [[x0, y1], [x1, y1], [ix1, iy1], [ix0, iy1]]],
-    ['frameV', [[x0, y0], [ix0, iy0], [ix0, iy1], [x0, y1]]],
-    ['frameV', [[x1, y0], [ix1, iy0], [ix1, iy1], [x1, y1]]],
-  ];
-}
-
-const grainFor = (r) => (r.w >= r.h ? 'frameH' : 'frameV');
-const lineSvg = (l, attrs) =>
-  `<line x1="${f2(l.a[0])}" y1="${f2(l.a[1])}" x2="${f2(l.b[0])}" y2="${f2(l.b[1])}" ${attrs}/>`;
 
 function hardware(g) {
   const s = [];
@@ -410,14 +388,6 @@ function frameWear(g) {
   return s.join('\n');
 }
 
-function svgDoc(g, tex, body) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${g.width}" height="${g.height}" viewBox="0 0 ${g.width} ${g.height}">
-<defs>${defs(g, tex)}</defs>
-<g clip-path="url(#boardClip)">
-${body}
-</g></svg>`;
-}
-
 /** Layer 1: the board without points (drawn under the points). */
 export function boardSVG(g, tex) {
   const s = [];
@@ -453,7 +423,7 @@ export function boardSVG(g, tex) {
   s.push(
     `<rect x="0" y="0" width="${g.width}" height="${g.height}" fill="url(#sheen)" opacity="0.8" style="mix-blend-mode:soft-light"/>`,
   );
-  return svgDoc(g, tex, s.join('\n'));
+  return svgDoc(g, defs(g, tex), s.join('\n'));
 }
 
 /** Layer 2: wear and shadows over the points (transparent elsewhere). */
@@ -490,5 +460,5 @@ export function shadeSVG(g, tex) {
       `<path d="M${f2(r.x)} ${f2(r.y + r.h + 0.5)} H${f2(r.x + r.w + 0.5)} V${f2(r.y)}" fill="none" stroke="#fff" stroke-opacity="0.22" stroke-width="0.8"/>`,
     );
   });
-  return svgDoc(g, tex, s.join('\n'));
+  return svgDoc(g, defs(g, tex), s.join('\n'));
 }
