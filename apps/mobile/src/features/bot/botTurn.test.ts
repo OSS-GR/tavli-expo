@@ -6,10 +6,12 @@ import {
 } from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
+  asodio,
   createBoard,
   createGameFlow,
   createSeededRng,
   getVariant,
+  legalNextMoves,
   plakoto,
   portes,
   resolveRules,
@@ -529,6 +531,43 @@ describe('startBotTurn timing (#172)', () => {
       expect(at.filter((s) => s.what === 'move')).toHaveLength(4);
     },
   );
+
+  it('a double it chose after a 1-2 (Acey-Deucey) gets no roll time: no dice were thrown (#177)', async () => {
+    const rules = resolveRules('asodio.aceyDeuceyGreek');
+    const store = createGameStore({
+      players: { white: 'you', black: 'bot' },
+      targetPoints: 1,
+      rules,
+      rng: createSeededRng(3),
+    });
+    const state: GameState = asodio.initialState({ startingPlayer: 'black', rules });
+    store.setState({
+      flow: { ...store.getState().flow, game: createGameFlow({ state, starter: 'black' }) },
+    });
+    // Black plays a 1-2 and must then choose a double.
+    const d = store.getState().dispatch;
+    d({ type: 'roll', player: 'black', dice: [1, 2] });
+    for (let next = legalNextMoves(store.getState().flow.game)[0]; next;) {
+      d({ type: 'move', player: 'black', move: next.moves[0]! });
+      next = legalNextMoves(store.getState().flow.game)[0];
+    }
+    d({ type: 'confirm', player: 'black' });
+    expect(store.getState().flow.game.phase).toBe('awaiting-answer');
+    const { log, at, actions } = timed(store);
+    const { beforeRollMs } = BOT_TIMING;
+    const t0 = Date.now();
+    const handle = start(store, actions, { ...BOT_TIMING, thinkMs: () => 0 });
+    await jest.advanceTimersByTimeAsync(10 * BOT_TIMING.moveMs);
+    // It answers after beforeRollMs and moves at once (the think time, 0
+    // here): no `afterRollMs`, no `doubleMs`. The four dice show at rest.
+    expect(log[0]).toMatch(/^answer [1-6]$/);
+    expect(log.filter((l) => l.startsWith('move'))).toHaveLength(4);
+    const first = at[0]!;
+    expect(first.what).toBe('move');
+    expect(first.ms - t0).toBeGreaterThanOrEqual(beforeRollMs);
+    expect(first.ms - t0).toBeLessThan(beforeRollMs + 10);
+    await handle.done;
+  });
 
   it('waits the think time when it is longer than afterRollMs', async () => {
     const store = botToRoll();

@@ -11,7 +11,6 @@ import {
   legalNextMoves,
   portes,
   resolveRules,
-  type MatchAction,
   type PerPlayer,
   type PlayerId,
   type Rng,
@@ -32,7 +31,7 @@ import { DEFAULT_SETTINGS, type BoardLayoutMode } from '@/features/settings/sett
 import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';
 
-import { createGameStore, diceChosen, type GameStore } from './gameStore';
+import { createGameStore, type GameStore } from './gameStore';
 import { GameScreen, type BotSeat } from './GameScreen';
 import type { Seat } from './seats';
 
@@ -292,6 +291,52 @@ describe('<GameScreen /> doubles (#177)', () => {
     expect(screen.getByLabelText('Dice 4-4-4-4, 3 left to play')).toBeOnTheScreen();
   });
 
+  it('a double chosen after a 1-2 (Acey-Deucey) shows four dice at rest at once, no label', async () => {
+    const rules = resolveRules('asodio.aceyDeuceyGreek');
+    const store = createGameStore({
+      players: { white: 'Ann', black: 'Bob' },
+      targetPoints: 1,
+      rules,
+      rng: createSeededRng(5),
+    });
+    const { flow } = store.getState();
+    const state = asodio.initialState({ startingPlayer: 'white', rules });
+    store.setState({ flow: { ...flow, game: createGameFlow({ state, starter: 'white' }) } });
+    await show(store);
+    const { dispatch } = store.getState();
+    await act(async () => {
+      dispatch({ type: 'roll', player: 'white', dice: [1, 2] });
+    });
+    await act(async () => {
+      for (let next = legalNextMoves(store.getState().flow.game)[0]; next;) {
+        dispatch({ type: 'move', player: 'white', move: next.moves[0]! });
+        next = legalNextMoves(store.getState().flow.game)[0];
+      }
+      dispatch({ type: 'confirm', player: 'white' });
+    });
+    expect(store.getState().flow.game.phase).toBe('awaiting-answer');
+    await tick(DOUBLE_SPLIT_AT_MS + DOUBLE_LABEL_MS);
+    await act(async () => {
+      dispatch({ type: 'answer', player: 'white', choice: '4' });
+    });
+    expect(store.getState().flow.game.state.dice).toEqual([4, 4]);
+    // No roll: the four dice show at once, not a pair first.
+    expect(diceDrawn()).toBe(4);
+    expect(diceOpacity()).toEqual([1, 1, 1, 1]);
+    expect(screen.getByLabelText('Dice 4-4-4-4, 4 left to play')).toBeOnTheScreen();
+    const canvas = screen.getByTestId('dice-row');
+    const parent = nativeParent(canvas);
+    expect(parent?.props.collapsable).toBe(false);
+    // No split and no late "Doubles!" label.
+    for (let ms = 0; ms <= DOUBLE_SPLIT_AT_MS + DOUBLE_LABEL_MS; ms += 100) {
+      expect(screen.queryByTestId('doubles-hint')).toBeNull();
+      expect(diceDrawn()).toBe(4);
+      await tick(100);
+    }
+    expect(screen.getByTestId('dice-row') === canvas).toBe(true);
+    expect(nativeParent(screen.getByTestId('dice-row')) === parent).toBe(true);
+  });
+
   // Greek names each double by its value (the owner's words), in the label
   // and in what screen readers hear.
   it.each([
@@ -395,124 +440,5 @@ describe('<GameScreen /> doubles (#177)', () => {
       expect(nativeParent(screen.getByTestId('dice-row')) === parent).toBe(true);
       expect(nativePath(screen.getByTestId('dice-row'))).toBe(path);
     });
-  });
-});
-
-/**
- * Acey-Deucey Asodio: after a 1-2 the player chooses a double (#202).
- * Nobody rolls it, so the four dice show at rest and the screen reader
- * says "chose", not "rolled".
- */
-describe('<GameScreen /> a chosen double (#202)', () => {
-  const rules = resolveRules('asodio.aceyDeuceyGreek');
-  const seats: PerPlayer<Seat> = {
-    white: { name: 'You', label: 'You', turnLabel: 'Your turn', you: true },
-    black: { name: 'Bot', label: 'Bot · Easy', turnLabel: 'Playing', you: false },
-  };
-
-  /** An Acey-Deucey game from the empty board, `player` to roll. */
-  function aceyDeucey(player: PlayerId, rng: Rng = createSeededRng(5)): GameStore {
-    const store = createGameStore({ players: { white: 'Ann', black: 'Bob' }, rules, rng });
-    const state = asodio.initialState({ startingPlayer: player, rules });
-    store.setState({
-      flow: { ...store.getState().flow, game: createGameFlow({ state, starter: player }) },
-    });
-    return store;
-  }
-
-  /** Four dice, none faded, and no "Doubles!" for the whole time a roll would split. */
-  async function expectFourAtRest() {
-    for (let ms = 0; ms <= DOUBLE_SPLIT_AT_MS + DOUBLE_LABEL_MS; ms += 100) {
-      expect(diceDrawn()).toBe(4);
-      expect(doublesHint()).toBeNull();
-      await tick(100);
-    }
-  }
-
-  it('your chosen double shows four dice at rest and is read as chosen, once', async () => {
-    const store = aceyDeucey('white');
-    await show(store, { seats });
-    const send = async (action: MatchAction) => {
-      await act(async () => {
-        expect(store.getState().dispatch(action)).toBe(true);
-      });
-    };
-    await send({ type: 'roll', player: 'white', dice: [1, 2] });
-    for (let i = 0; i < 2; i++) {
-      const move = legalNextMoves(store.getState().flow.game)[0]!.moves[0]!;
-      await send({ type: 'move', player: 'white', move });
-    }
-    await send({ type: 'confirm', player: 'white' });
-    expect(store.getState().flow.game.phase).toBe('awaiting-answer');
-    await send({ type: 'answer', player: 'white', choice: '4' });
-
-    // No roll: all four dice show at once, and they stay at rest.
-    expect(screen.getByLabelText('Dice 4-4-4-4, 4 left to play')).toBeOnTheScreen();
-    expect(diceOpacity()).toEqual([1, 1, 1, 1]);
-    await expectFourAtRest();
-
-    const said = announce.mock.calls.map(([text]) => String(text));
-    expect(said.filter((t) => t === 'You chose double 4: four moves of 4.')).toHaveLength(1);
-    expect(said.filter((t) => /double/i.test(t))).toHaveLength(1);
-  });
-
-  it('the bot’s chosen double: its 1-2 and its choice are read, and the dice do not roll', async () => {
-    // The first roll is 1-2 (the bot's), then seeded dice.
-    const seeded = createSeededRng(7);
-    const first = [0, 1];
-    const rng: Rng = { nextUint32: () => first.shift() ?? seeded.nextUint32() };
-    const store = aceyDeucey('black', rng);
-    const bot: BotSeat = {
-      player: 'black',
-      difficulty: 'easy',
-      runner: new InlineBotRunner(createBot()),
-      rng: createSeededRng(1),
-      timing: { thinkMs: () => 0 },
-    };
-    await show(store, { seats, bot });
-    // The bot rolls 1-2, plays it, then answers the question.
-    const chosen = () => diceChosen(store.getState().flow);
-    for (let guard = 0; guard < 200 && !chosen(); guard++) await tick(50);
-    expect(chosen()).toBe(true);
-    const dice = store.getState().flow.game.state.dice!;
-    expect(dice[0]).toBe(dice[1]);
-    const value = dice[0];
-    expect(store.getState().flow.game.played).toHaveLength(0);
-    expect(diceDrawn()).toBe(4);
-    expect(doublesHint()).toBeNull();
-
-    const said = announce.mock.calls.map(([text]) => String(text));
-    const line = new RegExp(
-      `^Bot played: [^.]+; [^.]+\\. Bot chose double ${value}: four moves of ${value}\\.$`,
-    );
-    expect(said.filter((t) => line.test(t))).toHaveLength(1);
-    expect(said.filter((t) => /rolled double/.test(t))).toHaveLength(0);
-
-    // The bot plays the double; no "Doubles!" shows over the chosen dice.
-    while (chosen()) {
-      expect(diceDrawn()).toBe(4);
-      expect(doublesHint()).toBeNull();
-      await tick(50);
-    }
-  });
-
-  it('reads your chosen double in Greek', async () => {
-    await i18n.changeLanguage('el');
-    const store = aceyDeucey('white');
-    await show(store, { seats });
-    const { dispatch } = store.getState();
-    await act(async () => {
-      dispatch({ type: 'roll', player: 'white', dice: [1, 2] });
-      for (let i = 0; i < 2; i++) {
-        const move = legalNextMoves(store.getState().flow.game)[0]!.moves[0]!;
-        dispatch({ type: 'move', player: 'white', move });
-      }
-      dispatch({ type: 'confirm', player: 'white' });
-    });
-    await act(async () => {
-      dispatch({ type: 'answer', player: 'white', choice: '5' });
-    });
-    expect(announce).toHaveBeenCalledWith('Διάλεξες πεντάρες: τέσσερις κινήσεις του 5.');
-    await expectFourAtRest();
   });
 });

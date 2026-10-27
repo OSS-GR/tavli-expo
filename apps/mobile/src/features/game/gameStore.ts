@@ -176,23 +176,6 @@ export function diceView(
   return out;
 }
 
-/**
- * Were this turn's dice chosen, not rolled? In the Acey-Deucey Asodio
- * presets a 1-2 lets the player choose a double (the `chooseDouble`
- * question). The answer sets the dice, and the turn starts with no roll
- * (#202). The log tells: the last event that gave dice is an `answer`, not
- * a `roll`. The moves and undos of this turn come after it, so skip them.
- */
-export function diceChosen(flow: MatchFlow): boolean {
-  if (flow.game.state.dice === null) return false;
-  for (let i = flow.log.length - 1; i >= 0; i--) {
-    const type = flow.log[i]?.type;
-    if (type === 'answer') return true;
-    if (type !== 'move' && type !== 'undo') return false;
-  }
-  return false;
-}
-
 export function turnView(flow: MatchFlow): TurnView {
   const game = flow.game;
   const board = currentBoard(game);

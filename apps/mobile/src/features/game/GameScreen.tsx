@@ -76,18 +76,12 @@ import { turnAnnouncement } from './announcements';
 import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, useGameFeedback } from './gameFeedback';
-import {
-  diceChosen,
-  diceView,
-  turnView,
-  useGameStore,
-  type DieView,
-  type GameStore,
-} from './gameStore';
+import { diceView, turnView, useGameStore, type DieView, type GameStore } from './gameStore';
 import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
 import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
+import { diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
 import { passNotice, winType } from './turnNotices';
 import { useAnnouncement } from './useAnnouncement';
@@ -528,13 +522,12 @@ export function GameScreen({
   // Dice in the controls row: this turn's, or the faded dice of a pass.
   const passDice: DieView[] = pass ? diceView(pass.dice, []) : [];
   const dice = showPass ? passDice : view.dice;
-  // The opening dice already rolled in the card: show them at rest.
+  // The opening dice already rolled in the card: show them at rest. So do
+  // dice that no roll gave: a double chosen after a 1-2 (Acey-Deucey, #177).
   const fromOpening = game.opening !== null && game.lastTurn === null;
-  // A chosen double (Acey-Deucey, after a 1-2) was never rolled: its four
-  // dice show at rest, with no roll, no split and no "Doubles!" (#202).
-  const chosen = diceChosen(flow);
-  const rollKey = fromOpening || showPass || chosen ? null : `${gameKey}:${game.state.turnNumber}`;
-  // A double shows its two dice first, then splits into four (#177).
+  const atRest = fromOpening || showPass || (game.state.dice !== null && !diceWereRolled(flow));
+  const rollKey = atRest ? null : `${gameKey}:${game.state.turnNumber}`;
+  // A rolled double shows its two dice first, then splits into four (#177).
   const reveal = useDoubleReveal(rollKey, dice);
 
   // The opening Roll button sits on the opening card, next to the dice (#176).

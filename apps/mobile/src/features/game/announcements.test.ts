@@ -10,7 +10,8 @@ import {
 import i18n from '@/i18n';
 
 import { turnAnnouncement, type AnnouncementNames } from './announcements';
-import { createGameStore, diceChosen } from './gameStore';
+import { createGameStore } from './gameStore';
+import { diceWereRolled } from './rolledDice';
 
 const names = { white: 'Ann', black: 'Bot' } as const;
 const vsBot = {
@@ -177,7 +178,7 @@ describe('turnAnnouncement: a chosen double (#202)', () => {
     // All four moves played: the same player rolls again (asodio.md 3.3).
     expect(store.getState().flow.game.state.toMove).toBe('white');
     dispatch({ type: 'roll', player: 'white', dice: [5, 5] });
-    expect(diceChosen(store.getState().flow)).toBe(false);
+    expect(diceWereRolled(store.getState().flow)).toBe(true);
     expect(announce()?.text).toBe('You rolled double 5: four moves of 5.');
   });
 
@@ -203,26 +204,5 @@ describe('turnAnnouncement: a chosen double (#202)', () => {
     const { dispatch, announce } = afterAceDeuce('white');
     dispatch({ type: 'answer', player: 'white', choice: value });
     expect(announce()?.text).toBe(`Διάλεξες ${name}: τέσσερις κινήσεις του ${value}.`);
-  });
-});
-
-describe('diceChosen (#202)', () => {
-  it('is true only while the turn plays the double chosen after a 1-2', () => {
-    const { store, dispatch, nextMove } = afterAceDeuce('white');
-    const chosen = () => diceChosen(store.getState().flow);
-    expect(chosen()).toBe(false);
-    dispatch({ type: 'answer', player: 'white', choice: '1' });
-    expect(chosen()).toBe(true);
-    dispatch({ type: 'move', player: 'white', move: nextMove()! });
-    expect(chosen()).toBe(true);
-    dispatch({ type: 'undo', player: 'white' });
-    expect(chosen()).toBe(true);
-  });
-
-  it('is false for rolled dice', () => {
-    const { store, dispatch } = afterFirstTurn();
-    expect(diceChosen(store.getState().flow)).toBe(false);
-    dispatch({ type: 'roll', player: 'black', dice: [4, 4] });
-    expect(diceChosen(store.getState().flow)).toBe(false);
   });
 });

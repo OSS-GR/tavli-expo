@@ -24,7 +24,7 @@ import type { TFunction } from 'i18next';
 
 import { moveLabel } from '@/features/accessibility/moveList';
 
-import { diceChosen } from './gameStore';
+import { diceWereRolled } from './rolledDice';
 
 export interface Announcement {
   /** One per event, so the same text is read again for a new event. */
@@ -53,7 +53,7 @@ export function turnAnnouncement(
     const player = game.state.toMove;
     const name = nameOf(player);
     // A chosen double (#202): the player picked these dice, nobody rolled.
-    if (diceChosen(flow) && isDouble(dice)) {
+    if (!diceWereRolled(flow) && isDouble(dice)) {
       const value = dice[0];
       const vars = { name, value, double: t(`game.doubles.name.${value}`) };
       if (isYou(player)) {
