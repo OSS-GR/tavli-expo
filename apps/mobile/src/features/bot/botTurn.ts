@@ -10,9 +10,17 @@
  *    pinned), ask the runner (`chooseAnswer`, or `botAnswer` for a runner
  *    without it), wait `beforeRollMs` and answer;
  * 1. wait `beforeRollMs`, then roll (a roll with no legal move passes by itself);
- * 2. ask the `BotRunner` for a turn and wait `thinkingDelayMs` at the same time;
- * 3. play the moves one by one, `moveMs` apart;
- * 4. confirm.
+ * 2. ask the `BotRunner` for a turn and wait at the same time: the think time
+ *    (`thinkingDelayMs`). Right after its own roll, never less than
+ *    `afterRollMs`, so the dice land and the player can read them. Dice that
+ *    were already there (the opening roll, a turn that goes on after the
+ *    menu) get only the think time;
+ * 3. play the moves one by one, `moveMs` apart, plus `hitMs` after a hit;
+ * 4. after the last move wait `landMs` (and `HIT_DELAY_MS` more after a
+ *    hit), so the checker lands, then confirm.
+ *
+ * The timings come from the Bot speed setting (`BOT_SPEED_TIMING` in
+ * `botSpeed.ts`, #172).
  *
  * `startBotTurn` returns a handle; `cancel()` stops the turn at the next
  * step (the user opened the menu or left the game).
@@ -32,6 +40,12 @@ import {
   type VariantPrompt,
 } from '@tavli/engine';
 
+import { HIT_DELAY_MS } from '@/features/board/flights';
+
+import { BOT_TIMING, type BotTiming } from './botSpeed';
+
+export { BOT_SPEED_TIMING, BOT_TIMING, type BotTiming } from './botSpeed';
+
 /** What the bot may do. Each returns `false` when the engine refuses it. */
 export interface BotTurnActions {
   roll: () => boolean;
@@ -50,17 +64,6 @@ export function botAnswer(prompt: VariantPrompt): string {
   if (prompt.choices.includes('playOn')) return 'playOn';
   return prompt.choices[0] ?? '';
 }
-
-export interface BotTiming {
-  /** Pause before the bot rolls, so the turn change is easy to see. */
-  readonly beforeRollMs: number;
-  /** Time between two moves (wireframe: about 0.4 s each). */
-  readonly moveMs: number;
-  /** Think time before the first move. Default: `thinkingDelayMs` from the bot package. */
-  readonly thinkMs?: (difficulty: Difficulty, rng: Rng, forced: boolean) => number;
-}
-
-export const BOT_TIMING: BotTiming = { beforeRollMs: 500, moveMs: 400 };
 
 export interface BotTurnOptions {
   /** The bot's side. */
@@ -128,7 +131,8 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
       wakers.add(resolve);
     });
 
-  const play = async () => {
+  /** `rolled`: the bot rolled these dice just now, so they must stay on screen a moment. */
+  const play = async (rolled: boolean) => {
     const game = getFlow().game;
     const dice = game.state.dice;
     if (dice === null) return false;
@@ -142,7 +146,7 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
         difficulty,
         seed: rng.nextUint32(),
       }),
-      sleep(thinkMs(difficulty, rng, forced)),
+      sleep(Math.max(thinkMs(difficulty, rng, forced), rolled ? timing.afterRollMs : 0)),
     ]);
     if (cancelled) return false;
 
@@ -158,15 +162,23 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
       for (let i = 0; i < played.length; i++) actions.undo();
       next = 0;
     }
-    for (const move of turn.moves.slice(next)) {
+    const rest = turn.moves.slice(next);
+    for (const [i, move] of rest.entries()) {
       if (cancelled) return false;
       if (!actions.move(move)) return false;
-      await sleep(timing.moveMs);
+      const hit = move.capture === 'hit';
+      // Between moves: the full gap. After the last one: only until it lands.
+      const last = i === rest.length - 1;
+      await sleep(
+        last ? timing.landMs + (hit ? HIT_DELAY_MS : 0) : timing.moveMs + (hit ? timing.hitMs : 0),
+      );
     }
     return true;
   };
 
   const run = async () => {
+    // Did this call roll the dice? Then they get time on screen.
+    let rolled = false;
     // At most: answer, roll, play, confirm.
     for (let guard = 0; guard < 5 && !cancelled; guard++) {
       const step = botStep(getFlow(), player);
@@ -200,8 +212,9 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
       } else if (step === 'roll') {
         await sleep(timing.beforeRollMs);
         if (cancelled || !actions.roll()) return;
+        rolled = true;
       } else if (step === 'play') {
-        if (!(await play())) return;
+        if (!(await play(rolled))) return;
       } else {
         actions.confirm();
         return;
