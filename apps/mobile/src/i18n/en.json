@@ -205,11 +205,15 @@
     "opening": {
       "title": "Who starts?",
       "body": "Each player rolls one die. The higher die starts and plays both.",
-      "tie": "Tie! Both rolled {{value}}. Roll again.",
+      "tie": "Tie: both rolled {{value}}. Roll again.",
+      "rolledBy": "{{name}} rolled {{value}}.",
+      "rolledBy_you": "You rolled {{value}}.",
       "result": "{{name}} starts with {{high}}-{{low}}.",
       "notRolled": "Not rolled yet",
       "rolled": "Rolled {{value}}",
-      "result_you": "You start with {{high}}-{{low}}."
+      "result_you": "You start with {{high}}-{{low}}.",
+      "ok": "OK",
+      "autoClose": "Closes by itself after 3 s."
     },
     "roll": {
       "opening": "Roll to start",

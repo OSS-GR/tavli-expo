@@ -1,18 +1,31 @@
 /**
- * "Who starts?" (wireframe 6a): a card over the board with one die per player.
+ * "Who starts?" (wireframe 6a, #176): a card over the board with one die
+ * per player, their names under the dice, and a big Roll button.
+ *
+ * - Before a roll, a die is a blank die face (no pips), not a "?".
+ * - A roll tumbles the die and lands it on the value the engine rolled.
+ * - A tie keeps both dice on screen with "Tie: both rolled 4. Roll again."
+ *   until the next roll.
+ * - The result ("Maria starts with 6-3.") has an OK button; the screen
+ *   also closes it after a moment.
+ *
+ * Each step is read to screen reader users (`useAnnouncement`); focus moves
+ * to the title when the card opens (#153).
  */
-import { Canvas } from '@shopify/react-native-skia';
-import type { PerPlayer, PlayerId } from '@tavli/engine';
+import { Canvas, Group } from '@shopify/react-native-skia';
+import type { DieValue, PerPlayer, PlayerId } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
 import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { ActionButton } from '@/components/ActionButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { DIE_SIZE } from '@/features/board/diceMotion';
 import { AnimatedDie } from '@/features/board/skia/AnimatedDie';
+import { DieBody } from '@/features/board/skia/DieShape';
 
-import type { OpeningStatus } from './opening';
+import { openingDice, type OpeningStatus } from './opening';
 import { useAnnouncement } from './useAnnouncement';
 
 export interface OpeningCardProps {
@@ -21,71 +34,103 @@ export interface OpeningCardProps {
   names: PerPlayer<string>;
   /** The human vs the bot: the result says "You start". */
   you?: PlayerId | null;
-  /** Changes when a new round starts (after a tie), so the dice roll again. */
-  roundKey: string;
+  /** The game in the match. With `status.round` it keys each die's roll. */
+  gameKey: string;
+  /** The Roll button's label ("Maria: roll"). Shown while the dice are not decided. */
+  rollLabel: string;
+  /** Just after a tie the Roll button waits a moment, so a quick tap does not skip the tie. */
+  rollDisabled?: boolean;
+  onRoll: () => void;
+  /** Closes the result. */
+  onClose: () => void;
   onDieLanded?: () => void;
 }
 
-const BOX = DIE_SIZE * 1.6;
+/** The opening dice are bigger than the dice in the controls row. */
+const SIZE = Math.round(DIE_SIZE * 1.3);
+/** Room around the die for its hop and shadow. */
+const BOX = Math.round(SIZE * 1.6);
 
 function OpeningDie({
   theme,
   value,
   rollKey,
   index,
+  label,
+  testID,
   onLand,
 }: {
   theme: ThemeManifest;
-  value: number | null;
+  value: DieValue | null;
   rollKey: string;
   index: number;
+  label: string;
+  testID: string;
   onLand?: () => void;
 }) {
-  const { t } = useTranslation();
-  if (value === null) {
-    return (
-      <View style={styles.placeholder} accessible accessibilityLabel={t('game.opening.notRolled')}>
-        {/* A stand-in die in a fixed box: it keeps its size. The box has the label. */}
-        <Text style={styles.question} importantForAccessibility="no" allowFontScaling={false}>
-          ?
-        </Text>
-      </View>
-    );
-  }
+  const tilt = theme.layouts['portrait-rotated'].dice.tilt[index] ?? 0;
   return (
-    <Canvas
-      style={styles.dieCanvas}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={t('game.opening.rolled', { value })}>
-      <AnimatedDie
-        key={rollKey}
-        style={theme.dice}
-        x={BOX / 2}
-        y={BOX / 2}
-        size={DIE_SIZE}
-        value={value}
-        index={index}
-        tilt={theme.layouts['portrait-rotated'].dice.tilt[index] ?? 0}
-        used={false}
-        rollKey={rollKey}
-        {...(onLand ? { onLand } : {})}
-      />
-    </Canvas>
+    // One canvas for the whole card life, always in this native view
+    // (`collapsable={false}`): on iOS a canvas that moves to another native
+    // parent loses its drawing (#173).
+    <View collapsable={false} style={styles.dieBox}>
+      <Canvas
+        testID={testID}
+        style={styles.dieBox}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={label}>
+        {value === null ? (
+          // Not rolled yet: a blank die face.
+          <Group
+            transform={[
+              { translateX: BOX / 2 },
+              { translateY: BOX / 2 },
+              { rotate: (tilt * Math.PI) / 180 },
+            ]}>
+            <DieBody style={theme.dice} size={SIZE} />
+          </Group>
+        ) : (
+          <AnimatedDie
+            key={rollKey}
+            style={theme.dice}
+            x={BOX / 2}
+            y={BOX / 2}
+            size={SIZE}
+            value={value}
+            index={index}
+            tilt={tilt}
+            used={false}
+            rollKey={rollKey}
+            {...(onLand ? { onLand } : {})}
+          />
+        )}
+      </Canvas>
+    </View>
   );
 }
+
+const PLAYERS: readonly PlayerId[] = ['white', 'black'];
 
 export function OpeningCard({
   theme,
   status,
   names,
   you = null,
-  roundKey,
+  gameKey,
+  rollLabel,
+  rollDisabled = false,
+  onRoll,
+  onClose,
   onDieLanded,
 }: OpeningCardProps) {
   const { t } = useTranslation();
-  const players: PlayerId[] = ['white', 'black'];
+  const dice = openingDice(status);
+  const decided = status.kind === 'decided';
+
   let message: string;
+  // Only the rules line is quiet; a roll, a tie and the result stand out.
+  let quiet = false;
   if (status.kind === 'decided') {
     const high = Math.max(status.white, status.black);
     const low = Math.min(status.white, status.black);
@@ -93,37 +138,82 @@ export function OpeningCard({
       status.starter === you
         ? t('game.opening.result_you', { high, low })
         : t('game.opening.result', { name: names[status.starter], high, low });
-  } else if (status.tie !== null && status.white === null && status.black === null) {
-    message = t('game.opening.tie', { value: status.tie });
+  } else if (status.kind === 'tie') {
+    message = t('game.opening.tie', { value: status.value });
   } else {
-    message = t('game.opening.body');
+    // One die rolled (pass-and-play): say whose and what.
+    const { white, black } = status;
+    const rolled: PlayerId | null =
+      white !== null && black === null
+        ? 'white'
+        : black !== null && white === null
+          ? 'black'
+          : null;
+    const value = rolled === null ? null : status[rolled];
+    quiet = value === null;
+    message =
+      rolled === null || value === null
+        ? t('game.opening.body')
+        : rolled === you
+          ? t('game.opening.rolledBy_you', { value })
+          : t('game.opening.rolledBy', { name: names[rolled], value });
   }
-  // Focus goes to the title when the card opens (#153), then the message is read.
+
+  // Focus goes to the title when the card opens (#153), then each step is
+  // read: the message and what to do next. A new round reads again, even
+  // with the same words (two ties of 4).
   const titleRef = useFocusOnShow();
-  // Read on both platforms (a live region works on Android only).
-  useAnnouncement(message);
+  useAnnouncement(decided ? message : `${message} ${rollLabel}.`, `${status.kind}:${status.round}`);
+
   return (
     <View testID="opening-card" style={styles.card}>
       <Text ref={titleRef} style={styles.title} accessibilityRole="header">
         {t('game.opening.title')}
       </Text>
-      <Text testID="opening-message" style={styles.body}>
+      <Text testID="opening-message" style={styles.message(quiet)}>
         {message}
       </Text>
       <View style={styles.dice}>
-        {players.map((player, index) => (
-          <View key={player} style={styles.player}>
-            <OpeningDie
-              theme={theme}
-              value={status[player]}
-              rollKey={`${roundKey}:${player}`}
-              index={index}
-              {...(onDieLanded ? { onLand: onDieLanded } : {})}
-            />
-            <Text style={styles.name}>{names[player]}</Text>
-          </View>
-        ))}
+        {PLAYERS.map((player, index) => {
+          const value = dice[player];
+          const starts = status.kind === 'decided' && status.starter === player;
+          return (
+            <View key={player} style={styles.player}>
+              <OpeningDie
+                theme={theme}
+                value={value}
+                rollKey={`${gameKey}:${status.round}:${player}`}
+                index={index}
+                testID={`opening-die-${player}`}
+                label={
+                  value === null ? t('game.opening.notRolled') : t('game.opening.rolled', { value })
+                }
+                {...(onDieLanded ? { onLand: onDieLanded } : {})}
+              />
+              <Text style={styles.name(starts)}>{names[player]}</Text>
+            </View>
+          );
+        })}
       </View>
+      <View style={styles.actions}>
+        {decided ? (
+          <ActionButton
+            testID="opening-ok-button"
+            label={t('game.opening.ok')}
+            kind="secondary"
+            onPress={onClose}
+          />
+        ) : (
+          <ActionButton
+            testID="roll-button"
+            label={rollLabel}
+            subtitle={t('game.roll.orTapBoard')}
+            disabled={rollDisabled}
+            onPress={onRoll}
+          />
+        )}
+      </View>
+      {decided ? <Text style={styles.footnote}>{t('game.opening.autoClose')}</Text> : null}
     </View>
   );
 }
@@ -144,48 +234,38 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.text,
     textAlign: 'center',
   },
-  body: {
-    fontSize: 16,
-    color: theme.colors.textDim,
+  message: (quiet: boolean) => ({
+    ...(quiet ? theme.type.body : theme.type.bodyStrong),
+    color: quiet ? theme.colors.textDim : theme.colors.text,
     textAlign: 'center',
-  },
+  }),
   dice: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: theme.space.xl,
-    paddingTop: theme.space.sm,
   },
   player: {
     alignItems: 'center',
     gap: theme.space.xs,
     maxWidth: 140,
   },
-  dieCanvas: {
+  dieBox: {
     width: BOX,
     height: BOX,
   },
-  placeholder: {
-    width: BOX,
-    height: BOX,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  question: {
-    width: DIE_SIZE,
-    height: DIE_SIZE,
-    lineHeight: DIE_SIZE,
+  name: (starts: boolean) => ({
+    ...theme.type.bodyStrong,
+    color: starts ? theme.colors.turnText : theme.colors.text,
     textAlign: 'center',
-    fontSize: 24,
-    fontWeight: '700',
-    color: theme.colors.textDim,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderRadius: theme.radii.md,
-    borderColor: theme.colors.border,
+  }),
+  actions: {
+    alignSelf: 'stretch',
+    paddingTop: theme.space.xs,
   },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text,
+  footnote: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 }));

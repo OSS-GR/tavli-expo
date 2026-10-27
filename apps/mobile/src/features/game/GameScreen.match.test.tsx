@@ -14,6 +14,7 @@ import { passNotice } from './turnNotices';
 
 import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
+import { pressOpeningRoll } from '../../../test/openingRoll';
 import { renderWithRoot } from '../../../test/render';
 
 const SIZE = { width: 375, height: 520 };
@@ -70,7 +71,7 @@ it(`plays a pass-and-play match to ${TARGET} with taps only`, async () => {
     const card = (testID: string) => screen.queryByTestId(testID) !== null;
     if (view.matchPhase === 'game-over') await press('next-game-button');
     else if (passNotice(flow) && card('pass-ok-button')) await press('pass-ok-button');
-    else if (view.phase === 'opening-roll') await press('roll-button');
+    else if (view.phase === 'opening-roll') await pressOpeningRoll();
     else if (openingStatus(view.game) && card('opening-overlay')) await press('opening-overlay');
     else if (view.phase === 'awaiting-roll') await press('roll-button');
     else if (view.phase === 'awaiting-confirm') await press('confirm-button');
