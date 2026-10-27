@@ -365,15 +365,21 @@ describe('resignMatch and rematch', () => {
 });
 
 describe('rotation and missing variants', () => {
+  // A registry with only Portes stands in for games that are not built yet.
+  const portesOnly = createVariantRegistry([portes]);
+
   it('lists the games of the rotation that are not built yet', () => {
-    expect(missingVariants(createMatch({ rules: TAVLI }))).toEqual(['plakoto', 'fevga']);
+    expect(missingVariants(createMatch({ rules: TAVLI }), portesOnly)).toEqual([
+      'plakoto',
+      'fevga',
+    ]);
     expect(missingVariants(createMatch())).toEqual([]);
   });
 
   it('startNextGame fails with a clear error when the next game is not built yet', () => {
     const match = play(createMatch({ rules: TAVLI, starter: 'white' }), win('white'));
     expect(nextVariantId(match)).toBe('plakoto');
-    expect(() => startNextGame(match, 'white')).toThrow(
+    expect(() => startNextGame(match, 'white', portesOnly)).toThrow(
       expect.objectContaining({
         code: 'UNKNOWN_VARIANT',
         path: 'match.rules.match.rotation[1]',
