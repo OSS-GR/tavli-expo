@@ -36,6 +36,10 @@ Each image ships as `name.webp` (@1x), `name@2x.webp` and `name@3x.webp`. All ar
 
 `preview/*.png` are renders of the theme made by `tools/preview.mjs`. They are not shipped in the app. Same sources and licenses as the theme.
 
+## Used outside this package: app icon and splash
+
+`apps/mobile/assets/icon/tools/build-icons.mjs` reads the four graded textures above and the Walnut Kafeneio palette. It makes the app icon, the Android adaptive icon layers, the splash images (`apps/mobile/assets/icon/*.png`) and the concept previews (`apps/mobile/assets/icon-concepts/*.png`). The shapes (checkers, points, die, Τ, brass ring) are our own drawing. License: project art; textures CC0 1.0, same sources as the table above. No font is used: the Τ is drawn as a path.
+
 ## Fonts
 
 No font is shipped. The preview draws the count badge with the machine's default sans-serif font.
