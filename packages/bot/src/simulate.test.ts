@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatTurn, portes } from '@tavli/engine';
+import { formatTurn, plakoto, portes } from '@tavli/engine';
 import type { Turn } from '@tavli/engine';
 
 import { createBot, playGame, simulate } from './index';
@@ -95,8 +95,9 @@ describe('simulate', () => {
       maxTurns: 5,
     });
     expect(short.failures.map((f) => f.code)).toEqual(['TOO_LONG', 'TOO_LONG']);
+    // Plakoto has no hard bot yet.
     const notYet = simulate({
-      variant: portes,
+      variant: plakoto,
       bots: [random, { bot: createBot(), difficulty: 'hard' }],
       games: 1,
       seed: 1,

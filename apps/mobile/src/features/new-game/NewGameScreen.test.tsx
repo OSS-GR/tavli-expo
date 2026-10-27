@@ -275,6 +275,27 @@ describe('<NewGameScreen /> game picker (#109)', () => {
     expect(screen.getByRole('radio', { name: 'Medium' })).toBeChecked();
   });
 
+  it('offers Hard for Portes but not for Tavli, like the bot today (#147)', async () => {
+    const user = userEvent.setup();
+    const levels = gameLevels(['easy', 'medium'], { portes: ['easy', 'medium', 'hard'] });
+    const { ui, onStart } = show('bot', levels);
+    await render(ui);
+
+    expect(screen.getByRole('radio', { name: 'Hard' })).toBeEnabled();
+    expect(screen.queryByText('Hard is coming soon.')).toBeNull();
+    await user.press(screen.getByRole('radio', { name: 'Hard' }));
+    expect(screen.getByText('Hard plays like a strong player.')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart.mock.calls[0][0]).toMatchObject({ game: 'portes', botLevel: 'hard' });
+
+    // Tavli needs Hard in all three games: it shows locked, and Easy plays.
+    await user.press(screen.getByRole('radio', { name: /^Tavli/ }));
+    expect(screen.getByRole('radio', { name: 'Hard' })).toBeDisabled();
+    expect(screen.getByText('Hard is coming soon.')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart.mock.calls[1][0]).toMatchObject({ game: 'tavli', botLevel: 'easy' });
+  });
+
   it('opens every built game in pass-and-play, even with no bot for them', async () => {
     const user = userEvent.setup();
     const { ui, onStart } = show('local', PORTES_ONLY(['easy']));

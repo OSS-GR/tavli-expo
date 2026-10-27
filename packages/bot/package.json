@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "simulate": "node --import ./scripts/register-ts.mjs ./scripts/simulate.ts",
-    "tune": "node --import ./scripts/register-ts.mjs ./scripts/tune.ts"
+    "tune": "node --import ./scripts/register-ts.mjs ./scripts/tune.ts",
+    "train": "node --import ./scripts/register-ts.mjs ./scripts/train.ts"
   },
   "dependencies": {
     "@tavli/contracts": "workspace:*",
