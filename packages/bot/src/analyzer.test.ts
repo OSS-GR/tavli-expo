@@ -254,12 +254,6 @@ describe('rankTurns', () => {
     expect(heldDice).toBeGreaterThan(0);
   });
 
-  it('throws NOT_IMPLEMENTED for 2-ply', () => {
-    expect(() => analyzer.rankTurns(start, [3, 1], { plies: 2 })).toThrow(
-      expect.objectContaining({ name: 'BotError', code: 'NOT_IMPLEMENTED' }),
-    );
-  });
-
   it('throws INVALID_REQUEST for a bad request', () => {
     const invalid = expect.objectContaining({ code: 'INVALID_REQUEST' });
     expect(() => analyzer.rankTurns(start, [3, 1], { top: 0 })).toThrow(invalid);
