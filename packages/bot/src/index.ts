@@ -47,6 +47,14 @@ export {
   portesHeuristic,
 } from './evaluators/portes-heuristic';
 export type { PortesWeights } from './evaluators/portes-heuristic';
+export {
+  FEVGA_DEFAULT_WEIGHTS,
+  FEVGA_HEURISTIC_ID,
+  createFevgaHeuristic,
+  evaluateFevgaSides,
+  fevgaHeuristic,
+} from './evaluators/fevga-heuristic';
+export type { FevgaWeights } from './evaluators/fevga-heuristic';
 export { InlineBotRunner, runBotRequest } from './inline-runner';
 export { FORCED_DELAY_MS, THINKING_DELAY_MS, thinkingDelayMs } from './thinking-delay';
 export type { DelayRange } from './thinking-delay';
