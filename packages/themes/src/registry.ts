@@ -4,6 +4,7 @@
  * To add a theme, import its `theme.json` here and add it to `BUNDLED`.
  */
 
+import oliveInlay from '../olive-inlay/theme.json';
 import walnutKafeneio from '../walnut-kafeneio/theme.json';
 import { resolvePalette } from './color';
 import type { BoardLayout, LayoutId, ThemeManifest } from './types';
@@ -11,6 +12,7 @@ import { assertTheme } from './validate';
 
 const BUNDLED: Readonly<Record<string, unknown>> = {
   'walnut-kafeneio': walnutKafeneio,
+  'olive-inlay': oliveInlay,
 };
 
 /** The theme a new install uses. */

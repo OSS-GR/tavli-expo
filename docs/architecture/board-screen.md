@@ -12,10 +12,10 @@
 | `paint.ts` | Theme gradients and colors → Skia props. |
 | `skia/BoardScene.tsx` | The Skia drawing. Props only: no hooks, no React Native. The same scene renders in the app, in Jest and headless. |
 | `skia/CheckerShape.tsx` | One checker from a theme `CheckerStyle`. |
-| `BoardCanvas.tsx` | The Skia `<Canvas>`, the theme from Settings and the space the board may fill. |
+| `BoardCanvas.tsx` | The Skia `<Canvas>`, the board theme from Settings (`useBoardTheme`) and the space the board may fill. |
 | `useBoardAssets.ts` | Loads the theme images and the badge font. |
 | `themeImages.ts` | The Metro `require` map for theme images (Metro only bundles literal requires). |
-| `StaticBoard.tsx` | A board that only shows a position. |
+| `StaticBoard.tsx` | A board that only shows a position. An optional `theme` prop draws another theme (the board picker). |
 | `positions.ts` | Fixed positions (start, mid-game, bear-off, Plakoto, Fevga, Asodio) for the dev screen, tests and screenshots. |
 | `diceMotion.ts` | The roll animation as pure math (worklets): tumble pose and face flips. |
 | `skia/DieShape.tsx`, `skia/AnimatedDie.tsx` | A die from the theme `DiceStyle`; the animated version tumbles and lands on the engine's value. |
@@ -45,6 +45,14 @@ The real route is `app/game/[id]/index.tsx`; match end is `app/game/[id]/match-e
 - `app/dev/board.tsx`: the fixed positions (`positions.ts`: Portes start, mid-game, bear-off, Plakoto start, Plakoto pins, Fevga start, Asodio start, Asodio loading, Asodio frozen army), from White's and from Black's side. Each position has its direction (`SAMPLE_DIRECTIONS`). The Asodio positions show the frozen marks.
 
 **Game flow and ADR-0003.** The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. ADR-0003 records this (updated in #29).
+
+## Board themes
+
+- Two boards ship: **Walnut Kafeneio** (default) and **Olive Inlay** (`packages/themes`). Both have the same geometry, so only the art changes.
+- The player picks one in **Settings → Board** (`features/settings/BoardThemePicker.tsx`): one radio row per bundled theme, with a small `StaticBoard` of the start position in that theme, and the theme's name and description in the app language. The choice saves at once as `boardTheme` (an unknown id falls back to the default).
+- `boardTheme` is separate from `theme` (the app colors, `@tavli/ui`, Settings → Look).
+- `useBoardTheme()` reads `boardTheme`. The game screen, the tutorial, the rules pictures (`StartPicture`) and every `StaticBoard` use it. The game sounds come from the board theme too.
+- A new theme needs its images in `themeImages.ts` and its sounds in `features/feedback/themeSounds.ts`; tests check both maps. The picker lists it by itself.
 
 ## Drawing
 

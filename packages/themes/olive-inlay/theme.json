@@ -1,0 +1,713 @@
+{
+  "id": "olive-inlay",
+  "version": "1.0.0",
+  "name": { "en": "Olive Inlay", "el": "Ελιά με ένθετα" },
+  "description": {
+    "en": "A light olive wood board with inlaid wenge and mahogany points, a Greek key on the bar, cream and walnut checkers.",
+    "el": "Ανοιχτόχρωμο ταβλί από ξύλο ελιάς: ένθετα τρίγωνα από wenge και μαόνι, μαίανδρος στη μέση, πούλια κρεμ και καρυδιάς."
+  },
+  "kind": "image",
+  "license": {
+    "art": "Made for the Tavlaki project.",
+    "sources": "Wood textures: CC0 1.0 (Poly Haven). Sounds: CC0 1.0 (Kenney, OpenGameArt).",
+    "file": "LICENSES.md"
+  },
+  "defaultLayout": "portrait-rotated",
+  "palette": {
+    "board.frame": "#8E6A40",
+    "board.field": "#D4BB8D",
+    "board.point.dark": "#3B2A20",
+    "board.point.light": "#7E3521",
+    "board.inlay.light": "#E7D7B6",
+    "board.inlay.dark": "#2E1E14",
+    "board.seam": "#2A1A10",
+    "board.amber": "#A8742A",
+    "light.sun": "#FFF3D6",
+    "checker.light": "#EADDC2",
+    "checker.light.edge": "#6B5232",
+    "checker.dark": "#4A2E1E",
+    "checker.dark.edge": "#1E120A",
+    "checker.dark.ring": "#B89A78",
+    "highlight.select": "#F2C14E",
+    "highlight.target": "#F2C14E",
+    "highlight.halo": "#2A1A10",
+    "dice.face": "#F3EAD7",
+    "dice.side": "#CDBB98",
+    "dice.edge": "#8F7A55",
+    "dice.pip": "#3B2416",
+    "dice.pip.ace": "#7E3521",
+    "ui.bg": "#F6EFE1",
+    "ui.bg.outer": "#D9C8A8",
+    "ui.text": "#33261A",
+    "ui.textDim": "#7A6650",
+    "ui.turn": "#C98A1B",
+    "ui.turnText": "#7A4A0E",
+    "ui.button.primary": "#4A2E1E",
+    "ui.button.primary.text": "#F3EAD7",
+    "ui.button.secondary": "#F4ECDB",
+    "ui.button.secondary.border": "#CDBB98",
+    "ui.button.secondary.text": "#4A3423"
+  },
+  "images": {
+    "boardPortrait": {
+      "file": "board-portrait.webp",
+      "scales": [1, 2, 3],
+      "width": 377,
+      "height": 630
+    },
+    "shadePortrait": {
+      "file": "shade-portrait.webp",
+      "scales": [1, 2, 3],
+      "width": 377,
+      "height": 630
+    },
+    "boardLandscape": {
+      "file": "board-landscape.webp",
+      "scales": [1, 2, 3],
+      "width": 630,
+      "height": 377
+    },
+    "shadeLandscape": {
+      "file": "shade-landscape.webp",
+      "scales": [1, 2, 3],
+      "width": 630,
+      "height": 377
+    },
+    "pointWenge": { "file": "point-wenge.webp", "scales": [1, 2, 3], "width": 160, "height": 160 },
+    "pointMahogany": {
+      "file": "point-mahogany.webp",
+      "scales": [1, 2, 3],
+      "width": 160,
+      "height": 160
+    }
+  },
+  "layouts": {
+    "portrait-rotated": {
+      "orientation": "portrait",
+      "aspectRatio": 0.598413,
+      "referenceSize": { "width": 377, "height": 630 },
+      "layers": [
+        { "id": "board", "image": "boardPortrait", "z": "underPoints", "blend": "srcOver" },
+        { "id": "shade", "image": "shadePortrait", "z": "overPoints", "blend": "srcOver" }
+      ],
+      "fields": [
+        { "x": 0.034483, "y": 0.020635, "w": 0.931034, "h": 0.40873 },
+        { "x": 0.034483, "y": 0.483333, "w": 0.931034, "h": 0.40873 }
+      ],
+      "points": [
+        {
+          "index": 1,
+          "rect": { "x": 0.034483, "y": 0.823942, "w": 0.465517, "h": 0.068121 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 2,
+          "rect": { "x": 0.034483, "y": 0.75582, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 3,
+          "rect": { "x": 0.034483, "y": 0.687698, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 4,
+          "rect": { "x": 0.034483, "y": 0.619577, "w": 0.465517, "h": 0.068121 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 5,
+          "rect": { "x": 0.034483, "y": 0.551455, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 6,
+          "rect": { "x": 0.034483, "y": 0.483333, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 7,
+          "rect": { "x": 0.034483, "y": 0.361243, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 8,
+          "rect": { "x": 0.034483, "y": 0.293122, "w": 0.465517, "h": 0.068121 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 9,
+          "rect": { "x": 0.034483, "y": 0.225, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 10,
+          "rect": { "x": 0.034483, "y": 0.156878, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 11,
+          "rect": { "x": 0.034483, "y": 0.088757, "w": 0.465517, "h": 0.068121 },
+          "base": "left",
+          "tone": "light"
+        },
+        {
+          "index": 12,
+          "rect": { "x": 0.034483, "y": 0.020635, "w": 0.465517, "h": 0.068122 },
+          "base": "left",
+          "tone": "dark"
+        },
+        {
+          "index": 13,
+          "rect": { "x": 0.5, "y": 0.020635, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 14,
+          "rect": { "x": 0.5, "y": 0.088757, "w": 0.465517, "h": 0.068121 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 15,
+          "rect": { "x": 0.5, "y": 0.156878, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 16,
+          "rect": { "x": 0.5, "y": 0.225, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 17,
+          "rect": { "x": 0.5, "y": 0.293122, "w": 0.465517, "h": 0.068121 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 18,
+          "rect": { "x": 0.5, "y": 0.361243, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 19,
+          "rect": { "x": 0.5, "y": 0.483333, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 20,
+          "rect": { "x": 0.5, "y": 0.551455, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 21,
+          "rect": { "x": 0.5, "y": 0.619577, "w": 0.465517, "h": 0.068121 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 22,
+          "rect": { "x": 0.5, "y": 0.687698, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "dark"
+        },
+        {
+          "index": 23,
+          "rect": { "x": 0.5, "y": 0.75582, "w": 0.465517, "h": 0.068122 },
+          "base": "right",
+          "tone": "light"
+        },
+        {
+          "index": 24,
+          "rect": { "x": 0.5, "y": 0.823942, "w": 0.465517, "h": 0.068121 },
+          "base": "right",
+          "tone": "dark"
+        }
+      ],
+      "pointShape": {
+        "depth": 0.888889,
+        "baseInset": 0.00466,
+        "seam": { "color": "{board.seam}", "opacity": 0.7, "width": 0.001592 },
+        "tileSize": 0.424403,
+        "tileRotation": 0
+      },
+      "bar": {
+        "rect": { "x": 0.034483, "y": 0.429365, "w": 0.931034, "h": 0.053968 },
+        "player": {
+          "rect": { "x": 0.5, "y": 0.429365, "w": 0.465517, "h": 0.053968 },
+          "base": "left"
+        },
+        "opponent": {
+          "rect": { "x": 0.034483, "y": 0.429365, "w": 0.465517, "h": 0.053968 },
+          "base": "right"
+        }
+      },
+      "trays": {
+        "player": {
+          "rect": { "x": 0.034483, "y": 0.906349, "w": 0.460212, "h": 0.073016 },
+          "base": "left"
+        },
+        "opponent": {
+          "rect": { "x": 0.505305, "y": 0.906349, "w": 0.460212, "h": 0.073016 },
+          "base": "right"
+        }
+      },
+      "diceArea": { "x": 0.367374, "y": 0.619577, "w": 0.265252, "h": 0.136243 },
+      "checker": {
+        "radius": 0.05305,
+        "stackSpacing": 0.106101,
+        "stackInset": 0.003183,
+        "maxStackDepth": 0.945869,
+        "maxVisible": 5,
+        "trayThickness": 0.026525
+      },
+      "dice": { "size": 0.087533, "tilt": [-11, 9] },
+      "shadow": { "dx": 0, "dy": 0.013263, "blur": 0.013263, "color": "#000000", "opacity": 0.5 },
+      "overlay": {
+        "gradient": {
+          "type": "radial",
+          "cx": 0.3,
+          "cy": 0.2,
+          "rx": 1,
+          "ry": 1,
+          "stops": [
+            { "offset": 0, "color": "{light.sun}", "opacity": 0.22 },
+            { "offset": 0.55, "color": "{light.sun}", "opacity": 0 },
+            { "offset": 1, "color": "#000000", "opacity": 0.22 }
+          ]
+        },
+        "blend": "softLight"
+      }
+    },
+    "landscape": {
+      "orientation": "landscape",
+      "aspectRatio": 1.671088,
+      "referenceSize": { "width": 630, "height": 377 },
+      "layers": [
+        { "id": "board", "image": "boardLandscape", "z": "underPoints", "blend": "srcOver" },
+        { "id": "shade", "image": "shadeLandscape", "z": "overPoints", "blend": "srcOver" }
+      ],
+      "fields": [
+        { "x": 0.020635, "y": 0.034483, "w": 0.40873, "h": 0.931034 },
+        { "x": 0.483333, "y": 0.034483, "w": 0.40873, "h": 0.931034 }
+      ],
+      "points": [
+        {
+          "index": 1,
+          "rect": { "x": 0.823942, "y": 0.5, "w": 0.068121, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 2,
+          "rect": { "x": 0.75582, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 3,
+          "rect": { "x": 0.687698, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 4,
+          "rect": { "x": 0.619577, "y": 0.5, "w": 0.068121, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 5,
+          "rect": { "x": 0.551455, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 6,
+          "rect": { "x": 0.483333, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 7,
+          "rect": { "x": 0.361243, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 8,
+          "rect": { "x": 0.293122, "y": 0.5, "w": 0.068121, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 9,
+          "rect": { "x": 0.225, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 10,
+          "rect": { "x": 0.156878, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 11,
+          "rect": { "x": 0.088757, "y": 0.5, "w": 0.068121, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 12,
+          "rect": { "x": 0.020635, "y": 0.5, "w": 0.068122, "h": 0.465517 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 13,
+          "rect": { "x": 0.020635, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 14,
+          "rect": { "x": 0.088757, "y": 0.034483, "w": 0.068121, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 15,
+          "rect": { "x": 0.156878, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 16,
+          "rect": { "x": 0.225, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 17,
+          "rect": { "x": 0.293122, "y": 0.034483, "w": 0.068121, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 18,
+          "rect": { "x": 0.361243, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 19,
+          "rect": { "x": 0.483333, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 20,
+          "rect": { "x": 0.551455, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 21,
+          "rect": { "x": 0.619577, "y": 0.034483, "w": 0.068121, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 22,
+          "rect": { "x": 0.687698, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 23,
+          "rect": { "x": 0.75582, "y": 0.034483, "w": 0.068122, "h": 0.465517 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 24,
+          "rect": { "x": 0.823942, "y": 0.034483, "w": 0.068121, "h": 0.465517 },
+          "base": "top",
+          "tone": "dark"
+        }
+      ],
+      "pointShape": {
+        "depth": 0.888889,
+        "baseInset": 0.00466,
+        "seam": { "color": "{board.seam}", "opacity": 0.7, "width": 0.000952 },
+        "tileSize": 0.253968,
+        "tileRotation": 90
+      },
+      "bar": {
+        "rect": { "x": 0.429365, "y": 0.034483, "w": 0.053968, "h": 0.931034 },
+        "player": {
+          "rect": { "x": 0.429365, "y": 0.034483, "w": 0.053968, "h": 0.465517 },
+          "base": "bottom"
+        },
+        "opponent": {
+          "rect": { "x": 0.429365, "y": 0.5, "w": 0.053968, "h": 0.465517 },
+          "base": "top"
+        }
+      },
+      "trays": {
+        "player": {
+          "rect": { "x": 0.906349, "y": 0.505305, "w": 0.073016, "h": 0.460212 },
+          "base": "bottom"
+        },
+        "opponent": {
+          "rect": { "x": 0.906349, "y": 0.034483, "w": 0.073016, "h": 0.460212 },
+          "base": "top"
+        }
+      },
+      "diceArea": { "x": 0.619577, "y": 0.367374, "w": 0.136243, "h": 0.265252 },
+      "checker": {
+        "radius": 0.031746,
+        "stackSpacing": 0.063492,
+        "stackInset": 0.001905,
+        "maxStackDepth": 0.945869,
+        "maxVisible": 5,
+        "trayThickness": 0.015873
+      },
+      "dice": { "size": 0.052381, "tilt": [-11, 9] },
+      "shadow": { "dx": 0, "dy": 0.007937, "blur": 0.007937, "color": "#000000", "opacity": 0.5 },
+      "overlay": {
+        "gradient": {
+          "type": "radial",
+          "cx": 0.3,
+          "cy": 0.2,
+          "rx": 1,
+          "ry": 1,
+          "stops": [
+            { "offset": 0, "color": "{light.sun}", "opacity": 0.22 },
+            { "offset": 0.55, "color": "{light.sun}", "opacity": 0 },
+            { "offset": 1, "color": "#000000", "opacity": 0.22 }
+          ]
+        },
+        "blend": "softLight"
+      }
+    }
+  },
+  "points": {
+    "dark": {
+      "name": { "en": "Wenge", "el": "Wenge" },
+      "fill": "{board.point.dark}",
+      "texture": "pointWenge"
+    },
+    "light": {
+      "name": { "en": "Mahogany", "el": "Μαόνι" },
+      "fill": "{board.point.light}",
+      "texture": "pointMahogany"
+    }
+  },
+  "checkers": {
+    "light": {
+      "name": { "en": "Cream maple", "el": "Κρεμ σφένδαμος" },
+      "fill": "{checker.light}",
+      "highlight": {
+        "type": "radial",
+        "cx": 0.36,
+        "cy": 0.32,
+        "rx": 0.75,
+        "ry": 0.75,
+        "stops": [
+          { "offset": 0, "color": "#FFFFFF", "opacity": 0.42 },
+          { "offset": 0.45, "color": "#FFFFFF", "opacity": 0.06 },
+          { "offset": 0.8, "color": "#000000", "opacity": 0.08 },
+          { "offset": 1, "color": "#000000", "opacity": 0.38 }
+        ]
+      },
+      "grooves": [
+        {
+          "radius": 0.72,
+          "width": 0.035,
+          "color": "#000000",
+          "opacity": 0.32,
+          "light": { "opacity": 0.55, "width": 0.025, "dx": 0.0225, "dy": 0.025 }
+        },
+        {
+          "radius": 0.4,
+          "width": 0.035,
+          "color": "#000000",
+          "opacity": 0.32,
+          "light": { "opacity": 0.55, "width": 0.025, "dx": 0.0225, "dy": 0.025 }
+        }
+      ],
+      "bevel": {
+        "inset": 0.05,
+        "width": 0.07,
+        "opacity": 0.7,
+        "gradient": {
+          "type": "linear",
+          "x1": 0,
+          "y1": 0,
+          "x2": 1,
+          "y2": 1,
+          "stops": [
+            { "offset": 0, "color": "#FFFFFF", "opacity": 0.85 },
+            { "offset": 0.5, "color": "#FFFFFF", "opacity": 0 },
+            { "offset": 1, "color": "#000000", "opacity": 0.6 }
+          ]
+        }
+      },
+      "rim": { "color": "{checker.light.edge}", "inset": 0.0175, "width": 0.055 }
+    },
+    "dark": {
+      "name": { "en": "Dark walnut", "el": "Σκούρα καρυδιά" },
+      "fill": "{checker.dark}",
+      "highlight": {
+        "type": "radial",
+        "cx": 0.3,
+        "cy": 0.26,
+        "rx": 0.75,
+        "ry": 0.75,
+        "stops": [
+          { "offset": 0, "color": "#FFFFFF", "opacity": 0.2 },
+          { "offset": 0.25, "color": "#FFFFFF", "opacity": 0.05 },
+          { "offset": 0.45, "color": "#FFFFFF", "opacity": 0.03 },
+          { "offset": 0.8, "color": "#000000", "opacity": 0.08 },
+          { "offset": 1, "color": "#000000", "opacity": 0.3 }
+        ]
+      },
+      "grooves": [
+        {
+          "radius": 0.72,
+          "width": 0.035,
+          "color": "#000000",
+          "opacity": 0.5,
+          "light": { "opacity": 0.22, "width": 0.025, "dx": 0.0225, "dy": 0.025 }
+        },
+        {
+          "radius": 0.4,
+          "width": 0.035,
+          "color": "#000000",
+          "opacity": 0.5,
+          "light": { "opacity": 0.22, "width": 0.025, "dx": 0.0225, "dy": 0.025 }
+        }
+      ],
+      "bevel": {
+        "inset": 0.05,
+        "width": 0.07,
+        "opacity": 0.85,
+        "gradient": {
+          "type": "linear",
+          "x1": 0,
+          "y1": 0,
+          "x2": 1,
+          "y2": 1,
+          "stops": [
+            { "offset": 0, "color": "#FFFFFF", "opacity": 0.85 },
+            { "offset": 0.5, "color": "#FFFFFF", "opacity": 0 },
+            { "offset": 1, "color": "#000000", "opacity": 0.6 }
+          ]
+        }
+      },
+      "ring": { "color": "{checker.dark.ring}", "inset": 0.065, "width": 0.055 },
+      "rim": { "color": "{checker.dark.edge}", "inset": 0.0175, "width": 0.055 }
+    },
+    "shadow": { "dx": 0.065, "dy": 0.12, "blur": 0.08, "color": "#000000", "opacity": 0.5 },
+    "badge": {
+      "fill": "{board.amber}",
+      "text": "{checker.dark.edge}",
+      "border": "{board.seam}",
+      "radius": 0.5,
+      "borderWidth": 0.06,
+      "fontSize": 0.55
+    }
+  },
+  "highlights": {
+    "select": {
+      "color": "{highlight.select}",
+      "radius": 1.11,
+      "width": 0.11,
+      "halo": { "color": "{highlight.halo}", "opacity": 0.8, "width": 0.21 }
+    },
+    "target": {
+      "color": "{highlight.target}",
+      "radius": 0.9,
+      "width": 0.09,
+      "dash": [0.2, 0.15],
+      "fillOpacity": 0.22,
+      "halo": { "color": "{highlight.halo}", "opacity": 0.75, "width": 0.18 }
+    }
+  },
+  "dice": {
+    "face": "{dice.face}",
+    "side": "{dice.side}",
+    "edge": "{dice.edge}",
+    "pip": "{dice.pip}",
+    "acePip": "{dice.pip.ace}",
+    "cornerRadius": 0.197,
+    "faceInset": 0.036,
+    "edgeWidth": 0.024,
+    "pipRadius": 0.1,
+    "pipSpacing": 0.245,
+    "highlight": {
+      "type": "radial",
+      "cx": 0.36,
+      "cy": 0.32,
+      "rx": 0.75,
+      "ry": 0.75,
+      "stops": [
+        { "offset": 0, "color": "#FFFFFF", "opacity": 0.42 },
+        { "offset": 0.45, "color": "#FFFFFF", "opacity": 0.06 },
+        { "offset": 0.8, "color": "#000000", "opacity": 0.08 },
+        { "offset": 1, "color": "#000000", "opacity": 0.38 }
+      ]
+    },
+    "highlightOpacity": 0.55,
+    "shadow": { "dx": 0.079, "dy": 0.121, "blur": 0.079, "color": "#000000", "opacity": 0.5 }
+  },
+  "sounds": {
+    "checkerPickUp": null,
+    "checkerPlace": [
+      "sounds/checker-place-1.m4a",
+      "sounds/checker-place-2.m4a",
+      "sounds/checker-place-3.m4a"
+    ],
+    "checkerHit": "sounds/checker-hit.m4a",
+    "bearOff": "sounds/bear-off.m4a",
+    "diceShake": null,
+    "diceRoll": ["sounds/dice-roll-1.m4a", "sounds/dice-roll-2.m4a"],
+    "diceLand": "sounds/dice-land.m4a",
+    "invalidMove": "sounds/invalid-move.m4a",
+    "turnStart": "sounds/turn-start.m4a",
+    "gameWin": "sounds/game-win.m4a",
+    "matchWin": "sounds/match-win.m4a"
+  },
+  "haptics": {
+    "checkerPickUp": "selection",
+    "checkerPlace": "light",
+    "checkerHit": "medium",
+    "bearOff": "light",
+    "diceLand": "light",
+    "invalidMove": "warning",
+    "gameWin": "success",
+    "matchWin": "success"
+  },
+  "accessibility": {
+    "checkerContrast": 9.18,
+    "colorBlindChecked": ["protanopia", "deuteranopia", "tritanopia"]
+  }
+}

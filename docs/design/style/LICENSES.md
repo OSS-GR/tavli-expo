@@ -9,6 +9,7 @@ All mockups, sketches and sources in this folder were made for this project:
 - `concept-a-olive-inlay.png`, `concept-a-olive-inlay@3x.webp`
 - `concept-b-walnut-kafeneio.png`, `concept-b-walnut-kafeneio@3x.webp`
 - `orientation.png`
+- `olive-inlay-theme.webp` (a render of the `olive-inlay` theme; same sources as that theme, see `packages/themes/LICENSES.md`)
 - everything in `src/` (scripts and generated SVGs)
 
 The board, checkers, dice, inlay patterns (dog-tooth, meander), hinges and UI are drawn in code. No art from other apps or makers is used.
