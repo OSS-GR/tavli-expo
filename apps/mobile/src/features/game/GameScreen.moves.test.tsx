@@ -109,6 +109,35 @@ describe('<GameScreen /> moves', () => {
     expect(countNodes(screen.toJSON() as JsonNode, 'DashPathEffect')).toBe(0);
   });
 
+  // #174: on a phone a quick tap never moves far enough to start the pan.
+  // The tap gesture must take it, even with a small wobble or a slow press.
+  it('moves by tap-tap with a wobbling finger and a slow press', async () => {
+    const store = await whiteToMove61();
+    const from = top(8, 3);
+    // The finger wobbles 5 pt: still a tap, not a drag.
+    await touch(PAN, [from, { x: from.x + 3, y: from.y + 4 }]);
+    expect(countNodes(screen.toJSON() as JsonNode, 'DashPathEffect')).toBe(2);
+    expect(haptics.calls).toEqual(['selection']);
+    // Touch, wait one second, lift: still a tap.
+    await touch(PAN, [point(7)], { holdMs: 1000 });
+    expect(played(store)).toEqual(['8/7']);
+  });
+
+  it('ignores a touch held still for a long time', async () => {
+    const store = await whiteToMove61();
+    await touch(PAN, [top(8, 3)], { holdMs: 3000 });
+    expect(countNodes(screen.toJSON() as JsonNode, 'DashPathEffect')).toBe(0);
+    expect(played(store)).toEqual([]);
+  });
+
+  it('drags once the finger moves 8 pt, and only then', async () => {
+    const store = await whiteToMove61();
+    const from = top(13, 5);
+    await touch(PAN, [from, { x: from.x, y: from.y + 8 }, point(7)]);
+    expect(played(store)).toEqual(['13/7']);
+    expect(haptics.calls).toEqual(['selection', 'light']);
+  });
+
   it('drops the selection on a second tap', async () => {
     const store = await whiteToMove61();
     await touch(PAN, [top(6, 5)]);

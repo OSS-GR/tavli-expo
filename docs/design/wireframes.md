@@ -386,6 +386,8 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 ## Board layout recommendation
 
+> New layout proposals for portrait and landscape (#184, #185): [game-layout-proposals.md](game-layout-proposals.md).
+
 A tavli board is wide (about 1.6 : 1). A portrait phone is tall (about 1 : 2.2). We need 24 points, the bar, two bear-off trays and a dice area.
 
 ### Option A: landscape board inside the portrait screen

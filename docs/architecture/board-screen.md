@@ -23,7 +23,7 @@
 | `interaction.ts` | Which checkers can move and where (from `legalNextMoves`), in screen points; what a tap or a drop means. Pure; the pickers are worklets. |
 | `flights.ts` | A move, a hit or an undo as short flights of checkers. Pure. |
 | `skia/MovingCheckers.tsx` | The checker in flight and the checker under the finger (UI thread). |
-| `InteractiveBoard.tsx` | The playing board: the pan gesture, selection, highlights and flights. |
+| `InteractiveBoard.tsx` | The playing board: the pan and tap gestures, selection, highlights and flights. |
 
 The game itself lives in `apps/mobile/src/features/game/`:
 
@@ -114,8 +114,13 @@ With `motherRule: "offerConcede"` (the app default) the engine flow stops in `aw
 ## Moving checkers
 
 - **Touch** a checker that can move: it gets a ring, and each legal target gets a dashed ring and a ghost checker where it would land (theme `highlights`). Targets come from the engine (`legalNextMoves`); the app never decides what is legal.
-- **Drag and drop:** one pan gesture (Gesture Handler 3, `usePanGesture`, `minDistance: 0`). The drag runs on the UI thread: the picked-up checker follows the finger through shared values. Only the result (picked up, dropped at x, y) goes to the JS thread.
-- **Tap-tap:** a touch that moves less than 8 pt is a tap. Tap a checker, then tap a target. A target wins over another movable checker on that point. A tap may miss a target by 22 pt (wireframe, iPhone SE). A swipe that does not start on a movable checker does nothing.
+- **Two gestures race** (#174; Gesture Handler 3, `useCompetingGestures(pan, tap)`, settings in `BOARD_GESTURES` in `interaction.ts`). The first to activate cancels the other.
+  - The **pan** (`usePanGesture`, `minDistance: 8`) is the drag. It activates once the finger moves 8 pt (`TAP_SLOP`).
+  - The **tap** (`useTapGesture`, `maxDistance: 8`, `maxDuration: 1500`) is tap-tap. It fails once the finger moves more than 8 pt, or stays down longer than 1.5 s (`TAP_MAX_MS`). So a slow press (touch, wait, lift) still selects.
+  - Why not one pan: a pan only activates on a move. A finger that lifts first makes the pan FAIL, so its `onFinalize` gets `canceled: true`. The old board used one pan with `minDistance: 0` and read a tap from a normal end. On a phone a quick tap has no move, so it was lost. Only a long press worked, because a held finger shakes a little, which activated the pan.
+  - The board is not inside a `ScrollView`. The game and tutorial screens only show a `ScrollView` over the board for a card, and then the card takes the touches on purpose.
+- **Drag and drop:** the drag runs on the UI thread: the picked-up checker follows the finger through shared values (`dragPoint`). Only the result (picked up, dropped at x, y) goes to the JS thread. `panEnd` says what the end of the pan means: a drop, a cancel, or nothing (it never dragged).
+- **Tap-tap:** tap a checker, then tap a target. A target wins over another movable checker on that point. A tap may miss a target by 22 pt (wireframe, iPhone SE). A swipe that does not start on a movable checker does nothing.
 - A drop on the source cancels quietly. A drop anywhere else is illegal: the checker flies back in 160 ms, with the theme's `invalidMove` haptic. A drag the system cancels (a call, the app goes to the background) also flies back, with no move.
 - **Hit-testing uses the drawing rects.** Sources and targets use `slotRect` (the same point rect that holds the triangle and the stack), the bar halves and the trays.
 - **Flights:** a move flies the checker to its landing place (200 ms); a hit sends the hit checker to the bar a moment later; a pin (Plakoto) only flies the pinner. While a checker flies, the checker at its landing place is hidden. The move that ends a turn (auto-confirm) has no flight when the board turns to the next player.
@@ -169,7 +174,7 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 - `geometry.test.ts` and `boardModel.test.ts`: the layout math (point → rect, stacks, badge, bar, trays, hit-testing) and the engine → slot mapping.
 - `dice.test.ts`, `gameStore.test.ts`, `GameScreen.test.tsx`: the roll animation math, the dice layout, the store over the engine flow, and the dice and opening card on screen.
 - `interaction.test.ts`: sources and targets on the drawing rects, tap and drop rules, flights for a move, a hit and an undo. `GameScreen.moves.test.tsx`: drag, tap-tap, an illegal drop and tap-to-roll through the screen.
-- Jest fakes Gesture Handler with `apps/mobile/test/gestureHandlerMock.tsx`; `touch(testID, path)` drives the board's pan gesture like a finger.
+- Jest fakes Gesture Handler with `apps/mobile/test/gestureHandlerMock.tsx`; `touch(testID, path, { holdMs, canceled })` drives the board's pan and tap like a finger. The mock follows the native state machine of Gesture Handler 3.3: a pan that never moved `minDistance` fails on lift (`canceled: true`), a tap fails past `maxDistance` or `maxDuration`, and the first gesture to activate cancels the others (#174). The old mock ended every pan normally, so it hid the tap bug. `GameScreen.moves.test.tsx` also covers a wobbling tap, a slow press, a long hold (nothing) and a drag that starts at 8 pt.
 - Jest fakes Reanimated with `apps/mobile/test/reanimatedMock.ts`: animations end at once and call their end callback. `Animated.View` is a plain view and `useAnimatedStyle` runs once. Spy on `useReducedMotion` to test reduce motion.
 - `GameScreen.timeout.test.tsx` (#170): the game-end sheet after a time-out (the name, "You", Greek, diplo and mono points) and the announcement read once.
 - `GameScreen.turn.test.tsx`: undo, confirm, auto-confirm, the turn indicator (flip and fixed), pip counts on and off, the pass card (OK and 3 s), the game-end sheet (diplo with reason, mono, celebration, announcement, Home), next game, and `onMatchOver` after the delay. `GameScreen.match.test.tsx` plays a whole match with taps only (to 1 by default; `FULL_MATCH=1` plays to 3) and ends on `onMatchOver`.
