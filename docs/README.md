@@ -30,6 +30,7 @@
 | [Backend, multiplayer, auth options](architecture/backend-options.md) | Vendors, costs, recommended design |
 | [Bot AI](architecture/bot-ai.md) | Bot levels, training, on-device play |
 | [Board screen](architecture/board-screen.md) | How the app draws the board (Skia), board flip, tests and screenshots |
+| [App shell](architecture/app-shell.md) | Home, new game, local matches, the bot turn, in-game menu |
 | [iMessage version](architecture/imessage.md) | How a GamePigeon-style version works |
 
 ## Design

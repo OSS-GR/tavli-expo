@@ -17,6 +17,8 @@ export interface OpeningCardProps {
   theme: ThemeManifest;
   status: OpeningStatus;
   names: PerPlayer<string>;
+  /** The human vs the bot: the result says "You start". */
+  you?: PlayerId | null;
   /** Changes when a new round starts (after a tie), so the dice roll again. */
   roundKey: string;
   onDieLanded?: () => void;
@@ -68,14 +70,24 @@ function OpeningDie({
   );
 }
 
-export function OpeningCard({ theme, status, names, roundKey, onDieLanded }: OpeningCardProps) {
+export function OpeningCard({
+  theme,
+  status,
+  names,
+  you = null,
+  roundKey,
+  onDieLanded,
+}: OpeningCardProps) {
   const { t } = useTranslation();
   const players: PlayerId[] = ['white', 'black'];
   let message: string;
   if (status.kind === 'decided') {
     const high = Math.max(status.white, status.black);
     const low = Math.min(status.white, status.black);
-    message = t('game.opening.result', { name: names[status.starter], high, low });
+    message =
+      status.starter === you
+        ? t('game.opening.result_you', { high, low })
+        : t('game.opening.result', { name: names[status.starter], high, low });
   } else if (status.tie !== null && status.white === null && status.black === null) {
     message = t('game.opening.tie', { value: status.tie });
   } else {
