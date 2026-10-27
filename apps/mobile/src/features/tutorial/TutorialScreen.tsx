@@ -274,9 +274,12 @@ export function TutorialScreen({
       </Animated.View>
 
       <View style={styles.boardArea}>
-        {/* While the mother card covers the board, screen readers skip the board. */}
+        {/* While the mother card covers the board, screen readers skip the board.
+            It never flattens (`collapsable={false}`), so the board canvas keeps
+            its native parent when those props change (#173). */}
         <View
           style={styles.boardLayer}
+          collapsable={false}
           importantForAccessibility={motherCard ? 'no-hide-descendants' : 'auto'}
           accessibilityElementsHidden={motherCard}>
           <InteractiveBoard

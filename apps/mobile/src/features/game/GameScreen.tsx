@@ -706,6 +706,12 @@ export function GameScreen({
 
   // Screen readers skip what a card or sheet covers (#153), as the tutorial
   // does for its mother card (#151).
+  // The two views that hide their content always hold their children
+  // (`collapsable={false}`). Otherwise React Native puts the children
+  // straight into a native view higher up, and the hiding props pull them
+  // back in: the children, the Skia canvases too, would move to another
+  // native parent. On iOS a canvas that moves loses its drawing, so the
+  // dice went blank after the menu or Settings (#173).
   const hideScreen = covered || endSheet !== null;
   const hideBoard = card !== null;
 
@@ -714,6 +720,7 @@ export function GameScreen({
       <View
         testID="game-content"
         style={styles.content}
+        collapsable={false}
         importantForAccessibility={hideScreen ? 'no-hide-descendants' : 'auto'}
         accessibilityElementsHidden={hideScreen}>
         <View style={styles.topRow}>
@@ -742,6 +749,7 @@ export function GameScreen({
           <View
             testID="game-board-layer"
             style={styles.boardLayer}
+            collapsable={false}
             importantForAccessibility={hideBoard ? 'no-hide-descendants' : 'auto'}
             accessibilityElementsHidden={hideBoard}>
             <InteractiveBoard
