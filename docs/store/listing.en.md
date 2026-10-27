@@ -14,7 +14,7 @@ Checked in the code on 2026-10-27:
 |-------|-------------------------|
 | Portes, Plakoto, Fevga, Asodio, and a Tavli match (Portes → Plakoto → Fevga) | `features/match/setup.ts`, [App shell](../architecture/app-shell.md#choosing-the-game-109) |
 | Match to 1, 3, 5 or 7 points; mono = 1, diplo = 2 | `features/match/setup.ts`, `newGame.length.*` texts |
-| Bot: Easy and Medium in all four games, Hard in Portes, Plakoto, Fevga and the Tavli match. Hard in Asodio is "coming soon". When Asodio Hard ships (#164), drop the game list after "Hard" in the description and in "What's new" | `features/bot/levels.ts`, `services.ts` (`botLevels`) |
+| Bot: Easy, Medium and Hard in all four games and the Tavli match | `features/bot/levels.ts`, `services.ts` (`botLevels`) |
 | The bot plays on the phone. Local games need no network | `InlineBotRunner` in `services.ts`; App shell, "Pass-and-play" |
 | Pass-and-play on one phone, optional names, the board turns to the player | `features/match/seats.ts`, `settings.boardView.*` |
 | A "How to play" page for each game, with the start position | `features/rules/` |
@@ -29,7 +29,8 @@ Do **not** claim:
 
 - **A tutorial for every game.** The lesson teaches Portes only. Plakoto, Fevga and Asodio have rules pages.
 - **Online play, friends, invites, push.** Not built (MVP2). Home shows "Play a friend · Coming soon".
-- **Hard bot in every game, more themes, face-to-face view.** Hard works in Portes, Plakoto, Fevga and Tavli, not in Asodio; the app shows Asodio Hard as "coming soon".
+- **That Hard in Asodio wins most games.** Hard works in every game. In Asodio it wins about half of its games against Medium, and about 70 % of the games that someone wins; about a quarter of the games end in a deadlock draw (`packages/bot/README.md`, "The Asodio net"). Say "Hard in every game", not how often it wins.
+- **More themes, face-to-face view.** Not built.
 - **Dark mode, iPad, accessibility claims.** Not checked for the store.
 
 **Owner:** decide if the listing mentions online play as "coming soon". The default here is **no**. Apple can reject metadata that names features the app does not have (App Review Guideline 2.3). An optional line is at the end of the description section.
@@ -102,7 +103,7 @@ PLAY ALL FOUR GREEK GAMES
 Or play a full Tavli match: Portes, Plakoto and Fevga in turn. Play to 1, 3, 5 or 7 points. Mono is 1 point, diplo is 2.
 
 PLAY THE BOT
-Three levels. Easy plays a random legal move, so it is good for learning. Medium plays like a casual player. Hard plays like a strong player, in Portes, Plakoto, Fevga and Tavli. The bot plays on your phone, so you can play with no internet.
+Three levels. Easy plays a random legal move, so it is good for learning. Medium plays like a casual player. Hard plays like a strong player, in every game. The bot plays on your phone, so you can play with no internet.
 
 PASS-AND-PLAY
 Two players, one phone. Type your names if you like. The board turns to the player whose turn it is.
@@ -124,7 +125,7 @@ No ads. No sign-in. Your games stay on your phone. You choose if the app may sen
 Privacy policy: https://tavlaki.com/privacy
 ```
 
-2,067 characters.
+2,045 characters.
 
 Optional line (only if the owner wants it, see above). Put it before "NO ADS, NO ACCOUNT":
 
@@ -140,14 +141,14 @@ Limit: 4,000 on the App Store, 500 on Google Play. This text fits both.
 ```text
 The first release of Tavlaki.
 • Portes, Plakoto, Fevga and Asodio, and full Tavli matches
-• Easy, Medium and Hard bot (Hard in Portes, Plakoto, Fevga and Tavli)
+• Easy, Medium and Hard bot in every game
 • Pass-and-play on one phone
 • Learn to play: a one-minute lesson on the board
 • How to play pages for every game
 • Greek and English
 ```
 
-294 characters.
+265 characters.
 
 ## Other store fields
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { asodio, formatTurn, portes } from '@tavli/engine';
 import type { Turn } from '@tavli/engine';
 
-import { createBot, playGame, simulate } from './index';
+import { asodioHeuristic, createBot, playGame, simulate } from './index';
 import type { Bot, SimulationPlayer } from './index';
 
 const random: SimulationPlayer = { bot: createBot(), difficulty: 'random' };
@@ -95,10 +95,13 @@ describe('simulate', () => {
       maxTurns: 5,
     });
     expect(short.failures.map((f) => f.code)).toEqual(['TOO_LONG', 'TOO_LONG']);
-    // Asodio has no hard bot yet.
+    // A bot with no hard evaluator for Asodio.
+    const noHard = createBot({
+      evaluators: new Map([['asodio', { easy: asodioHeuristic, medium: asodioHeuristic }]]),
+    });
     const notYet = simulate({
       variant: asodio,
-      bots: [random, { bot: createBot(), difficulty: 'hard' }],
+      bots: [random, { bot: noHard, difficulty: 'hard' }],
       games: 1,
       seed: 1,
     });
