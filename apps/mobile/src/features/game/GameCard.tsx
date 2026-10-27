@@ -1,6 +1,7 @@
 /**
- * A card over the board: no legal moves (wireframe 6f), game end (8) and
- * match end (9). The board stays visible around it.
+ * A card over the board: no legal moves (wireframe 6f), and "This game
+ * could not be opened." The board stays visible around it. Game end is
+ * `GameEndSheet`; match end is its own screen (`MatchEndScreen`).
  */
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
@@ -10,8 +11,6 @@ export interface GameCardProps {
   title: string;
   /** Lines under the title. */
   lines?: readonly string[];
-  /** A small chip under the title, e.g. "Mono · +1 point". */
-  chip?: string;
   /** Small text at the bottom, e.g. "Closes by itself after 3 s." */
   footnote?: string;
   /** Buttons. */
@@ -19,17 +18,12 @@ export interface GameCardProps {
   testID?: string;
 }
 
-export function GameCard({ title, lines = [], chip, footnote, children, testID }: GameCardProps) {
+export function GameCard({ title, lines = [], footnote, children, testID }: GameCardProps) {
   return (
     <View testID={testID} style={styles.card} accessibilityLiveRegion="polite">
       <Text style={styles.title} accessibilityRole="header">
         {title}
       </Text>
-      {chip ? (
-        <View style={styles.chip}>
-          <Text style={styles.chipText}>{chip}</Text>
-        </View>
-      ) : null}
       {lines.map((line, i) => (
         <Text key={i} style={styles.line}>
           {line}
@@ -53,18 +47,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   title: {
     ...theme.type.title,
-    color: theme.colors.text,
-  },
-  chip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xs,
-    borderRadius: theme.radii.pill,
-    borderWidth: 2,
-    borderColor: theme.colors.accent,
-  },
-  chipText: {
-    ...theme.type.bodyStrong,
     color: theme.colors.text,
   },
   line: {
