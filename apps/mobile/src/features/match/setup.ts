@@ -39,8 +39,9 @@ export function isMatchLength(value: unknown): value is MatchLength {
 /**
  * The games of the picker (#109). `tavli` is a full Tavli match: Portes →
  * Plakoto → Fevga in rotation (`docs/rules/tavli-match.md`). A game is
- * open when the engine has every game of its rotation (`isGameBuilt`);
- * Asodio is not built yet, so it shows locked.
+ * open when the engine has every game of its rotation and the board can
+ * draw it (`isGameBuilt`). Asodio is in the engine (#115), but the board
+ * cannot show its loading phase yet, so it shows locked.
  */
 export const GAME_CHOICES = ['portes', 'plakoto', 'fevga', 'tavli', 'asodio'] as const;
 
@@ -86,12 +87,18 @@ export function gameRotation(game: GameChoice): readonly StandardVariantId[] {
   return only === null ? getPreset(gamePreset(game)).match.rotation : [only];
 }
 
-/** True when the engine can play every game of the rotation. */
+/**
+ * The games the board can draw and play (#108). Add a game here once the
+ * board supports it.
+ */
+export const BOARD_GAMES: ReadonlySet<StandardVariantId> = new Set(['portes', 'plakoto', 'fevga']);
+
+/** True when the engine can play every game of the rotation and the board can draw it. */
 export function isGameBuilt(
   game: GameChoice,
   registry: VariantRegistry = VARIANT_REGISTRY,
 ): boolean {
-  return gameRotation(game).every((variant) => registry.has(variant));
+  return gameRotation(game).every((variant) => registry.has(variant) && BOARD_GAMES.has(variant));
 }
 
 /**
