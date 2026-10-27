@@ -622,7 +622,7 @@ Version numbers for npm packages were read from https://registry.npmjs.org on 20
 - **MMKV 4.3.2** (a Nitro module, no config plugin) sits behind the `Storage` port in `@tavli/contracts`. The adapter is `packages/adapters/storage-mmkv`. The port is synchronous, so settings load before the first frame.
 - **i18n:** `i18next` 26.5.10, `react-i18next` 17.1.9, `expo-localization` ~58.0.5 with `supportedLocales: ["el", "en"]` (per-app language in iOS and Android system settings). Keys are typed from `en.json`.
 - **Zustand 5.0.16** `persist` with a `version`, a `migrate` stub and a `merge` that cleans bad saved values.
-- **Jest:** `jest` 30.5, `jest-expo` ~58.0.12, `@testing-library/react-native` 14.1 (async `render` and events). Unistyles mocks come from `react-native-unistyles/mocks`.
+- **Jest:** `jest` 30.5, `jest-expo` ~58.0.12, `@testing-library/react-native` 14.1 (async `render` and events). Unistyles mocks come from `react-native-unistyles/mocks`. `jest-expo` does not run the React Compiler, so `apps/mobile/jest.config.js` turns it on (`supportsReactCompiler`): tests run the same code as the app (#152).
 - Unistyles and MMKV need a **development build**. Expo Go cannot run them.
 
 ## Notes from crash reporting (#43, 2026-10-26)

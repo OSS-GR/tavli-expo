@@ -30,6 +30,7 @@ import { openingStatus } from './opening';
 import type { Seat } from './seats';
 import { passNotice } from './turnNotices';
 
+import { runOnFakeTimers } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 
 const SIZE = { width: 375, height: 520 };
@@ -55,6 +56,9 @@ function firstMoveName(store: GameStore): string {
   const view = turnView(store.getState().flow);
   return moveLabel(i18n.t, moveChoices(view.legal)[0]!);
 }
+
+// The game screen closes its cards on timers (see test/clock.ts).
+runOnFakeTimers();
 
 beforeEach(async () => {
   jest.restoreAllMocks();

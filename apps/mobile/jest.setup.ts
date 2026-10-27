@@ -61,3 +61,10 @@ jest.mock('react-native-worklets', () => ({
 // Gesture Handler: a fake that lets tests drive the board's pan gesture
 // (`touch()` in test/gestureHandlerMock.tsx).
 jest.mock('react-native-gesture-handler', () => jest.requireActual('./test/gestureHandlerMock'));
+
+// React Native's Jest setup makes `performance.now` a `jest.fn`. React calls
+// it several times per render, and a mock keeps every call. A test that
+// plays a whole game renders thousands of times, so the list grows to
+// millions of entries and the garbage collector slows the test down a lot.
+// A plain function reads the same clock (and fake timers still replace it).
+globalThis.performance.now = () => Date.now();

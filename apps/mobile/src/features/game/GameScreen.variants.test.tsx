@@ -31,6 +31,7 @@ import { openingStatus } from './opening';
 import type { Seat } from './seats';
 import { passNotice } from './turnNotices';
 
+import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
 
@@ -78,6 +79,9 @@ const send = async (store: GameStore, action: MatchAction) => {
     expect(store.getState().dispatch(action)).toBe(true);
   });
 };
+
+// The game screen closes its cards on timers (see test/clock.ts).
+runOnFakeTimers();
 
 beforeEach(async () => {
   await act(async () => {

@@ -11,6 +11,7 @@ import { feedback } from '@/services';
 import { createGameStore } from './gameStore';
 import { GameScreen } from './GameScreen';
 
+import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
 import { countNodes, findAllNodes, type JsonNode } from '../../../test/tree';
@@ -65,6 +66,10 @@ function dragOpacity(): number {
   expect(groups).toHaveLength(1);
   return (groups[0]?.props['opacity'] as { value: number }).value;
 }
+
+// The opening result closes by itself after 1.5 s. On a real clock a slow
+// first render can take longer, and the card is gone before the tap.
+runOnFakeTimers();
 
 beforeEach(async () => {
   haptics.calls.length = 0;
