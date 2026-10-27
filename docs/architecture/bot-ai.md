@@ -2,6 +2,7 @@
 
 > Living document. Research date: 2026-10-26. Owner: `packages/bot`.
 > **Implemented API (#27):** `createBot(...).chooseTurn(state, dice, difficulty, { rng })` in `@tavli/bot`; the app uses the `BotRunner` port from `@tavli/contracts` (`chooseMove(req)`, async, seed-based). See `packages/bot/README.md`. The sketch in section 7 is the original design.
+> **Variant questions (#106):** `createBot(...).chooseAnswer(state, difficulty, { rng })` answers `Variant.prompt` (Plakoto "resign or play on"); the port has an optional `chooseAnswer(req)`. See section 4.5.
 > Related: [ADR-0002 modular architecture](../decisions/0002-modular-architecture.md), [roadmap](../roadmap.md).
 
 ## 1. Summary and recommendation
@@ -85,6 +86,8 @@ Why softmax noise and not random moves: a softmax picks good moves more often an
 
 **Measured (Portes, #28, 1,000 games, seed 1):** medium beats random 99.9%, medium beats easy 78.1%, and easy beats random 98.5%. Medium decides in 0.09 ms median and 3.9 ms worst (Node, 300 random positions). At "1 in 3 not best", medium beat easy only 57%, so easy uses more noise to keep the 70%+ gap.
 
+**Measured (Plakoto, #106, 1,000 games, seed 1):** medium beats random 93.6%, medium beats easy 84.9%, and easy beats random 84.6% (draws, when both mothers are pinned, count as non-wins: 5–10% of games). Medium decides in 0.07 ms median and 1 ms worst (Node, 300 random positions). Same temperatures as Portes. Details: `packages/bot/README.md`, "The Plakoto heuristic".
+
 **Measured (Fevga, #105, 1,000 games, seed 1):** medium beats random 94.4%, medium beats easy 81.4%, and easy beats random 74.0%. Same temperatures as Portes (easy 0.15, medium 0.01). Fevga has more luck: there is no hitting and every play of a roll moves the same pips, so a bot that only counts pips beats random play just 56%. Per turn, easy loses 0.075 points on average (71% of its turns are not the best); medium loses 0.002. Medium decides in 0.03 ms median and 1.7 ms worst (Node, 5,000 positions from medium games). Details: `packages/bot/README.md`, "The Fevga heuristic".
 
 The bot gets its own injected RNG (seeded). It never uses `Math.random`. This keeps tests repeatable and matches the engine rule.
@@ -109,6 +112,8 @@ A position score = weighted sum of features. Weights start hand-picked, then get
 
 Asodio: features to be decided once `docs/rules/asodio.md` exists. The pipeline does not change.
 
+**Plakoto, as built (#106, `plakoto-heuristic-v1`):** pins made and suffered (worth more the further the pinned checker is from home, and when the pinner sits in its own home), the mother pinned (4.5 logits, and 95% of the pinned side's losses count double), mother safety (a lone mother costs by the shots at it; 2+ on the start point are safe), lone checkers that can be pinned with their shot counts, race (Kleinman), home-board points, longest prime, borne off and stacking. No contact: the Portes race code. Weights in `PLAKOTO_DEFAULT_WEIGHTS`, tuned by two rounds of self-play (+0.27 points per game over the hand-picked start). There is no "anchor" feature: in Plakoto the start points are the anchors, and pins replace hits.
+
 **Fevga, as built (#105, `packages/bot/src/evaluators/fevga-heuristic.ts`).** In contact: the pip race (Kleinman, with a low weight), the best prime in front of the opponent plus the checkers trapped behind it, opponent points in front of a side's last checker, blocked landing points per die, die values with no move at all, the runner rule (until the runner passes own point 11 only it may move), home points, checkers still on the mother (own 24), stacking and checkers off. With no contact left it is a pure race, scored with the Portes race code and bear-off table. All weights are in `FEVGA_DEFAULT_WEIGHTS`. Self-play tuning found two things: a low race weight is much better (every play moves the same pips, so a big race term drowns the block features), and "points in front of the last checker" is the most useful block feature.
 
 ### 4.3 Feel human
@@ -124,6 +129,13 @@ Asodio: features to be decided once `docs/rules/asodio.md` exists. The pipeline 
 - **Hints and analysis:** the same `Analyzer` gives hints and post-game review. Hints are **off in online games** (both players must agree for friendly games; never in ranked).
 - **Bot use in online games:** online, the server decides dice and checks moves, but it cannot stop a player from running a bot on a second device. For ranked play later, compare each player's moves with the hard bot on the server. Flag accounts with an error rate that is too low over many games. This is how chess sites detect engines.
 - **Do not ship the hard bot's weights as a server secret.** They will be in the app bundle. That is fine; a bot is not a secret.
+
+### 4.5 Variant questions (Plakoto "resign or play on")
+
+Some variants ask a player a question between turns (`Variant.prompt`, phase `awaiting-answer`). Today only Plakoto does: with `motherRule: "offerConcede"` the pinned player chooses `resign` (the opponent wins 2 points) or `playOn`. The bot answers with the same 1-ply pipeline as a turn: apply each choice with the engine (`answerPrompt`), score the result (true points if the game ends, else the evaluator), then the level's softmax picks.
+
+- Resigning loses 2 points, the most a Plakoto game can lose, so "play on" is never worse. The evaluator puts a pinned mother close to −2 (measured: the pinned side scores −1.84 per game when it plays on; the evaluator says −1.78). So medium plays on, and easy (more noise) resigns some near-lost games, like a human who gives up.
+- The app asks the runner (`BotRunner.chooseAnswer`) when the phase is `awaiting-answer` and `prompt.player` is the bot. `simulate` does the same with `Bot.chooseAnswer`.
 
 ## 5. Training plan (hard level)
 
@@ -339,7 +351,7 @@ Tests the bot package must have:
 
 - Asodio rules: we found no public source. `docs/rules/asodio.md` must define them before we design its features.
 - Portes scoring: does our Portes count backgammon (triple)? It changes the net outputs.
-- Plakoto: confirm the "mother checker pinned" rule and its scoring in `docs/rules/plakoto.md`.
+- Plakoto: the mother rule is settled (`offerConcede`, owner, 2026-10-26; see `docs/rules/plakoto.md`). Open: should the bot resign a hopeless pinned mother at medium too, to save the human time? Today only easy sometimes does.
 
 ## 10. Sources
 

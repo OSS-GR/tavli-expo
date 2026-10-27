@@ -83,6 +83,12 @@ export interface Bot {
    * variant.
    */
   chooseTurn(state: GameState, dice: Dice, level: BotLevel, opts: BotOptions): Turn;
+  /**
+   * Optional. Answers the variant's question (`Variant.prompt`), for example
+   * Plakoto "resign or play on" after a mother is pinned. Returns one of
+   * `prompt.choices`, for `prompt.player`. Bots from `createBot` have it.
+   */
+  chooseAnswer?(state: GameState, level: BotLevel, opts: BotOptions): string;
 }
 
 /** What `createBot` returns: a `Bot` that can also say which levels it plays. */
@@ -94,6 +100,16 @@ export interface ConfiguredBot extends Bot {
    * level picker uses this to enable a level.
    */
   supportedLevels(variant: VariantId): readonly Difficulty[];
+  /**
+   * Answers the question that `state` waits for (`Variant.prompt`), from
+   * the view of `prompt.player`. Each choice is scored like a turn: the
+   * engine applies it (`Variant.answerPrompt`), then the level's evaluator
+   * scores the result (or the true points if the game ends). The level's
+   * noise policy picks one; `random` picks one uniformly. Throws
+   * `BotError('INVALID_REQUEST')` when there is no question, and
+   * `NOT_IMPLEMENTED` like `chooseTurn`.
+   */
+  chooseAnswer(state: GameState, level: BotLevel, opts: BotOptions): string;
 }
 
 /** One ranked turn, best first. */

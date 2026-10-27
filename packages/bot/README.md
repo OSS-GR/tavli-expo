@@ -18,9 +18,11 @@ type BotLevel = Difficulty | 'random'; // 'random' is for tests and as a baselin
 
 interface Bot {
   chooseTurn(state: GameState, dice: Dice, level: BotLevel, opts: BotOptions): Turn;
+  chooseAnswer?(state: GameState, level: BotLevel, opts: BotOptions): string; // Variant.prompt
 }
 interface ConfiguredBot extends Bot {
   supportedLevels(variant: VariantId): readonly Difficulty[]; // for the level picker
+  chooseAnswer(state: GameState, level: BotLevel, opts: BotOptions): string;
 }
 interface BotOptions {
   rng: Rng; // the bot's own RNG, never the dice RNG
@@ -42,26 +44,36 @@ interface Evaluation {
 
 - `chooseTurn` returns one full turn for the roll. A pass is a turn with
   empty `moves`. If `state.dice` is set, it must equal `dice`.
+- `chooseAnswer` answers the question a state waits for (`Variant.prompt`,
+  phase `awaiting-answer` in the turn flow): today only Plakoto "resign or
+  play on" after a mother is pinned (`motherRule: "offerConcede"`). It
+  returns one of `prompt.choices` (`'resign'` or `'playOn'`) for
+  `prompt.player`; pass it to the flow as the `answer` action. See "The
+  mother question" below.
 - `createBot({ variants?, evaluators?, policies? })` builds a bot. Default:
-  the engine's `VARIANT_REGISTRY`, `DEFAULT_EVALUATORS` (the Portes and
-  Fevga heuristics for easy and medium) and `DEFAULT_LEVEL_POLICIES`.
-- `bot.supportedLevels('portes')` and `bot.supportedLevels('fevga')` are
-  `['easy', 'medium']` today. Easy works for every known variant; medium
-  and hard need an evaluator. The app's level picker can use it, or probe
-  `chooseTurn` and catch `NOT_IMPLEMENTED`: both give the same answer.
+  the engine's `VARIANT_REGISTRY`, `DEFAULT_EVALUATORS` (the Portes,
+  Plakoto and Fevga heuristics for easy and medium) and
+  `DEFAULT_LEVEL_POLICIES`.
+- `bot.supportedLevels('portes')`, `bot.supportedLevels('plakoto')` and
+  `bot.supportedLevels('fevga')` are `['easy', 'medium']` today. Easy works
+  for every known variant; medium and hard need an evaluator. The app's
+  level picker can use it, or probe `chooseTurn` and catch
+  `NOT_IMPLEMENTED`: both give the same answer.
 - `scoreTurns(variant, evaluator, state, turns)` and `pickTurn` are the
   1-ply core. `Analyzer` (hints, post-game review) is only a type for now.
 
 Errors:
 
 - `BotError('NOT_IMPLEMENTED')`: no evaluator for this level and variant
-  (today: hard, and medium for every variant but Portes and Fevga).
-- `BotError('INVALID_REQUEST')`: `dice` differs from `state.dice`, or a
-  runner request names another variant than its state.
+  (today: hard, and medium for Asodio).
+- `BotError('INVALID_REQUEST')`: `dice` differs from `state.dice`, a
+  runner request names another variant than its state, or `chooseAnswer`
+  gets a state with no question.
 - `BotError('INVALID_REGISTRY')`: an evaluator sits under the wrong variant,
   or a temperature is not a number >= 0.
-- Engine errors pass through: `ILLEGAL_TURN` for a finished game,
-  `UNKNOWN_VARIANT`, `OUT_OF_RANGE` for a bad seed.
+- Engine errors pass through: `ILLEGAL_TURN` for a finished game (or a
+  Plakoto state that waits for its answer), `UNKNOWN_VARIANT`,
+  `OUT_OF_RANGE` for a bad seed.
 
 ## The levels
 
@@ -76,12 +88,12 @@ Every level but `random` runs the same pipeline (bot-ai.md, section 4.1):
    with the score in points. This is the noise. A bad turn is rare, a
    nearly-best turn is common, so mistakes look human.
 
-| Level  | Evaluator        | Noise (`T`) | How it plays                                                                                                                           |
-| ------ | ---------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| random | none             | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                |
-| easy   | Portes heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now. |
-| medium | Portes heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                     |
-| hard   | none yet (#52)   | 0           | Throws `NOT_IMPLEMENTED`.                                                                                                              |
+| Level  | Evaluator         | Noise (`T`) | How it plays                                                                                                                           |
+| ------ | ----------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| random | none              | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                |
+| easy   | variant heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now. |
+| medium | variant heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                     |
+| hard   | none yet (#52)    | 0           | Throws `NOT_IMPLEMENTED`.                                                                                                              |
 
 - Change the noise with `createBot({ policies: { medium: { temperature: 0.03 } } })`.
   `0` means "always a best turn" (ties at random).
@@ -232,6 +244,134 @@ random positions. Both bounds are far above the real numbers, so the test
 is safe on a slow or busy CI machine. Hermes on a phone is many times
 slower than Node, and the budget there is 200 ms.
 
+## The Plakoto heuristic
+
+Code: `src/evaluators/plakoto-*.ts`. Rules: `docs/rules/plakoto.md`. It
+works like the Portes heuristic: it scores a position before the roll,
+from the view of the player to roll, on its own small board arrays
+(`plakoto-board.ts`: counts plus a "pinned" flag per point, in each
+player's own numbering). The `scoreTurns` fast path plays each turn on
+copies of them and knows when a turn ends the game, for every mother rule
+(`plakotoTurnResult`). A test checks it against `applyTurn` + `result` +
+`evaluate` for all four mother rules and both check timings.
+
+**Contact** (a pin is possible, or a checker is pinned): a weighted sum of
+features in logits, `win = sigmoid(score)`. For both sides:
+
+- **Pins made and suffered**: each pinned opponent checker is worth
+  `pinBase + pinPips × (its own point) / 24`, plus `pinHome` when our pinner
+  sits in our home (it can stay there a long time). Suffered pins count the
+  same, the other way.
+- **Mother pinned** (`motherPinned`, the biggest weight). Most losses of
+  the pinned side are then doubles (`motherDouble`).
+- **Mother safety** (own checkers on the start point): a lone mother is a
+  target. The player to roll gains `motherShot × shots / 36` for the other
+  side's lone mother, and pays `rollerMother` for its own lone mother when an
+  opponent checker is 1–12 pips behind it. Two or more checkers on the start
+  are a door, so they are safe.
+- **Lone checkers that can be pinned**, with their shot counts
+  (`plakoto-shots.ts`: direct and combined shots; doors and pin points in
+  between block; a pinned checker cannot shoot; pinners and pinned
+  checkers cannot be pinned). Each costs `shots / 36 × blotShare × (value of
+that pin)`, plus `anyShot` for the chance of any pin. The roller pays
+  `rollerBlot` for each own lone checker in reach.
+- **Race / pips**: the Kleinman chance of the pip counts, as a logit,
+  × `race`.
+- **Home board**: made points by a value table (`pointShape`, the home
+  points most), and extra per home door while free opponent checkers still
+  have to get out of our home (`homePointPerBack`).
+- **Longest prime** of doors (2+ checkers or our pin) with a free opponent
+  checker behind it.
+- **Borne off** and **stacking**.
+
+**No contact**: the Portes race code (Keith, Kleinman, the bear-off table).
+Plakoto bears off by the shared rules, so the numbers are the same.
+
+### The mother question
+
+With `motherRule: "offerConcede"` (the app default), the pinned player is
+asked "resign or play on" (`awaiting-answer`). `chooseAnswer` scores both
+choices: `resign` = −2 points (the game ends), `playOn` = the evaluation
+of the position. Then the level's softmax picks, like a turn.
+
+- Playing on can never lose more than the 2 points of resigning, so the
+  true best answer is always "play on". The evaluation of a pinned mother
+  is close to −2 (it keeps the small draw chance: pin the other mother too).
+- **Medium** (T = 0.01) plays on in practice. **Easy** (T = 0.15)
+  sometimes resigns a near-lost game, like a tired human (about 40 % of its
+  mother questions). That costs little: about 0.16 points each time.
+- **Random** answers at random.
+
+How good the number is (1,000 medium-vs-medium games, seed 99; the pinned
+side always played on): 190 games had a pinned mother. The pinned side
+scored −1.84 points per game (175 double losses, 15 draws, no wins); the
+evaluator said −1.78 on average.
+
+### Plakoto weights
+
+All weights are in `PLAKOTO_DEFAULT_WEIGHTS`
+(`src/evaluators/plakoto-heuristic.ts`). Build a variant with
+`createPlakotoHeuristic({ ...PLAKOTO_DEFAULT_WEIGHTS, pinBase: 0.3 })`.
+
+| Weight             | Default | What it does (score in logits)                                         |
+| ------------------ | ------- | ---------------------------------------------------------------------- |
+| `race`             | 0.2     | × logit of the Kleinman chance of the pip counts                       |
+| `madePoint`        | 0.5     | × `pointShape[p]` for each made point on own 1–23                      |
+| `pointShape`       | table   | 0.12 (1-pt) … 0.32 (5-pt), 0.3 (6-pt), 0.25 (7-pt) … 0.06–0.08 (13–23) |
+| `homePointPerBack` | 0.06    | per home door, per free opponent checker still in our home (max 3)     |
+| `prime`            | 1       | × `primeShape[length]`: 0.1, 0.25, 0.5, 0.9, 1.5 for 2–6               |
+| `pinBase`          | 0.2     | per opponent checker we pin                                            |
+| `pinPips`          | 0.56    | × (pinned checker's own point) / 24                                    |
+| `pinHome`          | 0.2     | extra when our pinner is in our home                                   |
+| `motherPinned`     | 4.5     | we pin the opponent's mother                                           |
+| `motherDouble`     | 0.95    | share of the pinned side's losses that are doubles                     |
+| `blotShare`        | 0.6     | × shots/36 × value of the pin, per waiter lone checker                 |
+| `motherShot`       | 3       | × shots/36 at the waiter's lone mother                                 |
+| `anyShot`          | 0.26    | × (rolls that pin any checker)/36                                      |
+| `rollerBlot`       | 0.08    | per own lone checker with an opponent 1–12 pips behind                 |
+| `rollerMother`     | 0.5     | own lone mother with an opponent 1–12 pips behind                      |
+| `borneOff`         | 0.04    | per checker off                                                        |
+| `stack`            | 0.05    | per checker past the third on a point (not the start)                  |
+| `double`           | 0.975   | double share: × pips the loser needs to come home / (pips + 20)        |
+
+Tuning: two rounds of the same coordinate search as for Portes (a scratch
+copy of `src/tune.ts` for Plakoto; medium vs medium, 1,000 paired games per
+candidate, keep a change at +0.05 points per game). Round 1 (±50 %, all
+scalar weights) kept `race` 0.4 → 0.2, `madePoint` 1 → 0.5, `pinBase`
+0.4 → 0.2 and `double` 0.65 → 0.975. Round 2 (±30 %, 12 main weights) kept
+`pinPips` 0.8 → 0.56 and `anyShot` 0.2 → 0.26. On fresh seeds the tuned
+weights beat the hand-picked ones by **+0.27 points per game** (560 wins,
+411 losses, 29 draws in 1,000 games).
+
+### Plakoto strength and speed
+
+1,000 games per match, seed 1, half with each colour (A's numbers; a draw
+is a game where both mothers were pinned):
+
+| Match            | A wins       | Draws | A points : B points | Double wins (A) |
+| ---------------- | ------------ | ----- | ------------------- | --------------- |
+| medium vs random | 936 (93.6 %) | 48    | 1,802 : 28          | 866             |
+| medium vs easy   | 849 (84.9 %) | 65    | 1,511 : 124         | 662             |
+| easy vs random   | 846 (84.6 %) | 98    | 1,562 : 81          | 716             |
+
+`src/plakoto-strength.test.ts` plays `GAMES` = 200 games per match (fixed
+seeds, colours swapped halfway): medium beats random 187/200 (needs 85 %),
+easy beats random 174/200 (needs 70 %), medium beats easy 171/200 (needs
+70 %). Raise `GAMES` locally for tighter numbers.
+
+Decision time of the medium bot (Node 22, dev container, best of 3 runs
+per position):
+
+| Positions                                   | Median  | p90     | p99     | Max     |
+| ------------------------------------------- | ------- | ------- | ------- | ------- |
+| 300 random positions (the perf test set)    | 0.07 ms | 0.26 ms | 0.83 ms | 0.98 ms |
+| 5,000 positions from medium-vs-medium games | 0.05 ms | 0.25 ms | 1.4 ms  | 5.4 ms  |
+
+`src/plakoto-perf.test.ts` checks median < 20 ms and worst < 200 ms.
+
+Simulator: `pnpm --filter @tavli/bot simulate -- --variant plakoto --a medium --b easy`.
+1,000 medium-vs-easy Plakoto games take about 13 s.
+
 ## The Fevga heuristic
 
 Code: `src/evaluators/fevga-heuristic.ts` and `fevga-board.ts`. Rules:
@@ -357,6 +497,8 @@ The app never calls the bot directly. It uses the `BotRunner` port from
 ```ts
 const runner: BotRunner = new InlineBotRunner(); // or new InlineBotRunner(createBot({ evaluators }))
 const turn = await runner.chooseMove({ variant: 'portes', state, dice, difficulty: 'easy', seed });
+// Phase 'awaiting-answer' and the bot is prompt.player (Plakoto "resign or play on"):
+const choice = await runner.chooseAnswer?.({ variant: 'plakoto', state, difficulty: 'easy', seed });
 runner.cancel(); // the user left: pending requests reject with BotCancelledError
 ```
 
@@ -365,6 +507,10 @@ runner.cancel(); // the user left: pending requests reject with BotCancelledErro
 - `InlineBotRunner` runs the bot on the same thread, in a microtask. A
   `cancel()` right after `chooseMove` stops the bot before it runs.
 - Use a new seed for each request. Never reuse the dice seed.
+- `chooseAnswer` is optional on the port, so older runners and test fakes
+  still fit. `InlineBotRunner` has it (`runBotAnswer` is the synchronous
+  core). `state` is the flow's `state` while the phase is
+  `awaiting-answer`.
 
 ## Think time
 
@@ -387,7 +533,7 @@ at the same time as the wait, so the user does not see the real cost.
 
 ## How to add a level (or a variant)
 
-1. Write an `Evaluator` for the variant, for example
+1. Write an `Evaluator` for the variant, like
    `src/evaluators/plakoto-heuristic.ts`. It scores a position from the view
    of `state.toMove`. Keep it pure and fast. Add a `scoreTurns` fast path if
    `applyTurn` + `evaluate` is too slow.
@@ -404,7 +550,10 @@ at the same time as the wait, so the user does not see the real cost.
 3. The noise is a per-level temperature (`policies`). If a level needs more
    than 1-ply (2-ply for hard), add it in `chooseTurn` in
    `src/create-bot.ts`. Keep the RNG as the only source of chance.
-4. Add tests: always legal, same seed gives the same turn, and a simulation
+4. If the variant asks questions (`Variant.prompt`), `chooseAnswer` and
+   `simulate` handle them with no extra code: each choice is scored with
+   the same evaluator.
+5. Add tests: always legal, same seed gives the same turn, and a simulation
    against the level below it (`simulate`).
 
 ## Simulator
@@ -424,7 +573,9 @@ turns, illegal turns and the time. The exit code is 1 if any game failed.
 - In code: `simulate({ variant, bots: [a, b], games, seed })`. Player A
   plays White, B plays Black, and the first player alternates by game. The
   dice RNG and each bot RNG are separate streams from each game's seed. Each
-  chosen turn is checked by `variant.applyTurn`. A failure carries its
+  chosen turn is checked by `variant.applyTurn`. When the variant asks a
+  question after a turn, the asked player's bot answers it
+  (`chooseAnswer`; `onAnswer` sees each answer). A failure carries its
   `gameSeed`, so `playGame` can replay it.
 
 Numbers (Node 22, dev container, seed 1): 1,000 random-vs-random Portes
@@ -434,7 +585,8 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
 ## Tests
 
 `pnpm test` from the repo root, or `pnpm --filter @tavli/bot test` (about
-10 s on 4 cores; the files run in parallel).
+16 s in the dev container; the Plakoto strength test takes about 8 s of
+that; the files run in parallel).
 
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for
   a seed; passes; a win now is never missed (easy, medium, the fallback,
@@ -447,6 +599,19 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
   Kleinman.
 - `evaluators/bearoff.test.ts`: known bear-off values, moves equal the
   engine's, and the evaluator agrees with played-out races.
+- `evaluators/plakoto-heuristic.test.ts`: a pin held beats a pin suffered,
+  deep pins are worth more, a pinned mother is nearly a lost double, a lone
+  mother in reach costs, lone checkers in range cost, primes, the race; the
+  Plakoto shot table (doors, pins, pinned shooters); the game end after a
+  turn for each mother rule.
+- `plakoto-bot.test.ts`: levels, legal and repeatable turns, the fast path
+  equals the engine path for every mother rule, medium pins a mother, a
+  winning mother pin is always taken, the mother question (scores, medium
+  plays on, errors), the runner's `chooseAnswer`, and simulations with
+  questions.
+- `plakoto-strength.test.ts` (`GAMES` = 200 per match in CI),
+  `plakoto-perf.test.ts`.
+
 - `evaluators/fevga-heuristic.test.ts`: the parallel numbering, contact
   and the runner rule agree with the engine; colours are mirrors; the fast
   path equals the engine path; primes, a runner that is through, lost dice
