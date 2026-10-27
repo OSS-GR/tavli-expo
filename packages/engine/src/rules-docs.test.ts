@@ -13,8 +13,12 @@ import plakotoDoc from '../../../docs/rules/plakoto.md?raw';
 import portesDoc from '../../../docs/rules/portes.md?raw';
 import matchDoc from '../../../docs/rules/tavli-match.md?raw';
 import { getPreset } from './presets';
+import gameFlowTests from './flow/game-flow.test.ts?raw';
+import matchFlowTests from './flow/match-flow.test.ts?raw';
+import matchTests from './match.test.ts?raw';
 import asodioTests from './variants/asodio/asodio.test.ts?raw';
 import fevgaTests from './variants/fevga/fevga.test.ts?raw';
+import portesTests from './variants/portes/portes.test.ts?raw';
 import { PRESET_IDS, RULE_GROUPS, RULE_SCHEMA } from './rules';
 import type { PresetId, RuleSet } from './rules';
 import { section, tableRows } from './testing/markdown';
@@ -200,6 +204,11 @@ const EDGE_CASE_TESTS: readonly {
   tests: readonly string[];
   extra?: readonly string[];
 }[] = [
+  {
+    name: 'tavli-match.md',
+    doc: matchDoc,
+    tests: [matchTests, matchFlowTests, gameFlowTests, portesTests],
+  },
   { name: 'fevga.md', doc: fevgaDoc, tests: [fevgaTests] },
   { name: 'asodio.md', doc: asodioDoc, tests: [asodioTests], extra: ['### Presets'] },
 ];

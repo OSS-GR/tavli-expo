@@ -182,7 +182,7 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: 'Home' }));
     await user.press(screen.getByRole('link', { name: 'History' }));
     expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
-      /^Portes · vs Bot \(Easy\), You 0 – 0 Bot · first to \d, Won, /,
+      /^Portes · vs Bot \(Easy\), You 0 – 0 Bot · first to \d · Bot resigned, Won, /,
     );
 
     // Settings: clear it after the confirm step.
@@ -193,6 +193,58 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: 'Match history ›' }));
     expect(router.getPathname()).toBe('/history');
     expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
+  });
+
+  it('Resign match keeps the score: 0–0 at the start, 0–2 after a resigned game (#181)', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    const resignMatchFromMenu = async () => {
+      await user.press(screen.getByRole('button', { name: 'Game menu' }));
+      await user.press(screen.getByRole('button', { name: 'Resign match, Bot wins the match' }));
+      await user.press(screen.getByRole('button', { name: 'Resign' }));
+    };
+
+    // 1. Resign match at the start: nobody has a point, so it stays 0–0.
+    await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const first = matchSessions.current()!;
+    await resignMatchFromMenu();
+    await expectMatchEndAfterDelay(router, `/game/${first.id}/match-end`);
+    expect(screen.getByRole('header', { name: 'Bot wins the match!' })).toBeOnTheScreen();
+    expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Final score: You 0 – 0 Bot')).toBeOnTheScreen();
+
+    // 2. Rematch: resign a game (diplo at the start), then the match. The 0–2 stays.
+    await user.press(screen.getByRole('button', { name: /^Rematch/ }));
+    await act(async () => {
+      // The bot starts the rematch (it won the last game) and plays its turn.
+      jest.advanceTimersByTime(10_000);
+    });
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: 'Resign game, Bot wins this game' }));
+    await user.press(screen.getByRole('button', { name: 'Resign' }));
+    const card = screen.getByTestId('game-end-card');
+    expect(
+      within(card).getByText('Diplo: you resigned before you bore off a checker.'),
+    ).toBeOnTheScreen();
+    expect(within(card).getByText('You 0 – 2 Bot')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: /^Next game/ }));
+    await resignMatchFromMenu();
+    await expectMatchEndAfterDelay(router, `/game/${first.id}/match-end`);
+    expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Final score: You 0 – 2 Bot')).toBeOnTheScreen();
+    expect(screen.getByText('0 – 2')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Game 1 · Portes, Bot won, Diplo, 2 points')).toBeOnTheScreen();
+
+    // History shows the same scores, newest first.
+    await user.press(screen.getByRole('button', { name: 'Home' }));
+    await user.press(screen.getByRole('link', { name: 'History' }));
+    expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
+      /^Portes · vs Bot \(Easy\), You 0 – 2 Bot · first to \d · you resigned, Lost, /,
+    );
+    expect(screen.getByTestId('history-row-1')).toHaveAccessibleName(
+      /^Portes · vs Bot \(Easy\), You 0 – 0 Bot · first to \d · you resigned, Lost, /,
+    );
   });
 
   it('opens pass-and-play with the local mode param', async () => {
