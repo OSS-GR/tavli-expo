@@ -73,6 +73,14 @@ describe('createGameFeedback: one place for sound and haptic', () => {
     expect(haptics.calls).toEqual(['light', 'light', 'medium']);
   });
 
+  it('still plays after the clock jumps back', () => {
+    const { feedback, player, wait } = setup();
+    feedback.event('checkerPlace');
+    wait(-60_000);
+    feedback.event('checkerPlace');
+    expect(player.played).toEqual(['checkerPlace', 'checkerPlace']);
+  });
+
   it('plays every die landing', () => {
     const { feedback, player } = setup();
     feedback.event('diceLand');

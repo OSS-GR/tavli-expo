@@ -83,7 +83,8 @@ export function createGameFeedback({
     event: (event) => {
       const t = now();
       const before = last.get(event);
-      if (before !== undefined && t - before < MIN_GAP_MS[event]) return;
+      // A clock that jumped back (t < before) counts as enough time passed.
+      if (before !== undefined && t >= before && t - before < MIN_GAP_MS[event]) return;
       last.set(event, t);
       if (soundFiles(theme, event).length > 0) player.play(event);
       const style = theme.haptics[event];
