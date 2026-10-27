@@ -162,6 +162,24 @@ describe('a record is saved when a match ends', () => {
     });
   });
 
+  it('vs bot: you resign a game, then the match: the record keeps the 0–2 (#181)', () => {
+    const { sessions, history } = registry();
+    const s = sessions.start(defaultSetup('bot'));
+    openGame(s);
+    s.store.getState().dispatch({ type: 'resign', player: 'white' });
+    s.store.getState().dispatch({ type: 'nextGame' });
+    s.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
+    expect(history.getState().records).toHaveLength(1);
+    expect(history.getState().records[0]).toMatchObject({
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 2 },
+      games: 1,
+      diploWins: { white: 0, black: 1 },
+      end: 'finished',
+    });
+  });
+
   it('vs bot: your turn timer runs out in the last game, you lose the match on time (#170)', () => {
     const { sessions, history } = registry();
     const s = sessions.start(oneGameBot);
@@ -845,6 +863,20 @@ describe('history texts', () => {
     expect(historyRow(rec({ winner: 'black' }), t, 'en').result).toBe('Lost');
     expect(historyRow(rec({ end: 'abandoned', winner: null }), t, 'en').result).toBe(
       'Not finished',
+    );
+  });
+
+  it('says who resigned the match, next to the score (#181)', () => {
+    const lost = rec({ score: { white: 0, black: 2 }, winner: 'black', resignedBy: 'white' });
+    expect(historyRow(lost, t, 'en')).toMatchObject({
+      score: 'You 0 – 2 Bot · first to 3 · you resigned',
+      result: 'Lost',
+    });
+    const won = rec({ score: { white: 0, black: 0 }, winner: 'white', resignedBy: 'black' });
+    expect(historyRow(won, t, 'en').score).toBe('You 0 – 0 Bot · first to 3 · Bot resigned');
+    const local = rec({ mode: 'local', botLevel: null, names: { white: 'Maria', black: '' } });
+    expect(historyRow({ ...local, winner: 'black', resignedBy: 'white' }, t, 'en').score).toBe(
+      'Maria 3 – 1 Player 2 · first to 3 · Maria resigned',
     );
   });
 

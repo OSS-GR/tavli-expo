@@ -9,6 +9,7 @@ import {
 } from '@tavli/engine';
 import { act, screen, waitFor, within } from '@testing-library/react-native';
 
+import { SAMPLE_POSITIONS } from '@/features/board/positions';
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -143,7 +144,10 @@ describe('<MatchScreen /> vs bot', () => {
     expect(game(s).result).toEqual({ winner: 'black', points: 2, reason: 'resigned' });
     const card = screen.getByTestId('game-end-card');
     expect(within(card).getByText('Bot wins the game!')).toBeOnTheScreen();
-    expect(within(card).getByText('You resigned.')).toBeOnTheScreen();
+    // The card says why it is a diplo (#181).
+    expect(
+      within(card).getByText('Diplo: you resigned before you bore off a checker.'),
+    ).toBeOnTheScreen();
     expect(within(card).getByText('You 0 – 2 Bot')).toBeOnTheScreen();
     // Vs the bot, a bot win is not celebrated.
     expect(screen.queryByTestId('game-celebration', { includeHiddenElements: true })).toBeNull();
@@ -168,6 +172,38 @@ describe('<MatchScreen /> vs bot', () => {
     // No card over the board: the match-end screen opens after a moment.
     expect(screen.queryByTestId('game-end-card')).toBeNull();
     expect(props.onMatchOver).not.toHaveBeenCalled();
+    await act(async () => {
+      jest.advanceTimersByTime(MATCH_END_DELAY_MS);
+    });
+    expect(props.onMatchOver).toHaveBeenCalledTimes(1);
+  });
+
+  it('Resign match after a resigned game keeps the 0–2 (#181)', async () => {
+    const user = setupUser();
+    const s = session(defaultSetup('bot'));
+    startWith(s, 'white');
+    const { props, view } = show(s);
+    await view;
+
+    await user.press(button('Game menu'));
+    await user.press(button('Resign game, Bot wins this game'));
+    await user.press(button('Resign'));
+    expect(s.store.getState().flow.match.score).toEqual({ white: 0, black: 2 });
+    await user.press(button(/^Next game/));
+    // The bot starts game 2: the menu stops it.
+    await user.press(button('Game menu'));
+    expect(
+      within(screen.getByTestId('game-menu')).getByText('Portes · vs Bot (Easy) · You 0 – 2 Bot'),
+    ).toBeOnTheScreen();
+    await user.press(button('Resign match, Bot wins the match'));
+    await user.press(button('Resign'));
+
+    expect(s.store.getState().flow.match).toMatchObject({
+      status: 'finished',
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 2 },
+    });
     await act(async () => {
       jest.advanceTimersByTime(MATCH_END_DELAY_MS);
     });
@@ -221,6 +257,29 @@ describe('<MatchScreen /> pass-and-play', () => {
         'Maria wins 2 points (diplo), because Nikos has not borne off any checker yet.',
       ),
     ).toBeOnTheScreen();
+  });
+
+  it('a resign after a checker is off is a mono, and the card says why (#181)', async () => {
+    const user = setupUser();
+    const s = session({ ...defaultSetup('local'), names: { white: 'Maria', black: 'Nikos' } });
+    // Both players are bearing off; Maria (white) has 6 checkers off.
+    const state = {
+      ...portes.initialState({ startingPlayer: 'white' }),
+      board: SAMPLE_POSITIONS.bearoff,
+    };
+    s.store.setState({
+      flow: { ...s.store.getState().flow, game: createGameFlow({ state, starter: 'white' }) },
+    });
+    await show(s).view;
+
+    await user.press(button('Game menu'));
+    await user.press(button('Resign game, Nikos wins this game'));
+    await user.press(button('Resign'));
+    expect(game(s).result).toEqual({ winner: 'black', points: 1, reason: 'resigned' });
+    const card = screen.getByTestId('game-end-card');
+    expect(within(card).getByText('Mono · +1 point')).toBeOnTheScreen();
+    expect(within(card).getByText('Mono: Maria resigned the game.')).toBeOnTheScreen();
+    expect(within(card).getByText('Maria 0 – 1 Nikos')).toBeOnTheScreen();
   });
 
   it('screen readers skip the game under the menu and the resign dialog (#153)', async () => {

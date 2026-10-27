@@ -3,7 +3,7 @@ import { act, render, screen, userEvent } from '@testing-library/react-native';
 import i18n from '@/i18n';
 
 import { ContinueCard } from './ContinueCard';
-import { HomeScreen } from './HomeScreen';
+import { HomeScreen, levelList } from './HomeScreen';
 
 function setup(botLevels: readonly ('easy' | 'medium' | 'hard')[] = ['easy']) {
   const props = {
@@ -31,14 +31,28 @@ describe('<HomeScreen />', () => {
     expect(props.onHowToPlay).toHaveBeenCalled();
   });
 
-  it('says Medium is coming soon while only Easy works', async () => {
-    await render(<HomeScreen {...setup(['easy'])} />);
-    expect(screen.getByText('Easy for now. Medium is coming soon.')).toBeOnTheScreen();
+  it('lists the bot levels under "Play vs bot" (#182)', async () => {
+    const { rerender } = await render(<HomeScreen {...setup(['easy'])} />);
+    expect(screen.getByRole('button', { name: 'Play vs bot, Easy' })).toBeOnTheScreen();
+    await rerender(<HomeScreen {...setup(['easy', 'medium'])} />);
+    expect(screen.getByText('Easy or Medium')).toBeOnTheScreen();
+    await rerender(<HomeScreen {...setup(['easy', 'medium', 'hard'])} />);
+    expect(screen.getByText('Easy, Medium or Hard')).toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', { name: 'Play vs bot, Easy, Medium or Hard' }),
+    ).toBeOnTheScreen();
   });
 
-  it('says "Easy or Medium" once Medium works', async () => {
-    await render(<HomeScreen {...setup(['easy', 'medium'])} />);
-    expect(screen.getByText('Easy or Medium')).toBeOnTheScreen();
+  it('builds the level list from any levels, in both languages', () => {
+    const en = i18n.getFixedT('en');
+    const el = i18n.getFixedT('el');
+    expect(levelList([], en)).toBeUndefined();
+    expect(levelList(['medium'], en)).toBe('Medium');
+    expect(levelList(['easy', 'hard'], en)).toBe('Easy or Hard');
+    expect(levelList(['easy', 'medium', 'hard'], en)).toBe('Easy, Medium or Hard');
+    expect(levelList(['easy'], el)).toBe('Εύκολο');
+    expect(levelList(['easy', 'medium'], el)).toBe('Εύκολο ή Μέτριο');
+    expect(levelList(['easy', 'medium', 'hard'], el)).toBe('Εύκολο, Μέτριο ή Δύσκολο');
   });
 
   it('shows "Coming soon" for Play a friend and does not navigate', async () => {
@@ -70,6 +84,7 @@ describe('<HomeScreen />', () => {
       expect(screen.getByText('Παίξε με τον υπολογιστή')).toBeOnTheScreen();
       expect(screen.getByText('Δύο παίκτες, ένα κινητό')).toBeOnTheScreen();
       expect(screen.getByText('ΝΕΟ ΠΑΙΧΝΙΔΙ')).toBeOnTheScreen();
+      expect(screen.getByText('Εύκολο')).toBeOnTheScreen();
     } finally {
       await act(async () => {
         await i18n.changeLanguage('en');

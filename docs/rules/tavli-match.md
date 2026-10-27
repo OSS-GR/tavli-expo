@@ -167,6 +167,27 @@ is skipped.
 - There is no Crawford rule (there is no cube).
 - The match always starts with Portes (default).
 
+## Resigning (app rule)
+
+The federation rules and our other sources do not say how a resign
+scores. These are the app rules (owner, #63 and #181).
+
+- **Resign game:** the opponent wins the game. They get what the position
+  is worth now: diplo (2 points) if the resigning player has borne off no
+  checker, else mono (1 point). With `backgammonScores3` (Portes, off by
+  default) a backgammon position gives 3. A variant may score it in its own
+  way (Plakoto `offerConcede`: 2). The points count in the match like any
+  other win, so a resigned game can win the match.
+- **Resign match:** the match ends at once and the opponent wins it.
+  - The score stays as it is: the points of the finished games count. The
+    game in play gives no points. The opponent does not get the target
+    points, and the score is never reset.
+  - A player may resign the match at any time while it is in play: at 0–0,
+    during the opening roll, in the middle of a game, or after a game ends.
+    (In pass-and-play the app offers it only to the player to move.)
+  - The match end screen and the history show the real score and say who
+    resigned the match ("You resigned the match").
+
 ## Edge cases
 
 1. Opening roll tie (e.g. both roll 4): roll again until different.
@@ -195,6 +216,16 @@ is skipped.
     instead of bearing off from 2.
 17. Last checker comes into home with the first die; the second die bears off
     a checker in the same turn.
+18. Portes, match to 3, 0–0: the player to move resigns the game before any
+    checker is off → diplo, the opponent leads 2–0.
+19. A player who has borne off a checker resigns the game → mono, 1 point.
+20. Match to 3, 0–0: a player resigns the match at the start → the opponent
+    wins the match; the score stays 0–0.
+21. Match to 3: a resigned game gives 0–2, then the loser resigns the match
+    (after that game ends, or in the next game) → the opponent wins the
+    match; the score stays 0–2. It is not reset to 0–0, and it is not 0–3.
+22. Match to 3, 0–2: the trailing player resigns a game with no checker off
+    → diplo, 0–4: the match is won to the target, not resigned.
 
 ## House-rule variants (flags)
 

@@ -101,7 +101,15 @@ export function historyRow(record: HistoryRecord, t: TFunction, locale: string):
       blackScore: record.score.black,
     }),
     t('home.continue.target', { target: record.targetPoints }),
-  ].join(' · ');
+    // A resigned match keeps its score (#181): say who resigned it.
+    record.resignedBy === null
+      ? null
+      : seats[record.resignedBy].you
+        ? t('history.resigned_you')
+        : t('history.resigned', { name: seats[record.resignedBy].name }),
+  ]
+    .filter(Boolean)
+    .join(' · ');
   let badge: ResultBadge;
   if (record.winner === null) badge = 'unfinished';
   else if (record.mode === 'local') badge = 'winner';

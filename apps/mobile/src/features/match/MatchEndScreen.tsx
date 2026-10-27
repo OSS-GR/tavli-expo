@@ -47,13 +47,15 @@ export function MatchEndScreen({
     ? t('game.end.matchWinner_you')
     : t('game.end.matchWinner', { name: name(winner) });
   // Why the match ended, when it was not won on the board: a resign, or a
-  // turn timer that ran out in the last game (#170).
+  // turn timer that ran out in the last game (#170). Resign match keeps the
+  // score as it was (docs/rules/tavli-match.md, "Resigning"), so the screen
+  // says who resigned the match (#181).
   const timedOut = timedOutBy(match);
   const reason =
     match.resignedBy !== null
       ? seats[match.resignedBy].you
-        ? t('game.end.resigned_you')
-        : t('game.end.resigned', { name: name(match.resignedBy) })
+        ? t('game.end.resignedMatch_you')
+        : t('game.end.resignedMatch', { name: name(match.resignedBy) })
       : timedOut !== null
         ? seats[timedOut].you
           ? t('game.end.timeout_you')

@@ -15,8 +15,8 @@
     "newGame": "New game",
     "vsBot": {
       "title": "Play vs bot",
-      "subtitle": "Easy or Medium",
-      "subtitleEasy": "Easy for now. Medium is coming soon."
+      "levels": "{{first}} or {{last}}",
+      "levelsSeparator": ", "
     },
     "local": {
       "title": "Pass-and-play",
@@ -139,6 +139,8 @@
       "lostOnTime": "Lost on time",
       "winnerOnTime": "{{name}} won on time"
     },
+    "resigned": "{{name}} resigned",
+    "resigned_you": "you resigned",
     "vsBot": "Bot · {{level}}",
     "local": "Pass-and-play",
     "line": {
@@ -272,8 +274,14 @@
       "gameWinner_you": "You win the game!",
       "matchWinner_you": "You won the match!",
       "starts_you": "You start (winner starts)",
-      "resigned": "{{name}} resigned.",
-      "resigned_you": "You resigned.",
+      "resignedGame": "{{name}} resigned the game.",
+      "resignedGame_you": "You resigned the game.",
+      "resignedMono": "Mono: {{name}} resigned the game.",
+      "resignedMono_you": "Mono: you resigned the game.",
+      "resignedDiplo": "Diplo: {{name}} resigned before bearing off a checker.",
+      "resignedDiplo_you": "Diplo: you resigned before you bore off a checker.",
+      "resignedMatch": "{{name}} resigned the match.",
+      "resignedMatch_you": "You resigned the match.",
       "home": "Home",
       "changeSettings": "Change settings",
       "matchLabel": "Match",
