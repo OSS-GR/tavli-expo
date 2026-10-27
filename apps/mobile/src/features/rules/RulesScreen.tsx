@@ -30,9 +30,11 @@ export interface RulesScreenProps {
   variant: RulesVariant | null;
   /** Opens the page of one game (links on the Tavli page). */
   onOpenRules: (game: RulesGame) => void;
+  /** Opens the tutorial (#128). Shown on the Portes page, which the tutorial teaches. */
+  onLearnToPlay?: () => void;
 }
 
-export function RulesScreen({ variant, onOpenRules }: RulesScreenProps) {
+export function RulesScreen({ variant, onOpenRules, onLearnToPlay }: RulesScreenProps) {
   const { t } = useTranslation();
   return (
     <ScrollView
@@ -40,6 +42,14 @@ export function RulesScreen({ variant, onOpenRules }: RulesScreenProps) {
       style={styles.screen}
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic">
+      {variant === 'portes' && onLearnToPlay ? (
+        <ActionButton
+          testID="rules-learn-to-play"
+          kind="secondary"
+          label={t('tutorial.openFromRules')}
+          onPress={onLearnToPlay}
+        />
+      ) : null}
       {isRulesGame(variant) ? (
         RULES_PAGES[variant].map((section) => (
           <Section key={section.id} section={section} game={variant} />

@@ -167,6 +167,15 @@ export function defaultSetup(mode: MatchMode): MatchSetup {
   };
 }
 
+/**
+ * The setup of the first game after the tutorial (#128): Portes vs the
+ * Easy bot (or the easiest level this build has). The match length comes
+ * from `base` (the last choices).
+ */
+export function firstGameSetup(base: MatchSetup, levels: GameLevels = ALL_GAME_LEVELS): MatchSetup {
+  return sanitizeSetup({ ...base, mode: 'bot', game: 'portes', botLevel: 'easy' }, 'bot', levels);
+}
+
 /** Trims a typed name and cuts it to `MAX_NAME_LENGTH` characters. */
 export function cleanName(value: unknown): string {
   if (typeof value !== 'string') return '';

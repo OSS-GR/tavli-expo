@@ -142,6 +142,18 @@ describe('<RulesScreen />', () => {
     }
   });
 
+  it('offers the tutorial on the Portes page only (#128)', async () => {
+    const onLearnToPlay = jest.fn();
+    const props = { onOpenRules: jest.fn(), onLearnToPlay };
+    const view = await render(<RulesScreen variant="portes" {...props} />);
+    await userEvent
+      .setup()
+      .press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+    expect(onLearnToPlay).toHaveBeenCalledTimes(1);
+    await view.rerender(<RulesScreen variant="plakoto" {...props} />);
+    expect(screen.queryByTestId('rules-learn-to-play')).not.toBeOnTheScreen();
+  });
+
   it('has the sections the issue asks for', () => {
     const ids = (game: (typeof RULES_GAMES)[number]) => RULES_PAGES[game].map((s) => s.id);
     const shared = ['goal', 'start', 'moves', 'bearOff', 'scoring'];
