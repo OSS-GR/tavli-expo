@@ -17,9 +17,11 @@ import { seatsFor } from './seats';
 import { createSessionRegistry, newMatchId } from './sessions';
 import {
   GAME_CHOICES,
+  OPENING_ROLL_RULES,
   cleanName,
   defaultSetup,
   enginePlayers,
+  firstGameSetup,
   gameLevels,
   gameRotation,
   gameRuleSet,
@@ -43,7 +45,46 @@ describe('match setup', () => {
       targetPoints: 3,
       botLevel: 'easy',
       names: { white: '', black: '' },
+      openingRoll: 'useOpeningDice',
     });
+  });
+
+  it('keeps the opening roll house rule (#207); a bad or missing one is the federation rule', () => {
+    expect(sanitizeSetup({ openingRoll: 'rerollBoth' }, 'bot').openingRoll).toBe('rerollBoth');
+    expect(sanitizeSetup({ openingRoll: 'chosenStarterRolls' }, 'local').openingRoll).toBe(
+      'chosenStarterRolls',
+    );
+    expect(sanitizeSetup({ openingRoll: 'coinFlip' }, 'bot').openingRoll).toBe('useOpeningDice');
+    expect(sanitizeSetup({ game: 'plakoto' }, 'local').openingRoll).toBe('useOpeningDice');
+  });
+
+  it('the first game after the tutorial uses the standard opening roll (#207)', () => {
+    const last: MatchSetup = {
+      ...defaultSetup('bot'),
+      targetPoints: 5,
+      botLevel: 'medium',
+      openingRoll: 'chosenStarterRolls',
+    };
+    const levels = gameLevels(['easy', 'medium']);
+    for (const game of ['portes', 'plakoto', 'fevga', 'asodio'] as const) {
+      expect(firstGameSetup(last, levels, game)).toEqual({
+        ...defaultSetup('bot'),
+        game,
+        targetPoints: 5,
+        openingRoll: 'useOpeningDice',
+      });
+    }
+  });
+
+  it('puts the opening roll rule into the rules of every game (#207)', () => {
+    expect(gameRuleSet('portes').match.openingRoll).toBe('useOpeningDice');
+    for (const rule of OPENING_ROLL_RULES) {
+      for (const game of GAME_CHOICES) {
+        const rules = gameRuleSet(game, rule);
+        expect(rules.match.openingRoll).toBe(rule);
+        expect(rules.match.rotation).toEqual(gameRotation(game));
+      }
+    }
   });
 
   it('cleans names: trims and cuts to 16 characters (Greek too)', () => {
@@ -131,6 +172,16 @@ describe('last choices', () => {
     saveLastSetup(storage, botSetup);
     expect(loadLastSetup(storage, 'bot', gameLevels(['easy']))).toEqual(botSetup);
     expect(loadLastSetup(storage, 'local', gameLevels(['easy']))).toEqual(defaultSetup('local'));
+  });
+
+  it('remembers the opening roll house rule per mode (#207)', () => {
+    const storage = createMemoryStorage();
+    const local: MatchSetup = { ...defaultSetup('local'), openingRoll: 'chosenStarterRolls' };
+    saveLastSetup(storage, local);
+    expect(loadLastSetup(storage, 'local', gameLevels(['easy'])).openingRoll).toBe(
+      'chosenStarterRolls',
+    );
+    expect(loadLastSetup(storage, 'bot', gameLevels(['easy'])).openingRoll).toBe('useOpeningDice');
   });
 
   it('gives the defaults for broken data', () => {

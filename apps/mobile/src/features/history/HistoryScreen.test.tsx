@@ -29,6 +29,7 @@ function rec(over: Partial<HistoryRecord>): HistoryRecord {
     diploWins: { white: 1, black: 0 },
     draws: 0,
     matchNumber: 1,
+    openingRoll: 'useOpeningDice',
     ...over,
   };
 }

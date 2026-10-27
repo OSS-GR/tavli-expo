@@ -1,8 +1,8 @@
 /**
  * Large system fonts (#134): Home, New game, the game screen and its cards
- * (#153; choose a double, #205), the game menu and resign dialog, the end
- * screens, History (#142), the tutorial's mother card (#149) and the
- * Settings game picker (#159)
+ * (#153; choose a double, #205; the opening roll house rule cards, #207),
+ * the game menu and resign dialog, the end screens, History (#142), the
+ * tutorial's mother card (#149) and the Settings game picker (#159)
  * follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
@@ -282,6 +282,24 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(screen.getByTestId('mother-card')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
 
+    // The opening roll house rules (#207): the starter card, then the
+    // "rolls again" result.
+    const withOpening = (openingRoll: 'rerollBoth' | 'chosenStarterRolls') =>
+      createGameStore({
+        players: { white: 'Maria Papadopoulou', black: 'Bob' },
+        rules: resolveRules('portes', { match: { rotation: ['portes'], openingRoll } }),
+        rng: createSeededRng(1),
+      });
+    await showGame(withOpening('chosenStarterRolls'));
+    expect(screen.getByTestId('starter-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    const rerolling = withOpening('rerollBoth');
+    rerolling.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+    rerolling.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+    await showGame(rerolling);
+    expect(screen.getByTestId('opening-ok-button')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+
     // Acey-Deucey (#205): Maria plays a 1-2 and chooses a double. Bob holds
     // her own 18 to 15, so a chosen 6-6 then passes ("Maria chose 6-6").
     const choosing = storeAt(
@@ -428,6 +446,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       diploWins: { white: 1, black: 1 },
       draws: 1,
       matchNumber: 1,
+      openingRoll: 'useOpeningDice',
     };
     const bot: HistoryRecord = { ...record, id: 'b', mode: 'bot', botLevel: 'medium' };
     await renderWithRoot(<HistoryScreen records={[record, bot]} onPlay={jest.fn()} />);

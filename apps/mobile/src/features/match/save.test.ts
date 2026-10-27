@@ -358,3 +358,52 @@ describe('the saved game (#109)', () => {
     expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
   });
 });
+
+describe('the opening roll house rule in the save (#207)', () => {
+  it.each(['rerollBoth', 'chosenStarterRolls'] as const)(
+    'resumes a %s match with the same rule, still before the first roll',
+    (openingRoll) => {
+      const storage = createMemoryStorage();
+      const setup: MatchSetup = { ...defaultSetup('local'), openingRoll };
+      const s = registry(storage).start(setup);
+      expect(flowOf(s).match.rules.match.openingRoll).toBe(openingRoll);
+
+      const restored = registry(storage).get(s.id);
+      expect(restored?.setup.openingRoll).toBe(openingRoll);
+      const flow = restored && flowOf(restored);
+      expect(flow?.match.rules.match.openingRoll).toBe(openingRoll);
+      expect(flow?.game.phase).toBe('opening-roll');
+      // `chosenStarterRolls` waits for a pick; the others for the opening roll.
+      expect(flow?.game.opening === null).toBe(openingRoll === 'chosenStarterRolls');
+    },
+  );
+
+  it('resumes a chosen starter: the pick is in the log', () => {
+    const storage = createMemoryStorage();
+    const s = registry(storage).start({
+      ...defaultSetup('bot'),
+      openingRoll: 'chosenStarterRolls',
+    });
+    expect(s.store.getState().dispatch({ type: 'chooseStarter', player: 'black' })).toBe(true);
+
+    const restored = registry(storage).get(s.id);
+    const game = restored && flowOf(restored).game;
+    expect(game?.phase).toBe('awaiting-roll');
+    expect(game?.starter).toBe('black');
+  });
+
+  it('loads a save from before #207 (no rule) with the federation rule', () => {
+    const s = registry(createMemoryStorage()).start(botSetup);
+    const old = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    delete old.setup.openingRoll;
+    const result = parseSavedMatch(JSON.stringify(old), LEVELS);
+    expect(result.kind === 'ok' && result.saved.setup.openingRoll).toBe('useOpeningDice');
+  });
+
+  it('drops a save whose setup and log name another rule', () => {
+    const s = registry(createMemoryStorage()).start(botSetup);
+    const bad = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    bad.setup.openingRoll = 'rerollBoth';
+    expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
+  });
+});

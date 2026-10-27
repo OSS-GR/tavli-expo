@@ -47,7 +47,14 @@ describe('gameAnalytics with the game store', () => {
   it('sends game_started when the store starts a match', () => {
     const { analytics } = setup();
     expect(events(analytics)).toEqual([
-      { event: 'game_started', mode: 'local', game: 'portes', variant: 'portes', matchLength: 3 },
+      {
+        event: 'game_started',
+        mode: 'local',
+        game: 'portes',
+        variant: 'portes',
+        matchLength: 3,
+        openingRoll: 'useOpeningDice',
+      },
     ]);
   });
 
@@ -60,6 +67,7 @@ describe('gameAnalytics with the game store', () => {
       variant: 'portes',
       matchLength: 3,
       botLevel: 'easy',
+      openingRoll: 'useOpeningDice',
     });
   });
 
@@ -108,6 +116,7 @@ describe('gameAnalytics with the game store', () => {
         game: 'portes',
         variant: store.getState().flow.game.state.variant,
         matchLength: 3,
+        openingRoll: 'useOpeningDice',
       },
     ]);
   });

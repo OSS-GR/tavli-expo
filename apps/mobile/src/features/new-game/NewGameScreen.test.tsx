@@ -7,6 +7,7 @@ import { botLevelsByGame } from '@/features/bot/levels';
 import { defaultSetup, gameLevels, type GameLevels, type MatchMode } from '@/features/match/setup';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import i18n from '@/i18n';
 
 import { NewGameScreen } from './NewGameScreen';
 
@@ -356,5 +357,98 @@ describe('<NewGameScreen /> game picker (#109)', () => {
     await user.press(screen.getByRole('button', { name: 'How to play Tavli' }));
     expect(onRules).toHaveBeenCalledWith('tavli');
     expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
+  });
+});
+
+describe('<NewGameScreen /> house rules (#207)', () => {
+  it('starts with the federation rule and says what it does', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('bot');
+    await render(ui);
+
+    expect(screen.getByRole('header', { name: 'House rules' })).toBeOnTheScreen();
+    expect(screen.getByText('Opening roll')).toBeOnTheScreen();
+    expect(screen.getByTestId('new-game-opening-roll')).toHaveProp(
+      'accessibilityLabel',
+      'Opening roll',
+    );
+    expect(screen.getByRole('radio', { name: 'Standard' })).toBeChecked();
+    expect(
+      screen.getByText(
+        'Each player rolls one die. The higher die starts and plays both dice. The federation rule.',
+      ),
+    ).toBeOnTheScreen();
+    // The old "Who starts?" box is gone: the hint says it now.
+    expect(screen.queryByText('Who starts?')).toBeNull();
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart.mock.calls[0][0].openingRoll).toBe('useOpeningDice');
+  });
+
+  it('vs bot: picks "roll again" or "choose", with their hints', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('bot');
+    await render(ui);
+
+    await user.press(screen.getByRole('radio', { name: 'Roll again' }));
+    expect(screen.getByRole('radio', { name: 'Roll again' })).toBeChecked();
+    expect(
+      screen.getByText(
+        'Each player rolls one die. The higher die starts and rolls both dice again, so a double is possible.',
+      ),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart).toHaveBeenLastCalledWith({ ...defaultSetup('bot'), openingRoll: 'rerollBoth' });
+
+    await user.press(screen.getByRole('radio', { name: 'Choose' }));
+    expect(
+      screen.getByText('You choose who starts: you or the bot. That player rolls both dice.'),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart.mock.calls[1][0].openingRoll).toBe('chosenStarterRolls');
+  });
+
+  it('pass-and-play: the players choose who starts', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('local');
+    await render(ui);
+    await user.press(screen.getByRole('radio', { name: 'Choose' }));
+    expect(
+      screen.getByText('You choose who starts. That player rolls both dice.'),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart).toHaveBeenCalledWith({
+      ...defaultSetup('local'),
+      openingRoll: 'chosenStarterRolls',
+    });
+  });
+
+  it('starts from the last choice', async () => {
+    const { ui } = show('local', PORTES_ONLY(['easy']), {
+      ...defaultSetup('local'),
+      openingRoll: 'rerollBoth',
+    });
+    await render(ui);
+    expect(screen.getByRole('radio', { name: 'Roll again' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Standard' })).not.toBeChecked();
+  });
+
+  it('Greek: the section, the choices and a hint', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    try {
+      const { ui } = show('bot');
+      await render(ui);
+      expect(screen.getByRole('header', { name: 'Κανόνες καφενείου' })).toBeOnTheScreen();
+      expect(screen.getByText('Πρώτη ζαριά')).toBeOnTheScreen();
+      for (const name of ['Κανονικά', 'Ξαναρίχνει', 'Διαλέγουμε']) {
+        expect(screen.getByRole('radio', { name })).toBeOnTheScreen();
+      }
+      expect(screen.getByText(/Κανόνας της ομοσπονδίας\.$/)).toBeOnTheScreen();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
   });
 });

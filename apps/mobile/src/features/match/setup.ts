@@ -4,12 +4,18 @@
  *
  * Vs bot: the human plays White (at the bottom), the bot plays Black.
  */
-import { BOT_DIFFICULTIES, type Difficulty, type TutorialGame } from '@tavli/contracts';
+import {
+  BOT_DIFFICULTIES,
+  type Difficulty,
+  type OpeningRollRule,
+  type TutorialGame,
+} from '@tavli/contracts';
 import {
   DEFAULT_PRESET_BY_GAME,
   VARIANT_REGISTRY,
   getPreset,
   resolveRules,
+  type MatchRules,
   type PerPlayer,
   type PlayerId,
   type PresetId,
@@ -70,15 +76,47 @@ function singleGame(game: GameChoice): StandardVariantId | null {
 }
 
 /**
+ * The house rule for the opening roll (#207): the engine flag
+ * `match.openingRoll` (`docs/rules/tavli-match.md`, "Who starts the first
+ * game"). `useOpeningDice` is the federation rule and the default.
+ */
+export type { OpeningRollRule };
+
+// `OpeningRollRule` lives in contracts (it is an analytics value id too);
+// it must name exactly the engine's values. A type error here says they differ.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const SAME_AS_ENGINE: Same<OpeningRollRule, MatchRules['openingRoll']> = true;
+void SAME_AS_ENGINE;
+
+/** The choices on the new-game screen, default first. */
+export const OPENING_ROLL_RULES = [
+  'useOpeningDice',
+  'rerollBoth',
+  'chosenStarterRolls',
+] as const satisfies readonly OpeningRollRule[];
+
+export const DEFAULT_OPENING_ROLL: OpeningRollRule = 'useOpeningDice';
+
+export function isOpeningRollRule(value: unknown): value is OpeningRollRule {
+  return (OPENING_ROLL_RULES as readonly unknown[]).includes(value);
+}
+
+/**
  * The rules of a new match of `game`: its preset (`resolveRules`). A
  * one-game match plays only that game: the Plakoto and Fevga presets keep
  * the shared rotation Portes → Plakoto → Fevga (`NEUTRAL` in the engine), so
  * we set `match.rotation` to the game ("single game" in `tavli-match.md`).
- * Tavli keeps its rotation.
+ * Tavli keeps its rotation. `openingRoll` is the house rule (#207); the
+ * preset's own value (the federation rule) is the default.
  */
-export function gameRuleSet(game: GameChoice): RuleSet {
+export function gameRuleSet(
+  game: GameChoice,
+  openingRoll: OpeningRollRule = DEFAULT_OPENING_ROLL,
+): RuleSet {
   const only = singleGame(game);
-  return resolveRules(gamePreset(game), only === null ? {} : { match: { rotation: [only] } });
+  return resolveRules(gamePreset(game), {
+    match: { openingRoll, ...(only === null ? {} : { rotation: [only] }) },
+  });
 }
 
 /** The games one match of `game` plays, in order: one entry, or three for Tavli. */
@@ -155,6 +193,8 @@ export interface MatchSetup {
   readonly botLevel: Difficulty;
   /** Pass-and-play names as typed (trimmed). Empty = "Player 1" / "Player 2". */
   readonly names: PerPlayer<string>;
+  /** The house rule for the opening roll (#207). Default: the federation rule. */
+  readonly openingRoll: OpeningRollRule;
 }
 
 export function defaultSetup(mode: MatchMode): MatchSetup {
@@ -164,6 +204,7 @@ export function defaultSetup(mode: MatchMode): MatchSetup {
     targetPoints: 3,
     botLevel: 'easy',
     names: { white: '', black: '' },
+    openingRoll: DEFAULT_OPENING_ROLL,
   };
 }
 
@@ -171,15 +212,20 @@ export function defaultSetup(mode: MatchMode): MatchSetup {
  * The setup of the first game after the tutorial (#128): the game of the
  * lessons (Portes, or Plakoto, Fevga or Asodio after their lessons, #149,
  * #159) vs the
- * Easy bot (or the easiest level this build has). The match length comes
- * from `base` (the last choices).
+ * Easy bot (or the easiest level this build has), with the standard
+ * opening roll: the tutorial teaches no house rule (#207). The match length
+ * comes from `base` (the last choices).
  */
 export function firstGameSetup(
   base: MatchSetup,
   levels: GameLevels = ALL_GAME_LEVELS,
   game: TutorialGame = 'portes',
 ): MatchSetup {
-  return sanitizeSetup({ ...base, mode: 'bot', game, botLevel: 'easy' }, 'bot', levels);
+  return sanitizeSetup(
+    { ...base, mode: 'bot', game, botLevel: 'easy', openingRoll: DEFAULT_OPENING_ROLL },
+    'bot',
+    levels,
+  );
 }
 
 /** Trims a typed name and cuts it to `MAX_NAME_LENGTH` characters. */
@@ -202,9 +248,9 @@ export interface SanitizeOptions {
 
 /**
  * Turns any saved value into a valid setup for `mode`. Bad fields fall
- * back to the defaults. A game that is locked in this mode becomes Portes.
- * A bot level this build cannot play for the game becomes the easiest one
- * it can (`levels`).
+ * back to the defaults (an unknown opening roll rule too). A game that is
+ * locked in this mode becomes Portes. A bot level this build cannot play
+ * for the game becomes the easiest one it can (`levels`).
  */
 export function sanitizeSetup(
   raw: unknown,
@@ -231,6 +277,8 @@ export function sanitizeSetup(
       ? (level as Difficulty)
       : (gameLevels[0] ?? d.botLevel),
     names: { white: cleanName(names['white']), black: cleanName(names['black']) },
+    // Saves and last choices before #207 have none: the federation rule.
+    openingRoll: isOpeningRollRule(input['openingRoll']) ? input['openingRoll'] : d.openingRoll,
   };
 }
 

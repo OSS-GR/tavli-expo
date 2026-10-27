@@ -7,6 +7,7 @@ import {
   type PlayerId,
 } from '@tavli/engine';
 
+import { gameRuleSet, type OpeningRollRule } from '@/features/match/setup';
 import i18n from '@/i18n';
 
 import { turnAnnouncement, type AnnouncementNames } from './announcements';
@@ -108,6 +109,42 @@ describe('turnAnnouncement', () => {
     dispatch({ type: 'resign', player: 'black' });
     expect(store.getState().flow.game.result).not.toBeNull();
     expect(turnAnnouncement(store.getState().flow, i18n.t, passAndPlay)).toBeNull();
+  });
+});
+
+describe('turnAnnouncement with an opening roll house rule (#207)', () => {
+  const storeWith = (openingRoll: OpeningRollRule) =>
+    createGameStore({
+      players: names,
+      rules: gameRuleSet('portes', openingRoll),
+      rng: createSeededRng(3),
+    });
+
+  it('rerollBoth: the starter’s own first roll is read', () => {
+    const store = storeWith('rerollBoth');
+    const { dispatch } = store.getState();
+    dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+    dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+    const announce = () => turnAnnouncement(store.getState().flow, i18n.t, passAndPlay);
+    // The opening card says who starts.
+    expect(announce()).toBeNull();
+    dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+    expect(announce()?.text).toBe('Ann rolled double 6: four moves of 6.');
+  });
+
+  it('chosenStarterRolls: says who was picked, then reads the roll', () => {
+    const store = storeWith('chosenStarterRolls');
+    const { dispatch } = store.getState();
+    const announce = () => turnAnnouncement(store.getState().flow, i18n.t, vsBot);
+    expect(announce()).toBeNull();
+    dispatch({ type: 'chooseStarter', player: 'white' });
+    expect(announce()).toEqual({ key: '0:1:starter', text: 'You start.' });
+    dispatch({ type: 'roll', player: 'white', dice: [4, 2] });
+    expect(announce()).toEqual({ key: '0:1:roll', text: 'You rolled 4-2.' });
+
+    const other = storeWith('chosenStarterRolls');
+    other.getState().dispatch({ type: 'chooseStarter', player: 'black' });
+    expect(turnAnnouncement(other.getState().flow, i18n.t, passAndPlay)?.text).toBe('Bot starts.');
   });
 });
 
