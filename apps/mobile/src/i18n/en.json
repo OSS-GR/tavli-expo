@@ -64,6 +64,10 @@
       "label": "Show pip counts",
       "hint": "How many pips each player needs to bear off"
     },
+    "hints": {
+      "label": "Show hints",
+      "hint": "A Hint button shows the best move for your roll"
+    },
     "boardView": {
       "label": "Board view (pass-and-play)",
       "flip": "Flip",
@@ -277,6 +281,12 @@
       "turnOf": "{{name}}’s turn",
       "toEnter": "{{count}} to enter",
       "frozen": "Army frozen"
+    },
+    "hint": {
+      "button": "Hint",
+      "busy": "Thinking…",
+      "hide": "Hide the hint",
+      "text": "Hint: {{moves}}"
     },
     "controls": {
       "undo": "↶ Undo",

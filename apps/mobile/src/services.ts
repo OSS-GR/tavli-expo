@@ -7,7 +7,7 @@
  */
 import { createPostHogAnalytics } from '@tavli/analytics-posthog';
 import { createExpoSoundPlayer } from '@tavli/audio-expo';
-import { InlineBotRunner, createBot } from '@tavli/bot';
+import { InlineBotRunner, createAnalyzer, createBot, type Analyzer } from '@tavli/bot';
 import {
   createNoopAnalytics,
   createNoopCrashReporter,
@@ -97,3 +97,9 @@ export const botRunner: BotRunner = new InlineBotRunner(bot);
  * shows up as soon as the bot package has an evaluator for it.
  */
 export const botLevels: GameLevels = botLevelsByGame(bot);
+
+/**
+ * The Hint button (#209): the bot's Analyzer ranks the turns for a roll. It
+ * uses the same evaluators as the bot (the variant's best one).
+ */
+export const analyzer: Analyzer = createAnalyzer();

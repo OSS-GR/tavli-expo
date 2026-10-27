@@ -71,6 +71,8 @@ export interface Settings {
   /** End the turn as soon as all dice are used, without a Confirm tap. */
   autoConfirmMoves: boolean;
   showPipCounts: boolean;
+  /** Offline games: a Hint button shows the best turn for the roll (#209). */
+  showHints: boolean;
   boardFlipMode: BoardFlipMode;
   /** Where your home is (a real board seen from your seat). `left` mirrors the board. */
   homeBoardSide: HomeBoardSide;
@@ -91,6 +93,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   language: 'system',
   autoConfirmMoves: false,
   showPipCounts: true,
+  showHints: true,
   boardFlipMode: 'flip',
   homeBoardSide: 'right',
   boardLayout: 'tall',
@@ -137,6 +140,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     language: oneOf(LANGUAGE_PREFERENCES, input['language'], d.language),
     autoConfirmMoves: bool(input['autoConfirmMoves'], d.autoConfirmMoves),
     showPipCounts: bool(input['showPipCounts'], d.showPipCounts),
+    // Saves from before #209 have no value: hints start on.
+    showHints: bool(input['showHints'], d.showHints),
     boardFlipMode: oneOf(BOARD_FLIP_MODES, input['boardFlipMode'], d.boardFlipMode),
     // Saves from before #175 have no value: they load as `right`, the board as it was.
     homeBoardSide: oneOf(HOME_BOARD_SIDES, input['homeBoardSide'], d.homeBoardSide),
@@ -184,6 +189,7 @@ function pickSettings(state: SettingsState): Settings {
     language: state.language,
     autoConfirmMoves: state.autoConfirmMoves,
     showPipCounts: state.showPipCounts,
+    showHints: state.showHints,
     boardFlipMode: state.boardFlipMode,
     homeBoardSide: state.homeBoardSide,
     boardLayout: state.boardLayout,
