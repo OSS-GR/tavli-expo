@@ -94,7 +94,8 @@ The workflow `.github/workflows/claude-review.yml` has one job, **`claude-review
 - **Severity:** a finding is **blocking** when it is a correctness bug, a crash, data loss, a security problem, a test that fails or tests nothing, or a break of a hard rule in `CLAUDE.md`. Everything else is **optional**.
 - **Gate:** the job fails when there is a blocking finding, or when the review does not finish. Fix the blocking findings and push again. Optional findings do not block.
 - **Skipped** (a skipped job counts as passed): drafts, Dependabot PRs (they get no secrets), and PRs from forks. A draft is reviewed when you mark it ready for review.
-- **Workflow changes:** the Claude action runs only when `.github/workflows/claude-review.yml` is the same as on `main` (a security rule). That is why the review has its own file: a change to `ci.yml` does not switch it off. A PR that changes `claude-review.yml` gets a "skipped" comment and passes. **A person must review that change.**
+- **Token:** the action uses the workflow's own `GITHUB_TOKEN` (read-only for code), not the Claude app. So a PR that changes `claude-review.yml` is reviewed too.
+- **Debug:** the run log shows Claude's full output (`show_full_output`; the repo is private).
 - **Cost:** each push to a PR runs one review. A newer push cancels the older run. With `CLAUDE_CODE_OAUTH_TOKEN` the review uses the owner's Claude plan, not API billing.
 
 **Secret (owner, one time).** Add one repository secret (Settings → Secrets and variables → Actions):
