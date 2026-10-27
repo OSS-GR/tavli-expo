@@ -31,7 +31,10 @@ import { openingDiceInPlay } from './opening';
 import { diceWereRolled } from './rolledDice';
 
 export interface Announcement {
-  /** One per event, so the same text is read again for a new event. */
+  /**
+   * One per event in the match, so the same text is read again for a new
+   * event. The game screen adds the match (`matchKey`, #216).
+   */
   readonly key: string;
   readonly text: string;
 }

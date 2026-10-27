@@ -29,6 +29,12 @@ export interface MatchEndScreenProps {
   onReview?: () => void;
   onChangeSettings: () => void;
   onHome: () => void;
+  /**
+   * Names this match for this app run (`matchKey` of its game store, #216):
+   * the result is read once, and a remount does not read it again. Without
+   * it, every time the screen mounts.
+   */
+  announceKey?: string;
 }
 
 export function MatchEndScreen({
@@ -38,6 +44,7 @@ export function MatchEndScreen({
   onReview,
   onChangeSettings,
   onHome,
+  announceKey,
 }: MatchEndScreenProps) {
   const { t } = useTranslation();
   const seats = seatsFor(setup, t);
@@ -84,7 +91,10 @@ export function MatchEndScreen({
         ? t('matchEnd.rematchHint_you')
         : t('matchEnd.rematchHint', { name: name(starter) });
 
-  useAnnouncement([title, reason, scoreLine].filter(Boolean).join(' '));
+  useAnnouncement(
+    [title, reason, scoreLine].filter(Boolean).join(' '),
+    announceKey === undefined ? undefined : `${announceKey}:matchEnd`,
+  );
 
   return (
     <View testID="match-end-screen" style={styles.screen}>

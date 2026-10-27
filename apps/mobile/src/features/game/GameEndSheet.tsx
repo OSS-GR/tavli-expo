@@ -38,6 +38,11 @@ export interface GameEndSheetProps {
   celebrate: boolean;
   /** Next game and Home. */
   children: ReactNode;
+  /**
+   * Names this game end for this app run (#216): the result is read once,
+   * and a remount does not read it again. Without it, every time it opens.
+   */
+  announceKey?: string;
   testID?: string;
 }
 
@@ -52,10 +57,11 @@ export function GameEndSheet({
   target,
   celebrate,
   children,
+  announceKey,
   testID,
 }: GameEndSheetProps) {
   const titleRef = useFocusOnShow();
-  useAnnouncement([title, chip, reason, score, next].filter(Boolean).join(' '));
+  useAnnouncement([title, chip, reason, score, next].filter(Boolean).join(' '), announceKey);
   return (
     <View style={styles.root}>
       <View style={styles.scrim} />

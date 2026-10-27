@@ -312,3 +312,45 @@ describe('<MatchEndScreen />', () => {
     expect(rows.getByLabelText('Game 4 · Portes, You won, Mono, 1 point')).toBeOnTheScreen();
   });
 });
+
+describe('<MatchEndScreen /> announcement after a remount (#216)', () => {
+  const props = { onRematch: jest.fn(), onChangeSettings: jest.fn(), onHome: jest.fn() };
+  const match = playedMatch([
+    ['white', 1],
+    ['white', 2],
+  ]);
+  const result = 'You won the match! You 3 – 0 Bot';
+
+  // React Native's Jest setup makes it a `jest.fn` that keeps calls between tests.
+  const spyOnAnnounce = () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    announce.mockClear();
+    return announce;
+  };
+
+  it('reads the result once per match: a remount does not read it again', async () => {
+    const announce = spyOnAnnounce();
+    await renderWithRoot(
+      <MatchEndScreen setup={botSetup} match={match} announceKey="m1" {...props} />,
+    );
+    await screen.unmount();
+    await renderWithRoot(
+      <MatchEndScreen setup={botSetup} match={match} announceKey="m1" {...props} />,
+    );
+    expect(announce.mock.calls).toEqual([[result]]);
+    // Another match (a rematch has a new key) is read.
+    await screen.unmount();
+    await renderWithRoot(
+      <MatchEndScreen setup={botSetup} match={match} announceKey="m2" {...props} />,
+    );
+    expect(announce.mock.calls).toEqual([[result], [result]]);
+  });
+
+  it('without a key, reads the result on every mount', async () => {
+    const announce = spyOnAnnounce();
+    await renderWithRoot(<MatchEndScreen setup={botSetup} match={match} {...props} />);
+    await screen.unmount();
+    await renderWithRoot(<MatchEndScreen setup={botSetup} match={match} {...props} />);
+    expect(announce).toHaveBeenCalledTimes(2);
+  });
+});

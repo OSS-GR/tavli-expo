@@ -58,6 +58,12 @@ export interface GameStoreOptions {
 
 export interface GameStoreState {
   readonly flow: MatchFlow;
+  /**
+   * Names the match on this store for this app run: `m1`, `m2`, … from a
+   * counter, new for each store and each rematch (never a time). Screen
+   * reader events put it in their key, so each one is read once (#216).
+   */
+  readonly matchKey: string;
   /** The last action the engine refused, for logs and tests. `null` after a good one. */
   readonly lastError: string | null;
   /** Applies one action. Returns `false` (and keeps the flow) if the engine refuses it. */
@@ -67,6 +73,12 @@ export interface GameStoreState {
 }
 
 export type GameStore = StoreApi<GameStoreState>;
+
+let matchCount = 0;
+const nextMatchKey = () => {
+  matchCount += 1;
+  return `m${matchCount}`;
+};
 
 /**
  * Runs an analytics call and drops its errors. The move is already played
@@ -103,6 +115,7 @@ export function createGameStore({
   if (!saved && analytics) quietly(() => analytics.gameStarted(flow));
   return createStore<GameStoreState>()((set, get) => ({
     flow,
+    matchKey: nextMatchKey(),
     lastError: null,
     dispatch: (action) => {
       const previous = get().flow;
@@ -120,7 +133,7 @@ export function createGameStore({
     },
     rematch: () => {
       const next = createRematchFlow(get().flow, ctx);
-      set({ flow: next, lastError: null });
+      set({ flow: next, matchKey: nextMatchKey(), lastError: null });
       if (analytics) quietly(() => analytics.gameStarted(next));
     },
   }));
