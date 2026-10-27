@@ -5,10 +5,12 @@
  */
 import { InlineBotRunner, createBot } from '@tavli/bot';
 import {
+  asodio,
   createGameFlow,
   createSeededRng,
   legalNextMoves,
   portes,
+  resolveRules,
   type PerPlayer,
   type PlayerId,
   type Rng,
@@ -287,6 +289,52 @@ describe('<GameScreen /> doubles (#177)', () => {
     await tick(1);
     expect(store.getState().flow.game.played).toHaveLength(1);
     expect(screen.getByLabelText('Dice 4-4-4-4, 3 left to play')).toBeOnTheScreen();
+  });
+
+  it('a double chosen after a 1-2 (Acey-Deucey) shows four dice at rest at once, no label', async () => {
+    const rules = resolveRules('asodio.aceyDeuceyGreek');
+    const store = createGameStore({
+      players: { white: 'Ann', black: 'Bob' },
+      targetPoints: 1,
+      rules,
+      rng: createSeededRng(5),
+    });
+    const { flow } = store.getState();
+    const state = asodio.initialState({ startingPlayer: 'white', rules });
+    store.setState({ flow: { ...flow, game: createGameFlow({ state, starter: 'white' }) } });
+    await show(store);
+    const { dispatch } = store.getState();
+    await act(async () => {
+      dispatch({ type: 'roll', player: 'white', dice: [1, 2] });
+    });
+    await act(async () => {
+      for (let next = legalNextMoves(store.getState().flow.game)[0]; next;) {
+        dispatch({ type: 'move', player: 'white', move: next.moves[0]! });
+        next = legalNextMoves(store.getState().flow.game)[0];
+      }
+      dispatch({ type: 'confirm', player: 'white' });
+    });
+    expect(store.getState().flow.game.phase).toBe('awaiting-answer');
+    await tick(DOUBLE_SPLIT_AT_MS + DOUBLE_LABEL_MS);
+    await act(async () => {
+      dispatch({ type: 'answer', player: 'white', choice: '4' });
+    });
+    expect(store.getState().flow.game.state.dice).toEqual([4, 4]);
+    // No roll: the four dice show at once, not a pair first.
+    expect(diceDrawn()).toBe(4);
+    expect(diceOpacity()).toEqual([1, 1, 1, 1]);
+    expect(screen.getByLabelText('Dice 4-4-4-4, 4 left to play')).toBeOnTheScreen();
+    const canvas = screen.getByTestId('dice-row');
+    const parent = nativeParent(canvas);
+    expect(parent?.props.collapsable).toBe(false);
+    // No split and no late "Doubles!" label.
+    for (let ms = 0; ms <= DOUBLE_SPLIT_AT_MS + DOUBLE_LABEL_MS; ms += 100) {
+      expect(screen.queryByTestId('doubles-hint')).toBeNull();
+      expect(diceDrawn()).toBe(4);
+      await tick(100);
+    }
+    expect(screen.getByTestId('dice-row') === canvas).toBe(true);
+    expect(nativeParent(screen.getByTestId('dice-row')) === parent).toBe(true);
   });
 
   // Greek names each double by its value (the owner's words), in the label
