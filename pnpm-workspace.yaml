@@ -12,3 +12,6 @@ allowBuilds:
   unrs-resolver: false
   # Pulled in by the Jest tool chain. Prebuilt binaries ship as optional deps.
   '@parcel/watcher': false
+  # Pulled in by @sentry/react-native. Its postinstall only downloads the CLI
+  # binary when the prebuilt one (an optional dep) is missing.
+  '@sentry/cli': false

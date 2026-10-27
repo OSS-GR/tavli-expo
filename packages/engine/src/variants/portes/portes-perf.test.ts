@@ -15,10 +15,18 @@ import { portes } from './index';
 // DOM or Node types, so we declare the one function we use.
 declare const performance: { now(): number };
 
+/**
+ * The best of 3 runs. A busy CI machine can pause the test at any time, so
+ * one run can be slow by chance; three slow runs in a row mean slow code.
+ */
 function timeMs(state: GameState, dice: Dice): number {
-  const start = performance.now();
-  portes.legalTurns(state, dice);
-  return performance.now() - start;
+  let best = Infinity;
+  for (let run = 0; run < 3; run += 1) {
+    const start = performance.now();
+    portes.legalTurns(state, dice);
+    best = Math.min(best, performance.now() - start);
+  }
+  return best;
 }
 
 function median(values: readonly number[]): number {

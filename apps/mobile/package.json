@@ -13,8 +13,10 @@
     "build:icons": "node assets/icon/tools/build-icons.mjs"
   },
   "dependencies": {
+    "@sentry/react-native": "~8.28.0",
     "@shopify/react-native-skia": "2.14.0",
     "@tavli/contracts": "workspace:*",
+    "@tavli/crash-sentry": "workspace:*",
     "@tavli/engine": "workspace:*",
     "@tavli/haptics-expo": "workspace:*",
     "@tavli/storage-mmkv": "workspace:*",
@@ -22,6 +24,7 @@
     "@tavli/ui": "workspace:*",
     "expo": "~58.0.19",
     "expo-constants": "~58.0.13",
+    "expo-dev-client": "~58.0.15",
     "expo-font": "~58.0.10",
     "expo-haptics": "~58.0.7",
     "expo-linking": "~58.0.14",
@@ -30,6 +33,7 @@
     "expo-splash-screen": "~58.0.11",
     "expo-status-bar": "~58.0.4",
     "expo-system-ui": "~58.0.6",
+    "expo-updates": "~58.0.18",
     "i18next": "26.5.10",
     "react": "19.3.0",
     "react-dom": "19.3.0",

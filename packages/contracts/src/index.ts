@@ -1,7 +1,7 @@
 /**
  * Ports (interfaces) and shared types.
  *
- * Each outside service (auth, backend, push, analytics) gets an interface
+ * Each outside service (auth, backend, push, analytics, crash reports) gets an interface
  * here. Vendor code lives in `packages/adapters/*` and implements these
  * interfaces. This package has no runtime dependencies. It uses types from
  * `@tavli/engine` only (`import type`).
@@ -20,6 +20,20 @@ export {
   type Feedback,
   type HapticStyle,
 } from './feedback';
+export {
+  CRASH_LEVELS,
+  createNoopCrashReporter,
+  createRecordingCrashReporter,
+  isAnonymousInstallId,
+  type CrashBreadcrumb,
+  type CrashContext,
+  type CrashData,
+  type CrashLevel,
+  type CrashReporter,
+  type CrashReporterConfig,
+  type RecordedCrash,
+  type RecordingCrashReporter,
+} from './crash-reporter';
 export { BOT_DIFFICULTIES, BotCancelledError, isBotCancelled, isDifficulty } from './bot-runner';
 export type { BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
 export { createMemoryStorage, type Storage } from './storage';
