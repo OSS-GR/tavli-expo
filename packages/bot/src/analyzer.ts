@@ -90,6 +90,9 @@ function fromResult(result: GameResult, player: PlayerId): Evaluation {
   return { win: 0, winDouble: 0, loseDouble: double, equity: -result.points };
 }
 
+/** The most questions `twoPly` answers in a row after one turn. The shipped variants ask at most one. */
+const MAX_ANSWERS = 8;
+
 /** True for a turn that wins the game at once. The bot always takes one. */
 function winsNow(score: TurnScore): boolean {
   return score.gameOver && score.score > 0;
@@ -100,9 +103,6 @@ function winsNow(score: TurnScore): boolean {
  * first), then the rest by score. Ties keep the engine's order of
  * `legalTurns`, so the ranking is always the same.
  */
-/** The most questions `twoPly` answers in a row after one turn. The shipped variants ask at most one. */
-const MAX_ANSWERS = 8;
-
 function compareScores(a: TurnScore, b: TurnScore): number {
   const wins = Number(winsNow(b)) - Number(winsNow(a));
   if (wins !== 0) return wins;
