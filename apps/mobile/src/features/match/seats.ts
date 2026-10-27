@@ -2,7 +2,7 @@
 import type { PerPlayer } from '@tavli/engine';
 import type { TFunction } from 'i18next';
 
-import { plainSeats, type Seat } from '@/features/game/seats';
+import type { Seat } from '@/features/game/seats';
 
 import type { MatchSetup } from './setup';
 
@@ -25,11 +25,16 @@ export function seatsFor(setup: MatchSetup, t: TFunction): PerPlayer<Seat> {
       },
     };
   }
-  return plainSeats(
-    {
-      white: setup.names.white || t('game.players.white'),
-      black: setup.names.black || t('game.players.black'),
-    },
-    t('game.strip.turn'),
-  );
+  // Pass-and-play: the pill names the player (wireframe 6), so the phone
+  // shows whose turn it is after it changes hands.
+  const seat = (name: string): Seat => ({
+    name,
+    label: name,
+    turnLabel: t('game.strip.turnOf', { name }),
+    you: false,
+  });
+  return {
+    white: seat(setup.names.white || t('game.players.white')),
+    black: seat(setup.names.black || t('game.players.black')),
+  };
 }

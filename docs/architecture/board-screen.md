@@ -75,7 +75,7 @@ The real route is `app/game/[id].tsx` (see [App shell](app-shell.md)). Dev route
 - **Undo** takes back the last single move (`undo` action); the checker flies back, and a hit checker comes back from the bar. Disabled (dashed) when there is nothing to undo.
 - **Confirm** is enabled only when the engine says `canConfirm` (all dice used, or no move left). Then a hint shows: "All dice used. Confirm or undo."
 - **Auto-confirm** (Settings, default off): each move is sent with `autoConfirm`, so the engine ends a complete turn at once.
-- **Turn indicator:** the active player's strip gets a thick border and a pill: "YOUR TURN", or "PLAYING" for the bot. Pip counts follow the moves of the turn; Settings → Show pip counts hides them.
+- **Turn indicator:** the active player's strip gets a thick border and a pill: "YOUR TURN", "PLAYING" for the bot, or the player's name in pass-and-play ("MARIA'S TURN"). Pip counts follow the moves of the turn; Settings → Show pip counts hides them.
 - **No legal moves:** the engine passes the turn by itself. The card says who rolled what and that the turn passes; the dice stay, faded. It closes on OK or after 3 s. Until then the board stays with the player who passed (flip).
 - **Game end:** winner, Mono / Diplo chip, score, "Next game" (the winner starts). **Match end:** winner, score, "Rematch" (the last winner starts, no opening roll).
 - The opening result closes after 1.5 s, or at once on a tap anywhere on the board.
@@ -86,7 +86,6 @@ The real route is `app/game/[id].tsx` (see [App shell](app-shell.md)). Dev route
 - The game-end and match-end screens are cards over the board (no `match-end` route yet). The in-game menu is in [App shell](app-shell.md).
 - No dashed "last move" arrow and no double-tap shortcut yet.
 - The dice in the controls row are 40 pt (wireframe: about 44 pt), so Undo, the dice and Confirm fit on an iPhone SE.
-- In pass-and-play the pill says "YOUR TURN" for both players; the strip already shows the name.
 
 ## Board flip
 

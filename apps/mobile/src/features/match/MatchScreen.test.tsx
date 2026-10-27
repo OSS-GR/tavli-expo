@@ -1,4 +1,12 @@
-import { createGameFlow, createSeededRng, portes, type PlayerId } from '@tavli/engine';
+import {
+  VARIANT_REGISTRY,
+  createGameFlow,
+  createSeededRng,
+  getVariant,
+  portes,
+  type Dice,
+  type PlayerId,
+} from '@tavli/engine';
 import { act, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
@@ -200,5 +208,64 @@ describe('<MatchScreen /> pass-and-play', () => {
         'Maria wins 2 points (diplo), because Nikos has not borne off any checker yet.',
       ),
     ).toBeOnTheScreen();
+  });
+});
+
+/** Plays one full turn for the player to move, through the store (like taps). */
+function playTurn(s: MatchSession, dice: Dice) {
+  const { dispatch } = s.store.getState();
+  const player = game(s).state.toMove;
+  dispatch({ type: 'roll', player, dice });
+  const turn = getVariant(VARIANT_REGISTRY, 'portes').legalTurns(game(s).state, dice)[0]!;
+  for (const move of turn.moves) dispatch({ type: 'move', player, move });
+  dispatch({ type: 'confirm', player });
+}
+
+describe('<MatchScreen /> pass-and-play turns', () => {
+  const names = { white: 'Maria', black: 'Nikos' };
+  const bottom = () => within(screen.getByTestId('strip-bottom'));
+  const top = () => within(screen.getByTestId('strip-top'));
+
+  it('flips the board to the player to move, with their name in the pill', async () => {
+    const s = session({ ...defaultSetup('local'), names });
+    startWith(s, 'white');
+    await show(s).view;
+
+    expect(bottom().getByText('Maria')).toBeOnTheScreen();
+    expect(bottom().getByText('MARIA’S TURN')).toBeOnTheScreen();
+
+    await act(async () => playTurn(s, [6, 5]));
+    expect(game(s).state.toMove).toBe('black');
+    expect(bottom().getByText('Nikos')).toBeOnTheScreen();
+    expect(bottom().getByText('NIKOS’S TURN')).toBeOnTheScreen();
+    expect(top().getByText('Maria')).toBeOnTheScreen();
+    // No "pass the phone" screen: Nikos can roll at once (wireframe 6e).
+    expect(screen.getByRole('button', { name: 'Roll dice, or tap the board' })).toBeOnTheScreen();
+  });
+
+  it('keeps the board fixed when Settings say Fixed, and switches at once', async () => {
+    await act(async () => {
+      settingsStore.setState({ boardFlipMode: 'fixed' });
+    });
+    const s = session({ ...defaultSetup('local'), names });
+    startWith(s, 'white');
+    await show(s).view;
+
+    await act(async () => playTurn(s, [6, 5]));
+    expect(bottom().getByText('Maria')).toBeOnTheScreen();
+    expect(top().getByText('NIKOS’S TURN')).toBeOnTheScreen();
+
+    // A change in Settings (from the in-game menu) applies at once.
+    await act(async () => {
+      settingsStore.setState({ boardFlipMode: 'flip' });
+    });
+    expect(bottom().getByText('Nikos')).toBeOnTheScreen();
+  });
+
+  it('never flips vs the bot, whatever Settings say', async () => {
+    const s = session(defaultSetup('bot'));
+    startWith(s, 'black');
+    await show(s, { beforeRollMs: 10_000, moveMs: 5, thinkMs: () => 5 }).view;
+    expect(bottom().getByText('You')).toBeOnTheScreen();
   });
 });

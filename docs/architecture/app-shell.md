@@ -25,6 +25,15 @@
 - Vs bot the human plays **White** (bottom), the bot **Black**. The board never flips.
 - Names come from the setup, in the app language (`features/match/seats.ts`): "You" / "Bot · Easy", or the typed names with "Player 1" / "Player 2" as the default. The engine only stores labels (`enginePlayers`). Texts about the human use `_you` strings ("You win the game!").
 
+## Pass-and-play (#35)
+
+- Two optional names (max 16 characters, trimmed). Empty names show "Player 1" / "Player 2" in the app language, so they follow a language switch.
+- **Board view** on the new-game screen edits Settings → Board view (`features/settings/BoardViewPicker.tsx`), so both screens agree and a change from the in-game menu applies at once. **Flip** (default) turns the board to the player to move after each Confirm; **Fixed** keeps White at the bottom. **Face-to-face** shows locked (owner: after MVP1).
+- The pill on the active strip names the player ("Maria's turn"), as wireframe 6 asks.
+- No "pass the phone" screen: wireframe 6e says pass-and-play has no locked state. After Confirm the board flips and the next player sees the Roll button with their name.
+- Each player taps for their own opening die.
+- Everything is local: no network call anywhere in a pass-and-play match.
+
 ## The bot turn
 
 - The app reaches the bot only through the `BotRunner` port. `services.ts` wires `InlineBotRunner` and lists the levels the bot can play (`botLevels`, from `features/bot/levels.ts`): it asks the bot once and drops levels that throw `NOT_IMPLEMENTED`. Today only **Easy** works, so Medium and Hard show locked ("coming soon").

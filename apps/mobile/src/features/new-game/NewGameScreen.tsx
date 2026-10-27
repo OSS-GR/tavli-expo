@@ -23,6 +23,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { Toast, useToast } from '@/components/Toast';
+import { BoardViewPicker } from '@/features/settings/BoardViewPicker';
 import {
   GAME_CHOICES,
   MATCH_LENGTHS,
@@ -183,10 +184,15 @@ export function NewGameScreen({ mode, initial, botLevels, onBack, onStart }: New
             </View>
           </>
         ) : (
-          <SettingsSection title={t('newGame.players.label')}>
-            {nameField('white')}
-            {nameField('black')}
-          </SettingsSection>
+          <>
+            <SettingsSection title={t('newGame.players.label')}>
+              {nameField('white')}
+              {nameField('black')}
+            </SettingsSection>
+            <SettingsSection title={t('newGame.boardView')}>
+              <BoardViewPicker testID="new-game-board-view" />
+            </SettingsSection>
+          </>
         )}
       </ScrollView>
       <View style={styles.footer}>

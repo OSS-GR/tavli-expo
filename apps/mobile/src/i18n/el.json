@@ -121,7 +121,8 @@
       "pipsLabel": "Μένουν {{count}} πόντοι",
       "scoreLabel": "{{score}} από {{target}} βαθμούς",
       "turn": "Σειρά σου",
-      "playing": "Παίζει"
+      "playing": "Παίζει",
+      "turnOf": "Σειρά: {{name}}"
     },
     "controls": {
       "undo": "↶ Αναίρεση",
@@ -243,7 +244,8 @@
       "whiteLabel": "Όνομα παίκτη 1, λευκά πούλια",
       "blackLabel": "Όνομα παίκτη 2, μαύρα πούλια"
     },
-    "start": "Ξεκίνα"
+    "start": "Ξεκίνα",
+    "boardView": "Προβολή ταμπλό"
   },
   "rules": {
     "title": "Πώς παίζονται οι {{game}}",
