@@ -14,7 +14,7 @@ Checked in the code on 2026-10-27:
 |-------|-------------------------|
 | Portes, Plakoto, Fevga, Asodio, and a Tavli match (Portes → Plakoto → Fevga) | `features/match/setup.ts`, [App shell](../architecture/app-shell.md#choosing-the-game-109) |
 | Match to 1, 3, 5 or 7 points; mono = 1, diplo = 2 | `features/match/setup.ts`, `newGame.length.*` texts |
-| Bot: Easy and Medium in all four games, Hard in Portes, Plakoto, Fevga and the Tavli match. Hard in Asodio is "coming soon" | `features/bot/levels.ts`, `services.ts` (`botLevels`) |
+| Bot: Easy and Medium in all four games, Hard in Portes, Plakoto, Fevga and the Tavli match. Hard in Asodio is "coming soon". When Asodio Hard ships (#164), drop the game list after "Hard" in the description and in "What's new" | `features/bot/levels.ts`, `services.ts` (`botLevels`) |
 | The bot plays on the phone. Local games need no network | `InlineBotRunner` in `services.ts`; App shell, "Pass-and-play" |
 | Pass-and-play on one phone, optional names, the board turns to the player | `features/match/seats.ts`, `settings.boardView.*` |
 | A "How to play" page for each game, with the start position | `features/rules/` |
@@ -102,7 +102,7 @@ PLAY ALL FOUR GREEK GAMES
 Or play a full Tavli match: Portes, Plakoto and Fevga in turn. Play to 1, 3, 5 or 7 points. Mono is 1 point, diplo is 2.
 
 PLAY THE BOT
-Two levels. Easy plays a random legal move, so it is good for learning. Medium plays like a casual player. The bot plays on your phone, so you can play with no internet.
+Three levels. Easy plays a random legal move, so it is good for learning. Medium plays like a casual player. Hard plays like a strong player, in Portes, Plakoto, Fevga and Tavli. The bot plays on your phone, so you can play with no internet.
 
 PASS-AND-PLAY
 Two players, one phone. Type your names if you like. The board turns to the player whose turn it is.
@@ -124,7 +124,7 @@ No ads. No sign-in. Your games stay on your phone. You choose if the app may sen
 Privacy policy: https://tavlaki.com/privacy
 ```
 
-1,995 characters.
+2,067 characters.
 
 Optional line (only if the owner wants it, see above). Put it before "NO ADS, NO ACCOUNT":
 
@@ -140,14 +140,14 @@ Limit: 4,000 on the App Store, 500 on Google Play. This text fits both.
 ```text
 The first release of Tavlaki.
 • Portes, Plakoto, Fevga and Asodio, and full Tavli matches
-• Easy and Medium bot
+• Easy, Medium and Hard bot (Hard in Portes, Plakoto, Fevga and Tavli)
 • Pass-and-play on one phone
 • Learn to play: a one-minute lesson on the board
 • How to play pages for every game
 • Greek and English
 ```
 
-245 characters.
+294 characters.
 
 ## Other store fields
 

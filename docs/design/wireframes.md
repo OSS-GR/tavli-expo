@@ -164,7 +164,7 @@ Notes:
   - **Continue game** card (only when a saved game exists): game, opponent, match score, target and time since last move. The whole card is one target.
   - **Learn to play** card (#128, not drawn): title, one line, **Start the lesson** (filled) and **Not now** (text). Shows until the tutorial is finished or dismissed.
   - "New game" section:
-    - **Play vs bot** (main button, subtitle "Easy or Medium").
+    - **Play vs bot** (main button). The subtitle lists the bot levels, for example "Easy, Medium or Hard". The app builds it from the levels the bot plays in at least one game (#182).
     - **Pass-and-play** (subtitle "2 players, 1 phone").
     - **Play a friend** (disabled look, "Coming soon" chip).
   - **How to play** link (opens `/rules/portes`).
@@ -197,7 +197,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - Back button, title "Play vs bot".
   - **Game:** one card per open game: Portes (selected by default), Plakoto, Fevga, Tavli (all three in rotation) (#109). A game the bot cannot play yet, and Asodio (not built), show as locked chips. A tap on a locked chip shows "Coming soon".
   - **Match length:** segmented control **1 / 3 / 5 / 7**, default **3**. Helper text: "First to 3 points. Mono = 1, diplo = 2."
-  - **Bot level:** **Easy / Medium**, with Hard locked (v1.0). Helper text explains the selected level.
+  - **Bot level:** **Easy / Medium / Hard**. A level the bot cannot play in the chosen game shows locked, with "coming soon" under it. Helper text explains the selected level.
   - Info box "Who starts? Each player rolls one die. High die starts."
   - **Start game** (main button, bottom).
 - **States:**

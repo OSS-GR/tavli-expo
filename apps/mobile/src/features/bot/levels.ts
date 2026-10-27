@@ -75,3 +75,13 @@ export function botLevelsByGame(bot: LevelBot): GameLevels {
   });
   return Object.fromEntries(entries) as unknown as GameLevels;
 }
+
+/**
+ * The levels the bot plays in at least one game, easiest first. Home lists
+ * them under "Play vs bot" (#182), so the text follows the bot.
+ */
+export function anyGameLevels(levels: GameLevels): Difficulty[] {
+  return BOT_DIFFICULTIES.filter((level) =>
+    GAME_CHOICES.some((game) => levels[game].includes(level)),
+  );
+}

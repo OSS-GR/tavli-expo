@@ -4,6 +4,7 @@
  */
 import type { Difficulty } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
+import type { TFunction } from 'i18next';
 import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -19,7 +20,7 @@ export interface HomeScreenProps {
   onHowToPlay: () => void;
   /** Opens the match history (#142). The link shows only with it. */
   onHistory?: () => void;
-  /** The bot levels this build can play (for the "Play vs bot" subtitle). */
+  /** The bot levels this build can play, easiest first (the "Play vs bot" subtitle). */
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). */
   continueCard?: ReactNode;
@@ -44,7 +45,6 @@ export function HomeScreen({
   useEffect(() => {
     if (notice !== null) showToast(notice);
   }, [notice, showToast]);
-  const hasMedium = botLevels.includes('medium');
 
   return (
     <View style={styles.screen}>
@@ -85,7 +85,7 @@ export function HomeScreen({
             kind="primary"
             badge="AI"
             title={t('home.vsBot.title')}
-            subtitle={hasMedium ? t('home.vsBot.subtitle') : t('home.vsBot.subtitleEasy')}
+            subtitle={levelList(botLevels, t)}
             onPress={() => onNewGame('bot')}
           />
           <MenuButton
@@ -127,6 +127,19 @@ export function HomeScreen({
       <Toast text={toast} />
     </View>
   );
+}
+
+/**
+ * The level names as one line: "Easy", "Easy or Medium", "Easy, Medium or
+ * Hard". Built from the levels, so it stays right when the bot gets a new
+ * one (#182). No levels gives no subtitle.
+ */
+export function levelList(levels: readonly Difficulty[], t: TFunction): string | undefined {
+  const names = levels.map((level) => t(`bot.levels.${level}`));
+  const last = names.pop();
+  if (last === undefined) return undefined;
+  if (names.length === 0) return last;
+  return t('home.vsBot.levels', { first: names.join(t('home.vsBot.levelsSeparator')), last });
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
