@@ -45,6 +45,22 @@ describe('createGameStore', () => {
     expect([...game.state.dice!].sort()).toEqual([white, black].sort());
   });
 
+  it('names each match with a key of its own: per store and per rematch (#216)', () => {
+    const store = newStore();
+    const first = store.getState().matchKey;
+    // Moves keep the key: it names the match, not the position.
+    finishOpening(store);
+    expect(store.getState().matchKey).toBe(first);
+    // Another store (a new match, or a saved one loaded again) gets a new key.
+    const other = newStore().getState().matchKey;
+    expect(other).not.toBe(first);
+    store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    expect(store.getState().matchKey).toBe(first);
+    store.getState().rematch();
+    const rematch = store.getState().matchKey;
+    expect([first, other]).not.toContain(rematch);
+  });
+
   it('keeps the flow and reports an action the engine refuses', () => {
     const store = newStore();
     const before = store.getState().flow;

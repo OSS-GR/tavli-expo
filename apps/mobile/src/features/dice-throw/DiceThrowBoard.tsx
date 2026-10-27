@@ -79,6 +79,16 @@ export interface DiceThrowBoardProps {
   testID?: string;
 }
 
+/**
+ * Names each board this app run. `useAnnouncement` reads a keyed result
+ * once per app run (#216), and the throw count starts again on a new board.
+ */
+let boardCount = 0;
+const nextBoardKey = () => {
+  boardCount += 1;
+  return `throw-board-${boardCount}`;
+};
+
 interface Thrown {
   readonly key: number;
   readonly values: Dice;
@@ -116,6 +126,7 @@ export function DiceThrowBoard({
   const [thrown, setThrown] = useState<Thrown | null>(null);
   const [resting, setResting] = useState(false);
   const turns = useRef(0);
+  const [boardKey] = useState(nextBoardKey);
   const clock = useSharedValue(0);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
@@ -179,7 +190,7 @@ export function DiceThrowBoard({
     thrown && resting
       ? t('dev.board.throw.result', { first: thrown.values[0], second: thrown.values[1] })
       : null;
-  useAnnouncement(result, String(thrown?.key ?? ''));
+  useAnnouncement(result, thrown ? `${boardKey}:${thrown.key}` : undefined);
 
   // A swipe throws. No spread inside the config: the Worklets plugin does not allow it (#174).
   const pan = usePanGesture({

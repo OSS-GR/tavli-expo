@@ -196,6 +196,9 @@ export function GameScreen({
   const theme = useBoardTheme();
   const flow = useGameStore(store, (s) => s.flow);
   const dispatch = useGameStore(store, (s) => s.dispatch);
+  // Names the match for this app run: every screen reader event keys on it,
+  // so a remount does not read an event again (#216).
+  const matchKey = useGameStore(store, (s) => s.matchKey);
   const flipMode = useSettings((s) => s.boardFlipMode);
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
   const showPips = useSettings((s) => s.showPipCounts);
@@ -625,10 +628,15 @@ export function GameScreen({
   const timeoutLine = (loser: PlayerId) =>
     isYou(loser) ? t('game.end.timeout_you') : t('game.end.timeout', { name: nameOf(loser) });
 
-  // Screen readers hear each roll and the other player's moves (#134).
+  // Screen readers hear each roll and the other player's moves (#134),
+  // once each: a remount does not read the last one again (#216).
   const announcement = turnAnnouncement(flow, t, { nameOf, isYou });
-  useAnnouncement(announcement?.text ?? null, announcement?.key);
-  // The hint is read out once it shows (#209).
+  useAnnouncement(
+    announcement?.text ?? null,
+    announcement ? `${matchKey}:turn:${announcement.key}` : undefined,
+  );
+  // The hint is read out once it shows (#209). It is not a game event: the
+  // user asked for it, and a remount closes it (it is screen state).
   useAnnouncement(shownHint === null ? null : hintSpokenText(t, shownHint));
 
   // Dice in the controls row: this turn's, or the faded dice of a pass.
@@ -769,6 +777,7 @@ export function GameScreen({
     endSheet = (
       <GameEndSheet
         testID="game-end-card"
+        announceKey={`${matchKey}:end:${gameKey}`}
         title={
           winner === null
             ? t('game.end.draw')
@@ -826,6 +835,7 @@ export function GameScreen({
     card = (
       <GameCard
         testID="choose-double-card"
+        announceKey={`${matchKey}:chooseDouble:${gameKey}:${game.state.turnNumber}`}
         title={
           isYou(chooser)
             ? t('game.chooseDouble.title_you')
@@ -850,6 +860,7 @@ export function GameScreen({
     card = (
       <GameCard
         testID="mother-card"
+        announceKey={`${matchKey}:mother:${gameKey}:${game.state.turnNumber}`}
         title={
           isYou(pinned)
             ? t('game.mother.title_you')
@@ -901,6 +912,7 @@ export function GameScreen({
         // A new pass is a new card: focus moves and it is read again.
         key={pass.key}
         testID="pass-card"
+        announceKey={`${matchKey}:pass:${pass.key}`}
         title={
           reason === 'body'
             ? t('game.pass.title')
@@ -930,6 +942,7 @@ export function GameScreen({
         // A new game (after a draw) is a new card: focus moves and it is read again.
         key={`choose:${gameKey}`}
         testID="starter-card"
+        announceKey={`${matchKey}:starter:${gameKey}`}
         title={t('game.chooser.title')}
         lines={[t('game.chooser.body')]}>
         {order.map((player) => (
@@ -964,7 +977,8 @@ export function GameScreen({
           names={{ white: nameOf('white'), black: nameOf('black') }}
           you={isYou('white') ? 'white' : isYou('black') ? 'black' : null}
           rollsAgain={rules.match.openingRoll === 'rerollBoth'}
-          gameKey={gameKey}
+          // The match too: each step is read once per app run (#216).
+          gameKey={`${matchKey}:${gameKey}`}
           rollLabel={openingRollLabel}
           rollDisabled={tieWait}
           onRoll={roll}

@@ -39,7 +39,11 @@ export interface OpeningCardProps {
   you?: PlayerId | null;
   /** The starter rolls both dice again (`openingRoll: "rerollBoth"`, #207). */
   rollsAgain?: boolean;
-  /** The game in the match. With `status.round` it keys each die's roll. */
+  /**
+   * Names the game: the match (for this app run) and the game in it. With
+   * `status.round` it keys each die's roll and each step read to screen
+   * readers, so a remount does not read a step again (#216).
+   */
   gameKey: string;
   /** The Roll button's label ("Maria: roll"). Shown while the dice are not decided. */
   rollLabel: string;
@@ -177,9 +181,12 @@ export function OpeningCard({
 
   // Focus goes to the title when the card opens (#153), then each step is
   // read: the message and what to do next. A new round reads again, even
-  // with the same words (two ties of 4).
+  // with the same words (two ties of 4). A remount does not (#216).
   const titleRef = useFocusOnShow();
-  useAnnouncement(decided ? message : `${message} ${rollLabel}.`, `${status.kind}:${status.round}`);
+  useAnnouncement(
+    decided ? message : `${message} ${rollLabel}.`,
+    `${gameKey}:opening:${status.kind}:${status.round}`,
+  );
 
   return (
     <View testID="opening-card" style={styles.card}>
