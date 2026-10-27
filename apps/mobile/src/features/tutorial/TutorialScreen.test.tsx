@@ -149,6 +149,16 @@ describe('<TutorialScreen />', () => {
     ).toBeOnTheScreen();
   });
 
+  it('has no Hint button, on the board or in the move list (#209)', async () => {
+    await act(async () => {
+      settingsStore.setState({ ...DEFAULT_SETTINGS, moveList: 'on', showHints: true });
+    });
+    await open();
+    expect(screen.getByTestId('tutorial-move-list')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Hint' })).toBeNull();
+    expect(screen.queryByTestId('hint-button')).toBeNull();
+  });
+
   it('hides the move list by default (no screen reader)', async () => {
     await open();
     expect(screen.queryByTestId('tutorial-move-list')).not.toBeOnTheScreen();

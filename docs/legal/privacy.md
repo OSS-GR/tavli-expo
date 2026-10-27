@@ -92,6 +92,7 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Tutorial step | You finished a lesson of the tutorial. Includes the game, and the lesson's number and name (for example "hit") |
 | Tutorial finished | You finished the last lesson of the tutorial. Includes the game |
 | Tutorial skipped | You tapped Skip in the tutorial. Includes the game, and the lesson's number and name on screen |
+| Hint shown | You tapped Hint in a game. Includes the game only, never the position, the dice or the moves |
 | Screen viewed | You opened a screen. Includes the screen's name (for example "settings"), never personal data |
 
 Each event also carries technical facts: the phone maker and model (for example "iPhone 15", never the name you gave your phone), the system and its version, screen size, the app name and version, language and time zone. It carries the install id, and random ids that PostHog keeps on your phone.
