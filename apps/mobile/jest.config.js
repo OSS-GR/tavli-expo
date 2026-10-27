@@ -1,8 +1,27 @@
 // Jest for the Expo app (jest-expo preset + React Native Testing Library).
 // Pure packages use Vitest instead. See docs.expo.dev/develop/unit-testing.
+const { transform: presetTransform } = require('jest-expo/jest-preset');
+
+// The app builds with the React Compiler (`experiments.reactCompiler` in
+// app.json), but babel-preset-expo only runs it when the caller asks, and
+// jest-expo does not ask. So we ask here: tests run the same code as the
+// app, and a screen draws only the parts that changed. Without it a test
+// that plays a whole game draws the whole board on every tap and is about
+// three times slower.
+const BABEL = '\\.[jt]sx?$';
+const [babelJest, babelOptions] = presetTransform[BABEL];
+const transform = {
+  ...presetTransform,
+  [BABEL]: [
+    babelJest,
+    { ...babelOptions, caller: { ...babelOptions.caller, supportsReactCompiler: true } },
+  ],
+};
+
 /** @type {import('jest').Config} */
 module.exports = {
   preset: 'jest-expo',
+  transform,
   // The Unistyles mocks must load before our Unistyles config (unistyl.es/v3/start/testing).
   setupFiles: ['react-native-unistyles/mocks', '<rootDir>/jest.setup.ts'],
   // pnpm keeps packages in node_modules/.pnpm, so we use Expo's pnpm pattern.
