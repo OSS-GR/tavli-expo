@@ -12,7 +12,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "simulate": "node --import ./scripts/register-ts.mjs ./scripts/simulate.ts"
+    "simulate": "node --import ./scripts/register-ts.mjs ./scripts/simulate.ts",
+    "tune": "node --import ./scripts/register-ts.mjs ./scripts/tune.ts"
   },
   "dependencies": {
     "@tavli/contracts": "workspace:*",
