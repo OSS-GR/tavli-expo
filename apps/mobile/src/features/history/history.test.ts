@@ -307,7 +307,27 @@ describe('history list', () => {
     expect(store.getState().records).toHaveLength(1);
     store.getState().clear();
     expect(store.getState().records).toEqual([]);
-    expect(warn).toHaveBeenCalledTimes(3);
+    // read, write, remove, then the empty-history fallback write.
+    expect(warn).toHaveBeenCalledTimes(4);
+    warn.mockRestore();
+  });
+
+  it('still clears when remove fails: it writes an empty history instead', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const memory = createMemoryStorage();
+    const storage: Storage = {
+      getString: (key) => memory.getString(key),
+      setString: (key, value) => memory.setString(key, value),
+      remove: () => {
+        throw new Error('remove');
+      },
+    };
+    const store = createHistoryStore(storage);
+    store.getState().add(rec());
+    store.getState().clear();
+    expect(store.getState().records).toEqual([]);
+    // After a restart the old records do not come back.
+    expect(createHistoryStore(storage).getState().records).toEqual([]);
     warn.mockRestore();
   });
 

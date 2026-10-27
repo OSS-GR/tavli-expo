@@ -50,7 +50,14 @@ export function createHistoryStore(storage: Storage, max: number = MAX_HISTORY_R
       try {
         storage.remove(HISTORY_STORAGE_KEY);
       } catch (error) {
-        console.warn('could not clear the match history', error);
+        // Clear is a privacy control: if remove fails, overwrite with an
+        // empty history so the old records do not come back on restart.
+        console.warn('could not remove the match history; writing an empty one', error);
+        try {
+          storage.setString(HISTORY_STORAGE_KEY, serializeHistory([]));
+        } catch (writeError) {
+          console.warn('could not clear the match history', writeError);
+        }
       }
     },
   }));
