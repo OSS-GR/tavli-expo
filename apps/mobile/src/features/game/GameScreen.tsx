@@ -84,6 +84,10 @@ export interface GameScreenProps {
    * for the last game: match end replaces it (wireframe 8).
    */
   onMatchOver?: () => void;
+  /** The game on the board, shown over it: "Game 2 · Plakoto" (#109). */
+  gameLabel?: string;
+  /** The game after this one, on the game-end sheet: "Next: game 3 · Fevga" (#109). */
+  nextGameLabel?: string;
 }
 
 const other = (player: PlayerId): PlayerId => (player === 'white' ? 'black' : 'white');
@@ -98,6 +102,8 @@ export function GameScreen({
   onOpenMenu,
   onHome,
   onMatchOver,
+  gameLabel,
+  nextGameLabel,
 }: GameScreenProps) {
   const { t } = useTranslation();
   const theme = useBoardTheme();
@@ -410,6 +416,7 @@ export function GameScreen({
         chip={t(`game.end.${type}`, { count: result.points })}
         strongChip={result.points >= 2}
         reason={reason}
+        {...(nextGameLabel ? { next: nextGameLabel } : {})}
         matchLabel={t('game.end.matchLabel')}
         score={scoreLine}
         target={t('game.end.target', { target: match.targetPoints })}
@@ -518,6 +525,11 @@ export function GameScreen({
         ) : null}
         <View style={styles.topStrip}>{strip(top, 'strip-top')}</View>
       </View>
+      {gameLabel ? (
+        <Text testID="game-label" style={styles.gameLabel}>
+          {gameLabel}
+        </Text>
+      ) : null}
       <View style={styles.boardArea}>
         <InteractiveBoard
           testID="game-board"
@@ -566,6 +578,11 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   topStrip: {
     flex: 1,
+  },
+  gameLabel: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
+    textAlign: 'center',
   },
   menuButton: {
     width: theme.touch.minTarget,
