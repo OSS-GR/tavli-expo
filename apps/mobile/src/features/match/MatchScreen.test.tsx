@@ -9,6 +9,7 @@ import {
 } from '@tavli/engine';
 import { act, screen, waitFor, within } from '@testing-library/react-native';
 
+import { BOT_SPEED_TIMING, type BotTiming } from '@/features/bot/botTurn';
 import { SAMPLE_POSITIONS } from '@/features/board/positions';
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
@@ -21,7 +22,7 @@ import { defaultSetup, type MatchSetup } from './setup';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 
-const FAST = { beforeRollMs: 20, moveMs: 5, thinkMs: () => 5 };
+const FAST = { beforeRollMs: 20, afterRollMs: 5, moveMs: 5, hitMs: 0, landMs: 5, thinkMs: () => 5 };
 const WAIT = { timeout: 4000 };
 
 function session(setup: MatchSetup, seed = 11): MatchSession {
@@ -36,7 +37,7 @@ function startWith(s: MatchSession, starter: PlayerId) {
   });
 }
 
-function show(s: MatchSession, timing = FAST) {
+function show(s: MatchSession, timing: Partial<BotTiming> = FAST) {
   const props = {
     onExit: jest.fn(),
     onSettings: jest.fn(),
@@ -76,7 +77,7 @@ describe('<MatchScreen /> vs bot', () => {
   it('plays the bot turn through the flow and locks your controls meanwhile', async () => {
     const s = session(defaultSetup('bot'));
     startWith(s, 'black');
-    await show(s, { beforeRollMs: 150, moveMs: 5, thinkMs: () => 5 }).view;
+    await show(s, { ...FAST, beforeRollMs: 150 }).view;
 
     // The bot's turn: a locked box, no Roll button, the bot strip is active.
     expect(screen.getByTestId('bot-turn')).toHaveTextContent("Bot's turn…");
@@ -97,7 +98,7 @@ describe('<MatchScreen /> vs bot', () => {
     startWith(s, 'black');
     // The bot waits 600 ms before it rolls. On the fake clock the tap on the
     // menu takes 130 ms (setupUser), so the menu opens before the bot rolls.
-    await show(s, { beforeRollMs: 600, moveMs: 5, thinkMs: () => 5 }).view;
+    await show(s, { ...FAST, beforeRollMs: 600 }).view;
 
     await user.press(button('Game menu'));
     expect(screen.getByTestId('game-menu')).toBeOnTheScreen();
@@ -363,9 +364,32 @@ describe('<MatchScreen /> pass-and-play turns', () => {
   it('never flips vs the bot, whatever Settings say', async () => {
     const s = session(defaultSetup('bot'));
     startWith(s, 'black');
-    await show(s, { beforeRollMs: 10_000, moveMs: 5, thinkMs: () => 5 }).view;
+    await show(s, { ...FAST, beforeRollMs: 10_000 }).view;
     expect(bottom().getByText('You')).toBeOnTheScreen();
   });
+
+  it.each(['slow', 'normal', 'fast'] as const)(
+    'waits as long as Settings → Bot speed says before the bot rolls (%s, #172)',
+    async (speed) => {
+      await act(async () => {
+        settingsStore.setState({ botSpeed: speed });
+      });
+      const s = session(defaultSetup('bot'));
+      startWith(s, 'black');
+      // Only the think time is set: the rest comes from the setting.
+      await show(s, { thinkMs: () => 0 }).view;
+      const { beforeRollMs } = BOT_SPEED_TIMING[speed];
+
+      await act(async () => {
+        jest.advanceTimersByTime(beforeRollMs - 1);
+      });
+      expect(game(s).phase).toBe('awaiting-roll');
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(game(s).phase).not.toBe('awaiting-roll');
+    },
+  );
 });
 
 describe('<MatchScreen /> the chosen game (#109)', () => {

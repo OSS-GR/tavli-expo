@@ -73,6 +73,15 @@
       "fixedHint": "The board stays the same for both players.",
       "faceToFaceSoon": "Face-to-face view comes in a later update."
     },
+    "botSpeed": {
+      "label": "Bot speed",
+      "slow": "Slow",
+      "normal": "Normal",
+      "fast": "Fast",
+      "slowHint": "The bot takes its time, so you can follow each move.",
+      "normalHint": "The bot plays at a pace that is easy to follow.",
+      "fastHint": "The bot plays quickly."
+    },
     "sound": {
       "label": "Sound",
       "hint": "Also follows the phone's silent switch"
