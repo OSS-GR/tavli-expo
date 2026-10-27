@@ -49,13 +49,15 @@ interface Evaluation {
   play on" after a mother is pinned (`motherRule: "offerConcede"`). It
   returns one of `prompt.choices` (`'resign'` or `'playOn'`) for
   `prompt.player`; pass it to the flow as the `answer` action. See "The
-  mother question" below.
+  mother question" below. It also answers the Asodio `chooseDouble`
+  question of the Acey-Deucey presets (see "The Asodio heuristic"); the
+  owner version (`asodio.kafeneio`) asks nothing.
 - `createBot({ variants?, evaluators?, policies? })` builds a bot. Default:
   the engine's `VARIANT_REGISTRY`, `DEFAULT_EVALUATORS` (the Portes,
-  Plakoto and Fevga heuristics for easy and medium) and
+  Plakoto, Fevga and Asodio heuristics for easy and medium) and
   `DEFAULT_LEVEL_POLICIES`.
-- `bot.supportedLevels('portes')`, `bot.supportedLevels('plakoto')` and
-  `bot.supportedLevels('fevga')` are `['easy', 'medium']` today. Easy works
+- `bot.supportedLevels(v)` is `['easy', 'medium']` today for `portes`,
+  `plakoto`, `fevga` and `asodio`. Easy works
   for every known variant; medium and hard need an evaluator. The app's
   level picker can use it, or probe `chooseTurn` and catch
   `NOT_IMPLEMENTED`: both give the same answer.
@@ -65,7 +67,7 @@ interface Evaluation {
 Errors:
 
 - `BotError('NOT_IMPLEMENTED')`: no evaluator for this level and variant
-  (today: hard, and medium for Asodio).
+  (today: hard).
 - `BotError('INVALID_REQUEST')`: `dice` differs from `state.dice`, a
   runner request names another variant than its state, or `chooseAnswer`
   gets a state with no question.
@@ -100,9 +102,11 @@ Every level but `random` runs the same pipeline (bot-ai.md, section 4.1):
 - Easy for a variant with no evaluator plays a random turn, but still takes
   a turn that wins now.
 - Same state, dice, level and seed → the same turn.
-- Each variant uses its own heuristic (Portes, Fevga) with the same
-  temperatures. The "How it plays" numbers are for Portes; Fevga's are in
-  "Fevga strength and speed".
+- Each variant uses its own heuristic (Portes, Plakoto, Fevga, Asodio)
+  with the same temperatures. The "How it plays" numbers are for Portes;
+  the others are in each variant's "strength and speed" section.
+- A turn that keeps the same player to move (an Asodio extra roll) scores
+  the evaluation for that player, not for the opponent (`src/score.ts`).
 
 ## The Portes heuristic
 
@@ -489,6 +493,183 @@ after warm-up):
 
 `src/fevga-perf.test.ts` checks median < 20 ms and worst < 200 ms.
 
+## The Asodio heuristic
+
+Code: `src/evaluators/asodio-*.ts`. Rules: `docs/rules/asodio.md` (owner
+version, preset `asodio.kafeneio`, answers A1–A6) and the engine README
+("Asodio"). It works like the Plakoto heuristic: it scores a position
+before the roll, from the view of the player to roll, on its own small
+board arrays (`asodio-board.ts`: counts, waiting checkers at index 25 so
+the race code reads them as 25 pips, and a "pinned" flag per point). The
+board file also has a light copy of the engine's single-move rules (the
+loading lock, the quarter lock, pins, bearing off), so the evaluator can
+ask "which dice can this side move?" and count shots. The bot still plays
+only the turns the engine lists.
+
+**Contact** (a pin is possible, or a checker is pinned): a weighted sum of
+features in logits, `win = sigmoid(score)`. For both sides:
+
+- **Loading:** a waiting checker counts 25 pips. While the first-entry gate
+  holds (all 15 outside), the side also loses `gatePips` (28 pips: on
+  average 3.5 rolls pass before a 1-2 or a double). During loading there is
+  no choice to make (every die enters on its spot), so this only matters
+  for the evaluation, not for the moves.
+- **The army moves as one (quarter lock):** a pin is worth `pinBase +
+pinPips × (its own point) / 24`, plus `pinRear` when the pinned checker
+  is in its owner's rear quarter: when it is the last one there, the whole
+  army freezes (A6). A side with no legal move at all costs `frozen`; each
+  die value with no legal single move costs `deadDie`.
+- **Shots** (`asodio-shots.ts`): for each of the 21 rolls, it plays the
+  dice one at a time with the single-move rules, so only checkers the army
+  rules let move can shoot, a combined move stops at the quarter line (the
+  checker freezes there), and a lock that ends in the middle of a roll
+  frees the rest of it. The roller gains `blotShare × shots / 36 × (value of
+the pin)` per target, plus `anyShot`; the other side's shots at the
+  roller cost `rollerShare ×` the same.
+- **Race:** the Kleinman chance of the pip counts, as a logit, × `race`.
+- Made points (`madePoint`) and checkers off (`borneOff`).
+
+**Draws.** Deadlocks (A5) are common, so the evaluator knows two things
+about them:
+
+- A **mutual lock** is a sure draw, and scores 0. Own quarter `k` of one
+  side is quarter `3 − k` of the other. If our pinned checker is in our
+  quarter `a` and theirs in their quarter `b`, with `a + b ≤ 2`, each pinner
+  sits in front of its own pinned rear, so it is frozen for good. Neither
+  pin can end, and neither side can bear off. (This needs the owner flags:
+  pins, the quarter lock, frozen checkers that do not move.)
+- **Lock shots:** the rolls that would make a mutual lock. The side that is
+  behind takes such a pin, so a roller who is behind gets its equity pulled
+  toward 0 by its lock-shot chance; a roller who is ahead loses
+  `waiterLock ×` the other side's chance.
+
+Adding the lock rules raised medium vs random from 62 % to 72 % wins
+(200 games) and cut the draws from 34 % to 24 %.
+
+**No contact**: the Portes race code (Keith, Kleinman, the bear-off table).
+Asodio bears off as in Portes (A4).
+
+`scoreTurns` fast path: it plays each turn on copies of the board arrays
+and knows when a turn ends the game (all 15 off, or a deadlock). With a
+roll chain (the Acey-Deucey presets: extra rolls, the chosen double) it
+lets the engine play the turn instead, because the same player may move
+again. A test checks the fast path against `applyTurn` + `result` +
+`evaluate` for six flag sets.
+
+### The chooseDouble question (Acey-Deucey presets)
+
+The owner version asks nothing (no extra rolls, A3). In the Acey-Deucey
+presets (`asodio.aceyDeuceyGreek`, `asodio.aceyDeuceyAmerican`) a 1-2
+asks the player to choose a double (`prompt` kind `chooseDouble`, choices
+`'1'` … `'6'`). The answer sets `state.dice` to `[d, d]` and the same
+player moves. So `chooseAnswer` scores each choice as **the best turn with
+that double** (1-ply over its legal turns), not as the position before a
+roll. Then the level's softmax picks, as for a turn. `simulate` plays the
+chosen double (it uses `state.dice` when the state holds dice) and follows
+`state.toMove` through extra rolls. The Acey-Deucey presets hit instead of
+pinning: a hit is worth `hitBase + hitPips × (pips the checker loses) /
+24`. Their games never deadlock. Medium beats random 86.5 % (Greek) and
+100 % (American) in 200 games each. Their scores use the `"tavli"` scale;
+`"perChecker"` is not modelled.
+
+### Asodio weights
+
+All weights are in `ASODIO_DEFAULT_WEIGHTS`
+(`src/evaluators/asodio-heuristic.ts`). Build a variant with
+`createAsodioHeuristic({ ...ASODIO_DEFAULT_WEIGHTS, pinRear: 1.5 })`.
+
+| Weight         | Default | What it does (score in logits)                                        |
+| -------------- | ------- | --------------------------------------------------------------------- |
+| `race`         | 0.3     | × logit of the Kleinman chance of the pip counts                      |
+| `gatePips`     | 28      | pips added while the first-entry gate holds                           |
+| `pinBase`      | 0.4     | per opponent checker we pin                                           |
+| `pinPips`      | 0.4     | × (pinned checker's own point) / 24                                   |
+| `pinRear`      | 1.2     | extra when the pinned checker is in its owner's rear quarter          |
+| `hitBase`      | 0.2     | per hit (`captureMode: "hit"`)                                        |
+| `hitPips`      | 0.8     | × pips the hit checker loses / 24                                     |
+| `frozen`       | 1.5     | the side has no legal move with any die                               |
+| `deadDie`      | 0.08    | per die value with no legal single move                               |
+| `blotShare`    | 0.6     | × shots/36 × value of the pin, per target of the roller               |
+| `anyShot`      | 0.2     | × (rolls that pin any checker)/36                                     |
+| `rollerShare`  | 0.3     | × shots/36 × value, per roller checker the other side can pin         |
+| `waiterLock`   | 0.5     | share of the other side's lock-shot chance that counts (roller ahead) |
+| `madePoint`    | 0.04    | per made point (2+ checkers)                                          |
+| `borneOff`     | 0.04    | per checker off                                                       |
+| `double`       | 0.8     | mars share: × pips the loser needs to come home / (pips + 20)         |
+| `pinnedDouble` | 0.8     | mars share at least this for a side with a pinned rear checker        |
+
+Tuning: hand-picked, then checked by self-play. A coordinate search
+(medium vs medium, 400 paired games per candidate, ±50 %) found no change
+worth more than 0.07 points per game (the best: `race` 0.3 → 0.45, +0.065,
+within the noise), and a sweep against random and easy
+(400 games each) moved no win rate by more than its noise (about ±2.3 %).
+Three more features were tried and dropped because they made medium
+weaker: a cost per lone checker with a free opponent checker behind it
+(medium vs random 73 % → 67 %), a cost per own checker that a later pin
+could lock (72 % → 64 % at the higher weights), and a bonus for a pin held
+by a frozen pinner (no gain). The Asodio skill is mostly in the lock rules
+above, not in the weights.
+
+### Asodio strength and speed
+
+1,000 games per match, seed 1,
+`pnpm --filter @tavli/bot simulate -- --variant asodio --a medium --b random`
+(A plays White; the first player alternates):
+
+| Match            | A wins       | A losses     | Draws (deadlock) | A points : B points | Mars wins (A) |
+| ---------------- | ------------ | ------------ | ---------------- | ------------------- | ------------- |
+| medium vs random | 688 (68.8 %) | 40 (4.0 %)   | 272 (27.2 %)     | 1,310 : 51          | 622           |
+| medium vs easy   | 492 (49.2 %) | 181 (18.1 %) | 327 (32.7 %)     | 909 : 284           | 417           |
+| easy vs random   | 528 (52.8 %) | 60 (6.0 %)   | 412 (41.2 %)     | 950 : 100           | 422           |
+| medium vs medium | 346 (34.6 %) | 349          | 305 (30.5 %)     | 621 : 626           | 275           |
+| easy vs easy     | 293 (29.3 %) | 277          | 430 (43.0 %)     | 503 : 482           | 210           |
+| random vs random | 146 (14.6 %) | 144          | 710 (71.0 %)     | 245 : 229           | 99            |
+
+**Deadlock draws are very common** (open question Q28): 30 % of
+medium-vs-medium games, 43 % of easy-vs-easy games and 71 % of random
+games end with both armies frozen. A draw is a non-win in the table. Of the
+games that someone wins, medium wins 94.5 % against random and 73.1 %
+against easy, and easy wins 89.8 % against random. Most wins are mars
+(the frozen loser has borne off nothing).
+
+Why so many draws, even for medium: when the two armies pass each other in
+the middle of the board, each side's new quarter is the other side's rear
+quarter. Checkers that arrive there are frozen, and they land on the
+other side's last lone checkers. Once both sides have pinned such a
+checker, it is a mutual lock. In 200 medium-vs-random games, every draw
+went through a mutual lock first. Random made
+the locking pin in 49 of 65 draws, and in almost all of them medium's
+previous turn had no play with fewer lock shots (most of those turns had
+only 1–3 legal plays: the quarter lock leaves little choice). Medium makes
+the lock itself mostly when it is behind (a draw is better than a loss).
+
+So the issue's bars (medium ≥ 85 % vs random and ≥ 70 % vs easy, draws as
+non-wins) cannot be reached under the owner rules. `src/asodio-strength.test.ts`
+plays `GAMES` = 200 games per match (fixed seeds, colours swapped halfway)
+with bars set from the numbers above, with margin:
+
+| Match            | Bar                                               | Got (200 games)           |
+| ---------------- | ------------------------------------------------- | ------------------------- |
+| medium vs random | wins ≥ 60 %, losses ≤ 10 %                        | 151 wins, 8 losses        |
+| easy vs random   | wins ≥ 40 %, losses ≤ 15 %                        | 103 wins, 17 losses       |
+| medium vs easy   | wins ≥ 35 %, and ≥ 65 % of the games someone wins | 92 wins, 32 losses (74 %) |
+
+The three matches take about 20 s in all.
+
+Decision time of the medium bot (Node 22, dev container, best of 3 runs,
+after warm-up). Most loading turns are forced, so the median is tiny; the
+slow turns are doubles while the army crosses a quarter line:
+
+| Positions                                   | Median   | p90    | p99    | Max     |
+| ------------------------------------------- | -------- | ------ | ------ | ------- |
+| 300 random positions (the perf test set)    | 0.008 ms | 1.8 ms | 7.9 ms | 10.9 ms |
+| 3,000 positions from medium-vs-medium games | 0.024 ms | 1.5 ms | 7.1 ms | 20 ms   |
+
+`src/asodio-perf.test.ts` checks median < 20 ms and worst < 200 ms. In the
+Acey-Deucey presets (no quarter lock, so more plays, and the engine path)
+the worst case is about 145 ms. 1,000 medium-vs-easy owner-version games
+take about 45 s (most of it is the shot count).
+
 ## The runner (for the app)
 
 The app never calls the bot directly. It uses the `BotRunner` port from
@@ -564,7 +745,8 @@ pnpm --filter @tavli/bot simulate -- --games 1000 --a easy --b easy
 
 Options: `--games N`, `--a LEVEL` (White), `--b LEVEL` (Black), where
 `LEVEL` is `random`, `easy`, `medium` or `hard`, `--seed N`,
-`--variant ID`, `--help`. It prints wins, mono and diplo counts, average
+`--variant ID`, `--preset ID` (for example `asodio.aceyDeuceyGreek`;
+default: the variant's default preset), `--help`. It prints wins, mono and diplo counts, average
 turns, illegal turns and the time. The exit code is 1 if any game failed.
 
 - The script runs the TypeScript source with plain Node (22.18 or newer
@@ -575,8 +757,11 @@ turns, illegal turns and the time. The exit code is 1 if any game failed.
   dice RNG and each bot RNG are separate streams from each game's seed. Each
   chosen turn is checked by `variant.applyTurn`. When the variant asks a
   question after a turn, the asked player's bot answers it
-  (`chooseAnswer`; `onAnswer` sees each answer). A failure carries its
-  `gameSeed`, so `playGame` can replay it.
+  (`chooseAnswer`; `onAnswer` sees each answer). The next player is always
+  `state.toMove` (an Asodio extra roll keeps the same player), and a state
+  that already holds dice (the Asodio chosen double) plays those dice
+  instead of a new roll. `rules` picks a preset (default: the variant's
+  default). A failure carries its `gameSeed`, so `playGame` can replay it.
 
 Numbers (Node 22, dev container, seed 1): 1,000 random-vs-random Portes
 games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
@@ -585,8 +770,8 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
 ## Tests
 
 `pnpm test` from the repo root, or `pnpm --filter @tavli/bot test` (about
-16 s in the dev container; the Plakoto strength test takes about 8 s of
-that; the files run in parallel).
+40 s in the dev container; the Asodio strength test takes about 20 s and
+the Plakoto one about 8 s; the files run in parallel).
 
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for
   a seed; passes; a win now is never missed (easy, medium, the fallback,
@@ -620,6 +805,19 @@ that; the files run in parallel).
   `legalTurns` and repeats for a seed, a win now is never missed, and
   medium loses much less per turn than easy. `fevga-strength.test.ts`
   (200 games per match) and `fevga-perf.test.ts`.
+- `evaluators/asodio-heuristic.test.ts`: the board reads waiting
+  checkers and pins, the deadlock test agrees with the engine, the mutual
+  lock is a draw (and needs the owner flags), the shot count (direct,
+  combined, a combined move stops at the quarter line, frozen checkers
+  cannot shoot, lock shots), a pinned lagging checker and the entry gate
+  cost, a finished game scores its points.
+- `asodio-bot.test.ts`: `supportedLevels('asodio')`, legal and repeatable
+  turns for every preset and flag mix, the fast path equals the engine
+  path, a win now is never missed, medium pins the lagging checker that
+  freezes the other army, a roll chain keeps the equity on the same side,
+  the `chooseDouble` question (scores, levels), and whole games with roll
+  chains. `asodio-strength.test.ts` (200 games per match) and
+  `asodio-perf.test.ts`.
 - `strength.test.ts` (300 games per match), `perf.test.ts`,
   `simulate.test.ts` (1,000 random-vs-random games), `tune.test.ts` (a tiny
   search), and the runner and the command line.
