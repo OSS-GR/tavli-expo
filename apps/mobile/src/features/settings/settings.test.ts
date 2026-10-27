@@ -25,6 +25,7 @@ describe('settings store', () => {
     expect(state.autoConfirmMoves).toBe(false);
     expect(state.showPipCounts).toBe(true);
     expect(state.boardFlipMode).toBe('flip');
+    expect(state.homeBoardSide).toBe('right');
     // The move list follows the screen reader until the player picks On or Off.
     expect(state.moveList).toBe('auto');
     expect(state.theme).toBe('walnut-kafeneio');
@@ -141,6 +142,35 @@ describe('boardTheme', () => {
     expect(sanitizeSettings({ boardTheme: 7 }).boardTheme).toBe('walnut-kafeneio');
     // A save from before the board picker keeps its other values.
     expect(sanitizeSettings({ sound: false })).toEqual({ ...DEFAULT_SETTINGS, sound: false });
+  });
+});
+
+describe('homeBoardSide', () => {
+  it('saves bottom left and loads it on the next start', () => {
+    const storage = createMemoryStorage();
+    createSettingsStore(storage).getState().setSetting('homeBoardSide', 'left');
+    expect((savedJson(storage) as { state: Record<string, unknown> }).state).toMatchObject({
+      homeBoardSide: 'left',
+    });
+    expect(createSettingsStore(storage).getState().homeBoardSide).toBe('left');
+  });
+
+  it('loads a save from before the setting as bottom right, the board as it was', () => {
+    const storage = createMemoryStorage({
+      [SETTINGS_STORAGE_KEY]: JSON.stringify({
+        version: SETTINGS_VERSION,
+        state: { sound: false, boardFlipMode: 'fixed' },
+      }),
+    });
+    const state = createSettingsStore(storage).getState();
+    expect(state.homeBoardSide).toBe('right');
+    expect(state.sound).toBe(false);
+    expect(state.boardFlipMode).toBe('fixed');
+  });
+
+  it('falls back to bottom right for a bad value', () => {
+    expect(sanitizeSettings({ homeBoardSide: 'top' }).homeBoardSide).toBe('right');
+    expect(sanitizeSettings({ homeBoardSide: true }).homeBoardSide).toBe('right');
   });
 });
 

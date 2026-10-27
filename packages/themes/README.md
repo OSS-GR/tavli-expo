@@ -108,6 +108,8 @@ Each layout has:
 
 A stack shows at most `maxVisible` checkers. Above that, the last checker gets a count badge (`stackCenters` returns `badge`). If a stack does not fit, the spacing shrinks.
 
+**Mirror (home board on the bottom left, #175).** `mirrorLayout(layout)` mirrors every slot left to right: points (rect and base), bar halves, trays, fields and the dice area. Point numbers and tones stay. The app uses it for Settings → Your home → Bottom left. The images, the shadow and the lamp are not mirrored, so the light stays on the same side. So the art must fit both ways: the frame, fields, bar, bar halves, trays and points must be left–right symmetric. `isMirrorSymmetric(layout)` checks it, and `themes.test.ts` runs it on every portrait layout.
+
 ## Draw order for the Skia renderer
 
 1. `layout.shadow` under the board (a blurred rounded rect).

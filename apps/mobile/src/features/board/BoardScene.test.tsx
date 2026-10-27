@@ -3,9 +3,12 @@ import { getLayout, getTheme } from '@tavli/themes';
 
 import { getPreset } from '@tavli/engine';
 
+import type { HomeBoardSide } from '@/features/settings/settings';
+
 import { asodioMarks } from './asodio';
+import { portraitLayout } from './BoardCanvas';
 import { layoutBoard, type BoardView } from './boardModel';
-import { fitBoard } from './geometry';
+import { fitBoard, fitBoardWithShadow } from './geometry';
 import { rgba } from './paint';
 import { SAMPLE_DIRECTIONS, SAMPLE_POSITIONS } from './positions';
 import { BoardScene, FROZEN_MARK, PIN_RING_WIDTH } from './skia/BoardScene';
@@ -181,6 +184,46 @@ describe('<StaticBoard />', () => {
     });
     const canvas = screen.getByTestId('board-canvas');
     expect(canvas.props.style).toEqual({ width: 375, height: 455 });
+  });
+
+  // #175: Settings → Home board on the bottom left mirrors the drawing.
+  it('draws the mirrored board when the home is on the bottom left', async () => {
+    const size = { width: 377, height: 630 };
+    /** The centers of White's drawn checkers (their rim strokes). */
+    const whiteCheckers = async (side: HomeBoardSide) => {
+      await render(
+        <StaticBoard testID="board" board={SAMPLE_POSITIONS.start} view={WHITE} homeSide={side} />,
+      );
+      await act(async () => {
+        fireEvent(screen.getByTestId('board'), 'layout', {
+          nativeEvent: { layout: { x: 0, y: 0, ...size } },
+        });
+      });
+      return find(
+        (n) =>
+          n.type === 'Circle' &&
+          n.props.style === 'stroke' &&
+          n.props.color === theme.checkers.light.rim.color,
+      ).map((n) => ({ x: n.props.cx as number, y: n.props.cy as number }));
+    };
+    const normal = await whiteCheckers('right');
+    const mirrored = await whiteCheckers('left');
+    expect(normal).toHaveLength(15); // 2 + 5 + 3 + 5
+    const board = fitBoardWithShadow(layout, size);
+    const flipX = (x: number) => 2 * board.x + board.width - x;
+    const key = (p: { x: number; y: number }) => `${p.x.toFixed(2)}:${p.y.toFixed(2)}`;
+    expect(mirrored.map(key).sort()).toEqual(
+      normal.map((p) => key({ x: flipX(p.x), y: p.y })).sort(),
+    );
+    // White starts at the bottom left now: its 24 is left of the middle.
+    const start = mirrored.filter((p) => p.y > board.y + board.height * 0.8);
+    expect(start.every((p) => p.x < board.x + board.width / 2)).toBe(true);
+  });
+
+  it('keeps one mirrored layout per theme', () => {
+    expect(portraitLayout(theme, 'right')).toBe(layout);
+    expect(portraitLayout(theme, 'left')).toBe(portraitLayout(theme, 'left'));
+    expect(portraitLayout(theme, 'left')).not.toBe(layout);
   });
 });
 

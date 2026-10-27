@@ -7,7 +7,15 @@ import type { ThemeManifest } from '@tavli/themes';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
-import { BoardCanvas, portraitLayout, useBoardSpace, useBoardTheme } from './BoardCanvas';
+import type { HomeBoardSide } from '@/features/settings/settings';
+
+import {
+  BoardCanvas,
+  portraitLayout,
+  useBoardSpace,
+  useBoardTheme,
+  useHomeBoardSide,
+} from './BoardCanvas';
 import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
 import { fitBoardWithShadow } from './geometry';
 
@@ -18,14 +26,25 @@ export interface StaticBoardProps {
   marks?: BoardMarks;
   /** Draw with this theme instead of the one picked in Settings (the board picker). */
   theme?: ThemeManifest;
+  /** Draw with this home board side instead of the one picked in Settings (the side picker). */
+  homeSide?: HomeBoardSide;
   testID?: string;
 }
 
-export function StaticBoard({ board, view, marks, theme: themeProp, testID }: StaticBoardProps) {
+export function StaticBoard({
+  board,
+  view,
+  marks,
+  theme: themeProp,
+  homeSide: homeSideProp,
+  testID,
+}: StaticBoardProps) {
   const picked = useBoardTheme();
+  const pickedSide = useHomeBoardSide();
   const theme = themeProp ?? picked;
+  const homeSide = homeSideProp ?? pickedSide;
   const [size, onLayout] = useBoardSpace();
-  const geo = size ? fitBoardWithShadow(portraitLayout(theme), size) : null;
+  const geo = size ? fitBoardWithShadow(portraitLayout(theme, homeSide), size) : null;
   return (
     <View testID={testID} style={styles.space} onLayout={onLayout}>
       {size && geo ? (

@@ -159,6 +159,76 @@ export function diceCenters(layout: BoardLayout, count: 2 | 4): Vec[] {
   return out;
 }
 
+const MIRRORED_SIDE: Readonly<Record<Side, Side>> = {
+  left: 'right',
+  right: 'left',
+  top: 'top',
+  bottom: 'bottom',
+};
+
+/** A rect mirrored left to right across the middle of the board. */
+export function mirrorRect(r: Rect): Rect {
+  return { x: 1 - r.x - r.w, y: r.y, w: r.w, h: r.h };
+}
+
+function mirrorSlot<T extends StackSlot>(slot: T): T {
+  return { ...slot, rect: mirrorRect(slot.rect), base: MIRRORED_SIDE[slot.base] };
+}
+
+/**
+ * The layout mirrored left to right (Settings → Home board, #175). Every
+ * slot moves to the other side: points, bar halves, trays, fields and the
+ * dice area. Point numbers and point tones stay with their points, so the
+ * player's path runs the other way round.
+ *
+ * The image layers, the board shadow and the lamp do not change: the light
+ * still comes from the same side of the screen. So the art must fit both
+ * ways. `isMirrorSymmetric` checks that the layout allows it.
+ */
+export function mirrorLayout(layout: BoardLayout): BoardLayout {
+  return {
+    ...layout,
+    fields: layout.fields.map(mirrorRect),
+    points: layout.points.map(mirrorSlot),
+    bar: {
+      rect: mirrorRect(layout.bar.rect),
+      player: mirrorSlot(layout.bar.player),
+      opponent: mirrorSlot(layout.bar.opponent),
+    },
+    trays: { player: mirrorSlot(layout.trays.player), opponent: mirrorSlot(layout.trays.opponent) },
+    diceArea: mirrorRect(layout.diceArea),
+  };
+}
+
+/** Every area the board art must line up with: fields, bar, bar halves, trays, points. */
+function artRects(layout: BoardLayout): Rect[] {
+  return [
+    ...layout.fields,
+    layout.bar.rect,
+    layout.bar.player.rect,
+    layout.bar.opponent.rect,
+    layout.trays.player.rect,
+    layout.trays.opponent.rect,
+    ...layout.points.map((p) => p.rect),
+  ];
+}
+
+const sameRect = (p: Rect, q: Rect, epsilon: number): boolean =>
+  Math.abs(p.x - q.x) <= epsilon &&
+  Math.abs(p.y - q.y) <= epsilon &&
+  Math.abs(p.w - q.w) <= epsilon &&
+  Math.abs(p.h - q.h) <= epsilon;
+
+/**
+ * True when the mirrored layout puts every field, bar half, tray and point
+ * on an area of the same size that the layout already has. Then the board
+ * art fits the mirrored layout without being mirrored itself.
+ */
+export function isMirrorSymmetric(layout: BoardLayout, epsilon = 1e-4): boolean {
+  const own = artRects(layout);
+  return artRects(mirrorLayout(layout)).every((m) => own.some((r) => sameRect(m, r, epsilon)));
+}
+
 /** True when two rects share area (touching edges do not count). */
 export function rectsOverlap(p: Rect, q: Rect, epsilon = 1e-9): boolean {
   return (

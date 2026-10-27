@@ -3,7 +3,7 @@
  * rendered headless. Run: `pnpm --filter @tavli/mobile screenshots`.
  */
 import { Fill } from '@shopify/react-native-skia/lib/commonjs/headless';
-import { getLayout, getTheme } from '@tavli/themes';
+import { getLayout, getTheme, mirrorLayout } from '@tavli/themes';
 import { expect, it } from 'vitest';
 
 import { layoutBoard, type BoardView } from '@/features/board/boardModel';
@@ -22,6 +22,8 @@ interface BoardShot {
   theme?: string;
   position: SamplePositionId;
   view: BoardView;
+  /** Settings → Home board (#175). `left` mirrors the layout. Default: `right`. */
+  homeSide?: 'right' | 'left';
   /** Canvas size in points: the board area of a phone. */
   width: number;
   height: number;
@@ -63,6 +65,15 @@ const SHOTS: BoardShot[] = [
     width: 320,
     height: 524,
   },
+  // Settings → Home board: bottom left (#175). The board is mirrored; the art is not.
+  {
+    file: 'board-start-home-left.png',
+    position: 'start',
+    view: { viewer: 'white', direction: 'contrary' },
+    homeSide: 'left',
+    width: 360,
+    height: 590,
+  },
 ];
 
 it('renders the board screenshots', async () => {
@@ -70,7 +81,9 @@ it('renders the board screenshots', async () => {
   for (const shot of SHOTS) {
     const theme = getTheme(shot.theme ?? 'walnut-kafeneio');
     const images = loadThemeImages(theme, 1);
-    const geo = fitBoardWithShadow(getLayout(theme, 'portrait-rotated'), shot);
+    const portrait = getLayout(theme, 'portrait-rotated');
+    const layout = shot.homeSide === 'left' ? mirrorLayout(portrait) : portrait;
+    const geo = fitBoardWithShadow(layout, shot);
     const font = loadFont(theme.checkers.badge.fontSize * checkerRadius(geo));
     const picture = layoutBoard(geo, SAMPLE_POSITIONS[shot.position], shot.view);
     const { file, bytes } = await writePng(
