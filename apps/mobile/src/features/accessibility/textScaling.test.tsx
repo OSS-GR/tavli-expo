@@ -1,7 +1,8 @@
 /**
  * Large system fonts (#134): Home, New game, the game screen and its cards
- * (#153; the opening roll house rule cards, #207), the game menu and resign dialog, the end screens, History (#142),
- * the tutorial's mother card (#149) and the Settings game picker (#159)
+ * (#153; choose a double, #205; the opening roll house rule cards, #207),
+ * the game menu and resign dialog, the end screens, History (#142), the
+ * tutorial's mother card (#149) and the Settings game picker (#159)
  * follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
@@ -9,10 +10,12 @@
  * that keep text whole (see `test/textScaling.ts`), in English and in Greek.
  */
 import {
+  asodio,
   createBoard,
   createGameFlow,
   createMatch,
   createSeededRng,
+  legalNextMoves,
   plakoto,
   portes,
   recordGameResult,
@@ -217,8 +220,11 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
   );
 
   /** A store whose game starts from `board`, White to roll. */
-  function storeAt(board: BoardState, game: 'portes' | 'plakoto'): GameStore {
-    const rules = resolveRules(game, { match: { rotation: [game] } });
+  function storeAt(board: BoardState, game: 'portes' | 'plakoto' | 'aceyDeucey'): GameStore {
+    const rules =
+      game === 'aceyDeucey'
+        ? resolveRules('asodio.aceyDeuceyGreek')
+        : resolveRules(game, { match: { rotation: [game] } });
     const store = createGameStore({
       players: { white: 'Maria Papadopoulou', black: 'Bob' },
       rules,
@@ -226,7 +232,11 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     });
     const options = { startingPlayer: 'white' as const, rules };
     const initial =
-      game === 'portes' ? portes.initialState(options) : plakoto.initialState(options);
+      game === 'portes'
+        ? portes.initialState(options)
+        : game === 'plakoto'
+          ? plakoto.initialState(options)
+          : asodio.initialState(options);
     store.setState({
       flow: {
         ...store.getState().flow,
@@ -236,7 +246,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     return store;
   }
 
-  /** The game screen cards: no legal moves, the mother question. */
+  /** The game screen cards: no legal moves, the mother question, choose a double. */
   async function gameScreenCards() {
     // Maria is on the bar and Bob holds all six entry points.
     const closed = createBoard(
@@ -289,10 +299,39 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     await showGame(rerolling);
     expect(screen.getByTestId('opening-ok-button')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
+
+    // Acey-Deucey (#205): Maria plays a 1-2 and chooses a double. Bob holds
+    // her own 18 to 15, so a chosen 6-6 then passes ("Maria chose 6-6").
+    const choosing = storeAt(
+      createBoard(
+        {
+          white: { points: { 24: 15 } },
+          black: { points: { 7: 2, 8: 2, 9: 2, 10: 2, 12: 7 } },
+        },
+        'contrary',
+      ),
+      'aceyDeucey',
+    );
+    choosing.getState().dispatch({ type: 'roll', player: 'white', dice: [1, 2] });
+    for (const to of [23, 22]) {
+      const move = legalNextMoves(choosing.getState().flow.game)
+        .flatMap((source) => source.moves)
+        .find((m) => m.from === 24 && m.to === to);
+      choosing.getState().dispatch({ type: 'move', player: 'white', move: move! });
+    }
+    choosing.getState().dispatch({ type: 'confirm', player: 'white' });
+    await showGame(choosing);
+    expect(screen.getByTestId('choose-double-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('choose-double-6'));
+    });
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
   }
 
   it.each(BOARD_LAYOUT_MODES)(
-    'the game screen cards (%s layout): no legal moves, the mother question (#153)',
+    'the game screen cards (%s layout): no legal moves, the mother question, choose a double (#153, #205)',
     async (layout) => {
       await pickLayout(layout);
       await gameScreenCards();
@@ -346,7 +385,10 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       await gameScreenFlow();
       expect(screen.getByTestId('game-left', { includeHiddenElements: true })).toBeTruthy();
     });
-    it('the game screen cards: no legal moves, the mother question', gameScreenCards);
+    it(
+      'the game screen cards: no legal moves, the mother question, choose a double',
+      gameScreenCards,
+    );
     it('the game menu and the resign dialog', gameMenu);
     it('the tutorial: the Plakoto mother card', async () => {
       await tutorialMotherCard();

@@ -311,6 +311,8 @@
       "rolled_you": "You rolled {{dice}}.",
       "rolledDouble": "{{name}} rolled {{double}}: four moves of {{value}}.",
       "rolledDouble_you": "You rolled {{double}}: four moves of {{value}}.",
+      "choseDouble": "{{name}} chose {{double}}: four moves of {{value}}.",
+      "choseDouble_you": "You chose {{double}}: four moves of {{value}}.",
       "played": "{{name}} played: {{moves}}.",
       "chosenStarter": "{{name}} starts.",
       "chosenStarter_you": "You start."
@@ -330,7 +332,11 @@
       "lockedDouble_you": "You rolled {{dice}}. The board opens only with a double.",
       "frozenTitle": "Army frozen",
       "frozen": "{{name}} rolled {{dice}}. Their last checker is pinned, so no checker can move.",
-      "frozen_you": "You rolled {{dice}}. Your last checker is pinned, so no checker can move."
+      "frozen_you": "You rolled {{dice}}. Your last checker is pinned, so no checker can move.",
+      "bodyChosen": "{{name}} chose {{dice}}. No checker can move.",
+      "bodyChosen_you": "You chose {{dice}}. No checker can move.",
+      "frozenChosen": "{{name}} chose {{dice}}. Their last checker is pinned, so no checker can move.",
+      "frozenChosen_you": "You chose {{dice}}. Your last checker is pinned, so no checker can move."
     },
     "end": {
       "gameWinner": "{{name}} wins the game!",
@@ -372,7 +378,8 @@
       "name": "Bot",
       "strip": "Bot · {{level}}",
       "waiting": "Bot's turn…",
-      "moving": "Bot rolled {{dice}} and is moving…"
+      "moving": "Bot rolled {{dice}} and is moving…",
+      "choseMoving": "Bot chose {{dice}} and is moving…"
     },
     "menu": {
       "open": "Game menu",
@@ -414,6 +421,12 @@
       "resign": "Resign (lose 2)",
       "playOn": "Play on",
       "botPlaysOn": "{{name}} plays on."
+    },
+    "chooseDouble": {
+      "title": "{{name}}, you rolled 1-2",
+      "title_you": "You rolled 1-2",
+      "body": "Choose a double:",
+      "choice": "{{double}}: four moves of {{value}}"
     },
     "board": {
       "label": "Board",

@@ -62,7 +62,8 @@ interface Evaluation {
   level picker can use it, or probe `chooseTurn` and catch
   `NOT_IMPLEMENTED`: both give the same answer.
 - `scoreTurns(variant, evaluator, state, turns)` and `pickTurn` are the
-  1-ply core. `Analyzer` (hints, post-game review) is only a type for now.
+  1-ply core. `createAnalyzer` ranks the turns for hints (see "The
+  Analyzer").
 
 Errors:
 
@@ -76,6 +77,43 @@ Errors:
 - Engine errors pass through: `ILLEGAL_TURN` for a finished game (or a
   Plakoto state that waits for its answer), `UNKNOWN_VARIANT`,
   `OUT_OF_RANGE` for a bad seed.
+
+## The Analyzer (hints)
+
+`createAnalyzer({ variants?, evaluators? })` builds an `Analyzer` (#206),
+for hints and later for post-game review. Same defaults as `createBot`.
+
+```ts
+const analyzer = createAnalyzer();
+const ranked = analyzer.rankTurns(state, dice, { top: 3 }); // best first
+ranked[0].turn; // the hint
+ranked[1].equityLoss; // points lost against the best turn
+analyzer.evaluate(state); // the chances of state.toMove, before the roll
+```
+
+- It uses the variant's best evaluator: hard (the net) if there is one,
+  else medium. The default registry has a net for every game.
+- `rankTurns` scores every legal turn with `scoreTurns` (1-ply), like the
+  bot. A turn that wins at once ranks first (more points first), then the
+  rest by score. Its best turn is what hard plays at temperature 0.
+- Each `RankedTurn` has the `evaluation` after the turn, from the view of
+  the mover (`state.toMove`), and `equityLoss` against the best turn (0 for
+  the best, never below 0). `evaluation.equity` is the turn's score. When
+  the turn ends the game, the evaluation is the true result.
+- It follows `state.toMove`: an Asodio extra roll keeps the same player,
+  and then the view after the turn is already the mover's. If
+  `state.dice` is set (the chosen double), `dice` must equal it.
+- No randomness. The same input gives the same output, and equal scores
+  keep the engine's order of `legalTurns`.
+- A forced turn (or a pass) is a list of one with `equityLoss` 0.
+- `top` keeps the best `top` turns (an integer >= 1). Default: all.
+- `plies: 2` throws `BotError('NOT_IMPLEMENTED')` for now. Only 1-ply works.
+- `evaluate` of a finished game gives the true result (a draw is half a
+  win, like in the nets).
+- Errors: `NOT_IMPLEMENTED` (2-ply, or no hard or medium evaluator),
+  `INVALID_REQUEST` (`dice` differs from `state.dice`, a bad `top` or
+  `plies`), `INVALID_REGISTRY` like `createBot`, and the engine's errors
+  (a finished game in `rankTurns`, an unknown variant).
 
 ## The levels
 
@@ -1109,6 +1147,12 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
 45 s in the dev container; the Asodio strength test takes about 40 s with hard vs medium, and
 the Plakoto one about 15 s with hard vs medium; the files run in parallel).
 
+- `analyzer.test.ts`: a forced turn is one turn with no loss, a win now
+  ranks first (even when the evaluator likes another turn), for every
+  game the ranking holds every legal turn once, sorted, with `equityLoss`
+  > = 0, the best turn is hard at temperature 0, the evaluations are from
+  > the mover's view, the same input gives the same output, Acey-Deucey
+  > roll chains, `top`, the evaluator choice and the errors.
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for
   a seed; passes; a win now is never missed (easy, medium, the fallback,
   even with a huge temperature and an evaluator that wants to lose);

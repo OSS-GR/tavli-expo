@@ -129,7 +129,7 @@ A position score = weighted sum of features. Weights start hand-picked, then get
 ### 4.4 Fairness and anti-cheating
 
 - **Dice fairness:** players often think bots cheat with dice. The bot never sees future dice. `chooseMove` only gets the current dice. The dice RNG and the bot RNG are separate objects. Later we can show dice statistics after a game.
-- **Hints and analysis:** the same `Analyzer` gives hints and post-game review. Hints are **off in online games** (both players must agree for friendly games; never in ranked).
+- **Hints and analysis:** the same `Analyzer` gives hints and post-game review. `createAnalyzer` (`packages/bot/src/analyzer.ts`, #206) ranks the legal turns for a roll with the variant's best evaluator (hard net, else medium) and the bot's 1-ply core (`scoreTurns`). Its best turn is what hard plays at temperature 0. It has no randomness. 2-ply throws `NOT_IMPLEMENTED` for now. See "The Analyzer" in `packages/bot/README.md`. Hints are **off in online games** (both players must agree for friendly games; never in ranked).
 - **Bot use in online games:** online, the server decides dice and checks moves, but it cannot stop a player from running a bot on a second device. For ranked play later, compare each player's moves with the hard bot on the server. Flag accounts with an error rate that is too low over many games. This is how chess sites detect engines.
 - **Do not ship the hard bot's weights as a server secret.** They will be in the app bundle. That is fine; a bot is not a secret.
 
@@ -307,7 +307,7 @@ export interface Bot {
   ): Turn; // a Turn = the full list of single moves (Move[]) for this roll
 }
 
-/** Same machinery, used for hints and post-game review. */
+/** Same machinery, used for hints and post-game review. Built: `createAnalyzer` (#206), 1-ply only. */
 export interface Analyzer {
   rankTurns(
     state: GameState,
@@ -379,7 +379,7 @@ Tests the bot package must have:
 
 ### Phase 3 — Later
 
-- Hints and post-game review with the `Analyzer` (roadmap "Later").
+- Hints and post-game review with the `Analyzer` (roadmap "Later"). The 1-ply `createAnalyzer` is built (#206); next are the Hint button in the app and 2-ply.
 - Match-score-aware play (Tavli match to 5 or 7 points) using a match equity table.
 - Server-side move analysis for ranked anti-cheat.
 - Optional: stronger nets with rollouts + supervised training (wildbg style), or a port of the wildbg Portes evaluator if its licence and rules fit.
