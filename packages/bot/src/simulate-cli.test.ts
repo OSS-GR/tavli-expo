@@ -44,6 +44,20 @@ describe('simulator command line', () => {
     expect(report).toContain('time: 0.50 s');
   });
 
+  it('plays an Asodio preset', { timeout: 30_000 }, () => {
+    expect(
+      parseSimulateArgs(['--variant', 'asodio', '--preset', 'asodio.aceyDeuceyGreek']),
+    ).toMatchObject({ variant: 'asodio', preset: 'asodio.aceyDeuceyGreek' });
+    const cli = io();
+    const argv = ['--variant', 'asodio', '--preset', 'asodio.aceyDeuceyGreek', '--games', '2'];
+    expect(runSimulateCli([...argv, '--a', 'random', '--b', 'random'], cli)).toBe(0);
+    expect(cli.out.join('\n')).toContain('asodio (asodio.aceyDeuceyGreek): 2 games');
+    const wrong = io();
+    expect(runSimulateCli(['--variant', 'asodio', '--preset', 'plakoto'], wrong)).toBe(2);
+    expect(runSimulateCli(['--preset', 'nope'], io())).toBe(2);
+    expect(() => parseSimulateArgs(['--preset'])).toThrow('--preset');
+  });
+
   it('returns 2 for bad input and 1 for failed games', () => {
     const bad = io();
     expect(runSimulateCli(['--variant', 'nope'], bad)).toBe(2);

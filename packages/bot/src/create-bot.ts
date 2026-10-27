@@ -14,41 +14,37 @@
  * | medium | variant heuristic   | low (mostly the best turn)       |
  * | hard   | none yet (#52)      | throws `NOT_IMPLEMENTED`         |
  *
- * The variant heuristics: Portes (`portes-heuristic.ts`) and Fevga
- * (`fevga-heuristic.ts`). Easy for a variant with no evaluator falls back to
+ * The variant heuristics: Portes (`portes-heuristic.ts`), Plakoto
+ * (`plakoto-heuristic.ts`), Fevga (`fevga-heuristic.ts`) and Asodio
+ * (`asodio-heuristic.ts`). Easy for a variant with no evaluator falls back to
  * a random turn, but still takes a turn that wins at once. Medium and hard
  * need an evaluator.
  */
 
 import { BOT_DIFFICULTIES } from '@tavli/contracts';
-import type {
-  Dice,
-  GameState,
-  Rng,
-  Turn,
-  Variant,
-  VariantId,
-  VariantRegistry,
-} from '@tavli/engine';
+import type { Dice, GameState, Rng, Turn, VariantId, VariantRegistry } from '@tavli/engine';
 import { VARIANT_REGISTRY, getVariant } from '@tavli/engine';
 
 import { questionOf, scoreAnswers } from './answer';
 import { BotError } from './errors';
+import { asodioHeuristic } from './evaluators/asodio-heuristic';
 import { fevgaHeuristic } from './evaluators/fevga-heuristic';
 import { plakotoHeuristic } from './evaluators/plakoto-heuristic';
 import { portesHeuristic } from './evaluators/portes-heuristic';
 import { pickOne, randomUnit } from './random';
+import { scoreTurns, scoreWithEngine } from './score';
 import type {
   BotLevel,
   BotOptions,
   BotRegistry,
   ConfiguredBot,
   Difficulty,
-  Evaluator,
   EvaluatorRegistry,
   LevelPolicy,
   TurnScore,
 } from './types';
+
+export { scoreTurns };
 
 /** An empty registry: only `random` and the easy fallback work. */
 export const EMPTY_EVALUATOR_REGISTRY: EvaluatorRegistry = new Map();
@@ -58,6 +54,7 @@ export const DEFAULT_EVALUATORS: EvaluatorRegistry = new Map([
   ['portes', { easy: portesHeuristic, medium: portesHeuristic }],
   ['plakoto', { easy: plakotoHeuristic, medium: plakotoHeuristic }],
   ['fevga', { easy: fevgaHeuristic, medium: fevgaHeuristic }],
+  ['asodio', { easy: asodioHeuristic, medium: asodioHeuristic }],
 ]);
 
 /**
@@ -81,38 +78,6 @@ export const DEFAULT_LEVEL_POLICIES: Readonly<Record<Difficulty, LevelPolicy>> =
 /** `random`: one uniformly random turn from the legal list (a pass is a one-item list). */
 export function chooseRandomTurn(turns: readonly Turn[], rng: Rng): Turn {
   return pickOne(rng, turns);
-}
-
-/** The generic 1-ply path: play each turn with the engine, then evaluate. */
-function scoreWithEngine(
-  variant: Variant,
-  evaluator: Evaluator | undefined,
-  state: GameState,
-  turns: readonly Turn[],
-): TurnScore[] {
-  return turns.map((turn) => {
-    const after = variant.applyTurn(state, turn);
-    const result = variant.result(after);
-    if (result !== null) {
-      const points = result.winner === null ? 0 : result.points;
-      return { score: result.winner === state.toMove ? points : -points, gameOver: true };
-    }
-    // After the turn the opponent is to move, so their equity is our loss.
-    return {
-      score: evaluator === undefined ? 0 : -evaluator.evaluate(after).equity,
-      gameOver: false,
-    };
-  });
-}
-
-/** Scores every turn for the mover, with the evaluator's fast path if it has one. */
-export function scoreTurns(
-  variant: Variant,
-  evaluator: Evaluator,
-  state: GameState,
-  turns: readonly Turn[],
-): readonly TurnScore[] {
-  return evaluator.scoreTurns?.(state, turns) ?? scoreWithEngine(variant, evaluator, state, turns);
 }
 
 /** The turns (or answers) that win the game now with the most points, or `[]`. */

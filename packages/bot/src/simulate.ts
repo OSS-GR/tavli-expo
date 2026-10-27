@@ -6,7 +6,7 @@
  */
 
 import { EngineError, createSeededRng, rollDice } from '@tavli/engine';
-import type { GameState, PlayerId, Turn, Variant } from '@tavli/engine';
+import type { GameState, PlayerId, RuleSet, Turn, Variant } from '@tavli/engine';
 
 import { BotError } from './errors';
 import type { Bot, BotLevel } from './types';
@@ -37,6 +37,8 @@ export interface AnswerEvent {
 
 export interface SimulateOptions {
   readonly variant: Variant;
+  /** The rules of every game. Default: the variant's default preset. */
+  readonly rules?: RuleSet;
   /** Player A plays White, player B plays Black. */
   readonly bots: readonly [SimulationPlayer, SimulationPlayer];
   readonly games: number;
@@ -113,8 +115,11 @@ function errorCode(error: unknown): string {
  * Each turn is checked by `variant.applyTurn`, which throws on an illegal
  * turn. When the variant asks a question after a turn (`Variant.prompt`),
  * the bot of the player asked answers it (`Bot.chooseAnswer`), and
- * `variant.answerPrompt` checks the answer. Errors do not escape: they come
- * back as `ok: false`.
+ * `variant.answerPrompt` checks the answer. The next player is always
+ * `state.toMove` (Asodio may give the same player another roll), and a
+ * state that already holds dice (an Asodio chosen double) plays them
+ * instead of a new roll. Errors do not escape: they come back as
+ * `ok: false`.
  */
 export function playGame(
   options: Omit<SimulateOptions, 'games' | 'seed'> & { readonly game: number },
@@ -129,7 +134,10 @@ export function playGame(
   };
   const players = { white: bots[0], black: bots[1] };
 
-  let state = variant.initialState({ startingPlayer: game % 2 === 0 ? 'white' : 'black' });
+  const startingPlayer: PlayerId = game % 2 === 0 ? 'white' : 'black';
+  let state = variant.initialState(
+    options.rules === undefined ? { startingPlayer } : { startingPlayer, rules: options.rules },
+  );
   const firstTurn = state.turnNumber;
   try {
     while (!variant.isGameOver(state)) {
@@ -141,7 +149,10 @@ export function playGame(
           message: `no result after ${maxTurns} turns`,
         };
       }
-      const dice = rollDice(diceRng);
+      // The player to move is always `state.toMove`: a variant may give the
+      // same player another roll (Asodio extra rolls). A state that already
+      // holds dice (the Asodio chosen double) plays those dice, not a new roll.
+      const dice = state.dice ?? rollDice(diceRng);
       const rolled: GameState = { ...state, dice };
       const player = players[state.toMove];
       const turn = player.bot.chooseTurn(rolled, dice, player.difficulty, {

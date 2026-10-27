@@ -36,6 +36,7 @@
 - Analytics calls from the game store go through `quietly()`: an analytics error must never fail or undo a move.
 - `@tavli/contracts/testing` holds port contract checks. The analytics checks are plain functions, so Vitest and Jest can both run them.
 - App tests that need navigation use `renderRouter` from `expo-router/testing-library`. Render it once per test: a second `renderRouter` in the same test leaves the next test with an empty tree.
+- In Asodio a turn can keep the same player to move (extra rolls, the chosen double after a 1-2 in the Acey-Deucey presets). Code that drives turns (bot scoring, `simulate`, the app) must follow `state.toMove`, play `state.dice` when the state already holds dice, and never assume the players alternate.
 - Workspace packages export TypeScript source (`"main": "./src/index.ts"`). There is no build step. Metro and Vitest read the source.
 - pnpm refuses packages published less than 24 hours ago (`minimumReleaseAge`). Pick the previous version. Do not add an exclusion.
 - Pure packages test with Vitest. The app tests with Jest (`jest-expo` + React Native Testing Library 14, where `render` and events are `async`). `apps/mobile/jest.setup.ts` loads the Unistyles mocks first, then swaps `@/services` for in-memory fakes and fixes the phone language to English.

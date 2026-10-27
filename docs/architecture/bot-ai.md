@@ -90,6 +90,8 @@ Why softmax noise and not random moves: a softmax picks good moves more often an
 
 **Measured (Fevga, #105, 1,000 games, seed 1):** medium beats random 94.4%, medium beats easy 81.4%, and easy beats random 74.0%. Same temperatures as Portes (easy 0.15, medium 0.01). Fevga has more luck: there is no hitting and every play of a roll moves the same pips, so a bot that only counts pips beats random play just 56%. Per turn, easy loses 0.075 points on average (71% of its turns are not the best); medium loses 0.002. Medium decides in 0.03 ms median and 1.7 ms worst (Node, 5,000 positions from medium games). Details: `packages/bot/README.md`, "The Fevga heuristic".
 
+**Measured (Asodio owner version `asodio.kafeneio`, #125, 1,000 games, seed 1):** medium beats random 68.8% (4.0% losses, 27.2% draws), medium beats easy 49.2% (18.1% losses, 32.7% draws), and easy beats random 52.8% (6.0% losses, 41.2% draws). Draws are deadlocks (A5), and they are common: 30.5% of medium-vs-medium games, 43.0% of easy-vs-easy and 71.0% of random games (open question Q28). Of the games someone wins, medium wins 94.5% against random and 73.1% against easy. So the usual bars (85% / 70% with draws as non-wins) cannot be reached under the owner rules; the strength test uses bars set from these numbers. Same temperatures as Portes. Medium decides in 0.02 ms median and 20 ms worst (Node, 3,000 positions from medium games). Details: `packages/bot/README.md`, "The Asodio heuristic".
+
 The bot gets its own injected RNG (seeded). It never uses `Math.random`. This keeps tests repeatable and matches the engine rule.
 
 ### 4.2 Heuristic evaluator (per variant)
@@ -110,7 +112,7 @@ A position score = weighted sum of features. Weights start hand-picked, then get
 | Checkers still on start point | — | ✓ | ✓ |
 | Stacking / distribution | ✓ | ✓ | ✓ |
 
-Asodio: features to be decided once `docs/rules/asodio.md` exists. The pipeline does not change.
+**Asodio, as built (#125, `asodio-heuristic-v1`, owner version `asodio.kafeneio`):** the evaluator has a light copy of the single-move rules (loading lock, quarter lock, pins) so it can count which dice a side can move and which pins each side can make next roll (a combined move stops at the quarter line, frozen checkers cannot shoot). Features: pins made and suffered (worth much more when the pinned checker is in its owner's rear quarter, because it freezes the whole army, A6), a side with no move at all, dice with no move, shots at lone checkers, the race (Kleinman, with the first-entry gate as extra pips), made points, borne off. With no contact: the Portes race code. Draws: a **mutual lock** (each side has a pinned checker that can never be freed, because each pinner is frozen in front of its own pinned rear; own quarter `a` + their quarter `b` ≤ 2) is a sure draw and scores 0, and the next roll's chance to make one pulls the equity toward 0 for the side that is behind. The lock rules raised medium vs random from 62% to 72% (200 games); the weights barely matter. The Acey-Deucey presets (hits, roll chains, the `chooseDouble` question) work too.
 
 **Plakoto, as built (#106, `plakoto-heuristic-v1`):** pins made and suffered (worth more the further the pinned checker is from home, and when the pinner sits in its own home), the mother pinned (4.5 logits, and 95% of the pinned side's losses count double), mother safety (a lone mother costs by the shots at it; 2+ on the start point are safe), lone checkers that can be pinned with their shot counts, race (Kleinman), home-board points, longest prime, borne off and stacking. No contact: the Portes race code. Weights in `PLAKOTO_DEFAULT_WEIGHTS`, tuned by two rounds of self-play (+0.27 points per game over the hand-picked start). There is no "anchor" feature: in Plakoto the start points are the anchors, and pins replace hits.
 
@@ -130,11 +132,13 @@ Asodio: features to be decided once `docs/rules/asodio.md` exists. The pipeline 
 - **Bot use in online games:** online, the server decides dice and checks moves, but it cannot stop a player from running a bot on a second device. For ranked play later, compare each player's moves with the hard bot on the server. Flag accounts with an error rate that is too low over many games. This is how chess sites detect engines.
 - **Do not ship the hard bot's weights as a server secret.** They will be in the app bundle. That is fine; a bot is not a secret.
 
-### 4.5 Variant questions (Plakoto "resign or play on")
+### 4.5 Variant questions (Plakoto "resign or play on", Asodio "choose a double")
 
-Some variants ask a player a question between turns (`Variant.prompt`, phase `awaiting-answer`). Today only Plakoto does: with `motherRule: "offerConcede"` the pinned player chooses `resign` (the opponent wins 2 points) or `playOn`. The bot answers with the same 1-ply pipeline as a turn: apply each choice with the engine (`answerPrompt`), score the result (true points if the game ends, else the evaluator), then the level's softmax picks.
+Some variants ask a player a question between turns (`Variant.prompt`, phase `awaiting-answer`). Plakoto does: with `motherRule: "offerConcede"` the pinned player chooses `resign` (the opponent wins 2 points) or `playOn`. The bot answers with the same 1-ply pipeline as a turn: apply each choice with the engine (`answerPrompt`), score the result (true points if the game ends, else the evaluator), then the level's softmax picks.
 
 - Resigning loses 2 points, the most a Plakoto game can lose, so "play on" is never worse. The evaluator puts a pinned mother close to −2 (measured: the pinned side scores −1.84 per game when it plays on; the evaluator says −1.78). So medium plays on, and easy (more noise) resigns some near-lost games, like a human who gives up.
+- Asodio, Acey-Deucey presets only: after a 1-2 the player chooses a double (`chooseDouble`, choices `1`–`6`). The answer sets the dice of the same player's next turn, so each choice is scored as the best turn with that double (1-ply), not as a position before a roll. The owner version asks nothing (A3).
+- A turn or answer that keeps the same player to move (an Asodio extra roll) scores the evaluation for that player, not its negation. `simulate` always follows `state.toMove` and plays `state.dice` when the state already holds them.
 - The app asks the runner (`BotRunner.chooseAnswer`) when the phase is `awaiting-answer` and `prompt.player` is the bot. `simulate` does the same with `Bot.chooseAnswer`.
 
 ## 5. Training plan (hard level)
@@ -349,7 +353,7 @@ Tests the bot package must have:
 
 ## 9. Open questions
 
-- Asodio rules: we found no public source. `docs/rules/asodio.md` must define them before we design its features.
+- Asodio: deadlock draws are common even between bots (30% of medium-vs-medium games, see 4.1 and Q28 in `docs/open-questions.md`). Most come from the two armies crossing in the middle of the board, where each side's new quarter is the other side's rear quarter. If playtests confirm it, a rules change (not a bot change) is the fix.
 - Portes scoring: does our Portes count backgammon (triple)? It changes the net outputs.
 - Plakoto: the mother rule is settled (`offerConcede`, owner, 2026-10-26; see `docs/rules/plakoto.md`). Open: should the bot resign a hopeless pinned mother at medium too, to save the human time? Today only easy sometimes does.
 
