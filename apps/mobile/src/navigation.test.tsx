@@ -9,6 +9,7 @@ import { router as appRouter } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
+import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
 import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
@@ -54,6 +55,7 @@ beforeEach(async () => {
   const current = matchSessions.current();
   if (current) matchSessions.end(current.id);
   storage.remove(SAVED_MATCH_KEY);
+  await act(async () => historyStore.getState().clear());
 });
 
 describe('app navigation', () => {
@@ -147,6 +149,40 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: 'Home' }));
     expect(router.getPathname()).toBe('/');
     expect(screen.queryByRole('button', { name: /^Continue game/ })).toBeNull();
+  });
+
+  it('adds a finished match to History, opened from Home and Settings (#142)', async () => {
+    const user = userEvent.setup();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+
+    // No match yet: the empty state's Play opens New game.
+    await user.press(screen.getByRole('link', { name: 'History' }));
+    expect(router.getPathname()).toBe('/history');
+    await user.press(screen.getByRole('button', { name: 'Play' }));
+    expect(router.getPathname()).toBe('/new-game');
+
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const session = matchSessions.current()!;
+    await act(async () => {
+      session.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    });
+    await waitFor(() => expect(router.getPathname()).toBe(`/game/${session.id}/match-end`), {
+      timeout: MATCH_END_DELAY_MS + 2000,
+    });
+    await user.press(screen.getByRole('button', { name: 'Home' }));
+    await user.press(screen.getByRole('link', { name: 'History' }));
+    expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
+      /^Portes · vs Bot \(Easy\), You 0 – 0 Bot · first to \d, Won, /,
+    );
+
+    // Settings: clear it after the confirm step.
+    await act(async () => appRouter.back());
+    await user.press(screen.getByRole('button', { name: 'Settings' }));
+    await user.press(screen.getByRole('button', { name: 'Clear history' }));
+    await user.press(screen.getByRole('button', { name: 'Clear' }));
+    await user.press(screen.getByRole('button', { name: 'Match history ›' }));
+    expect(router.getPathname()).toBe('/history');
+    expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
   });
 
   it('opens pass-and-play with the local mode param', async () => {

@@ -68,6 +68,7 @@ export default function HomeRoute() {
       onNewGame={(mode) => router.push(newGameHref(mode))}
       onSettings={() => router.push('/settings')}
       onHowToPlay={() => router.push(rulesHref('portes'))}
+      onHistory={() => router.push('/history')}
     />
   );
 }
