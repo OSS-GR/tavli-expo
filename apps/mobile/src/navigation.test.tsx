@@ -4,6 +4,7 @@
  * is a route.)
  */
 import { userEvent, waitFor } from '@testing-library/react-native';
+import { router as appRouter } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
@@ -138,6 +139,33 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: /^Pass-and-play/ }));
     expect(router.getSearchParams()).toEqual({ mode: 'local' });
     expect(screen.getByLabelText('Name of player 1, white checkers')).toBeOnTheScreen();
+  });
+
+  it('opens the rules from New game and from the in-game menu', async () => {
+    const user = userEvent.setup();
+    const router = await renderRouter('./src/app', { initialUrl: '/new-game?mode=bot' });
+    await user.press(screen.getByRole('button', { name: 'How to play Portes' }));
+    expect(router.getPathname()).toBe('/rules/portes');
+    expect(screen.getByTestId('rules-section-hitting')).toBeOnTheScreen();
+
+    await act(async () => appRouter.back());
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: 'How to play Portes' }));
+    expect(router.getPathname()).toBe('/rules/portes');
+  });
+
+  it('opens the Plakoto rules page', async () => {
+    await renderRouter('./src/app', { initialUrl: '/rules/plakoto' });
+    expect(screen.getByTestId('rules-section-mother')).toBeOnTheScreen();
+  });
+
+  it('opens the Fevga rules from the Tavli page', async () => {
+    const user = userEvent.setup();
+    const router = await renderRouter('./src/app', { initialUrl: '/rules/tavli' });
+    await user.press(screen.getByRole('button', { name: 'How to play Fevga' }));
+    expect(router.getPathname()).toBe('/rules/fevga');
+    expect(screen.getByTestId('rules-section-runner')).toBeOnTheScreen();
   });
 
   it('shows "could not be opened" for an unknown game id', async () => {
