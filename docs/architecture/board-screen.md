@@ -78,7 +78,8 @@ Dev routes (release builds redirect them to Home):
 - **Turn indicator:** the active player's strip gets a thick border and a "YOUR TURN" pill. Pip counts follow the moves of the turn; Settings → Show pip counts hides them.
 - **No legal moves:** the engine passes the turn by itself. The card says who rolled what and that the turn passes; the dice stay, faded. It closes on OK or after 3 s. Until then the board stays with the player who passed (flip).
 - **Game end:** winner, Mono / Diplo chip, score, "Next game" (the winner starts). **Match end:** winner, score, "Rematch" (the last winner starts, no opening roll).
-- The opening result closes after 1.5 s, or at once on a tap.
+- The opening result closes after 1.5 s, or at once on a tap anywhere on the board.
+- A rematch starts the game and turn numbers again, so the screen forgets which cards were closed.
 
 ### Differences from the wireframes
 

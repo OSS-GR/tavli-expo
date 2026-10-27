@@ -65,12 +65,14 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
   // "No legal moves": the flow has passed the turn already; the card says why.
   const pass = passNotice(flow);
   const [passDismissed, setPassDismissed] = useState<string | null>(null);
+  const passKey = pass?.key ?? null;
   const showPass = pass !== null && passDismissed !== pass.key;
+  // Keyed on the pass, not the notice object (a new one on each render).
   useEffect(() => {
-    if (!showPass || pass === null) return;
-    const timer = setTimeout(() => setPassDismissed(pass.key), PASS_NOTICE_MS);
+    if (!showPass || passKey === null) return;
+    const timer = setTimeout(() => setPassDismissed(passKey), PASS_NOTICE_MS);
     return () => clearTimeout(timer);
-  }, [showPass, pass]);
+  }, [showPass, passKey]);
 
   // Pass-and-play "flip": the player to move sits at the bottom. While the
   // pass card shows, the board stays with the player who passed.
@@ -241,6 +243,9 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
           subtitle={t('game.end.starts', { name: names[match.winner] })}
           onPress={() => {
             setFlights([]);
+            // Game and turn numbers start again: forget the closed cards.
+            setPassDismissed(null);
+            setOpeningDismissed(null);
             rematch();
           }}
         />
@@ -301,7 +306,9 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
     card = (
       <Pressable
         testID="opening-overlay"
-        // A tap closes the result early; while rolling, a tap rolls.
+        // The whole board area: a tap anywhere closes the result early;
+        // while rolling, a tap rolls ("or tap the board").
+        style={styles.tapArea}
         onPress={decided ? () => setOpeningDismissed(gameKey) : roll}
         accessible={false}>
         <OpeningCard
@@ -378,6 +385,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+  },
+  tapArea: {
+    flex: 1,
     justifyContent: 'center',
   },
   hintRow: {
