@@ -6,9 +6,11 @@
 import { InlineBotRunner, createBot } from '@tavli/bot';
 import { createMemoryStorage } from '@tavli/contracts';
 import { createSeededRng, type DieValue, type PerPlayer, type PlayerId } from '@tavli/engine';
-import { act, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
+import { DOUBLE_SPLIT_AT_MS } from '@/features/board/diceMotion';
+import { DOUBLE_LABEL_MS } from '@/features/board/useDoubleReveal';
 import { createSessionRegistry } from '@/features/match/sessions';
 import { defaultSetup, gameRuleSet, type OpeningRollRule } from '@/features/match/setup';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
@@ -21,6 +23,7 @@ import type { Seat } from './seats';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot as render } from '../../../test/render';
+import { findAllNodes, type JsonNode } from '../../../test/tree';
 
 const hidden = { includeHiddenElements: true };
 
@@ -63,6 +66,14 @@ async function wait(ms: number) {
 }
 
 const game = (store: GameStore) => store.getState().flow.game;
+
+/** The dice the board's dice row draws now (each die is a moving Group). */
+function diceDrawn(): number {
+  const tree = screen.toJSON() as JsonNode | JsonNode[] | null;
+  const [canvas] = findAllNodes(tree, (n) => n.type === 'Canvas' && n.props.testID === 'dice-row');
+  if (canvas === undefined) return 0;
+  return findAllNodes(canvas, (n) => n.type === 'Group' && n.props.transform !== undefined).length;
+}
 const message = () => screen.getByTestId('opening-message');
 
 let announce: jest.SpyInstance;
@@ -184,6 +195,43 @@ describe('<GameScreen /> opening roll house rule (#207)', () => {
       await wait(OPENING_RESULT_MS + 10);
       expect(screen.queryByTestId('opening-card')).toBeNull();
       expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    });
+
+    it('no dice play before the starter’s own roll; that roll plays once, as a roll', async () => {
+      const store = newStore('rerollBoth');
+      await render(<GameScreen store={store} />);
+      await act(async () => {
+        fireEvent(screen.getByTestId('game-board', hidden), 'layout', {
+          nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 500 } },
+        });
+      });
+      // The opening roll: the dice are on the card, none on the board.
+      expect(diceDrawn()).toBe(0);
+      await rollDie(store, 'white', 2);
+      await rollDie(store, 'black', 5);
+      // The result, then Nikos waits to roll: still no dice, no label.
+      expect(diceDrawn()).toBe(0);
+      await wait(OPENING_RESULT_MS + DOUBLE_SPLIT_AT_MS * 5);
+      expect(screen.queryByTestId('opening-card')).toBeNull();
+      expect(diceDrawn()).toBe(0);
+      expect(screen.queryByTestId('doubles-hint')).toBeNull();
+
+      // His roll is a double: it rolls as two dice, and splits a beat later.
+      // Dice at rest would show all four at once.
+      await act(async () => {
+        store.getState().dispatch({ type: 'roll', player: 'black', dice: [5, 5] });
+      });
+      expect(diceDrawn()).toBe(2);
+      expect(screen.queryByTestId('doubles-hint')).toBeNull();
+      await wait(DOUBLE_SPLIT_AT_MS - 1);
+      expect(diceDrawn()).toBe(2);
+      await wait(1);
+      expect(diceDrawn()).toBe(4);
+      expect(screen.getByTestId('doubles-hint')).toHaveTextContent('Doubles!');
+      // Once: the label goes, and the dice stay four.
+      await wait(DOUBLE_LABEL_MS);
+      expect(screen.queryByTestId('doubles-hint')).toBeNull();
+      expect(diceDrawn()).toBe(4);
     });
 
     it('vs bot: "You start" and you roll again', async () => {

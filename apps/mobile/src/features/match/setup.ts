@@ -212,15 +212,20 @@ export function defaultSetup(mode: MatchMode): MatchSetup {
  * The setup of the first game after the tutorial (#128): the game of the
  * lessons (Portes, or Plakoto, Fevga or Asodio after their lessons, #149,
  * #159) vs the
- * Easy bot (or the easiest level this build has). The match length comes
- * from `base` (the last choices).
+ * Easy bot (or the easiest level this build has), with the standard
+ * opening roll: the tutorial teaches no house rule (#207). The match length
+ * comes from `base` (the last choices).
  */
 export function firstGameSetup(
   base: MatchSetup,
   levels: GameLevels = ALL_GAME_LEVELS,
   game: TutorialGame = 'portes',
 ): MatchSetup {
-  return sanitizeSetup({ ...base, mode: 'bot', game, botLevel: 'easy' }, 'bot', levels);
+  return sanitizeSetup(
+    { ...base, mode: 'bot', game, botLevel: 'easy', openingRoll: DEFAULT_OPENING_ROLL },
+    'bot',
+    levels,
+  );
 }
 
 /** Trims a typed name and cuts it to `MAX_NAME_LENGTH` characters. */

@@ -536,6 +536,9 @@ export function GameScreen({
   // dice that no roll gave: a double chosen after a 1-2 (Acey-Deucey, #177).
   // Both have no roll in the log. With `rerollBoth` (#207) the starter's
   // first dice are a roll of their own: they tumble.
+  // Before a roll the key names the coming turn, as in every turn: no dice
+  // row is drawn and the reveal waits for a double, so nothing plays until
+  // the dice come (the opening roll too).
   const atRest = showPass || (game.state.dice !== null && !diceWereRolled(flow));
   const rollKey = atRest ? null : `${gameKey}:${game.state.turnNumber}`;
   // A rolled double shows its two dice first, then splits into four (#177).

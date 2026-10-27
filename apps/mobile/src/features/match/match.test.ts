@@ -21,6 +21,7 @@ import {
   cleanName,
   defaultSetup,
   enginePlayers,
+  firstGameSetup,
   gameLevels,
   gameRotation,
   gameRuleSet,
@@ -55,6 +56,24 @@ describe('match setup', () => {
     );
     expect(sanitizeSetup({ openingRoll: 'coinFlip' }, 'bot').openingRoll).toBe('useOpeningDice');
     expect(sanitizeSetup({ game: 'plakoto' }, 'local').openingRoll).toBe('useOpeningDice');
+  });
+
+  it('the first game after the tutorial uses the standard opening roll (#207)', () => {
+    const last: MatchSetup = {
+      ...defaultSetup('bot'),
+      targetPoints: 5,
+      botLevel: 'medium',
+      openingRoll: 'chosenStarterRolls',
+    };
+    const levels = gameLevels(['easy', 'medium']);
+    for (const game of ['portes', 'plakoto', 'fevga', 'asodio'] as const) {
+      expect(firstGameSetup(last, levels, game)).toEqual({
+        ...defaultSetup('bot'),
+        game,
+        targetPoints: 5,
+        openingRoll: 'useOpeningDice',
+      });
+    }
   });
 
   it('puts the opening roll rule into the rules of every game (#207)', () => {
