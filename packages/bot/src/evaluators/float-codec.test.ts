@@ -25,5 +25,8 @@ describe('float codec', () => {
   it('throws on bad text', () => {
     expect(() => decodeFloat32('AA*A')).toThrow(RangeError);
     expect(() => decodeFloat32('AAA=')).toThrow(RangeError);
+    // 5 characters: the last one holds only 6 bits, not a whole byte.
+    expect(() => decodeFloat32('AACAP')).toThrow('bad length');
+    expect(() => decodeFloat32('AACAPwAAA')).toThrow('bad length');
   });
 });

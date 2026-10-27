@@ -90,12 +90,12 @@ Every level but `random` runs the same pipeline (bot-ai.md, section 4.1):
    with the score in points. This is the noise. A bad turn is rare, a
    nearly-best turn is common, so mistakes look human.
 
-| Level  | Evaluator         | Noise (`T`) | How it plays                                                                                                                              |
-| ------ | ----------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| random | none              | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                   |
-| easy   | variant heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now.    |
-| medium | variant heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                        |
-| hard   | Portes net        | 0.01        | Portes only (#147): the trained net, 1-ply, with the same small noise as medium. See "The Portes net". Other variants: `NOT_IMPLEMENTED`. |
+| Level  | Evaluator         | Noise (`T`) | How it plays                                                                                                                                                                          |
+| ------ | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| random | none              | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                                                               |
+| easy   | variant heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now.                                                |
+| medium | variant heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                                                                    |
+| hard   | variant net       | 0.01        | Portes (#147), Plakoto and Fevga (#156): a trained net, 1-ply, with the same small noise as medium. See "The Portes net" and "The Plakoto and Fevga nets". Asodio: `NOT_IMPLEMENTED`. |
 
 - Change the noise with `createBot({ policies: { medium: { temperature: 0.03 } } })`.
   `0` means "always a best turn" (ties at random).
@@ -252,8 +252,10 @@ slower than Node, and the budget there is 200 ms.
 
 The hard level for Portes (#147): a small neural net, trained by TD(λ)
 self-play in the style of TD-Gammon (bot-ai.md, section 5). Code:
-`src/evaluators/portes-net.ts` (inference), `src/train/` (training, dev
-only), `scripts/train.ts` (the Node entry point).
+`src/evaluators/portes-net.ts` (the Portes inputs), `src/evaluators/net.ts`
+(the net code shared with Plakoto and Fevga: the forward pass, loading, the
+evaluator and the 1-ply scoring), `src/train/` (training, dev only, for
+every game), `scripts/train.ts` (the Node entry point).
 
 **What it scores.** Like the heuristic, a position before the roll, from
 the view of the player to roll. The net only scores **contact** positions.
@@ -286,17 +288,24 @@ string of little-endian Float32 values (`float-codec.ts`): 8,203 weights, 32 KB 
 file loads in Metro, Vitest and Node with no `fs` and no JSON import. The
 evaluator decodes it on its first use, not at app start.
 
-**Training** (`src/train/td.ts`). The net plays itself, greedy 1-ply, with
-the engine's `legalTurns` and the fast board arrays. A game stops when
-contact breaks (the race heuristic gives the value) or at the end (the true
-result). Each position gets a λ-return target, computed backwards from the
+**Training** (`src/train/td.ts`, the same code for every game). The net
+plays itself, greedy 1-ply, with the engine's `legalTurns` and the fast
+board arrays. It scores the turns with `scoreNetCandidates` and picks with
+`pickTurn` (temperature 0): the same code as the bot, so the training
+policy and the bot cannot drift apart. A game stops at the first position
+the net does not score (here: contact breaks; the race heuristic gives the
+value) or at the end (the true result). A game longer than 1,000 turns is
+dropped. Each position gets a λ-return target, computed backwards from the
 end: `G_t = flip((1 − λ)·V_{t+1} + λ·G_{t+1})`, where `V_{t+1}` is the value
 the net gave the chosen turn. Then one gradient step per position with
-cross-entropy loss. A match against medium (1,000 paired games, seed 1)
-runs every 10,000 games; `best.json` keeps the best one.
+cross-entropy loss. A match against medium (1,000 paired games) runs every
+10,000 games; `best.json` keeps the best one. Each match has its own seed
+(`--eval-seed` + games played; #147 used seed 1 for all), so play the best
+checkpoints again on a fresh seed before you ship one. The optional warm
+start (`--warm N`) uses `--alpha` as its learning rate.
 
 ```sh
-pnpm --filter @tavli/bot train -- train --out /tmp/portes-net --hidden 40 --games 200000 --seed 12
+pnpm --filter @tavli/bot train -- train --game portes --out /tmp/portes-net --hidden 40 --games 200000 --seed 12
 pnpm --filter @tavli/bot train -- eval --file /tmp/portes-net/best.json --games 2000 --seed 99
 pnpm --filter @tavli/bot train -- export --file /tmp/portes-net/best.json
 ```
@@ -346,6 +355,109 @@ more than its 30 s, so the hard level stays 1-ply.
 300 random positions): median 0.14 ms, p90 0.68 ms, p99 3.3 ms, max 5.0 ms
 (medium on the same run: 0.08, 0.43, 2.2 and 5.7 ms). `src/hard-perf.test.ts` checks median < 50 ms
 and worst < 300 ms.
+
+## The Plakoto and Fevga nets
+
+The hard level for Plakoto and Fevga (#156), built like the Portes net:
+one hidden layer of 40 sigmoid units, 3 sigmoid outputs (P(win), P(win a
+double), P(lose a double)), 1-ply, temperature 0.01. The shared code is in
+`src/evaluators/net.ts`: a game plugs in through a `NetGame` (its board
+arrays, its game end, its inputs, and the positions the net leaves to the
+heuristic). The bot's evaluator (`createNetEvaluator`) and the trainer use
+the same `NetGame`, so they score turns the same way.
+
+**What the nets score.** Each net scores contact positions only. The
+game's heuristic scores the rest (and so do the training games, which stop
+there with the heuristic's value as the target):
+
+- Plakoto (`plakoto-net.ts`): a race, a finished game, and **any position
+  with a pinned mother**. A pinned mother nearly decides the game (README,
+  "The mother question": the pinned side scores about −1.8), and the
+  heuristic's number for it is close. So the net learns the play before a
+  mother falls, and the training games stay short. After a pin, hard plays
+  like medium. The mother question: hard scores "play on" like medium does,
+  so it plays on.
+- Fevga (`fevga-net.ts`): a race and a finished game. The runner rule and
+  the prime bans come from the engine's legal turns.
+
+**Inputs.** The roller's side first, then the waiter's, each in its own
+numbering:
+
+| Game    | Inputs | What                                                                                                |
+| ------- | ------ | --------------------------------------------------------------------------------------------------- |
+| both    | 192    | per own point 1–24, 4 units (TD-Gammon): n ≥ 1, n ≥ 2, n ≥ 3, (n − 3) / 2                           |
+| Plakoto | 48     | pin units: the side's checker on own point 1–24 is pinned (a waiter pin is a pin the roller holds)  |
+| Plakoto | 2      | a lone mother (one free checker left on own 24), per side                                           |
+| Plakoto | 4      | borne off / 15, pip counts / 100                                                                    |
+| Plakoto | 4      | rolls out of 36 that pin some checker, per side, and that pin the other mother (`plakoto-shots.ts`) |
+| Plakoto | 1      | the heuristic's contact score in logits / 4                                                         |
+| Fevga   | 4      | borne off / 15, pip counts / 100                                                                    |
+| Fevga   | 20     | the heuristic's block features per side (`sideFeatures`): prime, trapped checkers, points ahead,    |
+|         |        | blocked landings, dead dice, runner lock and runner distance (for the rules' runner target), home   |
+|         |        | points, checkers on the start, stacked checkers                                                     |
+| Fevga   | 1      | the heuristic's contact score in logits / 4                                                         |
+
+Plakoto has 251 inputs, Fevga 217. The heuristic inputs tie each net to
+its default weights (`PLAKOTO_DEFAULT_WEIGHTS`, `FEVGA_DEFAULT_WEIGHTS`): if
+you retune a heuristic, retrain its net (a test pins each net's value of
+the start).
+
+**Weights:** `src/evaluators/plakoto-net-weights.ts` (10,203 weights, 41 KB
+as Float32, a 55 KB file) and `src/evaluators/fevga-net-weights.ts` (8,843
+weights, 35 KB as Float32, a 48 KB file). Both are under the 100 KB budget.
+
+**Training** (the same trainer as Portes; Node 22, dev container, one core
+per run, no warm start, λ 0.7):
+
+```sh
+pnpm --filter @tavli/bot train -- train --game plakoto --out /tmp/plakoto-net --hidden 40 --games 50000 --alpha 0.1 --alpha-end 0.01 --seed 21 --eval-every 5000 --eval-games 600
+pnpm --filter @tavli/bot train -- train --game fevga --out /tmp/fevga-net --hidden 40 --games 100000 --alpha 0.1 --alpha-end 0.01 --seed 31
+pnpm --filter @tavli/bot train -- train --game fevga --out /tmp/fevga-net-b --from /tmp/fevga-net/games-70000.json --games 30000 --alpha 0.03 --alpha-end 0.005 --seed 32 --eval-seed 2000000
+pnpm --filter @tavli/bot train -- eval --game plakoto --file /tmp/plakoto-net/games-45000.json --games 1000 --seed 99
+pnpm --filter @tavli/bot train -- export --game plakoto --file /tmp/plakoto-net/games-45000.json
+```
+
+| Run       | Hidden | α (start → end)                     | Seed | Games  | Time     | Best checkpoints (1,000 paired games, seed 99) |
+| --------- | ------ | ----------------------------------- | ---- | ------ | -------- | ---------------------------------------------- |
+| Plakoto A | 40     | 0.1 → 0.01                          | 21   | 50,000 | 31.5 min | 35k: 71.4 %; **45k: 73.1 %**; 50k: 72.6 %      |
+| Plakoto B | 80     | 0.05 → 0.005                        | 22   | 35,000 | 27 min   | 30k: 76.0 %; 35k: 72.3 %                       |
+| Fevga A   | 40     | 0.1 → 0.01 (stopped at 78k of 100k) | 31   | 78,000 | 33 min   | 50k: 79.5 %; 60k: 76.3 %; 70k: 78.9 %          |
+| Fevga B   | 40     | 0.03 → 0.005, from A at 70k         | 32   | 30,000 | 13 min   | 10k: 79.8 %; 20k: 80.0 %; **30k: 80.0 %**      |
+
+About 24 Plakoto and 40 Fevga self-play games per second with 40 hidden
+units, plus the matches. Both nets passed 60 % against medium after 5,000
+to 10,000 games. Plakoto B (80 hidden units) did a little better on one
+checkpoint, but its weights file would be about 109 KB, over the budget,
+and its last checkpoint was no better than A. So we ship Plakoto A at
+45,000 games (`plakoto-net-v1`) and Fevga B at 30,000 (100,000 games in all,
+about 43 minutes: `fevga-net-v1`). The training notes are in the weights
+files. A first Plakoto run crashed at about 3,000 games: with
+`motherCheckTiming: "afterEachMove"`, a turn that pins the mother and then
+leaves it still asks the mother question. The trainer now answers
+"play on" (`playOn` in `td.ts`).
+
+**Strength** against medium (a draw is not a win):
+
+| Match                                                                    | Plakoto hard                              | Fevga hard                       |
+| ------------------------------------------------------------------------ | ----------------------------------------- | -------------------------------- |
+| `simulate -- --variant <game> --games 1000 --a hard --b medium --seed 1` | 732 (73.2 %), 6 draws, 1,145 : 320 points | 810 (81.0 %), 1,185 : 203 points |
+| 1,000 paired games, seed 2026 (`train -- eval`)                          | 736 (73.6 %), +0.85 points/game           | 807 (80.7 %), +1.01 points/game  |
+| 1,000 paired games, seed 99 (used to pick the checkpoint)                | 731 (73.1 %)                              | 800 (80.0 %)                     |
+| `*-strength.test.ts`: 200 paired games (seeds 2029, 3029)                | 150 (75.0 %)                              | 162 (81.0 %)                     |
+
+Both are above the epic target of 70 % (#52); the CI tests need 60 %.
+Seeds 1 and 2026 are fresh: no checkpoint was picked on them.
+
+**Decision time** (Node 22, dev container, best of 3 runs, after warm-up,
+300 random positions):
+
+| Bot          | Median  | p90     | p99     | Max    |
+| ------------ | ------- | ------- | ------- | ------ |
+| Plakoto hard | 0.20 ms | 0.79 ms | 2.4 ms  | 3.0 ms |
+| Fevga hard   | 0.07 ms | 0.22 ms | 0.66 ms | 1.1 ms |
+
+`src/hard-perf.test.ts` checks a median under 50 ms and a p99 under 300 ms
+for Portes, Plakoto and Fevga.
 
 ## The Plakoto heuristic
 
@@ -447,6 +559,8 @@ weights beat the hand-picked ones by **+0.27 points per game** (560 wins,
 411 losses, 29 draws in 1,000 games).
 
 ### Plakoto strength and speed
+
+(Hard: see "The Plakoto and Fevga nets".)
 
 1,000 games per match, seed 1, half with each colour (A's numbers; a draw
 is a game where both mothers were pinned):
@@ -558,6 +672,8 @@ scores counts), but the win numbers are rough, and easy's noise acts on
 these inflated scores.
 
 ### Fevga strength and speed
+
+(Hard: see "The Plakoto and Fevga nets".)
 
 1,000 games per match, seed 1,
 `pnpm --filter @tavli/bot simulate -- --variant fevga` (A plays White):
@@ -869,8 +985,8 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
 ## Tests
 
 `pnpm test` from the repo root, or `pnpm --filter @tavli/bot test` (about
-40 s in the dev container; the Asodio strength test takes about 20 s and
-the Plakoto one about 8 s; the files run in parallel).
+45 s in the dev container; the Asodio strength test takes about 20 s and
+the Plakoto one about 15 s with hard vs medium; the files run in parallel).
 
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for
   a seed; passes; a win now is never missed (easy, medium, the fallback,
@@ -921,10 +1037,20 @@ the Plakoto one about 8 s; the files run in parallel).
   colours give the same inputs, indexes in range), the shipped weights
   load and stay under 200 KB, outputs in range, a race uses the heuristic,
   a closed board scores high, the fast path equals the engine path, and a
-  pinned value for one position. `evaluators/float-codec.test.ts`: the
-  base64 Float32 round trip. `train/td.test.ts`: a gradient step, a
-  self-play game repeats for a seed, the warm-start labels, save and load.
+  pinned value for one position. `evaluators/plakoto-net.test.ts` and
+  `evaluators/fevga-net.test.ts`: the inputs (the start, pin units and lone
+  mothers, the runner inputs with and without the runner rule, both colours
+  give the same inputs, indexes in range and unique), the weights load and
+  stay under 100 KB, outputs in range, the heuristic for a race (and for a
+  pinned mother in Plakoto), the fast path equals the engine path (every
+  mother rule; with and without the runner rule), and a pinned value for
+  the start. `evaluators/float-codec.test.ts`: the base64 Float32 round
+  trip and bad lengths. `train/td.test.ts`: a gradient step; for each
+  game, a self-play game repeats for a seed, a game past `maxTurns` is
+  dropped, the warm-start labels; the mother question is answered "play
+  on"; game-end targets; save and load; the train script's flag parser.
 - `strength.test.ts` (300 games per match; hard vs medium 200 games),
-  `perf.test.ts`, `hard-perf.test.ts`,
+  hard vs medium in `plakoto-strength.test.ts` and `fevga-strength.test.ts`
+  (200 games each), `perf.test.ts`, `hard-perf.test.ts` (all three nets),
   `simulate.test.ts` (1,000 random-vs-random games), `tune.test.ts` (a tiny
   search), and the runner and the command line.

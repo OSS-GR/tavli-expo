@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BotCancelledError, isBotCancelled } from '@tavli/contracts';
 import type { BotMoveRequest } from '@tavli/contracts';
-import { createSeededRng, plakoto, portes, sameTurn } from '@tavli/engine';
+import { asodio, createSeededRng, portes, sameTurn } from '@tavli/engine';
 
 import { InlineBotRunner, createBot } from './index';
 import type { Bot } from './index';
@@ -62,13 +62,13 @@ describe('InlineBotRunner', () => {
     await expect(runner.chooseMove({ ...request, variant: 'plakoto' })).rejects.toMatchObject({
       code: 'INVALID_REQUEST',
     });
-    // Plakoto has no hard bot yet.
-    const plakotoStart = plakoto.initialState({ startingPlayer: 'black' });
+    // Asodio has no hard bot yet.
+    const asodioStart = asodio.initialState({ startingPlayer: 'black' });
     await expect(
       runner.chooseMove({
         ...request,
-        variant: 'plakoto',
-        state: plakotoStart,
+        variant: 'asodio',
+        state: asodioStart,
         difficulty: 'hard',
       }),
     ).rejects.toMatchObject({ code: 'NOT_IMPLEMENTED' });

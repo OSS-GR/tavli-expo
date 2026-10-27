@@ -229,8 +229,11 @@ function inReach(them: PlakotoSide, p: number): boolean {
   return false;
 }
 
-/** The contact score, in logits, for the roller. */
-function contactScore(roller: PlakotoSide, waiter: PlakotoSide, w: PlakotoWeights): number {
+/**
+ * The contact score, in logits, for the roller. The Plakoto net
+ * (`plakoto-net.ts`) uses it as one of its inputs.
+ */
+export function contactScore(roller: PlakotoSide, waiter: PlakotoSide, w: PlakotoWeights): number {
   let score = w.race * logit(kleinmanWinChance(pips(roller), pips(waiter)));
   score += sideScore(roller, waiter, w) - sideScore(waiter, roller, w);
 

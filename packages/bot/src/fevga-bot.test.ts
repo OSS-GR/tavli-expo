@@ -34,20 +34,18 @@ function position(
 const key = (turn: Turn): string => JSON.stringify(turn.moves);
 
 describe('fevga bot', () => {
-  it('plays easy and medium for Fevga; hard is not built yet', () => {
-    expect(bot.supportedLevels('fevga')).toEqual(['easy', 'medium']);
+  it('plays easy, medium and hard (the Fevga net) for Fevga', () => {
+    expect(bot.supportedLevels('fevga')).toEqual(['easy', 'medium', 'hard']);
     const dice: Dice = [6, 5];
     expect(() => bot.chooseTurn(start, dice, 'medium', { rng: createSeededRng(1) })).not.toThrow();
-    expect(() => bot.chooseTurn(start, dice, 'hard', { rng: createSeededRng(1) })).toThrow(
-      expect.objectContaining({ code: 'NOT_IMPLEMENTED' }),
-    );
+    expect(() => bot.chooseTurn(start, dice, 'hard', { rng: createSeededRng(1) })).not.toThrow();
   });
 
   it('always picks a turn from legalTurns, and the same seed gives the same turn', () => {
     for (const state of randomFevgaPositions(11, 80)) {
       const dice = state.dice ?? [1, 2];
       const legal = new Set(fevga.legalTurns(state, dice).map(key));
-      for (const level of ['easy', 'medium'] as const) {
+      for (const level of ['easy', 'medium', 'hard'] as const) {
         const a = bot.chooseTurn(state, dice, level, { rng: createSeededRng(7) });
         const b = bot.chooseTurn(state, dice, level, { rng: createSeededRng(7) });
         expect(legal.has(key(a))).toBe(true);
@@ -81,12 +79,12 @@ describe('fevga bot', () => {
       evaluate: () => ({ win: 0, winDouble: 0, loseDouble: 1, equity: -2 }),
     };
     const noisy = createBot({
-      evaluators: new Map([['fevga', { easy: contrary, medium: contrary }]]),
+      evaluators: new Map([['fevga', { easy: contrary, medium: contrary, hard: contrary }]]),
       policies: { easy: { temperature: 1000 } },
     });
     for (let seed = 0; seed < 20; seed += 1) {
       for (const b of [bot, noisy]) {
-        for (const level of ['easy', 'medium'] as const) {
+        for (const level of ['easy', 'medium', 'hard'] as const) {
           const turn = b.chooseTurn(state, dice, level, { rng: createSeededRng(seed) });
           const result = fevga.result(fevga.applyTurn(state, turn));
           expect(result).toEqual({ winner: 'white', points: 2, reason: 'borneOff' });

@@ -52,9 +52,28 @@ export {
   createPortesNetEvaluator,
   loadPortesNet,
   portesNet,
+  portesNetGame,
   shippedPortesNet,
 } from './evaluators/portes-net';
 export type { PortesNet, PortesNetFile } from './evaluators/portes-net';
+export { createNetEvaluator, loadNet } from './evaluators/net';
+export type { Net, NetFile, NetGame } from './evaluators/net';
+export {
+  PLAKOTO_NET_INPUTS,
+  createPlakotoNetEvaluator,
+  loadPlakotoNet,
+  plakotoNet,
+  plakotoNetGame,
+  shippedPlakotoNet,
+} from './evaluators/plakoto-net';
+export {
+  FEVGA_NET_INPUTS,
+  createFevgaNetEvaluator,
+  fevgaNet,
+  fevgaNetGame,
+  loadFevgaNet,
+  shippedFevgaNet,
+} from './evaluators/fevga-net';
 export {
   FEVGA_DEFAULT_WEIGHTS,
   FEVGA_HEURISTIC_ID,
