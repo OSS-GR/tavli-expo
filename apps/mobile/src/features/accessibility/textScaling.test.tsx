@@ -6,7 +6,7 @@
  * that keep text whole (see `test/textScaling.ts`), in English and in Greek.
  */
 import { createMatch, createSeededRng, recordGameResult, type Match } from '@tavli/engine';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen } from '@testing-library/react-native';
 
 import { HistoryScreen } from '@/features/history/HistoryScreen';
 import type { HistoryRecord } from '@/features/history/records';
@@ -14,7 +14,7 @@ import { ContinueCard } from '@/features/home/ContinueCard';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
-import { GameScreen } from '@/features/game/GameScreen';
+import { GameScreen, OPENING_RESULT_MS } from '@/features/game/GameScreen';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
 import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
@@ -23,6 +23,7 @@ import { settingsStore } from '@/features/settings/store';
 import { TutorialScreen } from '@/features/tutorial/TutorialScreen';
 import i18n from '@/i18n';
 
+import { runOnFakeTimers } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 import { textScalingProblems } from '../../../test/textScaling';
 import { layoutTutorialBoard, playLessonByTaps } from '../../../test/tutorialTaps';
@@ -31,6 +32,9 @@ import type { JsonNode } from '../../../test/tree';
 const problems = () => textScalingProblems(screen.toJSON() as JsonNode | JsonNode[] | null);
 
 const LANGUAGES = ['en', 'el'] as const;
+
+// The game screen closes the opening result on a timer (see test/clock.ts).
+runOnFakeTimers();
 
 beforeEach(async () => {
   await act(async () => {
@@ -125,14 +129,17 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
 
-    // A turn: strips, move list, Undo · dice · Confirm.
+    // The opening result, then a turn: strips, move list, Undo · dice · Confirm.
     await act(async () => {
       store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
       store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
     });
-    await waitFor(() => expect(screen.getByTestId('move-list')).toBeOnTheScreen(), {
-      timeout: 3000,
+    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await act(async () => {
+      jest.advanceTimersByTime(OPENING_RESULT_MS);
     });
+    expect(screen.getByTestId('move-list')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
 
     // The game-end sheet.
