@@ -40,7 +40,7 @@ import {
   runnerTargetOf,
   sideFeatures,
 } from './fevga-heuristic';
-import { createNetEvaluator, loadNet, pushInput, pushPointUnits } from './net';
+import { at, createNetEvaluator, loadNet, pushInput, pushPointUnits } from './net';
 import type { Net, NetFile, NetGame, SparseInput } from './net';
 import { OFF, pips } from './portes-board';
 import type { Side } from './portes-board';
@@ -51,10 +51,6 @@ export const FEVGA_NET_INPUTS = 217;
 
 /** The scale of each `sideFeatures` value (the last one, checkers off, is not used). */
 const FEATURE_SCALE = [1, 1, 1 / 12, 1 / 6, 1 / 6, 1, 1, 1 / 6, 1 / 15, 1 / 15] as const;
-
-function at(values: readonly number[], i: number): number {
-  return values[i] ?? 0;
-}
 
 /** Writes the inputs of a contact position into `input` (it is reused). */
 export function encodeFevga(

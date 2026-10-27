@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { anyGameLevels } from '@/features/bot/levels';
 import { ContinueCard } from '@/features/home/ContinueCard';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
@@ -47,7 +48,7 @@ export default function HomeRoute() {
 
   return (
     <HomeScreen
-      botLevels={botLevels.portes}
+      botLevels={anyGameLevels(botLevels)}
       notice={slot.broken ? t('home.continue.broken') : null}
       continueCard={
         saved ? (

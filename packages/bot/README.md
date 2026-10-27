@@ -54,11 +54,11 @@ interface Evaluation {
   owner version (`asodio.kafeneio`) asks nothing.
 - `createBot({ variants?, evaluators?, policies? })` builds a bot. Default:
   the engine's `VARIANT_REGISTRY`, `DEFAULT_EVALUATORS` (the Portes,
-  Plakoto, Fevga and Asodio heuristics for easy and medium, and the Portes
-  net for Portes hard) and `DEFAULT_LEVEL_POLICIES`.
-- `bot.supportedLevels(v)` is `['easy', 'medium', 'hard']` for `portes`
-  and `['easy', 'medium']` for `plakoto`, `fevga` and `asodio`. Easy works
-  for every known variant; medium and hard need an evaluator. The app's
+  Plakoto, Fevga and Asodio heuristics for easy and medium, and a trained
+  net per game for hard) and `DEFAULT_LEVEL_POLICIES`.
+- `bot.supportedLevels(v)` is `['easy', 'medium', 'hard']` for `portes`,
+  `plakoto`, `fevga` and `asodio`. Easy works for every known variant;
+  medium and hard need an evaluator. The app's
   level picker can use it, or probe `chooseTurn` and catch
   `NOT_IMPLEMENTED`: both give the same answer.
 - `scoreTurns(variant, evaluator, state, turns)` and `pickTurn` are the
@@ -67,7 +67,7 @@ interface Evaluation {
 Errors:
 
 - `BotError('NOT_IMPLEMENTED')`: no evaluator for this level and variant
-  (today: hard for Plakoto, Fevga and Asodio).
+  (only with a custom registry: the default one has every level).
 - `BotError('INVALID_REQUEST')`: `dice` differs from `state.dice`, a
   runner request names another variant than its state, or `chooseAnswer`
   gets a state with no question.
@@ -90,12 +90,12 @@ Every level but `random` runs the same pipeline (bot-ai.md, section 4.1):
    with the score in points. This is the noise. A bad turn is rare, a
    nearly-best turn is common, so mistakes look human.
 
-| Level  | Evaluator         | Noise (`T`) | How it plays                                                                                                                                                                          |
-| ------ | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| random | none              | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                                                               |
-| easy   | variant heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now.                                                |
-| medium | variant heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                                                                    |
-| hard   | variant net       | 0.01        | Portes (#147), Plakoto and Fevga (#156): a trained net, 1-ply, with the same small noise as medium. See "The Portes net" and "The Plakoto and Fevga nets". Asodio: `NOT_IMPLEMENTED`. |
+| Level  | Evaluator         | Noise (`T`) | How it plays                                                                                                                                                                                |
+| ------ | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| random | none              | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                                                                     |
+| easy   | variant heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now.                                                      |
+| medium | variant heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                                                                          |
+| hard   | variant net       | 0.01        | Portes (#147), Plakoto and Fevga (#156), Asodio (#164): a trained net, 1-ply, with the same small noise as medium. See "The Portes net", "The Plakoto and Fevga nets" and "The Asodio net". |
 
 - Change the noise with `createBot({ policies: { medium: { temperature: 0.03 } } })`.
   `0` means "always a best turn" (ties at random).
@@ -253,7 +253,7 @@ slower than Node, and the budget there is 200 ms.
 The hard level for Portes (#147): a small neural net, trained by TD(λ)
 self-play in the style of TD-Gammon (bot-ai.md, section 5). Code:
 `src/evaluators/portes-net.ts` (the Portes inputs), `src/evaluators/net.ts`
-(the net code shared with Plakoto and Fevga: the forward pass, loading, the
+(the net code shared with Plakoto, Fevga and Asodio: the forward pass, loading, the
 evaluator and the 1-ply scoring), `src/train/` (training, dev only, for
 every game), `scripts/train.ts` (the Node entry point).
 
@@ -375,7 +375,10 @@ there with the heuristic's value as the target):
   "The mother question": the pinned side scores about −1.8), and the
   heuristic's number for it is close. So the net learns the play before a
   mother falls, and the training games stay short. After a pin, hard plays
-  like medium. The mother question: hard scores "play on" like medium does,
+  like medium. This holds for every `motherRule` (`offerConcede`,
+  `instant`, `federation`): `usesNet` looks only at the board, so the
+  heuristic scores every position with a pinned mother, whatever the rule
+  does next. The mother question: hard scores "play on" like medium does,
   so it plays on.
 - Fevga (`fevga-net.ts`): a race and a finished game. The runner rule and
   the prime bans come from the engine's legal turns.
@@ -457,7 +460,125 @@ Seeds 1 and 2026 are fresh: no checkpoint was picked on them.
 | Fevga hard   | 0.07 ms | 0.22 ms | 0.66 ms | 1.1 ms |
 
 `src/hard-perf.test.ts` checks a median under 50 ms and a p99 under 300 ms
-for Portes, Plakoto and Fevga.
+for every net (Asodio: see "The Asodio net").
+
+## The Asodio net
+
+The hard level for Asodio (#164), owner version (`asodio.kafeneio`), built
+like the other nets: 279 inputs → 40 hidden units (sigmoid) → 3 outputs,
+1-ply, temperature 0.01. Code: `src/evaluators/asodio-net.ts`.
+
+**What it scores.** Contact positions with no **mutual lock**. The Asodio
+heuristic scores the rest: a race, a finished game, and a mutual lock
+(both armies hold each other forever: a sure draw, scored 0). Training
+games stop there too. The net counts a draw as half a win (the trainer's
+target for a draw is `[0.5, 0, 0]`), so the heuristic's numbers are put in
+the same terms (`evaluateAsodioFallback`: the same equity, with half the
+draw chance in `win`).
+
+**Only the owner rules.** The net was trained on `asodio.kafeneio`. For any
+other rule set (the Acey-Deucey presets, with hits and roll chains, or a
+changed army flag) the hard evaluator is the heuristic, for every position
+(`isAsodioNetRules` compares the move flags with the owner version). So
+hard plays like medium there, and the `chooseDouble` question goes to the
+heuristic too. The owner version asks no question, so self-play never
+meets a prompt (the trainer would answer one with `playOn`).
+
+**Inputs** (the roller's side first, then the waiter's):
+
+| Inputs | What                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------ |
+| 192    | per own point 1–24, 4 units (TD-Gammon): n ≥ 1, n ≥ 2, n ≥ 3, (n − 3) / 2                  |
+| 48     | pin units: the side's checker on own point 1–24 is pinned                                  |
+| 4      | loading: checkers still outside / 15; the first-entry gate holds (all 15 outside)          |
+| 4      | borne off / 15, pip counts / 100 (a waiting checker counts 25)                             |
+| 8      | the quarter lock: the side's rear quarter, one-hot                                         |
+| 8      | the quarter of the side's lowest pinned checker, one-hot (none when nothing is pinned)     |
+| 4      | checkers frozen in front of the rear quarter / 15; a pinned checker holds the rear quarter |
+| 4      | die values with no legal single move / 6; no die moves at all                              |
+| 4      | rolls out of 36 that pin some checker, and that make a mutual lock, per side               |
+| 2      | the heuristic's share of losses that are doubles (mars), per side                          |
+| 1      | the heuristic's contact score in logits / 4                                                |
+
+The heuristic inputs tie the net to `ASODIO_DEFAULT_WEIGHTS`: if you
+retune the heuristic, retrain the net (a test pins the net's value of the
+start).
+
+**Weights:** `src/evaluators/asodio-net-weights.ts` (11,323 weights, 45 KB
+as Float32, a 61 KB file), under the 100 KB budget.
+
+**Training** (the shared trainer; Node 22, dev container, 4 cores, up to 4
+runs side by side, no warm start). About 25 self-play games per second on
+a free core (a game is about 75 turns before the hand-off; most loading
+turns are forced), plus a 600-game match every 5,000 games:
+
+```sh
+pnpm --filter @tavli/bot train -- train --game asodio --out /tmp/asodio-net --hidden 40 --games 50000 --lambda 0.5 --alpha 0.05 --alpha-end 0.005 --seed 42 --eval-every 5000 --eval-games 600
+pnpm --filter @tavli/bot train -- eval --game asodio --file /tmp/asodio-net/games-35000.json --games 1000 --seed 99
+pnpm --filter @tavli/bot train -- export --game asodio --file /tmp/asodio-net/games-35000.json
+```
+
+| Run | Hidden | λ   | α (start → end)             | Seed | Games  | Time   | Best checkpoints (1,000 paired games, seed 99) |
+| --- | ------ | --- | --------------------------- | ---- | ------ | ------ | ---------------------------------------------- |
+| A   | 40     | 0.7 | 0.1 → 0.01                  | 41   | 50,000 | 88 min | 45k: 52.4 %; 50k: 49.5 %                       |
+| B   | 40     | 0.5 | 0.05 → 0.005                | 42   | 50,000 | 88 min | **35k: 51.7 %**; 45k: 49.4 %; 50k: 49.5 %      |
+| C   | 60     | 0.7 | 0.1 → 0.01 (stopped at 45k) | 43   | 45,000 | 78 min | 25k: 50.8 %                                    |
+| E   | 40     | 0.7 | 0.03 → 0.003, from B at 35k | 45   | 10,000 | 19 min | 10k: 49.3 % (600 games; stopped)               |
+
+The 600-game matches during training rose from about 40 % wins at 5,000
+games to 47–51 % from 25,000 games on, then stayed flat. We ship B at
+35,000 games (58 minutes of training): `asodio-net-v1`. A at 45,000 games
+did a little better on seed 99, but worse on the fresh seed 2026 (47.4 %).
+
+Tried and dropped (offline scripts, not in the repo):
+
+- **2-ply with the heuristic** (the top 3 turns, all 21 replies): 75 wins,
+  64 losses and 61 draws in 200 paired games against medium. No better
+  than medium, and about 25 times slower.
+- **Training against medium** half of the time (TD on games of the net
+  against the heuristic, from B at 10,000 games): 48.0 %, then 43.3 %
+  (600 games each). No gain.
+- **Picking turns by the win chance only** (no doubles): 165 wins, against
+  187 when it picks by equity (400 paired games).
+
+**Strength** of hard (the shipped net) against medium. A draw is not a win:
+
+| Match                                                                    | Hard wins    | Losses | Draws | Points per game   |
+| ------------------------------------------------------------------------ | ------------ | ------ | ----- | ----------------- |
+| `simulate -- --variant asodio --games 1000 --a hard --b medium --seed 1` | 489 (48.9 %) | 261    | 250   | +0.47 (909 : 442) |
+| 1,000 paired games, seed 1 (`train -- eval`)                             | 515 (51.5 %) | 243    | 242   | +0.54             |
+| 1,000 paired games, seed 2026                                            | 488 (48.8 %) | 257    | 255   | +0.47             |
+| 1,000 paired games, seed 99 (used to pick the checkpoint)                | 517 (51.7 %) | 227    | 256   | +0.57             |
+| `asodio-strength.test.ts`: 200 paired games, seed 2029                   | 102 (51.0 %) | 43     | 55    | +0.57 (187 : 73)  |
+
+For comparison, medium against medium wins 34.6 % and draws 30.5 % ("Asodio
+strength and speed"). So hard wins about half of its games against medium,
+and about two thirds of the games that someone wins. Seeds 1 and 2026 are
+fresh: no checkpoint was picked on them.
+
+**The Asodio bar (owner decision, #164).** The other games ask hard to win
+60 % of all 200 CI games against medium. Asodio does not: about a quarter
+of its games end in a lock draw (see below), so 60 % of all games is out of
+reach. In Asodio, hard must win **at least 60 % of the games that someone
+wins** (wins / (wins + losses)) **and score more points than medium**, in
+200 paired games. Draws are reported but do not count. The CI match
+(`asodio-strength.test.ts`, seed 2029) gives 102 wins, 43 losses and 55
+draws: 70 % of the decided games, 187 points against 73. The epic target
+of 70 % of all games (#52) is not met in Asodio.
+
+**Why the bar is hard to reach:** about a quarter of the games end in a
+deadlock draw. In 300 games of an early net (B at 10,000 games) against
+medium, 75 were draws. Medium made the locking pin in 45 of them (in 41,
+hard was ahead), and hard in 30 (in 21, hard was behind: a draw was its
+best result). Before 38 of medium's 45 locks, hard's last turn had no play
+with fewer lock shots (27 of those turns were forced). The quarter lock
+leaves little choice, so most draws come from the dice, not from the play.
+
+**Decision time** (Node 22, dev container, best of 3 runs, after warm-up,
+300 random positions): hard median 0.006 ms, p90 1.4 ms, p99 6.9 ms, max
+8.3 ms (medium on the same run: 0.005, 1.2, 6.5 and 8.1 ms). Most loading
+turns are forced, so the median is tiny. `src/hard-perf.test.ts` checks a
+median under 50 ms and a p99 under 300 ms.
 
 ## The Plakoto heuristic
 
@@ -985,7 +1106,7 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
 ## Tests
 
 `pnpm test` from the repo root, or `pnpm --filter @tavli/bot test` (about
-45 s in the dev container; the Asodio strength test takes about 20 s and
+45 s in the dev container; the Asodio strength test takes about 40 s with hard vs medium, and
 the Plakoto one about 15 s with hard vs medium; the files run in parallel).
 
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for
@@ -1044,13 +1165,17 @@ the Plakoto one about 15 s with hard vs medium; the files run in parallel).
   stay under 100 KB, outputs in range, the heuristic for a race (and for a
   pinned mother in Plakoto), the fast path equals the engine path (every
   mother rule; with and without the runner rule), and a pinned value for
-  the start. `evaluators/float-codec.test.ts`: the base64 Float32 round
+  the start. `evaluators/asodio-net.test.ts`: the same checks for the
+  Asodio net, plus the mutual lock as a draw (half a win) and the heuristic
+  for every rule set but the owner version. `evaluators/float-codec.test.ts`: the base64 Float32 round
   trip and bad lengths. `train/td.test.ts`: a gradient step; for each
   game, a self-play game repeats for a seed, a game past `maxTurns` is
-  dropped, the warm-start labels; the mother question is answered "play
+  dropped, the warm-start labels, the bot's score-only path gives the
+  trainer's scores; the mother question is answered "play
   on"; game-end targets; save and load; the train script's flag parser.
 - `strength.test.ts` (300 games per match; hard vs medium 200 games),
-  hard vs medium in `plakoto-strength.test.ts` and `fevga-strength.test.ts`
-  (200 games each), `perf.test.ts`, `hard-perf.test.ts` (all three nets),
+  hard vs medium in `plakoto-strength.test.ts`, `fevga-strength.test.ts`
+  and `asodio-strength.test.ts` (200 games each; Asodio counts only the
+  decided games, see "The Asodio net"), `perf.test.ts`, `hard-perf.test.ts` (all four nets),
   `simulate.test.ts` (1,000 random-vs-random games), `tune.test.ts` (a tiny
   search), and the runner and the command line.

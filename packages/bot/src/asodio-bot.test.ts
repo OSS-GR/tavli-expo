@@ -57,16 +57,15 @@ const CHAIN_RULES: readonly RuleSet[] = [
 ];
 
 describe('asodio levels', () => {
-  it('plays easy and medium (hard not yet)', () => {
-    expect(bot.supportedLevels('asodio')).toEqual(['easy', 'medium']);
+  it('plays every level, hard included (#164)', () => {
+    expect(bot.supportedLevels('asodio')).toEqual(['easy', 'medium', 'hard']);
     const start = asodio.initialState({ startingPlayer: 'white' });
-    expect(() => bot.chooseTurn(start, [1, 2], 'hard', { rng: createSeededRng(1) })).toThrow(
-      expect.objectContaining({ code: 'NOT_IMPLEMENTED' }),
-    );
+    expect(() => bot.chooseTurn(start, [1, 2], 'hard', { rng: createSeededRng(1) })).not.toThrow();
   });
 
   it('every level plays one of the legal turns, the same one for the same seed', LONG, () => {
-    const levels: BotLevel[] = ['random', 'easy', 'medium'];
+    // Hard with the Acey-Deucey presets and changed flags is the heuristic (`isAsodioNetRules`).
+    const levels: BotLevel[] = ['random', 'easy', 'medium', 'hard'];
     for (const [i, rules] of [...FAST_RULES, ...CHAIN_RULES].entries()) {
       for (const state of randomAsodioPositions(10 + i, 25, 4, rules)) {
         const d = state.dice as Dice;
@@ -109,7 +108,7 @@ describe('asodio levels', () => {
     const black = { points: { 12: 15 } };
     const state = { ...position(white, black), dice: [2, 1] as Dice };
     expect(asodio.legalTurns(state, [2, 1]).length).toBeGreaterThan(1);
-    for (const level of ['easy', 'medium'] as const) {
+    for (const level of ['easy', 'medium', 'hard'] as const) {
       for (let seed = 1; seed <= 20; seed += 1) {
         const turn = bot.chooseTurn(state, [2, 1], level, { rng: createSeededRng(seed) });
         expect(asodio.result(asodio.applyTurn(state, turn))).toMatchObject({
@@ -199,7 +198,7 @@ describe('the chooseDouble question (Acey-Deucey presets)', () => {
 
   it('every level answers with one of the choices, the same one for the same seed', () => {
     const asked = askedState();
-    for (const level of ['random', 'easy', 'medium'] as const) {
+    for (const level of ['random', 'easy', 'medium', 'hard'] as const) {
       for (let seed = 1; seed <= 10; seed += 1) {
         const choice = bot.chooseAnswer(asked, level, { rng: createSeededRng(seed) });
         expect(['1', '2', '3', '4', '5', '6']).toContain(choice);

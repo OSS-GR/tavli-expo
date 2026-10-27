@@ -65,6 +65,7 @@ function netScores(state: GameState): boolean {
   return plakotoNetGame.usesNet(
     plakotoSideOf(state, state.toMove),
     plakotoSideOf(state, opponent(state.toMove)),
+    state.rules.mother,
   );
 }
 
