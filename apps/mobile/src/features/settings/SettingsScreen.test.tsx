@@ -128,6 +128,66 @@ describe('<SettingsScreen />', () => {
     }
   });
 
+  it('picks the board layout: tall by default, or classic (#184)', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      consentStore.setState({ status: 'granted' });
+    });
+    await render(<SettingsScreen />);
+
+    const group = screen.getByTestId('settings-board-layout');
+    expect(group).toHaveAccessibleName('Board layout');
+    expect(within(group).getByRole('radio', { name: 'Tall' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Classic' })).not.toBeChecked();
+    expect(
+      screen.getByText('The board on its side, as big as the screen allows. Bigger checkers.'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByText('The board as on a table, as wide as the screen. Smaller checkers.'),
+    ).toBeOnTheScreen();
+    // A small picture of each layout, hidden from screen readers.
+    for (const mode of ['tall', 'classic']) {
+      const preview = `settings-board-layout-${mode}-preview`;
+      expect(screen.queryByTestId(preview)).toBeNull();
+      expect(screen.getByTestId(preview, { includeHiddenElements: true })).toBeTruthy();
+    }
+
+    await user.press(within(group).getByRole('radio', { name: 'Classic' }));
+    expect(settingsStore.getState().boardLayout).toBe('classic');
+    expect(within(group).getByRole('radio', { name: 'Classic' })).toBeChecked();
+    // Only the key goes out, never the value.
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'boardLayout' },
+    });
+
+    await user.press(within(group).getByRole('radio', { name: 'Tall' }));
+    expect(settingsStore.getState().boardLayout).toBe('tall');
+  });
+
+  it('names the board layouts in Greek', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    try {
+      await render(<SettingsScreen />);
+      const group = screen.getByTestId('settings-board-layout');
+      expect(group).toHaveAccessibleName('Διάταξη ταμπλό');
+      expect(within(group).getByRole('radio', { name: 'Ψηλό' })).toBeChecked();
+      expect(within(group).getByRole('radio', { name: 'Κλασικό' })).toBeOnTheScreen();
+      expect(
+        screen.getByText(
+          'Μόνο για το παιχνίδι. Το μάθημα και οι κανόνες δείχνουν πάντα το ψηλό ταμπλό.',
+        ),
+      ).toBeOnTheScreen();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
   it('picks the move list: automatic by default, then on or off (#134)', async () => {
     const user = userEvent.setup();
     await render(<SettingsScreen />);

@@ -42,6 +42,11 @@ export interface Mark {
   readonly x: number;
   readonly y: number;
   readonly r: number;
+  /**
+   * A target one checker reaches with this many dice (#180, two or more).
+   * Drawn as a dotted ring without the fill, with one dot per die inside.
+   */
+  readonly steps?: number;
 }
 
 export interface BoardHighlights {
@@ -68,6 +73,14 @@ export interface BoardSceneProps {
 }
 
 const NO_HIGHLIGHTS: BoardHighlights = { select: null, targets: [] };
+
+/**
+ * A combined target (#180, `Mark.steps`): the ring is dotted (its dash
+ * shorter by `dash`) and has no fill, so it reads as "further, more dice".
+ * Inside sit `steps` dots of `dot` checker radii, `gap` apart, each with a
+ * thin dark outline (`outline`) so it shows on light and dark points.
+ */
+export const COMBINED_MARK = { dash: 0.45, dot: 0.12, gap: 0.34, outline: 0.06 } as const;
 
 /** Width of the ring on a pinned checker, in checker radii. */
 export const PIN_RING_WIDTH = 0.16;
@@ -101,8 +114,11 @@ export function BoardScene({
   const badge = theme.checkers.badge;
   const hl = theme.highlights;
 
-  const layers = (z: 'underPoints' | 'overPoints') =>
-    layout.layers
+  // A mirrored layout whose art does not fit both ways (the classic board
+  // with your home on the left, #184) draws its images mirrored too.
+  const artFlip = layout.artMirrored ? [{ translateX: 2 * geo.x + W }, { scaleX: -1 }] : undefined;
+  const layers = (z: 'underPoints' | 'overPoints') => {
+    const drawn = layout.layers
       .filter((l) => l.z === z)
       .map((l) => {
         const image = images[l.image];
@@ -110,6 +126,8 @@ export function BoardScene({
           <Image key={l.id} image={image} {...board} fit="fill" blendMode={l.blend} />
         ) : null;
       });
+    return artFlip ? <Group transform={artFlip}>{drawn}</Group> : drawn;
+  };
 
   return (
     <Group>
@@ -303,33 +321,64 @@ export function BoardScene({
       })}
 
       {/* 8. Highlights: legal targets, then the selected checker. */}
-      {highlights.targets.map((t) => (
-        <Group key={`target:${t.key}`}>
-          <Circle
-            cx={t.x}
-            cy={t.y}
-            r={hl.target.radius * t.r}
-            color={rgba(hl.target.color, hl.target.fillOpacity)}
-          />
-          <Circle
-            cx={t.x}
-            cy={t.y}
-            r={hl.target.radius * t.r}
-            style="stroke"
-            strokeWidth={hl.target.halo.width * t.r}
-            color={rgba(hl.target.halo.color, hl.target.halo.opacity)}
-          />
-          <Circle
-            cx={t.x}
-            cy={t.y}
-            r={hl.target.radius * t.r}
-            style="stroke"
-            strokeWidth={hl.target.width * t.r}
-            color={hl.target.color}>
-            <DashPathEffect intervals={[hl.target.dash[0] * t.r, hl.target.dash[1] * t.r]} />
-          </Circle>
-        </Group>
-      ))}
+      {highlights.targets.map((t) => {
+        const steps = t.steps ?? 1;
+        const combined = steps > 1;
+        const ring = hl.target.radius * t.r;
+        const dash = combined ? hl.target.dash[0] * COMBINED_MARK.dash : hl.target.dash[0];
+        return (
+          <Group key={`target:${t.key}`}>
+            {combined ? null : (
+              <Circle
+                cx={t.x}
+                cy={t.y}
+                r={ring}
+                color={rgba(hl.target.color, hl.target.fillOpacity)}
+              />
+            )}
+            <Circle
+              cx={t.x}
+              cy={t.y}
+              r={ring}
+              style="stroke"
+              strokeWidth={hl.target.halo.width * t.r}
+              color={rgba(hl.target.halo.color, hl.target.halo.opacity)}
+            />
+            <Circle
+              cx={t.x}
+              cy={t.y}
+              r={ring}
+              style="stroke"
+              strokeWidth={hl.target.width * t.r}
+              color={hl.target.color}>
+              <DashPathEffect intervals={[dash * t.r, hl.target.dash[1] * t.r]} />
+            </Circle>
+            {combined
+              ? Array.from({ length: steps }, (_, i) => {
+                  const cx = t.x + (i - (steps - 1) / 2) * COMBINED_MARK.gap * t.r;
+                  return (
+                    <Group key={`step:${i}`}>
+                      <Circle
+                        cx={cx}
+                        cy={t.y}
+                        r={COMBINED_MARK.dot * t.r}
+                        style="stroke"
+                        strokeWidth={COMBINED_MARK.outline * 2 * t.r}
+                        color={rgba(hl.target.halo.color, hl.target.halo.opacity)}
+                      />
+                      <Circle
+                        cx={cx}
+                        cy={t.y}
+                        r={COMBINED_MARK.dot * t.r}
+                        color={hl.target.color}
+                      />
+                    </Group>
+                  );
+                })
+              : null}
+          </Group>
+        );
+      })}
       {[
         ...(highlights.cues ?? []),
         ...(highlights.select ? [{ ...highlights.select, key: 'select' }] : []),

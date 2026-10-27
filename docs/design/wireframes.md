@@ -223,11 +223,14 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 - **Route:** `app/game/[id]/index.tsx`
 - **Purpose:** Play the game. This is where players spend 95% of their time.
-- **Layout (top to bottom):**
-  1. **Menu button** (44 pt) and the **opponent strip**: name, pip count, match score ("0 /3").
-  2. **Board**, rotated 90° (see [Board layout](#board-layout-recommendation)). Bear-off trays sit at the bottom of the board.
-  3. **Your strip**: name, pip count, match score, turn pill.
-  4. **Controls**: Undo · dice · Confirm, or one big Roll button.
+- **Layout (top to bottom)**, Settings → Board → Board layout **Tall** (default since #184):
+  1. **Menu button** (36 pt circle, 44 pt touch area) inside the row of the **opponent strip**: name, pip count, match score ("0 /3"), on one line (36 pt).
+  2. **Board**, rotated 90° (see [Board layout](#board-layout-recommendation)), as large as the screen allows. Bear-off trays sit at the bottom of the board. The **dice** lie on the board, in the theme's dice area.
+  3. **Your strip**: name, pip count, match score, turn pill, on one line.
+  4. **Controls**: one row of two big buttons, Undo · Confirm, or one big Roll button.
+  - The game label ("Game 2 · Plakoto") is in the menu.
+- **Classic** layout (a setting, #184): the board as on a table, as wide as the screen, with its strips right above and below it, centred on the screen. The menu and the game label sit at the top; the buttons stay at the bottom. Pictures: [game-layout-proposals.md](game-layout-proposals.md) (proposal A, but centred).
+- The pictures below are the first layout (before #184): two-line strips and the dice between Undo and Confirm. The states they show are the same.
 - **Turn indicator:** the active player's strip gets a thick border and a pill ("YOUR TURN", "PLAYING", or the player's name in pass-and-play).
 - **Pip counts:** shown in both strips by default; Settings → Show pip counts hides them (#32).
 - **Count badge:** a stack of more than 5 checkers shows 5 checkers and a number badge on the last one (#29).
@@ -252,7 +255,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 <img src="wireframes/08-board-moving.png" width="300" alt="Board: moving checkers">
 
-- Dice sit between Undo and Confirm. A used die fades (#30). Here the 6 is used (13/7) and the 3 is left.
+- Dice sit between Undo and Confirm (since #184: on the board). A used die fades (#30). Here the 6 is used (13/7) and the 3 is left.
 - Touch a checker that can move: it gets a ring. Its legal target points get a dashed outline and a ghost checker (#31).
 - **Drag** to a target, or **tap** the checker and then the target. A drop on an illegal point returns the checker. Double-tap moves by the higher die.
 - When bearing off is legal, your tray (bottom left) is highlighted as a target.
@@ -377,6 +380,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - **Sound and feel:** Sound (toggle). Haptics (toggle). Sound also follows the phone's silent switch.
   - **Language:** **Ελληνικά / English**. The app switches at once.
   - **Look:** Board theme (MVP1 has one wooden board; the row says "more boards later").
+  - **Board** (#175, #184, not drawn): the board theme, **Board layout** (**Tall** / **Classic**, a small picture of the game screen each) and **Your home** (bottom right / bottom left).
   - **Help** (#128, not drawn): **Learn to play ›** opens a sheet with Portes, Plakoto, Fevga and Asodio (#159); a pick opens that game's lessons.
   - **Privacy:** Share anonymous usage data (toggle; calls `optIn()` / `optOut()` on the Analytics port, #61). Privacy policy link. Events: `docs/architecture/analytics-events.md`.
   - Footer: app version, build, licenses.
@@ -387,7 +391,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 ## Board layout recommendation
 
-> New layout proposals for portrait and landscape (#184, #185): [game-layout-proposals.md](game-layout-proposals.md).
+> New layout proposals for portrait and landscape (#184, #185): [game-layout-proposals.md](game-layout-proposals.md). **Decision (#184):** both portrait layouts ship. Option B (rotated, as large as the screen) is the default; option A (the classic board, centred) is a setting.
 
 A tavli board is wide (about 1.6 : 1). A portrait phone is tall (about 1 : 2.2). We need 24 points, the bar, two bear-off trays and a dice area.
 
@@ -410,7 +414,7 @@ A tavli board is wide (about 1.6 : 1). A portrait phone is tall (about 1 : 2.2).
 - Your checkers move from 24 (bottom right) **up** the right column, across the top, and **down** the left column into your home. Then they bear off into **your tray** right below your home.
 - **Bar:** a horizontal band in the middle. Your hit checkers wait on the right half, next to where they enter (points 19–24). The opponent's wait on the left half.
 - **Trays:** a strip under the board. Yours at bottom left, the opponent's at bottom right. Both are near the thumb.
-- **Dice:** in the controls row under the board, between Undo and Confirm. The roll, the dice and the confirm are all in one thumb zone.
+- **Dice:** in the controls row under the board, between Undo and Confirm. The roll, the dice and the confirm are all in one thumb zone. (Since #184 the dice lie on the board, in the theme's dice area, and the controls row has two big buttons.)
 - Sizes on a 390 × 844 phone: board **374 × 570 pt**, point **40 pt tall × 178 pt deep**, checker **36 pt**.
 - On an iPhone SE (375 × 667) the point height drops to about **31 pt** (checker about 27 pt). The point is still 170 pt deep. To keep tapping easy, a tap snaps to the **nearest legal target** within 22 pt, and drags use extra hit slop.
 - On large phones (430 × 932) points reach 44 pt.

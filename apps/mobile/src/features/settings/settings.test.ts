@@ -174,6 +174,39 @@ describe('homeBoardSide', () => {
   });
 });
 
+describe('boardLayout (#184)', () => {
+  it('starts with the tall board', () => {
+    expect(createSettingsStore(createMemoryStorage()).getState().boardLayout).toBe('tall');
+  });
+
+  it('saves the classic board and loads it on the next start', () => {
+    const storage = createMemoryStorage();
+    createSettingsStore(storage).getState().setSetting('boardLayout', 'classic');
+    expect((savedJson(storage) as { state: Record<string, unknown> }).state).toMatchObject({
+      boardLayout: 'classic',
+    });
+    expect(createSettingsStore(storage).getState().boardLayout).toBe('classic');
+  });
+
+  it('loads a save from before the setting as the tall board', () => {
+    const storage = createMemoryStorage({
+      [SETTINGS_STORAGE_KEY]: JSON.stringify({
+        version: SETTINGS_VERSION,
+        state: { sound: false, homeBoardSide: 'left' },
+      }),
+    });
+    const state = createSettingsStore(storage).getState();
+    expect(state.boardLayout).toBe('tall');
+    expect(state.homeBoardSide).toBe('left');
+    expect(state.sound).toBe(false);
+  });
+
+  it('falls back to the tall board for a bad value', () => {
+    expect(sanitizeSettings({ boardLayout: 'wide' }).boardLayout).toBe('tall');
+    expect(sanitizeSettings({ boardLayout: 1 }).boardLayout).toBe('tall');
+  });
+});
+
 describe('botSpeed (#172)', () => {
   it('starts at Normal and saves Slow or Fast', () => {
     const storage = createMemoryStorage();

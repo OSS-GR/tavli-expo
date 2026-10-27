@@ -209,6 +209,13 @@ export interface BoardLayout {
     gradient: RadialGradient;
     blend: BlendMode;
   };
+  /**
+   * Not in `theme.json`. `mirrorLayout` sets it when the art does not fit the
+   * mirrored slots (`isMirrorSymmetric` is false), for example the classic
+   * board with its trays on one side. The renderer then draws the image
+   * layers mirrored too, so the trays in the art move with the slots.
+   */
+  artMirrored?: boolean;
 }
 
 /** The two layouts every theme has. */

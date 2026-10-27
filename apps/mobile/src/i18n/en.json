@@ -102,13 +102,21 @@
       "label": "Board",
       "hint": "The game, the tutorial and the rules use this board."
     },
+    "boardLayout": {
+      "label": "Board layout",
+      "tall": "Tall",
+      "classic": "Classic",
+      "tallHint": "The board on its side, as big as the screen allows. Bigger checkers.",
+      "classicHint": "The board as on a table, as wide as the screen. Smaller checkers.",
+      "hint": "Only for the game. The tutorial and the rules always show the tall board."
+    },
     "homeBoard": {
       "label": "Your home",
       "right": "Bottom right",
       "left": "Bottom left",
       "rightHint": "Your checkers go round counterclockwise.",
       "leftHint": "Your checkers go round clockwise.",
-      "hint": "Pick it as on a real board, seen from your seat. The phone shows the board on its side, so your home is always at the bottom of the screen."
+      "hint": "Pick it as on a real board, seen from your seat. Your home is always at the bottom of the screen. The tall board lies on its side, so there your home is on the other side."
     },
     "moveList": {
       "label": "Move list",
@@ -249,13 +257,18 @@
       "bearOff": "Bear off from point {{from}}",
       "hits": "{{move}}, hits",
       "pins": "{{move}}, pins",
+      "then": "{{move}}, {{next}}",
+      "thenTo": "then to point {{to}}",
+      "thenOff": "then bear off",
       "short": {
         "move": "{{from}} → {{to}}",
         "fromBar": "Bar → {{to}}",
         "enter": "Enter → {{to}}",
         "bearOff": "{{from}} → Off",
         "hit": "{{move}} · hit",
-        "pin": "{{move}} · pin"
+        "pin": "{{move}} · pin",
+        "then": "{{move}} → {{to}}",
+        "thenOff": "{{move}} → Off"
       }
     },
     "announce": {

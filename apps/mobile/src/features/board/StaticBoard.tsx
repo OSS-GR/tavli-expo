@@ -7,11 +7,11 @@ import type { ThemeManifest } from '@tavli/themes';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
-import type { HomeBoardSide } from '@/features/settings/settings';
+import type { BoardLayoutMode, HomeBoardSide } from '@/features/settings/settings';
 
 import {
   BoardCanvas,
-  portraitLayout,
+  boardLayout,
   useBoardSpace,
   useBoardTheme,
   useHomeBoardSide,
@@ -28,6 +28,8 @@ export interface StaticBoardProps {
   theme?: ThemeManifest;
   /** Draw with this home board side instead of the one picked in Settings (the side picker). */
   homeSide?: HomeBoardSide;
+  /** The tall board on its side (default) or the classic wide board (the layout picker, #184). */
+  layout?: BoardLayoutMode;
   testID?: string;
 }
 
@@ -37,6 +39,7 @@ export function StaticBoard({
   marks,
   theme: themeProp,
   homeSide: homeSideProp,
+  layout = 'tall',
   testID,
 }: StaticBoardProps) {
   const picked = useBoardTheme();
@@ -44,7 +47,7 @@ export function StaticBoard({
   const theme = themeProp ?? picked;
   const homeSide = homeSideProp ?? pickedSide;
   const [size, onLayout] = useBoardSpace();
-  const geo = size ? fitBoardWithShadow(portraitLayout(theme, homeSide), size) : null;
+  const geo = size ? fitBoardWithShadow(boardLayout(theme, layout, homeSide), size) : null;
   return (
     <View testID={testID} style={styles.space} onLayout={onLayout}>
       {size && geo ? (

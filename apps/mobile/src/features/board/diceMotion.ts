@@ -84,14 +84,20 @@ export interface DicePlace {
  * Where the dice of a double sit (#177). `pair`: the two rolled dice, side
  * by side, before the split. `grid`: the four dice in a 2 x 2 grid after it.
  * One box holds both, so the row does not change size at the split.
+ * `size` sets the grid (each die `size * GRID_SCALE`). `pairSize` is the size
+ * of the two rolled dice; on the board a double gets a larger `size`, so the
+ * pair keeps the size of any roll (`boardDiceBox`).
  */
-export function doublePlaces(size = DIE_SIZE): {
+export function doublePlaces(
+  size = DIE_SIZE,
+  pairSize = size,
+): {
   pair: [DicePlace, DicePlace];
   grid: DicePlace[];
   width: number;
   height: number;
 } {
-  const two = dicePlaces(2, size);
+  const two = dicePlaces(2, pairSize);
   const pad = size * 0.3; // room for the hop and the shadow
   const s = size * GRID_SCALE;
   const gap = s * 0.18;
@@ -115,10 +121,14 @@ export function doublePlaces(size = DIE_SIZE): {
   };
 }
 
-/** Where each die sits in the row. Pure, so tests can check it. */
+/**
+ * Where each die sits in the row. Pure, so tests can check it. `pairSize`:
+ * see `doublePlaces` (four dice only).
+ */
 export function dicePlaces(
   count: number,
   size = DIE_SIZE,
+  pairSize = size,
 ): {
   places: DicePlace[];
   width: number;
@@ -126,7 +136,7 @@ export function dicePlaces(
 } {
   const pad = size * 0.3; // room for the hop and the shadow
   if (count === 4) {
-    const { grid, width, height } = doublePlaces(size);
+    const { grid, width, height } = doublePlaces(size, pairSize);
     return { places: grid, width, height };
   }
   const gap = size * 0.3;

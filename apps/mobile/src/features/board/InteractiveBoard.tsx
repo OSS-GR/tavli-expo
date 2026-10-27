@@ -6,13 +6,17 @@
  * - Drag and drop on a target moves it. A drop anywhere else flies back
  *   with a short animation and a warning haptic.
  * - A tap selects a checker; a tap on one of its targets moves it.
+ * - With `paths` (#180) a checker also lights the targets it reaches with
+ *   several dice ("2+3"). A tap or a drop there plays each step in order.
  * - Moves, hits and undos fly as short animations (`flights.ts`).
  *
  * Two gestures race (`BOARD_GESTURES`, #174): a pan for the drag and a tap
  * for tap-tap. Hit-testing uses the same rects that draw the points
- * (`geometry.ts`). With Settings → Home board on the bottom left (#175) the
- * layout is mirrored (`portraitLayout`), so the touches follow it. The gestures and the animations run on the UI thread;
- * only the result of a touch (select, move, cancel) goes to the JS thread.
+ * (`geometry.ts`). The layout comes from `boardLayout`: the tall or the
+ * classic board (`layout`, #184), mirrored with Settings → Home board on
+ * the bottom left (#175), so the touches follow it. The gestures and the
+ * animations run on the UI thread; only the result of a touch (select,
+ * move, cancel) goes to the JS thread.
  */
 import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
@@ -28,8 +32,11 @@ import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { StyleSheet } from 'react-native-unistyles';
 
-import { BoardCanvas, portraitLayout, useBoardSpace, useHomeBoardSide } from './BoardCanvas';
+import type { BoardLayoutMode } from '@/features/settings/settings';
+
+import { BoardCanvas, boardLayout, useBoardSpace, useHomeBoardSide } from './BoardCanvas';
 import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
+import type { MovePath } from './combined';
 import type { Flight } from './flights';
 import { fitBoardWithShadow, type BoardGeometry } from './geometry';
 import {
@@ -50,6 +57,11 @@ export const RETURN_MS = 160;
 
 export interface InteractiveBoardProps {
   theme: ThemeManifest;
+  /**
+   * The tall board on its side (default: the tutorial) or the classic wide
+   * board (the game screen with Settings → Board layout → Classic, #184).
+   */
+  layout?: BoardLayoutMode;
   /** The board as it is now (with the moves of this turn). */
   board: BoardState;
   view: BoardView;
@@ -67,6 +79,20 @@ export interface InteractiveBoardProps {
    * Returns `false` if the move was not played (the checker flies back).
    */
   onMove: (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => boolean;
+  /**
+   * One checker moved with several dice (#180, `flowPaths`): targets past
+   * the single ones. Lit only with `onSteps`. Default: none (the tutorial).
+   */
+  paths?: readonly MovePath[];
+  /**
+   * A combined target was chosen: play `steps` in order. Same `from` as
+   * `onMove`. Returns `false` if nothing was played (the checker flies back).
+   */
+  onSteps?: (
+    steps: readonly Move[],
+    geo: BoardGeometry,
+    from: { x: number; y: number } | null,
+  ) => boolean;
   /** A tap that did not touch a movable checker (e.g. tap the board to roll). */
   onBoardTap?: () => void;
   /** A checker was selected, and the next tap hit no target (the selection is dropped). */
@@ -101,12 +127,14 @@ function highlightsFor(
     x: t.landing.x,
     y: t.landing.y,
     r: t.r,
+    ...(t.moves.length > 1 ? { steps: t.moves.length } : {}),
   }));
   return { select: source.checker, targets };
 }
 
 export function InteractiveBoard({
   theme,
+  layout = 'tall',
   board,
   view,
   mover,
@@ -115,6 +143,8 @@ export function InteractiveBoard({
   flights,
   onFlightDone,
   onMove,
+  paths,
+  onSteps,
   onBoardTap,
   onMissTap,
   cue = false,
@@ -128,14 +158,15 @@ export function InteractiveBoard({
   const [size, onLayout] = useBoardSpace();
   const homeSide = useHomeBoardSide();
   const geo = useMemo(
-    () => (size ? fitBoardWithShadow(portraitLayout(theme, homeSide), size) : null),
-    [size, theme, homeSide],
+    () => (size ? fitBoardWithShadow(boardLayout(theme, layout, homeSide), size) : null),
+    [size, theme, layout, homeSide],
   );
   useEffect(() => {
     if (geo) onGeometry?.(geo);
   }, [geo, onGeometry]);
   const picture = geo ? layoutBoard(geo, board, view, marks) : null;
-  const sources = geo ? buildSources(geo, board, view, mover, legal) : [];
+  const combined = onSteps && legal.length > 0 ? (paths ?? []) : [];
+  const sources = geo ? buildSources(geo, board, view, mover, legal, combined) : [];
 
   // JS state: the selected source (tap-tap, or the one being dragged) and
   // the checker hidden while it is dragged. Both belong to one position:
@@ -191,9 +222,14 @@ export function InteractiveBoard({
   };
 
   const doMove = (source: number, target: number, from: { x: number; y: number } | null) => {
-    const move = sources[source]?.targets[target]?.move;
+    const moves = sources[source]?.targets[target]?.moves ?? [];
+    const [move] = moves;
     setSelected(null);
-    if (move && geo && onMove(move, geo, from)) {
+    const played =
+      move !== undefined &&
+      geo !== null &&
+      (moves.length > 1 ? (onSteps?.(moves, geo, from) ?? false) : onMove(move, geo, from));
+    if (played) {
       if (from) dropped.current = true;
       setDragKey(null);
     } else if (from) {

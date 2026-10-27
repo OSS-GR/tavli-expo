@@ -13,13 +13,19 @@ import {
   type PlayerId,
   type Rng,
 } from '@tavli/engine';
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { getTheme } from '@tavli/themes';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
-import { DOUBLE_SPLIT_AT_MS, USED_OPACITY } from '@/features/board/diceMotion';
+import { boardLayout } from '@/features/board/BoardCanvas';
+import { boardDiceBox } from '@/features/board/boardDice';
+import { DOUBLE_SPLIT_AT_MS, USED_OPACITY, doublePlaces } from '@/features/board/diceMotion';
+import { boxRatioWithShadow, fitBoardWithShadow } from '@/features/board/geometry';
 import { DOUBLE_LABEL_MS } from '@/features/board/useDoubleReveal';
 import { BOT_TIMING } from '@/features/bot/botSpeed';
+import { DEFAULT_SETTINGS, type BoardLayoutMode } from '@/features/settings/settings';
+import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';
 
 import { createGameStore, type GameStore } from './gameStore';
@@ -27,11 +33,17 @@ import { GameScreen, type BotSeat } from './GameScreen';
 import type { Seat } from './seats';
 
 import { runOnFakeTimers } from '../../../test/clock';
-import { nativeParent } from '../../../test/nativeParent';
+import { nativeParent, nativePath } from '../../../test/nativeParent';
 import { renderWithRoot } from '../../../test/render';
 import { findAllNodes, type JsonNode } from '../../../test/tree';
 
-const SIZE = { width: 375, height: 500 };
+const theme = getTheme('walnut-kafeneio');
+/** The space each layout gives the board on an iPhone SE (375 pt wide). */
+const SPACE: Readonly<Record<BoardLayoutMode, { width: number; height: number }>> = {
+  tall: { width: 375, height: 500 },
+  classic: { width: 375, height: 375 / boxRatioWithShadow(theme.layouts.landscape) },
+};
+const SIZE = SPACE.tall;
 
 /** Rolls 4 on every die: each roll is 4-4. */
 const fours: Rng = { nextUint32: () => 3 };
@@ -47,11 +59,15 @@ function toRoll(store: GameStore, player: PlayerId) {
   store.setState({ flow: { ...flow, game: createGameFlow({ state, starter: player }) } });
 }
 
-async function show(store: GameStore, props: Partial<ComponentProps<typeof GameScreen>> = {}) {
+async function show(
+  store: GameStore,
+  props: Partial<ComponentProps<typeof GameScreen>> = {},
+  size = SIZE,
+) {
   await renderWithRoot(<GameScreen store={store} {...props} />);
   await act(async () => {
     fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, ...SIZE } },
+      nativeEvent: { layout: { x: 0, y: 0, ...size } },
     });
   });
 }
@@ -85,8 +101,11 @@ beforeEach(async () => {
   announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
 });
 
-afterEach(() => {
+afterEach(async () => {
   announce.mockRestore();
+  await act(async () => {
+    settingsStore.setState({ ...DEFAULT_SETTINGS });
+  });
 });
 
 describe('<GameScreen /> doubles (#177)', () => {
@@ -255,5 +274,39 @@ describe('<GameScreen /> doubles (#177)', () => {
     await tick(DOUBLE_SPLIT_AT_MS);
     expect(screen.getByText('Διπλές!')).toBeOnTheScreen();
     expect(announce).toHaveBeenCalledWith('Ann: έφερε διπλές 2: τέσσερις κινήσεις του 2.');
+  });
+  describe.each(['tall', 'classic'] as const)('on the %s board (#184)', (layout) => {
+    it('splits on the board, in a box that does not move, with the canvas in place', async () => {
+      await act(async () => {
+        settingsStore.setState({ ...DEFAULT_SETTINGS, boardLayout: layout });
+      });
+      const store = newStore();
+      toRoll(store, 'white');
+      await show(store, {}, SPACE[layout]);
+      await act(async () => {
+        store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+      });
+      const geo = fitBoardWithShadow(boardLayout(theme, layout, 'right'), SPACE[layout]);
+      const want = boardDiceBox(geo, 4);
+      const box = () => screen.getByTestId('board-dice');
+      const at = { left: want.left, top: want.top };
+      expect(box().props.style).toEqual(expect.arrayContaining([expect.objectContaining(at)]));
+      // The two rolled dice lie on the board, at the size of any roll.
+      const layer = screen.getByTestId('game-board-layer');
+      expect(within(layer).getByLabelText('Dice 6-6-6-6, 4 left to play')).toBeOnTheScreen();
+      expect(diceDrawn()).toBe(2);
+      expect(want.pairSize).toBe(boardDiceBox(geo, 2).size);
+      expect(doublePlaces(want.size, want.pairSize).width).toBe(want.width);
+      const canvas = screen.getByTestId('dice-row');
+      const path = nativePath(canvas);
+
+      await tick(DOUBLE_SPLIT_AT_MS);
+      expect(diceDrawn()).toBe(4);
+      expect(doublesHint()).toBeOnTheScreen();
+      // The box stays where it was; the canvas keeps its native views (#173).
+      expect(box().props.style).toEqual(expect.arrayContaining([expect.objectContaining(at)]));
+      expect(screen.getByTestId('dice-row') === canvas).toBe(true);
+      expect(nativePath(screen.getByTestId('dice-row'))).toBe(path);
+    });
   });
 });

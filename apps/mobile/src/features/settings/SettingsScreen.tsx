@@ -18,6 +18,7 @@ import { TutorialSettings } from '@/features/tutorial/TutorialSettings';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
 
 import { BoardThemePicker } from './BoardThemePicker';
+import { BoardLayoutPicker } from './BoardLayoutPicker';
 import { HomeBoardSidePicker } from './HomeBoardSidePicker';
 import type { BoardFlipMode, MoveListMode } from './settings';
 import { useSettings } from './store';
@@ -176,6 +177,7 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
 
       <SettingsSection title={t('settings.sections.board')}>
         <BoardThemePicker testID="settings-board-theme" />
+        <BoardLayoutPicker testID="settings-board-layout" />
         <HomeBoardSidePicker testID="settings-home-board" />
       </SettingsSection>
 

@@ -1,12 +1,13 @@
 /**
- * The dice in the controls row (wireframes 6c–6f): two dice side by side,
+ * The dice (wireframes 6c–6f): two dice side by side,
  * or four smaller dice in a 2 x 2 grid for a double. Used dice fade.
  * The values always come from the engine flow.
  *
  * A double (#177) first shows the two rolled dice, like any roll. With
  * `split` it turns into four: each rolled die slides to the top row of the
  * grid, and a copy of it slides out from under it to the bottom row. The
- * screen decides when (`useDoubleReveal`).
+ * screen decides when (`useDoubleReveal`). On the board the pair keeps
+ * the size of any roll (`pairSize`) and the grid dice are a bit larger.
  */
 import { Canvas } from '@shopify/react-native-skia';
 import type { ThemeManifest } from '@tavli/themes';
@@ -33,6 +34,8 @@ export interface DiceRowProps {
   /** Called once when the last rolled die lands. */
   onLanded?: () => void;
   size?: number;
+  /** A double: the size of its two rolled dice before the split. Default `size`. */
+  pairSize?: number;
   testID?: string;
 }
 
@@ -51,6 +54,7 @@ export function DiceRow({
   split: givenSplit = true,
   onLanded,
   size = DIE_SIZE,
+  pairSize = size,
   testID,
 }: DiceRowProps) {
   const { t } = useTranslation();
@@ -68,7 +72,7 @@ export function DiceRow({
   let width: number;
   let height: number;
   if (double) {
-    const box = doublePlaces(size);
+    const box = doublePlaces(size, pairSize);
     ({ width, height } = box);
     slots = box.grid.map((place, i) => ({ place, pairAt: box.pair[i % 2], rolls: i < 2 }));
   } else {

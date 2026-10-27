@@ -12,7 +12,11 @@ import { act, screen, waitFor, within } from '@testing-library/react-native';
 import { BOT_SPEED_TIMING, type BotTiming } from '@/features/bot/botTurn';
 import { SAMPLE_POSITIONS } from '@/features/board/positions';
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
-import { DEFAULT_SETTINGS } from '@/features/settings/settings';
+import {
+  BOARD_LAYOUT_MODES,
+  DEFAULT_SETTINGS,
+  type BoardLayoutMode,
+} from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
 import { MatchScreen } from './MatchScreen';
@@ -401,48 +405,75 @@ describe('<MatchScreen /> pass-and-play turns', () => {
 });
 
 describe('<MatchScreen /> the chosen game (#109)', () => {
-  it('names the game of the Tavli rotation on the board and the next one after each game', async () => {
-    const user = setupUser();
-    const s = session({ ...defaultSetup('local'), game: 'tavli', targetPoints: 5 });
-    expect(s.store.getState().flow.match.rules.presetId).toBe('tavli');
-    startWith(s, 'white');
-    const { props, view } = show(s);
-    await view;
-
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 1 · Portes');
+  /**
+   * The game label: on the screen in the classic layout; in the menu in
+   * both (the tall layout has no room for it, #184).
+   */
+  async function expectGameLabel(
+    user: ReturnType<typeof setupUser>,
+    layout: BoardLayoutMode,
+    text: string,
+  ) {
+    if (layout === 'classic') expect(screen.getByTestId('game-label')).toHaveTextContent(text);
+    else expect(screen.queryByTestId('game-label', { includeHiddenElements: true })).toBeNull();
     await user.press(button('Game menu'));
-    expect(
-      within(screen.getByTestId('game-menu')).getByText(
-        'Tavli · pass-and-play · Player 1 0 – 0 Player 2',
-      ),
-    ).toBeOnTheScreen();
-    await user.press(button(/^Resign game/));
-    await user.press(button('Resign'));
+    expect(screen.getByTestId('menu-game-label')).toHaveTextContent(text);
+    await user.press(button(/^Resume/));
+  }
 
-    let card = screen.getByTestId('game-end-card');
-    expect(within(card).getByTestId('next-game-label')).toHaveTextContent('Next: game 2 · Plakoto');
-    // The finished game keeps its own label until Next game (under the sheet,
-    // so screen readers skip it).
-    expect(screen.getByTestId('game-label', { includeHiddenElements: true })).toHaveTextContent(
-      'Game 1 · Portes',
-    );
-    await user.press(within(card).getByRole('button', { name: /^Next game/ }));
+  it.each(BOARD_LAYOUT_MODES)(
+    'names the game of the Tavli rotation and the next one after each game (%s layout)',
+    async (layout) => {
+      await act(async () => {
+        settingsStore.getState().setSetting('boardLayout', layout);
+      });
+      const user = setupUser();
+      const s = session({ ...defaultSetup('local'), game: 'tavli', targetPoints: 5 });
+      expect(s.store.getState().flow.match.rules.presetId).toBe('tavli');
+      startWith(s, 'white');
+      const { props, view } = show(s);
+      await view;
 
-    expect(game(s).state.variant).toBe('plakoto');
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 2 · Plakoto');
-    await user.press(button('Game menu'));
-    await user.press(button('How to play Plakoto'));
-    expect(props.onRules).toHaveBeenCalled();
+      await expectGameLabel(user, layout, 'Game 1 · Portes');
+      await user.press(button('Game menu'));
+      expect(
+        within(screen.getByTestId('game-menu')).getByText(
+          'Tavli · pass-and-play · Player 1 0 – 0 Player 2',
+        ),
+      ).toBeOnTheScreen();
+      await user.press(button(/^Resign game/));
+      await user.press(button('Resign'));
 
-    await user.press(button('Game menu'));
-    await user.press(button(/^Resign game/));
-    await user.press(button('Resign'));
-    card = screen.getByTestId('game-end-card');
-    expect(within(card).getByTestId('next-game-label')).toHaveTextContent('Next: game 3 · Fevga');
-    await user.press(within(card).getByRole('button', { name: /^Next game/ }));
-    expect(game(s).state.variant).toBe('fevga');
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 3 · Fevga');
-  });
+      let card = screen.getByTestId('game-end-card');
+      expect(within(card).getByTestId('next-game-label')).toHaveTextContent(
+        'Next: game 2 · Plakoto',
+      );
+      if (layout === 'classic') {
+        // The finished game keeps its own label until Next game (under the
+        // sheet, so screen readers skip it).
+        expect(screen.queryByTestId('game-label')).toBeNull();
+        expect(screen.getByTestId('game-label', { includeHiddenElements: true })).toHaveTextContent(
+          'Game 1 · Portes',
+        );
+      }
+      await user.press(within(card).getByRole('button', { name: /^Next game/ }));
+
+      expect(game(s).state.variant).toBe('plakoto');
+      await expectGameLabel(user, layout, 'Game 2 · Plakoto');
+      await user.press(button('Game menu'));
+      await user.press(button('How to play Plakoto'));
+      expect(props.onRules).toHaveBeenCalled();
+
+      await user.press(button('Game menu'));
+      await user.press(button(/^Resign game/));
+      await user.press(button('Resign'));
+      card = screen.getByTestId('game-end-card');
+      expect(within(card).getByTestId('next-game-label')).toHaveTextContent('Next: game 3 · Fevga');
+      await user.press(within(card).getByRole('button', { name: /^Next game/ }));
+      expect(game(s).state.variant).toBe('fevga');
+      await expectGameLabel(user, layout, 'Game 3 · Fevga');
+    },
+  );
 
   it('plays a one-game match of Fevga: every game is Fevga', async () => {
     const user = setupUser();
@@ -450,8 +481,8 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
     expect(game(s).state.variant).toBe('fevga');
     expect(s.store.getState().flow.match.rules.match.rotation).toEqual(['fevga']);
     await show(s).view;
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 1 · Fevga');
     await user.press(button('Game menu'));
+    expect(screen.getByTestId('menu-game-label')).toHaveTextContent('Game 1 · Fevga');
     expect(button('How to play Fevga')).toBeOnTheScreen();
   });
 });

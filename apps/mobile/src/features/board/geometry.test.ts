@@ -2,6 +2,7 @@ import { getLayout, getTheme, mirrorLayout } from '@tavli/themes';
 
 import {
   barCheckerRadius,
+  boxRatioWithShadow,
   checkerRadius,
   distanceToRect,
   fitBoard,
@@ -54,6 +55,19 @@ describe('fitBoard', () => {
     const big = fitBoardWithShadow(layout, { width: 430, height: 2000 });
     expect(big.x).toBeGreaterThan(5);
     expect(big.x + big.width).toBeLessThan(430 - 5);
+  });
+  // The classic board (#184): a box of this shape is filled edge to edge.
+  it('gives the shape of a box the board and its shadow fill', () => {
+    const classic = getLayout(getTheme('walnut-kafeneio'), 'landscape');
+    for (const width of [375, 440]) {
+      const box = { width, height: width / boxRatioWithShadow(classic) };
+      const fit = fitBoardWithShadow(classic, box);
+      const room = width - 2 * Math.ceil((classic.shadow.dy + classic.shadow.blur) * width);
+      // As wide as the box less the shadow room (the room is rounded up to whole points).
+      expect(fit.width).toBeLessThanOrEqual(room + 1e-6);
+      expect(fit.width).toBeGreaterThan(room - 2);
+      expect(fit.width / fit.height).toBeCloseTo(classic.aspectRatio, 6);
+    }
   });
 });
 
