@@ -1,8 +1,11 @@
-import type { createRecordingAnalytics } from '@tavli/contracts';
+import { createMemoryStorage, type createRecordingAnalytics, type Storage } from '@tavli/contracts';
+import { createSeededRng } from '@tavli/engine';
 
+import { createGameAnalytics } from '@/features/analytics/gameAnalytics';
 import { analytics } from '@/services';
 
 import { matchSessions } from './appSessions';
+import { createSessionRegistry } from './sessions';
 import { defaultSetup, type MatchSetup } from './setup';
 
 const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
@@ -54,5 +57,62 @@ describe('game events for real matches (#61)', () => {
     const { store } = matchSessions.start(botSetup);
     store.getState().dispatch({ type: 'resignMatch', player: 'white' });
     expect(recorded.sent).toEqual([]);
+  });
+
+  it('sends game_abandoned when a new match replaces an unfinished one', () => {
+    matchSessions.start(localSetup);
+    recorded.sent.length = 0;
+
+    matchSessions.start(botSetup);
+    expect(tracked().map((e) => e.event)).toEqual(['game_abandoned', 'game_started']);
+    expect(tracked()[0]).toEqual({
+      event: 'game_abandoned',
+      mode: 'local',
+      variant: 'portes',
+      turn: 1,
+    });
+  });
+
+  it('sends no game_abandoned when the match before was over', () => {
+    const { store } = matchSessions.start(localSetup);
+    store.getState().dispatch({ type: 'resignMatch', player: 'white' });
+    recorded.sent.length = 0;
+
+    matchSessions.start(botSetup);
+    expect(tracked().map((e) => e.event)).toEqual(['game_started']);
+  });
+});
+
+describe('game events after an app restart (#61)', () => {
+  /** A fresh registry on the same storage: the app after a restart. */
+  function launch(storage: Storage) {
+    return createSessionRegistry({
+      createRng: () => createSeededRng(5),
+      storage,
+      createAnalytics: (setup) =>
+        createGameAnalytics({ mode: setup.mode }, { analytics: recorded }),
+    });
+  }
+
+  it('a resumed match sends no new game_started, but sends the later events', () => {
+    const storage = createMemoryStorage();
+    const { id } = launch(storage).start(localSetup);
+    recorded.sent.length = 0;
+
+    const resumed = launch(storage).get(id);
+    expect(resumed).not.toBeNull();
+    expect(tracked()).toEqual([]);
+
+    resumed!.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
+    expect(tracked().map((e) => e.event)).toEqual(['resign', 'game_finished']);
+  });
+
+  it('replacing a saved unfinished match sends game_abandoned for it', () => {
+    const storage = createMemoryStorage();
+    launch(storage).start(localSetup);
+    recorded.sent.length = 0;
+
+    launch(storage).start(botSetup);
+    expect(tracked().map((e) => e.event)).toEqual(['game_abandoned', 'game_started']);
   });
 });

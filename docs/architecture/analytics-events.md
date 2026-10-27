@@ -30,9 +30,9 @@ Every event also carries PostHog's standard properties (`$lib`, `$os_name`, `$os
 | Event | When it fires | Properties | Sent from |
 |-------|---------------|------------|-----------|
 | `app_opened` | Once per cold start, after consent. On the first launch it fires right after **Allow**. | none | `features/analytics/connect.ts` (`appOpened`, root layout) |
-| `game_started` | A game begins: a new match, the next game of a match, or a rematch. | `mode`: `bot` \| `local` \| `online`; `variant`: engine id (`portes`, `plakoto`, `fevga`, `asodio`); `matchLength`: points to win; `botLevel`: `easy` \| `medium` \| `hard` (only for `bot`) | game store (`createGameStore({ analytics })`), set for every match in `features/match/appSessions.ts` |
-| `game_finished` | A game ends: last checker borne off, mother pinned, a resign, a draw, or the match is resigned mid-game. | `mode`; `variant`; `result`: `mono` \| `diplo` \| `resign` \| `draw`; `turns`: turns played; `durationSec`: seconds since `game_started` | game store |
-| `game_abandoned` | The player leaves a game that is not over. | `mode`; `variant`; `turn`: turn number when they left | **Not wired yet** (see below) |
+| `game_started` | A game begins: a new match, the next game of a match, or a rematch. Not sent when a saved match is resumed (it started before). | `mode`: `bot` \| `local` \| `online`; `variant`: engine id (`portes`, `plakoto`, `fevga`, `asodio`); `matchLength`: points to win; `botLevel`: `easy` \| `medium` \| `hard` (only for `bot`) | game store (`createGameStore({ analytics })`), set for every match in `features/match/appSessions.ts` |
+| `game_finished` | A game ends: last checker borne off, mother pinned, a resign, a draw, or the match is resigned mid-game. | `mode`; `variant`; `result`: `mono` \| `diplo` \| `resign` \| `draw`; `turns`: turns played; `durationSec`: seconds since `game_started`, or since the resume for a resumed match | game store |
+| `game_abandoned` | The player starts a new match while a game is not over (in memory or saved). | `mode`; `variant`; `turn`: turn number when they left | `features/match/sessions.ts` (`start`) |
 | `undo_used` | The engine accepted an undo. | none | game store |
 | `resign` | A player resigned the game or the match. | none | game store |
 | `settings_changed` | A setting changed, except the theme. | `key`: the setting name (`sound`, `haptics`, `language`, `autoConfirmMoves`, `showPipCounts`, `boardFlipMode`) | `features/analytics/connect.ts` |
@@ -44,7 +44,7 @@ Notes:
 - `result`: `mono` is 1 point, `diplo` is 2 or more (a "backgammon" counts as diplo, `docs/rules/portes.md`). `draw` was added to the plan for Plakoto "both mothers pinned" and Asodio deadlock.
 - `turns` counts finished turns. A resign in the middle of turn 5 gives `turns: 4`.
 - The "Share usage data" switch is **not** a setting in this sense: changing it sends no event.
-- `game_abandoned` is a TODO (#61). It needs saved games (#36) to say what "leaving" means (for example, a new match replacing an unfinished one in `features/match/sessions.ts`). `createGameAnalytics(...).gameAbandoned(flow)` is ready to call.
+- `game_abandoned`: leaving the board (Home, the app in the background) is not abandoning, because the match is saved and can be continued (#36). Only a new match that replaces an unfinished one counts.
 
 ## Where the code is
 

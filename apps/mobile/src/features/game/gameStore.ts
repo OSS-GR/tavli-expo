@@ -44,14 +44,13 @@ export interface GameStoreOptions {
   /** Default: the `portes` preset. */
   rules?: RuleSet;
   rng: Rng;
+  /** Go on with this flow (a saved match) instead of a new one. The other options are ignored. */
+  flow?: MatchFlow;
   /**
    * Game events (#61): start, finish, undo and resign are sent from here.
-   * The app sets it for every match (`features/match/appSessions.ts`).
-   * Leave it out in tests.
-   * TODO(#61): send `game_abandoned` (`analytics.gameAbandoned(flow)`) when
-   * the player leaves an unfinished game, for example when a new match
-   * replaces it (`features/match/sessions.ts`), once saved games (#36) say
-   * what "leaving" means.
+   * A saved flow sends no `game_started` (the game started before).
+   * The app sets it for every match (`features/match/appSessions.ts`,
+   * which also sends `game_abandoned`). Leave it out in tests.
    */
   analytics?: GameAnalytics;
 }
@@ -73,18 +72,21 @@ export function createGameStore({
   targetPoints,
   rules,
   rng,
+  flow: saved,
   analytics,
 }: GameStoreOptions): GameStore {
   const ctx = { rng };
-  const flow = createMatchFlow(
-    {
-      rules: rules ?? getPreset('portes'),
-      players,
-      ...(targetPoints === undefined ? {} : { targetPoints }),
-    },
-    ctx,
-  );
-  analytics?.gameStarted(flow);
+  const flow =
+    saved ??
+    createMatchFlow(
+      {
+        rules: rules ?? getPreset('portes'),
+        players,
+        ...(targetPoints === undefined ? {} : { targetPoints }),
+      },
+      ctx,
+    );
+  if (!saved) analytics?.gameStarted(flow);
   return createStore<GameStoreState>()((set, get) => ({
     flow,
     lastError: null,

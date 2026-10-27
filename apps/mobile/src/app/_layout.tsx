@@ -5,6 +5,8 @@ import { useUnistyles } from 'react-native-unistyles';
 
 import { useAppAnalytics } from '@/features/analytics/useAppAnalytics';
 import { CrashBoundary } from '@/features/crash/CrashBoundary';
+import { matchSessions } from '@/features/match/appSessions';
+import { useSaveOnBackground } from '@/features/match/useSaveOnBackground';
 import { useLanguageSync } from '@/i18n/useLanguageSync';
 import { crashReporter } from '@/services';
 
@@ -12,6 +14,7 @@ function RootStack() {
   const { theme } = useUnistyles();
   useLanguageSync();
   useAppAnalytics();
+  useSaveOnBackground(matchSessions.saveNow);
 
   return (
     // Gesture Handler needs a root view (the board's drag gesture).
