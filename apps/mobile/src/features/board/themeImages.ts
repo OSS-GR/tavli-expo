@@ -19,4 +19,12 @@ export const THEME_IMAGES: Readonly<Record<string, Readonly<Record<string, numbe
     pointEbony: require('@tavli/themes/walnut-kafeneio/point-ebony.webp'),
     pointBone: require('@tavli/themes/walnut-kafeneio/point-bone.webp'),
   },
+  'olive-inlay': {
+    boardPortrait: require('@tavli/themes/olive-inlay/board-portrait.webp'),
+    shadePortrait: require('@tavli/themes/olive-inlay/shade-portrait.webp'),
+    boardLandscape: require('@tavli/themes/olive-inlay/board-landscape.webp'),
+    shadeLandscape: require('@tavli/themes/olive-inlay/shade-landscape.webp'),
+    pointWenge: require('@tavli/themes/olive-inlay/point-wenge.webp'),
+    pointMahogany: require('@tavli/themes/olive-inlay/point-mahogany.webp'),
+  },
 };

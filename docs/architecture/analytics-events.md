@@ -37,7 +37,7 @@ Every event also carries PostHog's standard properties (`$lib`, `$os_name`, `$os
 | `game_abandoned` | The player starts a new match while a game is not over (in memory or saved). | `mode`; `variant`; `turn`: turn number when they left | `features/match/sessions.ts` (`start`) |
 | `undo_used` | The engine accepted an undo. | none | game store |
 | `resign` | A player resigned the game or the match. | none | game store |
-| `settings_changed` | A setting changed, except the theme. | `key`: the setting name (`sound`, `haptics`, `language`, `autoConfirmMoves`, `showPipCounts`, `boardFlipMode`) | `features/analytics/connect.ts` |
+| `settings_changed` | A setting changed, except the theme. | `key`: the setting name (`sound`, `haptics`, `language`, `autoConfirmMoves`, `showPipCounts`, `boardFlipMode`, `boardTheme`) | `features/analytics/connect.ts` |
 | `theme_changed` | The board theme changed. | `theme`: theme id | `features/analytics/connect.ts` |
 | `tutorial_started` | The tutorial (#128) opens. | `source`: `home` \| `rules` \| `settings` (where it was opened) | `app/tutorial.tsx` through `features/tutorial/tutorialAnalytics.ts` |
 | `tutorial_step` | A lesson of the tutorial is learnt (before **Next**). | `step`: 1–7; `lesson`: lesson id (`move`, `bothDice`, `double`, `makePoint`, `hit`, `enter`, `bearOff`) | same |

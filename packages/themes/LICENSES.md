@@ -19,6 +19,15 @@ The source files are the 2K diffuse JPGs. `tools/walnut-kafeneio/prepare_texture
 | `point-ebony.jpg`                                  | [Flamed Black Veneer](https://polyhaven.com/a/flamed_black_veneer) | Jenelle van Heerden            | CC0 1.0 |
 | `point-bone.jpg`                                   | [White Maple Veneer](https://polyhaven.com/a/white_maple_veneer)   | Jenelle van Heerden            | CC0 1.0 |
 
+The Olive Inlay sources in `tools/olive-inlay/textures/` are copies of the Concept A textures of issue #13 (`docs/design/style/textures/a-*.jpg`, graded by `docs/design/style/src/prepare_textures.py`).
+
+| Graded source in `tools/olive-inlay/textures/` | Poly Haven asset                                                     | Author(s)           | License |
+| ---------------------------------------------- | -------------------------------------------------------------------- | ------------------- | ------- |
+| `field-olive.jpg`                              | [Smoked Walnut Veneer](https://polyhaven.com/a/smoked_walnut_veneer) | Jenelle van Heerden | CC0 1.0 |
+| `frame-olive-streak.jpg`                       | [Smoked Walnut Veneer](https://polyhaven.com/a/smoked_walnut_veneer) | Jenelle van Heerden | CC0 1.0 |
+| `point-wenge.jpg`                              | [Flamed Black Veneer](https://polyhaven.com/a/flamed_black_veneer)   | Jenelle van Heerden | CC0 1.0 |
+| `point-mahogany.jpg`                           | [Sapele Veneer](https://polyhaven.com/a/sapele_veneer)               | Jenelle van Heerden | CC0 1.0 |
+
 ## Theme `walnut-kafeneio`
 
 Each image ships as `name.webp` (@1x), `name@2x.webp` and `name@3x.webp`. All are made by `pnpm --filter @tavli/themes build:assets`.
@@ -32,9 +41,24 @@ Each image ships as `name.webp` (@1x), `name@2x.webp` and `name@3x.webp`. All ar
 | `point-ebony*.webp`                             | Tile for the dark points                                       | `point-ebony.jpg`, resized                                          | CC0 1.0                   |
 | `point-bone*.webp`                              | Tile for the light points                                      | `point-bone.jpg`, resized                                           | CC0 1.0                   |
 
+## Theme `olive-inlay`
+
+Each image ships as `name.webp` (@1x), `name@2x.webp` and `name@3x.webp`. All are made by `pnpm --filter @tavli/themes build:assets -- olive-inlay`.
+
+| Files in `olive-inlay/`                         | What                                                                                    | Made from                                                           | License                   |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------- |
+| `theme.json`                                    | Manifest                                                                                | Our own work                                                        | Project                   |
+| `board-portrait*.webp`, `board-landscape*.webp` | Frame, bar, trays, empty field; dog-tooth banding and meander bands                     | Our own drawing, filled with `field-olive` and `frame-olive-streak` | Project; textures CC0 1.0 |
+| `shade-portrait*.webp`, `shade-landscape*.webp` | Inlaid point cores with maple stringing, and the frame's inner shadow (over the points) | Our own drawing, filled with `point-wenge` and `point-mahogany`     | Project; textures CC0 1.0 |
+| `point-wenge*.webp`                             | Tile for the dark points                                                                | `point-wenge.jpg`, resized                                          | CC0 1.0                   |
+| `point-mahogany*.webp`                          | Tile for the light points                                                               | `point-mahogany.jpg`, resized                                       | CC0 1.0                   |
+| `sounds/*.m4a`                                  | The game sounds                                                                         | Copies of the Walnut Kafeneio sounds (see [Sounds](#sounds))        | CC0 1.0                   |
+
+The meander (Greek key) and the dog-tooth banding are traditional patterns, drawn in code. No maker's design is copied.
+
 ## Previews
 
-`preview/*.png` are renders of the theme made by `tools/preview.mjs`. They are not shipped in the app. Same sources and licenses as the theme.
+`preview/*.png` are renders of the themes made by `tools/preview.mjs`. They are not shipped in the app. Same sources and licenses as the theme.
 
 ## Used outside this package: app icon and splash
 
@@ -60,7 +84,7 @@ All third-party sounds are **CC0 1.0** ([deed](https://creativecommons.org/publi
 | [Casino Audio](https://kenney.nl/assets/casino-audio) 1.1                                                  | Kenney Vleugels (kenney.nl) | CC0 1.0 | `dice-grab-1.ogg`                                                                   |
 | [Music Jingles](https://kenney.nl/assets/music-jingles)                                                    | Kenney Vleugels (kenney.nl) | CC0 1.0 | `jingles_PIZZI10.ogg`, `jingles_STEEL10.ogg`                                        |
 
-### Files in `walnut-kafeneio/sounds/`
+### Files in `walnut-kafeneio/sounds/` (and the same files in `olive-inlay/sounds/`)
 
 Mono AAC (`.m4a`), 44.1 kHz, 64 kbit/s. About 54 KB in total (the limit is 500 KB, checked by `themes.test.ts`).
 

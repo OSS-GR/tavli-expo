@@ -116,6 +116,24 @@ describe('sanitizeSettings', () => {
   });
 });
 
+describe('boardTheme', () => {
+  it('starts with the default board and saves a bundled one', () => {
+    const storage = createMemoryStorage();
+    const store = createSettingsStore(storage);
+    expect(store.getState().boardTheme).toBe('walnut-kafeneio');
+
+    store.getState().setSetting('boardTheme', 'olive-inlay');
+    expect(createSettingsStore(storage).getState().boardTheme).toBe('olive-inlay');
+  });
+
+  it('falls back to the default board for an unknown or missing id', () => {
+    expect(sanitizeSettings({ boardTheme: 'no-such-board' }).boardTheme).toBe('walnut-kafeneio');
+    expect(sanitizeSettings({ boardTheme: 7 }).boardTheme).toBe('walnut-kafeneio');
+    // A save from before the board picker keeps its other values.
+    expect(sanitizeSettings({ sound: false })).toEqual({ ...DEFAULT_SETTINGS, sound: false });
+  });
+});
+
 describe('migrateSettings', () => {
   it('keeps valid values from any version', () => {
     expect(migrateSettings({ language: 'en' }, 0)).toEqual({ ...DEFAULT_SETTINGS, language: 'en' });

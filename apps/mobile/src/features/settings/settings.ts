@@ -11,6 +11,7 @@
  *    and add a step in `migrateSettings`.
  */
 import type { Storage } from '@tavli/contracts';
+import { DEFAULT_THEME_ID as DEFAULT_BOARD_THEME_ID, hasTheme } from '@tavli/themes';
 import { DEFAULT_THEME_ID, isThemeId, type ThemeId } from '@tavli/ui';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { createStore } from 'zustand/vanilla';
@@ -35,7 +36,10 @@ export interface Settings {
   autoConfirmMoves: boolean;
   showPipCounts: boolean;
   boardFlipMode: BoardFlipMode;
+  /** The app colors (`@tavli/ui`). */
   theme: ThemeId;
+  /** The board theme (`@tavli/themes`): the game, the tutorial and the rules pictures use it. */
+  boardTheme: string;
 }
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
@@ -46,6 +50,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   showPipCounts: true,
   boardFlipMode: 'flip',
   theme: DEFAULT_THEME_ID,
+  boardTheme: DEFAULT_BOARD_THEME_ID,
 };
 
 /** Raise this when the saved shape changes, and add a step to `migrateSettings`. */
@@ -87,6 +92,10 @@ export function sanitizeSettings(raw: unknown): Settings {
     showPipCounts: bool(input['showPipCounts'], d.showPipCounts),
     boardFlipMode: oneOf(BOARD_FLIP_MODES, input['boardFlipMode'], d.boardFlipMode),
     theme: isThemeId(input['theme']) ? input['theme'] : d.theme,
+    boardTheme:
+      typeof input['boardTheme'] === 'string' && hasTheme(input['boardTheme'])
+        ? input['boardTheme']
+        : d.boardTheme,
   };
 }
 
@@ -123,6 +132,7 @@ function pickSettings(state: SettingsState): Settings {
     showPipCounts: state.showPipCounts,
     boardFlipMode: state.boardFlipMode,
     theme: state.theme,
+    boardTheme: state.boardTheme,
   };
 }
 

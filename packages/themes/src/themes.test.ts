@@ -84,7 +84,35 @@ const outlineColors = (theme: ThemeManifest, side: 'light' | 'dark'): string[] =
 describe('theme registry', () => {
   it('lists the bundled themes and has a valid default', () => {
     expect(listThemeIds()).toContain('walnut-kafeneio');
+    expect(listThemeIds()).toContain('olive-inlay');
     expect(listThemeIds()).toContain(DEFAULT_THEME_ID);
+  });
+
+  it('gives every theme the geometry contract of the default theme', () => {
+    // The app, the hit test and the tutorial pictures rely on one board shape.
+    // A theme changes the art, not where points, bar, trays and dice are.
+    const base = getTheme(DEFAULT_THEME_ID);
+    const contract = (l: BoardLayout) => ({
+      orientation: l.orientation,
+      aspectRatio: l.aspectRatio,
+      referenceSize: l.referenceSize,
+      fields: l.fields,
+      points: l.points.map(({ index, rect, base: side }) => ({ index, rect, side })),
+      bar: l.bar,
+      trays: l.trays,
+      diceArea: l.diceArea,
+      checker: l.checker,
+      dice: l.dice,
+      depth: l.pointShape.depth,
+      baseInset: l.pointShape.baseInset,
+    });
+    for (const id of listThemeIds()) {
+      for (const layoutId of LAYOUT_IDS) {
+        expect(contract(getTheme(id).layouts[layoutId]), `${id} ${layoutId}`).toEqual(
+          contract(base.layouts[layoutId]),
+        );
+      }
+    }
   });
 
   it('throws for an unknown theme', () => {
@@ -190,17 +218,48 @@ for (const id of listThemeIds()) {
         });
       }
 
-      it(`${side} checker fill vs the field is at least 3:1`, () => {
-        expect(
-          contrastRatio(theme.checkers[side].fill, p['board.field'] as string),
-        ).toBeGreaterThanOrEqual(3);
+      it(`${side} checker vs the field is at least 3:1 (fill or outline)`, () => {
+        // A light field (Olive Inlay) and a cream checker are close in fill.
+        // Then the dark rim carries the contrast, as on points (palette.md).
+        const field = p['board.field'] as string;
+        const best = Math.max(...outlineColors(theme, side).map((c) => contrastRatio(c, field)));
+        expect(best).toBeGreaterThanOrEqual(3);
+      });
+
+      it(`${side} checker outline is wide enough to carry the contrast`, () => {
+        // The rim and the ring are what you see when the fill is close to the wood.
+        const s = theme.checkers[side];
+        expect(s.rim.width).toBeGreaterThanOrEqual(0.05);
+        if (s.ring) expect(s.ring.width).toBeGreaterThanOrEqual(0.05);
       });
     }
+
+    it('has one checker fill at least 3:1 from the field', () => {
+      // One of the two checkers must stand out by its fill alone.
+      const field = p['board.field'] as string;
+      const best = Math.max(
+        contrastRatio(theme.checkers.light.fill, field),
+        contrastRatio(theme.checkers.dark.fill, field),
+      );
+      expect(best).toBeGreaterThanOrEqual(3);
+    });
 
     it('highlights stand out from their halo by at least 3:1', () => {
       const { select, target } = theme.highlights;
       expect(contrastRatio(select.color, select.halo.color)).toBeGreaterThanOrEqual(3);
       expect(contrastRatio(target.color, target.halo.color)).toBeGreaterThanOrEqual(3);
+    });
+
+    it('text colors are at least 4.5:1 on their background', () => {
+      // The count badge number, and the UI text tokens on the UI background.
+      const { badge } = theme.checkers;
+      expect(contrastRatio(badge.text, badge.fill)).toBeGreaterThanOrEqual(4.5);
+      const bg = p['ui.bg'] as string;
+      for (const token of ['ui.text', 'ui.textDim']) {
+        const color = p[token];
+        if (color !== undefined)
+          expect(contrastRatio(color, bg), token).toBeGreaterThanOrEqual(4.5);
+      }
     });
 
     it('dice pips stand out from the face by at least 3:1', () => {
