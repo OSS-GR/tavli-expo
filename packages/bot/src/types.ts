@@ -142,7 +142,7 @@ export interface BotRegistry {
   readonly variants?: VariantRegistry;
   /**
    * Evaluators by variant and level. Default: `DEFAULT_EVALUATORS` (the
-   * Portes heuristic for easy and medium).
+   * Portes heuristic for easy and medium), for the variants in `variants`.
    */
   readonly evaluators?: EvaluatorRegistry;
   /** Override the noise of a level. Default: `DEFAULT_LEVEL_POLICIES`. */

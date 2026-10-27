@@ -196,7 +196,10 @@ function checkPolicies(policies: Readonly<Record<Difficulty, LevelPolicy>>): voi
  */
 export function createBot(registry: BotRegistry = {}): ConfiguredBot {
   const variants = registry.variants ?? VARIANT_REGISTRY;
-  const evaluators = registry.evaluators ?? DEFAULT_EVALUATORS;
+  // The defaults only cover the variants this bot knows (a custom registry may lack Portes).
+  const evaluators =
+    registry.evaluators ??
+    new Map([...DEFAULT_EVALUATORS].filter(([variantId]) => variants.has(variantId)));
   const policies = { ...DEFAULT_LEVEL_POLICIES, ...registry.policies };
   checkRegistry(variants, evaluators);
   checkPolicies(policies);
@@ -218,20 +221,22 @@ export function createBot(registry: BotRegistry = {}): ConfiguredBot {
       // `legalTurns` throws ILLEGAL_TURN on a finished game, and never returns an empty list.
       const turns = variant.legalTurns(state, dice);
       if (level === 'random') return chooseRandomTurn(turns, opts.rng);
-      if (turns.length === 1) return pickOne(opts.rng, turns);
 
-      const rolled: GameState = { ...state, dice };
       const evaluator = evaluators.get(state.variant)?.[level];
-      if (evaluator === undefined) {
-        if (level === 'easy') {
-          // No evaluator yet: random, but never miss a win.
-          const scores = scoreWithEngine(variant, undefined, rolled, turns);
-          return pickTurn(turns, scores, Infinity, opts.rng);
-        }
+      // Check this before the forced-turn shortcut, so a missing level fails on every turn.
+      if (evaluator === undefined && level !== 'easy') {
         throw new BotError(
           'NOT_IMPLEMENTED',
           `no ${level} bot for "${state.variant}" yet (no evaluator registered)`,
         );
+      }
+      if (turns.length === 1) return pickOne(opts.rng, turns);
+
+      const rolled: GameState = { ...state, dice };
+      if (evaluator === undefined) {
+        // Easy with no evaluator yet: random, but never miss a win.
+        const scores = scoreWithEngine(variant, undefined, rolled, turns);
+        return pickTurn(turns, scores, Infinity, opts.rng);
       }
       const scores = scoreTurns(variant, evaluator, rolled, turns);
       return pickTurn(turns, scores, policies[level].temperature, opts.rng);

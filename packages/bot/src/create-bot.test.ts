@@ -258,7 +258,8 @@ describe('a win now is never missed', () => {
     }
   });
 
-  it('easy wins at once in every position where it can', () => {
+  // Slow: it plays medium games to find the positions. A long timeout keeps it safe on busy CI.
+  it('easy wins at once in every position where it can', { timeout: 30_000 }, () => {
     // Collect end-game positions where some turns win and some do not.
     const rng = createSeededRng(99);
     const finder = createBot();
@@ -320,6 +321,10 @@ describe('registry', () => {
     expect(() => bot.chooseTurn(start, [3, 1], 'hard', { rng: createSeededRng(1) })).toThrow(
       expect.objectContaining({ name: 'BotError', code: 'NOT_IMPLEMENTED' }),
     );
+    // Also on a forced turn (here a pass), so a game cannot start and then fail later.
+    expect(() => bot.chooseTurn(blocked, [6, 5], 'hard', { rng: createSeededRng(1) })).toThrow(
+      expect.objectContaining({ code: 'NOT_IMPLEMENTED' }),
+    );
     const bare = createBot({ evaluators: EMPTY_EVALUATOR_REGISTRY });
     expect(() => bare.chooseTurn(start, [3, 1], 'medium', { rng: createSeededRng(1) })).toThrow(
       BotError,
@@ -353,7 +358,9 @@ describe('registry', () => {
     );
     expect(() => createBot({ policies: { medium: { temperature: NaN } } })).toThrow(BotError);
     // A custom variant registry is used for the lookup.
-    const bot = createBot({ variants: createVariantRegistry([]), evaluators: new Map() });
+    // The default evaluators skip variants the custom registry does not have.
+    const bot = createBot({ variants: createVariantRegistry([]) });
+    expect(bot.supportedLevels('portes')).toEqual([]);
     expect(() => bot.chooseTurn(start, [1, 2], 'easy', { rng: createSeededRng(1) })).toThrow(
       expect.objectContaining({ code: 'UNKNOWN_VARIANT' }),
     );
