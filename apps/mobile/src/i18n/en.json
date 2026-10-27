@@ -620,6 +620,62 @@
         "hint": "Tap a lit checker, then tap the ring in the tray.",
         "done": "All 15 are off. You win the game!",
         "board": "Board. All your checkers are home. The last two are on points 6 and 4, and lit. Dice 6 and 4."
+      },
+      "pin": {
+        "title": "Pin a lone checker",
+        "body": "There is no hitting in Plakoto. Land on a lone dark checker and you pin it: your checker sits on top. Move the lit checker onto the dark checker on point 9.",
+        "hint": "Move the lit checker 4 points, onto the dark checker.",
+        "done": "Pinned! The dark checker stays under yours and cannot move. There is no bar in Plakoto.",
+        "board": "Board. Your checker on point 13 is lit. Your opponent has a lone checker on point 9. Dice 4 and 2."
+      },
+      "pinned": {
+        "title": "A pinned checker waits",
+        "body": "Your checker on point 16 is pinned under a dark checker. It cannot move until all checkers on top of it have left. Move the lit checker instead, with both dice.",
+        "hint": "Your checker on point 16 is pinned and cannot move. Move the lit checker.",
+        "done": "Good. Your checker on point 16 is free again once the dark checker leaves.",
+        "board": "Board. Your checker on point 16 is pinned. Your checker on point 13 is lit. Dice 5 and 2."
+      },
+      "mother": {
+        "title": "The mother (μάνα)",
+        "body": "A player's mother is their last checker on their start point, point 24. Your opponent's mother sits alone on your point 1. Pin it with the lit checker.",
+        "hint": "Move the lit checker 4 points, onto point 1.",
+        "done": "You pinned the mother! Now your opponent must choose.",
+        "board": "Board. Your checker on point 5 is lit. Your opponent's last checker sits alone on its start, your point 1. Dice 4 and 3."
+      },
+      "plakotoBearOff": {
+        "title": "Bear off",
+        "body": "You bear off as in Portes, once all your checkers are home. In Plakoto, none of your checkers may be pinned. Bear off your last two checkers.",
+        "hint": "Tap a lit checker, then tap the ring in the tray.",
+        "done": "All 15 are off. You win the game!",
+        "board": "Board. All your checkers are home and none is pinned. The last two are on points 5 and 3, and lit. Dice 5 and 3."
+      },
+      "sameWay": {
+        "title": "The same way round",
+        "body": "Each player starts with all 15 checkers on point 24. The two stacks sit in opposite corners: the dark stack is on your point 12. Both players move the same way round the board. Move your first checker with both dice.",
+        "hint": "Move one checker from point 24, then move the same checker again.",
+        "done": "Off it runs! The dark checkers run the same way, from your point 12.",
+        "board": "Board. Your 15 checkers are on point 24, and lit. The dark stack is on your point 12. Dice 5 and 3."
+      },
+      "holdPoint": {
+        "title": "One checker holds a point",
+        "body": "There is no hitting and no pinning in Fevga. One checker is enough to hold a point: the other player can never land there. Move the lit checker with both dice.",
+        "hint": "The 4 lands on the dark checker on point 6. Play the 3 first, then the 4.",
+        "done": "Right. The lone dark checker blocked the 4, so you went round it.",
+        "board": "Board. Your checker on point 10 is lit. A lone dark checker holds point 6. Dice 4 and 3."
+      },
+      "runner": {
+        "title": "The first checker",
+        "body": "No other checker may leave point 24 until your first checker has passed your opponent's mother, on your point 12. Move it past with the 2. Then move a checker from point 24 with the 1.",
+        "hint": "First the lit checker, from 13 to 11 with the 2. Then a checker from 24, with the 1.",
+        "done": "Your first checker passed the dark stack, so all your checkers may move now.",
+        "board": "Board. Your first checker, on point 13, is lit. 14 checkers wait on point 24. The dark stack is on your point 12. Dice 2 and 1."
+      },
+      "sixInARow": {
+        "title": "Six in a row (εξάπορτο)",
+        "body": "You may not hold all six of your points 19 to 24 at the end of your turn. Here a 5 from point 24 would do that, and every other way to play both dice is blocked. So you play one die, the higher one: move the lit checker with the 6.",
+        "hint": "A 5 from point 24 makes six in a row. Move the lit checker with the 6.",
+        "done": "The 5 is lost. Six in a row is not allowed on your points 6 to 11 either, right in front of your opponent's mother.",
+        "board": "Board. You hold points 20 to 24. Your checker on point 8 is lit. The dark checkers hold points 13 to 18. Dice 6 and 5."
       }
     },
     "end": {
@@ -627,6 +683,28 @@
       "body": "Now play a real game of Portes against the Easy bot. The rules page has the rest.",
       "play": "Play your first game",
       "home": "Home"
+    },
+    "games": {
+      "plakoto": {
+        "title": "Learn Plakoto",
+        "skipHint": "Leave the lesson. You can open it again from the Plakoto rules page.",
+        "endTitle": "You know Plakoto!",
+        "endBody": "Now play a game of Plakoto against the Easy bot. The rules page has the rest.",
+        "play": "Play Plakoto"
+      },
+      "fevga": {
+        "title": "Learn Fevga",
+        "skipHint": "Leave the lesson. You can open it again from the Fevga rules page.",
+        "endTitle": "You know Fevga!",
+        "endBody": "Now play a game of Fevga against the Easy bot. The rules page has the rest.",
+        "play": "Play Fevga"
+      }
+    },
+    "motherCard": {
+      "title": "Your opponent's mother is pinned",
+      "body": "At the end of your turn, they see this card. If your mother is pinned, you get the same choice.",
+      "resigned": "Resign: you win 2 points and the game ends.",
+      "playedOn": "Play on: the game goes on. Their mother stays pinned until you leave it, and they cannot bear off."
     }
   }
 }
