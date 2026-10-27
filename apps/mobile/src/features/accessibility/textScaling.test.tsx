@@ -1,7 +1,7 @@
 /**
  * Large system fonts (#134): Home, New game, the game screen, the end
- * screens, History (#142) and the tutorial's mother card (#149) follow the
- * font size with no cut text. Jest
+ * screens, History (#142), the tutorial's mother card (#149) and the
+ * Settings game picker (#159) follow the font size with no cut text. Jest
  * cannot measure text, so `textScalingProblems` checks the layout rules
  * that keep text whole (see `test/textScaling.ts`), in English and in Greek.
  */
@@ -19,6 +19,7 @@ import { MatchEndScreen } from '@/features/match/MatchEndScreen';
 import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
+import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { settingsStore } from '@/features/settings/store';
 import { TutorialScreen } from '@/features/tutorial/TutorialScreen';
 import i18n from '@/i18n';
@@ -70,6 +71,15 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       await playLessonByTaps(i, 'plakoto');
     }
     expect(screen.getByTestId('tutorial-mother-card')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
+
+  it('Settings: the "Learn to play" game picker (#159)', async () => {
+    await renderWithRoot(<SettingsScreen onLearnToPlay={jest.fn()} />);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('settings-learn-to-play'));
+    });
+    expect(screen.getByTestId('tutorial-picker')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   });
 

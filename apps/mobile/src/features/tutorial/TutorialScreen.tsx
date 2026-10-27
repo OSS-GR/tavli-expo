@@ -1,7 +1,8 @@
 /**
  * The tutorial on the real board (`InteractiveBoard`), with fixed
  * positions and fixed dice: seven short lessons in Portes (#128, the
- * first-run tutorial), or four in Plakoto or Fevga (#149, `game`).
+ * first-run tutorial), or four in Plakoto or Fevga (#149) or Asodio (#159,
+ * `game`).
  *
  * Each lesson has one line of text, a ring on the checker to touch and,
  * after the checker is picked, the target ring. A wrong touch shakes the
@@ -10,7 +11,8 @@
  * With the move list on (a screen reader, or Settings), each lesson can
  * be played from its buttons too; they offer only the lesson's moves.
  * The Plakoto mother lesson ends with the "resign or play on" card
- * (`MotherLessonCard`) over the board.
+ * (`MotherLessonCard`) over the board. In Asodio the board marks the
+ * checkers the quarter lock freezes, as in a real game.
  *
  * The lessons and their rules live in `lessons.ts`; the engine decides
  * what is legal. This screen only shows them. The route sends analytics
@@ -38,6 +40,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { MoveList } from '@/features/accessibility/MoveList';
 import { useMoveListShown } from '@/features/accessibility/screenReader';
+import { asodioMarks } from '@/features/board/asodio';
 import { useBoardTheme } from '@/features/board/BoardCanvas';
 import type { BoardView } from '@/features/board/boardModel';
 import { DiceRow } from '@/features/board/DiceRow';
@@ -228,6 +231,9 @@ export function TutorialScreen({
   // Plakoto: the "resign or play on" card after the mother is pinned.
   const motherCard = done && lesson.id === 'mother';
   const legal = lessonMoves(lesson, flow);
+  const board = currentBoard(flow);
+  // Asodio: the frozen checkers look darker. Other games have no marks.
+  const marks = asodioMarks(board, flow.state.rules, view);
 
   return (
     <View testID="tutorial-screen" style={styles.screen}>
@@ -277,7 +283,7 @@ export function TutorialScreen({
             testID="tutorial-board"
             accessibilityLabel={t(`tutorial.lessons.${lesson.id}.board`)}
             theme={theme}
-            board={currentBoard(flow)}
+            board={board}
             view={view}
             mover="white"
             legal={legal}
@@ -290,6 +296,7 @@ export function TutorialScreen({
             onIllegalDrop={showWrong}
             onPickUp={() => feedback.event('checkerPickUp')}
             onGeometry={onGeometry}
+            marks={marks}
             cue
           />
         </View>

@@ -12,6 +12,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { TUTORIAL_GAMES } from '@/features/match/routes';
 
 import {
   RULES_PAGES,
@@ -32,15 +33,15 @@ export interface RulesScreenProps {
   /** Opens the page of one game (links on the Tavli page). */
   onOpenRules: (game: RulesGame) => void;
   /**
-   * Opens the lessons of a game: Portes (#128), Plakoto or Fevga (#149).
-   * Shown on those three pages.
+   * Opens the lessons of a game: Portes (#128), Plakoto or Fevga (#149),
+   * Asodio (#159). Shown on those four pages, not on the Tavli page.
    */
   onLearnToPlay?: (game: TutorialGame) => void;
 }
 
-/** The rules pages that have lessons on the board. */
+/** The rules pages that have lessons on the board: every game, not the Tavli match. */
 function tutorialGameOf(variant: RulesVariant | null): TutorialGame | null {
-  return variant === 'portes' || variant === 'plakoto' || variant === 'fevga' ? variant : null;
+  return TUTORIAL_GAMES.find((game) => game === variant) ?? null;
 }
 
 export function RulesScreen({ variant, onOpenRules, onLearnToPlay }: RulesScreenProps) {

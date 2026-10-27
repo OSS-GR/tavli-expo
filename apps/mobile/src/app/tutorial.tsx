@@ -1,8 +1,8 @@
 /**
- * The tutorial: `/tutorial?from=home|rules|settings&game=portes|plakoto|fevga`.
- * `game` picks the lesson set (#149); the default is Portes, the first-run
- * tutorial (#128). Saves "done" or "dismissed" for that set and sends the
- * tutorial events.
+ * The tutorial: `/tutorial?from=home|rules|settings&game=portes|plakoto|fevga|asodio`.
+ * `game` picks the lesson set (#149, #159); the default is Portes, the
+ * first-run tutorial (#128). Saves "done" or "dismissed" for that set and
+ * sends the tutorial events.
  */
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';

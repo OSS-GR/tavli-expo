@@ -1,6 +1,7 @@
 /**
  * A bottom sheet over a dimmed screen (wireframes 7 and 13). A tap on the
- * dimmed part, or the Android back button, calls `onClose`.
+ * dimmed part, or the Android back button, calls `onClose`. The sheet is
+ * never taller than the screen: put long content in a `ScrollView`.
  */
 import type { ReactNode } from 'react';
 import { Modal, Pressable, View } from 'react-native';
@@ -53,6 +54,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     opacity: 0.7,
   },
   sheet: (look: 'sheet' | 'dialog') => ({
+    flexShrink: 1,
     gap: theme.space.sm,
     padding: theme.space.xl,
     paddingBottom: look === 'sheet' ? rt.insets.bottom + theme.space.lg : theme.space.xl,

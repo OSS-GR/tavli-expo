@@ -16,8 +16,8 @@ export function newGameHref(mode: MatchMode) {
 
 /**
  * New game vs bot for the first game after the tutorial (#128): the game
- * of the lessons (Portes: `first=1`; Plakoto, Fevga: `first=plakoto`, #149)
- * vs the Easy bot, whatever was chosen last time.
+ * of the lessons (Portes: `first=1`; the others by name, `first=plakoto`,
+ * #149, #159) vs the Easy bot, whatever was chosen last time.
  */
 export function firstGameHref(game: TutorialGame = 'portes') {
   return {
@@ -28,7 +28,7 @@ export function firstGameHref(game: TutorialGame = 'portes') {
 
 /**
  * The tutorial, opened from Home, a rules page or Settings (#128).
- * `game` picks the lesson set (#149); Portes, the default, has no param.
+ * `game` picks the lesson set (#149, #159); Portes, the default, has no param.
  */
 export function tutorialHref(from: TutorialSource, game: TutorialGame = 'portes') {
   return game === 'portes'
@@ -63,7 +63,8 @@ export function parseIdParam(value: Param): string | null {
   return typeof id === 'string' && id.length > 0 ? id : null;
 }
 
-const TUTORIAL_GAMES: readonly TutorialGame[] = ['portes', 'plakoto', 'fevga'];
+/** Every lesson set, in the order Settings lists them (#159). */
+export const TUTORIAL_GAMES: readonly TutorialGame[] = ['portes', 'plakoto', 'fevga', 'asodio'];
 
 /**
  * The `first` param of the new-game screen: the first game after the
@@ -76,7 +77,7 @@ export function parseFirstGameParam(value: Param): TutorialGame | null {
   return TUTORIAL_GAMES.find((g) => g === game && g !== 'portes') ?? null;
 }
 
-/** The `game` param of the tutorial (#149). Anything else is Portes. */
+/** The `game` param of the tutorial (#149, #159). Anything else is Portes. */
 export function parseTutorialGame(value: Param): TutorialGame {
   const game = first(value);
   return TUTORIAL_GAMES.find((g) => g === game) ?? 'portes';

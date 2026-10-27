@@ -142,8 +142,8 @@ describe('<RulesScreen />', () => {
     }
   });
 
-  it.each(['portes', 'plakoto', 'fevga'] as const)(
-    'offers the lessons of %s on its page (#128, #149)',
+  it.each(['portes', 'plakoto', 'fevga', 'asodio'] as const)(
+    'offers the lessons of %s on its page (#128, #149, #159)',
     async (game) => {
       const onLearnToPlay = jest.fn();
       await render(
@@ -156,7 +156,7 @@ describe('<RulesScreen />', () => {
     },
   );
 
-  it.each(['tavli', 'asodio'] as const)('has no lessons on the %s page', async (variant) => {
+  it.each(['tavli'] as const)('has no lessons on the %s page', async (variant) => {
     await render(
       <RulesScreen variant={variant} onOpenRules={jest.fn()} onLearnToPlay={jest.fn()} />,
     );

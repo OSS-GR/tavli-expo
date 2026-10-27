@@ -8,14 +8,22 @@
  * moves it: `jest.advanceTimersByTime`, `waitFor` (it moves the fake clock
  * while it waits) or the small waits of `setupUser()`.
  */
-import { userEvent } from '@testing-library/react-native';
+import { cleanup, userEvent } from '@testing-library/react-native';
 
-/** Call once at the top of a test file: every test in it runs on fake timers. */
+/**
+ * Call once at the top of a test file (or of a `describe`): every test in
+ * it runs on fake timers.
+ *
+ * The screen is unmounted while the clock is still fake. A `renderRouter`
+ * tree unmounted after the switch back to real timers never stops: the
+ * test passes, but Jest hangs at 100% CPU (#159).
+ */
 export function runOnFakeTimers(): void {
   beforeEach(() => {
     jest.useFakeTimers();
   });
-  afterEach(() => {
+  afterEach(async () => {
+    await cleanup();
     jest.useRealTimers();
   });
 }

@@ -33,8 +33,11 @@ export type GameResultKind = 'mono' | 'diplo' | 'resign' | 'draw';
 /** Where the tutorial was opened: the Home card, a rules page, or Settings. */
 export type TutorialSource = 'home' | 'rules' | 'settings';
 
-/** Which lesson set of the tutorial: Portes (the first-run tutorial), Plakoto or Fevga (#149). */
-export type TutorialGame = 'portes' | 'plakoto' | 'fevga';
+/**
+ * Which lesson set of the tutorial: Portes (the first-run tutorial),
+ * Plakoto or Fevga (#149), or Asodio (#159).
+ */
+export type TutorialGame = 'portes' | 'plakoto' | 'fevga' | 'asodio';
 
 /** Every event and its properties. Property values are short strings, numbers or booleans. */
 export interface AnalyticsEvents {

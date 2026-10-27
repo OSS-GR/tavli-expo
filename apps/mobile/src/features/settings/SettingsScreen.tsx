@@ -1,3 +1,4 @@
+import type { TutorialGame } from '@tavli/contracts';
 import { THEME_IDS } from '@tavli/ui';
 import Constants from 'expo-constants';
 import { useLocales } from 'expo-localization';
@@ -12,6 +13,7 @@ import { ToggleRow } from '@/components/settings/ToggleRow';
 import { HistorySettings } from '@/features/history/HistorySettings';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
+import { TutorialSettings } from '@/features/tutorial/TutorialSettings';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
 
 import { BoardThemePicker } from './BoardThemePicker';
@@ -27,8 +29,12 @@ type BoardViewOption = BoardFlipMode | 'faceToFace';
  * data answer in the consent store, not in Settings.
  */
 export interface SettingsScreenProps {
-  /** Opens the tutorial (#128). The Help section shows only with it. */
-  onLearnToPlay?: () => void;
+  /**
+   * Opens the lessons of a game (#128, #159): "Learn to play" lets the
+   * player pick Portes, Plakoto, Fevga or Asodio. The Help section shows
+   * only with it.
+   */
+  onLearnToPlay?: (game: TutorialGame) => void;
   /** Opens the match history (#142). The History section shows only with it. */
   onHistory?: () => void;
 }
@@ -180,13 +186,7 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
 
       {onLearnToPlay ? (
         <SettingsSection title={t('settings.sections.help')}>
-          <Pressable
-            testID="settings-learn-to-play"
-            accessibilityRole="button"
-            onPress={onLearnToPlay}
-            style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
-            <Text style={styles.linkText}>{`${t('settings.learnToPlay')} ›`}</Text>
-          </Pressable>
+          <TutorialSettings onOpen={onLearnToPlay} />
         </SettingsSection>
       ) : null}
 

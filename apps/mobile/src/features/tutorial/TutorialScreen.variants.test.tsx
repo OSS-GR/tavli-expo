@@ -1,4 +1,7 @@
-/** The Plakoto and Fevga lessons (#149) on the screen: taps, the move list, the mother card. */
+/**
+ * The Plakoto and Fevga (#149) and Asodio (#159) lessons on the screen:
+ * taps, the move list, the mother card, the Asodio hints.
+ */
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 
 import { moveChoices, moveLabel } from '@/features/accessibility/moveList';
@@ -43,6 +46,7 @@ const press = async (testID: string) => {
 const GAMES = [
   ['plakoto', 'Learn Plakoto', 'You know Plakoto!', 'Play Plakoto'],
   ['fevga', 'Learn Fevga', 'You know Fevga!', 'Play Fevga'],
+  ['asodio', 'Learn Asodio', 'You know Asodio!', 'Play Asodio'],
 ] as const;
 
 beforeEach(async () => {
@@ -52,7 +56,7 @@ beforeEach(async () => {
   });
 });
 
-describe('<TutorialScreen game="plakoto|fevga" />', () => {
+describe('<TutorialScreen game="plakoto|fevga|asodio" />', () => {
   it.each(GAMES)(
     'runs the %s lessons to the end with taps only',
     async (game, title, end, play) => {
@@ -179,10 +183,41 @@ describe('<TutorialScreen game="plakoto|fevga" />', () => {
     const props = await open('fevga');
     expect(screen.getByRole('button', { name: 'Skip' })).toHaveProp(
       'accessibilityHint',
-      'Leave the lesson. You can open it again from the Fevga rules page.',
+      'Leave the lesson. You can open it again from Settings or the Fevga rules page.',
     );
     await press('tutorial-skip');
     expect(props.onSkip).toHaveBeenLastCalledWith(1, 'sameWay');
+  });
+
+  it('names the Asodio entries in the move list', async () => {
+    await act(async () => {
+      settingsStore.setState({ ...DEFAULT_SETTINGS, moveList: 'on' });
+    });
+    await open('asodio');
+    const list = within(screen.getByTestId('tutorial-move-list'));
+    expect(list.getAllByRole('button')).toHaveLength(2);
+    expect(list.getByRole('button', { name: 'Enter on point 24' })).toBeOnTheScreen();
+    expect(list.getByRole('button', { name: 'Enter on point 23' })).toBeOnTheScreen();
+  });
+
+  it('shows the hint when a frozen Asodio checker is touched', async () => {
+    await open('asodio');
+    for (let i = 0; i < 2; i++) {
+      await playLessonByTaps(i, 'asodio');
+      await press('tutorial-next');
+    }
+    expect(screen.getByTestId('tutorial-board')).toHaveAccessibleName(
+      'Board. Your last checker, on point 20, is lit. Your other 14 checkers are on points 14 to 18, frozen. Dice 4 and 3.',
+    );
+    await tapWrongPlace(18);
+    expect(screen.getByTestId('tutorial-hint')).toHaveTextContent(
+      'The darker checkers are frozen. First move the lit checker on point 20.',
+    );
+    // The last checker joins the others; then the army moves on.
+    await playLessonByTaps(2, 'asodio');
+    expect(screen.getByTestId('tutorial-success')).toHaveTextContent(
+      'All 15 were in one quarter again, so your army could move on. Your last checker sets the pace.',
+    );
   });
 
   it('speaks Greek', async () => {

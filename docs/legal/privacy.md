@@ -88,7 +88,7 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Resign | You resigned a game or a match |
 | Setting changed | You changed a setting. Includes the setting's name only, not its value |
 | Theme changed | You picked another board theme. Includes the theme's name |
-| Tutorial started | You opened the tutorial. Includes where you opened it from (home, rules or settings) and its game (Portes, Plakoto or Fevga) |
+| Tutorial started | You opened the tutorial. Includes where you opened it from (home, rules or settings) and its game (Portes, Plakoto, Fevga or Asodio) |
 | Tutorial step | You finished a lesson of the tutorial. Includes the game, and the lesson's number and name (for example "hit") |
 | Tutorial finished | You finished the last lesson of the tutorial. Includes the game |
 | Tutorial skipped | You tapped Skip in the tutorial. Includes the game, and the lesson's number and name on screen |

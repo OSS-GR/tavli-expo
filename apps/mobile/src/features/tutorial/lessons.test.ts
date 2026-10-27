@@ -1,4 +1,13 @@
-import { currentBoard, formatMove, getPreset, legalNextMoves, type GameFlow } from '@tavli/engine';
+import {
+  DEFAULT_PRESET_BY_GAME,
+  currentBoard,
+  formatMove,
+  getPreset,
+  legalNextMoves,
+  type GameFlow,
+} from '@tavli/engine';
+
+import { armyFrozen, frozenPoints } from '@/features/board/asodio';
 
 import {
   LESSONS,
@@ -59,7 +68,7 @@ describe('tutorial lessons', () => {
     ]);
   });
 
-  it('has four lessons each for Plakoto and Fevga (#149), with ids unique over all games', () => {
+  it('has four lessons each for Plakoto, Fevga (#149) and Asodio (#159), with ids unique over all games', () => {
     expect(LESSON_SETS.portes).toBe(LESSONS);
     expect(LESSON_SETS.plakoto.map((l) => l.id)).toEqual([
       'pin',
@@ -72,6 +81,12 @@ describe('tutorial lessons', () => {
       'holdPoint',
       'runner',
       'sixInARow',
+    ]);
+    expect(LESSON_SETS.asodio.map((l) => l.id)).toEqual([
+      'aceDeuce',
+      'enterAll',
+      'quarterLock',
+      'pinLast',
     ]);
     const ids = ALL_LESSONS.map((l) => l.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -86,8 +101,9 @@ describe('tutorial lessons', () => {
       const flow = startLesson(lesson(id));
       const { game } = lesson(id);
       expect(flow.state.variant).toBe(game);
-      // The app's default preset: Plakoto offerConcede, Fevga runner rule and bans.
-      expect(flow.state.rules).toEqual(getPreset(game));
+      // The app's default preset: Plakoto offerConcede, Fevga runner rule
+      // and bans, Asodio the owner version (asodio.kafeneio).
+      expect(flow.state.rules).toEqual(getPreset(DEFAULT_PRESET_BY_GAME[game]));
       expect(flow.phase).toBe('moving');
       expect(flow.state.toMove).toBe('white');
       expect(flow.state.dice).toEqual(lesson(id).dice);
@@ -226,5 +242,70 @@ describe('Fevga lessons (#149)', () => {
     const { flow: end } = playThrough('sixInARow');
     expect(end.phase).toBe('awaiting-confirm');
     expect(currentBoard(end).points[18]?.white).toBe(0);
+  });
+});
+
+describe('Asodio lessons (#159, owner version)', () => {
+  it('plays in the owner preset: loading lock, quarter lock, pins', () => {
+    const { rules } = startLesson(lesson('aceDeuce')).state;
+    expect(rules.presetId).toBe('asodio.kafeneio');
+    expect(rules.entry.firstEntryGate).toBe(true);
+    expect(rules.entry.moveWhileLoading).toBe(false);
+    expect(rules.quarters.quarterLock).toBe(true);
+    expect(rules.capture.captureMode).toBe('pin');
+  });
+
+  it('1: all 15 wait off the board; the 1-2 enters on 24 and 23', () => {
+    const flow = startLesson(lesson('aceDeuce'));
+    const board = currentBoard(flow);
+    expect(board.outside).toEqual({ white: 15, black: 15 });
+    expect(board.points.every((p) => p.white === 0 && p.black === 0)).toBe(true);
+    // The engine offers only entries: spot 1 is point 24, spot 2 is point 23.
+    expect(offered('aceDeuce', flow)).toEqual(engineMoves(flow));
+    expect(offered('aceDeuce', flow)).toEqual(['25/23', '25/24']);
+    const end = currentBoard(playThrough('aceDeuce').flow);
+    expect(end.points[23]?.white).toBe(1);
+    expect(end.points[22]?.white).toBe(1);
+    expect(end.outside.white).toBe(13);
+  });
+
+  it('2: the double 3-3 enters the last four on 22; entered checkers wait', () => {
+    const flow = startLesson(lesson('enterAll'));
+    // While a checker waits, no checker on the board may move (A2).
+    expect(engineMoves(flow)).toEqual(['25/22']);
+    const { flow: end, moves } = playThrough('enterAll');
+    expect(moves).toEqual(['25/22', '25/22', '25/22', '25/22']);
+    expect(currentBoard(end).points[21]?.white).toBe(4);
+    expect(currentBoard(end).outside.white).toBe(0);
+  });
+
+  it('3: the last checker on 20 holds the front back; once it joins, the army moves', () => {
+    const flow = startLesson(lesson('quarterLock'));
+    const { rules } = flow.state;
+    expect(frozenPoints(currentBoard(flow), 'white', rules)).toEqual([18, 17, 16, 15, 14]);
+    // The engine itself allows only the last checker to move.
+    expect(engineMoves(flow)).toEqual(['20/16', '20/17']);
+    const first = playLessonMove(lesson('quarterLock'), flow, {
+      from: 20,
+      to: 16,
+      die: 4,
+      capture: 'none',
+    })!;
+    // All 15 are in 13 to 18: nothing is frozen, every checker may move.
+    expect(frozenPoints(currentBoard(first), 'white', rules)).toEqual([]);
+    expect(offered('quarterLock', first)).toEqual(['14/11', '15/12', '16/13', '17/14', '18/15']);
+    expect(playThrough('quarterLock').flow.phase).toBe('awaiting-confirm');
+  });
+
+  it('4: pins the last dark checker on 10, and the whole dark army is frozen', () => {
+    const flow = startLesson(lesson('pinLast'));
+    const { rules } = flow.state;
+    expect(frozenPoints(currentBoard(flow), 'black', rules)).toEqual([12, 11]);
+    expect(offered('pinLast', flow)).toEqual(['16/10*']);
+    const board = currentBoard(playThrough('pinLast').flow);
+    expect(board.points[9]).toEqual({ white: 1, black: 1, pinned: 'black' });
+    // No hitting: nothing goes to the bar.
+    expect(board.bar.black).toBe(0);
+    expect(armyFrozen(board, 'black', rules)).toBe(true);
   });
 });

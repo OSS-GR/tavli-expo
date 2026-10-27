@@ -11,8 +11,8 @@ import { botLevels, storage } from '@/services';
 export default function NewGameRoute() {
   const params = useLocalSearchParams<{ mode?: string; first?: string }>();
   const mode = parseModeParam(params.mode);
-  // After the tutorial: its game (Portes, #128; Plakoto or Fevga, #149)
-  // vs the Easy bot. Else the last choices.
+  // After the tutorial: its game (Portes, #128; Plakoto or Fevga, #149;
+  // Asodio, #159) vs the Easy bot. Else the last choices.
   const firstGame = mode === 'bot' ? parseFirstGameParam(params.first) : null;
   const [initial] = useState(() => {
     const last = loadLastSetup(storage, mode, botLevels);
