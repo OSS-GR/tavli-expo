@@ -13,7 +13,7 @@ import { GameScreen } from './GameScreen';
 
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
-import { countNodes, type JsonNode } from '../../../test/tree';
+import { countNodes, findAllNodes, type JsonNode } from '../../../test/tree';
 
 const haptics = feedback as ReturnType<typeof createRecordingFeedback>;
 const SIZE = { width: 375, height: 500 };
@@ -51,6 +51,20 @@ async function whiteToMove61() {
 
 const played = (store: Awaited<ReturnType<typeof whiteToMove61>>) =>
   store.getState().flow.game.played.map((m) => `${m.from}/${m.to}`);
+
+/** The opacity of the checker under the finger (a shared value: 0 or 1). */
+function dragOpacity(): number {
+  const [board] = findAllNodes(
+    screen.toJSON() as JsonNode,
+    (n) => n.props['testID'] === 'game-board-canvas',
+  );
+  const groups = findAllNodes(
+    board ?? null,
+    (n) => n.type === 'Group' && typeof n.props['opacity'] === 'object',
+  );
+  expect(groups).toHaveLength(1);
+  return (groups[0]?.props['opacity'] as { value: number }).value;
+}
 
 beforeEach(async () => {
   haptics.calls.length = 0;
@@ -108,6 +122,36 @@ describe('<GameScreen /> moves', () => {
     // Nothing is movable now: a tap selects nothing.
     await touch(PAN, [top(6, 5)]);
     expect(countNodes(screen.toJSON() as JsonNode, 'DashPathEffect')).toBe(0);
+  });
+
+  it('hides the dragged checker after the move that ends the turn', async () => {
+    await act(async () => {
+      settingsStore.setState({ autoConfirmMoves: true });
+    });
+    const store = await whiteToMove61();
+    await touch(PAN, [top(13, 5), point(7)]);
+    expect(dragOpacity()).toBe(0);
+    await touch(PAN, [top(8, 3), point(7)]);
+    // Auto-confirm passed the turn to Black: no flight, and no drag copy left.
+    expect(store.getState().flow.game.state.toMove).toBe('black');
+    expect(dragOpacity()).toBe(0);
+  });
+
+  it('plays no move when the system cancels a drag', async () => {
+    const store = await whiteToMove61();
+    const from = top(13, 5);
+    await touch(PAN, [from, { x: from.x - 30, y: from.y + 30 }, point(7)], { canceled: true });
+    expect(played(store)).toEqual([]);
+    expect(haptics.calls).toEqual(['selection']);
+    expect(dragOpacity()).toBe(0);
+  });
+
+  it('does not treat a swipe as a tap', async () => {
+    const store = await whiteToMove61();
+    await touch(PAN, [top(8, 3)]);
+    // A swipe from an empty point that ends on a target of the selected checker.
+    await touch(PAN, [point(4), point(5), point(7)]);
+    expect(played(store)).toEqual([]);
   });
 
   it('rolls when the board is tapped before the roll', async () => {

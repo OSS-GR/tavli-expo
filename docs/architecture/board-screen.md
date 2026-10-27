@@ -59,10 +59,10 @@ Dev routes (release builds redirect them to Home):
 
 - **Touch** a checker that can move: it gets a ring, and each legal target gets a dashed ring and a ghost checker where it would land (theme `highlights`). Targets come from the engine (`legalNextMoves`); the app never decides what is legal.
 - **Drag and drop:** one pan gesture (Gesture Handler 3, `usePanGesture`, `minDistance: 0`). The drag runs on the UI thread: the picked-up checker follows the finger through shared values. Only the result (picked up, dropped at x, y) goes to the JS thread.
-- **Tap-tap:** a touch that moves less than 8 pt is a tap. Tap a checker, then tap a target. A target wins over another movable checker on that point. A tap may miss a target by 22 pt (wireframe, iPhone SE).
-- A drop on the source cancels quietly. A drop anywhere else is illegal: the checker flies back in 160 ms, with the theme's `invalidMove` haptic.
+- **Tap-tap:** a touch that moves less than 8 pt is a tap. Tap a checker, then tap a target. A target wins over another movable checker on that point. A tap may miss a target by 22 pt (wireframe, iPhone SE). A swipe that does not start on a movable checker does nothing.
+- A drop on the source cancels quietly. A drop anywhere else is illegal: the checker flies back in 160 ms, with the theme's `invalidMove` haptic. A drag the system cancels (a call, the app goes to the background) also flies back, with no move.
 - **Hit-testing uses the drawing rects.** Sources and targets use `slotRect` (the same point rect that holds the triangle and the stack), the bar halves and the trays.
-- **Flights:** a move flies the checker to its landing place (200 ms); a hit sends the hit checker to the bar a moment later. While a checker flies, the checker at its landing place is hidden.
+- **Flights:** a move flies the checker to its landing place (200 ms); a hit sends the hit checker to the bar a moment later. While a checker flies, the checker at its landing place is hidden. The move that ends a turn (auto-confirm) has no flight when the board turns to the next player.
 - Two dice that reach the same target (bearing off): the lower die is used, so the higher one stays.
 - Haptics from the theme: `checkerPickUp`, `checkerPlace`, `checkerHit`, `invalidMove`.
 - Not built: the optional double-tap shortcut (it would delay every single tap), and the dashed "last move" arrow from the wireframes.

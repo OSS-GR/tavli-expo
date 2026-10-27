@@ -87,11 +87,12 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
     const direction = game.state.rules.movement.direction;
     const before = view.board;
     const ok = dispatch({ type: 'move', player: mover, move, autoConfirm });
-    if (!ok) return;
+    if (!ok) return false;
     playHaptic(theme, move.capture === 'hit' ? 'checkerHit' : 'checkerPlace');
-    // The turn ended (auto-confirm): the board may turn, so skip the flight.
+    // The turn ended (auto-confirm) and the board turns: skip the flight.
     const next = store.getState().flow.game;
-    if (next.state.toMove !== mover || next.phase === 'awaiting-roll') return;
+    const turnEnded = next.state.toMove !== mover || next.phase === 'awaiting-roll';
+    if (turnEnded && flipMode === 'flip') return true;
     const after = applyMoveToBoard(before, mover, move, direction);
     const id = `m${store.getState().flow.log.length}`;
     const added = moveFlights(geo, boardView, mover, move, before, after, {
@@ -99,6 +100,7 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
       ...(from ? { from } : {}),
     });
     setFlights((old) => [...old, ...added]);
+    return true;
   };
 
   // The dice of the opening already rolled in the card: show them at rest.

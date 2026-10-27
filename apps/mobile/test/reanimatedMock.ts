@@ -6,6 +6,8 @@
  * has landed, a checker has arrived). Add what you use from Reanimated here.
  */
 
+import { useState } from 'react';
+
 type Callback = (finished: boolean) => void;
 
 export interface MockSharedValue<T> {
@@ -25,7 +27,11 @@ export function makeMutable<T>(initial: T): MockSharedValue<T> {
   return box;
 }
 
-export const useSharedValue = makeMutable;
+/** Like the real hook: the same box on every render. */
+export function useSharedValue<T>(initial: T): MockSharedValue<T> {
+  const [box] = useState(() => makeMutable(initial));
+  return box;
+}
 
 export function useDerivedValue<T>(processor: () => T): MockSharedValue<T> {
   return makeMutable(processor());
