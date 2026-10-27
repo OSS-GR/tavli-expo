@@ -9,8 +9,8 @@ import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ToggleRow } from '@/components/settings/ToggleRow';
-import { PRIVACY_POLICY_URL } from '@/features/analytics/consent';
-import { useConsent } from '@/features/analytics/store';
+import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
+import { useConsent } from '@/features/privacy/consentStore';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
 
 import type { BoardFlipMode } from './settings';

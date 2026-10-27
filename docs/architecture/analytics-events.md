@@ -8,6 +8,14 @@ See which modes and features players use, from the first test builds. Nothing mo
 
 ## Privacy rules (GDPR)
 
+- **One switch for analytics and crash reports.** The consent answer lives in `apps/mobile/src/features/privacy/` (`consent.ts`, `consentStore.ts`). Analytics and crash reports (#43) both follow it:
+
+  | Answer | Usage events | Crash reports |
+  |--------|--------------|---------------|
+  | Not answered yet | none | sent, with no user id |
+  | **Allow usage data** | sent, with the install ID | sent, with the install ID |
+  | **Don't allow** | none | none |
+
 - **No events before opt-in.** The first launch asks (wireframe 02). Until the user taps **Allow usage data**, the `Analytics` port drops every call. Closing the app without an answer counts as "no".
 - **Opt-out stops everything at once.** Settings → Privacy → **Share anonymous usage data** calls `optOut()`. Events already queued from before the opt-out may still upload. Nothing new is captured.
 - **No personal data.** No names, emails, usernames or contacts. Player names in pass-and-play are never sent. Settings events send the **key only**, never the value.
@@ -46,7 +54,8 @@ Notes:
 | Port contract checks (any test runner) | `packages/contracts/src/testing/analytics-contract.ts` (`@tavli/contracts/testing`) |
 | PostHog adapter | `packages/adapters/analytics-posthog` |
 | Adapter choice (`EXPO_PUBLIC_POSTHOG_KEY`, else no-op) | `apps/mobile/src/services.ts` |
-| Consent store, app wiring, game helper, screen tracking | `apps/mobile/src/features/analytics/` |
+| Consent answer and store (the one privacy switch) | `apps/mobile/src/features/privacy/` |
+| App wiring, game helper, screen tracking | `apps/mobile/src/features/analytics/` |
 | First-launch screens (language, consent) | `apps/mobile/src/features/welcome/`, routes `app/welcome/*` |
 
 ## Setup (owner)

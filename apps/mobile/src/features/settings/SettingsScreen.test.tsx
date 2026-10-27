@@ -1,7 +1,9 @@
 import type { createRecordingAnalytics } from '@tavli/contracts';
 import { act, render, screen, userEvent } from '@testing-library/react-native';
 
-import { consentStore } from '@/features/analytics/store';
+// The analytics wiring, which the root layout loads in the app.
+import '@/features/analytics/store';
+import { consentStore } from '@/features/privacy/consentStore';
 import i18n from '@/i18n';
 import { analytics } from '@/services';
 

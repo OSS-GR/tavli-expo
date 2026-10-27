@@ -136,16 +136,16 @@ Notes:
 <img src="wireframes/02-welcome-consent.png" width="300" alt="First launch: usage data consent">
 
 - **Route:** `app/welcome/privacy.tsx`
-- **Purpose:** Ask for opt-in to anonymous analytics (GDPR, #61). **No events are sent before the user chooses.**
+- **Purpose:** Ask for opt-in to anonymous analytics (GDPR, #61). **No usage events are sent before the user chooses.** Only anonymous crash reports (no install id) are sent before the answer. This is the one privacy switch: **Don't allow** also stops crash reports.
 - **Elements:**
   - Back button (to language) and "Step 2 of 2".
   - Simple picture placeholder.
   - Title "Help us make Tavlaki better".
-  - What we collect, in plain words (modes and games played, game start and end, settings changed).
-  - What we never collect (name, email, contacts). "Change it any time in Settings."
+  - What we collect, in plain words (modes and games played, game start and end, settings changed, crash reports).
+  - What we never collect (name, email, contacts). That until the choice only anonymous crash reports are sent, and that "Don't allow" turns off usage data and crash reports. "Change it any time in Settings."
   - Link "Read the privacy policy" (opens `tavlaki.com/privacy` in an in-app browser).
   - Two buttons with the **same look and size**: **Allow usage data** and **Don't allow**. No button is more prominent. Refusing must be as easy as accepting.
-- **States:** If the app closes before a choice, the answer is "Don't allow" and the screen shows again on next launch.
+- **States:** If the app closes before a choice, no usage data is sent (crash reports stay anonymous) and the screen shows again on next launch.
 - **Goes to:** Home. The choice is saved; Settings → "Share usage data" reflects it.
 
 ## 3. Home

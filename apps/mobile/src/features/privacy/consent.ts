@@ -1,9 +1,12 @@
 /**
  * The user's answer to "Share anonymous usage data" (GDPR, issue #61).
+ * It is the one privacy switch: analytics and crash reports both follow it.
  *
- * - `unset`: not asked yet, or the app closed before an answer. This counts
- *   as "no": nothing is sent, and the welcome flow shows on next launch.
- * - `granted` / `denied`: the answer from the welcome screen or Settings.
+ * - `unset`: not asked yet, or the app closed before an answer. No usage
+ *   data is sent. Crash reports are sent, but with no install id. The
+ *   welcome flow shows on next launch.
+ * - `granted`: usage data and crash reports, both with the install id.
+ * - `denied`: nothing at all, not even crash reports.
  *
  * Saved through the `Storage` port. Kept apart from Settings, so "reset
  * settings" can never turn analytics on or off by accident.
@@ -54,8 +57,9 @@ export function createConsentStore(storage: Storage) {
 export type ConsentStore = ReturnType<typeof createConsentStore>;
 
 /**
- * The one "Share usage data" switch. Analytics follows it; crash reports
- * (#43, `crashReportingAllowed`) should read it too.
+ * May the app send usage data, and tie crash reports to the install id?
+ * Only after "Allow". For crash reports themselves, see
+ * `features/crash/consent.ts` (`crashReportingAllowed`).
  */
 export function usageDataAllowed(status: ConsentStatus): boolean {
   return status === 'granted';

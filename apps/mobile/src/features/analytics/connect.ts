@@ -11,7 +11,7 @@ import type { StoreApi } from 'zustand/vanilla';
 import { getInstallId } from '@/features/install-id/installId';
 import type { Settings } from '@/features/settings/settings';
 
-import type { ConsentState } from './consent';
+import type { ConsentState } from '@/features/privacy/consent';
 
 export interface ConnectAnalyticsOptions {
   analytics: Analytics;

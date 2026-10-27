@@ -25,7 +25,7 @@ export const storage: Storage = createMmkvStorage({ id: 'tavlaki' });
 /**
  * Crash reports. Sentry in release builds that have `EXPO_PUBLIC_SENTRY_DSN`;
  * a no-op in dev and in builds without a DSN. Started in
- * `features/crash/start.ts`, which also follows the privacy setting.
+ * `features/crash/start.ts`, which also follows the consent store (`features/privacy`).
  */
 export const crashReporter: CrashReporter =
   __DEV__ || !process.env.EXPO_PUBLIC_SENTRY_DSN
@@ -38,7 +38,7 @@ export const feedback: Feedback = createExpoFeedback();
 /**
  * Usage analytics (#61): PostHog EU when `EXPO_PUBLIC_POSTHOG_KEY` is set,
  * else a no-op. It starts opted out; `features/analytics` turns it on only
- * after the user says yes. Use `features/analytics/store.ts`, not this.
+ * after the user says yes (`features/analytics/store.ts`).
  */
 export const analytics: Analytics = createAnalytics();
 

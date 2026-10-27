@@ -9,7 +9,12 @@ import { INSTALL_ID_STORAGE_KEY as INSTALL_ID_KEY } from '@/features/install-id/
 import { createSettingsStore } from '@/features/settings/settings';
 
 import { connectAnalytics } from './connect';
-import { CONSENT_STORAGE_KEY, createConsentStore, needsWelcome, usageDataAllowed } from './consent';
+import {
+  CONSENT_STORAGE_KEY,
+  createConsentStore,
+  needsWelcome,
+  usageDataAllowed,
+} from '@/features/privacy/consent';
 
 function setup(storage: Storage = createMemoryStorage()) {
   const analytics = createRecordingAnalytics();

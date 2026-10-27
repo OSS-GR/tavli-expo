@@ -3,8 +3,8 @@ import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
-import { PRIVACY_POLICY_URL } from '@/features/analytics/consent';
-import { useConsent } from '@/features/analytics/store';
+import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
+import { useConsent } from '@/features/privacy/consentStore';
 
 export interface WelcomeConsentScreenProps {
   onBack: () => void;
@@ -15,8 +15,10 @@ export interface WelcomeConsentScreenProps {
 /**
  * First launch, step 2 (wireframe 02): ask before any usage data is sent
  * (GDPR, #61). "Allow" and "Don't allow" look the same: refusing is as easy
- * as accepting. Closing the app without an answer counts as "no", and this
- * screen shows again on the next launch.
+ * as accepting. "Don't allow" stops usage data and crash reports (the one
+ * switch, `features/privacy`). Closing the app without an answer sends no
+ * usage data, only anonymous crash reports, and this screen shows again on
+ * the next launch.
  */
 export function WelcomeConsentScreen({ onBack, onDone }: WelcomeConsentScreenProps) {
   const { t } = useTranslation();
@@ -31,6 +33,7 @@ export function WelcomeConsentScreen({ onBack, onDone }: WelcomeConsentScreenPro
     t('welcome.privacy.collect.modes'),
     t('welcome.privacy.collect.games'),
     t('welcome.privacy.collect.settings'),
+    t('welcome.privacy.collect.crashes'),
   ];
 
   return (

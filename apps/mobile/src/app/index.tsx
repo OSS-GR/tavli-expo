@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
-import { needsWelcome } from '@/features/analytics/consent';
-import { useConsent } from '@/features/analytics/store';
+import { needsWelcome } from '@/features/privacy/consent';
+import { useConsent } from '@/features/privacy/consentStore';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
