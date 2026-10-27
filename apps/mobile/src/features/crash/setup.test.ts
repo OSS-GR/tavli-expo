@@ -94,6 +94,40 @@ describe('setupCrashReporting', () => {
     expect(reporter.enabled).toBe(true);
   });
 
+  it('sets the user before init and changes it only while the reporter is off', () => {
+    // The Sentry adapter picks its mode (anonymous or identified) from the
+    // user when it starts, and restarts if the user changes while it runs.
+    const calls: string[] = [];
+    const reporter = createRecordingCrashReporter();
+    const logged = {
+      ...reporter,
+      init: (config: Parameters<typeof reporter.init>[0]) => {
+        calls.push(`init:${reporter.user ? 'user' : 'none'}`);
+        reporter.init(config);
+      },
+      setUser: (id: string | null) => {
+        calls.push(id ? 'user' : 'no user');
+        reporter.setUser(id);
+      },
+      setEnabled: (enabled: boolean) => {
+        calls.push(enabled ? 'on' : 'off');
+        reporter.setEnabled(enabled);
+      },
+    };
+    const storage = answered(true);
+    const consent = createConsentStore(storage);
+    setupCrashReporting({ reporter: logged, consent, storage, dsn: DSN, environment: 'test' });
+    expect(calls).toEqual(['user', 'init:user']);
+
+    calls.length = 0;
+    consent.getState().setConsent(false);
+    expect(calls).toEqual(['off', 'no user']);
+
+    calls.length = 0;
+    consent.getState().setConsent(true);
+    expect(calls).toEqual(['user', 'on']);
+  });
+
   it('clears the user when the answer moves away from "Allow"', () => {
     const { reporter, consent } = setup({ storage: answered(true) });
     expect(reporter.user).not.toBeNull();

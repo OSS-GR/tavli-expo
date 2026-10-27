@@ -12,7 +12,7 @@ Two services get data. Nothing else leaves the phone. Local games (vs the bot, p
 
 | Service | What | When | Code |
 |---------|------|------|------|
-| **Sentry** (crash reports) | The error and stack trace; device facts (model, system and version, app version, memory, screen, language, time zone); a short trail of events before the error (breadcrumbs). No device name, no console lines, no query strings in URLs, no IP address in the event, no screenshots, no view hierarchy, no tracing, no replay. | Release builds with `EXPO_PUBLIC_SENTRY_DSN` only. Before an answer: sent **without** the install id. After **Allow usage data**: sent **with** the install id. After **Don't allow**: nothing. | `packages/adapters/crash-sentry/src/index.ts` (`scrubEvent`, `scrubBreadcrumb`, options), `apps/mobile/src/features/crash/consent.ts`, `setup.ts` |
+| **Sentry** (crash reports) | The error and stack trace; device facts (model, system and version, app version, memory, screen, language, time zone); a short trail of events before the error (breadcrumbs). After Allow also native crashes, app hangs (iOS), ANRs (Android) and release-health sessions. No device name, no console lines, no query strings in URLs, no IP address in the event, no screenshots, no view hierarchy, no tracing, no replay. | Release builds with `EXPO_PUBLIC_SENTRY_DSN` only. Before an answer: **JS errors only, with no id at all** (#139: the native SDKs and sessions are off, because they add Sentry's own installation id). After **Allow usage data**: everything, **with** the install id (a native crash report from iOS may carry Sentry's installation id instead). After **Don't allow**: nothing. | `packages/adapters/crash-sentry/src/index.ts` (`scrubEvent`, `scrubBreadcrumb`, options), `apps/mobile/src/features/crash/consent.ts`, `setup.ts` |
 | **PostHog EU** (usage data) | The events in [Analytics events](../architecture/analytics-events.md): app opened, game started / finished / abandoned, undo, resign, setting changed (key only), theme changed, screen viewed (route pattern), tutorial started / step / finished / skipped. Each event carries device facts (maker, model, system and version, screen, app name and version, language, time zone), the install id and PostHog's own random ids. No session replay, no autocapture, no GeoIP. | Only after **Allow usage data**. Before that the adapter drops every call. Turning it off empties the queue and resets PostHog's ids. | `packages/adapters/analytics-posthog/src/index.ts` (`postHogOptions`, the consent gate), `apps/mobile/src/features/analytics/connect.ts` |
 
 The **install id** is a random UUID made on the phone (`apps/mobile/src/features/install-id/installId.ts`). The app makes it only after **Allow usage data**. It is not an advertising id and does not come from the hardware. It is the "Device ID" below.
@@ -34,16 +34,14 @@ Tick these five. Leave every other box empty.
 | Identifiers | **Device ID** | The install id (PostHog `identify`, Sentry user id after Allow) and PostHog's random ids |
 | Usage Data | **Product Interaction** | The PostHog events (app opened, games, settings, screens) |
 | Diagnostics | **Crash Data** | Sentry crash and error reports |
-| Diagnostics | **Performance Data** | App hangs (iOS) and ANRs (Android). **Unverified:** these are Sentry native SDK defaults that the app does not turn off; we have not seen them in a build yet. Declare them anyway, as the manifest does. |
-| Diagnostics | **Other Diagnostic Data** | Device facts and breadcrumbs in crash reports; Sentry release-health sessions (**unverified**, a Sentry default); device facts on PostHog events |
-
-Issue #139 changes what Sentry sends before the consent answer (native defaults, sessions). Check these rows again when it is merged.
+| Diagnostics | **Performance Data** | App hangs (iOS) and ANRs (Android), after Allow only. These are Sentry native SDK defaults (checked in the SDK source in #139; not yet seen in a build). Declare them, as the manifest does. |
+| Diagnostics | **Other Diagnostic Data** | Device facts and breadcrumbs in crash reports; Sentry release-health sessions (after Allow only, #139); device facts on PostHog events |
 
 Leave empty (the app does not collect them): Contact Info (name, email, phone, address), Health and Fitness, Financial Info, Location (precise and coarse: PostHog GeoIP is off, and Sentry is set not to store IPs), Sensitive Info, Contacts, User Content (pass-and-play names stay on the phone), Browsing History, Search History, Identifiers → User ID (no accounts), Purchases, Usage Data → Advertising Data, Usage Data → Other Usage Data, Other Data.
 
 ## Step 3: For each data type
 
-Apple asks three questions per type. The purposes and the tracking answers match the privacy manifest in `app.json`. The "linked" answers do **not** match it yet: see [Why "linked to the user"](#why-linked-to-the-user).
+Apple asks three questions per type. The answers match the privacy manifest in `app.json` (#139 set `NSPrivacyCollectedDataTypeLinked: true` for all five types).
 
 | Data type | Purposes | Linked to the user? | Used for tracking? |
 |-----------|----------|---------------------|--------------------|
@@ -63,9 +61,9 @@ After **Allow usage data**, the app ties its data to the install id: `analytics.
 
 **Tracking stays No**: the id is ours only, it is never combined with other companies' data, and nothing is used for ads.
 
-**Owner:** you may still argue "not linked": no accounts, no name, email or phone, and the id is random and lives only in this install. If you choose that, keep the label and the manifest the same (`NSPrivacyCollectedDataTypeLinked: false`, as today).
+**Owner:** you may still argue "not linked": no accounts, no name, email or phone, and the id is random and lives only in this install. If you choose that, keep the label and the manifest the same: set `NSPrivacyCollectedDataTypeLinked` back to `false` in `apps/mobile/app.json` (a code PR).
 
-**Owner, next step:** the iOS privacy manifest in `apps/mobile/app.json` says `NSPrivacyCollectedDataTypeLinked: false` for all five types. With the answers above it must change to `true` for all five, in a code PR before the release build that goes to review. This docs PR does not change `app.json`.
+The iOS privacy manifest in `apps/mobile/app.json` says `NSPrivacyCollectedDataTypeLinked: true` for all five types, and `NSPrivacyCollectedDataTypeTracking: false` (#139).
 
 ## The label people will see
 
@@ -87,17 +85,16 @@ With the answers above, the App Store page shows:
 - [ ] Sentry organization is in the **EU** data region, and **Prevent Storing of IP Addresses** is on (`packages/adapters/crash-sentry/README.md`, step 5).
 - [ ] PostHog project is in the **EU** cloud, and **Discard client IP data** is on (`docs/architecture/analytics-events.md`, Setup). If IPs were stored, Apple could see it as coarse location.
 - [ ] The app has no other SDK that sends data. Today the only network SDKs are Sentry and PostHog. If you add one (for example EAS Update, push, Convex), update this page first.
-- [ ] Test a native crash (not a JS error) **before** answering the consent screen, and look at the event in Sentry. Check that it has no `user.id` and no device name. See "Points to check" below.
-- [ ] `NSPrivacyCollectedDataTypeLinked` in `apps/mobile/app.json` matches the "linked" answers above (today it says `false`; see [Why "linked to the user"](#why-linked-to-the-user)).
+- [ ] In a release build, **before** answering the consent screen, trigger a JS error and look at the event in Sentry: no `user`, no `contexts.device.id`, no device name, and no session in Release Health. Then trigger a native crash: nothing should arrive, not even on the next launch. See "Pre-consent crash reports" below.
+- [ ] `NSPrivacyCollectedDataTypeLinked` in `apps/mobile/app.json` matches the "linked" answers above (today: `true` for all five).
 - [ ] When accounts and online play ship (MVP2), redo the label: User ID, maybe Name or Email (sign-in), Gameplay Content.
 
-## Points to check in the code
+## Pre-consent crash reports (#139)
 
-These are not wrong on the label (the label already lists Device ID and diagnostics). They matter for the promise "before an answer, crash reports carry no id".
+The promise is "before an answer, crash reports carry no id". Issue #139 checked the Sentry SDK source (`@sentry/react-native` 8.28.0, sentry-cocoa 9.29.0, sentry-android 8.57.0) and changed the adapter:
 
-1. **Native crashes skip the JS scrub.** `scrubEvent` and `scrubBreadcrumb` run as the JS `beforeSend` and `beforeBreadcrumb`. A crash in native code (iOS or Android) is caught and sent by Sentry's native SDK. Its native `beforeSend` (in `@sentry/react-native`'s `RNSentryStart.java` and `RNSentry.mm`) only drops duplicates of JS errors; it does not call our scrub. Sentry's native SDKs may add their own random installation id as the user id when no user is set (we believe the Android SDK does). We did not confirm this in a build.
-2. **Release-health sessions.** `enableAutoSessionTracking` is not set, so Sentry's default (on) applies. Sessions report app starts and crash-free state, with Sentry's own installation id. They are sent before an answer, like crash reports. **Unverified** until checked in a build, like the app hang and ANR reports (Performance Data). Issue #139 changes this pre-consent behaviour.
+1. **Native events and sessions carry Sentry's own id.** The native SDKs set their random installation id as `user.id` on every event with no user (Android also as `device.id`), whatever `sendDefaultPii` says. Native crashes, app hangs and ANRs skip the JS scrub: the React Native SDK sets the native `beforeSend` itself. Sessions carry the same id.
+2. **So before an answer the native SDK does not start** (`enableNative: false`, `enableAutoSessionTracking: false`). Only JS errors are sent, with no user and no device id. After **Allow**, the adapter starts Sentry again with the native SDK and sessions. Details: `packages/adapters/crash-sentry/README.md` ("Anonymous mode").
+3. **The policy text is up to date.** It lists `game_abandoned` ("Game left") and the four tutorial events, and says what a crash report holds before and after the answer.
 
-3. **The policy is behind on some events.** The privacy policy lists "Game left" as "Planned, not sent yet". The code sends it now as `game_abandoned` (`features/analytics/gameAnalytics.ts`, called from `features/match/sessions.ts`), and [Analytics events](../architecture/analytics-events.md) lists it. The four tutorial events from #135 (`tutorial_started`, `tutorial_step`, `tutorial_finished`, `tutorial_skipped`) are not in the policy either. The label is not affected (they are all Product Interaction). **Owner:** fix the policy text in all four legal files before launch.
-
-If the test in point 1 shows an id before consent, open an issue: either set `enableAutoSessionTracking: false` and scrub native events (Sentry's native options), or change the policy text "sent, with no install id" to say Sentry adds its own random id.
+Labels: the pre-consent change does not change any box. Crash Data and Other Diagnostic Data are still collected before an answer (JS errors); Device ID, Performance Data and sessions only after Allow.

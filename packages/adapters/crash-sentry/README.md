@@ -5,13 +5,32 @@ The `CrashReporter` port (`@tavli/contracts`) backed by Sentry, using `@sentry/r
 ## What it does
 
 - **No DSN, no Sentry.** If `EXPO_PUBLIC_SENTRY_DSN` is missing, the app uses the no-op reporter and never starts Sentry. Dev builds (`__DEV__`) always use the no-op reporter.
-- **Privacy.** `sendDefaultPii` is off. No screenshots, no view hierarchy, no session replay, no performance tracing. `beforeSend` keeps only the anonymous install id as the user (or no user at all) and drops the device name. Never put names or emails in `captureMessage`, tags, extras or breadcrumbs.
+- **Privacy.** `sendDefaultPii` is off. No screenshots, no view hierarchy, no session replay, no performance tracing. `beforeSend` keeps only the anonymous install id as the user (or no user at all), drops the device name, and drops the ids the native SDKs add to JS events (`contexts.device.id` on Android, `contexts.app.device_app_hash` on iOS). Never put names or emails in `captureMessage`, tags, extras or breadcrumbs.
 - **Breadcrumbs.** Console breadcrumbs are dropped (a log line can hold anything). Request URLs in breadcrumbs lose their query string and fragment.
 - **Opt-out.** `setEnabled(false)` closes the SDK (JS and native). From then on no new event or breadcrumb is sent. Events already handed to the transport before the opt-out may still go out while the SDK closes. If the player opted out before launch, the SDK never starts.
 - **One privacy switch (#61).** The app's consent answer (`apps/mobile/src/features/privacy/consent.ts`) drives crash reports and analytics together. The rules are in `apps/mobile/src/features/crash/consent.ts`:
-  - **Before an answer:** reports are sent, but with no user id.
-  - **"Allow usage data":** reports carry the anonymous install id (`setUser`).
+  - **Before an answer (anonymous mode):** JS errors are sent, with no user id and no other id. The native SDKs do not start (`enableNative: false`) and there is no session tracking (`enableAutoSessionTracking: false`). See "Anonymous mode" below.
+  - **"Allow usage data" (identified mode):** reports carry the anonymous install id (`setUser`). The native SDKs run: native crashes, app hangs, ANRs and release-health sessions. If "Allow" comes while the app runs, the adapter closes Sentry and starts it again in this mode.
   - **"Don't allow":** `setEnabled(false)` and `setUser(null)`. Nothing is sent.
+
+### Anonymous mode (before the answer, #139)
+
+What we found in the SDK (`@sentry/react-native` 8.28.0, sentry-cocoa 9.29.0, sentry-android 8.57.0):
+
+- The native SDKs give every event with no user a user id: their own random **installation id** (iOS `SentryClient` `setUserIdIfNoUserSet`; Android `DefaultAndroidEventProcessor.mergeUser`, which also sets `device.id`). `sendDefaultPii: false` does not turn this off.
+- Native crashes, app hangs and ANRs are made and sent by the native SDK. The JS `beforeSend` never sees them, and the React Native SDK sets the native `beforeSend` itself (it only drops duplicate JS errors), so JS cannot strip the id.
+- `enableNativeCrashHandling: false` is not enough on Android: it removes the crash, old ANR and NDK integrations, but not `AnrV2Integration` (Android 11+), which reports past ANRs with the installation id. The React Native SDK has no option to turn it off.
+- Release-health sessions are native too, and carry the installation id as `did`.
+- JS events get the native user and contexts through `fetchNativeDeviceContexts`. `beforeSend` runs after that, so for JS events the scrub works.
+
+So before the answer the adapter does not start the native SDK at all. A report before the answer is a JS error with: the error and stack, the SDK's JS facts (platform, React Native and Hermes versions, environment), our breadcrumbs, and no user, device id or session.
+
+Trade-offs, accepted by design:
+
+- No native crash, app hang or ANR reports before the answer. The welcome flow asks on the first launch, so this window is short.
+- JS events before the answer have no release name or native device facts (phone model, system version). The JS SDK reads those from the native SDK. Stack traces are still mapped: the bundle has Debug IDs.
+- No offline queue: JS events are sent with `fetch`, so an event made with no network is lost.
+- After "Allow", native crash reports from iOS can still carry Sentry's installation id instead of our install id: a crash is sent on the next launch, and the iOS SDK does not apply the scope to crash events. The privacy policy says so.
 - **Never throws.** A Sentry failure must not crash the app.
 
 ## How the app uses it

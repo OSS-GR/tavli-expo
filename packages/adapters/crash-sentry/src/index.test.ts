@@ -14,7 +14,13 @@ const sentry = vi.hoisted(() => ({
 
 vi.mock('@sentry/react-native', () => sentry);
 
-const { createSentryCrashReporter, scrubBreadcrumb, scrubEvent } = await import('./index');
+const {
+  ANONYMOUS_OPTIONS,
+  IDENTIFIED_OPTIONS,
+  createSentryCrashReporter,
+  scrubBreadcrumb,
+  scrubEvent,
+} = await import('./index');
 
 const DSN = 'https://public@example.ingest.sentry.io/1';
 
@@ -74,6 +80,79 @@ describe('createSentryCrashReporter with a DSN', () => {
     expect(lastInitOptions()).not.toHaveProperty('debug');
   });
 
+  it('starts anonymous before an answer: JS only, no sessions, no user', () => {
+    const reporter = createSentryCrashReporter();
+    reporter.init({ dsn: DSN });
+    expect(lastInitOptions()).toMatchObject({
+      enableNative: false,
+      enableAutoSessionTracking: false,
+      enableNativeCrashHandling: false,
+      enableAppHangTracking: false,
+      enableWatchdogTerminationTracking: false,
+    });
+    expect(lastInitOptions()).toMatchObject(ANONYMOUS_OPTIONS);
+    expect(sentry.setUser).toHaveBeenLastCalledWith(null);
+    // Even if the native SDK put its own id on a JS event.
+    const sent = lastInitOptions().beforeSend({
+      message: 'boom',
+      user: { id: 'sentry-installation-id' },
+      contexts: { device: { id: 'sentry-installation-id', model: 'Pixel 9' } },
+    });
+    expect(sent).toEqual({ message: 'boom', contexts: { device: { model: 'Pixel 9' } } });
+  });
+
+  it('starts identified when the install id is set before init', () => {
+    const reporter = createSentryCrashReporter();
+    reporter.setUser('install_1234abcd');
+    reporter.init({ dsn: DSN });
+    expect(sentry.init).toHaveBeenCalledTimes(1);
+    expect(lastInitOptions()).toMatchObject({
+      enableNative: true,
+      enableAutoSessionTracking: true,
+    });
+    expect(lastInitOptions()).toMatchObject(IDENTIFIED_OPTIONS);
+    for (const key of [
+      'enableNativeCrashHandling',
+      'enableAppHangTracking',
+      'enableWatchdogTerminationTracking',
+    ]) {
+      // Left to the SDK default (on).
+      expect(lastInitOptions()).not.toHaveProperty(key);
+    }
+    expect(sentry.setUser).toHaveBeenLastCalledWith({ id: 'install_1234abcd' });
+    expect(lastInitOptions().beforeSend({ message: 'boom' })).toEqual({
+      message: 'boom',
+      user: { id: 'install_1234abcd' },
+    });
+  });
+
+  it('restarts in identified mode when the install id comes after init ("Allow")', async () => {
+    const reporter = createSentryCrashReporter();
+    reporter.init({ dsn: DSN });
+    expect(lastInitOptions()).toMatchObject(ANONYMOUS_OPTIONS);
+
+    reporter.setUser('install_1234abcd');
+    expect(sentry.close).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(sentry.init).toHaveBeenCalledTimes(2));
+    expect(lastInitOptions()).toMatchObject(IDENTIFIED_OPTIONS);
+    expect(sentry.setUser).toHaveBeenLastCalledWith({ id: 'install_1234abcd' });
+
+    // The same mode again: no restart.
+    reporter.setUser('install_5678efgh');
+    expect(sentry.close).toHaveBeenCalledTimes(1);
+    expect(sentry.setUser).toHaveBeenLastCalledWith({ id: 'install_5678efgh' });
+  });
+
+  it('does not restart for a user set while disabled', () => {
+    const reporter = createSentryCrashReporter();
+    reporter.init({ dsn: DSN, enabled: false });
+    reporter.setUser('install_1234abcd');
+    reporter.setEnabled(true);
+    expect(sentry.init).toHaveBeenCalledTimes(1);
+    expect(sentry.close).not.toHaveBeenCalled();
+    expect(lastInitOptions()).toMatchObject(IDENTIFIED_OPTIONS);
+  });
+
   it('maps exceptions, messages and breadcrumbs to Sentry', () => {
     const reporter = createSentryCrashReporter();
     reporter.init({ dsn: DSN });
@@ -112,7 +191,7 @@ describe('createSentryCrashReporter with a DSN', () => {
     });
   });
 
-  it('sets only anonymous ids as the user', () => {
+  it('sets only anonymous ids as the user', async () => {
     const reporter = createSentryCrashReporter();
     reporter.setUser('install_1234abcd');
     reporter.init({ dsn: DSN });
@@ -122,6 +201,7 @@ describe('createSentryCrashReporter with a DSN', () => {
     expect(sentry.setUser).toHaveBeenCalledTimes(1);
 
     reporter.setUser(null);
+    await vi.waitFor(() => expect(sentry.init).toHaveBeenCalledTimes(2));
     expect(sentry.setUser).toHaveBeenLastCalledWith(null);
   });
 
@@ -229,6 +309,20 @@ describe('scrubEvent', () => {
       message: 'boom',
       user: { id: 'install_1234abcd' },
       contexts: { device: { model: 'iPhone17,1' }, os: { name: 'iOS' } },
+    });
+  });
+
+  it("drops the native SDKs' own ids", () => {
+    const event = {
+      message: 'boom',
+      contexts: {
+        device: { id: 'sentry-installation-id', model: 'Pixel 9' },
+        app: { device_app_hash: 'abc123', app_version: '1.0.0' },
+      },
+    };
+    expect(scrubEvent(event as never, null)).toEqual({
+      message: 'boom',
+      contexts: { device: { model: 'Pixel 9' }, app: { app_version: '1.0.0' } },
     });
   });
 
