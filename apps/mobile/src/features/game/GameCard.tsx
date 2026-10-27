@@ -2,10 +2,15 @@
  * A card over the board: no legal moves (wireframe 6f), and "This game
  * could not be opened." The board stays visible around it. Game end is
  * `GameEndSheet`; match end is its own screen (`MatchEndScreen`).
+ *
+ * When the card opens, screen reader focus moves to its title (#153); the
+ * screen hides the board under it.
  */
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+
+import { useFocusOnShow } from '@/features/accessibility/focus';
 
 import { useAnnouncement } from './useAnnouncement';
 
@@ -21,11 +26,12 @@ export interface GameCardProps {
 }
 
 export function GameCard({ title, lines = [], footnote, children, testID }: GameCardProps) {
+  const titleRef = useFocusOnShow();
   // Read on both platforms (a live region works on Android only).
   useAnnouncement([title, ...lines].join(' '));
   return (
     <View testID={testID} style={styles.card}>
-      <Text style={styles.title} accessibilityRole="header">
+      <Text ref={titleRef} style={styles.title} accessibilityRole="header">
         {title}
       </Text>
       {lines.map((line, i) => (
