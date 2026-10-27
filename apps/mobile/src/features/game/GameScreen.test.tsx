@@ -1,6 +1,6 @@
 import type { createRecordingFeedback, createRecordingSoundPlayer } from '@tavli/contracts';
 import { createSeededRng, rollDie } from '@tavli/engine';
-import { act, render, screen, userEvent } from '@testing-library/react-native';
+import { act, screen, userEvent } from '@testing-library/react-native';
 
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -8,6 +8,8 @@ import { feedback, sound } from '@/services';
 
 import { createGameStore } from './gameStore';
 import { GameScreen, OPENING_RESULT_MS } from './GameScreen';
+
+import { renderWithRoot as render } from '../../../test/render';
 
 const haptics = feedback as ReturnType<typeof createRecordingFeedback>;
 const sounds = sound as ReturnType<typeof createRecordingSoundPlayer>;

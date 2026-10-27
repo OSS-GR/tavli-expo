@@ -19,6 +19,10 @@
 | `diceMotion.ts` | The roll animation as pure math (worklets): tumble pose and face flips. |
 | `skia/DieShape.tsx`, `skia/AnimatedDie.tsx` | A die from the theme `DiceStyle`; the animated version tumbles and lands on the engine's value. |
 | `DiceRow.tsx` | The dice in the controls row: 2 side by side, or 4 in a 2 x 2 grid for a double. Used dice fade. |
+| `interaction.ts` | Which checkers can move and where (from `legalNextMoves`), in screen points; what a tap or a drop means. Pure; the pickers are worklets. |
+| `flights.ts` | A move, a hit or an undo as short flights of checkers. Pure. |
+| `skia/MovingCheckers.tsx` | The checker in flight and the checker under the finger (UI thread). |
+| `InteractiveBoard.tsx` | The playing board: the pan gesture, selection, highlights and flights. |
 
 The game itself lives in `apps/mobile/src/features/game/`:
 
@@ -59,6 +63,18 @@ Dev routes (release builds redirect them to Home):
 - UI-only events (`diceLand`, `checkerPickUp`) use the `event` function that `useGameFeedback` returns.
 - The theme's sounds are preloaded when the game screen opens. Sounds mix with other apps' audio and follow the phone's silent switch.
 
+## Moving checkers
+
+- **Touch** a checker that can move: it gets a ring, and each legal target gets a dashed ring and a ghost checker where it would land (theme `highlights`). Targets come from the engine (`legalNextMoves`); the app never decides what is legal.
+- **Drag and drop:** one pan gesture (Gesture Handler 3, `usePanGesture`, `minDistance: 0`). The drag runs on the UI thread: the picked-up checker follows the finger through shared values. Only the result (picked up, dropped at x, y) goes to the JS thread.
+- **Tap-tap:** a touch that moves less than 8 pt is a tap. Tap a checker, then tap a target. A target wins over another movable checker on that point. A tap may miss a target by 22 pt (wireframe, iPhone SE). A swipe that does not start on a movable checker does nothing.
+- A drop on the source cancels quietly. A drop anywhere else is illegal: the checker flies back in 160 ms, with the theme's `invalidMove` haptic. A drag the system cancels (a call, the app goes to the background) also flies back, with no move.
+- **Hit-testing uses the drawing rects.** Sources and targets use `slotRect` (the same point rect that holds the triangle and the stack), the bar halves and the trays.
+- **Flights:** a move flies the checker to its landing place (200 ms); a hit sends the hit checker to the bar a moment later. While a checker flies, the checker at its landing place is hidden. The move that ends a turn (auto-confirm) has no flight when the board turns to the next player.
+- Two dice that reach the same target (bearing off): the lower die is used, so the higher one stays.
+- Haptics from the theme: `checkerPickUp`, `checkerPlace`, `checkerHit`, `invalidMove`.
+- Not built: the optional double-tap shortcut (it would delay every single tap), and the dashed "last move" arrow from the wireframes.
+
 ## Board flip
 
 The theme numbers points from the view of the player at the bottom (the **viewer**). The engine numbers points in White's order. `boardModel.ts` maps each absolute point to the viewer's own number (`absoluteToOwn`). So the viewer always moves 24 → 1, with home at the bottom left. Turning the board to the other player is only a change of viewer: a left–right mirror, as the wireframes ask.
@@ -67,6 +83,8 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 
 - `geometry.test.ts` and `boardModel.test.ts`: the layout math (point → rect, stacks, badge, bar, trays, hit-testing) and the engine → slot mapping.
 - `dice.test.ts`, `gameStore.test.ts`, `GameScreen.test.tsx`: the roll animation math, the dice layout, the store over the engine flow, and the dice and opening card on screen.
+- `interaction.test.ts`: sources and targets on the drawing rects, tap and drop rules, flights for a move, a hit and an undo. `GameScreen.moves.test.tsx`: drag, tap-tap, an illegal drop and tap-to-roll through the screen.
+- Jest fakes Gesture Handler with `apps/mobile/test/gestureHandlerMock.tsx`; `touch(testID, path)` drives the board's pan gesture like a finger.
 - Jest fakes Reanimated with `apps/mobile/test/reanimatedMock.ts`: animations end at once and call their end callback.
 - `BoardScene.test.tsx`: a render smoke test. Jest replaces Skia with `apps/mobile/test/skiaMock.tsx`: every Skia component becomes a plain element, so the test counts what the board would draw.
 

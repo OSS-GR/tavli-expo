@@ -43,3 +43,7 @@ jest.mock('react-native-worklets', () => ({
     (...args: unknown[]) =>
       fn(...args),
 }));
+
+// Gesture Handler: a fake that lets tests drive the board's pan gesture
+// (`touch()` in test/gestureHandlerMock.tsx).
+jest.mock('react-native-gesture-handler', () => jest.requireActual('./test/gestureHandlerMock'));
