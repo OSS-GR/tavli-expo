@@ -17,7 +17,7 @@
  * - `awaiting-confirm`: the moves form a full legal play. `confirm` ends
  *   the turn; `undo` goes back to `moving`.
  * - `awaiting-answer`: the variant asks a question (`Variant.prompt`), for
- *   example Plakoto "resign or play on" later. Not used by Portes.
+ *   example Plakoto "resign or play on". Not used by Portes.
  * - `game-over`: `result` holds the winner and the points.
  *
  * A roll with no legal move passes by itself: the flow plays the empty turn
