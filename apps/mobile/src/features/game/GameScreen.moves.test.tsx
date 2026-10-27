@@ -67,7 +67,7 @@ function dragOpacity(): number {
   return (groups[0]?.props['opacity'] as { value: number }).value;
 }
 
-// The opening result closes by itself after 1.5 s. On a real clock a slow
+// The opening result closes by itself after 3 s. On a real clock a slow
 // first render can take longer, and the card is gone before the tap.
 runOnFakeTimers();
 

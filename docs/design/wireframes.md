@@ -238,8 +238,8 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 - Card over the dimmed starting position: "Who starts?", two empty dice for **You** and **Bot**.
 - One tap on **Roll to start** (or on the board) rolls one die for each player.
-- *Tie:* "Tie! Roll again." The card stays.
-- *Result:* "You rolled 5, Bot rolled 3. You start with 5-3." After about 1.5 s the card closes. The starter plays those two dice (`useOpeningDice`, so the first roll is never a double).
+- *Tie:* "Tie: both rolled 4. Roll again." Both dice stay on the card until the next roll (#176).
+- *Result:* "You start with 5-3." The card closes on OK, on a tap, or after 3 s (#176). The starter plays those two dice (`useOpeningDice`, so the first roll is never a double).
 
 ### 6b. Your turn: roll
 

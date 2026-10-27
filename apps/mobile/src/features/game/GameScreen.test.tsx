@@ -31,7 +31,7 @@ function newStore(seed = seedWithoutTie()) {
   });
 }
 
-// The opening result closes by itself after 1.5 s (a timer).
+// The opening result closes by itself after 3 s (a timer).
 runOnFakeTimers();
 
 beforeEach(async () => {
@@ -92,7 +92,7 @@ describe('<GameScreen /> dice', () => {
       store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 4 });
       store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 4 });
     });
-    expect(screen.getByText('Tie! Both rolled 4. Roll again.')).toBeOnTheScreen();
+    expect(screen.getByText('Tie: both rolled 4. Roll again.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Ann: roll, or tap the board' })).toBeOnTheScreen();
   });
 

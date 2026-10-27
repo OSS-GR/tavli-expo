@@ -58,8 +58,14 @@ import { plainSeats, type Seat } from './seats';
 import { passNotice, winType } from './turnNotices';
 import { useAnnouncement } from './useAnnouncement';
 
-/** How long the opening result stays on screen. */
-export const OPENING_RESULT_MS = 1500;
+/** How long the opening result ("Maria starts with 6-3.") stays, unless a tap closes it (#176). */
+export const OPENING_RESULT_MS = 3000;
+/**
+ * After an opening tie, Roll waits this long: the dice land first, so a
+ * quick second tap does not skip the tie (#176). The tie itself stays on
+ * the card until the next roll.
+ */
+export const OPENING_TIE_WAIT_MS = 1000;
 /** The "no legal moves" card closes by itself after this time (wireframe 6f). */
 export const PASS_NOTICE_MS = 3000;
 /** The same card when the bot cannot move (wireframe 6f: "closes after 2 s"). */
@@ -173,7 +179,8 @@ export function GameScreen({
         : 'white';
   const boardView: BoardView = { viewer, direction };
 
-  // The opening card: while rolling, then the result for a moment.
+  // The opening card: while rolling (a tie stays until the next roll), then
+  // the result until a tap or for a moment (#176).
   const opening = openingStatus(game);
   const [openingDismissed, setOpeningDismissed] = useState<string | null>(null);
   const decided = opening?.kind === 'decided';
@@ -183,6 +190,15 @@ export function GameScreen({
     return () => clearTimeout(timer);
   }, [decided, gameKey]);
   const showOpening = opening !== null && !(decided && openingDismissed === gameKey);
+  // Just after a tie, Roll waits a moment (the dice land first).
+  const tieKey = opening?.kind === 'tie' ? `${gameKey}:${opening.round}` : null;
+  const [tieSeen, setTieSeen] = useState<string | null>(null);
+  useEffect(() => {
+    if (tieKey === null) return;
+    const timer = setTimeout(() => setTieSeen(tieKey), OPENING_TIE_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [tieKey]);
+  const tieWait = tieKey !== null && tieSeen !== tieKey;
 
   const matchOver = view.matchPhase === 'match-over' && match.winner !== null;
   const gameOver = view.matchPhase === 'game-over' && game.result !== null;
@@ -208,7 +224,8 @@ export function GameScreen({
     view.toMove === botPlayer;
 
   const roller = nextOpeningRoller(game);
-  const canRoll = !showPass && !botsTurn && (phase === 'awaiting-roll' || roller !== null);
+  const canRoll =
+    !showPass && !botsTurn && (phase === 'awaiting-roll' || (roller !== null && !tieWait));
 
   const roll = () => {
     if (!canRoll) return;
@@ -382,21 +399,15 @@ export function GameScreen({
   const fromOpening = game.opening !== null && game.lastTurn === null;
   const rollKey = fromOpening || showPass ? null : `${gameKey}:${game.state.turnNumber}`;
 
+  // The opening Roll button sits on the opening card, next to the dice (#176).
+  const openingRollLabel =
+    openingTaps === 'perPlayer' && roller !== null
+      ? t('game.roll.openingFor', { name: nameOf(roller) })
+      : t('game.roll.opening');
+
   let controls;
   if (phase === 'opening-roll') {
-    const label =
-      openingTaps === 'perPlayer' && roller !== null
-        ? t('game.roll.openingFor', { name: nameOf(roller) })
-        : t('game.roll.opening');
-    controls = (
-      <ActionButton
-        testID="roll-button"
-        label={label}
-        subtitle={t('game.roll.orTapBoard')}
-        onPress={roll}
-        grow
-      />
-    );
+    controls = null;
   } else if (botsTurn && !showPass && view.matchPhase === 'playing') {
     const rolled = game.state.dice;
     controls = (
@@ -616,7 +627,11 @@ export function GameScreen({
           status={opening}
           names={{ white: nameOf('white'), black: nameOf('black') }}
           you={isYou('white') ? 'white' : isYou('black') ? 'black' : null}
-          roundKey={`${gameKey}:${game.opening?.ties.length ?? 0}`}
+          gameKey={gameKey}
+          rollLabel={openingRollLabel}
+          rollDisabled={tieWait}
+          onRoll={roll}
+          onClose={() => setOpeningDismissed(gameKey)}
           onDieLanded={onDiceLanded}
         />
       </Pressable>

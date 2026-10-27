@@ -150,7 +150,21 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       rng: createSeededRng(1),
     });
     await showGame(store);
-    // The opening card.
+    // The opening card, with its Roll button (#176).
+    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+
+    // One die rolled ("Maria Papadopoulou rolled 5."), then a tie that stays (#176).
+    await act(async () => {
+      store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+    });
+    expect(screen.getByTestId('opening-message')).toHaveTextContent(/5/);
+    expect(problems()).toEqual([]);
+    await act(async () => {
+      store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 5 });
+    });
+    expect(store.getState().flow.game.opening?.ties).toEqual([5]);
     expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
 
@@ -160,6 +174,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
     });
     expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('opening-ok-button')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
     await act(async () => {
       jest.advanceTimersByTime(OPENING_RESULT_MS);
