@@ -1,7 +1,7 @@
 import { createSeededRng, legalNextMoves, resolveRules } from '@tavli/engine';
 
 import { createGameStore, type GameStore } from './gameStore';
-import { diceWereRolled } from './rolledDice';
+import { diceWereChosen, diceWereRolled } from './rolledDice';
 
 /** An Acey-Deucey game (a 1-2 chooses a double), White to roll its first turn. */
 function aceyDeucey(): GameStore {
@@ -53,5 +53,37 @@ describe('diceWereRolled (#177)', () => {
     dispatch({ type: 'answer', player: 'black', choice: '4' });
     expect(store.getState().flow.game.state.dice).toEqual([4, 4]);
     expect(diceWereRolled(store.getState().flow)).toBe(false);
+  });
+});
+
+describe('diceWereChosen (#205)', () => {
+  it('is true for a double chosen after a 1-2, until the next roll', () => {
+    const store = aceyDeucey();
+    playTurn(store, 'white');
+    const { dispatch } = store.getState();
+    dispatch({ type: 'roll', player: 'black', dice: [1, 2] });
+    expect(diceWereChosen(store.getState().flow, [1, 2])).toBe(false);
+    playTurn(store, 'black');
+    dispatch({ type: 'answer', player: 'black', choice: '4' });
+    expect(diceWereChosen(store.getState().flow, [4, 4])).toBe(true);
+    // Another value was not chosen.
+    expect(diceWereChosen(store.getState().flow, [3, 3])).toBe(false);
+    // The chosen double played in full gives a new roll (aceDeuceExtraRoll).
+    playTurn(store, 'black');
+    expect(store.getState().flow.game.state.toMove).toBe('black');
+    dispatch({ type: 'roll', player: 'black', dice: [4, 4] });
+    expect(diceWereChosen(store.getState().flow, [4, 4])).toBe(false);
+    expect(diceWereRolled(store.getState().flow)).toBe(true);
+  });
+
+  it('is false for rolled dice, a rolled double and the opening dice', () => {
+    const store = aceyDeucey();
+    // The opening 6-1 does not open the loading lock: a pass with those dice.
+    const opening = store.getState().flow.game.lastTurn!;
+    expect(opening.dice).toEqual([6, 1]);
+    expect(diceWereChosen(store.getState().flow, opening.dice)).toBe(false);
+    playTurn(store, 'white');
+    store.getState().dispatch({ type: 'roll', player: 'black', dice: [5, 5] });
+    expect(diceWereChosen(store.getState().flow, [5, 5])).toBe(false);
   });
 });

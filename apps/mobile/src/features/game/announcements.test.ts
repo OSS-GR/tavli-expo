@@ -1,9 +1,17 @@
-import { createSeededRng, legalNextMoves, type PlayerId } from '@tavli/engine';
+import {
+  asodio,
+  createGameFlow,
+  createSeededRng,
+  legalNextMoves,
+  resolveRules,
+  type PlayerId,
+} from '@tavli/engine';
 
 import i18n from '@/i18n';
 
-import { turnAnnouncement } from './announcements';
+import { turnAnnouncement, type AnnouncementNames } from './announcements';
 import { createGameStore } from './gameStore';
+import { diceWereRolled } from './rolledDice';
 
 const names = { white: 'Ann', black: 'Bot' } as const;
 const vsBot = {
@@ -100,5 +108,101 @@ describe('turnAnnouncement', () => {
     dispatch({ type: 'resign', player: 'black' });
     expect(store.getState().flow.game.result).not.toBeNull();
     expect(turnAnnouncement(store.getState().flow, i18n.t, passAndPlay)).toBeNull();
+  });
+});
+
+/**
+ * Acey-Deucey Asodio: `player` plays a 1-2 from the empty board and must
+ * now choose a double (`chooseDouble`).
+ */
+function afterAceDeuce(player: PlayerId) {
+  const rules = resolveRules('asodio.aceyDeuceyGreek');
+  const store = createGameStore({ players: names, rules, rng: createSeededRng(3) });
+  const state = asodio.initialState({ startingPlayer: player, rules });
+  store.setState({
+    flow: { ...store.getState().flow, game: createGameFlow({ state, starter: player }) },
+  });
+  const { dispatch } = store.getState();
+  dispatch({ type: 'roll', player, dice: [1, 2] });
+  const nextMove = () => legalNextMoves(store.getState().flow.game)[0]?.moves[0];
+  dispatch({ type: 'move', player, move: nextMove()! });
+  dispatch({ type: 'move', player, move: nextMove()! });
+  dispatch({ type: 'confirm', player });
+  expect(store.getState().flow.game.phase).toBe('awaiting-answer');
+  const announce = (who: AnnouncementNames = vsBot) =>
+    turnAnnouncement(store.getState().flow, i18n.t, who);
+  return { store, dispatch, nextMove, announce };
+}
+
+describe('turnAnnouncement: a chosen double (#202)', () => {
+  it('says you chose the double, not that you rolled it', () => {
+    const { store, dispatch, nextMove, announce } = afterAceDeuce('white');
+    // The question is open: nothing to read yet.
+    expect(announce()).toBeNull();
+    dispatch({ type: 'answer', player: 'white', choice: '4' });
+    expect(store.getState().flow.game.phase).toBe('moving');
+    expect(announce()).toEqual({ key: '0:2:chosen', text: 'You chose double 4: four moves of 4.' });
+    // A move ends the line. An undo to the turn start gives the same line and key, as after a roll.
+    dispatch({ type: 'move', player: 'white', move: nextMove()! });
+    expect(announce()).toBeNull();
+    dispatch({ type: 'undo', player: 'white' });
+    expect(announce()?.key).toBe('0:2:chosen');
+  });
+
+  it('reads the bot’s 1-2 and the double it chose, by name', () => {
+    const { dispatch, announce } = afterAceDeuce('black');
+    dispatch({ type: 'answer', player: 'black', choice: '6' });
+    const said = announce();
+    expect(said?.key).toBe('0:2:chosen');
+    expect(said?.text).toMatch(
+      /^Bot played: [^.]+; [^.]+\. Bot chose double 6: four moves of 6\.$/,
+    );
+    expect(said?.text).not.toMatch(/rolled/);
+  });
+
+  it('pass-and-play: the other player hears who chose which double', () => {
+    const { dispatch, announce } = afterAceDeuce('white');
+    dispatch({ type: 'answer', player: 'white', choice: '3' });
+    expect(announce(passAndPlay)?.text).toMatch(
+      /^Ann played: [^.]+; [^.]+\. Ann chose double 3: four moves of 3\.$/,
+    );
+  });
+
+  it('a rolled double in the same rules still says "rolled"', () => {
+    const { store, dispatch, nextMove, announce } = afterAceDeuce('white');
+    dispatch({ type: 'answer', player: 'white', choice: '2' });
+    for (let move = nextMove(); move !== undefined; move = nextMove()) {
+      dispatch({ type: 'move', player: 'white', move });
+    }
+    dispatch({ type: 'confirm', player: 'white' });
+    // All four moves played: the same player rolls again (asodio.md 3.3).
+    expect(store.getState().flow.game.state.toMove).toBe('white');
+    dispatch({ type: 'roll', player: 'white', dice: [5, 5] });
+    expect(diceWereRolled(store.getState().flow)).toBe(true);
+    expect(announce()?.text).toBe('You rolled double 5: four moves of 5.');
+  });
+
+  it('reads a chosen double in Greek', async () => {
+    await i18n.changeLanguage('el');
+    const you = afterAceDeuce('white');
+    you.dispatch({ type: 'answer', player: 'white', choice: '4' });
+    expect(you.announce()?.text).toBe('Διάλεξες τεσσάρες: τέσσερις κινήσεις του 4.');
+    const bot = afterAceDeuce('black');
+    bot.dispatch({ type: 'answer', player: 'black', choice: '4' });
+    expect(bot.announce()?.text).toMatch(/ Bot: διάλεξε τεσσάρες: τέσσερις κινήσεις του 4\.$/);
+  });
+
+  it.each([
+    ['1', 'ασσάκια'],
+    ['2', 'δυάρες'],
+    ['3', 'τριάρες'],
+    ['4', 'τεσσάρες'],
+    ['5', 'πεντάρες'],
+    ['6', 'εξάρες'],
+  ])('names the chosen double %s in Greek by its value: %s', async (value, name) => {
+    await i18n.changeLanguage('el');
+    const { dispatch, announce } = afterAceDeuce('white');
+    dispatch({ type: 'answer', player: 'white', choice: value });
+    expect(announce()?.text).toBe(`Διάλεξες ${name}: τέσσερις κινήσεις του ${value}.`);
   });
 });

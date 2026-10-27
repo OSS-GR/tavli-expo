@@ -1,6 +1,7 @@
 /**
  * The board screen (wireframe 6): the player strips, the board with the
- * dice on it, the cards over it (opening roll, no legal moves), the
+ * dice on it, the cards over it (opening roll, no legal moves, the mother
+ * question, the Acey-Deucey "choose a double" after a 1-2), the
  * game-end sheet (wireframe 8) and one row of big buttons (Roll, or Undo ·
  * Confirm). Match end is its own screen (wireframe 9): this screen calls
  * `onMatchOver`.
@@ -84,6 +85,7 @@ import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
 import { useSettings } from '@/features/settings/store';
 
 import { turnAnnouncement } from './announcements';
+import { DoubleChoices } from './DoubleChoices';
 import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, useGameFeedback } from './gameFeedback';
@@ -92,7 +94,7 @@ import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
 import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
-import { diceWereRolled } from './rolledDice';
+import { diceWereChosen, diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
 import { passNotice, winType } from './turnNotices';
 import { useAnnouncement } from './useAnnouncement';
@@ -263,8 +265,9 @@ export function GameScreen({
 
   const matchOver = view.matchPhase === 'match-over' && match.winner !== null;
   const gameOver = view.matchPhase === 'game-over' && game.result !== null;
-  // Plakoto "resign or play on?" (mother pinned). The pinned player answers;
-  // vs the bot, the bot answers its own question in its turn.
+  // A question for one player: Plakoto "resign or play on?" (mother pinned),
+  // or the Acey-Deucey "choose a double" after a 1-2 (#205). The player it
+  // asks answers; vs the bot, the bot answers its own question in its turn.
   const prompt = view.matchPhase === 'playing' ? currentPrompt(game) : null;
   const askHuman = prompt !== null && prompt.player !== botPlayer;
   const blocked = matchOver || gameOver || showPass || showOpening || askHuman;
@@ -637,7 +640,9 @@ export function GameScreen({
       <View testID="bot-turn" style={[styles.botBox, landscape && styles.botBoxSide]}>
         <Text style={styles.botText}>
           {rolled !== null && phase !== 'awaiting-roll'
-            ? t('game.bot.moving', { dice: rolled.join('-') })
+            ? diceWereChosen(flow, rolled)
+              ? t('game.bot.choseMoving', { dice: rolled.join('-') })
+              : t('game.bot.moving', { dice: rolled.join('-') })
             : t('game.bot.waiting')}
         </Text>
       </View>
@@ -775,7 +780,28 @@ export function GameScreen({
   // Cards over the board, at most one at a time, and none once the game is over.
   const over = gameOver || matchOver;
   let card = null;
-  if (!over && askHuman && prompt) {
+  if (!over && askHuman && prompt && prompt.kind === 'chooseDouble') {
+    // Acey-Deucey after a 1-2 (#205): six dice buttons, no way to close it
+    // without a choice. The answer sets the dice; the turn starts at once.
+    const chooser = prompt.player;
+    card = (
+      <GameCard
+        testID="choose-double-card"
+        title={
+          isYou(chooser)
+            ? t('game.chooseDouble.title_you')
+            : t('game.chooseDouble.title', { name: nameOf(chooser) })
+        }
+        lines={[t('game.chooseDouble.body')]}>
+        <DoubleChoices
+          choices={prompt.choices}
+          onChoose={(choice) => {
+            if (dispatch({ type: 'answer', player: chooser, choice })) setFlights([]);
+          }}
+        />
+      </GameCard>
+    );
+  } else if (!over && askHuman && prompt) {
     // Wireframe 17: two buttons of equal weight; no way to close it without a choice.
     const pinned = prompt.player;
     const opponentName = nameOf(other(pinned));
@@ -820,6 +846,14 @@ export function GameScreen({
         : armyFrozen(view.board, pass.player, rules)
           ? 'frozen'
           : 'body';
+    // A double chosen after a 1-2 that no checker can play (#205): "chose", not "rolled".
+    const chosen = diceWereChosen(flow, pass.dice);
+    const text =
+      chosen && reason === 'body'
+        ? 'bodyChosen'
+        : chosen && reason === 'frozen'
+          ? 'frozenChosen'
+          : reason;
     const vars = { name: nameOf(pass.player), dice: pass.dice.join('-') };
     // The player to move now comes from the engine (an extra roll keeps the same player).
     const next = game.state.toMove;
@@ -836,7 +870,7 @@ export function GameScreen({
               : t('game.pass.lockedTitle')
         }
         lines={[
-          isYou(pass.player) ? t(`game.pass.${reason}_you`, vars) : t(`game.pass.${reason}`, vars),
+          isYou(pass.player) ? t(`game.pass.${text}_you`, vars) : t(`game.pass.${text}`, vars),
           isYou(next) ? t('game.pass.next_you') : t('game.pass.next', { name: nameOf(next) }),
         ]}
         {...(botPassed ? { footnote: t('game.pass.autoClose') } : {})}>
