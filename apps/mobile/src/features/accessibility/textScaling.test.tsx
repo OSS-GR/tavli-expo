@@ -1,14 +1,9 @@
 /**
  * Large system fonts (#134): Home, New game, the game screen and its cards
-<<<<<<< HEAD
- * (#153; choose a double, #205), the game menu and resign dialog, the end
- * screens, the game review (#215), History (#142), the tutorial's mother
- * card (#149) and the Settings game picker (#159)
-=======
  * (#153; choose a double, #205; the opening roll house rule cards, #207),
- * the game menu and resign dialog, the end screens, History (#142), the
- * tutorial's mother card (#149) and the Settings game picker (#159)
->>>>>>> origin/main
+ * the game menu and resign dialog, the end screens, the game review
+ * (#215), History (#142), the tutorial's mother card (#149) and the
+ * Settings game picker (#159)
  * follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
