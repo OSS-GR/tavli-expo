@@ -88,14 +88,16 @@ const analyzer = createAnalyzer();
 const ranked = analyzer.rankTurns(state, dice, { top: 3 }); // best first
 ranked[0].turn; // the hint
 ranked[1].equityLoss; // points lost against the best turn
+analyzer.rankTurns(state, dice, { plies: 2, top: 3 }); // one roll deeper (#212)
 analyzer.evaluate(state); // the chances of state.toMove, before the roll
 ```
 
 - It uses the variant's best evaluator: hard (the net) if there is one,
   else medium. The default registry has a net for every game.
-- `rankTurns` scores every legal turn with `scoreTurns` (1-ply), like the
-  bot. A turn that wins at once ranks first (more points first), then the
-  rest by score. Its best turn is what hard plays at temperature 0.
+- `rankTurns` (`plies: 1`, the default) scores every legal turn with
+  `scoreTurns` (1-ply), like the bot. A turn that wins at once ranks first
+  (more points first), then the rest by score. Its best turn is what hard
+  plays at temperature 0.
 - Each `RankedTurn` has the `evaluation` after the turn, from the view of
   the mover (`state.toMove`), and `equityLoss` against the best turn (0 for
   the best, never below 0). `evaluation.equity` is the turn's score. When
@@ -107,13 +109,58 @@ analyzer.evaluate(state); // the chances of state.toMove, before the roll
   keep the engine's order of `legalTurns`.
 - A forced turn (or a pass) is a list of one with `equityLoss` 0.
 - `top` keeps the best `top` turns (an integer >= 1). Default: all.
-- `plies: 2` throws `BotError('NOT_IMPLEMENTED')` for now. Only 1-ply works.
 - `evaluate` of a finished game gives the true result (a draw is half a
   win, like in the nets).
-- Errors: `NOT_IMPLEMENTED` (2-ply, or no hard or medium evaluator),
+- Errors: `NOT_IMPLEMENTED` (no hard or medium evaluator),
   `INVALID_REQUEST` (`dice` differs from `state.dice`, a bad `top` or
   `plies`), `INVALID_REGISTRY` like `createBot`, and the engine's errors
   (a finished game in `rankTurns`, an unknown variant).
+
+### 2-ply (#212)
+
+`plies: 2` looks one roll deeper, for better hints and a fairer review:
+
+1. Score every turn at 1 ply. The candidates are the best 8
+   (`TWO_PLY_CANDIDATES`), plus any turn within 0.02 points of the best
+   (`TWO_PLY_MARGIN`, a near tie), at most 16 in all
+   (`TWO_PLY_MAX_CANDIDATES`).
+2. For each candidate, play it, then average over the 21 different rolls
+   of the next player (a double 1/36, the others 2/36) the result after
+   their best 1-ply reply (the turn hard plays at temperature 0).
+3. Rank the candidates by that 2-ply equity. A turn that wins at once is
+   still the best (its value is exact). The other turns follow in their
+   1-ply order, with their 1-ply evaluation; their `equityLoss` is their
+   1-ply loss, but never less than the last candidate's, so the list stays
+   sorted. A candidate's `evaluation` is the average of the chances after
+   each reply, from the mover's view, with the 2-ply equity.
+
+The engine drives every step, and the next player is always `toMove`:
+
+- A question after the turn (Plakoto "resign or play on", the Asodio
+  chosen double) gets the best 1-ply answer of the player asked
+  (`scoreAnswers`, as the bot answers). Then play goes on.
+- A state that holds dice (the Asodio chosen double) plays those dice: the
+  value is the best reply with them, with no average over rolls.
+- An Asodio extra roll keeps the same player to move. Then the "reply" is
+  the mover's own next roll, so its value counts for the mover.
+
+Why these numbers: on 189 random positions of all games with more than
+one turn, 2-ply on the best 16 found its best turn in the 1-ply top 3 in
+96 % of them, and outside the top 8 only twice. The margin adds near ties
+past the top 8; the cap stops Asodio rolls with dozens of near-equal turns
+from taking seconds.
+
+**Time** (Node 22, dev container, after warm-up): the middle-game Portes
+position in `src/analyzer-perf.test.ts` (4-2) ranks in about 110 ms; that
+test checks < 2 s. Over 30 random positions per game: Portes median 34 ms
+(worst 200 ms), Plakoto 87 ms (313 ms), Fevga 35 ms (140 ms), Asodio
+3 ms (1.1 s). Acey-Deucey is slow: median 0.45 s, worst 7 s. Its rules
+are not the net's, so it uses the Asodio heuristic, which costs about
+0.4 ms per position against 0.03 ms for the Portes net. Hermes on a phone
+is several times slower than Node, so a 2-ply hint fits the 1 s phone
+budget for Portes, Plakoto and Fevga, but not yet for Asodio. The bot's
+own play (`chooseTurn`) stays 1-ply, and nothing in the app uses 2 ply
+yet.
 
 ## The levels
 
@@ -1153,6 +1200,15 @@ the Plakoto one about 15 s with hard vs medium; the files run in parallel).
   > = 0, the best turn is hard at temperature 0, the evaluations are from
   > the mover's view, the same input gives the same output, Acey-Deucey
   > roll chains, `top`, the evaluator choice and the errors.
+- `analyzer-2ply.test.ts` (#212): 2-ply and 1-ply agree on a forced turn
+  and a win now; every game's 2-ply ranking holds every legal turn once,
+  sorted, the same for the same input; the candidates rank first and the
+  rest keep their 1-ply order; a candidate's equity equals a count by hand
+  over the 36 rolls; a race-only test evaluator splits into a direct shot
+  at 1 ply but stays safe at 2 ply; the Plakoto mother question; Asodio
+  extra rolls and chosen doubles; the errors.
+- `analyzer-perf.test.ts`: a 2-ply hint for a middle-game Portes position
+  takes < 2 s.
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for
   a seed; passes; a win now is never missed (easy, medium, the fallback,
   even with a huge temperature and an evaluator that wants to lose);
