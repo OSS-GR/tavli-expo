@@ -1,6 +1,6 @@
 # App shell: Home, new game, local matches
 
-> How the app starts a local match (vs bot or pass-and-play) and what the screens around the board do. Code: `apps/mobile/src/app/` (routes) and `apps/mobile/src/features/{home,new-game,match,bot}/`. Last review: 2026-10-27.
+> How the app starts a local match (vs bot or pass-and-play) and what the screens around the board do. Code: `apps/mobile/src/app/` (routes) and `apps/mobile/src/features/{home,new-game,match,bot,rules}/`. Last review: 2026-10-27.
 
 ## Routes
 
@@ -10,7 +10,7 @@
 | New game | `app/new-game.tsx?mode=bot\|local` | `features/new-game/NewGameScreen.tsx` |
 | Board | `app/game/[id]/index.tsx` | `features/match/MatchScreen.tsx` (wraps `GameScreen`) |
 | Match end | `app/game/[id]/match-end.tsx` | `features/match/MatchEndScreen.tsx` |
-| Rules (stub) | `app/rules/[variant].tsx` | a short text page |
+| Rules | `app/rules/[variant].tsx` | `features/rules/RulesScreen.tsx` |
 | Settings | `app/settings.tsx` | `features/settings/SettingsScreen.tsx` |
 
 - Screens get callbacks (`onNewGame`, `onExit`, …). Only the route files call `router`.
@@ -18,6 +18,16 @@
 - The board route has `gestureEnabled: false`: an iOS edge swipe would fight the checker drag.
 - An unknown id shows "This game could not be opened." with a Home button (`MissingGame.tsx`), on the board and on match end.
 - Links and params live in `features/match/routes.ts` (`newGameHref`, `gameHref`, `matchEndHref`, `parseModeParam`, `parseIdParam`).
+
+## Rules pages (#112)
+
+- `/rules/portes`, `/rules/plakoto` and `/rules/fevga` each show a full page. `/rules/tavli` explains the match rotation and links to the three pages. `/rules/asodio` says "coming later"; any other id says there are no rules.
+- Opened from Home (**How to play**), the in-game menu (**How to play Plakoto**: the game on the board, in Tavli the game of the rotation) and New game (the **i** button on each game card). Only the route files call `router`.
+- `features/rules/content.ts` lists each page's sections in reading order: goal, start position, dice and turns, how checkers move, hitting / pinning / no hitting, the special rules (Plakoto mother, Fevga first checker and six-in-a-row bans), bearing off and points. Shared sections (`rules.common.*`) appear on every page; a game can add its own line to a shared section (for example Plakoto: no bearing off while pinned).
+- The texts live in one i18n group, `rules.*`. Each body is a few short lines split by `\n`; each line shows as one bullet paragraph. Greek uses tavli words: πόρτα, πλάκωμα, μάνα, εξάπορτο, μάζεμα, μονό / διπλό, βαθμοί.
+- The texts describe the **default presets** only (`DEFAULT_PRESET_BY_GAME`): Plakoto `motherRule: "offerConcede"` (resign for diplo or play on; both mothers pinned is a draw), Fevga runner rule to pass the opponent's mother and the prime bans P1, P2 (points 6–11) and P3. When a default flag changes, update the page.
+- The start position is a small `StaticBoard` (60% of the width, at most 240 pt, the theme's aspect ratio) built from the engine's start layouts and the preset's direction, with White (light checkers) at the bottom. It is one image for screen readers ("The board at the start of Fevga").
+- Every section title is a header. Nothing has a fixed height, so the page works at large text sizes, and it scrolls.
 
 ## Local matches
 
@@ -95,6 +105,7 @@
 - "Play vs bot" says "Easy for now. Medium is coming soon." until Medium works.
 - A broken save on the board route shows the "could not be opened" card (not a dialog), with a Home button.
 - The game also saves mid-turn when the app goes to the background or the user exits (the wireframe accepts losing those moves; we keep them).
+- New game has a small **i** button on each game card that opens its rules page (not in wireframe 4).
 
 ## Tests
 
@@ -104,4 +115,5 @@
 - `HomeScreen.test.tsx`, `NewGameScreen.test.tsx`, `MatchScreen.test.tsx`: the screens (the game picker vs bot and in pass-and-play, locked games, levels per game; vs bot turn, pause while the menu is open, resign game and match, pass-and-play names; a Tavli match through Portes → Plakoto → Fevga with the game label and the next game).
 - `MatchEndScreen.test.tsx`: the win with every game row (and the game of each row in a Tavli match), the celebration and the announcement; Rematch, Change settings and Home; a lost match (no celebration, the bot starts the rematch); a resigned match; pass-and-play names; reduce motion; Greek.
 - `features/match/save.test.ts`: the save format (round trip, ten kinds of bad data dropped; the saved game: Tavli after a restart, an old save without a game, a game the log does not have), when it saves, clearing a finished match, resume after a restart, the Continue texts and the background hook.
-- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home → Continue, the replace dialog, the `mode` param, an unknown id, a broken save; match end → Rematch → match end → Change settings, and match end → Home with no Continue card). It replaces the library's own Reanimated mock with ours.
+- `features/rules/RulesScreen.test.tsx`: every page shows its sections in order with headers, the start pictures, the Tavli links, Asodio and unknown ids, Greek, and that `en` and `el` have the same `rules.*` keys (and the same number of lines), all used by a page.
+- `src/navigation.test.tsx`: the real routes with `expo-router/testing-library` (Home → New game → board → Home → Continue, the replace dialog, the `mode` param, an unknown id, a broken save; match end → Rematch → match end → Change settings, and match end → Home with no Continue card; the rules pages from New game, the in-game menu and the Tavli page). It replaces the library's own Reanimated mock with ours.

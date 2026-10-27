@@ -109,6 +109,28 @@ describe('<NewGameScreen /> vs bot', () => {
     await user.press(screen.getByRole('button', { name: 'Back' }));
     expect(onBack).toHaveBeenCalled();
   });
+
+  it('opens the rules of the game from the info button', async () => {
+    const user = userEvent.setup();
+    const onRules = jest.fn();
+    const onStart = jest.fn();
+    await render(
+      <NewGameScreen
+        mode="bot"
+        initial={defaultSetup('bot')}
+        botLevels={PORTES_ONLY(['easy'])}
+        onBack={jest.fn()}
+        onStart={onStart}
+        onRules={onRules}
+      />,
+    );
+
+    // The radio keeps its own name; the info button sits next to it.
+    expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
+    await user.press(screen.getByRole('button', { name: 'How to play Portes' }));
+    expect(onRules).toHaveBeenCalledWith('portes');
+    expect(onStart).not.toHaveBeenCalled();
+  });
 });
 
 describe('<NewGameScreen /> pass-and-play', () => {

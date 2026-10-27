@@ -177,7 +177,7 @@ export function NewGameScreen({
                     <Pressable
                       testID={`new-game-rules-${choice}`}
                       accessibilityRole="button"
-                      accessibilityLabel={t('rules.title', { game: t(`games.${choice}`) })}
+                      accessibilityLabel={t(`rules.title.${choice}`)}
                       onPress={() => onRules(choice)}
                       hitSlop={4}
                       style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
