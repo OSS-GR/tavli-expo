@@ -2,15 +2,21 @@
  * The dice in the controls row (wireframes 6c–6f): two dice side by side,
  * or four smaller dice in a 2 x 2 grid for a double. Used dice fade.
  * The values always come from the engine flow.
+ *
+ * A double (#177) first shows the two rolled dice, like any roll. With
+ * `split` it turns into four: each rolled die slides to the top row of the
+ * grid, and a copy of it slides out from under it to the bottom row. The
+ * screen decides when (`useDoubleReveal`).
  */
 import { Canvas } from '@shopify/react-native-skia';
 import type { ThemeManifest } from '@tavli/themes';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import type { DieView } from '@/features/game/gameStore';
 
-import { DIE_SIZE, dicePlaces } from './diceMotion';
+import { DIE_SIZE, dicePlaces, doublePlaces, type DicePlace } from './diceMotion';
 import { AnimatedDie } from './skia/AnimatedDie';
 
 export interface DiceRowProps {
@@ -18,15 +24,61 @@ export interface DiceRowProps {
   dice: readonly DieView[];
   /** Changes on each new roll; `null` shows the dice at rest. */
   rollKey: string | null;
-  /** Called once when the last die lands. */
+  /**
+   * A double: `false` shows only the two rolled dice, `true` the four dice
+   * to play. Default `true`. A change to `true` plays the split. Dice at
+   * rest (`rollKey` null) always show four.
+   */
+  split?: boolean;
+  /** Called once when the last rolled die lands. */
   onLanded?: () => void;
   size?: number;
   testID?: string;
 }
 
-export function DiceRow({ theme, dice, rollKey, onLanded, size = DIE_SIZE, testID }: DiceRowProps) {
+interface Slot {
+  readonly place: DicePlace;
+  /** A double: the die's place in the pair before the split. */
+  readonly pairAt?: DicePlace;
+  /** This die rolls (a double rolls only its first two dice). */
+  readonly rolls: boolean;
+}
+
+export function DiceRow({
+  theme,
+  dice,
+  rollKey,
+  split: givenSplit = true,
+  onLanded,
+  size = DIE_SIZE,
+  testID,
+}: DiceRowProps) {
   const { t } = useTranslation();
-  const { places, width, height } = dicePlaces(dice.length, size);
+  const double = dice.length === 4;
+  // Dice at rest (no roll) always show all four dice of a double.
+  const split = givenSplit || rollKey === null;
+  // Did this row show the pair of this roll? Then the split slides the new
+  // dice out of the pair. Otherwise (a double at rest) the grid shows at once.
+  const [pairShown, setPairShown] = useState<string | null>(null);
+  const pairKey = rollKey ?? 'rest';
+  if (double && !split && pairShown !== pairKey) setPairShown(pairKey);
+  const slideIn = double && pairShown === pairKey;
+
+  let slots: Slot[];
+  let width: number;
+  let height: number;
+  if (double) {
+    const box = doublePlaces(size);
+    ({ width, height } = box);
+    slots = box.grid.map((place, i) => ({ place, pairAt: box.pair[i % 2], rolls: i < 2 }));
+  } else {
+    const row = dicePlaces(dice.length, size);
+    ({ width, height } = row);
+    slots = row.places.map((place) => ({ place, rolls: true }));
+  }
+  // The last die that rolls calls `onLanded`.
+  const lastRoller = double ? 1 : dice.length - 1;
+
   const tilt = theme.layouts['portrait-rotated'].dice.tilt;
   const label = t('game.dice.label', {
     values: dice.map((d) => String(d.value)).join('-'),
@@ -35,7 +87,8 @@ export function DiceRow({ theme, dice, rollKey, onLanded, size = DIE_SIZE, testI
   return (
     // The canvas always sits in this native view (`collapsable={false}`), so
     // it never moves to another native parent when a view around it changes.
-    // On iOS a Skia canvas that moves loses its drawing (#173).
+    // On iOS a Skia canvas that moves loses its drawing (#173). The split of a
+    // double happens inside this one canvas.
     <View collapsable={false} style={{ width, height }}>
       <Canvas
         testID={testID}
@@ -44,21 +97,25 @@ export function DiceRow({ theme, dice, rollKey, onLanded, size = DIE_SIZE, testI
         accessibilityLabel={label}
         style={{ width, height }}>
         {dice.map((d, i) => {
-          const place = places[i];
-          if (place === undefined) return null;
+          const slot = slots[i];
+          if (slot === undefined) return null;
+          // Before the split a double draws only its two rolled dice.
+          if (!slot.rolls && !split) return null;
           return (
             <AnimatedDie
               key={`${rollKey ?? 'rest'}:${i}`}
               style={theme.dice}
-              x={place.x}
-              y={place.y}
-              size={place.size}
+              x={slot.place.x}
+              y={slot.place.y}
+              size={slot.place.size}
               value={d.value}
               index={i}
               tilt={tilt[i % 2] ?? 0}
               used={d.used}
-              rollKey={rollKey}
-              {...(i === dice.length - 1 && onLanded ? { onLand: onLanded } : {})}
+              rollKey={slot.rolls ? rollKey : null}
+              {...(slot.pairAt ? { pairAt: slot.pairAt, split } : {})}
+              {...(!slot.rolls && slideIn ? { slideIn: true } : {})}
+              {...(i === lastRoller && onLanded ? { onLand: onLanded } : {})}
             />
           );
         })}

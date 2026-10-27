@@ -222,7 +222,8 @@
       "orTapBoard": "ή πάτα το ταμπλό"
     },
     "dice": {
-      "label": "Ζάρια {{values}}, μένουν {{left}} για παίξιμο"
+      "label": "Ζάρια {{values}}, μένουν {{left}} για παίξιμο",
+      "doubles": "Διπλές!"
     },
     "strip": {
       "pips": "Πόντοι {{count}}",
@@ -260,6 +261,8 @@
     "announce": {
       "rolled": "{{name}}: έφερε {{dice}}.",
       "rolled_you": "Έφερες {{dice}}.",
+      "rolledDouble": "{{name}}: έφερε διπλές {{value}}: τέσσερις κινήσεις του {{value}}.",
+      "rolledDouble_you": "Έφερες διπλές {{value}}: τέσσερις κινήσεις του {{value}}.",
       "played": "{{name}}: έπαιξε {{moves}}."
     },
     "pass": {

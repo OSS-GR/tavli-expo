@@ -2,7 +2,8 @@
  * What the board screen reads to screen reader users as the game goes on
  * (#134). Pure.
  *
- * - After a roll: "Bob rolled 5-3." (or "You rolled 5-3.").
+ * - After a roll: "Bob rolled 5-3." (or "You rolled 5-3."). A double:
+ *   "You rolled double 4: four moves of 4." (#177).
  * - After another player's turn: "Bob played: Checker from point 13 to
  *   point 8; …. Your turn." Vs the bot that is the bot's turn; in
  *   pass-and-play every turn, so the next player hears what happened.
@@ -11,7 +12,7 @@
  * card (who starts), the pass card (the roll and why nothing moved), the
  * mother question, the game-end sheet and the match-end screen.
  */
-import { matchPhase, type MatchFlow, type PlayerId } from '@tavli/engine';
+import { isDouble, matchPhase, type MatchFlow, type PlayerId } from '@tavli/engine';
 import type { TFunction } from 'i18next';
 
 import { moveLabel } from '@/features/accessibility/moveList';
@@ -41,7 +42,19 @@ export function turnAnnouncement(
   const fromOpening = game.opening !== null && game.lastTurn === null;
   if (game.phase === 'moving' && game.played.length === 0 && dice !== null && !fromOpening) {
     const player = game.state.toMove;
-    const vars = { name: nameOf(player), dice: dice.join('-') };
+    const name = nameOf(player);
+    // A double says that it plays four times (#177): the dice row shows the
+    // two dice first and the four a moment later, but this is read once.
+    if (isDouble(dice)) {
+      const vars = { name, value: dice[0] };
+      return {
+        key: `${key}:roll`,
+        text: isYou(player)
+          ? t('game.announce.rolledDouble_you', vars)
+          : t('game.announce.rolledDouble', vars),
+      };
+    }
+    const vars = { name, dice: dice.join('-') };
     return {
       key: `${key}:roll`,
       text: isYou(player) ? t('game.announce.rolled_you', vars) : t('game.announce.rolled', vars),

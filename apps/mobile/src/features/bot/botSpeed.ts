@@ -18,10 +18,17 @@ export interface BotTiming {
   readonly beforeRollMs: number;
   /**
    * The least time from the bot's own roll to its first move. The dice
-   * land (the last die of a double: `DICE_LAND_MS`) and stay on screen for
-   * a moment before a checker moves. Only after a roll the bot just made.
+   * land (`DICE_LAND_MS`) and stay on screen for a moment before a checker
+   * moves. Only after a roll the bot just made.
    */
   readonly afterRollMs: number;
+  /**
+   * A double waits this much longer than `afterRollMs` (#177). Its two dice
+   * stay a beat after they land, then split into four (`DOUBLE_BEAT_MS` +
+   * `DOUBLE_SPLIT_MS`). So the pause after the four dice show is as long
+   * as the pause after any other roll.
+   */
+  readonly doubleMs: number;
   /**
    * Time from one move to the next. It is longer than a checker flight
    * (`FLIGHT_MS`, and `HIT_DELAY_MS` more for a hit), so each move lands
@@ -43,13 +50,35 @@ export interface BotTiming {
 /**
  * The timings of each Bot speed. Normal is the default. Before #172 the
  * bot rolled after 0.5 s and moved every 0.4 s: too fast to follow.
- * `afterRollMs` is the dice landing (920 ms) plus 1000, 600 or 250 ms.
+ * `afterRollMs` is the dice landing (740 ms) plus 1180, 780 or 430 ms.
+ * `doubleMs` is the same at every speed: the split of a double takes 900 ms.
  * `landMs` is the flight (200 ms) plus 400, 250 or 150 ms.
  */
 export const BOT_SPEED_TIMING: Readonly<Record<BotSpeed, BotTiming>> = {
-  slow: { beforeRollMs: 1300, afterRollMs: 1920, moveMs: 1300, hitMs: 700, landMs: 600 },
-  normal: { beforeRollMs: 900, afterRollMs: 1520, moveMs: 900, hitMs: 500, landMs: 450 },
-  fast: { beforeRollMs: 600, afterRollMs: 1170, moveMs: 550, hitMs: 300, landMs: 350 },
+  slow: {
+    beforeRollMs: 1300,
+    afterRollMs: 1920,
+    doubleMs: 900,
+    moveMs: 1300,
+    hitMs: 700,
+    landMs: 600,
+  },
+  normal: {
+    beforeRollMs: 900,
+    afterRollMs: 1520,
+    doubleMs: 900,
+    moveMs: 900,
+    hitMs: 500,
+    landMs: 450,
+  },
+  fast: {
+    beforeRollMs: 600,
+    afterRollMs: 1170,
+    doubleMs: 900,
+    moveMs: 550,
+    hitMs: 300,
+    landMs: 350,
+  },
 };
 
 /** The default timing: Normal speed. */

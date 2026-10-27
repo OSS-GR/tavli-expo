@@ -222,7 +222,8 @@
       "orTapBoard": "or tap the board"
     },
     "dice": {
-      "label": "Dice {{values}}, {{left}} left to play"
+      "label": "Dice {{values}}, {{left}} left to play",
+      "doubles": "Doubles!"
     },
     "strip": {
       "pips": "Pips {{count}}",
@@ -260,6 +261,8 @@
     "announce": {
       "rolled": "{{name}} rolled {{dice}}.",
       "rolled_you": "You rolled {{dice}}.",
+      "rolledDouble": "{{name}} rolled double {{value}}: four moves of {{value}}.",
+      "rolledDouble_you": "You rolled double {{value}}: four moves of {{value}}.",
       "played": "{{name}} played: {{moves}}."
     },
     "pass": {

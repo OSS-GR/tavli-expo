@@ -43,6 +43,7 @@ import { DiceRow } from '@/features/board/DiceRow';
 import { moveFlights, type Flight } from '@/features/board/flights';
 import type { BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
+import { useDoubleReveal } from '@/features/board/useDoubleReveal';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { useSettings } from '@/features/settings/store';
 
@@ -402,6 +403,8 @@ export function GameScreen({
   // The opening dice already rolled in the card: show them at rest.
   const fromOpening = game.opening !== null && game.lastTurn === null;
   const rollKey = fromOpening || showPass ? null : `${gameKey}:${game.state.turnNumber}`;
+  // A double shows its two dice first, then splits into four (#177).
+  const reveal = useDoubleReveal(rollKey, dice);
 
   // The opening Roll button sits on the opening card, next to the dice (#176).
   const openingRollLabel =
@@ -423,6 +426,7 @@ export function GameScreen({
             theme={theme}
             dice={dice}
             rollKey={rollKey}
+            split={reveal.split}
             onLanded={onDiceLanded}
           />
         ) : null}
@@ -460,6 +464,7 @@ export function GameScreen({
             theme={theme}
             dice={dice}
             rollKey={rollKey}
+            split={reveal.split}
             onLanded={onDiceLanded}
           />
         </View>
@@ -731,6 +736,10 @@ export function GameScreen({
   // dice went blank after the menu or Settings (#173).
   const hideScreen = covered || endSheet !== null;
   const hideBoard = card !== null;
+  // "Doubles!" for a moment after the split. Another note over the board wins.
+  const confirmHint = view.canConfirm && !blocked && !botsTurn;
+  const showDoublesHint =
+    reveal.label && !blocked && !confirmHint && botNote === null && gateToMove === null;
 
   return (
     <View style={styles.screen}>
@@ -798,10 +807,22 @@ export function GameScreen({
               </Text>
             </View>
           ) : null}
-          {view.canConfirm && !blocked && !botsTurn ? (
+          {confirmHint ? (
             <View style={styles.hintRow} pointerEvents="none">
               <Text testID="confirm-hint" style={styles.hint}>
                 {t('game.controls.allUsed')}
+              </Text>
+            </View>
+          ) : null}
+          {showDoublesHint ? (
+            // The roll announcement already says it is a double, so screen readers skip this.
+            <View style={styles.hintRow} pointerEvents="none">
+              <Text
+                testID="doubles-hint"
+                style={styles.hint}
+                accessible={false}
+                importantForAccessibility="no">
+                {t('game.dice.doubles')}
               </Text>
             </View>
           ) : null}
