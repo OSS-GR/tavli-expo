@@ -4,10 +4,18 @@
  * controls row (Roll, or Undo · dice · Confirm).
  *
  * Game logic stays in the engine. This screen sends actions to the game
- * store and shows the result.
+ * store and shows the result. Vs bot, the bot's turn runs here too
+ * (`startBotTurn`), so its moves fly like a human's.
  */
-import { applyMoveToBoard, type Move, type PlayerId } from '@tavli/engine';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { BotRunner, Difficulty } from '@tavli/contracts';
+import {
+  applyMoveToBoard,
+  type Move,
+  type PerPlayer,
+  type PlayerId,
+  type Rng,
+} from '@tavli/engine';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -19,6 +27,7 @@ import { DiceRow } from '@/features/board/DiceRow';
 import { moveFlights, type Flight } from '@/features/board/flights';
 import type { BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
+import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { useSettings } from '@/features/settings/store';
 
 import { GameCard } from './GameCard';
@@ -27,12 +36,25 @@ import { diceView, turnView, useGameStore, type DieView, type GameStore } from '
 import { nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
 import { PlayerStrip } from './PlayerStrip';
+import { plainSeats, type Seat } from './seats';
 import { passNotice, winType } from './turnNotices';
 
 /** How long the opening result stays on screen. */
 export const OPENING_RESULT_MS = 1500;
 /** The "no legal moves" card closes by itself after this time (wireframe 6f). */
 export const PASS_NOTICE_MS = 3000;
+/** The same card when the bot cannot move (wireframe 6f: "closes after 2 s"). */
+export const BOT_PASS_NOTICE_MS = 2000;
+
+/** The bot's side in a game vs the bot. */
+export interface BotSeat {
+  readonly player: PlayerId;
+  readonly difficulty: Difficulty;
+  readonly runner: BotRunner;
+  /** A UI RNG for think time and bot seeds. Never the dice RNG. */
+  readonly rng: Rng;
+  readonly timing?: Partial<BotTiming>;
+}
 
 export interface GameScreenProps {
   store: GameStore;
@@ -41,11 +63,33 @@ export interface GameScreenProps {
    * `one`: one tap rolls both (vs bot).
    */
   openingTaps?: 'one' | 'perPlayer';
+  /** Names and turn pills. Default: the names in the match. */
+  seats?: PerPlayer<Seat>;
+  /** Vs bot: the bot plays this side. Its turn locks the board. */
+  bot?: BotSeat;
+  /** Stops the bot (the menu is open, or another screen is on top). */
+  paused?: boolean;
+  /** Shows the menu button (wireframe 7). */
+  onOpenMenu?: () => void;
+  /** Shows "Home" on the game-end and match-end cards. */
+  onHome?: () => void;
+  /** Shows "Change settings" on the match-end card. */
+  onChangeSettings?: () => void;
 }
 
 const other = (player: PlayerId): PlayerId => (player === 'white' ? 'black' : 'white');
+const BOTH_SIDES: readonly PlayerId[] = ['white', 'black'];
 
-export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps) {
+export function GameScreen({
+  store,
+  openingTaps = 'perPlayer',
+  seats: givenSeats,
+  bot,
+  paused = false,
+  onOpenMenu,
+  onHome,
+  onChangeSettings,
+}: GameScreenProps) {
   const { t } = useTranslation();
   const theme = useBoardTheme();
   const flow = useGameStore(store, (s) => s.flow);
@@ -54,32 +98,41 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
   const flipMode = useSettings((s) => s.boardFlipMode);
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
   const showPips = useSettings((s) => s.showPipCounts);
-  // Sound and haptics: moves, rolls and wins play by themselves (from the engine log).
-  const feedback = useGameFeedback(store, theme);
 
   const view = useMemo(() => turnView(flow), [flow]);
   const { game, phase } = view;
   const { match } = flow;
-  const names = match.players;
+  const seats = givenSeats ?? plainSeats(match.players, t('game.strip.turn'));
   const gameKey = String(match.games.length);
   const direction = game.state.rules.movement.direction;
+  const botPlayer = bot?.player ?? null;
+  // Sound and haptics: moves, rolls and wins play by themselves (from the engine
+  // log). Vs the bot only the person's side counts, so a bot win plays no jingle.
+  const humans = useMemo(() => (botPlayer === null ? BOTH_SIDES : [other(botPlayer)]), [botPlayer]);
+  const feedback = useGameFeedback(store, theme, humans);
 
   // "No legal moves": the flow has passed the turn already; the card says why.
   const pass = passNotice(flow);
   const [passDismissed, setPassDismissed] = useState<string | null>(null);
   const passKey = pass?.key ?? null;
   const showPass = pass !== null && passDismissed !== pass.key;
+  const passMs = pass !== null && pass.player === botPlayer ? BOT_PASS_NOTICE_MS : PASS_NOTICE_MS;
   // Keyed on the pass, not the notice object (a new one on each render).
   useEffect(() => {
     if (!showPass || passKey === null) return;
-    const timer = setTimeout(() => setPassDismissed(passKey), PASS_NOTICE_MS);
+    const timer = setTimeout(() => setPassDismissed(passKey), passMs);
     return () => clearTimeout(timer);
-  }, [showPass, passKey]);
+  }, [showPass, passKey, passMs]);
 
   // Pass-and-play "flip": the player to move sits at the bottom. While the
   // pass card shows, the board stays with the player who passed.
   const active: PlayerId = showPass && pass ? pass.player : view.toMove;
-  const viewer: PlayerId = flipMode === 'flip' && phase !== 'opening-roll' ? active : 'white';
+  const viewer: PlayerId =
+    botPlayer !== null
+      ? other(botPlayer)
+      : flipMode === 'flip' && phase !== 'opening-roll'
+        ? active
+        : 'white';
   const boardView: BoardView = { viewer, direction };
 
   // The opening card: while rolling, then the result for a moment.
@@ -93,8 +146,17 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
   }, [decided, gameKey]);
   const showOpening = opening !== null && !(decided && openingDismissed === gameKey);
 
+  const matchOver = view.matchPhase === 'match-over' && match.winner !== null;
+  const gameOver = view.matchPhase === 'game-over' && game.result !== null;
+  const blocked = matchOver || gameOver || showPass || showOpening;
+  const botsTurn =
+    botPlayer !== null &&
+    phase !== 'opening-roll' &&
+    view.matchPhase === 'playing' &&
+    view.toMove === botPlayer;
+
   const roller = nextOpeningRoller(game);
-  const canRoll = !showPass && (phase === 'awaiting-roll' || roller !== null);
+  const canRoll = !showPass && !botsTurn && (phase === 'awaiting-roll' || roller !== null);
 
   const roll = () => {
     if (!canRoll) return;
@@ -120,17 +182,23 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
     geoRef.current = geo;
   }, []);
 
-  const onMove = (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => {
-    const mover = view.toMove;
-    const before = view.board;
-    const ok = dispatch({ type: 'move', player: mover, move, autoConfirm });
-    // The move's sound and haptic play from the engine log (useGameFeedback).
+  /** Plays one move (human or bot) and lets the checker fly. Reads the store, not the render. */
+  const playMove = (
+    move: Move,
+    geo: BoardGeometry | null,
+    from: { x: number; y: number } | null,
+    withAutoConfirm: boolean,
+  ): boolean => {
+    const now = turnView(store.getState().flow);
+    const mover = now.toMove;
+    const before = now.board;
+    const ok = dispatch({ type: 'move', player: mover, move, autoConfirm: withAutoConfirm });
     if (!ok) return false;
     // The turn ended (auto-confirm) and the board turns: no flight, and the
     // flights still in the air belong to the old view.
     const next = store.getState().flow.game;
     const turnEnded = next.state.toMove !== mover || next.phase === 'awaiting-roll';
-    if (turnEnded && flipMode === 'flip') {
+    if (geo === null || (turnEnded && flipMode === 'flip')) {
       setFlights([]);
       return true;
     }
@@ -143,24 +211,76 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
     return true;
   };
 
-  const undo = () => {
-    const last = game.played[game.played.length - 1];
-    const mover = view.toMove;
-    const before = view.board;
-    if (!dispatch({ type: 'undo', player: mover }) || last === undefined) return;
+  /** Returns whether the move was played; if not, the board flies the checker back. */
+  const onMove = (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => {
+    if (botsTurn) return false;
+    return playMove(move, geo, from, autoConfirm);
+  };
+
+  const undo = (): boolean => {
+    const now = store.getState().flow;
+    const last = now.game.played[now.game.played.length - 1];
+    const mover = now.game.state.toMove;
+    const before = turnView(now).board;
+    if (!dispatch({ type: 'undo', player: mover }) || last === undefined) return false;
     const geo = geoRef.current;
-    if (geo === null) return;
+    if (geo === null) return true;
     const after = turnView(store.getState().flow).board;
     const back = moveFlights(geo, boardView, mover, last, before, after, {
       id: `u${store.getState().flow.log.length}`,
       undo: true,
     });
     setFlights(back);
+    return true;
   };
 
-  const confirm = () => {
-    if (dispatch({ type: 'confirm', player: view.toMove })) setFlights([]);
+  const confirm = (): boolean => {
+    const mover = store.getState().flow.game.state.toMove;
+    if (!dispatch({ type: 'confirm', player: mover })) return false;
+    setFlights([]);
+    return true;
   };
+
+  // The bot's turn. It starts when nothing covers the board, and stops when
+  // the screen pauses (menu) or goes away. Same key = same turn.
+  const botActive = botsTurn && !blocked && !paused;
+  const botKey = `${gameKey}:${game.state.turnNumber}`;
+  const botRoll = useEffectEvent(() =>
+    botPlayer === null ? false : dispatch({ type: 'roll', player: botPlayer }),
+  );
+  const botMove = useEffectEvent((move: Move) => playMove(move, geoRef.current, null, false));
+  const botUndo = useEffectEvent(() => undo());
+  const botConfirm = useEffectEvent(() => confirm());
+  const botOptions = useEffectEvent(() => bot);
+  useEffect(() => {
+    const seat = botOptions();
+    if (!botActive || seat === undefined) return;
+    const handle = startBotTurn({
+      player: seat.player,
+      difficulty: seat.difficulty,
+      runner: seat.runner,
+      rng: seat.rng,
+      ...(seat.timing ? { timing: seat.timing } : {}),
+      getFlow: () => store.getState().flow,
+      actions: { roll: botRoll, move: botMove, undo: botUndo, confirm: botConfirm },
+      onError: (error) => console.error('bot turn failed', error),
+    });
+    return handle.cancel;
+  }, [botActive, botKey, store]);
+
+  // Texts that say "you" for the human vs the bot.
+  const nameOf = (player: PlayerId) => seats[player].name;
+  const isYou = (player: PlayerId) => seats[player].you;
+  const scoreLine = t('game.end.score', {
+    white: nameOf('white'),
+    black: nameOf('black'),
+    whiteScore: match.score.white,
+    blackScore: match.score.black,
+  });
+  const startsLine = (player: PlayerId) =>
+    isYou(player) ? t('game.end.starts_you') : t('game.end.starts', { name: nameOf(player) });
+  const resignedLine = (loser: PlayerId) =>
+    isYou(loser) ? t('game.end.resigned_you') : t('game.end.resigned', { name: nameOf(loser) });
 
   // Dice in the controls row: this turn's, or the faded dice of a pass.
   const passDice: DieView[] = pass ? diceView(pass.dice, []) : [];
@@ -173,7 +293,7 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
   if (phase === 'opening-roll') {
     const label =
       openingTaps === 'perPlayer' && roller !== null
-        ? t('game.roll.openingFor', { name: names[roller] })
+        ? t('game.roll.openingFor', { name: nameOf(roller) })
         : t('game.roll.opening');
     controls = (
       <ActionButton
@@ -183,6 +303,26 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
         onPress={roll}
         grow
       />
+    );
+  } else if (botsTurn && !showPass && view.matchPhase === 'playing') {
+    const rolled = game.state.dice;
+    controls = (
+      <View testID="bot-turn" style={styles.botBox} accessibilityLiveRegion="polite">
+        {dice.length > 0 ? (
+          <DiceRow
+            testID="dice-row"
+            theme={theme}
+            dice={dice}
+            rollKey={rollKey}
+            onLanded={onDiceLanded}
+          />
+        ) : null}
+        <Text style={styles.botText}>
+          {rolled !== null && phase !== 'awaiting-roll'
+            ? t('game.bot.moving', { dice: rolled.join('-') })
+            : t('game.bot.waiting')}
+        </Text>
+      </View>
     );
   } else if (phase === 'awaiting-roll' && !showPass) {
     controls = (
@@ -201,7 +341,7 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
           testID="undo-button"
           label={t('game.controls.undo')}
           kind="secondary"
-          disabled={!view.canUndo}
+          disabled={!view.canUndo || showPass}
           onPress={undo}
         />
         <View style={styles.diceSlot}>
@@ -216,33 +356,43 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
         <ActionButton
           testID="confirm-button"
           label={t('game.controls.confirm')}
-          disabled={!view.canConfirm}
+          disabled={!view.canConfirm || showPass}
           onPress={confirm}
         />
       </>
     );
   }
 
+  const homeButton = onHome ? (
+    <ActionButton
+      testID="end-home-button"
+      label={t('game.end.home')}
+      kind="secondary"
+      onPress={onHome}
+    />
+  ) : null;
+
   // Cards over the board, at most one at a time.
   let card = null;
-  if (view.matchPhase === 'match-over' && match.winner !== null) {
+  if (matchOver && match.winner !== null) {
+    const winner = match.winner;
     card = (
       <GameCard
         testID="match-end-card"
-        title={t('game.end.matchWinner', { name: names[match.winner] })}
+        title={
+          isYou(winner)
+            ? t('game.end.matchWinner_you')
+            : t('game.end.matchWinner', { name: nameOf(winner) })
+        }
         lines={[
-          t('game.end.score', {
-            white: names.white,
-            black: names.black,
-            whiteScore: match.score.white,
-            blackScore: match.score.black,
-          }),
+          ...(match.resignedBy !== null ? [resignedLine(match.resignedBy)] : []),
+          scoreLine,
           t('game.end.target', { target: match.targetPoints }),
         ]}>
         <ActionButton
           testID="rematch-button"
           label={t('game.end.rematch')}
-          subtitle={t('game.end.starts', { name: names[match.winner] })}
+          subtitle={startsLine(winner)}
           onPress={() => {
             setFlights([]);
             // Game and turn numbers start again: forget the closed cards.
@@ -251,9 +401,18 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
             rematch();
           }}
         />
+        {onChangeSettings ? (
+          <ActionButton
+            testID="change-settings-button"
+            label={t('game.end.changeSettings')}
+            kind="secondary"
+            onPress={onChangeSettings}
+          />
+        ) : null}
+        {homeButton}
       </GameCard>
     );
-  } else if (view.matchPhase === 'game-over' && game.result !== null) {
+  } else if (gameOver && game.result !== null) {
     const { result } = game;
     const winner = result.winner;
     const type = winType(result);
@@ -261,29 +420,28 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
       <GameCard
         testID="game-end-card"
         title={
-          winner === null ? t('game.end.draw') : t('game.end.gameWinner', { name: names[winner] })
+          winner === null
+            ? t('game.end.draw')
+            : isYou(winner)
+              ? t('game.end.gameWinner_you')
+              : t('game.end.gameWinner', { name: nameOf(winner) })
         }
         chip={t(`game.end.${type}`, { count: result.points })}
         lines={[
-          t('game.end.score', {
-            white: names.white,
-            black: names.black,
-            whiteScore: match.score.white,
-            blackScore: match.score.black,
-          }),
+          ...(result.reason === 'resigned' && winner !== null ? [resignedLine(other(winner))] : []),
+          scoreLine,
           t('game.end.target', { target: match.targetPoints }),
         ]}>
         <ActionButton
           testID="next-game-button"
           label={t('game.end.next')}
-          {...(match.nextStarter
-            ? { subtitle: t('game.end.starts', { name: names[match.nextStarter] }) }
-            : {})}
+          {...(match.nextStarter ? { subtitle: startsLine(match.nextStarter) } : {})}
           onPress={() => {
             setFlights([]);
             dispatch({ type: 'nextGame' });
           }}
         />
+        {homeButton}
       </GameCard>
     );
   } else if (showPass && pass) {
@@ -292,10 +450,16 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
         testID="pass-card"
         title={t('game.pass.title')}
         lines={[
-          t('game.pass.body', { name: names[pass.player], dice: pass.dice.join('-') }),
-          t('game.pass.next', { name: names[other(pass.player)] }),
+          isYou(pass.player)
+            ? t('game.pass.body_you', { dice: pass.dice.join('-') })
+            : t('game.pass.body', { name: nameOf(pass.player), dice: pass.dice.join('-') }),
+          isYou(other(pass.player))
+            ? t('game.pass.next_you')
+            : t('game.pass.next', { name: nameOf(other(pass.player)) }),
         ]}
-        footnote={t('game.pass.autoClose')}>
+        footnote={
+          passMs === BOT_PASS_NOTICE_MS ? t('game.pass.autoCloseShort') : t('game.pass.autoClose')
+        }>
         <ActionButton
           testID="pass-ok-button"
           label={t('game.pass.ok')}
@@ -316,7 +480,8 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
         <OpeningCard
           theme={theme}
           status={opening}
-          names={names}
+          names={{ white: nameOf('white'), black: nameOf('black') }}
+          you={isYou('white') ? 'white' : isYou('black') ? 'black' : null}
           roundKey={`${gameKey}:${game.opening?.ties.length ?? 0}`}
           onDieLanded={onDiceLanded}
         />
@@ -324,13 +489,13 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
     );
   }
 
-  const blocked = card !== null;
   const playing = phase !== 'opening-roll' && view.matchPhase === 'playing';
   const top = other(viewer);
   const strip = (player: PlayerId, testID: string) => (
     <PlayerStrip
       testID={testID}
-      name={names[player]}
+      name={seats[player].label}
+      turnLabel={seats[player].turnLabel}
       checker={theme.checkers[toneOf(player)]}
       pips={showPips ? view.pips[player] : null}
       score={match.score[player]}
@@ -341,7 +506,23 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
 
   return (
     <View style={styles.screen}>
-      {strip(top, 'strip-top')}
+      <View style={styles.topRow}>
+        {onOpenMenu ? (
+          <Pressable
+            testID="menu-button"
+            accessibilityRole="button"
+            accessibilityLabel={t('game.menu.open')}
+            hitSlop={4}
+            onPress={onOpenMenu}
+            style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}>
+            {/* U+2630: three lines ("hamburger"). */}
+            <Text style={styles.menuIcon} importantForAccessibility="no">
+              {'☰'}
+            </Text>
+          </Pressable>
+        ) : null}
+        <View style={styles.topStrip}>{strip(top, 'strip-top')}</View>
+      </View>
       <View style={styles.boardArea}>
         <InteractiveBoard
           testID="game-board"
@@ -349,7 +530,7 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
           board={view.board}
           view={boardView}
           mover={view.toMove}
-          legal={blocked ? [] : view.legal}
+          legal={blocked || botsTurn ? [] : view.legal}
           positionKey={String(flow.log.length)}
           flights={flights}
           onFlightDone={onFlightDone}
@@ -359,7 +540,7 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
           onPickUp={() => feedback.event('checkerPickUp')}
           onIllegalDrop={() => feedback.event('invalidMove')}
         />
-        {view.canConfirm && !blocked ? (
+        {view.canConfirm && !blocked && !botsTurn ? (
           <View style={styles.hintRow} pointerEvents="none">
             <Text testID="confirm-hint" style={styles.hint}>
               {t('game.controls.allUsed')}
@@ -381,6 +562,32 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingTop: theme.space.xs,
     backgroundColor: theme.colors.background,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.sm),
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: theme.space.sm,
+  },
+  topStrip: {
+    flex: 1,
+  },
+  menuButton: {
+    width: theme.touch.minTarget,
+    height: theme.touch.minTarget,
+    borderRadius: theme.touch.minTarget / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  menuIcon: {
+    fontSize: 22,
+    lineHeight: 26,
+    color: theme.colors.text,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   boardArea: {
     flex: 1,
@@ -419,5 +626,23 @@ const styles = StyleSheet.create((theme, rt) => ({
   diceSlot: {
     flex: 1,
     alignItems: 'center',
+  },
+  botBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    minHeight: theme.touch.button,
+    paddingHorizontal: theme.space.md,
+    paddingVertical: theme.space.xs,
+    borderRadius: theme.radii.lg,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: theme.colors.border,
+  },
+  botText: {
+    ...theme.type.body,
+    flex: 1,
+    color: theme.colors.textDim,
   },
 }));

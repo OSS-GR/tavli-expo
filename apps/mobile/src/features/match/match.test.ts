@@ -1,0 +1,176 @@
+import { createMemoryStorage } from '@tavli/contracts';
+import { createGameFlow, createSeededRng, portes, type BoardState } from '@tavli/engine';
+
+import { SAMPLE_POSITIONS } from '@/features/board/positions';
+import i18n from '@/i18n';
+
+import { lastSetupKey, loadLastSetup, saveLastSetup } from './lastSetup';
+import { canResignGame, previewResign, resigningPlayer } from './resign';
+import { gameHref, newGameHref, parseIdParam, parseModeParam, rulesHref } from './routes';
+import { seatsFor } from './seats';
+import { createSessionRegistry, newMatchId } from './sessions';
+import { cleanName, defaultSetup, enginePlayers, sanitizeSetup, type MatchSetup } from './setup';
+
+const t = i18n.t.bind(i18n);
+
+const botSetup: MatchSetup = { ...defaultSetup('bot'), targetPoints: 5 };
+const localSetup: MatchSetup = { ...defaultSetup('local'), names: { white: 'Maria', black: '' } };
+
+describe('match setup', () => {
+  it('defaults to a match to 3 vs an easy bot', () => {
+    expect(defaultSetup('bot')).toEqual({
+      mode: 'bot',
+      game: 'portes',
+      targetPoints: 3,
+      botLevel: 'easy',
+      names: { white: '', black: '' },
+    });
+  });
+
+  it('cleans names: trims and cuts to 16 characters (Greek too)', () => {
+    expect(cleanName('  Maria  ')).toBe('Maria');
+    expect(cleanName('Αλέξανδρος Παπαδόπουλος')).toBe('Αλέξανδρος Παπαδ');
+    expect(cleanName(42)).toBe('');
+  });
+
+  it('sanitizes saved choices and drops levels this build cannot play', () => {
+    expect(sanitizeSetup(null, 'local')).toEqual(defaultSetup('local'));
+    expect(
+      sanitizeSetup(
+        { targetPoints: 7, botLevel: 'medium', names: { white: ' Ann ', black: 5 } },
+        'bot',
+        ['easy'],
+      ),
+    ).toEqual({ ...defaultSetup('bot'), targetPoints: 7, names: { white: 'Ann', black: '' } });
+    expect(sanitizeSetup({ targetPoints: 4, botLevel: 'hard' }, 'bot').targetPoints).toBe(3);
+    expect(sanitizeSetup({ botLevel: 'medium' }, 'bot', ['easy', 'medium']).botLevel).toBe(
+      'medium',
+    );
+  });
+
+  it('gives the engine non-empty player labels', () => {
+    expect(enginePlayers(botSetup)).toEqual({ white: 'you', black: 'bot' });
+    expect(enginePlayers(localSetup)).toEqual({ white: 'Maria', black: 'player-2' });
+  });
+});
+
+describe('seats', () => {
+  it('names you and the bot, with the level in the strip', () => {
+    const seats = seatsFor(botSetup, t);
+    expect(seats.white).toEqual({ name: 'You', label: 'You', turnLabel: 'Your turn', you: true });
+    expect(seats.black).toEqual({
+      name: 'Bot',
+      label: 'Bot · Easy',
+      turnLabel: 'Playing',
+      you: false,
+    });
+  });
+
+  it('falls back to Player 1 / Player 2 in the app language', async () => {
+    expect(seatsFor(localSetup, t).black.name).toBe('Player 2');
+    await i18n.changeLanguage('el');
+    try {
+      expect(seatsFor(localSetup, t).black.name).toBe('Παίκτης 2');
+      expect(seatsFor(botSetup, t).black.label).toBe('Υπολογιστής · Εύκολο');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+});
+
+describe('routes', () => {
+  it('builds hrefs with params', () => {
+    expect(newGameHref('local')).toEqual({ pathname: '/new-game', params: { mode: 'local' } });
+    expect(gameHref('local-1')).toEqual({ pathname: '/game/[id]', params: { id: 'local-1' } });
+    expect(rulesHref('portes')).toEqual({
+      pathname: '/rules/[variant]',
+      params: { variant: 'portes' },
+    });
+  });
+
+  it('reads params safely', () => {
+    expect(parseModeParam('local')).toBe('local');
+    expect(parseModeParam(['local', 'bot'])).toBe('local');
+    expect(parseModeParam('online')).toBe('bot');
+    expect(parseModeParam(undefined)).toBe('bot');
+    expect(parseIdParam('local-1')).toBe('local-1');
+    expect(parseIdParam('')).toBeNull();
+    expect(parseIdParam(undefined)).toBeNull();
+  });
+});
+
+describe('last choices', () => {
+  it('remembers the setup per mode', () => {
+    const storage = createMemoryStorage();
+    saveLastSetup(storage, botSetup);
+    expect(loadLastSetup(storage, 'bot', ['easy'])).toEqual(botSetup);
+    expect(loadLastSetup(storage, 'local', ['easy'])).toEqual(defaultSetup('local'));
+  });
+
+  it('gives the defaults for broken data', () => {
+    const storage = createMemoryStorage({ [lastSetupKey('bot')]: '{not json' });
+    expect(loadLastSetup(storage, 'bot', ['easy'])).toEqual(defaultSetup('bot'));
+  });
+});
+
+describe('sessions', () => {
+  it('keeps one match at a time, found by id', () => {
+    let seed = 1;
+    const sessions = createSessionRegistry({ createRng: () => createSeededRng(seed++) });
+    const first = sessions.start(botSetup);
+    expect(first.id).toMatch(/^local-/);
+    expect(sessions.get(first.id)).toBe(first);
+    expect(first.store.getState().flow.match.targetPoints).toBe(5);
+
+    const second = sessions.start(localSetup);
+    expect(second.id).not.toBe(first.id);
+    expect(sessions.get(first.id)).toBeNull();
+    expect(sessions.current()).toBe(second);
+    sessions.end(second.id);
+    expect(sessions.current()).toBeNull();
+  });
+
+  it('makes ids from the clock and the rng', () => {
+    expect(newMatchId(createSeededRng(1), 36)).toMatch(/^local-10-[0-9a-z]+$/);
+  });
+});
+
+describe('resign', () => {
+  function startedFlow(board?: BoardState) {
+    const sessions = createSessionRegistry({ createRng: () => createSeededRng(4) });
+    const { store } = sessions.start(localSetup);
+    const base = portes.initialState({ startingPlayer: 'white' });
+    const state = board ? { ...base, board } : base;
+    store.setState({
+      flow: { ...store.getState().flow, game: createGameFlow({ state, starter: 'white' }) },
+    });
+    return store;
+  }
+
+  it('lets the human resign vs the bot, and the player to move in pass-and-play', () => {
+    const store = startedFlow();
+    const flow = store.getState().flow;
+    expect(resigningPlayer(flow, 'bot')).toBe('white');
+    expect(resigningPlayer(flow, 'local')).toBe('white');
+    expect(canResignGame(flow, 'white')).toBe(true);
+  });
+
+  it('allows no game resign during the opening roll', () => {
+    const sessions = createSessionRegistry({ createRng: () => createSeededRng(4) });
+    const flow = sessions.start(localSetup).store.getState().flow;
+    expect(flow.game.phase).toBe('opening-roll');
+    expect(resigningPlayer(flow, 'local')).toBeNull();
+    expect(canResignGame(flow, resigningPlayer(flow, 'bot'))).toBe(false);
+  });
+
+  it('gives diplo when the resigner has borne off nothing, else mono', () => {
+    const store = startedFlow();
+    const diplo = previewResign(store.getState().flow, 'white');
+    expect(diplo.result).toEqual({ winner: 'black', points: 2, reason: 'resigned' });
+    expect(diplo.score).toEqual({ white: 0, black: 2 });
+
+    // White has borne off a checker.
+    const mono = previewResign(startedFlow(SAMPLE_POSITIONS.bearoff).getState().flow, 'white');
+    expect(mono.result.points).toBe(1);
+  });
+});

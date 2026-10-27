@@ -6,9 +6,12 @@
  * Jest replaces this module with in-memory fakes (`jest.setup.ts`).
  */
 import { createExpoSoundPlayer } from '@tavli/audio-expo';
+import { InlineBotRunner, createBot } from '@tavli/bot';
 import {
   createNoopCrashReporter,
+  type BotRunner,
   type CrashReporter,
+  type Difficulty,
   type Feedback,
   type SoundPlayer,
   type Storage,
@@ -17,6 +20,8 @@ import { createSentryCrashReporter } from '@tavli/crash-sentry';
 import { createSeededRng, type Rng } from '@tavli/engine';
 import { createExpoFeedback } from '@tavli/haptics-expo';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
+
+import { supportedBotLevels } from '@/features/bot/levels';
 
 export const storage: Storage = createMmkvStorage({ id: 'tavlaki' });
 
@@ -54,3 +59,11 @@ function randomSeed(): number {
 export function createLocalRng(): Rng {
   return createSeededRng(randomSeed());
 }
+
+const bot = createBot();
+
+/** The bot port (ADR-0006). MVP1 runs the bot on the JS thread. */
+export const botRunner: BotRunner = new InlineBotRunner(bot);
+
+/** The bot levels this build can play. Medium shows up once its evaluator ships. */
+export const botLevels: readonly Difficulty[] = supportedBotLevels(bot);
