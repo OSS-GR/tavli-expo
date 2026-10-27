@@ -27,4 +27,12 @@ export const THEME_IMAGES: Readonly<Record<string, Readonly<Record<string, numbe
     pointWenge: require('@tavli/themes/olive-inlay/point-wenge.webp'),
     pointMahogany: require('@tavli/themes/olive-inlay/point-mahogany.webp'),
   },
+  'kafeneio-night': {
+    boardPortrait: require('@tavli/themes/kafeneio-night/board-portrait.webp'),
+    shadePortrait: require('@tavli/themes/kafeneio-night/shade-portrait.webp'),
+    boardLandscape: require('@tavli/themes/kafeneio-night/board-landscape.webp'),
+    shadeLandscape: require('@tavli/themes/kafeneio-night/shade-landscape.webp'),
+    pointRosewood: require('@tavli/themes/kafeneio-night/point-rosewood.webp'),
+    pointAsh: require('@tavli/themes/kafeneio-night/point-ash.webp'),
+  },
 };

@@ -48,7 +48,7 @@ The real route is `app/game/[id]/index.tsx`; match end is `app/game/[id]/match-e
 
 ## Board themes
 
-- Two boards ship: **Walnut Kafeneio** (default) and **Olive Inlay** (`packages/themes`). Both have the same geometry, so only the art changes.
+- Three boards ship: **Walnut Kafeneio** (default), **Olive Inlay** and **Kafeneio Night** (dark, #144) (`packages/themes`). All have the same geometry, so only the art changes.
 - The player picks one in **Settings → Board** (`features/settings/BoardThemePicker.tsx`): one radio row per bundled theme, with a small `StaticBoard` of the start position in that theme, and the theme's name and description in the app language. The choice saves at once as `boardTheme` (an unknown id falls back to the default).
 - `boardTheme` is separate from `theme` (the app colors, `@tavli/ui`, Settings → Look).
 - `useBoardTheme()` reads `boardTheme`. The game screen, the tutorial, the rules pictures (`StartPicture`) and every `StaticBoard` use it. The game sounds come from the board theme too.

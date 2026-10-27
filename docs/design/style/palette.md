@@ -108,6 +108,54 @@ Measured in the render: ivory vs black checker **12.70:1**; ivory vs field 4.03:
 
 Note: the first render had black vs field at 2.52:1, because the dome and dish highlights made the black checker look grey. We cut those highlights. Keep black-checker highlights small when the Blender skin is made.
 
+## Kafeneio Night
+
+The third board (issue #144). It came after the two concepts, so its numbers come from `packages/themes/src/themes.test.ts` (same WCAG formula), not from `src/contrast.py`. Textures are graded by `packages/themes/tools/kafeneio-night/prepare_textures.py`.
+
+### Board and checkers
+
+| Token | Hex | L\* | Use |
+|-------|-----|-----|-----|
+| `color.board.frame` | `#2A160E` | 9.8 | Black walnut frame, bar and trays (texture `frame-black-walnut`) |
+| `color.board.field` | `#4C2015` | 18.5 | Deep mahogany field (texture `field-mahogany`) |
+| `color.board.point.dark` | `#341917` | 12.5 | Rosewood points (texture `point-rosewood`) |
+| `color.board.point.light` | `#D9CDB2` | 82.7 | Pale ash points (texture `point-ash`) |
+| `color.board.point.seam` | `#B08A3E` | 59.7 | Thin brass line round every point |
+| `color.board.brass` | `#C99A3E` (light `#F3D58A`, dark `#6E4A16`) | 66.4 | Corner plates, nails, hinges, clasps, stringing |
+| `color.light.lamp` | `#FFB860` at 30 % → black at 40 % | | Low warm lamp (soft-light blend) |
+| `color.checker.light` | `#EEE4CD` | 90.8 | Ivory checker, dished centre |
+| `color.checker.light.edge` | `#5C4630` | 31.5 | Outline on ivory checkers |
+| `color.checker.dark` | `#17110E` | 5.6 | Ebony checker, dished centre |
+| `color.checker.dark.ring` | `#C99A3E` | 66.4 | Brass ring on ebony checkers (0.075 radius) |
+| `color.highlight.select` / `.target` | `#F6C858` | 82.7 | A slightly brighter gold for the dark field |
+| `color.highlight.halo` | `#0A0403` | 1.4 | Dark halo (12.9:1 with the gold) |
+| `color.dice.face` / `.pip` / `.pip.ace` | `#2A1A14` / `#E9C46A` / `#E8735A` | 11.1 / 80.7 / 61.8 | Dark dice, gold pips, coral ace pip, brass edge `#8A6526` |
+
+The UI tokens are dark, as in B: background `#2A1712` → `#0D0705`, text `#F1E6CF` (13.8:1), dim text `#C4AA88` (7.7:1).
+
+### Contrast (tokens)
+
+| Pair | Ratio | Pass 3:1? |
+|------|-------|-----------|
+| **ivory checker vs ebony checker** | **14.80:1** (ΔL\* 85.2) | Yes |
+| ivory checker vs mahogany field | 10.90:1 | Yes |
+| ivory checker vs rosewood point | 12.81:1 | Yes |
+| ivory checker vs ash point | 1.25:1 | No, fill alone |
+| → ivory checker **edge** vs ash point | 5.61:1 | Yes |
+| ebony checker vs ash point | 11.87:1 | Yes |
+| ebony checker vs mahogany field | 1.36:1 | No, fill alone |
+| → ebony checker **brass ring** vs field | 5.36:1 | Yes |
+| ebony checker vs rosewood point | 1.16:1 | No, fill alone |
+| → ebony checker **brass ring** vs rosewood | 6.30:1 | Yes |
+| rosewood point vs field | 1.18:1 | No, fill alone |
+| → brass point **seam** vs rosewood / field | 5.05:1 / 4.30:1 | Yes |
+| gold highlight vs field / rosewood | 8.74:1 / 10.27:1 | Yes |
+| gold highlight vs ash point | 1.00:1 | No, ring alone |
+| → dark **halo** vs ash point | 12.92:1 | Yes |
+| gold pip / ace pip vs dark die face | 10.00:1 / 5.60:1 | Yes |
+
+The checkers differ by lightness (ΔL\* 85), so they stay apart for every kind of color blindness, as in B.
+
 ## Color-blind check
 
 We simulated protanopia, deuteranopia and tritanopia (Machado et al. 2009, full severity). The checkers are told apart by lightness, so the gap stays large:
