@@ -83,7 +83,7 @@ All levels use the same pipeline:
 | Hard | Neural net (Portes #147, Plakoto and Fevga #156, Asodio #164) | 1-ply (2-ply was tried: no gain, much slower; see 5.7) | Softmax, temperature 0.01, like medium. |
 | (Later) Expert / Hints | Neural net | 2-ply, wider, longer time budget | None |
 
-Why softmax noise and not random moves: a softmax picks good moves more often and bad moves rarely. The bot then looks like a weaker human, not a broken program. Track the **average equity loss per move** of each level in bot-vs-bot tests. Tune temperature until the levels are clearly apart (e.g. Hard beats Medium ~70%+, Medium beats Easy ~70%+).
+Why softmax noise and not random moves: a softmax picks good moves more often and bad moves rarely. The bot then looks like a weaker human, not a broken program. Track the **average equity loss per move** of each level in bot-vs-bot tests. Tune temperature until the levels are clearly apart (e.g. Hard beats Medium ~70%+, Medium beats Easy ~70%+). Asodio is the exception: about a quarter of its games end in a lock draw, so its bars count only the games someone wins. Hard must win at least 60% of those against Medium and score more points (owner decision, #164; see 5.9).
 
 **Measured (Portes, #28, 1,000 games, seed 1):** medium beats random 99.9%, medium beats easy 78.1%, and easy beats random 98.5%. Medium decides in 0.09 ms median and 3.9 ms worst (Node, 300 random positions). At "1 in 3 not best", medium beat easy only 57%, so easy uses more noise to keep the 70%+ gap.
 

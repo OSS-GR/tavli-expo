@@ -148,8 +148,14 @@ export function evaluateAsodioFallback(
   options: AsodioOptions,
 ): Evaluation {
   const e = evaluateAsodioSides(roller, waiter, ASODIO_DEFAULT_WEIGHTS, options);
-  const win = (e.equity - e.winDouble + e.loseDouble + 1) / 2;
-  return { win, winDouble: e.winDouble, loseDouble: e.loseDouble, equity: e.equity };
+  // Clamped, so a training target is always a valid chance (rounding aside, it already is).
+  const unit = (p: number): number => Math.min(1, Math.max(0, p));
+  return {
+    win: unit((e.equity - e.winDouble + e.loseDouble + 1) / 2),
+    winDouble: unit(e.winDouble),
+    loseDouble: unit(e.loseDouble),
+    equity: e.equity,
+  };
 }
 
 /** Asodio for the shared net code. The context is the move rules (`asodioOptions`). */

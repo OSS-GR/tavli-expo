@@ -30,7 +30,7 @@
  */
 
 import { createSeededRng, opponent, rollDice } from '@tavli/engine';
-import type { GameState, PlayerId, Rng, Variant } from '@tavli/engine';
+import type { GameState, PlayerId, Rng, Turn, Variant } from '@tavli/engine';
 
 import { pickTurn } from '../create-bot';
 import { encodeFloat32 } from '../evaluators/float-codec';
@@ -192,6 +192,21 @@ export function playOn(variant: Variant, state: GameState): GameState {
   return next;
 }
 
+/**
+ * Plays a turn with the engine and answers any question after it. The 1-ply
+ * scores and the λ-returns flip the view each turn, so this throws if the
+ * same player moves again (`scoreNetCandidates`).
+ */
+function playTurn(variant: Variant, rolled: GameState, turn: Turn): GameState {
+  const next = playOn(variant, variant.applyTurn(rolled, turn));
+  if (next.toMove === rolled.toMove) {
+    throw new Error(
+      `${variant.id}: ${next.toMove} moves again, but the net code needs turns to alternate`,
+    );
+  }
+  return next;
+}
+
 /** The default `maxTurns`: far more than a real game (Portes, Plakoto and Fevga games take 50–120 turns). */
 export const DEFAULT_MAX_TURNS = 1000;
 
@@ -247,7 +262,7 @@ export function trainEpisode<S, C>(
       break;
     }
     values.push(value);
-    state = playOn(variant, variant.applyTurn(rolled, turn));
+    state = playTurn(variant, rolled, turn);
     roller = pick.theirs;
     waiter = pick.mine;
   }
@@ -337,7 +352,7 @@ export function heuristicPositions<S, C>(
       });
       const turn = turns[bestIndex];
       if (turn === undefined || ended) break;
-      state = playOn(variant, variant.applyTurn(rolled, turn));
+      state = playTurn(variant, rolled, turn);
       roller = next[1];
       waiter = next[0];
     }

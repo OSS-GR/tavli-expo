@@ -232,6 +232,14 @@ export interface NetCandidate<S> {
  * Scores each turn for the mover (1-ply), on the fast board: the true
  * points if the turn ends the game, else minus the next roller's equity.
  * The bot (`createNetEvaluator`) and the trainer both use it.
+ *
+ * "Minus" is right because, in every rule set a net plays, the engine
+ * hands the move to the other player after each turn: a side with no move
+ * passes on its own roll (an empty turn). Only the Asodio roll chains (the
+ * Acey-Deucey presets) keep the same player to move, and the Asodio net
+ * leaves those rule sets to the heuristic (`isAsodioNetRules`), which lets
+ * the engine play the turn and follows `toMove`. `td.test.ts` checks the
+ * hand-over for every game, and the trainer throws if it ever fails.
  */
 export function scoreNetCandidates<S, C>(
   game: NetGame<S, C>,

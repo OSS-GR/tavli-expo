@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { createBoard, createSeededRng, opponent, plakoto, portes, rollDice } from '@tavli/engine';
+import {
+  VARIANT_REGISTRY,
+  createBoard,
+  createSeededRng,
+  getVariant,
+  opponent,
+  plakoto,
+  portes,
+  rollDice,
+} from '@tavli/engine';
 import type { Dice, GameState } from '@tavli/engine';
 
 import { asodioNetGame } from '../evaluators/asodio-net';
@@ -18,6 +27,10 @@ import { plakotoNetGame } from '../evaluators/plakoto-net';
 import { sideOf } from '../evaluators/portes-board';
 import { encodePortes, loadPortesNet, portesNetGame } from '../evaluators/portes-net';
 import { pickOne } from '../random';
+import { randomAsodioPositions } from '../testing/random-asodio-positions';
+import { randomFevgaPositions } from '../testing/random-fevga-positions';
+import { randomPlakotoPositions } from '../testing/random-plakoto-positions';
+import { randomPositions } from '../testing/random-positions';
 import { numberFlag, parseFlags } from './args';
 import {
   createTrainScratch,
@@ -109,6 +122,52 @@ function episodeTest<S, C>(name: string, game: NetGame<S, C>): void {
     }
   });
 }
+
+/** Random positions of each game, with their dice. */
+const POSITIONS: readonly [string, () => GameState[]][] = [
+  ['portes', () => randomPositions(41, 150, 2)],
+  ['plakoto', () => randomPlakotoPositions(42, 150, 2)],
+  ['fevga', () => randomFevgaPositions(43, 150, 2)],
+  ['asodio', () => randomAsodioPositions(44, 300, 1)],
+];
+
+describe('turns alternate (the nets score the next roller as the other player)', () => {
+  for (const [name, positionsOf] of POSITIONS) {
+    it(`${name}: after every legal turn, the other player moves`, () => {
+      const variant = getVariant(VARIANT_REGISTRY, name);
+      let passes = 0;
+      for (const state of positionsOf()) {
+        for (const turn of variant.legalTurns(state, state.dice as Dice)) {
+          const after = playOn(variant, variant.applyTurn(state, turn));
+          if (variant.result(after) !== null) continue;
+          expect(after.toMove).toBe(opponent(state.toMove));
+          if (turn.moves.length === 0) passes += 1;
+        }
+      }
+      // Asodio: a frozen army passes on its own roll, so the turn still goes over.
+      if (name === 'asodio') expect(passes).toBeGreaterThan(0);
+    });
+  }
+
+  it('the trainer stops if the same player would move again', () => {
+    const variant = asodioNetGame.variant;
+    const sameMover: NetGame<unknown, unknown> = {
+      ...(asodioNetGame as NetGame<unknown, unknown>),
+      variant: {
+        ...variant,
+        applyTurn: (state, turn) => ({ ...variant.applyTurn(state, turn), toMove: state.toMove }),
+      },
+    };
+    const net = createTrainableNet(asodioNetGame.inputs, 8, createSeededRng(1));
+    expect(() =>
+      trainEpisode(sameMover, net, createSeededRng(2), {
+        lambda: 0.7,
+        alpha: 0.05,
+        startingPlayer: 'white',
+      }),
+    ).toThrow('moves again');
+  });
+});
 
 describe('training (dev only)', () => {
   it('a gradient step moves the outputs toward the target', () => {
