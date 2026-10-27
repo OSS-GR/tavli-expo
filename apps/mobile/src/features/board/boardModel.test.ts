@@ -237,7 +237,9 @@ describe('Fevga on the board', () => {
     const at = (v: BoardView) =>
       boardStacks(start, v)
         .map((s) => [s.slot, s.owners[0], s.owners.length] as const)
-        .sort((a, b) => (a[0].kind === 'point' && b[0].kind === 'point' ? a[0].index - b[0].index : 0));
+        .sort((a, b) =>
+          a[0].kind === 'point' && b[0].kind === 'point' ? a[0].index - b[0].index : 0,
+        );
     expect(at(PARALLEL_WHITE)).toEqual([
       [{ kind: 'point', index: 12 }, 'black', 15],
       [{ kind: 'point', index: 24 }, 'white', 15],
@@ -276,7 +278,10 @@ describe('Fevga on the board', () => {
       const picture = layoutBoard(g, start, PARALLEL_WHITE);
       const mid = (index: number) => {
         const r = slotRect(g, { kind: 'point', index });
-        return { x: r.x + r.width / 2 - (g.x + g.width / 2), y: r.y + r.height / 2 - (g.y + g.height / 2) };
+        return {
+          x: r.x + r.width / 2 - (g.x + g.width / 2),
+          y: r.y + r.height / 2 - (g.y + g.height / 2),
+        };
       };
       // Diagonally opposite: different halves across and along the board.
       expect(Math.sign(mid(24).x)).toBe(-Math.sign(mid(12).x));

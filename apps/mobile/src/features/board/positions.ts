@@ -6,15 +6,16 @@
  * White's (`contrary`); Fevga numbers them the same way round (`parallel`).
  * `SAMPLE_DIRECTIONS` says which one each position uses.
  */
-import { FEVGA_START, PLAKOTO_START, createBoard, type BoardState, type Direction } from '@tavli/engine';
+import {
+  FEVGA_START,
+  PLAKOTO_START,
+  createBoard,
+  type BoardState,
+  type Direction,
+} from '@tavli/engine';
 
 export type SamplePositionId =
-  | 'start'
-  | 'midgame'
-  | 'bearoff'
-  | 'plakotoStart'
-  | 'plakotoPins'
-  | 'fevgaStart';
+  'start' | 'midgame' | 'bearoff' | 'plakotoStart' | 'plakotoPins' | 'fevgaStart';
 
 export const SAMPLE_POSITION_IDS: readonly SamplePositionId[] = [
   'start',

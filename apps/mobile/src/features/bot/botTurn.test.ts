@@ -127,9 +127,9 @@ describe('botStep', () => {
     expect(botStep(flow, 'black')).toBe('answer');
     expect(botStep(flow, 'white')).toBeNull();
     // TODO(#106): the bot package decides; until then the bot plays on.
-    expect(botAnswer({ player: 'black', kind: 'motherPinned', choices: ['resign', 'playOn'] })).toBe(
-      'playOn',
-    );
+    expect(
+      botAnswer({ player: 'black', kind: 'motherPinned', choices: ['resign', 'playOn'] }),
+    ).toBe('playOn');
   });
 
   it('leaves the opening roll to the human tap', () => {

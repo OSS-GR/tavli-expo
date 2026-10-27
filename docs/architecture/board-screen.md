@@ -1,6 +1,6 @@
 # Board screen (app)
 
-> How the app draws the board and plays a turn. Code: `apps/mobile/src/features/board/`. Last review: 2026-10-26.
+> How the app draws the board and plays a turn. Code: `apps/mobile/src/features/board/`. Last review: 2026-10-27.
 
 ## Parts
 
@@ -40,18 +40,35 @@ The game itself lives in `apps/mobile/src/features/game/`:
 
 The real route is `app/game/[id]/index.tsx`; match end is `app/game/[id]/match-end.tsx` (see [App shell](app-shell.md)). Dev route (release builds redirect it to Home):
 
-- `app/dev/board.tsx`: the fixed positions, from White's and from Black's side.
+- `app/dev/board.tsx`: the fixed positions (`positions.ts`: Portes start, mid-game, bear-off, Plakoto start, Plakoto pins, Fevga start), from White's and from Black's side. Each position has its direction (`SAMPLE_DIRECTIONS`).
 
 **Game flow and ADR-0003.** The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. ADR-0003 records this (updated in #29).
 
 ## Drawing
 
 - The board uses the theme's **portrait-rotated** layout (wireframe option B). `fitBoardWithShadow` keeps the aspect ratio and leaves room for the shadow, so the board fits an iPhone SE and large phones.
-- Draw order follows `packages/themes/README.md`: shadow, image layers under the points, 24 vector points (color, wood tile, seam), image layers over the points, checkers and count badges, trays, highlights, lamp overlay.
+- Draw order follows `packages/themes/README.md`: shadow, image layers under the points, 24 vector points (color, wood tile, seam), image layers over the points, pinned checkers (Plakoto), checkers and count badges, trays, highlights, lamp overlay.
 - Until the images load, the board draws with the theme colors, so the first frame is never empty.
 - A stack shows at most `checker.maxVisible` (5) checkers. The last one carries a count badge.
 - **Bar checkers shrink to fit the bar.** In Walnut Kafeneio the bar is 34 pt and a checker 40 pt, so bar checkers get a radius of 94% of half the bar height.
 - Checker colors stay with the player: White uses the theme's `light` style, Black the `dark` style.
+
+## Plakoto and Fevga
+
+The board reads the game from the engine state: `rules.movement.direction` gives the direction (`turnView`, `GameScreen`), and the legal moves come from the engine (`legalNextMoves`) as in Portes. So drag, tap, hints, undo and confirm work the same in every game. Plakoto and Fevga never use the bar; only Portes does. (`outside`, the Asodio start, would wait on the bar; Asodio is not built yet.)
+
+- **Plakoto pins.** A pinned checker lies under the checkers that pin it. It sits at the base of the point, where a lone checker would be; the stack on top starts `PIN_PEEK` (0.6) checker radii further along the point, so the pinned checker peeks out on the base side (wireframe 17's small picture). It also gets a ring in the theme's badge color (`PIN_RING_WIDTH`), so a pin never looks like a normal stack. The pinned checker is not part of the stack: `countIn` does not count it, `pinnedIn` says it is there, and `layoutBoard` returns it in `pins` (key `<slot>:pinned`). Touch, ghost targets and flights use the same pinned stack positions (`stackGeometry(…, pinned)`), so a pin lands exactly where it is drawn. A pin is a plain move: no checker flies to the bar.
+- **Screen readers:** the board has a label, "Board", plus one line per pinned checker ("Bob's checker on point 24 is pinned", in the owner's own numbers).
+- **Fevga** (`direction: "parallel"`): both players start on their own point 24, in diagonally opposite corners (for White at the bottom: White on layout 24, Black on layout 12), and both move the same way round. This is only the point mapping in `boardModel.ts` (`absoluteToOwn`); the drawing and hit-testing rects are the same as in Portes. Tests check it in the portrait and the landscape layout.
+- The `plakoto` and `fevga` presets keep the Tavli rotation (Portes → Plakoto → Fevga), so a match of the `plakoto` preset starts with Portes. For a match of one game only, override the rotation: `resolveRules('plakoto', { match: { rotation: ['plakoto'] } })` (the tests do this).
+- The trays stay where the theme puts them. In Fevga the top player's home is the top right, but its tray stays at the bottom right.
+
+### The mother question (Plakoto)
+
+With `motherRule: "offerConcede"` (the app default) the engine flow stops in `awaiting-answer` after a turn that pins a mother, and `currentPrompt` names the pinned player.
+
+- **A person answers** (pass-and-play, or you vs the bot): a card over the board (wireframe 17), "Bob, your mother is pinned" (or "Your mother is pinned"), what happened and what Resign costs, and two buttons of equal weight: **Resign (lose 2)** and **Play on**. It cannot be closed without a choice. In pass-and-play the pinned player answers; with Flip on, the board turns to them first. The answer is the engine action `answer`.
+- **The bot answers** its own question in its turn (`botStep` → `'answer'` in `features/bot/botTurn.ts`). For now it always plays on (`botAnswer`). TODO(#106): call the runner's `chooseAnswer` when the port has it; `botAnswer` stays the fallback. A note over the board says "Bot plays on." until the bot's turn ends.
 
 ## Dice
 
@@ -75,7 +92,7 @@ The real route is `app/game/[id]/index.tsx`; match end is `app/game/[id]/match-e
 - **Tap-tap:** a touch that moves less than 8 pt is a tap. Tap a checker, then tap a target. A target wins over another movable checker on that point. A tap may miss a target by 22 pt (wireframe, iPhone SE). A swipe that does not start on a movable checker does nothing.
 - A drop on the source cancels quietly. A drop anywhere else is illegal: the checker flies back in 160 ms, with the theme's `invalidMove` haptic. A drag the system cancels (a call, the app goes to the background) also flies back, with no move.
 - **Hit-testing uses the drawing rects.** Sources and targets use `slotRect` (the same point rect that holds the triangle and the stack), the bar halves and the trays.
-- **Flights:** a move flies the checker to its landing place (200 ms); a hit sends the hit checker to the bar a moment later. While a checker flies, the checker at its landing place is hidden. The move that ends a turn (auto-confirm) has no flight when the board turns to the next player.
+- **Flights:** a move flies the checker to its landing place (200 ms); a hit sends the hit checker to the bar a moment later; a pin (Plakoto) only flies the pinner. While a checker flies, the checker at its landing place is hidden. The move that ends a turn (auto-confirm) has no flight when the board turns to the next player.
 - Two dice that reach the same target (bearing off): the lower die is used, so the higher one stays.
 - Haptics from the theme: `checkerPickUp`, `checkerPlace`, `checkerHit`, `invalidMove`.
 - Not built: the optional double-tap shortcut (it would delay every single tap), and the dashed "last move" arrow from the wireframes.
@@ -113,6 +130,7 @@ The theme numbers points from the view of the player at the bottom (the **viewer
 - Jest fakes Gesture Handler with `apps/mobile/test/gestureHandlerMock.tsx`; `touch(testID, path)` drives the board's pan gesture like a finger.
 - Jest fakes Reanimated with `apps/mobile/test/reanimatedMock.ts`: animations end at once and call their end callback. `Animated.View` is a plain view and `useAnimatedStyle` runs once. Spy on `useReducedMotion` to test reduce motion.
 - `GameScreen.turn.test.tsx`: undo, confirm, auto-confirm, the turn indicator (flip and fixed), pip counts on and off, the pass card (OK and 3 s), the game-end sheet (diplo with reason, mono, celebration, announcement, Home), next game, and `onMatchOver` after the delay. `GameScreen.match.test.tsx` plays a whole match with taps only (to 1 by default; `FULL_MATCH=1` plays to 3) and ends on `onMatchOver`.
+- Plakoto and Fevga: `boardModel.test.ts` (pins under their pinners, the Plakoto start, the Fevga start and its same-way movement, drawing and hit-testing in portrait and landscape), `interaction.test.ts` (a pin's ghost, landing and flights), `BoardScene.test.tsx` (pin rings, the Fevga start) and `botTurn.test.ts` (the bot plays on). `GameScreen.variants.test.tsx` plays a whole Plakoto game and a whole Fevga game with taps only, and tests the mother card (play on, resign, board label, vs bot both ways).
 - `BoardScene.test.tsx`: a render smoke test. Jest replaces Skia with `apps/mobile/test/skiaMock.tsx`: every Skia component becomes a plain element, so the test counts what the board would draw.
 
 ## Screenshots
