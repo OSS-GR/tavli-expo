@@ -29,7 +29,6 @@ import type { BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { playHaptic } from '@/features/feedback/feedback';
-import type { BoardFlipMode } from '@/features/settings/settings';
 import { useSettings } from '@/features/settings/store';
 
 import { GameCard } from './GameCard';
@@ -66,8 +65,6 @@ export interface GameScreenProps {
   openingTaps?: 'one' | 'perPlayer';
   /** Names and turn pills. Default: the names in the match. */
   seats?: PerPlayer<Seat>;
-  /** Board view for this match. Default: Settings → Board view. */
-  boardView?: BoardFlipMode;
   /** Vs bot: the bot plays this side. Its turn locks the board. */
   bot?: BotSeat;
   /** Stops the bot (the menu is open, or another screen is on top). */
@@ -86,7 +83,6 @@ export function GameScreen({
   store,
   openingTaps = 'perPlayer',
   seats: givenSeats,
-  boardView: givenBoardView,
   bot,
   paused = false,
   onOpenMenu,
@@ -98,8 +94,7 @@ export function GameScreen({
   const flow = useGameStore(store, (s) => s.flow);
   const dispatch = useGameStore(store, (s) => s.dispatch);
   const rematch = useGameStore(store, (s) => s.rematch);
-  const settingsFlipMode = useSettings((s) => s.boardFlipMode);
-  const flipMode = givenBoardView ?? settingsFlipMode;
+  const flipMode = useSettings((s) => s.boardFlipMode);
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
   const showPips = useSettings((s) => s.showPipCounts);
 

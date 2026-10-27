@@ -88,12 +88,14 @@ describe('<MatchScreen /> vs bot', () => {
     const user = userEvent.setup();
     const s = session(defaultSetup('bot'));
     startWith(s, 'black');
-    await show(s, { beforeRollMs: 150, moveMs: 5, thinkMs: () => 5 }).view;
+    // The bot waits 600 ms before it rolls. Opening the menu takes much less,
+    // even on a cold cache, and the menu stays open longer than that.
+    await show(s, { beforeRollMs: 600, moveMs: 5, thinkMs: () => 5 }).view;
 
     await user.press(button('Game menu'));
     expect(screen.getByTestId('game-menu')).toBeOnTheScreen();
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 900));
     });
     expect(game(s).phase).toBe('awaiting-roll');
     expect(game(s).state.toMove).toBe('black');

@@ -9,13 +9,13 @@ export interface Seat {
   readonly name: string;
   /** In the player strip, for example "Bot · Easy". */
   readonly label: string;
-  /** The pill on the active strip: "Your turn", "Playing". */
+  /** The pill on the active strip: "Your turn", "Playing", "Maria’s turn". */
   readonly turnLabel: string;
   /** The human vs the bot: texts say "you" ("You win the game!"). */
   readonly you: boolean;
 }
 
-/** Seats from plain names (pass-and-play, tests). */
+/** Seats from plain names, with one pill text for both (the default of GameScreen, tests). */
 export function plainSeats(names: PerPlayer<string>, turnLabel: string): PerPlayer<Seat> {
   return {
     white: { name: names.white, label: names.white, turnLabel, you: false },
