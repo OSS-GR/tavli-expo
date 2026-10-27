@@ -85,6 +85,8 @@ Why softmax noise and not random moves: a softmax picks good moves more often an
 
 **Measured (Portes, #28, 1,000 games, seed 1):** medium beats random 99.9%, medium beats easy 78.1%, and easy beats random 98.5%. Medium decides in 0.09 ms median and 3.9 ms worst (Node, 300 random positions). At "1 in 3 not best", medium beat easy only 57%, so easy uses more noise to keep the 70%+ gap.
 
+**Measured (Fevga, #105, 1,000 games, seed 1):** medium beats random 94.4%, medium beats easy 81.4%, and easy beats random 74.0%. Same temperatures as Portes (easy 0.15, medium 0.01). Fevga has more luck: there is no hitting and every play of a roll moves the same pips, so a bot that only counts pips beats random play just 56%. Per turn, easy loses 0.075 points on average (71% of its turns are not the best); medium loses 0.002. Medium decides in 0.03 ms median and 1.7 ms worst (Node, 5,000 positions from medium games). Details: `packages/bot/README.md`, "The Fevga heuristic".
+
 The bot gets its own injected RNG (seeded). It never uses `Math.random`. This keeps tests repeatable and matches the engine rule.
 
 ### 4.2 Heuristic evaluator (per variant)
@@ -106,6 +108,8 @@ A position score = weighted sum of features. Weights start hand-picked, then get
 | Stacking / distribution | ✓ | ✓ | ✓ |
 
 Asodio: features to be decided once `docs/rules/asodio.md` exists. The pipeline does not change.
+
+**Fevga, as built (#105, `packages/bot/src/evaluators/fevga-heuristic.ts`).** In contact: the pip race (Kleinman, with a low weight), the best prime in front of the opponent plus the checkers trapped behind it, opponent points in front of a side's last checker, blocked landing points per die, die values with no move at all, the runner rule (until the runner passes own point 11 only it may move), home points, checkers still on the mother (own 24), stacking and checkers off. With no contact left it is a pure race, scored with the Portes race code and bear-off table. All weights are in `FEVGA_DEFAULT_WEIGHTS`. Self-play tuning found two things: a low race weight is much better (every play moves the same pips, so a big race term drowns the block features), and "points in front of the last checker" is the most useful block feature.
 
 ### 4.3 Feel human
 
