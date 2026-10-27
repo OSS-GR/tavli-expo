@@ -290,6 +290,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       end: 'finished',
       winner: 'white',
       resignedBy: null,
+      timedOutBy: null,
       games: 6,
       diploWins: { white: 1, black: 1 },
       draws: 1,
