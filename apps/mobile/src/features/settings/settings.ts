@@ -27,6 +27,15 @@ export type BoardFlipMode = 'flip' | 'fixed';
 
 export const BOARD_FLIP_MODES: readonly BoardFlipMode[] = ['flip', 'fixed'];
 
+/**
+ * The move list next to the board (#134): one button per legal move.
+ * - `auto`: shown while a screen reader (VoiceOver, TalkBack) is on.
+ * - `on`: always shown. `off`: never shown.
+ */
+export type MoveListMode = 'auto' | 'on' | 'off';
+
+export const MOVE_LIST_MODES: readonly MoveListMode[] = ['auto', 'on', 'off'];
+
 export interface Settings {
   sound: boolean;
   haptics: boolean;
@@ -35,6 +44,7 @@ export interface Settings {
   autoConfirmMoves: boolean;
   showPipCounts: boolean;
   boardFlipMode: BoardFlipMode;
+  moveList: MoveListMode;
   theme: ThemeId;
 }
 
@@ -45,6 +55,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   autoConfirmMoves: false,
   showPipCounts: true,
   boardFlipMode: 'flip',
+  moveList: 'auto',
   theme: DEFAULT_THEME_ID,
 };
 
@@ -86,6 +97,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     autoConfirmMoves: bool(input['autoConfirmMoves'], d.autoConfirmMoves),
     showPipCounts: bool(input['showPipCounts'], d.showPipCounts),
     boardFlipMode: oneOf(BOARD_FLIP_MODES, input['boardFlipMode'], d.boardFlipMode),
+    moveList: oneOf(MOVE_LIST_MODES, input['moveList'], d.moveList),
     theme: isThemeId(input['theme']) ? input['theme'] : d.theme,
   };
 }
@@ -122,6 +134,7 @@ function pickSettings(state: SettingsState): Settings {
     autoConfirmMoves: state.autoConfirmMoves,
     showPipCounts: state.showPipCounts,
     boardFlipMode: state.boardFlipMode,
+    moveList: state.moveList,
     theme: state.theme,
   };
 }

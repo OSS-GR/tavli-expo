@@ -14,12 +14,14 @@ export interface ActionButtonProps {
   testID?: string;
   /** Grow to fill the row. */
   grow?: boolean;
+  /** What screen readers say, when the label has a symbol ("↶ Undo" → "Undo"). */
+  accessibilityLabel?: string;
 }
 
 /**
  * A big game button (wireframe rules: main = filled brass, second =
  * outlined, quiet = text only, disabled = dashed). At least 52 pt tall,
- * and text may wrap for longer Greek labels.
+ * and text may wrap for longer Greek labels and large system fonts.
  */
 export function ActionButton({
   label,
@@ -29,12 +31,13 @@ export function ActionButton({
   onPress,
   testID,
   grow = false,
+  accessibilityLabel = label,
 }: ActionButtonProps) {
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={subtitle ? `${label}, ${subtitle}` : label}
+      accessibilityLabel={subtitle ? `${accessibilityLabel}, ${subtitle}` : accessibilityLabel}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -43,14 +46,9 @@ export function ActionButton({
         grow && styles.grow,
         pressed && !disabled && styles.pressed,
       ]}>
-      <Text style={styles.label(kind, disabled)} numberOfLines={2}>
-        {label}
-      </Text>
-      {subtitle ? (
-        <Text style={styles.subtitle(kind, disabled)} numberOfLines={1}>
-          {subtitle}
-        </Text>
-      ) : null}
+      {/* No line limit: with a large system font the text wraps, never cut. */}
+      <Text style={styles.label(kind, disabled)}>{label}</Text>
+      {subtitle ? <Text style={styles.subtitle(kind, disabled)}>{subtitle}</Text> : null}
     </Pressable>
   );
 }

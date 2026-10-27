@@ -13,7 +13,7 @@ import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
 
-import type { BoardFlipMode } from './settings';
+import type { BoardFlipMode, MoveListMode } from './settings';
 import { useSettings } from './store';
 
 /** Pass-and-play board views. Face-to-face is shown but locked until it ships. */
@@ -40,6 +40,7 @@ export function SettingsScreen({ onLearnToPlay }: SettingsScreenProps = {}) {
   const showPipCounts = useSettings((s) => s.showPipCounts);
   const boardFlipMode = useSettings((s) => s.boardFlipMode);
   const theme = useSettings((s) => s.theme);
+  const moveList = useSettings((s) => s.moveList);
   const setSetting = useSettings((s) => s.setSetting);
   const shareUsageData = useConsent((s) => s.status === 'granted');
   const setConsent = useConsent((s) => s.setConsent);
@@ -65,6 +66,12 @@ export function SettingsScreen({ onLearnToPlay }: SettingsScreenProps = {}) {
     },
     { value: 'el', label: t('languages.el') },
     { value: 'en', label: t('languages.en') },
+  ];
+
+  const moveListOptions: SegmentOption<MoveListMode>[] = [
+    { value: 'auto', label: t('settings.moveList.auto') },
+    { value: 'on', label: t('settings.moveList.on') },
+    { value: 'off', label: t('settings.moveList.off') },
   ];
 
   const themeOptions = THEME_IDS.map((id) => ({ value: id, label: t(`themes.${id}`) }));
@@ -149,6 +156,18 @@ export function SettingsScreen({ onLearnToPlay }: SettingsScreenProps = {}) {
           onChange={(value) => setSetting('theme', value)}
         />
         <Text style={styles.hint}>{t('settings.theme.hint')}</Text>
+      </SettingsSection>
+
+      <SettingsSection title={t('settings.sections.accessibility')}>
+        <Text style={styles.label}>{t('settings.moveList.label')}</Text>
+        <SegmentedControl
+          testID="settings-move-list"
+          label={t('settings.moveList.label')}
+          options={moveListOptions}
+          value={moveList}
+          onChange={(value) => setSetting('moveList', value)}
+        />
+        <Text style={styles.hint}>{t(`settings.moveList.${moveList}Hint`)}</Text>
       </SettingsSection>
 
       {onLearnToPlay ? (

@@ -44,7 +44,7 @@ export function WelcomeConsentScreen({ onBack }: WelcomeConsentScreenProps) {
           hitSlop={8}
           onPress={onBack}
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-          <Text style={styles.backIcon} importantForAccessibility="no">
+          <Text style={styles.backIcon} importantForAccessibility="no" allowFontScaling={false}>
             {'‹'}
           </Text>
         </Pressable>
