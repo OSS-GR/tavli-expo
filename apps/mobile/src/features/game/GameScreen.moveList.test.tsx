@@ -278,7 +278,7 @@ describe('<GameScreen /> announcements vs the bot', () => {
     difficulty: 'easy' as const,
     runner,
     rng: createSeededRng(1),
-    timing: { beforeRollMs: 0, moveMs: 0, thinkMs: () => 0 },
+    timing: { beforeRollMs: 0, afterRollMs: 0, moveMs: 0, hitMs: 0, landMs: 0, thinkMs: () => 0 },
   };
 
   it('reads your roll, the bot’s roll and the bot’s moves; the list waits for your turn', async () => {

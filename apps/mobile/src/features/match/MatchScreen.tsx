@@ -13,10 +13,11 @@ import { useTranslation } from 'react-i18next';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Sheet } from '@/components/Sheet';
-import type { BotTiming } from '@/features/bot/botTurn';
+import { BOT_SPEED_TIMING, type BotTiming } from '@/features/bot/botTurn';
 import { useGameStore } from '@/features/game/gameStore';
 import { GameScreen, type BotSeat } from '@/features/game/GameScreen';
 import { winType } from '@/features/game/turnNotices';
+import { useSettings } from '@/features/settings/store';
 import { botRunner, createLocalRng } from '@/services';
 
 import { GameMenu } from './GameMenu';
@@ -35,7 +36,7 @@ export interface MatchScreenProps {
   onRules: () => void;
   /** The match is over: open the match-end screen. */
   onMatchOver: () => void;
-  /** For tests: another runner or faster bot timing. */
+  /** For tests: another runner, or bot timing on top of the Bot speed setting. */
   runner?: BotRunner;
   botTiming?: Partial<BotTiming>;
 }
@@ -58,6 +59,8 @@ export function MatchScreen({
   const dispatch = useGameStore(store, (s) => s.dispatch);
   const [overlay, setOverlay] = useState<Overlay>('none');
   const [uiRng] = useState(() => createLocalRng());
+  // A new speed applies from the bot's next turn.
+  const botSpeed = useSettings((s) => s.botSpeed);
 
   const seats = seatsFor(setup, t);
   const name = (player: PlayerId) => seats[player].name;
@@ -68,7 +71,7 @@ export function MatchScreen({
           difficulty: setup.botLevel,
           runner,
           rng: uiRng,
-          ...(botTiming ? { timing: botTiming } : {}),
+          timing: { ...BOT_SPEED_TIMING[botSpeed], ...botTiming },
         }
       : undefined;
 

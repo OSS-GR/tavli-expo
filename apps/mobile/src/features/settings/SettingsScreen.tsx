@@ -10,6 +10,7 @@ import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ToggleRow } from '@/components/settings/ToggleRow';
+import type { BotSpeed } from '@/features/bot/botSpeed';
 import { HistorySettings } from '@/features/history/HistorySettings';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
@@ -52,6 +53,7 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
   const boardFlipMode = useSettings((s) => s.boardFlipMode);
   const theme = useSettings((s) => s.theme);
   const moveList = useSettings((s) => s.moveList);
+  const botSpeed = useSettings((s) => s.botSpeed);
   const setSetting = useSettings((s) => s.setSetting);
   const shareUsageData = useConsent((s) => s.status === 'granted');
   const setConsent = useConsent((s) => s.setConsent);
@@ -83,6 +85,12 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
     { value: 'auto', label: t('settings.moveList.auto') },
     { value: 'on', label: t('settings.moveList.on') },
     { value: 'off', label: t('settings.moveList.off') },
+  ];
+
+  const botSpeedOptions: SegmentOption<BotSpeed>[] = [
+    { value: 'slow', label: t('settings.botSpeed.slow') },
+    { value: 'normal', label: t('settings.botSpeed.normal') },
+    { value: 'fast', label: t('settings.botSpeed.fast') },
   ];
 
   const themeOptions = THEME_IDS.map((id) => ({ value: id, label: t(`themes.${id}`) }));
@@ -128,6 +136,15 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
             : t('settings.boardView.fixedHint')}
         </Text>
         <Text style={styles.hint}>{t('settings.boardView.faceToFaceSoon')}</Text>
+        <Text style={styles.label}>{t('settings.botSpeed.label')}</Text>
+        <SegmentedControl
+          testID="settings-bot-speed"
+          label={t('settings.botSpeed.label')}
+          options={botSpeedOptions}
+          value={botSpeed}
+          onChange={(value) => setSetting('botSpeed', value)}
+        />
+        <Text style={styles.hint}>{t(`settings.botSpeed.${botSpeed}Hint`)}</Text>
       </SettingsSection>
 
       <SettingsSection title={t('settings.sections.soundAndFeel')}>

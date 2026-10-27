@@ -174,6 +174,38 @@ describe('homeBoardSide', () => {
   });
 });
 
+describe('botSpeed (#172)', () => {
+  it('starts at Normal and saves Slow or Fast', () => {
+    const storage = createMemoryStorage();
+    const store = createSettingsStore(storage);
+    expect(store.getState().botSpeed).toBe('normal');
+
+    store.getState().setSetting('botSpeed', 'slow');
+    expect(createSettingsStore(storage).getState().botSpeed).toBe('slow');
+    store.getState().setSetting('botSpeed', 'fast');
+    expect(createSettingsStore(storage).getState().botSpeed).toBe('fast');
+  });
+
+  it('loads a save from before the setting as Normal, and keeps its other values', () => {
+    const storage = createMemoryStorage({
+      [SETTINGS_STORAGE_KEY]: JSON.stringify({
+        version: SETTINGS_VERSION,
+        state: { sound: false, moveList: 'on' },
+      }),
+    });
+    expect(createSettingsStore(storage).getState()).toMatchObject({
+      sound: false,
+      moveList: 'on',
+      botSpeed: 'normal',
+    });
+  });
+
+  it('falls back to Normal for a bad value', () => {
+    expect(sanitizeSettings({ botSpeed: 'turbo' }).botSpeed).toBe('normal');
+    expect(sanitizeSettings({ botSpeed: 2 }).botSpeed).toBe('normal');
+  });
+});
+
 describe('migrateSettings', () => {
   it('keeps valid values from any version', () => {
     expect(migrateSettings({ language: 'en' }, 0)).toEqual({ ...DEFAULT_SETTINGS, language: 'en' });

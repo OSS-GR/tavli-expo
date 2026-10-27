@@ -317,7 +317,7 @@ describe('<GameScreen /> Asodio vs the bot', () => {
       difficulty: 'easy' as const,
       runner: new InlineBotRunner(createBot()),
       rng: createSeededRng(1),
-      timing: { beforeRollMs: 0, moveMs: 0, thinkMs: () => 0 },
+      timing: { beforeRollMs: 0, afterRollMs: 0, moveMs: 0, hitMs: 0, landMs: 0, thinkMs: () => 0 },
     };
     await show(store, { seats, bot });
     await waitFor(() => expect(store.getState().flow.game.state.toMove).toBe('white'), {

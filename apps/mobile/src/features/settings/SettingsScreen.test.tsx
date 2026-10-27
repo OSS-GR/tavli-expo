@@ -147,6 +147,54 @@ describe('<SettingsScreen />', () => {
     expect(screen.getByText('Play on the board only.')).toBeOnTheScreen();
   });
 
+  it('picks the bot speed: Normal by default, then Slow or Fast (#172)', async () => {
+    const user = userEvent.setup();
+    await render(<SettingsScreen />);
+
+    expect(screen.getByRole('radio', { name: 'Normal' })).toBeChecked();
+    expect(screen.getByText('The bot plays at a pace that is easy to follow.')).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('radio', { name: 'Slow' }));
+    expect(settingsStore.getState().botSpeed).toBe('slow');
+    expect(
+      screen.getByText('The bot takes its time, so you can follow each move.'),
+    ).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('radio', { name: 'Fast' }));
+    expect(settingsStore.getState().botSpeed).toBe('fast');
+    expect(screen.getByText('The bot plays quickly.')).toBeOnTheScreen();
+  });
+
+  it('shows the bot speed in Greek', async () => {
+    const user = userEvent.setup();
+    await render(<SettingsScreen />);
+
+    await user.press(screen.getByRole('radio', { name: 'Ελληνικά' }));
+    expect(await screen.findByText('Ταχύτητα υπολογιστή')).toBeOnTheScreen();
+    expect(screen.getByRole('radio', { name: 'Κανονικά' })).toBeChecked();
+    await user.press(screen.getByRole('radio', { name: 'Αργά' }));
+    expect(settingsStore.getState().botSpeed).toBe('slow');
+    expect(screen.getByRole('radio', { name: 'Γρήγορα' })).not.toBeChecked();
+
+    await user.press(screen.getByRole('radio', { name: 'Γλώσσα κινητού' }));
+    expect(await screen.findByRole('radio', { name: 'Slow' })).toBeChecked();
+  });
+
+  it('sends the bot speed key, never the value, when usage data is on', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      consentStore.setState({ status: 'granted' });
+    });
+    await render(<SettingsScreen />);
+
+    await user.press(screen.getByRole('radio', { name: 'Fast' }));
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'botSpeed' },
+    });
+  });
+
   it('turns usage data on and off from Privacy (one switch for the Analytics port)', async () => {
     const user = userEvent.setup();
     await render(<SettingsScreen />);

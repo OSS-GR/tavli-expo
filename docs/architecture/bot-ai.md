@@ -122,7 +122,7 @@ A position score = weighted sum of features. Weights start hand-picked, then get
 ### 4.3 Feel human
 
 - **Think time:** wait 500–1500 ms before moving. Shorter for forced or only-one moves (~300 ms). Longer for doubles and close decisions. Add small random jitter. Compute runs during this wait, so the user never sees the real cost.
-- **Move checkers one by one** with the normal animation (~250–400 ms each), not all at once.
+- **Move checkers one by one** with the normal animation, not all at once. Each move lands before the next one starts (about 0.9 s apart at Normal speed, #172; see [Bot turn timing](board-screen.md#bot-turn-timing-172)).
 - **Mistakes look natural** (softmax over good options, see 4.1). Easy should still bear off and take obvious safe moves.
 - **Optional:** bot names and avatars per level ("Yiayia", "Kafeneio regular", "Champion").
 

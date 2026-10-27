@@ -16,6 +16,7 @@ import { DEFAULT_THEME_ID, isThemeId, type ThemeId } from '@tavli/ui';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { createStore } from 'zustand/vanilla';
 
+import { BOT_SPEEDS, type BotSpeed } from '@/features/bot/botSpeed';
 import { LANGUAGE_PREFERENCES, type LanguagePreference } from '@/i18n/languages';
 
 /**
@@ -62,6 +63,8 @@ export interface Settings {
   /** Where your home is (a real board seen from your seat). `left` mirrors the board. */
   homeBoardSide: HomeBoardSide;
   moveList: MoveListMode;
+  /** How fast the bot plays its turn (#172, timings in `features/bot/botSpeed.ts`). */
+  botSpeed: BotSpeed;
   /** The app colors (`@tavli/ui`). */
   theme: ThemeId;
   /** The board theme (`@tavli/themes`): the game, the tutorial and the rules pictures use it. */
@@ -77,6 +80,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   boardFlipMode: 'flip',
   homeBoardSide: 'right',
   moveList: 'auto',
+  botSpeed: 'normal',
   theme: DEFAULT_THEME_ID,
   boardTheme: DEFAULT_BOARD_THEME_ID,
 };
@@ -122,6 +126,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     // Saves from before #175 have no value: they load as `right`, the board as it was.
     homeBoardSide: oneOf(HOME_BOARD_SIDES, input['homeBoardSide'], d.homeBoardSide),
     moveList: oneOf(MOVE_LIST_MODES, input['moveList'], d.moveList),
+    // Saves from before #172 have no bot speed: they load as Normal.
+    botSpeed: oneOf(BOT_SPEEDS, input['botSpeed'], d.botSpeed),
     theme: isThemeId(input['theme']) ? input['theme'] : d.theme,
     boardTheme:
       typeof input['boardTheme'] === 'string' && hasTheme(input['boardTheme'])
@@ -164,6 +170,7 @@ function pickSettings(state: SettingsState): Settings {
     boardFlipMode: state.boardFlipMode,
     homeBoardSide: state.homeBoardSide,
     moveList: state.moveList,
+    botSpeed: state.botSpeed,
     theme: state.theme,
     boardTheme: state.boardTheme,
   };
