@@ -24,7 +24,12 @@ type BoardViewOption = BoardFlipMode | 'faceToFace';
  * Layout follows `docs/design/wireframes.md`. Privacy (#61) saves the usage
  * data answer in the consent store, not in Settings.
  */
-export function SettingsScreen() {
+export interface SettingsScreenProps {
+  /** Opens the tutorial (#128). The Help section shows only with it. */
+  onLearnToPlay?: () => void;
+}
+
+export function SettingsScreen({ onLearnToPlay }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
   const locales = useLocales();
 
@@ -145,6 +150,18 @@ export function SettingsScreen() {
         />
         <Text style={styles.hint}>{t('settings.theme.hint')}</Text>
       </SettingsSection>
+
+      {onLearnToPlay ? (
+        <SettingsSection title={t('settings.sections.help')}>
+          <Pressable
+            testID="settings-learn-to-play"
+            accessibilityRole="button"
+            onPress={onLearnToPlay}
+            style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
+            <Text style={styles.linkText}>{`${t('settings.learnToPlay')} ›`}</Text>
+          </Pressable>
+        </SettingsSection>
+      ) : null}
 
       <SettingsSection title={t('settings.sections.privacy')}>
         <ToggleRow

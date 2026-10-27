@@ -3,14 +3,20 @@ import { useState } from 'react';
 
 import { matchSessions } from '@/features/match/appSessions';
 import { loadLastSetup, saveLastSetup } from '@/features/match/lastSetup';
-import { gameHref, parseModeParam, rulesHref } from '@/features/match/routes';
+import { gameHref, parseFirstGameParam, parseModeParam, rulesHref } from '@/features/match/routes';
+import { firstGameSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
 import { botLevels, storage } from '@/services';
 
 export default function NewGameRoute() {
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; first?: string }>();
   const mode = parseModeParam(params.mode);
-  const [initial] = useState(() => loadLastSetup(storage, mode, botLevels));
+  // After the tutorial: Portes vs the Easy bot (#128). Else the last choices.
+  const firstGame = mode === 'bot' && parseFirstGameParam(params.first);
+  const [initial] = useState(() => {
+    const last = loadLastSetup(storage, mode, botLevels);
+    return firstGame ? firstGameSetup(last, botLevels) : last;
+  });
   const [hasSavedGame] = useState(() => matchSessions.peek().kind === 'ok');
 
   return (

@@ -39,6 +39,10 @@ Every event also carries PostHog's standard properties (`$lib`, `$os_name`, `$os
 | `resign` | A player resigned the game or the match. | none | game store |
 | `settings_changed` | A setting changed, except the theme. | `key`: the setting name (`sound`, `haptics`, `language`, `autoConfirmMoves`, `showPipCounts`, `boardFlipMode`) | `features/analytics/connect.ts` |
 | `theme_changed` | The board theme changed. | `theme`: theme id | `features/analytics/connect.ts` |
+| `tutorial_started` | The tutorial (#128) opens. | `source`: `home` \| `rules` \| `settings` (where it was opened) | `app/tutorial.tsx` through `features/tutorial/tutorialAnalytics.ts` |
+| `tutorial_step` | A lesson of the tutorial is learnt (before **Next**). | `step`: 1–7; `lesson`: lesson id (`move`, `bothDice`, `double`, `makePoint`, `hit`, `enter`, `bearOff`) | same |
+| `tutorial_finished` | The last lesson is learnt and the end card shows. | none | same |
+| `tutorial_skipped` | **Skip** is tapped. | `step`: the lesson on screen, 1–7; `lesson`: its id | same |
 | `$screen` | A route change. | screen name = route pattern | `features/analytics/useAppAnalytics.ts` |
 
 Notes:
@@ -47,6 +51,7 @@ Notes:
 - `turns` counts finished turns. A resign in the middle of turn 5 gives `turns: 4`.
 - `durationSec` is wall-clock time from `game_started`, so it includes time in the background. A match resumed after an app restart sends no `game_started`, and the save has no start time, so that game's `game_finished` has no `durationSec`. The next game of the match has it again.
 - The "Share usage data" switch is **not** a setting in this sense: changing it sends no event.
+- Tutorial events say nothing about the player. The "tutorial done or dismissed" status itself stays on the phone (`features/tutorial/progress.ts`) and needs no consent; only these events follow the consent answer, like every other event.
 - `game_abandoned`: leaving the board (Home, the app in the background) is not abandoning, because the match is saved and can be continued (#36). Only a new match that replaces an unfinished one counts.
 
 ## Where the code is

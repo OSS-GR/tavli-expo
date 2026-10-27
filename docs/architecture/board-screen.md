@@ -111,6 +111,7 @@ With `motherRule: "offerConcede"` (the app default) the engine flow stops in `aw
 - **Flights:** a move flies the checker to its landing place (200 ms); a hit sends the hit checker to the bar a moment later; a pin (Plakoto) only flies the pinner. While a checker flies, the checker at its landing place is hidden. The move that ends a turn (auto-confirm) has no flight when the board turns to the next player.
 - Two dice that reach the same target (bearing off): the lower die is used, so the higher one stays.
 - Haptics from the theme: `checkerPickUp`, `checkerPlace`, `checkerHit`, `invalidMove`.
+- **Tutorial props** (#128): `cue` rings every movable checker while none is selected ("touch this one"; `BoardHighlights.cues`, drawn like the selected ring). `onMissTap` reports a tap that missed every target after a checker was picked. Games use neither.
 - Not built: the optional double-tap shortcut (it would delay every single tap), and the dashed "last move" arrow from the wireframes.
 
 ## Turn: undo, confirm, turn indicator

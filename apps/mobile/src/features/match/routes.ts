@@ -1,4 +1,6 @@
 /** Links and route params of the app shell (wireframes, "Route map"). Pure. */
+import type { TutorialSource } from '@tavli/contracts';
+
 import { isMatchMode, type MatchMode } from './setup';
 
 type Param = string | string[] | undefined;
@@ -10,6 +12,19 @@ function first(value: Param): string | undefined {
 /** `/new-game?mode=bot` or `?mode=local`. */
 export function newGameHref(mode: MatchMode) {
   return { pathname: '/new-game', params: { mode } } as const;
+}
+
+/**
+ * New game vs bot for the first game after the tutorial (#128): Portes vs
+ * the Easy bot, whatever was chosen last time.
+ */
+export function firstGameHref() {
+  return { pathname: '/new-game', params: { mode: 'bot', first: '1' } } as const;
+}
+
+/** The tutorial, opened from Home, a rules page or Settings (#128). */
+export function tutorialHref(from: TutorialSource) {
+  return { pathname: '/tutorial', params: { from } } as const;
 }
 
 /** The board of a local match. */
@@ -37,4 +52,17 @@ export function parseModeParam(value: Param): MatchMode {
 export function parseIdParam(value: Param): string | null {
   const id = first(value);
   return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
+/** The `first` param of the new-game screen: the first game after the tutorial. */
+export function parseFirstGameParam(value: Param): boolean {
+  return first(value) === '1';
+}
+
+const TUTORIAL_SOURCES: readonly TutorialSource[] = ['home', 'rules', 'settings'];
+
+/** The `from` param of the tutorial. Anything else counts as Home. */
+export function parseTutorialSource(value: Param): TutorialSource {
+  const from = first(value);
+  return TUTORIAL_SOURCES.find((s) => s === from) ?? 'home';
 }

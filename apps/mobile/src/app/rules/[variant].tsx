@@ -5,7 +5,7 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { rulesHref } from '@/features/match/routes';
+import { rulesHref, tutorialHref } from '@/features/match/routes';
 import { parseRulesVariant, rulesTitleKey } from '@/features/rules/content';
 import { RulesScreen } from '@/features/rules/RulesScreen';
 
@@ -16,7 +16,11 @@ export default function RulesRoute() {
   return (
     <>
       <Stack.Screen options={{ title: t(rulesTitleKey(variant)) }} />
-      <RulesScreen variant={variant} onOpenRules={(game) => router.push(rulesHref(game))} />
+      <RulesScreen
+        variant={variant}
+        onOpenRules={(game) => router.push(rulesHref(game))}
+        onLearnToPlay={() => router.push(tutorialHref('rules'))}
+      />
     </>
   );
 }

@@ -3,17 +3,27 @@
  * board → menu → Home. (Tests must not live in `src/app`: every file there
  * is a route.)
  */
+import type { createRecordingAnalytics } from '@tavli/contracts';
 import { userEvent, waitFor } from '@testing-library/react-native';
 import { router as appRouter } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { matchSessions } from '@/features/match/appSessions';
+import { saveLastSetup } from '@/features/match/lastSetup';
+import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
 import { SAVED_MATCH_KEY } from '@/features/match/savedMatch';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
-import { storage } from '@/services';
+import { LESSONS } from '@/features/tutorial/lessons';
+import { TUTORIAL_STORAGE_KEY } from '@/features/tutorial/progress';
+import { tutorialStore } from '@/features/tutorial/store';
+import { analytics, storage } from '@/services';
+
+import { layoutTutorialBoard, playLessonByTaps } from '../test/tutorialTaps';
+
+const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
 
 // The router testing library would mock Reanimated and worklets with the
 // packages' own mocks and replace ours (jest.setup.ts). Keep only its
@@ -34,6 +44,9 @@ beforeEach(async () => {
     // The user already answered the first-launch consent, so Home shows.
     consentStore.setState({ status: 'denied' });
   });
+  // The tutorial was not seen yet: Home offers it.
+  storage.remove(TUTORIAL_STORAGE_KEY);
+  await act(async () => tutorialStore.setState({ status: 'new' }));
   // Each test starts with no match and an empty save slot.
   const current = matchSessions.current();
   if (current) matchSessions.end(current.id);
@@ -190,5 +203,81 @@ describe('app navigation', () => {
       settingsStore.setState({ language: 'el' });
     });
     expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');
+  });
+});
+
+describe('tutorial (#128)', () => {
+  it('is offered on Home, skipped, and opened again from Settings and the rules page', async () => {
+    const user = userEvent.setup();
+    // Usage data allowed: the tutorial events go out.
+    await act(async () => consentStore.setState({ status: 'granted' }));
+    recorded.sent.length = 0;
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+
+    expect(screen.getByRole('header', { name: 'Learn to play' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Start the lesson' }));
+    expect(router.getPathname()).toBe('/tutorial');
+    expect(router.getSearchParams()).toEqual({ from: 'home' });
+    expect(screen.getByText('Lesson 1 of 7')).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('button', { name: 'Skip' }));
+    expect(router.getPathname()).toBe('/');
+    // Skipped: Home does not offer it again, also after a restart (saved).
+    expect(screen.queryByTestId('home-learn')).not.toBeOnTheScreen();
+    expect(tutorialStore.getState().status).toBe('dismissed');
+    expect(storage.getString(TUTORIAL_STORAGE_KEY)).toContain('dismissed');
+    const tracked = recorded.sent.filter((e) => e.type === 'track');
+    expect(tracked).toEqual([
+      { type: 'track', event: 'tutorial_started', props: { source: 'home' } },
+      { type: 'track', event: 'tutorial_skipped', props: { step: 1, lesson: 'move' } },
+    ]);
+
+    // Reopen from Settings → Help.
+    await user.press(screen.getByRole('button', { name: 'Settings' }));
+    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    expect(router.getPathname()).toBe('/tutorial');
+    expect(router.getSearchParams()).toEqual({ from: 'settings' });
+    await user.press(screen.getByRole('button', { name: 'Skip' }));
+    expect(router.getPathname()).toBe('/settings');
+
+    // Reopen from the Portes rules page.
+    await act(async () => appRouter.replace('/rules/portes'));
+    await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+    expect(router.getPathname()).toBe('/tutorial');
+    expect(router.getSearchParams()).toEqual({ from: 'rules' });
+  });
+
+  it('"Not now" on Home hides the card for good', async () => {
+    const user = userEvent.setup();
+    await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: 'Not now' }));
+    expect(screen.queryByTestId('home-learn')).not.toBeOnTheScreen();
+    expect(tutorialStore.getState().status).toBe('dismissed');
+  });
+
+  it('plays the whole tutorial with taps, then opens the first game: Portes vs Easy', async () => {
+    const user = userEvent.setup();
+    // The last choices were another game and level: the first game ignores them.
+    saveLastSetup(storage, { ...defaultSetup('bot'), game: 'plakoto', botLevel: 'medium' });
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: 'Start the lesson' }));
+    await layoutTutorialBoard();
+
+    for (const [i] of LESSONS.entries()) {
+      await playLessonByTaps(i);
+      await user.press(screen.getByRole('button', { name: 'Next' }));
+    }
+    expect(tutorialStore.getState().status).toBe('done');
+
+    await user.press(screen.getByRole('button', { name: 'Play your first game' }));
+    expect(router.getPathname()).toBe('/new-game');
+    expect(router.getSearchParams()).toEqual({ mode: 'bot', first: '1' });
+    expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Easy' })).toBeChecked();
+
+    // Back goes Home (the tutorial was replaced), and Home offers it no more.
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe('/');
+    expect(screen.queryByTestId('home-learn')).not.toBeOnTheScreen();
   });
 });
