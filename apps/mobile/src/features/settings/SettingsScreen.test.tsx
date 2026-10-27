@@ -1,15 +1,24 @@
+import type { createRecordingAnalytics } from '@tavli/contracts';
 import { act, render, screen, userEvent } from '@testing-library/react-native';
 
+// The analytics wiring, which the root layout loads in the app.
+import '@/features/analytics/store';
+import { consentStore } from '@/features/privacy/consentStore';
 import i18n from '@/i18n';
+import { analytics } from '@/services';
 
 import { DEFAULT_SETTINGS } from './settings';
 import { SettingsScreen } from './SettingsScreen';
 import { settingsStore } from './store';
 
+const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
+
 beforeEach(async () => {
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS });
+    consentStore.setState({ status: 'unset' });
   });
+  recorded.sent.length = 0;
 });
 
 describe('<SettingsScreen />', () => {
@@ -65,5 +74,37 @@ describe('<SettingsScreen />', () => {
 
     await user.press(screen.getByRole('radio', { name: 'Face-to-face' }));
     expect(settingsStore.getState().boardFlipMode).toBe('fixed');
+  });
+
+  it('turns usage data on and off from Privacy (one switch for the Analytics port)', async () => {
+    const user = userEvent.setup();
+    await render(<SettingsScreen />);
+
+    expect(screen.getByRole('header', { name: 'Privacy' })).toBeOnTheScreen();
+    const toggle = screen.getByRole('switch', { name: 'Share anonymous usage data' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByRole('link', { name: 'Privacy policy ›' })).toBeOnTheScreen();
+
+    await user.press(toggle);
+    expect(consentStore.getState().status).toBe('granted');
+    expect(recorded.isOptedIn()).toBe(true);
+    expect(screen.getByRole('switch', { name: 'Share anonymous usage data' })).toBeChecked();
+
+    // Opted in: a settings change sends its key.
+    await user.press(screen.getByRole('switch', { name: 'Sound' }));
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'sound' },
+    });
+
+    await user.press(screen.getByRole('switch', { name: 'Share anonymous usage data' }));
+    expect(consentStore.getState().status).toBe('denied');
+    expect(recorded.isOptedIn()).toBe(false);
+
+    // Opted out: nothing more is sent.
+    const count = recorded.sent.length;
+    await user.press(screen.getByRole('switch', { name: 'Haptics' }));
+    expect(recorded.sent).toHaveLength(count);
   });
 });

@@ -5,21 +5,25 @@ The `CrashReporter` port (`@tavli/contracts`) backed by Sentry, using `@sentry/r
 ## What it does
 
 - **No DSN, no Sentry.** If `EXPO_PUBLIC_SENTRY_DSN` is missing, the app uses the no-op reporter and never starts Sentry. Dev builds (`__DEV__`) always use the no-op reporter.
-- **Privacy.** `sendDefaultPii` is off. No screenshots, no view hierarchy, no session replay, no performance tracing. `beforeSend` keeps only the anonymous install id as the user and drops the device name. Never put names or emails in `captureMessage`, tags, extras or breadcrumbs.
+- **Privacy.** `sendDefaultPii` is off. No screenshots, no view hierarchy, no session replay, no performance tracing. `beforeSend` keeps only the anonymous install id as the user (or no user at all) and drops the device name. Never put names or emails in `captureMessage`, tags, extras or breadcrumbs.
 - **Breadcrumbs.** Console breadcrumbs are dropped (a log line can hold anything). Request URLs in breadcrumbs lose their query string and fragment.
-- **Opt-out.** `setEnabled(false)` closes the SDK (JS and native). From then on no new event or breadcrumb is sent. Events already handed to the transport before the opt-out may still go out while the SDK closes. If the player opted out before launch, the SDK never starts. Today there is no opt-out setting yet; `apps/mobile/src/features/crash/consent.ts` is the hook for it (TODO #61).
+- **Opt-out.** `setEnabled(false)` closes the SDK (JS and native). From then on no new event or breadcrumb is sent. Events already handed to the transport before the opt-out may still go out while the SDK closes. If the player opted out before launch, the SDK never starts.
+- **One privacy switch (#61).** The app's consent answer (`apps/mobile/src/features/privacy/consent.ts`) drives crash reports and analytics together. The rules are in `apps/mobile/src/features/crash/consent.ts`:
+  - **Before an answer:** reports are sent, but with no user id.
+  - **"Allow usage data":** reports carry the anonymous install id (`setUser`).
+  - **"Don't allow":** `setEnabled(false)` and `setUser(null)`. Nothing is sent.
 - **Never throws.** A Sentry failure must not crash the app.
 
 ## How the app uses it
 
-| File                                               | Job                                                                                                    |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `apps/mobile/src/services.ts`                      | Picks Sentry or the no-op reporter                                                                     |
-| `apps/mobile/src/features/crash/start.ts`          | Starts it first thing (imported first in `index.ts`), sets the install id, follows the privacy setting |
-| `apps/mobile/src/features/crash/CrashBoundary.tsx` | Top-level error boundary: reports render errors and shows "Something went wrong" with a Restart button |
-| `apps/mobile/app.config.ts`                        | Adds the `@sentry/react-native/expo` config plugin (source map upload)                                 |
-| `apps/mobile/metro.config.js`                      | `getSentryExpoConfig`: adds Debug IDs to bundles and source maps                                       |
-| `apps/mobile/app.json`                             | `ios.privacyManifests`: the "required reason" APIs Sentry uses                                         |
+| File                                               | Job                                                                                                     |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `apps/mobile/src/services.ts`                      | Picks Sentry or the no-op reporter                                                                      |
+| `apps/mobile/src/features/crash/start.ts`          | Starts it first thing (imported first in `index.ts`), follows the consent store (`features/privacy`)    |
+| `apps/mobile/src/features/crash/CrashBoundary.tsx` | Top-level error boundary: reports render errors and shows "Something went wrong" with a Restart button  |
+| `apps/mobile/app.config.ts`                        | Adds the `@sentry/react-native/expo` config plugin (source map upload)                                  |
+| `apps/mobile/metro.config.js`                      | `getSentryExpoConfig`: adds Debug IDs to bundles and source maps                                        |
+| `apps/mobile/app.json`                             | `ios.privacyManifests`: the "required reason" APIs Sentry uses, and the data Sentry and PostHog collect |
 
 ## Owner setup (one time)
 

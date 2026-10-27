@@ -35,6 +35,8 @@ import {
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
+import type { GameAnalytics } from '@/features/analytics/gameAnalytics';
+
 export interface GameStoreOptions {
   players: PerPlayer<string>;
   /** Points to win the match. Default: the rules' target (3). */
@@ -44,6 +46,13 @@ export interface GameStoreOptions {
   rng: Rng;
   /** Go on with this flow (a saved match) instead of a new one. The other options are ignored. */
   flow?: MatchFlow;
+  /**
+   * Game events (#61): start, finish, undo and resign are sent from here.
+   * A saved flow sends no `game_started` (the game started before).
+   * The app sets it for every match (`features/match/appSessions.ts`,
+   * which also sends `game_abandoned`). Leave it out in tests.
+   */
+  analytics?: GameAnalytics;
 }
 
 export interface GameStoreState {
@@ -64,6 +73,7 @@ export function createGameStore({
   rules,
   rng,
   flow: saved,
+  analytics,
 }: GameStoreOptions): GameStore {
   const ctx = { rng };
   const flow =
@@ -76,12 +86,16 @@ export function createGameStore({
       },
       ctx,
     );
+  if (!saved) analytics?.gameStarted(flow);
   return createStore<GameStoreState>()((set, get) => ({
     flow,
     lastError: null,
     dispatch: (action) => {
       try {
-        set({ flow: applyMatchAction(get().flow, action, ctx), lastError: null });
+        const previous = get().flow;
+        const next = applyMatchAction(previous, action, ctx);
+        set({ flow: next, lastError: null });
+        analytics?.actionApplied(previous, next, action);
         return true;
       } catch (error) {
         if (!(error instanceof EngineError)) throw error;
@@ -89,7 +103,11 @@ export function createGameStore({
         return false;
       }
     },
-    rematch: () => set({ flow: createRematchFlow(get().flow, ctx), lastError: null }),
+    rematch: () => {
+      const next = createRematchFlow(get().flow, ctx);
+      set({ flow: next, lastError: null });
+      analytics?.gameStarted(next);
+    },
   }));
 }
 
