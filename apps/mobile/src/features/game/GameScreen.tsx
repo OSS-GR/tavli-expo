@@ -363,6 +363,8 @@ export function GameScreen({
       type === 'diplo' ? 'resignedDiplo' : type === 'mono' ? 'resignedMono' : 'resignedGame';
     return isYou(loser) ? t(`game.end.${key}_you`) : t(`game.end.${key}`, { name: nameOf(loser) });
   };
+  const timeoutLine = (loser: PlayerId) =>
+    isYou(loser) ? t('game.end.timeout_you') : t('game.end.timeout', { name: nameOf(loser) });
 
   // Screen readers hear each roll and the other player's moves (#134).
   const announcement = turnAnnouncement(flow, t, { nameOf, isYou });
@@ -462,6 +464,9 @@ export function GameScreen({
     let reason: string | null = null;
     if (result.reason === 'resigned' && loser !== null) {
       reason = resignedLine(loser, type);
+    } else if (result.reason === 'timeout' && loser !== null) {
+      // An online turn timer ran out (#170). The sheet reads this line too.
+      reason = timeoutLine(loser);
     } else if (result.reason === 'borneOff' && type === 'diplo' && loser !== null) {
       reason = isYou(loser)
         ? t('game.end.noBearOff_you')

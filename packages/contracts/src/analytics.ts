@@ -35,10 +35,11 @@ export type MatchGame = 'portes' | 'plakoto' | 'fevga' | 'tavli' | 'asodio';
 export type ThemeKind = 'app' | 'board';
 
 /**
- * How a game ended: 1 point (mono), 2 or more points (diplo), a resign, or a
- * draw (Plakoto both mothers pinned, Asodio deadlock).
+ * How a game ended: 1 point (mono), 2 or more points (diplo), a resign, a
+ * draw (Plakoto both mothers pinned, Asodio deadlock), or a time-out (an
+ * online turn timer ran out, #170).
  */
-export type GameResultKind = 'mono' | 'diplo' | 'resign' | 'draw';
+export type GameResultKind = 'mono' | 'diplo' | 'resign' | 'draw' | 'timeout';
 
 /** Where the tutorial was opened: the Home card, a rules page, or Settings. */
 export type TutorialSource = 'home' | 'rules' | 'settings';

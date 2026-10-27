@@ -112,6 +112,28 @@ describe('gameAnalytics with the game store', () => {
     ]);
   });
 
+  it('sends game_finished with result timeout, and no resign, when a turn timer runs out (#170)', () => {
+    const { analytics, store, tick } = setup();
+    finishOpening(store);
+    tick(42);
+    analytics.sent.length = 0;
+
+    const toMove = store.getState().flow.game.state.toMove;
+    expect(store.getState().dispatch({ type: 'timeout', player: toMove })).toBe(true);
+    expect(store.getState().flow.game.result).toMatchObject({ reason: 'timeout' });
+    expect(events(analytics)).toEqual([
+      {
+        event: 'game_finished',
+        mode: 'local',
+        game: 'portes',
+        variant: 'portes',
+        result: 'timeout',
+        turns: 0,
+        durationSec: 42,
+      },
+    ]);
+  });
+
   it('ends the game in play when the match is resigned', () => {
     const { analytics, store } = setup();
     finishOpening(store);
@@ -285,5 +307,8 @@ describe('resultKind', () => {
     expect(resultKind({ winner: 'white', points: 3, reason: 'borneOff' })).toBe('diplo');
     expect(resultKind({ winner: 'white', points: 2, reason: 'resigned' })).toBe('resign');
     expect(resultKind({ winner: null, points: 0, reason: 'deadlock' })).toBe('draw');
+    // A time-out is its own result, whatever the points (1, or 2 for a diplo).
+    expect(resultKind({ winner: 'black', points: 1, reason: 'timeout' })).toBe('timeout');
+    expect(resultKind({ winner: 'white', points: 2, reason: 'timeout' })).toBe('timeout');
   });
 });

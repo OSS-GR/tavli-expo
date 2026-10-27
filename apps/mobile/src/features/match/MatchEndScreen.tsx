@@ -18,7 +18,7 @@ import { useAnnouncement } from '@/features/game/useAnnouncement';
 
 import { seatsFor } from './seats';
 import { HUMAN_SIDE, type MatchSetup } from './setup';
-import { matchLabel, variantName } from './summary';
+import { matchLabel, timedOutBy, variantName } from './summary';
 
 export interface MatchEndScreenProps {
   setup: MatchSetup;
@@ -46,14 +46,21 @@ export function MatchEndScreen({
   const title = seats[winner].you
     ? t('game.end.matchWinner_you')
     : t('game.end.matchWinner', { name: name(winner) });
-  // Resign match keeps the score as it was (docs/rules/tavli-match.md,
-  // "Resigning"), so the screen says why the match ended (#181).
-  const resigned =
-    match.resignedBy === null
-      ? null
-      : seats[match.resignedBy].you
+  // Why the match ended, when it was not won on the board: a resign, or a
+  // turn timer that ran out in the last game (#170). Resign match keeps the
+  // score as it was (docs/rules/tavli-match.md, "Resigning"), so the screen
+  // says who resigned the match (#181).
+  const timedOut = timedOutBy(match);
+  const reason =
+    match.resignedBy !== null
+      ? seats[match.resignedBy].you
         ? t('game.end.resignedMatch_you')
-        : t('game.end.resignedMatch', { name: name(match.resignedBy) });
+        : t('game.end.resignedMatch', { name: name(match.resignedBy) })
+      : timedOut !== null
+        ? seats[timedOut].you
+          ? t('game.end.timeout_you')
+          : t('game.end.timeout', { name: name(timedOut) })
+        : null;
   const scoreLine = t('game.end.score', {
     white: name('white'),
     black: name('black'),
@@ -74,7 +81,7 @@ export function MatchEndScreen({
         ? t('matchEnd.rematchHint_you')
         : t('matchEnd.rematchHint', { name: name(starter) });
 
-  useAnnouncement([title, resigned, scoreLine].filter(Boolean).join(' '));
+  useAnnouncement([title, reason, scoreLine].filter(Boolean).join(' '));
 
   return (
     <View testID="match-end-screen" style={styles.screen}>
@@ -83,7 +90,7 @@ export function MatchEndScreen({
         <Text style={styles.title} accessibilityRole="header">
           {title}
         </Text>
-        {resigned ? <Text style={styles.about}>{resigned}</Text> : null}
+        {reason ? <Text style={styles.about}>{reason}</Text> : null}
         <View
           testID="final-score"
           style={styles.scoreBox}
@@ -101,12 +108,16 @@ export function MatchEndScreen({
             {match.games.map((record, i) => {
               // Each game names its variant (#109): "Game 2 · Plakoto".
               const game = t('game.round', { number: i + 1, game: variantName(record.variant, t) });
+              // A game lost on time says so (#170): "Bot won on time".
+              const onTime = record.reason === 'timeout';
               const result =
                 record.winner === null
                   ? t('matchEnd.draw')
                   : seats[record.winner].you
-                    ? t('matchEnd.won_you')
-                    : t('matchEnd.won', { name: name(record.winner) });
+                    ? t(onTime ? 'matchEnd.wonOnTime_you' : 'matchEnd.won_you')
+                    : t(onTime ? 'matchEnd.wonOnTime' : 'matchEnd.won', {
+                        name: name(record.winner),
+                      });
               const type = record.winner === null ? 'points' : winType(record);
               const chip = type === 'points' ? null : t(`matchEnd.${type}`);
               return (

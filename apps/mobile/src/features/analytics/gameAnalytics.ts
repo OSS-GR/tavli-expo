@@ -1,6 +1,7 @@
 /**
  * Game events for analytics (issue #61): `game_started`, `game_finished`,
- * `game_abandoned`, `undo_used` and `resign`.
+ * `game_abandoned`, `undo_used` and `resign`. A time-out (#170) sends only
+ * `game_finished` with `result: 'timeout'`: the player did not resign.
  *
  * The game store calls this after every action the engine accepts
  * (`createGameStore({ analytics })`), so screens do not have to. The
@@ -45,9 +46,10 @@ export interface GameAnalytics {
   gameAbandoned: (flow: MatchFlow) => void;
 }
 
-/** mono (1 point), diplo (2 or more), resign, or draw. */
+/** mono (1 point), diplo (2 or more), resign, draw, or timeout (a turn timer ran out). */
 export function resultKind(result: GameResult): GameResultKind {
   if (result.reason === 'resigned') return 'resign';
+  if (result.reason === 'timeout') return 'timeout';
   if (result.winner === null) return 'draw';
   return result.points >= 2 ? 'diplo' : 'mono';
 }

@@ -55,6 +55,7 @@ function rec(over: Partial<HistoryRecord> = {}): HistoryRecord {
     end: 'finished',
     winner: 'white',
     resignedBy: null,
+    timedOutBy: null,
     games: 3,
     diploWins: { white: 1, black: 0 },
     draws: 0,
@@ -135,6 +136,7 @@ describe('a record is saved when a match ends', () => {
         end: 'finished',
         winner: 'white',
         resignedBy: 'black',
+        timedOutBy: null,
         games: 0,
         diploWins: { white: 0, black: 0 },
         draws: 0,
@@ -175,6 +177,37 @@ describe('a record is saved when a match ends', () => {
       games: 1,
       diploWins: { white: 0, black: 1 },
       end: 'finished',
+    });
+  });
+
+  it('vs bot: your turn timer runs out in the last game, you lose the match on time (#170)', () => {
+    const { sessions, history } = registry();
+    const s = sessions.start(oneGameBot);
+    openGame(s);
+    s.store.getState().dispatch({ type: 'timeout', player: 'white' });
+    expect(s.store.getState().flow.match.status).toBe('finished');
+    expect(history.getState().records[0]).toMatchObject({
+      end: 'finished',
+      winner: 'black',
+      resignedBy: null,
+      timedOutBy: 'white',
+      games: 1,
+    });
+  });
+
+  it('a time-out that does not end the match is not a loss on time (#170)', () => {
+    const { sessions, history } = registry();
+    const s = sessions.start({ ...defaultSetup('bot'), targetPoints: 3 });
+    openGame(s);
+    const { dispatch } = s.store.getState();
+    dispatch({ type: 'timeout', player: 'white' });
+    expect(s.store.getState().flow.match.status).toBe('in-progress');
+    // The match goes on; then White resigns it.
+    dispatch({ type: 'resignMatch', player: 'white' });
+    expect(history.getState().records[0]).toMatchObject({
+      winner: 'black',
+      resignedBy: 'white',
+      timedOutBy: null,
     });
   });
 
@@ -682,6 +715,11 @@ describe('history list', () => {
       { ...rec(), targetPoints: '3' },
       { ...rec(), matchNumber: 0 },
       { ...rec(), matchNumber: '1' },
+      // A time-out names the loser of a finished match.
+      { ...rec(), timedOutBy: 'red' },
+      { ...rec(), timedOutBy: 'white' },
+      { ...rec(), end: 'abandoned', winner: null, timedOutBy: 'black' },
+      { ...rec({ winner: 'black' }), resignedBy: 'white', timedOutBy: 'white' },
       // Times that make no valid date: they would crash the date text.
       { ...rec(), endedAt: 1e20 },
       { ...rec(), endedAt: -1 },
@@ -698,6 +736,14 @@ describe('history list', () => {
       rec({ id: `m${targetPoints}`, targetPoints }),
     );
     expect(parseHistory(serializeHistory(records))).toEqual(records);
+  });
+
+  it('saves and loads a match lost on time; a record from before #170 has no time-out', () => {
+    const onTime = rec({ winner: 'black', score: { white: 1, black: 3 }, timedOutBy: 'white' });
+    expect(parseHistory(serializeHistory([onTime]))).toEqual([onTime]);
+    const { timedOutBy: _, ...old } = rec();
+    const text = JSON.stringify({ v: HISTORY_VERSION, records: [old] });
+    expect(parseHistory(text)).toEqual([rec()]);
   });
 
   it('reads a record from before #150 (no match number)', () => {
@@ -842,6 +888,17 @@ describe('history texts', () => {
       score: 'Maria 3 – 1 Player 2 · first to 3',
       badge: 'winner',
       result: 'Player 2 won',
+    });
+  });
+
+  it('says when a match was won or lost on time (#170)', () => {
+    expect(historyRow(rec({ timedOutBy: 'black' }), t, 'en').result).toBe('Won on time');
+    const lost = rec({ winner: 'black', timedOutBy: 'white' });
+    expect(historyRow(lost, t, 'en')).toMatchObject({ badge: 'lost', result: 'Lost on time' });
+    const local = rec({ mode: 'local', botLevel: null, names: { white: 'Maria', black: '' } });
+    expect(historyRow({ ...local, winner: 'white', timedOutBy: 'black' }, t, 'en')).toMatchObject({
+      badge: 'winner',
+      result: 'Maria won on time',
     });
   });
 

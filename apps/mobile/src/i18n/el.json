@@ -134,7 +134,10 @@
       "won": "Νίκη",
       "lost": "Ήττα",
       "unfinished": "Δεν τελείωσε",
-      "winner": "{{name}}: νίκη"
+      "winner": "{{name}}: νίκη",
+      "wonOnTime": "Νίκη λόγω χρόνου",
+      "lostOnTime": "Ήττα λόγω χρόνου",
+      "winnerOnTime": "{{name}}: νίκη λόγω χρόνου"
     },
     "resigned": "{{name}}: παραιτήθηκε",
     "resigned_you": "παραιτήθηκες",
@@ -287,7 +290,9 @@
       "nextGame": "Επόμενη: παρτίδα {{number}} · {{game}}",
       "drawChip": "Ισοπαλία · 0 βαθμοί",
       "deadlock": "Κανένα πούλι δεν μπορεί πια να κινηθεί.",
-      "bothMothersPinned": "Πλακώθηκαν και οι δύο μάνες."
+      "bothMothersPinned": "Πλακώθηκαν και οι δύο μάνες.",
+      "timeout": "{{name}}: τελείωσε ο χρόνος.",
+      "timeout_you": "Τελείωσε ο χρόνος σου."
     },
     "you": "Εσύ",
     "bot": {
@@ -386,6 +391,8 @@
     "finalScore": "Τελικό σκορ: {{score}}",
     "won": "{{name}}: κέρδισε",
     "won_you": "Κέρδισες",
+    "wonOnTime": "{{name}}: κέρδισε λόγω χρόνου",
+    "wonOnTime_you": "Κέρδισες λόγω χρόνου",
     "draw": "Ισοπαλία",
     "mono": "Μονό",
     "diplo": "Διπλό",
