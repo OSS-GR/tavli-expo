@@ -11,7 +11,8 @@ module.exports = {
   ],
   testPathIgnorePatterns: ['/node_modules/', '/.expo/', '/ios/', '/android/'],
   // The first screen test in a file loads and transforms many modules on its
-  // first render. With a cold cache (always on CI) that takes about 5 s, so
-  // the 5 s default fails at random. 15 s still catches a test that hangs.
-  testTimeout: 15_000,
+  // first render. With a cold cache (always on CI) that takes about 5 s, and
+  // 15-18 s on a busy machine (`jest --no-cache` with the CPU in use), so a
+  // short timeout fails at random. 30 s still catches a test that hangs.
+  testTimeout: 30_000,
 };
