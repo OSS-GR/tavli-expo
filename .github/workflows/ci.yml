@@ -135,6 +135,7 @@ jobs:
       id-token: write
     steps:
       - name: Check the Claude secret
+        id: secret
         env:
           OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -172,7 +173,8 @@ jobs:
       # The review output is model text, so it goes in through `env`, never
       # straight into the script.
       - name: Post findings and gate
-        if: ${{ !cancelled() }}
+        # Not when the secret is missing: that step already explains the failure.
+        if: ${{ !cancelled() && steps.secret.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           OUT: ${{ steps.review.outputs.structured_output }}
