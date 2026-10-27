@@ -16,6 +16,7 @@ import { DEFAULT_THEME_ID, isThemeId, type ThemeId } from '@tavli/ui';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { createStore } from 'zustand/vanilla';
 
+import { BOT_SPEEDS, type BotSpeed } from '@/features/bot/botSpeed';
 import { LANGUAGE_PREFERENCES, type LanguagePreference } from '@/i18n/languages';
 
 /**
@@ -37,14 +38,6 @@ export type MoveListMode = 'auto' | 'on' | 'off';
 
 export const MOVE_LIST_MODES: readonly MoveListMode[] = ['auto', 'on', 'off'];
 
-/**
- * How fast the bot plays its turn (#172). The timings for each speed are
- * in `features/bot/botTurn.ts` (`BOT_SPEED_TIMING`).
- */
-export type BotSpeed = 'slow' | 'normal' | 'fast';
-
-export const BOT_SPEEDS: readonly BotSpeed[] = ['slow', 'normal', 'fast'];
-
 export interface Settings {
   sound: boolean;
   haptics: boolean;
@@ -54,7 +47,7 @@ export interface Settings {
   showPipCounts: boolean;
   boardFlipMode: BoardFlipMode;
   moveList: MoveListMode;
-  /** How fast the bot plays its turn. */
+  /** How fast the bot plays its turn (#172, timings in `features/bot/botSpeed.ts`). */
   botSpeed: BotSpeed;
   /** The app colors (`@tavli/ui`). */
   theme: ThemeId;

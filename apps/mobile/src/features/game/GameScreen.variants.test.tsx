@@ -282,7 +282,7 @@ describe('<GameScreen /> Plakoto mother question vs the bot', () => {
     difficulty: 'easy' as const,
     runner,
     rng: createSeededRng(1),
-    timing: { beforeRollMs: 150, afterRollMs: 0, moveMs: 0, hitMs: 0, thinkMs: () => 0 },
+    timing: { beforeRollMs: 150, afterRollMs: 0, moveMs: 0, hitMs: 0, landMs: 0, thinkMs: () => 0 },
   };
 
   it('the bot answers its own question ("play on") and plays its turn', async () => {

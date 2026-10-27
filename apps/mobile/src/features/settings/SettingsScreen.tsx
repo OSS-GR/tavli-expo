@@ -10,6 +10,7 @@ import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ToggleRow } from '@/components/settings/ToggleRow';
+import type { BotSpeed } from '@/features/bot/botSpeed';
 import { HistorySettings } from '@/features/history/HistorySettings';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
@@ -17,7 +18,7 @@ import { TutorialSettings } from '@/features/tutorial/TutorialSettings';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
 
 import { BoardThemePicker } from './BoardThemePicker';
-import type { BoardFlipMode, BotSpeed, MoveListMode } from './settings';
+import type { BoardFlipMode, MoveListMode } from './settings';
 import { useSettings } from './store';
 
 /** Pass-and-play board views. Face-to-face is shown but locked until it ships. */

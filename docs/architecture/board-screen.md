@@ -105,19 +105,21 @@ With `motherRule: "offerConcede"` (the app default) the engine flow stops in `aw
 
 ## Bot turn timing (#172)
 
-The owner's play test said the bot moved too fast to follow. Now each step of the bot's turn stays on screen long enough to see. The numbers are in `BOT_SPEED_TIMING` (`features/bot/botTurn.ts`). **Settings → Game → Bot speed** picks the row: **Slow**, **Normal** (default) or **Fast**. A new speed applies from the bot's next turn.
+The owner's play test said the bot moved too fast to follow. Now each step of the bot's turn stays on screen long enough to see. The numbers are in `BOT_SPEED_TIMING` (`features/bot/botSpeed.ts`, a leaf module that Settings and `botTurn.ts` both use). **Settings → Game → Bot speed** picks the row: **Slow**, **Normal** (default) or **Fast**. A new speed applies from the bot's next turn.
 
 | Step | Slow | Normal | Fast |
 | --- | --- | --- | --- |
 | Wait before the roll (`beforeRollMs`) | 1.3 s | 0.9 s | 0.6 s |
-| Least time from the roll to the first move (`afterRollMs`) | 1.92 s | 1.52 s | 1.17 s |
+| Least time from the bot's own roll to its first move (`afterRollMs`) | 1.92 s | 1.52 s | 1.17 s |
 | Time from one move to the next (`moveMs`) | 1.3 s | 0.9 s | 0.55 s |
-| Extra pause after a hit (`hitMs`) | 0.7 s | 0.5 s | 0.3 s |
+| Extra pause after a hit, before the next move (`hitMs`) | 0.7 s | 0.5 s | 0.3 s |
+| Time from the last move to the confirm (`landMs`) | 0.6 s | 0.45 s | 0.35 s |
 
-- **The dice stay on screen.** The bot thinks (`thinkingDelayMs` from `@tavli/bot`) while the dice roll. Its first move waits for the longer of the think time and `afterRollMs`. `afterRollMs` is `DICE_LAND_MS` (the last die of a double lands: `ROLL_MS` + 3 × `ROLL_STAGGER_MS`, 920 ms) plus a pause.
+- **The dice stay on screen.** The bot thinks (`thinkingDelayMs` from `@tavli/bot`) while the dice roll. Right after its own roll, its first move waits for the longer of the think time and `afterRollMs`. `afterRollMs` is the time the last die of a double lands (`ROLL_MS` + 3 × `ROLL_STAGGER_MS`, 920 ms) plus a pause.
+- **Dice it did not just roll** get only the think time: the opening dice (they were on the opening card), and a turn that goes on after the menu or Settings closes.
 - **Each move lands first.** A checker flies for `FLIGHT_MS` (200 ms); a hit checker leaves `HIT_DELAY_MS` (120 ms) later. `moveMs` is at least that plus 200 ms at every speed, so the next move starts after the last one has landed. `botTurn.test.ts` checks this.
 - **A hit gets a short extra pause** (`hitMs`), so the player sees the checker go to the bar. A pin (Plakoto) is a plain move.
-- After the last move the bot waits `moveMs` (and `hitMs` after a hit) before it confirms.
+- **After the last move** the bot waits only until the checker lands, plus a short beat: `landMs` (the 200 ms flight and 150–400 ms), and `HIT_DELAY_MS` more after a hit so the hit checker lands too. Then it confirms. The full `moveMs` gap is only between moves.
 - Tests move the fake clock by these constants, never by fixed numbers. Screen tests pass their own short `timing` (`MatchScreen` `botTiming`, `GameScreen` `bot.timing`).
 
 ## Sound and haptics

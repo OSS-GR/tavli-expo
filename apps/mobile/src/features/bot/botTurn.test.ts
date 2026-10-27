@@ -20,22 +20,18 @@ import {
 import { ROLL_MS, ROLL_STAGGER_MS } from '@/features/board/diceMotion';
 import { FLIGHT_MS, HIT_DELAY_MS } from '@/features/board/flights';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
-import { BOT_SPEEDS } from '@/features/settings/settings';
 
-import {
-  BOT_SPEED_TIMING,
-  BOT_TIMING,
-  DICE_LAND_MS,
-  botAnswer,
-  botStep,
-  startBotTurn,
-  type BotTurnActions,
-} from './botTurn';
+import { BOT_SPEEDS, BOT_SPEED_TIMING, BOT_TIMING, type BotTiming } from './botSpeed';
+import { botAnswer, botStep, startBotTurn, type BotTurnActions } from './botTurn';
 
 import { runOnFakeTimers } from '../../../test/clock';
 
-/** The least pause the player gets after a checker lands, before the next step. */
+/** The least pause the player gets after a checker lands, before the next move. */
 const MIN_PAUSE_MS = 200;
+/** The least beat after the last checker lands, before the confirm. */
+const MIN_BEAT_MS = 150;
+/** The last die of a double (four dice) lands this long after the roll. */
+const DICE_LAND_MS = ROLL_MS + 3 * ROLL_STAGGER_MS;
 
 /** A fake runner: the first legal turn, or whatever `pick` returns. Records requests. */
 function fakeRunner(pick?: (req: BotMoveRequest) => Turn | Promise<Turn>) {
@@ -129,7 +125,7 @@ function blackMotherPinned(): GameStore {
   return store;
 }
 
-const fast = { beforeRollMs: 0, afterRollMs: 0, moveMs: 0, hitMs: 0, thinkMs: () => 0 };
+const fast = { beforeRollMs: 0, afterRollMs: 0, moveMs: 0, hitMs: 0, landMs: 0, thinkMs: () => 0 };
 
 describe('botStep', () => {
   it('rolls, plays and confirms only on the bot turn', () => {
@@ -422,69 +418,21 @@ describe('startBotTurn timing (#172)', () => {
   /** The time from each stamp to the next one. */
   const gaps = (at: readonly { ms: number }[]) => at.slice(1).map((s, i) => s.ms - at[i]!.ms);
 
-  it.each(BOT_SPEEDS)(
-    '%s: rolls after beforeRollMs, keeps the dice on screen, then moves moveMs apart',
-    async (speed) => {
-      const store = botToRoll();
-      const { log, at, actions } = timed(store);
-      const { beforeRollMs, afterRollMs, moveMs } = BOT_SPEED_TIMING[speed];
-      const start = Date.now();
-      const handle = startBotTurn({
-        player: 'black',
-        difficulty: 'easy',
-        runner: fakeRunner(),
-        rng: createSeededRng(9),
-        getFlow: () => store.getState().flow,
-        actions,
-        timing: { ...BOT_SPEED_TIMING[speed], thinkMs: () => 0 },
-      });
-
-      await jest.advanceTimersByTimeAsync(beforeRollMs - 1);
-      expect(log).toEqual([]);
-      await jest.advanceTimersByTimeAsync(1);
-      expect(log).toEqual(['roll']);
-      // The bot is done thinking at once, but the dice stay on screen.
-      await jest.advanceTimersByTimeAsync(afterRollMs - 1);
-      expect(log).toEqual(['roll']);
-      await jest.advanceTimersByTimeAsync(1);
-      expect(log).toHaveLength(2);
-      await jest.advanceTimersByTimeAsync(5 * moveMs);
-      await handle.done;
-
-      expect(at[0]).toEqual({ what: 'roll', ms: start + beforeRollMs });
-      expect(at[1]).toEqual({ what: 'move', ms: start + beforeRollMs + afterRollMs });
-      expect(at.at(-1)?.what).toBe('confirm');
-      // The start position has no blot, so no hit: each next step is moveMs later.
-      const steps = at.slice(1);
-      expect(gaps(steps)).toEqual(steps.slice(1).map(() => moveMs));
-    },
-  );
-
-  it('waits the think time when it is longer than afterRollMs', async () => {
-    const store = botToRoll();
-    const { at, actions } = timed(store);
-    const { beforeRollMs, afterRollMs, moveMs } = BOT_TIMING;
-    const think = afterRollMs + 300;
-    const thinkMs = jest.fn(() => think);
-    const start = Date.now();
-    const handle = startBotTurn({
+  /** Starts the bot (Black) on `store` with the default timing and `timing` on top. */
+  function start(store: GameStore, actions: BotTurnActions, timing: Partial<BotTiming>) {
+    return startBotTurn({
       player: 'black',
       difficulty: 'easy',
       runner: fakeRunner(),
       rng: createSeededRng(9),
       getFlow: () => store.getState().flow,
       actions,
-      timing: { thinkMs },
+      timing,
     });
-    await jest.advanceTimersByTimeAsync(beforeRollMs + think + 5 * moveMs);
-    await handle.done;
+  }
 
-    expect(thinkMs).toHaveBeenCalledWith('easy', expect.anything(), expect.any(Boolean));
-    expect(at[1]).toEqual({ what: 'move', ms: start + beforeRollMs + think });
-  });
-
-  it('pauses hitMs longer after a hit', async () => {
-    // Black's own 8 to 6 with the 2 hits White's blot (White's own 19).
+  /** A Portes store where Black can hit White's blot: own 8 to 6 with the 2 of a 2-1. */
+  function blackCanHit(): { store: GameStore; turns: Turn[] } {
     const store = botToRoll();
     const board = createBoard(
       { white: { points: { 24: 14, 19: 1 } }, black: { points: { 8: 15 } } },
@@ -502,6 +450,106 @@ describe('startBotTurn timing (#172)', () => {
       store.getState().flow.game.state,
       [2, 1],
     );
+    return { store, turns };
+  }
+
+  it.each(BOT_SPEEDS)(
+    '%s: rolls after beforeRollMs, keeps the dice on screen, moves moveMs apart, confirms landMs after the last move',
+    async (speed) => {
+      const store = botToRoll();
+      const { log, at, actions } = timed(store);
+      const { beforeRollMs, afterRollMs, moveMs, landMs } = BOT_SPEED_TIMING[speed];
+      const t0 = Date.now();
+      const handle = start(store, actions, { ...BOT_SPEED_TIMING[speed], thinkMs: () => 0 });
+
+      await jest.advanceTimersByTimeAsync(beforeRollMs - 1);
+      expect(log).toEqual([]);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(log).toEqual(['roll']);
+      // The bot is done thinking at once, but the dice stay on screen.
+      await jest.advanceTimersByTimeAsync(afterRollMs - 1);
+      expect(log).toEqual(['roll']);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(log).toHaveLength(2);
+      await jest.advanceTimersByTimeAsync(5 * moveMs);
+      await handle.done;
+
+      expect(at[0]).toEqual({ what: 'roll', ms: t0 + beforeRollMs });
+      expect(at[1]).toEqual({ what: 'move', ms: t0 + beforeRollMs + afterRollMs });
+      expect(at.at(-1)?.what).toBe('confirm');
+      // The start position has no blot, so no hit: moveMs between moves,
+      // then only landMs from the last move to the confirm.
+      const moves = at.filter((s) => s.what === 'move');
+      expect(gaps(moves)).toEqual(moves.slice(1).map(() => moveMs));
+      expect(gaps(at.slice(-2))).toEqual([landMs]);
+    },
+  );
+
+  it('waits the think time when it is longer than afterRollMs', async () => {
+    const store = botToRoll();
+    const { at, actions } = timed(store);
+    const { beforeRollMs, afterRollMs, moveMs } = BOT_TIMING;
+    const think = afterRollMs + 300;
+    const thinkMs = jest.fn(() => think);
+    const t0 = Date.now();
+    const handle = start(store, actions, { thinkMs });
+    await jest.advanceTimersByTimeAsync(beforeRollMs + think + 5 * moveMs);
+    await handle.done;
+
+    expect(thinkMs).toHaveBeenCalledWith('easy', expect.anything(), expect.any(Boolean));
+    expect(at[1]).toEqual({ what: 'move', ms: t0 + beforeRollMs + think });
+  });
+
+  it('plays the opening dice after the think time only (it did not roll them)', async () => {
+    const store = createGameStore({
+      players: { white: 'you', black: 'bot' },
+      targetPoints: 3,
+      rng: createSeededRng(1),
+    });
+    const d = store.getState().dispatch;
+    d({ type: 'rollOpening', player: 'white', die: 1 });
+    d({ type: 'rollOpening', player: 'black', die: 6 });
+    expect(botStep(store.getState().flow, 'black')).toBe('play');
+
+    const { at, actions } = timed(store);
+    const think = 50;
+    const t0 = Date.now();
+    const handle = start(store, actions, { thinkMs: () => think });
+    await jest.advanceTimersByTimeAsync(think + 5 * BOT_TIMING.moveMs);
+    await handle.done;
+
+    expect(at.map((s) => s.what)).toEqual(['move', 'move', 'confirm']);
+    // Not afterRollMs: the dice have been on screen since the opening card.
+    expect(at[0]).toEqual({ what: 'move', ms: t0 + think });
+    expect(think).toBeLessThan(BOT_TIMING.afterRollMs);
+  });
+
+  it('goes on after the menu with the think time only (the dice were already rolled)', async () => {
+    const store = botToRoll();
+    const { log, at, actions } = timed(store);
+    const { beforeRollMs, afterRollMs, moveMs } = BOT_TIMING;
+    const think = 50;
+    const first = start(store, actions, { thinkMs: () => think });
+    await jest.advanceTimersByTimeAsync(beforeRollMs);
+    expect(log).toEqual(['roll']);
+    // The menu opens before the first move, and closes later.
+    first.cancel();
+    await first.done;
+    await jest.advanceTimersByTimeAsync(5000);
+
+    const resumed = Date.now();
+    const second = start(store, actions, { thinkMs: () => think });
+    await jest.advanceTimersByTimeAsync(think + 5 * moveMs);
+    await second.done;
+
+    expect(log.filter((l) => l === 'roll')).toHaveLength(1);
+    expect(at[1]).toEqual({ what: 'move', ms: resumed + think });
+    expect(think).toBeLessThan(afterRollMs);
+    expect(at.at(-1)?.what).toBe('confirm');
+  });
+
+  it('pauses hitMs longer after a hit between moves', async () => {
+    const { store, turns } = blackCanHit();
     const hitFirst = turns.find(
       (t) =>
         t.moves.length === 2 && t.moves[0]!.capture === 'hit' && t.moves[1]!.capture === 'none',
@@ -509,7 +557,7 @@ describe('startBotTurn timing (#172)', () => {
     expect(hitFirst).toBeDefined();
 
     const { at, actions } = timed(store);
-    const { afterRollMs, moveMs, hitMs } = BOT_TIMING;
+    const { moveMs, hitMs, landMs } = BOT_TIMING;
     const handle = startBotTurn({
       player: 'black',
       difficulty: 'easy',
@@ -519,22 +567,56 @@ describe('startBotTurn timing (#172)', () => {
       actions,
       timing: { thinkMs: () => 0 },
     });
-    await jest.advanceTimersByTimeAsync(afterRollMs + 3 * (moveMs + hitMs));
+    await jest.advanceTimersByTimeAsync(3 * (moveMs + hitMs));
     await handle.done;
 
     expect(at.map((s) => s.what)).toEqual(['move', 'move', 'confirm']);
-    expect(gaps(at)).toEqual([moveMs + hitMs, moveMs]);
+    expect(gaps(at)).toEqual([moveMs + hitMs, landMs]);
     expect(store.getState().flow.game.lastTurn?.moves).toEqual(hitFirst!.moves);
   });
 
+  it('confirms when the hit checker has landed after a last move that hits', async () => {
+    const { store, turns } = blackCanHit();
+    // 8/6* 8/7: the engine lists one order of a turn; the bot plays 8/7 first.
+    const both = turns.find(
+      (t) =>
+        t.moves.length === 2 &&
+        t.moves[0]!.capture === 'hit' &&
+        t.moves[1]!.capture === 'none' &&
+        t.moves[0]!.from === t.moves[1]!.from,
+    );
+    expect(both).toBeDefined();
+    const hitLast: Turn = { ...both!, moves: [both!.moves[1]!, both!.moves[0]!] };
+
+    const { at, actions } = timed(store);
+    const { moveMs, hitMs, landMs } = BOT_TIMING;
+    const handle = startBotTurn({
+      player: 'black',
+      difficulty: 'easy',
+      runner: fakeRunner(() => hitLast),
+      rng: createSeededRng(9),
+      getFlow: () => store.getState().flow,
+      actions,
+      timing: { thinkMs: () => 0 },
+    });
+    await jest.advanceTimersByTimeAsync(3 * (moveMs + hitMs));
+    await handle.done;
+
+    expect(at.map((s) => s.what)).toEqual(['move', 'move', 'confirm']);
+    // The hit checker leaves HIT_DELAY_MS after the hitter; no full hitMs pause.
+    expect(gaps(at)).toEqual([moveMs, landMs + HIT_DELAY_MS]);
+  });
+
   it.each(BOT_SPEEDS)('%s: each move lands before the next step starts', (speed) => {
-    const { afterRollMs, moveMs, hitMs } = BOT_SPEED_TIMING[speed];
+    const { afterRollMs, moveMs, hitMs, landMs } = BOT_SPEED_TIMING[speed];
     // A hit checker flies last: it leaves HIT_DELAY_MS after the mover.
     expect(moveMs).toBeGreaterThanOrEqual(HIT_DELAY_MS + FLIGHT_MS + MIN_PAUSE_MS);
     // The last die of a double lands, then the player gets a pause to read the dice.
-    expect(DICE_LAND_MS).toBe(ROLL_MS + 3 * ROLL_STAGGER_MS);
     expect(afterRollMs).toBeGreaterThanOrEqual(DICE_LAND_MS + MIN_PAUSE_MS);
     expect(hitMs).toBeGreaterThan(0);
+    // After the last move: the flight and a short beat, less than a full gap.
+    expect(landMs).toBeGreaterThanOrEqual(FLIGHT_MS + MIN_BEAT_MS);
+    expect(landMs).toBeLessThan(moveMs);
   });
 
   it('plays at Normal speed by default; Slow is slower and Fast is faster', () => {
@@ -543,7 +625,7 @@ describe('startBotTurn timing (#172)', () => {
     expect(BOT_TIMING.beforeRollMs).toBeGreaterThanOrEqual(900);
     expect(BOT_TIMING.moveMs).toBeGreaterThanOrEqual(900);
     const { slow, normal, fast: quick } = BOT_SPEED_TIMING;
-    for (const key of ['beforeRollMs', 'afterRollMs', 'moveMs', 'hitMs'] as const) {
+    for (const key of ['beforeRollMs', 'afterRollMs', 'moveMs', 'hitMs', 'landMs'] as const) {
       expect(slow[key]).toBeGreaterThan(normal[key]);
       expect(normal[key]).toBeGreaterThan(quick[key]);
     }
