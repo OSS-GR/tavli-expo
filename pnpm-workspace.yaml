@@ -15,3 +15,6 @@ allowBuilds:
   # Pulled in by @sentry/react-native. Its postinstall only downloads the CLI
   # binary when the prebuilt one (an optional dep) is missing.
   '@sentry/cli': false
+  # Pulled in by convex (apps/server). Its postinstall only checks the native
+  # binary. Prebuilt binaries ship as optional deps.
+  esbuild: false
