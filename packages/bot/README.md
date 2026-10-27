@@ -100,8 +100,10 @@ analyzer.evaluate(state); // the chances of state.toMove, before the roll
   plays at temperature 0.
 - Each `RankedTurn` has the `evaluation` after the turn, from the view of
   the mover (`state.toMove`), and `equityLoss` against the best turn (0 for
-  the best, never below 0). `evaluation.equity` is the turn's score. When
-  the turn ends the game, the evaluation is the true result.
+  the best, never below 0). At 1 ply, `evaluation.equity` is the turn's
+  score. At 2 plies, a candidate's evaluation is the average over the 21
+  replies, and the other turns keep their 1-ply evaluation (see "2-ply"
+  below). When the turn ends the game, the evaluation is the true result.
 - It follows `state.toMove`: an Asodio extra roll keeps the same player,
   and then the view after the turn is already the mover's. If
   `state.dice` is set (the chosen double), `dice` must equal it.
@@ -113,7 +115,9 @@ analyzer.evaluate(state); // the chances of state.toMove, before the roll
   win, like in the nets).
 - Errors: `NOT_IMPLEMENTED` (no hard or medium evaluator),
   `INVALID_REQUEST` (`dice` differs from `state.dice`, a bad `top` or
-  `plies`), `INVALID_REGISTRY` like `createBot`, and the engine's errors
+  `plies`, or at 2 plies a question the variant cannot take an answer
+  for: `prompt` with no `answerPrompt`), `INVALID_REGISTRY` like
+  `createBot`, and the engine's errors
   (a finished game in `rankTurns`, an unknown variant).
 
 ### 2-ply (#212)
@@ -133,6 +137,13 @@ analyzer.evaluate(state); // the chances of state.toMove, before the roll
    1-ply loss, but never less than the last candidate's, so the list stays
    sorted. A candidate's `evaluation` is the average of the chances after
    each reply, from the mover's view, with the 2-ply equity.
+
+**Two scales.** The candidates (first in the list) have 2-ply values; the
+turns after them have 1-ply values, with `equityLoss` raised to at least
+the last candidate's loss. Values across that boundary cannot be compared:
+a 1-ply equity is not a 2-ply equity. A review that grades each turn (for
+example "a blunder lost 0.3 points") should use `plies: 1`, or use 2-ply
+values only for turns inside the candidates.
 
 The engine drives every step, and the next player is always `toMove`:
 
@@ -160,7 +171,8 @@ are not the net's, so it uses the Asodio heuristic, which costs about
 is several times slower than Node, so a 2-ply hint fits the 1 s phone
 budget for Portes, Plakoto and Fevga, but not yet for Asodio. The bot's
 own play (`chooseTurn`) stays 1-ply, and nothing in the app uses 2 ply
-yet.
+yet. An app caller needs a budget (a deterministic cap on the work, or
+1 ply for Asodio) before it uses 2 ply in Asodio.
 
 ## The levels
 
@@ -1206,7 +1218,8 @@ the Plakoto one about 15 s with hard vs medium; the files run in parallel).
   rest keep their 1-ply order; a candidate's equity equals a count by hand
   over the 36 rolls; a race-only test evaluator splits into a direct shot
   at 1 ply but stays safe at 2 ply; the Plakoto mother question; Asodio
-  extra rolls and chosen doubles; the errors.
+  extra rolls and chosen doubles; the errors (also a stub variant that
+  asks a question with no `answerPrompt`).
 - `analyzer-perf.test.ts`: a 2-ply hint for a middle-game Portes position
   takes < 2 s.
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for

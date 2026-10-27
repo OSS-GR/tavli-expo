@@ -10,6 +10,7 @@ import {
   asodio,
   createBoard,
   createSeededRng,
+  createVariantRegistry,
   getPreset,
   getVariant,
   opponent,
@@ -320,6 +321,24 @@ describe('rankTurns with plies: 2', () => {
     });
     expect(() => easyOnly.rankTurns(blocked, [6, 5], TWO)).toThrow(
       expect.objectContaining({ code: 'NOT_IMPLEMENTED' }),
+    );
+  });
+
+  it('throws INVALID_REQUEST for a question the variant cannot take an answer for', () => {
+    // A stub Portes that asks a question after every turn but has no `answerPrompt`.
+    const asksOnly: Variant = Object.assign(Object.create(portes) as Variant, {
+      prompt: (state: GameState) => ({ player: state.toMove, kind: 'stub', choices: ['ok'] }),
+      answerPrompt: undefined,
+    });
+    const stub = createAnalyzer({
+      variants: createVariantRegistry([asksOnly]),
+      evaluators: new Map([['portes', { medium: portesHeuristic }]]),
+    });
+    const dice: Dice = [3, 1];
+    // 1 ply never plays past the turn, so it never meets the question.
+    expect(stub.rankTurns(start, dice).length).toBeGreaterThan(1);
+    expect(() => stub.rankTurns(start, dice, TWO)).toThrow(
+      expect.objectContaining({ name: 'BotError', code: 'INVALID_REQUEST' }),
     );
   });
 });

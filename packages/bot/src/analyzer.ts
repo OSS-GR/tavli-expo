@@ -13,7 +13,7 @@
 import type { Dice, DieValue, GameState, GameResult, PlayerId, Turn, Variant } from '@tavli/engine';
 import { DIE_VALUES, VARIANT_REGISTRY, getVariant } from '@tavli/engine';
 
-import { scoreAnswers } from './answer';
+import { questionOf, scoreAnswers } from './answer';
 import { checkDice, checkRegistry, defaultEvaluatorsFor } from './create-bot';
 import { BotError } from './errors';
 import { scoreTurns } from './score';
@@ -132,8 +132,9 @@ interface Valued {
  *   best turn (0 for the best, never below 0). A forced turn or a pass is
  *   a list of one. Throws `NOT_IMPLEMENTED` for a variant with no hard or
  *   medium evaluator, `INVALID_REQUEST` when `dice` differs from
- *   `state.dice`, `plies` is not 1 or 2, or `top` is not an integer >= 1,
- *   and the engine's errors for a finished game or an unknown variant.
+ *   `state.dice`, `plies` is not 1 or 2, `top` is not an integer >= 1, or
+ *   (at 2 plies) a question after a turn has no `answerPrompt`, and the
+ *   engine's errors for a finished game or an unknown variant.
  * - `plies: 1` (the default): `evaluation.equity` is the bot's score of
  *   the turn.
  * - `plies: 2`: the best `TWO_PLY_CANDIDATES` turns at 1 ply, and the
@@ -216,7 +217,9 @@ export function createAnalyzer(registry: BotRegistry = {}): Analyzer {
    *
    * 1. A question (`Variant.prompt`, like Plakoto "resign or play on" or
    *    the Asodio chosen double) gets the best 1-ply answer of the player
-   *    asked (`scoreAnswers`, as the bot answers), then play goes on.
+   *    asked (`scoreAnswers`, as the bot answers), then play goes on. A
+   *    question the variant cannot take an answer for (no `answerPrompt`)
+   *    throws `BotError('INVALID_REQUEST')`, like `chooseAnswer`.
    * 2. A state that holds dice (the Asodio chosen double) plays those dice:
    *    the value is the best reply with them. No average.
    * 3. Else the value is the average over the 21 rolls of the best 1-ply
@@ -225,17 +228,18 @@ export function createAnalyzer(registry: BotRegistry = {}): Analyzer {
    */
   function twoPly(variant: Variant, evaluator: Evaluator, after: GameState, me: PlayerId): Valued {
     let state = after;
-    for (let prompt = variant.prompt?.(state) ?? null; prompt !== null;) {
-      if (variant.answerPrompt === undefined) break;
+    while ((variant.prompt?.(state) ?? null) !== null) {
+      // `questionOf` throws INVALID_REQUEST when the variant cannot take the answer.
+      const prompt = questionOf(variant, state);
       const scores = scoreAnswers(variant, evaluator, state, prompt);
       const choice = prompt.choices[bestIndex(scores)] as string;
-      state = variant.answerPrompt(state, prompt.player, choice);
+      const answer = variant.answerPrompt as NonNullable<Variant['answerPrompt']>;
+      state = answer.call(variant, state, prompt.player, choice);
       const result = variant.result(state);
       if (result !== null) {
         const evaluation = fromResult(result, me);
         return { evaluation, equity: evaluation.equity };
       }
-      prompt = variant.prompt?.(state) ?? null;
     }
     if (state.dice !== null) return bestReply(variant, evaluator, state, state.dice, me);
 
