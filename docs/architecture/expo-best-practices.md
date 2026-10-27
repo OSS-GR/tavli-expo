@@ -625,3 +625,13 @@ Version numbers for npm packages were read from https://registry.npmjs.org on 20
 - **Zustand 5.0.16** `persist` with a `version`, a `migrate` stub and a `merge` that cleans bad saved values.
 - **Jest:** `jest` 30.5, `jest-expo` ~58.0.12, `@testing-library/react-native` 14.1 (async `render` and events). Unistyles mocks come from `react-native-unistyles/mocks`.
 - Unistyles and MMKV need a **development build**. Expo Go cannot run them.
+
+## Notes from crash reporting (#43, 2026-10-26)
+
+- **`@sentry/react-native` ~8.28.0** (the SDK 58 pin from `expo install`) sits behind the `CrashReporter` port. The adapter is `packages/adapters/crash-sentry`; its README has the owner setup (DSN, org, project, auth token).
+- We set Sentry up by hand, not with `@sentry/wizard`: the wizard would put `Sentry.init` and `Sentry.wrap` in app code, which ADR-0002 forbids.
+- `apps/mobile/app.config.ts` adds the `@sentry/react-native/expo` plugin on top of `app.json`. It reads `SENTRY_ORG` and `SENTRY_PROJECT` from the build env, and sets `disableAutoUpload` while `SENTRY_AUTH_TOKEN` is missing, so EAS builds pass before the token exists. `expo config` warns about the missing org and project until they are set.
+- `apps/mobile/metro.config.js` uses `getSentryExpoConfig` (Debug IDs for source maps).
+- `app.json` has `ios.privacyManifests` with the "required reason" APIs Sentry uses (UserDefaults, SystemBootTime, FileTimestamp) and the data it collects (crash, performance, diagnostics; not linked, no tracking). Update this when the analytics SDK (#61) lands.
+- `@sentry/cli` is in `allowBuilds: false`: its postinstall only downloads a binary the optional deps already ship.
+- Dev builds use the no-op reporter. Release builds send only when `EXPO_PUBLIC_SENTRY_DSN` is set. The anonymous install id (`features/install-id`) is the only user id; #61 should reuse it.

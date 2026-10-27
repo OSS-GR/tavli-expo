@@ -44,7 +44,7 @@ packages/bot/        Bot players (uses the engine)
 packages/contracts/  Interfaces (ports) and shared types
 packages/ui/         Design tokens and themes (plain data)
 packages/themes/     Board themes: theme.json manifests and art
-packages/adapters/*  Vendor code behind ports (storage-mmkv, haptics-expo, audio-expo)
+packages/adapters/*  Vendor code behind ports (storage-mmkv, haptics-expo, audio-expo, crash-sentry)
 ```
 
 See [ADR-0002](docs/decisions/0002-modular-architecture.md) for the full plan.

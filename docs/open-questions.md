@@ -7,6 +7,7 @@
 | # | Question | Why it matters | Affects |
 |---|----------|----------------|---------|
 | Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
+| Q18 | **Sentry project:** create a free Sentry React Native project and add the DSN, org and project slugs, and an auth token to EAS (steps in `packages/adapters/crash-sentry/README.md`). Until then, builds send no crash reports. | We see crashes from test builds | #43 |
 
 ## Answered
 
