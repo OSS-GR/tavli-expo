@@ -46,4 +46,32 @@ No font is shipped. The preview draws the count badge with the machine's default
 
 ## Sounds
 
-None yet. Sound keys in `theme.json` are names only; files come in #39 and #40. Add every sound file to this list when it arrives.
+All third-party sounds are **CC0 1.0** ([deed](https://creativecommons.org/publicdomain/zero/1.0/)). CC0 needs no credit. We list them anyway. Each license was checked on the source page and, for Kenney, in the `License.txt` inside the zip.
+
+`tools/walnut-kafeneio/build_sounds.py` downloads the sources (it checks a SHA-256 for each), then cuts, mixes, normalizes and encodes them. The raw sources are not in the repo.
+
+### Sources
+
+| Source                                                                                                     | Author                      | License | Files used                                                                          |
+| ---------------------------------------------------------------------------------------------------------- | --------------------------- | ------- | ----------------------------------------------------------------------------------- |
+| [Boardgame piece wobbles](https://opengameart.org/content/boardgame-piece-wobbles) (OpenGameArt)           | Aidan_Walker                | CC0 1.0 | `wobble02.ogg`–`wobble05.ogg`: a wooden game piece on a wooden table                |
+| [Wooden dice on wooden table roll](https://opengameart.org/content/wooden-dice-on-wodden-table-roll) (OGA) | Wuzzy                       | CC0 1.0 | `Holzwürfel_auf_Holztisch_1.flac`, `_3.flac`, `_4.flac`                             |
+| [Impact Sounds](https://kenney.nl/assets/impact-sounds) 1.0                                                | Kenney Vleugels (kenney.nl) | CC0 1.0 | `impactWood_light_000.ogg`, `impactWood_light_002.ogg`, `impactWood_medium_000.ogg` |
+| [Casino Audio](https://kenney.nl/assets/casino-audio) 1.1                                                  | Kenney Vleugels (kenney.nl) | CC0 1.0 | `dice-grab-1.ogg`                                                                   |
+| [Music Jingles](https://kenney.nl/assets/music-jingles)                                                    | Kenney Vleugels (kenney.nl) | CC0 1.0 | `jingles_PIZZI10.ogg`, `jingles_STEEL10.ogg`                                        |
+
+### Files in `walnut-kafeneio/sounds/`
+
+Mono AAC (`.m4a`), 44.1 kHz, 64 kbit/s. About 54 KB in total (the limit is 500 KB, checked by `themes.test.ts`).
+
+| File                     | Event          | Made from                                                                              | License |
+| ------------------------ | -------------- | -------------------------------------------------------------------------------------- | ------- |
+| `checker-place-1..3.m4a` | `checkerPlace` | One tap each from `wobble04`, `wobble03`, `wobble05`, with a little `impactWood_light` | CC0 1.0 |
+| `checker-hit.m4a`        | `checkerHit`   | Taps from `wobble02`, `wobble05`, `wobble04` plus `impactWood_medium_000`              | CC0 1.0 |
+| `bear-off.m4a`           | `bearOff`      | `impactWood_light_000` slowed down, plus taps from `wobble03`, `wobble04`              | CC0 1.0 |
+| `dice-roll-1.m4a`, `-2`  | `diceRoll`     | Wuzzy dice takes 1, 3 and 4, mixed as two dice, hiss removed                           | CC0 1.0 |
+| `dice-land.m4a`          | `diceLand`     | The last small hits of Wuzzy dice takes 3 and 4                                        | CC0 1.0 |
+| `invalid-move.m4a`       | `invalidMove`  | A tap from `wobble04`, slowed, muffled and played twice                                | CC0 1.0 |
+| `turn-start.m4a`         | `turnStart`    | Part of `dice-grab-1`, very quiet                                                      | CC0 1.0 |
+| `game-win.m4a`           | `gameWin`      | `jingles_PIZZI10` with a little `jingles_STEEL10`                                      | CC0 1.0 |
+| `match-win.m4a`          | `matchWin`     | The same, then both again a fifth higher                                               | CC0 1.0 |

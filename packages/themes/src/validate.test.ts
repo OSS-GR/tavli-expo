@@ -119,10 +119,40 @@ describe('validateTheme', () => {
   it('checks sound and haptic keys', () => {
     const t = copy();
     t['sounds'].boom = null;
-    t['haptics'].win = 'buzz';
+    t['haptics'].win = 'success';
+    t['haptics'].gameWin = 'buzz';
     const errors = errorsOf(t);
     expect(errors).toContain('sounds.boom: unknown sound key');
-    expect(errors.some((e) => e.startsWith('haptics.win: must be one of'))).toBe(true);
+    expect(errors).toContain('haptics.win: unknown haptic key');
+    expect(errors.some((e) => e.startsWith('haptics.gameWin: must be one of'))).toBe(true);
+  });
+
+  it('accepts a sound as one file, a list of takes, or null', () => {
+    const t = copy();
+    t['sounds'].checkerHit = 'sounds/hit.mp3';
+    t['sounds'].diceRoll = ['sounds/roll-1.m4a', 'sounds/roll-2.m4a'];
+    t['sounds'].turnStart = null;
+    delete t['sounds'].matchWin;
+    expect(errorsOf(t)).toEqual([]);
+  });
+
+  it('rejects bad sound files', () => {
+    const t = copy();
+    t['sounds'].checkerHit = 'hit.m4a';
+    t['sounds'].bearOff = 'sounds/../../secret.m4a';
+    t['sounds'].diceLand = 'sounds/land.wav';
+    t['sounds'].gameWin = 'sounds/Win.m4a';
+    t['sounds'].diceRoll = [];
+    t['sounds'].checkerPlace = ['sounds/a.m4a', 'sounds/a.m4a'];
+    t['sounds'].matchWin = 3;
+    t['sounds'].invalidMove = Array.from({ length: 9 }, (_, i) => `sounds/no-${i}.m4a`);
+    const errors = errorsOf(t);
+    for (const key of ['checkerHit', 'bearOff', 'diceLand', 'gameWin', 'matchWin']) {
+      expect(errors.some((e) => e.startsWith(`sounds.${key}: must`))).toBe(true);
+    }
+    expect(errors).toContain('sounds.diceRoll: must list 1 to 8 files');
+    expect(errors).toContain('sounds.invalidMove: must list 1 to 8 files');
+    expect(errors).toContain('sounds.checkerPlace: lists a file twice');
   });
 
   it('assertTheme throws with every error listed', () => {

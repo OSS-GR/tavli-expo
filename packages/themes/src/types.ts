@@ -301,19 +301,33 @@ export interface DiceStyle {
   shadow: Shadow;
 }
 
-/** Sound event names. Files come later (#39, #40). `null` = use the app default. */
-export type SoundKey =
+/**
+ * Game events that can have a sound and a haptic. The theme maps each event
+ * to a sound (`sounds`) and a haptic pattern (`haptics`). The app plays both
+ * with one call (`apps/mobile/src/features/feedback`).
+ */
+export type FeedbackEvent =
   | 'checkerPickUp'
   | 'checkerPlace'
   | 'checkerHit'
+  | 'bearOff'
   | 'diceShake'
   | 'diceRoll'
-  | 'bearOff'
+  | 'diceLand'
   | 'invalidMove'
-  | 'win';
+  | 'turnStart'
+  | 'gameWin'
+  | 'matchWin';
 
-export type HapticKey =
-  'checkerPickUp' | 'checkerPlace' | 'checkerHit' | 'diceLand' | 'invalidMove' | 'win';
+export type SoundKey = FeedbackEvent;
+export type HapticKey = FeedbackEvent;
+
+/**
+ * The sound of one event: a file, or several takes of the same sound (the app
+ * plays them in turn, so repeats do not sound like a machine gun). Paths are
+ * relative to the theme folder: `sounds/<kebab-name>.m4a`. `null` = silent.
+ */
+export type SoundFiles = string | readonly string[] | null;
 
 /** Haptic patterns. They map to `expo-haptics` in the app. */
 export type HapticStyle =
@@ -345,7 +359,7 @@ export interface ThemeManifest {
   checkers: CheckerStyles;
   highlights: HighlightStyles;
   dice: DiceStyle;
-  sounds: Partial<Record<SoundKey, string | null>>;
+  sounds: Partial<Record<SoundKey, SoundFiles>>;
   haptics: Partial<Record<HapticKey, HapticStyle>>;
   accessibility: {
     /** WCAG contrast of the two checker fills (checked by the tests). */

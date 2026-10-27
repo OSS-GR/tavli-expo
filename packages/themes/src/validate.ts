@@ -9,27 +9,29 @@
 
 import { isHexColor, tokenRef } from './color';
 import { rectInsideUnit, rectsOverlap } from './geometry';
-import type { LayoutId, Rect, ThemeManifest } from './types';
+import type { FeedbackEvent, HapticKey, LayoutId, Rect, SoundKey, ThemeManifest } from './types';
 
 export const LAYOUT_IDS: readonly LayoutId[] = ['portrait-rotated', 'landscape'];
-export const SOUND_KEYS = [
+/** Every game event a theme can give a sound and a haptic (see `FeedbackEvent`). */
+export const FEEDBACK_EVENTS = [
   'checkerPickUp',
   'checkerPlace',
   'checkerHit',
+  'bearOff',
   'diceShake',
   'diceRoll',
-  'bearOff',
-  'invalidMove',
-  'win',
-] as const;
-export const HAPTIC_KEYS = [
-  'checkerPickUp',
-  'checkerPlace',
-  'checkerHit',
   'diceLand',
   'invalidMove',
-  'win',
-] as const;
+  'turnStart',
+  'gameWin',
+  'matchWin',
+] as const satisfies readonly FeedbackEvent[];
+export const SOUND_KEYS: readonly SoundKey[] = FEEDBACK_EVENTS;
+export const HAPTIC_KEYS: readonly HapticKey[] = FEEDBACK_EVENTS;
+/** Sound files: `sounds/<kebab-name>.m4a` (or `.mp3`), inside the theme folder. */
+export const SOUND_FILE_PATTERN = /^sounds\/[a-z0-9]+(-[a-z0-9]+)*\.(m4a|mp3)$/;
+/** Most takes one sound may list. */
+export const MAX_SOUND_TAKES = 8;
 export const HAPTIC_STYLES = [
   'selection',
   'light',
@@ -507,9 +509,18 @@ export function validateTheme(value: unknown): ValidationResult {
   const sounds = c.obj(t['sounds'], 'sounds');
   if (sounds) {
     for (const [k, v] of Object.entries(sounds)) {
-      if (!(SOUND_KEYS as readonly string[]).includes(k))
-        c.fail(`sounds.${k}`, 'unknown sound key');
-      if (v !== null) c.str(v, `sounds.${k}`);
+      const p = `sounds.${k}`;
+      if (!(SOUND_KEYS as readonly string[]).includes(k)) c.fail(p, 'unknown sound key');
+      if (v === null) continue;
+      if (Array.isArray(v)) {
+        if (v.length === 0 || v.length > MAX_SOUND_TAKES) {
+          c.fail(p, `must list 1 to ${MAX_SOUND_TAKES} files`);
+        }
+        v.forEach((f, i) => c.str(f, `${p}[${i}]`, SOUND_FILE_PATTERN));
+        if (new Set(v).size !== v.length) c.fail(p, 'lists a file twice');
+      } else {
+        c.str(v, p, SOUND_FILE_PATTERN);
+      }
     }
   }
   const haptics = c.obj(t['haptics'], 'haptics');

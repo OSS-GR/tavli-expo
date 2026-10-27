@@ -55,7 +55,15 @@ The real route is `app/game/[id].tsx` (see [App shell](app-shell.md)). Dev route
 - The UI never picks dice. Every roll is an engine action (`roll`, `rollOpening`); the flow rolls with the `Rng` from `services.ts` (`createLocalRng`).
 - The animation (`diceMotion.ts`) is a 2D tumble on the UI thread: the die spins, hops and grows, and its face flips through the other numbers in a fixed order. From 78% of the roll on, it shows the engine's value.
 - **Opening roll:** a card with one die per player. In pass-and-play each player taps for their own die (`openingTaps="perPlayer"`); vs bot one tap rolls both (`"one"`). A tie says so and both roll again. The result stays 1.5 s; the starter then plays both opening dice.
-- A haptic plays when the last die lands: the theme's `haptics.diceLand` pattern through the `Feedback` port (`@tavli/contracts`, adapter `@tavli/haptics-expo`). `features/feedback/feedback.ts` skips it when Settings → Haptics is off.
+- A haptic and a sound play when the last die lands (`feedback.event('diceLand')`).
+
+## Sound and haptics
+
+- One call per game event: `feedback.event('checkerPlace')`. `features/feedback/feedback.ts` (`createGameFeedback`) looks up the theme's `sounds[event]` and `haptics[event]` and plays both. It drops an event that comes too soon after the same one (`MIN_GAP_MS`, e.g. 70 ms for checker clicks).
+- Two ports: `SoundPlayer` (adapter `@tavli/audio-expo`, expo-audio) and `Feedback` (haptics, adapter `@tavli/haptics-expo`). `appSound` follows Settings → Sound, `appFeedback` follows Settings → Haptics.
+- `features/game/gameFeedback.ts` (`useGameFeedback`, used by `GameScreen`) reads the engine's event log after each store change: a roll plays `diceRoll`; a move plays `checkerPlace`, `checkerHit` (hit or pin) or `bearOff`; the next player's turn plays `turnStart`; the end plays `gameWin` or `matchWin`. An action the engine refuses plays `invalidMove`. So drag, tap, bot and replay all sound the same, and screens need no extra calls.
+- UI-only events (`diceLand`, `checkerPickUp`) use the `event` function that `useGameFeedback` returns.
+- The theme's sounds are preloaded when the game screen opens. Sounds mix with other apps' audio and follow the phone's silent switch.
 
 ## Moving checkers
 
