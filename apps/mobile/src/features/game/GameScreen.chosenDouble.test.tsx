@@ -100,12 +100,18 @@ describe('<GameScreen /> a chosen double is read as chosen (#202)', () => {
   it('your choice: "You chose double 4: four moves of 4", once, and never "rolled"', async () => {
     const store = aceyDeucey('white');
     await show(store, { seats });
-    const send = await whitePlaysAceDeuce(store);
-    await send({ type: 'answer', player: 'white', choice: '4' });
+    await whitePlaysAceDeuce(store);
+    // The question card reads itself (#205); you answer on it.
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('choose-double-4'));
+    });
     await tick(DOUBLE_SPLIT_AT_MS + DOUBLE_LABEL_MS);
 
     expect(said().filter((t) => t === 'You chose double 4: four moves of 4.')).toHaveLength(1);
-    expect(said().filter((t) => /double/i.test(t))).toHaveLength(1);
+    expect(said().filter((t) => /double/i.test(t))).toEqual([
+      'You rolled 1-2 Choose a double:',
+      'You chose double 4: four moves of 4.',
+    ]);
   });
 
   it('the bot’s choice: its 1-2 and the double it chose are read once, by name', async () => {
