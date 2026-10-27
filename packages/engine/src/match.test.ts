@@ -254,7 +254,7 @@ describe('recordGameResult', () => {
 });
 
 describe('resignGame (owner: mono or diplo from the board right now)', () => {
-  it('gives mono when the resigning player has borne off a checker', () => {
+  it('tavli-match.md #19: a player with a checker off resigns the game → mono, 1 point', () => {
     const state = portesState('w: 6x5 offx10 ; b: 1x14 offx1');
     expect(resignGame(state, 'black')).toEqual({ winner: 'white', points: 1, reason: 'resigned' });
   });
@@ -316,12 +316,25 @@ describe('resignGame (owner: mono or diplo from the board right now)', () => {
     expect(resignGame(state, 'black').points).toBe(1);
   });
 
-  it('a resigned game counts in the match like any other result', () => {
+  it('tavli-match.md #18: Portes to 3, 0–0, a resign before any checker is off → diplo, 2–0', () => {
     const state = portes.initialState({ startingPlayer: 'white' });
     const match = play(portesMatch(), resignGame(state, 'white'));
     expect(match.score).toEqual({ white: 0, black: 2 });
-    expect(match.games[0]).toMatchObject({ reason: 'resigned', winner: 'black' });
+    expect(match.games[0]).toMatchObject({ reason: 'resigned', winner: 'black', points: 2 });
+    expect(match).toMatchObject({ status: 'in-progress', winner: null, resignedBy: null });
     expect(match.nextStarter).toBe('black');
+  });
+
+  it('tavli-match.md #22: to 3, 0–2, a resigned game with no checker off → 0–4, won to the target', () => {
+    const state = portes.initialState({ startingPlayer: 'white' });
+    const match = play(portesMatch(3), win('black', 2), resignGame(state, 'white'));
+    expect(match).toMatchObject({
+      score: { white: 0, black: 4 },
+      status: 'finished',
+      winner: 'black',
+      // Won to the target: nobody resigned the match.
+      resignedBy: null,
+    });
   });
 });
 

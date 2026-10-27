@@ -239,6 +239,56 @@ describe('match flow', () => {
     ).toThrow(illegalAction);
   });
 
+  it('tavli-match.md #20: to 3, 0–0, resign match at the start → the opponent wins, 0–0 stays', () => {
+    const atOpening = act(createMatchFlow({ rules: portesOnly(), targetPoints: 3 }), [
+      { type: 'resignMatch', player: 'white' },
+    ]);
+    const atFirstRoll = act(
+      createMatchFlow({ rules: portesOnly(), targetPoints: 3, starter: 'white' }),
+      [{ type: 'resignMatch', player: 'white' }],
+    );
+    for (const flow of [atOpening, atFirstRoll]) {
+      expect(matchPhase(flow)).toBe('match-over');
+      expect(flow.match).toMatchObject({
+        status: 'finished',
+        winner: 'black',
+        resignedBy: 'white',
+        score: { white: 0, black: 0 },
+        games: [],
+      });
+      expect(replay(flow.log)).toEqual(flow);
+    }
+  });
+
+  it('tavli-match.md #21: a resigned game gives 0–2, then resign match → 0–2 stays, never 0–0 or 0–3', () => {
+    const start = createMatchFlow({ rules: portesOnly(), targetPoints: 3, starter: 'white' });
+    const afterGame = act(start, [
+      { type: 'roll', player: 'white', dice: [3, 1] },
+      { type: 'resign', player: 'white' },
+    ]);
+    expect(afterGame.game.result).toEqual({ winner: 'black', points: 2, reason: 'resigned' });
+    expect(afterGame.match.score).toEqual({ white: 0, black: 2 });
+
+    // Resigned when the game is over, or in the middle of the next game.
+    const atGameEnd = act(afterGame, [{ type: 'resignMatch', player: 'white' }]);
+    const inNextGame = act(afterGame, [
+      { type: 'nextGame' },
+      { type: 'roll', player: 'black', dice: [6, 5] },
+      { type: 'resignMatch', player: 'white' },
+    ]);
+    for (const flow of [atGameEnd, inNextGame]) {
+      expect(flow.match).toMatchObject({
+        status: 'finished',
+        winner: 'black',
+        resignedBy: 'white',
+        score: { white: 0, black: 2 },
+      });
+      expect(flow.match.games).toHaveLength(1);
+      expect(validateMatch(JSON.parse(JSON.stringify(flow.match)))).toEqual(flow.match);
+      expect(replay(flow.log).match.score).toEqual({ white: 0, black: 2 });
+    }
+  });
+
   it('rematch: the winner of the last game starts, with no opening roll', () => {
     const over = act(createMatchFlow({ rules: portesOnly(), targetPoints: 1, starter: 'white' }), [
       { type: 'roll', player: 'white', dice: [3, 1] },
