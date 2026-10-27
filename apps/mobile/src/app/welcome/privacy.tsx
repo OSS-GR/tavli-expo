@@ -8,7 +8,12 @@ export default function WelcomePrivacyRoute() {
   return (
     <WelcomeConsentScreen
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/welcome/language'))}
-      onDone={() => router.replace('/')}
+      onDone={() => {
+        // Home's redirect left the language step at the bottom of the stack.
+        // Pop to it, then swap it for Home, so Back cannot return to the welcome flow.
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/');
+      }}
     />
   );
 }

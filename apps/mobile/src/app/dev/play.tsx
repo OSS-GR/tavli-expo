@@ -13,6 +13,12 @@ import { GameScreen } from '@/features/game/GameScreen';
 import { createLocalRng } from '@/services';
 
 export default function DevPlayRoute() {
+  // Check before the store exists: building it sends `game_started`.
+  if (!__DEV__) return <Redirect href="/" />;
+  return <DevPlay />;
+}
+
+function DevPlay() {
   const { t } = useTranslation();
   const [store] = useState(() =>
     createGameStore({
@@ -22,8 +28,6 @@ export default function DevPlayRoute() {
       analytics: createGameAnalytics({ mode: 'local' }),
     }),
   );
-
-  if (!__DEV__) return <Redirect href="/" />;
 
   return (
     <>

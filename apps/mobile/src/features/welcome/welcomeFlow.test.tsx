@@ -1,5 +1,6 @@
 import type { createRecordingAnalytics } from '@tavli/contracts';
 import { userEvent } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
 import RootLayout from '@/app/_layout';
@@ -126,5 +127,16 @@ describe('first launch', () => {
     await user.press(screen.getByRole('radio', { name: 'English' }));
     expect(settingsStore.getState().language).toBe('system');
     expect(await screen.findByRole('button', { name: 'Continue' })).toBeOnTheScreen();
+  });
+
+  it('leaves no welcome screen under Home after the answer', async () => {
+    const user = userEvent.setup();
+    await openApp();
+    await user.press(screen.getByRole('button', { name: 'Continue' }));
+    await user.press(screen.getByRole('button', { name: "Don't allow" }));
+
+    expect(screen).toHavePathname('/');
+    // Back (Android button, iOS swipe) must not return to the language step.
+    expect(router.canGoBack()).toBe(false);
   });
 });

@@ -57,7 +57,7 @@ Notes:
 4. In PostHog project settings, turn on **Discard client IP data**.
 5. Without a key the app uses the no-op adapter and logs once in dev: `[analytics] EXPO_PUBLIC_POSTHOG_KEY is not set`.
 
-To check: install a test build, tap **Allow usage data**, play a game, and look for `app_opened` and `game_started` in PostHog → Activity.
+To check: install a test build, tap **Allow usage data**, and look for `app_opened` and `$screen` in PostHog → Activity. Game events need a game route. Until `app/game/[id]` exists, try them in a dev build with the key set: open `/dev/play` (release builds send that route Home).
 
 ## Adding an event
 
