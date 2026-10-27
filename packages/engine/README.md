@@ -371,7 +371,8 @@ flag must keep the `portes` preset value, or the variant throws
 - Numbers on the dev container (Node 22): median 0.013 ms per position, the
   worst of 2,000 random positions about 1 ms; 15 checkers on 15 points with
   4-4 (1,882 plays) about 3.5 ms. `portes-perf.test.ts` checks median < 5 ms
-  and worst < 50 ms.
+  and worst < 50 ms. It times each position 3 times and keeps the best, so
+  a busy CI machine that pauses the test once does not fail it.
 - Plain arrays of small integers: V8 copies `array.slice()` far faster than
   a typed array. That alone made the search 3 times faster.
 
@@ -380,15 +381,58 @@ flag must keep the `portes` preset value, or the variant throws
 - `portes.test.ts`: one test per numbered edge case in `portes.md` and the
   movement, dice and bear-off cases (#9–#17) in `tavli-match.md`, named like
   `portes.md #7: ...`. Also flags, rules errors and `applyTurn` errors.
+- `portes-edge-cases.test.ts`: checks that the index below lists every
+  numbered edge case of `portes.md`, and that each listed file has a test
+  named `portes.md #N`. A new case in the doc fails CI until it has a test.
 - `portes-reference.test.ts`: a slow, simple generator (every order, no
   pruning) must find the same end positions in random positions.
-- `portes-fuzz.test.ts`: 2,000 random games to the end, with checks after
-  every turn. It uses plain `if` checks, not `expect`, in the hot loop:
-  `expect` is far too slow for millions of calls.
-- Test helpers (not exported): `src/testing/position-notation.ts` reads and
-  writes positions like `w: 24x2 13x5 8x3 6x5 ; b: 6x15` (own numbering per
-  side; a missing `off` means "the rest are off") and turns like `13/8* 8/5`
-  or `4/0:6`. `src/testing/random-positions.ts` makes random positions.
+- `portes-fuzz.test.ts` (#26): 10,000 random games to the end with a seeded
+  RNG (game `n` uses seed `n`). After every move: 15 checkers per player,
+  no point with both colors, and pip counts that only rise by a hit (the
+  mover loses exactly the pips moved; the opponent gains exactly what a
+  hit checker loses). After every turn: `applyTurn` gives the same board
+  as the single moves. Most plays are a random walk of legal single moves
+  by the oracle (below), because listing every play with `legalTurns` for
+  900,000 turns is too slow for CI. When the walk gets stuck before all
+  dice are used, and on one turn in 32 anyway, the play is a random pick
+  from `legalTurns`, and each of its moves is checked against the oracle.
+  About 9 s on the dev container. The hot loop uses plain `if` checks, not
+  `expect`: `expect` is far too slow for millions of calls.
+- Test helpers (not exported):
+  - `src/testing/position-notation.ts` reads and writes positions like
+    `w: 24x2 13x5 8x3 6x5 ; b: 6x15` (own numbering per side; a missing
+    `off` means "the rest are off") and turns like `13/8* 8/5` or `4/0:6`.
+    `portesState(text, { toMove, dice, rules, turnNumber })` gives a full
+    `GameState`, so a test is one line:
+    `portes.legalTurns(portesState('w: bar 6x14 ; b: 1x15'), [3, 3])`.
+  - `src/testing/portes-oracle.ts`: a slow, simple rules model with no code
+    shared with the variant: single moves (`canStep`, `step`) and all end
+    positions of a roll (`referenceFinals`).
+  - `src/testing/random-positions.ts` makes random positions.
+
+### Portes edge-case index
+
+Where each numbered edge case in `docs/rules/portes.md` is tested. Paths are
+from `src/`. `portes-edge-cases.test.ts` reads this table.
+
+| Case | Rule                                                       | Test file                                                                        |
+| ---- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 1    | Start: 15 each on 24/13/8/6 = 2/5/3/5                      | `variants/portes/portes.test.ts`                                                 |
+| 2    | No landing on an opponent door                             | `variants/portes/portes.test.ts`                                                 |
+| 3    | Landing on a blot hits it to the bar                       | `variants/portes/portes.test.ts`                                                 |
+| 4    | Bar checker cannot enter → the whole turn is lost          | `variants/portes/portes.test.ts`                                                 |
+| 5    | Two on the bar, 6-6: both enter on 19, then any sixes      | `variants/portes/portes.test.ts`                                                 |
+| 6    | Two on the bar, one die enters → enter one, lose the other | `variants/portes/portes.test.ts`                                                 |
+| 7    | Opponent holds 19–24 → pass every roll                     | `variants/portes/portes.test.ts`                                                 |
+| 8    | No combined move through a door (6-1: 13/7/6)              | `variants/portes/portes.test.ts`                                                 |
+| 9    | Hit and continue: 13/8\*/5 with 5-3                        | `variants/portes/portes.test.ts`                                                 |
+| 10   | No bearing off with a checker on the bar or outside home   | `variants/portes/portes.test.ts`                                                 |
+| 11   | Hit while bearing off → re-enter and come home first       | `variants/portes/portes.test.ts`                                                 |
+| 12   | Loser off 0, none on bar or in winner's home → 2           | `variants/portes/portes.test.ts`                                                 |
+| 13   | Loser off 0, a checker on the bar → 2 (3 with flag)        | `variants/portes/portes.test.ts`                                                 |
+| 14   | Loser off 1+ → 1, even with a checker on the bar           | `variants/portes/portes.test.ts`                                                 |
+| 15   | Game 1 opening roll is never a double                      | `flow/game-flow.test.ts` (the roll), `variants/portes/portes.test.ts` (the flag) |
+| 16   | Doubles: 4 moves; enter and keep moving                    | `variants/portes/portes.test.ts`                                                 |
 
 ## Fevga
 

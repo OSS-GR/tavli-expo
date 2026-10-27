@@ -33,3 +33,8 @@ export function pickOne<T>(rng: Rng, items: readonly T[]): T {
   if (item === undefined) throw new RangeError('pickOne needs a non-empty list');
   return item;
 }
+
+/** A uniform number in [0, 1), from one 32-bit draw. */
+export function randomUnit(rng: Rng): number {
+  return rng.nextUint32() / UINT32;
+}

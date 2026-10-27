@@ -9,12 +9,12 @@ import { EngineError, createSeededRng, rollDice } from '@tavli/engine';
 import type { GameState, PlayerId, Turn, Variant } from '@tavli/engine';
 
 import { BotError } from './errors';
-import type { Bot, Difficulty } from './types';
+import type { Bot, BotLevel } from './types';
 
 /** One side in a simulation. */
 export interface SimulationPlayer {
   readonly bot: Bot;
-  readonly difficulty: Difficulty;
+  readonly difficulty: BotLevel;
 }
 
 export interface TurnEvent {

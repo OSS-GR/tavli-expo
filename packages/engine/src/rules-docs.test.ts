@@ -16,30 +16,9 @@ import { getPreset } from './presets';
 import fevgaTests from './variants/fevga/fevga.test.ts?raw';
 import { PRESET_IDS, RULE_GROUPS, RULE_SCHEMA } from './rules';
 import type { PresetId, RuleSet } from './rules';
+import { section, tableRows } from './testing/markdown';
 
 type DocValue = string | number | boolean | readonly string[];
-
-/** The text under a heading, up to the next heading of any level. */
-function section(doc: string, heading: string): string {
-  const start = doc.indexOf(`${heading}\n`);
-  if (start < 0) throw new Error(`no section "${heading}"`);
-  const rest = doc.slice(start + heading.length + 1);
-  const end = rest.search(/^#{1,6} /m);
-  return end < 0 ? rest : rest.slice(0, end);
-}
-
-/** The table rows of a section, as trimmed cells. Skips the header and `|---|` lines. */
-function tableRows(text: string): string[][] {
-  return text
-    .split('\n')
-    .filter((line) => line.startsWith('| `'))
-    .map((line) =>
-      line
-        .split('|')
-        .slice(1, -1)
-        .map((cell) => cell.trim()),
-    );
-}
 
 /** Reads a default cell: the first `code` or **bold** token, as a JSON-like value. */
 function docValue(cell: string): DocValue {
