@@ -33,7 +33,7 @@ export interface HistoryRow {
   /** "You 3 – 1 Bot · first to 3". */
   readonly score: string;
   readonly badge: ResultBadge;
-  /** "Won", "Lost", "Not finished" or "Maria won". */
+  /** "Won", "Lost", "Not finished" or "Maria won"; "Lost on time" after a time-out (#170). */
   readonly result: string;
   readonly date: string;
   /** All of it, for screen readers: one label per row. */
@@ -106,10 +106,21 @@ export function historyRow(record: HistoryRecord, t: TFunction, locale: string):
   if (record.winner === null) badge = 'unfinished';
   else if (record.mode === 'local') badge = 'winner';
   else badge = record.winner === HUMAN_SIDE ? 'won' : 'lost';
-  const result =
-    badge === 'winner' && record.winner !== null
-      ? t('history.result.winner', { name: seats[record.winner].name })
-      : t(`history.result.${badge as Exclude<ResultBadge, 'winner'>}`);
+  // A match lost on time says so (#170): "Won on time", "Maria won on time".
+  const onTime = record.timedOutBy !== null;
+  let result: string;
+  if (badge === 'winner' && record.winner !== null) {
+    const name = seats[record.winner].name;
+    result = onTime
+      ? t('history.result.winnerOnTime', { name })
+      : t('history.result.winner', { name });
+  } else if (onTime && badge === 'won') {
+    result = t('history.result.wonOnTime');
+  } else if (onTime && badge === 'lost') {
+    result = t('history.result.lostOnTime');
+  } else {
+    result = t(`history.result.${badge as Exclude<ResultBadge, 'winner'>}`);
+  }
   const date = formatDate(record.endedAt, locale);
   const label = [title, score, result, date].filter(Boolean).join(', ');
   return { title, score, badge, result, date, label };

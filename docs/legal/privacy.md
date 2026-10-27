@@ -82,7 +82,7 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 |-------|------|
 | App opened | Once each time the app starts |
 | Game started | A game begins. Includes: against the bot or pass-and-play; which game (Portes, Plakoto, Fevga, Asodio, or Tavli: all three in turn); points to win; bot level |
-| Game finished | A game ends. Includes: the game; how it ended (single, double, resign, draw); number of turns; length in seconds |
+| Game finished | A game ends. Includes: the game; how it ended (single, double, resign, draw, time-out); number of turns; length in seconds |
 | Game left | You start a new match while a game is not over. Includes: against the bot or pass-and-play; the game; the turn number |
 | Undo used | You took back a move |
 | Resign | You resigned a game or a match |

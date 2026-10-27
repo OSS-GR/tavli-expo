@@ -9,13 +9,15 @@
  *
  * A record is written:
  * - when a match is over (`end: 'finished'`): won to the target, or a
- *   player resigned the match (`resignedBy`);
+ *   player resigned the match (`resignedBy`), or lost it on time
+ *   (`timedOutBy`, #170);
  * - when a new match replaces one that had started (`end: 'abandoned'`):
  *   it has no winner.
  */
 import { isDifficulty, type Difficulty } from '@tavli/contracts';
 import { type GameRecord, type Match, type PerPlayer, type PlayerId } from '@tavli/engine';
 
+import { timedOutBy } from '@/features/match/summary';
 import {
   isGameChoice,
   isMatchMode,
@@ -59,6 +61,12 @@ export interface HistoryRecord {
   readonly winner: PlayerId | null;
   /** The player who resigned the match, or `null`. */
   readonly resignedBy: PlayerId | null;
+  /**
+   * The player who lost the match on time: their turn timer ran out in the
+   * last game (#170, `timedOutBy` in `features/match/summary.ts`). `null`
+   * otherwise, and in records made before #170.
+   */
+  readonly timedOutBy: PlayerId | null;
   /** Finished games in the match. */
   readonly games: number;
   /** Games each player won with 2 points or more (diplo, "mars"; see `isDiplo`). */
@@ -116,6 +124,7 @@ export function historyRecord(
     end,
     winner: end === 'finished' ? match.winner : null,
     resignedBy: match.resignedBy,
+    timedOutBy: end === 'finished' ? timedOutBy(match) : null,
     games: match.games.length,
     diploWins,
     draws,
@@ -200,6 +209,14 @@ function parseRecord(raw: unknown): HistoryRecord | null {
   const number = raw['matchNumber'];
   const matchNumber = number === undefined || number === null ? null : number;
   if (matchNumber !== null && (!isCount(matchNumber) || matchNumber < 1)) return null;
+  // Records before #170 have no time-out. Only the loser of a finished match can have one.
+  const lostOnTime = raw['timedOutBy'] ?? null;
+  if (
+    lostOnTime !== null &&
+    (!isPlayer(lostOnTime) || end !== 'finished' || lostOnTime === winner)
+  ) {
+    return null;
+  }
   return {
     id,
     endedAt,
@@ -212,6 +229,7 @@ function parseRecord(raw: unknown): HistoryRecord | null {
     end,
     winner: winner as PlayerId | null,
     resignedBy,
+    timedOutBy: lostOnTime,
     games,
     diploWins,
     draws,

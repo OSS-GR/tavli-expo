@@ -24,6 +24,7 @@ function rec(over: Partial<HistoryRecord>): HistoryRecord {
     end: 'finished',
     winner: 'white',
     resignedBy: null,
+    timedOutBy: null,
     games: 4,
     diploWins: { white: 1, black: 0 },
     draws: 0,
@@ -79,6 +80,20 @@ describe('<HistoryScreen />', () => {
       'Portes · vs Bot (Easy), You 3 – 1 Bot · first to 3, Not finished, Oct 25, 2026',
     );
     expect(screen.queryByTestId('history-row-3')).toBeNull();
+  });
+
+  it('says when a match was lost on time (#170)', async () => {
+    await render(
+      <HistoryScreen
+        records={[rec({ winner: 'black', score: { white: 1, black: 3 }, timedOutBy: 'white' })]}
+        onPlay={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Lost on time')).toBeOnTheScreen();
+    expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
+      'Portes · vs Bot (Easy), You 1 – 3 Bot · first to 3, Lost on time, Oct 27, 2026',
+    );
   });
 
   it('shows stats per game and per bot level', async () => {
