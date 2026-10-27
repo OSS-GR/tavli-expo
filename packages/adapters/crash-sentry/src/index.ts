@@ -6,6 +6,7 @@
  * - Privacy: `sendDefaultPii` is off, no screenshots, no view hierarchy, no
  *   session replay. `beforeSend` drops every user field except the
  *   anonymous install id, and drops the device name ("Maria's iPhone").
+ *   `beforeBreadcrumb` drops console lines and cuts query strings from URLs.
  * - `setEnabled(false)` closes the SDK (JS and native), so nothing is sent.
  *   `setEnabled(true)` starts it again. If the player opted out before
  *   launch, pass `enabled: false` to `init` and the SDK never starts.
@@ -23,6 +24,7 @@ import * as Sentry from '@sentry/react-native';
 
 type SentryOptions = NonNullable<Parameters<typeof Sentry.init>[0]>;
 type SentryEvent = Sentry.ErrorEvent;
+type SentryBreadcrumb = Sentry.Breadcrumb;
 
 /** Runs `fn` and drops any error. */
 function safely(fn: () => void): void {
@@ -50,6 +52,18 @@ export function scrubEvent(event: SentryEvent, anonId: string | null): SentryEve
   return scrubbed;
 }
 
+/**
+ * Removes personal data from an automatic breadcrumb. Console lines can hold
+ * anything, so they are dropped. Query strings and fragments are cut from
+ * request URLs, because they may hold ids or tokens.
+ */
+export function scrubBreadcrumb(breadcrumb: SentryBreadcrumb): SentryBreadcrumb | null {
+  if (breadcrumb.category === 'console') return null;
+  const url = breadcrumb.data?.['url'];
+  if (typeof url !== 'string') return breadcrumb;
+  return { ...breadcrumb, data: { ...breadcrumb.data, url: url.split(/[?#]/, 1)[0] } };
+}
+
 function sentryCaptureContext(context: CrashContext | undefined) {
   if (!context) return undefined;
   return {
@@ -68,9 +82,17 @@ export function createSentryCrashReporter(): CrashReporter {
   let enabled = true;
   let running = false;
   let user: string | null = null;
+  // Set while `Sentry.close()` runs. It closes the native SDK only after it
+  // flushes, so a new `Sentry.init` must wait, or that late close shuts the
+  // new native SDK down.
+  let closing: Promise<void> | null = null;
 
   function start(): void {
     if (running || !dsn || !enabled || !config) return;
+    if (closing) {
+      void closing.then(() => safely(start));
+      return;
+    }
     const options: SentryOptions = {
       dsn,
       sendDefaultPii: false,
@@ -81,7 +103,7 @@ export function createSentryCrashReporter(): CrashReporter {
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0,
       beforeSend: (event) => (enabled ? scrubEvent(event, user) : null),
-      beforeBreadcrumb: (breadcrumb) => (enabled ? breadcrumb : null),
+      beforeBreadcrumb: (breadcrumb) => (enabled ? scrubBreadcrumb(breadcrumb) : null),
       ...(config.environment ? { environment: config.environment } : {}),
       ...(config.release ? { release: config.release } : {}),
       ...(config.dist ? { dist: config.dist } : {}),
@@ -95,7 +117,12 @@ export function createSentryCrashReporter(): CrashReporter {
   function stop(): void {
     if (!running) return;
     running = false;
-    void Sentry.close().catch(() => undefined);
+    const done: Promise<void> = Sentry.close()
+      .catch(() => undefined)
+      .then(() => {
+        if (closing === done) closing = null;
+      });
+    closing = done;
   }
 
   return {

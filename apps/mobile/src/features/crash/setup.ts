@@ -29,14 +29,14 @@ export function setupCrashReporting({
   dsn,
   environment,
 }: CrashSetupDeps): () => void {
+  let allowed = crashReportingAllowed(settings.getState());
   reporter.init({
     ...(dsn ? { dsn } : {}),
     environment,
-    enabled: crashReportingAllowed(settings.getState()),
+    enabled: allowed,
   });
   reporter.setUser(getInstallId(storage));
 
-  let allowed = crashReportingAllowed(settings.getState());
   return settings.subscribe((state) => {
     const next = crashReportingAllowed(state);
     if (next === allowed) return;

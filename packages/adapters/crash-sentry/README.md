@@ -6,7 +6,8 @@ The `CrashReporter` port (`@tavli/contracts`) backed by Sentry, using `@sentry/r
 
 - **No DSN, no Sentry.** If `EXPO_PUBLIC_SENTRY_DSN` is missing, the app uses the no-op reporter and never starts Sentry. Dev builds (`__DEV__`) always use the no-op reporter.
 - **Privacy.** `sendDefaultPii` is off. No screenshots, no view hierarchy, no session replay, no performance tracing. `beforeSend` keeps only the anonymous install id as the user and drops the device name. Never put names or emails in `captureMessage`, tags, extras or breadcrumbs.
-- **Opt-out.** `setEnabled(false)` closes the SDK (JS and native), and events still in the queue are dropped. If the player opted out before launch, the SDK never starts. Today there is no opt-out setting yet; `apps/mobile/src/features/crash/consent.ts` is the hook for it (TODO #61).
+- **Breadcrumbs.** Console breadcrumbs are dropped (a log line can hold anything). Request URLs in breadcrumbs lose their query string and fragment.
+- **Opt-out.** `setEnabled(false)` closes the SDK (JS and native). From then on no new event or breadcrumb is sent. Events already handed to the transport before the opt-out may still go out while the SDK closes. If the player opted out before launch, the SDK never starts. Today there is no opt-out setting yet; `apps/mobile/src/features/crash/consent.ts` is the hook for it (TODO #61).
 - **Never throws.** A Sentry failure must not crash the app.
 
 ## How the app uses it
@@ -49,8 +50,10 @@ Nothing here is a secret except `SENTRY_AUTH_TOKEN`. Never commit the token.
 
    Until this token exists, `app.config.ts` sets `disableAutoUpload`, so EAS builds still pass. Crash reports still arrive, but stack traces are not mapped to our source.
 
-5. **EAS Update** (later): after `eas update`, run `pnpm dlx sentry-expo-upload-sourcemaps dist` in `apps/mobile`. If that runs in GitHub Actions, add `SENTRY_AUTH_TOKEN` as a GitHub **repository secret** (Settings → Secrets and variables → Actions) and pass `SENTRY_ORG` and `SENTRY_PROJECT` as plain variables.
-6. Optional: link the Sentry project in the EAS dashboard (Account settings → Connections → Sentry) to see crashes next to each build and update.
+5. In the Sentry project, open **Settings → Security & Privacy** and turn on **Prevent Storing of IP Addresses**. Keep **Data Scrubber** and **Use Default Scrubbers** on. The app never sends an IP address, but Sentry could still see one from the network request.
+
+6. **EAS Update** (later): after `eas update`, run `pnpm dlx sentry-expo-upload-sourcemaps dist` in `apps/mobile`. If that runs in GitHub Actions, add `SENTRY_AUTH_TOKEN` as a GitHub **repository secret** (Settings → Secrets and variables → Actions) and pass `SENTRY_ORG` and `SENTRY_PROJECT` as plain variables.
+7. Optional: link the Sentry project in the EAS dashboard (Account settings → Connections → Sentry) to see crashes next to each build and update.
 
 For a local release build with source maps, put the token in `apps/mobile/.env.local` (git ignores `.env*.local`).
 

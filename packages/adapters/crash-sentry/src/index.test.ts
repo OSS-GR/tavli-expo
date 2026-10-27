@@ -14,7 +14,7 @@ const sentry = vi.hoisted(() => ({
 
 vi.mock('@sentry/react-native', () => sentry);
 
-const { createSentryCrashReporter, scrubEvent } = await import('./index');
+const { createSentryCrashReporter, scrubBreadcrumb, scrubEvent } = await import('./index');
 
 const DSN = 'https://public@example.ingest.sentry.io/1';
 
@@ -138,7 +138,7 @@ describe('createSentryCrashReporter with a DSN', () => {
     expect(sentry.captureException).toHaveBeenCalledTimes(1);
   });
 
-  it('closes Sentry on opt-out and drops anything still queued', () => {
+  it('closes Sentry on opt-out and drops events made after it', () => {
     const reporter = createSentryCrashReporter();
     reporter.init({ dsn: DSN });
     const { beforeSend, beforeBreadcrumb } = lastInitOptions();
@@ -157,6 +157,47 @@ describe('createSentryCrashReporter with a DSN', () => {
 
     reporter.setEnabled(false);
     expect(sentry.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for a running close before it starts Sentry again', async () => {
+    let finishClose: (flushed: boolean) => void = () => undefined;
+    sentry.close.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishClose = resolve;
+        }),
+    );
+    const reporter = createSentryCrashReporter();
+    reporter.init({ dsn: DSN });
+    reporter.setEnabled(false);
+    reporter.setEnabled(true);
+    // The old close would shut down a new native SDK, so init must wait.
+    expect(sentry.init).toHaveBeenCalledTimes(1);
+    reporter.captureException(new Error('boom'));
+    expect(sentry.captureException).not.toHaveBeenCalled();
+
+    finishClose(true);
+    await vi.waitFor(() => expect(sentry.init).toHaveBeenCalledTimes(2));
+    reporter.captureException(new Error('boom'));
+    expect(sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays off if the player opts out again while Sentry closes', async () => {
+    let finishClose: (flushed: boolean) => void = () => undefined;
+    sentry.close.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishClose = resolve;
+        }),
+    );
+    const reporter = createSentryCrashReporter();
+    reporter.init({ dsn: DSN });
+    reporter.setEnabled(false);
+    reporter.setEnabled(true);
+    reporter.setEnabled(false);
+    finishClose(true);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(sentry.init).toHaveBeenCalledTimes(1);
   });
 
   it('never throws when Sentry throws', () => {
@@ -194,5 +235,25 @@ describe('scrubEvent', () => {
   it('removes the user when there is no install id', () => {
     const event = { message: 'boom', user: { email: 'someone@example.com' } };
     expect(scrubEvent(event as never, null)).toEqual({ message: 'boom' });
+  });
+});
+
+describe('scrubBreadcrumb', () => {
+  it('drops console breadcrumbs', () => {
+    expect(scrubBreadcrumb({ category: 'console', message: 'joined as Maria' })).toBeNull();
+  });
+
+  it('cuts the query string and fragment from request URLs', () => {
+    expect(
+      scrubBreadcrumb({
+        category: 'fetch',
+        data: { url: 'https://api.example.com/games?email=someone@example.com#top', method: 'GET' },
+      }),
+    ).toEqual({ category: 'fetch', data: { url: 'https://api.example.com/games', method: 'GET' } });
+  });
+
+  it('keeps other breadcrumbs as they are', () => {
+    const breadcrumb = { category: 'navigation', data: { from: '/', to: '/play' } };
+    expect(scrubBreadcrumb(breadcrumb)).toBe(breadcrumb);
   });
 });
