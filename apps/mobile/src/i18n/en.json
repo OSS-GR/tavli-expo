@@ -134,7 +134,10 @@
       "won": "Won",
       "lost": "Lost",
       "unfinished": "Not finished",
-      "winner": "{{name}} won"
+      "winner": "{{name}} won",
+      "wonOnTime": "Won on time",
+      "lostOnTime": "Lost on time",
+      "winnerOnTime": "{{name}} won on time"
     },
     "vsBot": "Bot · {{level}}",
     "local": "Pass-and-play",
@@ -279,7 +282,9 @@
       "nextGame": "Next: game {{number}} · {{game}}",
       "drawChip": "Draw · 0 points",
       "deadlock": "No checker can ever move again.",
-      "bothMothersPinned": "Both mothers are pinned."
+      "bothMothersPinned": "Both mothers are pinned.",
+      "timeout": "{{name}} ran out of time.",
+      "timeout_you": "You ran out of time."
     },
     "you": "You",
     "bot": {
@@ -378,6 +383,8 @@
     "finalScore": "Final score: {{score}}",
     "won": "{{name}} won",
     "won_you": "You won",
+    "wonOnTime": "{{name}} won on time",
+    "wonOnTime_you": "You won on time",
     "draw": "Draw",
     "mono": "Mono",
     "diplo": "Diplo",

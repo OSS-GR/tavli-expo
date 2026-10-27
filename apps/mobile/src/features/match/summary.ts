@@ -1,5 +1,11 @@
 /** Texts about a match: the "Continue game" card (wireframe 3) and match end (9). Pure. */
-import { nextVariantId, type Match, type MatchFlow, type VariantId } from '@tavli/engine';
+import {
+  nextVariantId,
+  type Match,
+  type MatchFlow,
+  type PlayerId,
+  type VariantId,
+} from '@tavli/engine';
 import type { TFunction } from 'i18next';
 
 import type { SavedMatch } from './savedMatch';
@@ -76,4 +82,17 @@ export function nextGameLabel(match: Match, t: TFunction): string {
     number: match.games.length + 1,
     game: variantName(nextVariantId(match), t),
   });
+}
+
+/**
+ * The player who lost the match on time (#170): the last game ended because
+ * their online turn timer ran out, and that game ended the match. `null`
+ * for a match that is not over, was resigned (`resignedBy`), or was won
+ * another way.
+ */
+export function timedOutBy(match: Match): PlayerId | null {
+  if (match.status !== 'finished' || match.resignedBy !== null) return null;
+  const last = match.games.at(-1);
+  if (last?.reason !== 'timeout' || last.winner === null) return null;
+  return last.winner === 'white' ? 'black' : 'white';
 }
