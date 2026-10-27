@@ -20,7 +20,7 @@ The facts (what leaves the phone, when, and the code that does it) are in [app-p
 | Does your app collect or share any of the required user data types? | **Yes** | Crash reports and opt-in usage data |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** | Both SDKs send over HTTPS (`https://eu.i.posthog.com`, the Sentry DSN is `https://…`). **Owner:** check that the DSN starts with `https://`. |
 | Which methods of account creation does your app support? | **My app does not allow users to create an account** | No accounts yet (MVP2) |
-| Do you provide a way for users to request that their data is deleted? | **Owner:** recommended **No** for now | The policy offers requests by email (`privacy@tavlaki.com`). But the app does not show the install id yet, so we often cannot find a person's data. Answer **Yes** once Settings shows the install id (an idea in [legal/README.md](../legal/README.md#ideas-for-later-app-changes-not-part-of-90)). |
+| Do you provide a way for users to request that their data is deleted? | **Yes**. Method: an email to `privacy@tavlaki.com` | The [privacy policy](../legal/privacy.md#your-rights) promises deletion on request by that email, so the form must say Yes. The app does not show the install id yet, so finding one person's data can be hard; the policy says so. Showing the id in Settings would help (an idea in [legal/README.md](../legal/README.md#ideas-for-later-app-changes-not-part-of-90)). **Owner:** make `privacy@tavlaki.com` work before launch. |
 | Independent security review | Leave off | — |
 
 ## Section 2: Data types
@@ -41,20 +41,20 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 | Data type | Collected | Shared | Processed ephemerally | Required or optional | Purposes |
 |-----------|-----------|--------|-----------------------|----------------------|----------|
 | App interactions | Yes | No | No | **Optional** | **Analytics** |
-| Crash logs | Yes | No | No | **Optional** (see note) | **Analytics** |
-| Diagnostics | Yes | No | No | **Optional** (see note) | **Analytics** |
+| Crash logs | Yes | No | No | **Required** (see note) | **Analytics** |
+| Diagnostics | Yes | No | No | **Required** (see note) | **Analytics** |
 | Device or other IDs | Yes | No | No | **Optional** | **Analytics** |
 
 - **Purposes.** Google's "Analytics" includes "monitor app health, diagnose and fix bugs or crashes". So crash logs and diagnostics go under Analytics, not App functionality. (Apple puts crash data under App Functionality. That is a difference in the two forms, not in the facts.) No data is used for App functionality, Developer communications, Advertising or marketing, Fraud prevention, Personalization or Account management.
-- **Optional.** Usage data and the install id are sent only after **Allow usage data**. Crash reports and diagnostics are sent before an answer, but **Don't allow** and the Settings switch turn them off. **Owner:** if you read "optional" as "never collected before the user chooses", answer **Required** for Crash logs and Diagnostics.
-- **Device or other IDs** before an answer: the app sends no install id. Sentry's native SDK may add its own random id to native crash reports and sessions (see [app-privacy.md → Points to check](app-privacy.md#points-to-check-in-the-code)). The answer "Collected, Optional" covers both cases.
+- **Required or optional.** Usage data and the install id are sent only after **Allow usage data**, so App interactions and Device or other IDs are **Optional**. Crash reports and diagnostics are sent **before** the first answer, so users cannot fully opt out of them: answer **Required**, even though **Don't allow** and the Settings switch turn them off later. Issue #139 changes what is sent before the answer; check this again when it is merged.
+- **Device or other IDs** before an answer: the app sends no install id. Sentry's native SDK may add its own random id to native crash reports and sessions (see [app-privacy.md → Points to check](app-privacy.md#points-to-check-in-the-code)). This is unverified (see app-privacy.md). If a build shows such an id before the answer, change Device or other IDs to **Required**.
 
 ## What the Play listing will show
 
 - **No data shared with third parties.**
 - **Data collected:** App activity, App info and performance, Device or other IDs.
 - **Data is encrypted in transit.**
-- "You can request that data be deleted" only if you answered **Yes** above.
+- **You can request that data be deleted.**
 
 ## Other App content forms in the Play Console
 

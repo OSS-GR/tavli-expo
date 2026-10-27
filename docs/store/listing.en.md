@@ -18,7 +18,7 @@ Checked in the code on 2026-10-27:
 | The bot plays on the phone. Local games need no network | `InlineBotRunner` in `services.ts`; App shell, "Pass-and-play" |
 | Pass-and-play on one phone, optional names, the board turns to the player | `features/match/seats.ts`, `settings.boardView.*` |
 | A "How to play" page for each game, with the start position | `features/rules/` |
-| "Learn to play": a one-minute Portes lesson on the real board, 7 lessons (move, both dice, a double, make a door, hit, enter from the bar, bear off). Opens from a Home card, Settings → Help and the Portes rules page | `features/tutorial/` (`lessons.ts`), [App shell](../architecture/app-shell.md#tutorial-128) |
+| "Learn to play": a one-minute Portes lesson on the real board, 7 lessons (move, both dice, a double, make a door, hit, enter from the bar, bear off). Offered on first run (a Home card you can dismiss with **Not now**), always in Settings → Help, and on the Portes rules page | `features/tutorial/` (`lessons.ts`), [App shell](../architecture/app-shell.md#tutorial-128) |
 | Greek and English | `apps/mobile/src/i18n/` |
 | The game saves by itself; Continue on Home | `features/match/savedMatch.ts` |
 | Undo, Confirm, auto-confirm, pip counts, sound, haptics | `features/settings/settings.ts` |
@@ -108,7 +108,7 @@ PASS-AND-PLAY
 Two players, one phone. Type your names if you like. The board turns to the player whose turn it is.
 
 LEARN TO PLAY
-New to tavli? A one-minute lesson on the real board teaches Portes in 7 short steps: move a checker, use both dice, play a double, make a door, hit, enter from the bar and bear off. Then play your first game against the Easy bot.
+New to tavli? A one-minute lesson on the real board teaches Portes in 7 short steps: move a checker, use both dice, play a double, make a door, hit, enter from the bar and bear off. Then play your first game against the Easy bot. The lesson is offered on first run and is always in Settings → Help.
 Every game also has a "How to play" page: the start position, how checkers move, and the special rules. Open it from Home, from the game menu or from the New game screen.
 
 MADE FOR TAVLI PLAYERS
@@ -124,7 +124,7 @@ No ads. No sign-in. Your games stay on your phone. You choose if the app may sen
 Privacy policy: https://tavlaki.com/privacy
 ```
 
-1,926 characters.
+1,995 characters.
 
 Optional line (only if the owner wants it, see above). Put it before "NO ADS, NO ACCOUNT":
 

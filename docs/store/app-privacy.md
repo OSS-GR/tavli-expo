@@ -34,40 +34,46 @@ Tick these five. Leave every other box empty.
 | Identifiers | **Device ID** | The install id (PostHog `identify`, Sentry user id after Allow) and PostHog's random ids |
 | Usage Data | **Product Interaction** | The PostHog events (app opened, games, settings, screens) |
 | Diagnostics | **Crash Data** | Sentry crash and error reports |
-| Diagnostics | **Performance Data** | Sentry's native SDKs report app hangs (iOS) and ANRs (Android) by default. The app does not turn this off. |
-| Diagnostics | **Other Diagnostic Data** | Device facts and breadcrumbs in crash reports; Sentry release-health sessions; device facts on PostHog events |
+| Diagnostics | **Performance Data** | App hangs (iOS) and ANRs (Android). **Unverified:** these are Sentry native SDK defaults that the app does not turn off; we have not seen them in a build yet. Declare them anyway, as the manifest does. |
+| Diagnostics | **Other Diagnostic Data** | Device facts and breadcrumbs in crash reports; Sentry release-health sessions (**unverified**, a Sentry default); device facts on PostHog events |
+
+Issue #139 changes what Sentry sends before the consent answer (native defaults, sessions). Check these rows again when it is merged.
 
 Leave empty (the app does not collect them): Contact Info (name, email, phone, address), Health and Fitness, Financial Info, Location (precise and coarse: PostHog GeoIP is off, and Sentry is set not to store IPs), Sensitive Info, Contacts, User Content (pass-and-play names stay on the phone), Browsing History, Search History, Identifiers → User ID (no accounts), Purchases, Usage Data → Advertising Data, Usage Data → Other Usage Data, Other Data.
 
 ## Step 3: For each data type
 
-Apple asks three questions per type. The answers are the same as the privacy manifest in `app.json`.
+Apple asks three questions per type. The purposes and the tracking answers match the privacy manifest in `app.json`. The "linked" answers do **not** match it yet: see [Why "linked to the user"](#why-linked-to-the-user).
 
 | Data type | Purposes | Linked to the user? | Used for tracking? |
 |-----------|----------|---------------------|--------------------|
-| Device ID | **Analytics**, **App Functionality** | **No** | **No** |
-| Product Interaction | **Analytics** | **No** | **No** |
-| Crash Data | **App Functionality** | **No** | **No** |
-| Performance Data | **App Functionality** | **No** | **No** |
-| Other Diagnostic Data | **App Functionality** | **No** | **No** |
+| Device ID | **Analytics**, **App Functionality** | **Yes** | **No** |
+| Product Interaction | **Analytics** | **Yes** | **No** |
+| Crash Data | **App Functionality** | **Yes** | **No** |
+| Performance Data | **App Functionality** | **Yes** | **No** |
+| Other Diagnostic Data | **App Functionality** | **Yes** | **No** |
 
 - **Purposes.** Apple's "App Functionality" includes keeping the app from crashing. "Analytics" covers usage data to understand how people use the app. No type is used for Third-Party Advertising, Developer's Advertising or Marketing, Product Personalization or Other Purposes.
 - **Other Diagnostic Data** also rides on PostHog events (device model, system). If you want to be stricter, add **Analytics** as a second purpose. Then also add `NSPrivacyCollectedDataTypePurposeAnalytics` to that entry in `app.json` (a code change, in its own PR), so the label and the manifest still agree.
 - **Tracking: No.** Apple's "tracking" means linking our data with other companies' data for ads, or sharing it with data brokers. The app has no ads, no ad SDK, no advertising id (IDFA), and does not use App Tracking Transparency. Sentry and PostHog process the data for us only. So no App Tracking Transparency prompt is needed.
 
-### Why "not linked to the user"
+### Why "linked to the user"
 
-Apple counts data as linked when it is tied to the user's identity, for example through an account or contact details. Tavlaki has no accounts and never collects a name, email or phone number. The install id is random, lives only in this install, and is not tied to any other id. So we answer **No**, the same as `NSPrivacyCollectedDataTypeLinked: false` in the manifest.
+After **Allow usage data**, the app ties its data to the install id: `analytics.identify(getInstallId(storage))` in `features/analytics/connect.ts`, and `reporter.setUser(getInstallId(storage))` in `features/crash/setup.ts`. So every usage event, and every crash report and diagnostic after Allow, carries one persistent id. Apple treats data tied to a persistent identifier as linked, even without an account or a name. Apple asks one answer per data type, so a type that is linked some of the time is answered **Yes**. This is the safe default.
 
-**Owner:** this is a judgment call. A random install id still groups events from one phone. If you want the most careful label, answer **Yes (linked)** for all five types, and change `NSPrivacyCollectedDataTypeLinked` to `true` in `app.json` in the same release. Either way, label and manifest must agree.
+**Tracking stays No**: the id is ours only, it is never combined with other companies' data, and nothing is used for ads.
+
+**Owner:** you may still argue "not linked": no accounts, no name, email or phone, and the id is random and lives only in this install. If you choose that, keep the label and the manifest the same (`NSPrivacyCollectedDataTypeLinked: false`, as today).
+
+**Owner, next step:** the iOS privacy manifest in `apps/mobile/app.json` says `NSPrivacyCollectedDataTypeLinked: false` for all five types. With the answers above it must change to `true` for all five, in a code PR before the release build that goes to review. This docs PR does not change `app.json`.
 
 ## The label people will see
 
 With the answers above, the App Store page shows:
 
 - **Data Used to Track You:** none.
-- **Data Linked to You:** none.
-- **Data Not Linked to You:** Identifiers, Usage Data, Diagnostics.
+- **Data Linked to You:** Identifiers, Usage Data, Diagnostics.
+- **Data Not Linked to You:** none.
 
 ## Other App Privacy fields
 
@@ -82,14 +88,15 @@ With the answers above, the App Store page shows:
 - [ ] PostHog project is in the **EU** cloud, and **Discard client IP data** is on (`docs/architecture/analytics-events.md`, Setup). If IPs were stored, Apple could see it as coarse location.
 - [ ] The app has no other SDK that sends data. Today the only network SDKs are Sentry and PostHog. If you add one (for example EAS Update, push, Convex), update this page first.
 - [ ] Test a native crash (not a JS error) **before** answering the consent screen, and look at the event in Sentry. Check that it has no `user.id` and no device name. See "Points to check" below.
-- [ ] When accounts and online play ship (MVP2), redo the label: User ID, maybe Name or Email (sign-in), Gameplay Content, and "linked to the user" becomes **Yes**.
+- [ ] `NSPrivacyCollectedDataTypeLinked` in `apps/mobile/app.json` matches the "linked" answers above (today it says `false`; see [Why "linked to the user"](#why-linked-to-the-user)).
+- [ ] When accounts and online play ship (MVP2), redo the label: User ID, maybe Name or Email (sign-in), Gameplay Content.
 
 ## Points to check in the code
 
 These are not wrong on the label (the label already lists Device ID and diagnostics). They matter for the promise "before an answer, crash reports carry no id".
 
 1. **Native crashes skip the JS scrub.** `scrubEvent` and `scrubBreadcrumb` run as the JS `beforeSend` and `beforeBreadcrumb`. A crash in native code (iOS or Android) is caught and sent by Sentry's native SDK. Its native `beforeSend` (in `@sentry/react-native`'s `RNSentryStart.java` and `RNSentry.mm`) only drops duplicates of JS errors; it does not call our scrub. Sentry's native SDKs may add their own random installation id as the user id when no user is set (we believe the Android SDK does). We did not confirm this in a build.
-2. **Release-health sessions.** `enableAutoSessionTracking` is not set, so Sentry's default (on) applies. Sessions report app starts and crash-free state, with Sentry's own installation id. They are sent before an answer, like crash reports.
+2. **Release-health sessions.** `enableAutoSessionTracking` is not set, so Sentry's default (on) applies. Sessions report app starts and crash-free state, with Sentry's own installation id. They are sent before an answer, like crash reports. **Unverified** until checked in a build, like the app hang and ANR reports (Performance Data). Issue #139 changes this pre-consent behaviour.
 
 3. **The policy is behind on some events.** The privacy policy lists "Game left" as "Planned, not sent yet". The code sends it now as `game_abandoned` (`features/analytics/gameAnalytics.ts`, called from `features/match/sessions.ts`), and [Analytics events](../architecture/analytics-events.md) lists it. The four tutorial events from #135 (`tutorial_started`, `tutorial_step`, `tutorial_finished`, `tutorial_skipped`) are not in the policy either. The label is not affected (they are all Product Interaction). **Owner:** fix the policy text in all four legal files before launch.
 

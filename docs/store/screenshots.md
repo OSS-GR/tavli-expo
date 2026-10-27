@@ -98,6 +98,7 @@ The dice are random, so you play to each state (the tutorial is the exception: i
 ### 5. Before you upload
 
 - [ ] No "Dev" or "Preview" text on screen, and no dev menu.
+- [ ] Set the simulator or emulator to **light appearance** before every shot. `userInterfaceStyle` is `automatic` in `app.json`, so the system bars and dialogs follow the device setting; dark mode would mix with the app's light screens.
 - [ ] Only the sample names "Maria" and "Nikos" (no real people).
 - [ ] English shots in English, Greek shots in Greek, including the names on the board strips ("Bot" / "Υπολογιστής").
 - [ ] Same order in both stores and both languages.
