@@ -52,6 +52,18 @@ export type HomeBoardSide = 'right' | 'left';
 
 export const HOME_BOARD_SIDES: readonly HomeBoardSide[] = ['right', 'left'];
 
+/**
+ * How the game screen shows the board in portrait (#184).
+ * - `tall` (default): the board on its side, as large as the screen allows.
+ *   The long side runs from the top to the bottom of the screen.
+ * - `classic`: the board as it lies on a table, seen from your seat, as wide
+ *   as the screen and centred on it.
+ * The tutorial and the small board pictures always use `tall`.
+ */
+export type BoardLayoutMode = 'tall' | 'classic';
+
+export const BOARD_LAYOUT_MODES: readonly BoardLayoutMode[] = ['tall', 'classic'];
+
 export interface Settings {
   sound: boolean;
   haptics: boolean;
@@ -62,6 +74,8 @@ export interface Settings {
   boardFlipMode: BoardFlipMode;
   /** Where your home is (a real board seen from your seat). `left` mirrors the board. */
   homeBoardSide: HomeBoardSide;
+  /** The game screen layout: the tall board on its side, or the classic wide board (#184). */
+  boardLayout: BoardLayoutMode;
   moveList: MoveListMode;
   /** How fast the bot plays its turn (#172, timings in `features/bot/botSpeed.ts`). */
   botSpeed: BotSpeed;
@@ -79,6 +93,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   showPipCounts: true,
   boardFlipMode: 'flip',
   homeBoardSide: 'right',
+  boardLayout: 'tall',
   moveList: 'auto',
   botSpeed: 'normal',
   theme: DEFAULT_THEME_ID,
@@ -125,6 +140,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     boardFlipMode: oneOf(BOARD_FLIP_MODES, input['boardFlipMode'], d.boardFlipMode),
     // Saves from before #175 have no value: they load as `right`, the board as it was.
     homeBoardSide: oneOf(HOME_BOARD_SIDES, input['homeBoardSide'], d.homeBoardSide),
+    // Saves from before #184 have no layout: they load as `tall`, close to the board they had.
+    boardLayout: oneOf(BOARD_LAYOUT_MODES, input['boardLayout'], d.boardLayout),
     moveList: oneOf(MOVE_LIST_MODES, input['moveList'], d.moveList),
     // Saves from before #172 have no bot speed: they load as Normal.
     botSpeed: oneOf(BOT_SPEEDS, input['botSpeed'], d.botSpeed),
@@ -169,6 +186,7 @@ function pickSettings(state: SettingsState): Settings {
     showPipCounts: state.showPipCounts,
     boardFlipMode: state.boardFlipMode,
     homeBoardSide: state.homeBoardSide,
+    boardLayout: state.boardLayout,
     moveList: state.moveList,
     botSpeed: state.botSpeed,
     theme: state.theme,

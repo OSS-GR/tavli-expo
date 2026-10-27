@@ -114,8 +114,11 @@ export function BoardScene({
   const badge = theme.checkers.badge;
   const hl = theme.highlights;
 
-  const layers = (z: 'underPoints' | 'overPoints') =>
-    layout.layers
+  // A mirrored layout whose art does not fit both ways (the classic board
+  // with your home on the left, #184) draws its images mirrored too.
+  const artFlip = layout.artMirrored ? [{ translateX: 2 * geo.x + W }, { scaleX: -1 }] : undefined;
+  const layers = (z: 'underPoints' | 'overPoints') => {
+    const drawn = layout.layers
       .filter((l) => l.z === z)
       .map((l) => {
         const image = images[l.image];
@@ -123,6 +126,8 @@ export function BoardScene({
           <Image key={l.id} image={image} {...board} fit="fill" blendMode={l.blend} />
         ) : null;
       });
+    return artFlip ? <Group transform={artFlip}>{drawn}</Group> : drawn;
+  };
 
   return (
     <Group>

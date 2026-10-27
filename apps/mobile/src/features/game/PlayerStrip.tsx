@@ -1,14 +1,26 @@
 /**
  * A player strip above or below the board (wireframe 6): checker color,
- * name, pip count and match score. The player to move gets a thick border
- * and a "Your turn" pill, so color is never the only cue. Asodio adds a
- * short note under the name: the checkers still to enter, or "Army frozen".
+ * name, pip count and match score, on one line (#184). The player to move
+ * gets a thick border and a "Your turn" pill, so color is never the only
+ * cue. Asodio adds a short note after the pips: the checkers still to
+ * enter, or "Army frozen". A long name or a large font wraps the line; the
+ * strip then grows.
  */
 import type { CheckerStyle } from '@tavli/themes';
 import { displayCaps } from '@tavli/ui';
 import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+
+/** The height of a strip at the normal font size, in points (#184). The menu button matches it. */
+export const STRIP_HEIGHT = 36;
+
+const NBSP = '\u00A0';
+/**
+ * "Pips 167" never breaks in the middle. When a long name (or Greek) makes
+ * the line wrap, it breaks after a "·", so each part stays whole.
+ */
+const keepTogether = (part: string) => part.replace(/ /g, NBSP);
 
 export interface PlayerStripProps {
   name: string;
@@ -39,6 +51,9 @@ export function PlayerStrip({
 }: PlayerStripProps) {
   const { t } = useTranslation();
   const pill = turnLabel ?? t('game.strip.turn');
+  const details = [pips === null ? null : t('game.strip.pips', { count: pips }), note].filter(
+    (part) => part !== null,
+  );
   const label = [
     name,
     pips === null ? null : t('game.strip.pipsLabel', { count: pips }),
@@ -58,16 +73,15 @@ export function PlayerStrip({
       <View
         style={[styles.swatch, { backgroundColor: checker.fill, borderColor: checker.rim.color }]}
       />
-      <View style={styles.who}>
+      <Text style={styles.who}>
         <Text style={styles.name}>{name}</Text>
-        {pips === null && note === null ? null : (
-          <Text style={styles.pips}>
-            {[pips === null ? null : t('game.strip.pips', { count: pips }), note]
-              .filter((part) => part !== null)
-              .join(' · ')}
-          </Text>
+        {details.length === 0 ? null : (
+          <>
+            <Text style={styles.pips}>{`${NBSP}· `}</Text>
+            <Text style={styles.pips}>{details.map(keepTogether).join(`${NBSP}· `)}</Text>
+          </>
         )}
-      </View>
+      </Text>
       {active ? (
         <View style={styles.pill}>
           <Text style={styles.pillText}>{displayCaps(pill)}</Text>
@@ -86,9 +100,9 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space.sm,
-    minHeight: theme.touch.minTarget + theme.space.sm,
+    minHeight: STRIP_HEIGHT,
     paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xs,
+    paddingVertical: theme.space.xxs,
     marginHorizontal: theme.space.sm,
     borderRadius: theme.radii.lg,
     backgroundColor: theme.colors.surface,
@@ -96,9 +110,9 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: active ? theme.colors.turn : theme.colors.border,
   }),
   swatch: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
   },
   who: {

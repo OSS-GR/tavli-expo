@@ -6,7 +6,7 @@ import { getPreset } from '@tavli/engine';
 import type { HomeBoardSide } from '@/features/settings/settings';
 
 import { asodioMarks } from './asodio';
-import { portraitLayout } from './BoardCanvas';
+import { boardLayout, portraitLayout } from './BoardCanvas';
 import { layoutBoard, type BoardView } from './boardModel';
 import { fitBoard, fitBoardWithShadow } from './geometry';
 import { rgba } from './paint';
@@ -145,6 +145,32 @@ describe('<BoardScene />', () => {
     );
     expect(count('ImageShader')).toBe(24);
     expect(count('Image')).toBe(layout.layers.length);
+  });
+
+  // The classic board (#184) has its trays on one side. With your home on
+  // the bottom left its art is mirrored with the slots; the tall art is not.
+  it.each([
+    ['tall', false],
+    ['classic', true],
+  ] as const)('mirrors the art of the %s board for the bottom left: %s', async (mode, flips) => {
+    const image = { width: () => 160, height: () => 160 } as never;
+    const left = boardLayout(theme, mode, 'left');
+    const g = fitBoard(left, { width: 377, height: 630 });
+    const images = Object.fromEntries(layoutImageKeys(theme, left).map((k) => [k, image]));
+    const picture = layoutBoard(g, SAMPLE_POSITIONS.start, WHITE);
+    await render(
+      <BoardScene theme={theme} geo={g} images={images} picture={picture} font={font} />,
+    );
+    const mirrored = find(
+      (n) =>
+        n.type === 'Group' &&
+        JSON.stringify(n.props.transform) ===
+          JSON.stringify([{ translateX: 2 * g.x + g.width }, { scaleX: -1 }]),
+    );
+    expect(mirrored).toHaveLength(flips ? 2 : 0);
+    const inside = mirrored.reduce((sum, group) => sum + countNodes(group, 'Image'), 0);
+    expect(inside).toBe(flips ? left.layers.length : 0);
+    expect(count('Image')).toBe(left.layers.length);
   });
 
   it('hides a checker and draws highlights', async () => {
