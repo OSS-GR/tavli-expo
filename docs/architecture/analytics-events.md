@@ -30,7 +30,7 @@ Every event also carries PostHog's standard properties (`$lib`, `$os_name`, `$os
 | Event | When it fires | Properties | Sent from |
 |-------|---------------|------------|-----------|
 | `app_opened` | Once per cold start, after consent. On the first launch it fires right after **Allow**. | none | `features/analytics/connect.ts` (`appOpened`, root layout) |
-| `game_started` | A game begins: a new match, the next game of a match, or a rematch. | `mode`: `bot` \| `local` \| `online`; `variant`: engine id (`portes`, `plakoto`, `fevga`, `asodio`); `matchLength`: points to win; `botLevel`: `easy` \| `medium` \| `hard` (only for `bot`) | game store (`createGameStore({ analytics })`) |
+| `game_started` | A game begins: a new match, the next game of a match, or a rematch. | `mode`: `bot` \| `local` \| `online`; `variant`: engine id (`portes`, `plakoto`, `fevga`, `asodio`); `matchLength`: points to win; `botLevel`: `easy` \| `medium` \| `hard` (only for `bot`) | game store (`createGameStore({ analytics })`), set for every match in `features/match/appSessions.ts` |
 | `game_finished` | A game ends: last checker borne off, mother pinned, a resign, a draw, or the match is resigned mid-game. | `mode`; `variant`; `result`: `mono` \| `diplo` \| `resign` \| `draw`; `turns`: turns played; `durationSec`: seconds since `game_started` | game store |
 | `game_abandoned` | The player leaves a game that is not over. | `mode`; `variant`; `turn`: turn number when they left | **Not wired yet** (see below) |
 | `undo_used` | The engine accepted an undo. | none | game store |
@@ -44,7 +44,7 @@ Notes:
 - `result`: `mono` is 1 point, `diplo` is 2 or more (a "backgammon" counts as diplo, `docs/rules/portes.md`). `draw` was added to the plan for Plakoto "both mothers pinned" and Asodio deadlock.
 - `turns` counts finished turns. A resign in the middle of turn 5 gives `turns: 4`.
 - The "Share usage data" switch is **not** a setting in this sense: changing it sends no event.
-- `game_abandoned` is a TODO (#61). It needs the real game route (`app/game/[id]`) and saved games (#36) to say what "leaving" means. `createGameAnalytics(...).gameAbandoned(flow)` is ready to call.
+- `game_abandoned` is a TODO (#61). It needs saved games (#36) to say what "leaving" means (for example, a new match replacing an unfinished one in `features/match/sessions.ts`). `createGameAnalytics(...).gameAbandoned(flow)` is ready to call.
 
 ## Where the code is
 
@@ -66,7 +66,7 @@ Notes:
 4. In PostHog project settings, turn on **Discard client IP data**.
 5. Without a key the app uses the no-op adapter and logs once in dev: `[analytics] EXPO_PUBLIC_POSTHOG_KEY is not set`.
 
-To check: install a test build, tap **Allow usage data**, and look for `app_opened` and `$screen` in PostHog → Activity. Game events need a game route. Until `app/game/[id]` exists, try them in a dev build with the key set: open `/dev/play` (release builds send that route Home).
+To check: install a test build, tap **Allow usage data**, play a game vs the bot, and look for `app_opened`, `$screen`, `game_started` and `game_finished` in PostHog → Activity.
 
 ## Adding an event
 

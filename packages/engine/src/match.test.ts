@@ -366,7 +366,7 @@ describe('resignMatch and rematch', () => {
 
 describe('rotation and missing variants', () => {
   it('lists the games of the rotation that are not built yet', () => {
-    expect(missingVariants(createMatch({ rules: TAVLI }))).toEqual(['plakoto', 'fevga']);
+    expect(missingVariants(createMatch({ rules: TAVLI }))).toEqual(['plakoto']);
     expect(missingVariants(createMatch())).toEqual([]);
   });
 

@@ -21,6 +21,14 @@ export {
   type HapticStyle,
 } from './feedback';
 export {
+  createNoopSoundPlayer,
+  createRecordingSoundPlayer,
+  gatedSoundPlayer,
+  type SoundBank,
+  type SoundPlayer,
+  type SoundSource,
+} from './sound';
+export {
   CRASH_LEVELS,
   createNoopCrashReporter,
   createRecordingCrashReporter,

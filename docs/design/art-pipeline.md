@@ -129,14 +129,14 @@ One folder per theme in `packages/themes/<id>/`. Example `theme.json`:
   },
 
   "sounds": {
-    "checkerPlace": ["sfx/place-1.m4a", "sfx/place-2.m4a", "sfx/place-3.m4a"],
-    "checkerHit": "sfx/hit.m4a",
-    "diceRoll": ["sfx/dice-1.m4a", "sfx/dice-2.m4a"],
-    "bearOff": "sfx/bear-off.m4a",
-    "win": "sfx/win.m4a"
+    "checkerPlace": ["sounds/checker-place-1.m4a", "sounds/checker-place-2.m4a", "sounds/checker-place-3.m4a"],
+    "checkerHit": "sounds/checker-hit.m4a",
+    "diceRoll": ["sounds/dice-roll-1.m4a", "sounds/dice-roll-2.m4a"],
+    "bearOff": "sounds/bear-off.m4a",
+    "gameWin": "sounds/game-win.m4a"
   },
 
-  "haptics": { "place": "light", "hit": "medium", "invalid": "warning", "win": "success" },
+  "haptics": { "checkerPlace": "light", "checkerHit": "medium", "invalidMove": "warning", "gameWin": "success" },
 
   "accessibility": {
     "checkerContrastRatio": 4.8,
@@ -203,7 +203,7 @@ React Native uses points. Phones are @2x or @3x. The widest phones are about 440
 | Board (long side, landscape) | 900 px | 1800 px | 2700 px | 2800 px | WebP q85 |
 | Checker | 64 px | 128 px | 192 px | 256 px | WebP with alpha |
 | Die face / dice frame | 64 px | 128 px | 192 px | 256 px | WebP in an atlas |
-| App icon | 1024 px master | | | | PNG (store needs PNG) |
+| App icon | 1024 px master | | | | PNG (store needs PNG). See [app-icon.md](app-icon.md) |
 
 Rules:
 - Load only the scale the device needs. Do not ship 4096 px masters in the app.
@@ -287,6 +287,8 @@ Recording tips:
 - Export short mono files as AAC (`.m4a`) at 44.1 kHz. Keep each under 1 second where possible.
 - Normalize loudness so all sounds feel the same volume.
 - Play sounds with `expo-audio`. Preload them at board start for low delay.
+
+Done for Walnut Kafeneio (issue #39): CC0 sounds from Kenney and OpenGameArt, built by `packages/themes/tools/walnut-kafeneio/build_sounds.py` into `walnut-kafeneio/sounds/` (about 54 KB). Sources and licenses: `packages/themes/LICENSES.md`. How the app plays them: `docs/architecture/board-screen.md` (Sound and haptics). Own recordings of a real board can replace them later.
 
 ### 5.2 Haptics
 

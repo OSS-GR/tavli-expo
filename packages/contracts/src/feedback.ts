@@ -2,7 +2,8 @@
  * Feedback port: haptics (small vibrations) for game events.
  *
  * Board themes name a pattern for each event (`theme.haptics.diceLand`
- * = `'light'`); the app passes that pattern here. Sound comes later.
+ * = `'light'`); the app passes that pattern here. Sound has its own
+ * port, `SoundPlayer` (`sound.ts`).
  *
  * Adapters: `@tavli/haptics-expo` (the app), `createNoopFeedback` and
  * `createRecordingFeedback` (tests).

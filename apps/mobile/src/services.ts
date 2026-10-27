@@ -6,12 +6,17 @@
  * Jest replaces this module with in-memory fakes (`jest.setup.ts`).
  */
 import { createPostHogAnalytics } from '@tavli/analytics-posthog';
+import { createExpoSoundPlayer } from '@tavli/audio-expo';
+import { InlineBotRunner, createBot } from '@tavli/bot';
 import {
   createNoopAnalytics,
   createNoopCrashReporter,
   type Analytics,
+  type BotRunner,
   type CrashReporter,
+  type Difficulty,
   type Feedback,
+  type SoundPlayer,
   type Storage,
 } from '@tavli/contracts';
 import { createSentryCrashReporter } from '@tavli/crash-sentry';
@@ -19,6 +24,8 @@ import { createSeededRng, type Rng } from '@tavli/engine';
 import { createExpoFeedback } from '@tavli/haptics-expo';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
 import Constants from 'expo-constants';
+
+import { supportedBotLevels } from '@/features/bot/levels';
 
 export const storage: Storage = createMmkvStorage({ id: 'tavlaki' });
 
@@ -58,6 +65,8 @@ function createAnalytics(): Analytics {
     ...(Constants.expoConfig?.version ? { appVersion: Constants.expoConfig.version } : {}),
   });
 }
+/** Sound effects. Use `appSound` (features/feedback), which follows the Sound setting. */
+export const sound: SoundPlayer = createExpoSoundPlayer();
 
 /** A fresh 32-bit seed: from `crypto` when the runtime has it, else from the clock. */
 function randomSeed(): number {
@@ -77,3 +86,11 @@ function randomSeed(): number {
 export function createLocalRng(): Rng {
   return createSeededRng(randomSeed());
 }
+
+const bot = createBot();
+
+/** The bot port (ADR-0006). MVP1 runs the bot on the JS thread. */
+export const botRunner: BotRunner = new InlineBotRunner(bot);
+
+/** The bot levels this build can play. Medium shows up once its evaluator ships. */
+export const botLevels: readonly Difficulty[] = supportedBotLevels(bot);

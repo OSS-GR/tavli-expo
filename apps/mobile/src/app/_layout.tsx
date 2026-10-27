@@ -27,6 +27,9 @@ function RootStack() {
         <Stack.Screen name="settings" options={{ headerShown: true }} />
         {/* First launch (#61): no swipe back to Home before the user answers. */}
         <Stack.Screen name="welcome/language" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="rules/[variant]" options={{ headerShown: true }} />
+        {/* No swipe back on the board: it would fight the checker drag. */}
+        <Stack.Screen name="game/[id]" options={{ gestureEnabled: false }} />
       </Stack>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
     </GestureHandlerRootView>

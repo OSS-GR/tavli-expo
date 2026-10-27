@@ -5,24 +5,32 @@
 import './src/theme/unistyles';
 import './src/i18n';
 
-// Adapters: in-memory fakes instead of MMKV, expo-haptics, Sentry and PostHog.
-// `feedback` records every haptic, `crashReporter` every report and
-// `analytics` every event it would send (it follows the opt-in rules);
-// dice come from a fixed seed, so tests are repeatable.
+// Adapters: in-memory fakes instead of MMKV, expo-haptics, expo-audio,
+// Sentry and PostHog. `feedback` records every haptic, `sound` every sound,
+// `crashReporter` every report and `analytics` every event it would send
+// (it follows the opt-in rules); dice come from a fixed seed, so tests are
+// repeatable. The bot is the real inline runner (it is pure TypeScript).
 jest.mock('@/services', () => {
   const {
     createMemoryStorage,
     createRecordingAnalytics,
     createRecordingCrashReporter,
     createRecordingFeedback,
+    createRecordingSoundPlayer,
   } = jest.requireActual('@tavli/contracts');
   const { createSeededRng } = jest.requireActual('@tavli/engine');
+  const { InlineBotRunner, createBot } = jest.requireActual('@tavli/bot');
+  const { supportedBotLevels } = jest.requireActual('@/features/bot/levels');
+  const bot = createBot();
   return {
     storage: createMemoryStorage(),
     feedback: createRecordingFeedback(),
+    sound: createRecordingSoundPlayer(),
     crashReporter: createRecordingCrashReporter(),
     analytics: createRecordingAnalytics(),
     createLocalRng: () => createSeededRng(7),
+    botRunner: new InlineBotRunner(bot),
+    botLevels: supportedBotLevels(bot),
   };
 });
 

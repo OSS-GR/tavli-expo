@@ -46,10 +46,12 @@ export interface GameStoreOptions {
   rng: Rng;
   /**
    * Game events (#61): start, finish, undo and resign are sent from here.
+   * The app sets it for every match (`features/match/appSessions.ts`).
    * Leave it out in tests.
    * TODO(#61): send `game_abandoned` (`analytics.gameAbandoned(flow)`) when
-   * the player leaves an unfinished game. Do it in the real game route
-   * (`app/game/[id]`), once saved games (#36) say what "leaving" means.
+   * the player leaves an unfinished game, for example when a new match
+   * replaces it (`features/match/sessions.ts`), once saved games (#36) say
+   * what "leaving" means.
    */
   analytics?: GameAnalytics;
 }

@@ -8,7 +8,7 @@ import HomeScreen from '@/app/index';
 import SettingsRoute from '@/app/settings';
 import WelcomeLanguageRoute from '@/app/welcome/language';
 import WelcomePrivacyRoute from '@/app/welcome/privacy';
-import { CONSENT_STORAGE_KEY, needsWelcome } from '@/features/privacy/consent';
+import { CONSENT_STORAGE_KEY, createConsentStore, needsWelcome } from '@/features/privacy/consent';
 import { consentStore } from '@/features/privacy/consentStore';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -83,11 +83,15 @@ describe('first launch', () => {
     await user.press(screen.getByRole('button', { name: 'Continue' }));
     expect(screen).toHavePathname('/welcome/privacy');
 
-    // The app "closes" here: nothing was saved, so the next launch starts
-    // the welcome flow again (the other tests open the app in this state).
+    // The app "closes" here, before an answer: nothing is saved and
+    // analytics stays off.
     expect(storage.getString(CONSENT_STORAGE_KEY)).toBeUndefined();
-    expect(consentStore.getState().status).toBe('unset');
-    expect(needsWelcome(consentStore.getState().status)).toBe(true);
+    expect(recorded.isOptedIn()).toBe(false);
+    // The next launch loads the answer from storage again: still "not
+    // asked", so the welcome flow shows.
+    const nextLaunch = createConsentStore(storage).getState().status;
+    expect(nextLaunch).toBe('unset');
+    expect(needsWelcome(nextLaunch)).toBe(true);
   });
 
   it('"Don\'t allow" saves the answer, goes Home and sends nothing', async () => {
