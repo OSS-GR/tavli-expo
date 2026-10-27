@@ -1,7 +1,9 @@
 /**
  * Connects the `Analytics` port to the app: consent, the install ID,
- * `app_opened`, and the settings events. Pure wiring with injected stores,
- * so tests can run it with fakes. The app's instance is in `store.ts`.
+ * `app_opened`, and the settings events (`settings_changed`, and
+ * `theme_changed` for the app colors and the board theme). Pure wiring with
+ * injected stores, so tests can run it with fakes. The app's instance is in
+ * `store.ts`.
  *
  * Event plan: `docs/architecture/analytics-events.md`.
  */
@@ -71,7 +73,10 @@ export function connectAnalytics({
     for (const key of Object.keys(state) as (keyof Settings)[]) {
       if (typeof state[key] === 'function' || state[key] === previous[key]) continue;
       if (key === 'theme') {
-        analytics.track('theme_changed', { theme: state.theme });
+        analytics.track('theme_changed', { kind: 'app', theme: state.theme });
+      } else if (key === 'boardTheme') {
+        // A theme id from the bundled catalog, never free text.
+        analytics.track('theme_changed', { kind: 'board', theme: state.boardTheme });
       } else {
         // Only the key: values could say more than we need.
         analytics.track('settings_changed', { key });

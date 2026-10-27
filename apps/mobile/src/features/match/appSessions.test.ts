@@ -32,14 +32,28 @@ describe('game events for real matches (#61)', () => {
   it('sends game_started with the bot level for a match vs the bot', () => {
     matchSessions.start(botSetup);
     expect(tracked()).toEqual([
-      { event: 'game_started', mode: 'bot', variant: 'portes', matchLength: 5, botLevel: 'easy' },
+      {
+        event: 'game_started',
+        mode: 'bot',
+        game: 'portes',
+        variant: 'portes',
+        matchLength: 5,
+        botLevel: 'easy',
+      },
+    ]);
+  });
+
+  it('sends game: tavli for a Tavli match, and the game in play as variant', () => {
+    matchSessions.start({ ...localSetup, game: 'tavli' });
+    expect(tracked()).toEqual([
+      { event: 'game_started', mode: 'local', game: 'tavli', variant: 'portes', matchLength: 3 },
     ]);
   });
 
   it('sends game_started for pass-and-play, with no player names', () => {
     matchSessions.start(localSetup);
     expect(tracked()).toEqual([
-      { event: 'game_started', mode: 'local', variant: 'portes', matchLength: 3 },
+      { event: 'game_started', mode: 'local', game: 'portes', variant: 'portes', matchLength: 3 },
     ]);
     expect(JSON.stringify(recorded.sent)).not.toContain('Maria');
   });
@@ -68,6 +82,7 @@ describe('game events for real matches (#61)', () => {
     expect(tracked()[0]).toEqual({
       event: 'game_abandoned',
       mode: 'local',
+      game: 'portes',
       variant: 'portes',
       turn: 1,
     });
@@ -90,7 +105,7 @@ describe('game events after an app restart (#61)', () => {
       createRng: () => createSeededRng(5),
       storage,
       createAnalytics: (setup) =>
-        createGameAnalytics({ mode: setup.mode }, { analytics: recorded }),
+        createGameAnalytics({ mode: setup.mode, game: setup.game }, { analytics: recorded }),
     });
   }
 
