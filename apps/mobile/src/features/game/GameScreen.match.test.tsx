@@ -37,7 +37,7 @@ beforeEach(async () => {
  * A whole match through the screen, as two players would play it: roll,
  * tap a checker, tap a target, confirm, close the cards, next game, and
  * at the end the screen asks for the match-end screen.
- * By default a match to 1 (about 15 s). `FULL_MATCH=1` plays to 3 (about 70 s).
+ * By default a match to 1 (about 5 s). `FULL_MATCH=1` plays to 3 (about 15 s).
  */
 const TARGET = process.env['FULL_MATCH'] === '1' ? 3 : 1;
 
