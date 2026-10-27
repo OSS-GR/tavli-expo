@@ -102,7 +102,10 @@
         "bearoff": "Bear-off",
         "plakotoStart": "Plakoto",
         "plakotoPins": "Pins",
-        "fevgaStart": "Fevga"
+        "fevgaStart": "Fevga",
+        "asodioStart": "Asodio",
+        "asodioLoading": "Asodio loading",
+        "asodioFrozen": "Asodio frozen"
       },
       "viewer": "Board view",
       "viewWhite": "White at the bottom",
@@ -138,7 +141,9 @@
       "scoreLabel": "{{score}} of {{target}} points",
       "turn": "Your turn",
       "playing": "Playing",
-      "turnOf": "{{name}}’s turn"
+      "turnOf": "{{name}}’s turn",
+      "toEnter": "{{count}} to enter",
+      "frozen": "Army frozen"
     },
     "controls": {
       "undo": "↶ Undo",
@@ -153,7 +158,15 @@
       "autoClose": "Closes by itself after 3 s.",
       "body_you": "You rolled {{dice}}. No checker can move.",
       "next_you": "Your turn.",
-      "autoCloseShort": "Closes by itself after 2 s."
+      "autoCloseShort": "Closes by itself after 2 s.",
+      "lockedTitle": "Board locked",
+      "locked": "{{name}} rolled {{dice}}. The board opens only with a 1-2 or a double.",
+      "locked_you": "You rolled {{dice}}. The board opens only with a 1-2 or a double.",
+      "lockedDouble": "{{name}} rolled {{dice}}. The board opens only with a double.",
+      "lockedDouble_you": "You rolled {{dice}}. The board opens only with a double.",
+      "frozenTitle": "Army frozen",
+      "frozen": "{{name}} rolled {{dice}}. Their last checker is pinned, so no checker can move.",
+      "frozen_you": "You rolled {{dice}}. Your last checker is pinned, so no checker can move."
     },
     "end": {
       "gameWinner": "{{name}} wins the game!",
@@ -177,7 +190,10 @@
       "matchLabel": "Match",
       "noBearOff": "{{name}} did not bear off any checker.",
       "noBearOff_you": "You did not bear off any checker.",
-      "nextGame": "Next: game {{number}} · {{game}}"
+      "nextGame": "Next: game {{number}} · {{game}}",
+      "drawChip": "Draw · 0 points",
+      "deadlock": "No checker can ever move again.",
+      "bothMothersPinned": "Both mothers are pinned."
     },
     "you": "You",
     "bot": {
@@ -230,9 +246,23 @@
     "board": {
       "label": "Board",
       "pinned": "{{name}}’s checker on point {{point}} is pinned",
-      "pinned_you": "Your checker on point {{point}} is pinned"
+      "pinned_you": "Your checker on point {{point}} is pinned",
+      "toEnter_one": "{{name}} has {{count}} checker to enter",
+      "toEnter_other": "{{name}} has {{count}} checkers to enter",
+      "toEnterYou_one": "You have {{count}} checker to enter",
+      "toEnterYou_other": "You have {{count}} checkers to enter",
+      "frozen_one": "{{name}}’s checkers on point {{points}} are frozen",
+      "frozen_other": "{{name}}’s checkers on points {{points}} are frozen",
+      "frozenYou_one": "Your checkers on point {{points}} are frozen",
+      "frozenYou_other": "Your checkers on points {{points}} are frozen",
+      "armyFrozen": "{{name}}’s last checker is pinned: the whole army is frozen",
+      "armyFrozen_you": "Your last checker is pinned: your whole army is frozen"
     },
-    "round": "Game {{number}} · {{game}}"
+    "round": "Game {{number}} · {{game}}",
+    "asodio": {
+      "locked": "Roll 1-2 or a double to start",
+      "lockedDouble": "Roll a double to start"
+    }
   },
   "welcome": {
     "language": {
@@ -339,7 +369,6 @@
       "tavli": "How to play Tavli",
       "other": "How to play"
     },
-    "later": "Asodio comes in a later update, together with its rules.",
     "unknown": "There are no rules for this game.",
     "picture": {
       "label": "The board at the start of {{game}}",
@@ -412,6 +441,31 @@
       "primes": {
         "title": "Six in a row (εξάπορτο)",
         "body": "You may not hold six points in a row in your starting quarter (points 19 to 24).\nYou may not hold six points in a row right in front of the other player's mother (your points 6 to 11).\nThis counts at the end of your turn. If the only way to play both dice breaks it, you play one die only.\nSix in a row anywhere else is fine, but you must leave the other player a move if you can.\nIf every play you have blocks the other player, you can play any of them, and they pass."
+      }
+    },
+    "asodio": {
+      "goal": "In Asodio your 15 checkers move as one army, quarter by quarter. There is no hitting: you pin, as in Plakoto.",
+      "start": "All 15 checkers start off the board. The board is empty.\nYour checkers wait next to your starting quarter (points 19 to 24). A number shows how many are still to enter.",
+      "moves": {
+        "title": "How checkers move",
+        "body": "Your checkers move toward your home. The other player moves the opposite way.\nWhen one checker plays both dice, it must also be able to land on the point in between.\nOnce a checker is on the board, it stays there until you bear it off, and it never moves back."
+      },
+      "entering": {
+        "title": "Entering (ασόδυο)",
+        "body": "The board is locked until you roll a 1-2 (ασόδυο) or a double. Any other roll does nothing, and the turn passes.\nEach die enters one checker in your starting quarter: a 1 on point 24, a 2 on point 23, and so on up to a 6 on point 19.\nA double enters four checkers on the same point: with 3-3, four checkers enter on point 22.\nOnce the board is open, every roll enters more checkers.\nEntered checkers wait: no checker moves until all 15 are on the board.\nA checker cannot enter on 2 or more of the other player's checkers. If no die can enter a checker, the turn passes."
+      },
+      "quarters": {
+        "title": "Quarter by quarter",
+        "body": "When all 15 checkers are on the board, the army may move on.\nYour path has four quarters: points 19 to 24, 13 to 18, 7 to 12, and your home, 1 to 6.\nA checker that moves into a new quarter is frozen there. It cannot move again until all 15 of your checkers have reached that quarter.\nSo your last checker sets the pace: move it up, and the army is free again.\nOn the board, frozen checkers look a little darker."
+      },
+      "pinning": {
+        "title": "Pinning (πλάκωμα)",
+        "body": "If you land on a single checker of the other player, you pin it: your checker sits on top. There is no hitting.\nA pinned checker cannot move. It is free again when the checkers on top of it leave.\nYou cannot land on 2 or more of the other player's checkers, or where they pin one of yours.\nIf your last checker is pinned, your whole army is frozen: you pass until it is free."
+      },
+      "bearOff": "You cannot bear off while any of your checkers is pinned.",
+      "draw": {
+        "title": "A draw",
+        "body": "If no checker of either player can ever move again, the game is a draw.\nNobody gets points, and the next game starts again with one die each."
       }
     },
     "tavli": {

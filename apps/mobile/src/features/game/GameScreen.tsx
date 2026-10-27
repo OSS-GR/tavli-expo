@@ -24,6 +24,14 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 import { useBoardTheme } from '@/features/board/BoardCanvas';
+import {
+  armyFrozen,
+  asodioMarks,
+  frozenPoints,
+  loadingGate,
+  opensGate,
+  toEnterCount,
+} from '@/features/board/asodio';
 import { pinnedCheckers, toneOf, type BoardView } from '@/features/board/boardModel';
 import { DiceRow } from '@/features/board/DiceRow';
 import { moveFlights, type Flight } from '@/features/board/flights';
@@ -121,7 +129,8 @@ export function GameScreen({
   const { match } = flow;
   const seats = givenSeats ?? plainSeats(match.players, t('game.strip.turn'));
   const gameKey = String(match.games.length);
-  const direction = game.state.rules.movement.direction;
+  const rules = game.state.rules;
+  const direction = rules.movement.direction;
   const botPlayer = bot?.player ?? null;
   // Sound and haptics: moves, rolls and wins play by themselves (from the engine
   // log). Vs the bot only the person's side counts, so a bot win plays no jingle.
@@ -429,6 +438,11 @@ export function GameScreen({
       reason = isYou(loser)
         ? t('game.end.noBearOff_you')
         : t('game.end.noBearOff', { name: nameOf(loser) });
+    } else if (result.reason === 'deadlock') {
+      // Asodio A5: no one can ever move again.
+      reason = t('game.end.deadlock');
+    } else if (result.reason === 'bothMothersPinned') {
+      reason = t('game.end.bothMothersPinned');
     }
     endSheet = (
       <GameEndSheet
@@ -440,7 +454,9 @@ export function GameScreen({
               ? t('game.end.gameWinner_you')
               : t('game.end.gameWinner', { name: nameOf(winner) })
         }
-        chip={t(`game.end.${type}`, { count: result.points })}
+        chip={
+          winner === null ? t('game.end.drawChip') : t(`game.end.${type}`, { count: result.points })
+        }
         strongChip={result.points >= 2}
         reason={reason}
         {...(nextGameLabel ? { next: nextGameLabel } : {})}
@@ -507,17 +523,33 @@ export function GameScreen({
       </GameCard>
     );
   } else if (!over && showPass && pass) {
+    // Why nothing moved. Asodio: the loading lock (no 1-2 or double yet) or
+    // a frozen army (A6). The board has not changed since the pass.
+    const gate = loadingGate(view.board, pass.player, rules);
+    const reason =
+      gate !== null && !opensGate(gate, pass.dice)
+        ? gate === 'doubleOnly'
+          ? 'lockedDouble'
+          : 'locked'
+        : armyFrozen(view.board, pass.player, rules)
+          ? 'frozen'
+          : 'body';
+    const vars = { name: nameOf(pass.player), dice: pass.dice.join('-') };
+    // The player to move now comes from the engine (an extra roll keeps the same player).
+    const next = game.state.toMove;
     card = (
       <GameCard
         testID="pass-card"
-        title={t('game.pass.title')}
+        title={
+          reason === 'body'
+            ? t('game.pass.title')
+            : reason === 'frozen'
+              ? t('game.pass.frozenTitle')
+              : t('game.pass.lockedTitle')
+        }
         lines={[
-          isYou(pass.player)
-            ? t('game.pass.body_you', { dice: pass.dice.join('-') })
-            : t('game.pass.body', { name: nameOf(pass.player), dice: pass.dice.join('-') }),
-          isYou(other(pass.player))
-            ? t('game.pass.next_you')
-            : t('game.pass.next', { name: nameOf(other(pass.player)) }),
+          isYou(pass.player) ? t(`game.pass.${reason}_you`, vars) : t(`game.pass.${reason}`, vars),
+          isYou(next) ? t('game.pass.next_you') : t('game.pass.next', { name: nameOf(next) }),
         ]}
         footnote={
           passMs === BOT_PASS_NOTICE_MS ? t('game.pass.autoCloseShort') : t('game.pass.autoClose')
@@ -551,7 +583,57 @@ export function GameScreen({
     );
   }
 
-  // The screen reader hears the board's pinned checkers (Plakoto).
+  // Asodio: the checkers still to enter, and the ones the quarter lock
+  // freezes (A6: the whole army). Other games have neither.
+  const toEnter = {
+    white: toEnterCount(view.board, 'white'),
+    black: toEnterCount(view.board, 'black'),
+  };
+  const frozen = {
+    white: frozenPoints(view.board, 'white', rules),
+    black: frozenPoints(view.board, 'black', rules),
+  };
+  const armyStuck = {
+    white: armyFrozen(view.board, 'white', rules),
+    black: armyFrozen(view.board, 'black', rules),
+  };
+  const marks = asodioMarks(view.board, rules, boardView);
+  // The loading lock: until a 1-2 or a double, the board stays shut.
+  const gateToMove =
+    phase === 'awaiting-roll' && !blocked && !botsTurn
+      ? loadingGate(view.board, view.toMove, rules)
+      : null;
+  const stripNote = (player: PlayerId): string | null => {
+    if (armyStuck[player]) return t('game.strip.frozen');
+    if (toEnter[player] > 0) return t('game.strip.toEnter', { count: toEnter[player] });
+    return null;
+  };
+
+  // The screen reader hears the board's pinned checkers (Plakoto, Asodio),
+  // the checkers to enter and the frozen ones (Asodio).
+  const asodioLines = BOTH_SIDES.flatMap((player) => {
+    const you = isYou(player);
+    const name = nameOf(player);
+    const lines: string[] = [];
+    if (toEnter[player] > 0) {
+      const count = toEnter[player];
+      lines.push(
+        you ? t('game.board.toEnterYou', { count }) : t('game.board.toEnter', { name, count }),
+      );
+    }
+    if (armyStuck[player]) {
+      lines.push(you ? t('game.board.armyFrozen_you') : t('game.board.armyFrozen', { name }));
+    } else if (frozen[player].length > 0) {
+      const points = frozen[player].join(', ');
+      const count = frozen[player].length;
+      lines.push(
+        you
+          ? t('game.board.frozenYou', { points, count })
+          : t('game.board.frozen', { name, points, count }),
+      );
+    }
+    return lines;
+  });
   const boardLabel = [
     t('game.board.label'),
     ...pinnedCheckers(view.board, direction).map(({ player, point }) =>
@@ -559,6 +641,7 @@ export function GameScreen({
         ? t('game.board.pinned_you', { point })
         : t('game.board.pinned', { name: nameOf(player), point }),
     ),
+    ...asodioLines,
   ].join('. ');
   const botNote =
     botChoice !== null && botChoice.key === botKey && botChoice.choice === 'playOn' && botsTurn
@@ -574,6 +657,7 @@ export function GameScreen({
       turnLabel={seats[player].turnLabel}
       checker={theme.checkers[toneOf(player)]}
       pips={showPips ? view.pips[player] : null}
+      note={stripNote(player)}
       score={match.score[player]}
       target={match.targetPoints}
       active={playing && active === player}
@@ -621,7 +705,17 @@ export function GameScreen({
           onBoardTap={roll}
           onPickUp={() => feedback.event('checkerPickUp')}
           onIllegalDrop={() => feedback.event('invalidMove')}
+          marks={marks}
         />
+        {gateToMove !== null ? (
+          <View style={styles.hintRow} pointerEvents="none">
+            <Text testID="loading-lock-hint" style={styles.hint} accessibilityLiveRegion="polite">
+              {gateToMove === 'doubleOnly'
+                ? t('game.asodio.lockedDouble')
+                : t('game.asodio.locked')}
+            </Text>
+          </View>
+        ) : null}
         {view.canConfirm && !blocked && !botsTurn ? (
           <View style={styles.hintRow} pointerEvents="none">
             <Text testID="confirm-hint" style={styles.hint}>

@@ -202,7 +202,12 @@ describe('resign', () => {
 });
 
 describe('the chosen game (#109)', () => {
-  const PORTES_ONLY = gameLevels(['easy', 'medium'], { plakoto: [], fevga: [], tavli: [] });
+  const PORTES_ONLY = gameLevels(['easy', 'medium'], {
+    plakoto: [],
+    fevga: [],
+    tavli: [],
+    asodio: [],
+  });
 
   it('uses the engine presets, one game or the Tavli rotation', () => {
     expect(GAME_CHOICES.filter((game) => isGameBuilt(game))).toEqual([
@@ -210,14 +215,16 @@ describe('the chosen game (#109)', () => {
       'plakoto',
       'fevga',
       'tavli',
+      'asodio',
     ]);
     expect(gameRotation('tavli')).toEqual(['portes', 'plakoto', 'fevga']);
-    // Asodio is in the engine, but the board cannot draw it yet.
-    expect(VARIANT_REGISTRY.has('asodio')).toBe(true);
-    expect(isGameBuilt('asodio')).toBe(false);
-    for (const game of ['portes', 'plakoto', 'fevga'] as const) {
+    // A game is built only when the engine has it too.
+    const noAsodio = new Map([...VARIANT_REGISTRY].filter(([id]) => id !== 'asodio'));
+    expect(isGameBuilt('asodio', noAsodio)).toBe(false);
+    expect(isGameBuilt('portes', noAsodio)).toBe(true);
+    for (const game of ['portes', 'plakoto', 'fevga', 'asodio'] as const) {
       const rules = gameRuleSet(game);
-      expect(rules.presetId).toBe(game);
+      expect(rules.presetId).toBe(game === 'asodio' ? 'asodio.kafeneio' : game);
       // A one-game match plays only that game.
       expect(rules.match.rotation).toEqual([game]);
       expect(gameRotation(game)).toEqual([game]);
@@ -231,15 +238,18 @@ describe('the chosen game (#109)', () => {
     expect(isGameOpen('plakoto', 'bot', PORTES_ONLY)).toBe(false);
     expect(isGameOpen('plakoto', 'local', PORTES_ONLY)).toBe(true);
     expect(isGameOpen('portes', 'bot', PORTES_ONLY)).toBe(true);
-    expect(isGameOpen('asodio', 'local', PORTES_ONLY)).toBe(false);
-    expect(isGameOpen('asodio', 'bot', gameLevels(['easy'], { asodio: ['easy'] }))).toBe(false);
+    // Asodio (#124): pass-and-play always; vs bot with a level.
+    expect(isGameOpen('asodio', 'local', PORTES_ONLY)).toBe(true);
+    expect(isGameOpen('asodio', 'bot', PORTES_ONLY)).toBe(false);
+    expect(isGameOpen('asodio', 'bot', gameLevels(['easy'], { asodio: ['easy'] }))).toBe(true);
   });
 
   it('keeps the saved game when it is open, else Portes', () => {
     expect(sanitizeSetup({ game: 'tavli' }, 'bot').game).toBe('tavli');
     expect(sanitizeSetup({ game: 'fevga' }, 'local', PORTES_ONLY).game).toBe('fevga');
     expect(sanitizeSetup({ game: 'fevga' }, 'bot', PORTES_ONLY).game).toBe('portes');
-    expect(sanitizeSetup({ game: 'asodio' }, 'local').game).toBe('portes');
+    expect(sanitizeSetup({ game: 'asodio' }, 'local').game).toBe('asodio');
+    expect(sanitizeSetup({ game: 'asodio' }, 'bot', PORTES_ONLY).game).toBe('portes');
     expect(sanitizeSetup({ game: 'chess' }, 'local').game).toBe('portes');
     // A saved match keeps any built game.
     expect(sanitizeSetup({ game: 'fevga' }, 'bot', PORTES_ONLY, { keepBuiltGame: true }).game).toBe(
