@@ -8,7 +8,10 @@
  * - No automatic capture: no app lifecycle events, no touch autocapture, no
  *   session replay, no surveys, no feature flags and no remote config. So
  *   the SDK makes no network calls of its own before opt-in.
- * - `optOut()` also calls `reset()`: PostHog forgets the IDs it stored.
+ * - `optOut()` also empties PostHog's event queue and calls `reset()`.
+ *   PostHog's own `optOut()` only stops new captures: events already in the
+ *   queue would still upload on the next flush, and `reset()` keeps the
+ *   queue on purpose. So we clear it, and PostHog forgets the IDs it stored.
  * - GeoIP lookup is off. The owner should also turn on "Discard client IP
  *   data" in the PostHog project settings.
  *
@@ -21,7 +24,7 @@ import {
   type Analytics,
   type Storage,
 } from '@tavli/contracts';
-import { PostHog, type PostHogOptions } from 'posthog-react-native';
+import { PostHog, PostHogPersistedProperty, type PostHogOptions } from 'posthog-react-native';
 
 /** PostHog EU cloud, the ingestion host for EU projects. */
 export const POSTHOG_EU_HOST = 'https://eu.i.posthog.com';
@@ -29,7 +32,7 @@ export const POSTHOG_EU_HOST = 'https://eu.i.posthog.com';
 /** The PostHog methods this adapter uses. Tests pass a fake. */
 export type PostHogClient = Pick<
   PostHog,
-  'capture' | 'identify' | 'screen' | 'optIn' | 'optOut' | 'reset'
+  'capture' | 'identify' | 'screen' | 'optIn' | 'optOut' | 'reset' | 'setPersistedProperty'
 >;
 
 export interface PostHogAnalyticsOptions {
@@ -48,6 +51,15 @@ function settle(result: unknown): void {
   if (result instanceof Promise) result.catch(() => undefined);
 }
 
+/** Runs one SDK call and drops its errors (thrown or rejected). */
+function attempt(call: () => unknown): void {
+  try {
+    settle(call());
+  } catch {
+    // Ignore: the gate still blocks every event.
+  }
+}
+
 /** The PostHog settings we use. Exported for tests. */
 export function postHogOptions({
   storage,
@@ -58,6 +70,8 @@ export function postHogOptions({
     host,
     defaultOptIn: false,
     persistence: 'file',
+    // Keep `getItem` sync: PostHog then loads its saved data in the
+    // constructor (a Promise would load it later, over newer changes).
     customStorage: {
       getItem: (key) => storage.getString(key) ?? null,
       setItem: (key, value) => storage.setString(key, value),
@@ -82,12 +96,9 @@ export function postHogOptions({
 export function fromPostHogClient(client: PostHogClient): Analytics {
   const gate = createConsentGate();
   // PostHog keeps its own opt-in flag from the last run. Our gate is the
-  // source of truth, so start PostHog opted out too.
-  try {
-    settle(client.optOut());
-  } catch {
-    // Ignore: the gate still blocks every event.
-  }
+  // source of truth, so start PostHog opted out too. (Its queue stays: it
+  // only holds events from after an "Allow", and an opt-out empties it.)
+  attempt(() => client.optOut());
   return {
     track: (event, ...props) =>
       gate.send(() =>
@@ -99,20 +110,17 @@ export function fromPostHogClient(client: PostHogClient): Analytics {
     screen: (name) => gate.send(() => settle(client.screen(name))),
     optIn: () => {
       gate.set(true);
-      try {
-        settle(client.optIn());
-      } catch {
-        // Ignore.
-      }
+      attempt(() => client.optIn());
     },
     optOut: () => {
       gate.set(false);
-      try {
-        settle(client.optOut());
-        client.reset();
-      } catch {
-        // Ignore: the gate already stops every event.
-      }
+      // Each step on its own, so one failure does not skip the others.
+      attempt(() => client.optOut());
+      // Events captured before the opt-out must not upload after it. Safe at
+      // any time: our `customStorage.getItem` is sync, so PostHog loads its
+      // saved data in the constructor and no later load can bring the queue back.
+      attempt(() => client.setPersistedProperty(PostHogPersistedProperty.Queue, null));
+      attempt(() => client.reset());
     },
     isOptedIn: gate.isOptedIn,
   };

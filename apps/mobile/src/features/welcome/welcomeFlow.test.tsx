@@ -1,7 +1,8 @@
 import type { createRecordingAnalytics } from '@tavli/contracts';
 import { userEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
-import { act, renderRouter, screen } from 'expo-router/testing-library';
+import { act, getMockContext, renderRouter, screen } from 'expo-router/testing-library';
+import { Text } from 'react-native';
 
 import RootLayout from '@/app/_layout';
 import HomeScreen from '@/app/index';
@@ -17,16 +18,38 @@ import { analytics, storage } from '@/services';
 
 const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
 
+/** A stand-in for a route these tests only open by deep link. */
+const stub = (name: string) =>
+  function StubRoute() {
+    return <Text>{name}</Text>;
+  };
+
 const routes = {
   _layout: RootLayout,
   index: HomeScreen,
   settings: SettingsRoute,
   'welcome/language': WelcomeLanguageRoute,
   'welcome/privacy': WelcomePrivacyRoute,
+  'new-game': stub('new game'),
+  'rules/[variant]': stub('rules'),
+  'game/[id]/index': stub('board'),
+  'game/[id]/match-end': stub('match end'),
+  'dev/board': stub('dev board'),
 };
 
-async function openApp() {
-  return renderRouter(routes, { initialUrl: '/' });
+/** A URL for each app route (not the layout, not the welcome flow). */
+const appUrls = Object.keys(routes)
+  .filter((name) => name !== '_layout' && !name.startsWith('welcome/'))
+  .map((name) =>
+    `/${name}`
+      .replace(/\/?index$/, '')
+      .replace('[id]', 'local-abc')
+      .replace('[variant]', 'portes'),
+  )
+  .map((url) => url || '/');
+
+async function openApp(initialUrl = '/') {
+  return renderRouter(routes, { initialUrl });
 }
 
 beforeEach(async () => {
@@ -131,6 +154,37 @@ describe('first launch', () => {
     await user.press(screen.getByRole('radio', { name: 'English' }));
     expect(settingsStore.getState().language).toBe('system');
     expect(await screen.findByRole('button', { name: 'Continue' })).toBeOnTheScreen();
+  });
+
+  it('lists every route file, so the checks below cover new routes too', () => {
+    // The route files in `src/app`, as the router sees them (`./game/[id]/index.tsx`).
+    const files = getMockContext('./src/app')
+      .keys()
+      .map((file) => file.replace(/^\.\//, '').replace(/\.tsx?$/, ''))
+      .sort();
+    expect(Object.keys(routes).sort()).toEqual(files);
+  });
+
+  it.each(appUrls)('cannot be skipped by a deep link or a restored route (%s)', async (url) => {
+    await openApp(url);
+    expect(screen).toHavePathname('/welcome/language');
+    expect(screen.getByText('Choose your language')).toBeOnTheScreen();
+  });
+
+  it('after the answer from a deep link, goes Home with no welcome screen behind it', async () => {
+    const user = userEvent.setup();
+    await openApp('/game/local-abc');
+    await user.press(screen.getByRole('button', { name: 'Continue' }));
+    await user.press(screen.getByRole('button', { name: 'Allow usage data' }));
+
+    expect(screen).toHavePathname('/');
+    expect(router.canGoBack()).toBe(false);
+  });
+
+  it('sends a user who answered away from the welcome routes', async () => {
+    await act(async () => consentStore.getState().setConsent(true));
+    await openApp('/welcome/privacy');
+    expect(screen).toHavePathname('/');
   });
 
   it('leaves no welcome screen under Home after the answer', async () => {

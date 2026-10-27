@@ -8,8 +8,6 @@ import { useConsent } from '@/features/privacy/consentStore';
 
 export interface WelcomeConsentScreenProps {
   onBack: () => void;
-  /** After the user answered. */
-  onDone: () => void;
 }
 
 /**
@@ -18,15 +16,15 @@ export interface WelcomeConsentScreenProps {
  * as accepting. "Don't allow" stops usage data and crash reports (the one
  * switch, `features/privacy`). Closing the app without an answer sends no
  * usage data, only anonymous crash reports, and this screen shows again on
- * the next launch.
+ * the next launch. The answer itself leaves this screen: the root layout's
+ * guard opens Home.
  */
-export function WelcomeConsentScreen({ onBack, onDone }: WelcomeConsentScreenProps) {
+export function WelcomeConsentScreen({ onBack }: WelcomeConsentScreenProps) {
   const { t } = useTranslation();
   const setConsent = useConsent((s) => s.setConsent);
 
   const answer = (granted: boolean) => {
     setConsent(granted);
-    onDone();
   };
 
   const collect = [

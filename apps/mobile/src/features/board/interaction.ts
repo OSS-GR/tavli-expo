@@ -11,6 +11,7 @@ import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
 
 import {
   countIn,
+  pinnedIn,
   slotOfDestination,
   slotOfOrigin,
   topCheckerKey,
@@ -64,8 +65,12 @@ export interface MovableSource {
   readonly targets: readonly MoveTarget[];
 }
 
-/** Center and radius of the top checker of a slot with `count` checkers (a tray: its last one). */
-export function slotTop(geo: BoardGeometry, slot: Slot, count: number) {
+/**
+ * Center and radius of the top checker of a slot with `count` checkers in
+ * its stack (a tray: its last one). `pinned`: a pinned checker lies under
+ * the stack (Plakoto), so the stack starts a little further along.
+ */
+export function slotTop(geo: BoardGeometry, slot: Slot, count: number, pinned = false) {
   if (slot.kind === 'tray') {
     const rects = trayGeometry(geo, slot.side, count);
     const r = rects[rects.length - 1];
@@ -73,16 +78,27 @@ export function slotTop(geo: BoardGeometry, slot: Slot, count: number) {
     return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2, r: radius } : null;
   }
   if (count === 0) return null;
-  const { centers, radius } = stackGeometry(geo, slot, count);
+  const { centers, radius } = stackGeometry(geo, slot, count, pinned);
   const p = centers[centers.length - 1];
   return p ? { x: p.x, y: p.y, r: radius } : null;
 }
 
-/** Where a checker lands on `slot` (it holds `count` now). A hit lands on the blot. */
-function landingOn(geo: BoardGeometry, slot: Slot, count: number, hit: boolean): ScreenPoint {
+/**
+ * Where a checker lands on `slot` (its stack holds `count` now, with a
+ * pinned checker under it if `pinned`). A hit lands on the blot. A pin
+ * (Plakoto) lands on top of the blot, which then peeks out under it.
+ */
+function landingOn(
+  geo: BoardGeometry,
+  slot: Slot,
+  count: number,
+  pinned: boolean,
+  capture: Move['capture'],
+): ScreenPoint {
   if (slot.kind === 'tray') return trayLanding(geo, slot.side, count);
-  if (hit) return stackPosition(geo, slot, 1, 0);
-  return stackPosition(geo, slot, count + 1, count);
+  if (capture === 'hit') return stackPosition(geo, slot, 1, 0);
+  if (capture === 'pin') return stackPosition(geo, slot, 1, 0, true);
+  return stackPosition(geo, slot, count + 1, count, pinned);
 }
 
 /**
@@ -102,7 +118,7 @@ export function buildSources(
   for (const group of legal) {
     const slot = slotOfOrigin(group.from, mover, view);
     const count = countIn(board, slot, view);
-    const top = slotTop(geo, slot, count);
+    const top = slotTop(geo, slot, count, pinnedIn(board, slot, view));
     const checkerKey = topCheckerKey(geo, slot, count);
     if (top === null || checkerKey === null) continue;
     const byTarget = new Map<string, MoveTarget>();
@@ -112,7 +128,13 @@ export function buildSources(
       const old = byTarget.get(key);
       if (old !== undefined && old.move.die <= move.die) continue;
       const rect = slotRect(geo, to);
-      const landing = landingOn(geo, to, countIn(board, to, view), move.capture === 'hit');
+      const landing = landingOn(
+        geo,
+        to,
+        countIn(board, to, view),
+        pinnedIn(board, to, view),
+        move.capture,
+      );
       const r = to.kind === 'tray' ? Math.min(R, rect.height / 2) : R;
       byTarget.set(key, { key, slot: to, rect, landing, r, move });
     }
