@@ -168,7 +168,7 @@ Recommended approach:
 
 1. Draw the static board (frame, 24 points, bar, home areas) in one Skia `<Canvas>`.
 2. Draw checkers as Skia shapes or images. Their positions are Reanimated shared values.
-3. Wrap the canvas in one `GestureDetector` with a `usePanGesture`. Do hit-testing in a worklet: find the checker under the finger, move its shared value with the finger, find the nearest legal point on release.
+3. Wrap the canvas in one `GestureDetector` with a `usePanGesture` for the drag and a `useTapGesture` for taps, in `useCompetingGestures` (a pan alone loses quick taps: it fails when the finger lifts before it moves, #174). Do hit-testing in a worklet: find the checker under the finger, move its shared value with the finger, find the nearest legal point on release.
 4. Ask the game engine for legal moves **once** when the turn starts. Keep them in a shared value so the worklet can check drops without crossing to JS.
 5. On drop, snap with `withSpring`/`withTiming`, then `scheduleOnRN` to send the move to the game state machine.
 6. Dice: start with 2D. Use Skia or Reanimated sprite/rotation animations. Put dice behind a `DiceView` component so a 3D version can replace it later.
