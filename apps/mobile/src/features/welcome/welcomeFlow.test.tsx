@@ -36,6 +36,7 @@ const routes = {
   tutorial: stub('tutorial'),
   'game/[id]/index': stub('board'),
   'game/[id]/match-end': stub('match end'),
+  'game/[id]/review': stub('review'),
   'dev/board': stub('dev board'),
 };
 

@@ -25,6 +25,8 @@ export interface MatchEndScreenProps {
   /** A finished match. */
   match: Match;
   onRematch: () => void;
+  /** "Review": the biggest mistakes of the last game (#215). */
+  onReview?: () => void;
   onChangeSettings: () => void;
   onHome: () => void;
 }
@@ -33,6 +35,7 @@ export function MatchEndScreen({
   setup,
   match,
   onRematch,
+  onReview,
   onChangeSettings,
   onHome,
 }: MatchEndScreenProps) {
@@ -157,6 +160,14 @@ export function MatchEndScreen({
           subtitle={rematchHint}
           onPress={onRematch}
         />
+        {onReview ? (
+          <ActionButton
+            testID="review-button"
+            label={t('game.end.review')}
+            kind="secondary"
+            onPress={onReview}
+          />
+        ) : null}
         <ActionButton
           testID="change-settings-button"
           label={t('game.end.changeSettings')}

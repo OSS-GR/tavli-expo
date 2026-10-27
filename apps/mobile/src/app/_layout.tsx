@@ -62,6 +62,7 @@ function RootStack() {
             options={{ gestureEnabled: false, ...TURNS_WITH_PHONE }}
           />
           <Stack.Screen name="game/[id]/match-end" />
+          <Stack.Screen name="game/[id]/review" options={{ headerShown: true }} />
           <Stack.Screen name="dev/board" />
         </Stack.Protected>
         <Stack.Protected guard={welcome} redirectTo="/">

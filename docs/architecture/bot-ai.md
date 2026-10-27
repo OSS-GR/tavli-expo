@@ -381,7 +381,7 @@ Tests the bot package must have:
 
 ### Phase 3 — Later
 
-- Hints and post-game review with the `Analyzer` (roadmap "Later"). `createAnalyzer` is built, 1-ply (#206) and 2-ply (#212). The app's Hint button uses 1 ply in offline games (#209, `docs/architecture/board-screen.md`, "Hint"); next is the post-game review (#215).
+- Hints and post-game review with the `Analyzer` (roadmap "Later"). `createAnalyzer` is built, 1-ply (#206) and 2-ply (#212). The app's Hint button uses 1 ply in offline games (#209, `docs/architecture/board-screen.md`, "Hint"), and so does the game review (#215, `apps/mobile/src/features/review/`, "Game review" in the same doc). Next: 2-ply hints where they are fast enough.
 - Match-score-aware play (Tavli match to 5 or 7 points) using a match equity table.
 - Server-side move analysis for ranked anti-cheat.
 - Optional: stronger nets with rollouts + supervised training (wildbg style), or a port of the wildbg Portes evaluator if its licence and rules fit.

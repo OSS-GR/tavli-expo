@@ -46,6 +46,11 @@ export function matchEndHref(id: string) {
   return { pathname: '/game/[id]/match-end', params: { id } } as const;
 }
 
+/** The review of the game that just ended in a local match (#215). */
+export function reviewHref(id: string) {
+  return { pathname: '/game/[id]/review', params: { id } } as const;
+}
+
 /** The rules page of a game (`/rules/portes`, …). */
 export function rulesHref(variant: string) {
   return { pathname: '/rules/[variant]', params: { variant } } as const;

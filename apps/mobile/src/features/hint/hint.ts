@@ -141,9 +141,9 @@ export function bestRest(
 }
 
 /**
- * The moves of a hint, one group per checker run: a move that goes on from
- * where the move before it landed joins it ("13 → 10 → 5"). The order stays
- * the order of the turn.
+ * The moves of a hint (or of a turn in the game review, #215), one group per
+ * checker run: a move that goes on from where the move before it landed
+ * joins it ("13 → 10 → 5"). The order stays the order of the turn.
  */
 export function hintGroups(moves: readonly Move[]): Move[][] {
   const groups: Move[][] = [];

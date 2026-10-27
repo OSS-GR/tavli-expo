@@ -13,7 +13,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { matchSessions } from '@/features/match/appSessions';
 import { MatchScreen } from '@/features/match/MatchScreen';
 import { MissingGame } from '@/features/match/MissingGame';
-import { matchEndHref, parseIdParam, rulesHref } from '@/features/match/routes';
+import { matchEndHref, parseIdParam, reviewHref, rulesHref } from '@/features/match/routes';
 
 /** Back to Home: pops to it, or opens it when the board was the first screen. */
 function goHome() {
@@ -41,6 +41,8 @@ export default function GameRoute() {
         // The rules of the game on the board (in Tavli, this game of the rotation).
         onRules={() => router.push(rulesHref(session.store.getState().flow.game.state.variant))}
         onMatchOver={() => router.replace(matchEndHref(session.id))}
+        // The review of the game that just ended (#215); Back returns to the sheet.
+        onReview={() => router.push(reviewHref(session.id))}
       />
     </View>
   );
