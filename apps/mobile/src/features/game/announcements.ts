@@ -3,7 +3,9 @@
  * (#134). Pure.
  *
  * - After a roll: "Bob rolled 5-3." (or "You rolled 5-3."). A double:
- *   "You rolled double 4: four moves of 4." (#177).
+ *   "You rolled double 4: four moves of 4." (#177). Greek names each double
+ *   by its value ("Έφερες τεσσάρες: …"), so the name is a key per value
+ *   (`game.doubles.name.N`).
  * - After another player's turn: "Bob played: Checker from point 13 to
  *   point 8; …. Your turn." Vs the bot that is the bot's turn; in
  *   pass-and-play every turn, so the next player hears what happened.
@@ -46,7 +48,8 @@ export function turnAnnouncement(
     // A double says that it plays four times (#177): the dice row shows the
     // two dice first and the four a moment later, but this is read once.
     if (isDouble(dice)) {
-      const vars = { name, value: dice[0] };
+      const value = dice[0];
+      const vars = { name, value, double: t(`game.doubles.name.${value}`) };
       return {
         key: `${key}:roll`,
         text: isYou(player)
