@@ -27,9 +27,9 @@ function listingBot(levels: Partial<Record<VariantId, readonly Difficulty[]>>): 
 }
 
 describe('supportedBotLevels', () => {
-  it('finds easy and medium for each built game in the bot package today', () => {
+  it('finds easy and medium for each built game today, and hard for Portes', () => {
     const bot = createBot();
-    expect(supportedBotLevels(bot)).toEqual(['easy', 'medium']);
+    expect(supportedBotLevels(bot)).toEqual(['easy', 'medium', 'hard']);
     expect(supportedBotLevels(bot, 'plakoto')).toEqual(['easy', 'medium']);
     expect(supportedBotLevels(bot, 'fevga')).toEqual(['easy', 'medium']);
     expect(supportedBotLevels(bot, 'asodio')).toEqual(['easy', 'medium']);
@@ -63,9 +63,10 @@ describe('supportedBotLevels', () => {
 });
 
 describe('botLevelsByGame', () => {
-  it('opens every built game in the bot package today', () => {
+  it('opens every built game in the bot package today (Hard only for Portes)', () => {
+    // Tavli needs a level in Portes, Plakoto and Fevga, so it has no Hard yet.
     expect(botLevelsByGame(createBot())).toEqual({
-      portes: ['easy', 'medium'],
+      portes: ['easy', 'medium', 'hard'],
       plakoto: ['easy', 'medium'],
       fevga: ['easy', 'medium'],
       tavli: ['easy', 'medium'],

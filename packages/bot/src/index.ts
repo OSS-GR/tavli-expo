@@ -48,6 +48,14 @@ export {
 } from './evaluators/portes-heuristic';
 export type { PortesWeights } from './evaluators/portes-heuristic';
 export {
+  PORTES_NET_INPUTS,
+  createPortesNetEvaluator,
+  loadPortesNet,
+  portesNet,
+  shippedPortesNet,
+} from './evaluators/portes-net';
+export type { PortesNet, PortesNetFile } from './evaluators/portes-net';
+export {
   FEVGA_DEFAULT_WEIGHTS,
   FEVGA_HEURISTIC_ID,
   createFevgaHeuristic,

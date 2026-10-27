@@ -54,10 +54,10 @@ interface Evaluation {
   owner version (`asodio.kafeneio`) asks nothing.
 - `createBot({ variants?, evaluators?, policies? })` builds a bot. Default:
   the engine's `VARIANT_REGISTRY`, `DEFAULT_EVALUATORS` (the Portes,
-  Plakoto, Fevga and Asodio heuristics for easy and medium) and
-  `DEFAULT_LEVEL_POLICIES`.
-- `bot.supportedLevels(v)` is `['easy', 'medium']` today for `portes`,
-  `plakoto`, `fevga` and `asodio`. Easy works
+  Plakoto, Fevga and Asodio heuristics for easy and medium, and the Portes
+  net for Portes hard) and `DEFAULT_LEVEL_POLICIES`.
+- `bot.supportedLevels(v)` is `['easy', 'medium', 'hard']` for `portes`
+  and `['easy', 'medium']` for `plakoto`, `fevga` and `asodio`. Easy works
   for every known variant; medium and hard need an evaluator. The app's
   level picker can use it, or probe `chooseTurn` and catch
   `NOT_IMPLEMENTED`: both give the same answer.
@@ -67,7 +67,7 @@ interface Evaluation {
 Errors:
 
 - `BotError('NOT_IMPLEMENTED')`: no evaluator for this level and variant
-  (today: hard).
+  (today: hard for Plakoto, Fevga and Asodio).
 - `BotError('INVALID_REQUEST')`: `dice` differs from `state.dice`, a
   runner request names another variant than its state, or `chooseAnswer`
   gets a state with no question.
@@ -90,12 +90,12 @@ Every level but `random` runs the same pipeline (bot-ai.md, section 4.1):
    with the score in points. This is the noise. A bad turn is rare, a
    nearly-best turn is common, so mistakes look human.
 
-| Level  | Evaluator         | Noise (`T`) | How it plays                                                                                                                           |
-| ------ | ----------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| random | none              | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                |
-| easy   | variant heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now. |
-| medium | variant heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                     |
-| hard   | none yet (#52)    | 0           | Throws `NOT_IMPLEMENTED`.                                                                                                              |
+| Level  | Evaluator         | Noise (`T`) | How it plays                                                                                                                              |
+| ------ | ----------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| random | none              | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                   |
+| easy   | variant heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now.    |
+| medium | variant heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                        |
+| hard   | Portes net        | 0.01        | Portes only (#147): the trained net, 1-ply, with the same small noise as medium. See "The Portes net". Other variants: `NOT_IMPLEMENTED`. |
 
 - Change the noise with `createBot({ policies: { medium: { temperature: 0.03 } } })`.
   `0` means "always a best turn" (ties at random).
@@ -247,6 +247,105 @@ Decision time of the medium bot (Node 22, dev container, after warm-up):
 random positions. Both bounds are far above the real numbers, so the test
 is safe on a slow or busy CI machine. Hermes on a phone is many times
 slower than Node, and the budget there is 200 ms.
+
+## The Portes net
+
+The hard level for Portes (#147): a small neural net, trained by TD(λ)
+self-play in the style of TD-Gammon (bot-ai.md, section 5). Code:
+`src/evaluators/portes-net.ts` (inference), `src/train/` (training, dev
+only), `scripts/train.ts` (the Node entry point).
+
+**What it scores.** Like the heuristic, a position before the roll, from
+the view of the player to roll. The net only scores **contact** positions.
+A race (no contact) and a finished game use the Portes heuristic (the Keith
+count, the Kleinman metric and the exact bear-off table), so the net never
+has to learn the race. The hard level is 1-ply, with the same small noise
+as medium (temperature 0.01).
+
+**The net.** 201 inputs → 40 hidden units (sigmoid) → 3 outputs (sigmoid):
+P(win), P(win a diplo), P(lose a diplo). `equity = 2·win − 1 + winDouble −
+loseDouble`, with each diplo chance capped at the win (or loss) chance. The
+inputs, the roller's side first, then the waiter's, each in its own
+numbering:
+
+| Inputs | What                                                                          |
+| ------ | ----------------------------------------------------------------------------- |
+| 192    | per own point 1–24, 4 units (TD-Gammon): n ≥ 1, n ≥ 2, n ≥ 3, (n − 3) / 2     |
+| 4      | checkers on the bar / 2, borne off / 15                                       |
+| 2      | pip counts / 100                                                              |
+| 2      | rolls out of 36 that hit a blot, for each side (`shots.ts`)                   |
+| 1      | the heuristic's contact score in logits / 4 (`contactScore`, default weights) |
+
+Most inputs are 0, so the first layer only adds the weight rows of the
+inputs that are set (a sparse sum). The last input ties the net to
+`PORTES_DEFAULT_WEIGHTS`: if you retune the heuristic, retrain the net (a
+test pins the net's value of a fixed position).
+
+**The weights** ship in `src/evaluators/portes-net-weights.ts`: one base64
+string of little-endian Float32 values (`float-codec.ts`): 8,203 weights, 32 KB as Float32, a 44 KB file. A `.ts`
+file loads in Metro, Vitest and Node with no `fs` and no JSON import. The
+evaluator decodes it on its first use, not at app start.
+
+**Training** (`src/train/td.ts`). The net plays itself, greedy 1-ply, with
+the engine's `legalTurns` and the fast board arrays. A game stops when
+contact breaks (the race heuristic gives the value) or at the end (the true
+result). Each position gets a λ-return target, computed backwards from the
+end: `G_t = flip((1 − λ)·V_{t+1} + λ·G_{t+1})`, where `V_{t+1}` is the value
+the net gave the chosen turn. Then one gradient step per position with
+cross-entropy loss. A match against medium (1,000 paired games, seed 1)
+runs every 10,000 games; `best.json` keeps the best one.
+
+```sh
+pnpm --filter @tavli/bot train -- train --out /tmp/portes-net --hidden 40 --games 200000 --seed 12
+pnpm --filter @tavli/bot train -- eval --file /tmp/portes-net/best.json --games 2000 --seed 99
+pnpm --filter @tavli/bot train -- export --file /tmp/portes-net/best.json
+```
+
+What we ran (Node 22, dev container, 4 cores): three runs side by side for
+about 65 minutes, each on one core (about 45 self-play games per second
+with 40 hidden units, a little less with 80, plus the matches). No warm
+start. The plan was 200,000 games each; we stopped them after about an
+hour, because the matches had been flat for a while. Then we played the
+best checkpoints of each run again on a fresh seed (2,000 paired games,
+seed 99):
+
+| Run | Hidden | λ   | α (start → end of 200k) | Seed | Games played | Best checkpoint (seed 99) |
+| --- | ------ | --- | ----------------------- | ---- | ------------ | ------------------------- |
+| A   | 80     | 0.7 | 0.1 → 0.01              | 11   | 130,000      | 110k: 75.1 %, +0.63       |
+| B   | 40     | 0.7 | 0.1 → 0.01              | 12   | 160,000      | **150k: 76.8 %, +0.66**   |
+| C   | 80     | 0.5 | 0.05 → 0.005            | 13   | 130,000      | 120k: 74.8 %, +0.63       |
+
+(Win share and points per game against medium.) All three runs beat
+medium about 70 % of the time after only 10,000 games, and 73–76 % from
+about 50,000 games on. The bigger net did not help, so we ship run B at
+150,000 games (58 minutes of training): `portes-net-v1`. Its training
+notes are in the weights file.
+
+**Strength** of hard (the shipped net) against medium:
+
+| Match                                                   | Hard wins      | Points per game |
+| ------------------------------------------------------- | -------------- | --------------- |
+| `simulate -- --games 1000 --a hard --b medium --seed 1` | 742 (74.2 %)   | +0.64           |
+| 1,000 paired games, seed 2026 (`train -- eval`)         | 734 (73.4 %)   | +0.58           |
+| 2,000 paired games, seed 99                             | 1,535 (76.8 %) | +0.66           |
+| `strength.test.ts`: 200 paired games, seed 2029         | 157 (78.5 %)   |                 |
+
+With `simulate`, hard scored 945 points against 307, with 203 diplo wins
+against 49. So hard beats medium 73–77 % of the time, above the epic target
+of 70 % (#52) by 3 to 7 points. The CI test needs 60 %. The checkpoint was
+chosen by its seed-1 matches, so the fresh seeds (99, 2026) are the fair
+numbers.
+
+**2-ply.** We tried 2-ply on the best 3 turns (within 0.05 points of the
+best), with a net from the middle of training. Over 400 paired games
+against medium it won 286 games, against 287 for 1-ply, and the match took
+16 times longer (79 s against 5 s). The strength test would then take far
+more than its 30 s, so the hard level stays 1-ply.
+
+**Decision time** of the hard bot (Node 22, dev container, after warm-up,
+300 random positions): median 0.14 ms, p90 0.68 ms, p99 3.3 ms, max 5.0 ms
+(medium on the same run: 0.08, 0.43, 2.2 and 5.7 ms). `src/hard-perf.test.ts` checks median < 50 ms
+and worst < 300 ms.
 
 ## The Plakoto heuristic
 
@@ -818,6 +917,14 @@ the Plakoto one about 8 s; the files run in parallel).
   the `chooseDouble` question (scores, levels), and whole games with roll
   chains. `asodio-strength.test.ts` (200 games per match) and
   `asodio-perf.test.ts`.
-- `strength.test.ts` (300 games per match), `perf.test.ts`,
+- `evaluators/portes-net.test.ts`: the inputs (TD-Gammon units, both
+  colours give the same inputs, indexes in range), the shipped weights
+  load and stay under 200 KB, outputs in range, a race uses the heuristic,
+  a closed board scores high, the fast path equals the engine path, and a
+  pinned value for one position. `evaluators/float-codec.test.ts`: the
+  base64 Float32 round trip. `train/td.test.ts`: a gradient step, a
+  self-play game repeats for a seed, the warm-start labels, save and load.
+- `strength.test.ts` (300 games per match; hard vs medium 200 games),
+  `perf.test.ts`, `hard-perf.test.ts`,
   `simulate.test.ts` (1,000 random-vs-random games), `tune.test.ts` (a tiny
   search), and the runner and the command line.
