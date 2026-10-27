@@ -14,12 +14,14 @@
  *   it has no winner.
  */
 import { isDifficulty, type Difficulty } from '@tavli/contracts';
-import { type Match, type PerPlayer, type PlayerId } from '@tavli/engine';
+import { type GameRecord, type Match, type PerPlayer, type PlayerId } from '@tavli/engine';
 
 import {
   isGameChoice,
+  isMatchLength,
   isMatchMode,
   type GameChoice,
+  type MatchLength,
   type MatchMode,
   type MatchSetup,
 } from '@/features/match/setup';
@@ -46,7 +48,8 @@ export interface HistoryRecord {
   readonly botLevel: Difficulty | null;
   /** Pass-and-play names as typed. Empty = "Player 1" / "Player 2". Empty vs bot. */
   readonly names: PerPlayer<string>;
-  readonly targetPoints: number;
+  /** One of the lengths of the new-game screen (`MATCH_LENGTHS`). */
+  readonly targetPoints: MatchLength;
   /** The final score (or the score when the match was left). */
   readonly score: PerPlayer<number>;
   readonly end: MatchEnd;
@@ -56,10 +59,23 @@ export interface HistoryRecord {
   readonly resignedBy: PlayerId | null;
   /** Finished games in the match. */
   readonly games: number;
-  /** Games each player won with 2 points or more (diplo, "mars"). */
+  /** Games each player won with 2 points or more (diplo, "mars"; see `isDiplo`). */
   readonly diploWins: PerPlayer<number>;
   /** Games that ended in a draw (Plakoto: both mothers pinned; Asodio: deadlock). */
   readonly draws: number;
+}
+
+/**
+ * A won game worth 2 points or more is a diplo (mars). The app's games all
+ * use the shared Tavli scoring (`docs/rules/tavli-match.md`, "Winning &
+ * scoring"): a single is 1 point, a double is 2. Every way to a double
+ * gives 2: no checker borne off, a pinned mother (Plakoto), or a resign or
+ * a timeout in such a position (the opponent wins what the position is
+ * worth, `resignGame`). Only the `backgammonScores3` flag (Portes, off by
+ * default) gives 3, and that is a double too. A draw is 0 points.
+ */
+export function isDiplo(game: GameRecord): boolean {
+  return game.winner !== null && game.points >= 2;
 }
 
 /** The record of a match that ends now (`end: 'finished'`) or is left (`'abandoned'`). */
@@ -74,7 +90,7 @@ export function historyRecord(
   let draws = 0;
   for (const game of match.games) {
     if (game.winner === null) draws += 1;
-    else if (game.points >= 2) diploWins[game.winner] += 1;
+    else if (isDiplo(game)) diploWins[game.winner] += 1;
   }
   const bot = setup.mode === 'bot';
   return {
@@ -84,7 +100,8 @@ export function historyRecord(
     game: setup.game,
     botLevel: bot ? setup.botLevel : null,
     names: bot ? { white: '', black: '' } : { ...setup.names },
-    targetPoints: match.targetPoints,
+    // The same as `match.targetPoints`, but typed as a match length.
+    targetPoints: setup.targetPoints,
     score: { ...match.score },
     end,
     winner: end === 'finished' ? match.winner : null,
@@ -102,6 +119,19 @@ export function addRecord(
   max: number = MAX_HISTORY_RECORDS,
 ): HistoryRecord[] {
   return [record, ...records.filter((r) => r.id !== record.id)].slice(0, max);
+}
+
+/**
+ * Has a record of session `sessionId` ended after `since`? The record id is
+ * `<session id>@<endedAt>` (`historyRecord`).
+ */
+export function recordedAfter(
+  records: readonly HistoryRecord[],
+  sessionId: string,
+  since: number,
+): boolean {
+  const prefix = `${sessionId}@`;
+  return records.some((r) => r.id.startsWith(prefix) && r.endedAt > since);
 }
 
 export function serializeHistory(records: readonly HistoryRecord[]): string {
@@ -148,7 +178,7 @@ function parseRecord(raw: unknown): HistoryRecord | null {
   if (!isDateMs(endedAt)) return null;
   if (!isMatchMode(mode) || !isGameChoice(game)) return null;
   if (mode === 'bot' ? !isDifficulty(botLevel) : botLevel !== null) return null;
-  if (!isCount(targetPoints) || targetPoints < 1) return null;
+  if (!isMatchLength(targetPoints)) return null;
   if (end !== 'finished' && end !== 'abandoned') return null;
   if (end === 'finished' ? !isPlayer(winner) : winner !== null) return null;
   if (resignedBy !== null && !isPlayer(resignedBy)) return null;

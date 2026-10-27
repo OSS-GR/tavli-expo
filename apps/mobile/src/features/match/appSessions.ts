@@ -16,5 +16,8 @@ export const matchSessions = createSessionRegistry({
     createGameAnalytics(
       setup.mode === 'bot' ? { mode: 'bot', botLevel: setup.botLevel } : { mode: 'local' },
     ),
-  history: { add: (record) => historyStore.getState().add(record) },
+  history: {
+    add: (record) => historyStore.getState().add(record),
+    recordedAfter: (sessionId, since) => historyStore.getState().recordedAfter(sessionId, since),
+  },
 });

@@ -11,6 +11,7 @@ import {
   MAX_HISTORY_RECORDS,
   addRecord,
   parseHistory,
+  recordedAfter,
   serializeHistory,
   type HistoryRecord,
 } from './records';
@@ -19,6 +20,8 @@ export interface HistoryState {
   /** Newest first. */
   readonly records: readonly HistoryRecord[];
   add: (record: HistoryRecord) => void;
+  /** Has a record of session `sessionId` ended after `since` (`recordedAfter`)? */
+  recordedAfter: (sessionId: string, since: number) => boolean;
   /** Deletes every record. */
   clear: () => void;
 }
@@ -45,6 +48,7 @@ export function createHistoryStore(storage: Storage, max: number = MAX_HISTORY_R
         console.warn('could not save the match history', error);
       }
     },
+    recordedAfter: (sessionId, since) => recordedAfter(get().records, sessionId, since),
     clear: () => {
       set({ records: [] });
       try {

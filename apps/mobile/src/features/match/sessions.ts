@@ -16,8 +16,14 @@
  * match that replaces an unfinished one sends `game_abandoned` for it.
  *
  * With `history`, every match adds a record to the match history (#142):
- * when it is over (won or resigned), and when a new match replaces one
- * that had started (`abandoned`). A history error never breaks a move.
+ * when it is over (won or resigned), and when a new match (or a saved one
+ * that `get(id)` loads) replaces one that had started (`abandoned`). A
+ * history error never breaks a move.
+ *
+ * A save older than a history record of its session is stale (#150): the
+ * match ended but the app died before the slot was cleared, or the match
+ * was left but the remove failed. `peek()` drops it, so the match is not
+ * resumed or recorded twice.
  */
 import type { Storage } from '@tavli/contracts';
 import type { MatchFlow, Rng } from '@tavli/engine';
@@ -30,6 +36,7 @@ import {
   SAVED_MATCH_KEY,
   parseSavedMatch,
   serializeSavedMatch,
+  type SavedMatch,
   type SavedMatchResult,
 } from './savedMatch';
 import {
@@ -73,7 +80,14 @@ export interface SessionDeps {
   /** Game events for a match (#61). Leave it out in tests that do not check them. */
   readonly createAnalytics?: (setup: MatchSetup) => GameAnalytics;
   /** The match history (#142). Leave it out in tests that do not check it. */
-  readonly history?: { readonly add: (record: HistoryRecord) => void };
+  readonly history?: MatchHistory;
+}
+
+/** What the registry needs from the match history (#142). */
+export interface MatchHistory {
+  readonly add: (record: HistoryRecord) => void;
+  /** Has a record of session `sessionId` ended after `since` (ms since 1970)? */
+  readonly recordedAfter: (sessionId: string, since: number) => boolean;
 }
 
 /** A new local match id. Not a secret; it only has to be unique on this phone. */
@@ -158,6 +172,17 @@ export function createSessionRegistry({
     }
   };
 
+  // A save older than a record of its session is stale (see the top).
+  const isStale = ({ id, savedAt }: SavedMatch): boolean => {
+    if (!history) return false;
+    try {
+      return history.recordedAfter(id, savedAt);
+    } catch (error) {
+      console.warn('could not read the match history', error);
+      return false;
+    }
+  };
+
   const savedId = (): string | null => {
     const result = peek();
     return result.kind === 'ok' ? result.saved.id : null;
@@ -166,8 +191,9 @@ export function createSessionRegistry({
   const peek = (): SavedMatchResult => {
     if (!storage) return { kind: 'none' };
     const result = parseSavedMatch(readSaved(), levels);
-    if (result.kind !== 'ok') removeSaved();
-    return result;
+    if (result.kind === 'ok' && !isStale(result.saved)) return result;
+    removeSaved();
+    return result.kind === 'ok' ? { kind: 'none' } : result;
   };
 
   const attach = (next: MatchSession, analytics: GameAnalytics | undefined) => {
@@ -191,16 +217,22 @@ export function createSessionRegistry({
     sessionAnalytics = null;
   };
 
+  // The player left the match in memory: `game_abandoned`, and an
+  // `abandoned` history record. `gameAbandoned` ignores a finished game or
+  // match; so does `record`.
+  const abandonSession = (s: MatchSession) => {
+    const { flow } = s.store.getState();
+    sessionAnalytics?.gameAbandoned(flow);
+    record(s.id, s.setup, flow, 'abandoned');
+  };
+
   // A new match replaces the one before it. If that one was not over (in
-  // memory, or only in the save slot after a restart), the player left it:
-  // `game_abandoned`, and an `abandoned` history record. `gameAbandoned`
-  // ignores a finished game or match; so does `record`.
+  // memory, or only in the save slot after a restart), the player left it.
+  // A stale save is not recorded again: `peek` drops it.
   const abandonPrevious = () => {
     if (!createAnalytics && !history) return;
     if (session) {
-      const { flow } = session.store.getState();
-      sessionAnalytics?.gameAbandoned(flow);
-      record(session.id, session.setup, flow, 'abandoned');
+      abandonSession(session);
       return;
     }
     const result = peek();
@@ -233,6 +265,9 @@ export function createSessionRegistry({
       if (session?.id === id) return session;
       const result = peek();
       if (result.kind !== 'ok' || result.saved.id !== id) return null;
+      // The saved match replaces the one in memory (rare: that one's save
+      // failed), so the player left that one.
+      if (session) abandonSession(session);
       const { setup, flow } = result.saved;
       // A resumed match gets game events too, but no new `game_started`:
       // the game started before the app closed.
