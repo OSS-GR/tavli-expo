@@ -1,10 +1,11 @@
 /**
  * The board on screen: a Skia canvas that draws a `BoardScene`.
  *
- * `useBoardTheme` reads the board theme from Settings, `useHomeBoardSide`
- * the home board side and `useBoardLayoutMode` the game screen layout
- * (#184). `boardLayout` gives the theme layout for both: the tall board on
- * its side (`portraitLayout`) or the classic wide board. `useBoardSpace`
+ * `useBoardTheme` reads the board theme from Settings and `useHomeBoardSide`
+ * the home board side. The game screen layout (tall, classic or landscape)
+ * comes from `useScreenLayout` (`screenLayout.ts`, #184, #185).
+ * `boardLayout` gives the theme layout: the tall board on its side
+ * (`portraitLayout`) or the classic wide board. `useBoardSpace`
  * measures the space the board may fill; `fitBoard` then gives the geometry.
  */
 import { Canvas } from '@shopify/react-native-skia';
@@ -37,11 +38,6 @@ export function useBoardTheme(): ThemeManifest {
 /** Where your home is, from Settings → Home board (#175). */
 export function useHomeBoardSide(): HomeBoardSide {
   return useSettings((s) => s.homeBoardSide);
-}
-
-/** The game screen layout from Settings → Board → Board layout (#184). */
-export function useBoardLayoutMode(): BoardLayoutMode {
-  return useSettings((s) => s.boardLayout);
 }
 
 /** One mirrored layout per theme layout, so its identity stays the same between renders. */

@@ -4,7 +4,7 @@
  * and drag), with the dice on the board, the home board side (#175) and
  * the flip view.
  */
-import { createSeededRng, resolveRules, type PlayerId } from '@tavli/engine';
+import { createSeededRng, resolveRules } from '@tavli/engine';
 import { getTheme } from '@tavli/themes';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 
@@ -15,26 +15,21 @@ import {
   fitBoardWithShadow,
   slotRect,
   stackPosition,
-  type BoardGeometry,
 } from '@/features/board/geometry';
-import { buildSources } from '@/features/board/interaction';
 import {
   DEFAULT_SETTINGS,
-  type BoardFlipMode,
   type BoardLayoutMode,
   type HomeBoardSide,
 } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
-import { createGameStore, turnView, type GameStore } from './gameStore';
+import { createGameStore, type GameStore } from './gameStore';
 import { GameScreen } from './GameScreen';
-import { openingStatus } from './opening';
-import { passNotice } from './turnNotices';
 
+import { center, playToTheEnd, press } from '../../../test/boardPlay';
 import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { nativePath } from '../../../test/nativeParent';
-import { pressOpeningRoll } from '../../../test/openingRoll';
 import { renderWithRoot } from '../../../test/render';
 
 const theme = getTheme('walnut-kafeneio');
@@ -48,11 +43,6 @@ const hidden = { includeHiddenElements: true };
 
 const geoFor = (layout: BoardLayoutMode, side: HomeBoardSide = 'right') =>
   fitBoardWithShadow(boardLayout(theme, layout, side), SPACE[layout]);
-
-const center = (r: { x: number; y: number; width: number; height: number }) => ({
-  x: r.x + r.width / 2,
-  y: r.y + r.height / 2,
-});
 
 function newStore(game: 'portes' | 'plakoto' | 'fevga', seed: number): GameStore {
   return createGameStore({
@@ -93,62 +83,8 @@ async function show(store: GameStore, layout: BoardLayoutMode, gameLabel?: strin
   });
 }
 
-const press = async (testID: string) => {
-  await act(async () => {
-    fireEvent.press(screen.getByTestId(testID));
-  });
-};
-
 const played = (store: GameStore) =>
   store.getState().flow.game.played.map((m) => `${m.from}/${m.to}`);
-
-/** The sources of the player to move, as the screen sees them. */
-function sourcesNow(store: GameStore, geo: BoardGeometry, flipMode: BoardFlipMode) {
-  const view = turnView(store.getState().flow);
-  const viewer: PlayerId = flipMode === 'flip' ? view.toMove : 'white';
-  const boardView = { viewer, direction: view.game.state.rules.movement.direction };
-  return buildSources(geo, view.board, boardView, view.toMove, view.legal);
-}
-
-/**
- * Plays the match to its end: roll, then each move by tap-tap or (every
- * third move) by drag, confirm, close the cards. Plakoto's mother question
- * is answered "play on". Returns how many moves were played by tap and by drag.
- */
-async function playToTheEnd(store: GameStore, geo: BoardGeometry, flipMode: BoardFlipMode) {
-  let taps = 0;
-  let drags = 0;
-  let steps = 0;
-  for (; steps < 4000; steps++) {
-    const { flow } = store.getState();
-    const view = turnView(flow);
-    if (view.matchPhase !== 'playing') break;
-    const card = (testID: string) => screen.queryByTestId(testID) !== null;
-    if (view.phase === 'awaiting-answer') await press('mother-play-on-button');
-    else if (passNotice(flow) && card('pass-ok-button')) await press('pass-ok-button');
-    else if (view.phase === 'opening-roll') await pressOpeningRoll();
-    else if (openingStatus(view.game) && card('opening-overlay')) await press('opening-overlay');
-    else if (view.phase === 'awaiting-roll') await press('roll-button');
-    else if (view.phase === 'awaiting-confirm') await press('confirm-button');
-    else {
-      const sources = sourcesNow(store, geo, flipMode);
-      const source = sources[(taps + drags) % sources.length]!;
-      const target = source.targets[0]!;
-      const from = { x: source.checker.x, y: source.checker.y };
-      if ((taps + drags) % 3 === 2) {
-        await touch(PAN, [from, { x: from.x + 12, y: from.y + 12 }, target.landing]);
-        drags++;
-      } else {
-        await touch(PAN, [from]);
-        await touch(PAN, [center(target.rect)]);
-        taps++;
-      }
-      expect(store.getState().flow.log.length).toBeGreaterThan(flow.log.length);
-    }
-  }
-  expect(steps).toBeLessThan(4000);
-  return { taps, drags };
-}
 
 // The game screen closes its cards on timers (see test/clock.ts).
 runOnFakeTimers();
@@ -162,7 +98,10 @@ describe('<GameScreen /> board layouts (#184)', () => {
     expect(DEFAULT_SETTINGS.boardLayout).toBe('tall');
     await show(newStore('portes', 3), 'tall', 'Game 1 · Portes');
     expect(screen.queryByTestId('game-label')).toBeNull();
-    expect(screen.queryByTestId('game-middle')).toBeNull();
+    // The strips sit above and below the board area, not in it.
+    const middle = screen.getByTestId('game-middle');
+    expect(within(middle).queryByTestId('strip-top')).toBeNull();
+    expect(within(middle).queryByTestId('strip-bottom')).toBeNull();
     // The menu button and the top strip share one row.
     const menu = screen.getByTestId('menu-button');
     expect(menu.parent).toBe(screen.getByTestId('strip-top').parent?.parent);
@@ -252,7 +191,7 @@ describe('<GameScreen /> board layouts (#184)', () => {
     await act(async () => {
       settingsStore.getState().setSetting('boardLayout', 'classic');
     });
-    expect(screen.getByTestId('game-middle')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('game-middle')).getByTestId('strip-top')).toBeOnTheScreen();
     // The new board measures its space again.
     await act(async () => {
       fireEvent(screen.getByTestId('game-board', hidden), 'layout', {

@@ -12,7 +12,8 @@
 | `paint.ts` | Theme gradients and colors → Skia props. |
 | `skia/BoardScene.tsx` | The Skia drawing. Props only: no hooks, no React Native. The same scene renders in the app, in Jest and headless. |
 | `skia/CheckerShape.tsx` | One checker from a theme `CheckerStyle`. |
-| `BoardCanvas.tsx` | The Skia `<Canvas>`, the board theme, the home board side and the board layout from Settings (`useBoardTheme`, `useHomeBoardSide`, `useBoardLayoutMode`), the theme layout for them (`boardLayout`; `portraitLayout` for the tall one) and the space the board may fill. |
+| `BoardCanvas.tsx` | The Skia `<Canvas>`, the board theme and the home board side from Settings (`useBoardTheme`, `useHomeBoardSide`), the theme layout for a board layout and a side (`boardLayout`; `portraitLayout` for the tall one) and the space the board may fill. |
+| `screenLayout.ts` | Which game screen layout fits the window (#185): `tall` or `classic` from Settings in portrait, `landscape` when the window is wider than tall (`useScreenLayout`, `screenLayoutFor`), and the side column width (`sideColumnWidth`). |
 | `useBoardAssets.ts` | Loads the theme images and the badge font. |
 | `themeImages.ts` | The Metro `require` map for theme images (Metro only bundles literal requires). |
 | `StaticBoard.tsx` | A board that only shows a position. Optional `theme`, `homeSide` and `layout` props draw another theme, side or layout (the Settings pickers). |
@@ -20,12 +21,12 @@
 | `diceMotion.ts` | The roll animation as pure math (worklets): tumble pose and face flips. |
 | `skia/DieShape.tsx`, `skia/AnimatedDie.tsx` | A die from the theme `DiceStyle`; the animated version tumbles and lands on the engine's value. |
 | `DiceRow.tsx` | The dice: 2 side by side, or 4 in a 2 x 2 grid for a double. Used dice fade. The game screen puts them on the board (#184); the tutorial under it. |
-| `boardDice.ts` | Where the dice lie on the board (#184): centred on the theme's dice area, at least `MIN_BOARD_DIE` (32 pt). Pure. |
+| `boardDice.ts` | Where the dice lie on the board (#184): centred on the theme's dice area, at least `MIN_BOARD_DIE` (32 pt). In landscape, in the right column next to the board (`columnDiceBox`, #185). Pure. |
 | `interaction.ts` | Which checkers can move and where (from `legalNextMoves`), in screen points; what a tap or a drop means. Pure; the pickers are worklets. |
 | `combined.ts` | One checker moved with several dice (#180): the "2+3" paths, step by step from the engine (`flowPaths`). Pure. |
 | `flights.ts` | A move, a hit or an undo as short flights of checkers; a combined move as one flight through its middle points (`pathFlights`). Pure. |
 | `skia/MovingCheckers.tsx` | The checker in flight and the checker under the finger (UI thread). |
-| `InteractiveBoard.tsx` | The playing board: the pan and tap gestures, selection, highlights and flights. |
+| `InteractiveBoard.tsx` | The playing board: the pan and tap gestures, selection, highlights and flights. With a new `spaceKey` (the phone turned, #185) it reports no geometry until it has measured its new space. |
 
 The game itself lives in `apps/mobile/src/features/game/`:
 
@@ -34,7 +35,7 @@ The game itself lives in `apps/mobile/src/features/game/`:
 | `gameStore.ts` | A Zustand store around the engine `MatchFlow` reducer, with the injected `Rng`. `turnView(flow)` computes what the screen shows (board mid-turn, legal moves, dice, pips). |
 | `moveGroups.ts` | Which moves of the turn form one combined move (#180), so one Undo takes it back whole. Pure. |
 | `opening.ts`, `OpeningCard.tsx` | The opening roll card: one die per player, its Roll button, tie, result. |
-| `PlayerStrip.tsx` | A player strip on one line (#184, `STRIP_HEIGHT` 36 pt): checker color, name, pip count, an optional note (Asodio: "12 to enter", "Army frozen"), match score, turn pill. A long name, Greek or a large font wraps it; it breaks only after a "·". |
+| `PlayerStrip.tsx` | A player strip on one line (#184, `STRIP_HEIGHT` 36 pt): checker color, name, pip count, an optional note (Asodio: "12 to enter", "Army frozen"), match score, turn pill. A long name, Greek or a large font wraps it; it breaks only after a "·". `stacked` (landscape, #185): one part per line for a side column. |
 | `GameCard.tsx`, `turnNotices.ts` | Cards over the board: no legal moves, "could not be opened". |
 | `GameEndSheet.tsx` | Game end (wireframe 8): a sheet over the final board. |
 | `Celebration.tsx` | The small win effect on the game-end sheet and the match-end screen. |
@@ -90,7 +91,36 @@ Both layouts:
 - **One row of two big buttons** at the bottom, in thumb reach: Undo and Confirm share the width (`grow`), or one Roll button, or the bot's box ("Bot rolled 4-2 and is moving…").
 - Every text reads upright: nothing on the screen is turned; only the board art lies a quarter turn in Tall.
 
-Sizes (board, checker): Tall on an iPhone SE about 282 × 471 pt, checker 30 pt (before #184: 242 × 404 pt, 26 pt); on a Pro Max 412 × 688 pt, checker 44 pt (before: 372 × 621 pt, 39 pt). Classic on an iPhone SE about 363 × 217 pt, checker 23 pt; on a Pro Max 426 × 255 pt, checker 27 pt. Not built: anything in the classic layout's free space (proposal question 5), landscape (#185), face-to-face.
+Sizes (board, checker): Tall on an iPhone SE about 282 × 471 pt, checker 30 pt (before #184: 242 × 404 pt, 26 pt); on a Pro Max 412 × 688 pt, checker 44 pt (before: 372 × 621 pt, 39 pt). Classic on an iPhone SE about 363 × 217 pt, checker 23 pt; on a Pro Max 426 × 255 pt, checker 27 pt. Landscape: see [Landscape](#landscape-185). Not built: anything in the classic layout's free space (proposal question 5), face-to-face.
+
+## Landscape (#185)
+
+The owner's decision: only the **game screen** and the **tutorial board** turn with the phone. Home, New game, Settings, History, Rules, match end and the welcome screens stay upright. In landscape the whole game UI turns, so every text reads upright.
+
+**Orientation.** `app.json` allows every orientation (`"orientation": "default"`), so a screen can turn. The root `Stack` locks every screen upright (`orientation: 'portrait_up'` in `screenOptions`, `src/app/_layout.tsx`); the game route and the tutorial route follow the phone (`orientation: 'default'`: portrait and both landscapes, never upside down on an iPhone). This is react-native-screens' per-screen orientation, the way the Expo docs recommend with Expo Router; no extra native module. The phone's own rotation lock still wins. The menu and the resign dialogs are a `Modal` (`Sheet`): on iOS a `Modal` turns the screen back to portrait unless it lists landscape, so the game's `Sheet` passes `turns` (`supportedOrientations`). Other sheets stay portrait only.
+
+**Layout choice.** `useScreenLayout` (`screenLayout.ts`) reads the window (`useWindowDimensions`): wider than tall is `landscape`, else the Board layout setting (`tall` or `classic`). Landscape always draws the classic board (`boardModeOf`), whatever the setting; turning back to portrait brings the setting back.
+
+| Part | Landscape |
+|---|---|
+| Board | the classic board (`landscape` theme layout) in the middle, as large as the space between the columns allows (`flex: 1`, `fitBoardWithShadow`) |
+| Left column (`game-left`) | the menu button, the other player's strip, your strip, and Undo under the left thumb. The strips are `stacked`: the color and the score, the turn pill, the name, the pips. The other player's strip sits at the top (next to their side of the board), yours at the bottom. |
+| Right column (`game-right`) | the game label at the top, an empty slot for the dice, Roll (or Confirm, or the bot's box) under the right thumb. The column lies over the right part of the board layer (`position: absolute`). The top part (`game-right-top`) is exactly as tall as the space above the dice, the slot (`game-dice-slot`) as tall as the dice box (four dice for a double), and the bottom part (`game-right-bottom`) takes the rest. The top and bottom parts scroll on their own, so a large font never puts text over the dice. The slot stays before a roll too, so Roll and Confirm sit in the same place. |
+| Column width | `SIDE_COLUMN` (128 pt), up to 1.35 times that with a large font (`sideColumnWidth`). The longest label is Greek "Επιβεβαίωση" (about 100 pt at 17 pt); the side buttons are `compact` (4 pt side padding, no minimum width), so it fits on one line. |
+| Dice | in the right column's slot, as large as the column allows (32 to 40 pt, `columnDiceBox`). The board layer reaches under the right column (`paddingRight` of the column width; the board keeps clear of it), so the dice box lies inside the layer, never outside its parent. So the dice canvas never changes its native parent when the phone turns (#173), and a roll does not start again. The cards, the notes and the move list keep clear of the column (`besideColumn`). |
+| Safe areas | the screen keeps `insets.left`, `insets.right` and `insets.bottom` free (the notch or Dynamic Island, the round corners, the home bar). |
+| Cards (opening, pass, mother) | over the board, between the columns; they scroll when they are taller than the screen |
+| Game-end sheet, menu, dialogs | at most `MAX_SHEET_WIDTH` (560 pt) wide, in the middle; they scroll |
+| Move list | under the board |
+| Large fonts | both columns are scroll views, so nothing is cut; the columns grow a little and the board gets smaller |
+
+Sizes (board, checker, point): iPhone SE 667 × 375 pt: 389 × 233 pt, checker 25 pt, point 27 pt (the width limits it; about 130 pt stay free above and below). Pro Max 956 × 440 pt (62 pt safe areas left and right, 21 pt at the bottom): 556 × 333 pt, checker 35 pt, point 38 pt. The proposal estimated 28 and 37 pt with 96 pt columns; those columns are too narrow for Greek.
+
+**Turning mid-turn keeps everything.** Every layout keeps the board at the same place in the React tree: `game-content` → `game-middle` → the board frame → `game-board-layer`. Only the views around it change (the top row or the left column before it, the strips and the buttons or the right column after it). So the board (with a picked-up checker), the dice canvas and an open card stay mounted, and the views around the board never flatten (`collapsable={false}`), so the canvases keep their native parent. The game state lives in the store anyway. Checkers in the air just land when the board's space changes (their flight belongs to the old board place). The tutorial does the same: the lesson column on the left in landscape, the board in the same place in the tree.
+
+**The dice wait for the new board place.** `useScreenLayout` also gives a `spaceKey` (the layout, the window size and the font scale). When it changes (the phone turns, a split screen resizes, the font size changes), the board is still drawn in its old space for a moment. `InteractiveBoard` then keeps drawing the old layout at the old size, measures its new space (its layout event, or `measure` right after the change when the size stays the same) and only then reports the new geometry. `GameScreen` keeps the geometry with the key it was measured for. Until the new one comes, the dice stay mounted (no new roll) but hide (`opacity: 0`), so they never sit in a wrong place or jump.
+
+**Tutorial in landscape.** The lesson (title, Skip, the lesson text, the move list, the dice and Next) sits in a left column (38% of the width, 240–340 pt) that scrolls as a whole; the classic board fills the rest. Next sits under the dice, as wide as the column, so Greek or a large font has room. In portrait it keeps the tall board, with the dice and Next side by side.
 
 ## Plakoto, Fevga and Asodio
 
@@ -217,7 +247,7 @@ The owner's play test: "Say I rolled a 2 and a 3. I should see what a 2 move and
 
 - The celebration is a small Reanimated effect, not a Lottie file (ADR-0005 says Lottie via Skia). It is a stand-in until the art task adds a Lottie win effect; the place and the "only a person's win" rule stay the same. The in-game menu is in [App shell](app-shell.md).
 - No dashed "last move" arrow and no double-tap shortcut yet.
-- The dice lie on the board (#184), at least 32 pt (wireframe: about 44 pt in the controls row). The tutorial still shows its dice under the board, at 40 pt.
+- The dice lie on the board (#184), at least 32 pt (wireframe: about 44 pt in the controls row); in landscape in the right column (#185). The tutorial still shows its dice under the board, at 40 pt (in landscape in its left column).
 
 ## Accessibility
 
@@ -273,6 +303,7 @@ How the mirror works:
 - Accessibility: `moveList.test.ts` (labels in en and el, one button per target, the order, the bar, bearing off, Asodio entering), `announcements.test.ts`, `GameScreen.moveList.test.tsx` (a whole Portes game and a Plakoto mother question with buttons only, `auto` with a screen reader, the announcements vs the bot), `TutorialScreen.test.tsx` (every lesson with the move list), `GameScreen.cards.test.tsx` (each card hides the board from screen readers and gives it back when it closes, focus moves to the card) and `textScaling.test.tsx`.
 - Home board side (#175): `packages/themes` tests `mirrorLayout` and that every theme is symmetric. `geometry.test.ts` and `interaction.test.ts` check the mirrored rects, triangles, stacks, pins, trays, hit tests, taps, drops, flights and the flip on top. `BoardScene.test.tsx` draws a mirrored `StaticBoard`. `GameScreen.homeSide.test.tsx` plays a whole Portes, Plakoto (fixed view), Fevga and Asodio game with taps on the mirrored board, a drag, and a change of the setting during a game. `TutorialScreen.variants.test.tsx` runs every lesson of the four games mirrored (`test/tutorialTaps.ts` follows the setting). `settings.test.ts`, `SettingsScreen.test.tsx` (labels, Greek, `settings_changed`) and `RulesScreen.test.tsx` (the mirrored caption).
 - Board layouts (#184): `settings.test.ts` (Tall by default, saved and loaded, old saves load as Tall), `SettingsScreen.test.tsx` (the picker, its pictures, Greek, `settings_changed`), `packages/themes` (`artMirrored` for the landscape layout, home bottom left when mirrored), `geometry.test.ts` (`boxRatioWithShadow`), `boardDice.test.ts` (the dice box in both layouts, both sides, both phones), `interaction.test.ts` (the classic board: the same moves and combined targets as the tall one on the drawn places, taps and drops, a combined flight with a hit, both sides and the flip), `BoardScene.test.tsx` (the classic art mirrored for the bottom left, the tall art not), `GameScreen.layout.test.tsx` (each layout: a whole Portes, Plakoto and Fevga game by tap and drag, a drag and a tap with the home on either side, the dice box on the board and its canvas staying in place, a change of the setting during a game), `MatchScreen.test.tsx` (the game label in each layout) and `textScaling.test.tsx` (the game screen, its cards and the menu in both layouts, en and el).
+- Landscape (#185): `screenLayout.test.ts` (the layout by window size, the classic board in landscape, the column width), `boardDice.test.ts` (`columnDiceBox`: right of the board layer, in the column, centred, 32 to 40 pt), `GameScreen.landscape.test.tsx` (the columns and what is in them, a whole Portes, Plakoto and Fevga game by tap and drag with the home on either side, the dice in the right column keeping their canvas, the free dice slot in the right column at font scale 1 and 2 (the layer spans the column, the top part ends at the dice, both parts scroll); the dice hidden after a turn of the phone or a window resize until the board's new layout, then in the new place; turning the phone mid-turn keeps the game, a picked-up checker, the dice views and their native parents, an open opening card with its tie and an open pass card), `TutorialScreen.test.tsx` (the lesson column, a lesson by taps on the classic board, a picked-up checker kept through a turn), `MatchScreen.test.tsx` (the menu and dialogs allow landscape), `navigation.test.tsx` (only the game and tutorial routes turn) and `textScaling.test.tsx` (the game screen, its cards, the menu and the tutorial in a landscape window at font scale 2, en and el; the tutorial column scrolls and Next sits under the dice). `test/window.ts` turns the phone in a test (`setWindow`, `Dimensions.set`).
 - `DiceRow.test.tsx` and the #173 test in `src/navigation.test.tsx`: the dice canvas keeps its native parent (and the board canvas its native views) through the menu, Settings and back, Resume, and the app going to the background and back.
 - `BoardScene.test.tsx`: a render smoke test. Jest replaces Skia with `apps/mobile/test/skiaMock.tsx`: every Skia component becomes a plain element, so the test counts what the board would draw.
 - The `GameScreen.*.test.tsx` files run on fake timers (`runOnFakeTimers()` from `apps/mobile/test/clock.ts`). The screen closes the opening result, the bot's pass card and the bot's answer note on timers, so on a real clock a busy machine could close a card before the test taps it (#152). The other tests that render the game screen do the same: `MatchScreen.test.tsx`, `src/navigation.test.tsx` and `textScaling.test.tsx` (#160).
@@ -285,4 +316,4 @@ How the mirror works:
 - `board-midgame-black-view.png`: Black's view (flip): count badge, bar, tray.
 - `board-start-home-left.png`: the Portes start with Settings → Your home on the bottom left (#175): the board mirrored, the art not.
 - `play-moving.png`: a turn in progress (wireframe 6c): 13/7 played, the checker on 8 picked up, its target lit, the used 6 faded. The strips and buttons are React Native views, so they are not in the picture.
-- Whole-screen pictures of both layouts (#184) were made like the [proposals](../design/game-layout-proposals.md#how-the-pictures-were-made): the real `BoardScene` at the size each layout gives it, the strips and buttons as HTML with the app's styles. That script is not kept in the repo.
+- Whole-screen pictures of both layouts (#184) and of landscape (#185) were made like the [proposals](../design/game-layout-proposals.md#how-the-pictures-were-made): the real `BoardScene` at the size each layout gives it, the strips and buttons as HTML with the app's styles. That script is not kept in the repo.

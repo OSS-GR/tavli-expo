@@ -79,7 +79,36 @@ beforeEach(async () => {
   await act(async () => historyStore.getState().clear());
 });
 
+/** The orientation lock of the native screen that holds `element` (react-native-screens). */
+function orientationOf(element: ReturnType<typeof screen.getByTestId>): unknown {
+  let node = element.parent;
+  while (node !== null && node.type !== 'RNSScreen') node = node.parent;
+  return node?.props.screenOrientation;
+}
+
 describe('app navigation', () => {
+  it('turns only the game board and the tutorial with the phone (#185)', async () => {
+    const user = setupUser();
+    await renderRouter('./src/app', { initialUrl: '/' });
+    const playVsBot = screen.getByRole('button', { name: /^Play vs bot/ });
+    expect(orientationOf(playVsBot)).toBe('portrait_up');
+    await user.press(playVsBot);
+    expect(orientationOf(screen.getByRole('button', { name: 'Start game' }))).toBe('portrait_up');
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    // The game screen follows the phone: portrait or landscape (not upside down on iPhone).
+    expect(orientationOf(screen.getByTestId('game-board', { includeHiddenElements: true }))).toBe(
+      'default',
+    );
+
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: /^Settings/ }));
+    expect(orientationOf(screen.getByTestId('settings-learn-to-play'))).toBe('portrait_up');
+    await act(async () => appRouter.push('/tutorial'));
+    expect(orientationOf(screen.getByTestId('tutorial-board'))).toBe('default');
+    await act(async () => appRouter.push('/history'));
+    expect(orientationOf(screen.getByTestId('history-screen'))).toBe('portrait_up');
+  });
+
   it('starts a game vs the bot and goes back home from the menu', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
