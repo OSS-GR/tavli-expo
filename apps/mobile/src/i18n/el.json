@@ -138,7 +138,7 @@
       "played": "Ματς {{value}}",
       "won": "Νίκες {{value}}",
       "lost": "Ήττες {{value}}",
-      "winRate": "{{value}}% νίκες",
+      "winRate": "Ποσοστό νικών {{value}}",
       "diplo": "Διπλά {{value}}",
       "draws": "Ισοπαλίες {{value}}",
       "unfinished": "Δεν τελείωσαν {{value}}"

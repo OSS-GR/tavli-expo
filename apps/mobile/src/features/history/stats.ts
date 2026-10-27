@@ -5,7 +5,8 @@
  * - `played`: matches, finished or left;
  * - `won` / `lost`: finished matches the human won or lost (vs bot);
  * - `unfinished`: matches left for a new one (neither won nor lost);
- * - `winRate`: `won / played`, a whole percent;
+ * - `winRate`: `won / (won + lost)`, a whole percent of finished matches,
+ *   so it matches the Won and Lost numbers next to it;
  * - `diploWins`: games the human won with 2 points or more (mars);
  * - `draws`: drawn games. A draw is not a loss; it counts on its own.
  *
@@ -49,9 +50,10 @@ export const EMPTY_LINE: StatLine = {
   draws: 0,
 };
 
-/** Won matches as a whole percent of played ones, or `null` with none played. */
+/** Won matches as a whole percent of finished ones (won + lost), or `null` with none finished. */
 export function winRate(line: StatLine): number | null {
-  return line.played === 0 ? null : Math.round((line.won / line.played) * 100);
+  const finished = line.won + line.lost;
+  return finished === 0 ? null : Math.round((line.won / finished) * 100);
 }
 
 /** Adds one match to a line. Won, lost and mars wins are from the human's side (vs bot). */

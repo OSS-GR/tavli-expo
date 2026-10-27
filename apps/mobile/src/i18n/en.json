@@ -138,7 +138,7 @@
       "played": "Played {{value}}",
       "won": "Won {{value}}",
       "lost": "Lost {{value}}",
-      "winRate": "{{value}}% won",
+      "winRate": "Win rate {{value}}",
       "diplo": "Diplo wins {{value}}",
       "draws": "Draws {{value}}",
       "unfinished": "Not finished {{value}}"

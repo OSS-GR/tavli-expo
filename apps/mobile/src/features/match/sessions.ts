@@ -88,8 +88,9 @@ export function isRestPoint(flow: MatchFlow): boolean {
 }
 
 /**
- * Has anyone played in this match? A game finished, or someone rolled or
- * moved. A match left before that gets no history record.
+ * Has anyone played in this match? A game finished, or someone rolled for a
+ * turn (`roll`) or moved. The opening roll (`rollOpening`, `chooseStarter`)
+ * does not count. A match left before that gets no history record.
  */
 export function hasStarted(flow: MatchFlow): boolean {
   return (

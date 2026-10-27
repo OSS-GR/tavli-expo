@@ -173,10 +173,12 @@ function parseRecord(raw: unknown): HistoryRecord | null {
 }
 
 /**
- * Reads the saved history, newest first. Never throws: bad JSON or another
+ * Reads the saved history in its stored order (newest first, as `addRecord`
+ * writes it; the clock may have moved back, so it is not sorted by time),
+ * at most `MAX_HISTORY_RECORDS`. Never throws: bad JSON or another
  * version gives an empty list; a bad record is dropped, the rest stay. Ids
  * are unique (they are the list keys): of two records with one id, the
- * newest stays.
+ * first (newest) stays.
  */
 export function parseHistory(text: string | undefined): HistoryRecord[] {
   if (text === undefined) return [];
@@ -187,10 +189,7 @@ export function parseHistory(text: string | undefined): HistoryRecord[] {
     return [];
   }
   if (!isRecord(raw) || raw['v'] !== HISTORY_VERSION || !Array.isArray(raw['records'])) return [];
-  const records = raw['records']
-    .map(parseRecord)
-    .filter((r): r is HistoryRecord => r !== null)
-    .sort((a, b) => b.endedAt - a.endedAt);
+  const records = raw['records'].map(parseRecord).filter((r): r is HistoryRecord => r !== null);
   const seen = new Set<string>();
   const unique = records.filter((r) => !seen.has(r.id) && seen.add(r.id));
   return unique.slice(0, MAX_HISTORY_RECORDS);

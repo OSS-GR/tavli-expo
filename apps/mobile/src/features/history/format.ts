@@ -102,16 +102,22 @@ export function historyRow(record: HistoryRecord, t: TFunction, locale: string):
 }
 
 /**
- * "Played 5 · Won 3 · Lost 1 · 60% won · Diplo wins 1 · Draws 0" vs the bot;
+ * "Played 5 · Won 3 · Lost 1 · Win rate 75% · Diplo wins 1 · Draws 0" vs
+ * the bot ("Win rate —" before a match is won or lost);
  * "Played 4 · Draws 1" in pass-and-play. "Not finished" shows only when some were.
  */
+/** "75%", or "—" when there is no rate yet. */
+function rateText(rate: number | null): string {
+  return rate === null ? '—' : `${rate}%`;
+}
+
 export function statParts(line: StatLine, mode: 'bot' | 'local', t: TFunction): string[] {
   const parts = [t('history.line.played', { value: line.played })];
   if (mode === 'bot') {
     parts.push(
       t('history.line.won', { value: line.won }),
       t('history.line.lost', { value: line.lost }),
-      t('history.line.winRate', { value: winRate(line) ?? 0 }),
+      t('history.line.winRate', { value: rateText(winRate(line)) }),
       t('history.line.diplo', { value: line.diploWins }),
     );
   }

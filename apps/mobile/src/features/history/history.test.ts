@@ -217,6 +217,17 @@ describe('a left match', () => {
     ]);
   });
 
+  it('is not recorded after the opening roll alone', () => {
+    const { sessions, history } = registry();
+    const s = sessions.start(defaultSetup('bot'));
+    openGame(s);
+    const { flow } = s.store.getState();
+    expect(flow.log.map((e) => e.type)).toEqual(['start', 'rollOpening', 'rollOpening']);
+    expect(hasStarted(flow)).toBe(false);
+    sessions.start(defaultSetup('local'));
+    expect(history.getState().records).toEqual([]);
+  });
+
   it('is not recorded when nobody played yet, or when it was over', () => {
     const { sessions, history } = registry();
     sessions.start(defaultSetup('bot'));
@@ -334,16 +345,31 @@ describe('history list', () => {
     expect(parseHistory(serializeHistory([good]))).toEqual([good]);
   });
 
-  it('keeps one record per id, the newest', () => {
+  it('keeps one record per id, the first (newest)', () => {
     const text = serializeHistory([
-      rec({ id: 'a', endedAt: 1 }),
-      rec({ id: 'b', endedAt: 2 }),
       rec({ id: 'a', endedAt: 3 }),
+      rec({ id: 'b', endedAt: 2 }),
+      rec({ id: 'a', endedAt: 1 }),
     ]);
     expect(parseHistory(text).map((r) => [r.id, r.endedAt])).toEqual([
       ['a', 3],
       ['b', 2],
     ]);
+  });
+
+  it('keeps the stored order when the clock moved back', () => {
+    const storage = createMemoryStorage();
+    const store = createHistoryStore(storage);
+    store.getState().add(rec({ id: 'first', endedAt: 100 }));
+    // The phone clock was set back before the next match ended.
+    store.getState().add(rec({ id: 'second', endedAt: 50 }));
+    const order = ['second', 'first'];
+    expect(store.getState().records.map((r) => r.id)).toEqual(order);
+    expect(
+      createHistoryStore(storage)
+        .getState()
+        .records.map((r) => r.id),
+    ).toEqual(order);
   });
 });
 
@@ -397,11 +423,15 @@ describe('stats', () => {
     });
   });
 
-  it('gives the win rate as a whole percent of played matches', () => {
+  it('gives the win rate as a whole percent of finished matches (won + lost)', () => {
     expect(winRate(EMPTY_LINE)).toBeNull();
-    expect(winRate({ ...EMPTY_LINE, played: 3, won: 1 })).toBe(33);
-    expect(winRate({ ...EMPTY_LINE, played: 3, won: 2 })).toBe(67);
-    expect(winRate({ ...EMPTY_LINE, played: 4, won: 4 })).toBe(100);
+    // Left matches only: no rate yet.
+    expect(winRate({ ...EMPTY_LINE, played: 2, unfinished: 2 })).toBeNull();
+    expect(winRate({ ...EMPTY_LINE, played: 3, won: 1, lost: 2 })).toBe(33);
+    expect(winRate({ ...EMPTY_LINE, played: 3, won: 2, lost: 1 })).toBe(67);
+    // A left match does not lower the rate.
+    expect(winRate({ ...EMPTY_LINE, played: 5, won: 4, unfinished: 1 })).toBe(100);
+    expect(winRate({ ...EMPTY_LINE, played: 1, lost: 1 })).toBe(0);
   });
 
   it('has no stats with no records', () => {
@@ -465,7 +495,7 @@ describe('history texts', () => {
       'Played 5',
       'Won 3',
       'Lost 1',
-      '60% won',
+      'Win rate 75%',
       'Diplo wins 2',
       'Draws 1',
       'Not finished 1',
