@@ -164,9 +164,15 @@ describe('<TutorialScreen game="plakoto|fevga" />', () => {
     });
     expect(card.getByText(/^Play on: the game goes on\./)).toBeOnTheScreen();
 
-    // Next leaves the card behind.
+    // The card scrolls when it is taller than the board, and screen readers skip the board under it.
+    expect(screen.getByTestId('tutorial-mother-overlay').type).toBe('RCTScrollView');
+    expect(screen.queryByTestId('tutorial-board')).not.toBeOnTheScreen();
+    expect(screen.getByTestId('tutorial-board', { includeHiddenElements: true })).toBeOnTheScreen();
+
+    // Next leaves the card behind, and the board is back for screen readers.
     await press('tutorial-next');
     expect(screen.queryByTestId('tutorial-mother-card')).not.toBeOnTheScreen();
+    expect(screen.getByTestId('tutorial-board')).toBeOnTheScreen();
   });
 
   it('skips with the lesson set’s own hint', async () => {

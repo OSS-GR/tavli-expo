@@ -25,7 +25,7 @@ import {
 } from '@tavli/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -225,6 +225,8 @@ export function TutorialScreen({
   }
 
   const dice = diceView(lesson.dice, remainingDice(flow));
+  // Plakoto: the "resign or play on" card after the mother is pinned.
+  const motherCard = done && lesson.id === 'mother';
   const legal = lessonMoves(lesson, flow);
 
   return (
@@ -266,29 +268,39 @@ export function TutorialScreen({
       </Animated.View>
 
       <View style={styles.boardArea}>
-        <InteractiveBoard
-          testID="tutorial-board"
-          accessibilityLabel={t(`tutorial.lessons.${lesson.id}.board`)}
-          theme={theme}
-          board={currentBoard(flow)}
-          view={view}
-          mover="white"
-          legal={legal}
-          positionKey={`${index}:${flow.played.length}`}
-          flights={flights}
-          onFlightDone={onFlightDone}
-          onMove={onMove}
-          onBoardTap={showWrong}
-          onMissTap={showWrong}
-          onIllegalDrop={showWrong}
-          onPickUp={() => feedback.event('checkerPickUp')}
-          onGeometry={onGeometry}
-          cue
-        />
-        {done && lesson.id === 'mother' ? (
-          <View style={styles.overlay}>
+        {/* While the mother card covers the board, screen readers skip the board. */}
+        <View
+          style={styles.boardLayer}
+          importantForAccessibility={motherCard ? 'no-hide-descendants' : 'auto'}
+          accessibilityElementsHidden={motherCard}>
+          <InteractiveBoard
+            testID="tutorial-board"
+            accessibilityLabel={t(`tutorial.lessons.${lesson.id}.board`)}
+            theme={theme}
+            board={currentBoard(flow)}
+            view={view}
+            mover="white"
+            legal={legal}
+            positionKey={`${index}:${flow.played.length}`}
+            flights={flights}
+            onFlightDone={onFlightDone}
+            onMove={onMove}
+            onBoardTap={showWrong}
+            onMissTap={showWrong}
+            onIllegalDrop={showWrong}
+            onPickUp={() => feedback.event('checkerPickUp')}
+            onGeometry={onGeometry}
+            cue
+          />
+        </View>
+        {motherCard ? (
+          // Scrolls when a small phone or a large font makes the card taller than the board.
+          <ScrollView
+            testID="tutorial-mother-overlay"
+            style={styles.overlay}
+            contentContainerStyle={styles.overlayContent}>
             <MotherLessonCard />
-          </View>
+          </ScrollView>
         ) : null}
       </View>
 
@@ -379,9 +391,16 @@ const styles = StyleSheet.create((theme, rt) => ({
   boardArea: {
     flex: 1,
   },
+  boardLayer: {
+    flex: 1,
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
+  },
+  overlayContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: theme.space.sm,
   },
   controls: {
     flexDirection: 'row',
