@@ -195,7 +195,9 @@ describe('match flow', () => {
     expect(matchPhase(flow)).toBe('game-over');
     expect(nextVariantId(flow.match)).toBe('plakoto');
     const copy = JSON.parse(JSON.stringify(flow)) as MatchFlow;
-    expect(() => applyMatchAction(flow, { type: 'nextGame' })).toThrow(
+    // A registry without Plakoto stands in for a game that is not built yet.
+    const registry = createVariantRegistry([portes]);
+    expect(() => applyMatchAction(flow, { type: 'nextGame' }, { registry })).toThrow(
       expect.objectContaining({ code: 'UNKNOWN_VARIANT' }),
     );
     expect(flow).toEqual(copy);
