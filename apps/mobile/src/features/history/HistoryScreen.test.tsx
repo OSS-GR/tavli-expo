@@ -27,6 +27,7 @@ function rec(over: Partial<HistoryRecord>): HistoryRecord {
     games: 4,
     diploWins: { white: 1, black: 0 },
     draws: 0,
+    matchNumber: 1,
     ...over,
   };
 }

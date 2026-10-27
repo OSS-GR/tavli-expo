@@ -69,16 +69,38 @@ function addTo(line: StatLine, record: HistoryRecord): StatLine {
   };
 }
 
-/** Stats per game, in the picker's order. Games with no match are left out. */
+/** The lines of one game while `historyStats` adds them up. */
+interface GameLines {
+  readonly levels: Map<Difficulty, StatLine>;
+  local: StatLine | null;
+}
+
+/**
+ * Stats per game, in the picker's order, from one pass over the records.
+ * Games with no match are left out.
+ */
 export function historyStats(records: readonly HistoryRecord[]): GameStats[] {
+  const games = new Map<GameChoice, GameLines>();
+  for (const record of records) {
+    let lines = games.get(record.game);
+    if (!lines) {
+      lines = { levels: new Map(), local: null };
+      games.set(record.game, lines);
+    }
+    if (record.mode === 'local') {
+      lines.local = addTo(lines.local ?? EMPTY_LINE, record);
+    } else if (record.botLevel !== null) {
+      const level = record.botLevel;
+      lines.levels.set(level, addTo(lines.levels.get(level) ?? EMPTY_LINE, record));
+    }
+  }
   return GAME_CHOICES.flatMap((game) => {
-    const mine = records.filter((r) => r.game === game);
-    if (mine.length === 0) return [];
+    const lines = games.get(game);
+    if (!lines) return [];
     const byLevel = BOT_DIFFICULTIES.flatMap((level) => {
-      const atLevel = mine.filter((r) => r.mode === 'bot' && r.botLevel === level);
-      return atLevel.length === 0 ? [] : [{ level, line: atLevel.reduce(addTo, EMPTY_LINE) }];
+      const line = lines.levels.get(level);
+      return line ? [{ level, line }] : [];
     });
-    const local = mine.filter((r) => r.mode === 'local');
-    return [{ game, byLevel, local: local.length === 0 ? null : local.reduce(addTo, EMPTY_LINE) }];
+    return [{ game, byLevel, local: lines.local }];
   });
 }
