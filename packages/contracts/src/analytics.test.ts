@@ -32,7 +32,12 @@ describe('no-op analytics (port contract)', () => {
     const analytics = createNoopAnalytics();
     analytics.optIn();
     expect(() => {
-      analytics.track('game_started', { mode: 'bot', variant: 'portes', matchLength: 3 });
+      analytics.track('game_started', {
+        mode: 'bot',
+        game: 'portes',
+        variant: 'portes',
+        matchLength: 3,
+      });
       analytics.identify('x');
       analytics.screen('/');
     }).not.toThrow();
@@ -74,7 +79,7 @@ describe('isAnonymousInstallId', () => {
 });
 
 describe('event names', () => {
-  it('lists the event plan of issue #61', () => {
+  it('lists the event plan (issues #61, #128, #163)', () => {
     expect(ANALYTICS_EVENTS).toEqual([
       'app_opened',
       'game_started',
@@ -91,12 +96,19 @@ describe('event names', () => {
     ]);
   });
 
+  // The rows of the "Events" table: `| \`name\` | ...`.
+  const docEvents = [...eventsDoc.matchAll(/^\| `([\w$]+)` \|/gm)].map((match) => match[1] ?? '');
+
   it('are all in the event plan doc (docs/architecture/analytics-events.md)', () => {
     for (const event of ANALYTICS_EVENTS) {
-      expect({ event, listed: eventsDoc.includes(`| \`${event}\` |`) }).toEqual({
-        event,
-        listed: true,
-      });
+      expect({ event, listed: docEvents.includes(event) }).toEqual({ event, listed: true });
     }
+  });
+
+  it('match the doc: the doc lists no event the code does not have', () => {
+    // `$screen` is PostHog's own screen event, sent by `screen()`.
+    const known: readonly string[] = [...ANALYTICS_EVENTS, '$screen'];
+    expect(docEvents.filter((event) => !known.includes(event))).toEqual([]);
+    expect(new Set(docEvents).size).toBe(docEvents.length);
   });
 });

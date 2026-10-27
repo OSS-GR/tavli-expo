@@ -14,13 +14,15 @@
  *
  * Event plan: `docs/architecture/analytics-events.md`.
  */
-import type { Analytics, Difficulty, GameMode, GameResultKind } from '@tavli/contracts';
+import type { Analytics, Difficulty, GameMode, GameResultKind, MatchGame } from '@tavli/contracts';
 import type { GameResult, MatchAction, MatchFlow } from '@tavli/engine';
 
 import { analytics as appAnalytics } from '@/services';
 
 export interface GameAnalyticsSetup {
   mode: GameMode;
+  /** The game picked for the match: one game, or `tavli` for the rotation. */
+  game: MatchGame;
   /** Only for `mode: 'bot'`. */
   botLevel?: Difficulty;
 }
@@ -60,7 +62,7 @@ function gameIsOver(flow: MatchFlow): boolean {
 }
 
 export function createGameAnalytics(
-  { mode, botLevel }: GameAnalyticsSetup,
+  { mode, game, botLevel }: GameAnalyticsSetup,
   { analytics = appAnalytics, now = Date.now }: GameAnalyticsDeps = {},
 ): GameAnalytics {
   /** When the game in play started, or `null` for a resumed game (unknown). */
@@ -87,6 +89,7 @@ export function createGameAnalytics(
     const sent = send(() =>
       analytics.track('game_finished', {
         mode,
+        game,
         variant: flow.game.state.variant,
         result,
         turns: turnsPlayed(flow),
@@ -105,6 +108,7 @@ export function createGameAnalytics(
     send(() =>
       analytics.track('game_started', {
         mode,
+        game,
         variant: flow.game.state.variant,
         matchLength: flow.match.targetPoints,
         ...(mode === 'bot' && botLevel !== undefined ? { botLevel } : {}),
@@ -134,6 +138,7 @@ export function createGameAnalytics(
       const sent = send(() =>
         analytics.track('game_abandoned', {
           mode,
+          game,
           variant: flow.game.state.variant,
           turn: flow.game.state.turnNumber,
         }),

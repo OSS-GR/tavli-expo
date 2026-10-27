@@ -114,7 +114,7 @@ describe('connectAnalytics', () => {
     ]);
   });
 
-  it('sends settings_changed with the key only, and theme_changed for the theme', () => {
+  it('sends settings_changed with the key only, and theme_changed for the app colors', () => {
     const { analytics, consent, settings } = setup();
     consent.getState().setConsent(true);
     analytics.sent.length = 0;
@@ -133,8 +133,19 @@ describe('connectAnalytics', () => {
     expect(analytics.sent.at(-1)).toEqual({
       type: 'track',
       event: 'theme_changed',
-      props: { theme: 'other-theme' },
+      props: { kind: 'app', theme: 'other-theme' },
     });
+  });
+
+  it('sends theme_changed with the board theme id when the board theme changes', () => {
+    const { analytics, consent, settings } = setup();
+    consent.getState().setConsent(true);
+    analytics.sent.length = 0;
+
+    settings.getState().setSetting('boardTheme', 'olive-inlay');
+    expect(analytics.sent).toEqual([
+      { type: 'track', event: 'theme_changed', props: { kind: 'board', theme: 'olive-inlay' } },
+    ]);
   });
 
   it('uses the install ID that crash reports already saved (#43)', () => {
