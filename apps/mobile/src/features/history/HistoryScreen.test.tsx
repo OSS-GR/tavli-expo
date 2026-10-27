@@ -86,13 +86,13 @@ describe('<HistoryScreen />', () => {
     expect(screen.getByRole('header', { name: 'Stats' })).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Portes' })).toBeOnTheScreen();
     expect(screen.getByTestId('history-stats-portes-easy')).toHaveAccessibleName(
-      'Bot · Easy, Played 1, Won 0, 0% won, Diplo wins 1, Draws 0, Not finished 1',
+      'Bot · Easy, Played 1, Won 0, Lost 0, 0% won, Diplo wins 1, Draws 0, Not finished 1',
     );
     expect(screen.getByTestId('history-stats-portes-local')).toHaveAccessibleName(
       'Pass-and-play, Played 1, Draws 1',
     );
     expect(screen.getByTestId('history-stats-plakoto-medium')).toHaveAccessibleName(
-      'Bot · Medium, Played 1, Won 0, 0% won, Diplo wins 1, Draws 0',
+      'Bot · Medium, Played 1, Won 0, Lost 1, 0% won, Diplo wins 1, Draws 0',
     );
     expect(screen.queryByTestId('history-stats-fevga')).toBeNull();
   });

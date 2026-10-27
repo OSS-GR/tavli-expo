@@ -323,11 +323,27 @@ describe('history list', () => {
       { ...rec(), diploWins: null },
       { ...rec(), games: 1.5 },
       { ...rec(), targetPoints: 0 },
+      // Times that make no valid date: they would crash the date text.
+      { ...rec(), endedAt: 1e20 },
+      { ...rec(), endedAt: -1 },
+      { ...rec(), endedAt: Number.MAX_VALUE },
     ];
     const good = rec({ id: 'good' });
     const text = JSON.stringify({ v: HISTORY_VERSION, records: [...bad, good] });
     expect(parseHistory(text)).toEqual([good]);
     expect(parseHistory(serializeHistory([good]))).toEqual([good]);
+  });
+
+  it('keeps one record per id, the newest', () => {
+    const text = serializeHistory([
+      rec({ id: 'a', endedAt: 1 }),
+      rec({ id: 'b', endedAt: 2 }),
+      rec({ id: 'a', endedAt: 3 }),
+    ]);
+    expect(parseHistory(text).map((r) => [r.id, r.endedAt])).toEqual([
+      ['a', 3],
+      ['b', 2],
+    ]);
   });
 });
 
@@ -425,6 +441,12 @@ describe('history texts', () => {
     expect(formatDate(ms, 'en-US')).toBe('Oct 27, 2026');
     expect(formatDate(ms, 'el')).toMatch(/27 Οκτ/);
     expect(formatDate(ms, 'not a locale!')).toBe('2026-10-27');
+    // Never throws, even for a time that is not a date.
+    expect(formatDate(1e20, 'en')).toBe('');
+    expect(formatDate(Number.NaN, 'not a locale!')).toBe('');
+    expect(historyRow(rec({ endedAt: 1e20 }), t, 'en').label).toBe(
+      'Portes · vs Bot (Easy), You 3 – 1 Bot · first to 3, Won',
+    );
   });
 
   it('uses the phone locale when it speaks the app language', () => {
@@ -442,6 +464,7 @@ describe('history texts', () => {
     expect(statParts(line, 'bot', t)).toEqual([
       'Played 5',
       'Won 3',
+      'Lost 1',
       '60% won',
       'Diplo wins 2',
       'Draws 1',

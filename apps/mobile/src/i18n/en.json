@@ -137,6 +137,7 @@
     "line": {
       "played": "Played {{value}}",
       "won": "Won {{value}}",
+      "lost": "Lost {{value}}",
       "winRate": "{{value}}% won",
       "diplo": "Diplo wins {{value}}",
       "draws": "Draws {{value}}",

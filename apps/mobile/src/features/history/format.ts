@@ -52,9 +52,14 @@ export function dateLocale(
   return match?.languageTag ?? language;
 }
 
-/** "27 Oct 2026" in `locale`. A locale the phone cannot format falls back to the ISO date. */
+/**
+ * The date in `locale`: "Oct 27, 2026" in `en-US`, "27 Oct 2026" in
+ * `en-GB`. A locale the phone cannot format gives the ISO date
+ * ("2026-10-27"). Never throws: a time that is not a valid date gives "".
+ */
 export function formatDate(ms: number, locale: string): string {
   const date = new Date(ms);
+  if (Number.isNaN(date.getTime())) return '';
   try {
     return new Intl.DateTimeFormat(locale, {
       day: 'numeric',
@@ -62,7 +67,11 @@ export function formatDate(ms: number, locale: string): string {
       year: 'numeric',
     }).format(date);
   } catch {
-    return date.toISOString().slice(0, 10);
+    try {
+      return date.toISOString().slice(0, 10);
+    } catch {
+      return '';
+    }
   }
 }
 
@@ -88,11 +97,12 @@ export function historyRow(record: HistoryRecord, t: TFunction, locale: string):
       ? t('history.result.winner', { name: seats[record.winner].name })
       : t(`history.result.${badge as Exclude<ResultBadge, 'winner'>}`);
   const date = formatDate(record.endedAt, locale);
-  return { title, score, badge, result, date, label: [title, score, result, date].join(', ') };
+  const label = [title, score, result, date].filter(Boolean).join(', ');
+  return { title, score, badge, result, date, label };
 }
 
 /**
- * "Played 5 · Won 3 · 60% won · Diplo wins 1 · Draws 0" vs the bot;
+ * "Played 5 · Won 3 · Lost 1 · 60% won · Diplo wins 1 · Draws 0" vs the bot;
  * "Played 4 · Draws 1" in pass-and-play. "Not finished" shows only when some were.
  */
 export function statParts(line: StatLine, mode: 'bot' | 'local', t: TFunction): string[] {
@@ -100,6 +110,7 @@ export function statParts(line: StatLine, mode: 'bot' | 'local', t: TFunction): 
   if (mode === 'bot') {
     parts.push(
       t('history.line.won', { value: line.won }),
+      t('history.line.lost', { value: line.lost }),
       t('history.line.winRate', { value: winRate(line) ?? 0 }),
       t('history.line.diplo', { value: line.diploWins }),
     );

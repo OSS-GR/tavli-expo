@@ -126,6 +126,16 @@ function perPlayer<T>(value: unknown, check: (v: unknown) => v is T): PerPlayer<
 
 const isString = (value: unknown): value is string => typeof value === 'string';
 
+/** A time that makes a valid `Date` (1970 or later). `1e20` would not: it cannot be shown. */
+function isDateMs(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    !Number.isNaN(new Date(value).getTime())
+  );
+}
+
 /** One saved record, or `null` when any field is wrong. */
 function parseRecord(raw: unknown): HistoryRecord | null {
   if (!isRecord(raw)) return null;
@@ -135,7 +145,7 @@ function parseRecord(raw: unknown): HistoryRecord | null {
   const score = perPlayer(raw['score'], isCount);
   const diploWins = perPlayer(raw['diploWins'], isCount);
   if (typeof id !== 'string' || id.length === 0) return null;
-  if (typeof endedAt !== 'number' || !Number.isFinite(endedAt)) return null;
+  if (!isDateMs(endedAt)) return null;
   if (!isMatchMode(mode) || !isGameChoice(game)) return null;
   if (mode === 'bot' ? !isDifficulty(botLevel) : botLevel !== null) return null;
   if (!isCount(targetPoints) || targetPoints < 1) return null;
@@ -164,7 +174,9 @@ function parseRecord(raw: unknown): HistoryRecord | null {
 
 /**
  * Reads the saved history, newest first. Never throws: bad JSON or another
- * version gives an empty list; a bad record is dropped, the rest stay.
+ * version gives an empty list; a bad record is dropped, the rest stay. Ids
+ * are unique (they are the list keys): of two records with one id, the
+ * newest stays.
  */
 export function parseHistory(text: string | undefined): HistoryRecord[] {
   if (text === undefined) return [];
@@ -179,5 +191,7 @@ export function parseHistory(text: string | undefined): HistoryRecord[] {
     .map(parseRecord)
     .filter((r): r is HistoryRecord => r !== null)
     .sort((a, b) => b.endedAt - a.endedAt);
-  return records.slice(0, MAX_HISTORY_RECORDS);
+  const seen = new Set<string>();
+  const unique = records.filter((r) => !seen.has(r.id) && seen.add(r.id));
+  return unique.slice(0, MAX_HISTORY_RECORDS);
 }

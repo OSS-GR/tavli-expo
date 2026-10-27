@@ -137,6 +137,7 @@
     "line": {
       "played": "Ματς {{value}}",
       "won": "Νίκες {{value}}",
+      "lost": "Ήττες {{value}}",
       "winRate": "{{value}}% νίκες",
       "diplo": "Διπλά {{value}}",
       "draws": "Ισοπαλίες {{value}}",

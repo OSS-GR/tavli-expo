@@ -91,7 +91,7 @@ export function HistoryScreen({ records, onPlay }: HistoryScreenProps) {
                   </View>
                 </View>
                 <Text style={styles.rowScore}>{row.score}</Text>
-                <Text style={styles.rowDate}>{row.date}</Text>
+                {row.date ? <Text style={styles.rowDate}>{row.date}</Text> : null}
               </View>
             );
           })}
