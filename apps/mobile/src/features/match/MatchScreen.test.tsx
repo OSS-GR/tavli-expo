@@ -9,6 +9,7 @@ import {
 } from '@tavli/engine';
 import { act, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 
+import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
@@ -38,7 +39,7 @@ function show(s: MatchSession, timing = FAST) {
     onExit: jest.fn(),
     onSettings: jest.fn(),
     onRules: jest.fn(),
-    onChangeSettings: jest.fn(),
+    onMatchOver: jest.fn(),
   };
   const view = renderWithRoot(<MatchScreen session={s} botTiming={timing} {...props} />);
   return { props, view };
@@ -137,12 +138,14 @@ describe('<MatchScreen /> vs bot', () => {
     expect(within(card).getByText('Bot wins the game!')).toBeOnTheScreen();
     expect(within(card).getByText('You resigned.')).toBeOnTheScreen();
     expect(within(card).getByText('You 0 – 2 Bot')).toBeOnTheScreen();
+    // Vs the bot, a bot win is not celebrated.
+    expect(screen.queryByTestId('game-celebration', { includeHiddenElements: true })).toBeNull();
 
     await user.press(within(card).getByRole('button', { name: 'Home' }));
     expect(props.onExit).toHaveBeenCalled();
   });
 
-  it('resigns the match', async () => {
+  it('resigns the match and asks for the match-end screen', async () => {
     const user = userEvent.setup();
     const s = session(defaultSetup('bot'));
     startWith(s, 'white');
@@ -155,10 +158,11 @@ describe('<MatchScreen /> vs bot', () => {
     await user.press(button('Resign'));
 
     expect(s.store.getState().flow.match.winner).toBe('black');
-    const card = screen.getByTestId('match-end-card');
-    expect(within(card).getByText('Bot wins the match!')).toBeOnTheScreen();
-    await user.press(within(card).getByRole('button', { name: 'Change settings' }));
-    expect(props.onChangeSettings).toHaveBeenCalled();
+    // No card over the board: the match-end screen opens after a moment.
+    expect(screen.queryByTestId('game-end-card')).toBeNull();
+    await waitFor(() => expect(props.onMatchOver).toHaveBeenCalledTimes(1), {
+      timeout: MATCH_END_DELAY_MS + 2000,
+    });
   });
 
   it('opens rules, settings and home from the menu', async () => {

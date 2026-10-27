@@ -164,7 +164,10 @@
       "resigned": "{{name}}: παραιτήθηκε.",
       "resigned_you": "Παραιτήθηκες.",
       "home": "Αρχική",
-      "changeSettings": "Αλλαγή ρυθμίσεων"
+      "changeSettings": "Αλλαγή ρυθμίσεων",
+      "matchLabel": "Ματς",
+      "noBearOff": "{{name}}: δεν μάζεψε κανένα πούλι.",
+      "noBearOff_you": "Δεν μάζεψες κανένα πούλι."
     },
     "you": "Εσύ",
     "bot": {
@@ -205,6 +208,21 @@
       "title": "Αυτό το παιχνίδι δεν άνοιξε.",
       "home": "Αρχική"
     }
+  },
+  "matchEnd": {
+    "finalScore": "Τελικό σκορ: {{score}}",
+    "game": "Παρτίδα {{number}}",
+    "won": "{{name}}: κέρδισε",
+    "won_you": "Κέρδισες",
+    "draw": "Ισοπαλία",
+    "mono": "Μονό",
+    "diplo": "Διπλό",
+    "points": "+{{count}}",
+    "pointsLabel_one": "{{count}} βαθμός",
+    "pointsLabel_other": "{{count}} βαθμοί",
+    "rematchHint": "Ίδιες ρυθμίσεις · ξεκινά: {{name}}",
+    "rematchHint_you": "Ίδιες ρυθμίσεις · ξεκινάς εσύ",
+    "rematchHintOpening": "Ίδιες ρυθμίσεις"
   },
   "games": {
     "portes": "Πόρτες",

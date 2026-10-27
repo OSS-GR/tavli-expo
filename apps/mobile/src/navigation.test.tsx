@@ -3,9 +3,10 @@
  * board → menu → Home. (Tests must not live in `src/app`: every file there
  * is a route.)
  */
-import { userEvent } from '@testing-library/react-native';
+import { userEvent, waitFor } from '@testing-library/react-native';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 
+import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { matchSessions } from '@/features/match/appSessions';
 import { SAVED_MATCH_KEY } from '@/features/match/savedMatch';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
@@ -74,6 +75,60 @@ describe('app navigation', () => {
     expect(matchSessions.current()?.setup.mode).toBe('local');
   });
 
+  it('opens match end when the match is over, then rematch, change settings or home', async () => {
+    const user = userEvent.setup();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const session = matchSessions.current()!;
+    const board = `/game/${session.id}`;
+    const end = `${board}/match-end`;
+
+    // The bot resigns the match: you win. The match-end screen replaces the board.
+    const botResigns = () =>
+      act(async () => {
+        session.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+      });
+    await botResigns();
+    await waitFor(() => expect(router.getPathname()).toBe(end), {
+      timeout: MATCH_END_DELAY_MS + 2000,
+    });
+    expect(screen.getByRole('header', { name: 'You won the match!' })).toBeOnTheScreen();
+    // A finished match is not in the save slot.
+    expect(storage.getString(SAVED_MATCH_KEY)).toBeUndefined();
+
+    // Rematch: the same settings, back on the board, and you start (no opening roll).
+    await user.press(screen.getByRole('button', { name: 'Rematch, Same settings · you start' }));
+    expect(router.getPathname()).toBe(board);
+    expect(session.store.getState().flow.match.status).toBe('in-progress');
+    expect(screen.getByRole('button', { name: 'Roll dice, or tap the board' })).toBeOnTheScreen();
+    expect(JSON.parse(storage.getString(SAVED_MATCH_KEY) ?? '{}').id).toBe(session.id);
+
+    // Change settings: the new-game form of the same mode; the match is gone.
+    await botResigns();
+    await waitFor(() => expect(router.getPathname()).toBe(end), {
+      timeout: MATCH_END_DELAY_MS + 2000,
+    });
+    await user.press(screen.getByRole('button', { name: 'Change settings' }));
+    expect(router.getPathname()).toBe('/new-game');
+    expect(router.getSearchParams()).toEqual({ mode: 'bot' });
+    expect(matchSessions.current()).toBeNull();
+
+    // Home: no Continue card, because the match is over.
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const next = matchSessions.current()!;
+    await act(async () => {
+      next.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
+    });
+    await waitFor(() => expect(router.getPathname()).toBe(`/game/${next.id}/match-end`), {
+      timeout: MATCH_END_DELAY_MS + 2000,
+    });
+    expect(screen.getByRole('header', { name: 'Bot wins the match!' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Home' }));
+    expect(router.getPathname()).toBe('/');
+    expect(screen.queryByRole('button', { name: /^Continue game/ })).toBeNull();
+  });
+
   it('opens pass-and-play with the local mode param', async () => {
     const user = userEvent.setup();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
@@ -84,6 +139,11 @@ describe('app navigation', () => {
 
   it('shows "could not be opened" for an unknown game id', async () => {
     await renderRouter('./src/app', { initialUrl: '/game/local-nope' });
+    expect(screen.getByText('This game could not be opened.')).toBeOnTheScreen();
+  });
+
+  it('shows "could not be opened" for the match end of an unknown game', async () => {
+    await renderRouter('./src/app', { initialUrl: '/game/local-nope/match-end' });
     expect(screen.getByText('This game could not be opened.')).toBeOnTheScreen();
   });
 
