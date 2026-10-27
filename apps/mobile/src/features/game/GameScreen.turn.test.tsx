@@ -290,7 +290,10 @@ describe('<GameScreen /> no legal moves vs the bot (#178)', () => {
 
     await user.press(button('OK'));
     expect(screen.queryByTestId('pass-card')).toBeNull();
-    await waitFor(() => expect(store.getState().flow.game.state.toMove).toBe('white'));
+    // A whole bot turn at Normal speed (#172) takes a few seconds of fake time.
+    await waitFor(() => expect(store.getState().flow.game.state.toMove).toBe('white'), {
+      timeout: 30_000,
+    });
     const rolls = store.getState().flow.log.filter((e) => e.type === 'roll');
     expect(rolls.length).toBeGreaterThan(1);
   });
