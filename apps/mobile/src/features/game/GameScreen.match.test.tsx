@@ -12,6 +12,7 @@ import { GameScreen, MATCH_END_DELAY_MS } from './GameScreen';
 import { openingStatus } from './opening';
 import { passNotice } from './turnNotices';
 
+import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
 
@@ -23,6 +24,9 @@ const center = (r: { x: number; y: number; width: number; height: number }) => (
   y: r.y + r.height / 2,
 });
 
+// The game screen closes its cards on timers (see test/clock.ts).
+runOnFakeTimers();
+
 beforeEach(async () => {
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS });
@@ -33,7 +37,7 @@ beforeEach(async () => {
  * A whole match through the screen, as two players would play it: roll,
  * tap a checker, tap a target, confirm, close the cards, next game, and
  * at the end the screen asks for the match-end screen.
- * By default a match to 1 (about 15 s). `FULL_MATCH=1` plays to 3 (about 70 s).
+ * By default a match to 1 (about 5 s). `FULL_MATCH=1` plays to 3 (about 15 s).
  */
 const TARGET = process.env['FULL_MATCH'] === '1' ? 3 : 1;
 

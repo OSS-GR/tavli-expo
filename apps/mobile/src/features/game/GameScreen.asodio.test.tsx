@@ -29,6 +29,7 @@ import { openingStatus } from './opening';
 import type { Seat } from './seats';
 import { passNotice } from './turnNotices';
 
+import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
 
@@ -103,6 +104,9 @@ async function tapMove(sourceKey: string, targetKey: string) {
   await touch(PAN, [center(target.rect)]);
 }
 const storeRef: { current: GameStore | null } = { current: null };
+
+// The game screen closes its cards on timers (see test/clock.ts).
+runOnFakeTimers();
 
 beforeEach(async () => {
   await act(async () => {

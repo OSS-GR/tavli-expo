@@ -7,7 +7,7 @@ import {
   type PlayerId,
 } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
-import { act, fireEvent, screen, userEvent, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
@@ -18,6 +18,7 @@ import { settingsStore } from '@/features/settings/store';
 import { createGameStore, type GameStore } from './gameStore';
 import { GameScreen, MATCH_END_DELAY_MS, PASS_NOTICE_MS } from './GameScreen';
 
+import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
 
@@ -73,6 +74,9 @@ async function annMoves61(store = newStore()) {
 const button = (name: RegExp | string) => screen.getByRole('button', { name });
 const phase = (store: GameStore) => store.getState().flow.game.phase;
 
+// The opening result, the pass card and the match end run on timers.
+runOnFakeTimers();
+
 beforeEach(async () => {
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS });
@@ -81,7 +85,7 @@ beforeEach(async () => {
 
 describe('<GameScreen /> undo and confirm', () => {
   it('takes back one move at a time', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const store = await annMoves61();
     expect(button('Undo')).toBeDisabled();
     await touch(PAN, [top(13, 5), point(7)]);
@@ -93,7 +97,7 @@ describe('<GameScreen /> undo and confirm', () => {
   });
 
   it('enables Confirm only when the turn is complete, then passes the turn', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const store = await annMoves61();
     expect(button('Confirm')).toBeDisabled();
     await touch(PAN, [top(13, 5), point(7)]);
@@ -123,7 +127,7 @@ describe('<GameScreen /> undo and confirm', () => {
 
 describe('<GameScreen /> turn indicator', () => {
   it('marks the player to move, and flips the board to them (flip)', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const store = await annMoves61();
     const bottom = () => within(screen.getByTestId('strip-bottom'));
     const upper = () => within(screen.getByTestId('strip-top'));
@@ -145,7 +149,7 @@ describe('<GameScreen /> turn indicator', () => {
   });
 
   it('keeps White at the bottom in fixed view', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     await act(async () => {
       settingsStore.getState().setSetting('boardFlipMode', 'fixed');
     });
@@ -181,7 +185,7 @@ describe('<GameScreen /> no legal moves', () => {
   const closed = closedBoard;
 
   it('explains the pass, keeps the faded dice and closes on OK', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const store = newStore();
     setPosition(store, closed);
     await show(store);
@@ -203,47 +207,37 @@ describe('<GameScreen /> no legal moves', () => {
   });
 
   it('closes by itself after 3 s', async () => {
-    jest.useFakeTimers();
-    try {
-      const store = newStore();
-      setPosition(store, closed);
-      await show(store);
-      await act(async () => {
-        store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
-      });
-      expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
-      await act(async () => {
-        jest.advanceTimersByTime(PASS_NOTICE_MS + 10);
-      });
-      expect(screen.queryByTestId('pass-card')).toBeNull();
-    } finally {
-      jest.useRealTimers();
-    }
+    const store = newStore();
+    setPosition(store, closed);
+    await show(store);
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
+    });
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(PASS_NOTICE_MS + 10);
+    });
+    expect(screen.queryByTestId('pass-card')).toBeNull();
   });
 
   it('closes after 3 s even when the screen draws again meanwhile', async () => {
-    jest.useFakeTimers();
-    try {
-      const store = newStore();
-      setPosition(store, closed);
-      await show(store);
-      await act(async () => {
-        store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
-      });
-      await act(async () => {
-        jest.advanceTimersByTime(PASS_NOTICE_MS - 1000);
-      });
-      // A settings change draws the screen again; the timer keeps running.
-      await act(async () => {
-        settingsStore.setState({ showPipCounts: false });
-      });
-      await act(async () => {
-        jest.advanceTimersByTime(1010);
-      });
-      expect(screen.queryByTestId('pass-card')).toBeNull();
-    } finally {
-      jest.useRealTimers();
-    }
+    const store = newStore();
+    setPosition(store, closed);
+    await show(store);
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(PASS_NOTICE_MS - 1000);
+    });
+    // A settings change draws the screen again; the timer keeps running.
+    await act(async () => {
+      settingsStore.setState({ showPipCounts: false });
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(1010);
+    });
+    expect(screen.queryByTestId('pass-card')).toBeNull();
   });
 });
 
@@ -264,7 +258,7 @@ describe('<GameScreen /> game and match end', () => {
     board = lastChecker,
     props: Partial<ComponentProps<typeof GameScreen>> = {},
   ) {
-    const user = userEvent.setup();
+    const user = setupUser();
     setPosition(store, board);
     await show(store, props);
     await act(async () => {
@@ -333,8 +327,9 @@ describe('<GameScreen /> game and match end', () => {
     // The final position stays a moment, so the last checker lands first.
     expect(onMatchOver).not.toHaveBeenCalled();
     expect(screen.queryByTestId('roll-button')).toBeNull();
-    await waitFor(() => expect(onMatchOver).toHaveBeenCalledTimes(1), {
-      timeout: MATCH_END_DELAY_MS + 2000,
+    await act(async () => {
+      jest.advanceTimersByTime(MATCH_END_DELAY_MS);
     });
+    expect(onMatchOver).toHaveBeenCalledTimes(1);
   });
 });
