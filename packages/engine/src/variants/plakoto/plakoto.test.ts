@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DIE_VALUES } from '../../dice';
 import type { Dice } from '../../dice';
-import { formatTurn } from '../../move';
+import { formatMove, formatTurn } from '../../move';
 import { getPreset, resolveRules } from '../../presets';
 import type { RuleOverrides, RuleSet } from '../../rules';
 import type { GameState } from '../../state';
@@ -311,6 +311,28 @@ describe('Plakoto variant', () => {
       mother: { motherRule: 'instant', mutualMotherPin: 'replay' },
     });
     expect(plakoto.initialState({ startingPlayer: 'white', rules }).rules).toEqual(rules);
+  });
+
+  // #179: a checker leaves a door, pins a blot, and moves on with the other die.
+  it('after a pin, the pinner may play the other die, in both dice orders', () => {
+    // White's door on 13. A Black blot on White's 8 (Black's 17).
+    const s = state('w: 13x2 6x13 ; b: 17 24x14');
+    const next = (dice: Dice, played: string) =>
+      plakoto
+        .nextMoves(s, dice, played === '' ? [] : parsePlakotoTurn(played, 'white', dice).moves)
+        .map(formatMove);
+    for (const dice of [
+      [5, 3],
+      [3, 5],
+    ] as Dice[]) {
+      expect(next(dice, '')).toContain('13/8*');
+      expect(next(dice, '13/8*')).toContain('8/5');
+      expect(next(dice, '13/8* 8/5')).toEqual([]);
+      // The pinned checker is free again once its pinner moves on.
+      expect(after('w: 13x2 6x13 ; b: 17 24x14', dice, '13/8* 8/5')).toBe(
+        'w: 13 6x13 5 ; b: 24x14 17',
+      );
+    }
   });
 
   it('higherDieRule=false lets the player choose the lower die', () => {

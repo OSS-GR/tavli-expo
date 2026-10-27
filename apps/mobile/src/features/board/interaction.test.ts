@@ -262,6 +262,45 @@ describe('moveFlights', () => {
     expect(hit!.toR).toBeLessThan(hit!.fromR);
   });
 
+  // #179: after a hit, the hitter must still be touchable on its new point,
+  // where it is drawn and where its flight lands. Only it and the bar hide.
+  it.each([
+    ['White', WHITE],
+    ['Black (flip)', BLACK],
+  ])('keeps the hitter a source on its new point (%s view)', (_, view) => {
+    // White's door on 13; a Black blot on White's 8 (Black's 17).
+    const board = createBoard(
+      { white: { points: { 13: 2, 6: 13 } }, black: { points: { 17: 1, 24: 14 } } },
+      'contrary',
+    );
+    const flow = whiteToMove([5, 3], board);
+    const hit = source(sourcesFor(flow, view), view === WHITE ? 'p13' : 'p12');
+    const to8 = hit.targets.find((t) => t.move.to === 8)!;
+    expect(to8.move).toMatchObject({ from: 13, die: 5, capture: 'hit' });
+
+    const before = currentBoard(flow);
+    const played = applyGameAction(flow, { type: 'move', player: 'white', move: to8.move });
+    const after = currentBoard(played);
+    const sources = sourcesFor(played, view);
+    const hitter = source(sources, to8.key);
+    expect(hitter.targets.map((t) => t.move)).toContainEqual(
+      expect.objectContaining({ from: 8, to: 5, die: 3 }),
+    );
+    // The other checker of the door can still move too.
+    expect(sources.map((s) => s.key)).toContain(hit.key);
+
+    // The hitter is drawn under its key, where the touch finds it.
+    const drawn = layoutBoard(geo, after, view).checkers.find((c) => c.key === hitter.checker.key);
+    expect(drawn).toMatchObject({ owner: 'white', x: hitter.checker.x, y: hitter.checker.y });
+    expect(pickSource(sources, hitter.checker.x, hitter.checker.y)).toBe(sources.indexOf(hitter));
+
+    // The flights hide the hitter (until it lands) and the bar top, nothing else.
+    const [mover, victim] = moveFlights(geo, view, 'white', to8.move, before, after, { id: 'h' });
+    expect(mover!.hide).toBe(hitter.checker.key);
+    expect(mover!.to).toMatchObject({ x: hitter.checker.x, y: hitter.checker.y });
+    expect(victim!.hide).toMatch(/^bar:/);
+  });
+
   it('flies back on undo, and brings a hit checker back from the bar', () => {
     const board = createBoard(
       { white: { points: { 13: 15 } }, black: { points: { 18: 1, 1: 14 } } },
