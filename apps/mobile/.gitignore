@@ -44,6 +44,12 @@ yarn-error.*
 
 # EAS: local signing files and build output (eas build --local)
 credentials.json
+credentials/
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
 *.apk
 *.aab
 *.ipa

@@ -29,7 +29,8 @@ function isVariant(value: string): value is Variant {
 }
 
 function readVariant(): Variant {
-  const value = process.env.APP_VARIANT ?? 'development';
+  // An empty APP_VARIANT counts as unset.
+  const value = process.env.APP_VARIANT || 'development';
   if (!isVariant(value)) {
     throw new Error(`Unknown APP_VARIANT "${value}". Use development, preview or production.`);
   }
