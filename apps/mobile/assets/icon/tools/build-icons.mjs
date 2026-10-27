@@ -212,9 +212,15 @@ function sheet(c, r) {
 
 async function main() {
   const args = process.argv.slice(2);
+  // Accept both `--pick zari` and `--pick=zari`.
   const pickIndex = args.indexOf('--pick');
-  const pick = pickIndex >= 0 ? args[pickIndex + 1] : DEFAULT_PICK;
-  if (!CONCEPTS[pick]) {
+  const pickArg = args.find((a) => a.startsWith('--pick='));
+  const pick = pickArg
+    ? pickArg.slice('--pick='.length)
+    : pickIndex >= 0
+      ? args[pickIndex + 1]
+      : DEFAULT_PICK;
+  if (!Object.hasOwn(CONCEPTS, pick)) {
     throw new Error(`Unknown concept "${pick}". Use one of: ${Object.keys(CONCEPTS).join(', ')}`);
   }
   fs.mkdirSync(CONCEPT_DIR, { recursive: true });
