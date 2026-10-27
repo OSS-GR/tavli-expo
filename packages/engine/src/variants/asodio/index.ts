@@ -131,7 +131,22 @@ function lossPoints(rules: RuleSet, off: number): number {
   }
 }
 
+/**
+ * `result` per state. States are never changed, so the answer never goes
+ * stale. This keeps the deadlock scan (A5) off the hot path: `checkPlayable`
+ * and `prompt` call `result` for every candidate turn.
+ */
+const RESULTS = new WeakMap<GameState, GameResult | null>();
+
 function result(state: GameState): GameResult | null {
+  const cached = RESULTS.get(state);
+  if (cached !== undefined) return cached;
+  const found = computeResult(state);
+  RESULTS.set(state, found);
+  return found;
+}
+
+function computeResult(state: GameState): GameResult | null {
   const { board, rules } = state;
   for (const winner of PLAYERS) {
     if (board.off[winner] !== CHECKERS_PER_PLAYER) continue;
