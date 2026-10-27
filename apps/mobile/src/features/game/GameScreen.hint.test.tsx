@@ -19,7 +19,7 @@ import {
   resolveRules,
   rollDice,
   type BoardState,
-  type DieValue,
+  type Dice,
   type GameState,
   type PerPlayer,
   type PlayerId,
@@ -114,7 +114,7 @@ async function show(
   return store;
 }
 
-async function roll(store: GameStore, dice: [DieValue, DieValue]) {
+async function roll(store: GameStore, dice: Dice) {
   const player = store.getState().flow.game.state.toMove;
   await act(async () => {
     expect(store.getState().dispatch({ type: 'roll', player, dice })).toBe(true);
