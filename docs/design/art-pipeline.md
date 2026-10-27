@@ -129,14 +129,14 @@ One folder per theme in `packages/themes/<id>/`. Example `theme.json`:
   },
 
   "sounds": {
-    "checkerPlace": ["sfx/place-1.m4a", "sfx/place-2.m4a", "sfx/place-3.m4a"],
-    "checkerHit": "sfx/hit.m4a",
-    "diceRoll": ["sfx/dice-1.m4a", "sfx/dice-2.m4a"],
-    "bearOff": "sfx/bear-off.m4a",
-    "win": "sfx/win.m4a"
+    "checkerPlace": ["sounds/checker-place-1.m4a", "sounds/checker-place-2.m4a", "sounds/checker-place-3.m4a"],
+    "checkerHit": "sounds/checker-hit.m4a",
+    "diceRoll": ["sounds/dice-roll-1.m4a", "sounds/dice-roll-2.m4a"],
+    "bearOff": "sounds/bear-off.m4a",
+    "gameWin": "sounds/game-win.m4a"
   },
 
-  "haptics": { "place": "light", "hit": "medium", "invalid": "warning", "win": "success" },
+  "haptics": { "checkerPlace": "light", "checkerHit": "medium", "invalidMove": "warning", "gameWin": "success" },
 
   "accessibility": {
     "checkerContrastRatio": 4.8,
