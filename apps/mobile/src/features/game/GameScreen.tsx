@@ -120,13 +120,15 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
     const mover = view.toMove;
     const before = view.board;
     const ok = dispatch({ type: 'move', player: mover, move, autoConfirm });
-    if (!ok) return;
+    if (!ok) return false;
     playHaptic(theme, move.capture === 'hit' ? 'checkerHit' : 'checkerPlace');
-    // The turn ended (auto-confirm): the board may turn, so no flight.
+    // The turn ended (auto-confirm) and the board turns: no flight, and the
+    // flights still in the air belong to the old view.
     const next = store.getState().flow.game;
-    if (next.state.toMove !== mover || next.phase === 'awaiting-roll') {
+    const turnEnded = next.state.toMove !== mover || next.phase === 'awaiting-roll';
+    if (turnEnded && flipMode === 'flip') {
       setFlights([]);
-      return;
+      return true;
     }
     const after = applyMoveToBoard(before, mover, move, direction);
     const added = moveFlights(geo, boardView, mover, move, before, after, {
@@ -134,6 +136,7 @@ export function GameScreen({ store, openingTaps = 'perPlayer' }: GameScreenProps
       ...(from ? { from } : {}),
     });
     setFlights((old) => [...old, ...added]);
+    return true;
   };
 
   const undo = () => {
