@@ -1,8 +1,9 @@
-/** Texts about a saved match for the "Continue game" card (wireframe 3). Pure. */
+/** Texts about a match: the "Continue game" card (wireframe 3) and match end (9). Pure. */
 import type { TFunction } from 'i18next';
 
 import type { SavedMatch } from './savedMatch';
 import { seatsFor } from './seats';
+import type { MatchSetup } from './setup';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -23,15 +24,19 @@ export interface ContinueSummary {
   readonly status: string;
 }
 
+/** "Portes · vs Bot (Easy)" or "Portes · pass-and-play". */
+export function matchLabel(setup: MatchSetup, t: TFunction): string {
+  const game = t(`games.${setup.game}`);
+  return setup.mode === 'bot'
+    ? t('home.continue.vsBot', { game, level: t(`bot.levels.${setup.botLevel}`) })
+    : t('home.continue.local', { game });
+}
+
 export function continueSummary(saved: SavedMatch, t: TFunction, now: number): ContinueSummary {
   const { setup, flow } = saved;
   const seats = seatsFor(setup, t);
-  const game = t(`games.${setup.game}`);
   return {
-    game:
-      setup.mode === 'bot'
-        ? t('home.continue.vsBot', { game, level: t(`bot.levels.${setup.botLevel}`) })
-        : t('home.continue.local', { game }),
+    game: matchLabel(setup, t),
     status: [
       t('game.end.score', {
         white: seats.white.name,

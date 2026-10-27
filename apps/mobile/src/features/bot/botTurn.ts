@@ -42,9 +42,9 @@ export interface BotTurnActions {
 }
 
 /**
- * The bot's answer to a variant question. Plakoto mother pinned: always
- * "play on" for now.
- * TODO(#106): ask the bot package for its answer once it has one.
+ * The bot's default answer to a variant question. Plakoto mother pinned:
+ * "play on". TODO(#106): the `BotRunner` port gets `chooseAnswer`; this
+ * stays the fallback for a runner without it.
  */
 export function botAnswer(prompt: VariantPrompt): string {
   if (prompt.choices.includes('playOn')) return 'playOn';
@@ -173,8 +173,12 @@ export function startBotTurn(options: BotTurnOptions): BotTurnHandle {
       if (step === null) return;
       if (step === 'answer') {
         const prompt = currentPrompt(getFlow().game);
+        if (prompt === null) return;
+        // TODO(#106): use the runner's answer once the port has one:
+        // `(await runner.chooseAnswer?.({ ...request })) ?? botAnswer(prompt)`.
+        const choice = botAnswer(prompt);
         await sleep(timing.beforeRollMs);
-        if (cancelled || prompt === null || !actions.answer(botAnswer(prompt))) return;
+        if (cancelled || !actions.answer(choice)) return;
       } else if (step === 'roll') {
         await sleep(timing.beforeRollMs);
         if (cancelled || !actions.roll()) return;

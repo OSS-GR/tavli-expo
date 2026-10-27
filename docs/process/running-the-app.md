@@ -186,10 +186,12 @@ The first Android build asks to make a **keystore** (the signing key). Say **yes
 
 | Route | What it is |
 | --- | --- |
-| `/` | Home |
+| `/` | Home: New game, and Continue when a match is saved |
+| `/new-game` | New game: vs the bot or pass-and-play, match length |
+| `/game/<id>` | The board for a match (opened from New game or Continue) |
+| `/rules/<variant>` | How to play (a stub for now) |
 | `/settings` | Settings (language, sound, haptics, board options) |
 | `/dev/board` | **Dev only.** The board with sample positions. You can flip the board. |
-| `/dev/play` | **Dev only.** A pass-and-play Portes match to 3 points on one phone: the game screen end to end. |
 | `/_sitemap` | Expo Router's list of all routes. Tap one to open it. |
 
 Dev routes only work in development builds. Release builds (the `preview` profile) send them back home.
@@ -197,7 +199,7 @@ Dev routes only work in development builds. Release builds (the `preview` profil
 **How to open a route:**
 
 - iOS simulator: `xcrun simctl openurl booted "tavlaki://dev/board"`
-- iPhone: type `tavlaki://dev/play` in Safari's address bar.
+- iPhone: type `tavlaki://dev/board` in Safari's address bar.
 - Android emulator: `adb shell am start -a android.intent.action.VIEW -d "tavlaki://dev/board"`
 
 **Dev menu:** press `m` in the Metro terminal, shake the phone, or press `Cmd+D` (iOS simulator) / `Cmd+M` or `Ctrl+M` (Android emulator). It has reload and the performance monitor.

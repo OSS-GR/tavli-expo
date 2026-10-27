@@ -1,6 +1,6 @@
 import { createSeededRng, type MatchFlow } from '@tavli/engine';
 
-import { flowEvents, storeEvents } from './gameFeedback';
+import { flowEvents, isHumanWin, storeEvents } from './gameFeedback';
 import { createGameStore } from './gameStore';
 
 function newStore() {
@@ -125,6 +125,16 @@ describe('flowEvents', () => {
     expect(eventsOf(store, () => dispatch({ type: 'undo', player: 'white' }))).toEqual([]);
     dispatch({ type: 'resign', player: 'white' });
     expect(eventsOf(store, () => rematch())).toEqual([]);
+  });
+});
+
+describe('isHumanWin', () => {
+  it('is true only when a person wins (the jingle and the celebration)', () => {
+    expect(isHumanWin('black')).toBe(true);
+    expect(isHumanWin('white', ['white'])).toBe(true);
+    expect(isHumanWin('black', ['white'])).toBe(false);
+    expect(isHumanWin(null)).toBe(false);
+    expect(isHumanWin(undefined)).toBe(false);
   });
 });
 

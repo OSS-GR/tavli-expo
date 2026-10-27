@@ -25,6 +25,17 @@ import type { GameStore, GameStoreState } from './gameStore';
 const BOTH: readonly PlayerId[] = ['white', 'black'];
 
 /**
+ * A person won (not the bot, not a draw). The win jingle (`gameWin`,
+ * `matchWin`) and the celebration on the end screens both use this.
+ */
+export function isHumanWin(
+  winner: PlayerId | null | undefined,
+  humans: readonly PlayerId[] = BOTH,
+): boolean {
+  return winner != null && humans.includes(winner);
+}
+
+/**
  * The game events between two flows of the same match, oldest first.
  *
  * `humans` are the sides a person plays. The win jingle plays only when one
@@ -51,12 +62,10 @@ export function flowEvents(
   }
   const before = matchPhase(prev);
   const after = matchPhase(next);
-  const humanWon = (winner: PlayerId | null | undefined) =>
-    winner != null && humans.includes(winner);
   if (after === 'match-over' && before !== 'match-over') {
-    if (humanWon(next.match.winner)) out.push('matchWin');
+    if (isHumanWin(next.match.winner, humans)) out.push('matchWin');
   } else if (after === 'game-over' && before !== 'game-over') {
-    if (humanWon(next.match.games.at(-1)?.winner)) out.push('gameWin');
+    if (isHumanWin(next.match.games.at(-1)?.winner, humans)) out.push('gameWin');
   } else if (
     after === 'playing' &&
     next.game.phase === 'awaiting-roll' &&
