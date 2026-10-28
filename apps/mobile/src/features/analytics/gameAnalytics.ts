@@ -116,6 +116,8 @@ export function createGameAnalytics(
         ...(mode === 'bot' && botLevel !== undefined ? { botLevel } : {}),
         // The house rule (#207), from the match rules: a value id only.
         openingRoll: flow.match.rules.match.openingRoll,
+        // The rules version (#241): the preset of the game in play.
+        rulesVersion: flow.game.state.rules.presetId,
       }),
     );
   };

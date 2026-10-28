@@ -54,6 +54,7 @@ describe('gameAnalytics with the game store', () => {
         variant: 'portes',
         matchLength: 3,
         openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
       },
     ]);
   });
@@ -68,6 +69,7 @@ describe('gameAnalytics with the game store', () => {
       matchLength: 3,
       botLevel: 'easy',
       openingRoll: 'useOpeningDice',
+      rulesVersion: 'portes',
     });
   });
 
@@ -117,6 +119,7 @@ describe('gameAnalytics with the game store', () => {
         variant: store.getState().flow.game.state.variant,
         matchLength: 3,
         openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
       },
     ]);
   });

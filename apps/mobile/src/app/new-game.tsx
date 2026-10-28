@@ -27,7 +27,7 @@ export default function NewGameRoute() {
       initial={initial}
       botLevels={botLevels}
       hasSavedGame={hasSavedGame}
-      onRules={(game) => router.push(rulesHref(game))}
+      onRules={(game, preset) => router.push(rulesHref(game, preset))}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       onStart={(setup) => {
         saveLastSetup(storage, setup);

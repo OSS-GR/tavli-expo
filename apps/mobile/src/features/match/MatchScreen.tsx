@@ -143,7 +143,7 @@ export function MatchScreen({
   } else if (overlay === 'resignGame' && gameResignable) {
     const { result, score: after } = previewResign(flow, resigner);
     const winner = opponent(resigner);
-    const type = winType(result);
+    const type = winType(result, flow.game.state.rules.scoring.method);
     const you = seats[resigner].you;
     const vars = { winner: name(winner), loser: name(resigner), count: result.points };
     const body =

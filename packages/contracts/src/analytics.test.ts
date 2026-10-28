@@ -38,6 +38,7 @@ describe('no-op analytics (port contract)', () => {
         variant: 'portes',
         matchLength: 3,
         openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
       });
       analytics.identify('x');
       analytics.screen('/');

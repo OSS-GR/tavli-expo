@@ -7,13 +7,15 @@
  * A game shows locked ("Coming soon") when the engine does not have it, or
  * vs the bot when the bot has no level for it (`botLevels`).
  *
- * House rules (#207, a first part of Kafeneio mode #58): one choice, the
- * opening roll (`match.openingRoll` in the engine). The hint under it says
- * who starts and how.
+ * House rules (#207, a first part of Kafeneio mode #58): the opening roll
+ * (`match.openingRoll` in the engine). The hint under it says who starts
+ * and how. Plakoto and Asodio also get the rules version (#241): the
+ * engine preset of the match (`RULES_VERSIONS`). Its hint says what
+ * changes. Games with one preset, and a Tavli match, show no version.
  */
 import type { Difficulty } from '@tavli/contracts';
 import { BOT_DIFFICULTIES } from '@tavli/contracts';
-import type { PlayerId } from '@tavli/engine';
+import type { PlayerId, PresetId } from '@tavli/engine';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -39,14 +41,20 @@ import {
   MATCH_LENGTHS,
   MAX_NAME_LENGTH,
   OPENING_ROLL_RULES,
+  RULES_VERSIONS,
+  VERSION_KEYS,
   cleanName,
+  gamePreset,
   isGameOpen,
+  isVersionedGame,
   type GameChoice,
   type GameLevels,
   type MatchLength,
   type MatchMode,
   type MatchSetup,
   type OpeningRollRule,
+  type RulesVersion,
+  type RulesVersions,
 } from '@/features/match/setup';
 
 export interface NewGameScreenProps {
@@ -59,8 +67,11 @@ export interface NewGameScreenProps {
   onStart: (setup: MatchSetup) => void;
   /** A saved game exists: Start asks first, because it ends that game (wireframe 4). */
   hasSavedGame?: boolean;
-  /** Opens the rules of a game (the info button on its card). */
-  onRules?: (game: GameChoice) => void;
+  /**
+   * Opens the rules of a game (the info button on its card). `preset` is
+   * the game's chosen rules version (#241), so the page can name it.
+   */
+  onRules?: (game: GameChoice, preset: PresetId) => void;
 }
 
 export function NewGameScreen({
@@ -80,6 +91,7 @@ export function NewGameScreen({
   const [chosenLevel, setBotLevel] = useState<Difficulty>(initial.botLevel);
   const [names, setNames] = useState(initial.names);
   const [openingRoll, setOpeningRoll] = useState<OpeningRollRule>(initial.openingRoll);
+  const [rulesVersions, setRulesVersions] = useState<RulesVersions>(initial.rulesVersions);
 
   const openGames = GAME_CHOICES.filter((choice) => isGameOpen(choice, mode, levelsByGame));
   const lockedGames = GAME_CHOICES.filter((choice) => !openGames.includes(choice));
@@ -109,6 +121,21 @@ export function NewGameScreen({
       ? t('newGame.houseRules.chosenStarterRollsHintBot')
       : t(`newGame.houseRules.${openingRoll}Hint`);
 
+  // The rules version (#241): only for a game with more than one preset.
+  const versionGame = isVersionedGame(game) ? game : null;
+  const version = versionGame === null ? null : rulesVersions[versionGame];
+  const versionOptions: SegmentOption<RulesVersion>[] =
+    versionGame === null
+      ? []
+      : RULES_VERSIONS[versionGame].map((id) => ({
+          value: id,
+          label: t(`newGame.rulesVersion.${VERSION_KEYS[id]}`),
+        }));
+  const chooseVersion = (id: RulesVersion) => {
+    if (versionGame === null) return;
+    setRulesVersions((old) => ({ ...old, [versionGame]: id }));
+  };
+
   const [asking, setAsking] = useState(false);
   const startNow = () =>
     onStart({
@@ -118,6 +145,7 @@ export function NewGameScreen({
       botLevel,
       names: { white: cleanName(names.white), black: cleanName(names.black) },
       openingRoll,
+      rulesVersions,
     });
   const start = () => (hasSavedGame ? setAsking(true) : startNow());
 
@@ -194,7 +222,7 @@ export function NewGameScreen({
                       testID={`new-game-rules-${choice}`}
                       accessibilityRole="button"
                       accessibilityLabel={t(`rules.title.${choice}`)}
-                      onPress={() => onRules(choice)}
+                      onPress={() => onRules(choice, gamePreset(choice, rulesVersions))}
                       hitSlop={4}
                       style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
                       <Text style={styles.rulesIcon} importantForAccessibility="no">
@@ -281,6 +309,22 @@ export function NewGameScreen({
             onChange={setOpeningRoll}
           />
           <Text style={styles.hint}>{openingHint}</Text>
+          {/* The rules version (#241): Plakoto and Asodio only. */}
+          {version !== null ? (
+            <View style={styles.subPart}>
+              <Text style={styles.subLabel}>{t('newGame.houseRules.rulesVersion')}</Text>
+              <SegmentedControl
+                testID="new-game-rules-version"
+                label={t('newGame.houseRules.rulesVersion')}
+                options={versionOptions}
+                value={version}
+                onChange={chooseVersion}
+              />
+              <Text testID="new-game-rules-version-hint" style={styles.hint}>
+                {t(`newGame.rulesVersion.${VERSION_KEYS[version]}Hint`)}
+              </Text>
+            </View>
+          ) : null}
         </SettingsSection>
       </ScrollView>
       <View style={styles.footer}>
@@ -442,6 +486,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   subLabel: {
     ...theme.type.bodyStrong,
     color: theme.colors.text,
+  },
+  subPart: {
+    gap: theme.space.xs,
+    paddingTop: theme.space.md,
   },
   nameRow: {
     flexDirection: 'row',

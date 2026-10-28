@@ -1,4 +1,4 @@
-import { act, render, screen, userEvent } from '@testing-library/react-native';
+import { act, render, screen, userEvent, within } from '@testing-library/react-native';
 
 import { createBot } from '@tavli/bot';
 import type { Difficulty } from '@tavli/contracts';
@@ -131,7 +131,7 @@ describe('<NewGameScreen /> vs bot', () => {
     // The radio keeps its own name; the info button sits next to it.
     expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
     await user.press(screen.getByRole('button', { name: 'How to play Portes' }));
-    expect(onRules).toHaveBeenCalledWith('portes');
+    expect(onRules).toHaveBeenCalledWith('portes', 'portes');
     expect(onStart).not.toHaveBeenCalled();
   });
 });
@@ -355,7 +355,7 @@ describe('<NewGameScreen /> game picker (#109)', () => {
       />,
     );
     await user.press(screen.getByRole('button', { name: 'How to play Tavli' }));
-    expect(onRules).toHaveBeenCalledWith('tavli');
+    expect(onRules).toHaveBeenCalledWith('tavli', 'tavli');
     expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
   });
 });
@@ -445,6 +445,143 @@ describe('<NewGameScreen /> house rules (#207)', () => {
         expect(screen.getByRole('radio', { name })).toBeOnTheScreen();
       }
       expect(screen.getByText(/Κανόνας της ομοσπονδίας\.$/)).toBeOnTheScreen();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+});
+
+describe('<NewGameScreen /> rules version (#241)', () => {
+  const EVERY_GAME = gameLevels(['easy', 'medium']);
+  const versions = () => screen.getByTestId('new-game-rules-version');
+  const option = (name: string) => within(versions()).getByRole('radio', { name });
+  const hint = () => screen.getByTestId('new-game-rules-version-hint');
+
+  it('shows the choice only for Plakoto and Asodio', async () => {
+    const user = userEvent.setup();
+    const { ui } = show('bot', EVERY_GAME);
+    await render(ui);
+    expect(screen.queryByTestId('new-game-rules-version')).toBeNull();
+    for (const game of ['Fevga', 'Tavli', 'Portes']) {
+      await user.press(screen.getByRole('radio', { name: new RegExp(`^${game}`) }));
+      expect(screen.queryByTestId('new-game-rules-version')).toBeNull();
+    }
+    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
+    expect(versions()).toHaveProp('accessibilityLabel', 'Rules version');
+    expect(screen.getByText('Rules version')).toBeOnTheScreen();
+    expect(
+      within(versions())
+        .getAllByRole('radio')
+        .map((r) => r.props.accessibilityLabel),
+    ).toEqual(['Standard', 'Federation']);
+    await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
+    expect(
+      within(versions())
+        .getAllByRole('radio')
+        .map((r) => r.props.accessibilityLabel),
+    ).toEqual(['Standard', 'Greek', 'American']);
+  });
+
+  it('keeps the default presets unless a version is picked', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('local', EVERY_GAME);
+    await render(ui);
+    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
+    expect(option('Standard')).toBeChecked();
+    expect(hint()).toHaveTextContent(
+      'If your mother is pinned, you choose: resign (2 points) or play on.',
+    );
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart).toHaveBeenLastCalledWith({ ...defaultSetup('local'), game: 'plakoto' });
+  });
+
+  it('picks Federation for Plakoto and a version for Asodio, each with its hint', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('bot', EVERY_GAME);
+    await render(ui);
+
+    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
+    await user.press(option('Federation'));
+    expect(option('Federation')).toBeChecked();
+    expect(option('Standard')).not.toBeChecked();
+    expect(hint()).toHaveTextContent(
+      'Federation rules: pin the mother and win 2 points once your own point 24 is empty. Both mothers pinned: a draw.',
+    );
+
+    // Asodio keeps its own choice.
+    await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
+    expect(option('Standard')).toBeChecked();
+    expect(hint()).toHaveTextContent(/^Kafeneio rules: all 15 enter first/);
+    await user.press(option('Greek'));
+    expect(hint()).toHaveTextContent(/^Acey-Deucey, Greek rules: you hit, not pin\./);
+    await user.press(option('American'));
+    expect(hint()).toHaveTextContent(/1 point per checker left\.$/);
+    await user.press(option('Greek'));
+
+    // Back to Plakoto: Federation is still picked.
+    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
+    expect(option('Federation')).toBeChecked();
+
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart).toHaveBeenLastCalledWith({
+      ...defaultSetup('bot'),
+      game: 'plakoto',
+      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' },
+    });
+  });
+
+  it('starts from the last choice', async () => {
+    const { ui } = show('local', EVERY_GAME, {
+      ...defaultSetup('local'),
+      game: 'asodio',
+      rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+    });
+    await render(ui);
+    expect(option('American')).toBeChecked();
+  });
+
+  it('opens the rules of a game in its chosen version', async () => {
+    const user = userEvent.setup();
+    const onRules = jest.fn();
+    await render(
+      <NewGameScreen
+        mode="local"
+        initial={{
+          ...defaultSetup('local'),
+          rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' },
+        }}
+        botLevels={EVERY_GAME}
+        onBack={jest.fn()}
+        onStart={jest.fn()}
+        onRules={onRules}
+      />,
+    );
+    await user.press(screen.getByRole('button', { name: 'How to play Plakoto' }));
+    expect(onRules).toHaveBeenLastCalledWith('plakoto', 'plakoto.federation');
+    await user.press(screen.getByRole('button', { name: 'How to play Asodio' }));
+    expect(onRules).toHaveBeenLastCalledWith('asodio', 'asodio.kafeneio');
+  });
+
+  it('Greek: the label, the choices and a hint', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    try {
+      const user = userEvent.setup();
+      const { ui } = show('local', EVERY_GAME);
+      await render(ui);
+      await user.press(screen.getByRole('radio', { name: /^Πλακωτό/ }));
+      expect(screen.getByText('Παραλλαγή')).toBeOnTheScreen();
+      expect(versions()).toHaveProp('accessibilityLabel', 'Παραλλαγή');
+      for (const name of ['Κανονική', 'Ομοσπονδίας']) expect(option(name)).toBeOnTheScreen();
+      await user.press(screen.getByRole('radio', { name: /^Ασόδιο/ }));
+      for (const name of ['Κανονική', 'Ελληνική', 'Αμερικάνικη']) {
+        expect(option(name)).toBeOnTheScreen();
+      }
+      await user.press(option('Ελληνική'));
+      expect(hint()).toHaveTextContent(/^Ελληνικοί κανόνες: χτυπάς, δεν πλακώνεις\./);
     } finally {
       await act(async () => {
         await i18n.changeLanguage('en');

@@ -18,6 +18,8 @@
  * Adapters: `@tavli/analytics-posthog` (the app), `createNoopAnalytics` (no
  * key, local dev) and `createRecordingAnalytics` (tests).
  */
+import type { PresetId } from '@tavli/engine';
+
 import type { Difficulty } from './bot-runner';
 import { isAnonymousInstallId } from './install-id';
 
@@ -71,6 +73,11 @@ export interface AnalyticsEvents {
     botLevel?: Difficulty;
     /** The opening roll house rule (#207). */
     openingRoll: OpeningRollRule;
+    /**
+     * The rules version of the game in play (#241): its engine preset id,
+     * for example `plakoto.federation`. A value id only.
+     */
+    rulesVersion: PresetId;
   };
   game_finished: {
     mode: GameMode;

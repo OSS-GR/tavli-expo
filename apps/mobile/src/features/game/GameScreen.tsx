@@ -756,7 +756,7 @@ export function GameScreen({
     const { result } = game;
     const winner = result.winner;
     const loser = winner === null ? null : other(winner);
-    const type = winType(result);
+    const type = winType(result, game.state.rules.scoring.method);
     let reason: string | null = null;
     if (result.reason === 'resigned' && loser !== null) {
       reason = resignedLine(loser, type, game.state.board.off[loser]);

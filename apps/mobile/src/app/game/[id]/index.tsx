@@ -38,8 +38,12 @@ export default function GameRoute() {
           goHome();
         }}
         onSettings={() => router.push('/settings')}
-        // The rules of the game on the board (in Tavli, this game of the rotation).
-        onRules={() => router.push(rulesHref(session.store.getState().flow.game.state.variant))}
+        // The rules of the game on the board (in Tavli, this game of the
+        // rotation), in its rules version (#241).
+        onRules={() => {
+          const { state } = session.store.getState().flow.game;
+          router.push(rulesHref(state.variant, state.rules.presetId));
+        }}
         onMatchOver={() => router.replace(matchEndHref(session.id))}
         // The review of the game that just ended (#215); Back returns to the sheet.
         onReview={() => router.push(reviewHref(session.id))}

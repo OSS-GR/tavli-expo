@@ -13,9 +13,11 @@ import {
   TAVLI_SECTION,
   paragraphs,
   parseRulesVariant,
+  parseRulesVersion,
   rulesDirection,
   rulesTitleKey,
   startBoard,
+  versionSection,
   type RulesKey,
   type RulesVariant,
 } from './content';
@@ -80,11 +82,13 @@ describe('rules texts', () => {
   });
 
   it('uses every rules key on some page', () => {
+    const versions = (
+      ['plakoto.federation', 'asodio.aceyDeuceyGreek', 'asodio.aceyDeuceyAmerican'] as const
+    ).map(versionSection);
     const used = new Set<string>(
-      [...RULES_GAMES.flatMap((game) => RULES_PAGES[game]), TAVLI_SECTION].flatMap((section) => [
-        section.title,
-        ...section.body,
-      ]),
+      [...RULES_GAMES.flatMap((game) => RULES_PAGES[game]), TAVLI_SECTION, ...versions].flatMap(
+        (section) => [section.title, ...section.body],
+      ),
     );
     for (const id of ['portes', 'plakoto', 'fevga', 'asodio', 'tavli', null] as const) {
       used.add(rulesTitleKey(id));
@@ -108,6 +112,23 @@ describe('content', () => {
     expect(parseRulesVariant('asodio')).toBe('asodio');
     expect(parseRulesVariant('chess')).toBeNull();
     expect(parseRulesVariant(undefined)).toBeNull();
+  });
+
+  it('reads the version param (#241): only a rules version of the game that is not its default', () => {
+    expect(parseRulesVersion('plakoto', 'plakoto.federation')).toBe('plakoto.federation');
+    expect(parseRulesVersion('asodio', ['asodio.aceyDeuceyGreek'])).toBe('asodio.aceyDeuceyGreek');
+    expect(parseRulesVersion('asodio', 'asodio.aceyDeuceyAmerican')).toBe(
+      'asodio.aceyDeuceyAmerican',
+    );
+    // The default version, another game's version, a game with one preset, junk.
+    expect(parseRulesVersion('plakoto', 'plakoto')).toBeNull();
+    expect(parseRulesVersion('asodio', 'asodio.kafeneio')).toBeNull();
+    expect(parseRulesVersion('asodio', 'plakoto.federation')).toBeNull();
+    expect(parseRulesVersion('portes', 'plakoto.federation')).toBeNull();
+    expect(parseRulesVersion('tavli', 'tavli')).toBeNull();
+    expect(parseRulesVersion(null, 'plakoto.federation')).toBeNull();
+    expect(parseRulesVersion('plakoto', undefined)).toBeNull();
+    expect(parseRulesVersion('plakoto', 'chess')).toBeNull();
   });
 
   it('builds each start position from the default preset', () => {
@@ -160,6 +181,29 @@ describe('<RulesScreen />', () => {
       expect(onLearnToPlay).toHaveBeenCalledWith(game);
     },
   );
+
+  it.each([
+    ['plakoto', 'plakoto.federation', 'This game: federation rules'],
+    ['asodio', 'asodio.aceyDeuceyGreek', 'This game: Greek rules'],
+    ['asodio', 'asodio.aceyDeuceyAmerican', 'This game: American rules'],
+  ] as const)(
+    'a %s game in %s says on top what its version changes (#241)',
+    async (game, version, title) => {
+      await render(<RulesScreen variant={game} version={version} onOpenRules={jest.fn()} />);
+      const headers = screen.getAllByRole('header').map((h) => h.props.children);
+      expect(headers[0]).toBe(title);
+      expect(headers.slice(1)).toEqual(RULES_PAGES[game].map((section) => tr(section.title)));
+      const box = screen.getByTestId('rules-section-version');
+      for (const line of paragraphs(versionSection(version).body.map(tr))) {
+        expect(within(box).getByText(line)).toBeOnTheScreen();
+      }
+    },
+  );
+
+  it('shows no version section for the default rules', async () => {
+    await render(<RulesScreen variant="plakoto" version={null} onOpenRules={jest.fn()} />);
+    expect(screen.queryByTestId('rules-section-version')).not.toBeOnTheScreen();
+  });
 
   it.each(['tavli'] as const)('has no lessons on the %s page', async (variant) => {
     await render(

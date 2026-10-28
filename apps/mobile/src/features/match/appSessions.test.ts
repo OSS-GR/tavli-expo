@@ -40,6 +40,7 @@ describe('game events for real matches (#61)', () => {
         matchLength: 5,
         botLevel: 'easy',
         openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
       },
     ]);
   });
@@ -47,6 +48,19 @@ describe('game events for real matches (#61)', () => {
   it('sends the opening roll house rule as a value id (#207)', () => {
     matchSessions.start({ ...localSetup, openingRoll: 'rerollBoth' });
     expect(tracked()[0]).toMatchObject({ event: 'game_started', openingRoll: 'rerollBoth' });
+  });
+
+  it('sends the rules version as a value id: the preset of the game in play (#241)', () => {
+    matchSessions.start({
+      ...localSetup,
+      game: 'asodio',
+      rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+    });
+    expect(tracked()[0]).toMatchObject({
+      event: 'game_started',
+      game: 'asodio',
+      rulesVersion: 'asodio.aceyDeuceyAmerican',
+    });
   });
 
   it('sends game: tavli for a Tavli match, and the game in play as variant', () => {
@@ -59,6 +73,7 @@ describe('game events for real matches (#61)', () => {
         variant: 'portes',
         matchLength: 3,
         openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
       },
     ]);
   });
@@ -73,6 +88,7 @@ describe('game events for real matches (#61)', () => {
         variant: 'portes',
         matchLength: 3,
         openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
       },
     ]);
     expect(JSON.stringify(recorded.sent)).not.toContain('Maria');
