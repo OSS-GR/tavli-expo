@@ -9,12 +9,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TURN_TIME_MS, createRecordingPushProvider } from '@tavli/contracts';
 import type {
   GameTransportErrorCode,
+  InviteErrorCode,
   OnlineGamePace,
   RecordingPushProvider,
 } from '@tavli/contracts';
 
 import { api, components, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
+import { INVITE_DELETE_PAGE } from './account';
 import { setPushProvider } from './push';
 import schema from './schema';
 import { modules } from './test.setup';
@@ -50,7 +52,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-async function rejectsWith(call: Promise<unknown>, code: GameTransportErrorCode) {
+async function rejectsWith(call: Promise<unknown>, code: GameTransportErrorCode | InviteErrorCode) {
   await expect(call).rejects.toMatchObject({ data: { code } });
 }
 
@@ -131,6 +133,18 @@ async function rawGame(t: Tester, gameId: Id<'games'>) {
   return await t.run(async (ctx) => await ctx.db.get(gameId));
 }
 
+async function inviteCodes(t: Tester): Promise<string[]> {
+  return await t.run(async (ctx) =>
+    (await ctx.db.query('invites').collect()).map((invite) => invite.code),
+  );
+}
+
+/** Runs the scheduled functions that are due now (each `runAfter(0)`). */
+async function flush(t: Tester) {
+  vi.advanceTimersByTime(0);
+  await t.finishInProgressScheduledFunctions();
+}
+
 describe('deleteMyAccount', () => {
   it('resigns active games, keeps finished ones, and deletes invites, tokens and the user', async () => {
     const t = setup();
@@ -159,8 +173,7 @@ describe('deleteMyAccount', () => {
     expect(await authRows(t, 'session', alice)).toHaveLength(1);
     expect(await authRows(t, 'account', alice)).toHaveLength(1);
 
-    vi.advanceTimersByTime(0);
-    await t.finishInProgressScheduledFunctions();
+    await flush(t);
     push.clear();
 
     await as(t, alice).mutation(api.account.deleteMyAccount, {});
@@ -180,9 +193,11 @@ describe('deleteMyAccount', () => {
     expect(kept?.players).toEqual({ white: bob, black: alice });
     expect(await as(t, bob).query(api.games.listMyGames, { status: 'finished' })).toHaveLength(2);
 
-    // Alice's invites are gone; Bob's stays.
-    const invites = await t.run(async (ctx) => await ctx.db.query('invites').collect());
-    expect(invites.map((invite) => invite.code)).toEqual([bobsInvite]);
+    // Alice's open invite is gone at once. The cancelled one goes in the
+    // scheduled `deleteSentInvites`, after the call. Bob's stays.
+    expect((await inviteCodes(t)).sort()).toEqual([bobsInvite, cancelled].sort());
+    await flush(t);
+    expect(await inviteCodes(t)).toEqual([bobsInvite]);
 
     // Alice's push tokens are gone; Bob's stays.
     const tokens = await t.run(async (ctx) => await ctx.db.query('pushTokens').collect());
@@ -276,5 +291,101 @@ describe('deleteMyAccount', () => {
   it('throws NOT_SIGNED_IN for a token whose user does not exist', async () => {
     const t = setup();
     await rejectsWith(as(t, 'nobody').mutation(api.account.deleteMyAccount, {}), 'NOT_SIGNED_IN');
+  });
+});
+
+describe('after the delete, the old token is refused (#306)', () => {
+  // The token stays valid for up to 15 minutes; convex-test keeps the
+  // identity, as a client that kept the old token would.
+  it('createInvite, registerPushToken, acceptInvite and declineInvite get NOT_SIGNED_IN, and save nothing', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    const bobsInvite = await createInvite(t, bob);
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    await flush(t);
+
+    await rejectsWith(createInvite(t, alice), 'NOT_SIGNED_IN');
+    await rejectsWith(register(t, alice, 'ExponentPushToken[alice-phone]'), 'NOT_SIGNED_IN');
+    const caller = as(t, alice);
+    await rejectsWith(
+      caller.mutation(api.invites.acceptInvite, { code: bobsInvite }),
+      'NOT_SIGNED_IN',
+    );
+    await rejectsWith(
+      caller.mutation(api.invites.declineInvite, { code: bobsInvite }),
+      'NOT_SIGNED_IN',
+    );
+
+    const invites = await t.run(async (ctx) => await ctx.db.query('invites').collect());
+    expect(invites).toHaveLength(1);
+    expect(invites[0]).toMatchObject({ code: bobsInvite, status: 'open', answeredBy: null });
+    expect(await t.run(async (ctx) => await ctx.db.query('pushTokens').collect())).toEqual([]);
+    expect(await t.run(async (ctx) => await ctx.db.query('games').collect())).toEqual([]);
+  });
+
+  it('nobody can accept an open invite of the deleted account', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    const code = await createInvite(t, alice);
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    await rejectsWith(as(t, bob).mutation(api.invites.acceptInvite, { code }), 'INVITE_NOT_FOUND');
+  });
+});
+
+describe('deleteSentInvites (#306)', () => {
+  /** Saves `count` cancelled invites from `from`, as if made over the months. */
+  async function closedInvites(t: Tester, from: string, count: number): Promise<void> {
+    await t.run(async (ctx) => {
+      for (let i = 0; i < count; i++) {
+        await ctx.db.insert('invites', {
+          code: `C${String(i).padStart(7, '0')}`,
+          from,
+          choice: 'portes',
+          targetPoints: 3,
+          pace: 'async',
+          status: 'cancelled',
+          expiresAt: START - 1,
+          gameId: null,
+          answeredBy: null,
+        });
+      }
+    });
+  }
+
+  async function invitesFrom(t: Tester, from: string): Promise<number> {
+    return await t.run(
+      async (ctx) =>
+        (await ctx.db.query('invites').collect()).filter((invite) => invite.from === from).length,
+    );
+  }
+
+  it('deletes many invites in pages, after the call, and leaves other players’ invites', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    await closedInvites(t, alice, 2 * INVITE_DELETE_PAGE + 1);
+    await createInvite(t, alice);
+    await createInvite(t, bob);
+
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    // The open invite is gone with the call; the closed ones wait.
+    expect(await invitesFrom(t, alice)).toBe(2 * INVITE_DELETE_PAGE + 1);
+    await flush(t);
+    expect(await invitesFrom(t, alice)).toBe(INVITE_DELETE_PAGE + 1);
+    await flush(t);
+    expect(await invitesFrom(t, alice)).toBe(1);
+    await flush(t);
+    expect(await invitesFrom(t, alice)).toBe(0);
+    expect(await invitesFrom(t, bob)).toBe(1);
+
+    // The last page was not full: nothing more is scheduled for it.
+    const pending = await t.run(async (ctx) =>
+      (await ctx.db.system.query('_scheduled_functions').collect()).filter(
+        (job) => job.name.includes('deleteSentInvites') && job.state.kind === 'pending',
+      ),
+    );
+    expect(pending).toEqual([]);
   });
 });
