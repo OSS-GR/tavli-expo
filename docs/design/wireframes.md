@@ -226,15 +226,15 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 - **Route:** `app/game/[id]/index.tsx`
 - **Purpose:** Play the game. This is where players spend 95% of their time.
 - **Layout (top to bottom)**, Settings → Board → Board layout **Tall** (default since #184):
-  1. **Menu button** (36 pt circle, 44 pt touch area) inside the row of the **opponent strip**: name, pip count, match score ("0 /3"), on one line (36 pt).
+  1. **Menu button** (36 pt circle, 44 pt touch area) inside the row of the **opponent strip**: name and match score ("0 /3"), on one line (36 pt).
   2. **Board**, rotated 90° (see [Board layout](#board-layout-recommendation)), as large as the screen allows. Bear-off trays sit at the bottom of the board. The **dice** lie on the board, in the theme's dice area.
-  3. **Your strip**: name, pip count, match score, turn pill, on one line.
+  3. **Your strip**: name, match score, turn pill, on one line.
   4. **Controls**: one row of two big buttons, Undo · Confirm, or one big Roll button.
   - The game label ("Game 2 · Plakoto") is in the menu.
 - **Classic** layout (a setting, #184): the board as on a table, as wide as the screen, with its strips right above and below it, centred on the screen. The menu and the game label sit at the top; the buttons stay at the bottom. Pictures: [game-layout-proposals.md](game-layout-proposals.md) (proposal A, but centred).
-- The pictures below are the first layout (before #184): two-line strips and the dice between Undo and Confirm. The states they show are the same.
+- The pictures below are the first layout (before #184): two-line strips and the dice between Undo and Confirm. They also show a pip count ("Pips 167"), which the app no longer has (#238). The states they show are the same.
 - **Turn indicator:** the active player's strip gets a thick border and a pill ("YOUR TURN", "PLAYING", or the player's name in pass-and-play).
-- **Pip counts:** shown in both strips by default; Settings → Show pip counts hides them (#32).
+- **No pip count:** the strips show no pip count, and Settings has no switch for it. The owner removed it (#238, Q19 in `docs/open-questions.md`).
 - **Count badge:** a stack of more than 5 checkers shows 5 checkers and a number badge on the last one (#29).
 
 ### 6a. Opening roll
@@ -479,4 +479,4 @@ Rule of thumb: plan **+100%** for labels under 12 characters and **+30%** for se
 2. **Resign points in Portes:** How many points does the opponent get? Proposal: what the position is worth now, so diplo (2) if the resigning player has borne off no checker, else mono (1). Do we also want "Resign match"?
 3. **Opening roll:** Does one tap roll both opening dice (fast), or does each player tap for their own die (more like the kafeneio)? Proposal: one tap vs bot, one tap per player in pass-and-play.
 4. **Auto-confirm default:** Off (safer; you always see Confirm and can undo) or on (faster)? Proposal: off.
-5. **Pip counts:** Always shown (proposal), or a setting, since some kafeneio players see pip counts as "help"?
+5. **Pip counts:** Always shown (proposal), or a setting, since some kafeneio players see pip counts as "help"? **Answer:** first a setting, shown by default (#32); later the owner removed the pip count (#238).

@@ -1,13 +1,13 @@
 /**
  * A player strip above or below the board (wireframe 6): checker color,
- * name, pip count and match score, on one line (#184). The player to move
- * gets a thick border and a "Your turn" pill, so color is never the only
- * cue. Asodio adds a short note after the pips: the checkers still to
- * enter, or "Army frozen". A long name or a large font wraps the line; the
- * strip then grows.
+ * name and match score, on one line (#184). The player to move gets a
+ * thick border and a "Your turn" pill, so color is never the only cue.
+ * Asodio adds a short note after the name: the checkers still to enter, or
+ * "Army frozen". A long name or a large font wraps the line; the strip then
+ * grows. There is no pip count (#238).
  *
  * `stacked` (landscape, #185): a small card for a side column, one part per
- * line: the color and the score, the turn pill, the name, the pips.
+ * line: the color and the score, the turn pill, the name, the note.
  */
 import type { CheckerStyle } from '@tavli/themes';
 import { displayCaps } from '@tavli/ui';
@@ -20,8 +20,8 @@ export const STRIP_HEIGHT = 36;
 
 const NBSP = '\u00A0';
 /**
- * "Pips 167" never breaks in the middle. When a long name (or Greek) makes
- * the line wrap, it breaks after a "·", so each part stays whole.
+ * A note such as "12 to enter" never breaks in the middle. When a long name
+ * (or Greek) makes the line wrap, it breaks after the "·", so the note stays whole.
  */
 const keepTogether = (part: string) => part.replace(/ /g, NBSP);
 
@@ -29,8 +29,6 @@ export interface PlayerStripProps {
   name: string;
   /** The player's checker style from the board theme (for the color swatch). */
   checker: CheckerStyle;
-  /** `null` hides the pip count (Settings → Show pip counts). */
-  pips: number | null;
   /** A short note under the name, e.g. "12 to enter" (Asodio). `null`: none. */
   note?: string | null;
   score: number;
@@ -46,7 +44,6 @@ export interface PlayerStripProps {
 export function PlayerStrip({
   name,
   checker,
-  pips,
   note = null,
   score,
   target,
@@ -57,16 +54,7 @@ export function PlayerStrip({
 }: PlayerStripProps) {
   const { t } = useTranslation();
   const pill = turnLabel ?? t('game.strip.turn');
-  const details = [pips === null ? null : t('game.strip.pips', { count: pips }), note].filter(
-    (part) => part !== null,
-  );
-  const label = [
-    name,
-    pips === null ? null : t('game.strip.pipsLabel', { count: pips }),
-    note,
-    t('game.strip.scoreLabel', { score, target }),
-    active ? pill : null,
-  ]
+  const label = [name, note, t('game.strip.scoreLabel', { score, target }), active ? pill : null]
     .filter((part) => part !== null)
     .join(', ');
   const swatch = (
@@ -99,9 +87,7 @@ export function PlayerStrip({
         </View>
         {pillView}
         <Text style={styles.name}>{name}</Text>
-        {details.length === 0 ? null : (
-          <Text style={styles.pips}>{details.map(keepTogether).join(`${NBSP}· `)}</Text>
-        )}
+        {note === null ? null : <Text style={styles.note}>{keepTogether(note)}</Text>}
       </View>
     );
   }
@@ -115,10 +101,10 @@ export function PlayerStrip({
       {swatch}
       <Text style={styles.who}>
         <Text style={styles.name}>{name}</Text>
-        {details.length === 0 ? null : (
+        {note === null ? null : (
           <>
-            <Text style={styles.pips}>{`${NBSP}· `}</Text>
-            <Text style={styles.pips}>{details.map(keepTogether).join(`${NBSP}· `)}</Text>
+            <Text style={styles.note}>{`${NBSP}· `}</Text>
+            <Text style={styles.note}>{keepTogether(note)}</Text>
           </>
         )}
       </Text>
@@ -171,7 +157,7 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.bodyStrong,
     color: theme.colors.text,
   },
-  pips: {
+  note: {
     ...theme.type.caption,
     color: theme.colors.textDim,
   },

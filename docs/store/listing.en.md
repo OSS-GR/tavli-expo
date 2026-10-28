@@ -21,7 +21,7 @@ Checked in the code on 2026-10-27:
 | "Learn to play": a one-minute Portes lesson on the real board, 7 lessons (move, both dice, a double, make a door, hit, enter from the bar, bear off). Offered on first run (a Home card you can dismiss with **Not now**), always in Settings → Help, and on the Portes rules page | `features/tutorial/` (`lessons.ts`), [App shell](../architecture/app-shell.md#tutorial-128) |
 | Greek and English | `apps/mobile/src/i18n/` |
 | The game saves by itself; Continue on Home | `features/match/savedMatch.ts` |
-| Undo, Confirm, auto-confirm, pip counts, sound, haptics | `features/settings/settings.ts` |
+| Undo, Confirm, auto-confirm, sound, haptics | `features/settings/settings.ts` |
 | One board theme: Walnut kafeneio | `themes.walnut-kafeneio` |
 | No ads, no account, opt-in usage data | [Privacy policy](../legal/privacy.md) |
 
@@ -115,7 +115,6 @@ Every game also has a "How to play" page: the start position, how checkers move,
 MADE FOR TAVLI PLAYERS
 • Greek and English
 • Undo your moves until you confirm the turn, or turn on auto-confirm
-• Pip counts, if you want them
 • Your game saves by itself. Come back later and continue.
 • A wooden board, with sound and haptics
 
@@ -125,7 +124,7 @@ No ads. No sign-in. Your games stay on your phone. You choose if the app may sen
 Privacy policy: https://tavlaki.com/privacy
 ```
 
-2,045 characters.
+2,014 characters.
 
 Optional line (only if the owner wants it, see above). Put it before "NO ADS, NO ACCOUNT":
 

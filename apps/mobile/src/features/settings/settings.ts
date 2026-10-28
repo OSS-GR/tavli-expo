@@ -70,7 +70,6 @@ export interface Settings {
   language: LanguagePreference;
   /** End the turn as soon as all dice are used, without a Confirm tap. */
   autoConfirmMoves: boolean;
-  showPipCounts: boolean;
   /** Offline games: a Hint button shows the best turn for the roll (#209). */
   showHints: boolean;
   boardFlipMode: BoardFlipMode;
@@ -92,7 +91,6 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   haptics: true,
   language: 'system',
   autoConfirmMoves: false,
-  showPipCounts: true,
   showHints: true,
   boardFlipMode: 'flip',
   homeBoardSide: 'right',
@@ -130,7 +128,10 @@ function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
-/** Turns any saved value into valid settings. Unknown keys are dropped. */
+/**
+ * Turns any saved value into valid settings. Unknown keys are dropped, and so
+ * are removed settings: `showPipCounts` (the pip count, removed in #238).
+ */
 export function sanitizeSettings(raw: unknown): Settings {
   const input = isRecord(raw) ? raw : {};
   const d = DEFAULT_SETTINGS;
@@ -139,7 +140,6 @@ export function sanitizeSettings(raw: unknown): Settings {
     haptics: bool(input['haptics'], d.haptics),
     language: oneOf(LANGUAGE_PREFERENCES, input['language'], d.language),
     autoConfirmMoves: bool(input['autoConfirmMoves'], d.autoConfirmMoves),
-    showPipCounts: bool(input['showPipCounts'], d.showPipCounts),
     // Saves from before #209 have no value: hints start on.
     showHints: bool(input['showHints'], d.showHints),
     boardFlipMode: oneOf(BOARD_FLIP_MODES, input['boardFlipMode'], d.boardFlipMode),
@@ -188,7 +188,6 @@ function pickSettings(state: SettingsState): Settings {
     haptics: state.haptics,
     language: state.language,
     autoConfirmMoves: state.autoConfirmMoves,
-    showPipCounts: state.showPipCounts,
     showHints: state.showHints,
     boardFlipMode: state.boardFlipMode,
     homeBoardSide: state.homeBoardSide,

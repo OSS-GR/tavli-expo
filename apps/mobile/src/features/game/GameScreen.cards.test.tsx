@@ -222,7 +222,9 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
     await act(async () => {
       store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 5] });
     });
-    expect(screen.getByText('Army frozen')).toBeOnTheScreen();
+    // The card's title. White's strip says "Army frozen" too: with no pip
+    // count (#238) the note is the strip's only detail.
+    expect(within(screen.getByTestId('pass-card')).getByText('Army frozen')).toBeOnTheScreen();
     expectBoardHidden();
     await press('pass-ok-button');
     expectBoardShown();

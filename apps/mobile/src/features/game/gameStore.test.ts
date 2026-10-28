@@ -107,7 +107,6 @@ describe('turnView', () => {
     const view = turnView(newStore().getState().flow);
     expect(view.dice).toEqual([]);
     expect(view.legal).toEqual([]);
-    expect(view.pips).toEqual({ white: 167, black: 167 });
   });
 
   it('shows the dice of the turn and the legal moves', () => {

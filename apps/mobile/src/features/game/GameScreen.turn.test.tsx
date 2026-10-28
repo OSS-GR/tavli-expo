@@ -16,6 +16,7 @@ import { AccessibilityInfo } from 'react-native';
 import { fitBoardWithShadow, slotRect, stackPosition } from '@/features/board/geometry';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import i18n from '@/i18n';
 
 import { createGameStore, type GameStore } from './gameStore';
 import { BOT_PASS_NOTICE_MS, GameScreen, MATCH_END_DELAY_MS, type BotSeat } from './GameScreen';
@@ -24,6 +25,7 @@ import type { Seat } from './seats';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
+import { LANDSCAPE_SE, PORTRAIT_SE, resetWindow, setWindow } from '../../../test/window';
 
 const SIZE = { width: 375, height: 500 };
 const geo = fitBoardWithShadow(getLayout(getTheme('walnut-kafeneio'), 'portrait-rotated'), SIZE);
@@ -137,13 +139,13 @@ describe('<GameScreen /> turn indicator', () => {
     expect(bottom().getByText('Ann')).toBeOnTheScreen();
     expect(bottom().getByText('YOUR TURN')).toBeOnTheScreen();
     expect(upper().queryByText('YOUR TURN')).toBeNull();
-    expect(bottom().getByText('Pips 167')).toBeOnTheScreen();
-    expect(upper().getByText('Pips 167')).toBeOnTheScreen();
 
     await touch(PAN, [top(13, 5), point(7)]);
     await touch(PAN, [top(8, 3), point(7)]);
-    // The pip count follows the moves of the turn: 167 - 6 - 1.
-    expect(bottom().getByText('Pips 160')).toBeOnTheScreen();
+    // The moves change nothing in the strip: it has no pip count (#238).
+    expect(screen.getByTestId('strip-bottom')).toHaveAccessibleName(
+      'Ann, 0 of 3 points, Your turn',
+    );
     await user.press(button('Confirm'));
     expect(bottom().getByText('Bob')).toBeOnTheScreen();
     expect(bottom().getByText('YOUR TURN')).toBeOnTheScreen();
@@ -165,14 +167,46 @@ describe('<GameScreen /> turn indicator', () => {
     expect(bottom.queryByText('YOUR TURN')).toBeNull();
     expect(within(screen.getByTestId('strip-top')).getByText('YOUR TURN')).toBeOnTheScreen();
   });
+});
 
-  it('hides pip counts when the setting is off', async () => {
+// The strips show no pip count (#238): the owner removed it.
+describe('<GameScreen /> strips without a pip count (#238)', () => {
+  afterEach(async () => {
     await act(async () => {
-      settingsStore.getState().setSetting('showPipCounts', false);
+      await i18n.changeLanguage('en');
     });
-    await annMoves61();
-    expect(screen.queryByText(/^Pips/)).toBeNull();
+    await resetWindow();
   });
+
+  it.each([
+    ['portrait', 'en', PORTRAIT_SE, 'Ann, 0 of 3 points, Your turn', 'Bob, 0 of 3 points'],
+    ['landscape', 'en', LANDSCAPE_SE, 'Ann, 0 of 3 points, Your turn', 'Bob, 0 of 3 points'],
+    ['portrait', 'el', PORTRAIT_SE, 'Ann, 0 από 3 βαθμούς, Σειρά σου', 'Bob, 0 από 3 βαθμούς'],
+    ['landscape', 'el', LANDSCAPE_SE, 'Ann, 0 από 3 βαθμούς, Σειρά σου', 'Bob, 0 από 3 βαθμούς'],
+  ] as const)(
+    '%s, %s: only the name, the score and the turn',
+    async (layout, language, window, you, them) => {
+      await setWindow(window);
+      await act(async () => {
+        await i18n.changeLanguage(language);
+      });
+      await annMoves61();
+      const bottom = screen.getByTestId('strip-bottom');
+      const upper = screen.getByTestId('strip-top');
+      if (layout === 'landscape') {
+        // The stacked strips of the left column.
+        expect(within(screen.getByTestId('game-left')).getByTestId('strip-top')).toBe(upper);
+      }
+      expect(bottom).toHaveAccessibleName(you);
+      expect(upper).toHaveAccessibleName(them);
+      for (const strip of [bottom, upper]) {
+        // No "Pips 167" or «Πόντοι 167».
+        expect(strip).not.toHaveTextContent(/pip|πόντ|167/i);
+        // No "·" is left after the name: Portes has no note.
+        expect(strip).not.toHaveTextContent(/·/);
+      }
+    },
+  );
 });
 
 // Ann is on the bar and Bob holds all six entry points.
@@ -225,7 +259,7 @@ describe('<GameScreen /> no legal moves', () => {
       jest.advanceTimersByTime(30_000);
     });
     await act(async () => {
-      settingsStore.setState({ showPipCounts: false });
+      settingsStore.setState({ showHints: false });
     });
     await act(async () => {
       jest.advanceTimersByTime(30_000);

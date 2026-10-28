@@ -90,7 +90,6 @@ Limit: 4,000 (App Store description and Google Play full description).
 ΦΤΙΑΓΜΕΝΟ ΓΙΑ ΤΑΒΛΑΔΟΡΟΥΣ
 • Ελληνικά και αγγλικά
 • Αναίρεση κινήσεων μέχρι να πατήσεις «Επιβεβαίωση», ή αυτόματη επιβεβαίωση
-• Μετρητής πόντων, αν τον θέλεις
 • Το παιχνίδι αποθηκεύεται μόνο του. Συνεχίζεις όποτε θέλεις.
 • Ξύλινο ταμπλό, με ήχους και δόνηση
 
@@ -100,7 +99,7 @@ Limit: 4,000 (App Store description and Google Play full description).
 Πολιτική απορρήτου: https://tavlaki.com/el/privacy
 ```
 
-2,308 characters (4,123 bytes in UTF-8; both stores count characters as far as we know, so it fits).
+2,275 characters (4,063 bytes in UTF-8; both stores count characters as far as we know, so it fits).
 
 Optional line (only if the owner wants it). Put it before "ΧΩΡΙΣ ΔΙΑΦΗΜΙΣΕΙΣ":
 
