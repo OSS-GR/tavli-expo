@@ -13,7 +13,8 @@ import type { GameSummary } from '@tavli/contracts';
 import { OnlineGameError, sideOf, toView } from './online-game';
 import type { ViewInput } from './online-game';
 
-export interface SummaryInput extends ViewInput {
+/** A summary drops `previousGame`, so its input has none (no need to read it). */
+export interface SummaryInput extends Omit<ViewInput, 'previousGame'> {
   /** The last saved change, in epoch milliseconds (server clock). */
   readonly updatedAt: number;
 }
@@ -28,7 +29,7 @@ export function summarizeGame(input: SummaryInput, playerId: string): GameSummar
   if (mySide === null) {
     throw new OnlineGameError('NOT_A_PLAYER', 'you are not a player of this game');
   }
-  const view = toView(input);
+  const view = toView({ ...input, previousGame: null });
   return {
     gameId: view.gameId,
     status: view.status,

@@ -370,7 +370,7 @@ describe('"your turn" pushes', () => {
       const doc = await ctx.db.get(gameId);
       if (doc === null) throw new Error('no game');
       const pinned = motherPin(loadFlow(doc.flow));
-      await ctx.db.patch(gameId, { flow: storeFlow(pinned.flow) });
+      await ctx.db.patch(gameId, { flow: storeFlow(pinned.flow, null) });
       return pinned.pin;
     });
     await registerBoth(t);
@@ -477,7 +477,9 @@ describe('"your turn" pushes', () => {
         ...flow.match.rules,
         match: { ...flow.match.rules.match, nextGameStarter: 'alternate' as const },
       };
-      await ctx.db.patch(gameId, { flow: storeFlow({ ...flow, match: { ...flow.match, rules } }) });
+      await ctx.db.patch(gameId, {
+        flow: storeFlow({ ...flow, match: { ...flow.match, rules } }, null),
+      });
     });
     await registerBoth(t);
     const starter = await playOneTurn(t, gameId);

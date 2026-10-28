@@ -22,6 +22,7 @@ import {
   HIT_DELAY_MS,
   TURN_MOVE_GAP_MS,
   flightMs,
+  flightsEndMs,
   moveFlights,
   pathFlights,
   turnFlights,
@@ -305,6 +306,9 @@ describe('turnFlights (#255)', () => {
     ]);
     // Two checkers and a blot: each waits in sight where it stands.
     expect(flights.map((f) => f.hiddenMs)).toEqual([undefined, undefined, undefined]);
+    // The turn is down when the hit checker lands on the bar (#299).
+    expect(flightsEndMs(flights)).toBe(FLIGHT_MS + TURN_MOVE_GAP_MS + HIT_DELAY_MS + FLIGHT_MS);
+    expect(flightsEndMs([])).toBe(0);
   });
 });
 

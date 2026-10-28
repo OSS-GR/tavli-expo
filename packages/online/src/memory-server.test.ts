@@ -24,7 +24,7 @@ import { SERVER_ACTOR } from './calls';
 import { createMemoryGameServer } from './memory-server';
 import type { MemoryGameServer } from './memory-server';
 import { OnlineGameError, createOnlineMatch } from './online-game';
-import { motherPin, pickChoice, pickTurn } from './testing';
+import { lastBearOff, motherPin, pickChoice, pickTurn } from './testing';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -97,6 +97,15 @@ function contractSubject(): GameTransportContractSubject {
       const { flow, pin } = motherPin(plakoto);
       server.setFlowForTest(gameId, flow);
       await server.transportFor(BOB).sendTurn({ gameId, expectedVersion: 1, moves: pin });
+      return gameId;
+    },
+    createWinningTurn: async () => {
+      const gameId = server.createGame(ALICE, PLAYERS, 'portes', 3, 'live');
+      const portes = createOnlineMatch(
+        { choice: 'portes', targetPoints: 3, players: PLAYERS },
+        createSeededRng(1),
+      );
+      server.setFlowForTest(gameId, lastBearOff(portes));
       return gameId;
     },
     createOtherGame: async () =>
