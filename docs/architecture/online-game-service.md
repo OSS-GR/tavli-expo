@@ -9,7 +9,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | Path | What it holds |
 |---|---|
 | `apps/server/convex/schema.ts` | The tables: `games`, `moves` and `invites` |
-| `apps/server/convex/games.ts` | The Convex functions: `createGame`, `makeMove`, `answer`, `resign`, `getGame`, and the internal `checkTimeout`. They keep only the database and scheduler parts. |
+| `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign` and `getGame`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
 | `apps/server/convex/caller.ts` | `signedInPlayer(ctx)`: the caller's player id from the sign-in token ([Sign-in](#sign-in)) |
 | `apps/server/convex/convex.config.ts` | The Convex app: it uses the Better Auth component |
 | `apps/server/convex/auth.ts` | Better Auth: the component client and `createAuth` (anonymous, Expo and Convex plugins) |
@@ -101,15 +101,17 @@ client                     makeMove (one transaction)
 - **The server rests only where it waits for a player:** `moving` (play your roll) or `awaiting-answer` (a question). Everything else happens on the server, inside the same transaction (`advance`).
 - **A roll with no legal move** passes by itself, as in the engine flow. `game.lastTurn` shows the dice of the pass.
 - **Between games** the server starts the next game at once (with the opening roll, if the rules ask for one). The result of the finished game is in `match.games`.
-- **Opening roll:** the server rolls it in `createGame`. `chosenStarterRolls` is not supported online; no preset uses it.
+- **Opening roll:** the server rolls it when the game starts (`insertGame`). `chosenStarterRolls` is not supported online; no preset uses it.
 
 ### Other calls
 
-No call takes a player id. The caller is the signed-in user ([Sign-in](#sign-in)). With no sign-in, every call below except `checkTimeout` throws `NOT_SIGNED_IN`.
+No public call takes a player id. The caller is the signed-in user ([Sign-in](#sign-in)). With no sign-in, every public call below throws `NOT_SIGNED_IN`. A client cannot call the internal ones.
+
+A game between two people starts only from an accepted invite ([Invites](#invites)): `acceptInvite` calls `insertGame`. `createGame` is internal (#274), so no user can start a game with another user who did not agree.
 
 | Call | Who may call | Version | What it does |
 |---|---|---|---|
-| `createGame(players, choice, targetPoints, pace)` | one of the two players | – | New game at version 1. The opening and first roll are done, and the first turn's clock runs. Returns the id. |
+| `createGame(callerId, players, choice, targetPoints, pace)` | internal (tests, the Convex dashboard) | – | New game at version 1 through `insertGame`. The opening and first roll are done, and the first turn's clock runs. An internal call has no sign-in, so `callerId` names who starts the game; it must be one of the players. Returns the id. |
 | `makeMove(gameId, expectedVersion, moves)` | the player to move | yes | One full turn (above). Returns `{ ok: true, version }`, or `TIMED_OUT` ([Turn timers](#turn-timers)). |
 | `answer(gameId, expectedVersion, choice)` | the player the question asks | yes | Answers `prompt` (Plakoto mother question: `resign` or `playOn`; Asodio chosen double). Then the server rolls on. Returns like `makeMove`. |
 | `resign(gameId)` | either player, any time | no | Resigns the **match**; the opponent wins. No version, so a resign never fails only because the opponent just moved. It ignores the turn timer. Returns the new version. |
@@ -124,7 +126,7 @@ Every write call except `resign` takes `expectedVersion`. Convex mutations are s
 
 Owner answers Q3 and Q15: both **live** and **async** (slow) games. A turn lasts **1 minute live** and **24 hours async** (`TURN_TIME_MS` in contracts). When the time runs out, the player the server waits for **loses that game**. The match goes on with the next game, or ends if that game gave the last point.
 
-- **The deadline.** Every save that leaves the match running sets `turnDeadline = now + TURN_TIME_MS[pace]`: `createGame`, `makeMove`, `answer`, and a time out (the server's rolls and the next game happen in the same save). So each wait for a player gets a full turn time, also when the same player acts again (an Asodio extra roll, an answer and then a roll). A finished match has `turnDeadline: null`.
+- **The deadline.** Every save that leaves the match running sets `turnDeadline = now + TURN_TIME_MS[pace]`: the new game (`insertGame`), `makeMove`, `answer`, and a time out (the server's rolls and the next game happen in the same save). So each wait for a player gets a full turn time, also when the same player acts again (an Asodio extra roll, an answer and then a roll). A finished match has `turnDeadline: null`.
 - **The scheduler.** The same save schedules `internal.games.checkTimeout({ gameId, version })` with `ctx.scheduler.runAt(turnDeadline)`. Any later change bumps the version, so an old check does nothing. No cancel is needed. If a check ever runs before the deadline, it schedules itself again for the deadline.
 - **On a call.** `makeMove` and `answer` check the deadline after the version check. At or after the deadline (`now >= turnDeadline`), they save the time out instead of the call and return `{ ok: false, version, error: { code: 'TIMED_OUT', message } }`. This is a return value, not a thrown error: a thrown error rolls back the whole transaction, and so the time out too. A client adapter turns it into a `TIMED_OUT` rejection (the port's `sendTurn` / `sendAnswer`). The scheduled check for the old version then does nothing.
 - **The engine.** The time out is the engine game action `{ type: 'timeout', player }` (only the player the game waits for, not during the opening roll). It ends the game like a resign of that game (`resignGame`: mono 1 if the player has borne off a checker, else diplo 2), with `reason: 'timeout'` in `GameResult` and `GameRecord`. The engine has no clock: the server decides when time is up, with `Date.now()` inside the Convex function. The pure helpers `deadlineAfter`, `isTimedOut`, `timeOut`, `callTimedOut` and `scheduledCheck` in `@tavli/online` take `now` as an argument.
@@ -202,7 +204,6 @@ Every public function in `games.ts` and `invites.ts` gets the caller from `signe
 ### Not done yet
 
 - **Guest upgrade:** when a guest links Apple, Google or email, Better Auth makes a new user. Moving the guest's games and invites to the new id (`onLinkAccount`) comes with those sign-in methods.
-- **`createGame` is public:** a signed-in user can start a game with any player id they know, as long as they are one of the two players. The app starts games through invites. Make `createGame` internal, or check the other player, once the app no longer needs it.
 
 ## Invites
 
@@ -248,7 +249,7 @@ inviter                 server                                   friend
   │ ◄── getInvite / listMyInvites / getGame (reactive) ─────────► │ gameId
 ```
 
-`acceptInvite` and `createGame` share one helper: `insertGame` in `games.ts`. If the game cannot start, the whole call rolls back and the invite stays open.
+`acceptInvite` and the internal `createGame` share one helper: `insertGame` in `games.ts`. If the game cannot start, the whole call rolls back and the invite stays open.
 
 ### Calls
 
@@ -339,7 +340,7 @@ A deploy does not change the stored data. Convex refuses a schema that the store
 
 `createMemoryGameServer({ rng, now })` in `@tavli/online` (#251) runs the same model and the same call checks as the Convex functions, with games in a `Map`. The app, its tests and the Convex adapter can play against the real server model with no network and no account. Its API is in `packages/online/README.md`.
 
-- `createGame(callerId, players, choice, targetPoints, pace)` has the same rules as the Convex mutation. `transportFor(playerId)` gives that player's `GameTransport`.
+- `createGame(callerId, players, choice, targetPoints, pace)` has the same rules as the internal Convex `createGame`. `transportFor(playerId)` gives that player's `GameTransport`.
 - It acts like a network: `subscribe` calls `onView` on a later microtask (never inside the call), every call waits one microtask, and views, requests and log events are copies (a JSON round trip).
 - It has no sign-in: `transportFor(playerId)` stands for that user, signed in. Errors reject with plain `GameTransportErrorData`, with the server codes. A missing game calls `onError` with `NOT_FOUND`, and a stranger's `subscribe` calls it with `NOT_A_PLAYER`.
 - Time comes from `now()`. `runDueTimeouts()` is the in-memory `checkTimeout`: it applies every time out whose deadline has passed, each at its own deadline, like the scheduler. A late `sendTurn` gets `TIMED_OUT`, and the time out is saved.
@@ -370,7 +371,7 @@ Run it after you add or rename a file in `convex/`. The push also checks what a 
 
 ## Open points
 
-- **Sign-in follow-ups:** Apple, Google and email magic link; moving a guest's games after an upgrade; the app wiring of `@tavli/auth-better-auth`; the `createGame` exposure ([Not done yet](#not-done-yet)).
+- **Sign-in follow-ups:** Apple, Google and email magic link; moving a guest's games after an upgrade; the app wiring of `@tavli/auth-better-auth` ([Not done yet](#not-done-yet)).
 - **Invite limits:** nothing limits how many open invites one player makes, and nothing limits code guesses. With about 850 billion codes, a guess rarely hits. Add a cap and a rate limit per signed-in user.
 - **Verify the dice** on a real deployment: `crypto.getRandomValues` in a mutation gives different, unpredictable dice per call.
 - **App wiring of the Convex adapter:** `createConvexGameTransportFromUrl(convexUrl(), auth)` in `services.ts` (`apps/mobile/src/convexUrl.ts` gives the URL per app variant), once the auth wiring is there. One `ConvexClient` (`createConvexClient`) should serve the games and the invites.
