@@ -33,7 +33,7 @@ Online games talk to a Convex deployment (#257). The variant picks it:
 | Variant | Convex deployment | URL |
 | --- | --- | --- |
 | `development` | dev | `https://exciting-reindeer-792.eu-west-1.convex.cloud` |
-| `preview` | prod | `https://superb-dog-503.eu-west-1.convex.cloud` |
+| `preview` | dev | `https://exciting-reindeer-792.eu-west-1.convex.cloud` |
 | `production` | prod | `https://superb-dog-503.eu-west-1.convex.cloud` |
 
 Sign-in (Better Auth, #266) uses the same deployment's **site URL**: the same name with `.convex.site` in place of `.convex.cloud` (for example `https://superb-dog-503.eu-west-1.convex.site`).

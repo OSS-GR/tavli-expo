@@ -26,7 +26,7 @@ const CONVEX_PROD_URL = 'https://superb-dog-503.eu-west-1.convex.cloud';
 
 const VARIANTS = {
   development: { idSuffix: '.dev', nameSuffix: ' Dev', convexUrl: CONVEX_DEV_URL },
-  preview: { idSuffix: '.preview', nameSuffix: ' Preview', convexUrl: CONVEX_PROD_URL },
+  preview: { idSuffix: '.preview', nameSuffix: ' Preview', convexUrl: CONVEX_DEV_URL },
   production: { idSuffix: '', nameSuffix: '', convexUrl: CONVEX_PROD_URL },
 } as const;
 
