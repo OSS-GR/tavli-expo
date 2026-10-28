@@ -6,12 +6,21 @@ import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine
 import { createMemoryGameServer } from '@tavli/online';
 import { pickTurn } from '@tavli/online/testing';
 
+import { storeEvents } from '@/features/game/gameFeedback';
 import i18n from '@/i18n';
 import { botLevels, botRunner } from '@/services';
 
 import { onlineBoardStore } from './boardStore';
 import { clockText, clockTickMs } from './clock';
-import { DEV_BOT_ID, DEV_TICK_MS, startDevInvite, stopDevGame } from './devGame';
+import {
+  DEV_BOT_ID,
+  DEV_TICK_MS,
+  devGameRunning,
+  startDevGame,
+  startDevInvite,
+  stopAnyDevGame,
+  stopDevGame,
+} from './devGame';
 import { MAX_TRIES_PER_TURN, startOnlineBot, type OnlineBot } from './onlineBot';
 import { createOnlineStore, viewFlow, type OnlineStore } from './onlineStore';
 import { remoteTurn } from './remoteTurn';
@@ -170,6 +179,71 @@ describe('onlineBoardStore refusals', () => {
     expect(errors[0]).toMatch(/by itself/);
     stop();
   });
+
+  it('does not buzz for a call that did not go through or a lost connection', async () => {
+    const { server, gameId } = serverWithGame();
+    const real = server.transportFor('me');
+    let lost: ((error: unknown) => void) | undefined;
+    const store = createOnlineStore({
+      transport: {
+        subscribe: (id, onView, onError) => {
+          lost = onError;
+          return real.subscribe(id, onView, onError);
+        },
+        sendTurn: (request) => real.sendTurn(request),
+        sendAnswer: (request) => real.sendAnswer(request),
+        resign: () => Promise.reject(new Error('no network')),
+      },
+      gameId,
+      me: 'me',
+    });
+    open.push(store);
+    await flush();
+    const board = onlineBoardStore(store, gameId)!;
+    const before = board.getState();
+    const heard: unknown[] = [];
+    const stop = board.subscribe((state) => heard.push(state));
+    // The resign does not go through: the notice tells about it.
+    expect(board.getState().dispatch({ type: 'resignMatch', player: 'white' })).toBe(true);
+    await flush();
+    expect(store.getState().notice).toBe('sendFailed');
+    expect(store.getState().lastError).not.toBeNull();
+    // The connection drops.
+    lost!(new Error('offline'));
+    expect(store.getState().loadError).toBe('network');
+    expect(heard).toEqual([]);
+    expect(board.getState()).toBe(before);
+    expect(storeEvents(before, board.getState())).toEqual([]);
+    // A refused move still buzzes.
+    expect(board.getState().dispatch({ type: 'roll', player: 'white' })).toBe(false);
+    expect(storeEvents(before, board.getState())).toEqual(['invalidMove']);
+    stop();
+  });
+});
+
+describe('devGame', () => {
+  it('stops only the game it names, and the dev screen stops any', () => {
+    const server = createMemoryGameServer({ rng: createSeededRng(3), now: () => Date.now() });
+    const options = {
+      server,
+      me: 'me',
+      choice: 'portes',
+      pace: 'live',
+      targetPoints: 1,
+      difficulty: botLevels.portes[0]!,
+      runner: botRunner,
+      rng: createSeededRng(4),
+    } as const;
+    const game = startDevGame(options);
+    expect(server.getGame(game.gameId)?.players.black).toBe(DEV_BOT_ID);
+    stopDevGame('another-game');
+    expect(devGameRunning()).toBe(true);
+    stopDevGame(game.gameId);
+    expect(devGameRunning()).toBe(false);
+    startDevGame(options);
+    stopAnyDevGame();
+    expect(devGameRunning()).toBe(false);
+  });
 });
 
 describe('startOnlineBot', () => {
@@ -206,6 +280,38 @@ describe('startOnlineBot', () => {
     expect(sendTurn).toHaveBeenCalledTimes(MAX_TRIES_PER_TURN);
     expect(errors.map(String)).toContainEqual(expect.stringMatching(/gave up on version/));
     expect(server.getGame(gameId)!.waitingFor).toBe('black');
+  });
+
+  it('plays a view that came before it listened', async () => {
+    const { server, gameId } = serverWithGame();
+    while (server.getGame(gameId)!.waitingFor !== 'black') await playServerTurn(server, gameId);
+    const version = server.getGame(gameId)!.version;
+    const real = server.transportFor('bot');
+    open.push(
+      startOnlineBot({
+        // This transport gives the view at once, inside `subscribe`.
+        transport: {
+          subscribe: (id, onView, onError) => {
+            onView(server.getGame(id)!);
+            return real.subscribe(id, onView, onError);
+          },
+          sendTurn: (request) => real.sendTurn(request),
+          sendAnswer: (request) => real.sendAnswer(request),
+          resign: (id) => real.resign(id),
+        },
+        gameId,
+        botId: 'bot',
+        difficulty: botLevels.portes[0]!,
+        runner: botRunner,
+        rng: createSeededRng(2),
+        timing: { thinkMs: () => 0 },
+      }),
+    );
+    for (let i = 0; i < 50 && server.getGame(gameId)!.version === version; i++) {
+      jest.advanceTimersByTime(100);
+      await flush();
+    }
+    expect(server.getGame(gameId)!.version).toBeGreaterThan(version);
   });
 
   // Two bots, each on its own transport, play whole matches. They follow
@@ -248,7 +354,7 @@ describe('startOnlineBot', () => {
 });
 
 describe('startDevInvite (#256)', () => {
-  afterEach(() => stopDevGame());
+  afterEach(() => stopAnyDevGame());
 
   function devInvite() {
     const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => Date.now() });

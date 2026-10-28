@@ -51,6 +51,12 @@ export interface Flight {
    * one leg of `FLIGHT_MS` per stop, plus the last one.
    */
   readonly via?: readonly { readonly x: number; readonly y: number; readonly r: number }[];
+  /**
+   * Not drawn for this long after it starts (a whole turn, #255): the
+   * checker waits where an earlier flight lands, and that one is still in
+   * the air. Without it, one checker shows twice.
+   */
+  readonly hiddenMs?: number;
 }
 
 /** How long a flight is in the air: one `FLIGHT_MS` per leg. */
@@ -232,9 +238,10 @@ export const TURN_MOVE_GAP_MS = 100;
  * The flights of a whole turn that arrives at once: the other player's
  * turn in an online game (#255). The moves fly one after the other, each
  * `FLIGHT_MS + TURN_MOVE_GAP_MS` after the one before. Until its turn
- * comes, a checker waits at its start. `before` is the board before the
- * first move; the moves are replayed on it with the engine's
- * `applyMoveToBoard`.
+ * comes, a checker waits at its start. A checker that moves again (a
+ * double) waits where its last flight lands: it stays hidden until that
+ * flight is down (`hiddenMs`). `before` is the board before the first
+ * move; the moves are replayed on it with the engine's `applyMoveToBoard`.
  */
 export function turnFlights(
   geo: BoardGeometry,
@@ -249,12 +256,31 @@ export function turnFlights(
   moves.forEach((move, i) => {
     const after = applyMoveToBoard(board, mover, move, options.direction);
     const delay = i * (FLIGHT_MS + TURN_MOVE_GAP_MS);
+    const earlier = flights.length;
     for (const f of moveFlights(geo, view, mover, move, board, after, {
       id: `${options.id}:${i}`,
     })) {
-      flights.push({ ...f, delay: f.delay + delay });
+      const flight = { ...f, delay: f.delay + delay };
+      const lands = landsAt(flights.slice(0, earlier), flight);
+      flights.push(lands === null ? flight : { ...flight, hiddenMs: lands });
     }
     board = after;
   });
   return flights;
+}
+
+/**
+ * When the last of `earlier` that lands where `flight` starts is down (ms
+ * from the start), or `null` when none does.
+ */
+function landsAt(earlier: readonly Flight[], flight: Flight): number | null {
+  let down: number | null = null;
+  for (const e of earlier) {
+    const same =
+      e.owner === flight.owner &&
+      Math.abs(e.to.x - flight.from.x) < 0.5 &&
+      Math.abs(e.to.y - flight.from.y) < 0.5;
+    if (same) down = Math.max(down ?? 0, e.delay + flightMs(e));
+  }
+  return down;
 }

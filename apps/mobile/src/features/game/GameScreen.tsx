@@ -64,7 +64,15 @@ import {
   type PlayerId,
   type Rng,
 } from '@tavli/engine';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -648,7 +656,9 @@ export function GameScreen({
     );
   });
   const isOnline = online !== undefined;
-  useEffect(() => {
+  // A layout effect: the flights start in the same frame as the new
+  // board, so the turn's end never shows first for a frame.
+  useLayoutEffect(() => {
     const before = seenFlow.current;
     seenFlow.current = flow;
     if (isOnline && before !== flow) flyRemoteTurn(before, flow);

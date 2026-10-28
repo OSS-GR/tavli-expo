@@ -32,6 +32,7 @@ export function OnlineMatchEnd(props: OnlineMatchEndProps) {
 function OnlineMatchEndGame(props: OnlineMatchEndProps) {
   const { gameId, transport, me } = props;
   const store = useOnlineGame({ transport, gameId, me });
+  if (store === null) return <Waiting />;
   return <OnlineMatchEndView store={store} {...props} />;
 }
 
