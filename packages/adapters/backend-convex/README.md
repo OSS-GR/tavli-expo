@@ -35,13 +35,16 @@ The app wiring is a later issue. It will look like this, in `apps/mobile/src/ser
 ```ts
 import { createConvexGameTransportFromUrl } from '@tavli/backend-convex';
 
+import { convexUrl } from './convexUrl';
+
 // `auth` is the AuthProvider (`@tavli/auth-better-auth`).
-const games = createConvexGameTransportFromUrl(process.env.EXPO_PUBLIC_CONVEX_URL, auth);
+const url = convexUrl();
+const games = url === undefined ? undefined : createConvexGameTransportFromUrl(url, auth);
 ```
 
 `createConvexClient(url, auth)` makes the signed-in `ConvexClient` alone, so the invite calls can share one client (one socket) with the games later: `createConvexGameTransport({ client })`.
 
 ## Setup
 
-- `EXPO_PUBLIC_CONVEX_URL`: the deployment URL (`https://<name>.convex.cloud`). It is public. The owner gets it when the Convex project is made (#129), and sets it as an EAS environment variable.
+- The deployment URL comes from `convexUrl()` (`apps/mobile/src/convexUrl.ts`): `app.config.ts` sets it per app variant, and `EXPO_PUBLIC_CONVEX_URL` wins. See "Which server the app uses" in `docs/process/running-the-app.md`.
 - The sign-in setup is in [`../auth-better-auth/README.md`](../auth-better-auth/README.md).

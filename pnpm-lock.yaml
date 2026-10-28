@@ -223,6 +223,9 @@ importers:
       '@tavli/haptics-expo':
         specifier: workspace:*
         version: link:../../packages/adapters/haptics-expo
+      '@tavli/online':
+        specifier: workspace:*
+        version: link:../../packages/online
       '@tavli/storage-mmkv':
         specifier: workspace:*
         version: link:../../packages/adapters/storage-mmkv

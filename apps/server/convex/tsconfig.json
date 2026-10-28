@@ -1,0 +1,7 @@
+{
+  // `convex deploy` typechecks with this file (`tsc --project convex`) before
+  // it pushes. Without it, the deploy skips the typecheck. It uses the same
+  // settings as ../tsconfig.json, which `pnpm typecheck` uses.
+  "extends": "../tsconfig.json",
+  "include": ["."]
+}

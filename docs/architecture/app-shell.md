@@ -188,6 +188,26 @@ The player's past local matches and simple stats, offline.
 - **Change settings** ends the session and opens the new-game screen of the same mode, filled with the last choices. **Home** ends the session and goes Home (no Continue card: the match is over).
 - The win jingle (`matchWin`, `useGameFeedback`) plays on the board when the match ends. The match-end screen adds no sound.
 
+## Online games (#254)
+
+The app logic for one online game, with no screen yet. It lives in `features/online/`. The server is the truth: see "Move flow" and "Turn timers" in [Online game service](online-game-service.md).
+
+- **`createOnlineStore({ transport, gameId, me, now })`** (`onlineStore.ts`) is a Zustand store over the `GameTransport` port. `me` is the player id of this phone; the store finds your side in `view.players`. The calls carry no player id: the transport knows the caller.
+- **Views.** The store subscribes at once. Each view with a newer `version` replaces the local flow: `{ schemaVersion, match: view.match, game: view.game, log: [] }` (`viewFlow`). A repeat or an older version is ignored, so your local moves stay. `flow` and `view` are `null` until the first view arrives. A load error (for example `NOT_FOUND`) sets `loadError`.
+- **Your turn on the phone.** `dispatch` takes the engine's `MatchAction`s. `move` and `undo` go through `applyMatchAction` on the local flow, as in `gameStore.ts`: the engine is the only judge of a move, and Undo stays on the phone. The store follows the view (`waitingFor`, `prompt`, `game.state.toMove`), never "the players alternate": an Asodio turn can give you another roll.
+- **Calls.** `confirm` sends every move of the turn in order (`sendTurn` with the view's `version` as `expectedVersion`). A `move` with `autoConfirm` sends the turn as soon as it is complete (the engine never confirms online). `answer` (the Plakoto mother question, the Asodio chosen double) goes through `sendAnswer`, and `resignMatch` through `resign`. The engine checks a confirm and an answer first. Online there is no game resign: `resign` is refused.
+- **Sending.** From a call until the server has it **and** its new view is here, `sending` is `true` and every action is refused. A call that fails always clears it.
+- **Refused with no call:** the steps the server does by itself (`roll`, `rollOpening`, `nextGame`, `chooseStarter`, `timeout`), an action for the other side, a move, undo, confirm or answer when it is not your turn, any action before the first view, after the match or after `dispose()`. `resignMatch` works on either turn.
+- **Errors** set `notice` (the screen shows it, then calls `clearNotice`) and `lastError`:
+  - `STALE_VERSION` → `stale`: the local moves are dropped; the store shows the newest view.
+  - `TIMED_OUT` → `timedOut` ("Your time ran out"): the local moves are dropped. The server saved the time out, so its view follows.
+  - Any other server code → `refused`: the local moves are dropped.
+  - A network error (anything that is not `GameTransportErrorData`) → `sendFailed`: the local moves stay, so the player can confirm again.
+- **Time left** (`timeLeft.ts`, pure): `timeLeft(view, localNow, offset)` is `turnDeadline - (localNow + offset)`, never below 0, `null` when the match is over. The deadline is on the server clock. The store keeps `clockOffset` (server time - phone time): 0 for the first view after you open a game (it may be old), then the highest `estimateOffset` of the newer versions: `turnDeadline - TURN_TIME_MS[pace]` is the server time of that save. A view always arrives after its save, so an estimate is never above the true offset, and a late view (after a reconnect) cannot pull it down.
+- **`dispose()`** stops the subscription. The store then ignores every later view and call result.
+- **Not like `GameStoreState`.** The store has `flow`, `matchKey` (`o1`, `o2`, …), `lastError` and `dispatch` like the local store, so `GameScreen` can read it with few changes. But `flow` is `null` until the first view, there is no `rematch` (an online match has no rematch yet), and `dispatch(confirm)` returning `true` only means the call started: the result comes later (`sending`, `notice`, the next view). No analytics events are sent yet.
+- **Tests** (`onlineStore.test.ts`, `timeLeft.test.ts`) run the real server model: `createMemoryGameServer` from `@tavli/online` with two stores, one per player. The server runs no timers: a test moves its `now` and calls `runDueTimeouts()`. A wrapper transport rejects with a plain `Error` for a network error.
+
 ## Differences from the wireframes
 
 - The menu is a `Modal` sheet inside the board route, not a `menu.tsx` form-sheet route. So the board folder has no `menu.tsx`, and Settings from the menu is a push, not a modal.

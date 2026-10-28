@@ -22,6 +22,7 @@
     "@tavli/crash-sentry": "workspace:*",
     "@tavli/engine": "workspace:*",
     "@tavli/haptics-expo": "workspace:*",
+    "@tavli/online": "workspace:*",
     "@tavli/storage-mmkv": "workspace:*",
     "@tavli/themes": "workspace:*",
     "@tavli/ui": "workspace:*",
