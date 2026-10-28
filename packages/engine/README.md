@@ -786,7 +786,10 @@ interface Match {
   rotation entry. `missingVariants(match)` lists them up front.
 - `gameRules(match, variant)`: the game of `match.rules` uses those rules.
   The other games use their default preset with the same `match` group.
-  With the `tavli` match preset, every game uses its default preset.
+  With the `tavli` match preset, every game uses its default preset. A
+  rotation on a game preset plays that preset in that game only: the app's
+  Tavli match with Federation Plakoto (#247) is `plakoto.federation` with
+  the rotation Portes → Plakoto → Fevga.
 - `validateMatch(value)` checks a match from outside. Besides the shape, it
   checks that `score`, `rotationIndex`, `status`, `winner` and
   `nextStarter` fit the list of games. So the stored totals can never drift

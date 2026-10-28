@@ -11,7 +11,8 @@
  * (`match.openingRoll` in the engine). The hint under it says who starts
  * and how. Plakoto and Asodio also get the rules version (#241): the
  * engine preset of the match (`RULES_VERSIONS`). Its hint says what
- * changes. Games with one preset, and a Tavli match, show no version.
+ * changes. A Tavli match shows the version of its Plakoto game, "Rules
+ * version (Plakoto)" (#247). Portes and Fevga have one preset: no version.
  * Both groups have a "Standard" option, so each radio names its group for
  * screen readers (#243), for example "Opening roll: Standard".
  */
@@ -49,7 +50,7 @@ import {
   gamePreset,
   gameScoring,
   isGameOpen,
-  isVersionedGame,
+  versionedGameOf,
   type GameChoice,
   type GameLevels,
   type MatchLength,
@@ -125,8 +126,13 @@ export function NewGameScreen({
       : t(`newGame.houseRules.${openingRoll}Hint`);
 
   // The rules version (#241): only for a game with more than one preset.
-  const versionGame = isVersionedGame(game) ? game : null;
+  // A Tavli match picks the version of its Plakoto game (#247).
+  const versionGame = versionedGameOf(game);
   const version = versionGame === null ? null : rulesVersions[versionGame];
+  const versionLabel =
+    game === 'tavli'
+      ? t('newGame.houseRules.rulesVersionPlakoto')
+      : t('newGame.houseRules.rulesVersion');
   const versionOptions: SegmentOption<RulesVersion>[] =
     versionGame === null
       ? []
@@ -322,15 +328,15 @@ export function NewGameScreen({
             onChange={setOpeningRoll}
           />
           <Text style={styles.hint}>{openingHint}</Text>
-          {/* The rules version (#241): Plakoto and Asodio only. */}
+          {/* The rules version (#241): Plakoto and Asodio, and Tavli's Plakoto game (#247). */}
           {version !== null ? (
             <View style={styles.subPart}>
-              <Text style={styles.subLabel}>{t('newGame.houseRules.rulesVersion')}</Text>
+              <Text style={styles.subLabel}>{versionLabel}</Text>
               <SegmentedControl
                 testID="new-game-rules-version"
-                label={t('newGame.houseRules.rulesVersion')}
+                label={versionLabel}
                 options={versionOptions}
-                accessibilityLabelFor={houseRuleLabel(t('newGame.houseRules.rulesVersion'))}
+                accessibilityLabelFor={houseRuleLabel(versionLabel)}
                 value={version}
                 onChange={chooseVersion}
               />

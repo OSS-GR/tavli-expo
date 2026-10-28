@@ -10,9 +10,8 @@ import {
   gamePreset,
   isMatchLength,
   isOpeningRollRule,
-  isRulesVersion,
-  isVersionedGame,
   otherVersion,
+  versionsOfPreset,
   type MatchSetup,
 } from '@/features/match/setup';
 import { matchLabel } from '@/features/match/summary';
@@ -32,10 +31,7 @@ import { winRate, type StatLine } from './stats';
 export function recordSetup(record: HistoryRecord): MatchSetup {
   const base = defaultSetup(record.mode);
   const { game, preset } = record;
-  const rulesVersions =
-    isVersionedGame(game) && isRulesVersion(game, preset)
-      ? { ...base.rulesVersions, [game]: preset }
-      : base.rulesVersions;
+  const rulesVersions = versionsOfPreset(game, preset, base.rulesVersions);
   return {
     ...base,
     game,
@@ -56,7 +52,8 @@ export interface HistoryRow {
   /**
    * "You 3 – 1 Bot · first to 3". A house rule follows the length, with
    * New game's short label: "· Opening roll: Roll again" (#221), "· Rules
-   * version: Federation" (#241).
+   * version: Federation" (#241), in a Tavli match "· Rules version
+   * (Plakoto): Federation" (#247).
    */
   readonly score: string;
   readonly badge: ResultBadge;
@@ -133,10 +130,13 @@ export function historyRow(record: HistoryRecord, t: TFunction, locale: string):
     setup.openingRoll === DEFAULT_OPENING_ROLL
       ? null
       : t('history.openingRoll', { rule: t(`newGame.houseRules.${setup.openingRoll}`) }),
-    // The rules version (#241); the default preset shows nothing.
+    // The rules version (#241); the default preset shows nothing. A Tavli
+    // match names the game it is for (#247).
     version === null
       ? null
-      : t('history.rulesVersion', { version: t(`newGame.rulesVersion.${VERSION_KEYS[version]}`) }),
+      : t(setup.game === 'tavli' ? 'history.rulesVersionPlakoto' : 'history.rulesVersion', {
+          version: t(`newGame.rulesVersion.${VERSION_KEYS[version]}`),
+        }),
     // A resigned match keeps its score (#181): say who resigned it.
     record.resignedBy === null
       ? null

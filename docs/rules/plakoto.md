@@ -96,7 +96,7 @@ Only the path from own 24 to own 1 counts.
 
 ### Mother (μάνα) rule — federation version
 
-> **App default is `offerConcede`** (owner's choice): the pinned player may resign for 2 points or play on. See the flags table. The federation version below is a preset (`plakoto.federation`). The app offers it on New game → House rules → Rules version → **Federation** (#241).
+> **App default is `offerConcede`** (owner's choice): the pinned player may resign for 2 points or play on. See the flags table. The federation version below is a preset (`plakoto.federation`). The app offers it on New game → House rules → Rules version → **Federation** (#241), for a Plakoto match and for the Plakoto game of a Tavli match (#247).
 
 Let A's mother be pinned by B (B has a checker on A's point 24 = B's point 1,
 on top of A's last checker there).

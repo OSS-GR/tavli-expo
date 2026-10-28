@@ -364,6 +364,30 @@ describe('app navigation', () => {
     expect(router.getPathname()).toBe('/rules/portes');
   });
 
+  it('opens the rules of the Plakoto game of a Tavli match in its version (#247)', async () => {
+    const user = setupUser();
+    const session = matchSessions.start({
+      ...defaultSetup('local'),
+      game: 'tavli',
+      rulesVersions: { ...defaultSetup('local').rulesVersions, plakoto: 'plakoto.federation' },
+    });
+    const { dispatch } = session.store.getState();
+    // Game 1 (Portes, its default rules) ends with a resign; game 2 is Plakoto.
+    dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+    dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+    expect(session.store.getState().flow.game.state.rules.presetId).toBe('portes');
+    dispatch({ type: 'resign', player: 'white' });
+    dispatch({ type: 'nextGame' });
+    expect(session.store.getState().flow.game.state.rules.presetId).toBe('plakoto.federation');
+
+    const router = await renderRouter('./src/app', { initialUrl: `/game/${session.id}` });
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: 'How to play Plakoto' }));
+    expect(router.getPathname()).toBe('/rules/plakoto');
+    expect(router.getSearchParams()).toMatchObject({ version: 'plakoto.federation' });
+    expect(screen.getByTestId('rules-section-version')).toBeOnTheScreen();
+  });
+
   it('opens the Plakoto rules page', async () => {
     await renderRouter('./src/app', { initialUrl: '/rules/plakoto' });
     expect(screen.getByTestId('rules-section-mother')).toBeOnTheScreen();
