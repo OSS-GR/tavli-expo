@@ -15,9 +15,10 @@
  *
  * Time comes from the `now` option. Nothing runs on a timer: call
  * `runDueTimeouts()` to apply the time outs whose deadline has passed (the
- * in-memory version of the Convex `checkTimeout`). Invites need no timer:
- * like on Convex, an open invite counts as expired once `now()` reaches
- * its `expiresAt`.
+ * in-memory version of the Convex `checkTimeout`). Like on Convex, an
+ * open invite counts as expired once `now()` reaches its `expiresAt`;
+ * `runDueTimeouts()` also marks it `expired` and tells its watchers (the
+ * in-memory version of the Convex `expireInvite`).
  */
 
 import { normalizeInviteCode } from '@tavli/contracts';
@@ -50,6 +51,7 @@ import {
   InviteError,
   checkAnswer,
   checkCancel,
+  isInviteExpired,
   newInvite,
   pickInviteCodeNow,
   toInviteView,
@@ -126,7 +128,8 @@ export interface MemoryGameServer {
   /**
    * The invites of `playerId`: every call comes from that player, as with
    * `transportFor`. `acceptInvite` starts the game as the Convex
-   * `acceptInvite` does (the inviter plays white).
+   * `acceptInvite` does (the inviter plays white). `watchInvite` sends a
+   * view on a later microtask after each change.
    */
   invitesFor(playerId: string): Invites;
   /** The invite as a client sees it at `now()` (a copy), or `null` when no invite has the code. */
@@ -140,6 +143,9 @@ export interface MemoryGameServer {
    * Convex scheduler, it runs each check at its deadline: a game that
    * waited two turn times loses two games. Returns how many time outs it
    * applied.
+   *
+   * It also marks each open invite whose time is up `expired`, and sends
+   * the new view to its watchers (not counted in the result).
    */
   runDueTimeouts(): number;
   /**
@@ -164,6 +170,13 @@ interface MemoryGame extends SavedGame {
 interface Listener {
   readonly gameId: string;
   readonly onView: (view: OnlineGameView) => void;
+  active: boolean;
+}
+
+interface InviteListener {
+  /** The normalized code, or `null` for text that is not a code. */
+  readonly code: string | null;
+  readonly onView: (view: InviteView | null) => void;
   active: boolean;
 }
 
@@ -201,8 +214,9 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const { rng, now } = options;
   const games = new Map<string, MemoryGame>();
   const listeners = new Set<Listener>();
-  /** By code (capital letters). */
+  /** By code (capital letters). Kept in the order they were made. */
   const invites = new Map<string, InviteRecord>();
+  const inviteListeners = new Set<InviteListener>();
   let nextId = 1;
 
   function viewOf(game: MemoryGame): OnlineGameView {
@@ -382,6 +396,53 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     return invite === undefined ? null : toInviteView(invite, now());
   }
 
+  /** Sends the view of `code` as it is now to `listener` on a later microtask, unless it stops first. */
+  function sendInvite(listener: InviteListener): void {
+    const text = JSON.stringify(listener.code === null ? null : inviteView(listener.code));
+    later(() => {
+      if (listener.active) listener.onView(JSON.parse(text) as InviteView | null);
+    });
+  }
+
+  /** Saves the invite and sends its new view to each watcher of its code. */
+  function saveInvite(invite: InviteRecord): void {
+    invites.set(invite.code, invite);
+    for (const listener of inviteListeners) {
+      if (listener.code === invite.code) sendInvite(listener);
+    }
+  }
+
+  function makeInvite(
+    callerId: string,
+    choice: OnlineGameChoice,
+    targetPoints: number,
+    pace: OnlineGamePace,
+  ): string {
+    const options = { from: callerId, choice, targetPoints, pace };
+    // Check the arguments before a code is drawn, as the Convex function
+    // throws before it saves anything.
+    const invite = newInvite(options, '', now());
+    const code = pickInviteCodeNow(rng, (taken) => invites.has(taken));
+    saveInvite({ ...invite, code });
+    return code;
+  }
+
+  function cancel(callerId: string, text: string): void {
+    const invite = loadInvite(text);
+    checkCancel(invite, callerId, now());
+    saveInvite({ ...invite, status: 'cancelled' });
+  }
+
+  /** The open invites of `playerId` at `now()`, newest first, like the Convex `listMyInvites`. */
+  function openInvitesOf(playerId: string): InviteView[] {
+    const at = now();
+    return [...invites.values()]
+      .filter((invite) => invite.from === playerId && invite.status === 'open')
+      .filter((invite) => !isInviteExpired(invite, at))
+      .reverse()
+      .map((invite) => toInviteView(invite, at));
+  }
+
   /** Runs `step` on a later microtask; errors reject as plain data. */
   async function inviteCall<T>(step: () => T): Promise<T> {
     await nextTick();
@@ -410,7 +471,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             invite.targetPoints,
             invite.pace,
           );
-          invites.set(invite.code, { ...invite, status: 'accepted', gameId });
+          saveInvite({ ...invite, status: 'accepted', gameId });
           return gameId;
         });
       },
@@ -418,8 +479,28 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         return inviteCall(() => {
           const invite = loadInvite(text);
           checkAnswer(invite, playerId, now());
-          invites.set(invite.code, { ...invite, status: 'declined' });
+          saveInvite({ ...invite, status: 'declined' });
         });
+      },
+      createInvite(game) {
+        const { choice, targetPoints, pace } = copy(game);
+        return inviteCall(() => makeInvite(playerId, choice, targetPoints, pace));
+      },
+      cancelInvite(text) {
+        return inviteCall(() => cancel(playerId, text));
+      },
+      listMyInvites() {
+        return inviteCall(() => openInvitesOf(playerId));
+      },
+      watchInvite(text, onView) {
+        // Like the Convex `getInvite`, text that is not a code sends `null`.
+        const listener: InviteListener = { code: normalizeInviteCode(text), onView, active: true };
+        inviteListeners.add(listener);
+        sendInvite(listener);
+        return () => {
+          listener.active = false;
+          inviteListeners.delete(listener);
+        };
       },
     };
   }
@@ -427,18 +508,9 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   return {
     createGame,
 
-    createInvite(callerId, choice, targetPoints, pace) {
-      const code = pickInviteCodeNow(rng, (taken) => invites.has(taken));
-      const options = { from: callerId, choice, targetPoints, pace };
-      invites.set(code, newInvite(options, code, now()));
-      return code;
-    },
+    createInvite: makeInvite,
 
-    cancelInvite(callerId, text) {
-      const invite = loadInvite(text);
-      checkCancel(invite, callerId, now());
-      invites.set(invite.code, { ...invite, status: 'cancelled' });
-    },
+    cancelInvite: cancel,
 
     invitesFor,
 
@@ -467,6 +539,9 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           applied += 1;
           game = games.get(gameId);
         }
+      }
+      for (const invite of invites.values()) {
+        if (isInviteExpired(invite, at)) saveInvite({ ...invite, status: 'expired' });
       }
       return applied;
     },

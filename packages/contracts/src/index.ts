@@ -72,7 +72,14 @@ export {
   isInviteErrorData,
   normalizeInviteCode,
 } from './invite';
-export type { InviteErrorCode, InviteErrorData, InviteStatus, InviteView, Invites } from './invite';
+export type {
+  InviteErrorCode,
+  InviteErrorData,
+  InviteStatus,
+  InviteView,
+  Invites,
+  NewInvite,
+} from './invite';
 export {
   AUTH_ERROR_CODES,
   MEMORY_AUTH_TOKEN_PREFIX,

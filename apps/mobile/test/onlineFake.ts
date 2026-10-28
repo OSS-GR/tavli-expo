@@ -11,8 +11,11 @@
  * - `onlineServer()` and `gameTransportFor(playerId)` are the dev game
  *   parts (`/dev/online`): the server itself, and one cached transport
  *   per player.
+ * - `invites` is the `Invites` port on the server as the signed-in user
+ *   (#281), like the Convex adapter. With nobody signed in it fails
+ *   `NOT_SIGNED_IN`.
  * - `invitesFor(playerId)` is the `Invites` port of a player on the same
- *   server (#256), so an accepted invite starts its game there.
+ *   server (#256): the dev invites, and a friend in a test.
  *
  * A test makes games with `onlineFake.server().createGame(...)`. Each test
  * starts with a new server, no cached transports and nobody signed in
@@ -71,6 +74,43 @@ function caller(): GameTransport | null {
   return user === null ? null : transportFor(user.id);
 }
 
+/** The `Invites` of the signed-in user, or `null` when nobody is signed in. */
+function inviter(): Invites | null {
+  const user = auth.currentUser();
+  return user === null ? null : invitesFor(user.id);
+}
+
+/** A rejection like the server's, when nobody is signed in. */
+function notSignedIn(): Promise<never> {
+  return Promise.reject({ ...NOT_SIGNED_IN });
+}
+
+/**
+ * The Convex invites of the app (`invites` of `@/services`): each call
+ * comes from the user signed in to `auth` at that moment, like the Convex
+ * adapter with the sign-in token. With nobody signed in it fails
+ * `NOT_SIGNED_IN`.
+ */
+const invites: Invites = {
+  createInvite: (game) => inviter()?.createInvite(game) ?? notSignedIn(),
+  getInvite: (code) => inviter()?.getInvite(code) ?? notSignedIn(),
+  watchInvite(code, onView, onError) {
+    const port = inviter();
+    if (port !== null) return port.watchInvite(code, onView, onError);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) onError?.({ ...NOT_SIGNED_IN });
+    });
+    return () => {
+      active = false;
+    };
+  },
+  acceptInvite: (code) => inviter()?.acceptInvite(code) ?? notSignedIn(),
+  declineInvite: (code) => inviter()?.declineInvite(code) ?? notSignedIn(),
+  cancelInvite: (code) => inviter()?.cancelInvite(code) ?? notSignedIn(),
+  listMyInvites: () => inviter()?.listMyInvites() ?? notSignedIn(),
+};
+
 const games: GameTransport = {
   subscribe(gameId, onView, onError) {
     const transport = caller();
@@ -92,6 +132,7 @@ const games: GameTransport = {
 export const onlineFake = {
   auth,
   games,
+  invites,
   /** Where the fake keeps the session. Set `session` to sign a user in at once. */
   authStore,
   /** The in-memory server of the current test. */

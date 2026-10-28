@@ -24,7 +24,7 @@ import type { MemoryGameServer } from '@tavli/online';
 import type { BotTiming } from '@/features/bot/botTurn';
 import { onInviteAccepted } from '@/features/invites/acceptedInvite';
 
-import { rememberDevGame } from './devGameIds';
+import { rememberDevGame, rememberDevInvite } from './devGameIds';
 import { startOnlineBot } from './onlineBot';
 
 /** The bot's player id in a dev game. */
@@ -133,11 +133,16 @@ export interface DevInvite {
  *
  * It also looks at once after each Accept on this phone
  * (`onInviteAccepted`), so the bot starts without waiting for a tick.
+ * That look also marks the game a dev game (`playDevGame` →
+ * `rememberDevGame`) before the invite route opens it, so the board
+ * plays it on the in-memory server.
  */
 export function startDevInvite(options: DevMatchOptions): DevInvite {
   current?.stop();
   const { server } = options;
   const code = server.createInvite(DEV_BOT_ID, options.choice, options.targetPoints, options.pace);
+  // The invite route opens this code on the in-memory server, not on Convex.
+  rememberDevInvite(code);
   const check = () => {
     if (current !== invite) return;
     const view = server.getInvite(code);

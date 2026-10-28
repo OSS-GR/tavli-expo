@@ -38,6 +38,7 @@ jest.mock('@/services', () => {
     analyzer: createAnalyzer(),
     auth: onlineFake.auth,
     games: onlineFake.games,
+    invites: onlineFake.invites,
     onlineServer: onlineFake.server,
     onlinePlayerId: 'me',
     gameTransportFor: onlineFake.transportFor,

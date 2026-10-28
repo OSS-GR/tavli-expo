@@ -1,10 +1,8 @@
 // The Convex client adapter (`@tavli/backend-convex`, #253) against the
-// real Convex functions, offline. A fake Convex client runs each call
-// through convex-test as one signed-in user (`t.withIdentity`). After
-// each mutation it runs the watched queries again, like the real client,
-// which sends new query results before the mutation resolves. The
-// `GameTransport` contract checks (`@tavli/contracts/testing`) then run
-// on top.
+// real Convex functions, offline. A fake Convex client (`test.network.ts`)
+// runs each call through convex-test as one signed-in user
+// (`t.withIdentity`). The `GameTransport` contract checks
+// (`@tavli/contracts/testing`) then run on top.
 
 import { convexTest } from 'convex-test';
 import { getFunctionName } from 'convex/server';
@@ -31,6 +29,7 @@ import { motherPin } from '@tavli/online/testing';
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import schema from './schema';
+import { convexTestNetwork } from './test.network';
 import { modules, pickTurn } from './test.setup';
 
 const ALICE = 'alice';
@@ -62,87 +61,13 @@ afterEach(() => {
 type AnyQuery = FunctionReference<'query'>;
 type AnyMutation = FunctionReference<'mutation'>;
 
-/** A query the fake client watches. */
-interface Watched {
-  readonly refresh: () => Promise<void>;
-}
-
-/**
- * Fake Convex clients over one convex-test backend, one client per
- * signed-in user. `settle()` waits until every query run has finished.
- */
-function convexTestNetwork(t: Tester) {
-  const watched = new Set<Watched>();
-  const pending = new Set<Promise<void>>();
-
-  function track(work: Promise<void>): void {
-    pending.add(work);
-    const done = () => {
-      pending.delete(work);
-    };
-    work.then(done, done);
-  }
-
-  async function refreshAll(): Promise<void> {
-    await Promise.all([...watched].map((query) => query.refresh()));
-  }
-
-  function clientFor(subject: string): ConvexGameClient {
-    const user = t.withIdentity({ subject });
-    return {
-      onUpdate(query, args, onResult, onError) {
-        let active = true;
-        // Like Convex: a result goes out only when it changed.
-        let last: string | undefined;
-        // One run at a time, so an old result never comes after a new one.
-        let queue = Promise.resolve();
-        const runOnce = async () => {
-          let key: string;
-          let deliver: () => void;
-          try {
-            const result = await user.query(query as AnyQuery, args);
-            key = `result:${JSON.stringify(result)}`;
-            deliver = () => onResult(result);
-          } catch (error) {
-            key = `error:${String(error)}`;
-            deliver = () => onError(error as Error);
-          }
-          if (!active || key === last) return;
-          last = key;
-          deliver();
-        };
-        const entry: Watched = {
-          refresh: () => {
-            queue = queue.then(runOnce);
-            track(queue);
-            return queue;
-          },
-        };
-        watched.add(entry);
-        void entry.refresh();
-        return () => {
-          active = false;
-          watched.delete(entry);
-        };
-      },
-      async mutation(fn, args) {
-        try {
-          return await user.mutation(fn as AnyMutation, args);
-        } finally {
-          // The real client has the new query results before the mutation resolves.
-          await refreshAll();
-        }
-      },
-    };
-  }
-
+/** Game transports on fake Convex clients over one backend (`test.network.ts`). */
+function gameNetwork(t: Tester) {
+  const network = convexTestNetwork(t);
   return {
     transportFor: (subject: string): GameTransport =>
-      createConvexGameTransport({ client: clientFor(subject) }),
-    settle: async () => {
-      await Promise.all([...pending]);
-      await Promise.resolve();
-    },
+      createConvexGameTransport({ client: network.clientFor(subject) }),
+    settle: network.settle,
   };
 }
 
@@ -157,7 +82,7 @@ async function createGame(t: Tester, game: GameTransportContractGame): Promise<I
 
 function contractSubject(): GameTransportContractSubject {
   const t = setup();
-  const network = convexTestNetwork(t);
+  const network = gameNetwork(t);
   const picker = createSeededRng(8);
   return {
     createGame: (game) => createGame(t, game),
@@ -207,7 +132,7 @@ describe('the adapter on the real functions', () => {
 
   it('a late turn rejects with TIMED_OUT, and both players see the time out', async () => {
     const t = setup();
-    const network = convexTestNetwork(t);
+    const network = gameNetwork(t);
     const gameId = await createGame(t, { choice: 'portes', targetPoints: 5, pace: 'live' });
     const views: OnlineGameView[] = [];
     const stop = network.transportFor(BOB).subscribe(gameId, (view) => views.push(view));
@@ -267,7 +192,7 @@ describe('the adapter on the real functions', () => {
 
   it('a string that is no game id fails argument validation: a plain error, not port data', async () => {
     const t = setup();
-    const network = convexTestNetwork(t);
+    const network = gameNetwork(t);
     const transport = network.transportFor(ALICE);
     const reason = await reasonOf(transport.resign('not-a-game-id'));
     expect(reason).toBeInstanceOf(Error);

@@ -1,24 +1,26 @@
 /**
- * Online play (#266): sign-in (`AuthProvider`) and online games
- * (`GameTransport`), built on first use.
+ * Online play (#266, #281): sign-in (`AuthProvider`), online games
+ * (`GameTransport`) and invites (`Invites`), built on first use.
  *
  * `services.ts` passes the adapters. This file imports none, so Jest can
  * test it with fakes. Nothing here runs at app start:
  * - the sign-in client is made on the first call to `auth`;
- * - the Convex client (one socket) opens on the first call to `games`.
+ * - the Convex client (one socket) opens on the first call to `games` or
+ *   `invites`; both share it.
  *
  * No call here makes an account. A guest account is made only when a
- * screen calls `auth.signInAsGuest()`, when the user first opens online
- * play. Never send the user id to analytics.
+ * screen calls `auth.signInAsGuest()`: when the user makes or opens an
+ * invite (`features/online/account.ts`). Never send the user id to analytics.
  */
-import type { AuthProvider, GameTransport } from '@tavli/contracts';
+import type { AuthProvider, GameTransport, Invites } from '@tavli/contracts';
 
 import type { ConvexServer } from './convexUrl';
 
-/** Sign-in and online games. Both share one signed-in client. */
+/** Sign-in, online games and invites. Games and invites share one signed-in client. */
 export interface OnlineServices {
   readonly auth: AuthProvider;
   readonly games: GameTransport;
+  readonly invites: Invites;
 }
 
 /** How to make the real parts. `services.ts` passes the adapters. */
@@ -29,6 +31,8 @@ export interface OnlineAdapters<Client> {
   createClient(url: string, auth: AuthProvider): Client;
   /** The game transport on the shared client. */
   createGames(client: Client): GameTransport;
+  /** The invites on the shared client. */
+  createInvites(client: Client): Invites;
 }
 
 /** Calls `make` once, on the first call, and keeps the result. */
@@ -62,6 +66,19 @@ export function lazyGameTransport(get: () => GameTransport): GameTransport {
   };
 }
 
+/** An `Invites` port that makes the real one on its first call. */
+export function lazyInvites(get: () => Invites): Invites {
+  return {
+    createInvite: (game) => get().createInvite(game),
+    getInvite: (code) => get().getInvite(code),
+    watchInvite: (code, onView, onError) => get().watchInvite(code, onView, onError),
+    acceptInvite: (code) => get().acceptInvite(code),
+    declineInvite: (code) => get().declineInvite(code),
+    cancelInvite: (code) => get().cancelInvite(code),
+    listMyInvites: () => get().listMyInvites(),
+  };
+}
+
 /**
  * The online services for `server`, or `undefined` when this build has
  * no server (`convexServer()` is `undefined`): then online play is off.
@@ -72,8 +89,13 @@ export function createOnlineServices<Client>(
 ): OnlineServices | undefined {
   if (server === undefined) return undefined;
   const auth = once(() => adapters.createAuth(server.siteUrl));
-  // Later the invite calls take this same client (one socket).
+  // Games and invites share this client (one socket).
   const client = once(() => adapters.createClient(server.url, auth()));
   const games = once(() => adapters.createGames(client()));
-  return { auth: lazyAuthProvider(auth), games: lazyGameTransport(games) };
+  const invites = once(() => adapters.createInvites(client()));
+  return {
+    auth: lazyAuthProvider(auth),
+    games: lazyGameTransport(games),
+    invites: lazyInvites(invites),
+  };
 }

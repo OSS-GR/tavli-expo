@@ -112,23 +112,56 @@ export function isInviteErrorData(value: unknown): value is InviteErrorData {
   );
 }
 
+/** The game an invite offers: what the inviter picks. Plain JSON. */
+export interface NewInvite {
+  readonly choice: OnlineGameChoice;
+  /** The match length in points (an integer of 1 or more). */
+  readonly targetPoints: number;
+  readonly pace: OnlineGamePace;
+}
+
 /**
- * The invite port (#256): what the app needs to answer an invite. The
- * adapter knows who the caller is (the signed-in user), as in
- * `GameTransport`, so no call carries a player id. Each call takes the
- * code in any case.
+ * The invite port (#256, #281): make an invite, watch it, and answer one.
+ * The adapter knows who the caller is (the signed-in user), as in
+ * `GameTransport`, so no call carries a player id. Each call that takes a
+ * code takes it in any case.
  *
- * Making and sharing an invite from the app is a later issue, so the
- * port has no `createInvite` yet. The contract checks are
- * `invitesContract` in `@tavli/contracts/testing`.
+ * Adapters: the in-memory server (`createMemoryGameServer` in
+ * `@tavli/online`) and the Convex client (`createConvexInvites` in
+ * `@tavli/backend-convex`). The contract checks are `invitesContract` in
+ * `@tavli/contracts/testing`.
  */
 export interface Invites {
+  /**
+   * Makes an open invite from the caller. It expires `INVITE_TIME_MS`
+   * later. Resolves with its code (capital letters). Rejects with
+   * `InviteErrorData`: `BAD_REQUEST` for a bad match length,
+   * `NOT_SIGNED_IN` with no sign-in.
+   */
+  createInvite(game: NewInvite): Promise<string>;
   /**
    * The invite with this code, or `null` when no invite has it (also for
    * text that cannot be a code). An open invite whose time is up shows
    * `expired`.
    */
   getInvite(code: string): Promise<InviteView | null>;
+  /**
+   * Watches the invite: `onView` gets the invite now and after every
+   * change (`null` when no invite has the code), until the returned
+   * function is called. Like `GameTransport.subscribe`, it never calls
+   * back inside `watchInvite` or after the stop function, and each view
+   * is a copy. A failure goes to `onError` (`InviteErrorData` from the
+   * server, or a network error as it is).
+   *
+   * The server marks an invite `expired` when its time is up, so a
+   * watcher sees that too (the in-memory server does it in
+   * `runDueTimeouts`).
+   */
+  watchInvite(
+    code: string,
+    onView: (view: InviteView | null) => void,
+    onError?: (error: unknown) => void,
+  ): () => void;
   /**
    * Accepts the invite and starts the game (the inviter plays white).
    * Resolves with the `gameId`. Rejects with `InviteErrorData`:
@@ -138,4 +171,12 @@ export interface Invites {
   acceptInvite(code: string): Promise<string>;
   /** Says no to the invite. Rejects like `acceptInvite`. */
   declineInvite(code: string): Promise<void>;
+  /**
+   * The inviter takes the invite back. Rejects with `InviteErrorData`:
+   * `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`,
+   * `NOT_YOUR_INVITE` or `BAD_REQUEST`.
+   */
+  cancelInvite(code: string): Promise<void>;
+  /** The open invites the caller made, newest first. Invites whose time is up are left out. */
+  listMyInvites(): Promise<InviteView[]>;
 }
