@@ -1,6 +1,6 @@
 import { createSeededRng, type MatchFlow } from '@tavli/engine';
 
-import { flowEvents, isHumanWin, storeEvents } from './gameFeedback';
+import { flowEvents, isHumanWin, moveEvent, storeEvents } from './gameFeedback';
 import { createGameStore } from './gameStore';
 
 function newStore() {
@@ -125,6 +125,20 @@ describe('flowEvents', () => {
     expect(eventsOf(store, () => dispatch({ type: 'undo', player: 'white' }))).toEqual([]);
     dispatch({ type: 'resign', player: 'white' });
     expect(eventsOf(store, () => rematch())).toEqual([]);
+  });
+
+  it('plays the first move on a flow with an empty log (an online view, #271)', () => {
+    const view: MatchFlow = { ...opened().getState().flow, log: [] };
+    expect(flowEvents(view, withMove(view, { from: 13, to: 7, die: 6 }))).toEqual(['checkerPlace']);
+  });
+});
+
+describe('moveEvent', () => {
+  it('names the sound of one move', () => {
+    expect(moveEvent({ capture: 'none', to: 7 })).toBe('checkerPlace');
+    expect(moveEvent({ capture: 'hit', to: 7 })).toBe('checkerHit');
+    expect(moveEvent({ capture: 'pin', to: 7 })).toBe('checkerHit');
+    expect(moveEvent({ capture: 'none', to: 'off' })).toBe('bearOff');
   });
 });
 
