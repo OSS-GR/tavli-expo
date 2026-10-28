@@ -301,6 +301,75 @@
       "body": "Check the connection and try again.",
       "retry": "Try again"
     },
+    "account": {
+      "title": "Game invite",
+      "body": "A friend sent you an invite to an online game. An online game needs a free account. We make a guest account for you, with no name and no email.",
+      "show": "Show the invite",
+      "busy": "Making your free account…",
+      "failed": "Your free account was not made. Check the connection and try again."
+    },
+    "off": {
+      "title": "Online play is off",
+      "body": "This version of the app cannot play online."
+    },
+    "home": "Home"
+  },
+  "friend": {
+    "title": "Play a friend online",
+    "back": "Back",
+    "intro": "Pick the game. You get a link to send to a friend, and the game starts when they accept.",
+    "game": "Game",
+    "length": "Match length",
+    "pace": "Pace",
+    "live": "Live",
+    "async": "Async",
+    "account": "An online game needs a free account. We make a guest account for you, with no name and no email.",
+    "make": "Make an invite",
+    "making": "Making the invite…",
+    "makeFailed": "The invite was not made. Check the connection and try again.",
+    "accountFailed": "Your free account was not made. Check the connection and try again.",
+    "tooMany": "You have {{max}} open invites. Wait until a friend answers one, or until one expires, then make a new one.",
+    "wait": {
+      "title": "Send the invite",
+      "body": "Send this link to a friend. The game starts when they accept.",
+      "code": "Code",
+      "link": "Link",
+      "share": "Share the invite",
+      "shareMessage": "Play tavli with me on Tavlaki. Open this link to join: {{link}} (code {{code}})",
+      "status": "Waiting for your friend…",
+      "stay": "Keep this screen open until your friend joins. The invite stays open for 24 hours.",
+      "cancel": "Cancel the invite",
+      "cancelling": "Cancelling…",
+      "cancelFailed": "The invite was not cancelled. Check the connection and try again.",
+      "loading": "Loading the invite…"
+    },
+    "joined": {
+      "title": "Your friend joined",
+      "body": "The game opens now.",
+      "open": "Open the game"
+    },
+    "declined": {
+      "title": "Your friend said no",
+      "body": "Make a new invite to try again."
+    },
+    "expired": {
+      "title": "The invite expired",
+      "body": "Nobody accepted it within 24 hours. Make a new one."
+    },
+    "cancelled": {
+      "title": "The invite is cancelled",
+      "body": "Nobody can accept it now."
+    },
+    "notFound": {
+      "title": "Invite not found",
+      "body": "This invite is not on this phone. Make a new one."
+    },
+    "failed": {
+      "title": "The invite did not load",
+      "body": "Check the connection and try again.",
+      "retry": "Try again"
+    },
+    "again": "Make a new invite",
     "home": "Home"
   },
   "game": {

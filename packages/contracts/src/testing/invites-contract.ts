@@ -248,7 +248,11 @@ export function invitesContract(): InvitesContractCheck[] {
       name: 'createInvite resolves with a new code, and the inviter is the caller',
       run: async (subject) => {
         const invites = subject.invitesFor('inviter');
-        const first = await invites.createInvite({ choice: 'tavli', targetPoints: 3, pace: 'live' });
+        const first = await invites.createInvite({
+          choice: 'tavli',
+          targetPoints: 3,
+          pace: 'live',
+        });
         const second = await invites.createInvite(FEVGA);
         checkCode(first);
         checkCode(second);
@@ -335,7 +339,11 @@ export function invitesContract(): InvitesContractCheck[] {
           'the open invites',
         );
         same(mine[0], await viewOf(invites, second), 'a listed invite');
-        same(await subject.invitesFor('other').listMyInvites(), [], 'the invites of another player');
+        same(
+          await subject.invitesFor('other').listMyInvites(),
+          [],
+          'the invites of another player',
+        );
         await subject.passTime(INVITE_TIME_MS);
         same(await invites.listMyInvites(), [], 'the invites after they expired');
       },

@@ -154,9 +154,13 @@ describe('InviteScreen', () => {
 
   it('shows "not found" at once for a link with no code, with no server call', async () => {
     const invites: Invites = {
+      createInvite: jest.fn(),
       getInvite: jest.fn(),
+      watchInvite: jest.fn(),
       acceptInvite: jest.fn(),
       declineInvite: jest.fn(),
+      cancelInvite: jest.fn(),
+      listMyInvites: jest.fn(),
     };
     await openInvite('ABCD234O', invites);
     expect(screen.getByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
@@ -264,7 +268,7 @@ describe('InviteScreen', () => {
       const code = server.createInvite(FRIEND, 'portes', 3, 'live');
       const real = server.invitesFor(ME);
       const invites: Invites = {
-        getInvite: real.getInvite,
+        ...real,
         acceptInvite: jest.fn(real.acceptInvite),
         declineInvite: jest.fn(real.declineInvite),
       };
