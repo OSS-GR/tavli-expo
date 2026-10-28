@@ -6,7 +6,7 @@ import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TURN_TIME_MS, createRecordingPushProvider } from '@tavli/contracts';
+import { INVITE_TIME_MS, TURN_TIME_MS, createRecordingPushProvider } from '@tavli/contracts';
 import type {
   GameTransportErrorCode,
   InviteErrorCode,
@@ -16,7 +16,7 @@ import type {
 
 import { api, components, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { INVITE_DELETE_PAGE } from './account';
+import { GAME_RESIGN_PAGE, INVITE_DELETE_PAGE } from './account';
 import { setPushProvider } from './push';
 import schema from './schema';
 import { modules } from './test.setup';
@@ -324,6 +324,27 @@ describe('after the delete, the old token is refused (#306)', () => {
     expect(await t.run(async (ctx) => await ctx.db.query('games').collect())).toEqual([]);
   });
 
+  it('an open invite whose time is up stays until deleteSentInvites, and nobody can accept it', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    const code = await createInvite(t, alice);
+    // The time is up, but `expireInvite` has not run yet: still `open`.
+    vi.setSystemTime(START + INVITE_TIME_MS + 1);
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+
+    // It is out of the open range (`expiresAt > now`), so the call
+    // leaves it to `deleteSentInvites`.
+    const left = await t.run(async (ctx) => await ctx.db.query('invites').collect());
+    expect(left).toHaveLength(1);
+    expect(left[0]).toMatchObject({ code, status: 'open' });
+    await rejectsWith(as(t, bob).mutation(api.invites.acceptInvite, { code }), 'INVITE_EXPIRED');
+    expect(await t.run(async (ctx) => await ctx.db.query('games').collect())).toEqual([]);
+
+    await flush(t);
+    expect(await inviteCodes(t)).toEqual([]);
+  });
+
   it('nobody can accept an open invite of the deleted account', async () => {
     const t = setup();
     const alice = await guest(t);
@@ -331,6 +352,94 @@ describe('after the delete, the old token is refused (#306)', () => {
     const code = await createInvite(t, alice);
     await as(t, alice).mutation(api.account.deleteMyAccount, {});
     await rejectsWith(as(t, bob).mutation(api.invites.acceptInvite, { code }), 'INVITE_NOT_FOUND');
+  });
+});
+
+describe('resignActiveGames (#309)', () => {
+  /** The ids of the active games of `playerId`, on both sides. */
+  async function activeGames(t: Tester, playerId: string): Promise<Id<'games'>[]> {
+    return await t.run(async (ctx) =>
+      (await ctx.db.query('games').collect())
+        .filter(
+          (game) =>
+            game.status === 'active' &&
+            (game.players.white === playerId || game.players.black === playerId),
+        )
+        .map((game) => game._id),
+    );
+  }
+
+  async function pendingResigns(t: Tester): Promise<number> {
+    return await t.run(
+      async (ctx) =>
+        (await ctx.db.system.query('_scheduled_functions').collect()).filter(
+          (job) => job.name.includes('resignActiveGames') && job.state.kind === 'pending',
+        ).length,
+    );
+  }
+
+  it('resigns more games than one page, after the call, and the turn timer still works', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    const carol = await guest(t);
+    // Alice plays on both sides, against two players, in live games.
+    const count = 2 * GAME_RESIGN_PAGE + 1;
+    const all: Id<'games'>[] = [];
+    for (let i = 0; i < count; i++) {
+      const other = i % 3 === 0 ? carol : bob;
+      const white = i % 2 === 0 ? alice : other;
+      const black = i % 2 === 0 ? other : alice;
+      all.push(await createGame(t, white, black, 'live'));
+    }
+    const theirs = await createGame(t, bob, carol, 'live');
+
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    // The call resigned one page; the rest wait for the scheduled pages.
+    expect(await activeGames(t, alice)).toHaveLength(count - GAME_RESIGN_PAGE);
+    expect(await authRows(t, 'user', alice)).toEqual([]);
+    expect(await pendingResigns(t)).toBe(1);
+
+    // Meanwhile a turn runs out in a game Alice still plays. The turn
+    // timer ends it as usual (a 1-point match), though her user is gone.
+    const [waiting] = await activeGames(t, alice);
+    if (waiting === undefined) throw new Error('no active game left');
+    const before = await rawGame(t, waiting);
+    if (before?.turnDeadline == null) throw new Error('no turn deadline');
+    vi.setSystemTime(before.turnDeadline + 1);
+    await t.mutation(internal.games.checkTimeout, { gameId: waiting, version: before.version });
+    const timedOut = await rawGame(t, waiting);
+    expect(timedOut?.status).toBe('finished');
+    expect(timedOut?.version).toBe(before.version + 1);
+
+    // Each run resigns one page; the last one is not full and stops.
+    await flush(t);
+    expect(await activeGames(t, alice)).toHaveLength(count - 2 * GAME_RESIGN_PAGE - 1);
+    await flush(t);
+    expect(await activeGames(t, alice)).toEqual([]);
+    expect(await pendingResigns(t)).toBe(0);
+
+    // Every game is over. Alice resigned each one but the timed-out
+    // one, so the other player won it.
+    for (const gameId of all) {
+      const game = await rawGame(t, gameId);
+      expect(game?.status).toBe('finished');
+      expect(game?.turnDeadline).toBeNull();
+      if (gameId === waiting) continue;
+      expect(game?.winner).toBe(game?.players.white === alice ? 'black' : 'white');
+    }
+    // The game of Bob and Carol is not touched.
+    expect((await rawGame(t, theirs))?.status).toBe('active');
+  });
+
+  it('schedules no page when the first page holds every game', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    for (let i = 0; i < GAME_RESIGN_PAGE - 1; i++) await createGame(t, alice, bob);
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    expect(await activeGames(t, alice)).toEqual([]);
+    expect(await pendingResigns(t)).toBe(0);
   });
 });
 
