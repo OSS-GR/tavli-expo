@@ -59,7 +59,7 @@ function notFound(): GameTransportErrorData {
  * `instanceof`: when two copies of `convex/values` load (ESM and CJS), a
  * real server error is not an instance of this copy's class.
  */
-function isConvexError(error: unknown): error is { readonly data: unknown } {
+export function isConvexError(error: unknown): error is { readonly data: unknown } {
   if (error instanceof ConvexError) return true;
   return (
     typeof error === 'object' &&
