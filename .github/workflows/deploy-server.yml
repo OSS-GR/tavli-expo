@@ -81,27 +81,34 @@ jobs:
             exit 1
           fi
 
+          # A space or a line break around a pasted key breaks the deploy.
+          case "$CONVEX_DEPLOY_KEY" in
+            [[:space:]]*|*[[:space:]])
+              echo "::error::The repo secret $secret has a space or a line break at the start or end. Paste the key again without them."
+              exit 1
+              ;;
+          esac
+
           # A deploy key starts with "<type>:<deployment name>|". Check it
           # names the deployment the app uses for this target
           # (apps/mobile/app.config.ts), so a swapped key fails here.
-          # The part before "|" is not secret (the type and the public
-          # deployment name), so the error may show it.
           case "$CONVEX_DEPLOY_KEY" in
             "$deployment|"*) echo "The $secret key is for $deployment." ;;
             *)
+              # The part before "|" of a Convex key is its type and public
+              # names, not secret. Show it only for the 4 Convex key types,
+              # so the start of some other token never reaches the log.
               prefix="${CONVEX_DEPLOY_KEY%%|*}"
-              # Show the prefix only when it looks like "<type>:<names>".
-              if [ "$prefix" != "$CONVEX_DEPLOY_KEY" ] && [[ "$prefix" =~ ^[a-z]+(:[a-z0-9-]+)+$ ]]; then
-                found="a key that starts with \"$prefix|\""
+              if [ "$prefix" != "$CONVEX_DEPLOY_KEY" ] && [[ "$prefix" =~ ^(dev|prod|project|preview)(:[a-z0-9-]+)+$ ]]; then
+                found="a Convex ${prefix%%:*} key that starts with \"$prefix|\""
               else
-                found="text that is not a deploy key"
+                found="text that is not a Convex deploy key"
               fi
-              case "$CONVEX_DEPLOY_KEY" in
-                project:*|preview:*) hint=" That is a project or preview key, which does not name one deployment. Make a deploy key of the deployment itself: dashboard > the ${deployment%%:*} deployment ${deployment#*:} > Settings > URL and Deploy Key > Generate." ;;
-                [[:space:]]*|*[[:space:]]) hint=" It has a space or a line break at the start or end. Paste it again without them." ;;
-                *) hint=" Make a new deploy key for that deployment in the Convex dashboard." ;;
+              case "$prefix" in
+                project:*|preview:*) hint=" A ${prefix%%:*} key does not name one deployment." ;;
+                *) hint="" ;;
               esac
-              echo "::error::The repo secret $secret must be a deploy key for $deployment (it starts with \"$deployment|\"). It holds $found.$hint"
+              echo "::error::The repo secret $secret must be a deploy key for $deployment (it starts with \"$deployment|\"). It holds $found.$hint Make one in the Convex dashboard: the ${deployment%%:*} deployment ${deployment#*:} > Settings > URL and Deploy Key > Generate."
               exit 1
               ;;
           esac
