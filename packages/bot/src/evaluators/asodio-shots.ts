@@ -26,15 +26,7 @@ import {
   undoOne,
 } from './asodio-board';
 import type { AsodioOptions, AsodioSide, MutableMoveContext } from './asodio-board';
-
-/** The 21 different rolls: [die 1, die 2, how many of the 36 rolls]. */
-const ROLLS: readonly (readonly [number, number, number])[] = (() => {
-  const rolls: [number, number, number][] = [];
-  for (let a = 1; a <= 6; a += 1) {
-    for (let b = a; b <= 6; b += 1) rolls.push([a, b, a === b ? 1 : 2]);
-  }
-  return rolls;
-})();
+import { ROLLS } from './rolls';
 
 export interface AsodioShots {
   /** Rolls out of 36 that pin (or hit) at least one checker. */

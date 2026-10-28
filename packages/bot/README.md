@@ -133,6 +133,9 @@ analyzer.evaluate(state); // the chances of state.toMove, before the roll
    of the next player (`DISTINCT_ROLLS` from the engine: a double 1/36,
    the others 2/36) the result after
    their best 1-ply reply (the turn hard plays at temperature 0).
+   The shot counts and the bear-off table read the same rolls through
+   `evaluators/rolls.ts` (#234): low die first, weights out of 36, in the
+   order their scores were made with (`rolls.test.ts` checks it).
 3. Rank the candidates by that 2-ply equity. A turn that wins at once is
    still the best (its value is exact). The other turns follow in their
    1-ply order, with their 1-ply evaluation; their `equityLoss` is their

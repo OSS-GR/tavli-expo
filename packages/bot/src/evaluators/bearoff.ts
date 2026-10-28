@@ -26,6 +26,7 @@
 
 import { OFF } from './portes-board';
 import type { Side } from './portes-board';
+import { ROLLS } from './rolls';
 
 /** The table covers sides with at most this many checkers left, all on own points 1–6. */
 export const BEAROFF_MAX_CHECKERS = 6;
@@ -101,15 +102,6 @@ export function endPositions(key: number, a: number, b: number): number[] {
   }
   return layer;
 }
-
-/** The 21 different rolls with their weight out of 36. */
-const ROLLS: readonly (readonly [number, number, number])[] = (() => {
-  const rolls: [number, number, number][] = [];
-  for (let a = 1; a <= 6; a += 1) {
-    for (let b = a; b <= 6; b += 1) rolls.push([a, b, a === b ? 1 : 2]);
-  }
-  return rolls;
-})();
 
 function rollsToFinish(key: number): Float64Array {
   const known = table.get(key);
