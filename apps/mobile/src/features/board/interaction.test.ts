@@ -565,13 +565,14 @@ describe('combined targets (#180)', () => {
   const withPaths = (g = geo, view = WHITE) =>
     buildSources(g, currentBoard(flow), view, 'white', legalNextMoves(flow), flowPaths(flow));
 
-  it('adds 13/10/5 after the single targets of 13, with both steps', () => {
+  it('adds 13/8*/5 after the single targets of 13, with both steps', () => {
     const s13 = source(withPaths(), 'p13');
     expect(s13.targets.map((t) => t.key)).toEqual(['p8', 'p10', 'p5']);
     const to5 = s13.targets[2]!;
+    // 13/10/5 is legal too; the order that hits the blot on 8 wins.
     expect(to5.moves).toEqual([
-      { from: 13, to: 10, die: 3, capture: 'none' },
-      { from: 10, to: 5, die: 5, capture: 'none' },
+      { from: 13, to: 8, die: 5, capture: 'hit' },
+      { from: 8, to: 5, die: 3, capture: 'none' },
     ]);
     expect(to5.move).toBe(to5.moves[0]);
     expect(to5.rect).toEqual(slotRect(geo, { kind: 'point', index: 5 }));

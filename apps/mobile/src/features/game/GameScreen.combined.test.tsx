@@ -138,23 +138,23 @@ beforeEach(async () => {
 describe('<GameScreen /> one checker with both dice (#180)', () => {
   const { point, top } = places('right');
 
-  it('Portes: lights 13/8, 13/10 and 13/10/5, and plays 13/10/5 by tap-tap', async () => {
+  it('Portes: lights 13/8, 13/10 and 13/8/5, and plays 13/8*/5 by tap-tap', async () => {
     const store = await toPlay('portes', [5, 3], { board: createBoard(DOOR, 'contrary') });
     await touch(PAN, [top(13, 2)]);
     // Two single targets and one combined target with two dots.
     expect(rings()).toBe(3);
     expect(stepDots()).toBe(2);
     await touch(PAN, [point(5)]);
-    // The order that does not hit on the way.
-    expect(played(store)).toEqual(['13/10', '10/5']);
-    expect(currentBoard(store.getState().flow.game).bar.black).toBe(0);
+    // 13/10/5 is legal too, but the order that hits on the way wins.
+    expect(played(store)).toEqual(['13/8*', '8/5']);
+    expect(currentBoard(store.getState().flow.game).bar.black).toBe(1);
     expect(rings()).toBe(0);
   });
 
-  it('Portes: plays the combined target by drag and drop', async () => {
+  it('Portes: plays the combined target by drag and drop, with the hit', async () => {
     const store = await toPlay('portes', [5, 3], { board: createBoard(DOOR, 'contrary') });
     await drag(top(13, 2), point(5));
-    expect(played(store)).toEqual(['13/10', '10/5']);
+    expect(played(store)).toEqual(['13/8*', '8/5']);
   });
 
   it('Portes: hits on the way when that is the only order, and Undo takes it all back', async () => {
@@ -254,13 +254,13 @@ describe('<GameScreen /> both dice on the mirrored board and in the flip view', 
     ['left', 'tap'],
     ['right', 'drag'],
     ['left', 'drag'],
-  ] as const)('home on the %s: plays 13/10/5 by %s', async (side, how) => {
+  ] as const)('home on the %s: plays 13/8*/5 by %s', async (side, how) => {
     await setSettings({ homeBoardSide: side });
     const { point, top } = places(side);
     const store = await toPlay('portes', [5, 3], { board: createBoard(DOOR, 'contrary') });
     if (how === 'tap') await tapTap(top(13, 2), point(5));
     else await drag(top(13, 2), point(5));
-    expect(played(store)).toEqual(['13/10', '10/5']);
+    expect(played(store)).toEqual(['13/8*', '8/5']);
     // Where 5 is on the other side's board, nothing happens.
     await pressUndo();
     const other = places(side === 'right' ? 'left' : 'right');
@@ -281,7 +281,7 @@ describe('<GameScreen /> both dice on the mirrored board and in the flip view', 
       const store = await toPlay('portes', [5, 3], { board, player: 'black' });
       // Black sits at the bottom: its own 13 is drawn where White's would be.
       await tapTap(top(13, 2), point(5));
-      expect(played(store)).toEqual(['13/10', '10/5']);
+      expect(played(store)).toEqual(['13/8*', '8/5']);
     },
   );
 
@@ -297,24 +297,24 @@ describe('<GameScreen /> both dice on the mirrored board and in the flip view', 
       const store = await toPlay('portes', [5, 3], { board, player: 'black' });
       // White at the bottom: Black's 13 is White's 12, Black's 5 is White's 20.
       await drag(top(12, 2), point(20));
-      expect(played(store)).toEqual(['13/10', '10/5']);
+      expect(played(store)).toEqual(['13/8*', '8/5']);
     },
   );
 });
 
 describe('<GameScreen /> both dice in the move list', () => {
-  it('offers 13 → 10 → 5 as a button and plays it', async () => {
+  it('offers 13 → 8 → 5 with the hit as a button and plays it', async () => {
     await setSettings({ moveList: 'on' });
     const store = await toPlay('portes', [5, 3], { board: createBoard(DOOR, 'contrary') });
-    const button = screen.getByTestId('move-list-13>5:3+5');
+    const button = screen.getByTestId('move-list-13>5:5+3');
     expect(button).toHaveProp(
       'accessibilityLabel',
-      'Checker from point 13 to point 10, then to point 5',
+      'Checker from point 13 to point 8, hits, then to point 5',
     );
     await act(async () => {
       fireEvent.press(button);
     });
-    expect(played(store)).toEqual(['13/10', '10/5']);
+    expect(played(store)).toEqual(['13/8*', '8/5']);
     await pressUndo();
     expect(played(store)).toEqual([]);
   });
