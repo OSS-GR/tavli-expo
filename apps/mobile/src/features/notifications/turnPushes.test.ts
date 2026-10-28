@@ -243,6 +243,24 @@ describe('the token on the server', () => {
     ]);
   });
 
+  it('a new token whose register fails is sent again on the next sync', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup(optedIn());
+    await auth.signInAsGuest();
+    notifications.setPermission('granted');
+    await pushes.sync();
+    const first = notifications.token;
+    // The token changes while the server cannot be reached.
+    jest.spyOn(pushTokens, 'register').mockRejectedValueOnce(new Error('offline'));
+    const second = notifications.rollToken();
+    await settle();
+    expect(pushTokens.calls).toHaveLength(1);
+    await pushes.sync();
+    expect(pushTokens.calls.slice(1)).toEqual([
+      { kind: 'register', playerId: 'guest-1', token: second, platform: 'android' },
+      { kind: 'remove', playerId: 'guest-1', token: first },
+    ]);
+  });
+
   it('is not registered while nobody is signed in, or the phone does not allow pushes', async () => {
     const { pushes, notifications, pushTokens, auth } = setup(optedIn());
     notifications.setPermission('granted');

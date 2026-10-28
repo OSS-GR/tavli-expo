@@ -145,6 +145,8 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
   let stopTokenListener: (() => void) | null = null;
   /** The push service gave a new token: the next sync asks for it. */
   let tokenChanged = false;
+  // Counts token changes, so a change during a register is not lost.
+  let tokenChanges = 0;
   /** An `offer()` that has not decided yet: a second one does nothing. */
   let offerRunning = false;
 
@@ -177,19 +179,25 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
     // A new token later (the push service may change it) registers again.
     stopTokenListener ??= notifications.onTokenChange(() => {
       tokenChanged = true;
+      tokenChanges += 1;
       void sync();
     });
     // Registered in this run for this user, and no new token since: asking
     // Expo for the token again would only give the same one.
     if (registered?.userId === user.id && !tokenChanged) return;
+    const changesSeen = tokenChanges;
     const token = await notifications.getToken();
     // No token now (offline): keep `tokenChanged`, so the next sync asks again.
     if (token === null) return;
-    tokenChanged = false;
     const before = registered;
-    if (before !== null && before.userId === user.id && before.token === token) return;
-    await pushTokens.register(token, notifications.platform);
-    registered = { userId: user.id, token };
+    if (before === null || before.userId !== user.id || before.token !== token) {
+      // A failed register throws here: `tokenChanged` stays, so the next
+      // sync tries again.
+      await pushTokens.register(token, notifications.platform);
+      registered = { userId: user.id, token };
+    }
+    // Clear the flag only when no new token came during this sync.
+    if (tokenChanges === changesSeen) tokenChanged = false;
     // The old token of this user is dead: take it off the list. A failed
     // call only leaves it until Expo says it is gone.
     if (before !== null && before.userId === user.id && before.token !== token) {
