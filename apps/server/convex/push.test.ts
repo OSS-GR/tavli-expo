@@ -286,11 +286,23 @@ describe('"your turn" pushes', () => {
       }
     }
 
-    // The next turn tells the first player.
+    // The next turn tells the first player. The dice are real: when the
+    // first player's roll has no legal move (a hit checker facing a closed
+    // point), the turn passes at once and the server waits for the same
+    // player again. Then nobody gets a push (#308).
     push.clear();
-    await playOneTurn(t, gameId);
+    const second = await playOneTurn(t, gameId);
+    const after = await view(t, gameId);
+    const next = waiting(after);
+    if (next === second) {
+      // Only a real pass keeps the wait here: the first player's turn
+      // played no move.
+      expect(after.game.lastTurn).toMatchObject({ player: played, moves: [] });
+    }
     await flush(t);
-    expect(push.sent.map((message) => message.to)).toEqual([TOKEN_OF[played]]);
+    expect(push.sent.map((message) => message.to)).toEqual(
+      next === second ? [] : [TOKEN_OF[played]],
+    );
   });
 
   it('a live game sends none', async () => {
