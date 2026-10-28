@@ -220,17 +220,72 @@ describe('fromBetterAuthClient', () => {
     expect(await restart().ready()).toEqual(user);
   });
 
-  it('a failed session load counts as signed out; a sign-in tries again', async () => {
+  it('a failed session load counts as signed out; the next call loads again', async () => {
     const server = createServer();
     const first = subject(server);
     const user = await first.auth.signInAsGuest();
     server.failures.set('getSession', 'throw');
     const again = first.restart();
     expect(await again.ready()).toBeNull();
-    // signInAsGuest does not make a second guest: the server still knows the session.
-    server.failures.set('signIn.anonymous', { status: 400, message: 'already signed in' });
-    expect(await rejection(again.signInAsGuest())).toMatchObject({ code: 'REJECTED' });
+    // The sign-in loads the saved session again and makes no second guest.
+    expect(await again.signInAsGuest()).toEqual(user);
     expect(server.guests).toBe(1);
-    expect(user.id).toBe('user-1');
+  });
+
+  it('a guest sign-in never replaces a session it could not load', async () => {
+    const server = createServer();
+    const first = subject(server);
+    await first.auth.signInAsGuest();
+    const again = first.restart();
+    server.failures.set('getSession', 'throw');
+    expect(await again.ready()).toBeNull();
+    server.failures.set('getSession', { message: 'offline' });
+    expect(await rejection(again.signInAsGuest())).toMatchObject({ code: 'NETWORK' });
+    expect(server.calls.filter((c) => c === 'signIn.anonymous')).toHaveLength(1);
+    expect(server.guests).toBe(1);
+  });
+
+  it('calls at the same time share one token fetch', async () => {
+    const { auth, server } = subject();
+    await auth.signInAsGuest();
+    const [a, b] = await Promise.all([auth.getToken(), auth.getToken()]);
+    expect(a).toBe(b);
+    expect(server.calls.filter((c) => c === 'convex.token')).toHaveLength(1);
+  });
+
+  it('drops a token fetched for a user who signed out during the fetch', async () => {
+    const server = createServer();
+    const phone = { cookie: null as string | null };
+    const client = createClient(server, phone);
+    // Hold the first token answer until the test lets it go.
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let first = true;
+    const realToken = client.convex.token.bind(client.convex);
+    const gated: BetterAuthClient = {
+      ...client,
+      convex: {
+        async token(options) {
+          const result = await realToken(options);
+          if (first) {
+            first = false;
+            await held;
+          }
+          return result;
+        },
+      },
+    };
+    const auth = fromBetterAuthClient(gated, { now: () => server.clock });
+    const old = await auth.signInAsGuest();
+    const stale = auth.getToken();
+    await auth.signOut();
+    const next = await auth.signInAsGuest();
+    expect(next.id).not.toBe(old.id);
+    release();
+    expect(await stale).toBeNull();
+    const token = await auth.getToken();
+    expect(jwtPayload(token ?? '')['sub']).toBe(next.id);
   });
 });

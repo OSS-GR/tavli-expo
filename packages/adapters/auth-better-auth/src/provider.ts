@@ -122,12 +122,21 @@ export function fromBetterAuthClient(
   let user: AuthUser | null = null;
   let token: { readonly value: string; readonly expiresAt: number | null } | null = null;
   let loading: Promise<AuthUser | null> | null = null;
+  /** The session load failed on the network: a guest sign-in must not replace a saved session. */
+  let loadFailed = false;
   let signingIn: Promise<AuthUser> | null = null;
+  let fetching: Promise<string | null> | null = null;
+  /** Goes up each time the user changes, so a token fetched for an old user is dropped. */
+  let epoch = 0;
 
   function set(next: AuthUser | null): void {
     const changed = JSON.stringify(next) !== JSON.stringify(user);
+    if (next?.id !== user?.id) {
+      epoch += 1;
+      token = null;
+      fetching = null;
+    }
     user = next;
-    if (next === null) token = null;
     if (!changed) return;
     for (const listener of [...listeners]) {
       const value = copy(next);
@@ -139,19 +148,31 @@ export function fromBetterAuthClient(
 
   function ready(): Promise<AuthUser | null> {
     loading ??= client.getSession(NO_THROW).then(
-      ({ data }) => {
-        // A failed load counts as signed out; a sign-in tries again.
+      ({ data, error }) => {
         if (data?.user) set(toUser(data.user));
+        // No HTTP status: the server was not reached. The next call loads again.
+        else if (error !== null && typeof error.status !== 'number') failLoad();
+        else loadFailed = false;
         return copy(user);
       },
-      () => copy(user),
+      () => {
+        failLoad();
+        return copy(user);
+      },
     );
     return loading.then(() => copy(user));
+  }
+
+  function failLoad(): void {
+    loadFailed = true;
+    loading = null;
   }
 
   async function signIn(): Promise<AuthUser> {
     await ready();
     if (user !== null) return { ...user };
+    // A saved session may exist: a new guest now would lose it.
+    if (loadFailed) throw authError(null, 'could not load the session');
     let result: BetterAuthResult<{ readonly user: BetterAuthUserData }>;
     try {
       result = await client.signIn.anonymous(NO_THROW);
@@ -163,6 +184,26 @@ export function fromBetterAuthClient(
     }
     set(toUser(result.data.user));
     return { ...toUser(result.data.user) };
+  }
+
+  async function fetchToken(forEpoch: number): Promise<string | null> {
+    let result: BetterAuthResult<{ readonly token: string }>;
+    try {
+      result = await client.convex.token(NO_THROW);
+    } catch {
+      return null;
+    }
+    // The user changed during the fetch: this token is not theirs.
+    if (forEpoch !== epoch) return null;
+    if (result.error?.status === 401) {
+      // The session ended on the server (it ran out or was revoked).
+      set(null);
+      return null;
+    }
+    const value = result.data?.token;
+    if (typeof value !== 'string' || value === '') return null;
+    token = { value, expiresAt: expiresAt(value) };
+    return value;
   }
 
   return {
@@ -197,21 +238,15 @@ export function fromBetterAuthClient(
         request?.forceRefresh !== true &&
         (saved.expiresAt === null || saved.expiresAt - TOKEN_MARGIN_MS > now());
       if (fresh) return saved.value;
-      let result: BetterAuthResult<{ readonly token: string }>;
-      try {
-        result = await client.convex.token(NO_THROW);
-      } catch {
-        return null;
+      // Calls at the same time share one fetch, so they cannot save out of order.
+      if (fetching === null) {
+        const started = fetchToken(epoch);
+        fetching = started;
+        void started.finally(() => {
+          if (fetching === started) fetching = null;
+        });
       }
-      if (result.error?.status === 401) {
-        // The session ended on the server (it ran out or was revoked).
-        set(null);
-        return null;
-      }
-      const value = result.data?.token;
-      if (typeof value !== 'string' || value === '') return null;
-      token = { value, expiresAt: expiresAt(value) };
-      return value;
+      return fetching;
     },
     onChange(listener) {
       const own = (next: AuthUser | null) => listener(next);
