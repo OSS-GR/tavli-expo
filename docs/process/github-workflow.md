@@ -63,25 +63,29 @@ Acceptance criteria
 
 ## CI
 
-The workflow is `.github/workflows/ci.yml`. It has one job, called **`checks`**. The Claude review is a second workflow (see below).
+The workflow is `.github/workflows/ci.yml`. Its jobs run at the same time (#248). The last job is called **`checks`**: it passes only when every other job passed or was skipped. Only `checks` is a required check, so the other jobs can change names freely. The Claude review is a second workflow (see below).
 
 **When it runs:** on every pull request (any base branch: opened, new pushes, reopened, and marked ready for review) and on every push to `main`.
 
-**What it runs**, in this order:
+**What it runs:**
 
-1. `pnpm install --frozen-lockfile`
-2. `pnpm lint`
-3. `pnpm typecheck`
-4. `pnpm test`
-5. `pnpm format:check`
+| Job | What it does |
+| --- | --- |
+| `changes` | Looks for a docs-only change (see below). |
+| `static` | `expo install --check`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check` |
+| `test-packages` | `pnpm -r --filter '!@tavli/mobile' test` (Vitest; the bot is most of it) |
+| `test-app (1/2)`, `test-app (2/2)` | `jest --shard=i/2` in `apps/mobile`. `apps/mobile/test/shardSequencer.js` splits the files by size, so both halves take about the same time. |
+| `checks` | Fails if any job above failed or was cancelled. |
+
+Each job runs `pnpm install --frozen-lockfile` first (`.github/actions/setup`).
 
 Node comes from `.nvmrc`. pnpm comes from `packageManager` in `package.json`. The pnpm store is cached between runs.
 
-Run the same commands on your machine before you push. If they pass locally, they should pass in CI.
+Run the same commands on your machine before you push (`pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`). If they pass locally, they should pass in CI.
 
-**Docs-only changes:** if a PR only changes files in `docs/` or Markdown in `.github/`, the first step skips the rest and the job passes. Other Markdown files (like `README.md` and `CLAUDE.md`) still run all checks, because Prettier checks them. We do not use `paths-ignore`: it would skip the workflow, so a required check would never report and the PR would wait forever.
+**Docs-only changes:** if a PR only changes files in `docs/` or Markdown in `.github/`, the `changes` job skips the other jobs and `checks` passes. Other Markdown files (like `README.md` and `CLAUDE.md`) still run all checks, because Prettier checks them. We do not use `paths-ignore`: it would skip the workflow, so a required check would never report and the PR would wait forever.
 
-**Saving minutes:** the repo is private, so we get 2,000 free Actions minutes a month. To keep runs cheap, the `checks` job caches the pnpm store, stops after 15 minutes, and cancels an older run when you push again to the same PR.
+**Saving minutes:** the repo is private, so we get 2,000 free Actions minutes a month. To keep runs cheap, the jobs cache the pnpm store, stop after 15 minutes, and an older run is cancelled when you push again to the same PR. GitHub bills each job in whole minutes, so the parallel jobs cost about 3 more minutes per run than one long job, but the wait is about 3 minutes instead of 7.
 
 **Dependency updates:** Dependabot (`.github/dependabot.yml`) opens grouped PRs every Monday: one for Expo packages, one for dev tooling, one for GitHub Actions. It does not propose Expo SDK, React or React Native upgrades. Do those by hand in `apps/mobile`: run `npx expo install expo@^<sdk> --fix` (for example `expo@^59.0.0`). Expo then picks the React, React Native and native library versions that match the SDK.
 
