@@ -292,7 +292,13 @@ describe('"your turn" pushes', () => {
     // player again. Then nobody gets a push (#308).
     push.clear();
     const second = await playOneTurn(t, gameId);
-    const next = waiting(await view(t, gameId));
+    const after = await view(t, gameId);
+    const next = waiting(after);
+    if (next === second) {
+      // Only a real pass keeps the wait here: the first player's turn
+      // played no move.
+      expect(after.game.lastTurn).toMatchObject({ player: played, moves: [] });
+    }
     await flush(t);
     expect(push.sent.map((message) => message.to)).toEqual(
       next === second ? [] : [TOKEN_OF[played]],
