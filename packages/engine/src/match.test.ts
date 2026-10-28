@@ -430,6 +430,14 @@ describe('rotation and missing variants', () => {
     expect(plakoto.match).toEqual(match.rules.match);
     expect(plakoto.match.targetPoints).toBe(5);
     expect(gameRules(match, 'fevga').movement.direction).toBe('parallel');
+    // A rotation on a game preset (#247): that game plays it, the others their defaults.
+    const federation = createMatch({
+      rules: resolveRules('plakoto.federation', { match: { rotation: TAVLI.match.rotation } }),
+    });
+    expect(gameRules(federation, 'plakoto')).toBe(federation.rules);
+    expect(gameRules(federation, 'plakoto').mother.motherRule).toBe('federation');
+    expect(gameRules(federation, 'portes').presetId).toBe('portes');
+    expect(gameRules(federation, 'fevga').presetId).toBe('fevga');
   });
 });
 

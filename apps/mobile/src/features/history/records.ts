@@ -32,8 +32,7 @@ import {
   isGameChoice,
   isMatchMode,
   isOpeningRollRule,
-  isRulesVersion,
-  isVersionedGame,
+  versionsOfPreset,
   type GameChoice,
   type MatchMode,
   type MatchSetup,
@@ -100,9 +99,11 @@ export interface HistoryRecord {
   readonly openingRoll: OpeningRollRule;
   /**
    * The engine preset of the match (#241, `match.rules.presetId`): the
-   * rules version of Plakoto and Asodio, else the game's one preset
-   * (`tavli` for a Tavli match). Records made before #241 (or with a
-   * preset that is not one of the game's) load with the default preset.
+   * rules version of Plakoto and Asodio, else the game's one preset. A
+   * Tavli match has `tavli`, or the Plakoto version its Plakoto game played
+   * when it is not the default (#247, `gamePreset`). Records made before
+   * #241 (or with a preset that is not one of the game's) load with the
+   * default preset.
    */
   readonly preset: PresetId;
 }
@@ -296,10 +297,12 @@ function parseRecord(raw: unknown): HistoryRecord | null {
   };
 }
 
-/** `raw` when it is a preset a match of `game` can have, else the game's default preset. */
+/**
+ * `raw` when it is a preset a match of `game` can have (a Tavli match: `tavli`
+ * or a Plakoto version, #247), else the game's default preset.
+ */
 export function recordPreset(game: GameChoice, raw: unknown): PresetId {
-  if (isVersionedGame(game) && isRulesVersion(game, raw)) return raw;
-  return gamePreset(game);
+  return gamePreset(game, versionsOfPreset(game, raw));
 }
 
 /**

@@ -2,7 +2,13 @@
 import type { TutorialGame, TutorialSource } from '@tavli/contracts';
 import type { PresetId } from '@tavli/engine';
 
-import { isMatchMode, otherVersion, type MatchMode } from './setup';
+import {
+  isMatchMode,
+  isRulesVersion,
+  isVersionedGame,
+  otherVersion,
+  type MatchMode,
+} from './setup';
 
 type Param = string | string[] | undefined;
 
@@ -54,11 +60,15 @@ export function reviewHref(id: string) {
 
 /**
  * The rules page of a game (`/rules/portes`, …). `preset` is the engine
- * preset in play or chosen: a rules version that is not the default
- * (#241) adds `version` (`/rules/plakoto?version=plakoto.federation`).
+ * preset in play or chosen: a rules version of `variant` that is not the
+ * default (#241) adds `version` (`/rules/plakoto?version=plakoto.federation`).
+ * Another game's version adds nothing: the Tavli page of a match whose
+ * Plakoto game plays Federation (#247) is the plain Tavli page.
  */
 export function rulesHref(variant: string, preset?: PresetId) {
-  const version = preset === undefined ? null : otherVersion(preset);
+  const other = preset === undefined ? null : otherVersion(preset);
+  const version =
+    other !== null && isVersionedGame(variant) && isRulesVersion(variant, other) ? other : null;
   return version === null
     ? ({ pathname: '/rules/[variant]', params: { variant } } as const)
     : ({ pathname: '/rules/[variant]', params: { variant, version } } as const);
