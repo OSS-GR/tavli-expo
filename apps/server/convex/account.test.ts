@@ -1,0 +1,280 @@
+// Delete my account (#302), run offline with convex-test and the Better
+// Auth component's test helper. Alice and Bob are real guests (signed in
+// through the HTTP routes), so the test can check the component's tables.
+
+import betterAuthTest from '@convex-dev/better-auth/test';
+import { convexTest } from 'convex-test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { TURN_TIME_MS, createRecordingPushProvider } from '@tavli/contracts';
+import type {
+  GameTransportErrorCode,
+  OnlineGamePace,
+  RecordingPushProvider,
+} from '@tavli/contracts';
+
+import { api, components, internal } from './_generated/api';
+import type { Id } from './_generated/dataModel';
+import { setPushProvider } from './push';
+import schema from './schema';
+import { modules } from './test.setup';
+
+type Tester = ReturnType<typeof setup>;
+
+function setup() {
+  const t = convexTest(schema, modules);
+  betterAuthTest.register(t);
+  return t;
+}
+
+function as(t: Tester, id: string) {
+  return t.withIdentity({ subject: id });
+}
+
+const START = Date.UTC(2026, 9, 28, 12, 0, 0);
+let push: RecordingPushProvider;
+
+beforeEach(() => {
+  vi.stubEnv('BETTER_AUTH_SECRET', 'a-test-secret-that-is-long-enough-0123456789');
+  vi.stubEnv('CONVEX_SITE_URL', 'http://127.0.0.1:3211');
+  // Every game schedules a turn timer; fake timers keep it from firing.
+  vi.useFakeTimers();
+  vi.setSystemTime(START);
+  push = createRecordingPushProvider();
+  setPushProvider(push);
+});
+
+afterEach(() => {
+  setPushProvider(null);
+  vi.useRealTimers();
+  vi.unstubAllEnvs();
+});
+
+async function rejectsWith(call: Promise<unknown>, code: GameTransportErrorCode) {
+  await expect(call).rejects.toMatchObject({ data: { code } });
+}
+
+/** Signs in a new guest through the Better Auth routes. Returns the player id. */
+async function guest(t: Tester): Promise<string> {
+  const response = await t.fetch('/api/auth/sign-in/anonymous', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: 'tavlaki://' },
+    body: '{}',
+  });
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { user: { id: string } };
+  return body.user.id;
+}
+
+type AuthModel = 'user' | 'session' | 'account';
+
+/** The rows of `model` in the Better Auth component that belong to `userId`. */
+async function authRows(t: Tester, model: AuthModel, userId: string): Promise<unknown[]> {
+  const field = model === 'user' ? '_id' : 'userId';
+  const result = await t.run(
+    async (ctx) =>
+      (await ctx.runQuery(components.betterAuth.adapter.findMany, {
+        model,
+        where: [{ field, value: userId }],
+        paginationOpts: { cursor: null, numItems: 100 },
+      })) as { page: unknown[] },
+  );
+  return result.page;
+}
+
+/** Links an Apple account to `userId`, as a later sign-in issue will. */
+async function linkAccount(t: Tester, userId: string): Promise<void> {
+  await t.run(async (ctx) => {
+    await ctx.runMutation(components.betterAuth.adapter.create, {
+      input: {
+        model: 'account',
+        data: {
+          accountId: `apple-${userId}`,
+          providerId: 'apple',
+          userId,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      },
+    });
+  });
+}
+
+async function createGame(
+  t: Tester,
+  white: string,
+  black: string,
+  pace: OnlineGamePace = 'async',
+): Promise<Id<'games'>> {
+  return await t.mutation(internal.games.createGame, {
+    callerId: white,
+    players: { white, black },
+    choice: 'portes',
+    targetPoints: 1,
+    pace,
+  });
+}
+
+async function register(t: Tester, id: string, token: string) {
+  await as(t, id).mutation(api.push.registerPushToken, { token, platform: 'ios' });
+}
+
+async function createInvite(t: Tester, id: string): Promise<string> {
+  return await as(t, id).mutation(api.invites.createInvite, {
+    choice: 'portes',
+    targetPoints: 3,
+    pace: 'async',
+  });
+}
+
+async function rawGame(t: Tester, gameId: Id<'games'>) {
+  return await t.run(async (ctx) => await ctx.db.get(gameId));
+}
+
+describe('deleteMyAccount', () => {
+  it('resigns active games, keeps finished ones, and deletes invites, tokens and the user', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    await linkAccount(t, alice);
+
+    // An active game, and a finished one (Bob resigned it: Alice won).
+    const active = await createGame(t, alice, bob);
+    const finished = await createGame(t, bob, alice);
+    await as(t, bob).mutation(api.games.resign, { gameId: finished });
+    const finishedBefore = await rawGame(t, finished);
+
+    // An open invite and a cancelled one from Alice, an open one from Bob.
+    await createInvite(t, alice);
+    const cancelled = await createInvite(t, alice);
+    await as(t, alice).mutation(api.invites.cancelInvite, { code: cancelled });
+    const bobsInvite = await createInvite(t, bob);
+
+    // Two phones for Alice, one for Bob.
+    await register(t, alice, 'ExponentPushToken[alice-phone]');
+    await register(t, alice, 'ExponentPushToken[alice-tablet]');
+    await register(t, bob, 'ExponentPushToken[bob-phone]');
+
+    expect(await authRows(t, 'user', alice)).toHaveLength(1);
+    expect(await authRows(t, 'session', alice)).toHaveLength(1);
+    expect(await authRows(t, 'account', alice)).toHaveLength(1);
+
+    vi.advanceTimersByTime(0);
+    await t.finishInProgressScheduledFunctions();
+    push.clear();
+
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+
+    // Bob sees the active game won by Alice's resign.
+    const resigned = await as(t, bob).query(api.games.getGame, { gameId: active });
+    expect(resigned?.status).toBe('finished');
+    expect(resigned?.match.winner).toBe('black');
+    expect(resigned?.match.resignedBy).toBe('white');
+    expect(resigned?.turnDeadline).toBeNull();
+
+    // The finished game is kept as it was, for Bob.
+    expect(await rawGame(t, finished)).toEqual(finishedBefore);
+    const kept = await as(t, bob).query(api.games.getGame, { gameId: finished });
+    expect(kept?.status).toBe('finished');
+    expect(kept?.match.winner).toBe('black');
+    expect(kept?.players).toEqual({ white: bob, black: alice });
+    expect(await as(t, bob).query(api.games.listMyGames, { status: 'finished' })).toHaveLength(2);
+
+    // Alice's invites are gone; Bob's stays.
+    const invites = await t.run(async (ctx) => await ctx.db.query('invites').collect());
+    expect(invites.map((invite) => invite.code)).toEqual([bobsInvite]);
+
+    // Alice's push tokens are gone; Bob's stays.
+    const tokens = await t.run(async (ctx) => await ctx.db.query('pushTokens').collect());
+    expect(tokens.map((row) => row.token)).toEqual(['ExponentPushToken[bob-phone]']);
+
+    // The Better Auth user, its session and its account are gone; Bob's stay.
+    expect(await authRows(t, 'user', alice)).toEqual([]);
+    expect(await authRows(t, 'session', alice)).toEqual([]);
+    expect(await authRows(t, 'account', alice)).toEqual([]);
+    expect(await authRows(t, 'user', bob)).toHaveLength(1);
+    expect(await authRows(t, 'session', bob)).toHaveLength(1);
+
+    // The resign ended the match: nobody gets "your turn", and the turn
+    // timer and the invite expiry find nothing to do.
+    vi.advanceTimersByTime(TURN_TIME_MS.async + 1);
+    await t.finishInProgressScheduledFunctions();
+    expect(push.sent).toEqual([]);
+    expect((await as(t, bob).query(api.games.getGame, { gameId: active }))?.version).toBe(
+      resigned?.version,
+    );
+  });
+
+  it('a second call gets NOT_SIGNED_IN: the token outlives the user', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    await rejectsWith(as(t, alice).mutation(api.account.deleteMyAccount, {}), 'NOT_SIGNED_IN');
+  });
+
+  it('works for a guest with no games, invites or tokens', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    expect(await authRows(t, 'user', alice)).toEqual([]);
+    expect(await authRows(t, 'user', bob)).toHaveLength(1);
+  });
+
+  it('resigns a live game too, and every active game', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    const carol = await guest(t);
+    const live = await createGame(t, bob, alice, 'live');
+    const other = await createGame(t, alice, carol);
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    const liveView = await as(t, bob).query(api.games.getGame, { gameId: live });
+    expect(liveView?.status).toBe('finished');
+    expect(liveView?.match.winner).toBe('white');
+    const otherView = await as(t, carol).query(api.games.getGame, { gameId: other });
+    expect(otherView?.status).toBe('finished');
+    expect(otherView?.match.winner).toBe('black');
+  });
+
+  it('does not touch the games of other players', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    const carol = await guest(t);
+    const theirs = await createGame(t, bob, carol);
+    const before = await rawGame(t, theirs);
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    expect(await rawGame(t, theirs)).toEqual(before);
+  });
+
+  it('is the only way to delete a guest: the Better Auth delete routes are off', async () => {
+    const t = setup();
+    const signIn = await t.fetch('/api/auth/sign-in/anonymous', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'tavlaki://' },
+      body: '{}',
+    });
+    const { user } = (await signIn.json()) as { user: { id: string } };
+    const cookie = signIn.headers.get('set-cookie') ?? '';
+    for (const path of ['/api/auth/delete-anonymous-user', '/api/auth/delete-user']) {
+      const response = await t.fetch(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'tavlaki://', cookie },
+        body: '{}',
+      });
+      expect(response.status).toBe(404);
+    }
+    expect(await authRows(t, 'user', user.id)).toHaveLength(1);
+  });
+
+  it('throws NOT_SIGNED_IN without a sign-in', async () => {
+    const t = setup();
+    await rejectsWith(t.mutation(api.account.deleteMyAccount, {}), 'NOT_SIGNED_IN');
+  });
+
+  it('throws NOT_SIGNED_IN for a token whose user does not exist', async () => {
+    const t = setup();
+    await rejectsWith(as(t, 'nobody').mutation(api.account.deleteMyAccount, {}), 'NOT_SIGNED_IN');
+  });
+});

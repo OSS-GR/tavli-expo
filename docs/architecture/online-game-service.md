@@ -1,6 +1,6 @@
 # Online game service
 
-Status: first version (#126, part of #46), with turn timers (#133), invites by code (#252), [my games](#my-games) (#296), ["your turn" pushes](#push) (#280), [sign-in](#sign-in) (#131), a [Convex client adapter](#the-convex-adapter) (#253) and its [invites adapter](#the-convex-invites-adapter) (#281). The game model is in the pure package `@tavli/online`, with an [in-memory server](#the-in-memory-server) (#251). It runs and is tested **offline**, with no Convex account. CI deploys it to Convex (#257, see [Deploy](#deploy)).
+Status: first version (#126, part of #46), with turn timers (#133), invites by code (#252), [my games](#my-games) (#296), ["your turn" pushes](#push) (#280), [sign-in](#sign-in) (#131), [account deletion](#delete-an-account) (#302), a [Convex client adapter](#the-convex-adapter) (#253) and its [invites adapter](#the-convex-invites-adapter) (#281). The game model is in the pure package `@tavli/online`, with an [in-memory server](#the-in-memory-server) (#251). It runs and is tested **offline**, with no Convex account. CI deploys it to Convex (#257, see [Deploy](#deploy)).
 
 Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0002](../decisions/0002-modular-architecture.md).
 
@@ -10,9 +10,11 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 |---|---|
 | `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `invites` and `pushTokens` |
 | `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
+| `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)) |
+| `apps/server/convex/model/account.ts` | The pure part of account deletion: `gameOnDelete` (resign, keep or skip a game) |
 | `apps/server/convex/caller.ts` | `signedInPlayer(ctx)`: the caller's player id from the sign-in token ([Sign-in](#sign-in)) |
 | `apps/server/convex/convex.config.ts` | The Convex app: it uses the Better Auth component |
-| `apps/server/convex/auth.ts` | Better Auth: the component client and `createAuth` (anonymous, Expo and Convex plugins) |
+| `apps/server/convex/auth.ts` | Better Auth: the component client and `createAuth` (anonymous, Expo and Convex plugins; the delete routes are off) |
 | `apps/server/convex/auth.config.ts` | The token issuer Convex trusts: Better Auth on the deployment's site URL |
 | `apps/server/convex/http.ts` | The HTTP routes: Better Auth under `/api/auth` |
 | `packages/online/src/online-game.ts` | The game logic, with no Convex code. Pure: dice come from an `Rng` argument |
@@ -203,7 +205,7 @@ Issue #131. Owner decision: online play waits for sign-in. There is no play keye
 
 ### Who calls
 
-Every public function in `games.ts` and `invites.ts` gets the caller from `signedInPlayer(ctx)` in `caller.ts`:
+Every public function in `games.ts`, `invites.ts`, `push.ts` and `account.ts` gets the caller from `signedInPlayer(ctx)` in `caller.ts`:
 
 - **The player id is `identity.subject`.** It is the Better Auth user id (the token's `sub`). It stays the same for a user across sessions and token refreshes. We do not use `tokenIdentifier` (issuer + subject): the issuer is the site URL, and a new site URL (a custom domain) would change every player id. There is one issuer. If a second one is ever added, move to `tokenIdentifier` and migrate the stored ids.
 - **No identity:** `NOT_SIGNED_IN`. The code is in both `GAME_TRANSPORT_ERROR_CODES` and `INVITE_ERROR_CODES`, so every call can throw it.
@@ -236,7 +238,7 @@ Issue #266. `apps/mobile/src/services.ts` exports `auth` (`AuthProvider`), `game
 
 ### Not done yet
 
-- **Guest upgrade:** when a guest links Apple, Google or email, Better Auth makes a new user. Moving the guest's games and invites to the new id (`onLinkAccount`) comes with those sign-in methods.
+- **Guest upgrade:** when a guest links Apple, Google or email, Better Auth makes a new user. Moving the guest's games and invites to the new id (`onLinkAccount`) comes with those sign-in methods. After the link, the anonymous plugin deletes the guest's Better Auth user by itself (not through `deleteMyAccount`), so the move must happen in `onLinkAccount`, before that.
 
 ## Invites
 
@@ -384,6 +386,39 @@ A token whose push failed with `Failed` (the network, a request with no answer i
 - **Language:** the push text is English only (see [The text](#the-text)). A locale field comes later.
 - **No expiry job yet:** a player keeps at most 5 tokens (`MAX_PUSH_TOKENS_PER_PLAYER`), and a token is dropped when the push service answers `DeviceNotRegistered`. Nothing removes a token that only went quiet. A scheduled job that removes tokens by an old `updatedAt` is a follow-up.
 
+## Delete an account
+
+Issue #302. App stores ask for in-app account deletion. The app screen is a later issue; the server part is the public mutation `deleteMyAccount` in `convex/account.ts`. It takes no arguments: the caller comes from `signedInPlayer(ctx)`.
+
+### What it does
+
+One transaction. If any step throws, nothing is deleted.
+
+1. **Checks the user still exists.** A Convex token stays valid until it expires (15 minutes, the `convex` plugin's default), also after its user is deleted. So the call reads the Better Auth user (`authComponent.getAnyUserById`). No user: `NOT_SIGNED_IN`. A second call after a delete gets this clean error.
+2. **Active games:** the caller resigns each one (`resignAs` in `games.ts`, the same checks and the same `save` as `resign`). The other player wins the match. The save bumps the version, so the turn timer's check does nothing, and `scheduleTurnPush` runs as on every save (a resign ends the match, so no push goes out).
+3. **Finished games** (and the games just resigned) stay for the other player, as they are. See [What is kept](#what-is-kept).
+4. **Invites:** every invite the caller sent is deleted, open or not. An open invite's scheduled `expireInvite` then finds no row and does nothing. Invites someone else sent stay, also when the caller answered them.
+5. **Push tokens:** every `pushTokens` row of the caller is deleted.
+6. **Better Auth:** the user, its sessions and its accounts (Apple, Google, … once they exist) are deleted with Better Auth's own delete, `internalAdapter.deleteUser`, from `createAuth(ctx).$context`. It runs on the component's tables through the component adapter, with Better Auth's database hooks. It is the step that the `/delete-user` route and the anonymous plugin's `/delete-anonymous-user` route run too.
+
+The pure part, what happens to each game (`gameOnDelete`: `resign`, `keep` or `skip`), is in `convex/model/account.ts`.
+
+### Why not Better Auth's delete route
+
+Better Auth's `deleteUser` API (`/delete-user`) needs a request with a session, and refuses a session older than its `freshAge` (1 day) unless the user sends a password. Guests have no password, and the call would not run inside our transaction. `internalAdapter.deleteUser` needs neither and runs in the mutation.
+
+Both delete routes are **off**, so no client can delete a user without steps 2–5: `/delete-user` because `user.deleteUser` is not enabled, `/delete-anonymous-user` through `disabledPaths` in `auth.ts`. `account.test.ts` checks that both answer 404.
+
+### What is kept
+
+- **Finished games and their `moves`** stay, so the other player keeps their history. The caller's player id stays in them (in `players`, in the stored flow and in the log). We keep the id and do not swap in a fixed "deleted player" id: the id is a random string that names nobody once the Better Auth user is gone, our tables hold no name, email or profile, and the id is in the stored flow and in every log row, so a swap would be a large rewrite. **A later issue that adds a name or a profile field to our tables must clear it here.**
+- **Invites someone else sent** that the caller answered (`answeredBy`) stay with their sender.
+
+### Errors
+
+- No sign-in, or no Better Auth user for the token: `NOT_SIGNED_IN`.
+- A token whose user was deleted still passes `signedInPlayer` until it expires, so for up to 15 minutes other calls (for example `createInvite`) could still save rows under the deleted id. The app signs out right after the delete, so this needs a client that keeps the old token on purpose. Checking the user on every call is an open point.
+
 ## Tests (offline)
 
 `pnpm test` runs Vitest in `apps/server` with the **edge runtime** environment (`@edge-runtime/vm`), as the convex-test docs say. convex-test runs the real functions against an in-memory database, with schema checks.
@@ -394,6 +429,8 @@ A token whose push failed with `Failed` (the network, a request with no answer i
 - `convex/model/push.test.ts` (pure): `turnPushSide` (a new game of the match, never the caller), `turnWait`, the messages (high priority, the ttl), `turnPushTtl`, the dead tokens, the retry tokens and the cap (it keeps the token just registered).
 - `convex/invites.test.ts` (convex-test, fake timers): create and accept starts a game that `getGame` shows (the inviter is white); accept twice; your own invite; decline and cancel (and who may call them); an unknown and a malformed code; codes in any case; a code clash (a spy on `crypto.getRandomValues`); the cap on open invites (`TOO_MANY_INVITES` and nothing saved; accept, decline, cancel and expiry free a place, also before the scheduler runs; another player is not affected); a game error rolls the accept back; the invite expires at 24 hours and accept, decline and cancel then fail; an accept just in time; `listMyInvites`; every call refuses a call with no identity; the inviter is the identity; a stranger cannot read the new game. It also runs the `invitesContract()` checks on the real functions (#256).
 - `convex/auth.test.ts` (convex-test with the Better Auth component, `register` from `@convex-dev/better-auth/test`): the `/api/auth` routes answer; a guest signs in over HTTP and gets a Convex token whose `sub` is the user id; that identity makes an invite.
+- `convex/account.test.ts` (convex-test with the Better Auth component, fake timers, a recording sender): Alice and Bob sign in as guests over HTTP. Alice, with an active game, a finished game, two invites, two push tokens and a linked account, deletes her account: Bob sees the active game won by her resign; the finished game is unchanged; her invites, tokens, Better Auth user, session and account are gone, and Bob's stay; no push goes out and the turn timer does nothing. A second call, no sign-in and a token with no user get `NOT_SIGNED_IN`. A guest with no data; a live game and several games; other players' games are not touched; the Better Auth delete routes answer 404.
+- `convex/model/account.test.ts` (pure): `gameOnDelete`.
 - `convex/convexTransport.test.ts` (convex-test, fake timers): the `GameTransport` contract checks on the [Convex adapter](#the-convex-adapter) with the real functions; a late turn, no sign-in and a bad id through the adapter; the adapter's function names and types against `api`.
 - `convex/convexInvites.test.ts` (convex-test, fake timers, #281): the `Invites` contract checks on the [Convex invites adapter](#the-convex-invites-adapter) with the real functions; no sign-in, a bad argument, an accept seen by the watching inviter, the cap and the scheduled expiry through the adapter; `INVITE_FUNCTIONS` against `api`.
 
@@ -494,5 +531,6 @@ Run it after you add or rename a file in `convex/`. The push also checks what a 
 - **Verify on a real deployment** that a mutation resolves only after the watched `getGame` shows its change (the offline test assumes it, as the Convex docs say).
 - **Clock skew:** `turnDeadline` is on the server clock. A phone should show the time left from the server time (for example the offset seen when the view arrives), not trust its own clock.
 - **Push follow-ups:** the app part (permission, token, register on sign-in, remove on sign-out, open the game on a tap); push receipts (Expo can also report a dead token later, in a receipt: a scheduled check of the receipts would remove those too); the text in the player's language; a push when a game ends on time.
+- **Account deletion follow-ups:** the app screen (it calls `deleteMyAccount`, then signs out); a check of the Better Auth user on every call, so a deleted user's token stops at once ([Errors](#errors-2)); clear any name or profile field a later issue adds ([What is kept](#what-is-kept)).
 - **Friends, usernames, users, presence**: later issues. The invite app screen and link route: #256. Play a friend (make, share, wait): #281.
 - **Document size**: one game row holds the whole match flow (a few KB). The log is in `moves`, so the row does not grow with the game.
