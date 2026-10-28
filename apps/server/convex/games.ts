@@ -18,8 +18,9 @@
  *
  * Push (#280): a save that moves the wait to the other player of an async
  * game, or starts the next game of the match, schedules a "your turn"
- * push (`scheduleTurnPush` in `push.ts`). It is sent after the save, so
- * it never fails a move.
+ * push (`scheduleTurnPush` in `push.ts`). A save that ends an async match
+ * schedules a "game over" push instead (#316). It is sent after the save,
+ * so it never fails a move.
  *
  * The caller is the signed-in user (#131): every public function reads
  * the player id from `ctx.auth` (`signedInPlayer`), and no public call
@@ -72,7 +73,7 @@ import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { signedInPlayer } from './caller';
 import { createCryptoRng } from './model/cryptoRng';
-import { turnWait } from './model/push';
+import { NEW_MATCH_WAIT, turnWait } from './model/push';
 import { scheduleTurnPush } from './push';
 import { gameChoice, gamePace, gameStatus } from './schema';
 
@@ -167,7 +168,8 @@ async function startClock(
  * Saves `flow` after a step from `before` (the saved flow): a version
  * bump, its log rows, a new turn deadline, and a "your turn" push when
  * the wait moved to the other player of an async game, or a new game
- * started (#280).
+ * started (#280), or a "game over" push when the step ended an async
+ * match (#316).
  */
 async function save(
   ctx: MutationCtx,
@@ -294,12 +296,11 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
   await ctx.db.patch(gameId, { eventCount, turnDeadline });
   // Nobody was waited for before. The caller started the game and is in
   // the app, so only the other player can get a push.
-  const before = { side: null, game: 0 };
   await scheduleTurnPush(
     ctx,
     { _id: gameId, pace, players },
     version,
-    before,
+    NEW_MATCH_WAIT,
     turnWait(flow),
     callerId,
   );

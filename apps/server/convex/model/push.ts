@@ -1,11 +1,18 @@
 /**
- * The pure parts of "your turn" pushes (#280): who gets a push after a
- * save, the text, the messages, which tokens to drop or retry. No Convex
- * types; `push.ts` holds the functions. See "Push" in
- * `docs/architecture/online-game-service.md`.
+ * The pure parts of the pushes: "your turn" (#280) and "game over"
+ * (#316). Who gets a push after a save, the text, the messages, which
+ * tokens to drop or retry. No Convex types; `push.ts` holds the
+ * functions. See "Push" in `docs/architecture/online-game-service.md`.
  */
 
-import type { OnlineGamePace, PushErrorCode, PushMessage, PushResult } from '@tavli/contracts';
+import type {
+  OnlineGamePace,
+  OnlineGameStatus,
+  PushErrorCode,
+  PushMessage,
+  PushResult,
+} from '@tavli/contracts';
+import { PLAYERS } from '@tavli/engine';
 import type { MatchFlow, PlayerId } from '@tavli/engine';
 import { waitingFor } from '@tavli/online';
 
@@ -21,17 +28,39 @@ export const TURN_PUSH_TEXT = {
   body: 'An online game is waiting for your move.',
 } as const;
 
+/**
+ * The text of a "game over" push (#316): the match is over. English for
+ * now; the one place to change it. It holds no names, no emails and not
+ * who won.
+ */
+export const MATCH_END_PUSH_TEXT = {
+  title: 'Tavlaki',
+  body: 'Your game is over. See the result.',
+} as const;
+
+/** Which push: "your turn", or "game over" (the match is over). */
+export type PushKind = 'turn' | 'matchEnd';
+
 /** What the server waits for: a side, in one game of the match. */
 export interface TurnWait {
   /** The side to move or to answer, or `null` (no game yet, or the match is over). */
   readonly side: PlayerId | null;
   /** Which game of the match: the number of games already finished. */
   readonly game: number;
+  /** The match is over. */
+  readonly over: boolean;
 }
+
+/** What the server waits for before a new match: nobody, and the match runs. */
+export const NEW_MATCH_WAIT: TurnWait = { side: null, game: 0, over: false };
 
 /** What the server waits for in `flow`. */
 export function turnWait(flow: MatchFlow): TurnWait {
-  return { side: waitingFor(flow), game: flow.match.games.length };
+  return {
+    side: waitingFor(flow),
+    game: flow.match.games.length,
+    over: flow.match.status === 'finished',
+  };
 }
 
 /**
@@ -55,9 +84,33 @@ export function turnPushSide(
   after: TurnWait,
   caller: PlayerId | null,
 ): PlayerId | null {
-  if (pace !== 'async' || after.side === null || after.side === caller) return null;
+  if (pace !== 'async' || after.over || after.side === null || after.side === caller) return null;
   if (after.side === before.side && after.game === before.game) return null;
   return after.side;
+}
+
+/**
+ * The sides to tell "game over" after a save (#316), or none.
+ *
+ * Only the save that ends the match pushes (`after.over`, and not
+ * `before.over`), and only in an async game: in a live game both players
+ * are in the app. The caller never gets one: they made the winning move
+ * or resigned, so they see the result. After a time out (`caller` is
+ * `null`: the server) both players get one.
+ *
+ * It never overlaps `turnPushSide`: that one never pushes when the match
+ * is over, and this one only then. A game that ends while the match goes
+ * on starts the next game: that is a "your turn" push, not this one. So
+ * one save sends one kind of push.
+ */
+export function matchEndPushSides(
+  pace: OnlineGamePace,
+  before: TurnWait,
+  after: TurnWait,
+  caller: PlayerId | null,
+): PlayerId[] {
+  if (pace !== 'async' || before.over || !after.over) return [];
+  return PLAYERS.filter((side) => side !== caller);
 }
 
 /**
@@ -88,6 +141,64 @@ export function turnMessages(
     priority: 'high',
     ttlSeconds,
   }));
+}
+
+/**
+ * How long the push service keeps a "game over" push, in seconds: one
+ * day. The result does not go stale like a turn, but a note from days
+ * ago is no use: the player has opened the app by then.
+ */
+export const MATCH_END_PUSH_TTL_SECONDS = 24 * 60 * 60;
+
+/**
+ * One "game over" message per token, with `normal` priority (nothing
+ * waits for the player, so the phone may hold it to save power) and a
+ * time to live of `MATCH_END_PUSH_TTL_SECONDS`.
+ */
+export function matchEndMessages(tokens: readonly string[], gameId: string): PushMessage[] {
+  return tokens.map((to) => ({
+    to,
+    ...MATCH_END_PUSH_TEXT,
+    data: { gameId },
+    priority: 'normal',
+    ttlSeconds: MATCH_END_PUSH_TTL_SECONDS,
+  }));
+}
+
+/**
+ * The messages of a push of `kind` to `tokens`, sent at `now`. A turn
+ * push lives until `turnDeadline` (`turnPushTtl`): with no time left it
+ * is no messages, so nothing is sent.
+ */
+export function pushMessages(
+  kind: PushKind,
+  tokens: readonly string[],
+  gameId: string,
+  turnDeadline: number | null,
+  now: number,
+): PushMessage[] {
+  if (kind === 'matchEnd') return matchEndMessages(tokens, gameId);
+  const ttl = turnPushTtl(turnDeadline, now);
+  return ttl === null ? [] : turnMessages(tokens, gameId, ttl);
+}
+
+/**
+ * Whether a push of `kind`, scheduled by the save of `version`, should
+ * still go out to `game` (the game as saved now, or `null` when it is
+ * gone). The game must still be at `version`:
+ *
+ * - a turn push needs the match to run: once the player has played (a
+ *   new version) or the match is over, "your turn" would be late;
+ * - a "game over" push needs the match to be over. No save changes a
+ *   finished match, so its version stays: the retry still goes out.
+ */
+export function pushStillDue(
+  kind: PushKind,
+  game: { readonly version: number; readonly status: OnlineGameStatus } | null,
+  version: number,
+): boolean {
+  if (game === null || game.version !== version) return false;
+  return game.status === (kind === 'turn' ? 'active' : 'finished');
 }
 
 /** The tokens whose result failed with one of `codes`. */

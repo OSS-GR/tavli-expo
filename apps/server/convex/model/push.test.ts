@@ -3,14 +3,21 @@ import { describe, expect, it } from 'vitest';
 import type { PushResult } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import type { PlayerId } from '@tavli/engine';
-import { createOnlineMatch, timeOut, waitingFor } from '@tavli/online';
+import { createOnlineMatch, resign, timeOut, waitingFor } from '@tavli/online';
 
 import {
+  MATCH_END_PUSH_TEXT,
+  MATCH_END_PUSH_TTL_SECONDS,
   MAX_PUSH_TOKENS_PER_PLAYER,
   MAX_PUSH_RETRIES,
+  NEW_MATCH_WAIT,
   PUSH_RETRY_MS,
   TURN_PUSH_TEXT,
   deadTokens,
+  matchEndMessages,
+  matchEndPushSides,
+  pushMessages,
+  pushStillDue,
   retryTokens,
   tokensOverCap,
   turnMessages,
@@ -20,9 +27,11 @@ import {
 } from './push';
 import type { TurnWait } from './push';
 
-describe('turnPushSide', () => {
-  const at = (side: PlayerId | null, game = 0): TurnWait => ({ side, game });
+const at = (side: PlayerId | null, game = 0): TurnWait => ({ side, game, over: false });
+/** The match is over after `game` games: nobody is waited for. */
+const over = (game = 1): TurnWait => ({ side: null, game, over: true });
 
+describe('turnPushSide', () => {
   it('tells the other side in an async game', () => {
     expect(turnPushSide('async', at('white'), at('black'), 'white')).toBe('black');
     expect(turnPushSide('async', at('black'), at('white'), 'black')).toBe('white');
@@ -50,8 +59,10 @@ describe('turnPushSide', () => {
   });
 
   it('tells nobody when the match is over', () => {
-    expect(turnPushSide('async', at('white'), at(null), 'white')).toBeNull();
-    expect(turnPushSide('async', at('white', 2), at(null, 3), null)).toBeNull();
+    expect(turnPushSide('async', at('white'), over(), 'white')).toBeNull();
+    expect(turnPushSide('async', at('white', 2), over(3), null)).toBeNull();
+    // Even with a side (it cannot happen: `waitingFor` is null then).
+    expect(turnPushSide('async', at('white'), { ...over(), side: 'black' }, 'white')).toBeNull();
   });
 
   it('never pushes in a live game', () => {
@@ -61,16 +72,77 @@ describe('turnPushSide', () => {
   });
 });
 
+describe('matchEndPushSides', () => {
+  it('tells the other player when the caller ends an async match', () => {
+    // A winning move or a resign by the caller.
+    expect(matchEndPushSides('async', at('white'), over(), 'white')).toEqual(['black']);
+    expect(matchEndPushSides('async', at('white', 2), over(3), 'black')).toEqual(['white']);
+  });
+
+  it('tells both players after a time out (the server ended it)', () => {
+    expect(matchEndPushSides('async', at('white'), over(), null)).toEqual(['white', 'black']);
+  });
+
+  it('tells nobody while the match goes on: the turn push covers a new game', () => {
+    expect(matchEndPushSides('async', at('white'), at('black'), 'white')).toEqual([]);
+    expect(matchEndPushSides('async', at('white', 0), at('white', 1), null)).toEqual([]);
+    expect(matchEndPushSides('async', NEW_MATCH_WAIT, at('white'), 'black')).toEqual([]);
+  });
+
+  it('tells nobody when the match was over before the save', () => {
+    expect(matchEndPushSides('async', over(), over(), null)).toEqual([]);
+  });
+
+  it('never pushes in a live game', () => {
+    expect(matchEndPushSides('live', at('white'), over(), 'white')).toEqual([]);
+    expect(matchEndPushSides('live', at('white'), over(), null)).toEqual([]);
+  });
+
+  it('never overlaps the turn push: one save, one kind of push', () => {
+    const waits = [
+      NEW_MATCH_WAIT,
+      at('white'),
+      at('black'),
+      at('white', 1),
+      at('black', 1),
+      over(),
+      over(2),
+    ];
+    for (const pace of ['async', 'live'] as const) {
+      for (const before of waits) {
+        for (const after of waits) {
+          for (const caller of ['white', 'black', null] as const) {
+            const turn = turnPushSide(pace, before, after, caller);
+            const end = matchEndPushSides(pace, before, after, caller);
+            expect(turn !== null && end.length > 0).toBe(false);
+            if (caller !== null) expect(end).not.toContain(caller);
+          }
+        }
+      }
+    }
+  });
+});
+
 describe('turnWait', () => {
   it('reads the waited side and the game number of a flow', () => {
     const flow = createOnlineMatch(
       { choice: 'portes', targetPoints: 3, players: { white: 'a', black: 'b' } },
       createSeededRng(1),
     );
-    expect(turnWait(flow)).toEqual({ side: flow.game.state.toMove, game: 0 });
+    expect(turnWait(flow)).toEqual({ side: flow.game.state.toMove, game: 0, over: false });
     const next = timeOut(flow, createSeededRng(2));
     expect(next.match.games).toHaveLength(1);
-    expect(turnWait(next)).toEqual({ side: waitingFor(next), game: 1 });
+    expect(turnWait(next)).toEqual({ side: waitingFor(next), game: 1, over: false });
+  });
+
+  it('says when the match is over', () => {
+    const flow = createOnlineMatch(
+      { choice: 'portes', targetPoints: 3, players: { white: 'a', black: 'b' } },
+      createSeededRng(1),
+    );
+    const ended = resign(flow, 'white', createSeededRng(2));
+    // A match resign adds no game to `match.games`.
+    expect(turnWait(ended)).toEqual({ side: null, game: 0, over: true });
   });
 });
 
@@ -88,8 +160,55 @@ describe('turnMessages', () => {
   });
 
   it('keeps the text short', () => {
-    expect(TURN_PUSH_TEXT.title.length).toBeLessThanOrEqual(30);
-    expect(TURN_PUSH_TEXT.body.length).toBeLessThanOrEqual(80);
+    for (const text of [TURN_PUSH_TEXT, MATCH_END_PUSH_TEXT]) {
+      expect(text.title.length).toBeLessThanOrEqual(30);
+      expect(text.body.length).toBeLessThanOrEqual(80);
+    }
+  });
+});
+
+describe('matchEndMessages', () => {
+  it('makes one normal priority message per token that lives one day', () => {
+    const message = (to: string) => ({
+      to,
+      title: MATCH_END_PUSH_TEXT.title,
+      body: MATCH_END_PUSH_TEXT.body,
+      data: { gameId: 'g1' },
+      priority: 'normal',
+      ttlSeconds: 24 * 60 * 60,
+    });
+    expect(MATCH_END_PUSH_TTL_SECONDS).toBe(86_400);
+    expect(matchEndMessages(['a', 'b'], 'g1')).toEqual([message('a'), message('b')]);
+  });
+});
+
+describe('pushMessages', () => {
+  it('a turn push lives until the turn deadline; none with no time left', () => {
+    expect(pushMessages('turn', ['a'], 'g1', 60_000, 0)).toEqual(turnMessages(['a'], 'g1', 60));
+    expect(pushMessages('turn', ['a'], 'g1', 500, 0)).toEqual([]);
+    expect(pushMessages('turn', ['a'], 'g1', null, 0)).toEqual([]);
+  });
+
+  it('a "game over" push needs no deadline', () => {
+    expect(pushMessages('matchEnd', ['a'], 'g1', null, 0)).toEqual(matchEndMessages(['a'], 'g1'));
+  });
+});
+
+describe('pushStillDue', () => {
+  const game = (version: number, status: 'active' | 'finished') => ({ version, status });
+
+  it('a turn push: the game is still at the version and the match runs', () => {
+    expect(pushStillDue('turn', game(3, 'active'), 3)).toBe(true);
+    expect(pushStillDue('turn', game(4, 'active'), 3)).toBe(false);
+    expect(pushStillDue('turn', game(3, 'finished'), 3)).toBe(false);
+    expect(pushStillDue('turn', null, 3)).toBe(false);
+  });
+
+  it('a "game over" push: the match at the version is over', () => {
+    expect(pushStillDue('matchEnd', game(3, 'finished'), 3)).toBe(true);
+    expect(pushStillDue('matchEnd', game(3, 'active'), 3)).toBe(false);
+    expect(pushStillDue('matchEnd', game(4, 'finished'), 3)).toBe(false);
+    expect(pushStillDue('matchEnd', null, 3)).toBe(false);
   });
 });
 

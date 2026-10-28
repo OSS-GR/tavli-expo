@@ -180,7 +180,7 @@ If you are a parent and think your child allowed usage data, write to us, and we
 These features are planned. They are **not** in the app today. We will update this policy before they go live and tell you in the app.
 
 - **Sign-in with Apple, Google or an email link**, and **friends**. These will store your account and friends list on our server (Convex), with sign-in through Better Auth. (Guest accounts and online games with a friend are live now: see above.)
-- **Push notifications** (for example "your turn"), through the Expo push service.
+- **Push notifications** (for example "your turn" or "your game is over"), through the Expo push service.
 - **App updates over the air** (EAS Update by Expo). The app will ask Expo's servers at launch if a newer version exists. This request carries technical facts only.
 
 ## This website
