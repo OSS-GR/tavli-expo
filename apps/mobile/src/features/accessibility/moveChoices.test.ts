@@ -24,7 +24,7 @@ import {
   moveChoices,
   moveLabel,
   moveShortLabel,
-} from './moveList';
+} from './moveChoices';
 import { moveListShown } from './screenReader';
 
 const t = i18n.t;

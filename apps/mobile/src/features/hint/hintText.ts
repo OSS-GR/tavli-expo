@@ -6,7 +6,7 @@
 import type { Move } from '@tavli/engine';
 import type { TFunction } from 'i18next';
 
-import { choiceLabel, choiceShortLabel } from '@/features/accessibility/moveList';
+import { choiceLabel, choiceShortLabel } from '@/features/accessibility/moveChoices';
 
 import { hintGroups } from './hint';
 

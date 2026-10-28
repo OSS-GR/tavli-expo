@@ -17,7 +17,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import type { MovePath } from '@/features/board/combined';
 
-import { choiceLabel, choiceShortLabel, listChoices } from './moveList';
+import { choiceLabel, choiceShortLabel, listChoices } from './moveChoices';
 
 /** The Hint button of the list (#209). */
 export interface MoveListHint {
