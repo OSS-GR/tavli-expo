@@ -178,6 +178,31 @@ describe('match flow', () => {
     ]);
   });
 
+  it('a rotation on a Plakoto preset plays that preset only in the Plakoto game (#247)', () => {
+    const rules = resolveRules('plakoto.federation', {
+      match: { rotation: getPreset('tavli').match.rotation, openingRoll: 'rerollBoth' },
+    });
+    let flow = createMatchFlow({ rules, targetPoints: 99, starter: 'white' }, fakes);
+    const presets: string[] = [];
+    for (let game = 0; game < 4; game += 1) {
+      const { state } = flow.game;
+      presets.push(`${state.variant}:${state.rules.presetId}`);
+      // Every game keeps the match flags of the match rules.
+      expect(state.rules.match).toEqual(flow.match.rules.match);
+      flow = playOn(flow, createSeededRng(game), createSeededRng(game + 50), {}, fakes);
+      flow = applyMatchAction(flow, { type: 'nextGame' }, fakes);
+    }
+    expect(presets).toEqual([
+      'portes:portes',
+      'plakoto:plakoto.federation',
+      'fevga:fevga',
+      'portes:portes',
+    ]);
+    // The log replays to the same match, and the match loads from JSON.
+    expect(replay(flow.log, fakes)).toEqual(flow);
+    expect(validateMatch(JSON.parse(JSON.stringify(flow.match)))).toEqual(flow.match);
+  });
+
   it('the match ends at the target score; nothing more can be played', () => {
     const over = playMatch(createMatchFlow({ rules: portesOnly() }), 7);
     expect(matchPhase(over)).toBe('match-over');

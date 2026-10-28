@@ -78,6 +78,28 @@ describe('game events for real matches (#61)', () => {
     ]);
   });
 
+  it('a Tavli match sends the Plakoto version only for its Plakoto game (#247)', () => {
+    const { store } = matchSessions.start({
+      ...localSetup,
+      game: 'tavli',
+      targetPoints: 7,
+      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' },
+    });
+    const { dispatch } = store.getState();
+    for (let game = 0; game < 2; game += 1) {
+      dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+      dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+      dispatch({ type: 'resign', player: 'white' });
+      dispatch({ type: 'nextGame' });
+    }
+    const started = tracked().filter((e) => e.event === 'game_started');
+    expect(started).toMatchObject([
+      { game: 'tavli', variant: 'portes', rulesVersion: 'portes' },
+      { game: 'tavli', variant: 'plakoto', rulesVersion: 'plakoto.federation' },
+      { game: 'tavli', variant: 'fevga', rulesVersion: 'fevga' },
+    ]);
+  });
+
   it('sends game_started for pass-and-play, with no player names', () => {
     matchSessions.start(localSetup);
     expect(tracked()).toEqual([

@@ -157,6 +157,7 @@
     "onPhone": "Μόνο σε αυτό το κινητό: τα τελευταία σου {{max}} ματς.",
     "openingRoll": "Πρώτη ζαριά: {{rule}}",
     "rulesVersion": "Παραλλαγή: {{version}}",
+    "rulesVersionPlakoto": "Παραλλαγή (Πλακωτό): {{version}}",
     "result": {
       "won": "Νίκη",
       "lost": "Ήττα",
@@ -553,6 +554,7 @@
       "chosenStarterRollsHint": "Διαλέγετε ποιος ξεκινά. Αυτός ρίχνει και τα δύο ζάρια.",
       "chosenStarterRollsHintBot": "Διαλέγεις ποιος ξεκινά: εσύ ή ο υπολογιστής. Αυτός ρίχνει και τα δύο ζάρια.",
       "rulesVersion": "Παραλλαγή",
+      "rulesVersionPlakoto": "Παραλλαγή (Πλακωτό)",
       "optionLabel": "{{group}}: {{option}}"
     },
     "rulesVersion": {

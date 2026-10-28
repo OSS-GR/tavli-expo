@@ -167,6 +167,12 @@ is skipped.
   fine (e.g. 4 + 2 = 6 in a 5-point match wins).
 - There is no Crawford rule (there is no cube).
 - The match always starts with Portes (default).
+- **Rules version of one game (app, #247):** a rotation can start from the
+  preset of one of its games, for example `plakoto.federation` with the
+  rotation Portes → Plakoto → Fevga. Then only that game plays that preset;
+  the other games play their default presets. Every game keeps the match
+  flags of the match (`gameRules` in `packages/engine/src/match.ts`). The
+  `tavli` preset plays the default preset of every game.
 
 ## Resigning (app rule)
 

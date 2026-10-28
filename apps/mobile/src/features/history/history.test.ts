@@ -170,6 +170,17 @@ describe('a record is saved when a match ends', () => {
     const tavli = sessions.start({ ...defaultSetup('local'), game: 'tavli' });
     tavli.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
     expect(history.getState().records[0]?.preset).toBe('tavli');
+    // A Tavli match keeps the version of its Plakoto game (#247).
+    const federation = sessions.start({
+      ...defaultSetup('local'),
+      game: 'tavli',
+      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' },
+    });
+    federation.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    expect(history.getState().records[0]).toMatchObject({
+      game: 'tavli',
+      preset: 'plakoto.federation',
+    });
   });
 
   it('vs bot: you resign the only game at the start, the bot wins a diplo', () => {
@@ -842,6 +853,7 @@ describe('history list', () => {
       rec({ id: 'a', game: 'plakoto', preset: 'plakoto.federation' }),
       rec({ id: 'b', game: 'asodio', preset: 'asodio.aceyDeuceyAmerican' }),
       rec({ id: 'c', game: 'tavli' }),
+      rec({ id: 'd', game: 'tavli', preset: 'plakoto.federation' }),
     ];
     expect(parseHistory(serializeHistory(records))).toEqual(records);
     const old = (over: Partial<HistoryRecord>) => {
@@ -870,12 +882,17 @@ describe('history list', () => {
         { ...rec({ id: 'a', game: 'plakoto' }), preset: 'asodio.aceyDeuceyGreek' },
         { ...rec({ id: 'b', game: 'portes' }), preset: 'plakoto.federation' },
         { ...rec({ id: 'c', game: 'asodio' }), preset: 'chess' },
+        // A Tavli match plays no Asodio, and `plakoto` is never its preset (#247).
+        { ...rec({ id: 'd', game: 'tavli' }), preset: 'asodio.aceyDeuceyGreek' },
+        { ...rec({ id: 'e', game: 'tavli' }), preset: 'plakoto' },
       ],
     });
     expect(parseHistory(text).map((r) => r.preset)).toEqual([
       'plakoto',
       'portes',
       'asodio.kafeneio',
+      'tavli',
+      'tavli',
     ]);
   });
 
@@ -1117,6 +1134,26 @@ describe('history texts', () => {
     for (const game of ['plakoto', 'asodio', 'tavli', 'portes'] as const) {
       expect(historyRow(rec({ game }), t, 'en').score).toBe('You 3 – 1 Bot · first to 3');
     }
+  });
+
+  it('names the game of the version in a Tavli match (#247)', () => {
+    const el = i18n.getFixedT('el');
+    const federation = rec({ game: 'tavli', preset: 'plakoto.federation' });
+    expect(historyRow(federation, t, 'en')).toMatchObject({
+      title: 'Tavli · vs Bot (Easy)',
+      score: 'You 3 – 1 Bot · first to 3 · Rules version (Plakoto): Federation',
+    });
+    expect(historyRow(federation, el, 'el').score).toBe(
+      'Εσύ 3 – 1 Υπολογιστής · στους 3 · Παραλλαγή (Πλακωτό): Ομοσπονδίας',
+    );
+    expect(recordSetup(federation).rulesVersions).toEqual({
+      plakoto: 'plakoto.federation',
+      asodio: 'asodio.kafeneio',
+    });
+    expect(recordSetup(rec({ game: 'tavli' })).rulesVersions).toEqual({
+      plakoto: 'plakoto',
+      asodio: 'asodio.kafeneio',
+    });
   });
 
   it("keeps the record's rules version in its setup (#241)", () => {
