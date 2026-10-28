@@ -28,14 +28,16 @@ export type WinType = 'mono' | 'diplo' | 'points';
 
 /**
  * The win type of a game worth `points`, by the scoring of its rules.
- * With `perChecker` scoring (Acey-Deucey American, #241) 2 points are two
- * checkers left, not a diplo: the screens say "+2 points".
+ * With `perChecker` scoring (Acey-Deucey American, #241, #245) there is no
+ * mono or diplo: each point is a checker the loser has not borne off, so
+ * the screens say "+1 point" or "+2 points".
  */
 export function winType(
   result: { readonly points: number },
   scoring: RuleSet['scoring']['method'] = 'tavli',
 ): WinType {
+  if (scoring === 'perChecker') return 'points';
   if (result.points === 1) return 'mono';
-  if (result.points === 2 && scoring !== 'perChecker') return 'diplo';
+  if (result.points === 2) return 'diplo';
   return 'points';
 }

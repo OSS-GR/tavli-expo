@@ -8,8 +8,8 @@ describe('winType', () => {
     expect(winType({ points: 2 }, 'tavli')).toBe('diplo');
   });
 
-  it('perChecker scoring (Acey-Deucey American, #241): 2 checkers left is not a diplo', () => {
-    expect(winType({ points: 1 }, 'perChecker')).toBe('mono');
+  it('perChecker scoring (Acey-Deucey American, #241, #245): never mono or diplo', () => {
+    expect(winType({ points: 1 }, 'perChecker')).toBe('points');
     expect(winType({ points: 2 }, 'perChecker')).toBe('points');
     expect(winType({ points: 15 }, 'perChecker')).toBe('points');
   });

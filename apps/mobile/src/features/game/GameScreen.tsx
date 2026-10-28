@@ -615,7 +615,19 @@ export function GameScreen({
   // A resigned game says why it gives these points (#181): "Diplo: you
   // resigned before you bore off a checker." The diplo reason shows only when
   // it is true: a variant may score a resign 2 for another reason.
-  const resignedLine = (loser: PlayerId, type: ReturnType<typeof winType>, off: number) => {
+  // With `perChecker` scoring (Acey-Deucey American, #245) the engine's
+  // points are the checkers the loser did not bear off: the line says that.
+  const resignedLine = (
+    loser: PlayerId,
+    type: ReturnType<typeof winType>,
+    off: number,
+    perChecker: { readonly count: number } | null,
+  ) => {
+    if (perChecker !== null) {
+      return isYou(loser)
+        ? t('game.end.resignedPerCheckerYou', perChecker)
+        : t('game.end.resignedPerChecker', { ...perChecker, name: nameOf(loser) });
+    }
     const key =
       type === 'diplo' && off === 0
         ? 'resignedDiplo'
@@ -756,13 +768,21 @@ export function GameScreen({
     const { result } = game;
     const winner = result.winner;
     const loser = winner === null ? null : other(winner);
-    const type = winType(result, game.state.rules.scoring.method);
+    const scoring = game.state.rules.scoring.method;
+    const type = winType(result, scoring);
+    // Acey-Deucey American (#245): 1 point per checker the loser did not
+    // bear off. The count is the engine's points; the app adds no rule.
+    const perChecker = scoring === 'perChecker' ? { count: result.points } : null;
     let reason: string | null = null;
     if (result.reason === 'resigned' && loser !== null) {
-      reason = resignedLine(loser, type, game.state.board.off[loser]);
+      reason = resignedLine(loser, type, game.state.board.off[loser], perChecker);
     } else if (result.reason === 'timeout' && loser !== null) {
       // An online turn timer ran out (#170). The sheet reads this line too.
       reason = timeoutLine(loser);
+    } else if (result.reason === 'borneOff' && perChecker !== null && loser !== null) {
+      reason = isYou(loser)
+        ? t('game.end.checkersLeftYou', perChecker)
+        : t('game.end.checkersLeft', { ...perChecker, name: nameOf(loser) });
     } else if (result.reason === 'borneOff' && type === 'diplo' && loser !== null) {
       reason = isYou(loser)
         ? t('game.end.noBearOff_you')

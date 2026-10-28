@@ -177,6 +177,9 @@ Default (tavli convention, cardgamesgr):
 
 Flag `scoring`: `"tavli"` (default), `"perChecker"` (loser pays 1 per
 checker not borne off — American), `"singleOnly"` (always 1 — Frantzis).
+A resign scores the same way as the position (`tavli-match.md`,
+"Resigning"): with `"perChecker"` the opponent gets 1 point per checker the
+resigning player has not borne off, on the board or outside.
 
 Asodio is not in the standard Tavli rotation. Offer it as a standalone game
 or as an optional extra in a custom rotation.

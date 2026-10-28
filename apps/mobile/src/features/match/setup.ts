@@ -123,6 +123,18 @@ export function gamePreset(
   return isVersionedGame(game) ? versions[game] : GAME_PRESETS[game];
 }
 
+/**
+ * How a match of `game` scores a game (`scoring.method` of its preset): the
+ * New game hint names mono and diplo only when they exist (#245). Acey-Deucey
+ * American is `perChecker`. A Tavli match scores like its three games.
+ */
+export function gameScoring(
+  game: GameChoice,
+  versions: RulesVersions = DEFAULT_RULES_VERSIONS,
+): RuleSet['scoring']['method'] {
+  return getPreset(gamePreset(game, versions)).scoring.method;
+}
+
 type DefaultVersion = { [G in VersionedGame]: (typeof RULES_VERSIONS)[G][0] }[VersionedGame];
 
 /** A rules version that is not its game's default (#241). */
