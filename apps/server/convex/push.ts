@@ -4,7 +4,9 @@
  * The app registers the Expo push token of the phone
  * (`registerPushToken`) and removes it on sign-out (`removePushToken`).
  * Both read the player from the sign-in (`signedInPlayer`); no call takes
- * a player id.
+ * a player id. `registerPushToken` also checks that the account still
+ * exists (`existingPlayer`, #306), so a deleted account's token cannot
+ * save a push token that nothing would remove.
  *
  * When a save in `games.ts` moves the wait to the other player of an
  * async game, it calls `scheduleTurnPush`. That schedules `sendTurnPush`,
@@ -30,7 +32,7 @@ import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { internalAction, internalMutation, internalQuery, mutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
-import { signedInPlayer } from './caller';
+import { existingPlayer, signedInPlayer } from './caller';
 import {
   MAX_PUSH_RETRIES,
   PUSH_RETRY_MS,
@@ -92,13 +94,14 @@ function checkToken(token: string): void {
  * token that belonged to another player moves to the caller (the phone
  * signed in to another account). A player keeps at most
  * `MAX_PUSH_TOKENS_PER_PLAYER` tokens: a new one drops the oldest.
- * Rejects a token that is not an Expo push token (`BAD_REQUEST`).
+ * Rejects a token that is not an Expo push token (`BAD_REQUEST`), and a
+ * deleted account (`NOT_SIGNED_IN`).
  */
 export const registerPushToken = mutation({
   args: { token: v.string(), platform: pushPlatform },
   returns: v.null(),
   handler: async (ctx, { token, platform }) => {
-    const playerId = await signedInPlayer(ctx);
+    const playerId = await existingPlayer(ctx);
     checkToken(token);
     const updatedAt = Date.now();
     const rows = await ctx.db

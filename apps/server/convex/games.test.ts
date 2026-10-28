@@ -495,7 +495,7 @@ describe('the Plakoto mother question', () => {
         lastTurn: null,
         result: null,
       };
-      await ctx.db.patch(gameId, { flow: storeFlow({ ...flow, game }) });
+      await ctx.db.patch(gameId, { flow: storeFlow({ ...flow, game }, null) });
     });
     const v = await view(t, gameId);
     const state = v.game.state;

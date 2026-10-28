@@ -10,15 +10,15 @@ import {
   type MatchFlow,
 } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
-import { pickTurn } from '@tavli/online/testing';
+import { lastBearOff, pickTurn } from '@tavli/online/testing';
 
-import { storeEvents } from '@/features/game/gameFeedback';
+import { moveEvent, storeEvents } from '@/features/game/gameFeedback';
 import { inviteAccepted } from '@/features/invites/acceptedInvite';
 import { currentGameLabel } from '@/features/match/summary';
 import i18n from '@/i18n';
 import { botLevels, botRunner } from '@/services';
 
-import { onlineBoardStore } from './boardStore';
+import { gameEnd, onlineBoardStore } from './boardStore';
 import { clockText, clockTickMs } from './clock';
 import {
   DEV_BOT_ID,
@@ -30,6 +30,7 @@ import {
   stopDevGame,
 } from './devGame';
 import { MAX_TRIES_PER_TURN, startOnlineBot, type OnlineBot } from './onlineBot';
+import { viewEvents } from './onlineFeedback';
 import { createOnlineStore, viewFlow, type OnlineStore } from './onlineStore';
 import { remoteTurn } from './remoteTurn';
 
@@ -291,6 +292,45 @@ describe('onlineBoardStore between games (#286)', () => {
     stop();
   });
 
+  it('replays the other player’s winning turn: the board ends on the final position (#299)', async () => {
+    const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => Date.now() });
+    const gameId = server.createGame('them', { white: 'them', black: 'me' }, 'portes', 3, 'live');
+    server.setFlowForTest(gameId, lastBearOff(viewFlow(server.getGame(gameId)!)));
+    const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
+    open.push(store);
+    await flush();
+    const board = onlineBoardStore(store, gameId)!;
+    const before = board.getState().flow;
+    const moves = pickTurn(before.game, createSeededRng(2));
+    const { version } = server.getGame(gameId)!;
+    await server.transportFor('them').sendTurn({ gameId, expectedVersion: version, moves });
+    await flush();
+
+    // The store has game 2; the board holds the end of game 1.
+    const view = store.getState().view!;
+    expect(view.match.games).toHaveLength(1);
+    expect(view.game.phase).toBe('moving');
+    const held = board.getState().flow;
+    expect(held.match).toBe(store.getState().flow!.match);
+    expect(held.game).toEqual(view.previousGame);
+    expect(held.game.phase).toBe('game-over');
+    expect(held.game.result).toMatchObject({ winner: 'white', reason: 'borneOff' });
+    expect(held.game.state.board.off.white).toBe(15);
+    expect(currentBoard(held.game)).not.toEqual(currentBoard(before.game));
+    expect(held.log).toEqual([]);
+
+    // The winning turn flies from the board before it, and sounds as a remote turn.
+    const turn = remoteTurn(before, held, 'black');
+    expect(turn).toEqual({ player: 'white', moves, before: currentBoard(before.game) });
+    expect(viewEvents(before, held, 'black').map(({ event }) => event)).toEqual(
+      moves.map(moveEvent),
+    );
+    // The sheet closes: the next game, with no turn to fly.
+    board.release();
+    expect(board.getState().flow).toBe(store.getState().flow);
+    expect(remoteTurn(held, board.getState().flow, 'black')).toBeNull();
+  });
+
   it('drops the moves of a turn that timed out', async () => {
     const { server, gameId, store, board } = await openBoard();
     while (server.getGame(gameId)!.waitingFor !== 'white') {
@@ -390,6 +430,58 @@ describe('onlineBoardStore between games (#286)', () => {
     while (store.getState().view?.status === 'active') await timeOut(server);
     // Match end: the board shows the last view, nothing waits.
     expect(board.getState().flow).toBe(store.getState().flow);
+  });
+
+  it('shows the newest game when the board missed one, with no turn to fly (#299)', async () => {
+    const { server, gameId, store, board } = await openBoard(5);
+    // Nobody reads the board while two games time out (the phone was away).
+    const before = board.getState().flow;
+    for (let i = 0; i < 2; i++) {
+      jest.advanceTimersByTime(TURN_TIME_MS.live + 1);
+      expect(server.runDueTimeouts()).toBe(1);
+    }
+    await flush();
+    const view = store.getState().view!;
+    expect(view.status).toBe('active');
+    expect(view.match.games).toHaveLength(2);
+    expect(server.getGame(gameId)!.previousGame).toEqual(view.previousGame);
+
+    // The board holds game 2, the game the sheet shows (the newest record).
+    const held = board.getState().flow;
+    const record = held.match.games.at(-1)!;
+    expect(held.game).toEqual(view.previousGame);
+    expect(held.game.result).toEqual({
+      winner: record.winner,
+      points: record.points,
+      reason: 'timeout',
+    });
+    // Its last turn is not one from the board before: nothing flies or sounds.
+    expect(remoteTurn(before, held, 'white')).toBeNull();
+    const moveSounds: string[] = ['checkerPlace', 'checkerHit', 'bearOff'];
+    const events = viewEvents(before, held, 'white').map(({ event }) => event);
+    expect(events.filter((event) => moveSounds.includes(event))).toEqual([]);
+  });
+
+  it('does not show a previousGame that is not the newest game (an older server)', async () => {
+    const { server, store } = await openBoard(5);
+    const before = store.getState().flow!;
+    await timeOut(server);
+    const view = store.getState().view!;
+    const next = store.getState().flow!;
+    const ended = view.previousGame!;
+    expect(gameEnd(before, next, ended).game).toBe(ended);
+    // A game whose result is not the newest record: the board marks its own flow over.
+    const other = { ...ended, result: { ...ended.result!, points: ended.result!.points + 1 } };
+    const held = gameEnd(before, next, other);
+    expect(held.game).not.toBe(other);
+    expect(held.game.phase).toBe('game-over');
+    expect(held.game.state.board).toEqual(before.game.state.board);
+    const record = next.match.games.at(-1)!;
+    expect(held.game.result).toEqual({
+      winner: record.winner,
+      points: record.points,
+      reason: record.reason,
+    });
   });
 
   it('does not hold a game that ended before the board was made', async () => {

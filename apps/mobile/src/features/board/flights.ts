@@ -65,6 +65,11 @@ export function flightMs(flight: Flight): number {
   return FLIGHT_MS * (1 + (flight.via?.length ?? 0));
 }
 
+/** When the last of `flights` lands, in ms from their start. 0 for none. */
+export function flightsEndMs(flights: readonly Flight[]): number {
+  return flights.reduce((end, f) => Math.max(end, f.delay + flightMs(f)), 0);
+}
+
 /** The key of the top checker of a slot, if it is a drawn checker that only this flight brings. */
 function hideKey(geo: BoardGeometry, slot: Slot, count: number): string | null {
   if (count > geo.layout.checker.maxVisible) return null;

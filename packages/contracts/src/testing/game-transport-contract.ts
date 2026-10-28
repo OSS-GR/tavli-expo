@@ -44,6 +44,13 @@ export interface GameTransportContractSubject {
    */
   readonly createMotherQuestion: () => Promise<string>;
   /**
+   * Creates a Portes game (3 points, live) where White, to move, bears off
+   * its last checkers: every legal turn wins the game for 1 point, and
+   * the match goes on. (`lastBearOff` in `@tavli/online/testing` builds
+   * the position.)
+   */
+  readonly createWinningTurn: () => Promise<string>;
+  /**
    * Creates a Portes game (1 point, live) that White is not in: the player
    * `black` plays the white side, the stranger the black side. Resolves
    * to its id.
@@ -187,6 +194,11 @@ async function rejectsWith(
     throw new Error(`${what}: the rejection is not GameTransportErrorData: ${String(reason)}`);
   }
   same(reason.code, code, `${what}: error code`);
+}
+
+/** The moves of a turn without their `capture` (the server fills it in). */
+function plainMoves(moves: readonly MoveInput[] | undefined) {
+  return (moves ?? []).map(({ from, to, die }) => ({ from, to, die }));
 }
 
 /** A new game, watched by both players, with its first view. */
@@ -487,6 +499,48 @@ export function gameTransportContract(): GameTransportContractCheck[] {
           'STALE_VERSION',
           'the same answer again',
         );
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
+      name: 'a turn that ends a game stays in previousGame while the match goes on',
+      run: async (subject) => {
+        const { gameId, watchers, view } = await startGame(
+          subject,
+          await subject.createWinningTurn(),
+        );
+        same(view.previousGame, null, 'previousGame in the first game');
+        same(waiting(view), 'white', 'the side to move');
+        const moves = subject.legalTurn(view);
+        await subject.transportFor('white').sendTurn({
+          gameId,
+          expectedVersion: view.version,
+          moves,
+        });
+        const white = await viewAt(subject, watchers.white, view.version + 1);
+        const black = await viewAt(subject, watchers.black, view.version + 1);
+        same(black, white, 'Black view');
+        same(white.status, 'active', 'status after the first game');
+        same(white.match.games.length, 1, 'finished games');
+        // The next game has started; previousGame keeps the end of the first.
+        same(white.game.result, null, 'game.result of the next game');
+        const ended = white.previousGame;
+        if (ended === null) throw new Error('no previousGame after the game ended');
+        same(ended.phase, 'game-over', 'previousGame.phase');
+        same(ended.result?.winner, 'white', 'previousGame.result.winner');
+        same(ended.lastTurn?.player, 'white', 'previousGame.lastTurn.player');
+        same(plainMoves(ended.lastTurn?.moves), plainMoves(moves), 'previousGame.lastTurn.moves');
+        same(ended.state.board.off.white, 15, 'previousGame: White checkers off');
+        same(ended.played, [], 'previousGame.played');
+        // It stays until the next game ends.
+        await subject.transportFor(waiting(white)).sendTurn({
+          gameId,
+          expectedVersion: white.version,
+          moves: subject.legalTurn(white),
+        });
+        const next = await viewAt(subject, watchers.white, white.version + 1);
+        same(next.previousGame, ended, 'previousGame after a turn of the next game');
         watchers.white.stop();
         watchers.black.stop();
       },

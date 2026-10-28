@@ -40,7 +40,11 @@ export default defineSchema({
     rules: v.string(),
     /** The variant of the current game. */
     variant: v.string(),
-    /** The engine `MatchFlow` without its log, JSON text. The log is in `moves`. */
+    /**
+     * The engine `MatchFlow` without its log, and the game before the
+     * current one as it ended (#299): `StoredFlow` of `@tavli/online`,
+     * JSON text. The log is in `moves`.
+     */
     flow: v.string(),
     status: gameStatus,
     /** The match winner once `status` is `finished`. */

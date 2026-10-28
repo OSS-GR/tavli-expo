@@ -24,7 +24,7 @@ import type {
 } from '@tavli/contracts/testing';
 import { createSeededRng } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
-import { motherPin } from '@tavli/online/testing';
+import { lastBearOff, motherPin } from '@tavli/online/testing';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -101,13 +101,23 @@ function contractSubject(): GameTransportContractSubject {
         const doc = await ctx.db.get(gameId);
         if (doc === null) throw new Error('no game');
         const { flow, pin } = motherPin(loadFlow(doc.flow));
-        await ctx.db.patch(gameId, { flow: storeFlow(flow) });
+        await ctx.db.patch(gameId, { flow: storeFlow(flow, null) });
         return pin;
       });
       await t.withIdentity({ subject: BOB }).mutation(api.games.makeMove, {
         gameId,
         expectedVersion: 1,
         moves: [...pin],
+      });
+      await network.refreshAll();
+      return gameId;
+    },
+    createWinningTurn: async () => {
+      const gameId = await createGame(t, { choice: 'portes', targetPoints: 3, pace: 'live' });
+      await t.run(async (ctx) => {
+        const doc = await ctx.db.get(gameId);
+        if (doc === null) throw new Error('no game');
+        await ctx.db.patch(gameId, { flow: storeFlow(lastBearOff(loadFlow(doc.flow)), null) });
       });
       await network.refreshAll();
       return gameId;

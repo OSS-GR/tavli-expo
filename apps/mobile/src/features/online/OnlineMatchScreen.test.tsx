@@ -8,10 +8,12 @@ import {
 } from '@tavli/contracts';
 import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
+import { lastBearOff } from '@tavli/online/testing';
 import { getLayout, getTheme } from '@tavli/themes';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
+import { FLIGHT_MS, turnMoveDelay } from '@/features/board/flights';
 import { buildSources } from '@/features/board/interaction';
 import { fitBoardWithShadow, slotRect } from '@/features/board/geometry';
 import { turnView } from '@/features/game/gameStore';
@@ -66,9 +68,12 @@ async function openGame(
   targetPoints = 5,
   botThinkMs = BOT_THINK_MS,
   meTransport: (server: MemoryGameServer) => GameTransport = (server) => server.transportFor('me'),
+  /** Changes the game before anyone watches it (`setFlowForTest`). */
+  prepare?: (server: MemoryGameServer, gameId: string) => void,
 ): Promise<Game> {
   const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
   const gameId = server.createGame('me', { white: 'me', black: 'bot' }, choice, targetPoints, pace);
+  prepare?.(server, gameId);
   bot = startOnlineBot({
     transport: server.transportFor('bot'),
     gameId,
@@ -308,6 +313,37 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(announce).toHaveBeenCalledTimes(1);
       expect(String(announce.mock.calls[0]?.[0])).toMatch(/rolled|start/);
       announce.mockRestore();
+    });
+
+    it('flies the bot’s winning turn to the end position before the sheet opens (#299)', async () => {
+      const game = await openGame('portes', 'live', 5, BOT_THINK_MS, undefined, (server, id) => {
+        // The bot (Black) bears off its last two checkers with its next turn.
+        server.setFlowForTest(id, lastBearOff(viewFlow(server.getGame(id)!), 'black'));
+      });
+      expect(view(game).waitingFor).toBe('black');
+      sounds.played.length = 0;
+      // The bot thinks, then its whole turn arrives.
+      for (let i = 0; i < 100 && view(game).match.games.length === 0; i++) await wait(50);
+      // Its two checkers fly off one after the other. The sheet waits until
+      // the last one lands, so it never covers them.
+      const landed = turnMoveDelay(1) + FLIGHT_MS;
+      await wait(landed - 1);
+      expect(screen.queryByTestId('game-end-card')).toBeNull();
+      expect(screen.queryByTestId('next-game-button')).toBeNull();
+      await wait(1);
+      expect(screen.getByTestId('game-end-card')).toHaveTextContent(/Opponent wins the game/);
+      await wait(2000);
+      // The server has game 2; its view keeps the bot's winning turn.
+      expect(view(game).match.games).toEqual([
+        expect.objectContaining({ winner: 'black', reason: 'borneOff' }),
+      ]);
+      const winning = view(game).previousGame?.lastTurn;
+      expect(winning?.player).toBe('black');
+      expect(winning?.moves.map((move) => move.to)).toEqual(['off', 'off']);
+      // Its checkers flew off one by one, with their sounds, as any turn of the bot.
+      expect(moveSounds()).toEqual(['bearOff', 'bearOff']);
+      expect(sounds.played).not.toContain('gameWin');
+      expect(screen.queryByTestId('board-dice')).toBeNull();
     });
 
     it('keeps the turn timer of the next game running under the sheet', async () => {
