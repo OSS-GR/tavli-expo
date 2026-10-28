@@ -96,27 +96,30 @@ export function InviteScreen({
   /**
    * Runs an answer. An error that says what happened to the invite shows
    * that state. Once the screen is gone, a late answer does nothing.
+   *
+   * After a successful answer the buttons stay off: the invite is closed,
+   * and a second tap while the route navigates would only get
+   * `INVITE_CLOSED`. Only a failed answer turns them on again.
    */
   const answer = (kind: 'accept' | 'decline') => {
     if (busy !== null) return;
     setBusy(kind);
     setActionFailed(false);
-    const done = (next: () => void) => {
+    const failed = (error: unknown) => {
       if (!mounted.current) return;
-      // The buttons work again, also while a slow navigation runs.
       setBusy(null);
-      next();
+      const next = stateOfError(error);
+      if (next === null) setActionFailed(true);
+      else setState(next);
     };
-    const failed = (error: unknown) =>
-      done(() => {
-        const next = stateOfError(error);
-        if (next === null) setActionFailed(true);
-        else setState(next);
-      });
     if (kind === 'accept') {
-      invites.acceptInvite(code).then((gameId) => done(() => onAccepted(gameId)), failed);
+      invites.acceptInvite(code).then((gameId) => {
+        if (mounted.current) onAccepted(gameId);
+      }, failed);
     } else {
-      invites.declineInvite(code).then(() => done(onDeclined), failed);
+      invites.declineInvite(code).then(() => {
+        if (mounted.current) onDeclined();
+      }, failed);
     }
   };
 

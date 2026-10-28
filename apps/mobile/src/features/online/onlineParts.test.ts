@@ -7,6 +7,7 @@ import { createMemoryGameServer } from '@tavli/online';
 import { pickTurn } from '@tavli/online/testing';
 
 import { storeEvents } from '@/features/game/gameFeedback';
+import { inviteAccepted } from '@/features/invites/acceptedInvite';
 import i18n from '@/i18n';
 import { botLevels, botRunner } from '@/services';
 
@@ -15,7 +16,6 @@ import { clockText, clockTickMs } from './clock';
 import {
   DEV_BOT_ID,
   DEV_TICK_MS,
-  checkDevInvite,
   devGameRunning,
   startDevGame,
   startDevInvite,
@@ -410,19 +410,19 @@ describe('startDevInvite (#256)', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it('checkDevInvite starts the bot at once after Accept, not on the next tick', async () => {
+  it('starts the bot at once after Accept on this phone, not on the next tick', async () => {
     const { server, code } = devInvite();
     const gameId = await server.invitesFor('me').acceptInvite(code);
-    checkDevInvite();
+    inviteAccepted(gameId);
     // No time has passed, and the dev game of the invite runs.
     expect(devGameRunning()).toBe(true);
     stopDevGame(gameId);
     expect(devGameRunning()).toBe(false);
   });
 
-  it('checkDevInvite leaves an open invite alone', () => {
+  it('an Accept of another invite leaves the open dev invite alone', () => {
     const { server, code } = devInvite();
-    checkDevInvite();
+    inviteAccepted('another-game');
     expect(server.getInvite(code)?.status).toBe('open');
     expect(devGameRunning()).toBe(true);
   });

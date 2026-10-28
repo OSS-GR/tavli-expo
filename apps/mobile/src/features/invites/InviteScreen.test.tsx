@@ -256,16 +256,35 @@ describe('InviteScreen', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
   });
 
-  it('turns the buttons on again after Accept, while the route opens the game', async () => {
-    const user = setupUser();
-    const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
-    const props = await openInvite(code, server.invitesFor(ME));
-    await user.press(await screen.findByRole('button', { name: 'Accept' }));
-    expect(props.onAccepted).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Decline' })).toBeEnabled();
-  });
+  it.each(['Accept', 'Decline'] as const)(
+    'keeps the buttons off after a successful %s: a second tap sends no second call',
+    async (button) => {
+      const user = setupUser();
+      const { server } = setup();
+      const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+      const real = server.invitesFor(ME);
+      const invites: Invites = {
+        getInvite: real.getInvite,
+        acceptInvite: jest.fn(real.acceptInvite),
+        declineInvite: jest.fn(real.declineInvite),
+      };
+      // The route has not navigated yet: the screen is still there.
+      const props = await openInvite(code, invites);
+      await user.press(await screen.findByRole('button', { name: button }));
+      expect(button === 'Accept' ? props.onAccepted : props.onDeclined).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Decline' })).toBeDisabled();
+
+      await user.press(screen.getByRole('button', { name: 'Accept' }));
+      await user.press(screen.getByRole('button', { name: 'Decline' }));
+      const calls =
+        (invites.acceptInvite as jest.Mock).mock.calls.length +
+        (invites.declineInvite as jest.Mock).mock.calls.length;
+      expect(calls).toBe(1);
+      expect(screen.queryByRole('header', { name: 'This invite was already used' })).toBeNull();
+      expect(props.onAccepted.mock.calls.length + props.onDeclined.mock.calls.length).toBe(1);
+    },
+  );
 
   it('does nothing when the answer comes after the screen closed', async () => {
     const user = setupUser();
