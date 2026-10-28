@@ -62,26 +62,49 @@ export interface RecordingPushProvider extends PushProvider {
   readonly sent: readonly PushMessage[];
   /** From now on, a push to `token` answers `DeviceNotRegistered`. */
   kill(token: string): void;
+  /**
+   * From now on, a push to `token` fails with `error` (default `Failed`:
+   * the network or a server error), until `revive(token)`.
+   */
+  fail(token: string, error?: PushErrorCode): void;
+  /** A push to `token` answers `ok` again (after `kill` or `fail`). */
+  revive(token: string): void;
   /** Forgets the sent messages. */
   clear(): void;
 }
 
+const ERROR_TEXT: Readonly<Record<PushErrorCode, string>> = {
+  DeviceNotRegistered: 'the token is not registered',
+  MessageTooBig: 'the message is too big',
+  MessageRateExceeded: 'too many pushes to this device',
+  InvalidCredentials: 'the credentials are not valid',
+  Failed: 'the push failed',
+};
+
 /**
  * A push provider that only records what it sends. A token passed to
- * `kill` (or in `deadTokens`) answers `DeviceNotRegistered`; every other
- * token answers `ok`.
+ * `kill` (or in `deadTokens`) answers `DeviceNotRegistered`, a token
+ * passed to `fail` answers its error, and every other token answers `ok`.
  */
 export function createRecordingPushProvider(
   deadTokens: readonly string[] = [],
 ): RecordingPushProvider {
-  const dead = new Set(deadTokens);
+  const failing = new Map<string, PushErrorCode>(
+    deadTokens.map((token) => [token, 'DeviceNotRegistered']),
+  );
   let sent: PushMessage[] = [];
   return {
     get sent() {
       return sent;
     },
     kill(token) {
-      dead.add(token);
+      failing.set(token, 'DeviceNotRegistered');
+    },
+    fail(token, error = 'Failed') {
+      failing.set(token, error);
+    },
+    revive(token) {
+      failing.delete(token);
     },
     clear() {
       sent = [];
@@ -89,11 +112,12 @@ export function createRecordingPushProvider(
     send(messages) {
       sent = [...sent, ...messages];
       return Promise.resolve(
-        messages.map((message): PushResult =>
-          dead.has(message.to)
-            ? { ok: false, error: 'DeviceNotRegistered', message: 'the token is not registered' }
-            : { ok: true },
-        ),
+        messages.map((message): PushResult => {
+          const error = failing.get(message.to);
+          return error === undefined
+            ? { ok: true }
+            : { ok: false, error, message: ERROR_TEXT[error] };
+        }),
       );
     },
   };

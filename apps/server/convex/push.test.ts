@@ -6,7 +6,7 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createRecordingPushProvider } from '@tavli/contracts';
+import { TURN_TIME_MS, createRecordingPushProvider } from '@tavli/contracts';
 import type {
   GameTransportErrorCode,
   OnlineGamePace,
@@ -20,7 +20,7 @@ import { motherPin } from '@tavli/online/testing';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { MAX_PUSH_TOKENS_PER_PLAYER, TURN_PUSH_TEXT } from './model/push';
+import { MAX_PUSH_TOKENS_PER_PLAYER, PUSH_RETRY_MS, TURN_PUSH_TEXT } from './model/push';
 import { setPushProvider } from './push';
 import schema from './schema';
 import { modules, pickTurn } from './test.setup';
@@ -61,6 +61,12 @@ afterEach(() => {
 /** Runs the pushes the last save scheduled (they run at once, after it). */
 async function flush(t: Tester) {
   vi.advanceTimersByTime(0);
+  await t.finishInProgressScheduledFunctions();
+}
+
+/** Moves the clock by `ms` and runs what is due then. */
+async function wait(t: Tester, ms: number) {
+  vi.advanceTimersByTime(ms);
   await t.finishInProgressScheduledFunctions();
 }
 
@@ -400,5 +406,110 @@ describe('"your turn" pushes', () => {
     const v = await view(t, gameId);
     expect(v.version).toBe(2);
     expect(await tokens(t)).toEqual([`${ALICE}: ${ALICE_TOKEN}`, `${BOB}: ${BOB_TOKEN}`]);
+  });
+  it('a time out that starts the next game tells the side it waits for, the same side too', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    // "alternate": the player who did not start game 1 starts game 2. So
+    // when that player runs out of time, game 2 waits for them again.
+    await t.run(async (ctx) => {
+      const doc = await ctx.db.get(gameId);
+      if (doc === null) throw new Error('no game');
+      const flow = loadFlow(doc.flow);
+      const rules = {
+        ...flow.match.rules,
+        match: { ...flow.match.rules.match, nextGameStarter: 'alternate' as const },
+      };
+      await ctx.db.patch(gameId, { flow: storeFlow({ ...flow, match: { ...flow.match, rules } }) });
+    });
+    await registerBoth(t);
+    const starter = await playOneTurn(t, gameId);
+    const late = otherSide(starter);
+    await flush(t);
+    expect(push.sent.map((message) => message.to)).toEqual([TOKEN_OF[late]]);
+
+    push.clear();
+    await wait(t, TURN_TIME_MS.async);
+    const next = await view(t, gameId);
+    expect(next.match.games[0]).toMatchObject({ winner: starter, reason: 'timeout' });
+    expect(waiting(next)).toBe(late);
+    await flush(t);
+    expect(push.sent.map((message) => message.to)).toEqual([TOKEN_OF[late]]);
+  });
+
+  it('a time out tells the winner, who starts the next game', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    await registerBoth(t);
+    const late = waiting(await view(t, gameId));
+    await wait(t, TURN_TIME_MS.async);
+    const next = await view(t, gameId);
+    expect(next.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
+    expect(waiting(next)).toBe(otherSide(late));
+    await flush(t);
+    expect(push.sent.map((message) => message.to)).toEqual([TOKEN_OF[otherSide(late)]]);
+  });
+
+  it(`a failed push is tried once more after ${PUSH_RETRY_MS / 1000} s, for the failed tokens only`, async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    const other = PLAYERS[otherSide(waiting(await view(t, gameId)))];
+    const good = 'ExponentPushToken[good-phone]';
+    const flaky = 'ExponentPushToken[flaky-phone]';
+    await register(t, other, good);
+    vi.setSystemTime(START + 1);
+    await register(t, other, flaky);
+    push.fail(flaky);
+    await playOneTurn(t, gameId);
+    await flush(t);
+    expect(push.sent.map((message) => message.to)).toEqual([flaky, good]);
+
+    push.clear();
+    await wait(t, PUSH_RETRY_MS - 1);
+    expect(push.sent).toEqual([]);
+    await wait(t, 1);
+    expect(push.sent.map((message) => message.to)).toEqual([flaky]);
+
+    // It failed again: no third try. A failed token is not removed.
+    push.clear();
+    await wait(t, PUSH_RETRY_MS * 4);
+    expect(push.sent).toEqual([]);
+    expect(await tokens(t)).toEqual([`${other}: ${flaky}`, `${other}: ${good}`].sort());
+  });
+
+  it('a rate limited push is tried again, and the retry goes out when the service is back', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    await registerBoth(t);
+    const side = otherSide(waiting(await view(t, gameId)));
+    push.fail(TOKEN_OF[side], 'MessageRateExceeded');
+    await playOneTurn(t, gameId);
+    await flush(t);
+    push.revive(TOKEN_OF[side]);
+    push.clear();
+    await wait(t, PUSH_RETRY_MS);
+    expect(push.sent.map((message) => message.to)).toEqual([TOKEN_OF[side]]);
+  });
+
+  it('a retry is dropped when the player has played since', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    const side = otherSide(waiting(await view(t, gameId)));
+    await register(t, PLAYERS[side], TOKEN_OF[side]);
+    push.fail(TOKEN_OF[side]);
+    await playOneTurn(t, gameId);
+    await flush(t);
+    expect(push.sent).toHaveLength(1);
+    // The player opened the app and played before the retry.
+    expect(await playOneTurn(t, gameId)).toBe(side);
+    await flush(t);
+    push.clear();
+    await wait(t, PUSH_RETRY_MS);
+    expect(push.sent).toEqual([]);
   });
 });

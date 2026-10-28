@@ -1,12 +1,13 @@
 /**
  * The pure parts of "your turn" pushes (#280): who gets a push after a
- * save, the text, the messages, and which tokens to drop. No Convex
+ * save, the text, the messages, which tokens to drop or retry. No Convex
  * types; `push.ts` holds the functions. See "Push" in
  * `docs/architecture/online-game-service.md`.
  */
 
-import type { OnlineGamePace, PushMessage, PushResult } from '@tavli/contracts';
-import type { PlayerId } from '@tavli/engine';
+import type { OnlineGamePace, PushErrorCode, PushMessage, PushResult } from '@tavli/contracts';
+import type { MatchFlow, PlayerId } from '@tavli/engine';
+import { waitingFor } from '@tavli/online';
 
 /** The most push tokens a player keeps (one per phone). A new one drops the oldest. */
 export const MAX_PUSH_TOKENS_PER_PLAYER = 5;
@@ -20,24 +21,43 @@ export const TURN_PUSH_TEXT = {
   body: 'An online game is waiting for your move.',
 } as const;
 
+/** What the server waits for: a side, in one game of the match. */
+export interface TurnWait {
+  /** The side to move or to answer, or `null` (no game yet, or the match is over). */
+  readonly side: PlayerId | null;
+  /** Which game of the match: the number of games already finished. */
+  readonly game: number;
+}
+
+/** What the server waits for in `flow`. */
+export function turnWait(flow: MatchFlow): TurnWait {
+  return { side: waitingFor(flow), game: flow.match.games.length };
+}
+
 /**
  * The side to tell "your turn" after a save, or `null` for no push.
  *
- * `before` is the side the server waited for before the save (for a new
- * game: the side of the player who started it, who is in the app), and
- * `after` the side it waits for now (`waitingFor`: the side to move, or
- * the side that must answer a question). A push goes out only in an async
- * game, and only when the wait moved to the other side. When the same
- * side plays again (an Asodio extra roll), or the match is over, there is
- * no push. A live game never pushes: both players are in the app.
+ * `before` is what the server waited for before the save (for a new game:
+ * nobody), `after` what it waits for now (`waitingFor`: the side to move,
+ * or the side that must answer a question). `caller` is the side of the
+ * player who caused the save, or `null` for the server (a time out).
+ *
+ * A push goes out only in an async game, never to the caller (they are in
+ * the app), and only when the wait moved to the other side, or a new game
+ * of the match started: a time out ends a game, and the next one may wait
+ * for the same side again. When the same side plays again in the same
+ * game (an Asodio extra roll), or the match is over, there is no push. A
+ * live game never pushes: both players are in the app.
  */
 export function turnPushSide(
   pace: OnlineGamePace,
-  before: PlayerId | null,
-  after: PlayerId | null,
+  before: TurnWait,
+  after: TurnWait,
+  caller: PlayerId | null,
 ): PlayerId | null {
-  if (pace !== 'async' || after === null || after === before) return null;
-  return after;
+  if (pace !== 'async' || after.side === null || after.side === caller) return null;
+  if (after.side === before.side && after.game === before.game) return null;
+  return after.side;
 }
 
 /** One "your turn" message per token. */
@@ -45,17 +65,45 @@ export function turnMessages(tokens: readonly string[], gameId: string): PushMes
   return tokens.map((to) => ({ to, ...TURN_PUSH_TEXT, data: { gameId } }));
 }
 
+/** The tokens whose result failed with one of `codes`. */
+function tokensFailedWith(
+  messages: readonly PushMessage[],
+  results: readonly PushResult[],
+  codes: ReadonlySet<PushErrorCode>,
+): string[] {
+  return messages
+    .filter((_, i) => {
+      const result = results[i];
+      return result !== undefined && !result.ok && codes.has(result.error);
+    })
+    .map((message) => message.to);
+}
+
+const DEAD_ERRORS: ReadonlySet<PushErrorCode> = new Set(['DeviceNotRegistered']);
+
 /** The tokens the push service called dead (`DeviceNotRegistered`). */
 export function deadTokens(
   messages: readonly PushMessage[],
   results: readonly PushResult[],
 ): string[] {
-  return messages
-    .filter((_, i) => {
-      const result = results[i];
-      return result !== undefined && !result.ok && result.error === 'DeviceNotRegistered';
-    })
-    .map((message) => message.to);
+  return tokensFailedWith(messages, results, DEAD_ERRORS);
+}
+
+/** How long a failed push waits before its one retry. */
+export const PUSH_RETRY_MS = 30_000;
+
+/** How many times a failed push is sent again. */
+export const MAX_PUSH_RETRIES = 1;
+
+/** The errors worth one more try: the push service or the network was busy. */
+const RETRY_ERRORS: ReadonlySet<PushErrorCode> = new Set(['Failed', 'MessageRateExceeded']);
+
+/** The tokens to send again later (`Failed` or `MessageRateExceeded`). */
+export function retryTokens(
+  messages: readonly PushMessage[],
+  results: readonly PushResult[],
+): string[] {
+  return tokensFailedWith(messages, results, RETRY_ERRORS);
 }
 
 /**

@@ -39,6 +39,21 @@ describe('createRecordingPushProvider', () => {
       { ok: true },
     ]);
   });
+
+  it('fails a token with an error until it is revived', async () => {
+    const push = createRecordingPushProvider(['b']);
+    push.fail('a');
+    push.fail('c', 'MessageRateExceeded');
+    const three = [message, { ...message, to: 'b' }, { ...message, to: 'c' }];
+    expect(await push.send(three)).toEqual([
+      { ok: false, error: 'Failed', message: 'the push failed' },
+      { ok: false, error: 'DeviceNotRegistered', message: 'the token is not registered' },
+      { ok: false, error: 'MessageRateExceeded', message: 'too many pushes to this device' },
+    ]);
+    push.revive('a');
+    push.revive('b');
+    expect((await push.send(three)).map((result) => result.ok)).toEqual([true, true, false]);
+  });
 });
 
 describe('isPushErrorCode', () => {

@@ -22,7 +22,8 @@
 import { ConvexError, v } from 'convex/values';
 
 import type { GameTransportErrorCode, OnlineGamePace, PushProvider } from '@tavli/contracts';
-import type { PerPlayer, PlayerId } from '@tavli/engine';
+import type { PerPlayer } from '@tavli/engine';
+import { sideOf } from '@tavli/online';
 import { createExpoPushProvider, isExpoPushToken } from '@tavli/push-expo';
 
 import { internal } from './_generated/api';
@@ -30,7 +31,16 @@ import type { Id } from './_generated/dataModel';
 import { internalAction, internalMutation, internalQuery, mutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { signedInPlayer } from './caller';
-import { deadTokens, tokensOverCap, turnMessages, turnPushSide } from './model/push';
+import {
+  MAX_PUSH_RETRIES,
+  PUSH_RETRY_MS,
+  deadTokens,
+  retryTokens,
+  tokensOverCap,
+  turnMessages,
+  turnPushSide,
+} from './model/push';
+import type { TurnWait } from './model/push';
 import { pushPlatform } from './schema';
 
 // ---------------------------------------------------------------------------
@@ -146,19 +156,22 @@ export interface PushGame {
 }
 
 /**
- * Called by every save in `games.ts`, in its transaction: when the wait
- * moved from `before` to the other side `after` in an async game (see
- * `turnPushSide`), and that player has a push token, it schedules
- * `sendTurnPush` for the saved `version`. It sends nothing itself.
+ * Called by every save in `games.ts`, in its transaction, with what the
+ * server waited for `before` and `after` the save (`turnWait`) and the
+ * player who caused it (`callerId`, or `SERVER_ACTOR` for a time out).
+ * When `turnPushSide` picks a side and that player has a push token, it
+ * schedules `sendTurnPush` for the saved `version`. It sends nothing
+ * itself.
  */
 export async function scheduleTurnPush(
   ctx: MutationCtx,
   game: PushGame,
   version: number,
-  before: PlayerId | null,
-  after: PlayerId | null,
+  before: TurnWait,
+  after: TurnWait,
+  callerId: string,
 ): Promise<void> {
-  const side = turnPushSide(game.pace, before, after);
+  const side = turnPushSide(game.pace, before, after, sideOf(game.players, callerId));
   if (side === null) return;
   const playerId = game.players[side];
   // No token, no action: most players have none until the app asks.
@@ -175,14 +188,20 @@ export async function scheduleTurnPush(
 }
 
 /**
- * The tokens to tell "your turn", newest first. None when the game has
- * changed since `version` (the player already played, or it is over):
- * then the push would be late.
+ * The tokens to tell "your turn", newest first: all of the player's, or
+ * only those in `only` (a retry). None when the game has changed since
+ * `version` (the player already played, or it is over): then the push
+ * would be late.
  */
 export const turnPushTokens = internalQuery({
-  args: { gameId: v.id('games'), version: v.number(), playerId: v.string() },
+  args: {
+    gameId: v.id('games'),
+    version: v.number(),
+    playerId: v.string(),
+    only: v.optional(v.array(v.string())),
+  },
   returns: v.array(v.string()),
-  handler: async (ctx, { gameId, version, playerId }) => {
+  handler: async (ctx, { gameId, version, playerId, only }) => {
     const game = await ctx.db.get(gameId);
     if (game === null || game.version !== version || game.status !== 'active') return [];
     const rows = await ctx.db
@@ -190,7 +209,10 @@ export const turnPushTokens = internalQuery({
       .withIndex('by_player', (q) => q.eq('playerId', playerId))
       .order('desc')
       .collect();
-    return rows.map((row) => row.token);
+    const tokens = rows.map((row) => row.token);
+    if (only === undefined) return tokens;
+    const wanted = new Set(only);
+    return tokens.filter((token) => wanted.has(token));
   },
 });
 
@@ -214,17 +236,30 @@ export const removeDeadTokens = internalMutation({
 
 /**
  * Sends "your turn" to the phones of `playerId` (scheduled by
- * `scheduleTurnPush`, after the save). Removes the dead tokens. The push
- * provider never throws; if this action fails anyway, the move is saved.
+ * `scheduleTurnPush`, after the save). Removes the dead tokens. A token
+ * whose push failed (`Failed`, `MessageRateExceeded`: a busy service or
+ * the network) gets one more try after `PUSH_RETRY_MS`: the same action
+ * with `attempt` + 1 and only those `tokens`. The version check drops the
+ * retry when the player has played since. The push provider never
+ * throws; if this action fails anyway, the move is saved.
  */
 export const sendTurnPush = internalAction({
-  args: { gameId: v.id('games'), version: v.number(), playerId: v.string() },
+  args: {
+    gameId: v.id('games'),
+    version: v.number(),
+    playerId: v.string(),
+    /** 0 (or missing) for the first send, 1 for the retry. */
+    attempt: v.optional(v.number()),
+    /** A retry: only these tokens. */
+    tokens: v.optional(v.array(v.string())),
+  },
   returns: v.null(),
-  handler: async (ctx, { gameId, version, playerId }) => {
+  handler: async (ctx, { gameId, version, playerId, attempt = 0, tokens: only }) => {
     const tokens = await ctx.runQuery(internal.push.turnPushTokens, {
       gameId,
       version,
       playerId,
+      ...(only === undefined ? {} : { only }),
     });
     if (tokens.length === 0) return null;
     const messages = turnMessages(tokens, gameId);
@@ -232,6 +267,16 @@ export const sendTurnPush = internalAction({
     const dead = deadTokens(messages, results);
     if (dead.length > 0) {
       await ctx.runMutation(internal.push.removeDeadTokens, { playerId, tokens: dead });
+    }
+    const retry = retryTokens(messages, results);
+    if (retry.length > 0 && attempt < MAX_PUSH_RETRIES) {
+      await ctx.scheduler.runAfter(PUSH_RETRY_MS, internal.push.sendTurnPush, {
+        gameId,
+        version,
+        playerId,
+        attempt: attempt + 1,
+        tokens: retry,
+      });
     }
     return null;
   },

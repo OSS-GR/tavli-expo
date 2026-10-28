@@ -17,8 +17,9 @@
  * needed. `makeMove` and `answer` check the deadline too.
  *
  * Push (#280): a save that moves the wait to the other player of an async
- * game schedules a "your turn" push (`scheduleTurnPush` in `push.ts`). It
- * is sent after the save, so it never fails a move.
+ * game, or starts the next game of the match, schedules a "your turn"
+ * push (`scheduleTurnPush` in `push.ts`). It is sent after the save, so
+ * it never fails a move.
  *
  * The caller is the signed-in user (#131): every public function reads
  * the player id from `ctx.auth` (`signedInPlayer`), and no public call
@@ -49,11 +50,9 @@ import {
   playTurn,
   resign as resignMatch,
   scheduledCheck,
-  sideOf,
   storeFlow,
   timeOut,
   toView,
-  waitingFor,
 } from '@tavli/online';
 
 import { internal } from './_generated/api';
@@ -62,6 +61,7 @@ import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { signedInPlayer } from './caller';
 import { createCryptoRng } from './model/cryptoRng';
+import { turnWait } from './model/push';
 import { scheduleTurnPush } from './push';
 import { gameChoice, gamePace } from './schema';
 
@@ -151,7 +151,8 @@ async function startClock(
 /**
  * Saves `flow` after a step from `before` (the saved flow): a version
  * bump, its log rows, a new turn deadline, and a "your turn" push when
- * the wait moved to the other player of an async game (#280).
+ * the wait moved to the other player of an async game, or a new game
+ * started (#280).
  */
 async function save(
   ctx: MutationCtx,
@@ -165,7 +166,7 @@ async function save(
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
   const turnDeadline = await startClock(ctx, game._id, version, game.pace, flow, now);
   await ctx.db.patch(game._id, { ...gameFields(flow), version, eventCount, turnDeadline });
-  await scheduleTurnPush(ctx, game, version, waitingFor(before), waitingFor(flow));
+  await scheduleTurnPush(ctx, game, version, turnWait(before), turnWait(flow), callerId);
   return version;
 }
 
@@ -267,9 +268,17 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
   const eventCount = await writeEvents(ctx, gameId, 0, version, callerId, flow);
   const turnDeadline = await startClock(ctx, gameId, version, pace, flow, Date.now());
   await ctx.db.patch(gameId, { eventCount, turnDeadline });
-  // The player who starts the game is in the app; the other one may not be.
-  const starter = sideOf(players, callerId);
-  await scheduleTurnPush(ctx, { _id: gameId, pace, players }, version, starter, waitingFor(flow));
+  // Nobody was waited for before. The caller started the game and is in
+  // the app, so only the other player can get a push.
+  const before = { side: null, game: 0 };
+  await scheduleTurnPush(
+    ctx,
+    { _id: gameId, pace, players },
+    version,
+    before,
+    turnWait(flow),
+    callerId,
+  );
   return gameId;
 }
 
