@@ -18,7 +18,7 @@
 | **Labels** | Area, game, priority, size, and who can do it. Source of truth: `.github/labels.json`. |
 | **Project board** | "Tavli Roadmap" board with columns *Backlog → Ready → In progress → In review → Done*. |
 | **Pull requests** | One issue per PR. PR text says `Closes #NN`. |
-| **Actions** | CI (lint, typecheck, tests) and label/milestone sync. |
+| **Actions** | CI (lint, typecheck, tests), the server deploy, and label/milestone sync. |
 | **Discussions** (optional) | Open questions and ideas that are not tasks yet. |
 
 ## Labels
@@ -108,6 +108,18 @@ The workflow `.github/workflows/claude-review.yml` has one job, **`claude-review
 - or `ANTHROPIC_API_KEY`: a key from the Claude Console, billed per use.
 
 Without a secret, the job fails with a clear error. The Claude GitHub App must also be installed on the repo (it is).
+
+### Server deploy (`deploy-server`)
+
+The workflow `.github/workflows/deploy-server.yml` deploys the Convex functions in `apps/server` (#257). It is **not** a required check: it never runs on a pull request.
+
+- **Dev:** on each push to `main` that changes `apps/server/**`, `packages/engine/**`, `packages/contracts/**`, the lockfile, the root config or the workflow itself. You can also start it by hand (Actions → **Deploy server** → **Run workflow**, target `dev`).
+- **Prod:** only by hand, with target `prod`, from `main`. The job uses the GitHub environment `production`.
+- **Steps:** check the deploy key, install, server typecheck and tests, then `convex deploy --typecheck enable` in `apps/server`.
+- **Never on PRs:** it has no `pull_request` or `pull_request_target` trigger, so PR code never sees the deploy keys. Keep it that way.
+- **Secrets:** `CONVEX_DEPLOY_KEY_DEV` and `CONVEX_DEPLOY_KEY_PROD`. The first step fails with a clear error when the key is missing or is for another deployment.
+
+How a deploy works, and how to roll back: [online game service](../architecture/online-game-service.md#deploy).
 
 ### Require the checks on `main` (owner, one time)
 

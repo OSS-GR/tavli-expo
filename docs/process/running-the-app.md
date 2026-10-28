@@ -1,6 +1,6 @@
 # Running the app
 
-> Living document. Last review: 2026-10-26. Issue #39.
+> Living document. Last review: 2026-10-28. Issues #39, #257.
 
 This guide is for the owner. It shows every way to run Tavlaki without paid Apple or Google accounts. Follow the parts in order the first time.
 
@@ -25,6 +25,30 @@ This guide is for the owner. It shows every way to run Tavlaki without paid Appl
 | `production` | Tavlaki | `com.tavlaki` | EAS `production` profile (store, later) |
 
 The `APP_VARIANT` env var picks the variant (see `apps/mobile/app.config.ts`). Local builds use `development`. **Why:** a free Apple ID reserves every bundle id it signs. A reserved `com.tavlaki` could block the paid Apple account at launch. So we only sign `com.tavlaki` once the paid account exists.
+
+### Which server the app uses
+
+Online games talk to a Convex deployment (#257). The variant picks it:
+
+| Variant | Convex deployment | URL |
+| --- | --- | --- |
+| `development` | dev | `https://exciting-reindeer-792.eu-west-1.convex.cloud` |
+| `preview` | prod | `https://superb-dog-503.eu-west-1.convex.cloud` |
+| `production` | prod | `https://superb-dog-503.eu-west-1.convex.cloud` |
+
+**How it works.** `apps/mobile/app.config.ts` puts the URL in `extra.convexUrl`. The app reads it in one place: `convexUrl()` in `apps/mobile/src/convexUrl.ts`. Expo evaluates `app.config.ts` both for `npx expo start` (Metro sends the config to the dev build) and for EAS builds (the config is built into the app). So one table covers local runs and cloud builds, and `eas.json` needs no URL: its profiles only set `APP_VARIANT`. The URLs are public, so they may be in the repo. The deploy keys are not (see [online game service](../architecture/online-game-service.md#deploy)).
+
+**Use your own deployment.** Set `EXPO_PUBLIC_CONVEX_URL`. It wins over the variant. Then restart Metro:
+
+```bash
+# for one run
+EXPO_PUBLIC_CONVEX_URL=https://your-name-123.eu-west-1.convex.cloud npx expo start
+
+# or keep it in apps/mobile/.env.local (git ignores it)
+echo 'EXPO_PUBLIC_CONVEX_URL=https://your-name-123.eu-west-1.convex.cloud' > .env.local
+```
+
+For a local Convex backend, an `http://` URL works too. To try prod from a dev build, set `EXPO_PUBLIC_CONVEX_URL` to the prod URL. An EAS build reads it from the EAS environment variables, if you set it there. Check the result with `npx expo config --type public` (look at `extra.convexUrl`).
 
 **Setup once** (all parts):
 

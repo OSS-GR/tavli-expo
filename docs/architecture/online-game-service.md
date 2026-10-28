@@ -1,6 +1,6 @@
 # Online game service
 
-Status: first version (#126, part of #46), with turn timers (#133). It runs and is tested **offline**, with no Convex account. Deploying needs the owner (a later issue).
+Status: first version (#126, part of #46), with turn timers (#133). It is tested **offline**, with no Convex account. CI deploys it to Convex (#257, see [Deploy](#deploy)).
 
 Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0002](../decisions/0002-modular-architecture.md).
 
@@ -13,6 +13,8 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `apps/server/convex/model/online-game.ts` | The game logic, with no Convex code. Pure: dice come from an `Rng` argument |
 | `apps/server/convex/model/crypto-rng.ts` | The dice RNG: `crypto.getRandomValues` |
 | `apps/server/convex/_generated/` | Convex codegen output, committed (see [Codegen](#codegen-without-a-deployment)) |
+| `apps/server/convex/tsconfig.json` | The typecheck that `convex deploy` runs before it pushes |
+| `.github/workflows/deploy-server.yml` | The deploy (see [Deploy](#deploy)) |
 | `packages/contracts/src/game-transport.ts` | The `GameTransport` port, the `OnlineGameView` type, the paces and `TURN_TIME_MS` |
 
 Only `apps/server` imports `convex`. The port in `packages/contracts` is plain TypeScript. There is no client adapter yet.
@@ -145,9 +147,48 @@ A rejected call throws a `ConvexError` whose `data` is `{ code, message }` (`Gam
 
 The test files and `test.setup.ts` have two dots in their names, so Convex does not deploy them. The module glob in `test.setup.ts` uses a negative pattern (`['./**/*.*s', '!./**/*.*.*s']`): the extglob from the convex-test docs does not work with the Vite glob of Vitest 5.
 
+## Deploy
+
+The Convex project has two deployments (#129), both in the EU (`eu-west-1`):
+
+| Target | Deployment | URL | Deploy key (repo secret) | App variants |
+|---|---|---|---|---|
+| dev | `exciting-reindeer-792` | `https://exciting-reindeer-792.eu-west-1.convex.cloud` | `CONVEX_DEPLOY_KEY_DEV` | `development` |
+| prod | `superb-dog-503` | `https://superb-dog-503.eu-west-1.convex.cloud` | `CONVEX_DEPLOY_KEY_PROD` | `preview`, `production` |
+
+The URLs are public client config. They live in `apps/mobile/app.config.ts` (see [Running the app](../process/running-the-app.md#which-server-the-app-uses)). The deploy keys are secrets. They live only in GitHub, never in the repo.
+
+### How a deploy happens
+
+The workflow `.github/workflows/deploy-server.yml` does it:
+
+1. **Dev, by itself:** on each push to `main` that changes `apps/server/**`, `packages/engine/**`, `packages/contracts/**`, `pnpm-lock.yaml`, the root config (`package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.nvmrc`), the setup action or the workflow. When the functions import another package, add its path there.
+2. **Check the key.** The first step runs before any repo code. It fails with an `::error::` when the secret is empty, or when the key is for another deployment (a deploy key starts with `dev:<name>|` or `prod:<name>|`). It never prints the key.
+3. **Test.** Install (`.github/actions/setup`), then `pnpm --filter @tavli/server typecheck` and `pnpm --filter @tavli/server test`.
+4. **Deploy.** `pnpm exec convex deploy --typecheck enable` in `apps/server`, with `CONVEX_DEPLOY_KEY` from the secret. Convex typechecks with `convex/tsconfig.json`, writes `_generated/` again, bundles the functions, and pushes the functions, the schema and the indexes. With `--typecheck enable`, the deploy fails when the typecheck fails or cannot run. (The default, `try`, skips the typecheck when `convex/tsconfig.json` is missing.)
+
+It never runs on pull requests, so PR code never sees a deploy key. Two deploys to the same target never overlap (one `concurrency` group per target), and a running deploy is never cancelled.
+
+### Deploy to prod
+
+1. Merge the change to `main`. Wait for the dev deploy to pass, and try it on a `development` build.
+2. GitHub → **Actions** → **Deploy server** → **Run workflow**. Pick the branch `main` and the target `prod`.
+3. The job runs in the GitHub environment `production`. GitHub makes it on the first run. The owner can add **required reviewers** there (Settings → Environments → `production`). Then each prod deploy waits for an approval. Dev runs use the environment `development`, with no rules.
+
+A prod run from any branch but `main` fails at the first step.
+
+### Roll back
+
+A rollback is a new deploy of the old code:
+
+1. Revert the bad commit on `main` with a PR (`git revert`). Its merge deploys dev again.
+2. If prod has the bad code, run **Deploy server** with the target `prod` from `main` again.
+
+A deploy does not change the stored data. Convex refuses a schema that the stored data does not match, so a rollback that removes a field or a table can fail. Then fix forward: keep the field optional in the schema, or clean up the data first.
+
 ## Codegen without a deployment
 
-Convex code imports types from `convex/_generated/`. We **commit** these files, as Convex recommends. CI never runs codegen and needs no account or secret.
+Convex code imports types from `convex/_generated/`. We **commit** these files, as Convex recommends. The CI checks never run codegen and need no account or secret. (The deploy writes `_generated/` again on the runner, but never commits it.)
 
 `npx convex codegen` normally needs a deployment (`CONVEX_DEPLOYMENT`). It fails without one. To regenerate offline, run:
 
@@ -161,10 +202,9 @@ pnpm --filter @tavli/server codegen   # convex codegen --system-udfs --typecheck
 
 ## Open points
 
-- **Deploy** (owner): create the Convex project (EU region if offered), run `npx convex dev` once in `apps/server`, add `CONVEX_DEPLOY_KEY` as a secret for deploys. Not needed for CI.
 - **Auth** (#46): replace the `callerId` argument with the Better Auth user (`ctx.auth`). Then `getGame` should answer only the two players.
 - **Verify the dice** on a real deployment: `crypto.getRandomValues` in a mutation gives different, unpredictable dice per call.
-- **Client adapter**: `packages/adapters/backend-convex` implements `GameTransport` with the Convex React client.
+- **Client adapter** (#253): `packages/adapters/backend-convex` implements `GameTransport` with the Convex React client. `apps/mobile/src/services.ts` gives it the URL from `convexUrl()` (`apps/mobile/src/convexUrl.ts`).
 - **Clock skew:** `turnDeadline` is on the server clock. A phone should show the time left from the server time (for example the offset seen when the view arrives), not trust its own clock.
 - **Invites, friends, users, presence, push**: later issues.
 - **Document size**: one game row holds the whole match flow (a few KB). The log is in `moves`, so the row does not grow with the game.
