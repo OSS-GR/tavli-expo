@@ -23,6 +23,9 @@
         "dark": "./assets/icon/icon-ios-dark.png",
         "tinted": "./assets/icon/icon-ios-tinted.png"
       },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "privacyManifests": {
         "NSPrivacyAccessedAPITypes": [
           {
@@ -140,7 +143,8 @@
           "color": "#3B2A1D",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "@sentry/react-native/expo"
     ],
     "experiments": {
       "typedRoutes": true,

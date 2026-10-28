@@ -186,6 +186,22 @@ describe('app.config.ts', () => {
   it('keeps the other extra fields', () => {
     expect(configFor('development').extra).toMatchObject({ eas: { projectId: 'x' } });
   });
+
+  // The config goes into the fingerprint. EAS Build makes it on your computer
+  // and on the build server, and fails when they differ. An env var that only
+  // one side has (a secret EAS variable, a `.env.local` value) does that.
+  // Before you add a var here, check that both sides see it (top of
+  // app.config.ts). The test reads the source: Babel rewrites
+  // `process.env.EXPO_PUBLIC_*`, so a proxy on `process.env` misses them.
+  it('reads only env vars that both EAS Build and your computer see', () => {
+    const source = fs.readFileSync(path.join(__dirname, '../app.config.ts'), 'utf8');
+    // Every read is `process.env.NAME`, so the list below is complete.
+    expect(source.match(/process\.env(?!\.\w)/g)).toBeNull();
+    const names = new Set([...source.matchAll(/process\.env\.(\w+)/g)].map((match) => match[1]));
+    expect(names).toEqual(
+      new Set(['APP_VARIANT', 'EXPO_PUBLIC_CONVEX_URL', 'EXPO_PUBLIC_CONVEX_SITE_URL']),
+    );
+  });
 });
 
 describe('APP_SCHEME', () => {

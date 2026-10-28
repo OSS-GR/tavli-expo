@@ -40,13 +40,16 @@ Trade-offs, accepted by design:
 | `apps/mobile/src/services.ts`                      | Picks Sentry or the no-op reporter                                                                      |
 | `apps/mobile/src/features/crash/start.ts`          | Starts it first thing (imported first in `index.ts`), follows the consent store (`features/privacy`)    |
 | `apps/mobile/src/features/crash/CrashBoundary.tsx` | Top-level error boundary: reports render errors and shows "Something went wrong" with a Restart button  |
-| `apps/mobile/app.config.ts`                        | Adds the `@sentry/react-native/expo` config plugin (source map upload)                                  |
+| `apps/mobile/app.json`                             | `plugins`: the `@sentry/react-native/expo` config plugin (source map upload), with no options           |
+| `apps/mobile/eas.json`                             | `SENTRY_DISABLE_AUTO_UPLOAD` in `build.base.env`: no upload until the token exists (step 4)             |
 | `apps/mobile/metro.config.js`                      | `getSentryExpoConfig`: adds Debug IDs to bundles and source maps                                        |
 | `apps/mobile/app.json`                             | `ios.privacyManifests`: the "required reason" APIs Sentry uses, and the data Sentry and PostHog collect |
 
 ## Owner setup (one time)
 
 Nothing here is a secret except `SENTRY_AUTH_TOKEN`. Never commit the token.
+
+`SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_URL`, `SENTRY_AUTH_TOKEN` and `SENTRY_DISABLE_AUTO_UPLOAD` are read only by Sentry's build scripts, while the native build runs. Never pass them to the config plugin from `app.config.ts`. The app config goes into the fingerprint, which EAS makes on your computer and on the build server. A value that only EAS has (the secret token) or only your computer has (`.env.local`) makes every EAS build fail ("Runtime version calculated on local machine not equal to runtime version calculated during build"). `expo config` prints "Missing config for organization, project". That is expected: the build scripts read the env vars.
 
 1. Sign up at [sentry.io](https://sentry.io/signup/) (free tier: 5,000 errors a month). Create a **React Native** project. Note the **organization slug**, the **project slug** and the **DSN** (Project settings → Client Keys (DSN)).
 2. Add the DSN as an EAS environment variable. It is public (it ships in the app), so plain-text visibility is fine:
@@ -71,14 +74,14 @@ Nothing here is a secret except `SENTRY_AUTH_TOKEN`. Never commit the token.
    eas env:create --name SENTRY_AUTH_TOKEN --value "<token>" --environment preview --environment production --visibility secret
    ```
 
-   Until this token exists, `app.config.ts` sets `disableAutoUpload`, so EAS builds still pass. Crash reports still arrive, but stack traces are not mapped to our source.
+   Then remove `SENTRY_DISABLE_AUTO_UPLOAD` from `build.base.env` in `apps/mobile/eas.json`. A value in `eas.json` wins over an EAS variable, so it must go. Until then, release builds skip the upload and still pass. Crash reports still arrive, but stack traces are not mapped to our source. Debug builds (the `development` profiles) never upload.
 
 5. In the Sentry project, open **Settings → Security & Privacy** and turn on **Prevent Storing of IP Addresses**. Keep **Data Scrubber** and **Use Default Scrubbers** on. The app never sends an IP address, but Sentry could still see one from the network request.
 
 6. **EAS Update** (later): after `eas update`, run `pnpm dlx sentry-expo-upload-sourcemaps dist` in `apps/mobile`. If that runs in GitHub Actions, add `SENTRY_AUTH_TOKEN` as a GitHub **repository secret** (Settings → Secrets and variables → Actions) and pass `SENTRY_ORG` and `SENTRY_PROJECT` as plain variables.
 7. Optional: link the Sentry project in the EAS dashboard (Account settings → Connections → Sentry) to see crashes next to each build and update.
 
-For a local release build with source maps, put the token in `apps/mobile/.env.local` (git ignores `.env*.local`).
+For a local release build with source maps, put the token, `SENTRY_ORG` and `SENTRY_PROJECT` in `apps/mobile/.env.local` (git ignores `.env*.local`). Without the token, put `SENTRY_DISABLE_AUTO_UPLOAD=true` there instead, or the release build fails at the upload step.
 
 ## Check it works
 
