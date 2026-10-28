@@ -13,18 +13,21 @@ import {
   answerPrompt,
   createOnlineMatch,
   deadlineAfter,
+  endedGame,
   isTimedOut,
   loadFlow,
+  loadPreviousGame,
   onlineGameRules,
   playTurn,
   resign,
   sideOf,
   storeFlow,
+  storeStep,
   timeOut,
   toView,
   waitingFor,
 } from './online-game';
-import { pickChoice, pickTurn } from './testing';
+import { lastBearOff, pickChoice, pickTurn } from './testing';
 
 const PLAYERS = { white: 'alice', black: 'bob' };
 
@@ -35,6 +38,7 @@ const VIEW = {
   pace: 'live',
   turnDeadline: 1000,
   players: PLAYERS,
+  previousGame: null,
 } as const;
 
 function create(choice: OnlineGameChoice = 'portes', seed = 1, targetPoints = 1) {
@@ -262,6 +266,85 @@ describe('stored flow', () => {
 
   it('rejects an unknown schema version', () => {
     expect(() => loadFlow(JSON.stringify({ schemaVersion: 99 }))).toThrow(/schema version/);
+  });
+
+  it('keeps the previous game apart from the flow; a flow saved before #299 has none', () => {
+    const { flow } = create();
+    const ended = lastBearOff(flow).game;
+    const text = storeFlow(flow, ended);
+    expect(loadPreviousGame(text)).toEqual(ended);
+    expect(loadFlow(text)).toEqual(loadFlow(storeFlow(flow)));
+    expect(Object.keys(loadFlow(text))).not.toContain('previousGame');
+    const old = JSON.stringify({
+      schemaVersion: flow.schemaVersion,
+      match: flow.match,
+      game: flow.game,
+    });
+    expect(loadPreviousGame(old)).toBeNull();
+    expect(loadFlow(old)).toEqual(loadFlow(text));
+  });
+});
+
+describe('previousGame (#299)', () => {
+  /** A 5-point Portes match where White's next turn bears off the last checkers. */
+  function lastTurn() {
+    const { flow, rng } = create('portes', 1, 5);
+    const text = storeFlow(lastBearOff(flow));
+    const before = loadFlow(text);
+    const moves = pickTurn(before.game, createSeededRng(9));
+    return { text, before, moves, rng };
+  }
+
+  it('the turn that ends a game is kept as it ended; the next game starts', () => {
+    const { text, before, moves, rng } = lastTurn();
+    const next = playTurn(before, 'white', moves, rng);
+    expect(next.match.games).toHaveLength(1);
+    expect(next.game.phase).toBe('moving');
+    const ended = endedGame(before, next);
+    expect(ended?.phase).toBe('game-over');
+    expect(ended?.result).toMatchObject({ winner: 'white', points: 1 });
+    expect(ended?.lastTurn?.player).toBe('white');
+    expect(ended?.lastTurn?.moves).toEqual(moves);
+    expect(ended?.state.board.off.white).toBe(15);
+    const saved = storeStep(text, next);
+    expect(loadPreviousGame(saved)).toEqual(ended);
+    expect(loadFlow(saved)).toEqual(loadFlow(storeFlow(next)));
+    const view = toView({
+      ...VIEW,
+      choice: 'portes',
+      flow: loadFlow(saved),
+      previousGame: ended ?? null,
+    });
+    expect(view.previousGame).toEqual(ended);
+  });
+
+  it('stays through the next game until that game ends', () => {
+    const { text, before, moves, rng } = lastTurn();
+    const first = storeStep(text, playTurn(before, 'white', moves, rng));
+    const ended = loadPreviousGame(first);
+    const flow = loadFlow(first);
+    const step = playTurn(flow, flow.game.state.toMove, pickTurn(flow.game, rng), rng);
+    expect(endedGame(flow, step)).toBeNull();
+    expect(loadPreviousGame(storeStep(first, step))).toEqual(ended);
+    // A time out ends the second game: it takes the place of the first.
+    const late = loadFlow(storeStep(first, step));
+    const timedOut = timeOut(late, rng);
+    const second = loadPreviousGame(storeStep(storeStep(first, step), timedOut));
+    expect(second?.result?.reason).toBe('timeout');
+    expect(second?.state.board).toEqual(late.game.state.board);
+  });
+
+  it('a step that starts no next game keeps none: the first game, and the match end', () => {
+    const { flow, rng } = create('portes', 1, 1);
+    const text = storeFlow(flow);
+    const step = playTurn(loadFlow(text), flow.game.state.toMove, pickTurn(flow.game, rng), rng);
+    expect(loadPreviousGame(storeStep(text, step))).toBeNull();
+    // A 1-point match ends with the game: `game` is that game, no next game starts.
+    const won = storeFlow(lastBearOff(flow));
+    const done = playTurn(loadFlow(won), 'white', pickTurn(loadFlow(won).game, rng), rng);
+    expect(done.match.status).toBe('finished');
+    expect(done.game.lastTurn?.player).toBe('white');
+    expect(loadPreviousGame(storeStep(won, done))).toBeNull();
   });
 });
 

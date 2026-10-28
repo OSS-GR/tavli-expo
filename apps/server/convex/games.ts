@@ -52,12 +52,14 @@ import {
   eventActor,
   latestGames,
   loadFlow,
+  loadPreviousGame,
   matchStatus,
   nextDeadline,
   playTurn,
   resign as resignMatch,
   scheduledCheck,
   storeFlow,
+  storeStep,
   summarizeGame,
   timeOut,
   toView,
@@ -116,10 +118,11 @@ async function writeEvents(
   return seq;
 }
 
-function gameFields(flow: MatchFlow) {
+/** The fields of `flow`. `stored` is its text: `storeStep` after a step (#299). */
+function gameFields(flow: MatchFlow, stored = storeFlow(flow)) {
   return {
     variant: flow.game.state.variant,
-    flow: storeFlow(flow),
+    flow: stored,
     status: matchStatus(flow),
     winner: flow.match.winner,
   };
@@ -174,7 +177,7 @@ async function save(
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
   const turnDeadline = await startClock(ctx, game._id, version, game.pace, flow, now);
   await ctx.db.patch(game._id, {
-    ...gameFields(flow),
+    ...gameFields(flow, storeStep(game.flow, flow)),
     version,
     eventCount,
     turnDeadline,
@@ -417,6 +420,7 @@ function viewInput(game: Doc<'games'>) {
     turnDeadline: game.turnDeadline,
     players: game.players,
     flow: loadFlow(game.flow),
+    previousGame: loadPreviousGame(game.flow),
   };
 }
 

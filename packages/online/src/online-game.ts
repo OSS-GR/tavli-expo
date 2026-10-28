@@ -16,7 +16,10 @@
  * The stored flow is the engine `MatchFlow` without its log. The log
  * lives apart (on Convex, in the `moves` table), one row per event. A
  * step starts from the stored flow with an empty log, so `flow.log` after
- * the step holds just the new events.
+ * the step holds just the new events. The stored flow also keeps the game
+ * before the current one, as it ended (`previousGame`, #299): `advance`
+ * starts the next game at once, so the view would lose the turn that
+ * ended a game. Save a step with `storeStep`.
  */
 
 import { TURN_TIME_MS } from '@tavli/contracts';
@@ -38,6 +41,7 @@ import {
   resolveRules,
 } from '@tavli/engine';
 import type {
+  GameFlow,
   MatchAction,
   MatchFlow,
   MoveInput,
@@ -105,25 +109,74 @@ export function onlineGameRules(choice: OnlineGameChoice): RuleSet {
 // ---------------------------------------------------------------------------
 // Stored flow
 
-/** The `MatchFlow` without its log, as saved (on Convex, in `games.flow`). */
-export type StoredFlow = Omit<MatchFlow, 'log'>;
+/**
+ * The `MatchFlow` without its log, as saved (on Convex, in `games.flow`),
+ * and the game before the current one as it ended. Flows saved before
+ * #299 have no `previousGame`: read it as `null`.
+ */
+export type StoredFlow = Omit<MatchFlow, 'log'> & { readonly previousGame?: GameFlow };
 
-export function storeFlow(flow: MatchFlow): string {
+/** The stored text of `flow`. `previousGame` is the game before `flow.game`, as it ended. */
+export function storeFlow(flow: MatchFlow, previousGame: GameFlow | null = null): string {
   const stored: StoredFlow = {
     schemaVersion: flow.schemaVersion,
     match: flow.match,
     game: flow.game,
+    ...(previousGame === null ? {} : { previousGame }),
   };
   return JSON.stringify(stored);
 }
 
-/** Reads a stored flow. Only the server writes it, so a shape check is enough. */
-export function loadFlow(text: string): MatchFlow {
+function parseStored(text: string): StoredFlow {
   const stored = JSON.parse(text) as StoredFlow;
   if (stored.schemaVersion !== MATCH_FLOW_SCHEMA_VERSION) {
     throw new Error(`stored flow has schema version ${String(stored.schemaVersion)}`);
   }
-  return { ...stored, log: [] };
+  return stored;
+}
+
+/** Reads a stored flow. Only the server writes it, so a shape check is enough. */
+export function loadFlow(text: string): MatchFlow {
+  const { schemaVersion, match, game } = parseStored(text);
+  return { schemaVersion, match, game, log: [] };
+}
+
+/**
+ * The game before the current one, as it ended (phase `game-over`): its
+ * `lastTurn` is the turn that ended it. `null` in the first game, and for
+ * a flow saved before #299 until its next game starts.
+ */
+export function loadPreviousGame(text: string): GameFlow | null {
+  return parseStored(text).previousGame ?? null;
+}
+
+/**
+ * The game that ended in a step, as it ended, or `null` when no next game
+ * started in it. `before` is the flow the step started from; `after` the
+ * flow after it, whose `log` holds just the step's events. It plays those
+ * events again on `before` (they hold their dice, so no RNG) and keeps the
+ * game that the last `nextGame` replaced.
+ */
+export function endedGame(before: MatchFlow, after: MatchFlow): GameFlow | null {
+  if (!after.log.some((event) => event.type === 'nextGame')) return null;
+  let flow = before;
+  let ended: GameFlow | null = null;
+  for (const event of after.log) {
+    if (event.type === 'start') continue;
+    if (event.type === 'nextGame') ended = flow.game;
+    flow = applyMatchAction(flow, event);
+  }
+  return ended;
+}
+
+/**
+ * The stored text after a step: `next`, and the game before its current
+ * one. That is the game that ended in the step, else the one `stored`
+ * kept. `stored` is the text the step loaded its flow from.
+ */
+export function storeStep(stored: string, next: MatchFlow): string {
+  const ended = endedGame(loadFlow(stored), next);
+  return storeFlow(next, ended ?? loadPreviousGame(stored));
 }
 
 // ---------------------------------------------------------------------------
@@ -295,6 +348,8 @@ export interface ViewInput {
   readonly turnDeadline: number | null;
   readonly players: PerPlayer<string>;
   readonly flow: MatchFlow;
+  /** The game before `flow.game`, as it ended (`loadPreviousGame`). */
+  readonly previousGame: GameFlow | null;
 }
 
 /**
@@ -302,7 +357,7 @@ export interface ViewInput {
  * rolls each roll when its turn starts), and nothing about the RNG.
  */
 export function toView(input: ViewInput): OnlineGameView {
-  const { gameId, version, choice, pace, turnDeadline, players, flow } = input;
+  const { gameId, version, choice, pace, turnDeadline, players, flow, previousGame } = input;
   const finished = matchPhase(flow) === 'match-over';
   return {
     gameId,
@@ -314,6 +369,7 @@ export function toView(input: ViewInput): OnlineGameView {
     players,
     match: flow.match,
     game: flow.game,
+    previousGame,
     waitingFor: waitingFor(flow),
     prompt: flow.match.status === 'finished' ? null : currentPrompt(flow.game),
   };

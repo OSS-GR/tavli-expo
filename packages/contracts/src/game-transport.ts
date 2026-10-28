@@ -89,6 +89,15 @@ export interface OnlineGameView {
    * empty: a turn is sent and saved as a whole.
    */
   readonly game: GameFlow;
+  /**
+   * The game before `game`, as it ended (phase `game-over`, #299): its
+   * `lastTurn` is the turn that ended it, and its board is the end
+   * position. When a game ends and the match goes on, the server starts
+   * the next game at once, so `game` no longer shows that turn. `null` in
+   * the first game (and in games saved before #299, until their next game
+   * starts).
+   */
+  readonly previousGame: GameFlow | null;
   /** The side the server waits for (to move, or to answer). `null` when finished. */
   readonly waitingFor: PlayerId | null;
   /** The question `waitingFor` must answer, else `null`. */

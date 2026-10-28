@@ -10,9 +10,9 @@ import {
   type MatchFlow,
 } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
-import { pickTurn } from '@tavli/online/testing';
+import { lastBearOff, pickTurn } from '@tavli/online/testing';
 
-import { storeEvents } from '@/features/game/gameFeedback';
+import { moveEvent, storeEvents } from '@/features/game/gameFeedback';
 import { inviteAccepted } from '@/features/invites/acceptedInvite';
 import { currentGameLabel } from '@/features/match/summary';
 import i18n from '@/i18n';
@@ -30,6 +30,7 @@ import {
   stopDevGame,
 } from './devGame';
 import { MAX_TRIES_PER_TURN, startOnlineBot, type OnlineBot } from './onlineBot';
+import { viewEvents } from './onlineFeedback';
 import { createOnlineStore, viewFlow, type OnlineStore } from './onlineStore';
 import { remoteTurn } from './remoteTurn';
 
@@ -288,6 +289,45 @@ describe('onlineBoardStore between games (#286)', () => {
     board.release();
     expect(seen).toEqual([held, store.getState().flow]);
     stop();
+  });
+
+  it('replays the other player’s winning turn: the board ends on the final position (#299)', async () => {
+    const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => Date.now() });
+    const gameId = server.createGame('them', { white: 'them', black: 'me' }, 'portes', 3, 'live');
+    server.setFlowForTest(gameId, lastBearOff(viewFlow(server.getGame(gameId)!)));
+    const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
+    open.push(store);
+    await flush();
+    const board = onlineBoardStore(store, gameId)!;
+    const before = board.getState().flow;
+    const moves = pickTurn(before.game, createSeededRng(2));
+    const { version } = server.getGame(gameId)!;
+    await server.transportFor('them').sendTurn({ gameId, expectedVersion: version, moves });
+    await flush();
+
+    // The store has game 2; the board holds the end of game 1.
+    const view = store.getState().view!;
+    expect(view.match.games).toHaveLength(1);
+    expect(view.game.phase).toBe('moving');
+    const held = board.getState().flow;
+    expect(held.match).toBe(store.getState().flow!.match);
+    expect(held.game).toEqual(view.previousGame);
+    expect(held.game.phase).toBe('game-over');
+    expect(held.game.result).toMatchObject({ winner: 'white', reason: 'borneOff' });
+    expect(held.game.state.board.off.white).toBe(15);
+    expect(currentBoard(held.game)).not.toEqual(currentBoard(before.game));
+    expect(held.log).toEqual([]);
+
+    // The winning turn flies from the board before it, and sounds as a remote turn.
+    const turn = remoteTurn(before, held, 'black');
+    expect(turn).toEqual({ player: 'white', moves, before: currentBoard(before.game) });
+    expect(viewEvents(before, held, 'black').map(({ event }) => event)).toEqual(
+      moves.map(moveEvent),
+    );
+    // The sheet closes: the next game, with no turn to fly.
+    board.release();
+    expect(board.getState().flow).toBe(store.getState().flow);
+    expect(remoteTurn(held, board.getState().flow, 'black')).toBeNull();
   });
 
   it('drops the moves of a turn that timed out', async () => {

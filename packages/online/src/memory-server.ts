@@ -66,9 +66,11 @@ import {
   answerPrompt,
   createOnlineMatch,
   loadFlow,
+  loadPreviousGame,
   playTurn,
   resign,
   storeFlow,
+  storeStep,
   timeOut,
   sideOf,
   toView,
@@ -225,6 +227,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       turnDeadline: game.turnDeadline,
       players: game.players,
       flow: loadFlow(game.flow),
+      previousGame: loadPreviousGame(game.flow),
     };
   }
 
@@ -274,7 +277,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     const version = game.version + 1;
     const saved: MemoryGame = {
       ...game,
-      flow: storeFlow(flow),
+      flow: storeStep(game.flow, flow),
       status: matchStatus(flow),
       version,
       turnDeadline: nextDeadline(game.pace, flow, at),

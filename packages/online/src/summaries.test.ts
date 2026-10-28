@@ -22,6 +22,7 @@ function input(choice: 'portes' | 'tavli' = 'portes'): SummaryInput {
     turnDeadline: 5000,
     players: PLAYERS,
     flow: createOnlineMatch({ choice, targetPoints: 3, players: PLAYERS }, rng),
+    previousGame: null,
     updatedAt: 1234,
   };
 }
