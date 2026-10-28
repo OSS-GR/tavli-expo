@@ -21,7 +21,8 @@ does not give.
    - change it, translate it, or make works based on it;
    - publish, share, sell, rent or sublicense it, or any part of it;
    - put it, or an app built from it, in an app store or on a website;
-   - use the name "Tavlaki", the board art, the sounds or the logos;
+   - use the name "Tavlaki", or the project's own board art, sounds or
+     logos (the third-party parts in section 5 keep their own terms);
    - use it to train, test or improve a machine learning model.
 
 3. How to ask for permission
@@ -38,7 +39,11 @@ does not give.
 5. Third-party parts
 
    Some files come from other people and keep their own licenses. They are
-   listed in packages/themes/LICENSES.md and docs/design/style/LICENSES.md.
+   listed in packages/themes/LICENSES.md and docs/design/style/LICENSES.md:
+   CC0 1.0 wood textures and sounds. CC0 lets anyone use those sources
+   freely. This notice covers only the project's own work, including what
+   the project made from those sources (the board art and the mixed
+   sounds).
    Packages that the project installs (node_modules) keep their own
    licenses too. This notice does not change those licenses.
 
