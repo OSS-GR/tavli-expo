@@ -202,6 +202,7 @@ describe('onlineBoardStore refusals', () => {
         sendAnswer: (request) => real.sendAnswer(request),
         resign: () => Promise.reject(new Error('no network')),
         listMyGames: (request) => real.listMyGames(request),
+        watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
       },
       gameId,
       me: 'me',
@@ -447,6 +448,8 @@ describe('startOnlineBot', () => {
           sendAnswer: (request) => real.sendAnswer(request),
           resign: (id) => real.resign(id),
           listMyGames: (request) => real.listMyGames(request),
+          watchMyGames: (request, onList, onError) =>
+            real.watchMyGames(request, onList, onError),
         },
         gameId,
         botId: 'bot',
@@ -484,6 +487,8 @@ describe('startOnlineBot', () => {
           sendAnswer: (request) => real.sendAnswer(request),
           resign: (id) => real.resign(id),
           listMyGames: (request) => real.listMyGames(request),
+          watchMyGames: (request, onList, onError) =>
+            real.watchMyGames(request, onList, onError),
         },
         gameId,
         botId: 'bot',

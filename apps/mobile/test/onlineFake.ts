@@ -85,6 +85,17 @@ function notSignedIn(): Promise<never> {
   return Promise.reject({ ...NOT_SIGNED_IN });
 }
 
+/** A watch with nobody signed in: `NOT_SIGNED_IN` later, never inside the call. */
+function signedOutWatch(onError: ((error: unknown) => void) | undefined): () => void {
+  let active = true;
+  void Promise.resolve().then(() => {
+    if (active) onError?.({ ...NOT_SIGNED_IN });
+  });
+  return () => {
+    active = false;
+  };
+}
+
 /**
  * The Convex invites of the app (`invites` of `@/services`): each call
  * comes from the user signed in to `auth` at that moment, like the Convex
@@ -97,13 +108,7 @@ const invites: Invites = {
   watchInvite(code, onView, onError) {
     const port = inviter();
     if (port !== null) return port.watchInvite(code, onView, onError);
-    let active = true;
-    void Promise.resolve().then(() => {
-      if (active) onError?.({ ...NOT_SIGNED_IN });
-    });
-    return () => {
-      active = false;
-    };
+    return signedOutWatch(onError);
   },
   acceptInvite: (code) => inviter()?.acceptInvite(code) ?? notSignedIn(),
   declineInvite: (code) => inviter()?.declineInvite(code) ?? notSignedIn(),
@@ -115,19 +120,18 @@ const games: GameTransport = {
   subscribe(gameId, onView, onError) {
     const transport = caller();
     if (transport !== null) return transport.subscribe(gameId, onView, onError);
-    let active = true;
-    // Later, never inside `subscribe`, like the real transport.
-    void Promise.resolve().then(() => {
-      if (active) onError?.({ ...NOT_SIGNED_IN });
-    });
-    return () => {
-      active = false;
-    };
+    return signedOutWatch(onError);
   },
   sendTurn: (request) => caller()?.sendTurn(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   sendAnswer: (request) => caller()?.sendAnswer(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   resign: (gameId) => caller()?.resign(gameId) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   listMyGames: (request) => caller()?.listMyGames(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
+  // The user signed in when the watch starts, like a Convex watch on one token.
+  watchMyGames(request, onList, onError) {
+    const transport = caller();
+    if (transport !== null) return transport.watchMyGames(request, onList, onError);
+    return signedOutWatch(onError);
+  },
 };
 
 export const onlineFake = {

@@ -232,8 +232,21 @@ export interface GameTransport {
   /**
    * The caller's games with this `status` (#296), newest change first, at
    * most `MAX_LISTED_GAMES`. Never another player's game. A call, not a
-   * live list: call it again to see changes. Rejects with
+   * live list: `watchMyGames` follows the changes. Rejects with
    * `GameTransportErrorData` (`NOT_SIGNED_IN`).
    */
   listMyGames(request: ListMyGamesRequest): Promise<readonly GameSummary[]>;
+  /**
+   * The live form of `listMyGames` (#297): `onList` gets the list now and
+   * after every change to it (a move, a new game, a game that ends),
+   * until the returned function is called. Like `subscribe`, it never
+   * calls back inside `watchMyGames` or after the stop function, and each
+   * list is a copy. A failure goes to `onError`: `GameTransportErrorData`
+   * from the server (`NOT_SIGNED_IN`), or a network error as it is.
+   */
+  watchMyGames(
+    request: ListMyGamesRequest,
+    onList: (games: readonly GameSummary[]) => void,
+    onError?: (error: unknown) => void,
+  ): () => void;
 }

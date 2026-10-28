@@ -64,6 +64,7 @@ export function lazyGameTransport(get: () => GameTransport): GameTransport {
     sendAnswer: (request) => get().sendAnswer(request),
     resign: (gameId) => get().resign(gameId),
     listMyGames: (request) => get().listMyGames(request),
+    watchMyGames: (request, onList, onError) => get().watchMyGames(request, onList, onError),
   };
 }
 

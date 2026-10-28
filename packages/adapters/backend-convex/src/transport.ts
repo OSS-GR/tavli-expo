@@ -90,6 +90,11 @@ function copyView(view: OnlineGameView): OnlineGameView {
   return JSON.parse(JSON.stringify(view)) as OnlineGameView;
 }
 
+/** A copy of a list: the client may share one cached result between watchers. */
+function copyList(games: readonly GameSummary[]): GameSummary[] {
+  return JSON.parse(JSON.stringify(games)) as GameSummary[];
+}
+
 /** Runs a call; a rejection becomes the port's error (`toTransportError`). */
 async function run<T>(call: () => Promise<T>): Promise<T> {
   try {
@@ -171,7 +176,35 @@ export function createConvexGameTransport(options: ConvexGameTransportOptions): 
     async listMyGames({ status }) {
       const games = await run(() => client.query(GAME_FUNCTIONS.listMyGames, { status }));
       // The client may share a cached result; the caller gets its own copy.
-      return JSON.parse(JSON.stringify(games)) as GameSummary[];
+      return copyList(games);
+    },
+
+    watchMyGames({ status }, onList, onError) {
+      let active = true;
+      // Like `subscribe`: never inside the call, never after the stop function.
+      const later = (deliver: () => void) => {
+        void Promise.resolve().then(() => {
+          if (active) deliver();
+        });
+      };
+      // `listMyGames` is a Convex query, so the client watches it: the
+      // server sends a new result whenever one of the caller's games
+      // changes (#297).
+      const stop = client.onUpdate(
+        GAME_FUNCTIONS.listMyGames,
+        { status },
+        (games) => {
+          later(() => onList(copyList(games)));
+        },
+        (error) => {
+          later(() => onError?.(toTransportError(error)));
+        },
+      );
+      return () => {
+        if (!active) return;
+        active = false;
+        stop();
+      };
     },
   };
 }

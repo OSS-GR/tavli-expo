@@ -68,6 +68,7 @@ function gameNetwork(t: Tester) {
     transportFor: (subject: string): GameTransport =>
       createConvexGameTransport({ client: network.clientFor(subject) }),
     settle: network.settle,
+    refreshAll: network.refreshAll,
   };
 }
 
@@ -84,8 +85,16 @@ function contractSubject(): GameTransportContractSubject {
   const t = setup();
   const network = gameNetwork(t);
   const picker = createSeededRng(8);
+  // These change the database outside a client mutation. The real client
+  // gets the new query results by itself; the fake runs its watched
+  // queries again (`watchMyGames`).
+  const refreshed = async <T>(work: Promise<T>): Promise<T> => {
+    const result = await work;
+    await network.refreshAll();
+    return result;
+  };
   return {
-    createGame: (game) => createGame(t, game),
+    createGame: (game) => refreshed(createGame(t, game)),
     createMotherQuestion: async () => {
       const gameId = await createGame(t, { choice: 'plakoto', targetPoints: 1, pace: 'live' });
       const pin = await t.run(async (ctx) => {
@@ -100,16 +109,19 @@ function contractSubject(): GameTransportContractSubject {
         expectedVersion: 1,
         moves: [...pin],
       });
+      await network.refreshAll();
       return gameId;
     },
-    createOtherGame: async () =>
-      await t.mutation(internal.games.createGame, {
-        callerId: BOB,
-        players: { white: BOB, black: EVE },
-        choice: 'portes',
-        targetPoints: 1,
-        pace: 'live',
-      }),
+    createOtherGame: () =>
+      refreshed(
+        t.mutation(internal.games.createGame, {
+          callerId: BOB,
+          players: { white: BOB, black: EVE },
+          choice: 'portes',
+          targetPoints: 1,
+          pace: 'live',
+        }),
+      ),
     missingGameId: async () => {
       const gameId = await createGame(t, { choice: 'portes', targetPoints: 1, pace: 'live' });
       await t.run(async (ctx) => ctx.db.delete(gameId));
@@ -121,6 +133,7 @@ function contractSubject(): GameTransportContractSubject {
     passTime: async (ms) => {
       vi.advanceTimersByTime(ms);
       await t.finishInProgressScheduledFunctions();
+      await network.refreshAll();
     },
   };
 }
@@ -205,6 +218,15 @@ describe('the adapter on the real functions', () => {
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(errors).toHaveLength(1);
     expect(errors[0]).toEqual({ code: 'NOT_SIGNED_IN', message: expect.any(String) });
+    const listErrors: unknown[] = [];
+    transport.watchMyGames(
+      { status: 'active' },
+      () => undefined,
+      (error) => listErrors.push(error),
+    );
+    await loaded;
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(listErrors).toEqual([{ code: 'NOT_SIGNED_IN', message: expect.any(String) }]);
   });
 
   it('a string that is no game id fails argument validation: a plain error, not port data', async () => {
