@@ -21,6 +21,9 @@
  * EAS variable. Never read a secret EAS variable (your computer never gets
  * it) or a value that is only in `.env.local` (git ignores it, so EAS never
  * gets it). `src/convexUrl.test.ts` lists the env vars this file may read.
+ * That test reads this file's text, so read each var here, in the dot form
+ * that `readVariant` uses. The test fails on a destructured or bracket read,
+ * and it cannot see a read in another file.
  * See docs/process/running-the-app.md.
  */
 import type { ConfigContext, ExpoConfig } from 'expo/config';
