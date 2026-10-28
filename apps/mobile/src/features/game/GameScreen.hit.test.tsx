@@ -13,15 +13,23 @@ import {
   portes,
   resolveRules,
   type BoardState,
+  type DieValue,
   type Move,
   type SourceMoves,
 } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 
+import { boardLayout } from '@/features/board/BoardCanvas';
 import type { BoardView } from '@/features/board/boardModel';
 import { moveFlights } from '@/features/board/flights';
-import { fitBoardWithShadow, slotRect, stackPosition, type Slot } from '@/features/board/geometry';
+import {
+  boxRatioWithShadow,
+  fitBoardWithShadow,
+  slotRect,
+  stackPosition,
+  type Slot,
+} from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -254,5 +262,81 @@ describe('<InteractiveBoard /> while the hit checker flies to the bar (#179)', (
       expect.anything(),
       expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
     );
+  });
+});
+
+describe('<GameScreen /> the same checker after a hit, Black on the classic board (#179)', () => {
+  // Black's door on 13 and 13 on 6, a White blot on Black's 8 (Black's own numbers).
+  const BLACK_DOOR = { black: { points: { 13: 2, 6: 13 } }, white: { points: { 17: 1, 24: 14 } } };
+  const CLASSIC = { width: 375, height: 375 / boxRatioWithShadow(theme.layouts.landscape) };
+  // Black sits at the bottom (flip), so the layout numbers are Black's own.
+  const g = fitBoardWithShadow(boardLayout(theme, 'classic', 'left'), CLASSIC);
+  const at = (index: number) => {
+    const r = slotRect(g, { kind: 'point', index });
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  };
+  const topOf = (index: number, count: number) =>
+    stackPosition(g, { kind: 'point', index }, count, count - 1);
+  const dragOn = (from: Point, to: Point) =>
+    touch(PAN, [from, { x: from.x + 15, y: from.y + 15 }, to]);
+
+  /** Black to play `dice` in Portes: classic board, home on the left, flip view. */
+  async function blackToPlay(dice: [DieValue, DieValue]): Promise<GameStore> {
+    await act(async () => {
+      settingsStore.setState({
+        ...DEFAULT_SETTINGS,
+        boardLayout: 'classic',
+        homeBoardSide: 'left',
+        boardFlipMode: 'flip',
+      });
+    });
+    const rules = resolveRules('portes', { match: { rotation: ['portes'] } });
+    const store = createGameStore({
+      players: { white: 'Ann', black: 'Bob' },
+      rules,
+      rng: createSeededRng(5),
+    });
+    const state = {
+      ...portes.initialState({ startingPlayer: 'black', rules }),
+      board: createBoard(BLACK_DOOR, 'contrary'),
+    };
+    store.setState({
+      flow: { ...store.getState().flow, game: createGameFlow({ state, starter: 'black' }) },
+    });
+    await renderWithRoot(<GameScreen store={store} />);
+    await act(async () => {
+      fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, ...CLASSIC } },
+      });
+    });
+    await act(async () => {
+      expect(store.getState().dispatch({ type: 'roll', player: 'black', dice })).toBe(true);
+    });
+    return store;
+  }
+
+  it('hits by tap-tap, then moves the hitter on by tap-tap', async () => {
+    const store = await blackToPlay([5, 3]);
+    await tapTap(topOf(13, 2), at(8));
+    expect(played(store)).toEqual(['13/8*']);
+    await touch(PAN, [topOf(8, 1)]);
+    expect(targetRings()).toBe(1);
+    await touch(PAN, [at(5)]);
+    expect(played(store)).toEqual(['13/8*', '8/5']);
+  });
+
+  it('hits by drag, then drags the hitter on', async () => {
+    const store = await blackToPlay([5, 3]);
+    await dragOn(topOf(13, 2), at(8));
+    expect(played(store)).toEqual(['13/8*']);
+    await dragOn(topOf(8, 1), at(5));
+    expect(played(store)).toEqual(['13/8*', '8/5']);
+  });
+
+  it('a double: the hitter plays on with the next five', async () => {
+    const store = await blackToPlay([5, 5]);
+    await tapTap(topOf(13, 2), at(8));
+    await dragOn(topOf(8, 1), at(3));
+    expect(played(store)).toEqual(['13/8*', '8/3']);
   });
 });
