@@ -10,6 +10,8 @@ Planning stage (milestone **M0 Foundation**). See the [roadmap](docs/roadmap.md)
 
 ## How to run
 
+These steps are for the owner and for people the owner gave permission to (see [License](#license)).
+
 You need **Node 22** (see `.nvmrc`) and **pnpm**. The repo pins pnpm 12 in `package.json`. pnpm 9.7 or newer switches to that version by itself.
 
 1. Install everything from the repo root:
@@ -77,3 +79,7 @@ Use `StyleSheet` from `react-native-unistyles` with the theme: `StyleSheet.creat
 ## Docs
 
 All project docs live in [`docs/`](docs/README.md). Start there.
+
+## License
+
+All rights reserved. You may read the code on GitHub, but you may not copy, use or change it without written permission. See [`LICENSE`](LICENSE). Third-party parts keep their own licenses ([`packages/themes/LICENSES.md`](packages/themes/LICENSES.md), [`docs/design/style/LICENSES.md`](docs/design/style/LICENSES.md)).

@@ -25,7 +25,7 @@
 
 ## Tooling notes
 
-- Run `pnpm install`, `pnpm lint`, `pnpm typecheck` and `pnpm test` from the repo root.
+- Run `pnpm install`, `pnpm lint`, `pnpm typecheck` and `pnpm format:check` from the repo root. For tests run `pnpm test:changed` (changed packages and their dependents, plus the app's Jest tests related to changed app files; `git fetch origin main` first). CI runs the full `pnpm test` on every push, so do not run it before each push. Run the app's whole Jest (`pnpm --filter @tavli/mobile test`) when you change something many app tests use: engine rules, the bot, contracts, `apps/mobile/test/*` or `jest.setup.ts` (#287).
 - pnpm is pinned in `package.json` (`packageManager`). pnpm switches to that version by itself. Corepack 0.34 cannot run pnpm 12, so do not rely on Corepack.
 - ESLint stays on 9.x for now. `eslint-config-expo` 58 uses `eslint-plugin-react` 7.x, which crashes on ESLint 10.
 - The lint config is one file: `eslint.config.mjs`. It blocks vendor SDKs (including `expo-haptics`, `expo-audio` and `expo-secure-store`) outside `packages/adapters/**` and `apps/server/**`, React/Expo in `engine`, `bot` and `contracts`, and `Math.random` in `engine`.
