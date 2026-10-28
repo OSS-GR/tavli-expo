@@ -7,7 +7,9 @@
  * in-memory server runs no timers, so the dev game calls
  * `runDueTimeouts()` every second: a turn timer that ran out ends that
  * game, as on the real server. One dev game runs at a time: a new one
- * stops the last one. A finished match stops by itself.
+ * stops the last one. A finished match stops by itself. The game also
+ * stops when its board closes (nobody can open it again) or when the dev
+ * screen closes.
  */
 import { thinkingDelayMs } from '@tavli/bot';
 import type { BotRunner, Difficulty, OnlineGameChoice, OnlineGamePace } from '@tavli/contracts';
@@ -90,7 +92,15 @@ export function startDevGame(options: DevGameOptions): DevGame {
   return game;
 }
 
-/** Stops the running dev game, if any (tests call it after each test). */
-export function stopDevGame(): void {
-  current?.stop();
+/**
+ * Stops the running dev game, if any: its turn timers and its bot. With
+ * `gameId`, only when the running game is that one.
+ */
+export function stopDevGame(gameId?: string): void {
+  if (gameId === undefined || current?.gameId === gameId) current?.stop();
+}
+
+/** Is a dev game running (its timers and its bot)? */
+export function devGameRunning(): boolean {
+  return current !== null;
 }

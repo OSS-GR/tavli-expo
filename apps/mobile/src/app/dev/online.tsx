@@ -12,7 +12,7 @@ import {
   type OnlineGamePace,
 } from '@tavli/contracts';
 import { Redirect, Stack, router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -20,7 +20,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { SegmentedControl } from '@/components/settings/SegmentedControl';
 import { gameHref } from '@/features/match/routes';
-import { startDevGame } from '@/features/online/devGame';
+import { startDevGame, stopDevGame } from '@/features/online/devGame';
 import { botLevels, botRunner, createLocalRng, onlinePlayerId, onlineServer } from '@/services';
 
 const LENGTHS = ['1', '3', '5'] as const;
@@ -42,13 +42,16 @@ export default function DevOnlineRoute() {
   const [pace, setPace] = useState<OnlineGamePace>('live');
   const [length, setLength] = useState<Length>('3');
   const [rng] = useState(createLocalRng);
+  // The game lives while this screen is in the stack (under its board).
+  // When it closes (Home, or back), the bot and the turn timers stop.
+  useEffect(() => () => stopDevGame(), []);
 
   if (!__DEV__) return <Redirect href="/" />;
 
   const start = () => {
     const level = games.find((g) => g.choice === choice)?.level ?? 'easy';
     const { gameId } = startDevGame({
-      server: onlineServer,
+      server: onlineServer(),
       me: onlinePlayerId,
       choice,
       pace,

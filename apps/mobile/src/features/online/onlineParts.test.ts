@@ -151,6 +151,25 @@ describe('onlineBoardStore', () => {
   });
 });
 
+describe('onlineBoardStore refusals', () => {
+  it('gives a new snapshot for each refusal, also the same one twice', async () => {
+    const { server, gameId } = serverWithGame();
+    const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
+    open.push(store);
+    await flush();
+    const board = onlineBoardStore(store, gameId)!;
+    const errors: (string | null)[] = [];
+    const stop = board.subscribe((state) => errors.push(state.lastError));
+    // The server rolls: the store refuses a roll, with the same text each time.
+    expect(board.getState().dispatch({ type: 'roll', player: 'white' })).toBe(false);
+    expect(board.getState().dispatch({ type: 'roll', player: 'white' })).toBe(false);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toBe(errors[1]);
+    expect(errors[0]).toMatch(/by itself/);
+    stop();
+  });
+});
+
 describe('startOnlineBot', () => {
   it('gives up on a turn the server keeps refusing, then waits for a new view', async () => {
     const { server, gameId } = serverWithGame();

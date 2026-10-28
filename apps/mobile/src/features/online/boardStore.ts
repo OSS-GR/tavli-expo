@@ -23,6 +23,7 @@ export function onlineBoardStore(store: OnlineStore, gameId: string): BoardStore
   const matchKey = `online:${gameId}`;
   const dispatch = store.getState().dispatch;
   let flow: MatchFlow = first;
+  let refusals = store.getState().refusals;
   let snapshot: BoardStoreState = {
     flow,
     matchKey,
@@ -33,8 +34,15 @@ export function onlineBoardStore(store: OnlineStore, gameId: string): BoardStore
   const read = (state: OnlineStoreState): BoardStoreState => {
     // A store keeps its flow once it has one; keep the last one just in case.
     const next = state.flow ?? flow;
-    if (next !== snapshot.flow || state.lastError !== snapshot.lastError) {
+    // A new refusal is a new snapshot even with the same text, like a
+    // `set` of the local store.
+    if (
+      next !== snapshot.flow ||
+      state.lastError !== snapshot.lastError ||
+      state.refusals !== refusals
+    ) {
       flow = next;
+      refusals = state.refusals;
       snapshot = { flow: next, matchKey, lastError: state.lastError, dispatch };
     }
     return snapshot;

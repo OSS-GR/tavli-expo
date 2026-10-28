@@ -76,6 +76,12 @@ export interface OnlineStoreState {
   readonly matchKey: string;
   /** The last action the store or the server refused, for logs and tests. `null` after a good one. */
   readonly lastError: string | null;
+  /**
+   * How many actions this store refused with no call. The same refusal
+   * twice gives the same `lastError`; the count still changes, so the
+   * board plays its "invalid move" feedback each time.
+   */
+  readonly refusals: number;
   /** Set when the game could not load. */
   readonly loadError: OnlineLoadError | null;
   /**
@@ -159,7 +165,7 @@ export function createOnlineStore({
 
   const store = createStore<OnlineStoreState>()((set, get) => {
     const refuse = (message: string): false => {
-      set({ lastError: message });
+      set((s) => ({ lastError: message, refusals: s.refusals + 1 }));
       return false;
     };
 
@@ -253,6 +259,7 @@ export function createOnlineStore({
       side: null,
       matchKey: nextMatchKey(),
       lastError: null,
+      refusals: 0,
       loadError: null,
       sending: false,
       notice: null,
