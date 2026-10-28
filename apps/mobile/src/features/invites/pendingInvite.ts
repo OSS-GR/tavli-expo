@@ -12,16 +12,24 @@ import { inviteCodeFromPath } from './link';
 
 /**
  * The code of an invite link that opened the app while `welcome` (the
- * first-launch flow) was due, until that invite shows. Else `null`.
+ * first-launch flow) was due, until the welcome flow has redirected.
+ * Else `null`.
+ *
+ * It adjusts its state while it renders, as React suggests for state that
+ * follows props (an effect would set it one render late, and lint refuses
+ * a set state in an effect).
  */
 export function usePendingInvite(welcome: boolean): string | null {
   const pathname = usePathname();
   const [pending, setPending] = useState<string | null>(null);
   const code = inviteCodeFromPath(pathname);
+  const onWelcome = pathname.startsWith('/welcome');
   // The guarded invite route is in the state for a moment before the
   // router redirects to the welcome flow: remember its code.
   if (welcome && code !== null && code !== pending) setPending(code);
-  // After the welcome flow the invite shows: nothing waits any more.
-  if (!welcome && code !== null && code === pending) setPending(null);
+  // The answer is in and the router has left the welcome routes (to the
+  // invite, or anywhere else): nothing waits any more, so a later welcome
+  // flow cannot open this invite again.
+  if (!welcome && !onWelcome && pending !== null) setPending(null);
   return pending;
 }

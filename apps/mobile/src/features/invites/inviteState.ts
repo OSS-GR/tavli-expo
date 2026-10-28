@@ -37,6 +37,11 @@ export function stateOfView(view: InviteView | null, me: string): InviteScreenSt
  * The state for a rejected call, when the rejection says what happened to
  * the invite. `null` for any other error: the call failed, and the user
  * may try again.
+ *
+ * `BAD_REQUEST` is one of those other errors. The screen never sends a bad
+ * code (it shows "not found" for one with no call), so a `BAD_REQUEST`
+ * means something else failed, for example the game did not start on
+ * Accept. The invite is still open then.
  */
 export function stateOfError(error: unknown): InviteScreenState | null {
   if (!isInviteErrorData(error)) return null;
@@ -46,7 +51,6 @@ export function stateOfError(error: unknown): InviteScreenState | null {
     case 'INVITE_CLOSED':
       return { kind: 'used' };
     case 'INVITE_NOT_FOUND':
-    case 'BAD_REQUEST':
       return { kind: 'notFound' };
     case 'OWN_INVITE':
       return { kind: 'own' };

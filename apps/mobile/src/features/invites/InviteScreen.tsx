@@ -18,7 +18,7 @@
  * Navigation stays in the route (`app/invite/[code].tsx`).
  */
 import { normalizeInviteCode, type InviteView, type Invites } from '@tavli/contracts';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -63,6 +63,14 @@ export function InviteScreen({
   const [busy, setBusy] = useState<Busy>(null);
   const [actionFailed, setActionFailed] = useState(false);
   const valid = normalizeInviteCode(code) !== null;
+  // False once the screen is gone (Accept and Decline answer later).
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!valid) return;
@@ -85,21 +93,31 @@ export function InviteScreen({
     setAttempt((n) => n + 1);
   };
 
-  /** Runs an answer. An error that says what happened to the invite shows that state. */
+  /**
+   * Runs an answer. An error that says what happened to the invite shows
+   * that state. Once the screen is gone, a late answer does nothing.
+   */
   const answer = (kind: 'accept' | 'decline') => {
     if (busy !== null) return;
     setBusy(kind);
     setActionFailed(false);
-    const call =
-      kind === 'accept'
-        ? invites.acceptInvite(code).then(onAccepted)
-        : invites.declineInvite(code).then(onDeclined);
-    call.catch((error: unknown) => {
+    const done = (next: () => void) => {
+      if (!mounted.current) return;
+      // The buttons work again, also while a slow navigation runs.
       setBusy(null);
-      const next = stateOfError(error);
-      if (next === null) setActionFailed(true);
-      else setState(next);
-    });
+      next();
+    };
+    const failed = (error: unknown) =>
+      done(() => {
+        const next = stateOfError(error);
+        if (next === null) setActionFailed(true);
+        else setState(next);
+      });
+    if (kind === 'accept') {
+      invites.acceptInvite(code).then((gameId) => done(() => onAccepted(gameId)), failed);
+    } else {
+      invites.declineInvite(code).then(() => done(onDeclined), failed);
+    }
   };
 
   return (

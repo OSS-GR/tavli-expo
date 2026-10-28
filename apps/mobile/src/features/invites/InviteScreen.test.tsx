@@ -9,7 +9,7 @@ import {
   type Invites,
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
-import { createMemoryGameServer } from '@tavli/online';
+import { createMemoryGameServer, SERVER_ACTOR } from '@tavli/online';
 import { act, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
@@ -49,8 +49,10 @@ async function openInvite(code: string, invites: Invites, me = ME) {
     onDeclined: jest.fn(),
     onHome: jest.fn(),
   };
-  await renderWithRoot(<InviteScreen code={code} invites={invites} me={me} {...props} />);
-  return props;
+  const { unmount } = await renderWithRoot(
+    <InviteScreen code={code} invites={invites} me={me} {...props} />,
+  );
+  return { ...props, unmount };
 }
 
 describe('InviteScreen', () => {
@@ -223,6 +225,70 @@ describe('InviteScreen', () => {
     expect(server.getInvite(code)?.status).toBe('open');
   });
 
+  it('keeps the invite open with a retry when the game does not start (BAD_REQUEST)', async () => {
+    const user = setupUser();
+    const { server } = setup();
+    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    // The server actor cannot be a player: the game check rejects with
+    // BAD_REQUEST, as when the server cannot start the game.
+    const props = await openInvite(code, server.invitesFor(SERVER_ACTOR), SERVER_ACTOR);
+    await user.press(await screen.findByRole('button', { name: 'Accept' }));
+    expect(
+      await screen.findByText('That did not work. Check the connection and try again.'),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole('header', { name: 'Invite not found' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
+    expect(props.onAccepted).not.toHaveBeenCalled();
+    expect(server.getInvite(code)?.status).toBe('open');
+  });
+
+  it('shows "did not load" with Try again for a BAD_REQUEST on load', async () => {
+    const { server } = setup();
+    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const invites: Invites = {
+      ...server.invitesFor(ME),
+      getInvite: () => Promise.reject({ code: 'BAD_REQUEST', message: 'refused' }),
+    };
+    await openInvite(code, invites);
+    expect(
+      await screen.findByRole('header', { name: 'The invite did not load' }),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+  });
+
+  it('turns the buttons on again after Accept, while the route opens the game', async () => {
+    const user = setupUser();
+    const { server } = setup();
+    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const props = await openInvite(code, server.invitesFor(ME));
+    await user.press(await screen.findByRole('button', { name: 'Accept' }));
+    expect(props.onAccepted).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeEnabled();
+  });
+
+  it('does nothing when the answer comes after the screen closed', async () => {
+    const user = setupUser();
+    const { server } = setup();
+    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const real = server.invitesFor(ME);
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const invites: Invites = {
+      ...real,
+      acceptInvite: (text) => gate.then(() => real.acceptInvite(text)),
+    };
+    const props = await openInvite(code, invites);
+    await user.press(await screen.findByRole('button', { name: 'Accept' }));
+    await props.unmount();
+    await act(async () => release());
+    // The server took the answer, but nothing opens a game for a closed screen.
+    expect(server.getInvite(code)?.status).toBe('accepted');
+    expect(props.onAccepted).not.toHaveBeenCalled();
+  });
+
   it('screen readers: focus moves to the title, and the invite is read', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent');
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
@@ -284,7 +350,8 @@ describe('inviteState', () => {
     expect(stateOfError(error('INVITE_EXPIRED'))).toEqual({ kind: 'expired' });
     expect(stateOfError(error('INVITE_CLOSED'))).toEqual({ kind: 'used' });
     expect(stateOfError(error('INVITE_NOT_FOUND'))).toEqual({ kind: 'notFound' });
-    expect(stateOfError(error('BAD_REQUEST'))).toEqual({ kind: 'notFound' });
+    // A bad code never reaches the server, so BAD_REQUEST is some other failure.
+    expect(stateOfError(error('BAD_REQUEST'))).toBeNull();
     expect(stateOfError(error('OWN_INVITE'))).toEqual({ kind: 'own' });
     expect(stateOfError(error('NOT_SIGNED_IN'))).toBeNull();
     expect(stateOfError(new Error('offline'))).toBeNull();

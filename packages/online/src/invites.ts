@@ -70,19 +70,35 @@ export function newInviteCode(rng: Rng): string {
  */
 export const MAX_CODE_TRIES = 10;
 
+/** The codes to try, one per clash: at most `MAX_CODE_TRIES`. */
+function* codeTries(rng: Rng): Generator<string> {
+  for (let i = 0; i < MAX_CODE_TRIES; i++) yield newInviteCode(rng);
+}
+
+function noFreeCode(): Error {
+  return new Error(`no free invite code after ${MAX_CODE_TRIES} tries`);
+}
+
 /**
  * A new code that `isTaken` says is free. On a clash it tries again with
- * a new code, up to `MAX_CODE_TRIES` times.
+ * a new code, up to `MAX_CODE_TRIES` times. The Convex server checks its
+ * table here.
  */
 export async function pickInviteCode(
   rng: Rng,
   isTaken: (code: string) => Promise<boolean>,
 ): Promise<string> {
-  for (let i = 0; i < MAX_CODE_TRIES; i++) {
-    const code = newInviteCode(rng);
-    if (!(await isTaken(code))) return code;
-  }
-  throw new Error(`no free invite code after ${MAX_CODE_TRIES} tries`);
+  for (const code of codeTries(rng)) if (!(await isTaken(code))) return code;
+  throw noFreeCode();
+}
+
+/**
+ * `pickInviteCode` for a server that can check a code at once, such as
+ * the in-memory server (its `createInvite` answers at once).
+ */
+export function pickInviteCodeNow(rng: Rng, isTaken: (code: string) => boolean): string {
+  for (const code of codeTries(rng)) if (!isTaken(code)) return code;
+  throw noFreeCode();
 }
 
 // ---------------------------------------------------------------------------

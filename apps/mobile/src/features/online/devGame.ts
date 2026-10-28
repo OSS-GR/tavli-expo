@@ -115,34 +115,56 @@ function playDevGame(gameId: string, options: DevBotOptions): DevGame {
 export interface DevInvite {
   /** The invite code, in capital letters. */
   readonly code: string;
+  /** Looks at the invite now: once it is accepted, the bot plays the game. */
+  check: () => void;
+  /** Stops looking. An invite that is still open is cancelled. */
   stop: () => void;
 }
+
+/** The dev invite that runs now, if any. */
+let currentInvite: DevInvite | null = null;
 
 /**
  * The bot makes an invite (#256). Every `DEV_TICK_MS` the dev invite
  * looks at it: once it is accepted, the bot plays the new game; once it
  * is declined or expired, it stops. The game or invite before it stops.
+ * A dev invite that stops while open is cancelled, so nobody can accept
+ * it later and wait for a bot that never comes.
  */
 export function startDevInvite(options: DevMatchOptions): DevInvite {
   current?.stop();
   const { server } = options;
   const code = server.createInvite(DEV_BOT_ID, options.choice, options.targetPoints, options.pace);
-  const timer = setInterval(() => {
+  const check = () => {
+    if (current !== invite) return;
     const view = server.getInvite(code);
     if (view?.status === 'open') return;
     invite.stop();
     // `playDevGame` becomes the running dev game.
     if (view?.status === 'accepted' && view.gameId !== null) playDevGame(view.gameId, options);
-  }, DEV_TICK_MS);
+  };
+  const timer = setInterval(check, DEV_TICK_MS);
   const invite: DevInvite = {
     code,
+    check,
     stop: () => {
       clearInterval(timer);
+      if (server.getInvite(code)?.status === 'open') server.cancelInvite(DEV_BOT_ID, code);
       if (current === invite) current = null;
+      if (currentInvite === invite) currentInvite = null;
     },
   };
   current = invite;
+  currentInvite = invite;
   return invite;
+}
+
+/**
+ * Looks at the running dev invite now, not on its next tick. The invite
+ * route calls it after Accept, so the bot starts at once.
+ */
+export function checkDevInvite(): void {
+  currentInvite?.check();
 }
 
 /**

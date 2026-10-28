@@ -25,7 +25,7 @@ turn timers and the data model.
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/online-game.ts`   | The game model: `onlineGameRules`, `createOnlineMatch`, `playTurn`, `answerPrompt`, `resign`, `timeOut`, `advance`, `toView`, `storeFlow` / `loadFlow`, the timer helpers `deadlineAfter` / `isTimedOut`, and `OnlineGameError`                                        |
 | `src/calls.ts`         | The call checks both servers share: `checkNewGame`, `checkCall` (game, caller, version), `checkViewer` (who may read a game), `callTimedOut` + `TIMED_OUT_ERROR`, `scheduledCheck` (the turn timer check), `nextDeadline`, `matchStatus`, `eventActor`, `SERVER_ACTOR` |
-| `src/invites.ts`       | The invite checks and codes (#252, moved here in #256): `newInviteCode`, `pickInviteCode`, `newInvite`, `checkAnswer`, `checkCancel`, `inviteStatus`, `toInviteView`, and `InviteError`                                                                                |
+| `src/invites.ts`       | The invite checks and codes (#252, moved here in #256): `newInviteCode`, `pickInviteCode`, `pickInviteCodeNow`, `newInvite`, `checkAnswer`, `checkCancel`, `inviteStatus`, `toInviteView`, and `InviteError`                                                           |
 | `src/memory-server.ts` | `createMemoryGameServer({ rng, now })`                                                                                                                                                                                                                                 |
 | `src/testing.ts`       | `@tavli/online/testing`, for tests only: `pickTurn`, `pickChoice`, `motherPin` (a Plakoto position for the mother question)                                                                                                                                            |
 
@@ -71,8 +71,10 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
   (`{ seq, version, actor, event }`, like the Convex `moves` rows).
   `replay(events.map((row) => row.event))` rebuilds the game.
 - **Invites** (#256): `createInvite(callerId, choice, targetPoints, pace)`
-  makes an open invite and returns its code (from the server's `rng`).
-  `invitesFor(playerId)` gives that player's `Invites` port
+  makes an open invite and returns its code (from the server's `rng`,
+  through `pickInviteCodeNow`, the at-once twin of `pickInviteCode`).
+  `cancelInvite(callerId, code)` takes an open invite back, like the
+  Convex `cancelInvite`. `invitesFor(playerId)` gives that player's `Invites` port
   (`getInvite`, `acceptInvite`, `declineInvite`), and `getInvite(code)`
   reads one invite. The checks are those of `invites.ts`, as on Convex.
   `acceptInvite` starts the game with `createGame` (the inviter plays

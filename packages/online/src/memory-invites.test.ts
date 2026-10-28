@@ -124,4 +124,23 @@ describe('in-memory invites', () => {
     await sent;
     expect(server.getInvite(code)?.status).toBe('declined');
   });
+
+  it('the inviter cancels an open invite; nobody can accept it then', async () => {
+    const { server } = setup();
+    const code = server.createInvite(ALICE, 'portes', 1, 'live');
+    expect(() => server.cancelInvite(BOB, code)).toThrow(
+      expect.objectContaining({ code: 'NOT_YOUR_INVITE' }),
+    );
+    server.cancelInvite(ALICE, code.toLowerCase());
+    expect(server.getInvite(code)?.status).toBe('cancelled');
+    await expect(server.invitesFor(BOB).acceptInvite(code)).rejects.toMatchObject({
+      code: 'INVITE_CLOSED',
+    });
+    expect(() => server.cancelInvite(ALICE, code)).toThrow(
+      expect.objectContaining({ code: 'INVITE_CLOSED' }),
+    );
+    expect(() => server.cancelInvite(ALICE, 'ABCD2345')).toThrow(
+      expect.objectContaining({ code: 'INVITE_NOT_FOUND' }),
+    );
+  });
 });

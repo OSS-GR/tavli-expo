@@ -51,6 +51,7 @@ export {
   newInvite,
   newInviteCode,
   pickInviteCode,
+  pickInviteCodeNow,
   toInviteView,
 } from './invites';
 export type { InviteRecord, NewInviteOptions } from './invites';

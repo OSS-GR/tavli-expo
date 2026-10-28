@@ -28,6 +28,10 @@ const LINK_FORMS = [
 /**
  * The invite code in `link`, in capital letters, or `null` when `link` is
  * not an invite link or its code is not a code.
+ *
+ * No route uses it yet: the router opens `tavlaki://invite/<code>` by
+ * itself. It is here for universal links and app links later, when an
+ * `https://tavlaki.com/i/<code>` link must be turned into the route.
  */
 export function inviteCodeFromLink(link: string): string | null {
   const text = link.trim();

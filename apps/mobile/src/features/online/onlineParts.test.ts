@@ -15,6 +15,7 @@ import { clockText, clockTickMs } from './clock';
 import {
   DEV_BOT_ID,
   DEV_TICK_MS,
+  checkDevInvite,
   devGameRunning,
   startDevGame,
   startDevInvite,
@@ -407,5 +408,57 @@ describe('startDevInvite (#256)', () => {
     await server.invitesFor('me').declineInvite(code);
     jest.advanceTimersByTime(DEV_TICK_MS);
     expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('checkDevInvite starts the bot at once after Accept, not on the next tick', async () => {
+    const { server, code } = devInvite();
+    const gameId = await server.invitesFor('me').acceptInvite(code);
+    checkDevInvite();
+    // No time has passed, and the dev game of the invite runs.
+    expect(devGameRunning()).toBe(true);
+    stopDevGame(gameId);
+    expect(devGameRunning()).toBe(false);
+  });
+
+  it('checkDevInvite leaves an open invite alone', () => {
+    const { server, code } = devInvite();
+    checkDevInvite();
+    expect(server.getInvite(code)?.status).toBe('open');
+    expect(devGameRunning()).toBe(true);
+  });
+
+  it('cancels an open invite when it stops, so a late Accept is refused', async () => {
+    const { server, code } = devInvite();
+    stopAnyDevGame();
+    expect(server.getInvite(code)?.status).toBe('cancelled');
+    await expect(server.invitesFor('me').acceptInvite(code)).rejects.toMatchObject({
+      code: 'INVITE_CLOSED',
+    });
+  });
+
+  it('cancels the old invite when a new invite or a dev game starts', () => {
+    const first = devInvite();
+    const second = devInvite();
+    expect(first.server.getInvite(first.code)?.status).toBe('cancelled');
+    expect(second.server.getInvite(second.code)?.status).toBe('open');
+    startDevGame({
+      server: second.server,
+      me: 'me',
+      choice: 'portes',
+      pace: 'live',
+      targetPoints: 1,
+      difficulty: botLevels.portes[0]!,
+      runner: botRunner,
+      rng: createSeededRng(2),
+      timing: { thinkMs: () => 0 },
+    });
+    expect(second.server.getInvite(second.code)?.status).toBe('cancelled');
+  });
+
+  it('keeps an accepted invite as it is when it stops', async () => {
+    const { server, code } = devInvite();
+    await server.invitesFor('me').acceptInvite(code);
+    stopAnyDevGame();
+    expect(server.getInvite(code)?.status).toBe('accepted');
   });
 });

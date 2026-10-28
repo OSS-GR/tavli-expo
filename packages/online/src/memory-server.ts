@@ -48,10 +48,10 @@ import {
 import type { SavedGame } from './calls';
 import {
   InviteError,
-  MAX_CODE_TRIES,
   checkAnswer,
+  checkCancel,
   newInvite,
-  newInviteCode,
+  pickInviteCodeNow,
   toInviteView,
 } from './invites';
 import type { InviteRecord } from './invites';
@@ -117,6 +117,12 @@ export interface MemoryGameServer {
     targetPoints: number,
     pace: OnlineGamePace,
   ): string;
+  /**
+   * The inviter takes back an open invite, like the Convex `cancelInvite`.
+   * Throws an `InviteError` (`INVITE_NOT_FOUND`, `INVITE_EXPIRED`,
+   * `INVITE_CLOSED`, `NOT_YOUR_INVITE`, `BAD_REQUEST`).
+   */
+  cancelInvite(callerId: string, code: string): void;
   /**
    * The invites of `playerId`: every call comes from that player, as with
    * `transportFor`. `acceptInvite` starts the game as the Convex
@@ -422,15 +428,16 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     createGame,
 
     createInvite(callerId, choice, targetPoints, pace) {
-      // As `pickInviteCode`: a new code on a clash, up to `MAX_CODE_TRIES` times.
-      for (let i = 0; i < MAX_CODE_TRIES; i++) {
-        const code = newInviteCode(rng);
-        if (invites.has(code)) continue;
-        const options = { from: callerId, choice, targetPoints, pace };
-        invites.set(code, newInvite(options, code, now()));
-        return code;
-      }
-      throw new Error(`no free invite code after ${MAX_CODE_TRIES} tries`);
+      const code = pickInviteCodeNow(rng, (taken) => invites.has(taken));
+      const options = { from: callerId, choice, targetPoints, pace };
+      invites.set(code, newInvite(options, code, now()));
+      return code;
+    },
+
+    cancelInvite(callerId, text) {
+      const invite = loadInvite(text);
+      checkCancel(invite, callerId, now());
+      invites.set(invite.code, { ...invite, status: 'cancelled' });
     },
 
     invitesFor,
