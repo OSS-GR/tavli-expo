@@ -73,7 +73,8 @@ The workflow is `.github/workflows/ci.yml`. Its jobs run at the same time (#248)
 | --- | --- |
 | `changes` | Looks for a docs-only change (see below). |
 | `static` | `expo install --check`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check` |
-| `test-packages` | `pnpm -r --filter '!@tavli/mobile' test` (Vitest; the bot is most of it) |
+| `test-packages` | `pnpm -r --filter '!@tavli/mobile' --filter '!@tavli/bot' test` (Vitest) |
+| `test-bot` | `pnpm --filter @tavli/bot test`, the longest package, on its own runner (#287) |
 | `test-app (1/2)`, `test-app (2/2)` | `jest --shard=i/2` in `apps/mobile`. `apps/mobile/test/shardSequencer.js` splits the files by size, so both halves take about the same time. |
 | `checks` | Fails if any job above failed or was cancelled. |
 
@@ -81,7 +82,11 @@ Each job runs `pnpm install --frozen-lockfile` first (`.github/actions/setup`).
 
 Node comes from `.nvmrc`. pnpm comes from `packageManager` in `package.json`. The pnpm store is cached between runs.
 
-Run the same commands on your machine before you push (`pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`). If they pass locally, they should pass in CI.
+**Before you push (#287):** run `pnpm lint`, `pnpm typecheck`, `pnpm format:check` and `pnpm test:changed`. CI runs every test on every push, so do not wait for a full local `pnpm test` each time.
+
+- `pnpm test:changed` runs Vitest in the packages changed since `origin/main` and in the packages that depend on them, then the app's Jest tests related to the changed app files (`jest --changedSince=origin/main`). Run `git fetch origin main` first.
+- The app's Jest does not follow changes in other packages. When you change something many tests use (engine rules, the bot, `packages/contracts`, `apps/mobile/test/*`, `jest.setup.ts`), run the app's tests too (`pnpm --filter @tavli/mobile test`) or the full `pnpm test`.
+- When CI fails, run the failing file locally, fix it, and push again.
 
 **Docs-only changes:** if a PR only changes files in `docs/` or Markdown in `.github/`, the `changes` job skips the other jobs and `checks` passes. Other Markdown files (like `README.md` and `CLAUDE.md`) still run all checks, because Prettier checks them. We do not use `paths-ignore`: it would skip the workflow, so a required check would never report and the PR would wait forever.
 

@@ -24,13 +24,19 @@
  * The caller is the signed-in user (#131): every public function reads
  * the player id from `ctx.auth` (`signedInPlayer`), and no public call
  * takes a player id. Each call checks that the caller may act. `getGame` answers
- * only the two players.
+ * only the two players, and `listMyGames` (#296) lists only the caller's games.
  */
 
 import { ConvexError, v } from 'convex/values';
 import type { Infer } from 'convex/values';
 
-import type { GameTransportErrorData, OnlineGamePace, OnlineGameView } from '@tavli/contracts';
+import { MAX_LISTED_GAMES } from '@tavli/contracts';
+import type {
+  GameSummary,
+  GameTransportErrorData,
+  OnlineGamePace,
+  OnlineGameView,
+} from '@tavli/contracts';
 import { serializeRules } from '@tavli/engine';
 import type { MatchFlow, MoveInput, PlayerId } from '@tavli/engine';
 import {
@@ -44,6 +50,7 @@ import {
   checkViewer,
   createOnlineMatch,
   eventActor,
+  latestGames,
   loadFlow,
   matchStatus,
   nextDeadline,
@@ -51,6 +58,7 @@ import {
   resign as resignMatch,
   scheduledCheck,
   storeFlow,
+  summarizeGame,
   timeOut,
   toView,
 } from '@tavli/online';
@@ -58,12 +66,12 @@ import {
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
-import type { MutationCtx } from './_generated/server';
+import type { MutationCtx, QueryCtx } from './_generated/server';
 import { signedInPlayer } from './caller';
 import { createCryptoRng } from './model/cryptoRng';
 import { turnWait } from './model/push';
 import { scheduleTurnPush } from './push';
-import { gameChoice, gamePace } from './schema';
+import { gameChoice, gamePace, gameStatus } from './schema';
 
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
 function reject(error: OnlineGameError): never {
@@ -165,7 +173,13 @@ async function save(
   const version = game.version + 1;
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
   const turnDeadline = await startClock(ctx, game._id, version, game.pace, flow, now);
-  await ctx.db.patch(game._id, { ...gameFields(flow), version, eventCount, turnDeadline });
+  await ctx.db.patch(game._id, {
+    ...gameFields(flow),
+    version,
+    eventCount,
+    turnDeadline,
+    updatedAt: now,
+  });
   await scheduleTurnPush(ctx, game, version, turnWait(before), turnWait(flow), callerId);
   return version;
 }
@@ -254,6 +268,7 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
     createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
   );
   const version = 1;
+  const now = Date.now();
   const gameId = await ctx.db.insert('games', {
     players,
     choice,
@@ -264,9 +279,10 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
     version,
     eventCount: 0,
     turnDeadline: null,
+    updatedAt: now,
   });
   const eventCount = await writeEvents(ctx, gameId, 0, version, callerId, flow);
-  const turnDeadline = await startClock(ctx, gameId, version, pace, flow, Date.now());
+  const turnDeadline = await startClock(ctx, gameId, version, pace, flow, now);
   await ctx.db.patch(gameId, { eventCount, turnDeadline });
   // Nobody was waited for before. The caller started the game and is in
   // the app, so only the other player can get a push.
@@ -391,6 +407,19 @@ export const checkTimeout = internalMutation({
   },
 });
 
+/** The view input of a stored game (`toView`, `summarizeGame`). */
+function viewInput(game: Doc<'games'>) {
+  return {
+    gameId: game._id,
+    version: game.version,
+    choice: game.choice,
+    pace: game.pace,
+    turnDeadline: game.turnDeadline,
+    players: game.players,
+    flow: loadFlow(game.flow),
+  };
+}
+
 /**
  * The game as a client may see it, or `null` when there is no such game.
  * It never holds dice that are not rolled yet. Both players watch this
@@ -404,14 +433,49 @@ export const getGame = query({
     const loaded = await ctx.db.get(gameId);
     const game = guarded(() => checkViewer(loaded, callerId));
     if (game === null) return null;
-    return toView({
-      gameId: game._id,
-      version: game.version,
-      choice: game.choice,
-      pace: game.pace,
-      turnDeadline: game.turnDeadline,
-      players: game.players,
-      flow: loadFlow(game.flow),
-    });
+    return toView(viewInput(game));
+  },
+});
+
+/**
+ * The newest `MAX_LISTED_GAMES` games of `callerId` on one side with
+ * `status`, from that side's index, newest change first.
+ */
+async function gamesOnSide(
+  ctx: QueryCtx,
+  index: 'by_white' | 'by_black',
+  callerId: string,
+  status: Doc<'games'>['status'],
+): Promise<Doc<'games'>[]> {
+  const field = index === 'by_white' ? 'players.white' : 'players.black';
+  return await ctx.db
+    .query('games')
+    .withIndex(index, (q) => q.eq(field, callerId).eq('status', status))
+    .order('desc')
+    .take(MAX_LISTED_GAMES);
+}
+
+/**
+ * The caller's games with `status` (#296), newest change first, at most
+ * `MAX_LISTED_GAMES`. It reads the newest of each side's index
+ * (`by_white`, `by_black`) and keeps the newest of both. A summary tells
+ * nothing about the other player but their side (`summarizeGame`).
+ */
+export const listMyGames = query({
+  args: { status: gameStatus },
+  handler: async (ctx, { status }): Promise<GameSummary[]> => {
+    const callerId = await signedInPlayer(ctx);
+    const [asWhite, asBlack] = await Promise.all([
+      gamesOnSide(ctx, 'by_white', callerId, status),
+      gamesOnSide(ctx, 'by_black', callerId, status),
+    ]);
+    return latestGames(
+      [...asWhite, ...asBlack].map((game) =>
+        summarizeGame(
+          { ...viewInput(game), updatedAt: game.updatedAt ?? game._creationTime },
+          callerId,
+        ),
+      ),
+    );
   },
 });

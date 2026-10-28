@@ -7,17 +7,20 @@
  *   }
  *
  * Make a new subject for each check. A check rejects with an `Error` when
- * the transport breaks the contract. The checks never wait on a clock:
- * they call `subject.settle()` in a loop while they wait for a view.
+ * the transport breaks the contract. The checks never wait on a real
+ * clock: they call `subject.settle()` in a loop while they wait for a
+ * view, and `subject.passTime()` to move the server clock.
  */
 import type { MoveInput, PlayerId } from '@tavli/engine';
 
 import { isGameTransportErrorData } from '../game-transport';
 import type {
+  GameSummary,
   GameTransport,
   GameTransportErrorCode,
   OnlineGameChoice,
   OnlineGamePace,
+  OnlineGameStatus,
   OnlineGameView,
 } from '../game-transport';
 
@@ -36,12 +39,23 @@ export interface GameTransportContractSubject {
    * `playOn`. (`motherPin` in `@tavli/online/testing` builds the position.)
    */
   readonly createMotherQuestion: () => Promise<string>;
+  /**
+   * Creates a Portes game (1 point, live) that White is not in: the player
+   * `black` plays the white side, the stranger the black side. Resolves
+   * to its id.
+   */
+  readonly createOtherGame: () => Promise<string>;
   /** An id that names no game. */
   readonly missingGameId: () => Promise<string>;
   /** The transport of one side, or of a caller who is neither player. */
   readonly transportFor: (who: PlayerId | 'stranger') => GameTransport;
   /** A legal full turn for `view.waitingFor` (the contract has no engine at run time). */
   readonly legalTurn: (view: OnlineGameView) => readonly MoveInput[];
+  /**
+   * Moves the server clock forward by `ms` (a few seconds at most, far
+   * less than a turn). Never wait on a real clock here.
+   */
+  readonly passTime: (ms: number) => Promise<void>;
   /**
    * Lets the transport deliver. The checks call it in a loop while they
    * wait for a view, and a few times to show that no view comes. Default:
@@ -180,6 +194,43 @@ async function startGame(subject: GameTransportContractSubject, gameId: string) 
   const view = await firstView(subject, black);
   return { gameId, watchers, view };
 }
+
+/** The ids of the caller's games with `status`, in the order the transport lists them. */
+async function listedIds(transport: GameTransport, status: OnlineGameStatus): Promise<string[]> {
+  return (await transport.listMyGames({ status })).map((summary) => summary.gameId);
+}
+
+/** The summary of `gameId` in the caller's list of `status`. Throws when it is not there. */
+async function summaryOf(
+  transport: GameTransport,
+  status: OnlineGameStatus,
+  gameId: string,
+): Promise<GameSummary> {
+  const summary = (await transport.listMyGames({ status })).find((s) => s.gameId === gameId);
+  if (summary === undefined) throw new Error(`game ${gameId} is not in the ${status} list`);
+  return summary;
+}
+
+/** The summary must match the view that `side` sees. */
+function sameAsView(summary: GameSummary, view: OnlineGameView, side: PlayerId): void {
+  same(summary.gameId, view.gameId, 'summary.gameId');
+  same(summary.status, view.status, 'summary.status');
+  same(summary.choice, view.choice, 'summary.choice');
+  same(summary.presetId, view.match.rules.presetId, 'summary.presetId');
+  same(summary.variant, view.game.state.variant, 'summary.variant');
+  same(summary.targetPoints, view.match.targetPoints, 'summary.targetPoints');
+  same(summary.pace, view.pace, 'summary.pace');
+  same(summary.mySide, side, 'summary.mySide');
+  same(summary.waitingFor, view.waitingFor, 'summary.waitingFor');
+  same(summary.myTurn, view.waitingFor === side, 'summary.myTurn');
+  same(summary.score, view.match.score, 'summary.score');
+  same(summary.winner, view.match.winner, 'summary.winner');
+  same(summary.turnDeadline, view.turnDeadline, 'summary.turnDeadline');
+  if (typeof summary.updatedAt !== 'number') throw new Error('summary.updatedAt is not a number');
+}
+
+/** One second: the checks move the clock between changes, so each change has its own time. */
+const TICK_MS = 1000;
 
 export function gameTransportContract(): GameTransportContractCheck[] {
   return [
@@ -485,6 +536,106 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         const after = await viewAt(subject, watchers.black, view.version + 1);
         same(after.version, view.version + 1, 'version after the turn');
         same(watchers.black.views[0]?.version, view.version, 'Black first view');
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
+      name: 'listMyGames lists only my own games, newest first',
+      run: async (subject) => {
+        same(
+          await listedIds(subject.transportFor('stranger'), 'active'),
+          [],
+          'a list with no games',
+        );
+        const first = await subject.createGame(PORTES);
+        await subject.passTime(TICK_MS);
+        const second = await subject.createGame({
+          choice: 'fevga',
+          targetPoints: 5,
+          pace: 'async',
+        });
+        await subject.passTime(TICK_MS);
+        const other = await subject.createOtherGame();
+        same(
+          await listedIds(subject.transportFor('white'), 'active'),
+          [second, first],
+          'White games',
+        );
+        same(
+          await listedIds(subject.transportFor('black'), 'active'),
+          [other, second, first],
+          'Black games',
+        );
+        same(
+          await listedIds(subject.transportFor('stranger'), 'active'),
+          [other],
+          'stranger games',
+        );
+        // Each summary says what the player's own view says.
+        const { watchers, view } = await startGame(subject, second);
+        sameAsView(await summaryOf(subject.transportFor('white'), 'active', second), view, 'white');
+        sameAsView(await summaryOf(subject.transportFor('black'), 'active', second), view, 'black');
+        // In the other game, Black plays the white side.
+        const otherWatcher = watch(subject.transportFor('black'), other);
+        const otherView = await firstView(subject, otherWatcher);
+        sameAsView(
+          await summaryOf(subject.transportFor('black'), 'active', other),
+          otherView,
+          'white',
+        );
+        otherWatcher.stop();
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
+      name: 'listMyGames puts the game with the last change first',
+      run: async (subject) => {
+        const first = await subject.createGame(PORTES);
+        await subject.passTime(TICK_MS);
+        const second = await subject.createGame(PORTES);
+        await subject.passTime(TICK_MS);
+        const before = await summaryOf(subject.transportFor('white'), 'active', first);
+        const { watchers, view } = await startGame(subject, first);
+        await subject.transportFor(waiting(view)).sendTurn({
+          gameId: first,
+          expectedVersion: view.version,
+          moves: subject.legalTurn(view),
+        });
+        const after = await viewAt(subject, watchers.white, view.version + 1);
+        same(await listedIds(subject.transportFor('white'), 'active'), [first, second], 'order');
+        const summary = await summaryOf(subject.transportFor('white'), 'active', first);
+        if (!(summary.updatedAt > before.updatedAt)) {
+          throw new Error(`updatedAt did not move on: ${before.updatedAt} → ${summary.updatedAt}`);
+        }
+        sameAsView(summary, after, 'white');
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
+      name: 'listMyGames filters by status: a finished game moves to finished',
+      run: async (subject) => {
+        const first = await subject.createGame(PORTES);
+        await subject.passTime(TICK_MS);
+        const second = await subject.createGame(PORTES);
+        same(await listedIds(subject.transportFor('white'), 'finished'), [], 'finished at start');
+        const { watchers, view } = await startGame(subject, first);
+        await subject.passTime(TICK_MS);
+        await subject.transportFor('black').resign(first);
+        const after = await viewAt(subject, watchers.white, view.version + 1);
+        for (const who of ['white', 'black'] as const) {
+          const transport = subject.transportFor(who);
+          same(await listedIds(transport, 'active'), [second], `${who} active games`);
+          same(await listedIds(transport, 'finished'), [first], `${who} finished games`);
+        }
+        const summary = await summaryOf(subject.transportFor('white'), 'finished', first);
+        sameAsView(summary, after, 'white');
+        same(summary.status, 'finished', 'summary.status');
+        same(summary.winner, 'white', 'summary.winner');
+        same(summary.myTurn, false, 'summary.myTurn');
+        same(summary.turnDeadline, null, 'summary.turnDeadline');
         watchers.white.stop();
         watchers.black.stop();
       },
