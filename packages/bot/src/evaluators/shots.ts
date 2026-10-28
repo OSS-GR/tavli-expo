@@ -16,17 +16,10 @@
  * `noHitAndRunInHome`. They change the count very rarely.
  */
 
+import { DISTINCT_ROLLS } from '@tavli/engine';
+
 import { BAR } from './portes-board';
 import type { Side } from './portes-board';
-
-/** The 21 different rolls: [die 1, die 2, how many of the 36 rolls]. */
-const ROLLS: readonly (readonly [number, number, number])[] = (() => {
-  const rolls: [number, number, number][] = [];
-  for (let a = 1; a <= 6; a += 1) {
-    for (let b = a; b <= 6; b += 1) rolls.push([a, b, a === b ? 1 : 2]);
-  }
-  return rolls;
-})();
 
 export interface ShotCount {
   /** Rolls out of 36 that hit at least one blot. */
@@ -84,7 +77,10 @@ export function countShots(roller: Side, waiter: Side): ShotCount {
     }
   };
 
-  for (const [a, b, weight] of ROLLS) {
+  for (const { dice, weight: chance } of DISTINCT_ROLLS) {
+    // `dice` is [high, low]. `weight` counts the roll out of 36: 1 or 2.
+    const [b, a] = dice;
+    const weight = chance * 36;
     for (const p of blots) hit[p] = false;
 
     if (a === b) {

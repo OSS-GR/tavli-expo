@@ -24,6 +24,8 @@
  * is left for the hard bot (a precomputed file, #52).
  */
 
+import { DISTINCT_ROLLS } from '@tavli/engine';
+
 import { OFF } from './portes-board';
 import type { Side } from './portes-board';
 
@@ -102,14 +104,14 @@ export function endPositions(key: number, a: number, b: number): number[] {
   return layer;
 }
 
-/** The 21 different rolls with their weight out of 36. */
-const ROLLS: readonly (readonly [number, number, number])[] = (() => {
-  const rolls: [number, number, number][] = [];
-  for (let a = 1; a <= 6; a += 1) {
-    for (let b = a; b <= 6; b += 1) rolls.push([a, b, a === b ? 1 : 2]);
-  }
-  return rolls;
-})();
+/**
+ * The 21 rolls ordered by the low die, then the high die (1-1, 2-1, 3-1, …,
+ * 6-6). The table sums floats roll by roll, and this order keeps every
+ * number bit for bit as it was before `DISTINCT_ROLLS` (#226).
+ */
+const ROLLS_LOW_FIRST = [...DISTINCT_ROLLS].sort(
+  (x, y) => x.dice[1] - y.dice[1] || x.dice[0] - y.dice[0],
+);
 
 function rollsToFinish(key: number): Float64Array {
   const known = table.get(key);
@@ -118,15 +120,16 @@ function rollsToFinish(key: number): Float64Array {
   if (key === 0) {
     dist[0] = 1;
   } else {
-    for (const [a, b, weight] of ROLLS) {
-      // Play the roll that finishes fastest on average.
+    for (const { dice, weight: share } of ROLLS_LOW_FIRST) {
+      // Play the roll that finishes fastest on average. `dice` is [high, low]:
+      // pass the low die first, so a tie in the mean keeps the same play.
+      const [high, low] = dice;
       let best: Float64Array | undefined;
-      for (const after of endPositions(key, a, b)) {
+      for (const after of endPositions(key, low, high)) {
         const next = rollsToFinish(after);
         if (best === undefined || (next[MEAN] ?? 0) < (best[MEAN] ?? 0)) best = next;
       }
       if (best === undefined) continue;
-      const share = weight / 36;
       for (let k = 0; k < MAX_ROLLS; k += 1)
         dist[k + 1] = (dist[k + 1] ?? 0) + (best[k] ?? 0) * share;
       dist[MAX_ROLLS] = (dist[MAX_ROLLS] ?? 0) + (best[MAX_ROLLS] ?? 0) * share;

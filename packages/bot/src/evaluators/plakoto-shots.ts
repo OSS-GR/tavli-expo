@@ -16,17 +16,10 @@
  * ignores the "use as much of the roll as possible" rules.
  */
 
+import { DISTINCT_ROLLS } from '@tavli/engine';
+
 import { PINNED } from './plakoto-board';
 import type { PlakotoSide } from './plakoto-board';
-
-/** The 21 different rolls: [die 1, die 2, how many of the 36 rolls]. */
-const ROLLS: readonly (readonly [number, number, number])[] = (() => {
-  const rolls: [number, number, number][] = [];
-  for (let a = 1; a <= 6; a += 1) {
-    for (let b = a; b <= 6; b += 1) rolls.push([a, b, a === b ? 1 : 2]);
-  }
-  return rolls;
-})();
 
 export interface PlakotoShots {
   /** Rolls out of 36 that pin at least one checker. */
@@ -72,7 +65,10 @@ export function countPlakotoShots(roller: PlakotoSide, waiter: PlakotoSide): Pla
 
   const hit: boolean[] = new Array<boolean>(25).fill(false);
   let any = 0;
-  for (const [a, b, weight] of ROLLS) {
+  for (const { dice, weight: chance } of DISTINCT_ROLLS) {
+    // `dice` is [high, low]. `weight` counts the roll out of 36: 1 or 2.
+    const [b, a] = dice;
+    const weight = chance * 36;
     for (const p of blots) hit[p] = false;
     if (a === b) {
       for (const s of from) {
