@@ -50,7 +50,6 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
   const haptics = useSettings((s) => s.haptics);
   const language = useSettings((s) => s.language);
   const autoConfirmMoves = useSettings((s) => s.autoConfirmMoves);
-  const showPipCounts = useSettings((s) => s.showPipCounts);
   const showHints = useSettings((s) => s.showHints);
   const boardFlipMode = useSettings((s) => s.boardFlipMode);
   const theme = useSettings((s) => s.theme);
@@ -112,13 +111,6 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
           hint={t('settings.autoConfirm.hint')}
           value={autoConfirmMoves}
           onValueChange={(value) => setSetting('autoConfirmMoves', value)}
-        />
-        <ToggleRow
-          testID="settings-pip-counts"
-          label={t('settings.pipCounts.label')}
-          hint={t('settings.pipCounts.hint')}
-          value={showPipCounts}
-          onValueChange={(value) => setSetting('showPipCounts', value)}
         />
         <ToggleRow
           testID="settings-hints"

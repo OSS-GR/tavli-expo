@@ -29,11 +29,24 @@ describe('<SettingsScreen />', () => {
     expect(screen.getByRole('switch', { name: 'Sound' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Haptics' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Auto-confirm moves' })).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Show pip counts' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Show hints' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Phone language' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Flip' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Face-to-face' })).toBeDisabled();
+  });
+
+  it('has no pip count row (#238), in English and in Greek', async () => {
+    const user = userEvent.setup();
+    await render(<SettingsScreen />);
+    expect(screen.queryByTestId('settings-pip-counts')).toBeNull();
+    expect(screen.queryByText(/pip/i)).toBeNull();
+
+    await user.press(screen.getByRole('radio', { name: 'Ελληνικά' }));
+    expect(await screen.findByRole('header', { name: 'Παιχνίδι' })).toBeOnTheScreen();
+    expect(screen.queryByText('Μετρητής πόντων')).toBeNull();
+
+    await user.press(screen.getByRole('radio', { name: 'Γλώσσα κινητού' }));
+    expect(await screen.findByRole('switch', { name: 'Sound' })).toBeOnTheScreen();
   });
 
   it('switches to Greek at once when the user picks Ελληνικά', async () => {

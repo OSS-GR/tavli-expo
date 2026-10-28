@@ -60,10 +60,6 @@
       "label": "Auto-confirm moves",
       "hint": "End the turn when all dice are used"
     },
-    "pipCounts": {
-      "label": "Show pip counts",
-      "hint": "How many pips each player needs to bear off"
-    },
     "hints": {
       "label": "Show hints",
       "hint": "A Hint button shows the best move for your roll"
@@ -274,8 +270,6 @@
       }
     },
     "strip": {
-      "pips": "Pips {{count}}",
-      "pipsLabel": "{{count}} pips to go",
       "scoreLabel": "{{score}} of {{target}} points",
       "turn": "Your turn",
       "playing": "Playing",

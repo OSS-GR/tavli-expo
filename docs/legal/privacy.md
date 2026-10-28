@@ -6,7 +6,7 @@ This is not legal advice. The owner should have a lawyer or a GDPR expert check 
 
 # Tavlaki privacy policy
 
-**Last updated:** 27 October 2026
+**Last updated:** 28 October 2026
 
 Ελληνικά: [tavlaki.com/el/privacy](https://tavlaki.com/el/privacy)
 
@@ -31,7 +31,7 @@ Contact: **privacy@tavlaki.com** <!-- OWNER: confirm this address works before p
 
 The app saves these things on your phone only. They never leave it.
 
-- **Your settings:** sound, haptics, language, board theme, board turn, auto-confirm, pip counts.
+- **Your settings:** sound, haptics, language, board theme, board turn, auto-confirm.
 - **Your games:** the match you are playing, so you can go back to it, and your last choices on the New game screen. In pass-and-play, this includes the player names you type. Names are never sent anywhere.
 - **Your privacy answer** (allow or don't allow).
 - **An install id:** a random code, made on your phone. It is not your name, email, phone number or a device id. It does not come from your phone's hardware. The app makes it only after you tap **Allow usage data**.

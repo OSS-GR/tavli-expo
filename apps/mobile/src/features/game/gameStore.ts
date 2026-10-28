@@ -17,7 +17,6 @@ import {
   getPreset,
   legalNextMoves,
   matchPhase,
-  pipCount,
   remainingDice,
   type BoardState,
   type DieValue,
@@ -155,7 +154,6 @@ export interface TurnView {
   readonly dice: readonly DieView[];
   readonly canConfirm: boolean;
   readonly canUndo: boolean;
-  readonly pips: PerPlayer<number>;
 }
 
 /**
@@ -181,7 +179,6 @@ export function diceView(
 export function turnView(flow: MatchFlow): TurnView {
   const game = flow.game;
   const board = currentBoard(game);
-  const direction = game.state.rules.movement.direction;
   const roll = game.state.dice;
   const rolled = roll !== null && (game.phase === 'moving' || game.phase === 'awaiting-confirm');
   return {
@@ -194,9 +191,5 @@ export function turnView(flow: MatchFlow): TurnView {
     dice: rolled ? diceView(roll, remainingDice(game)) : [],
     canConfirm: canConfirm(game),
     canUndo: canUndo(game),
-    pips: {
-      white: pipCount(board, 'white', direction),
-      black: pipCount(board, 'black', direction),
-    },
   };
 }

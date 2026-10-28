@@ -23,7 +23,6 @@ describe('settings store', () => {
     expect(state.haptics).toBe(true);
     expect(state.language).toBe('system');
     expect(state.autoConfirmMoves).toBe(false);
-    expect(state.showPipCounts).toBe(true);
     // Hints (#209) start on.
     expect(state.showHints).toBe(true);
     expect(state.boardFlipMode).toBe('flip');
@@ -51,7 +50,6 @@ describe('settings store', () => {
     const first = createSettingsStore(storage);
     first.getState().setSetting('autoConfirmMoves', true);
     first.getState().setSetting('boardFlipMode', 'fixed');
-    first.getState().setSetting('showPipCounts', false);
     first.getState().setSetting('showHints', false);
     first.getState().setSetting('moveList', 'on');
 
@@ -59,7 +57,6 @@ describe('settings store', () => {
     expect(second.getState()).toMatchObject({
       autoConfirmMoves: true,
       boardFlipMode: 'fixed',
-      showPipCounts: false,
       showHints: false,
       moveList: 'on',
     });
@@ -104,6 +101,26 @@ describe('settings store', () => {
     expect(store.getState()).toMatchObject(DEFAULT_SETTINGS);
   });
 
+  it('loads a save with the removed pip count setting (#238) and drops it', () => {
+    const storage = createMemoryStorage({
+      [SETTINGS_STORAGE_KEY]: JSON.stringify({
+        version: SETTINGS_VERSION,
+        state: { ...DEFAULT_SETTINGS, showPipCounts: false, autoConfirmMoves: true },
+      }),
+    });
+
+    const store = createSettingsStore(storage);
+    expect(store.getState()).not.toHaveProperty('showPipCounts');
+    expect(store.getState()).toMatchObject({ ...DEFAULT_SETTINGS, autoConfirmMoves: true });
+
+    // The next save leaves it out.
+    store.getState().setSetting('sound', false);
+    expect(savedJson(storage)).toEqual({
+      version: SETTINGS_VERSION,
+      state: { ...DEFAULT_SETTINGS, autoConfirmMoves: true, sound: false },
+    });
+  });
+
   it('migrates a save from an older version', () => {
     const storage = createMemoryStorage({
       [SETTINGS_STORAGE_KEY]: JSON.stringify({ version: 0, state: { sound: false } }),
@@ -127,6 +144,14 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ extra: 1, sound: false })).toEqual({
       ...DEFAULT_SETTINGS,
       sound: false,
+    });
+  });
+
+  it('drops the removed pip count setting (#238), whatever its value', () => {
+    expect(sanitizeSettings({ showPipCounts: false })).toEqual(DEFAULT_SETTINGS);
+    expect(sanitizeSettings({ showPipCounts: 'yes', haptics: false })).toEqual({
+      ...DEFAULT_SETTINGS,
+      haptics: false,
     });
   });
 });

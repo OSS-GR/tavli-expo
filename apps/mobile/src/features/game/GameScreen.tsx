@@ -201,7 +201,6 @@ export function GameScreen({
   const matchKey = useGameStore(store, (s) => s.matchKey);
   const flipMode = useSettings((s) => s.boardFlipMode);
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
-  const showPips = useSettings((s) => s.showPipCounts);
   const showHints = useSettings((s) => s.showHints);
   const showMoveList = useMoveListShown();
   const { layout, column, spaceKey } = useScreenLayout();
@@ -1063,7 +1062,6 @@ export function GameScreen({
       name={seats[player].label}
       turnLabel={seats[player].turnLabel}
       checker={theme.checkers[toneOf(player)]}
-      pips={showPips ? view.pips[player] : null}
       note={stripNote(player)}
       score={match.score[player]}
       target={match.targetPoints}

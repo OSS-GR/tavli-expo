@@ -8,7 +8,7 @@
 - Both layouts: one-line strips (36 pt), the dice on the board (in the theme's dice area, at least 32 pt so they are easy to read), one row of two big buttons (Undo · Confirm, or one Roll) at the bottom. Every text stays upright.
 - Tall: the menu sits in the top strip and the game label moves into the menu. Classic: the menu and the game label sit at the top; the strips hug the board.
 - How it is built: [Board screen → Board layouts](../architecture/board-screen.md#board-layouts-184).
-- **Landscape (#185): built as drawn below.** Only the game screen and the tutorial board turn with the phone; every other screen stays upright. The classic board sits in the middle; the left column holds the menu, both players and Undo, the right column the game label, the dice and Roll or Confirm. Changes from the picture: the columns are 128 pt (not 96 pt), so Greek "Επιβεβαίωση" fits on one line; the board is then a little smaller (checker 25 pt on the SE, 35 pt on the Pro Max). The strips show the color and the score on the first line, then the pill, the name and the pips. How it is built: [Board screen → Landscape](../architecture/board-screen.md#landscape-185).
+- **Landscape (#185): built as drawn below.** Only the game screen and the tutorial board turn with the phone; every other screen stays upright. The classic board sits in the middle; the left column holds the menu, both players and Undo, the right column the game label, the dice and Roll or Confirm. Changes from the picture: the columns are 128 pt (not 96 pt), so Greek "Επιβεβαίωση" fits on one line; the board is then a little smaller (checker 25 pt on the SE, 35 pt on the Pro Max). The strips show the color and the score on the first line, then the pill and the name (no pip count since #238). How it is built: [Board screen → Landscape](../architecture/board-screen.md#landscape-185).
 
 ## How to read the pictures
 
@@ -111,7 +111,7 @@ Points to solve when we build it (all solved in #185):
 3. **Landscape sides:** players on the left and the dice on the right, as drawn? Do left-handed players need a "swap sides" setting? **#185: as drawn. No "swap sides" setting yet.**
 4. **Dice:** on the board (A, B) or in the button row (today)? On the board they are smaller unless we raise the theme's dice size. **Answered: on the board (#184); the app draws them at least 32 pt.**
 5. **Proposal A only:** what goes into the free space: the match score, the last moves, the move list, or nothing? **For now nothing (#184): the board is centred, so the free space is split above and below it.**
-6. **Strips:** one line is enough (name, pips, checkers off, score, turn)? The match score and "checkers off" can also move to the menu. **#184: one line with the name, pips, score and turn (no "checkers off": the trays show them). A long name, Greek or a large font wraps it to two lines.**
+6. **Strips:** one line is enough (name, pips, checkers off, score, turn)? The match score and "checkers off" can also move to the menu. **#184: one line with the name, pips, score and turn (no "checkers off": the trays show them). A long name, Greek or a large font wraps it to two lines. #238 removed the pips.**
 7. **Rotation lock:** the phone's own rotation lock is always respected. Do we also want an in-app "keep portrait" setting? **#185: not built; the phone's lock is enough for now.**
 
 ## How the pictures were made
