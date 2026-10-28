@@ -4,9 +4,10 @@
  * deadline; when it passes, the player the server waits for loses the game.
  *
  * Each mutation is one Convex transaction: load the game, check the call,
- * run the engine (`model/online-game.ts`), roll the next dice on the
- * server, and save with a version bump. If anything throws, nothing is
- * saved.
+ * run the engine (`@tavli/online`), roll the next dice on the server, and
+ * save with a version bump. If anything throws, nothing is saved. The
+ * call checks are pure helpers in `@tavli/online` too (#251), shared with
+ * the in-memory server; this file keeps the database and scheduler parts.
  *
  * Timers: every save that leaves the match running sets a new
  * `turnDeadline` and schedules `checkTimeout` for that version. A later
@@ -22,39 +23,34 @@ import type { Infer } from 'convex/values';
 
 import type { GameTransportErrorData, OnlineGamePace, OnlineGameView } from '@tavli/contracts';
 import { serializeRules } from '@tavli/engine';
-import type { FlowEvent, MatchFlow, MoveInput, PlayerId } from '@tavli/engine';
+import type { MatchFlow, MoveInput, PlayerId } from '@tavli/engine';
+import {
+  OnlineGameError,
+  SERVER_ACTOR,
+  TIMED_OUT_ERROR,
+  answerPrompt,
+  callTimedOut,
+  checkCall,
+  checkNewGame,
+  createOnlineMatch,
+  eventActor,
+  loadFlow,
+  matchStatus,
+  nextDeadline,
+  playTurn,
+  resign as resignMatch,
+  scheduledCheck,
+  storeFlow,
+  timeOut,
+  toView,
+} from '@tavli/online';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { createCryptoRng } from './model/crypto-rng';
-import {
-  OnlineGameError,
-  answerPrompt,
-  createOnlineMatch,
-  deadlineAfter,
-  isTimedOut,
-  loadFlow,
-  playTurn,
-  resign as resignMatch,
-  sideOf,
-  storeFlow,
-  timeOut,
-  toView,
-} from './model/online-game';
 import { gameChoice, gamePace } from './schema';
-
-/** The `actor` of events the server plays itself. */
-const SERVER_ACTOR = 'server';
-
-const SERVER_EVENTS: ReadonlySet<FlowEvent['type']> = new Set([
-  'start',
-  'rollOpening',
-  'roll',
-  'nextGame',
-  'timeout',
-]);
 
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
 function reject(error: OnlineGameError): never {
@@ -76,10 +72,6 @@ function guarded<T>(step: () => T): T {
   }
 }
 
-function fail(code: GameTransportErrorData['code'], message: string): never {
-  reject(new OnlineGameError(code, message));
-}
-
 /** Appends the new events of `flow.log` to `moves`. */
 async function writeEvents(
   ctx: MutationCtx,
@@ -95,7 +87,7 @@ async function writeEvents(
       gameId,
       seq,
       version,
-      actor: SERVER_EVENTS.has(event.type) ? SERVER_ACTOR : callerId,
+      actor: eventActor(event, callerId),
       event: JSON.stringify(event),
     });
     seq += 1;
@@ -107,25 +99,20 @@ function gameFields(flow: MatchFlow) {
   return {
     variant: flow.game.state.variant,
     flow: storeFlow(flow),
-    status: flow.match.status === 'finished' ? ('finished' as const) : ('active' as const),
+    status: matchStatus(flow),
     winner: flow.match.winner,
   };
 }
 
-/** Loads a game for `callerId` and checks the version. */
+/** Loads a game for `callerId` and checks the version (`checkCall`). */
 async function loadForCaller(
   ctx: MutationCtx,
   gameId: Id<'games'>,
   callerId: string,
   expectedVersion: number | null,
 ): Promise<{ game: Doc<'games'>; side: PlayerId; flow: MatchFlow }> {
-  const game = await ctx.db.get(gameId);
-  if (game === null) fail('NOT_FOUND', 'no such game');
-  const side = sideOf(game.players, callerId);
-  if (side === null) fail('NOT_A_PLAYER', 'you are not a player of this game');
-  if (expectedVersion !== null && expectedVersion !== game.version) {
-    fail('STALE_VERSION', `the game is at version ${game.version}, not ${expectedVersion}`);
-  }
+  const loaded = await ctx.db.get(gameId);
+  const { game, side } = guarded(() => checkCall(loaded, callerId, expectedVersion));
   return { game, side, flow: loadFlow(game.flow) };
 }
 
@@ -142,8 +129,8 @@ async function startClock(
   flow: MatchFlow,
   now: number,
 ): Promise<number | null> {
-  if (flow.match.status === 'finished') return null;
-  const deadline = deadlineAfter(pace, now);
+  const deadline = nextDeadline(pace, flow, now);
+  if (deadline === null) return null;
   await ctx.scheduler.runAt(deadline, internal.games.checkTimeout, { gameId, version });
   return deadline;
 }
@@ -206,9 +193,9 @@ async function onTime(
   play: (now: number) => Promise<number>,
 ): Promise<WriteResult> {
   const now = Date.now();
-  if (game.status === 'active' && isTimedOut(game.turnDeadline, now)) {
+  if (callTimedOut(game, now)) {
     const version = await applyTimeout(ctx, game, flow, now);
-    return { ok: false, version, error: { code: 'TIMED_OUT', message: 'the turn time ran out' } };
+    return { ok: false, version, error: { ...TIMED_OUT_ERROR } };
   }
   return { ok: true, version: await play(now) };
 }
@@ -242,13 +229,7 @@ export const createGame = mutation({
   },
   returns: v.id('games'),
   handler: async (ctx, { callerId, players, choice, targetPoints, pace }) => {
-    if (sideOf(players, callerId) === null) {
-      fail('BAD_REQUEST', 'the caller must be one of the players');
-    }
-    // The move log marks server events with SERVER_ACTOR, so no player may use that id.
-    if (players.white === SERVER_ACTOR || players.black === SERVER_ACTOR) {
-      fail('BAD_REQUEST', `"${SERVER_ACTOR}" is not a valid player id`);
-    }
+    guarded(() => checkNewGame(callerId, players));
     const flow = guarded(() =>
       createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
     );
@@ -342,10 +323,10 @@ export const checkTimeout = internalMutation({
   returns: v.null(),
   handler: async (ctx, { gameId, version }) => {
     const game = await ctx.db.get(gameId);
-    if (game === null || game.version !== version || game.status !== 'active') return null;
-    if (game.turnDeadline === null) return null;
     const now = Date.now();
-    if (!isTimedOut(game.turnDeadline, now)) {
+    const check = scheduledCheck(game, version, now);
+    if (game === null || game.turnDeadline === null || check === 'skip') return null;
+    if (check === 'early') {
       // Too early (the scheduler ran before the deadline): check again then.
       await ctx.scheduler.runAt(game.turnDeadline, internal.games.checkTimeout, {
         gameId,

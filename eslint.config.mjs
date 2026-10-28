@@ -12,7 +12,12 @@ import tseslint from 'typescript-eslint';
 const PACKAGE_FILES = ['packages/**/*.{js,ts,tsx,cjs,mjs}', 'apps/server/**/*.{js,ts,cjs,mjs}'];
 
 // Pure packages: no React, React Native, Expo or vendor code.
-const PURE_PACKAGES = ['packages/engine/**', 'packages/bot/**', 'packages/contracts/**'];
+const PURE_PACKAGES = [
+  'packages/engine/**',
+  'packages/bot/**',
+  'packages/contracts/**',
+  'packages/online/**',
+];
 
 // Only these folders may import vendor SDKs (ADR-0002).
 const VENDOR_ALLOWED = ['packages/adapters/**', 'apps/server/**'];
@@ -150,6 +155,22 @@ export default defineConfig([
           object: 'Math',
           property: 'random',
           message: 'The engine must be deterministic. Use the injected RNG instead.',
+        },
+      ],
+    },
+  },
+
+  // Online game model and in-memory server: dice come from the injected
+  // RNG too, so tests and the server control them.
+  {
+    files: ['packages/online/**'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'Online games roll with the injected RNG (createMemoryGameServer({ rng })).',
         },
       ],
     },

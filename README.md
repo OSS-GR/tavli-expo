@@ -45,6 +45,7 @@ apps/server/         Convex functions for online games (tested offline with conv
 packages/engine/     Pure TypeScript game rules
 packages/bot/        Bot players (uses the engine)
 packages/contracts/  Interfaces (ports) and shared types
+packages/online/     Online game model and an in-memory game server (pure)
 packages/ui/         Design tokens and themes (plain data)
 packages/themes/     Board themes: theme.json manifests and art
 packages/adapters/*  Vendor code behind ports (storage-mmkv, haptics-expo, audio-expo, crash-sentry)

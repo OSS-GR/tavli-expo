@@ -12,6 +12,7 @@
   "dependencies": {
     "@tavli/contracts": "workspace:*",
     "@tavli/engine": "workspace:*",
+    "@tavli/online": "workspace:*",
     "convex": "1.46.0"
   },
   "devDependencies": {

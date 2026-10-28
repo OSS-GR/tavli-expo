@@ -48,6 +48,7 @@
 | [Expo / React Native best practices](architecture/expo-best-practices.md) | Stack, tooling, releases |
 | [Backend, multiplayer, auth options](architecture/backend-options.md) | Vendors, costs, recommended design |
 | [Online game service](architecture/online-game-service.md) | Convex server (`apps/server`): data model, move flow, dice, offline tests and codegen, open points |
+| [Online package](../packages/online/README.md) | `@tavli/online`: the pure game model, the shared call checks and the in-memory game server |
 | [Bot AI](architecture/bot-ai.md) | Bot levels, training, on-device play |
 | [Board screen](architecture/board-screen.md) | How the app draws the board (Skia), board flip, tests and screenshots |
 | [App shell](architecture/app-shell.md) | Home, new game, local matches, the bot turn, in-game menu |

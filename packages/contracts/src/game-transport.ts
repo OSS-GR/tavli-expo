@@ -4,7 +4,8 @@
  * The app plays an online game only through `GameTransport`. The server
  * (`apps/server`, Convex) is the truth: it rolls the dice, checks every
  * turn with `@tavli/engine` and saves the game. A client adapter (later,
- * `packages/adapters/backend-convex`) implements this port.
+ * `packages/adapters/backend-convex`) implements this port. The in-memory
+ * server in `@tavli/online` implements it too, with no network.
  *
  * Every type here is plain JSON, so it can cross the network as it is.
  * See `docs/architecture/online-game-service.md`.
@@ -151,7 +152,9 @@ export interface GameTransport {
   /**
    * Calls `onView` with the game now and after every change. Returns a
    * function that stops the updates. `onError` gets load errors (for
-   * example `NOT_FOUND`).
+   * example `NOT_FOUND`). Both are called later, never inside `subscribe`
+   * itself. The contract checks are `gameTransportContract` in
+   * `@tavli/contracts/testing`.
    */
   subscribe(
     gameId: string,
