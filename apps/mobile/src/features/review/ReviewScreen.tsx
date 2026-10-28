@@ -12,9 +12,10 @@
  * memory (`review.ts`); nothing is saved.
  *
  * Screen readers: each mistake is one element with the full text; the
- * board and the dice in it are hidden from them. The switch is two
- * buttons after it (`selected`); it only changes the picture, so the
- * card's label stays the same. The result is read when the review is done.
+ * board and the dice in it are hidden from them. The switch is hidden
+ * too: it only changes the marks on that hidden board, and the card's
+ * label already reads both turns. The result is read when the review is
+ * done.
  */
 import type { Analyzer } from '@tavli/bot';
 import { diceMoves, type MatchFlow, type PlayerId } from '@tavli/engine';
@@ -134,7 +135,7 @@ function MistakeCard({ mistake, name, testID }: MistakeCardProps) {
   // The board as on a table: wide and low, so it fits in a card.
   const aspectRatio = boardLayout(theme, 'classic', homeSide).aspectRatio;
   const strong = mistake.band === 'big';
-  // Both turns start from the board before the turn.
+  // Both turns start from the board before the turn, and both are the mover's.
   const marked = shown === 'best' ? mistake.best : mistake.turn;
   const options: { value: ShownTurn; label: string }[] = [
     {
@@ -165,7 +166,7 @@ function MistakeCard({ mistake, name, testID }: MistakeCardProps) {
               view={view}
               marks={asodioMarks(state.board, state.rules, view)}
               layout="classic"
-              turn={{ mover: marked.player, moves: marked.moves }}
+              turn={{ mover: mistake.turn.player, moves: marked.moves }}
               testID={`${testID}-board`}
             />
           </View>
@@ -186,8 +187,16 @@ function MistakeCard({ mistake, name, testID }: MistakeCardProps) {
           {text.best}
         </Text>
       </View>
-      {/* Which turn the board marks: two buttons, each says if it is on. */}
-      <View testID={`${testID}-switch`} style={styles.switch}>
+      {/*
+        Which turn the board marks. Hidden from screen readers like the
+        board: it changes nothing they can perceive.
+      */}
+      <View
+        testID={`${testID}-switch`}
+        collapsable={false}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+        style={styles.switch}>
         {options.map((option) => {
           const selected = option.value === shown;
           return (
@@ -279,10 +288,10 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // The line of the turn on the board is bold; the other one is dim.
+  // The line of the turn on the board is bold; the other one is regular.
   line: (selected: boolean) => ({
     ...(selected ? theme.type.bodyStrong : theme.type.body),
-    color: selected ? theme.colors.text : theme.colors.textDim,
+    color: theme.colors.text,
   }),
   // The buttons share a row; at a large font the second one wraps to a row
   // of its own, and a long label wraps inside its button.
@@ -311,6 +320,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   pressed: {
     opacity: 0.7,
   },
+  // `textDim` on `surface` keeps 4.5:1 (checked in `packages/ui` for every app theme).
   segmentLabel: (selected: boolean) => ({
     ...(selected ? theme.type.bodyStrong : theme.type.body),
     textAlign: 'center',

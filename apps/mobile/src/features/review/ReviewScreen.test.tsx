@@ -253,6 +253,13 @@ function drawnMarks(card: string) {
 
 const flat = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style);
 
+/**
+ * A switch button. The switch is hidden from screen readers (it only
+ * changes the hidden board), so the query must include hidden elements.
+ */
+const switchButton = (name: string) =>
+  screen.getByRole('button', { name, includeHiddenElements: true });
+
 describe('<ReviewScreen /> marks on the board (#230)', () => {
   it('marks the best turn first, and the played turn after a tap, from the same board', async () => {
     const user = setupUser();
@@ -263,6 +270,8 @@ describe('<ReviewScreen /> marks on the board (#230)', () => {
     const card = await screen.findByTestId('review-mistake-1');
     await layoutBoard('review-mistake-1');
 
+    // The best turn is for the same player as the played one.
+    expect(mistake!.best.player).toBe(mistake!.turn.player);
     const best = expectedMarks(mistake!, mistake!.best);
     const played = expectedMarks(mistake!, mistake!.turn);
     // The two turns differ, so the marks tell them apart.
@@ -271,23 +280,23 @@ describe('<ReviewScreen /> marks on the board (#230)', () => {
     expect(played.cues.length).toBeGreaterThan(0);
 
     // Best move by default.
-    const bestButton = screen.getByRole('button', { name: 'Best move' });
-    const playedButton = screen.getByRole('button', { name: 'Your move' });
-    expect(bestButton).toBeSelected();
-    expect(playedButton).not.toBeSelected();
+    expect(switchButton('Best move')).toBeSelected();
+    expect(switchButton('Your move')).not.toBeSelected();
     expect(drawnMarks('review-mistake-1')).toEqual(best);
+    // Both lines in the text colour; the marked one is bold.
     const boldStyle = flat('review-mistake-1-best');
     const plainStyle = flat('review-mistake-1-played');
     expect(boldStyle.fontWeight).not.toEqual(plainStyle.fontWeight);
+    expect(boldStyle.color).toBe(plainStyle.color);
 
     const canvas = screen.getByTestId('review-mistake-1-board-canvas', {
       includeHiddenElements: true,
     });
     const path = nativePath(canvas);
 
-    await user.press(playedButton);
-    expect(screen.getByRole('button', { name: 'Your move' })).toBeSelected();
-    expect(screen.getByRole('button', { name: 'Best move' })).not.toBeSelected();
+    await user.press(switchButton('Your move'));
+    expect(switchButton('Your move')).toBeSelected();
+    expect(switchButton('Best move')).not.toBeSelected();
     expect(drawnMarks('review-mistake-1')).toEqual(played);
     // The line of the marked turn is the bold one.
     expect(flat('review-mistake-1-played')).toEqual(boldStyle);
@@ -300,32 +309,48 @@ describe('<ReviewScreen /> marks on the board (#230)', () => {
       ),
     ).toBe(path);
 
-    await user.press(screen.getByRole('button', { name: 'Best move' }));
-    expect(screen.getByRole('button', { name: 'Best move' })).toBeSelected();
+    await user.press(switchButton('Best move'));
+    expect(switchButton('Best move')).toBeSelected();
     expect(drawnMarks('review-mistake-1')).toEqual(best);
   });
 
-  it('keeps the switch out of the card, and each card has its own', async () => {
+  it('hides the switch from screen readers, and each card has its own', async () => {
     const user = setupUser();
-    await renderWithRoot(<ReviewScreen setup={local} flow={oneBadTurn()} />);
+    const flow = oneBadTurn();
+    const mistakes = reviewGame(flow, ['white', 'black'], testAnalyzer);
+    await renderWithRoot(<ReviewScreen setup={local} flow={flow} />);
     await screen.findByTestId('review-mistake-3');
+    // It changes only the hidden board: no stops for a screen reader.
+    expect(screen.queryAllByRole('button')).toEqual([]);
+    expect(screen.queryByTestId('review-mistake-1-switch')).toBeNull();
+    const toggle = screen.getByTestId('review-mistake-1-switch', { includeHiddenElements: true });
+    expect(toggle.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(toggle.props.accessibilityElementsHidden).toBe(true);
+    expect(toggle.props.collapsable).toBe(false);
     // Pass-and-play names the player.
     expect(
-      within(screen.getByTestId('review-mistake-1-switch')).getByRole('button', {
-        name: "Bob's move",
-      }),
-    ).toBeOnTheScreen();
+      within(toggle).getByRole('button', { name: "Bob's move", includeHiddenElements: true }),
+    ).toBeTruthy();
     expect(
-      within(screen.getByTestId('review-mistake-3-switch')).getByRole('button', {
-        name: "Maria's move",
-      }),
-    ).toBeOnTheScreen();
-    // The switch is not inside the card's one element, so screen readers reach it.
-    expect(within(screen.getByTestId('review-mistake-1')).queryByRole('button')).toBeNull();
-    await user.press(screen.getByTestId('review-mistake-2-show-played'));
-    expect(screen.getByTestId('review-mistake-2-show-played')).toBeSelected();
-    expect(screen.getByTestId('review-mistake-1-show-best')).toBeSelected();
-    expect(screen.getByTestId('review-mistake-3-show-best')).toBeSelected();
+      within(
+        screen.getByTestId('review-mistake-3-switch', { includeHiddenElements: true }),
+      ).getByRole('button', { name: "Maria's move", includeHiddenElements: true }),
+    ).toBeTruthy();
+
+    const played = () =>
+      screen.getByTestId('review-mistake-2-show-played', { includeHiddenElements: true });
+    await user.press(played());
+    expect(played()).toBeSelected();
+    expect(
+      screen.getByTestId('review-mistake-1-show-best', { includeHiddenElements: true }),
+    ).toBeSelected();
+    expect(
+      screen.getByTestId('review-mistake-3-show-best', { includeHiddenElements: true }),
+    ).toBeSelected();
+    // The card's label does not follow the switch.
+    expect(screen.getByTestId('review-mistake-2')).toHaveAccessibleName(
+      mistakeText(i18n.t, mistakes[1]!, 'Bob').label,
+    );
   });
 
   it('speaks Greek', async () => {
@@ -335,11 +360,11 @@ describe('<ReviewScreen /> marks on the board (#230)', () => {
     const user = setupUser();
     await renderWithRoot(<ReviewScreen setup={vsBot} flow={oneBadTurn()} />);
     await screen.findByTestId('review-mistake-1');
-    expect(screen.getByRole('button', { name: 'Η καλύτερη' })).toBeSelected();
-    expect(screen.getByRole('button', { name: 'Η κίνησή σου' })).not.toBeSelected();
-    await user.press(screen.getByRole('button', { name: 'Η κίνησή σου' }));
-    expect(screen.getByRole('button', { name: 'Η κίνησή σου' })).toBeSelected();
-    expect(screen.getByRole('button', { name: 'Η καλύτερη' })).not.toBeSelected();
+    expect(switchButton('Η καλύτερη')).toBeSelected();
+    expect(switchButton('Η κίνησή σου')).not.toBeSelected();
+    await user.press(switchButton('Η κίνησή σου'));
+    expect(switchButton('Η κίνησή σου')).toBeSelected();
+    expect(switchButton('Η καλύτερη')).not.toBeSelected();
   });
 
   it('speaks Greek in pass-and-play', async () => {
@@ -348,6 +373,6 @@ describe('<ReviewScreen /> marks on the board (#230)', () => {
     });
     await renderWithRoot(<ReviewScreen setup={local} flow={oneBadTurn()} />);
     await screen.findByTestId('review-mistake-3');
-    expect(screen.getByRole('button', { name: 'Κίνηση: Maria' })).not.toBeSelected();
+    expect(switchButton('Κίνηση: Maria')).not.toBeSelected();
   });
 });

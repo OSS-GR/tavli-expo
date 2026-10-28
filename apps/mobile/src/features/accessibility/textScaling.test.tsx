@@ -445,13 +445,15 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     await screen.findByTestId('review-mistake-3');
     expect(problems()).toEqual([]);
     // The switch: its buttons wrap to two rows at a large font.
-    const toggle = screen.getByTestId('review-mistake-3-switch');
+    // It is hidden from screen readers, but its text still scales.
+    const hidden = { includeHiddenElements: true };
+    const toggle = screen.getByTestId('review-mistake-3-switch', hidden);
     expect(StyleSheet.flatten(toggle.props.style).flexWrap).toBe('wrap');
-    expect(within(toggle).getAllByRole('button')).toHaveLength(2);
+    expect(within(toggle).getAllByRole('button', hidden)).toHaveLength(2);
     await act(async () => {
-      fireEvent.press(screen.getByTestId('review-mistake-3-show-played'));
+      fireEvent.press(screen.getByTestId('review-mistake-3-show-played', hidden));
     });
-    expect(screen.getByTestId('review-mistake-3-show-played')).toBeSelected();
+    expect(screen.getByTestId('review-mistake-3-show-played', hidden)).toBeSelected();
     expect(problems()).toEqual([]);
     await renderWithRoot(<ReviewScreen setup={defaultSetup('bot')} flow={allBest()} />);
     await screen.findByTestId('review-status');
