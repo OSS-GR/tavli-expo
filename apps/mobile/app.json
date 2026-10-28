@@ -6,6 +6,9 @@
     "runtimeVersion": {
       "policy": "fingerprint"
     },
+    "updates": {
+      "url": "https://u.expo.dev/ab412a0d-e0c2-4f38-878d-57249f4db757"
+    },
     "platforms": ["ios", "android"],
     "orientation": "default",
     "icon": "./assets/icon/icon.png",
@@ -118,6 +121,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ab412a0d-e0c2-4f38-878d-57249f4db757"
+      }
+    },
+    "owner": "oss_gr-org"
   }
 }
