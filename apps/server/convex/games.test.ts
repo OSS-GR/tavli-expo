@@ -13,10 +13,10 @@ import type {
 } from '@tavli/contracts';
 import { createBoard, createSeededRng, plakoto, replay } from '@tavli/engine';
 import type { FlowEvent, GameFlow, GameState, PlayerId } from '@tavli/engine';
+import { loadFlow, storeFlow } from '@tavli/online';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { loadFlow, storeFlow } from './model/online-game';
 import schema from './schema';
 import { modules, pickTurn } from './test.setup';
 
