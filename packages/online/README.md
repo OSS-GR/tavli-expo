@@ -21,13 +21,13 @@ turn timers and the data model.
 
 ## What it exports
 
-| File                   | What it holds                                                                                                                                                                                                                                                          |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/online-game.ts`   | The game model: `onlineGameRules`, `createOnlineMatch`, `playTurn`, `answerPrompt`, `resign`, `timeOut`, `advance`, `toView`, `storeFlow` / `loadFlow`, the timer helpers `deadlineAfter` / `isTimedOut`, and `OnlineGameError`                                        |
-| `src/calls.ts`         | The call checks both servers share: `checkNewGame`, `checkCall` (game, caller, version), `checkViewer` (who may read a game), `callTimedOut` + `TIMED_OUT_ERROR`, `scheduledCheck` (the turn timer check), `nextDeadline`, `matchStatus`, `eventActor`, `SERVER_ACTOR` |
-| `src/invites.ts`       | The invite checks and codes (#252, moved here in #256): `newInviteCode`, `pickInviteCode`, `pickInviteCodeNow`, `newInvite`, `checkAnswer`, `checkCancel`, `inviteStatus`, `toInviteView`, and `InviteError`                                                           |
-| `src/memory-server.ts` | `createMemoryGameServer({ rng, now })`                                                                                                                                                                                                                                 |
-| `src/testing.ts`       | `@tavli/online/testing`, for tests only: `pickTurn`, `pickChoice`, `motherPin` (a Plakoto position for the mother question)                                                                                                                                            |
+| File                   | What it holds                                                                                                                                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/online-game.ts`   | The game model: `onlineGameRules`, `createOnlineMatch`, `playTurn`, `answerPrompt`, `resign`, `timeOut`, `advance`, `toView`, `storeFlow` / `loadFlow`, the timer helpers `deadlineAfter` / `isTimedOut`, and `OnlineGameError`                                                                        |
+| `src/calls.ts`         | The call checks both servers share: `checkNewGame`, `checkCall` (game, caller, version), `checkViewer` (who may read a game), `callTimedOut` + `TIMED_OUT_ERROR`, `scheduledCheck` (the turn timer check), `nextDeadline`, `matchStatus`, `eventActor`, `SERVER_ACTOR`                                 |
+| `src/invites.ts`       | The invite checks and codes (#252, moved here in #256): `newInviteCode`, `pickInviteCode`, `pickInviteCodeNow`, `newInvite`, `checkAnswer`, `checkCancel`, the cap on open invites (`MAX_OPEN_INVITES`, `countOpenInvites`, `checkInviteCap`, #275), `inviteStatus`, `toInviteView`, and `InviteError` |
+| `src/memory-server.ts` | `createMemoryGameServer({ rng, now })`                                                                                                                                                                                                                                                                 |
+| `src/testing.ts`       | `@tavli/online/testing`, for tests only: `pickTurn`, `pickChoice`, `motherPin` (a Plakoto position for the mother question)                                                                                                                                                                            |
 
 A failed check throws an `OnlineGameError` (`code` is a
 `GameTransportErrorCode`). Each server turns it into its own error: Convex
@@ -73,6 +73,8 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
 - **Invites** (#256): `createInvite(callerId, choice, targetPoints, pace)`
   makes an open invite and returns its code (from the server's `rng`,
   through `pickInviteCodeNow`, the at-once twin of `pickInviteCode`).
+  A player with `MAX_OPEN_INVITES` (10) open invites gets
+  `TOO_MANY_INVITES`, as on Convex (#275).
   `cancelInvite(callerId, code)` takes an open invite back, like the
   Convex `cancelInvite`. `invitesFor(playerId)` gives that player's `Invites` port
   (`getInvite`, `acceptInvite`, `declineInvite`), and `getInvite(code)`
@@ -99,7 +101,8 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
 - `invites.test.ts`: the invite checks and codes with a seeded RNG (moved
   from `apps/server`).
 - `memory-invites.test.ts`: the `Invites` contract checks
-  (`invitesContract`), the game an accept starts, codes and clashes.
+  (`invitesContract`), the game an accept starts, codes and clashes,
+  and the cap on open invites.
 
 An adapter of `GameTransport` (for example the Convex adapter) runs the
 same contract checks. They are plain async functions, so Vitest and Jest

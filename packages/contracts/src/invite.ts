@@ -88,6 +88,12 @@ export const INVITE_ERROR_CODES = [
   'OWN_INVITE',
   /** Only the inviter can cancel an invite. */
   'NOT_YOUR_INVITE',
+  /**
+   * The caller already has the most open invites a player may have
+   * (`MAX_OPEN_INVITES` in `@tavli/online`: 10, #275). Only `createInvite` gives it.
+   * One frees its place once it is accepted, declined, cancelled or expired.
+   */
+  'TOO_MANY_INVITES',
   /** Bad arguments (for example a code with a wrong length or character). */
   'BAD_REQUEST',
   /** The call has no signed-in user (the same code as in `GAME_TRANSPORT_ERROR_CODES`). */
