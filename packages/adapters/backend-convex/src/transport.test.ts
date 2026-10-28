@@ -133,6 +133,21 @@ describe('subscribe', () => {
     expect(watcher.errors).toEqual([]);
   });
 
+  it('gives each watcher its own copy of a shared result', async () => {
+    const fake = fakeClient();
+    const transport = createConvexGameTransport({ client: fake.client });
+    const a = watch(transport, 'g1');
+    const b = watch(transport, 'g1');
+    // The real client hands the same cached object to every watcher.
+    const shared = viewStub(3);
+    for (const sub of fake.subscriptions) sub.onResult(shared);
+    await flush();
+    expect(a.views).toEqual([shared]);
+    expect(b.views).toEqual([shared]);
+    expect(a.views[0]).not.toBe(shared);
+    expect(a.views[0]).not.toBe(b.views[0]);
+  });
+
   it('a null result (no such game) calls onError with NOT_FOUND', async () => {
     const fake = fakeClient();
     const watcher = watch(createConvexGameTransport({ client: fake.client }));
@@ -303,6 +318,15 @@ describe('toTransportError', () => {
     expect(
       toTransportError(new ConvexError({ code: 'ILLEGAL_MOVE', message: 'no', more: 1 })),
     ).toEqual({ code: 'ILLEGAL_MOVE', message: 'no' });
+  });
+
+  it('maps a ConvexError from another copy of convex/values by its name', () => {
+    const other = Object.assign(new Error('Server Error'), {
+      name: 'ConvexError',
+      data: { code: 'STALE_VERSION', message: 'old version' },
+    });
+    expect(other).not.toBeInstanceOf(ConvexError);
+    expect(toTransportError(other)).toEqual({ code: 'STALE_VERSION', message: 'old version' });
   });
 
   it('leaves other values alone', () => {
