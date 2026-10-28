@@ -37,4 +37,6 @@ module.exports = {
   // 15-18 s on a busy machine (`jest --no-cache` with the CPU in use), so a
   // short timeout fails at random. 30 s still catches a test that hangs.
   testTimeout: 30_000,
+  // Splits the files evenly between CI shards (test/shardSequencer.js).
+  testSequencer: '<rootDir>/test/shardSequencer.js',
 };
