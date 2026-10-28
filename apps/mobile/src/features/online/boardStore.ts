@@ -18,7 +18,8 @@
  * newest view (the new record and score): the game as it ended, from the
  * view's `previousGame` (#299). Its `lastTurn` is the turn that ended it,
  * so the other player's winning turn flies and sounds as a remote turn
- * (`remoteTurn`) before the sheet opens. A server without `previousGame`
+ * (`remoteTurn`), and `GameScreen` opens the sheet only once its checkers
+ * land (`landingWait`). A server without `previousGame`
  * gives the last flow the board showed of that game, marked over. The
  * screen draws it as a local game end: the sheet, no dice, no buttons. A
  * game that ends under the sheet (a time out) takes its place.
@@ -29,7 +30,7 @@
  * go by itself (match end shows the last game).
  * Games that ended before the board was made are not held.
  */
-import { currentBoard, type GameFlow, type MatchFlow } from '@tavli/engine';
+import { currentBoard, type GameFlow, type GameRecord, type MatchFlow } from '@tavli/engine';
 
 import type { BoardStore, BoardStoreState } from '@/features/game/gameStore';
 
@@ -41,9 +42,27 @@ export interface OnlineBoardStore extends BoardStore {
 }
 
 /**
+ * True when `ended` is the game of `record`: over, with its variant and
+ * its result. A `previousGame` that is not the newest game (a server
+ * that did not keep it) fails.
+ */
+function isGameOf(ended: GameFlow, record: GameRecord): boolean {
+  const { result } = ended;
+  return (
+    ended.phase === 'game-over' &&
+    result !== null &&
+    ended.state.variant === record.variant &&
+    result.winner === record.winner &&
+    result.points === record.points &&
+    result.reason === record.reason
+  );
+}
+
+/**
  * The end of a game as a local game shows it, with the match of `next`.
  * `ended` is the view's `previousGame`: the game as the server ended it,
- * with the turn that ended it and the end board (#299). Without it (an
+ * with the turn that ended it and the end board (#299). It counts only
+ * when it is the newest game of `next`, the one the sheet shows. Else (an
  * older server), `from` (the last flow of that game) is marked over with
  * the result of the newest record of `next`. It only draws: no rule is
  * judged. The moves of a timed-out turn never counted, so they go.
@@ -55,8 +74,10 @@ export function gameEnd(
 ): MatchFlow {
   const record = next.match.games.at(-1);
   if (record === undefined) return from;
-  // An empty log: the feedback reads it as a view (`onlineStoreEvents`).
-  if (ended?.phase === 'game-over') return { ...from, match: next.match, game: ended, log: [] };
+  if (ended !== null && isGameOf(ended, record)) {
+    // An empty log: the feedback reads it as a view (`onlineStoreEvents`).
+    return { ...from, match: next.match, game: ended, log: [] };
+  }
   const { game } = from;
   const board = record.reason === 'timeout' ? game.state.board : currentBoard(game);
   return {
@@ -102,10 +123,13 @@ export function onlineBoardStore(store: OnlineStore, gameId: string): OnlineBoar
       } else if (games > (held ?? snapshot.flow).match.games.length) {
         // A game ended. The board shows the end of that game: the view's
         // `previousGame` (#299), also when it ended under the sheet of the
-        // game before (the store took its views). So the board, the label
-        // and the Rules of the menu name the game the sheet shows. Without
-        // `previousGame`: the last flow of that game. Only when a view was
-        // missed is that flow gone: the board keeps the end it shows.
+        // game before (the store took its views), or when more than one
+        // game ended between two views. It is the newest game (`gameEnd`
+        // checks it), so the board, the label and the Rules of the menu
+        // name the game the sheet shows; a skipped game has no turn to
+        // fly (`remoteTurn` checks the board). Without `previousGame`: the
+        // last flow of that game. Only when a view was missed is that flow
+        // gone: the board keeps the end it shows.
         const from = before.match.games.length === games - 1 ? before : (held ?? before);
         held = gameEnd(from, next, state.view?.previousGame ?? null);
       }

@@ -52,7 +52,7 @@ import {
   eventActor,
   latestGames,
   loadFlow,
-  loadPreviousGame,
+  loadStored,
   matchStatus,
   nextDeadline,
   playTurn,
@@ -64,6 +64,7 @@ import {
   timeOut,
   toView,
 } from '@tavli/online';
+import type { LoadedFlow, SteppedFlow } from '@tavli/online';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
@@ -118,8 +119,11 @@ async function writeEvents(
   return seq;
 }
 
-/** The fields of `flow`. `stored` is its text: `storeStep` after a step (#299). */
-function gameFields(flow: MatchFlow, stored = storeFlow(flow)) {
+/**
+ * The fields of `flow`. `stored` is its text: `storeStep` after a step,
+ * so the view keeps the game that ended (#299).
+ */
+function gameFields(flow: MatchFlow, stored: string) {
   return {
     variant: flow.game.state.variant,
     flow: stored,
@@ -134,10 +138,10 @@ async function loadForCaller(
   gameId: Id<'games'>,
   callerId: string,
   expectedVersion: number | null,
-): Promise<{ game: Doc<'games'>; side: PlayerId; flow: MatchFlow }> {
+): Promise<{ game: Doc<'games'>; side: PlayerId; before: LoadedFlow }> {
   const loaded = await ctx.db.get(gameId);
   const { game, side } = guarded(() => checkCall(loaded, callerId, expectedVersion));
-  return { game, side, flow: loadFlow(game.flow) };
+  return { game, side, before: loadStored(game.flow) };
 }
 
 /**
@@ -169,21 +173,21 @@ async function save(
   ctx: MutationCtx,
   game: Doc<'games'>,
   callerId: string,
-  before: MatchFlow,
-  flow: MatchFlow,
+  before: LoadedFlow,
+  flow: SteppedFlow,
   now: number,
 ): Promise<number> {
   const version = game.version + 1;
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
   const turnDeadline = await startClock(ctx, game._id, version, game.pace, flow, now);
   await ctx.db.patch(game._id, {
-    ...gameFields(flow, storeStep(game.flow, flow)),
+    ...gameFields(flow, storeStep(before, flow)),
     version,
     eventCount,
     turnDeadline,
     updatedAt: now,
   });
-  await scheduleTurnPush(ctx, game, version, turnWait(before), turnWait(flow), callerId);
+  await scheduleTurnPush(ctx, game, version, turnWait(before.flow), turnWait(flow), callerId);
   return version;
 }
 
@@ -191,11 +195,11 @@ async function save(
 async function applyTimeout(
   ctx: MutationCtx,
   game: Doc<'games'>,
-  flow: MatchFlow,
+  before: LoadedFlow,
   now: number,
 ): Promise<number> {
-  const next = guarded(() => timeOut(flow, createCryptoRng()));
-  return await save(ctx, game, SERVER_ACTOR, flow, next, now);
+  const next = guarded(() => timeOut(before.flow, createCryptoRng()));
+  return await save(ctx, game, SERVER_ACTOR, before, next, now);
 }
 
 /**
@@ -223,12 +227,12 @@ type WriteResult = Infer<typeof writeResult>;
 async function onTime(
   ctx: MutationCtx,
   game: Doc<'games'>,
-  flow: MatchFlow,
+  before: LoadedFlow,
   play: (now: number) => Promise<number>,
 ): Promise<WriteResult> {
   const now = Date.now();
   if (callTimedOut(game, now)) {
-    const version = await applyTimeout(ctx, game, flow, now);
+    const version = await applyTimeout(ctx, game, before, now);
     return { ok: false, version, error: { ...TIMED_OUT_ERROR } };
   }
   return { ok: true, version: await play(now) };
@@ -278,7 +282,8 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
     pace,
     targetPoints,
     rules: serializeRules(flow.match.rules),
-    ...gameFields(flow),
+    // A new match: no game ended before it.
+    ...gameFields(flow, storeFlow(flow, null)),
     version,
     eventCount: 0,
     turnDeadline: null,
@@ -338,10 +343,12 @@ export const makeMove = mutation({
   returns: writeResult,
   handler: async (ctx, { gameId, expectedVersion, moves }) => {
     const callerId = await signedInPlayer(ctx);
-    const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
-    return await onTime(ctx, game, flow, async (now) => {
-      const next = guarded(() => playTurn(flow, side, moves.map(toMoveInput), createCryptoRng()));
-      return await save(ctx, game, callerId, flow, next, now);
+    const { game, side, before } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
+    return await onTime(ctx, game, before, async (now) => {
+      const next = guarded(() =>
+        playTurn(before.flow, side, moves.map(toMoveInput), createCryptoRng()),
+      );
+      return await save(ctx, game, callerId, before, next, now);
     });
   },
 });
@@ -359,10 +366,10 @@ export const answer = mutation({
   returns: writeResult,
   handler: async (ctx, { gameId, expectedVersion, choice }) => {
     const callerId = await signedInPlayer(ctx);
-    const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
-    return await onTime(ctx, game, flow, async (now) => {
-      const next = guarded(() => answerPrompt(flow, side, choice, createCryptoRng()));
-      return await save(ctx, game, callerId, flow, next, now);
+    const { game, side, before } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
+    return await onTime(ctx, game, before, async (now) => {
+      const next = guarded(() => answerPrompt(before.flow, side, choice, createCryptoRng()));
+      return await save(ctx, game, callerId, before, next, now);
     });
   },
 });
@@ -392,9 +399,9 @@ export async function resignAs(
   gameId: Id<'games'>,
   callerId: string,
 ): Promise<number> {
-  const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, null);
-  const next = guarded(() => resignMatch(flow, side, createCryptoRng()));
-  return await save(ctx, game, callerId, flow, next, Date.now());
+  const { game, side, before } = await loadForCaller(ctx, gameId, callerId, null);
+  const next = guarded(() => resignMatch(before.flow, side, createCryptoRng()));
+  return await save(ctx, game, callerId, before, next, Date.now());
 }
 
 /**
@@ -419,13 +426,13 @@ export const checkTimeout = internalMutation({
       });
       return null;
     }
-    await applyTimeout(ctx, game, loadFlow(game.flow), now);
+    await applyTimeout(ctx, game, loadStored(game.flow), now);
     return null;
   },
 });
 
-/** The view input of a stored game (`toView`, `summarizeGame`). */
-function viewInput(game: Doc<'games'>) {
+/** The view input of a stored game, without its flow (`toView`, `summarizeGame`). */
+function gameInput(game: Doc<'games'>) {
   return {
     gameId: game._id,
     version: game.version,
@@ -433,8 +440,6 @@ function viewInput(game: Doc<'games'>) {
     pace: game.pace,
     turnDeadline: game.turnDeadline,
     players: game.players,
-    flow: loadFlow(game.flow),
-    previousGame: loadPreviousGame(game.flow),
   };
 }
 
@@ -451,7 +456,8 @@ export const getGame = query({
     const loaded = await ctx.db.get(gameId);
     const game = guarded(() => checkViewer(loaded, callerId));
     if (game === null) return null;
-    return toView(viewInput(game));
+    const { flow, previousGame } = loadStored(game.flow);
+    return toView({ ...gameInput(game), flow, previousGame });
   },
 });
 
@@ -490,7 +496,11 @@ export const listMyGames = query({
     return latestGames(
       [...asWhite, ...asBlack].map((game) =>
         summarizeGame(
-          { ...viewInput(game), updatedAt: game.updatedAt ?? game._creationTime },
+          {
+            ...gameInput(game),
+            flow: loadFlow(game.flow),
+            updatedAt: game.updatedAt ?? game._creationTime,
+          },
           callerId,
         ),
       ),

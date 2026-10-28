@@ -19,7 +19,8 @@
  * the step holds just the new events. The stored flow also keeps the game
  * before the current one, as it ended (`previousGame`, #299): `advance`
  * starts the next game at once, so the view would lose the turn that
- * ended a game. Save a step with `storeStep`.
+ * ended a game. `advance` keeps that game (`SteppedFlow.endedGame`), and
+ * `storeStep` saves it.
  */
 
 import { TURN_TIME_MS } from '@tavli/contracts';
@@ -116,8 +117,32 @@ export function onlineGameRules(choice: OnlineGameChoice): RuleSet {
  */
 export type StoredFlow = Omit<MatchFlow, 'log'> & { readonly previousGame?: GameFlow };
 
-/** The stored text of `flow`. `previousGame` is the game before `flow.game`, as it ended. */
-export function storeFlow(flow: MatchFlow, previousGame: GameFlow | null = null): string {
+/** A stored flow as read: the flow (with an empty log) and the game before it. */
+export interface LoadedFlow {
+  readonly flow: MatchFlow;
+  /**
+   * The game before `flow.game`, as it ended (phase `game-over`): its
+   * `lastTurn` is the turn that ended it. `null` in the first game, and
+   * for a flow saved before #299 until its next game starts.
+   */
+  readonly previousGame: GameFlow | null;
+}
+
+/**
+ * The flow after a step. `endedGame` is the game that ended in the step,
+ * as it ended, or `null` when no next game started in it. `advance` keeps
+ * it when it starts the next game, so nothing plays the step again.
+ */
+export interface SteppedFlow extends MatchFlow {
+  readonly endedGame: GameFlow | null;
+}
+
+/**
+ * The stored text of `flow`. `previousGame` is the game before
+ * `flow.game`, as it ended. After a step, use `storeStep`: it keeps the
+ * game that ended.
+ */
+export function storeFlow(flow: MatchFlow, previousGame: GameFlow | null): string {
   const stored: StoredFlow = {
     schemaVersion: flow.schemaVersion,
     match: flow.match,
@@ -127,56 +152,31 @@ export function storeFlow(flow: MatchFlow, previousGame: GameFlow | null = null)
   return JSON.stringify(stored);
 }
 
-function parseStored(text: string): StoredFlow {
+/**
+ * Reads a stored flow, with one parse. Only the server writes it, so a
+ * shape check is enough.
+ */
+export function loadStored(text: string): LoadedFlow {
   const stored = JSON.parse(text) as StoredFlow;
   if (stored.schemaVersion !== MATCH_FLOW_SCHEMA_VERSION) {
     throw new Error(`stored flow has schema version ${String(stored.schemaVersion)}`);
   }
-  return stored;
+  const { schemaVersion, match, game, previousGame } = stored;
+  return { flow: { schemaVersion, match, game, log: [] }, previousGame: previousGame ?? null };
 }
 
-/** Reads a stored flow. Only the server writes it, so a shape check is enough. */
+/** Reads just the flow of a stored text (`loadStored(text).flow`). */
 export function loadFlow(text: string): MatchFlow {
-  const { schemaVersion, match, game } = parseStored(text);
-  return { schemaVersion, match, game, log: [] };
-}
-
-/**
- * The game before the current one, as it ended (phase `game-over`): its
- * `lastTurn` is the turn that ended it. `null` in the first game, and for
- * a flow saved before #299 until its next game starts.
- */
-export function loadPreviousGame(text: string): GameFlow | null {
-  return parseStored(text).previousGame ?? null;
-}
-
-/**
- * The game that ended in a step, as it ended, or `null` when no next game
- * started in it. `before` is the flow the step started from; `after` the
- * flow after it, whose `log` holds just the step's events. It plays those
- * events again on `before` (they hold their dice, so no RNG) and keeps the
- * game that the last `nextGame` replaced.
- */
-export function endedGame(before: MatchFlow, after: MatchFlow): GameFlow | null {
-  if (!after.log.some((event) => event.type === 'nextGame')) return null;
-  let flow = before;
-  let ended: GameFlow | null = null;
-  for (const event of after.log) {
-    if (event.type === 'start') continue;
-    if (event.type === 'nextGame') ended = flow.game;
-    flow = applyMatchAction(flow, event);
-  }
-  return ended;
+  return loadStored(text).flow;
 }
 
 /**
  * The stored text after a step: `next`, and the game before its current
- * one. That is the game that ended in the step, else the one `stored`
- * kept. `stored` is the text the step loaded its flow from.
+ * one. That is the game that ended in the step, else the one `before`
+ * kept. `before` is what the step loaded its flow from.
  */
-export function storeStep(stored: string, next: MatchFlow): string {
-  const ended = endedGame(loadFlow(stored), next);
-  return storeFlow(next, ended ?? loadPreviousGame(stored));
+export function storeStep(before: LoadedFlow, next: SteppedFlow): string {
+  return storeFlow(next, next.endedGame ?? before.previousGame);
 }
 
 // ---------------------------------------------------------------------------
@@ -192,15 +192,19 @@ function apply(flow: MatchFlow, action: MatchAction, rng: Rng): MatchFlow {
 /**
  * Plays every step that needs no player: the opening roll, each roll (a
  * roll with no legal move passes by itself) and the start of the next
- * game. Stops when a player must act or the match is over.
+ * game. Stops when a player must act or the match is over. The result
+ * keeps the game it replaced with the next one (`endedGame`).
  */
-export function advance(flow: MatchFlow, rng: Rng): MatchFlow {
+export function advance(flow: MatchFlow, rng: Rng): SteppedFlow {
   let next = flow;
+  let endedGame: GameFlow | null = null;
+  const done = (): SteppedFlow => ({ ...next, endedGame });
   for (let i = 0; i < MAX_SERVER_STEPS; i++) {
-    if (next.match.status === 'finished') return next;
+    if (next.match.status === 'finished') return done();
     const { game } = next;
     switch (game.phase) {
       case 'game-over':
+        endedGame = game;
         next = apply(next, { type: 'nextGame' }, rng);
         break;
       case 'opening-roll': {
@@ -217,7 +221,7 @@ export function advance(flow: MatchFlow, rng: Rng): MatchFlow {
         next = apply(next, { type: 'roll', player: game.state.toMove }, rng);
         break;
       default:
-        return next;
+        return done();
     }
   }
   throw new Error(`advance did not stop after ${MAX_SERVER_STEPS} steps`);
@@ -230,7 +234,10 @@ export interface CreateOnlineMatchOptions {
   readonly players: PerPlayer<string>;
 }
 
-/** A new match, advanced to the first roll. `flow.log` holds every event so far. */
+/**
+ * A new match, advanced to the first roll. `flow.log` holds every event so
+ * far. Save it with `storeFlow(flow, null)`: no game ended before it.
+ */
 export function createOnlineMatch(options: CreateOnlineMatchOptions, rng: Rng): MatchFlow {
   const { choice, targetPoints, players } = options;
   if (players.white === players.black) fail('BAD_REQUEST', 'the two players must differ');
@@ -239,7 +246,8 @@ export function createOnlineMatch(options: CreateOnlineMatchOptions, rng: Rng): 
     fail('BAD_REQUEST', 'online games need an opening roll');
   }
   const flow = engineStep(() => createMatchFlow({ rules, targetPoints, players, starter: null }));
-  return advance(flow, rng);
+  const { schemaVersion, match, game, log } = advance(flow, rng);
+  return { schemaVersion, match, game, log };
 }
 
 /** The side of `callerId`, or `null` when the caller is not a player. */
@@ -268,7 +276,7 @@ export function playTurn(
   player: PlayerId,
   moves: readonly MoveInput[],
   rng: Rng,
-): MatchFlow {
+): SteppedFlow {
   checkActive(flow);
   if (flow.game.phase === 'awaiting-answer') {
     fail(
@@ -295,7 +303,7 @@ export function answerPrompt(
   player: PlayerId,
   choice: string,
   rng: Rng,
-): MatchFlow {
+): SteppedFlow {
   checkActive(flow);
   const prompt = currentPrompt(flow.game);
   if (prompt === null) fail('ILLEGAL_ACTION', 'there is no question to answer');
@@ -304,9 +312,10 @@ export function answerPrompt(
 }
 
 /** `player` resigns the whole match. Allowed at any time, on either turn. */
-export function resign(flow: MatchFlow, player: PlayerId, rng: Rng): MatchFlow {
+export function resign(flow: MatchFlow, player: PlayerId, rng: Rng): SteppedFlow {
   checkActive(flow);
-  return apply(flow, { type: 'resignMatch', player }, rng);
+  // The match ends here: no next game starts, so no game ends "before" one.
+  return { ...apply(flow, { type: 'resignMatch', player }, rng), endedGame: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +339,7 @@ export function isTimedOut(deadline: number | null, now: number): boolean {
  * game (engine action `timeout`, scored like a resign of that game). Then
  * the server rolls on: the next game starts, or the match ends.
  */
-export function timeOut(flow: MatchFlow, rng: Rng): MatchFlow {
+export function timeOut(flow: MatchFlow, rng: Rng): SteppedFlow {
   checkActive(flow);
   const player = waitingFor(flow);
   if (player === null) fail('GAME_OVER', 'the match is over');
@@ -348,7 +357,7 @@ export interface ViewInput {
   readonly turnDeadline: number | null;
   readonly players: PerPlayer<string>;
   readonly flow: MatchFlow;
-  /** The game before `flow.game`, as it ended (`loadPreviousGame`). */
+  /** The game before `flow.game`, as it ended (`LoadedFlow.previousGame`). */
   readonly previousGame: GameFlow | null;
 }
 

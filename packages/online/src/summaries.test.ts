@@ -22,7 +22,6 @@ function input(choice: 'portes' | 'tavli' = 'portes'): SummaryInput {
     turnDeadline: 5000,
     players: PLAYERS,
     flow: createOnlineMatch({ choice, targetPoints: 3, players: PLAYERS }, rng),
-    previousGame: null,
     updatedAt: 1234,
   };
 }
@@ -34,7 +33,7 @@ function summary(gameId: string, updatedAt: number): GameSummary {
 describe('summarizeGame', () => {
   it('holds the facts of the view, for the side of the player', () => {
     const game = input('tavli');
-    const view = toView(game);
+    const view = toView({ ...game, previousGame: null });
     const mover = view.waitingFor;
     for (const [playerId, side] of [
       ['alice', 'white'],

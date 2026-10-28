@@ -92,7 +92,7 @@ function contractSubject(): GameTransportContractSubject {
         const doc = await ctx.db.get(gameId);
         if (doc === null) throw new Error('no game');
         const { flow, pin } = motherPin(loadFlow(doc.flow));
-        await ctx.db.patch(gameId, { flow: storeFlow(flow) });
+        await ctx.db.patch(gameId, { flow: storeFlow(flow, null) });
         return pin;
       });
       await t.withIdentity({ subject: BOB }).mutation(api.games.makeMove, {
@@ -107,7 +107,7 @@ function contractSubject(): GameTransportContractSubject {
       await t.run(async (ctx) => {
         const doc = await ctx.db.get(gameId);
         if (doc === null) throw new Error('no game');
-        await ctx.db.patch(gameId, { flow: storeFlow(lastBearOff(loadFlow(doc.flow))) });
+        await ctx.db.patch(gameId, { flow: storeFlow(lastBearOff(loadFlow(doc.flow)), null) });
       });
       return gameId;
     },

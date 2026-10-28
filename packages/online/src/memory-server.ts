@@ -68,7 +68,7 @@ import {
   answerPrompt,
   createOnlineMatch,
   loadFlow,
-  loadPreviousGame,
+  loadStored,
   playTurn,
   resign,
   storeFlow,
@@ -77,6 +77,7 @@ import {
   sideOf,
   toView,
 } from './online-game';
+import type { LoadedFlow, SteppedFlow } from './online-game';
 import { latestGames, summarizeGame } from './summaries';
 
 export interface MemoryGameServerOptions {
@@ -162,7 +163,8 @@ export interface MemoryGameServer {
   /**
    * Tests only: replaces the stored flow of a game, like a Convex test
    * that patches `games.flow`. The version, the deadline and the log stay
-   * as they are, and no view is sent. Call it before anyone subscribes.
+   * as they are, no `previousGame` is kept, and no view is sent. Call it
+   * before anyone subscribes.
    */
   setFlowForTest(gameId: string, flow: MatchFlow): void;
 }
@@ -232,7 +234,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const inviteListeners = new Set<InviteListener>();
   let nextId = 1;
 
-  function viewInput(game: MemoryGame) {
+  /** The view input of `game`, without its flow. */
+  function gameInput(game: MemoryGame) {
     return {
       gameId: game.gameId,
       version: game.version,
@@ -240,13 +243,12 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       pace: game.pace,
       turnDeadline: game.turnDeadline,
       players: game.players,
-      flow: loadFlow(game.flow),
-      previousGame: loadPreviousGame(game.flow),
     };
   }
 
   function viewOf(game: MemoryGame): OnlineGameView {
-    return toView(viewInput(game));
+    const { flow, previousGame } = loadStored(game.flow);
+    return toView({ ...gameInput(game), flow, previousGame });
   }
 
   /** The games of `playerId` with `status`, like the Convex `listMyGames`. */
@@ -254,7 +256,12 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     const summaries: GameSummary[] = [];
     for (const game of games.values()) {
       if (game.status !== status || sideOf(game.players, playerId) === null) continue;
-      summaries.push(summarizeGame({ ...viewInput(game), updatedAt: game.updatedAt }, playerId));
+      summaries.push(
+        summarizeGame(
+          { ...gameInput(game), flow: loadFlow(game.flow), updatedAt: game.updatedAt },
+          playerId,
+        ),
+      );
     }
     return latestGames(summaries);
   }
@@ -286,12 +293,21 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     });
   }
 
-  /** Saves the flow after a step: a version bump, its log rows and a new turn deadline. */
-  function save(game: MemoryGame, callerId: string, flow: MatchFlow, at: number): void {
+  /**
+   * Saves the flow after a step: a version bump, its log rows and a new
+   * turn deadline. `before` is what the step loaded its flow from.
+   */
+  function save(
+    game: MemoryGame,
+    callerId: string,
+    before: LoadedFlow,
+    flow: SteppedFlow,
+    at: number,
+  ): void {
     const version = game.version + 1;
     const saved: MemoryGame = {
       ...game,
-      flow: storeStep(game.flow, flow),
+      flow: storeStep(before, flow),
       status: matchStatus(flow),
       version,
       turnDeadline: nextDeadline(game.pace, flow, at),
@@ -304,7 +320,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
 
   /** The player the server waits for loses the current game. */
   function applyTimeout(game: MemoryGame, at: number): void {
-    save(game, SERVER_ACTOR, timeOut(loadFlow(game.flow), rng), at);
+    const before = loadStored(game.flow);
+    save(game, SERVER_ACTOR, before, timeOut(before.flow, rng), at);
   }
 
   /**
@@ -317,7 +334,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     gameId: string,
     expectedVersion: number | null,
     timed: boolean,
-    step: (flow: MatchFlow, side: PlayerId) => MatchFlow,
+    step: (flow: MatchFlow, side: PlayerId) => SteppedFlow,
   ): Promise<void> {
     await nextTick();
     try {
@@ -327,7 +344,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         applyTimeout(game, at);
         throw new OnlineGameError(TIMED_OUT_ERROR.code, TIMED_OUT_ERROR.message);
       }
-      save(game, callerId, step(loadFlow(game.flow), side), at);
+      const before = loadStored(game.flow);
+      save(game, callerId, before, step(before.flow, side), at);
     } catch (error) {
       throw toErrorData(error);
     }
@@ -404,7 +422,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       choice,
       pace,
       targetPoints,
-      flow: storeFlow(flow),
+      flow: storeFlow(flow, null),
       status: matchStatus(flow),
       version,
       turnDeadline: nextDeadline(pace, flow, at),
@@ -587,7 +605,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     setFlowForTest(gameId, flow) {
       const game = games.get(gameId);
       if (game === undefined) throw new Error(`no game ${gameId}`);
-      games.set(gameId, { ...game, flow: storeFlow(flow), status: matchStatus(flow) });
+      games.set(gameId, { ...game, flow: storeFlow(flow, null), status: matchStatus(flow) });
     },
   };
 }

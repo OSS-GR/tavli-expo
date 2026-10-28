@@ -16,10 +16,9 @@ export {
   answerPrompt,
   createOnlineMatch,
   deadlineAfter,
-  endedGame,
   isTimedOut,
   loadFlow,
-  loadPreviousGame,
+  loadStored,
   onlineGameRules,
   playTurn,
   resign,
@@ -30,7 +29,13 @@ export {
   toView,
   waitingFor,
 } from './online-game';
-export type { CreateOnlineMatchOptions, StoredFlow, ViewInput } from './online-game';
+export type {
+  CreateOnlineMatchOptions,
+  LoadedFlow,
+  SteppedFlow,
+  StoredFlow,
+  ViewInput,
+} from './online-game';
 export {
   SERVER_ACTOR,
   TIMED_OUT_ERROR,

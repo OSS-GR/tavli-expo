@@ -18,7 +18,7 @@ import { currentGameLabel } from '@/features/match/summary';
 import i18n from '@/i18n';
 import { botLevels, botRunner } from '@/services';
 
-import { onlineBoardStore } from './boardStore';
+import { gameEnd, onlineBoardStore } from './boardStore';
 import { clockText, clockTickMs } from './clock';
 import {
   DEV_BOT_ID,
@@ -429,6 +429,58 @@ describe('onlineBoardStore between games (#286)', () => {
     while (store.getState().view?.status === 'active') await timeOut(server);
     // Match end: the board shows the last view, nothing waits.
     expect(board.getState().flow).toBe(store.getState().flow);
+  });
+
+  it('shows the newest game when the board missed one, with no turn to fly (#299)', async () => {
+    const { server, gameId, store, board } = await openBoard(5);
+    // Nobody reads the board while two games time out (the phone was away).
+    const before = board.getState().flow;
+    for (let i = 0; i < 2; i++) {
+      jest.advanceTimersByTime(TURN_TIME_MS.live + 1);
+      expect(server.runDueTimeouts()).toBe(1);
+    }
+    await flush();
+    const view = store.getState().view!;
+    expect(view.status).toBe('active');
+    expect(view.match.games).toHaveLength(2);
+    expect(server.getGame(gameId)!.previousGame).toEqual(view.previousGame);
+
+    // The board holds game 2, the game the sheet shows (the newest record).
+    const held = board.getState().flow;
+    const record = held.match.games.at(-1)!;
+    expect(held.game).toEqual(view.previousGame);
+    expect(held.game.result).toEqual({
+      winner: record.winner,
+      points: record.points,
+      reason: 'timeout',
+    });
+    // Its last turn is not one from the board before: nothing flies or sounds.
+    expect(remoteTurn(before, held, 'white')).toBeNull();
+    const moveSounds: string[] = ['checkerPlace', 'checkerHit', 'bearOff'];
+    const events = viewEvents(before, held, 'white').map(({ event }) => event);
+    expect(events.filter((event) => moveSounds.includes(event))).toEqual([]);
+  });
+
+  it('does not show a previousGame that is not the newest game (an older server)', async () => {
+    const { server, store } = await openBoard(5);
+    const before = store.getState().flow!;
+    await timeOut(server);
+    const view = store.getState().view!;
+    const next = store.getState().flow!;
+    const ended = view.previousGame!;
+    expect(gameEnd(before, next, ended).game).toBe(ended);
+    // A game whose result is not the newest record: the board marks its own flow over.
+    const other = { ...ended, result: { ...ended.result!, points: ended.result!.points + 1 } };
+    const held = gameEnd(before, next, other);
+    expect(held.game).not.toBe(other);
+    expect(held.game.phase).toBe('game-over');
+    expect(held.game.state.board).toEqual(before.game.state.board);
+    const record = next.match.games.at(-1)!;
+    expect(held.game.result).toEqual({
+      winner: record.winner,
+      points: record.points,
+      reason: record.reason,
+    });
   });
 
   it('does not hold a game that ended before the board was made', async () => {
