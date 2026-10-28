@@ -6,6 +6,7 @@ import type { GameTransport, OnlineGameView } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { pickTurn } from '@tavli/online/testing';
 import { act, render, screen, within } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { hasOnlineAccount, rememberOnlineAccount } from '@/features/online/accountHint';
 import i18n from '@/i18n';
@@ -64,14 +65,30 @@ function rowIds(): string[] {
 }
 
 describe('<HomeOnlineGames />', () => {
-  it('shows nothing and makes no guest with no saved session', async () => {
+  it('keeps the account note when the session does not load, and makes no guest', async () => {
+    // Better Auth's ready() gives null with no network too: no sign-out.
     rememberOnlineAccount();
-    newGame();
+    const gameId = newGame();
+    const user = setupUser();
     await show();
-    expect(screen.queryByTestId('home-online-games')).toBeNull();
+    expect(
+      screen.getByText('Your online games did not load. Check the connection.'),
+    ).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(0);
-    // The session is gone: Home stops loading it at start.
+    expect(hasOnlineAccount()).toBe(true);
+    // The network is back: Try again loads the session and the list.
+    signIn();
+    await user.press(screen.getByRole('button', { name: 'Try again' }));
+    await flush();
+    expect(rowIds()).toEqual([gameId]);
+    // Only a sign-out forgets the account.
+    await act(async () => {
+      await auth!.signOut();
+    });
+    await flush();
+    expect(screen.queryByTestId('home-online-games')).toBeNull();
     expect(hasOnlineAccount()).toBe(false);
+    expect(onlineFake.authStore.guests).toBe(0);
   });
 
   it('says it is loading until the first list comes', async () => {
@@ -168,6 +185,26 @@ describe('<HomeOnlineGames />', () => {
     expect(rowIds()).toContain(second);
   });
 
+  it('sets the clocks right at once when the app comes back to the front', async () => {
+    // React Native's Jest setup makes `AppState.addEventListener` a mock.
+    const addListener = jest.mocked(AppState.addEventListener);
+    const firstCall = addListener.mock.calls.length;
+    signIn();
+    const gameId = newGame();
+    await show();
+    const row = screen.getByTestId(`online-game-${gameId}`);
+    expect(within(row).getByText('0–0 · 24 h left')).toBeOnTheScreen();
+    // Two hours in the background: the phone clock moves, no timer runs.
+    jest.setSystemTime(Date.now() + 2 * 60 * 60 * 1000);
+    expect(within(row).getByText('0–0 · 24 h left')).toBeOnTheScreen();
+    await act(async () => {
+      for (const [type, fn] of addListener.mock.calls.slice(firstCall)) {
+        if (type === 'change') (fn as (next: AppStateStatus) => void)('active');
+      }
+    });
+    expect(within(row).getByText('0–0 · 22 h left')).toBeOnTheScreen();
+  });
+
   it('counts the time down while it shows', async () => {
     signIn();
     const gameId = newGame('live');
@@ -228,6 +265,25 @@ describe('<HomeOnlineGames />', () => {
     await flush();
     expect(rowIds()).toEqual([gameId]);
     expect(screen.queryByTestId('online-games-stale')).toBeNull();
+  });
+
+  it('keeps the stale note when the list was empty and the connection fails', async () => {
+    signIn();
+    let fail: ((error: unknown) => void) | undefined;
+    const losing: GameTransport = {
+      ...games!,
+      watchMyGames(request, onList, onError) {
+        fail = onError;
+        return games!.watchMyGames(request, onList);
+      },
+    };
+    await show(losing);
+    expect(screen.queryByTestId('home-online-games')).toBeNull();
+    await act(async () => fail?.(new Error('connection lost')));
+    expect(
+      screen.getByText('This list may be out of date. Check the connection.'),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
   });
 
   it('hides the list after a sign-out, and forgets the account', async () => {

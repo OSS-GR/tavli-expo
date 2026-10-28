@@ -8,7 +8,10 @@
  *
  * The note is set when a screen finds or makes the account
  * (`signInForOnline`, `useOnlineAccount`, `useOnlineConnection`). Home
- * removes it when the saved session is gone. It holds no id: only `1`,
+ * removes it only on a sign-out (`auth.onChange(null)`). A session that
+ * `ready()` gives as `null` keeps it: Better Auth gives `null` when it
+ * cannot reach the server too, and a launch with no network must not
+ * hide the list for good. It holds no id: only `1`,
  * under `ONLINE_ACCOUNT_KEY` in the `Storage` port. It never leaves the
  * phone.
  */
@@ -16,7 +19,7 @@ import { storage } from '@/services';
 
 export const ONLINE_ACCOUNT_KEY = 'onlineAccount';
 
-/** True when an online account was used on this phone, and Home did not find it gone since. */
+/** True when an online account was used on this phone, and nobody signed out since. */
 export function hasOnlineAccount(): boolean {
   try {
     return storage.getString(ONLINE_ACCOUNT_KEY) === '1';

@@ -59,16 +59,19 @@ export function OnlineGameList({
     );
   }
   const { games, offset } = state;
-  if (games.length === 0) {
-    return emptyText === undefined ? null : (
+  const empty =
+    games.length === 0 && emptyText !== undefined ? (
       <Text testID="online-games-empty" style={styles.note}>
         {emptyText}
       </Text>
-    );
-  }
+    ) : null;
+  // No game and no failure: only the empty text. After a failure the
+  // stale note shows even with no game: the list may be out of date.
+  if (games.length === 0 && !state.failed) return empty;
   const shown = limit === undefined ? games : games.slice(0, limit);
   return (
     <View style={styles.list}>
+      {empty}
       {shown.map((game) => (
         <OnlineGameRow
           key={game.gameId}

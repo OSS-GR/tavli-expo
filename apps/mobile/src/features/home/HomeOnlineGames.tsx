@@ -1,8 +1,8 @@
 /**
  * "Your online games" on Home (#297): the first few active online games
  * of the saved session, "Your turn" first, live from the server. It shows
- * nothing with no saved session or no active game. "See all" opens the
- * whole list.
+ * nothing after a sign-out, or with no active game and no failure. "See
+ * all" opens the whole list.
  */
 import type { AuthProvider, GameTransport } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
@@ -33,7 +33,8 @@ export function HomeOnlineGames({ auth, games, focused, onOpen, onSeeAll }: Home
   const shown = state.status === 'loaded' ? state.games.slice(0, HOME_GAME_ROWS) : [];
   const now = usePhoneClock(listTickMs(shown), focused);
   if (state.status === 'signedOut') return null;
-  if (state.status === 'loaded' && state.games.length === 0) return null;
+  // No active game: no card, unless the list may be out of date.
+  if (state.status === 'loaded' && state.games.length === 0 && !state.failed) return null;
   const title = t('home.online.title');
   return (
     <View testID="home-online-games" style={styles.section}>

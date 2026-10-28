@@ -1152,11 +1152,13 @@ describe('your online games on Home (#297)', () => {
     expect(router.getPathname()).toBe(`/game/${ids[0]}`);
   });
 
-  it('"See all" with nobody signed in says there is no game, and makes no account', async () => {
+  it('"See all" with no session says it did not load, and makes no account', async () => {
+    // ready() gives null: maybe no network, so the list offers Try again.
     await renderRouter('./src/app', { initialUrl: '/online-games' });
     expect(
-      await screen.findByText('No online games right now. Play a friend to start one.'),
+      await screen.findByText('Your online games did not load. Check the connection.'),
     ).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(0);
   });
 });

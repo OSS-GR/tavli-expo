@@ -9,6 +9,7 @@
 import type { AuthProvider, AuthUser, GameSummary, GameTransport } from '@tavli/contracts';
 import type { TFunction } from 'i18next';
 import { useCallback, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { forgetOnlineAccount } from './accountHint';
 import { clockText, clockTickMs } from './clock';
@@ -34,7 +35,11 @@ export type MyGamesState =
       readonly offset: number;
       readonly failed: boolean;
     }
-  /** The session or the first list did not load. `retry` tries again. */
+  /**
+   * The session or the first list did not load. `retry` tries again. A
+   * session that `ready()` gives as `null` counts as this too: Better Auth
+   * gives `null` when it cannot reach the server, so that is no sign-out.
+   */
   | { readonly status: 'failed' };
 
 /** Your turn first; each part keeps the server order (newest change first). */
@@ -104,6 +109,11 @@ export function gameRowText(
  * session (`auth.ready()`) and follows sign-in and sign-out
  * (`auth.onChange`); it never makes an account. A failure after a list
  * came keeps that list (`failed: true`); `retry` starts the watch again.
+ *
+ * Only `onChange(null)` is a sign-out: it hides the list and forgets the
+ * account note (`forgetOnlineAccount`). `ready()` giving `null` may only
+ * mean no network (Better Auth's `ready()` never rejects), so it shows
+ * `failed` and keeps the note; `retry` loads the session again.
  */
 export function useMyOnlineGames(
   auth: AuthProvider,
@@ -136,13 +146,14 @@ export function useMyOnlineGames(
       stop?.();
       stop = null;
       if (id === null) {
-        // The saved session is gone: Home stops loading it at start.
+        // Signed out: Home stops loading the session at start.
         forgetOnlineAccount();
         setState({ status: 'signedOut' });
         return;
       }
-      // Another user's list is not this user's: load it from scratch.
-      if (switched) setState({ status: 'loading' });
+      // Another user's list is not this user's: load it from scratch. A
+      // retry keeps the old list of the same user until the new one comes.
+      setState((last) => (switched || last.status !== 'loaded' ? { status: 'loading' } : last));
       stop = games.watchMyGames(
         { status: 'active' },
         (list) => {
@@ -158,8 +169,14 @@ export function useMyOnlineGames(
       );
     };
 
+    /** No session from `ready()`: maybe no network, so no sign-out. */
+    const loaded = (user: AuthUser | null) => {
+      if (user !== null) follow(user);
+      else if (current === undefined) fail();
+    };
+
     const unsubscribe = auth.onChange(follow);
-    auth.ready().then(follow, fail);
+    auth.ready().then(loaded, fail);
     return () => {
       live = false;
       unsubscribe();
@@ -177,7 +194,9 @@ export function useMyOnlineGames(
 
 /**
  * The phone time, updated every `tickMs` while `running` (a list with a
- * turn timer on a screen in view). `null` never updates.
+ * turn timer on a screen in view), and at once when it starts running or
+ * the app comes back to the front (timers run late after the background).
+ * `null` never updates.
  */
 export function usePhoneClock(tickMs: number | null, running: boolean): number {
   const [now, setNow] = useState(() => Date.now());
@@ -187,9 +206,13 @@ export function usePhoneClock(tickMs: number | null, running: boolean): number {
     // At once too: the screen may come back into view hours later.
     const first = setTimeout(tick, 0);
     const timer = setInterval(tick, tickMs);
+    const front = AppState.addEventListener('change', (next) => {
+      if (next === 'active') tick();
+    });
     return () => {
       clearTimeout(first);
       clearInterval(timer);
+      front.remove();
     };
   }, [tickMs, running]);
   return now;
