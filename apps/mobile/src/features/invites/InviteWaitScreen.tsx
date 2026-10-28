@@ -7,7 +7,9 @@
  *   (`onGame`) after `JOINED_OPEN_MS`, or at once with "Open the game".
  * - Declined, expired, cancelled, not found and "did not load" (with Try
  *   again) each have a card with "Make a new invite" and Home.
- * - Cancel takes the invite back and goes Home.
+ * - Cancel takes the invite back and goes Home. The watch sees that
+ *   cancel too; the screen keeps that view back until Cancel answers, so
+ *   no "cancelled" card shows (or is read) on the way Home.
  * - Screen readers: each card moves focus to its title and is read once.
  *   Large fonts scroll: no text has a line limit.
  *
@@ -58,6 +60,10 @@ export function InviteWaitScreen({
   const [attempt, setAttempt] = useState(0);
   const [cancelling, setCancelling] = useState(false);
   const [cancelFailed, setCancelFailed] = useState(false);
+  // True while this phone's Cancel waits for the server.
+  const cancelPending = useRef(false);
+  // A "cancelled" view that came while Cancel waited.
+  const heldCancel = useRef<WaitState | null>(null);
   // False once the screen is gone (Cancel answers later).
   const mounted = useRef(true);
   useEffect(() => {
@@ -79,7 +85,12 @@ export function InviteWaitScreen({
       code,
       (view) => {
         const next = waitStateOfView(view);
-        setState(next);
+        if (next.kind === 'cancelled' && cancelPending.current) {
+          // Most likely our own Cancel: it goes Home when it answers.
+          heldCancel.current = next;
+        } else {
+          setState(next);
+        }
         // The invite never changes again: stop watching.
         if (isFinalWait(next)) finish();
       },
@@ -97,13 +108,24 @@ export function InviteWaitScreen({
     if (cancelling) return;
     setCancelling(true);
     setCancelFailed(false);
+    cancelPending.current = true;
+    heldCancel.current = null;
     invites.cancelInvite(code).then(
       () => {
+        cancelPending.current = false;
         if (mounted.current) onHome();
       },
       (error: unknown) => {
+        cancelPending.current = false;
         if (!mounted.current) return;
         setCancelling(false);
+        // Cancelled on another phone or screen: show what the watch saw.
+        const held = heldCancel.current;
+        heldCancel.current = null;
+        if (held !== null) {
+          setState(held);
+          return;
+        }
         const next = waitStateOfCancelError(error);
         if (next !== null) setState(next);
         // A closed invite: the watch shows what happened (the friend may have just accepted).

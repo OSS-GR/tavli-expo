@@ -13,6 +13,7 @@ import {
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, MAX_OPEN_INVITES } from '@tavli/online';
 import { act, screen } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
 
 import i18n from '@/i18n';
 
@@ -199,6 +200,14 @@ describe('FriendSetupScreen', () => {
     await act(async () => {
       await i18n.changeLanguage('en');
     });
+  });
+
+  it('screen readers: focus moves to the title', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent');
+    await open(setup());
+    await screen.findByRole('header', { name: 'Play a friend online' });
+    expect(focus).toHaveBeenCalledWith(expect.anything(), 'focus');
+    focus.mockRestore();
   });
 
   it('goes back with the back button', async () => {

@@ -9,6 +9,7 @@
  *   guest, once.
  * - It talks to the server only through the `Invites` port.
  * - A new invite sends `invite_created` (no code, no ids).
+ * - Screen readers: focus moves to the title when the screen opens.
  * - Large fonts scroll: no text has a line limit.
  *
  * Navigation stays in the route (`app/friend/index.tsx`).
@@ -32,6 +33,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
+import { useFocusOnShow } from '@/features/accessibility/focus';
 import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
 import { signInForOnline } from '@/features/online/account';
 
@@ -65,6 +67,7 @@ export function FriendSetupScreen({
   const [pace, setPace] = useState<OnlineGamePace>('live');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<Problem | null>(null);
+  const titleRef = useFocusOnShow();
   // False once the screen is gone (the server answers later).
   const mounted = useRef(true);
   useEffect(() => {
@@ -133,7 +136,7 @@ export function FriendSetupScreen({
             {'‹'}
           </Text>
         </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
+        <Text ref={titleRef} style={styles.title} accessibilityRole="header">
           {t('friend.title')}
         </Text>
         <View style={styles.headerSpace} />

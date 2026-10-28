@@ -156,14 +156,70 @@ describe('InviteWaitScreen', () => {
     expect(onGame).toHaveBeenCalledTimes(1);
   });
 
-  it('Cancel takes the invite back and goes Home', async () => {
+  it('Cancel takes the invite back and goes Home, with no "cancelled" card on the way', async () => {
     const user = setupUser();
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const { code, mine, server } = setup();
-    const { onHome } = await openWait(code, mine);
+    // The watch sees the cancel before Cancel answers, like Convex.
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const invites: Invites = {
+      ...mine,
+      cancelInvite: async (text) => {
+        await mine.cancelInvite(text);
+        await held;
+      },
+    };
+    const { onHome } = await openWait(code, invites);
     await user.press(await screen.findByRole('button', { name: 'Cancel the invite' }));
     await flush();
     expect(server.getInvite(code)?.status).toBe('cancelled');
+    expect(screen.queryByTestId('invite-wait-cancelled')).toBeNull();
+    expect(onHome).not.toHaveBeenCalled();
+    await act(async () => release());
+    await flush();
     expect(onHome).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('invite-wait-cancelled')).toBeNull();
+    expect(announce).not.toHaveBeenCalledWith(expect.stringContaining('The invite is cancelled'));
+    announce.mockRestore();
+  });
+
+  it('a Cancel that fails after the invite was cancelled elsewhere shows "cancelled"', async () => {
+    const user = setupUser();
+    const { code, mine } = setup();
+    const invites: Invites = {
+      ...mine,
+      // Another screen cancelled it just before: this Cancel gets INVITE_CLOSED.
+      cancelInvite: async (text) => {
+        await mine.cancelInvite(text);
+        return await mine.cancelInvite(text);
+      },
+    };
+    const { onHome } = await openWait(code, invites);
+    await user.press(await screen.findByRole('button', { name: 'Cancel the invite' }));
+    await flush();
+    expect(screen.getByRole('header', { name: 'The invite is cancelled' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('invite-wait-cancel-failed')).toBeNull();
+    expect(onHome).not.toHaveBeenCalled();
+  });
+
+  it('screen readers: focus moves to the title of each card', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent');
+    const { code, mine, friend } = setup();
+    await openWait(code, mine);
+    await screen.findByRole('header', { name: 'Send the invite' });
+    const opened = focus.mock.calls.length;
+    expect(focus).toHaveBeenLastCalledWith(expect.anything(), 'focus');
+    await act(async () => {
+      await friend.acceptInvite(code);
+    });
+    await flush();
+    expect(screen.getByRole('header', { name: 'Your friend joined' })).toBeOnTheScreen();
+    expect(focus.mock.calls.length).toBeGreaterThan(opened);
+    expect(focus).toHaveBeenLastCalledWith(expect.anything(), 'focus');
+    focus.mockRestore();
   });
 
   it('a Cancel that does not reach the server says so, and keeps the invite', async () => {

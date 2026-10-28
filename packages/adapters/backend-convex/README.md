@@ -23,15 +23,15 @@ Version: `convex` 1.46.0, a peer dependency (the app installs it). Keep it on th
 
 ## Files
 
-| File                    | Job |
-| --- | --- |
-| `src/transport.ts`      | `createConvexGameTransport({ client })`: the port on any object with `onUpdate`, `query` and `mutation` (`ConvexGameClient`) |
+| File                    | Job                                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/transport.ts`      | `createConvexGameTransport({ client })`: the port on any object with `onUpdate`, `query` and `mutation` (`ConvexGameClient`)                |
 | `src/functions.ts`      | `GAME_FUNCTIONS` and `INVITE_FUNCTIONS`: typed references to the server functions, by name (`GAME_FUNCTION_NAMES`, `INVITE_FUNCTION_NAMES`) |
-| `src/invites.ts`        | `createConvexInvites({ client })`: the `Invites` port, and `toInviteError` |
-| `src/client.ts`         | `createConvexGameTransportFromUrl(url, auth)`, `createConvexClient(url, auth)` and `authTokenFetcher(auth)` |
-| `src/transport.test.ts` | The mapping on a fake client: views, `NOT_FOUND`, errors, `TIMED_OUT`, unsubscribe, `listMyGames` |
-| `src/client.test.ts`    | The token fetcher and the URL factory (`convex/browser` mocked, no socket) |
-| `src/invites.test.ts`   | The invites mapping on a fake client: arguments, copies, errors, `watchInvite` and its stop |
+| `src/invites.ts`        | `createConvexInvites({ client })`: the `Invites` port, and `toInviteError`                                                                  |
+| `src/client.ts`         | `createConvexGameTransportFromUrl(url, auth)`, `createConvexClient(url, auth)` and `authTokenFetcher(auth)`                                 |
+| `src/transport.test.ts` | The mapping on a fake client: views, `NOT_FOUND`, errors, `TIMED_OUT`, unsubscribe, `listMyGames`                                           |
+| `src/client.test.ts`    | The token fetcher and the URL factory (`convex/browser` mocked, no socket)                                                                  |
+| `src/invites.test.ts`   | The invites mapping on a fake client: arguments, copies, errors, `watchInvite` and its stop                                                 |
 
 The contract checks (`gameTransportContract`) run in `apps/server`, against the real Convex functions with convex-test: `apps/server/convex/convexTransport.test.ts`. That file also checks `GAME_FUNCTIONS` against the server's generated `api`, in name and type. The `Invites` contract checks (`invitesContract`) and the `INVITE_FUNCTIONS` check run the same way in `apps/server/convex/convexInvites.test.ts`. Both use the fake clients in `apps/server/convex/test.network.ts`.
 
