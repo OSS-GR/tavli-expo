@@ -1,7 +1,10 @@
 // The invite functions (#252), run offline with convex-test. Codes come
 // from the server's own RNG (Web Crypto). Each call is signed in with a
-// convex-test identity (#131): `as(t, id)` calls as the user `id`.
+// convex-test identity (#131): `as(t, id)` calls as the user `id`. The
+// players are Better Auth users (`authUsers`), since the calls that save
+// the caller's id check that the account exists (#306).
 
+import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -25,16 +28,20 @@ import { MAX_OPEN_INVITES } from '@tavli/online';
 
 import { api } from './_generated/api';
 import schema from './schema';
-import { modules } from './test.setup';
+import { authUsers, modules } from './test.setup';
 
-const ALICE = 'alice';
-const BOB = 'bob';
-const CAROL = 'carol';
+// The players: new Better Auth users for each test, made by `setup()`.
+let ALICE = '';
+let BOB = '';
+let CAROL = '';
 
-type Tester = ReturnType<typeof setup>;
+type Tester = Awaited<ReturnType<typeof setup>>;
 
-function setup() {
-  return convexTest(schema, modules);
+async function setup() {
+  const t = convexTest(schema, modules);
+  betterAuthTest.register(t);
+  [ALICE = '', BOB = '', CAROL = ''] = await authUsers(t, 3);
+  return t;
 }
 
 /** Calls as the signed-in user `id` (the token `subject`, the player id). */
@@ -101,17 +108,17 @@ function otherCode(code: string): string {
 
 describe('createInvite', () => {
   it('returns a code of 8 characters from the alphabet', async () => {
-    const t = setup();
+    const t = await setup();
     // One player per invite: one player may have only MAX_OPEN_INVITES open.
-    for (let i = 0; i < 20; i++) {
-      const code = await createInvite(t, `player-${i}`);
+    for (const player of await authUsers(t, 20)) {
+      const code = await createInvite(t, player);
       expect(code).toMatch(/^[2-9A-Z]{8}$/);
       for (const char of code) expect(INVITE_CODE_ALPHABET).toContain(char);
     }
   });
 
   it('makes an open invite that expires in 24 hours', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t, ALICE, 'plakoto', 5, 'async');
     expect(await invite(t, code)).toEqual({
       code,
@@ -126,7 +133,7 @@ describe('createInvite', () => {
   });
 
   it('tries again when a code is taken', async () => {
-    const t = setup();
+    const t = await setup();
     // The first call reads zeros: its first code is 22222222. The second
     // call gives zeros again for the first code (a clash), then ones.
     const spy = vi.spyOn(globalThis.crypto, 'getRandomValues');
@@ -147,7 +154,7 @@ describe('createInvite', () => {
   });
 
   it('rejects a bad match length and the player id "server"', async () => {
-    const t = setup();
+    const t = await setup();
     await rejectsWith(createInvite(t, ALICE, 'portes', 0), 'BAD_REQUEST');
     await rejectsWith(createInvite(t, ALICE, 'portes', 2.5), 'BAD_REQUEST');
     await rejectsWith(createInvite(t, 'server'), 'BAD_REQUEST');
@@ -171,7 +178,7 @@ describe('the cap on open invites (#275)', () => {
   }
 
   it('rejects one more open invite with TOO_MANY_INVITES, and saves nothing', async () => {
-    const t = setup();
+    const t = await setup();
     await fill(t);
     await rejectsWith(createInvite(t), 'TOO_MANY_INVITES');
     // The cap comes first, also for a call with a bad match length.
@@ -185,13 +192,13 @@ describe('the cap on open invites (#275)', () => {
   });
 
   it('another player is not affected', async () => {
-    const t = setup();
+    const t = await setup();
     await fill(t);
     expect(await createInvite(t, BOB)).toMatch(/^[2-9A-Z]{8}$/);
   });
 
   it('an accepted, declined or cancelled invite frees a place', async () => {
-    const t = setup();
+    const t = await setup();
     const [accepted, declined, cancelled] = await fill(t);
     await as(t, BOB).mutation(api.invites.acceptInvite, { code: accepted! });
     await createInvite(t);
@@ -205,7 +212,7 @@ describe('the cap on open invites (#275)', () => {
   });
 
   it('an expired invite frees a place at expiresAt, also before the scheduler runs', async () => {
-    const t = setup();
+    const t = await setup();
     await fill(t);
     vi.setSystemTime(START + INVITE_TIME_MS - 1);
     await rejectsWith(createInvite(t), 'TOO_MANY_INVITES');
@@ -218,7 +225,7 @@ describe('the cap on open invites (#275)', () => {
   });
 
   it('places freed by the scheduled expiry stay free', async () => {
-    const t = setup();
+    const t = await setup();
     await fill(t);
     await wait(t, INVITE_TIME_MS);
     const rows = await rowsOf(t, ALICE);
@@ -230,14 +237,14 @@ describe('the cap on open invites (#275)', () => {
 
 describe('getInvite', () => {
   it('finds a code in any case, with spaces at the ends', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     expect((await invite(t, code.toLowerCase())).code).toBe(code);
     expect((await invite(t, ` ${code} `)).code).toBe(code);
   });
 
   it('returns null for an unknown or malformed code', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     expect(await as(t, BOB).query(api.invites.getInvite, { code: otherCode(code) })).toBeNull();
     expect(await as(t, BOB).query(api.invites.getInvite, { code: code.slice(1) })).toBeNull();
@@ -248,7 +255,7 @@ describe('getInvite', () => {
 
 describe('acceptInvite', () => {
   it('starts the game: the inviter plays white, and getGame shows it', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t, ALICE, 'fevga', 3, 'async');
     const gameId = await as(t, BOB).mutation(api.invites.acceptInvite, { code });
     const game = await as(t, BOB).query(api.games.getGame, { gameId });
@@ -275,7 +282,7 @@ describe('acceptInvite', () => {
   });
 
   it('accepts a code in any case', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     const gameId = await as(t, BOB).mutation(api.invites.acceptInvite, {
       code: code.toLowerCase(),
@@ -284,7 +291,7 @@ describe('acceptInvite', () => {
   });
 
   it('fails the second time, for the same and for another player', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     await as(t, BOB).mutation(api.invites.acceptInvite, { code });
     await rejectsWith(as(t, BOB).mutation(api.invites.acceptInvite, { code }), 'INVITE_CLOSED');
@@ -294,7 +301,7 @@ describe('acceptInvite', () => {
   });
 
   it('rejects your own invite, and makes no game', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     await rejectsWith(as(t, ALICE).mutation(api.invites.acceptInvite, { code }), 'OWN_INVITE');
     expect((await invite(t, code)).status).toBe('open');
@@ -303,7 +310,7 @@ describe('acceptInvite', () => {
   });
 
   it('rejects an unknown code and a malformed code', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     await rejectsWith(
       as(t, BOB).mutation(api.invites.acceptInvite, { code: otherCode(code) }),
@@ -320,7 +327,7 @@ describe('acceptInvite', () => {
   });
 
   it('rejects the token subject "server" and an empty one in every call', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     for (const id of ['server', '', '  ']) {
       const caller = as(t, id);
@@ -335,7 +342,7 @@ describe('acceptInvite', () => {
   });
 
   it('a game error rolls the whole call back', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     // A bad match length can only get in by hand: createInvite rejects it.
     await t.run(async (ctx) => {
@@ -357,7 +364,7 @@ describe('acceptInvite', () => {
 
 describe('declineInvite and cancelInvite', () => {
   it('a friend declines: the invite closes and cannot be accepted', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     await as(t, BOB).mutation(api.invites.declineInvite, { code });
     expect((await invite(t, code)).status).toBe('declined');
@@ -367,7 +374,7 @@ describe('declineInvite and cancelInvite', () => {
   });
 
   it('the inviter cannot decline, and another player cannot cancel', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     await rejectsWith(as(t, ALICE).mutation(api.invites.declineInvite, { code }), 'OWN_INVITE');
     await rejectsWith(as(t, BOB).mutation(api.invites.cancelInvite, { code }), 'NOT_YOUR_INVITE');
@@ -375,7 +382,7 @@ describe('declineInvite and cancelInvite', () => {
   });
 
   it('the inviter cancels: the invite closes and cannot be accepted', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     await as(t, ALICE).mutation(api.invites.cancelInvite, { code: code.toLowerCase() });
     expect((await invite(t, code)).status).toBe('cancelled');
@@ -383,7 +390,7 @@ describe('declineInvite and cancelInvite', () => {
   });
 
   it('rejects an unknown code', async () => {
-    const t = setup();
+    const t = await setup();
     await rejectsWith(
       as(t, BOB).mutation(api.invites.declineInvite, { code: 'ABCD2345' }),
       'INVITE_NOT_FOUND',
@@ -397,7 +404,7 @@ describe('declineInvite and cancelInvite', () => {
 
 describe('expiry (24 hours)', () => {
   it('an invite is open until 24 hours, then the server marks it expired', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     await wait(t, INVITE_TIME_MS - 1);
     expect((await invite(t, code)).status).toBe('open');
@@ -413,7 +420,7 @@ describe('expiry (24 hours)', () => {
   });
 
   it('accept, decline and cancel fail on an expired invite', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     await wait(t, INVITE_TIME_MS);
     await rejectsWith(as(t, BOB).mutation(api.invites.acceptInvite, { code }), 'INVITE_EXPIRED');
@@ -424,7 +431,7 @@ describe('expiry (24 hours)', () => {
   });
 
   it('at expiresAt the invite is expired, also before the scheduler runs', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     // The clock reaches the time, but the scheduled expiry has not run.
     vi.setSystemTime(START + INVITE_TIME_MS);
@@ -434,7 +441,7 @@ describe('expiry (24 hours)', () => {
   });
 
   it('an accept just in time works, and the expiry later does nothing', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t, ALICE, 'portes', 3, 'async');
     vi.setSystemTime(START + INVITE_TIME_MS - 1);
     const gameId = await as(t, BOB).mutation(api.invites.acceptInvite, { code });
@@ -443,7 +450,7 @@ describe('expiry (24 hours)', () => {
   });
 
   it('the expiry leaves a declined or cancelled invite as it is', async () => {
-    const t = setup();
+    const t = await setup();
     const declined = await createInvite(t);
     const cancelled = await createInvite(t);
     await as(t, BOB).mutation(api.invites.declineInvite, { code: declined });
@@ -456,7 +463,7 @@ describe('expiry (24 hours)', () => {
 
 describe('listMyInvites', () => {
   it('lists the open invites the caller sent, newest first', async () => {
-    const t = setup();
+    const t = await setup();
     const first = await createInvite(t, ALICE);
     await wait(t, 1000);
     const second = await createInvite(t, ALICE, 'tavli', 5);
@@ -479,7 +486,7 @@ describe('listMyInvites', () => {
   });
 
   it('drops invites once they expire', async () => {
-    const t = setup();
+    const t = await setup();
     const old = await createInvite(t, ALICE);
     await wait(t, INVITE_TIME_MS / 2);
     const fresh = await createInvite(t, ALICE);
@@ -492,7 +499,7 @@ describe('listMyInvites', () => {
 
 describe('sign-in (#131)', () => {
   it('refuses every call without a sign-in, and saves nothing', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t);
     await rejectsWith(
       t.mutation(api.invites.createInvite, { choice: 'portes', targetPoints: 3, pace: 'live' }),
@@ -511,8 +518,23 @@ describe('sign-in (#131)', () => {
     expect(rows).toHaveLength(1);
   });
 
+  it('the calls that save the caller’s id refuse a token with no account (#306)', async () => {
+    const t = await setup();
+    const code = await createInvite(t);
+    const ghost = as(t, 'no-such-user');
+    await rejectsWith(createInvite(t, 'no-such-user'), 'NOT_SIGNED_IN');
+    await rejectsWith(ghost.mutation(api.invites.acceptInvite, { code }), 'NOT_SIGNED_IN');
+    await rejectsWith(ghost.mutation(api.invites.declineInvite, { code }), 'NOT_SIGNED_IN');
+    // The reads skip the check: they save nothing.
+    expect((await ghost.query(api.invites.getInvite, { code }))?.status).toBe('open');
+    expect(await ghost.query(api.invites.listMyInvites, {})).toEqual([]);
+    const rows = await t.run(async (ctx) => ctx.db.query('invites').collect());
+    expect(rows).toHaveLength(1);
+    expect(await t.run(async (ctx) => ctx.db.query('games').collect())).toEqual([]);
+  });
+
   it('the inviter is the signed-in user: the invite, the game and the list use that id', async () => {
-    const t = setup();
+    const t = await setup();
     const code = await createInvite(t, ALICE);
     expect((await invite(t, code)).from).toBe(ALICE);
     expect((await as(t, ALICE).query(api.invites.listMyInvites, {})).map((i) => i.code)).toEqual([
@@ -531,8 +553,8 @@ describe('sign-in (#131)', () => {
  * client rejects with a `ConvexError`; the port rejects with its `data`,
  * so this subject unwraps it, as a client adapter will.
  */
-function contractSubject(): InvitesContractSubject {
-  const t = setup();
+async function contractSubject(): Promise<InvitesContractSubject> {
+  const t = await setup();
   const ids = { inviter: ALICE, friend: BOB, other: CAROL } as const;
   const unwrap = (error: unknown) => {
     throw (error as { data?: unknown }).data ?? error;
@@ -558,6 +580,6 @@ function contractSubject(): InvitesContractSubject {
 
 describe('Invites contract (Convex functions)', () => {
   for (const check of invitesContract()) {
-    it(check.name, () => check.run(contractSubject()));
+    it(check.name, async () => check.run(await contractSubject()));
   }
 });

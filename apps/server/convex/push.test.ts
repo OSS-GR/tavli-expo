@@ -1,8 +1,11 @@
 // Push tokens and "your turn" pushes (#280), run offline with convex-test.
 // The sender is a recording provider (`setPushProvider`), so no test
 // reaches the network. Each push runs as a scheduled action after the
-// save: `flush` moves the fake clock by 0 ms and waits for it.
+// save: `flush` moves the fake clock by 0 ms and waits for it. Alice and
+// Bob are Better Auth users (`authUsers`): `registerPushToken` checks
+// that the account exists (#306).
 
+import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,7 +17,7 @@ import type {
   RecordingPushProvider,
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
-import type { PlayerId } from '@tavli/engine';
+import type { PerPlayer, PlayerId } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
 import { motherPin } from '@tavli/online/testing';
 
@@ -23,19 +26,24 @@ import type { Id } from './_generated/dataModel';
 import { MAX_PUSH_TOKENS_PER_PLAYER, PUSH_RETRY_MS, TURN_PUSH_TEXT } from './model/push';
 import { setPushProvider } from './push';
 import schema from './schema';
-import { modules, pickTurn } from './test.setup';
+import { authUsers, modules, pickTurn } from './test.setup';
 
-const ALICE = 'alice';
-const BOB = 'bob';
-const PLAYERS = { white: ALICE, black: BOB };
+// The players: new Better Auth users for each test, made by `setup()`.
+let ALICE = '';
+let BOB = '';
+let PLAYERS: PerPlayer<string> = { white: ALICE, black: BOB };
 const ALICE_TOKEN = 'ExponentPushToken[alice-phone]';
 const BOB_TOKEN = 'ExponentPushToken[bob-phone]';
 const TOKEN_OF: Record<PlayerId, string> = { white: ALICE_TOKEN, black: BOB_TOKEN };
 
-type Tester = ReturnType<typeof setup>;
+type Tester = Awaited<ReturnType<typeof setup>>;
 
-function setup() {
-  return convexTest(schema, modules);
+async function setup() {
+  const t = convexTest(schema, modules);
+  betterAuthTest.register(t);
+  [ALICE = '', BOB = ''] = await authUsers(t, 2);
+  PLAYERS = { white: ALICE, black: BOB };
+  return t;
 }
 
 function as(t: Tester, id: string) {
@@ -136,7 +144,7 @@ async function registerBoth(t: Tester) {
 
 describe('registerPushToken and removePushToken', () => {
   it('saves the caller’s token once, and removes it', async () => {
-    const t = setup();
+    const t = await setup();
     await register(t, ALICE, ALICE_TOKEN);
     vi.setSystemTime(START + 1000);
     await as(t, ALICE).mutation(api.push.registerPushToken, {
@@ -158,7 +166,7 @@ describe('registerPushToken and removePushToken', () => {
   });
 
   it('needs a sign-in', async () => {
-    const t = setup();
+    const t = await setup();
     await rejectsWith(
       t.mutation(api.push.registerPushToken, { token: ALICE_TOKEN, platform: 'ios' }),
       'NOT_SIGNED_IN',
@@ -169,8 +177,14 @@ describe('registerPushToken and removePushToken', () => {
     );
   });
 
+  it('registerPushToken refuses a token with no account, and saves nothing (#306)', async () => {
+    const t = await setup();
+    await rejectsWith(register(t, 'no-such-user', ALICE_TOKEN), 'NOT_SIGNED_IN');
+    expect(await tokens(t)).toEqual([]);
+  });
+
   it('rejects a token that is not an Expo push token', async () => {
-    const t = setup();
+    const t = await setup();
     for (const token of ['', 'hello', 'ExponentPushToken[]', 'ExponentPushToken[a b]']) {
       await rejectsWith(
         as(t, ALICE).mutation(api.push.registerPushToken, { token, platform: 'ios' }),
@@ -182,7 +196,7 @@ describe('registerPushToken and removePushToken', () => {
   });
 
   it('a stranger cannot remove another player’s token', async () => {
-    const t = setup();
+    const t = await setup();
     await register(t, ALICE, ALICE_TOKEN);
     await as(t, 'eve').mutation(api.push.removePushToken, { token: ALICE_TOKEN });
     expect(await tokens(t)).toEqual([`${ALICE}: ${ALICE_TOKEN}`]);
@@ -190,14 +204,14 @@ describe('registerPushToken and removePushToken', () => {
 
   it('a token registered by another player moves to that player', async () => {
     // The phone signed in to another account.
-    const t = setup();
+    const t = await setup();
     await register(t, ALICE, ALICE_TOKEN);
     await register(t, BOB, ALICE_TOKEN);
     expect(await tokens(t)).toEqual([`${BOB}: ${ALICE_TOKEN}`]);
   });
 
   it(`keeps at most ${MAX_PUSH_TOKENS_PER_PLAYER} tokens per player: a new one drops the oldest`, async () => {
-    const t = setup();
+    const t = await setup();
     const phone = (i: number) => `ExpoPushToken[phone-${i}]`;
     for (let i = 0; i <= MAX_PUSH_TOKENS_PER_PLAYER; i++) {
       vi.setSystemTime(START + i * 1000);
@@ -225,7 +239,7 @@ describe('registerPushToken and removePushToken', () => {
   it('the cap never drops the token just registered, even when the others look newer', async () => {
     // Another call's server clock can be ahead: its rows then sort after
     // the new one.
-    const t = setup();
+    const t = await setup();
     const phone = (i: number) => `ExpoPushToken[phone-${i}]`;
     await t.run(async (ctx) => {
       for (let i = 0; i < MAX_PUSH_TOKENS_PER_PLAYER; i++) {
@@ -247,7 +261,7 @@ describe('registerPushToken and removePushToken', () => {
 
 describe('"your turn" pushes', () => {
   it('a turn in an async game sends one push to the other player', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     await registerBoth(t);
@@ -280,7 +294,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a live game sends none', async () => {
-    const t = setup();
+    const t = await setup();
     await registerBoth(t);
     const gameId = await createGame(t, 'live');
     await playOneTurn(t, gameId);
@@ -290,7 +304,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a new async game tells the first player only when they did not start it', async () => {
-    const t = setup();
+    const t = await setup();
     await registerBoth(t);
     // The server rolls the opening, so either side may move first.
     for (let i = 0; i < 12; i++) {
@@ -305,7 +319,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('sends to every phone of the player, and none to a player with no token', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     const side = waiting(await view(t, gameId));
@@ -332,7 +346,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a dead token is removed; the other tokens stay', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     const side = waiting(await view(t, gameId));
@@ -349,7 +363,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('when the same player waits again (after the mother question), there is no push', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async', 'plakoto');
     await flush(t);
     const pin = await t.run(async (ctx) => {
@@ -385,7 +399,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a resign ends the match: no push', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     await registerBoth(t);
@@ -396,7 +410,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a late push does nothing: the game changed since', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     await registerBoth(t);
@@ -416,7 +430,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a push after the turn deadline does nothing: the turn is lost anyway', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     await registerBoth(t);
@@ -433,7 +447,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a failed push does not touch the game or the tokens', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     await registerBoth(t);
@@ -450,7 +464,7 @@ describe('"your turn" pushes', () => {
     expect(await tokens(t)).toEqual([`${ALICE}: ${ALICE_TOKEN}`, `${BOB}: ${BOB_TOKEN}`]);
   });
   it('a time out that starts the next game tells the side it waits for, the same side too', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     // "alternate": the player who did not start game 1 starts game 2. So
@@ -481,7 +495,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a time out tells the winner, who starts the next game', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     await registerBoth(t);
@@ -495,7 +509,7 @@ describe('"your turn" pushes', () => {
   });
 
   it(`a failed push is tried once more after ${PUSH_RETRY_MS / 1000} s, for the failed tokens only`, async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     const other = PLAYERS[otherSide(waiting(await view(t, gameId)))];
@@ -525,7 +539,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a rate limited push is tried again, and the retry goes out when the service is back', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     await registerBoth(t);
@@ -540,7 +554,7 @@ describe('"your turn" pushes', () => {
   });
 
   it('a retry is dropped when the player has played since', async () => {
-    const t = setup();
+    const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
     const side = otherSide(waiting(await view(t, gameId)));
