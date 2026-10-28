@@ -50,6 +50,8 @@ echo 'EXPO_PUBLIC_CONVEX_URL=https://your-name-123.eu-west-1.convex.cloud' > .en
 
 For a local Convex backend, an `http://` URL works too. To try prod from a dev build, set `EXPO_PUBLIC_CONVEX_URL` to the prod URL. An EAS build reads it from the EAS environment variables, if you set it there. Check the result with `npx expo config --type public` (look at `extra.convexUrl`).
 
+**Updates (`eas update`) carry the URL too.** The URL is fixed when the bundle is built. Run `eas update` with the same `APP_VARIANT` as the build it targets (for example `APP_VARIANT=production eas update --channel production`). Without `APP_VARIANT`, the bundle gets the dev URL, and a store build that loads it talks to dev. A stray `EXPO_PUBLIC_CONVEX_URL` in your shell or `.env.local` also goes into the bundle, so clear it first.
+
 **Setup once** (all parts):
 
 1. Install Node 22 and pnpm (see the README).
