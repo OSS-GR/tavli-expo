@@ -17,11 +17,13 @@
  * board holds the end of the game: the last flow the board showed of that
  * game, marked over (`gameEnd`), with the match of the newest view (the
  * new record and score). The screen draws it as a local game end: the
- * sheet, no dice, no buttons. `release()` (the sheet's button) shows the
- * newest flow: only then do the next game's dice tumble and sound, and its
- * turn is read. Only the board waits: the online store takes every view
- * at once, so the moves, the deadlines and the time left go on. When the
- * match ends, the board lets go by itself (match end shows the last game).
+ * sheet, no dice, no buttons. A game that ends under the sheet (a time
+ * out) takes its place: the board then shows the last flow of that game.
+ * `release()` (the sheet's button) shows the newest flow: only then do the
+ * next game's dice tumble and sound, and its turn is read. Only the board
+ * waits: the online store takes every view at once, so the moves, the
+ * deadlines and the time left go on. When the match ends, the board lets
+ * go by itself (match end shows the last game).
  * Games that ended before the board was made are not held.
  */
 import { currentBoard, type MatchFlow } from '@tavli/engine';
@@ -36,11 +38,10 @@ export interface OnlineBoardStore extends BoardStore {
 }
 
 /**
- * The end of a game as a local game shows it: `from` (the board's last
- * flow of that game) marked over with the result of the newest record of
- * `next`, and the match of `next`. `from` may be a held end too: a game
- * that ends under the sheet keeps the board it shows. It only draws: no
- * rule is judged. The moves of a timed-out turn never counted, so they go.
+ * The end of a game as a local game shows it: `from` (the last flow of
+ * that game) marked over with the result of the newest record of `next`,
+ * and the match of `next`. It only draws: no rule is judged. The moves of
+ * a timed-out turn never counted, so they go.
  */
 export function gameEnd(from: MatchFlow, next: MatchFlow): MatchFlow {
   const record = next.match.games.at(-1);
@@ -81,17 +82,20 @@ export function onlineBoardStore(store: OnlineStore, gameId: string): OnlineBoar
     // A store keeps its flow once it has one; keep the last one just in case.
     const next = state.flow ?? latest;
     if (next !== latest) {
+      const before = latest;
       latest = next;
+      const games = next.match.games.length;
       if (next.match.status === 'finished') {
         // Match end: the last game stays on the board, nothing waits.
         held = null;
-      } else if (held !== null) {
-        // Another game ended while the sheet was open: the sheet shows it.
-        // The board keeps the end it shows: the moves that ended the first
-        // game stay, also when the next game ends by a time out.
-        if (next.match.games.length > held.match.games.length) held = gameEnd(held, next);
-      } else if (next.match.games.length > snapshot.flow.match.games.length) {
-        held = gameEnd(snapshot.flow, next);
+      } else if (games > (held ?? snapshot.flow).match.games.length) {
+        // A game ended. The board shows the end of that game: its last
+        // flow, also when it ended under the sheet of the game before (the
+        // store took its views). So the board, the label and the Rules of
+        // the menu name the game the sheet shows. Only when a view was
+        // missed is that flow gone: the board keeps the end it shows.
+        const from = before.match.games.length === games - 1 ? before : (held ?? before);
+        held = gameEnd(from, next);
       }
     }
     const shown = held ?? latest;

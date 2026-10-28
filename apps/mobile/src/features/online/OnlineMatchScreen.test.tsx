@@ -239,12 +239,16 @@ describe('<OnlineMatchScreen /> (#255)', () => {
 
   describe('between games (#286)', () => {
     /** The bot is too slow: its time runs out and you win game 1. The sheet opens. */
-    async function winGameOne(user: ReturnType<typeof setupUser>) {
+    async function winGameOne(
+      user: ReturnType<typeof setupUser>,
+      choice: OnlineGameChoice = 'portes',
+      targetPoints = 5,
+    ) {
       // The classic layout shows the game label ("Game 1 · Portes").
       await act(async () => {
         settingsStore.getState().setSetting('boardLayout', 'classic');
       });
-      const game = await openGame('portes', 'live', 5, TURN_TIME_MS.live * 2);
+      const game = await openGame(choice, 'live', targetPoints, TURN_TIME_MS.live * 2);
       if (view(game).waitingFor === 'white') {
         await untilYourTurn(game);
         await playTurnByTaps(game);
@@ -332,6 +336,21 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
       await wait(3000);
       expect(sounds.played.filter((s) => s === 'diceRoll')).toEqual(['diceRoll']);
+    });
+
+    it('names game 2 of a Tavli match when it ends under the sheet', async () => {
+      const user = setupUser();
+      const game = await winGameOne(user, 'tavli', 15);
+      expect(gameLabel()).toHaveTextContent('Game 1 · Portes');
+      expect(screen.getByTestId('game-end-card')).toHaveTextContent(/Next: game 2 · Plakoto/);
+      // Nobody plays game 2 (Plakoto) while the sheet is open.
+      await act(async () => {
+        jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+        game.server.runDueTimeouts();
+      });
+      expect(view(game).match.games).toHaveLength(2);
+      expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/Next: game 3 · Fevga/);
+      expect(gameLabel()).toHaveTextContent('Game 2 · Plakoto');
     });
   });
 
