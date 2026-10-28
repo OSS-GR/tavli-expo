@@ -2,6 +2,7 @@
 // (`setupFilesAfterEnv` in jest.config.js).
 
 import { resetAnnouncements } from '../src/features/game/useAnnouncement';
+import { forgetOnlineAccount } from '../src/features/online/accountHint';
 import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
 
 import { resetOnlineFake } from './onlineFake';
@@ -13,8 +14,10 @@ beforeEach(() => {
 });
 
 // Online play (`auth`, `games`, `onlineServer` of `@/services`): each test
-// starts with a new in-memory server, nobody signed in and no dev games.
+// starts with a new in-memory server, nobody signed in, no dev games and
+// no note of an online account on the phone (#297).
 beforeEach(() => {
   resetOnlineFake();
   forgetDevGamesForTest();
+  forgetOnlineAccount();
 });
