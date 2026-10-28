@@ -7,14 +7,18 @@
  */
 import { createPostHogAnalytics } from '@tavli/analytics-posthog';
 import { createExpoSoundPlayer } from '@tavli/audio-expo';
+import { createBetterAuthProvider, createSecureSessionStorage } from '@tavli/auth-better-auth';
+import { createConvexClient, createConvexGameTransport } from '@tavli/backend-convex';
 import { InlineBotRunner, createAnalyzer, createBot, type Analyzer } from '@tavli/bot';
 import {
   createNoopAnalytics,
   createNoopCrashReporter,
   type Analytics,
+  type AuthProvider,
   type BotRunner,
   type CrashReporter,
   type Feedback,
+  type GameTransport,
   type SoundPlayer,
   type Storage,
 } from '@tavli/contracts';
@@ -24,8 +28,10 @@ import { createExpoFeedback } from '@tavli/haptics-expo';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
 import Constants from 'expo-constants';
 
+import { APP_SCHEME, convexServer } from '@/convexUrl';
 import { botLevelsByGame } from '@/features/bot/levels';
 import type { GameLevels } from '@/features/match/setup';
+import { createOnlineServices } from '@/onlineServices';
 
 export const storage: Storage = createMmkvStorage({ id: 'tavlaki' });
 
@@ -103,3 +109,28 @@ export const botLevels: GameLevels = botLevelsByGame(bot);
  * uses the same evaluators as the bot (the variant's best one).
  */
 export const analyzer: Analyzer = createAnalyzer();
+
+/**
+ * Online play (#266): the Convex deployment of this build (`convexUrl.ts`),
+ * with Better Auth sign-in on its site URL. Both are made on first use
+ * (`onlineServices.ts`): the app makes no network call and no guest
+ * account at start. `undefined` when the build has no Convex URL: then
+ * online play is off. Both are set, or both are `undefined`.
+ */
+const online = createOnlineServices(convexServer(), {
+  createAuth: (baseURL) =>
+    createBetterAuthProvider({
+      baseURL,
+      scheme: APP_SCHEME,
+      // The session cookie signs the user in: it lives in the secure store.
+      storage: createSecureSessionStorage(),
+    }),
+  createClient: createConvexClient,
+  createGames: (client) => createConvexGameTransport({ client }),
+});
+
+/** Sign-in for online play (guest only, for now). Call `signInAsGuest()` when the user opens online play. */
+export const auth: AuthProvider | undefined = online?.auth;
+
+/** Online games on the Convex deployment. A screen checks `games === undefined` to show that online play is off. */
+export const games: GameTransport | undefined = online?.games;

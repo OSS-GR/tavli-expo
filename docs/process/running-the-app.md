@@ -36,7 +36,9 @@ Online games talk to a Convex deployment (#257). The variant picks it:
 | `preview` | prod | `https://superb-dog-503.eu-west-1.convex.cloud` |
 | `production` | prod | `https://superb-dog-503.eu-west-1.convex.cloud` |
 
-**How it works.** `apps/mobile/app.config.ts` puts the URL in `extra.convexUrl`. The app reads it in one place: `convexUrl()` in `apps/mobile/src/convexUrl.ts`. Expo evaluates `app.config.ts` both for `npx expo start` (Metro sends the config to the dev build) and for EAS builds (the config is built into the app). So one table covers local runs and cloud builds, and `eas.json` needs no URL: its profiles only set `APP_VARIANT`. The URLs are public, so they may be in the repo. The deploy keys are not (see [online game service](../architecture/online-game-service.md#deploy)).
+Sign-in (Better Auth, #266) uses the same deployment's **site URL**: the same name with `.convex.site` in place of `.convex.cloud` (for example `https://superb-dog-503.eu-west-1.convex.site`).
+
+**How it works.** `apps/mobile/app.config.ts` puts the URL in `extra.convexUrl` and the site URL in `extra.convexSiteUrl`. The app reads them in one place: `apps/mobile/src/convexUrl.ts` (`convexServer()`, used by `services.ts`). Without both URLs, online play is off (`auth` and `games` in `services.ts` are `undefined`). Expo evaluates `app.config.ts` both for `npx expo start` (Metro sends the config to the dev build) and for EAS builds (the config is built into the app). So one table covers local runs and cloud builds, and `eas.json` needs no URL: its profiles only set `APP_VARIANT`. The URLs are public, so they may be in the repo. The deploy keys are not (see [online game service](../architecture/online-game-service.md#deploy)).
 
 **Use your own deployment.** Set `EXPO_PUBLIC_CONVEX_URL`. It wins over the variant. Then restart Metro:
 
@@ -48,9 +50,17 @@ EXPO_PUBLIC_CONVEX_URL=https://your-name-123.eu-west-1.convex.cloud npx expo sta
 echo 'EXPO_PUBLIC_CONVEX_URL=https://your-name-123.eu-west-1.convex.cloud' > .env.local
 ```
 
-For a local Convex backend, an `http://` URL works too. To try prod from a dev build, set `EXPO_PUBLIC_CONVEX_URL` to the prod URL. An EAS build reads it from the EAS environment variables, if you set it there. Check the result with `npx expo config --type public` (look at `extra.convexUrl`).
+The site URL follows: `https://your-name-123.eu-west-1.convex.site`. Set `EXPO_PUBLIC_CONVEX_SITE_URL` only when it is somewhere else, for example a custom domain.
 
-**Updates (`eas update`) carry the URL too.** The URL is fixed when the bundle is built. Run `eas update` with the same `APP_VARIANT` as the build it targets (for example `APP_VARIANT=production eas update --channel production`). Without `APP_VARIANT`, the bundle gets the dev URL, and a store build that loads it talks to dev. A stray `EXPO_PUBLIC_CONVEX_URL` in your shell or `.env.local` also goes into the bundle, so clear it first.
+For a local Convex backend, an `http://` URL works too. A local backend has no `.convex.cloud` name, so also set its site URL, or online play stays off:
+
+```bash
+EXPO_PUBLIC_CONVEX_URL=http://127.0.0.1:3210 EXPO_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211 npx expo start
+```
+
+To try prod from a dev build, set `EXPO_PUBLIC_CONVEX_URL` to the prod URL. An EAS build reads both variables from the EAS environment variables, if you set them there. Check the result with `npx expo config --type public` (look at `extra.convexUrl` and `extra.convexSiteUrl`).
+
+**Updates (`eas update`) carry the URL too.** The URL is fixed when the bundle is built. Run `eas update` with the same `APP_VARIANT` as the build it targets (for example `APP_VARIANT=production eas update --channel production`). Without `APP_VARIANT`, the bundle gets the dev URL, and a store build that loads it talks to dev. A stray `EXPO_PUBLIC_CONVEX_URL` or `EXPO_PUBLIC_CONVEX_SITE_URL` in your shell or `.env.local` also goes into the bundle, so clear it first.
 
 **Setup once** (all parts):
 
@@ -235,7 +245,7 @@ Dev routes only work in development builds. Release builds (the `preview` profil
 | You see | Fix |
 | --- | --- |
 | Pressing `i` or `a` opens **Expo Go**, or "No development build installed" | Build and install the dev build first: `npx expo run:ios` or `npx expo run:android`. |
-| Red screen: a native module is missing (for example `NitroModules`, `RNSkia`, `MMKV`, `Worklets`) | The native app is older than the code. Rebuild: `npx expo run:ios` / `npx expo run:android`. |
+| Red screen: a native module is missing (for example `NitroModules`, `RNSkia`, `MMKV`, `Worklets`, `ExpoSecureStore`) | The native app is older than the code. Rebuild: `npx expo run:ios` / `npx expo run:android`. |
 | Strange errors after pulling new code | Run `pnpm install` in the repo root, then `npx expo start --clear`. |
 | Native build fails after a native package change | `npx expo prebuild --clean`, then `npx expo run:ios` / `run:android` again. |
 | "Xcode must be 26.4 or newer" or iOS SDK errors | Update Xcode in the Mac App Store. Then `npx expo prebuild --clean`. |
