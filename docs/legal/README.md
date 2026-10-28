@@ -51,6 +51,13 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 - [ ] Check the retention times on your Sentry and PostHog plans. The policy states each vendor's documented default (checked 2026-10-27).
 - [ ] Have the policy checked (see the note at the top).
 
+## Server data that is not live yet
+
+The server can keep data that the app does not send yet. The policy changes when the app starts to send it, in that PR.
+
+- **Push tokens (#280).** The server table `pushTokens` keeps, per player: the Expo push token of each phone, the platform (`ios` or `android`) and when the phone last registered it. That is at most 5 tokens per player. A token is removed on sign-out (`removePushToken`), when Expo says the phone is no longer registered, when the player adds a sixth phone (the oldest goes), and when another account signs in on that phone (the token moves to that account). To send a push, the server gives Expo the token, a fixed text ("Your turn") and the game id. No names and no emails. See "Push" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md).
+  - When the app part ships: update the "Push notifications" item in "Coming later" (all four files) to say what is kept, why (to tell you it is your turn), for how long, and that Expo carries the push (check where Expo processes the data). Add Expo to the vendor list, and update the store privacy answers. Check whether Expo's terms need a data processing agreement.
+
 ## Ideas for later (app changes, not part of #90)
 
 - Open `https://tavlaki.com/el/privacy` when the app language is Greek.

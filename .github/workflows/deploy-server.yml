@@ -21,6 +21,7 @@ on:
       - packages/engine/**
       - packages/contracts/**
       - packages/online/**
+      - packages/adapters/push-expo/**
       - pnpm-lock.yaml
       - package.json
       - pnpm-workspace.yaml
