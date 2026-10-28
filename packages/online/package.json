@@ -1,0 +1,21 @@
+{
+  "name": "@tavli/online",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The online game model and an in-memory game server. Pure TypeScript. Depends only on the engine and the contracts.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tavli/contracts": "workspace:*",
+    "@tavli/engine": "workspace:*"
+  }
+}

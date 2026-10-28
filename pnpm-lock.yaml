@@ -353,6 +353,9 @@ importers:
       '@tavli/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@tavli/online':
+        specifier: workspace:*
+        version: link:../../packages/online
       convex:
         specifier: 1.46.0
         version: 1.46.0(react@19.3.0)
@@ -433,6 +436,15 @@ importers:
         version: link:../engine
 
   packages/engine: {}
+
+  packages/online:
+    dependencies:
+      '@tavli/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@tavli/engine':
+        specifier: workspace:*
+        version: link:../engine
 
   packages/themes:
     devDependencies:

@@ -1,5 +1,5 @@
-// The pure online game logic, with a seeded RNG (tests only; the server
-// always uses `createCryptoRng`).
+// The pure online game logic, with a seeded RNG (tests only; the Convex
+// server always uses `createCryptoRng`).
 
 import { describe, expect, it } from 'vitest';
 
@@ -8,7 +8,6 @@ import type { OnlineGameChoice } from '@tavli/contracts';
 import { createSeededRng, getPreset, matchPhase, replay } from '@tavli/engine';
 import type { FlowEvent, MatchFlow, Rng } from '@tavli/engine';
 
-import { pickChoice, pickTurn } from '../test.setup';
 import {
   OnlineGameError,
   answerPrompt,
@@ -25,6 +24,7 @@ import {
   toView,
   waitingFor,
 } from './online-game';
+import { pickChoice, pickTurn } from './testing';
 
 const PLAYERS = { white: 'alice', black: 'bob' };
 

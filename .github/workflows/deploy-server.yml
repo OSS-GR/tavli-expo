@@ -18,6 +18,7 @@ on:
       - apps/server/**
       - packages/engine/**
       - packages/contracts/**
+      - packages/online/**
       - pnpm-lock.yaml
       - package.json
       - pnpm-workspace.yaml

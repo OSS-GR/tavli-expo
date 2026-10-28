@@ -1,10 +1,12 @@
 /**
- * The online game logic, with no Convex code (#126).
+ * The online game logic, with no Convex code (#126, moved here in #251).
  *
- * The Convex functions in `../games.ts` load a game, call one function
- * here, and save the result. Everything here is pure: dice come from the
- * `Rng` the caller passes in. The server passes the secure RNG
- * (`crypto-rng.ts`); tests may pass a seeded one.
+ * A server loads a game, calls one function here, and saves the result.
+ * Two servers do this: the Convex functions (`apps/server/convex/games.ts`)
+ * and the in-memory server (`memory-server.ts`). Everything here is pure:
+ * dice come from the `Rng` the caller passes in. The Convex server passes
+ * the secure RNG (`apps/server/convex/model/crypto-rng.ts`); tests may pass
+ * a seeded one.
  *
  * The server keeps a game at rest in a phase where it waits for a player:
  * `moving` (a player must play their roll) or `awaiting-answer` (a variant
@@ -12,9 +14,9 @@
  * server, in `advance`.
  *
  * The stored flow is the engine `MatchFlow` without its log. The log
- * lives in the `moves` table, one row per event. A step starts from the
- * stored flow with an empty log, so `flow.log` after the step holds just
- * the new events.
+ * lives apart (on Convex, in the `moves` table), one row per event. A
+ * step starts from the stored flow with an empty log, so `flow.log` after
+ * the step holds just the new events.
  */
 
 import { TURN_TIME_MS } from '@tavli/contracts';
@@ -46,7 +48,10 @@ import type {
   RuleSet,
 } from '@tavli/engine';
 
-/** A rejected call. The Convex layer turns it into a `ConvexError`. */
+/**
+ * A rejected call. The Convex layer turns it into a `ConvexError`; the
+ * in-memory server rejects with its `{ code, message }`.
+ */
 export class OnlineGameError extends Error {
   constructor(
     readonly code: GameTransportErrorCode,
@@ -100,7 +105,7 @@ export function onlineGameRules(choice: OnlineGameChoice): RuleSet {
 // ---------------------------------------------------------------------------
 // Stored flow
 
-/** The `MatchFlow` without its log, as saved in `games.flow`. */
+/** The `MatchFlow` without its log, as saved (on Convex, in `games.flow`). */
 export type StoredFlow = Omit<MatchFlow, 'log'>;
 
 export function storeFlow(flow: MatchFlow): string {
@@ -112,7 +117,7 @@ export function storeFlow(flow: MatchFlow): string {
   return JSON.stringify(stored);
 }
 
-/** Reads `games.flow`. Only the server writes it, so a shape check is enough. */
+/** Reads a stored flow. Only the server writes it, so a shape check is enough. */
 export function loadFlow(text: string): MatchFlow {
   const stored = JSON.parse(text) as StoredFlow;
   if (stored.schemaVersion !== MATCH_FLOW_SCHEMA_VERSION) {
