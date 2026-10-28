@@ -36,7 +36,7 @@ Online games talk to a Convex deployment (#257). The variant picks it:
 | `preview` | dev | `https://exciting-reindeer-792.eu-west-1.convex.cloud` |
 | `production` | prod | `https://superb-dog-503.eu-west-1.convex.cloud` |
 
-Sign-in (Better Auth, #266) uses the same deployment's **site URL**: the same name with `.convex.site` in place of `.convex.cloud` (for example `https://superb-dog-503.eu-west-1.convex.site`).
+Sign-in (Better Auth, #266) uses the same deployment's **site URL**: the same name with `.convex.site` in place of `.convex.cloud` (for example `https://exciting-reindeer-792.eu-west-1.convex.site` for dev).
 
 **How it works.** `apps/mobile/app.config.ts` puts the URL in `extra.convexUrl` and the site URL in `extra.convexSiteUrl`. The app reads them in one place: `apps/mobile/src/convexUrl.ts` (`convexServer()`, used by `services.ts`). Without both URLs, online play is off (`auth` and `games` in `services.ts` are `undefined`). Expo evaluates `app.config.ts` both for `npx expo start` (Metro sends the config to the dev build) and for EAS builds (the config is built into the app). So one table covers local runs and cloud builds, and `eas.json` needs no URL: its profiles only set `APP_VARIANT`. The URLs are public, so they may be in the repo. The deploy keys are not (see [online game service](../architecture/online-game-service.md#deploy)).
 
