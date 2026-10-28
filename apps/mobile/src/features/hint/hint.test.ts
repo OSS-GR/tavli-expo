@@ -97,6 +97,7 @@ describe('hintPlies (#219)', () => {
     ['plakoto', 2],
     ['plakoto.federation', 2],
     ['fevga', 2],
+    // Asodio stays at 1 ply: its worst 2-ply hint is much slower than Plakoto's (#233).
     ['asodio.kafeneio', 1],
     ['asodio.aceyDeuceyGreek', 1],
     ['asodio.aceyDeuceyAmerican', 1],

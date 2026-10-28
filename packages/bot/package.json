@@ -16,7 +16,8 @@
     "tune": "node --import ./scripts/register-ts.mjs ./scripts/tune.ts",
     "train": "node --import ./scripts/register-ts.mjs ./scripts/train.ts",
     "golden:asodio": "node --import ./scripts/register-ts.mjs ./scripts/asodio-golden.ts",
-    "bench:asodio": "node --import ./scripts/register-ts.mjs ./scripts/bench-asodio.ts"
+    "bench:asodio": "node --import ./scripts/register-ts.mjs ./scripts/bench-asodio.ts",
+    "bench:hint": "node --import ./scripts/register-ts.mjs ./scripts/bench-hint.ts"
   },
   "dependencies": {
     "@tavli/contracts": "workspace:*",

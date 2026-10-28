@@ -173,15 +173,43 @@ are not the net's, so it uses the Asodio heuristic, which cost about
 it costs 4–4.9× less in Acey-Deucey and 2.4× less in the owner version
 (see the table below). Hermes on a phone is several times slower than
 Node, so a 2-ply hint fits the 1 s phone budget for Portes, Plakoto and
-Fevga. For Asodio it does not yet: after #225 the worst 2-ply hint we saw
-still takes 0.5–0.7 s in Node in Acey-Deucey, which is several seconds on
-a phone. The bot's own play (`chooseTurn`) stays 1-ply.
+Fevga. For Asodio it does not yet: even after #225 its worst 2-ply hint
+takes 1.2–2.5 s in Node, 4–8 times Plakoto's worst (see "Asodio and 2
+ply" below), which is several seconds on a phone. The bot's own play
+(`chooseTurn`) stays 1-ply.
 
 **In the app (#219).** The Hint asks for 2 ply in Portes, Plakoto and
 Fevga, and for 1 ply in Asodio (every preset): `hintPlies` in
 `apps/mobile/src/features/hint/hint.ts`. The game review stays at 1 ply
 (see "Two scales"). Asodio needs a deterministic cap on the work before it
 can use 2 ply.
+
+**Asodio and 2 ply (#233).** `pnpm --filter @tavli/bot bench:hint` times
+one 2-ply hint (`rankTurns` with `plies: 2, top: 1`) on 500 seeded
+positions per game (250 from best play, 250 from random play,
+`src/testing/hint-work.ts`). The rule: a game hints at 2 ply only when
+its worst hint is no slower than Plakoto's, the slowest game that already
+does. After #225, Node 22, dev container, three seeds (219, 233, 7), so
+1,500 positions per game:
+
+| Game or preset       | Median (ms) | Worst per seed (ms) | Worst positions scored |
+| -------------------- | ----------- | ------------------- | ---------------------- |
+| Plakoto              | 28–34       | 322, 245, 330       | 21,264                 |
+| `asodio.kafeneio`    | 4           | 481, 934, 1,207     | 17,461                 |
+| Acey-Deucey Greek    | 22–23       | 1,468, 1,209, 2,517 | 74,010                 |
+| Acey-Deucey American | 67–82       | 876, 1,686, 1,002   | 44,879                 |
+
+So every Asodio preset stays at 1 ply. Most Asodio hints are fast (the
+owner version's median is a tenth of Plakoto's), but the worst ones are
+not. The owner version uses the net, and in its slowest hints a
+position costs about 0.03–0.07 ms (mostly the shot count), 3–5 times a
+Plakoto position, so even its worst count, below Plakoto's, takes 1.2 s.
+In Acey-Deucey a few rolls also score far more positions (Greek up to
+74,010). Most of the worst are doubles, some of them the chosen double
+after a 1-2. The earlier
+"0.2–0.7 s worst" came from 30 positions per preset, too few to find the
+tail. Asodio can use 2 ply once a deterministic cap bounds the work of
+these rare positions; then add its presets to `analyzer-work.test.ts`.
 
 **Work bound.** `src/analyzer-work.test.ts` counts the positions the
 evaluator scores in one 2-ply hint (`rankTurns` with `plies: 2, top: 1`):
