@@ -879,6 +879,11 @@
     "played_you": "You played: {{moves}}",
     "played": "{{name}} played: {{moves}}",
     "best": "Best: {{moves}}",
+    "show": {
+      "played_you": "Your move",
+      "played": "{{name}}'s move",
+      "best": "Best move"
+    },
     "band": {
       "small": "Small mistake",
       "medium": "Medium mistake",

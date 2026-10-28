@@ -2,21 +2,25 @@
  * The game review (#215): the biggest mistakes of the game that just
  * ended, biggest first (at most three). Each one shows the position before
  * the turn with its dice, what was played, the best turn and how bad the
- * mistake was. No mistake: "Well played!".
+ * mistake was. No mistake: "Well played!". A switch at the foot of each
+ * card picks the turn the board marks, the way the Hint does (#230): the
+ * best turn (default) or the played one, both on the position before the
+ * turn.
  *
  * The route (`app/game/[id]/review.tsx`) opens it from the game-end sheet
  * and the match-end screen. It reads the game from the match log in
  * memory (`review.ts`); nothing is saved.
  *
  * Screen readers: each mistake is one element with the full text; the
- * board and the dice in it are hidden from them. The result is read when
- * the review is done.
+ * board and the dice in it are hidden from them. The switch is two
+ * buttons after it (`selected`); it only changes the picture, so the
+ * card's label stays the same. The result is read when the review is done.
  */
 import type { Analyzer } from '@tavli/bot';
 import { diceMoves, type MatchFlow, type PlayerId } from '@tavli/engine';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { asodioMarks } from '@/features/board/asodio';
@@ -44,6 +48,8 @@ export interface ReviewScreenProps {
 }
 
 const BOTH_SIDES: readonly PlayerId[] = ['white', 'black'];
+/** Which turn a card's board marks. */
+type ShownTurn = 'played' | 'best';
 /** The dice under each small board. */
 const REVIEW_DIE_SIZE = 32;
 
@@ -116,6 +122,7 @@ function MistakeCard({ mistake, name, testID }: MistakeCardProps) {
   const { t } = useTranslation();
   const theme = useBoardTheme();
   const homeSide = useHomeBoardSide();
+  const [shown, setShown] = useState<ShownTurn>('best');
   const text = mistakeText(t, mistake, name);
   const { state } = mistake;
   const dice = state.dice ?? mistake.turn.dice;
@@ -127,41 +134,76 @@ function MistakeCard({ mistake, name, testID }: MistakeCardProps) {
   // The board as on a table: wide and low, so it fits in a card.
   const aspectRatio = boardLayout(theme, 'classic', homeSide).aspectRatio;
   const strong = mistake.band === 'big';
+  // Both turns start from the board before the turn.
+  const marked = shown === 'best' ? mistake.best : mistake.turn;
+  const options: { value: ShownTurn; label: string }[] = [
+    {
+      value: 'played',
+      label: name === null ? t('review.show.played_you') : t('review.show.played', { name }),
+    },
+    { value: 'best', label: t('review.show.best') },
+  ];
   return (
-    <View testID={testID} style={styles.card} accessible accessibilityLabel={text.label}>
-      <View style={styles.cardHead}>
-        <View style={styles.chip(strong)}>
-          <Text style={styles.chipText(strong)}>{text.band}</Text>
+    <View style={styles.card}>
+      {/* One element for screen readers, with the full text. */}
+      <View testID={testID} style={styles.cardBody} accessible accessibilityLabel={text.label}>
+        <View style={styles.cardHead}>
+          <View style={styles.chip(strong)}>
+            <Text style={styles.chipText(strong)}>{text.band}</Text>
+          </View>
+          <Text style={styles.turn}>{text.turn}</Text>
         </View>
-        <Text style={styles.turn}>{text.turn}</Text>
+        {/* The picture only: the card's label says it all. */}
+        <View
+          collapsable={false}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+          style={styles.pictureRow}>
+          <View style={styles.picture(aspectRatio)}>
+            <StaticBoard
+              board={state.board}
+              view={view}
+              marks={asodioMarks(state.board, state.rules, view)}
+              layout="classic"
+              turn={{ mover: marked.player, moves: marked.moves }}
+              testID={`${testID}-board`}
+            />
+          </View>
+          <View style={styles.dice}>
+            <DiceRow
+              theme={theme}
+              dice={diceView(dice, diceMoves(dice))}
+              rollKey={null}
+              size={REVIEW_DIE_SIZE}
+              testID={`${testID}-dice`}
+            />
+          </View>
+        </View>
+        <Text testID={`${testID}-played`} style={styles.line(shown === 'played')}>
+          {text.played}
+        </Text>
+        <Text testID={`${testID}-best`} style={styles.line(shown === 'best')}>
+          {text.best}
+        </Text>
       </View>
-      {/* The picture only: the card's label says it all. */}
-      <View
-        collapsable={false}
-        importantForAccessibility="no-hide-descendants"
-        accessibilityElementsHidden
-        style={styles.pictureRow}>
-        <View style={styles.picture(aspectRatio)}>
-          <StaticBoard
-            board={state.board}
-            view={view}
-            marks={asodioMarks(state.board, state.rules, view)}
-            layout="classic"
-            testID={`${testID}-board`}
-          />
-        </View>
-        <View style={styles.dice}>
-          <DiceRow
-            theme={theme}
-            dice={diceView(dice, diceMoves(dice))}
-            rollKey={null}
-            size={REVIEW_DIE_SIZE}
-            testID={`${testID}-dice`}
-          />
-        </View>
+      {/* Which turn the board marks: two buttons, each says if it is on. */}
+      <View testID={`${testID}-switch`} style={styles.switch}>
+        {options.map((option) => {
+          const selected = option.value === shown;
+          return (
+            <Pressable
+              key={option.value}
+              testID={`${testID}-show-${option.value}`}
+              accessibilityRole="button"
+              accessibilityLabel={option.label}
+              accessibilityState={{ selected }}
+              onPress={() => setShown(option.value)}
+              style={({ pressed }) => [styles.segment(selected), pressed && styles.pressed]}>
+              <Text style={styles.segmentLabel(selected)}>{option.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
-      <Text style={styles.played}>{text.played}</Text>
-      <Text style={styles.best}>{text.best}</Text>
     </View>
   );
 }
@@ -192,12 +234,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
   },
   card: {
-    gap: theme.space.sm,
+    gap: theme.space.md,
     padding: theme.space.md,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+  },
+  cardBody: {
+    gap: theme.space.sm,
   },
   cardHead: {
     flexDirection: 'row',
@@ -234,14 +279,43 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  played: {
-    ...theme.type.body,
-    color: theme.colors.text,
+  // The line of the turn on the board is bold; the other one is dim.
+  line: (selected: boolean) => ({
+    ...(selected ? theme.type.bodyStrong : theme.type.body),
+    color: selected ? theme.colors.text : theme.colors.textDim,
+  }),
+  // The buttons share a row; at a large font the second one wraps to a row
+  // of its own, and a long label wraps inside its button.
+  switch: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space.xs,
+    padding: theme.space.xs,
+    borderRadius: theme.radii.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  best: {
-    ...theme.type.bodyStrong,
-    color: theme.colors.text,
+  segment: (selected: boolean) => ({
+    flexGrow: 1,
+    flexShrink: 1,
+    minHeight: theme.touch.minTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.space.md,
+    paddingVertical: theme.space.xs,
+    borderRadius: theme.radii.md,
+    borderWidth: 2,
+    borderColor: selected ? theme.colors.accent : 'transparent',
+    backgroundColor: selected ? theme.colors.surfaceSelected : 'transparent',
+  }),
+  pressed: {
+    opacity: 0.7,
   },
+  segmentLabel: (selected: boolean) => ({
+    ...(selected ? theme.type.bodyStrong : theme.type.body),
+    textAlign: 'center',
+    color: selected ? theme.colors.text : theme.colors.textDim,
+  }),
   note: {
     ...theme.type.caption,
     color: theme.colors.textDim,
