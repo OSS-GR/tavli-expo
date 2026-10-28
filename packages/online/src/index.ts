@@ -1,8 +1,8 @@
 /**
  * Online games, in pure TypeScript (#251): the game model the server runs
- * (`online-game.ts`), the checks around each call (`calls.ts`), and an
- * in-memory server that gives a `GameTransport` per player
- * (`memory-server.ts`).
+ * (`online-game.ts`), the checks around each call (`calls.ts`), the invite
+ * checks and codes (`invites.ts`), and an in-memory server that gives a
+ * `GameTransport` and an `Invites` per player (`memory-server.ts`).
  *
  * It depends only on `@tavli/engine` and `@tavli/contracts`. The Convex
  * functions in `apps/server` and the app both use it. See
@@ -40,5 +40,19 @@ export {
   scheduledCheck,
 } from './calls';
 export type { SavedGame } from './calls';
+export {
+  InviteError,
+  MAX_CODE_TRIES,
+  checkAnswer,
+  checkCancel,
+  inviteExpiresAt,
+  inviteStatus,
+  isInviteExpired,
+  newInvite,
+  newInviteCode,
+  pickInviteCode,
+  toInviteView,
+} from './invites';
+export type { InviteRecord, NewInviteOptions } from './invites';
 export { createMemoryGameServer } from './memory-server';
 export type { LoggedEvent, MemoryGameServer, MemoryGameServerOptions } from './memory-server';

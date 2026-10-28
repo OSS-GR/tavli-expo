@@ -14,7 +14,6 @@ import type * as games from "../games.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as model_cryptoRng from "../model/cryptoRng.js";
-import type * as model_invites from "../model/invites.js";
 
 import type {
   ApiFromModules,
@@ -29,7 +28,6 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   invites: typeof invites;
   "model/cryptoRng": typeof model_cryptoRng;
-  "model/invites": typeof model_invites;
 }>;
 
 /**

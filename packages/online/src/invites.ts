@@ -1,14 +1,13 @@
 /**
- * The invite logic, with no Convex code (#252).
+ * The invite logic, with no Convex code (#252, moved here in #256).
  *
- * The Convex functions in `../invites.ts` load an invite, call one check
- * here, and save the result. Everything here is pure: the clock is an
- * argument (`now`, epoch milliseconds) and random values come from the
- * `Rng` the caller passes in. The server passes the secure RNG
- * (`cryptoRng.ts`); tests may pass a seeded one.
- *
- * A later issue moves this file to `@tavli/online`, for the app's
- * in-memory server. So it must not use Convex types.
+ * Two servers use it: the Convex functions in `apps/server/convex/
+ * invites.ts` load an invite, call one check here, and save the result;
+ * the in-memory server (`memory-server.ts`) does the same with a `Map`.
+ * Everything here is pure: the clock is an argument (`now`, epoch
+ * milliseconds) and random values come from the `Rng` the caller passes
+ * in. The Convex server passes its secure RNG (`cryptoRng.ts`); tests may
+ * pass a seeded one.
  */
 
 import { INVITE_CODE_ALPHABET, INVITE_CODE_LENGTH, INVITE_TIME_MS } from '@tavli/contracts';
@@ -21,7 +20,10 @@ import type {
 } from '@tavli/contracts';
 import type { Rng } from '@tavli/engine';
 
-/** A rejected call. The Convex layer turns it into a `ConvexError`. */
+/**
+ * A rejected call. The Convex layer turns it into a `ConvexError`; the
+ * in-memory server into plain `InviteErrorData`.
+ */
 export class InviteError extends Error {
   constructor(
     readonly code: InviteErrorCode,

@@ -1,25 +1,32 @@
 /**
  * An online game server in memory (#251). It runs the same game logic and
  * the same call checks as the Convex functions (`apps/server/convex/
- * games.ts`), with no network and no account. It gives a `GameTransport`
- * per player, so the app and its tests can play online games before the
- * Convex project exists.
+ * games.ts` and `invites.ts`), with no network and no account. It gives a
+ * `GameTransport` and an `Invites` per player, so the app and its tests
+ * can play online games before the Convex project exists.
  *
  * It acts like a network:
  * - `subscribe` calls `onView` on a later microtask, never inside the call.
  * - Every view, request and event is a copy (a JSON round trip), so a
  *   client cannot change the server state, and the server cannot change a
  *   view a client holds.
- * - A rejected call rejects with plain `GameTransportErrorData`.
+ * - A rejected call rejects with plain `GameTransportErrorData` (an
+ *   invite call with plain `InviteErrorData`).
  *
  * Time comes from the `now` option. Nothing runs on a timer: call
  * `runDueTimeouts()` to apply the time outs whose deadline has passed (the
- * in-memory version of the Convex `checkTimeout`).
+ * in-memory version of the Convex `checkTimeout`). Invites need no timer:
+ * like on Convex, an open invite counts as expired once `now()` reaches
+ * its `expiresAt`.
  */
 
+import { normalizeInviteCode } from '@tavli/contracts';
 import type {
   GameTransport,
   GameTransportErrorData,
+  InviteErrorData,
+  InviteView,
+  Invites,
   OnlineGameChoice,
   OnlineGamePace,
   OnlineGameView,
@@ -39,6 +46,15 @@ import {
   scheduledCheck,
 } from './calls';
 import type { SavedGame } from './calls';
+import {
+  InviteError,
+  MAX_CODE_TRIES,
+  checkAnswer,
+  newInvite,
+  newInviteCode,
+  toInviteView,
+} from './invites';
+import type { InviteRecord } from './invites';
 import {
   OnlineGameError,
   answerPrompt,
@@ -89,6 +105,26 @@ export interface MemoryGameServer {
    * the sign-in token). Only the two players may subscribe to a game.
    */
   transportFor(playerId: string): GameTransport;
+  /**
+   * Makes an open invite from `callerId`, like the Convex `createInvite`:
+   * it expires `INVITE_TIME_MS` after `now()`. The code comes from the
+   * server's `rng`. Returns the code. Throws an `InviteError`
+   * (`BAD_REQUEST`) for a bad match length.
+   */
+  createInvite(
+    callerId: string,
+    choice: OnlineGameChoice,
+    targetPoints: number,
+    pace: OnlineGamePace,
+  ): string;
+  /**
+   * The invites of `playerId`: every call comes from that player, as with
+   * `transportFor`. `acceptInvite` starts the game as the Convex
+   * `acceptInvite` does (the inviter plays white).
+   */
+  invitesFor(playerId: string): Invites;
+  /** The invite as a client sees it at `now()` (a copy), or `null` when no invite has the code. */
+  getInvite(code: string): InviteView | null;
   /** The game as a client sees it (a copy), or `null` when there is no such game. */
   getGame(gameId: string): OnlineGameView | null;
   /** The event log of the game, oldest first (copies). `replay` rebuilds the game from it. */
@@ -139,10 +175,17 @@ function nextTick(): Promise<void> {
   return Promise.resolve();
 }
 
-/** An `OnlineGameError` becomes plain `GameTransportErrorData`; anything else is a bug. */
+/**
+ * An `OnlineGameError` becomes plain `GameTransportErrorData`, an
+ * `InviteError` plain `InviteErrorData`; anything else is a bug.
+ */
 function toErrorData(error: unknown): unknown {
   if (error instanceof OnlineGameError) {
     const data: GameTransportErrorData = { code: error.code, message: error.message };
+    return data;
+  }
+  if (error instanceof InviteError) {
+    const data: InviteErrorData = { code: error.code, message: error.message };
     return data;
   }
   return error;
@@ -152,6 +195,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const { rng, now } = options;
   const games = new Map<string, MemoryGame>();
   const listeners = new Set<Listener>();
+  /** By code (capital letters). */
+  const invites = new Map<string, InviteRecord>();
   let nextId = 1;
 
   function viewOf(game: MemoryGame): OnlineGameView {
@@ -286,28 +331,111 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     };
   }
 
+  function createGame(
+    callerId: string,
+    players: PerPlayer<string>,
+    choice: OnlineGameChoice,
+    targetPoints: number,
+    pace: OnlineGamePace,
+  ): string {
+    checkNewGame(callerId, players);
+    const flow = createOnlineMatch({ choice, targetPoints, players: copy(players) }, rng);
+    const gameId = `game-${nextId}`;
+    nextId += 1;
+    const version = 1;
+    const game: MemoryGame = {
+      gameId,
+      players: copy(players),
+      choice,
+      pace,
+      targetPoints,
+      flow: storeFlow(flow),
+      status: matchStatus(flow),
+      version,
+      turnDeadline: nextDeadline(pace, flow, now()),
+      events: logRows(0, version, callerId, flow),
+    };
+    games.set(gameId, game);
+    return gameId;
+  }
+
+  /** The invite of `text` (any case). Rejects a malformed or unknown code, like the Convex `load`. */
+  function loadInvite(text: string): InviteRecord {
+    const code = normalizeInviteCode(text);
+    if (code === null)
+      throw new InviteError('BAD_REQUEST', 'an invite code has 8 letters and digits');
+    const invite = invites.get(code);
+    if (invite === undefined) throw new InviteError('INVITE_NOT_FOUND', 'no invite has this code');
+    return invite;
+  }
+
+  /** The view of the invite of `text` (any case) at `now()`, or `null`, like the Convex `getInvite`. */
+  function inviteView(text: string): InviteView | null {
+    const code = normalizeInviteCode(text);
+    const invite = code === null ? undefined : invites.get(code);
+    return invite === undefined ? null : toInviteView(invite, now());
+  }
+
+  /** Runs `step` on a later microtask; errors reject as plain data. */
+  async function inviteCall<T>(step: () => T): Promise<T> {
+    await nextTick();
+    try {
+      return step();
+    } catch (error) {
+      throw toErrorData(error);
+    }
+  }
+
+  function invitesFor(playerId: string): Invites {
+    return {
+      getInvite(text) {
+        return inviteCall(() => inviteView(text));
+      },
+      acceptInvite(text) {
+        return inviteCall(() => {
+          const invite = loadInvite(text);
+          checkAnswer(invite, playerId, now());
+          // If the game cannot start, the invite stays open (the Convex
+          // transaction rolls back too).
+          const gameId = createGame(
+            playerId,
+            { white: invite.from, black: playerId },
+            invite.choice,
+            invite.targetPoints,
+            invite.pace,
+          );
+          invites.set(invite.code, { ...invite, status: 'accepted', gameId });
+          return gameId;
+        });
+      },
+      declineInvite(text) {
+        return inviteCall(() => {
+          const invite = loadInvite(text);
+          checkAnswer(invite, playerId, now());
+          invites.set(invite.code, { ...invite, status: 'declined' });
+        });
+      },
+    };
+  }
+
   return {
-    createGame(callerId, players, choice, targetPoints, pace) {
-      checkNewGame(callerId, players);
-      const flow = createOnlineMatch({ choice, targetPoints, players: copy(players) }, rng);
-      const gameId = `game-${nextId}`;
-      nextId += 1;
-      const version = 1;
-      const game: MemoryGame = {
-        gameId,
-        players: copy(players),
-        choice,
-        pace,
-        targetPoints,
-        flow: storeFlow(flow),
-        status: matchStatus(flow),
-        version,
-        turnDeadline: nextDeadline(pace, flow, now()),
-        events: logRows(0, version, callerId, flow),
-      };
-      games.set(gameId, game);
-      return gameId;
+    createGame,
+
+    createInvite(callerId, choice, targetPoints, pace) {
+      // As `pickInviteCode`: a new code on a clash, up to `MAX_CODE_TRIES` times.
+      for (let i = 0; i < MAX_CODE_TRIES; i++) {
+        const code = newInviteCode(rng);
+        if (invites.has(code)) continue;
+        const options = { from: callerId, choice, targetPoints, pace };
+        invites.set(code, newInvite(options, code, now()));
+        return code;
+      }
+      throw new Error(`no free invite code after ${MAX_CODE_TRIES} tries`);
     },
+
+    invitesFor,
+
+    getInvite: (text) => copy(inviteView(text)),
 
     transportFor,
 
