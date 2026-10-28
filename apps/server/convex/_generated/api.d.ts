@@ -14,7 +14,9 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as games from "../games.js";
+import type * as invites from "../invites.js";
 import type * as model_crypto_rng from "../model/crypto-rng.js";
+import type * as model_invites from "../model/invites.js";
 import type * as model_online_game from "../model/online-game.js";
 
 /**
@@ -27,7 +29,9 @@ import type * as model_online_game from "../model/online-game.js";
  */
 declare const fullApi: ApiFromModules<{
   games: typeof games;
+  invites: typeof invites;
   "model/crypto-rng": typeof model_crypto_rng;
+  "model/invites": typeof model_invites;
   "model/online-game": typeof model_online_game;
 }>;
 export declare const api: FilterApi<
