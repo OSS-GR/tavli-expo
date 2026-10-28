@@ -3,8 +3,9 @@
  *
  * The app plays an online game only through `GameTransport`. The server
  * (`apps/server`, Convex) is the truth: it rolls the dice, checks every
- * turn with `@tavli/engine` and saves the game. A client adapter (later,
- * `packages/adapters/backend-convex`) implements this port. The in-memory
+ * turn with `@tavli/engine` and saves the game. The client adapter
+ * `@tavli/backend-convex` (`packages/adapters/backend-convex`) implements
+ * this port. The in-memory
  * server in `@tavli/online` implements it too, with no network.
  *
  * Every type here is plain JSON, so it can cross the network as it is.

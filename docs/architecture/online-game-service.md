@@ -1,6 +1,6 @@
 # Online game service
 
-Status: first version (#126, part of #46), with turn timers (#133), invites by code (#252) and [sign-in](#sign-in) (#131). The game model is in the pure package `@tavli/online`, with an [in-memory server](#the-in-memory-server) (#251). It runs and is tested **offline**, with no Convex account. CI deploys it to Convex (#257, see [Deploy](#deploy)).
+Status: first version (#126, part of #46), with turn timers (#133), invites by code (#252), [sign-in](#sign-in) (#131) and a [Convex client adapter](#the-convex-adapter) (#253). The game model is in the pure package `@tavli/online`, with an [in-memory server](#the-in-memory-server) (#251). It runs and is tested **offline**, with no Convex account. CI deploys it to Convex (#257, see [Deploy](#deploy)).
 
 Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0002](../decisions/0002-modular-architecture.md).
 
@@ -28,8 +28,9 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `packages/contracts/src/game-transport.ts` | The `GameTransport` port, the `OnlineGameView` type, the paces and `TURN_TIME_MS` |
 | `packages/contracts/src/auth.ts` | The `AuthProvider` port, `AuthUser`, the auth error codes and the in-memory provider |
 | `packages/adapters/auth-better-auth` | `AuthProvider` on the Better Auth Expo client (its `README.md`) |
+| `packages/adapters/backend-convex` | `GameTransport` on the Convex client ([The port](#the-port), its `README.md`) |
 
-Only `apps/server` and the auth adapter import `convex` and Better Auth. The ports in `packages/contracts` and `@tavli/online` are plain TypeScript. The app must not import server code, so it uses `@tavli/online`. There is no Convex client adapter yet.
+Only `apps/server` and the adapters (`auth-better-auth`, `backend-convex`) import `convex` and Better Auth. The ports in `packages/contracts` and `@tavli/online` are plain TypeScript. The app must not import server code, so it uses `@tavli/online` and the ports.
 
 ## Data model
 
@@ -152,7 +153,19 @@ The app plays a game through the online store (`apps/mobile/src/features/online/
 
 ## The port
 
-`GameTransport` in `packages/contracts`: `subscribe(gameId, onView, onError)`, `sendTurn({ gameId, expectedVersion, moves })`, `sendAnswer({ gameId, expectedVersion, choice })`, `resign(gameId)`. The calls carry no player id. The server reads the caller from the sign-in token, which the backend client gets from the `AuthProvider` port ([Sign-in](#sign-in)). `subscribe` is for the two players only: a stranger's `onError` gets `NOT_A_PLAYER`. A Convex adapter (`packages/adapters/backend-convex`) comes in a later issue.
+`GameTransport` in `packages/contracts`: `subscribe(gameId, onView, onError)`, `sendTurn({ gameId, expectedVersion, moves })`, `sendAnswer({ gameId, expectedVersion, choice })`, `resign(gameId)`. The calls carry no player id. The server reads the caller from the sign-in token, which the backend client gets from the `AuthProvider` port ([Sign-in](#sign-in)). `subscribe` is for the two players only: a stranger's `onError` gets `NOT_A_PLAYER`.
+
+### The Convex adapter
+
+`@tavli/backend-convex` (`packages/adapters/backend-convex`, #253) implements the port on the Convex client. Its `README.md` has the details.
+
+- `createConvexGameTransport({ client })`: `client` is any object with `onUpdate(query, args, onResult, onError)` and `mutation(fn, args)`. `ConvexClient` from `convex/browser` fits, and a test passes a fake.
+- `createConvexGameTransportFromUrl(url, auth)` makes the `ConvexClient` for the app and calls `setAuth` with a token fetcher on the `AuthProvider` (`getToken({ forceRefresh })`). The app wiring (`services.ts`) is a later issue.
+- `subscribe` watches `getGame`. A view goes to `onView`; `null` goes to `onError` as `NOT_FOUND`. Both wait one microtask, so neither is called inside `subscribe` or after the stop function.
+- A `ConvexError` whose `data` passes `isGameTransportErrorData` rejects with that data (a plain object). Every code maps so, `NOT_SIGNED_IN` too. Other errors (the network) reject as they are.
+- `makeMove` and `answer` return `{ ok: false, error: { code: 'TIMED_OUT' } }` when the turn time ran out ([Turn timers](#turn-timers)): `sendTurn` and `sendAnswer` reject with that data. They resolve only after the mutation resolves.
+- The function references are names (`GAME_FUNCTIONS` with `makeFunctionReference`), not the generated `api`: the `api` types pull in all server code, and `apps/server` depends on the adapter for its tests. `convex/convexTransport.test.ts` checks the names and types against `api`.
+- **Offline test:** `apps/server/convex/convexTransport.test.ts` runs `gameTransportContract()` on the adapter with the real functions. A fake client runs each call through convex-test as one user (`t.withIdentity({ subject })`). After each mutation it runs the watched queries again before it resolves, like the real client, and it sends a query result only when it changed. Fake timers, like `games.test.ts`. It also covers a late turn (`TIMED_OUT`) and a call with no sign-in (`NOT_SIGNED_IN`).
 
 ## Sign-in
 
@@ -270,6 +283,7 @@ A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }
 - `convex/invites.test.ts` (convex-test, fake timers): create and accept starts a game that `getGame` shows (the inviter is white); accept twice; your own invite; decline and cancel (and who may call them); an unknown and a malformed code; codes in any case; a code clash (a spy on `crypto.getRandomValues`); a game error rolls the accept back; the invite expires at 24 hours and accept, decline and cancel then fail; an accept just in time; `listMyInvites`; every call refuses a call with no identity; the inviter is the identity; a stranger cannot read the new game.
 - `convex/model/invites.test.ts` (pure, seeded RNG): codes, the fair draw, clashes, the checks and the view.
 - `convex/auth.test.ts` (convex-test with the Better Auth component, `register` from `@convex-dev/better-auth/test`): the `/api/auth` routes answer; a guest signs in over HTTP and gets a Convex token whose `sub` is the user id; that identity makes an invite.
+- `convex/convexTransport.test.ts` (convex-test, fake timers): the `GameTransport` contract checks on the [Convex adapter](#the-convex-adapter) with the real functions; a late turn, no sign-in and a bad id through the adapter; the adapter's function names and types against `api`.
 
 `packages/online` (Vitest, pure, seeded RNG):
 
@@ -332,7 +346,7 @@ A deploy does not change the stored data. Convex refuses a schema that the store
 
 ### Contract checks
 
-`gameTransportContract()` in `@tavli/contracts/testing` checks any `GameTransport`. The checks are plain async functions, so Vitest and Jest can both run them. The subject gives a way to create a game, a Plakoto game at the mother question, a missing game id, a transport per side (and for a stranger), and a legal turn. The checks: the first view arrives on a later tick; a legal turn reaches both players with `version + 1`; an old version gets `STALE_VERSION`; the wrong player gets `NOT_YOUR_TURN` and a stranger `NOT_A_PLAYER`; a stranger cannot watch a game (`subscribe` gets `NOT_A_PLAYER`); an incomplete turn gets `ILLEGAL_MOVE`; the mother question; resign finishes the match; no view after unsubscribe; a missing game gives `NOT_FOUND`; a view is a copy. Every rejection must pass `isGameTransportErrorData`. The in-memory server runs them, and the Convex adapter must run them too.
+`gameTransportContract()` in `@tavli/contracts/testing` checks any `GameTransport`. The checks are plain async functions, so Vitest and Jest can both run them. The subject gives a way to create a game, a Plakoto game at the mother question, a missing game id, a transport per side (and for a stranger), and a legal turn. The checks: the first view arrives on a later tick; a legal turn reaches both players with `version + 1`; an old version gets `STALE_VERSION`; the wrong player gets `NOT_YOUR_TURN` and a stranger `NOT_A_PLAYER`; a stranger cannot watch a game (`subscribe` gets `NOT_A_PLAYER`); an incomplete turn gets `ILLEGAL_MOVE`; the mother question; resign finishes the match; no view after unsubscribe; a missing game gives `NOT_FOUND`; a view is a copy. Every rejection must pass `isGameTransportErrorData`. The in-memory server and the [Convex adapter](#the-convex-adapter) run them.
 
 ## Codegen without a deployment
 
@@ -355,7 +369,9 @@ Run it after you add or rename a file in `convex/`. The push also checks what a 
 - **Sign-in follow-ups:** Apple, Google and email magic link; moving a guest's games after an upgrade; the app wiring of `@tavli/auth-better-auth`; the `createGame` exposure ([Not done yet](#not-done-yet)).
 - **Invite limits:** nothing limits how many open invites one player makes, and nothing limits code guesses. With about 850 billion codes, a guess rarely hits. Add a cap and a rate limit per signed-in user.
 - **Verify the dice** on a real deployment: `crypto.getRandomValues` in a mutation gives different, unpredictable dice per call.
-- **Client adapter** (#253, not done yet): `packages/adapters/backend-convex` will implement `GameTransport` with the Convex React client. `apps/mobile/src/services.ts` will give it the URL from `convexUrl()` (`apps/mobile/src/convexUrl.ts`).
+- **App wiring of the Convex adapter:** `createConvexGameTransportFromUrl(convexUrl(), auth)` in `services.ts` (`apps/mobile/src/convexUrl.ts` gives the URL per app variant), once the auth wiring is there. One `ConvexClient` (`createConvexClient`) should serve the games and the invites.
+- **A bad game id:** `getGame` and the mutations take `v.id('games')`. A string that is not a game id (for example from a broken link) fails argument validation, a plain error, not `NOT_FOUND`. The app should treat any non-port error on load as "cannot open this game".
+- **Verify on a real deployment** that a mutation resolves only after the watched `getGame` shows its change (the offline test assumes it, as the Convex docs say).
 - **Clock skew:** `turnDeadline` is on the server clock. A phone should show the time left from the server time (for example the offset seen when the view arrives), not trust its own clock.
 - **Friends, usernames, users, presence, push**: later issues. The invite app screen and link route: #256.
 - **Document size**: one game row holds the whole match flow (a few KB). The log is in `moves`, so the row does not grow with the game.

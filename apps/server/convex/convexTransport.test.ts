@@ -1,0 +1,338 @@
+// The Convex client adapter (`@tavli/backend-convex`, #253) against the
+// real Convex functions, offline. A fake Convex client runs each call
+// through convex-test as one signed-in user (`t.withIdentity`). After
+// each mutation it runs the watched queries again, like the real client,
+// which sends new query results before the mutation resolves. The
+// `GameTransport` contract checks (`@tavli/contracts/testing`) then run
+// on top.
+
+import { convexTest } from 'convex-test';
+import { getFunctionName } from 'convex/server';
+import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  GAME_FUNCTIONS,
+  GAME_FUNCTION_NAMES,
+  createConvexGameTransport,
+} from '@tavli/backend-convex';
+import type { ConvexGameClient, GameFunctions } from '@tavli/backend-convex';
+import { isGameTransportErrorData } from '@tavli/contracts';
+import type { GameTransport, OnlineGameView } from '@tavli/contracts';
+import { gameTransportContract } from '@tavli/contracts/testing';
+import type {
+  GameTransportContractGame,
+  GameTransportContractSubject,
+} from '@tavli/contracts/testing';
+import { createSeededRng } from '@tavli/engine';
+import { loadFlow, storeFlow } from '@tavli/online';
+import { motherPin } from '@tavli/online/testing';
+
+import { api } from './_generated/api';
+import type { Id } from './_generated/dataModel';
+import schema from './schema';
+import { modules, pickTurn } from './test.setup';
+
+const ALICE = 'alice';
+const BOB = 'bob';
+const EVE = 'eve';
+const PLAYERS = { white: ALICE, black: BOB };
+
+type Tester = ReturnType<typeof setup>;
+
+function setup() {
+  return convexTest(schema, modules);
+}
+
+// Every game schedules a turn timer. Fake timers keep those checks from
+// firing on their own (see games.test.ts).
+const START = Date.UTC(2026, 9, 28, 12, 0, 0);
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(START);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+// convex-test types each call from the reference it gets. The fake
+// clients take any reference, so they pass it on untyped.
+type AnyQuery = FunctionReference<'query'>;
+type AnyMutation = FunctionReference<'mutation'>;
+
+/** A query the fake client watches. */
+interface Watched {
+  readonly refresh: () => Promise<void>;
+}
+
+/**
+ * Fake Convex clients over one convex-test backend, one client per
+ * signed-in user. `settle()` waits until every query run has finished.
+ */
+function convexTestNetwork(t: Tester) {
+  const watched = new Set<Watched>();
+  const pending = new Set<Promise<void>>();
+
+  function track(work: Promise<void>): void {
+    pending.add(work);
+    const done = () => {
+      pending.delete(work);
+    };
+    work.then(done, done);
+  }
+
+  async function refreshAll(): Promise<void> {
+    await Promise.all([...watched].map((query) => query.refresh()));
+  }
+
+  function clientFor(subject: string): ConvexGameClient {
+    const user = t.withIdentity({ subject });
+    return {
+      onUpdate(query, args, onResult, onError) {
+        let active = true;
+        // Like Convex: a result goes out only when it changed.
+        let last: string | undefined;
+        // One run at a time, so an old result never comes after a new one.
+        let queue = Promise.resolve();
+        const runOnce = async () => {
+          let key: string;
+          let deliver: () => void;
+          try {
+            const result = await user.query(query as AnyQuery, args);
+            key = `result:${JSON.stringify(result)}`;
+            deliver = () => onResult(result);
+          } catch (error) {
+            key = `error:${String(error)}`;
+            deliver = () => onError(error as Error);
+          }
+          if (!active || key === last) return;
+          last = key;
+          deliver();
+        };
+        const entry: Watched = {
+          refresh: () => {
+            queue = queue.then(runOnce);
+            track(queue);
+            return queue;
+          },
+        };
+        watched.add(entry);
+        void entry.refresh();
+        return () => {
+          active = false;
+          watched.delete(entry);
+        };
+      },
+      async mutation(fn, args) {
+        try {
+          return await user.mutation(fn as AnyMutation, args);
+        } finally {
+          // The real client has the new query results before the mutation resolves.
+          await refreshAll();
+        }
+      },
+    };
+  }
+
+  return {
+    transportFor: (subject: string): GameTransport =>
+      createConvexGameTransport({ client: clientFor(subject) }),
+    settle: async () => {
+      await Promise.all([...pending]);
+      await Promise.resolve();
+    },
+  };
+}
+
+/** Alice creates a game: she is White, Bob is Black. */
+async function createGame(t: Tester, game: GameTransportContractGame): Promise<Id<'games'>> {
+  return await t
+    .withIdentity({ subject: ALICE })
+    .mutation(api.games.createGame, { players: PLAYERS, ...game });
+}
+
+function contractSubject(): GameTransportContractSubject {
+  const t = setup();
+  const network = convexTestNetwork(t);
+  const picker = createSeededRng(8);
+  return {
+    createGame: (game) => createGame(t, game),
+    createMotherQuestion: async () => {
+      const gameId = await createGame(t, { choice: 'plakoto', targetPoints: 1, pace: 'live' });
+      const pin = await t.run(async (ctx) => {
+        const doc = await ctx.db.get(gameId);
+        if (doc === null) throw new Error('no game');
+        const { flow, pin } = motherPin(loadFlow(doc.flow));
+        await ctx.db.patch(gameId, { flow: storeFlow(flow) });
+        return pin;
+      });
+      await t.withIdentity({ subject: BOB }).mutation(api.games.makeMove, {
+        gameId,
+        expectedVersion: 1,
+        moves: [...pin],
+      });
+      return gameId;
+    },
+    missingGameId: async () => {
+      const gameId = await createGame(t, { choice: 'portes', targetPoints: 1, pace: 'live' });
+      await t.run(async (ctx) => ctx.db.delete(gameId));
+      return gameId;
+    },
+    transportFor: (who) => network.transportFor(who === 'stranger' ? EVE : PLAYERS[who]),
+    legalTurn: (view) => pickTurn(view.game, picker),
+    settle: network.settle,
+  };
+}
+
+describe('GameTransport contract (Convex adapter on the real functions)', () => {
+  for (const check of gameTransportContract()) {
+    it(check.name, () => check.run(contractSubject()));
+  }
+});
+
+describe('the adapter on the real functions', () => {
+  /** The rejection reason of `call`; throws when it resolves. */
+  async function reasonOf(call: Promise<unknown>): Promise<unknown> {
+    return await call.then(
+      () => {
+        throw new Error('the call resolved');
+      },
+      (error: unknown) => error,
+    );
+  }
+
+  it('a late turn rejects with TIMED_OUT, and both players see the time out', async () => {
+    const t = setup();
+    const network = convexTestNetwork(t);
+    const gameId = await createGame(t, { choice: 'portes', targetPoints: 5, pace: 'live' });
+    const views: OnlineGameView[] = [];
+    const stop = network.transportFor(BOB).subscribe(gameId, (view) => views.push(view));
+    await network.settle();
+    await network.settle();
+    const first = views[0];
+    if (first === undefined || first.waitingFor === null) throw new Error('no first view');
+    const late = first.waitingFor;
+
+    // Past the deadline, before the scheduled check runs.
+    vi.setSystemTime(START + 60 * 1000);
+    const reason = await reasonOf(
+      network.transportFor(PLAYERS[late]).sendTurn({
+        gameId,
+        expectedVersion: first.version,
+        moves: pickTurn(first.game, createSeededRng(3)),
+      }),
+    );
+    expect(reason).toEqual({ code: 'TIMED_OUT', message: expect.any(String) });
+    expect(isGameTransportErrorData(reason)).toBe(true);
+    // The time out was saved, and the view of the next game is already here.
+    await network.settle();
+    const after = views[views.length - 1];
+    expect(after?.version).toBe(first.version + 1);
+    expect(after?.match.games[0]).toMatchObject({ reason: 'timeout' });
+    stop();
+  });
+
+  it('a caller with no sign-in gets NOT_SIGNED_IN', async () => {
+    const t = setup();
+    const gameId = await createGame(t, { choice: 'portes', targetPoints: 1, pace: 'live' });
+    // A client with no token: convex-test with no identity.
+    let loaded: Promise<unknown> = Promise.resolve();
+    const anonymous: ConvexGameClient = {
+      onUpdate: (query, args, onResult, onError) => {
+        loaded = t.query(query as AnyQuery, args).then(onResult, onError);
+        return () => undefined;
+      },
+      mutation: (fn, args) => t.mutation(fn as AnyMutation, args),
+    };
+    const transport = createConvexGameTransport({ client: anonymous });
+    expect(await reasonOf(transport.resign(gameId))).toEqual({
+      code: 'NOT_SIGNED_IN',
+      message: expect.any(String),
+    });
+    const errors: unknown[] = [];
+    transport.subscribe(
+      gameId,
+      () => undefined,
+      (error) => errors.push(error),
+    );
+    await loaded;
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toEqual({ code: 'NOT_SIGNED_IN', message: expect.any(String) });
+  });
+
+  it('a string that is no game id fails argument validation: a plain error, not port data', async () => {
+    const t = setup();
+    const network = convexTestNetwork(t);
+    const transport = network.transportFor(ALICE);
+    const reason = await reasonOf(transport.resign('not-a-game-id'));
+    expect(reason).toBeInstanceOf(Error);
+    expect(isGameTransportErrorData(reason)).toBe(false);
+    const errors: unknown[] = [];
+    const stop = transport.subscribe(
+      'not-a-game-id',
+      () => undefined,
+      (error) => errors.push(error),
+    );
+    await network.settle();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBeInstanceOf(Error);
+    expect(isGameTransportErrorData(errors[0])).toBe(false);
+    stop();
+  });
+});
+
+// The adapter names the functions itself (`GAME_FUNCTIONS`). They must
+// match the server's `api`, in name and in type.
+
+type Extends<A, B> = [A] extends [B] ? true : false;
+
+/** Fails the type check when `T` is not `true`. */
+function expectType<T extends true>(): T | undefined {
+  return undefined;
+}
+
+/** The adapter's arguments with the game id as the server types it. */
+type WithGameId<F extends FunctionReference<'query' | 'mutation'>> = Omit<
+  FunctionArgs<F>,
+  'gameId'
+> & { gameId: Id<'games'> };
+
+describe('function references', () => {
+  it('the adapter names the functions of the server api', () => {
+    expect(GAME_FUNCTION_NAMES).toEqual({
+      getGame: getFunctionName(api.games.getGame),
+      makeMove: getFunctionName(api.games.makeMove),
+      answer: getFunctionName(api.games.answer),
+      resign: getFunctionName(api.games.resign),
+    });
+    for (const key of Object.keys(GAME_FUNCTION_NAMES) as (keyof GameFunctions)[]) {
+      expect(getFunctionName(GAME_FUNCTIONS[key])).toBe(getFunctionName(api.games[key]));
+    }
+  });
+
+  it('the server takes the adapter arguments and returns what the adapter expects', () => {
+    type Api = typeof api.games;
+    expectType<Extends<WithGameId<GameFunctions['getGame']>, FunctionArgs<Api['getGame']>>>();
+    expectType<Extends<WithGameId<GameFunctions['makeMove']>, FunctionArgs<Api['makeMove']>>>();
+    expectType<Extends<WithGameId<GameFunctions['answer']>, FunctionArgs<Api['answer']>>>();
+    expectType<Extends<WithGameId<GameFunctions['resign']>, FunctionArgs<Api['resign']>>>();
+    expectType<
+      Extends<FunctionReturnType<Api['getGame']>, FunctionReturnType<GameFunctions['getGame']>>
+    >();
+    expectType<
+      Extends<FunctionReturnType<Api['makeMove']>, FunctionReturnType<GameFunctions['makeMove']>>
+    >();
+    expectType<
+      Extends<FunctionReturnType<Api['answer']>, FunctionReturnType<GameFunctions['answer']>>
+    >();
+    expectType<
+      Extends<FunctionReturnType<Api['resign']>, FunctionReturnType<GameFunctions['resign']>>
+    >();
+    // A wrong type fails: the checks above are not always true.
+    // @ts-expect-error -- a number is not a view.
+    expectType<Extends<number, FunctionReturnType<GameFunctions['getGame']>>>();
+  });
+});
