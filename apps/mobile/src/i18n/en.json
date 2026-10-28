@@ -159,6 +159,7 @@
     "stats": "Stats",
     "matches": "Matches",
     "onPhone": "Saved only on this phone: your last {{max}} matches.",
+    "openingRoll": "Opening roll: {{rule}}",
     "result": {
       "won": "Won",
       "lost": "Lost",

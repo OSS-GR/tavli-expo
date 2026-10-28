@@ -153,6 +153,6 @@ To check: install a test build, tap **Allow usage data**, play a game vs the bot
 
 1. Add it to `AnalyticsEvents` and `ANALYTICS_EVENTS` in `packages/contracts/src/analytics.ts`.
 2. Add a row to the Events table, and say which question it answers (the docs test fails until the row is there). Add it to a dashboard.
-3. Send it from a store or a small helper, not from deep inside a component. Write `analytics.track('event_name', …)` with the name as a string literal: `eventPlan.test.ts` reads the source and checks every name against the list. Wrap the call so an error never breaks the app (`quietly()` or `send()` in the helpers).
+3. Send it from a store or a small helper, not from deep inside a component. Write `analytics.track('event_name', …)` with the name as a string literal: `eventPlan.test.ts` reads the source and checks every name against the list. Wrap the call so an error never breaks the app (`quietly()` from `apps/mobile/src/features/analytics/quietly.ts`, or `send()` in the helpers).
 4. Never send names, emails or free text. Use numbers and ids from a fixed set only.
 5. When the event tells something new, also update the privacy policy (`docs/legal/`, all four files) and the store answers (`docs/store/app-privacy.md`, `docs/store/play-data-safety.md`).

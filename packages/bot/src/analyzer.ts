@@ -10,8 +10,8 @@
  * is no randomness: the same state gives the same ranking.
  */
 
-import type { Dice, DieValue, GameState, GameResult, PlayerId, Turn, Variant } from '@tavli/engine';
-import { DIE_VALUES, VARIANT_REGISTRY, getVariant } from '@tavli/engine';
+import type { Dice, GameState, GameResult, PlayerId, Turn, Variant } from '@tavli/engine';
+import { DISTINCT_ROLLS, VARIANT_REGISTRY, getVariant } from '@tavli/engine';
 
 import { questionOf, scoreAnswers } from './answer';
 import { checkDice, checkRegistry, defaultEvaluatorsFor } from './create-bot';
@@ -49,20 +49,6 @@ export const TWO_PLY_MARGIN = 0.02;
  * hint fast.
  */
 export const TWO_PLY_MAX_CANDIDATES = 16;
-
-/** One roll of the two dice, with its chance: 1/36 for a double, 2/36 for the rest. */
-interface WeightedRoll {
-  readonly dice: Dice;
-  readonly weight: number;
-}
-
-/** The 21 different rolls, higher die first. Their weights add up to 1. */
-const ROLLS: readonly WeightedRoll[] = DIE_VALUES.flatMap((high) =>
-  DIE_VALUES.filter((low) => low <= high).map((low: DieValue) => ({
-    dice: [high, low] as Dice,
-    weight: high === low ? 1 / 36 : 2 / 36,
-  })),
-);
 
 /**
  * The same chances, seen from the other player. `win` becomes `1 − win`:
@@ -257,7 +243,7 @@ export function createAnalyzer(registry: BotRegistry = {}): Analyzer {
     let winDouble = 0;
     let loseDouble = 0;
     let equity = 0;
-    for (const { dice, weight } of ROLLS) {
+    for (const { dice, weight } of DISTINCT_ROLLS) {
       const reply = bestReply(variant, evaluator, state, dice, me);
       win += weight * reply.evaluation.win;
       winDouble += weight * reply.evaluation.winDouble;

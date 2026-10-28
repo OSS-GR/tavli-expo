@@ -130,7 +130,8 @@ analyzer.evaluate(state); // the chances of state.toMove, before the roll
    (`TWO_PLY_MARGIN`, a near tie), at most 16 in all
    (`TWO_PLY_MAX_CANDIDATES`).
 2. For each candidate, play it, then average over the 21 different rolls
-   of the next player (a double 1/36, the others 2/36) the result after
+   of the next player (`DISTINCT_ROLLS` from the engine: a double 1/36,
+   the others 2/36) the result after
    their best 1-ply reply (the turn hard plays at temperature 0).
 3. Rank the candidates by that 2-ply equity. A turn that wins at once is
    still the best (its value is exact). The other turns follow in their
@@ -168,12 +169,33 @@ test checks < 2 s. Over 30 random positions per game: Portes median 34 ms
 (worst 200 ms), Plakoto 87 ms (313 ms), Fevga 35 ms (140 ms), Asodio
 3 ms (1.1 s). Acey-Deucey was slow: median 0.45 s, worst 7 s. Its rules
 are not the net's, so it uses the Asodio heuristic, which cost about
-0.2–0.4 ms per position against 0.03 ms for the Portes net. Hermes on a
-phone is several times slower than Node, so a 2-ply hint fits the 1 s
-phone budget for Portes, Plakoto and Fevga, but not yet for Asodio. The
-bot's own play (`chooseTurn`) stays 1-ply, and nothing in the app uses
-2 ply yet. An app caller needs a budget (a deterministic cap on the
-work, or 1 ply for Asodio) before it uses 2 ply in Asodio.
+0.2–0.4 ms per position against 0.03 ms for the Portes net (about 4–5×
+less since #225, see below). Hermes on a phone is several times slower
+than Node, so a 2-ply hint fits the 1 s phone budget for Portes, Plakoto
+and Fevga, but not yet for Asodio. The bot's own play (`chooseTurn`)
+stays 1-ply.
+
+**In the app (#219).** The Hint asks for 2 ply in Portes, Plakoto and
+Fevga, and for 1 ply in Asodio (every preset): `hintPlies` in
+`apps/mobile/src/features/hint/hint.ts`. The game review stays at 1 ply
+(see "Two scales"). Asodio needs a deterministic cap on the work before it
+can use 2 ply.
+
+**Work bound.** `src/analyzer-work.test.ts` counts the positions the
+evaluator scores in one 2-ply hint (`rankTurns` with `plies: 2, top: 1`):
+each `evaluate` call, and each turn given to a `scoreTurns` fast path.
+That count is deterministic, unlike the time. It plays 120 positions per
+game (60 from games where both players play the 1-ply best turn, 60 from
+random play) and checks the worst against a fixed bound:
+
+| Game    | Median            | Worst seen (500 positions) | Bound  |
+| ------- | ----------------- | -------------------------- | ------ |
+| Portes  | about 2,000       | 14,501                     | 19,000 |
+| Plakoto | about 2,500–3,600 | 19,065                     | 25,000 |
+| Fevga   | about 1,300–1,700 | 13,649                     | 18,000 |
+
+A scored position costs about 0.01–0.015 ms in Node (the nets), so the
+bounds are about 0.2–0.4 s in Node. Raise a bound only with a reason here.
 
 **The Asodio heuristic, before and after #225** (same scores; Node 22,
 dev container, `pnpm --filter @tavli/bot bench:asodio`, on the 2,100
@@ -1250,6 +1272,8 @@ the Plakoto one about 15 s with hard vs medium; the files run in parallel).
   at 1 ply but stays safe at 2 ply; the Plakoto mother question; Asodio
   extra rolls and chosen doubles; the errors (also a stub variant that
   asks a question with no `answerPrompt`).
+- `analyzer-work.test.ts` (#219): the work of one 2-ply hint in Portes,
+  Plakoto and Fevga stays under its bound (positions scored, see "2-ply").
 - `analyzer-perf.test.ts`: a 2-ply hint for a middle-game Portes position
   takes < 2 s.
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for

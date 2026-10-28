@@ -6,14 +6,17 @@
 import { createAnalyzer } from '@tavli/bot';
 import { createRecordingAnalytics, type Analytics } from '@tavli/contracts';
 import {
+  PRESET_IDS,
   VARIANT_REGISTRY,
   applyGameAction,
   applyMoveToBoard,
   asodio,
   createBoard,
   createGameFlow,
+  createMatch,
   currentPrompt,
   fevga,
+  gameRules,
   getVariant,
   legalNextMoves,
   plakoto,
@@ -29,7 +32,7 @@ import {
 
 import i18n from '@/i18n';
 
-import { bestRest, boardKey, hintGroups, hintHasChoice, turnFinishes } from './hint';
+import { bestRest, boardKey, hintGroups, hintHasChoice, hintPlies, turnFinishes } from './hint';
 import { sendHintShown } from './hintAnalytics';
 import { hintShortText, hintSpokenText } from './hintText';
 
@@ -58,6 +61,18 @@ const after = (game: GameFlow, moves: readonly Move[]) =>
     game.state.board,
   );
 
+/** The Analyzer's options for a hint in `game` (#219): the hint's depth, best turn only. */
+const hintOptions = (game: GameFlow) => ({ plies: hintPlies(game.state.rules), top: 1 });
+
+/** A first move after which the best turn's end position is out of reach, if there is one. */
+function offBestMove(game: GameFlow): Move | undefined {
+  const [best] = analyzer.rankTurns(game.state, game.state.dice!, hintOptions(game));
+  const bestEnd = boardKey(after(game, best!.turn.moves));
+  return legalNextMoves(game)
+    .flatMap((g) => g.moves)
+    .find((move) => !turnFinishes(play(game, move)).has(bestEnd));
+}
+
 const GAMES = [portes, plakoto, fevga] as const;
 /** Four turns of a game, white and black in turn. */
 const OPENING: readonly [DieValue, DieValue][] = [
@@ -75,6 +90,37 @@ const ROLLS: readonly [DieValue, DieValue][] = [
   [3, 3],
 ];
 
+describe('hintPlies (#219)', () => {
+  it.each([
+    ['portes', 2],
+    ['tavli', 2],
+    ['plakoto', 2],
+    ['plakoto.federation', 2],
+    ['fevga', 2],
+    ['asodio.kafeneio', 1],
+    ['asodio.aceyDeuceyGreek', 1],
+    ['asodio.aceyDeuceyAmerican', 1],
+  ] as const)('%s: %i ply', (preset, plies) => {
+    expect(hintPlies(resolveRules(preset))).toBe(plies);
+  });
+
+  it('covers every preset', () => {
+    for (const preset of PRESET_IDS) {
+      expect([1, 2]).toContain(hintPlies(resolveRules(preset)));
+    }
+  });
+
+  it('follows the game of a match: each game plays with its own preset', () => {
+    for (const preset of ['tavli', 'plakoto.federation', 'asodio.aceyDeuceyGreek'] as const) {
+      const match = createMatch({ rules: resolveRules(preset) });
+      expect(hintPlies(gameRules(match, 'portes'))).toBe(2);
+      expect(hintPlies(gameRules(match, 'plakoto'))).toBe(2);
+      expect(hintPlies(gameRules(match, 'fevga'))).toBe(2);
+      expect(hintPlies(gameRules(match, 'asodio'))).toBe(1);
+    }
+  });
+});
+
 describe('bestRest', () => {
   it.each(GAMES.map((v) => [v.id, v] as const))(
     '%s: before a move, the hint is the best turn of the Analyzer',
@@ -85,22 +131,56 @@ describe('bestRest', () => {
         [4, 4],
       ] as [DieValue, DieValue][]) {
         const game = rolled(variant, dice);
-        const [best] = analyzer.rankTurns(game.state, dice, { top: 1 });
+        const [best] = analyzer.rankTurns(game.state, dice, hintOptions(game));
         expect(bestRest(game, analyzer)).toEqual(best!.turn.moves);
       }
     },
   );
 
-  it('asks the Analyzer for the best turn only when it can reach it', () => {
+  it('asks for 2 ply in Portes: the best turn first, then every turn at once after a move', () => {
     const game = rolled(portes, [6, 5]);
     const spy = jest.spyOn(analyzer, 'rankTurns');
+    const asked = () => spy.mock.calls.map((call) => call[2]);
     try {
       bestRest(game, analyzer);
-      expect(spy.mock.calls.map((call) => call[2])).toEqual([{ top: 1 }]);
-      const [best] = analyzer.rankTurns(game.state, [6, 5], { top: 1 });
+      expect(asked()).toEqual([{ plies: 2, top: 1 }]);
+      const [best] = analyzer.rankTurns(game.state, [6, 5], hintOptions(game));
+      // After a move one ranking does it, whether the best turn is in reach or not.
+      const moves = [best!.turn.moves[0]!, offBestMove(game)!];
+      for (const move of moves) {
+        spy.mockClear();
+        expect(bestRest(play(game, move), analyzer)).not.toBeNull();
+        expect(asked()).toEqual([{ plies: 2 }]);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('asks for 1 ply in Asodio, and for every turn only when the best is out of reach', () => {
+    // Every checker entered, so a 6-4 has several plays.
+    const board = createBoard(
+      {
+        white: { points: { 24: 2, 13: 5, 8: 3, 6: 5 } },
+        black: { points: { 24: 2, 13: 5, 8: 3, 6: 5 } },
+      },
+      asodio.direction,
+    );
+    const game = rolled(asodio, [6, 4], board, resolveRules('asodio.kafeneio'));
+    expect(hintHasChoice(game)).toBe(true);
+    const spy = jest.spyOn(analyzer, 'rankTurns');
+    const asked = () => spy.mock.calls.map((call) => call[2]);
+    try {
+      bestRest(game, analyzer);
+      expect(asked()).toEqual([{ plies: 1, top: 1 }]);
+      const [best] = analyzer.rankTurns(game.state, [6, 4], hintOptions(game));
       spy.mockClear();
       bestRest(play(game, best!.turn.moves[0]!), analyzer);
-      expect(spy.mock.calls.map((call) => call[2])).toEqual([{ top: 1 }]);
+      expect(asked()).toEqual([{ plies: 1, top: 1 }]);
+      const off = offBestMove(game)!;
+      spy.mockClear();
+      expect(bestRest(play(game, off), analyzer)).not.toBeNull();
+      expect(asked()).toEqual([{ plies: 1, top: 1 }, { plies: 1 }]);
     } finally {
       spy.mockRestore();
     }
@@ -110,7 +190,7 @@ describe('bestRest', () => {
     '%s: after the first move of the best turn, the hint is the rest of it',
     (_id, variant) => {
       const game = rolled(variant, [6, 5]);
-      const [best] = analyzer.rankTurns(game.state, [6, 5], { top: 1 });
+      const [best] = analyzer.rankTurns(game.state, [6, 5], hintOptions(game));
       const moves = best!.turn.moves;
       const next = play(game, moves[0]!);
       const rest = bestRest(next, analyzer)!;
@@ -133,7 +213,7 @@ describe('bestRest', () => {
       for (const dice of ROLLS) {
         const game = rolled(variant, dice, state.board);
         if (game.phase !== 'moving') continue;
-        const ranked = analyzer.rankTurns(game.state, dice);
+        const ranked = analyzer.rankTurns(game.state, dice, { plies: hintPlies(game.state.rules) });
         const bestEnd = boardKey(after(game, ranked[0]!.turn.moves));
         // A first move that cannot reach the best end.
         const first = legalNextMoves(game)
@@ -172,7 +252,7 @@ describe('bestRest', () => {
     game = applyGameAction(game, { type: 'answer', player: 'white', choice: '4' });
     expect(game.state.toMove).toBe('white');
     expect(game.state.dice).toEqual([4, 4]);
-    const [best] = analyzer.rankTurns(game.state, [4, 4], { top: 1 });
+    const [best] = analyzer.rankTurns(game.state, [4, 4], hintOptions(game));
     expect(bestRest(game, analyzer)).toEqual(best!.turn.moves);
   });
 

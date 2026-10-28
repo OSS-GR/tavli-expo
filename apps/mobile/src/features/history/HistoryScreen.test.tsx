@@ -97,6 +97,21 @@ describe('<HistoryScreen />', () => {
     );
   });
 
+  it('shows the opening roll house rule in the row and its label (#221)', async () => {
+    const records = [rec({ id: 'b', openingRoll: 'chosenStarterRolls' }), rec({ id: 'a' })];
+    await render(<HistoryScreen records={records} onPlay={jest.fn()} />);
+
+    const score = 'You 3 – 1 Bot · first to 3 · Opening roll: Choose';
+    expect(screen.getByText(score)).toBeOnTheScreen();
+    expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
+      `Portes · vs Bot (Easy), ${score}, Won, Oct 27, 2026`,
+    );
+    // The federation rule shows nothing extra (texts: `history.test.ts`).
+    expect(screen.getByTestId('history-row-1')).toHaveAccessibleName(
+      'Portes · vs Bot (Easy), You 3 – 1 Bot · first to 3, Won, Oct 27, 2026',
+    );
+  });
+
   it('shows stats per game and per bot level', async () => {
     await render(<HistoryScreen records={RECORDS} onPlay={jest.fn()} />);
 

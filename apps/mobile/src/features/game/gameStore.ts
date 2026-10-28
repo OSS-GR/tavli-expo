@@ -36,6 +36,7 @@ import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
 import type { GameAnalytics } from '@/features/analytics/gameAnalytics';
+import { quietly } from '@/features/analytics/quietly';
 
 export interface GameStoreOptions {
   players: PerPlayer<string>;
@@ -79,19 +80,6 @@ const nextMatchKey = () => {
   matchCount += 1;
   return `m${matchCount}`;
 };
-
-/**
- * Runs an analytics call and drops its errors. The move is already played
- * when it runs: analytics must never fail or undo it. The Hint button uses
- * it too (#209).
- */
-export function quietly(send: () => void): void {
-  try {
-    send();
-  } catch (error) {
-    console.warn('analytics failed', error);
-  }
-}
 
 export function createGameStore({
   players,

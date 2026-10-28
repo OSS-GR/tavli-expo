@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { diceMoves, isDouble, rollDice, rollDie } from './dice';
+import { DISTINCT_ROLLS, diceMoves, isDouble, rollDice, rollDie } from './dice';
 import { EngineError } from './errors';
 import { createSeededRng, rngFromState } from './rng';
 import type { Rng } from './rng';
@@ -133,5 +133,76 @@ describe('dice helpers', () => {
     expect(diceMoves([3, 5])).toEqual([5, 3]);
     expect(diceMoves([6, 1])).toEqual([6, 1]);
     expect(isDouble([6, 1])).toBe(false);
+  });
+});
+
+describe('DISTINCT_ROLLS (#226)', () => {
+  const names = DISTINCT_ROLLS.map(({ dice }) => dice.join('-'));
+
+  it('has 21 rolls with no duplicates, in a fixed order', () => {
+    expect(DISTINCT_ROLLS).toHaveLength(21);
+    expect(new Set(names).size).toBe(21);
+    expect(names).toEqual([
+      '1-1',
+      '2-1',
+      '2-2',
+      '3-1',
+      '3-2',
+      '3-3',
+      '4-1',
+      '4-2',
+      '4-3',
+      '4-4',
+      '5-1',
+      '5-2',
+      '5-3',
+      '5-4',
+      '5-5',
+      '6-1',
+      '6-2',
+      '6-3',
+      '6-4',
+      '6-5',
+      '6-6',
+    ]);
+  });
+
+  it('puts the higher die first', () => {
+    for (const { dice } of DISTINCT_ROLLS) expect(dice[0]).toBeGreaterThanOrEqual(dice[1]);
+  });
+
+  it('has 6 doubles at 1/36 and 15 other rolls at 2/36', () => {
+    const doubles = DISTINCT_ROLLS.filter(({ dice }) => isDouble(dice));
+    const others = DISTINCT_ROLLS.filter(({ dice }) => !isDouble(dice));
+    expect(doubles).toHaveLength(6);
+    expect(others).toHaveLength(15);
+    for (const { weight } of doubles) expect(weight).toBe(1 / 36);
+    for (const { weight } of others) expect(weight).toBe(2 / 36);
+  });
+
+  it('has weights that add up to 1', () => {
+    const sum = DISTINCT_ROLLS.reduce((total, { weight }) => total + weight, 0);
+    expect(sum).toBeCloseTo(1, 12);
+  });
+
+  it('covers each of the 36 ordered rolls once', () => {
+    const count = new Map<string, number>();
+    for (const a of [1, 2, 3, 4, 5, 6]) {
+      for (const b of [1, 2, 3, 4, 5, 6]) {
+        const key = `${Math.max(a, b)}-${Math.min(a, b)}`;
+        count.set(key, (count.get(key) ?? 0) + 1);
+      }
+    }
+    for (const { dice, weight } of DISTINCT_ROLLS) {
+      expect(count.get(dice.join('-'))).toBe(weight * 36);
+    }
+  });
+
+  it('cannot be changed by a caller', () => {
+    expect(Object.isFrozen(DISTINCT_ROLLS)).toBe(true);
+    for (const roll of DISTINCT_ROLLS) {
+      expect(Object.isFrozen(roll)).toBe(true);
+      expect(Object.isFrozen(roll.dice)).toBe(true);
+    }
   });
 });
