@@ -57,8 +57,10 @@ const NO_PUSHES = createStore<TurnPushesState>()(() => ({
 
 /**
  * True while the turn notifications offer shows over the screen. A screen
- * under it hides its content from screen readers, takes no focus and reads
- * nothing out while this is true (#153).
+ * under it hides its content from screen readers and takes no focus while
+ * this is true (#153). Hidden is not silenced: the invite wait screen also
+ * holds its announcements, but the game screen may still announce a line
+ * (the first turn) under the offer, as it does under its own menu.
  */
 export function useTurnPushOffering(): boolean {
   return useStore(turnPushes()?.store ?? NO_PUSHES, (s) => s.offering);

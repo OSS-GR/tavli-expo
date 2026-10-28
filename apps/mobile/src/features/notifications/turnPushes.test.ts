@@ -289,6 +289,31 @@ describe('the token on the server', () => {
     expect(auth.currentUser()).toBeNull();
   });
 
+  it('sign-out asks Expo for no token when they were never turned on in the app', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup();
+    await auth.signInAsGuest();
+    notifications.setPermission('granted');
+    await signOutOfOnline(auth, pushes);
+    expect(auth.currentUser()).toBeNull();
+    expect(notifications.tokenRequests).toBe(0);
+    expect(pushTokens.calls).toEqual([]);
+  });
+
+  it('a no to a later prompt keeps an earlier "Turn on", so sign-out still removes the token', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup(optedIn());
+    await auth.signInAsGuest();
+    // Android "ask again": the phone took the permission back.
+    notifications.answerPromptWith('denied');
+    await expect(pushes.turnOn()).resolves.toBe('denied');
+    expect(pushes.store.getState()).toMatchObject({ turnedOn: true, declined: true });
+    // Later the player allows them again in the phone settings.
+    notifications.setPermission('granted');
+    await signOutOfOnline(auth, pushes);
+    expect(pushTokens.calls).toEqual([
+      { kind: 'remove', playerId: 'guest-1', token: notifications.token },
+    ]);
+  });
+
   it('sign-out with no turn notifications only signs out', async () => {
     const { auth } = setup();
     await auth.signInAsGuest();

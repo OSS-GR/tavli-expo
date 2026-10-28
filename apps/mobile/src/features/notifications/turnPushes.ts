@@ -234,7 +234,9 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
         // Only a real answer to the system prompt: granted or denied.
         if (before === 'undetermined') onAnswer?.(answer === 'granted' ? 'granted' : 'denied');
         const on = answer === 'granted';
-        save({ declined: !on, turnedOn: on });
+        // A no keeps an earlier yes: the server may still hold the token,
+        // and sign-out must remove it. Nothing is sent without a grant.
+        save({ declined: !on, turnedOn: on || store.getState().turnedOn });
       } finally {
         store.setState({ permission: answer, offering: false, asking: false });
       }
@@ -248,7 +250,11 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
     unregister(then) {
       const step = chain.then(async () => {
         try {
-          const token = registered?.token ?? (await notifications.getToken());
+          // Not registered in this run and never turned on in the app: the
+          // server has no token of this phone, so do not ask Expo for one.
+          const token =
+            registered?.token ??
+            (store.getState().turnedOn ? await notifications.getToken() : null);
           registered = null;
           if (token !== null) await pushTokens.remove(token);
         } catch {

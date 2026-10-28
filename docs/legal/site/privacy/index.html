@@ -56,7 +56,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li><strong>Your settings:</strong> sound, haptics, language, board theme, board turn, auto-confirm.</li>
 <li><strong>Your games:</strong> the match you are playing, so you can go back to it, and your last choices on the New game screen. In pass-and-play, this includes the player names you type. Names are never sent anywhere.</li>
 <li><strong>Your privacy answer</strong> (allow or don't allow).</li>
-<li><strong>Your "Not now"</strong> to turn notifications, so the app does not ask again by itself.</li>
+<li><strong>Your answer</strong> (<strong>Turn on</strong> or <strong>Not now</strong>) to turn notifications, so the app does not ask again by itself and sends the push token only after <strong>Turn on</strong>.</li>
 <li><strong>An install id:</strong> a random code, made on your phone. It is not your name, email, phone number or a device id. It does not come from your phone's hardware. The app makes it only after you tap <strong>Allow usage data</strong>.</li>
 </ul>
 <p>Deleting the app deletes all of this from your phone. If you install the app again, you get a new install id. (On Android, your phone's own backup may keep a copy of app data and bring it back when you reinstall.)</p>
@@ -216,7 +216,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>Your phone gets a <strong>push token</strong> from Expo's push service (Expo, through Apple's or Google's push service). It is a random address for this app on this phone. It is not your name, email or phone number.</li>
 <li>The app sends the push token and the phone system (iOS or Android) to our game server, under your guest account's user id. The server keeps, for each of your phones: the push token, the phone system and when the phone last sent it. At most 5 phones per account.</li>
 <li>When it is your turn in an async game, or an async game is over, the server gives Expo the push token, a fixed text ("Your turn: an online game is waiting for your move", or "Your game is over. See the result.") and the game's id, so a tap opens that game. No names, no emails and no moves. Expo passes the push to Apple or Google, which show it on your phone.</li>
-<li>The server deletes a push token when Expo says the phone no longer takes pushes (for example after you turn notifications off or delete the app), when you add a sixth phone (the oldest goes), when another account signs in on that phone (the token moves to that account), and when you sign out or your account is deleted.</li>
+<li>The server deletes a push token when Expo says it is no longer valid (for example after you delete the app), when you add a sixth phone (the oldest goes), when another account signs in on that phone (the token moves to that account), and when you sign out or your account is deleted. Turning notifications off in your phone's settings stops them from showing on your phone; the token stays on the server until one of these happens.</li>
 <li>The push token <strong>never goes to analytics</strong> (PostHog) and never goes into crash reports (Sentry). Usage data gets only your answer (allowed or not allowed), and only if you allowed usage data.</li>
 </ul>
 <h2 id="what-we-never-do">What we never do</h2>
