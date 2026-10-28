@@ -4,11 +4,13 @@
  * (`test/reviewGame.ts`) on fake timers: the work runs on timers.
  */
 import { BotError, type Analyzer } from '@tavli/bot';
+import type { CrashReporter, RecordingCrashReporter } from '@tavli/contracts';
 import { act, screen, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
 import { defaultSetup, type MatchSetup } from '@/features/match/setup';
 import i18n from '@/i18n';
+import { crashReporter } from '@/services';
 
 import { runOnFakeTimers } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
@@ -17,14 +19,19 @@ import { allBest, oneBadTurn, testAnalyzer } from '../../../test/reviewGame';
 import { lastGameTurns, reviewGame } from './review';
 import { ReviewScreen } from './ReviewScreen';
 import { mistakeText } from './reviewText';
+import { reportReviewFailure } from './useGameReview';
 
 runOnFakeTimers();
+
+// The fake from `jest.setup.ts`: it keeps every report.
+const crash = crashReporter as RecordingCrashReporter;
 
 const vsBot = defaultSetup('bot');
 const local: MatchSetup = { ...defaultSetup('local'), names: { white: 'Maria', black: 'Bob' } };
 
 let announce: jest.SpyInstance;
 beforeEach(() => {
+  crash.clear();
   announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
 });
 afterEach(async () => {
@@ -100,18 +107,65 @@ describe('<ReviewScreen />', () => {
     expect(await screen.findByText('No moves to review in this game.')).toBeOnTheScreen();
   });
 
-  it('says when the game cannot be reviewed', async () => {
+  it('says when the game cannot be reviewed, and reports the error with safe context only', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const failure = new BotError('NOT_IMPLEMENTED', 'no evaluator');
+    // The third ranking fails: the third turn of the game (index 2).
+    let calls = 0;
     const broken: Analyzer = {
       ...testAnalyzer,
-      rankTurns: () => {
-        throw new BotError('NOT_IMPLEMENTED', 'no evaluator');
+      rankTurns: (...args) => {
+        calls += 1;
+        if (calls === 3) throw failure;
+        return testAnalyzer.rankTurns(...args);
       },
     };
     try {
-      await renderWithRoot(<ReviewScreen setup={vsBot} flow={oneBadTurn()} analyzer={broken} />);
+      await renderWithRoot(<ReviewScreen setup={local} flow={oneBadTurn()} analyzer={broken} />);
       expect(await screen.findByText('This game cannot be reviewed.')).toBeOnTheScreen();
+      expect(screen.queryByTestId('review-mistake-1')).toBeNull();
       expect(warn).toHaveBeenCalled();
+      // One report: the game, the variant and the turn index. No names,
+      // positions or moves.
+      expect(crash.reports).toEqual([
+        {
+          kind: 'exception',
+          error: failure,
+          context: {
+            tags: { feature: 'review', game: 'portes', variant: 'portes' },
+            extra: { turn: 2 },
+          },
+        },
+      ]);
+      expect(JSON.stringify(crash.reports)).not.toMatch(/Maria|Bob/);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('sends no crash report for a normal review', async () => {
+    await renderWithRoot(<ReviewScreen setup={vsBot} flow={oneBadTurn()} />);
+    await screen.findByTestId('review-mistake-1');
+    expect(crash.reports).toEqual([]);
+  });
+
+  it('keeps the failed state when the crash reporter itself throws', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const throwing: CrashReporter = {
+      ...crash,
+      captureException: () => {
+        throw new Error('reporter down');
+      },
+    };
+    try {
+      expect(() =>
+        reportReviewFailure(throwing, new Error('boom'), {
+          game: 'tavli',
+          variant: 'plakoto',
+          turn: null,
+        }),
+      ).not.toThrow();
+      expect(warn).toHaveBeenCalledWith('could not report the failed review', expect.any(Error));
     } finally {
       warn.mockRestore();
     }

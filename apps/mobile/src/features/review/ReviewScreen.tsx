@@ -52,7 +52,7 @@ export function ReviewScreen({ setup, flow, analyzer = appAnalyzer }: ReviewScre
   const vsBot = setup.mode === 'bot';
   // Vs the bot only the person's turns count; in pass-and-play both players'.
   const players = useMemo(() => (vsBot ? [HUMAN_SIDE] : BOTH_SIDES), [vsBot]);
-  const review = useGameReview(flow, players, analyzer);
+  const review = useGameReview(flow, players, analyzer, setup.game);
   const seats = seatsFor(setup, t);
 
   const game = t('game.round', {
