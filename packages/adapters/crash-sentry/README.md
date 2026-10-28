@@ -41,7 +41,6 @@ Trade-offs, accepted by design:
 | `apps/mobile/src/features/crash/start.ts`          | Starts it first thing (imported first in `index.ts`), follows the consent store (`features/privacy`)    |
 | `apps/mobile/src/features/crash/CrashBoundary.tsx` | Top-level error boundary: reports render errors and shows "Something went wrong" with a Restart button  |
 | `apps/mobile/app.json`                             | `plugins`: the `@sentry/react-native/expo` config plugin (source map upload), with no options           |
-| `apps/mobile/eas.json`                             | `SENTRY_DISABLE_AUTO_UPLOAD` in `build.base.env`: no upload until the token exists (step 4)             |
 | `apps/mobile/metro.config.js`                      | `getSentryExpoConfig`: adds Debug IDs to bundles and source maps                                        |
 | `apps/mobile/app.json`                             | `ios.privacyManifests`: the "required reason" APIs Sentry uses, and the data Sentry and PostHog collect |
 
@@ -74,18 +73,25 @@ Nothing here is a secret except `SENTRY_AUTH_TOKEN`. Never commit the token.
    eas env:create --name SENTRY_AUTH_TOKEN --value "<token>" --environment preview --environment production --visibility secret
    ```
 
-   Then remove `SENTRY_DISABLE_AUTO_UPLOAD` from `build.base.env` in `apps/mobile/eas.json`. A value in `eas.json` wins over an EAS variable, so it must go. Until then, release builds skip the upload and still pass. Crash reports still arrive, but stack traces are not mapped to our source. Debug builds (the `development` profiles) never upload.
+   **Done (2026-10-28, #338).** Every preview and production EAS build now uploads its source maps and debug files, so stack traces point to our source. Debug builds (the `development` profiles) never upload. If a build fails at the Sentry upload step, check the token. To skip the upload while you fix it, add `SENTRY_DISABLE_AUTO_UPLOAD=true` as an EAS variable for that environment. Never put it back in `eas.json`: a value there wins over every EAS variable.
 
 5. In the Sentry project, open **Settings → Security & Privacy** and turn on **Prevent Storing of IP Addresses**. Keep **Data Scrubber** and **Use Default Scrubbers** on. The app never sends an IP address, but Sentry could still see one from the network request.
 
-6. **EAS Update** (later): after `eas update`, run `pnpm dlx sentry-expo-upload-sourcemaps dist` in `apps/mobile`. If that runs in GitHub Actions, add `SENTRY_AUTH_TOKEN` as a GitHub **repository secret** (Settings → Secrets and variables → Actions) and pass `SENTRY_ORG` and `SENTRY_PROJECT` as plain variables.
+6. **EAS Update:** after `eas update`, run `pnpm dlx sentry-expo-upload-sourcemaps dist` in `apps/mobile`. It needs `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` in your shell or in `apps/mobile/.env.local`: `eas env:exec` cannot read a secret variable. If that runs in GitHub Actions, add `SENTRY_AUTH_TOKEN` as a GitHub **repository secret** (Settings → Secrets and variables → Actions) and pass `SENTRY_ORG` and `SENTRY_PROJECT` as plain variables.
 7. Optional: link the Sentry project in the EAS dashboard (Account settings → Connections → Sentry) to see crashes next to each build and update.
 
 For a local release build with source maps, put the token, `SENTRY_ORG` and `SENTRY_PROJECT` in `apps/mobile/.env.local` (git ignores `.env*.local`). Without the token, put `SENTRY_DISABLE_AUTO_UPLOAD=true` there instead, or the release build fails at the upload step.
 
 ## Check it works
 
-Make a release build (for example the EAS `preview` profile), then trigger an error from a dev-only button. It shows in Sentry within a minute. Dev builds send nothing.
+The app has no button that sends a test error. Check with Release Health instead: after "Allow usage data" the app turns on Sentry's session tracking (`IDENTIFIED_OPTIONS`).
+
+1. Install a release build (the TestFlight build, or an EAS `preview` build) and tap **Allow usage data**. Crash reports follow that one switch.
+2. Use the app for a moment, then send it to the background or close it. Sentry gets a session when it ends.
+3. In Sentry, open the project → **Releases**. The build's release (for example `com.tavlaki@1.0.0+1`, environment `production` unless `EXPO_PUBLIC_SENTRY_ENVIRONMENT` is set) shows at least one session. Then the DSN, the network and the consent switch all work.
+4. Real errors show under **Issues** within a minute. Their stack traces point to our source when the build uploaded its source maps (step 4), or after `sentry-expo-upload-sourcemaps` for an EAS update (step 6).
+
+Dev builds send nothing (the no-op reporter). Before an answer only JS errors go out, with no id and no session ("Anonymous mode" above), so the Releases check needs "Allow". After "Don't allow" nothing goes out.
 
 ## Tests
 
