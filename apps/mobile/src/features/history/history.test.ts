@@ -21,7 +21,7 @@ import {
 } from '@/features/match/setup';
 import i18n from '@/i18n';
 
-import { dateLocale, formatDate, historyRow, statParts } from './format';
+import { dateLocale, formatDate, historyRow, recordSetup, statParts } from './format';
 import { createHistoryStore } from './historyStore';
 import {
   HISTORY_STORAGE_KEY,
@@ -935,6 +935,49 @@ describe('history texts', () => {
       badge: 'winner',
       result: 'Maria won on time',
     });
+  });
+
+  it('shows the opening roll house rule after the length (#221)', () => {
+    const el = i18n.getFixedT('el');
+    const reroll = rec({ openingRoll: 'rerollBoth' });
+    expect(historyRow(reroll, t, 'en')).toMatchObject({
+      score: 'You 3 – 1 Bot · first to 3 · Opening roll: Roll again',
+      label:
+        'Portes · vs Bot (Easy), You 3 – 1 Bot · first to 3 · Opening roll: Roll again, Won, Jan 1, 1970',
+    });
+    expect(historyRow(reroll, el, 'el').score).toBe(
+      'Εσύ 3 – 1 Υπολογιστής · στους 3 · Πρώτη ζαριά: Ξαναρίχνει',
+    );
+    const chosen = rec({ openingRoll: 'chosenStarterRolls' });
+    expect(historyRow(chosen, t, 'en').score).toBe(
+      'You 3 – 1 Bot · first to 3 · Opening roll: Choose',
+    );
+    expect(historyRow(chosen, el, 'el').score).toBe(
+      'Εσύ 3 – 1 Υπολογιστής · στους 3 · Πρώτη ζαριά: Διαλέγουμε',
+    );
+    // The federation rule shows nothing extra.
+    expect(historyRow(rec(), t, 'en').score).toBe('You 3 – 1 Bot · first to 3');
+    expect(historyRow(rec(), el, 'el').score).toBe('Εσύ 3 – 1 Υπολογιστής · στους 3');
+    // It comes before the resign note.
+    const resigned = rec({ openingRoll: 'rerollBoth', winner: 'black', resignedBy: 'white' });
+    expect(historyRow(resigned, t, 'en').score).toBe(
+      'You 3 – 1 Bot · first to 3 · Opening roll: Roll again · you resigned',
+    );
+  });
+
+  it("keeps the record's opening roll in its setup (#221)", () => {
+    for (const openingRoll of ['useOpeningDice', 'rerollBoth', 'chosenStarterRolls'] as const) {
+      expect(recordSetup(rec({ openingRoll })).openingRoll).toBe(openingRoll);
+      const local = rec({ mode: 'local', botLevel: null, openingRoll });
+      expect(recordSetup(local)).toMatchObject({ mode: 'local', openingRoll });
+    }
+  });
+
+  it('gives an unknown opening roll the federation rule and shows nothing for it (#221)', () => {
+    // A record is typed, but one built in code could still carry a bad value.
+    const odd = rec({ openingRoll: 'tossACoin' as HistoryRecord['openingRoll'] });
+    expect(recordSetup(odd).openingRoll).toBe('useOpeningDice');
+    expect(historyRow(odd, t, 'en').score).toBe('You 3 – 1 Bot · first to 3');
   });
 
   it('shows a match length the new-game screen does not offer as it is', () => {
