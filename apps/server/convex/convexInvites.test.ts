@@ -2,8 +2,11 @@
 // `@tavli/backend-convex`, #281) against the real Convex functions,
 // offline. Fake Convex clients (`test.network.ts`) run each call through
 // convex-test as one signed-in user. The `Invites` contract checks
-// (`@tavli/contracts/testing`) then run on top.
+// (`@tavli/contracts/testing`) then run on top. The players are Better
+// Auth users (`authUsers`): the calls that save the caller's id check
+// that the account exists (#306).
 
+import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { getFunctionName } from 'convex/server';
 import type { FunctionArgs, FunctionReturnType } from 'convex/server';
@@ -25,14 +28,18 @@ import { api } from './_generated/api';
 import schema from './schema';
 import { convexTestNetwork } from './test.network';
 import type { Tester } from './test.network';
-import { modules } from './test.setup';
+import { authUsers, modules } from './test.setup';
 
-const ALICE = 'alice';
-const BOB = 'bob';
-const CAROL = 'carol';
+// The players: new Better Auth users for each test, made by `setup()`.
+let ALICE = '';
+let BOB = '';
+let CAROL = '';
 
-function setup(): Tester {
-  return convexTest(schema, modules);
+async function setup(): Promise<Tester> {
+  const t = convexTest(schema, modules);
+  betterAuthTest.register(t);
+  [ALICE = '', BOB = '', CAROL = ''] = await authUsers(t, 3);
+  return t;
 }
 
 // Every invite schedules its expiry, and every game a turn timer. Fake
@@ -64,8 +71,8 @@ function inviteNetwork(t: Tester) {
   };
 }
 
-function contractSubject(): InvitesContractSubject {
-  const network = inviteNetwork(setup());
+async function contractSubject(): Promise<InvitesContractSubject> {
+  const network = inviteNetwork(await setup());
   const ids = { inviter: ALICE, friend: BOB, other: CAROL } as const;
   return {
     inviterId: ALICE,
@@ -77,7 +84,7 @@ function contractSubject(): InvitesContractSubject {
 
 describe('Invites contract (Convex adapter on the real functions)', () => {
   for (const check of invitesContract()) {
-    it(check.name, () => check.run(contractSubject()));
+    it(check.name, async () => check.run(await contractSubject()));
   }
 });
 
@@ -92,7 +99,7 @@ describe('the adapter on the real functions', () => {
   }
 
   it('a caller with no sign-in gets NOT_SIGNED_IN, as plain data', async () => {
-    const network = inviteNetwork(setup());
+    const network = inviteNetwork(await setup());
     const code = await network
       .invitesFor(ALICE)
       .createInvite({ choice: 'portes', targetPoints: 1, pace: 'live' });
@@ -123,7 +130,7 @@ describe('the adapter on the real functions', () => {
   });
 
   it('a game that is not a game fails argument validation: a plain error, not port data', async () => {
-    const network = inviteNetwork(setup());
+    const network = inviteNetwork(await setup());
     const bad = { choice: 'backgammon', targetPoints: 1, pace: 'live' } as never;
     const reason = await reasonOf(network.invitesFor(ALICE).createInvite(bad));
     expect(reason).toBeInstanceOf(Error);
@@ -131,7 +138,7 @@ describe('the adapter on the real functions', () => {
   });
 
   it('the inviter watches the invite: the accept brings the game id, then the game opens', async () => {
-    const network = inviteNetwork(setup());
+    const network = inviteNetwork(await setup());
     const alice = network.invitesFor(ALICE);
     const code = await alice.createInvite({ choice: 'plakoto', targetPoints: 3, pace: 'async' });
     const views: (InviteView | null)[] = [];
@@ -147,7 +154,7 @@ describe('the adapter on the real functions', () => {
   });
 
   it('one invite over the cap gives TOO_MANY_INVITES, as plain data (#275)', async () => {
-    const network = inviteNetwork(setup());
+    const network = inviteNetwork(await setup());
     const alice = network.invitesFor(ALICE);
     const game = { choice: 'portes', targetPoints: 1, pace: 'live' } as const;
     for (let i = 0; i < MAX_OPEN_INVITES; i += 1) await alice.createInvite(game);
@@ -158,7 +165,7 @@ describe('the adapter on the real functions', () => {
   });
 
   it('the scheduled expiry reaches a watcher', async () => {
-    const network = inviteNetwork(setup());
+    const network = inviteNetwork(await setup());
     const alice = network.invitesFor(ALICE);
     const code = await alice.createInvite({ choice: 'fevga', targetPoints: 1, pace: 'live' });
     const views: (string | undefined)[] = [];

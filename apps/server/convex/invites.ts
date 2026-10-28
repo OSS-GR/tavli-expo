@@ -20,7 +20,10 @@
  *
  * The caller is the signed-in user (#131), as in `games.ts`: every
  * public function reads the player id from `ctx.auth` (`signedInPlayer`).
- * Without a sign-in a call gets `NOT_SIGNED_IN`, also `getInvite`.
+ * Without a sign-in a call gets `NOT_SIGNED_IN`, also `getInvite`. The
+ * calls that save the caller's id (`createInvite`, `acceptInvite`,
+ * `declineInvite`) also check that the account still exists
+ * (`existingPlayer`, #306).
  */
 
 import { ConvexError, v } from 'convex/values';
@@ -44,7 +47,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
-import { signedInPlayer } from './caller';
+import { existingPlayer, signedInPlayer } from './caller';
 import { insertGame } from './games';
 import { createCryptoRng } from './model/cryptoRng';
 import { gameChoice, gamePace } from './schema';
@@ -76,9 +79,10 @@ async function findByCode(ctx: QueryCtx, code: string): Promise<Doc<'invites'> |
 /**
  * The open invites of `from` whose time is not up at `now`: at most
  * `limit`, newest first. One index range (`by_from`), so the call reads
- * no other rows.
+ * no other rows. `createInvite` checks the cap on this range, so it never
+ * holds more than `MAX_OPEN_INVITES`. `deleteMyAccount` uses it too.
  */
-async function openInvitesOf(
+export async function openInvitesOf(
   ctx: QueryCtx,
   from: string,
   now: number,
@@ -114,7 +118,7 @@ export const createInvite = mutation({
   },
   returns: v.string(),
   handler: async (ctx, { choice, targetPoints, pace }) => {
-    const callerId = await signedInPlayer(ctx);
+    const callerId = await existingPlayer(ctx);
     const now = Date.now();
     // Reading at most the cap is enough to know if the caller is at it.
     const open = await openInvitesOf(ctx, callerId, now, MAX_OPEN_INVITES);
@@ -156,7 +160,7 @@ export const acceptInvite = mutation({
   args: { code: v.string() },
   returns: v.id('games'),
   handler: async (ctx, { code }) => {
-    const callerId = await signedInPlayer(ctx);
+    const callerId = await existingPlayer(ctx);
     const invite = await load(ctx, code);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
     const gameId: Id<'games'> = await insertGame(ctx, {
@@ -176,7 +180,7 @@ export const declineInvite = mutation({
   args: { code: v.string() },
   returns: v.null(),
   handler: async (ctx, { code }) => {
-    const callerId = await signedInPlayer(ctx);
+    const callerId = await existingPlayer(ctx);
     const invite = await load(ctx, code);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
     await ctx.db.patch(invite._id, { status: 'declined', answeredBy: callerId });
