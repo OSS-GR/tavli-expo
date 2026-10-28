@@ -149,6 +149,16 @@ export interface RankOptions {
   readonly plies?: 1 | 2;
   /** Return only the best `top` turns (an integer >= 1). Default: all. */
   readonly top?: number;
+  /**
+   * 2 plies only: the most positions the evaluator may score for the
+   * deeper looks (#237), counting the 1-ply scores of every turn too. An
+   * integer >= 0, or `Infinity` (the default: no budget). The candidates
+   * get their deeper look in 1-ply order; when a look would pass the
+   * budget, that candidate and the later ones keep their 1-ply values. So
+   * the work is bounded and the result stays the same for the same input.
+   * The app's Hint uses `TWO_PLY_HINT_BUDGETS`. See `createAnalyzer`.
+   */
+  readonly budget?: number;
 }
 
 /**

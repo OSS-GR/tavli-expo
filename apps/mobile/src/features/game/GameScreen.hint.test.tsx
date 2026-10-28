@@ -33,7 +33,13 @@ import { AccessibilityInfo } from 'react-native';
 import { moveChoices, moveLabel } from '@/features/accessibility/moveList';
 import { BOT_TIMING } from '@/features/bot/botSpeed';
 import { checkerRuns } from '@/features/board/hintMarks';
-import { bestRest, boardKey, hintHasChoice, hintPlies } from '@/features/hint/hint';
+import {
+  bestRest,
+  boardKey,
+  hintHasChoice,
+  hintPlies,
+  hintRankOptions,
+} from '@/features/hint/hint';
 import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
 import { DEFAULT_SETTINGS, type Settings } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -130,11 +136,11 @@ async function tick(ms = 0) {
   });
 }
 
-/** The best turn of the Analyzer for the game in the store, at the hint's depth (#219). */
+/** The best turn of the Analyzer for the game in the store, with the hint's options (#219, #237). */
 function best(store: GameStore) {
   const { state } = store.getState().flow.game;
-  return analyzer.rankTurns(state, state.dice!, { plies: hintPlies(state.rules), top: 1 })[0]!.turn
-    .moves;
+  return analyzer.rankTurns(state, state.dice!, { ...hintRankOptions(state.rules), top: 1 })[0]!
+    .turn.moves;
 }
 
 /** The target rings on the board (the hint's, or a selected checker's). */
@@ -411,34 +417,41 @@ describe('<GameScreen /> Hint button (#209)', () => {
     expect(rings()).toBe(checkerRuns(best(store)).length);
   });
 
-  it('Portes hints at 2 ply (#219): a roll where 1 ply picks another turn', async () => {
-    const rules = resolveRules('portes');
-    expect(hintPlies(rules)).toBe(2);
-    // The best turn at each depth, and its end board.
-    const bestAt = ({ state }: GameFlow, plies: 1 | 2) => {
-      const [first] = analyzer.rankTurns(state, state.dice!, { plies, top: 1 });
-      return {
-        moves: first!.turn.moves,
-        end: boardKey(portes.applyTurn(state, first!.turn).board),
+  it.each([
+    ['Portes', portes, 'portes'],
+    ['Asodio', asodio, 'asodio.kafeneio'],
+  ] as const)(
+    '%s hints at 2 ply (#219, #237): a roll where 1 ply picks another turn',
+    async (_name, variant, preset) => {
+      const rules = resolveRules(preset);
+      expect(hintPlies(rules)).toBe(2);
+      // The best turn at each depth (2 ply with the hint's budget), and its end board.
+      const bestAt = ({ state }: GameFlow, plies: 1 | 2) => {
+        const options = plies === 2 ? hintRankOptions(state.rules) : { plies };
+        const [first] = analyzer.rankTurns(state, state.dice!, { ...options, top: 1 });
+        return {
+          moves: first!.turn.moves,
+          end: boardKey(variant.applyTurn(state, first!.turn).board),
+        };
       };
-    };
-    const { state, dice } = laterChoice(
-      portes,
-      rules,
-      (game) => bestAt(game, 1).end !== bestAt(game, 2).end,
-    );
-    const store = await show({ rules, state });
-    await roll(store, dice);
-    await act(async () => {
-      fireEvent.press(hintButton()!);
-    });
-    await tick();
-    const { game } = store.getState().flow;
-    const two = hintShortText(i18n.t, bestAt(game, 2).moves);
-    expect(two).not.toBe(hintShortText(i18n.t, bestAt(game, 1).moves));
-    expect(screen.getByTestId('hint-text')).toHaveTextContent(two);
-    expect(best(store)).toEqual(bestAt(game, 2).moves);
-  });
+      const { state, dice } = laterChoice(
+        variant,
+        rules,
+        (game) => bestAt(game, 1).end !== bestAt(game, 2).end,
+      );
+      const store = await show({ variant, rules, state });
+      await roll(store, dice);
+      await act(async () => {
+        fireEvent.press(hintButton()!);
+      });
+      await tick();
+      const { game } = store.getState().flow;
+      const two = hintShortText(i18n.t, bestAt(game, 2).moves);
+      expect(two).not.toBe(hintShortText(i18n.t, bestAt(game, 1).moves));
+      expect(screen.getByTestId('hint-text')).toHaveTextContent(two);
+      expect(best(store)).toEqual(bestAt(game, 2).moves);
+    },
+  );
 
   it('screen readers get the Hint in the move list, and hear the hint', async () => {
     await setSettings({ moveList: 'on' });

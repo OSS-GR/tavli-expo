@@ -7,9 +7,10 @@
  * finish it: the best ranked turn whose end position the player can still
  * reach. The ways to finish come from the engine (`Variant.nextMoves`), so
  * this file never checks a rule itself. How deep the Analyzer looks
- * depends on the game (`hintPlies`, #219).
+ * depends on the game (`hintPlies`, #219), and a 2-ply hint has a fixed
+ * work budget (`hintRankOptions`, #237).
  */
-import type { Analyzer } from '@tavli/bot';
+import { TWO_PLY_HINT_BUDGETS, type Analyzer, type RankOptions } from '@tavli/bot';
 import {
   VARIANT_REGISTRY,
   applyMoveToBoard,
@@ -25,22 +26,12 @@ import {
 } from '@tavli/engine';
 
 /**
- * How deep the Hint looks, per rules preset (#219). 2 ply looks one roll
- * ahead and gives better hints, but it costs much more than 1 ply. One
- * 2-ply ranking in Node (`packages/bot/README.md`, "2-ply"):
- *
- * - Portes, Plakoto and Fevga: 2 ply. Median 34 ms (Portes), 87 ms
- *   (Plakoto) and 35 ms (Fevga), worst about 0.3 s. A phone is several
- *   times slower, and that still fits the 1 s hint budget.
- *   `packages/bot/src/analyzer-work.test.ts` bounds the work of one such
- *   hint per game.
- * - Asodio, every preset: 1 ply (checked again in #233, after the faster
- *   heuristic of #225). A preset gets 2 ply only when its worst hint is no
- *   slower than Plakoto's. Worst of 1,500 seeded positions
- *   (`pnpm --filter @tavli/bot bench:hint`): Plakoto 0.33 s, Kafeneio
- *   1.2 s (median 4 ms), Acey-Deucey Greek 2.5 s (median 22 ms),
- *   Acey-Deucey American 1.7 s (median 67–82 ms). Most Asodio hints are fast,
- *   but the rare slow ones take several seconds on a phone.
+ * How deep the Hint looks, per rules preset (#219, #237): 2 ply everywhere.
+ * 2 ply looks one roll ahead and gives better hints, but it costs much more
+ * than 1 ply, so it runs with the preset's work budget (`hintRankOptions`).
+ * Under that budget the worst hint of every preset is about as fast as
+ * Plakoto's, which fits the 1 s phone budget: the numbers are in
+ * `packages/bot/README.md`, "2-ply budget".
  *
  * Each game of a match plays with its own preset, so the preset names the
  * game. A new preset must pick a depth here (the type checks it).
@@ -51,14 +42,25 @@ const HINT_PLIES: { readonly [P in PresetId]: 1 | 2 } = {
   plakoto: 2,
   'plakoto.federation': 2,
   fevga: 2,
-  'asodio.kafeneio': 1,
-  'asodio.aceyDeuceyGreek': 1,
-  'asodio.aceyDeuceyAmerican': 1,
+  'asodio.kafeneio': 2,
+  'asodio.aceyDeuceyGreek': 2,
+  'asodio.aceyDeuceyAmerican': 2,
 };
 
 /** The Analyzer depth (`plies`) of a hint in a game with these rules. */
 export function hintPlies(rules: RuleSet): 1 | 2 {
   return HINT_PLIES[rules.presetId];
+}
+
+/**
+ * The Analyzer options of a hint in a game with these rules (#237): its
+ * depth, and at 2 ply the preset's work budget (`TWO_PLY_HINT_BUDGETS`), so
+ * a rare hard position cannot take seconds. The budget counts work, not
+ * time, so the same position always gets the same hint.
+ */
+export function hintRankOptions(rules: RuleSet): RankOptions {
+  const plies = hintPlies(rules);
+  return plies === 2 ? { plies, budget: TWO_PLY_HINT_BUDGETS[rules.presetId] } : { plies };
 }
 
 /** A short key for a board: two boards with the same checkers get the same key. */
@@ -153,9 +155,10 @@ export function hintHasChoice(
  * The best rest of the turn: the moves to play now, in order. `null` when
  * the game does not wait for a move.
  *
- * It asks the Analyzer for the best turn only (`top: 1`), at the depth of
- * `hintPlies`. If the moves played so far cannot reach that turn's end
- * position, it takes the best ranked turn that they can still reach. At
+ * It asks the Analyzer for the best turn only (`top: 1`), with `options`
+ * (default: `hintRankOptions`). If the moves played so far cannot reach
+ * that turn's end position, it takes the best ranked turn that they can
+ * still reach. At
  * 2 ply `top` saves almost nothing (every candidate gets the deeper look
  * anyway), so after a move it ranks every turn once, not twice.
  */
@@ -163,13 +166,13 @@ export function bestRest(
   game: GameFlow,
   analyzer: Analyzer,
   variant: Variant = getVariant(VARIANT_REGISTRY, game.state.variant),
+  options: RankOptions = hintRankOptions(game.state.rules),
 ): readonly Move[] | null {
   const dice = movingDice(game);
   if (dice === null) return null;
   const { state, played } = game;
-  const plies = hintPlies(state.rules);
-  const allAtOnce = played.length > 0 && plies === 2;
-  const ranking = analyzer.rankTurns(state, dice, allAtOnce ? { plies } : { plies, top: 1 });
+  const allAtOnce = played.length > 0 && options.plies === 2;
+  const ranking = analyzer.rankTurns(state, dice, allAtOnce ? options : { ...options, top: 1 });
   const best = ranking[0];
   if (best === undefined) return null;
   if (played.length === 0) return best.turn.moves;
@@ -178,7 +181,7 @@ export function bestRest(
   const reach = (moves: readonly Move[]) => finishes.get(boardKey(boardAfter(state, moves)));
   const direct = reach(best.turn.moves);
   if (direct !== undefined) return direct;
-  for (const ranked of allAtOnce ? ranking : analyzer.rankTurns(state, dice, { plies })) {
+  for (const ranked of allAtOnce ? ranking : analyzer.rankTurns(state, dice, options)) {
     const rest = reach(ranked.turn.moves);
     if (rest !== undefined) return rest;
   }

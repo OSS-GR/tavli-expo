@@ -42,6 +42,8 @@ export {
 } from './create-bot';
 export {
   TWO_PLY_CANDIDATES,
+  TWO_PLY_HINT_BUDGET,
+  TWO_PLY_HINT_BUDGETS,
   TWO_PLY_MARGIN,
   TWO_PLY_MAX_CANDIDATES,
   createAnalyzer,
