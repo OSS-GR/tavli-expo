@@ -19,7 +19,7 @@ import {
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
-import { moveChoices, moveLabel } from '@/features/accessibility/moveList';
+import { moveChoices, moveLabel } from '@/features/accessibility/moveChoices';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';

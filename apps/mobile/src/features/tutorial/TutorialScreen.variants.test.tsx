@@ -4,7 +4,7 @@
  */
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 
-import { moveChoices, moveLabel } from '@/features/accessibility/moveList';
+import { moveChoices, moveLabel } from '@/features/accessibility/moveChoices';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';

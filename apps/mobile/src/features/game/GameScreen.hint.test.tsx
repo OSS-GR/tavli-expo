@@ -30,7 +30,7 @@ import {
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
-import { moveChoices, moveLabel } from '@/features/accessibility/moveList';
+import { moveChoices, moveLabel } from '@/features/accessibility/moveChoices';
 import { BOT_TIMING } from '@/features/bot/botSpeed';
 import { checkerRuns } from '@/features/board/hintMarks';
 import {
