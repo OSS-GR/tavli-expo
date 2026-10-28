@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { rollDice } from '@tavli/engine';
 
-import { createCryptoRng } from './crypto-rng';
-import type { RandomSource } from './crypto-rng';
+import { createCryptoRng } from './cryptoRng';
+import type { RandomSource } from './cryptoRng';
 
 describe('createCryptoRng', () => {
   it('returns the values of the random source, in order', () => {

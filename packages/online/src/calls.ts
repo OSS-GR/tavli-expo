@@ -77,6 +77,20 @@ export function checkCall<G extends SavedGame>(
 }
 
 /**
+ * Checks who may watch `game` (`null` when there is no such game): only
+ * its two players (#131). Returns the game, or `null` for a missing game
+ * (the servers answer `null` or `NOT_FOUND` then). A stranger gets
+ * `NOT_A_PLAYER`.
+ */
+export function checkViewer<G extends SavedGame>(game: G | null, callerId: string): G | null {
+  if (game === null) return null;
+  if (sideOf(game.players, callerId) === null) {
+    throw new OnlineGameError('NOT_A_PLAYER', 'only the players may watch this game');
+  }
+  return game;
+}
+
+/**
  * True when a player's move or answer comes too late: the match runs and
  * its turn deadline has passed at `now`. Then the server saves the time
  * out instead of the call, and the call gets `TIMED_OUT_ERROR`.

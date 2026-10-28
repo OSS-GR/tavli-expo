@@ -14,8 +14,10 @@
  * change bumps the version, so an old check does nothing: no cancel is
  * needed. `makeMove` and `answer` check the deadline too.
  *
- * Auth comes later: for now the caller passes its player id
- * (`callerId`). Each call checks that the caller may act.
+ * The caller is the signed-in user (#131): every public function reads
+ * the player id from `ctx.auth` (`signedInPlayer`), and no call takes a
+ * player id. Each call checks that the caller may act. `getGame` answers
+ * only the two players.
  */
 
 import { ConvexError, v } from 'convex/values';
@@ -32,6 +34,7 @@ import {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkViewer,
   createOnlineMatch,
   eventActor,
   loadFlow,
@@ -49,11 +52,9 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
-import { createCryptoRng } from './model/crypto-rng';
+import { signedInPlayer } from './caller';
+import { createCryptoRng } from './model/cryptoRng';
 import { gameChoice, gamePace } from './schema';
-
-/** The `actor` of events the server plays itself (`invites.ts` uses it too). */
-export { SERVER_ACTOR };
 
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
 function reject(error: OnlineGameError): never {
@@ -217,6 +218,7 @@ function toMoveInput(move: Infer<typeof moveInput>): MoveInput {
 }
 
 export interface NewGame {
+  /** The signed-in caller (`signedInPlayer`). */
   readonly callerId: string;
   readonly players: { readonly white: string; readonly black: string };
   readonly choice: Infer<typeof gameChoice>;
@@ -255,10 +257,12 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
   return gameId;
 }
 
-/** Creates a game between two players (see `insertGame`). Returns the id. */
+/**
+ * Creates a game between two players (see `insertGame`). The caller must
+ * be one of them. Returns the id.
+ */
 export const createGame = mutation({
   args: {
-    callerId: v.string(),
     players: v.object({ white: v.string(), black: v.string() }),
     choice: gameChoice,
     targetPoints: v.number(),
@@ -266,7 +270,8 @@ export const createGame = mutation({
     pace: gamePace,
   },
   returns: v.id('games'),
-  handler: async (ctx, args) => await insertGame(ctx, args),
+  handler: async (ctx, args) =>
+    await insertGame(ctx, { ...args, callerId: await signedInPlayer(ctx) }),
 });
 
 /**
@@ -279,12 +284,12 @@ export const createGame = mutation({
 export const makeMove = mutation({
   args: {
     gameId: v.id('games'),
-    callerId: v.string(),
     expectedVersion: v.number(),
     moves: v.array(moveInput),
   },
   returns: writeResult,
-  handler: async (ctx, { gameId, callerId, expectedVersion, moves }) => {
+  handler: async (ctx, { gameId, expectedVersion, moves }) => {
+    const callerId = await signedInPlayer(ctx);
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
     return await onTime(ctx, game, flow, async (now) => {
       const next = guarded(() => playTurn(flow, side, moves.map(toMoveInput), createCryptoRng()));
@@ -300,12 +305,12 @@ export const makeMove = mutation({
 export const answer = mutation({
   args: {
     gameId: v.id('games'),
-    callerId: v.string(),
     expectedVersion: v.number(),
     choice: v.string(),
   },
   returns: writeResult,
-  handler: async (ctx, { gameId, callerId, expectedVersion, choice }) => {
+  handler: async (ctx, { gameId, expectedVersion, choice }) => {
+    const callerId = await signedInPlayer(ctx);
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
     return await onTime(ctx, game, flow, async (now) => {
       const next = guarded(() => answerPrompt(flow, side, choice, createCryptoRng()));
@@ -320,9 +325,10 @@ export const answer = mutation({
  * just moved. It does not look at the turn timer. Returns the new version.
  */
 export const resign = mutation({
-  args: { gameId: v.id('games'), callerId: v.string() },
+  args: { gameId: v.id('games') },
   returns: v.number(),
-  handler: async (ctx, { gameId, callerId }) => {
+  handler: async (ctx, { gameId }) => {
+    const callerId = await signedInPlayer(ctx);
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, null);
     const next = guarded(() => resignMatch(flow, side, createCryptoRng()));
     return await save(ctx, game, callerId, next, Date.now());
@@ -359,12 +365,15 @@ export const checkTimeout = internalMutation({
 /**
  * The game as a client may see it, or `null` when there is no such game.
  * It never holds dice that are not rolled yet. Both players watch this
- * query, so their screens update after every change.
+ * query, so their screens update after every change. Only the two
+ * players may read it: anyone else gets `NOT_A_PLAYER` (#131).
  */
 export const getGame = query({
   args: { gameId: v.id('games') },
   handler: async (ctx, { gameId }): Promise<OnlineGameView | null> => {
-    const game = await ctx.db.get(gameId);
+    const callerId = await signedInPlayer(ctx);
+    const loaded = await ctx.db.get(gameId);
+    const game = guarded(() => checkViewer(loaded, callerId));
     if (game === null) return null;
     return toView({
       gameId: game._id,

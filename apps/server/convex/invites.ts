@@ -14,8 +14,9 @@
  * `checkTimeout` does for turns. The calls check the time too, so an
  * invite is closed at `expiresAt` also when the scheduler is late.
  *
- * Auth comes later (#131): for now the caller passes its player id
- * (`callerId`), as in `games.ts`.
+ * The caller is the signed-in user (#131), as in `games.ts`: every
+ * public function reads the player id from `ctx.auth` (`signedInPlayer`).
+ * Without a sign-in a call gets `NOT_SIGNED_IN`, also `getInvite`.
  */
 
 import { ConvexError, v } from 'convex/values';
@@ -27,8 +28,9 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
-import { SERVER_ACTOR, insertGame } from './games';
-import { createCryptoRng } from './model/crypto-rng';
+import { signedInPlayer } from './caller';
+import { insertGame } from './games';
+import { createCryptoRng } from './model/cryptoRng';
 import {
   InviteError,
   checkAnswer,
@@ -57,12 +59,6 @@ function guarded<T>(step: () => T): T {
   }
 }
 
-function checkPlayerId(playerId: string): void {
-  if (playerId.trim() === '') fail('BAD_REQUEST', 'the player id is empty');
-  // The move log marks server events with SERVER_ACTOR, so no player may use that id.
-  if (playerId === SERVER_ACTOR) fail('BAD_REQUEST', `"${SERVER_ACTOR}" is not a valid player id`);
-}
-
 async function findByCode(ctx: QueryCtx, code: string): Promise<Doc<'invites'> | null> {
   return await ctx.db
     .query('invites')
@@ -85,15 +81,14 @@ async function load(ctx: MutationCtx, text: string): Promise<Doc<'invites'>> {
  */
 export const createInvite = mutation({
   args: {
-    callerId: v.string(),
     choice: gameChoice,
     targetPoints: v.number(),
     /** `live` (1 minute per turn) or `async` (24 hours per turn). */
     pace: gamePace,
   },
   returns: v.string(),
-  handler: async (ctx, { callerId, choice, targetPoints, pace }) => {
-    checkPlayerId(callerId);
+  handler: async (ctx, { choice, targetPoints, pace }) => {
+    const callerId = await signedInPlayer(ctx);
     const code = await pickInviteCode(
       createCryptoRng(),
       async (candidate) => (await findByCode(ctx, candidate)) !== null,
@@ -106,10 +101,14 @@ export const createInvite = mutation({
   },
 });
 
-/** The invite with this code (any case), or `null` when there is none. */
+/**
+ * The invite with this code (any case), or `null` when there is none.
+ * Any signed-in user with the code may read it: the code is the secret.
+ */
 export const getInvite = query({
   args: { code: v.string() },
   handler: async (ctx, { code: text }): Promise<InviteView | null> => {
+    await signedInPlayer(ctx);
     const code = normalizeInviteCode(text);
     if (code === null) return null;
     const invite = await findByCode(ctx, code);
@@ -124,10 +123,10 @@ export const getInvite = query({
  * `accepted` with the game id. Returns the game id.
  */
 export const acceptInvite = mutation({
-  args: { callerId: v.string(), code: v.string() },
+  args: { code: v.string() },
   returns: v.id('games'),
-  handler: async (ctx, { callerId, code }) => {
-    checkPlayerId(callerId);
+  handler: async (ctx, { code }) => {
+    const callerId = await signedInPlayer(ctx);
     const invite = await load(ctx, code);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
     const gameId: Id<'games'> = await insertGame(ctx, {
@@ -144,10 +143,10 @@ export const acceptInvite = mutation({
 
 /** The caller (not the inviter) says no to the invite. */
 export const declineInvite = mutation({
-  args: { callerId: v.string(), code: v.string() },
+  args: { code: v.string() },
   returns: v.null(),
-  handler: async (ctx, { callerId, code }) => {
-    checkPlayerId(callerId);
+  handler: async (ctx, { code }) => {
+    const callerId = await signedInPlayer(ctx);
     const invite = await load(ctx, code);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
     await ctx.db.patch(invite._id, { status: 'declined', answeredBy: callerId });
@@ -157,10 +156,10 @@ export const declineInvite = mutation({
 
 /** The inviter takes the invite back. */
 export const cancelInvite = mutation({
-  args: { callerId: v.string(), code: v.string() },
+  args: { code: v.string() },
   returns: v.null(),
-  handler: async (ctx, { callerId, code }) => {
-    checkPlayerId(callerId);
+  handler: async (ctx, { code }) => {
+    const callerId = await signedInPlayer(ctx);
     const invite = await load(ctx, code);
     guarded(() => checkCancel(invite, callerId, Date.now()));
     await ctx.db.patch(invite._id, { status: 'cancelled' });
@@ -170,8 +169,9 @@ export const cancelInvite = mutation({
 
 /** The open invites the caller sent, newest first. Invites whose time is up are left out. */
 export const listMyInvites = query({
-  args: { callerId: v.string() },
-  handler: async (ctx, { callerId }): Promise<InviteView[]> => {
+  args: {},
+  handler: async (ctx): Promise<InviteView[]> => {
+    const callerId = await signedInPlayer(ctx);
     const now = Date.now();
     const open = await ctx.db
       .query('invites')

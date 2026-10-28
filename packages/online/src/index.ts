@@ -33,6 +33,7 @@ export {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkViewer,
   eventActor,
   matchStatus,
   nextDeadline,
