@@ -32,7 +32,6 @@ const at = (side: PlayerId | null, game = 0): TurnWait => ({ side, game, over: f
 const over = (game = 1): TurnWait => ({ side: null, game, over: true });
 
 describe('turnPushSide', () => {
-
   it('tells the other side in an async game', () => {
     expect(turnPushSide('async', at('white'), at('black'), 'white')).toBe('black');
     expect(turnPushSide('async', at('black'), at('white'), 'black')).toBe('white');
