@@ -2,8 +2,8 @@
  * Large system fonts (#134): Home, New game, the game screen and its cards
  * (#153; choose a double, #205; the opening roll house rule cards, #207),
  * the game menu and resign dialog, the end screens, the game review
- * (#215), History (#142), the tutorial's mother card (#149) and the
- * Settings game picker (#159)
+ * (#215) with its switch (#230), History (#142), the tutorial's mother
+ * card (#149) and the Settings game picker (#159)
  * follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
@@ -434,7 +434,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(problems()).toEqual([]);
   });
 
-  it('the game review: busy, three mistakes, and "Well played" (#215)', async () => {
+  it('the game review: busy, three mistakes with their switch, and "Well played" (#215, #230)', async () => {
     const local = {
       ...defaultSetup('local'),
       names: { white: 'Maria Papadopoulou', black: 'Bob' },
@@ -443,6 +443,17 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(screen.getByTestId('review-busy')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
     await screen.findByTestId('review-mistake-3');
+    expect(problems()).toEqual([]);
+    // The switch: its buttons wrap to two rows at a large font.
+    // It is hidden from screen readers, but its text still scales.
+    const hidden = { includeHiddenElements: true };
+    const toggle = screen.getByTestId('review-mistake-3-switch', hidden);
+    expect(StyleSheet.flatten(toggle.props.style).flexWrap).toBe('wrap');
+    expect(within(toggle).getAllByRole('button', hidden)).toHaveLength(2);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('review-mistake-3-show-played', hidden));
+    });
+    expect(screen.getByTestId('review-mistake-3-show-played', hidden)).toBeSelected();
     expect(problems()).toEqual([]);
     await renderWithRoot(<ReviewScreen setup={defaultSetup('bot')} flow={allBest()} />);
     await screen.findByTestId('review-status');

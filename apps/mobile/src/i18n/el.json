@@ -879,6 +879,11 @@
     "played_you": "Έπαιξες: {{moves}}",
     "played": "{{name}}: έπαιξε {{moves}}",
     "best": "Καλύτερο: {{moves}}",
+    "show": {
+      "played_you": "Η κίνησή σου",
+      "played": "Κίνηση: {{name}}",
+      "best": "Η καλύτερη"
+    },
     "band": {
       "small": "Μικρό λάθος",
       "medium": "Μεσαίο λάθος",

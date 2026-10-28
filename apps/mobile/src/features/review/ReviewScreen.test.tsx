@@ -1,22 +1,32 @@
 /**
  * The review screen (#215): busy first, then the biggest mistakes with
- * the played and the best turn, or "Well played!". Scripted Portes games
- * (`test/reviewGame.ts`) on fake timers: the work runs on timers.
+ * the played and the best turn, or "Well played!". Each card's switch
+ * marks the best or the played turn on its board (#230). Scripted Portes
+ * games (`test/reviewGame.ts`) on fake timers: the work runs on timers.
  */
 import { BotError, type Analyzer } from '@tavli/bot';
 import type { CrashReporter, RecordingCrashReporter } from '@tavli/contracts';
-import { act, screen, within } from '@testing-library/react-native';
-import { AccessibilityInfo } from 'react-native';
+import type { Turn } from '@tavli/engine';
+import { getTheme } from '@tavli/themes';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 
+import { boardLayout } from '@/features/board/BoardCanvas';
+import type { BoardView } from '@/features/board/boardModel';
+import { fitBoardWithShadow } from '@/features/board/geometry';
+import { hintHighlights } from '@/features/board/hintMarks';
 import { defaultSetup, type MatchSetup } from '@/features/match/setup';
+import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';
 import { crashReporter } from '@/services';
 
-import { runOnFakeTimers } from '../../../test/clock';
+import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { nativePath } from '../../../test/nativeParent';
 import { renderWithRoot } from '../../../test/render';
 import { allBest, oneBadTurn, testAnalyzer } from '../../../test/reviewGame';
+import { findAllNodes, type JsonNode } from '../../../test/tree';
 
-import { lastGameTurns, reviewGame } from './review';
+import { lastGameTurns, reviewGame, type Mistake } from './review';
 import { ReviewScreen } from './ReviewScreen';
 import { mistakeText } from './reviewText';
 import { reportReviewFailure } from './useGameReview';
@@ -184,5 +194,185 @@ describe('<ReviewScreen />', () => {
     expect(within(card).getByText('Γύρος 5 · ζάρια 6-5')).toBeOnTheScreen();
     expect(within(card).getByText('Έπαιξες: 8 → 2, 8 → 3 · χτύπημα')).toBeOnTheScreen();
     expect(within(card).getByText('Καλύτερο: 24 → 18 → 13 · χτύπημα')).toBeOnTheScreen();
+  });
+});
+
+/** The space the small board gets in these tests. */
+const BOARD_SIZE = { width: 320, height: 150 };
+
+/** Gives the card's board its size, so it draws. */
+async function layoutBoard(card: string) {
+  await act(async () => {
+    fireEvent(screen.getByTestId(`${card}-board`, { includeHiddenElements: true }), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, ...BOARD_SIZE } },
+    });
+  });
+}
+
+const centre = (m: { x: number; y: number }) => ({ x: m.x, y: m.y });
+
+/** The marks the Hint would draw for `turn` on the board before the mistake. */
+function expectedMarks(mistake: Mistake, turn: Turn) {
+  const { boardTheme, homeBoardSide } = settingsStore.getState();
+  const theme = getTheme(boardTheme);
+  const geo = fitBoardWithShadow(boardLayout(theme, 'classic', homeBoardSide), BOARD_SIZE);
+  const view: BoardView = {
+    viewer: mistake.turn.player,
+    direction: mistake.state.rules.movement.direction,
+  };
+  const marks = hintHighlights(geo, mistake.state.board, view, turn.player, turn.moves);
+  return { cues: (marks.cues ?? []).map(centre), targets: marks.targets.map(centre) };
+}
+
+/**
+ * The marks on a card's board: the select rings (cues) and the dashed
+ * target rings, by their centres. The dots of a combined target are
+ * filled, so they are not cues.
+ */
+function drawnMarks(card: string) {
+  const { boardTheme } = settingsStore.getState();
+  const hl = getTheme(boardTheme).highlights;
+  const [canvas] = findAllNodes(
+    screen.toJSON() as JsonNode,
+    (n) => n.props['testID'] === `${card}-board-canvas`,
+  );
+  expect(canvas).toBeDefined();
+  const circles = findAllNodes(canvas!, (n) => n.type === 'Circle');
+  const dashed = (n: JsonNode) =>
+    (n.children ?? []).some((c) => typeof c !== 'string' && c.type === 'DashPathEffect');
+  const at = (n: JsonNode) => ({ x: n.props['cx'] as number, y: n.props['cy'] as number });
+  return {
+    cues: circles
+      .filter(
+        (n) => n.props['color'] === hl.select.color && n.props['style'] === 'stroke' && !dashed(n),
+      )
+      .map(at),
+    targets: circles.filter(dashed).map(at),
+  };
+}
+
+const flat = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style);
+
+/**
+ * A switch button. The switch is hidden from screen readers (it only
+ * changes the hidden board), so the query must include hidden elements.
+ */
+const switchButton = (name: string) =>
+  screen.getByRole('button', { name, includeHiddenElements: true });
+
+describe('<ReviewScreen /> marks on the board (#230)', () => {
+  it('marks the best turn first, and the played turn after a tap, from the same board', async () => {
+    const user = setupUser();
+    const flow = oneBadTurn();
+    const [mistake] = reviewGame(flow, ['white'], testAnalyzer);
+    const text = mistakeText(i18n.t, mistake!, null);
+    await renderWithRoot(<ReviewScreen setup={vsBot} flow={flow} />);
+    const card = await screen.findByTestId('review-mistake-1');
+    await layoutBoard('review-mistake-1');
+
+    // The best turn is for the same player as the played one.
+    expect(mistake!.best.player).toBe(mistake!.turn.player);
+    const best = expectedMarks(mistake!, mistake!.best);
+    const played = expectedMarks(mistake!, mistake!.turn);
+    // The two turns differ, so the marks tell them apart.
+    expect(best).not.toEqual(played);
+    expect(best.targets.length).toBeGreaterThan(0);
+    expect(played.cues.length).toBeGreaterThan(0);
+
+    // Best move by default.
+    expect(switchButton('Best move')).toBeSelected();
+    expect(switchButton('Your move')).not.toBeSelected();
+    expect(drawnMarks('review-mistake-1')).toEqual(best);
+    // Both lines in the text colour; the marked one is bold.
+    const boldStyle = flat('review-mistake-1-best');
+    const plainStyle = flat('review-mistake-1-played');
+    expect(boldStyle.fontWeight).not.toEqual(plainStyle.fontWeight);
+    expect(boldStyle.color).toBe(plainStyle.color);
+
+    const canvas = screen.getByTestId('review-mistake-1-board-canvas', {
+      includeHiddenElements: true,
+    });
+    const path = nativePath(canvas);
+
+    await user.press(switchButton('Your move'));
+    expect(switchButton('Your move')).toBeSelected();
+    expect(switchButton('Best move')).not.toBeSelected();
+    expect(drawnMarks('review-mistake-1')).toEqual(played);
+    // The line of the marked turn is the bold one.
+    expect(flat('review-mistake-1-played')).toEqual(boldStyle);
+    expect(flat('review-mistake-1-best')).toEqual(plainStyle);
+    // The card reads the same, and the board keeps its native parent (#173).
+    expect(card).toHaveAccessibleName(text.label);
+    expect(
+      nativePath(
+        screen.getByTestId('review-mistake-1-board-canvas', { includeHiddenElements: true }),
+      ),
+    ).toBe(path);
+
+    await user.press(switchButton('Best move'));
+    expect(switchButton('Best move')).toBeSelected();
+    expect(drawnMarks('review-mistake-1')).toEqual(best);
+  });
+
+  it('hides the switch from screen readers, and each card has its own', async () => {
+    const user = setupUser();
+    const flow = oneBadTurn();
+    const mistakes = reviewGame(flow, ['white', 'black'], testAnalyzer);
+    await renderWithRoot(<ReviewScreen setup={local} flow={flow} />);
+    await screen.findByTestId('review-mistake-3');
+    // It changes only the hidden board: no stops for a screen reader.
+    expect(screen.queryAllByRole('button')).toEqual([]);
+    expect(screen.queryByTestId('review-mistake-1-switch')).toBeNull();
+    const toggle = screen.getByTestId('review-mistake-1-switch', { includeHiddenElements: true });
+    expect(toggle.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(toggle.props.accessibilityElementsHidden).toBe(true);
+    expect(toggle.props.collapsable).toBe(false);
+    // Pass-and-play names the player.
+    expect(
+      within(toggle).getByRole('button', { name: "Bob's move", includeHiddenElements: true }),
+    ).toBeTruthy();
+    expect(
+      within(
+        screen.getByTestId('review-mistake-3-switch', { includeHiddenElements: true }),
+      ).getByRole('button', { name: "Maria's move", includeHiddenElements: true }),
+    ).toBeTruthy();
+
+    const played = () =>
+      screen.getByTestId('review-mistake-2-show-played', { includeHiddenElements: true });
+    await user.press(played());
+    expect(played()).toBeSelected();
+    expect(
+      screen.getByTestId('review-mistake-1-show-best', { includeHiddenElements: true }),
+    ).toBeSelected();
+    expect(
+      screen.getByTestId('review-mistake-3-show-best', { includeHiddenElements: true }),
+    ).toBeSelected();
+    // The card's label does not follow the switch.
+    expect(screen.getByTestId('review-mistake-2')).toHaveAccessibleName(
+      mistakeText(i18n.t, mistakes[1]!, 'Bob').label,
+    );
+  });
+
+  it('speaks Greek', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    const user = setupUser();
+    await renderWithRoot(<ReviewScreen setup={vsBot} flow={oneBadTurn()} />);
+    await screen.findByTestId('review-mistake-1');
+    expect(switchButton('Η καλύτερη')).toBeSelected();
+    expect(switchButton('Η κίνησή σου')).not.toBeSelected();
+    await user.press(switchButton('Η κίνησή σου'));
+    expect(switchButton('Η κίνησή σου')).toBeSelected();
+    expect(switchButton('Η καλύτερη')).not.toBeSelected();
+  });
+
+  it('speaks Greek in pass-and-play', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    await renderWithRoot(<ReviewScreen setup={local} flow={oneBadTurn()} />);
+    await screen.findByTestId('review-mistake-3');
+    expect(switchButton('Κίνηση: Maria')).not.toBeSelected();
   });
 });
