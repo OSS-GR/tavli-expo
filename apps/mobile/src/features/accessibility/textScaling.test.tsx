@@ -721,7 +721,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       <HistoryScreen
         records={[]}
         onPlay={jest.fn()}
-        online={<OnlineHistory auth={auth} games={games} />}
+        online={(onMatches) => <OnlineHistory auth={auth} games={games} onMatches={onMatches} />}
       />,
     );
     expect(await screen.findAllByTestId(/^history-online-/)).toHaveLength(2);
@@ -739,7 +739,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       <HistoryScreen
         records={[]}
         onPlay={jest.fn()}
-        online={<OnlineHistory auth={auth} games={offline} />}
+        online={(onMatches) => <OnlineHistory auth={auth} games={offline} onMatches={onMatches} />}
       />,
     );
     expect(await screen.findByTestId('online-games-retry')).toBeOnTheScreen();

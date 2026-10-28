@@ -16,7 +16,7 @@ import {
   type MatchSetup,
 } from '@/features/match/setup';
 import { matchLabel } from '@/features/match/summary';
-import { gameScore, gameTitle } from '@/features/online/myGames';
+import { gameScore, gameTitle } from '@/features/online/gameText';
 
 import type { HistoryRecord } from './records';
 import { winRate, type StatLine } from './stats';

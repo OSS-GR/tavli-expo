@@ -12,7 +12,7 @@
  */
 import type { AuthProvider, GameTransport } from '@tavli/contracts';
 import { useLocales } from 'expo-localization';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -27,19 +27,35 @@ import { MatchList, SectionTitle } from './MatchList';
 export interface OnlineHistoryProps {
   auth: AuthProvider | undefined;
   games: GameTransport | undefined;
+  /**
+   * `true` while the list loads or holds a match, else `false`: History
+   * shows "No matches yet" only with no local record and no online match.
+   */
+  onMatches?: (has: boolean) => void;
 }
 
-export function OnlineHistory({ auth, games }: OnlineHistoryProps) {
+export function OnlineHistory({ auth, games, onMatches }: OnlineHistoryProps) {
   // Read once when History opens: no note, no network call.
   const [account] = useState(hasOnlineAccount);
   if (!account || auth === undefined || games === undefined) return null;
-  return <FinishedOnlineMatches auth={auth} games={games} />;
+  return <FinishedOnlineMatches auth={auth} games={games} onMatches={onMatches} />;
 }
 
-function FinishedOnlineMatches({ auth, games }: { auth: AuthProvider; games: GameTransport }) {
+interface FinishedOnlineMatchesProps {
+  auth: AuthProvider;
+  games: GameTransport;
+  onMatches: ((has: boolean) => void) | undefined;
+}
+
+function FinishedOnlineMatches({ auth, games, onMatches }: FinishedOnlineMatchesProps) {
   const { t, i18n } = useTranslation();
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
   const { state, retry } = useMyOnlineGames(auth, games, 'finished');
+  const has = state.status === 'loading' || (state.status === 'loaded' && state.games.length > 0);
+  useEffect(() => {
+    onMatches?.(has);
+  }, [onMatches, has]);
+  useEffect(() => () => onMatches?.(false), [onMatches]);
   if (state.status === 'signedOut') return null;
   // No finished match: no section, unless the list may be out of date.
   if (state.status === 'loaded' && state.games.length === 0 && !state.failed) return null;

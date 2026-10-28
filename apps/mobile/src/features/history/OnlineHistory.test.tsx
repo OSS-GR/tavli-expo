@@ -75,7 +75,7 @@ async function show(records: readonly HistoryRecord[] = [RECORD], transport = ga
     <HistoryScreen
       records={records}
       onPlay={jest.fn()}
-      online={<OnlineHistory auth={auth} games={transport} />}
+      online={(onMatches) => <OnlineHistory auth={auth} games={transport} onMatches={onMatches} />}
     />,
   );
   await flush();
@@ -123,7 +123,9 @@ describe('<OnlineHistory />', () => {
       <HistoryScreen
         records={[RECORD]}
         onPlay={jest.fn()}
-        online={<OnlineHistory auth={undefined} games={undefined} />}
+        online={(onMatches) => (
+          <OnlineHistory auth={undefined} games={undefined} onMatches={onMatches} />
+        )}
       />,
     );
     await flush();
@@ -178,14 +180,41 @@ describe('<OnlineHistory />', () => {
     expect(historyStore.getState().records).toEqual([]);
   });
 
-  it('shows the online matches under the empty state', async () => {
+  it('with no local record but an online match, shows no empty state', async () => {
     signIn();
     rememberOnlineAccount();
     const won = await finished(FRIEND);
+    const watch = jest.spyOn(onlineFake.games, 'watchMyGames');
     await show([]);
-    expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
+    expect(screen.queryByText('No matches yet')).toBeNull();
+    expect(screen.queryByTestId('history-play')).toBeNull();
     expect(screen.queryByRole('header', { name: 'Stats' })).toBeNull();
     expect(rowIds()).toEqual([won]);
+    // The section kept its place: one watch only.
+    expect(watch).toHaveBeenCalledTimes(1);
+    watch.mockRestore();
+  });
+
+  it('with no local record and no online account, shows the empty state', async () => {
+    signIn();
+    await finished(FRIEND);
+    await show([]);
+    expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Play' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('history-online')).toBeNull();
+  });
+
+  it('shows the empty state again after a sign-out', async () => {
+    signIn();
+    rememberOnlineAccount();
+    await finished(FRIEND);
+    await show([]);
+    expect(screen.queryByText('No matches yet')).toBeNull();
+    await act(async () => {
+      await auth!.signOut();
+    });
+    await flush();
+    expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
   });
 
   it('shows no section when no online match has finished', async () => {
@@ -194,6 +223,10 @@ describe('<OnlineHistory />', () => {
     newGame();
     await show();
     expect(screen.queryByTestId('history-online')).toBeNull();
+    // With no local record either: the empty state.
+    await screen.unmount();
+    await show([]);
+    expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
   });
 
   it('says when the list did not load; Try again loads it', async () => {

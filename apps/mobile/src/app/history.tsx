@@ -20,7 +20,7 @@ export default function HistoryRoute() {
       <HistoryScreen
         records={records}
         onPlay={() => router.push(newGameHref('bot'))}
-        online={<OnlineHistory auth={auth} games={games} />}
+        online={(onMatches) => <OnlineHistory auth={auth} games={games} onMatches={onMatches} />}
       />
     </>
   );

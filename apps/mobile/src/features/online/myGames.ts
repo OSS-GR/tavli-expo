@@ -20,6 +20,7 @@ import { AppState } from 'react-native';
 
 import { forgetOnlineAccount } from './accountHint';
 import { clockText, clockTickMs } from './clock';
+import { gameScore, gameTitle } from './gameText';
 import { timeLeft } from './timeLeft';
 
 /** The most rows Home shows. "See all" opens the whole list. */
@@ -90,21 +91,6 @@ export interface GameRowText {
   readonly time: string | null;
   /** What a screen reader reads for the whole row: "Portes vs friend, your turn, 3 to 1, 23 h left". */
   readonly label: string;
-}
-
-/** "Portes vs friend". */
-export function gameTitle(game: GameSummary, t: TFunction): string {
-  return t('home.online.vsFriend', { game: t(`games.${game.choice}`) });
-}
-
-/** The score, your points first: "3–1" to show, "3 to 1" to read. */
-export function gameScore(game: GameSummary, t: TFunction): { text: string; spoken: string } {
-  const me = game.score[game.mySide];
-  const friend = game.score[game.mySide === 'white' ? 'black' : 'white'];
-  return {
-    text: t('home.online.score', { me, friend }),
-    spoken: t('home.online.scoreSpoken', { me, friend }),
-  };
 }
 
 /** The text of one row at phone time `localNow`. */

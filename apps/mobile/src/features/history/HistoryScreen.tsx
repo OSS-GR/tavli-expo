@@ -2,13 +2,14 @@
  * History (#142): stats per game and bot level, then the past matches,
  * newest first. Offline: the records live on the phone (`records.ts`).
  * Finished online matches (#313) come last, in their own section
- * (`online`); they never count in the stats.
+ * (`online`); they never count in the stats. "No matches yet" shows only
+ * when the phone has no record and the online section has no match.
  *
  * It only shows what it is given. The route (`app/history.tsx`) reads the
  * store and navigates.
  */
 import { useLocales } from 'expo-localization';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -25,72 +26,83 @@ export interface HistoryScreenProps {
   records: readonly HistoryRecord[];
   /** The empty state's Play button. */
   onPlay: () => void;
-  /** The finished online matches (#313), under the local ones. */
-  online?: ReactNode;
+  /**
+   * The finished online matches (#313), under the local ones. It calls
+   * `onMatches(true)` while it loads or lists a match, so the screen hides
+   * its empty state.
+   */
+  online?: (onMatches: (has: boolean) => void) => ReactNode;
 }
 
 export function HistoryScreen({ records, onPlay, online }: HistoryScreenProps) {
   const { t, i18n } = useTranslation();
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
+  const [onlineMatches, setOnlineMatches] = useState(false);
+  const empty = records.length === 0 && !onlineMatches;
 
-  if (records.length === 0) {
-    return (
-      <View testID="history-screen" style={styles.screen}>
-        <ScrollView contentContainerStyle={[styles.content, styles.emptyContent]}>
-          <Text style={styles.emptyTitle} accessibilityRole="header">
-            {t('history.emptyTitle')}
-          </Text>
-          <Text style={styles.emptyText}>{t('history.empty')}</Text>
-          <ActionButton testID="history-play" label={t('history.play')} onPress={onPlay} />
-          {online}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  const stats = historyStats(records);
-
+  // One tree for every state: the online section keeps its place, so it
+  // never mounts again (and never watches again) when the empty state goes.
   return (
     <View testID="history-screen" style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <SectionTitle title={t('history.stats')} />
-        {stats.map(({ game, byLevel, local }) => (
-          <View key={game} testID={`history-stats-${game}`} style={styles.card}>
-            <Text style={styles.cardTitle} accessibilityRole="header">
-              {t(`games.${game}`)}
+      <ScrollView contentContainerStyle={[styles.content, empty && styles.emptyContent]}>
+        {empty ? (
+          <>
+            <Text style={styles.emptyTitle} accessibilityRole="header">
+              {t('history.emptyTitle')}
             </Text>
-            {byLevel.map(({ level, line }) => (
-              <StatRow
-                key={level}
-                testID={`history-stats-${game}-${level}`}
-                title={t('history.vsBot', { level: t(`bot.levels.${level}`) })}
-                line={line}
-                mode="bot"
-              />
-            ))}
-            {local ? (
-              <StatRow
-                testID={`history-stats-${game}-local`}
-                title={t('history.local')}
-                line={local}
-                mode="local"
-              />
-            ) : null}
-          </View>
-        ))}
-
-        <SectionTitle title={t('history.matches')} />
-        <MatchList
-          rows={records.map((record, i) => ({
-            ...historyRow(record, t, locale),
-            key: record.id,
-            testID: `history-row-${i}`,
-          }))}
-        />
-        <Text style={styles.note}>{t('history.onPhone', { max: MAX_HISTORY_RECORDS })}</Text>
-        {online}
+            <Text style={styles.emptyText}>{t('history.empty')}</Text>
+            <ActionButton testID="history-play" label={t('history.play')} onPress={onPlay} />
+          </>
+        ) : null}
+        {records.length > 0 ? <LocalHistory records={records} locale={locale} /> : null}
+        {online?.(setOnlineMatches)}
       </ScrollView>
     </View>
+  );
+}
+
+/** Stats, then the local matches, newest first. */
+function LocalHistory({ records, locale }: { records: readonly HistoryRecord[]; locale: string }) {
+  const { t } = useTranslation();
+  const stats = historyStats(records);
+  return (
+    <>
+      <SectionTitle title={t('history.stats')} />
+      {stats.map(({ game, byLevel, local }) => (
+        <View key={game} testID={`history-stats-${game}`} style={styles.card}>
+          <Text style={styles.cardTitle} accessibilityRole="header">
+            {t(`games.${game}`)}
+          </Text>
+          {byLevel.map(({ level, line }) => (
+            <StatRow
+              key={level}
+              testID={`history-stats-${game}-${level}`}
+              title={t('history.vsBot', { level: t(`bot.levels.${level}`) })}
+              line={line}
+              mode="bot"
+            />
+          ))}
+          {local ? (
+            <StatRow
+              testID={`history-stats-${game}-local`}
+              title={t('history.local')}
+              line={local}
+              mode="local"
+            />
+          ) : null}
+        </View>
+      ))}
+
+      <SectionTitle title={t('history.matches')} />
+      <MatchList
+        rows={records.map((record, i) => ({
+          ...historyRow(record, t, locale),
+          key: record.id,
+          testID: `history-row-${i}`,
+        }))}
+      />
+      <Text style={styles.note}>{t('history.onPhone', { max: MAX_HISTORY_RECORDS })}</Text>
+    </>
   );
 }
 
