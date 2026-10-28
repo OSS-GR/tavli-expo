@@ -35,24 +35,37 @@ export type LegalAfter = (steps: readonly Move[]) => readonly SourceMoves[];
 
 const keyOf = (from: Origin, to: Destination) => `${String(from)}>${String(to)}`;
 
-/** How many steps before the last one hit or pin a checker. */
-const capturesOnTheWay = (path: readonly Move[]) =>
-  path.slice(0, -1).filter((m) => m.capture !== 'none').length;
+/** The hits and the pins of the steps before the last one. */
+function onTheWay(path: readonly Move[]): { hits: number; pins: number } {
+  let hits = 0;
+  let pins = 0;
+  for (const move of path.slice(0, -1)) {
+    if (move.capture === 'hit') hits += 1;
+    else if (move.capture === 'pin') pins += 1;
+  }
+  return { hits, pins };
+}
 
 /**
- * True when `a` is the better way to the same target than `b`.
+ * True when `a` is the better way to the same target than `b`. Hits and
+ * pins rank the opposite way.
  *
  * 1. Fewer steps (only bearing off can reach "off" with fewer dice).
- * 2. Fewer hits or pins on the way. A path that hits (Portes) or pins
- *    (Plakoto) on a middle point is offered only when no other order is
- *    legal. A player who wants the hit plays the two dice one by one.
- * 3. The lower die first ("a 2 and then a 3").
+ * 2. More hits on the way (Portes, Asodio's Acey-Deucey presets). A move
+ *    through a lone checker hits it, as players expect, and the hit checker
+ *    stays on the bar. A player who does not want the hit plays the two
+ *    dice one by one.
+ * 3. Fewer pins on the way (Plakoto, Asodio's Kafeneio preset). The checker
+ *    moves on at once and the pinned checker is free again, so a pin on the
+ *    way changes nothing.
+ * 4. The lower die first ("a 2 and then a 3").
  */
 function better(a: readonly Move[], b: readonly Move[]): boolean {
   if (a.length !== b.length) return a.length < b.length;
-  const ca = capturesOnTheWay(a);
-  const cb = capturesOnTheWay(b);
-  if (ca !== cb) return ca < cb;
+  const wayA = onTheWay(a);
+  const wayB = onTheWay(b);
+  if (wayA.hits !== wayB.hits) return wayA.hits > wayB.hits;
+  if (wayA.pins !== wayB.pins) return wayA.pins < wayB.pins;
   for (let i = 0; i < a.length; i++) {
     const da = a[i]?.die ?? 0;
     const db = b[i]?.die ?? 0;

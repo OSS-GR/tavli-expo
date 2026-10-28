@@ -1,8 +1,9 @@
 /**
  * #180: one checker moved with several dice. The paths come only from the
  * engine's legal moves, step by step; these tests check that, the order
- * rule (no hit or pin on the way when another order is legal), doubles,
- * bearing off, and Plakoto, Fevga and Asodio.
+ * rule (a hit on the way when an order hits, but no pin on the way when
+ * another order is legal), doubles, bearing off, and Plakoto, Fevga and
+ * Asodio.
  */
 import {
   applyGameAction,
@@ -10,6 +11,7 @@ import {
   createBoard,
   createGameFlow,
   createSeededRng,
+  currentBoard,
   fevga,
   legalNextMoves,
   plakoto,
@@ -74,12 +76,14 @@ describe('combinedPaths (#180)', () => {
     expect(paths.map(shortPath)).toEqual(['13/10(3) 10/5(5)']);
   });
 
-  it('Portes: prefers the order that does not hit on the way', () => {
+  it('Portes: prefers the order that hits on the way', () => {
     const flow = whiteToMove('portes', [5, 3], door());
     const paths = flowPaths(flow);
-    // 13/8* then 8/5 would hit on the way; 13/10/5 does not.
-    expect(paths.map(shortPath)).toEqual(['13/10(3) 10/5(5)']);
-    expect(pathStops(paths[0]!)).toEqual([10]);
+    // 13/10/5 is legal too, but 13/8* then 8/5 hits the blot on the way.
+    expect(paths.map(shortPath)).toEqual(['13/8*(5) 8/5(3)']);
+    expect(pathStops(paths[0]!)).toEqual([8]);
+    // The engine plays it, and the hit Black checker stays on the bar.
+    expect(currentBoard(replay(flow, paths[0]!)).bar.black).toBe(1);
   });
 
   it('Portes: offers the hit on the way when it is the only order', () => {
@@ -101,6 +105,32 @@ describe('combinedPaths (#180)', () => {
     const after = replay(flow, paths[0]!);
     expect(after.phase).toBe('awaiting-confirm');
   });
+
+  // Asodio hits in its Acey-Deucey presets, so they follow the Portes rule.
+  // (Kafeneio pins like Plakoto; its army rules lock this made-up position.)
+  it.each(['asodio.aceyDeuceyAmerican', 'asodio.aceyDeuceyGreek'] as const)(
+    'Asodio %s: prefers the order that hits on the way',
+    (preset) => {
+      const rules = resolveRules(preset, { match: { rotation: ['asodio'] } });
+      const start = asodio.initialState({ startingPlayer: 'white', rules });
+      const board = createBoard(
+        { white: { points: { 13: 2, 6: 13 } }, black: { points: { 17: 1, 24: 14 } } },
+        rules.movement.direction,
+      );
+      const flow = applyGameAction(
+        createGameFlow({ state: { ...start, board }, starter: 'white' }),
+        {
+          type: 'roll',
+          player: 'white',
+          dice: [5, 3],
+        },
+      );
+      const paths = flowPaths(flow).filter((p) => p.from === 13 && p.to === 5);
+      // 13/10/5 is legal too; the hit on 8 wins, and the hit checker stays on the bar.
+      expect(paths.map(shortPath)).toEqual(['13/8*(5) 8/5(3)']);
+      expect(currentBoard(replay(flow, paths[0]!)).bar.black).toBe(1);
+    },
+  );
 
   it('a double reaches 2, 3 and 4 steps, each step legal', () => {
     const board = createBoard(
