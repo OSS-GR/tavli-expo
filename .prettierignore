@@ -9,6 +9,8 @@ apps/mobile/android/
 apps/mobile/assets/
 # Written by `convex codegen`.
 apps/server/convex/_generated/
+# The local backend that `pnpm --filter @tavli/server codegen` runs.
+apps/server/.convex/
 
 # Written by hand or by other tools. Do not reformat them here.
 docs/

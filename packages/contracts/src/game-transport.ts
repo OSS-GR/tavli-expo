@@ -3,8 +3,9 @@
  *
  * The app plays an online game only through `GameTransport`. The server
  * (`apps/server`, Convex) is the truth: it rolls the dice, checks every
- * turn with `@tavli/engine` and saves the game. A client adapter (later,
- * `packages/adapters/backend-convex`) implements this port. The in-memory
+ * turn with `@tavli/engine` and saves the game. The client adapter
+ * `@tavli/backend-convex` (`packages/adapters/backend-convex`) implements
+ * this port. The in-memory
  * server in `@tavli/online` implements it too, with no network.
  *
  * Every type here is plain JSON, so it can cross the network as it is.
@@ -89,7 +90,7 @@ export interface OnlineGameView {
 export const GAME_TRANSPORT_ERROR_CODES = [
   /** No game with this id. */
   'NOT_FOUND',
-  /** The caller is not one of the two players. */
+  /** The caller is not one of the two players. Only the players may watch a game too. */
   'NOT_A_PLAYER',
   /** The server waits for the other player. */
   'NOT_YOUR_TURN',
@@ -108,6 +109,8 @@ export const GAME_TRANSPORT_ERROR_CODES = [
   'TIMED_OUT',
   /** Bad arguments (for example the same player on both sides). */
   'BAD_REQUEST',
+  /** The call has no signed-in user. Sign in (a guest account is enough), then try again. */
+  'NOT_SIGNED_IN',
 ] as const;
 
 export type GameTransportErrorCode = (typeof GAME_TRANSPORT_ERROR_CODES)[number];
@@ -145,14 +148,16 @@ export interface SendAnswerRequest {
 }
 
 /**
- * The port. The adapter knows who the caller is (auth); the calls do not
- * carry a player id.
+ * The port. The adapter knows who the caller is: the signed-in user
+ * (`AuthProvider`). The calls do not carry a player id; the server reads
+ * it from the sign-in token.
  */
 export interface GameTransport {
   /**
    * Calls `onView` with the game now and after every change. Returns a
-   * function that stops the updates. `onError` gets load errors (for
-   * example `NOT_FOUND`). Both are called later, never inside `subscribe`
+   * function that stops the updates. `onError` gets load errors:
+   * `NOT_FOUND`, or `NOT_A_PLAYER` when the caller is not one of the two
+   * players. Both are called later, never inside `subscribe`
    * itself. The contract checks are `gameTransportContract` in
    * `@tavli/contracts/testing`.
    */

@@ -1,0 +1,25 @@
+{
+  "name": "@tavli/backend-convex",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GameTransport port adapter backed by the Convex client (ADR-0004).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tavli/contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "convex": "^1.46.0"
+  },
+  "devDependencies": {
+    "convex": "1.46.0"
+  }
+}

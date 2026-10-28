@@ -20,12 +20,12 @@ turn timers and the data model.
 
 ## What it exports
 
-| File                   | What it holds                                                                                                                                                                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/online-game.ts`   | The game model: `onlineGameRules`, `createOnlineMatch`, `playTurn`, `answerPrompt`, `resign`, `timeOut`, `advance`, `toView`, `storeFlow` / `loadFlow`, the timer helpers `deadlineAfter` / `isTimedOut`, and `OnlineGameError`   |
-| `src/calls.ts`         | The call checks both servers share: `checkNewGame`, `checkCall` (game, caller, version), `callTimedOut` + `TIMED_OUT_ERROR`, `scheduledCheck` (the turn timer check), `nextDeadline`, `matchStatus`, `eventActor`, `SERVER_ACTOR` |
-| `src/memory-server.ts` | `createMemoryGameServer({ rng, now })`                                                                                                                                                                                            |
-| `src/testing.ts`       | `@tavli/online/testing`, for tests only: `pickTurn`, `pickChoice`, `motherPin` (a Plakoto position for the mother question)                                                                                                       |
+| File                   | What it holds                                                                                                                                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/online-game.ts`   | The game model: `onlineGameRules`, `createOnlineMatch`, `playTurn`, `answerPrompt`, `resign`, `timeOut`, `advance`, `toView`, `storeFlow` / `loadFlow`, the timer helpers `deadlineAfter` / `isTimedOut`, and `OnlineGameError`                                        |
+| `src/calls.ts`         | The call checks both servers share: `checkNewGame`, `checkCall` (game, caller, version), `checkViewer` (who may read a game), `callTimedOut` + `TIMED_OUT_ERROR`, `scheduledCheck` (the turn timer check), `nextDeadline`, `matchStatus`, `eventActor`, `SERVER_ACTOR` |
+| `src/memory-server.ts` | `createMemoryGameServer({ rng, now })`                                                                                                                                                                                                                                 |
+| `src/testing.ts`       | `@tavli/online/testing`, for tests only: `pickTurn`, `pickChoice`, `motherPin` (a Plakoto position for the mother question)                                                                                                                                            |
 
 A failed check throws an `OnlineGameError` (`code` is a
 `GameTransportErrorCode`). Each server turns it into its own error: Convex
@@ -48,10 +48,13 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
   and result as the Convex mutation. It returns the id (`game-1`,
   `game-2`, …) and throws an `OnlineGameError` for bad arguments.
 - `transportFor(playerId)`: a `GameTransport`. Every call it makes comes
-  from that player.
+  from that player. There is no sign-in here: the transport stands for
+  that player, signed in. The Convex server reads the player from the
+  sign-in token instead (#131).
 - `subscribe` calls `onView` with the current view on a later microtask,
   then after each change. It never calls it inside `subscribe`. A missing
-  game calls `onError` with `NOT_FOUND`.
+  game calls `onError` with `NOT_FOUND`. Only the two players may watch a
+  game: a stranger's `onError` gets `NOT_A_PLAYER`, as on the server.
 - A call waits one microtask before it changes anything, like a network.
 - Views, requests and log events are copies (a JSON round trip). A client
   cannot change the server state.
@@ -76,7 +79,7 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
 - `online-game.test.ts`: the model with a seeded RNG (moved from
   `apps/server`): whole matches of every game choice, replay, error codes,
   the timer helpers.
-- `calls.test.ts`: the shared call checks.
+- `calls.test.ts`: the shared call checks, and `checkViewer`.
 - `memory-server.test.ts`: the `GameTransport` contract checks
   (`gameTransportContract` from `@tavli/contracts/testing`), a whole
   match of each game choice through two transports (the log replays to

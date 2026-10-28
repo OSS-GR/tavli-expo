@@ -5,7 +5,7 @@
  * here, and save the result. Everything here is pure: the clock is an
  * argument (`now`, epoch milliseconds) and random values come from the
  * `Rng` the caller passes in. The server passes the secure RNG
- * (`crypto-rng.ts`); tests may pass a seeded one.
+ * (`cryptoRng.ts`); tests may pass a seeded one.
  *
  * A later issue moves this file to `@tavli/online`, for the app's
  * in-memory server. So it must not use Convex types.
