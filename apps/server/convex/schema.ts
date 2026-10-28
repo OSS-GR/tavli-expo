@@ -87,7 +87,9 @@ export default defineSchema({
     answeredBy: v.union(v.string(), v.null()),
   })
     .index('by_code', ['code'])
-    .index('by_from', ['from', 'status']),
+    // "My open invites" and the cap on them (#275): the open invites of
+    // one player whose time is not up are one range (`expiresAt > now`).
+    .index('by_from', ['from', 'status', 'expiresAt']),
 
   /**
    * The Expo push tokens of each player's phones (#280), for "your turn"

@@ -21,6 +21,7 @@ import type {
 } from '@tavli/contracts';
 import { invitesContract } from '@tavli/contracts/testing';
 import type { InvitesContractPlayer, InvitesContractSubject } from '@tavli/contracts/testing';
+import { MAX_OPEN_INVITES } from '@tavli/online';
 
 import { api } from './_generated/api';
 import schema from './schema';
@@ -101,8 +102,9 @@ function otherCode(code: string): string {
 describe('createInvite', () => {
   it('returns a code of 8 characters from the alphabet', async () => {
     const t = setup();
+    // One player per invite: one player may have only MAX_OPEN_INVITES open.
     for (let i = 0; i < 20; i++) {
-      const code = await createInvite(t);
+      const code = await createInvite(t, `player-${i}`);
       expect(code).toMatch(/^[2-9A-Z]{8}$/);
       for (const char of code) expect(INVITE_CODE_ALPHABET).toContain(char);
     }
@@ -151,6 +153,78 @@ describe('createInvite', () => {
     await rejectsWith(createInvite(t, 'server'), 'BAD_REQUEST');
     const rows = await t.run(async (ctx) => ctx.db.query('invites').collect());
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe('the cap on open invites (#275)', () => {
+  /** `from` makes `MAX_OPEN_INVITES` invites. Returns their codes. */
+  async function fill(t: Tester, from = ALICE): Promise<string[]> {
+    const codes: string[] = [];
+    for (let i = 0; i < MAX_OPEN_INVITES; i++) codes.push(await createInvite(t, from));
+    return codes;
+  }
+
+  async function rowsOf(t: Tester, from: string) {
+    return await t.run(async (ctx) =>
+      (await ctx.db.query('invites').collect()).filter((row) => row.from === from),
+    );
+  }
+
+  it('rejects one more open invite with TOO_MANY_INVITES, and saves nothing', async () => {
+    const t = setup();
+    await fill(t);
+    await rejectsWith(createInvite(t), 'TOO_MANY_INVITES');
+    // The cap comes first, also for a call with a bad match length.
+    await rejectsWith(createInvite(t, ALICE, 'portes', 0), 'TOO_MANY_INVITES');
+    expect(await rowsOf(t, ALICE)).toHaveLength(MAX_OPEN_INVITES);
+    // No expiry was scheduled for the rejected calls.
+    const scheduled = await t.run(async (ctx) =>
+      ctx.db.system.query('_scheduled_functions').collect(),
+    );
+    expect(scheduled).toHaveLength(MAX_OPEN_INVITES);
+  });
+
+  it('another player is not affected', async () => {
+    const t = setup();
+    await fill(t);
+    expect(await createInvite(t, BOB)).toMatch(/^[2-9A-Z]{8}$/);
+  });
+
+  it('an accepted, declined or cancelled invite frees a place', async () => {
+    const t = setup();
+    const [accepted, declined, cancelled] = await fill(t);
+    await as(t, BOB).mutation(api.invites.acceptInvite, { code: accepted! });
+    await createInvite(t);
+    await rejectsWith(createInvite(t), 'TOO_MANY_INVITES');
+    await as(t, BOB).mutation(api.invites.declineInvite, { code: declined! });
+    await createInvite(t);
+    await rejectsWith(createInvite(t), 'TOO_MANY_INVITES');
+    await as(t, ALICE).mutation(api.invites.cancelInvite, { code: cancelled! });
+    await createInvite(t);
+    await rejectsWith(createInvite(t), 'TOO_MANY_INVITES');
+  });
+
+  it('an expired invite frees a place at expiresAt, also before the scheduler runs', async () => {
+    const t = setup();
+    await fill(t);
+    vi.setSystemTime(START + INVITE_TIME_MS - 1);
+    await rejectsWith(createInvite(t), 'TOO_MANY_INVITES');
+    // The time is up, but no scheduled expiry has marked the rows yet.
+    vi.setSystemTime(START + INVITE_TIME_MS);
+    const rows = await rowsOf(t, ALICE);
+    expect(rows.every((row) => row.status === 'open')).toBe(true);
+    await fill(t);
+    await rejectsWith(createInvite(t), 'TOO_MANY_INVITES');
+  });
+
+  it('places freed by the scheduled expiry stay free', async () => {
+    const t = setup();
+    await fill(t);
+    await wait(t, INVITE_TIME_MS);
+    const rows = await rowsOf(t, ALICE);
+    expect(rows.every((row) => row.status === 'expired')).toBe(true);
+    await fill(t);
+    await rejectsWith(createInvite(t), 'TOO_MANY_INVITES');
   });
 });
 

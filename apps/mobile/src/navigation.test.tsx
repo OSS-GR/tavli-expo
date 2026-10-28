@@ -5,6 +5,7 @@
  */
 import type { createRecordingAnalytics } from '@tavli/contracts';
 import { createGameFlow, portes } from '@tavli/engine';
+import { MAX_OPEN_INVITES } from '@tavli/online';
 import { fireEvent, within } from '@testing-library/react-native';
 import { router as appRouter } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
@@ -13,7 +14,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
-import { DEV_TICK_MS, devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
+import { DEV_BOT_ID, DEV_TICK_MS, devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
 import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
@@ -885,6 +886,29 @@ describe('invites (#256)', () => {
       jest.advanceTimersByTime(DEV_TICK_MS);
     });
     expect(devGameRunning()).toBe(false);
+  });
+
+  it('says so when the bot has too many open invites (#275), and does not crash', async () => {
+    const user = setupUser();
+    // The test server is shared by the whole file: take these back at the end.
+    const open = Array.from({ length: MAX_OPEN_INVITES }, () =>
+      onlineServer().createInvite(DEV_BOT_ID, 'portes', 1, 'live'),
+    );
+    try {
+      await renderRouter('./src/app', { initialUrl: '/dev/online' });
+      await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+      expect(
+        screen.getByText('The bot has too many open invites. Wait until one closes.'),
+      ).toBeOnTheScreen();
+      expect(screen.queryByTestId('dev-online-invite-code')).toBeNull();
+      expect(devGameRunning()).toBe(false);
+    } finally {
+      for (const code of open) onlineServer().cancelInvite(DEV_BOT_ID, code);
+    }
+    // With a free place, the next press makes the invite.
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(screen.getByTestId('dev-online-invite-code')).toBeOnTheScreen();
+    expect(screen.queryByTestId('dev-online-invite-error')).toBeNull();
   });
 
   it('opens an invite link straight away, in any case', async () => {
