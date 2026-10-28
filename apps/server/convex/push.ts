@@ -39,6 +39,7 @@ import {
   tokensOverCap,
   turnMessages,
   turnPushSide,
+  turnPushTtl,
 } from './model/push';
 import type { TurnWait } from './model/push';
 import { pushPlatform } from './schema';
@@ -54,6 +55,8 @@ let provider: PushProvider | null = null;
  * on, set `EXPO_ACCESS_TOKEN` with `npx convex env set` (never in the repo).
  */
 function pushProvider(): PushProvider {
+  // The adapter cuts off a request after `EXPO_PUSH_TIMEOUT_MS` (10 s):
+  // its tokens then get the retry, well before the action's time limit.
   provider ??= createExpoPushProvider({
     fetch: (url, init) => fetch(url, init),
     accessToken: process.env['EXPO_ACCESS_TOKEN'],
@@ -117,7 +120,7 @@ export const registerPushToken = mutation({
       .withIndex('by_player', (q) => q.eq('playerId', playerId))
       .order('asc')
       .collect();
-    for (const row of tokensOverCap(mine)) await ctx.db.delete(row._id);
+    for (const row of tokensOverCap(mine, token)) await ctx.db.delete(row._id);
     return null;
   },
 });
@@ -189,7 +192,8 @@ export async function scheduleTurnPush(
 
 /**
  * The tokens to tell "your turn", newest first: all of the player's, or
- * only those in `only` (a retry). None when the game has changed since
+ * only those in `only` (a retry), and the game's turn deadline (for the
+ * push's time to live). No tokens when the game has changed since
  * `version` (the player already played, or it is over): then the push
  * would be late.
  */
@@ -200,19 +204,24 @@ export const turnPushTokens = internalQuery({
     playerId: v.string(),
     only: v.optional(v.array(v.string())),
   },
-  returns: v.array(v.string()),
+  returns: v.object({
+    tokens: v.array(v.string()),
+    turnDeadline: v.union(v.number(), v.null()),
+  }),
   handler: async (ctx, { gameId, version, playerId, only }) => {
     const game = await ctx.db.get(gameId);
-    if (game === null || game.version !== version || game.status !== 'active') return [];
+    if (game === null || game.version !== version || game.status !== 'active') {
+      return { tokens: [], turnDeadline: null };
+    }
     const rows = await ctx.db
       .query('pushTokens')
       .withIndex('by_player', (q) => q.eq('playerId', playerId))
       .order('desc')
       .collect();
-    const tokens = rows.map((row) => row.token);
-    if (only === undefined) return tokens;
-    const wanted = new Set(only);
-    return tokens.filter((token) => wanted.has(token));
+    const all = rows.map((row) => row.token);
+    const wanted = only === undefined ? null : new Set(only);
+    const tokens = wanted === null ? all : all.filter((token) => wanted.has(token));
+    return { tokens, turnDeadline: game.turnDeadline };
   },
 });
 
@@ -236,7 +245,9 @@ export const removeDeadTokens = internalMutation({
 
 /**
  * Sends "your turn" to the phones of `playerId` (scheduled by
- * `scheduleTurnPush`, after the save). Removes the dead tokens. A token
+ * `scheduleTurnPush`, after the save), with `high` priority and a time to
+ * live up to the turn deadline (`turnPushTtl`; no time left, no push).
+ * Removes the dead tokens. A token
  * whose push failed (`Failed`, `MessageRateExceeded`: a busy service or
  * the network) gets one more try after `PUSH_RETRY_MS`: the same action
  * with `attempt` + 1 and only those `tokens`. The version check drops the
@@ -255,14 +266,15 @@ export const sendTurnPush = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, { gameId, version, playerId, attempt = 0, tokens: only }) => {
-    const tokens = await ctx.runQuery(internal.push.turnPushTokens, {
+    const { tokens, turnDeadline } = await ctx.runQuery(internal.push.turnPushTokens, {
       gameId,
       version,
       playerId,
       ...(only === undefined ? {} : { only }),
     });
-    if (tokens.length === 0) return null;
-    const messages = turnMessages(tokens, gameId);
+    const ttl = turnPushTtl(turnDeadline, Date.now());
+    if (tokens.length === 0 || ttl === null) return null;
+    const messages = turnMessages(tokens, gameId, ttl);
     const results = await pushProvider().send(messages);
     const dead = deadTokens(messages, results);
     if (dead.length > 0) {

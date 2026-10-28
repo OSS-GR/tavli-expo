@@ -60,9 +60,34 @@ export function turnPushSide(
   return after.side;
 }
 
-/** One "your turn" message per token. */
-export function turnMessages(tokens: readonly string[], gameId: string): PushMessage[] {
-  return tokens.map((to) => ({ to, ...TURN_PUSH_TEXT, data: { gameId } }));
+/**
+ * The seconds the push service may keep a "your turn" push: the time left
+ * until the turn deadline, rounded down. After the deadline the turn is
+ * lost anyway, so a late "your turn" would be wrong. `null` when no full
+ * second is left, or the game has no deadline: then send nothing.
+ */
+export function turnPushTtl(turnDeadline: number | null, now: number): number | null {
+  if (turnDeadline === null) return null;
+  const seconds = Math.floor((turnDeadline - now) / 1000);
+  return seconds >= 1 ? seconds : null;
+}
+
+/**
+ * One "your turn" message per token, with `high` priority (the phone shows
+ * it at once) and `ttlSeconds` from `turnPushTtl`.
+ */
+export function turnMessages(
+  tokens: readonly string[],
+  gameId: string,
+  ttlSeconds: number,
+): PushMessage[] {
+  return tokens.map((to) => ({
+    to,
+    ...TURN_PUSH_TEXT,
+    data: { gameId },
+    priority: 'high',
+    ttlSeconds,
+  }));
 }
 
 /** The tokens whose result failed with one of `codes`. */
@@ -108,8 +133,16 @@ export function retryTokens(
 
 /**
  * The rows to drop so that at most `MAX_PUSH_TOKENS_PER_PLAYER` remain:
- * the oldest ones. `rows` are a player's tokens, oldest first.
+ * the oldest ones. `rows` are a player's tokens, oldest first. The row of
+ * `keep` (the token just registered) is never dropped, even when it is not
+ * the newest: two rows can have the same `updatedAt`, and the server clock
+ * of another call can be ahead.
  */
-export function tokensOverCap<T>(rows: readonly T[]): T[] {
-  return rows.slice(0, Math.max(0, rows.length - MAX_PUSH_TOKENS_PER_PLAYER));
+export function tokensOverCap<T extends { readonly token: string }>(
+  rows: readonly T[],
+  keep: string,
+): T[] {
+  const over = rows.length - MAX_PUSH_TOKENS_PER_PLAYER;
+  if (over <= 0) return [];
+  return rows.filter((row) => row.token !== keep).slice(0, over);
 }

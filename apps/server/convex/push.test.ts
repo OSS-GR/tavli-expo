@@ -221,6 +221,28 @@ describe('registerPushToken and removePushToken', () => {
     // Bob's token is not touched by Alice's cap.
     expect(await tokens(t)).toContain(`${BOB}: ${BOB_TOKEN}`);
   });
+
+  it('the cap never drops the token just registered, even when the others look newer', async () => {
+    // Another call's server clock can be ahead: its rows then sort after
+    // the new one.
+    const t = setup();
+    const phone = (i: number) => `ExpoPushToken[phone-${i}]`;
+    await t.run(async (ctx) => {
+      for (let i = 0; i < MAX_PUSH_TOKENS_PER_PLAYER; i++) {
+        await ctx.db.insert('pushTokens', {
+          playerId: ALICE,
+          token: phone(i),
+          platform: 'ios',
+          updatedAt: START + 60_000,
+        });
+      }
+    });
+    await register(t, ALICE, ALICE_TOKEN);
+    const mine = (await tokenRows(t)).map((row) => row.token);
+    expect(mine).toHaveLength(MAX_PUSH_TOKENS_PER_PLAYER);
+    expect(mine).toContain(ALICE_TOKEN);
+    expect(mine).not.toContain(phone(0));
+  });
 });
 
 describe('"your turn" pushes', () => {
@@ -238,6 +260,9 @@ describe('"your turn" pushes', () => {
         title: TURN_PUSH_TEXT.title,
         body: TURN_PUSH_TEXT.body,
         data: { gameId },
+        priority: 'high',
+        // Kept for the whole turn time, and no longer.
+        ttlSeconds: TURN_TIME_MS.async / 1000,
       },
     ]);
     // The push text holds no player ids.
@@ -390,6 +415,23 @@ describe('"your turn" pushes', () => {
     expect(push.sent.map((message) => message.to)).toEqual([TOKEN_OF[waiting(v)]]);
   });
 
+  it('a push after the turn deadline does nothing: the turn is lost anyway', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    await registerBoth(t);
+    await playOneTurn(t, gameId);
+    const v = await view(t, gameId);
+    // The clock moves, but the scheduled push and time out have not run.
+    vi.setSystemTime(START + TURN_TIME_MS.async);
+    await t.action(internal.push.sendTurnPush, {
+      gameId,
+      version: v.version,
+      playerId: PLAYERS[waiting(v)],
+    });
+    expect(push.sent).toEqual([]);
+  });
+
   it('a failed push does not touch the game or the tokens', async () => {
     const t = setup();
     const gameId = await createGame(t, 'async');
@@ -472,6 +514,8 @@ describe('"your turn" pushes', () => {
     expect(push.sent).toEqual([]);
     await wait(t, 1);
     expect(push.sent.map((message) => message.to)).toEqual([flaky]);
+    // The retry keeps the push only for the time left in the turn.
+    expect(push.sent[0]?.ttlSeconds).toBe((TURN_TIME_MS.async - PUSH_RETRY_MS) / 1000);
 
     // It failed again: no third try. A failed token is not removed.
     push.clear();

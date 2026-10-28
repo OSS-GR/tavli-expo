@@ -15,6 +15,7 @@ import {
   tokensOverCap,
   turnMessages,
   turnPushSide,
+  turnPushTtl,
   turnWait,
 } from './push';
 import type { TurnWait } from './push';
@@ -74,11 +75,16 @@ describe('turnWait', () => {
 });
 
 describe('turnMessages', () => {
-  it('makes one message per token with the fixed text and the game id', () => {
-    expect(turnMessages(['a', 'b'], 'g1')).toEqual([
-      { to: 'a', title: TURN_PUSH_TEXT.title, body: TURN_PUSH_TEXT.body, data: { gameId: 'g1' } },
-      { to: 'b', title: TURN_PUSH_TEXT.title, body: TURN_PUSH_TEXT.body, data: { gameId: 'g1' } },
-    ]);
+  it('makes one high priority message per token with the fixed text, the game id and the ttl', () => {
+    const message = (to: string) => ({
+      to,
+      title: TURN_PUSH_TEXT.title,
+      body: TURN_PUSH_TEXT.body,
+      data: { gameId: 'g1' },
+      priority: 'high',
+      ttlSeconds: 600,
+    });
+    expect(turnMessages(['a', 'b'], 'g1', 600)).toEqual([message('a'), message('b')]);
   });
 
   it('keeps the text short', () => {
@@ -89,7 +95,7 @@ describe('turnMessages', () => {
 
 describe('deadTokens', () => {
   it('picks only the DeviceNotRegistered tokens', () => {
-    const messages = turnMessages(['a', 'b', 'c', 'd'], 'g1');
+    const messages = turnMessages(['a', 'b', 'c', 'd'], 'g1', 60);
     const results: PushResult[] = [
       { ok: true },
       { ok: false, error: 'DeviceNotRegistered', message: 'gone' },
@@ -101,7 +107,7 @@ describe('deadTokens', () => {
 
 describe('retryTokens', () => {
   it('picks the Failed and MessageRateExceeded tokens, no others', () => {
-    const messages = turnMessages(['a', 'b', 'c', 'd', 'e', 'f'], 'g1');
+    const messages = turnMessages(['a', 'b', 'c', 'd', 'e', 'f'], 'g1', 60);
     const results: PushResult[] = [
       { ok: true },
       { ok: false, error: 'DeviceNotRegistered', message: 'gone' },
@@ -118,11 +124,37 @@ describe('retryTokens', () => {
   });
 });
 
+describe('turnPushTtl', () => {
+  it('is the whole seconds left until the turn deadline', () => {
+    expect(turnPushTtl(100_000, 0)).toBe(100);
+    expect(turnPushTtl(100_999, 0)).toBe(100);
+    expect(turnPushTtl(1_000, 0)).toBe(1);
+  });
+
+  it('is null with no full second left, or no deadline: no push', () => {
+    expect(turnPushTtl(999, 0)).toBeNull();
+    expect(turnPushTtl(1_000, 1_000)).toBeNull();
+    expect(turnPushTtl(1_000, 5_000)).toBeNull();
+    expect(turnPushTtl(null, 0)).toBeNull();
+  });
+});
+
 describe('tokensOverCap', () => {
+  const rows = (count: number) => Array.from({ length: count }, (_, i) => ({ token: `t${i}` }));
+  const names = (picked: readonly { token: string }[]) => picked.map((row) => row.token);
+
   it(`drops the oldest rows over ${MAX_PUSH_TOKENS_PER_PLAYER}`, () => {
-    const rows = Array.from({ length: MAX_PUSH_TOKENS_PER_PLAYER + 2 }, (_, i) => i);
-    expect(tokensOverCap(rows)).toEqual([0, 1]);
-    expect(tokensOverCap(rows.slice(0, MAX_PUSH_TOKENS_PER_PLAYER))).toEqual([]);
-    expect(tokensOverCap([])).toEqual([]);
+    const all = rows(MAX_PUSH_TOKENS_PER_PLAYER + 2);
+    const newest = `t${MAX_PUSH_TOKENS_PER_PLAYER + 1}`;
+    expect(names(tokensOverCap(all, newest))).toEqual(['t0', 't1']);
+    expect(tokensOverCap(all.slice(0, MAX_PUSH_TOKENS_PER_PLAYER), 't0')).toEqual([]);
+    expect(tokensOverCap([], 't0')).toEqual([]);
+  });
+
+  it('never drops the token just registered, even when it sorts as the oldest', () => {
+    // A tie on `updatedAt`, or another call's clock ahead, can put it first.
+    const all = rows(MAX_PUSH_TOKENS_PER_PLAYER + 1);
+    expect(names(tokensOverCap(all, 't0'))).toEqual(['t1']);
+    expect(names(tokensOverCap(all, 't1'))).toEqual(['t0']);
   });
 });

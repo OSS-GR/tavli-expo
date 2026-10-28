@@ -6,9 +6,10 @@ It has no vendor SDK: it uses `fetch` only, so it runs in a Convex action.
 
 ## What it does
 
-- **`createExpoPushProvider({ fetch, accessToken?, url? })`** POSTs the messages to `https://exp.host/--/api/v2/push/send`, at most 100 per request (`EXPO_PUSH_BATCH`), one request after the other. Each message goes out as `{ to, title, body, data: { gameId }, sound: 'default' }`.
-- **One result per message, in order.** Expo answers one "push ticket" per message. An `ok` ticket gives `{ ok: true }`. An `error` ticket gives `{ ok: false, error, message }`: Expo's `details.error` maps to our code (`DeviceNotRegistered`, `MessageTooBig`, `MessageRateExceeded`, `InvalidCredentials`; `MismatchSenderId` is `InvalidCredentials` too), anything else is `Failed`.
-- **Never rejects.** A network error, an HTTP error, or an answer without one ticket per message makes every message of that batch `Failed`. The next batch still goes out.
+- **`createExpoPushProvider({ fetch, accessToken?, url?, timeoutMs? })`** POSTs the messages to `https://exp.host/--/api/v2/push/send`, at most 100 per request (`EXPO_PUSH_BATCH`), one request after the other. Each message goes out as `{ to, title, body, data: { gameId }, sound: 'default' }`, plus `priority` and `ttl` (from `ttlSeconds`) when the message has them.
+- **A time limit.** A request (and its answer's body) that takes more than `timeoutMs` (default `EXPO_PUSH_TIMEOUT_MS`, 10 s) is cut off: `fetch` gets an `AbortSignal`, and the adapter stops waiting even when `fetch` ignores it. Its messages are `Failed`.
+- **One result per message, in order.** Expo answers one "push ticket" per message. An `ok` ticket gives `{ ok: true }`. An `error` ticket gives `{ ok: false, error, message }`: Expo's `details.error` maps to our code (`DeviceNotRegistered`, `MessageTooBig`, `MessageRateExceeded`, `InvalidCredentials`; `MismatchSenderId` is `InvalidCredentials` too), anything else is `Failed` (also names such as `constructor`: the table is a `Map`).
+- **Never rejects.** A network error, a request with no answer in time, an HTTP error, or an answer without one ticket per message makes every message of that batch `Failed`. The next batch still goes out.
 - **`isExpoPushToken(value)`** checks the token shape: `ExponentPushToken[…]` or `ExpoPushToken[…]`, no spaces or brackets inside, at most 200 characters. The server checks every token with it before it saves one.
 
 ## Access token

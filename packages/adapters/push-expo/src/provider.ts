@@ -9,6 +9,10 @@
  * the Expo project, pass `accessToken` from a Convex env var, never from
  * the repo.
  *
+ * A request that gets no answer in `timeoutMs` (default
+ * `EXPO_PUSH_TIMEOUT_MS`) is cut off: its messages fail with `Failed`, so
+ * the caller can try again before the Convex action runs out of time.
+ *
  * Expo also gives "push receipts" later (a second call, by ticket id).
  * This adapter reads only the tickets. See the README.
  */
@@ -19,10 +23,17 @@ export const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 /** The most messages Expo takes in one request. */
 export const EXPO_PUSH_BATCH = 100;
 
-/** The part of `fetch` the adapter uses. The global `fetch` fits. */
+/** How long one request may take before the adapter cuts it off. */
+export const EXPO_PUSH_TIMEOUT_MS = 10_000;
+
+/**
+ * The part of `fetch` the adapter uses. The global `fetch` fits. A fetch
+ * should stop when `signal` aborts (the time is up); the adapter gives up
+ * at that time even when it does not.
+ */
 export type PushFetch = (
   url: string,
-  init: { method: 'POST'; headers: Record<string, string>; body: string },
+  init: { method: 'POST'; headers: Record<string, string>; body: string; signal: AbortSignal },
 ) => Promise<{ readonly ok: boolean; readonly status: number; json(): Promise<unknown> }>;
 
 export interface ExpoPushOptions {
@@ -32,17 +43,23 @@ export interface ExpoPushOptions {
   readonly accessToken?: string | undefined;
   /** Default `EXPO_PUSH_URL`. */
   readonly url?: string;
+  /** How long one request may take, in ms. Default `EXPO_PUSH_TIMEOUT_MS`. */
+  readonly timeoutMs?: number;
 }
 
-/** The error names Expo puts in `details.error`, and our code for each. */
-const EXPO_ERRORS: Readonly<Record<string, PushErrorCode>> = {
-  DeviceNotRegistered: 'DeviceNotRegistered',
-  MessageTooBig: 'MessageTooBig',
-  MessageRateExceeded: 'MessageRateExceeded',
-  InvalidCredentials: 'InvalidCredentials',
+/**
+ * The error names Expo puts in `details.error`, and our code for each. A
+ * `Map`, so a name such as `constructor` finds nothing (a plain object
+ * would find its inherited keys).
+ */
+const EXPO_ERRORS: ReadonlyMap<string, PushErrorCode> = new Map([
+  ['DeviceNotRegistered', 'DeviceNotRegistered'],
+  ['MessageTooBig', 'MessageTooBig'],
+  ['MessageRateExceeded', 'MessageRateExceeded'],
+  ['InvalidCredentials', 'InvalidCredentials'],
   // The FCM credentials of the project do not match the token's app.
-  MismatchSenderId: 'InvalidCredentials',
-};
+  ['MismatchSenderId', 'InvalidCredentials'],
+]);
 
 function failed(error: PushErrorCode, message: string): PushResult {
   return { ok: false, error, message };
@@ -59,11 +76,15 @@ function ticketResult(ticket: unknown): PushResult {
   const message = typeof ticket['message'] === 'string' ? ticket['message'] : 'Expo said no';
   const details = ticket['details'];
   const name = isRecord(details) ? details['error'] : undefined;
-  const code = typeof name === 'string' ? EXPO_ERRORS[name] : undefined;
+  const code = typeof name === 'string' ? EXPO_ERRORS.get(name) : undefined;
   return failed(code ?? 'Failed', message);
 }
 
-/** The Expo wire format of a message. `sound: 'default'` plays the phone's push sound. */
+/**
+ * The Expo wire format of a message. `sound: 'default'` plays the phone's
+ * push sound. `priority` and `ttl` (seconds) go out only when the message
+ * has them.
+ */
 function toExpo(message: PushMessage) {
   return {
     to: message.to,
@@ -71,7 +92,30 @@ function toExpo(message: PushMessage) {
     body: message.body,
     data: { gameId: message.data.gameId },
     sound: 'default',
+    ...(message.priority === undefined ? {} : { priority: message.priority }),
+    ...(message.ttlSeconds === undefined ? {} : { ttl: message.ttlSeconds }),
   };
+}
+
+/**
+ * Runs `work` with a signal that aborts after `ms`. Rejects at that time
+ * even when `work` does not stop on the signal.
+ */
+async function withTimeout<T>(ms: number, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeUp = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`no answer in ${ms} ms`);
+      controller.abort(error);
+      reject(error);
+    }, ms);
+  });
+  try {
+    return await Promise.race([work(controller.signal), timeUp]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function createExpoPushProvider(options: ExpoPushOptions): PushProvider {
@@ -79,6 +123,7 @@ export function createExpoPushProvider(options: ExpoPushOptions): PushProvider {
   // `this`, and some runtimes reject `fetch` with a foreign `this`.
   const send = options.fetch;
   const url = options.url ?? EXPO_PUSH_URL;
+  const timeoutMs = options.timeoutMs ?? EXPO_PUSH_TIMEOUT_MS;
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -89,13 +134,14 @@ export function createExpoPushProvider(options: ExpoPushOptions): PushProvider {
 
   async function sendBatch(batch: readonly PushMessage[]): Promise<PushResult[]> {
     const all = (result: PushResult) => batch.map(() => result);
+    const body = JSON.stringify(batch.map(toExpo));
     try {
-      const response = await send(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(batch.map(toExpo)),
+      // The time limit covers the answer's body too.
+      const { response, answer } = await withTimeout(timeoutMs, async (signal) => {
+        const response = await send(url, { method: 'POST', headers, body, signal });
+        const answer: unknown = await response.json().catch(() => null);
+        return { response, answer };
       });
-      const answer: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         return all(failed('Failed', `Expo answered HTTP ${response.status}`));
       }

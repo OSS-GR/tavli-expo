@@ -22,6 +22,13 @@ export interface PushMessage {
   readonly body: string;
   /** What the app reads when the player taps the push. */
   readonly data: { readonly gameId: string };
+  /** `high` asks the phone to show it at once. Left out: the service's default. */
+  readonly priority?: 'normal' | 'high';
+  /**
+   * How long the push service keeps the push for a phone that is off, in
+   * seconds. After that it drops it. Left out: the service's default.
+   */
+  readonly ttlSeconds?: number;
 }
 
 /** Why a push failed. */
