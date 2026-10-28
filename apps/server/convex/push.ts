@@ -1,5 +1,6 @@
 /**
- * Push tokens and "your turn" pushes (#280, ADR-0004 point 7).
+ * Push tokens, "your turn" pushes (#280, ADR-0004 point 7) and "game
+ * over" pushes (#316).
  *
  * The app registers the Expo push token of the phone
  * (`registerPushToken`) and removes it on sign-out (`removePushToken`).
@@ -13,7 +14,10 @@
  * an action that runs after the save is committed, so a failed push can
  * never fail or undo a move. The action sends "your turn" to the player's
  * tokens through the `PushProvider` port, and removes the tokens the push
- * service calls dead. The pure parts are in `model/push.ts`.
+ * service calls dead. A save that ends an async match schedules the same
+ * action with `kind: 'matchEnd'`: "game over" to the player who did not
+ * end it (both players after a time out). The pure parts are in
+ * `model/push.ts`.
  *
  * The sender is the Expo Push adapter (`@tavli/push-expo`) on `fetch`.
  * Tests swap it with `setPushProvider` (a recording provider), so they
@@ -24,7 +28,7 @@
 import { ConvexError, v } from 'convex/values';
 
 import type { GameTransportErrorCode, OnlineGamePace, PushProvider } from '@tavli/contracts';
-import type { PerPlayer } from '@tavli/engine';
+import type { PerPlayer, PlayerId } from '@tavli/engine';
 import { sideOf } from '@tavli/online';
 import { createExpoPushProvider, isExpoPushToken } from '@tavli/push-expo';
 
@@ -37,13 +41,14 @@ import {
   MAX_PUSH_RETRIES,
   PUSH_RETRY_MS,
   deadTokens,
+  matchEndPushSides,
+  pushMessages,
+  pushStillDue,
   retryTokens,
   tokensOverCap,
-  turnMessages,
   turnPushSide,
-  turnPushTtl,
 } from './model/push';
-import type { TurnWait } from './model/push';
+import type { PushKind, TurnWait } from './model/push';
 import { pushPlatform } from './schema';
 
 // ---------------------------------------------------------------------------
@@ -152,7 +157,10 @@ export const removePushToken = mutation({
 });
 
 // ---------------------------------------------------------------------------
-// "Your turn"
+// "Your turn" and "game over"
+
+/** Which push (`PushKind`): "your turn" or "game over". */
+const pushKind = v.union(v.literal('turn'), v.literal('matchEnd'));
 
 /** The game fields `scheduleTurnPush` reads. */
 export interface PushGame {
@@ -165,9 +173,11 @@ export interface PushGame {
  * Called by every save in `games.ts`, in its transaction, with what the
  * server waited for `before` and `after` the save (`turnWait`) and the
  * player who caused it (`callerId`, or `SERVER_ACTOR` for a time out).
- * When `turnPushSide` picks a side and that player has a push token, it
- * schedules `sendTurnPush` for the saved `version`. It sends nothing
- * itself.
+ * When `turnPushSide` picks a side, that player gets "your turn"; when
+ * the save ended an async match, `matchEndPushSides` picks who gets
+ * "game over". The two never pick for the same save. For each player
+ * with a push token it schedules `sendTurnPush` for the saved `version`.
+ * It sends nothing itself.
  */
 export async function scheduleTurnPush(
   ctx: MutationCtx,
@@ -177,8 +187,22 @@ export async function scheduleTurnPush(
   after: TurnWait,
   callerId: string,
 ): Promise<void> {
-  const side = turnPushSide(game.pace, before, after, sideOf(game.players, callerId));
-  if (side === null) return;
+  const caller = sideOf(game.players, callerId);
+  const turnSide = turnPushSide(game.pace, before, after, caller);
+  if (turnSide !== null) await schedulePush(ctx, game, version, 'turn', turnSide);
+  for (const side of matchEndPushSides(game.pace, before, after, caller)) {
+    await schedulePush(ctx, game, version, 'matchEnd', side);
+  }
+}
+
+/** Schedules a push of `kind` to the player on `side`, if they have a token. */
+async function schedulePush(
+  ctx: MutationCtx,
+  game: PushGame,
+  version: number,
+  kind: PushKind,
+  side: PlayerId,
+): Promise<void> {
   const playerId = game.players[side];
   // No token, no action: most players have none until the app asks.
   const token = await ctx.db
@@ -190,30 +214,33 @@ export async function scheduleTurnPush(
     gameId: game._id,
     version,
     playerId,
+    kind,
   });
 }
 
 /**
- * The tokens to tell "your turn", newest first: all of the player's, or
- * only those in `only` (a retry), and the game's turn deadline (for the
- * push's time to live). No tokens when the game has changed since
- * `version` (the player already played, or it is over): then the push
- * would be late.
+ * The tokens to send a push of `kind` to, newest first: all of the
+ * player's, or only those in `only` (a retry), and the game's turn
+ * deadline (for the time to live of "your turn"). No tokens when the push
+ * is no longer due (`pushStillDue`): "your turn" after the player has
+ * played or the match is over, "game over" for a match that is not over,
+ * or a game that is gone.
  */
 export const turnPushTokens = internalQuery({
   args: {
     gameId: v.id('games'),
     version: v.number(),
     playerId: v.string(),
+    kind: pushKind,
     only: v.optional(v.array(v.string())),
   },
   returns: v.object({
     tokens: v.array(v.string()),
     turnDeadline: v.union(v.number(), v.null()),
   }),
-  handler: async (ctx, { gameId, version, playerId, only }) => {
+  handler: async (ctx, { gameId, version, playerId, kind, only }) => {
     const game = await ctx.db.get(gameId);
-    if (game === null || game.version !== version || game.status !== 'active') {
+    if (game === null || !pushStillDue(kind, game, version)) {
       return { tokens: [], turnDeadline: null };
     }
     const rows = await ctx.db
@@ -247,14 +274,20 @@ export const removeDeadTokens = internalMutation({
 });
 
 /**
- * Sends "your turn" to the phones of `playerId` (scheduled by
- * `scheduleTurnPush`, after the save), with `high` priority and a time to
- * live up to the turn deadline (`turnPushTtl`; no time left, no push).
- * Removes the dead tokens. A token
- * whose push failed (`Failed`, `MessageRateExceeded`: a busy service or
- * the network) gets one more try after `PUSH_RETRY_MS`: the same action
- * with `attempt` + 1 and only those `tokens`. The version check drops the
- * retry when the player has played since. The push provider never
+ * Sends a push to the phones of `playerId` (scheduled by
+ * `scheduleTurnPush`, after the save). `kind` `turn` (the default) is
+ * "your turn", with `high` priority and a time to live up to the turn
+ * deadline (`turnPushTtl`; no time left, no push). `matchEnd` is "game
+ * over" (#316), with `normal` priority and a time to live of one day
+ * (`matchEndMessages`). The name stays `sendTurnPush` for both, and
+ * `kind` may be missing, so the jobs scheduled before a deploy still run.
+ *
+ * Removes the dead tokens. A token whose push failed (`Failed`,
+ * `MessageRateExceeded`: a busy service or the network) gets one more
+ * try after `PUSH_RETRY_MS`: the same action with `attempt` + 1 and only
+ * those `tokens`. The version check (`pushStillDue`) drops a "your turn"
+ * retry when the player has played since; a finished match keeps its
+ * version, so a "game over" retry goes out. The push provider never
  * throws; if this action fails anyway, the move is saved.
  */
 export const sendTurnPush = internalAction({
@@ -262,22 +295,26 @@ export const sendTurnPush = internalAction({
     gameId: v.id('games'),
     version: v.number(),
     playerId: v.string(),
+    /** `turn` (or missing) for "your turn", `matchEnd` for "game over". */
+    kind: v.optional(pushKind),
     /** 0 (or missing) for the first send, 1 for the retry. */
     attempt: v.optional(v.number()),
     /** A retry: only these tokens. */
     tokens: v.optional(v.array(v.string())),
   },
   returns: v.null(),
-  handler: async (ctx, { gameId, version, playerId, attempt = 0, tokens: only }) => {
+  handler: async (ctx, args) => {
+    const { gameId, version, playerId, kind = 'turn', attempt = 0, tokens: only } = args;
     const { tokens, turnDeadline } = await ctx.runQuery(internal.push.turnPushTokens, {
       gameId,
       version,
       playerId,
+      kind,
       ...(only === undefined ? {} : { only }),
     });
-    const ttl = turnPushTtl(turnDeadline, Date.now());
-    if (tokens.length === 0 || ttl === null) return null;
-    const messages = turnMessages(tokens, gameId, ttl);
+    if (tokens.length === 0) return null;
+    const messages = pushMessages(kind, tokens, gameId, turnDeadline, Date.now());
+    if (messages.length === 0) return null;
     const results = await pushProvider().send(messages);
     const dead = deadTokens(messages, results);
     if (dead.length > 0) {
@@ -289,6 +326,7 @@ export const sendTurnPush = internalAction({
         gameId,
         version,
         playerId,
+        kind,
         attempt: attempt + 1,
         tokens: retry,
       });

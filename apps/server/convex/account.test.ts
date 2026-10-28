@@ -17,6 +17,7 @@ import type {
 import { api, components, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { INVITE_DELETE_PAGE } from './account';
+import { MATCH_END_PUSH_TEXT } from './model/push';
 import { setPushProvider } from './push';
 import schema from './schema';
 import { modules } from './test.setup';
@@ -210,11 +211,14 @@ describe('deleteMyAccount', () => {
     expect(await authRows(t, 'user', bob)).toHaveLength(1);
     expect(await authRows(t, 'session', bob)).toHaveLength(1);
 
-    // The resign ended the match: nobody gets "your turn", and the turn
-    // timer and the invite expiry find nothing to do.
+    // The resign ended the match: Bob gets "game over" (#316), Alice gets
+    // nothing (she resigned, and her tokens are gone). Nobody gets "your
+    // turn", and the turn timer and the invite expiry find nothing to do.
     vi.advanceTimersByTime(TURN_TIME_MS.async + 1);
     await t.finishInProgressScheduledFunctions();
-    expect(push.sent).toEqual([]);
+    expect(push.sent.map((message) => [message.to, message.title, message.data.gameId])).toEqual([
+      ['ExponentPushToken[bob-phone]', MATCH_END_PUSH_TEXT.title, active],
+    ]);
     expect((await as(t, bob).query(api.games.getGame, { gameId: active }))?.version).toBe(
       resigned?.version,
     );
