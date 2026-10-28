@@ -27,8 +27,11 @@ function show(initial = defaultSetup('local')) {
 }
 
 const lengthHint = () => screen.getByTestId('new-game-length-hint');
+// Each version radio names its group first ("Rules version: Greek", #243).
 const version = (name: string) =>
-  within(screen.getByTestId('new-game-rules-version')).getByRole('radio', { name });
+  within(screen.getByTestId('new-game-rules-version')).getByRole('radio', {
+    name: new RegExp(`: ${name}$`),
+  });
 
 beforeEach(async () => {
   await act(async () => {
