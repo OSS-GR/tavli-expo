@@ -1,19 +1,23 @@
 /**
  * History (#142): stats per game and bot level, then the past matches,
  * newest first. Offline: the records live on the phone (`records.ts`).
+ * Finished online matches (#313) come last, in their own section
+ * (`online`); they never count in the stats. "No matches yet" shows only
+ * when the phone has no record and the online section has no match.
  *
  * It only shows what it is given. The route (`app/history.tsx`) reads the
  * store and navigates.
  */
-import { displayCaps } from '@tavli/ui';
 import { useLocales } from 'expo-localization';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 
-import { dateLocale, historyRow, statParts, type ResultBadge } from './format';
+import { dateLocale, historyRow, statParts } from './format';
+import { MatchList, SectionTitle } from './MatchList';
 import { MAX_HISTORY_RECORDS, type HistoryRecord } from './records';
 import { historyStats, type StatLine } from './stats';
 
@@ -22,91 +26,83 @@ export interface HistoryScreenProps {
   records: readonly HistoryRecord[];
   /** The empty state's Play button. */
   onPlay: () => void;
+  /**
+   * The finished online matches (#313), under the local ones. It calls
+   * `onMatches(true)` while it loads or lists a match, so the screen hides
+   * its empty state.
+   */
+  online?: (onMatches: (has: boolean) => void) => ReactNode;
 }
 
-export function HistoryScreen({ records, onPlay }: HistoryScreenProps) {
+export function HistoryScreen({ records, onPlay, online }: HistoryScreenProps) {
   const { t, i18n } = useTranslation();
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
+  const [onlineMatches, setOnlineMatches] = useState(false);
+  const empty = records.length === 0 && !onlineMatches;
 
-  if (records.length === 0) {
-    return (
-      <View testID="history-screen" style={styles.screen}>
-        <ScrollView contentContainerStyle={[styles.content, styles.emptyContent]}>
-          <Text style={styles.emptyTitle} accessibilityRole="header">
-            {t('history.emptyTitle')}
-          </Text>
-          <Text style={styles.emptyText}>{t('history.empty')}</Text>
-          <ActionButton testID="history-play" label={t('history.play')} onPress={onPlay} />
-        </ScrollView>
-      </View>
-    );
-  }
-
-  const stats = historyStats(records);
-
+  // One tree for every state: the online section keeps its place, so it
+  // never mounts again (and never watches again) when the empty state goes.
   return (
     <View testID="history-screen" style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Section title={t('history.stats')} />
-        {stats.map(({ game, byLevel, local }) => (
-          <View key={game} testID={`history-stats-${game}`} style={styles.card}>
-            <Text style={styles.cardTitle} accessibilityRole="header">
-              {t(`games.${game}`)}
+      <ScrollView contentContainerStyle={[styles.content, empty && styles.emptyContent]}>
+        {empty ? (
+          <>
+            <Text style={styles.emptyTitle} accessibilityRole="header">
+              {t('history.emptyTitle')}
             </Text>
-            {byLevel.map(({ level, line }) => (
-              <StatRow
-                key={level}
-                testID={`history-stats-${game}-${level}`}
-                title={t('history.vsBot', { level: t(`bot.levels.${level}`) })}
-                line={line}
-                mode="bot"
-              />
-            ))}
-            {local ? (
-              <StatRow
-                testID={`history-stats-${game}-local`}
-                title={t('history.local')}
-                line={local}
-                mode="local"
-              />
-            ) : null}
-          </View>
-        ))}
-
-        <Section title={t('history.matches')} />
-        <View style={styles.list}>
-          {records.map((record, i) => {
-            const row = historyRow(record, t, locale);
-            return (
-              <View
-                key={record.id}
-                testID={`history-row-${i}`}
-                style={[styles.row, i > 0 && styles.rowLine]}
-                accessible
-                accessibilityLabel={row.label}>
-                <View style={styles.rowTop}>
-                  <Text style={styles.rowTitle}>{row.title}</Text>
-                  <View style={styles.badge(row.badge)}>
-                    <Text style={styles.badgeText(row.badge)}>{row.result}</Text>
-                  </View>
-                </View>
-                <Text style={styles.rowScore}>{row.score}</Text>
-                {row.date ? <Text style={styles.rowDate}>{row.date}</Text> : null}
-              </View>
-            );
-          })}
-        </View>
-        <Text style={styles.note}>{t('history.onPhone', { max: MAX_HISTORY_RECORDS })}</Text>
+            <Text style={styles.emptyText}>{t('history.empty')}</Text>
+            <ActionButton testID="history-play" label={t('history.play')} onPress={onPlay} />
+          </>
+        ) : null}
+        {records.length > 0 ? <LocalHistory records={records} locale={locale} /> : null}
+        {online?.(setOnlineMatches)}
       </ScrollView>
     </View>
   );
 }
 
-function Section({ title }: { title: string }) {
+/** Stats, then the local matches, newest first. */
+function LocalHistory({ records, locale }: { records: readonly HistoryRecord[]; locale: string }) {
+  const { t } = useTranslation();
+  const stats = historyStats(records);
   return (
-    <Text style={styles.section} accessibilityRole="header" accessibilityLabel={title}>
-      {displayCaps(title)}
-    </Text>
+    <>
+      <SectionTitle title={t('history.stats')} />
+      {stats.map(({ game, byLevel, local }) => (
+        <View key={game} testID={`history-stats-${game}`} style={styles.card}>
+          <Text style={styles.cardTitle} accessibilityRole="header">
+            {t(`games.${game}`)}
+          </Text>
+          {byLevel.map(({ level, line }) => (
+            <StatRow
+              key={level}
+              testID={`history-stats-${game}-${level}`}
+              title={t('history.vsBot', { level: t(`bot.levels.${level}`) })}
+              line={line}
+              mode="bot"
+            />
+          ))}
+          {local ? (
+            <StatRow
+              testID={`history-stats-${game}-local`}
+              title={t('history.local')}
+              line={local}
+              mode="local"
+            />
+          ) : null}
+        </View>
+      ))}
+
+      <SectionTitle title={t('history.matches')} />
+      <MatchList
+        rows={records.map((record, i) => ({
+          ...historyRow(record, t, locale),
+          key: record.id,
+          testID: `history-row-${i}`,
+        }))}
+      />
+      <Text style={styles.note}>{t('history.onPhone', { max: MAX_HISTORY_RECORDS })}</Text>
+    </>
   );
 }
 
@@ -160,11 +156,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     textAlign: 'center',
     paddingBottom: theme.space.md,
   },
-  section: {
-    ...theme.type.section,
-    color: theme.colors.textDim,
-    paddingTop: theme.space.lg,
-  },
   card: {
     gap: theme.space.xs,
     padding: theme.space.lg,
@@ -184,59 +175,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
   },
   statText: {
-    ...theme.type.caption,
-    color: theme.colors.textDim,
-  },
-  list: {
-    paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radii.lg,
-    backgroundColor: theme.colors.surface,
-  },
-  row: {
-    gap: theme.space.xxs,
-    minHeight: theme.touch.row,
-    paddingVertical: theme.space.md,
-  },
-  rowLine: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.separator,
-  },
-  rowTop: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: theme.space.sm,
-  },
-  rowTitle: {
-    ...theme.type.bodyStrong,
-    flexShrink: 1,
-    flexGrow: 1,
-    color: theme.colors.text,
-  },
-  badge: (badge: ResultBadge) => ({
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xxs,
-    borderRadius: theme.radii.pill,
-    borderWidth: 2,
-    borderStyle: badge === 'unfinished' ? ('dashed' as const) : ('solid' as const),
-    borderColor: badge === 'unfinished' ? theme.colors.border : theme.colors.accent,
-    backgroundColor: badge === 'won' ? theme.colors.accent : 'transparent',
-  }),
-  badgeText: (badge: ResultBadge) => ({
-    ...theme.type.caption,
-    fontWeight: '600' as const,
-    color:
-      badge === 'won'
-        ? theme.colors.onAccent
-        : badge === 'unfinished'
-          ? theme.colors.textDim
-          : theme.colors.text,
-  }),
-  rowScore: {
-    ...theme.type.body,
-    color: theme.colors.text,
-  },
-  rowDate: {
     ...theme.type.caption,
     color: theme.colors.textDim,
   },

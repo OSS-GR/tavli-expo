@@ -195,6 +195,11 @@
       "diplo": "Διπλά {{value}}",
       "draws": "Ισοπαλίες {{value}}",
       "unfinished": "Δεν τελείωσαν {{value}}"
+    },
+    "online": {
+      "title": "Online",
+      "youWon": "Κέρδισες",
+      "friendWon": "Κέρδισε ο φίλος σου"
     }
   },
   "languages": {
