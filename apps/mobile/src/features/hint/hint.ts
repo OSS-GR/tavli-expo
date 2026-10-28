@@ -34,10 +34,13 @@ import {
  *   times slower, and that still fits the 1 s hint budget.
  *   `packages/bot/src/analyzer-work.test.ts` bounds the work of one such
  *   hint per game.
- * - Asodio, every preset: 1 ply. The Kafeneio rules are fast in most
- *   positions (median 3 ms) but reach 1.1 s. The Acey-Deucey presets score
- *   with a heuristic, because their rules are not the net's: median
- *   0.45 s, worst about 7 s.
+ * - Asodio, every preset: 1 ply (checked again in #233, after the faster
+ *   heuristic of #225). A preset gets 2 ply only when its worst hint is no
+ *   slower than Plakoto's. Worst of 1,500 seeded positions
+ *   (`pnpm --filter @tavli/bot bench:hint`): Plakoto 0.33 s, Kafeneio
+ *   1.2 s (median 4 ms), Acey-Deucey Greek 2.5 s (median 22 ms),
+ *   Acey-Deucey American 1.7 s (median 67–82 ms). Most Asodio hints are fast,
+ *   but the rare slow ones take several seconds on a phone.
  *
  * Each game of a match plays with its own preset, so the preset names the
  * game. A new preset must pick a depth here (the type checks it).
