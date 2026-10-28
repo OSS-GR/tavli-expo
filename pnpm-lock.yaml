@@ -458,6 +458,16 @@ importers:
         specifier: 1.46.0
         version: 1.46.0(react@19.3.0)
 
+  packages/adapters/backend-convex:
+    dependencies:
+      '@tavli/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+    devDependencies:
+      convex:
+        specifier: 1.46.0
+        version: 1.46.0(react@19.3.0)
+
   packages/adapters/crash-sentry:
     dependencies:
       '@tavli/contracts':
