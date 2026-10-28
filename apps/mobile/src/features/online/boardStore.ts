@@ -3,7 +3,7 @@
  *
  * `GameScreen` reads a `BoardStore`: a flow that is never `null`, a match
  * key, the last error and `dispatch`. This wraps an `OnlineStore` that has
- * its first view. The snapshot is cached, so a change of another field
+ * its first view. Its `lastError` is only a move this phone refused. The snapshot is cached, so a change of another field
  * (`sending`, `notice`, …) does not render the board again.
  *
  * The match key names the game (`online:<gameId>`), not the store: a new
@@ -24,26 +24,21 @@ export function onlineBoardStore(store: OnlineStore, gameId: string): BoardStore
   const dispatch = store.getState().dispatch;
   let flow: MatchFlow = first;
   let refusals = store.getState().refusals;
-  let snapshot: BoardStoreState = {
-    flow,
-    matchKey,
-    lastError: store.getState().lastError,
-    dispatch,
-  };
+  let snapshot: BoardStoreState = { flow, matchKey, lastError: null, dispatch };
 
   const read = (state: OnlineStoreState): BoardStoreState => {
     // A store keeps its flow once it has one; keep the last one just in case.
     const next = state.flow ?? flow;
-    // A new refusal is a new snapshot even with the same text, like a
-    // `set` of the local store.
-    if (
-      next !== snapshot.flow ||
-      state.lastError !== snapshot.lastError ||
-      state.refusals !== refusals
-    ) {
+    // The board buzzes on `lastError` (an unchanged flow with an error):
+    // only a move this phone refused gives one. A turn that did not go
+    // through, or a lost connection, sets `lastError` too, but the notice
+    // tells about it. A new refusal is a new snapshot even with the same
+    // text, like a `set` of the local store.
+    const refused = state.refusals !== refusals;
+    if (next !== snapshot.flow || refused) {
       flow = next;
       refusals = state.refusals;
-      snapshot = { flow: next, matchKey, lastError: state.lastError, dispatch };
+      snapshot = { flow: next, matchKey, lastError: refused ? state.lastError : null, dispatch };
     }
     return snapshot;
   };

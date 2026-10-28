@@ -93,11 +93,16 @@ export function startDevGame(options: DevGameOptions): DevGame {
 }
 
 /**
- * Stops the running dev game, if any: its turn timers and its bot. With
- * `gameId`, only when the running game is that one.
+ * Stops the dev game `gameId` (its turn timers and its bot), when it is
+ * the one that runs. Any other game goes on.
  */
-export function stopDevGame(gameId?: string): void {
-  if (gameId === undefined || current?.gameId === gameId) current?.stop();
+export function stopDevGame(gameId: string): void {
+  if (current?.gameId === gameId) current.stop();
+}
+
+/** Stops the running dev game, whatever its id. For the dev screen only. */
+export function stopAnyDevGame(): void {
+  current?.stop();
 }
 
 /** Is a dev game running (its timers and its bot)? */

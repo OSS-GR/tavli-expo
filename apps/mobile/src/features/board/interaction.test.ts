@@ -258,6 +258,31 @@ describe('turnFlights (#255)', () => {
     // The second move starts where the first one landed.
     expect(flights[1]!.from).toEqual(flights[0]!.to);
     expect(flights[1]!.to).toMatchObject(stackPosition(geo, { kind: 'point', index: 2 }, 1, 0));
+    // It is the same checker: it shows there only once the first flight is down.
+    expect(flights[0]!.hiddenMs).toBeUndefined();
+    expect(flights[1]!.hiddenMs).toBe(FLIGHT_MS);
+  });
+
+  it('hides each later move of one checker until it lands (a double)', () => {
+    const before = portes.initialState({ startingPlayer: 'white' }).board;
+    const moves: Move[] = [
+      { from: 13, to: 11, die: 2, capture: 'none' },
+      { from: 11, to: 9, die: 2, capture: 'none' },
+      { from: 9, to: 7, die: 2, capture: 'none' },
+      { from: 13, to: 11, die: 2, capture: 'none' },
+    ];
+    const flights = turnFlights(geo, WHITE, 'white', moves, before, {
+      id: 'r',
+      direction: 'contrary',
+    });
+    const step = FLIGHT_MS + TURN_MOVE_GAP_MS;
+    expect(flights.map((f) => [f.delay, f.hiddenMs])).toEqual([
+      [0, undefined],
+      [step, FLIGHT_MS],
+      [2 * step, step + FLIGHT_MS],
+      // Another checker: it waits in sight at its start.
+      [3 * step, undefined],
+    ]);
   });
 
   it('sends a hit checker to the bar after its own move lands', () => {
@@ -278,6 +303,8 @@ describe('turnFlights (#255)', () => {
       ['r:1:0', 'white', FLIGHT_MS + TURN_MOVE_GAP_MS],
       ['r:1:1', 'black', FLIGHT_MS + TURN_MOVE_GAP_MS + HIT_DELAY_MS],
     ]);
+    // Two checkers and a blot: each waits in sight where it stands.
+    expect(flights.map((f) => f.hiddenMs)).toEqual([undefined, undefined, undefined]);
   });
 });
 

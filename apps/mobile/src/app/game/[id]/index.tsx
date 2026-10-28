@@ -43,8 +43,13 @@ export default function GameRoute() {
   const id = parseIdParam(params.id);
   const focused = useIsFocused();
   // A dev game vs the bot (#255) stops when its board closes: nobody can
-  // open it again. Other games go on.
-  useEffect(() => () => stopDevGame(id ?? undefined), [id]);
+  // open it again. Other games go on, also when this board has no id.
+  useEffect(
+    () => () => {
+      if (id !== null) stopDevGame(id);
+    },
+    [id],
+  );
 
   if (id !== null && !isLocalGameId(id)) {
     return (

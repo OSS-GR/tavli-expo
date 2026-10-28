@@ -13,7 +13,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
-import { devGameRunning, stopDevGame } from '@/features/online/devGame';
+import { devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
 import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
@@ -747,7 +747,7 @@ describe('tutorial from Settings (#159)', () => {
 });
 
 describe('online games (#255)', () => {
-  afterEach(() => stopDevGame());
+  afterEach(() => stopAnyDevGame());
 
   it('shows "could not be opened" for an unknown online game', async () => {
     await renderRouter('./src/app', { initialUrl: '/game/game-nope' });

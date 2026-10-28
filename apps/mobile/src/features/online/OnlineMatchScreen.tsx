@@ -67,6 +67,7 @@ export function OnlineMatchScreen(props: OnlineMatchScreenProps) {
 function OnlineGame(props: OnlineMatchScreenProps) {
   const { gameId, transport, me, now } = props;
   const store = useOnlineGame({ transport, gameId, me, ...(now ? { now } : {}) });
+  if (store === null) return <Loading />;
   return <OnlineLoader store={store} {...props} />;
 }
 

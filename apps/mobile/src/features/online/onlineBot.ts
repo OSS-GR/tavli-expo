@@ -66,25 +66,17 @@ export function startOnlineBot(options: OnlineBotOptions): OnlineBot {
   let turn: BotTurnHandle | null = null;
   /** The view version the bot plays now. A new version is a new turn. */
   let playing: number | null = null;
-  /** The view version the last refused turn was on, and how many tries it had. */
-  let failedOn: number | null = null;
-  let tries = 0;
+  /** How many turns the bot started on each view version. */
+  const tries = new Map<number, number>();
 
   const check = () => {
     if (stopped) return;
     const { view, flow, side, sending, notice } = store.getState();
     if (notice !== null) {
-      // The turn did not go through (stale, refused, not sent): play again,
-      // up to MAX_TRIES_PER_TURN times on the same view.
+      // The turn did not go through (stale, refused, not sent): play the
+      // view again, up to MAX_TRIES_PER_TURN turns on one version.
       options.onError?.(new Error(`online bot: ${notice} (${store.getState().lastError ?? ''})`));
-      tries = failedOn === playing ? tries + 1 : 1;
-      failedOn = playing;
-      if (tries >= MAX_TRIES_PER_TURN) {
-        options.onError?.(new Error(`online bot: gave up on version ${playing ?? '?'}`));
-        // `playing` stays: the bot waits for a newer view.
-      } else {
-        playing = null;
-      }
+      playing = null;
       store.getState().clearNotice();
       return;
     }
@@ -94,6 +86,17 @@ export function startOnlineBot(options: OnlineBotOptions): OnlineBot {
       return;
     }
     if (view.waitingFor !== side || playing === view.version) return;
+    const tried = tries.get(view.version) ?? 0;
+    if (tried >= MAX_TRIES_PER_TURN) {
+      // Said once; then the bot waits for a newer view.
+      if (tried === MAX_TRIES_PER_TURN) {
+        options.onError?.(new Error(`online bot: gave up on version ${view.version}`));
+        tries.set(view.version, tried + 1);
+      }
+      return;
+    }
+    for (const version of tries.keys()) if (version < view.version) tries.delete(version);
+    tries.set(view.version, tried + 1);
     turn?.cancel();
     playing = view.version;
     const dispatch = store.getState().dispatch;
@@ -125,5 +128,7 @@ export function startOnlineBot(options: OnlineBotOptions): OnlineBot {
     store.getState().dispose();
   };
 
+  // The store may already wait for the bot.
+  check();
   return { store, stop };
 }

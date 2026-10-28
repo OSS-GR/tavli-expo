@@ -3,7 +3,7 @@
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
 import { act, render, renderHook } from '@testing-library/react-native';
-import { Activity, StrictMode, type ReactNode } from 'react';
+import { Activity, StrictMode, Suspense, type ReactNode } from 'react';
 
 import type { OnlineStore } from './onlineStore';
 import { useOnlineGame } from './useOnlineGame';
@@ -69,7 +69,7 @@ describe('useOnlineGame', () => {
       { wrapper },
     );
     await flush();
-    const store = result.current;
+    const store = result.current!;
     expect(store.getState().flow).not.toBeNull();
     // The store still talks to the server: Resign match goes through.
     let sent = false;
@@ -80,7 +80,7 @@ describe('useOnlineGame', () => {
     expect(store.getState().lastError).toBeNull();
     await flush();
     expect(server.getGame(gameId)?.status).toBe('finished');
-    expect(result.current.getState().view?.status).toBe('finished');
+    expect(result.current!.getState().view?.status).toBe('finished');
 
     // Unmounting disposes it.
     await unmount();
@@ -93,9 +93,39 @@ describe('useOnlineGame', () => {
       useOnlineGame({ transport, gameId, me: 'me' }),
     );
     await flush();
-    const first = result.current;
+    const first = result.current!;
     await rerender({});
     expect(result.current).toBe(first);
     expect(first.getState().flow).not.toBeNull();
+  });
+
+  it('opens nothing in a render that React throws away', async () => {
+    const { gameId, transport } = setup();
+    let open = 0;
+    const counted = {
+      ...transport,
+      subscribe: (...args: Parameters<typeof transport.subscribe>) => {
+        open += 1;
+        const stop = transport.subscribe(...args);
+        return () => {
+          open -= 1;
+          stop();
+        };
+      },
+    };
+    function Game(): ReactNode {
+      useOnlineGame({ transport: counted, gameId, me: 'me' });
+      // The mount suspends for good: React drops this render.
+      throw new Promise<never>(() => {});
+    }
+    const { unmount } = await render(
+      <Suspense fallback={null}>
+        <Game />
+      </Suspense>,
+    );
+    await flush();
+    expect(open).toBe(0);
+    await unmount();
+    expect(open).toBe(0);
   });
 });
