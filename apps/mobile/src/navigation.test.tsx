@@ -1162,3 +1162,44 @@ describe('your online games on Home (#297)', () => {
     expect(onlineFake.authStore.guests).toBe(0);
   });
 });
+
+describe('online matches in History (#313)', () => {
+  const ME = 'guest-1';
+
+  /** A finished match of mine vs Bob: Bob resigns it. */
+  async function wonMatch(): Promise<string> {
+    jest.advanceTimersByTime(1000);
+    const gameId = onlineFake
+      .server()
+      .createGame(ME, { white: ME, black: 'bob' }, 'portes', 3, 'async');
+    await onlineFake.transportFor('bob').resign(gameId);
+    return gameId;
+  }
+
+  it('a phone with no online account loads no session in History', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    await wonMatch();
+    const ready = jest.spyOn(onlineFake.auth, 'ready');
+    await renderRouter('./src/app', { initialUrl: '/history' });
+    expect(await screen.findByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
+    expect(ready).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('history-online')).toBeNull();
+    ready.mockRestore();
+  });
+
+  it('History lists a finished online match under the local ones, and no record', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    rememberOnlineAccount();
+    const gameId = await wonMatch();
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('link', { name: 'History' }));
+    expect(router.getPathname()).toBe('/history');
+    expect(await screen.findByTestId(`history-online-${gameId}`)).toHaveAccessibleName(
+      /^Portes vs friend, 0 to 0, first to 3, You won, /,
+    );
+    expect(screen.getByRole('header', { name: 'Online' })).toBeOnTheScreen();
+    expect(historyStore.getState().records).toEqual([]);
+    expect(onlineFake.authStore.guests).toBe(0);
+  });
+});

@@ -6,7 +6,7 @@
  * card (#149), the Settings game picker (#159) and the online game
  * screen with its game-end sheet and match end (#255) and the invite
  * screen (#256), Play a friend online with its waiting screen (#281), and
- * your online games on Home and "See all" (#297) follow the font size with no cut text. The game screen, its cards and
+ * your online games on Home and "See all" (#297) and in History (#313) follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
  * cannot measure text, so `textScalingProblems` checks the layout rules
@@ -37,6 +37,7 @@ import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { HistoryScreen } from '@/features/history/HistoryScreen';
+import { OnlineHistory } from '@/features/history/OnlineHistory';
 import type { HistoryRecord } from '@/features/history/records';
 import { ContinueCard } from '@/features/home/ContinueCard';
 import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
@@ -52,6 +53,7 @@ import { MatchScreen } from '@/features/match/MatchScreen';
 import { createSessionRegistry } from '@/features/match/sessions';
 import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
+import { rememberOnlineAccount } from '@/features/online/accountHint';
 import { MyGamesScreen } from '@/features/online/MyGamesScreen';
 import { startOnlineBot } from '@/features/online/onlineBot';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
@@ -701,6 +703,46 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     await renderWithRoot(<HistoryScreen records={[record, bot, houseRule]} onPlay={jest.fn()} />);
     expect(problems()).toEqual([]);
     await renderWithRoot(<HistoryScreen records={[]} onPlay={jest.fn()} />);
+    expect(problems()).toEqual([]);
+  });
+
+  it('history: finished online matches and a list that did not load (#313)', async () => {
+    const server = createMemoryGameServer({ rng: createSeededRng(4), now: () => Date.now() });
+    const store = createMemoryAuthStore();
+    store.session = { id: 'me', isGuest: true };
+    const auth = createMemoryAuthProvider(store);
+    const games = server.transportFor('me');
+    for (const choice of ['tavli', 'asodio'] as const) {
+      const gameId = server.createGame('me', { white: 'me', black: 'friend' }, choice, 5, 'async');
+      await server.transportFor(choice === 'tavli' ? 'friend' : 'me').resign(gameId);
+    }
+    rememberOnlineAccount();
+    const history = await renderWithRoot(
+      <HistoryScreen
+        records={[]}
+        onPlay={jest.fn()}
+        online={<OnlineHistory auth={auth} games={games} />}
+      />,
+    );
+    expect(await screen.findAllByTestId(/^history-online-/)).toHaveLength(2);
+    expect(problems()).toEqual([]);
+    await history.unmount();
+
+    const offline = {
+      ...games,
+      watchMyGames: (_request: unknown, _onList: unknown, onError?: (error: unknown) => void) => {
+        void Promise.resolve().then(() => onError?.(new Error('offline')));
+        return () => undefined;
+      },
+    };
+    await renderWithRoot(
+      <HistoryScreen
+        records={[]}
+        onPlay={jest.fn()}
+        online={<OnlineHistory auth={auth} games={offline} />}
+      />,
+    );
+    expect(await screen.findByTestId('online-games-retry')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   });
 });

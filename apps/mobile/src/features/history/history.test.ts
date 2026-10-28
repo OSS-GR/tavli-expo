@@ -1,4 +1,4 @@
-import { createMemoryStorage, type Storage } from '@tavli/contracts';
+import { createMemoryStorage, type GameSummary, type Storage } from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
   createSeededRng,
@@ -22,7 +22,14 @@ import {
 } from '@/features/match/setup';
 import i18n from '@/i18n';
 
-import { dateLocale, formatDate, historyRow, recordSetup, statParts } from './format';
+import {
+  dateLocale,
+  formatDate,
+  historyRow,
+  onlineHistoryRow,
+  recordSetup,
+  statParts,
+} from './format';
 import { createHistoryStore } from './historyStore';
 import {
   HISTORY_STORAGE_KEY,
@@ -1229,5 +1236,60 @@ describe('history texts', () => {
       'Not finished 1',
     ]);
     expect(statParts({ ...line, unfinished: 0 }, 'local', t)).toEqual(['Played 5', 'Draws 1']);
+  });
+});
+
+describe('online history texts (#313)', () => {
+  const finished: GameSummary = {
+    gameId: 'g1',
+    status: 'finished',
+    choice: 'plakoto',
+    presetId: 'plakoto',
+    variant: 'plakoto',
+    targetPoints: 5,
+    pace: 'async',
+    mySide: 'black',
+    waitingFor: null,
+    myTurn: false,
+    score: { white: 2, black: 5 },
+    winner: 'black',
+    updatedAt: Date.UTC(2026, 9, 28, 12),
+    turnDeadline: null,
+  };
+
+  it('names the winner, with your points first', () => {
+    expect(onlineHistoryRow(finished, t, 'en-GB')).toEqual({
+      title: 'Plakoto vs friend',
+      score: '5–2 · first to 5',
+      badge: 'won',
+      result: 'You won',
+      date: '28 Oct 2026',
+      label: 'Plakoto vs friend, 5 to 2, first to 5, You won, 28 Oct 2026',
+    });
+    expect(onlineHistoryRow({ ...finished, mySide: 'white' }, t, 'en-GB')).toMatchObject({
+      score: '2–5 · first to 5',
+      badge: 'lost',
+      result: 'Your friend won',
+      label: 'Plakoto vs friend, 2 to 5, first to 5, Your friend won, 28 Oct 2026',
+    });
+  });
+
+  it('shows no result when the server gives no winner', () => {
+    expect(onlineHistoryRow({ ...finished, winner: null }, t, 'en-GB')).toMatchObject({
+      badge: null,
+      result: null,
+      label: 'Plakoto vs friend, 5 to 2, first to 5, 28 Oct 2026',
+    });
+  });
+
+  it('speaks Greek', async () => {
+    await i18n.changeLanguage('el');
+    try {
+      expect(onlineHistoryRow(finished, t, 'el').label).toBe(
+        'Πλακωτό με φίλο, 5 προς 2, στους 5, Κέρδισες, 28 Οκτ 2026',
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

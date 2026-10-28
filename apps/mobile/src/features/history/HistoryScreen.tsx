@@ -1,19 +1,22 @@
 /**
  * History (#142): stats per game and bot level, then the past matches,
  * newest first. Offline: the records live on the phone (`records.ts`).
+ * Finished online matches (#313) come last, in their own section
+ * (`online`); they never count in the stats.
  *
  * It only shows what it is given. The route (`app/history.tsx`) reads the
  * store and navigates.
  */
-import { displayCaps } from '@tavli/ui';
 import { useLocales } from 'expo-localization';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 
-import { dateLocale, historyRow, statParts, type ResultBadge } from './format';
+import { dateLocale, historyRow, statParts } from './format';
+import { MatchList, SectionTitle } from './MatchList';
 import { MAX_HISTORY_RECORDS, type HistoryRecord } from './records';
 import { historyStats, type StatLine } from './stats';
 
@@ -22,9 +25,11 @@ export interface HistoryScreenProps {
   records: readonly HistoryRecord[];
   /** The empty state's Play button. */
   onPlay: () => void;
+  /** The finished online matches (#313), under the local ones. */
+  online?: ReactNode;
 }
 
-export function HistoryScreen({ records, onPlay }: HistoryScreenProps) {
+export function HistoryScreen({ records, onPlay, online }: HistoryScreenProps) {
   const { t, i18n } = useTranslation();
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
 
@@ -37,6 +42,7 @@ export function HistoryScreen({ records, onPlay }: HistoryScreenProps) {
           </Text>
           <Text style={styles.emptyText}>{t('history.empty')}</Text>
           <ActionButton testID="history-play" label={t('history.play')} onPress={onPlay} />
+          {online}
         </ScrollView>
       </View>
     );
@@ -47,7 +53,7 @@ export function HistoryScreen({ records, onPlay }: HistoryScreenProps) {
   return (
     <View testID="history-screen" style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Section title={t('history.stats')} />
+        <SectionTitle title={t('history.stats')} />
         {stats.map(({ game, byLevel, local }) => (
           <View key={game} testID={`history-stats-${game}`} style={styles.card}>
             <Text style={styles.cardTitle} accessibilityRole="header">
@@ -73,40 +79,18 @@ export function HistoryScreen({ records, onPlay }: HistoryScreenProps) {
           </View>
         ))}
 
-        <Section title={t('history.matches')} />
-        <View style={styles.list}>
-          {records.map((record, i) => {
-            const row = historyRow(record, t, locale);
-            return (
-              <View
-                key={record.id}
-                testID={`history-row-${i}`}
-                style={[styles.row, i > 0 && styles.rowLine]}
-                accessible
-                accessibilityLabel={row.label}>
-                <View style={styles.rowTop}>
-                  <Text style={styles.rowTitle}>{row.title}</Text>
-                  <View style={styles.badge(row.badge)}>
-                    <Text style={styles.badgeText(row.badge)}>{row.result}</Text>
-                  </View>
-                </View>
-                <Text style={styles.rowScore}>{row.score}</Text>
-                {row.date ? <Text style={styles.rowDate}>{row.date}</Text> : null}
-              </View>
-            );
-          })}
-        </View>
+        <SectionTitle title={t('history.matches')} />
+        <MatchList
+          rows={records.map((record, i) => ({
+            ...historyRow(record, t, locale),
+            key: record.id,
+            testID: `history-row-${i}`,
+          }))}
+        />
         <Text style={styles.note}>{t('history.onPhone', { max: MAX_HISTORY_RECORDS })}</Text>
+        {online}
       </ScrollView>
     </View>
-  );
-}
-
-function Section({ title }: { title: string }) {
-  return (
-    <Text style={styles.section} accessibilityRole="header" accessibilityLabel={title}>
-      {displayCaps(title)}
-    </Text>
   );
 }
 
@@ -160,11 +144,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     textAlign: 'center',
     paddingBottom: theme.space.md,
   },
-  section: {
-    ...theme.type.section,
-    color: theme.colors.textDim,
-    paddingTop: theme.space.lg,
-  },
   card: {
     gap: theme.space.xs,
     padding: theme.space.lg,
@@ -184,59 +163,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
   },
   statText: {
-    ...theme.type.caption,
-    color: theme.colors.textDim,
-  },
-  list: {
-    paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radii.lg,
-    backgroundColor: theme.colors.surface,
-  },
-  row: {
-    gap: theme.space.xxs,
-    minHeight: theme.touch.row,
-    paddingVertical: theme.space.md,
-  },
-  rowLine: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.separator,
-  },
-  rowTop: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: theme.space.sm,
-  },
-  rowTitle: {
-    ...theme.type.bodyStrong,
-    flexShrink: 1,
-    flexGrow: 1,
-    color: theme.colors.text,
-  },
-  badge: (badge: ResultBadge) => ({
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xxs,
-    borderRadius: theme.radii.pill,
-    borderWidth: 2,
-    borderStyle: badge === 'unfinished' ? ('dashed' as const) : ('solid' as const),
-    borderColor: badge === 'unfinished' ? theme.colors.border : theme.colors.accent,
-    backgroundColor: badge === 'won' ? theme.colors.accent : 'transparent',
-  }),
-  badgeText: (badge: ResultBadge) => ({
-    ...theme.type.caption,
-    fontWeight: '600' as const,
-    color:
-      badge === 'won'
-        ? theme.colors.onAccent
-        : badge === 'unfinished'
-          ? theme.colors.textDim
-          : theme.colors.text,
-  }),
-  rowScore: {
-    ...theme.type.body,
-    color: theme.colors.text,
-  },
-  rowDate: {
     ...theme.type.caption,
     color: theme.colors.textDim,
   },

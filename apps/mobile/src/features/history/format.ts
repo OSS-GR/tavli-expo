@@ -1,4 +1,5 @@
 /** Texts of the history screen (#142). Pure. */
+import type { GameSummary } from '@tavli/contracts';
 import type { TFunction } from 'i18next';
 
 import { seatsFor } from '@/features/match/seats';
@@ -15,6 +16,7 @@ import {
   type MatchSetup,
 } from '@/features/match/setup';
 import { matchLabel } from '@/features/match/summary';
+import { gameScore, gameTitle } from '@/features/online/myGames';
 
 import type { HistoryRecord } from './records';
 import { winRate, type StatLine } from './stats';
@@ -168,6 +170,42 @@ export function historyRow(record: HistoryRecord, t: TFunction, locale: string):
   const date = formatDate(record.endedAt, locale);
   const label = [title, score, result, date].filter(Boolean).join(', ');
   return { title, score, badge, result, date, label };
+}
+
+export interface OnlineHistoryRow {
+  /** "Portes vs friend", as on Home. */
+  readonly title: string;
+  /** Your points first: "3–1 · first to 5". */
+  readonly score: string;
+  /** `won` or `lost`; `null` when the server gives no winner. */
+  readonly badge: 'won' | 'lost' | null;
+  /** "You won" or "Your friend won"; `null` with no winner. */
+  readonly result: string | null;
+  /** The day of the last change: the end of the match. */
+  readonly date: string;
+  /** All of it, for screen readers: "Portes vs friend, 3 to 1, first to 5, You won, Oct 28, 2026". */
+  readonly label: string;
+}
+
+/** One finished online match (#313). The other player is "your friend", as on Home. */
+export function onlineHistoryRow(
+  game: GameSummary,
+  t: TFunction,
+  locale: string,
+): OnlineHistoryRow {
+  const title = gameTitle(game, t);
+  const score = gameScore(game, t);
+  const target = t('home.continue.target', { target: game.targetPoints });
+  const badge = game.winner === null ? null : game.winner === game.mySide ? 'won' : 'lost';
+  const result =
+    badge === null
+      ? null
+      : badge === 'won'
+        ? t('history.online.youWon')
+        : t('history.online.friendWon');
+  const date = formatDate(game.updatedAt, locale);
+  const label = [title, score.spoken, target, result, date].filter(Boolean).join(', ');
+  return { title, score: `${score.text} · ${target}`, badge, result, date, label };
 }
 
 /** "75%", or "—" when there is no rate yet. */
