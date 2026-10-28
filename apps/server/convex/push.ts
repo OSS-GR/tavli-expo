@@ -231,14 +231,16 @@ export const turnPushTokens = internalQuery({
     gameId: v.id('games'),
     version: v.number(),
     playerId: v.string(),
-    kind: pushKind,
+    // Optional: an action still on the old code during a deploy calls this
+    // without `kind`.
+    kind: v.optional(pushKind),
     only: v.optional(v.array(v.string())),
   },
   returns: v.object({
     tokens: v.array(v.string()),
     turnDeadline: v.union(v.number(), v.null()),
   }),
-  handler: async (ctx, { gameId, version, playerId, kind, only }) => {
+  handler: async (ctx, { gameId, version, playerId, kind = 'turn', only }) => {
     const game = await ctx.db.get(gameId);
     if (game === null || !pushStillDue(kind, game, version)) {
       return { tokens: [], turnDeadline: null };
