@@ -58,7 +58,7 @@ For a local Convex backend, an `http://` URL works too. A local backend has no `
 EXPO_PUBLIC_CONVEX_URL=http://127.0.0.1:3210 EXPO_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211 npx expo start
 ```
 
-To try prod from a dev build, set `EXPO_PUBLIC_CONVEX_URL` to the prod URL. An EAS build reads both variables from the EAS environment variables, if you set them there. Check the result with `npx expo config --type public` (look at `extra.convexUrl` and `extra.convexSiteUrl`).
+To try prod from a dev build, set `EXPO_PUBLIC_CONVEX_URL` to the prod URL. An EAS build reads both variables from the EAS environment variables, if you set them there. Never leave them in `.env.local` when you run `eas build`: EAS never sees that file, so the fingerprint differs and the build fails (see [Common errors](#6-common-errors-and-fixes)). Check the result with `npx expo config --type public` (look at `extra.convexUrl` and `extra.convexSiteUrl`).
 
 **Updates (`eas update`) carry the URL too.** The URL is fixed when the bundle is built. Run `eas update` with the same `APP_VARIANT` as the build it targets (for example `APP_VARIANT=production eas update --channel production`). Without `APP_VARIANT`, the bundle gets the dev URL, and a store build that loads it talks to dev. A stray `EXPO_PUBLIC_CONVEX_URL` or `EXPO_PUBLIC_CONVEX_SITE_URL` in your shell or `.env.local` also goes into the bundle, so clear it first.
 
@@ -205,6 +205,10 @@ eas build --platform android --profile preview
 
 The first Android build asks to make a **keystore** (the signing key). Say **yes**. EAS keeps it safe for you. It needs no Google account.
 
+**Run `pnpm install` before `eas build`.** EAS makes the fingerprint (the runtime version, see [EAS Update](#eas-update-over-the-air-updates-for-later)) on your computer and again on the build server. When the two differ, the build fails. Old packages in your `node_modules` make them differ, and so does a value in `apps/mobile/.env.local` that changes the app config, because git ignores that file and EAS never gets it.
+
+**Sentry uploads are off** (`SENTRY_DISABLE_AUTO_UPLOAD` in `eas.json`) until the owner adds the Sentry token. See the [crash-sentry README](../../packages/adapters/crash-sentry/README.md#owner-setup-one-time).
+
 **Manual GitHub workflow.** The **EAS build** workflow (`.github/workflows/eas-build.yml`) starts a cloud build from the Actions tab. It only runs when you click **Run workflow**. It needs a repo secret `EXPO_TOKEN`: make a token on expo.dev > **Account settings** > **Access tokens**, then add it in GitHub > **Settings** > **Secrets and variables** > **Actions**. The run does not wait for the build, so it uses about 2 GitHub minutes.
 
 ### Versions and build numbers
@@ -261,6 +265,7 @@ The invite lives on the in-memory server, so it works only while the app runs. A
 | Pressing `i` or `a` opens **Expo Go**, or "No development build installed" | Build and install the dev build first: `npx expo run:ios` or `npx expo run:android`. |
 | Red screen: a native module is missing (for example `NitroModules`, `RNSkia`, `MMKV`, `Worklets`, `ExpoSecureStore`) | The native app is older than the code. Rebuild: `npx expo run:ios` / `npx expo run:android`. |
 | Strange errors after pulling new code | Run `pnpm install` in the repo root, then `npx expo start --clear`. |
+| EAS build fails in "Configure expo-updates": "Runtime version calculated on local machine not equal to runtime version calculated during build" | Your computer and EAS made different fingerprints. The build log shows the difference ("Difference between local and EAS fingerprints"). Package versions differ: run `pnpm install` in the repo root. `expoConfig` differs: look for a value in `apps/mobile/.env.local` that `app.config.ts` reads, and remove it or make it an EAS variable. Then build again. |
 | Native build fails after a native package change | `npx expo prebuild --clean`, then `npx expo run:ios` / `run:android` again. |
 | "Xcode must be 26.4 or newer" or iOS SDK errors | Update Xcode in the Mac App Store. Then `npx expo prebuild --clean`. |
 | "No simulator available" | Xcode > **Settings** > **Components** > **Get** an iOS simulator. |

@@ -34,6 +34,7 @@
     "better-auth": "1.6.33",
     "convex": "1.46.0",
     "expo": "~58.0.20",
+    "expo-asset": "~58.0.18",
     "expo-audio": "~58.0.10",
     "expo-constants": "~58.0.13",
     "expo-dev-client": "~58.0.16",
@@ -80,6 +81,7 @@
     "install": {
       "exclude": [
         "expo",
+        "expo-asset",
         "expo-constants",
         "expo-dev-client",
         "expo-font",
