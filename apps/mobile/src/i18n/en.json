@@ -205,6 +205,11 @@
       "diplo": "Diplo wins {{value}}",
       "draws": "Draws {{value}}",
       "unfinished": "Not finished {{value}}"
+    },
+    "online": {
+      "title": "Online",
+      "youWon": "You won",
+      "friendWon": "Your friend won"
     }
   },
   "languages": {

@@ -1,17 +1,19 @@
 /**
  * "Your online games" (#297): the active online games of the saved
- * session, live from the server (`GameTransport.watchMyGames`).
+ * session, live from the server (`GameTransport.watchMyGames`). History
+ * (#313) watches the finished ones with the same hook.
  *
  * The hook makes no account: with no saved session it shows nothing. The
  * rest is pure: the order (your turn first), the row text and the time
  * left. Never send the user id to analytics.
  */
-import type { AuthProvider, GameSummary, GameTransport } from '@tavli/contracts';
+import type { AuthProvider, GameSummary, GameTransport, OnlineGameStatus } from '@tavli/contracts';
 import type { TFunction } from 'i18next';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { clockText, clockTickMs } from './clock';
+import { gameScore, gameTitle } from './gameText';
 import { useSessionWatch, type SessionWatchState, type StartSessionWatch } from './sessionWatch';
 import { timeLeft } from './timeLeft';
 
@@ -81,34 +83,33 @@ export function gameRowText(
   localNow: number,
   offset: number,
 ): GameRowText {
-  const title = t('home.online.vsFriend', { game: t(`games.${game.choice}`) });
+  const title = gameTitle(game, t);
   const turn = game.myTurn ? t('home.online.yourTurn') : t('home.online.waiting');
-  const me = game.score[game.mySide];
-  const friend = game.score[game.mySide === 'white' ? 'black' : 'white'];
-  const score = t('home.online.score', { me, friend });
+  const { text: score, spoken: scoreSpoken } = gameScore(game, t);
   const left = timeLeft(game, localNow, offset);
   const time =
     left === null ? null : t('home.online.timeLeft', { time: clockText(left, game.pace, t) });
-  const spoken = [title, turn, t('home.online.scoreSpoken', { me, friend }), time];
+  const spoken = [title, turn, scoreSpoken, time];
   return { title, turn, score, time, label: spoken.filter((part) => part !== null).join(', ') };
 }
 
 /**
- * The active online games of the saved session, live
- * (`useSessionWatch`): it reads the session and follows sign-in and
- * sign-out; it never makes an account. A failure after a list came keeps
- * that list (`failed: true`); `retry` starts the watch again. Only a
- * sign-out forgets the account note; a `null` from `ready()` shows
- * `failed` (see `useSessionWatch`).
+ * The online games of the saved session with this `status` (default
+ * `active`; History asks for `finished`), live (`useSessionWatch`): it
+ * reads the session and follows sign-in and sign-out; it never makes an
+ * account. A failure after a list came keeps that list (`failed: true`);
+ * `retry` starts the watch again. Only a sign-out forgets the account
+ * note; a `null` from `ready()` shows `failed` (see `useSessionWatch`).
  */
 export function useMyOnlineGames(
   auth: AuthProvider,
   games: GameTransport,
+  status: OnlineGameStatus = 'active',
   now: () => number = Date.now,
 ): { readonly state: MyGamesState; readonly retry: () => void } {
   const start = useCallback<StartSessionWatch<readonly GameSummary[]>>(
-    (onList, onError) => games.watchMyGames({ status: 'active' }, onList, onError),
-    [games],
+    (onList, onError) => games.watchMyGames({ status }, onList, onError),
+    [games, status],
   );
   const toLoaded = useCallback(
     (list: readonly GameSummary[]): MyGamesList => ({
