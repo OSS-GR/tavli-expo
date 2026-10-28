@@ -33,7 +33,12 @@ const PER_SOURCE = 250;
 const args = process.argv.slice(2).filter((arg) => arg !== '--');
 const seedArg = args.find((arg) => arg.startsWith('--seed='));
 const seed = seedArg === undefined ? 219 : Number(seedArg.slice('--seed='.length));
+if (!Number.isInteger(seed)) throw new Error(`--seed must be an integer, got "${seedArg}"`);
 const only = args.filter((arg) => !arg.startsWith('--'));
+const unknown = only.filter((game) => !(HINT_WORK_GAMES as readonly string[]).includes(game));
+if (unknown.length > 0) {
+  throw new Error(`unknown game: ${unknown.join(', ')} (one of: ${HINT_WORK_GAMES.join(', ')})`);
+}
 
 const median = (values: readonly number[]): number =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)] ?? 0;

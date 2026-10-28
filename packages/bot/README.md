@@ -174,7 +174,7 @@ it costs 4–4.9× less in Acey-Deucey and 2.4× less in the owner version
 (see the table below). Hermes on a phone is several times slower than
 Node, so a 2-ply hint fits the 1 s phone budget for Portes, Plakoto and
 Fevga. For Asodio it does not yet: even after #225 its worst 2-ply hint
-takes 1.2–2.5 s in Node, 4–8 times Plakoto's worst (see "Asodio and 2
+takes 1.2–2.5 s in Node, about 3.5–8 times Plakoto's worst (see "Asodio and 2
 ply" below), which is several seconds on a phone. The bot's own play
 (`chooseTurn`) stays 1-ply.
 

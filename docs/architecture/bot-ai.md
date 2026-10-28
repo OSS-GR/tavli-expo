@@ -381,7 +381,7 @@ Tests the bot package must have:
 
 ### Phase 3 — Later
 
-- Hints and post-game review with the `Analyzer` (roadmap "Later"). `createAnalyzer` is built, 1-ply (#206) and 2-ply (#212). The app's Hint button (#209, offline games, `docs/architecture/board-screen.md`, "Hint") uses 2 ply in Portes, Plakoto and Fevga and 1 ply in Asodio (#219, `hintPlies`). The game review stays at 1 ply (#215, `apps/mobile/src/features/review/`, "Game review" in the same doc). #233 measured Asodio again after the faster heuristic (#225): its worst hints are still 4–8 times slower than Plakoto's, so it stays at 1 ply. Next: a deterministic cap on the 2-ply work, so Asodio hints can use 2 ply too.
+- Hints and post-game review with the `Analyzer` (roadmap "Later"). `createAnalyzer` is built, 1-ply (#206) and 2-ply (#212). The app's Hint button (#209, offline games, `docs/architecture/board-screen.md`, "Hint") uses 2 ply in Portes, Plakoto and Fevga and 1 ply in Asodio (#219, `hintPlies`). The game review stays at 1 ply (#215, `apps/mobile/src/features/review/`, "Game review" in the same doc). #233 measured Asodio again after the faster heuristic (#225): its worst hints are still about 3.5–8 times slower than Plakoto's, so it stays at 1 ply. Next: a deterministic cap on the 2-ply work, so Asodio hints can use 2 ply too.
 - Match-score-aware play (Tavli match to 5 or 7 points) using a match equity table.
 - Server-side move analysis for ranked anti-cheat.
 - Optional: stronger nets with rollouts + supervised training (wildbg style), or a port of the wildbg Portes evaluator if its licence and rules fit.
