@@ -7,6 +7,7 @@ import {
   HUMAN_SIDE,
   defaultSetup,
   isMatchLength,
+  isOpeningRollRule,
   type MatchSetup,
 } from '@/features/match/setup';
 import { matchLabel } from '@/features/match/summary';
@@ -17,9 +18,9 @@ import { winRate, type StatLine } from './stats';
 /**
  * The setup a record came from, for the texts the app already has (seats,
  * labels). A length the new-game screen does not offer gets the default
- * here; the row still shows the real one ("first to 9"). The opening roll
- * house rule (#207) is the record's own, so a match started from this
- * setup plays the same rule.
+ * here; the row still shows the real one ("first to 9"). It keeps the
+ * record's opening roll house rule (#207), so the setup is correct; an
+ * unknown rule gets the federation rule, as in `records.ts`.
  */
 export function recordSetup(record: HistoryRecord): MatchSetup {
   const base = defaultSetup(record.mode);
@@ -29,7 +30,7 @@ export function recordSetup(record: HistoryRecord): MatchSetup {
     targetPoints: isMatchLength(record.targetPoints) ? record.targetPoints : base.targetPoints,
     botLevel: record.botLevel ?? 'easy',
     names: record.names,
-    openingRoll: record.openingRoll,
+    openingRoll: isOpeningRollRule(record.openingRoll) ? record.openingRoll : DEFAULT_OPENING_ROLL,
   };
 }
 
@@ -41,7 +42,7 @@ export interface HistoryRow {
   readonly title: string;
   /**
    * "You 3 – 1 Bot · first to 3". A house rule follows the length, with
-   * New game's short label: "· Roll again" or "· Choose" (#221).
+   * New game's short label: "· Opening roll: Roll again" (#221).
    */
   readonly score: string;
   readonly badge: ResultBadge;
@@ -114,9 +115,9 @@ export function historyRow(record: HistoryRecord, t: TFunction, locale: string):
     }),
     t('home.continue.target', { target: record.targetPoints }),
     // The opening roll house rule (#221); the federation rule shows nothing.
-    record.openingRoll === DEFAULT_OPENING_ROLL
+    setup.openingRoll === DEFAULT_OPENING_ROLL
       ? null
-      : t(`newGame.houseRules.${record.openingRoll}`),
+      : t('history.openingRoll', { rule: t(`newGame.houseRules.${setup.openingRoll}`) }),
     // A resigned match keeps its score (#181): say who resigned it.
     record.resignedBy === null
       ? null
