@@ -97,9 +97,11 @@ jobs:
             *)
               # The part before "|" of a Convex key is its type and public
               # names, not secret. Show it only for the 4 Convex key types,
-              # so the start of some other token never reaches the log.
+              # with lower-case names (letters, digits, dots, dashes; a
+              # region can follow a dot), so the start of some other token
+              # never reaches the log.
               prefix="${CONVEX_DEPLOY_KEY%%|*}"
-              if [ "$prefix" != "$CONVEX_DEPLOY_KEY" ] && [[ "$prefix" =~ ^(dev|prod|project|preview)(:[A-Za-z0-9._-]+)+$ ]]; then
+              if [ "$prefix" != "$CONVEX_DEPLOY_KEY" ] && [[ "$prefix" =~ ^(dev|prod|project|preview)(:[a-z0-9.-]+)+$ ]]; then
                 found="a Convex ${prefix%%:*} key that starts with \"$prefix|\""
               else
                 found="text that is not a Convex deploy key"
