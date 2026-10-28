@@ -102,6 +102,14 @@ function contractSubject(): GameTransportContractSubject {
       });
       return gameId;
     },
+    createOtherGame: async () =>
+      await t.mutation(internal.games.createGame, {
+        callerId: BOB,
+        players: { white: BOB, black: EVE },
+        choice: 'portes',
+        targetPoints: 1,
+        pace: 'live',
+      }),
     missingGameId: async () => {
       const gameId = await createGame(t, { choice: 'portes', targetPoints: 1, pace: 'live' });
       await t.run(async (ctx) => ctx.db.delete(gameId));
@@ -110,6 +118,10 @@ function contractSubject(): GameTransportContractSubject {
     transportFor: (who) => network.transportFor(who === 'stranger' ? EVE : PLAYERS[who]),
     legalTurn: (view) => pickTurn(view.game, picker),
     settle: network.settle,
+    passTime: async (ms) => {
+      vi.advanceTimersByTime(ms);
+      await t.finishInProgressScheduledFunctions();
+    },
   };
 }
 
@@ -171,10 +183,15 @@ describe('the adapter on the real functions', () => {
         loaded = t.query(query as AnyQuery, args).then(onResult, onError);
         return () => undefined;
       },
+      query: (fn, args) => t.query(fn as AnyQuery, args),
       mutation: (fn, args) => t.mutation(fn as AnyMutation, args),
     };
     const transport = createConvexGameTransport({ client: anonymous });
     expect(await reasonOf(transport.resign(gameId))).toEqual({
+      code: 'NOT_SIGNED_IN',
+      message: expect.any(String),
+    });
+    expect(await reasonOf(transport.listMyGames({ status: 'active' }))).toEqual({
       code: 'NOT_SIGNED_IN',
       message: expect.any(String),
     });
@@ -234,6 +251,7 @@ describe('function references', () => {
       makeMove: getFunctionName(api.games.makeMove),
       answer: getFunctionName(api.games.answer),
       resign: getFunctionName(api.games.resign),
+      listMyGames: getFunctionName(api.games.listMyGames),
     });
     for (const key of Object.keys(GAME_FUNCTION_NAMES) as (keyof GameFunctions)[]) {
       expect(getFunctionName(GAME_FUNCTIONS[key])).toBe(getFunctionName(api.games[key]));
@@ -247,6 +265,9 @@ describe('function references', () => {
     expectType<Extends<WithGameId<GameFunctions['answer']>, FunctionArgs<Api['answer']>>>();
     expectType<Extends<WithGameId<GameFunctions['resign']>, FunctionArgs<Api['resign']>>>();
     expectType<
+      Extends<FunctionArgs<GameFunctions['listMyGames']>, FunctionArgs<Api['listMyGames']>>
+    >();
+    expectType<
       Extends<FunctionReturnType<Api['getGame']>, FunctionReturnType<GameFunctions['getGame']>>
     >();
     expectType<
@@ -257,6 +278,12 @@ describe('function references', () => {
     >();
     expectType<
       Extends<FunctionReturnType<Api['resign']>, FunctionReturnType<GameFunctions['resign']>>
+    >();
+    expectType<
+      Extends<
+        FunctionReturnType<Api['listMyGames']>,
+        FunctionReturnType<GameFunctions['listMyGames']>
+      >
     >();
     // A wrong type fails: the checks above are not always true.
     // @ts-expect-error -- a number is not a view.

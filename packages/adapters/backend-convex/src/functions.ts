@@ -14,9 +14,11 @@ import { makeFunctionReference } from 'convex/server';
 import type { FunctionReference } from 'convex/server';
 
 import type {
+  GameSummary,
   GameTransportErrorData,
   InviteView,
   NewInvite,
+  OnlineGameStatus,
   OnlineGameView,
   SendTurnRequest,
 } from '@tavli/contracts';
@@ -51,6 +53,12 @@ export interface GameFunctions {
     WriteResult
   >;
   readonly resign: FunctionReference<'mutation', 'public', { gameId: string }, number>;
+  readonly listMyGames: FunctionReference<
+    'query',
+    'public',
+    { status: OnlineGameStatus },
+    GameSummary[]
+  >;
 }
 
 /** The Convex function names (`module:function`) the adapter calls. */
@@ -59,6 +67,7 @@ export const GAME_FUNCTION_NAMES = {
   makeMove: 'games:makeMove',
   answer: 'games:answer',
   resign: 'games:resign',
+  listMyGames: 'games:listMyGames',
 } as const satisfies { readonly [K in keyof GameFunctions]: string };
 
 export const GAME_FUNCTIONS: GameFunctions = {
@@ -66,6 +75,7 @@ export const GAME_FUNCTIONS: GameFunctions = {
   makeMove: makeFunctionReference(GAME_FUNCTION_NAMES.makeMove),
   answer: makeFunctionReference(GAME_FUNCTION_NAMES.answer),
   resign: makeFunctionReference(GAME_FUNCTION_NAMES.resign),
+  listMyGames: makeFunctionReference(GAME_FUNCTION_NAMES.listMyGames),
 };
 
 /** What `createInvite` takes: the game the inviter picks (`NewInvite`). */

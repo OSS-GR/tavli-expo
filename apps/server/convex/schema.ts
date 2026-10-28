@@ -19,6 +19,8 @@ export const gamePace = v.union(...ONLINE_GAME_PACES.map((pace) => v.literal(pac
 
 export const side = v.union(v.literal('white'), v.literal('black'));
 
+export const gameStatus = v.union(v.literal('active'), v.literal('finished'));
+
 const inviteStatus = v.union(...INVITE_STATUSES.map((status) => v.literal(status)));
 
 export default defineSchema({
@@ -37,7 +39,7 @@ export default defineSchema({
     variant: v.string(),
     /** The engine `MatchFlow` without its log, JSON text. The log is in `moves`. */
     flow: v.string(),
-    status: v.union(v.literal('active'), v.literal('finished')),
+    status: gameStatus,
     /** The match winner once `status` is `finished`. */
     winner: v.union(side, v.null()),
     /** Goes up by one on every change. Calls send it back as `expectedVersion`. */
@@ -49,9 +51,16 @@ export default defineSchema({
      * the match is finished. `checkTimeout` runs at this time.
      */
     turnDeadline: v.union(v.number(), v.null()),
+    /**
+     * The last saved change, epoch ms (server clock), for "my games"
+     * (#296). Optional only because games saved before #296 have none:
+     * they count their `_creationTime`, and the index puts them last.
+     */
+    updatedAt: v.optional(v.number()),
   })
-    .index('by_white', ['players.white'])
-    .index('by_black', ['players.black']),
+    // "My games" (#296): one player's games with one status, newest change first.
+    .index('by_white', ['players.white', 'status', 'updatedAt'])
+    .index('by_black', ['players.black', 'status', 'updatedAt']),
 
   /** The event log of each game: one engine `FlowEvent` per row, in order. */
   moves: defineTable({

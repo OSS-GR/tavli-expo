@@ -1,7 +1,7 @@
 /**
  * `GameTransport` on a Convex client (#253, ADR-0004).
  *
- * The client is any object with the two calls below: `ConvexClient` from
+ * The client is any object with the three calls below: `ConvexClient` from
  * `convex/browser` fits, and a test can pass a fake. The calls carry no
  * player id: the client sends the sign-in token (`setAuth`), and the
  * server reads the caller from it (#131).
@@ -11,6 +11,7 @@ import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex
 
 import { isGameTransportErrorData } from '@tavli/contracts';
 import type {
+  GameSummary,
   GameTransport,
   GameTransportErrorData,
   OnlineGameView,
@@ -20,7 +21,7 @@ import type {
 import { GAME_FUNCTIONS } from './functions';
 import type { WriteResult } from './functions';
 
-/** The two Convex client calls the adapter needs. `ConvexClient` has both. */
+/** The three Convex client calls the adapter needs. `ConvexClient` has all of them. */
 export interface ConvexGameClient {
   /**
    * Calls `onResult` with the query result now and after every change, and
@@ -32,6 +33,11 @@ export interface ConvexGameClient {
     onResult: (result: FunctionReturnType<Query>) => unknown,
     onError: (error: Error) => unknown,
   ): () => void;
+  /** Runs a query once. Resolves with its result. */
+  query<Query extends FunctionReference<'query'>>(
+    query: Query,
+    args: FunctionArgs<Query>,
+  ): Promise<Awaited<FunctionReturnType<Query>>>;
   /** Runs a mutation. Resolves with its result once the server saved it. */
   mutation<Mutation extends FunctionReference<'mutation'>>(
     mutation: Mutation,
@@ -84,7 +90,7 @@ function copyView(view: OnlineGameView): OnlineGameView {
   return JSON.parse(JSON.stringify(view)) as OnlineGameView;
 }
 
-/** Runs a mutation; a rejection becomes the port's error (`toTransportError`). */
+/** Runs a call; a rejection becomes the port's error (`toTransportError`). */
 async function run<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
@@ -160,6 +166,12 @@ export function createConvexGameTransport(options: ConvexGameTransportOptions): 
 
     async resign(gameId) {
       await run(() => client.mutation(GAME_FUNCTIONS.resign, { gameId }));
+    },
+
+    async listMyGames({ status }) {
+      const games = await run(() => client.query(GAME_FUNCTIONS.listMyGames, { status }));
+      // The client may share a cached result; the caller gets its own copy.
+      return JSON.parse(JSON.stringify(games)) as GameSummary[];
     },
   };
 }

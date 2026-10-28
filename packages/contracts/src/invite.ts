@@ -12,7 +12,7 @@ import type { OnlineGameChoice, OnlineGamePace } from './game-transport';
 
 /**
  * How long an invite stays open, in milliseconds: 24 hours. Then it
- * expires. Open question Q31 asks the owner if 24 hours is right.
+ * expires. The owner kept 24 hours (Q31, answered 2026-10-28).
  */
 export const INVITE_TIME_MS = 24 * 60 * 60 * 1000;
 

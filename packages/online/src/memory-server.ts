@@ -7,6 +7,8 @@
  *
  * It acts like a network:
  * - `subscribe` calls `onView` on a later microtask, never inside the call.
+ * - `listMyGames` (#296) lists the caller's games with `summarizeGame`,
+ *   like the Convex `listMyGames`.
  * - Every view, request and event is a copy (a JSON round trip), so a
  *   client cannot change the server state, and the server cannot change a
  *   view a client holds.
@@ -23,6 +25,7 @@
 
 import { normalizeInviteCode } from '@tavli/contracts';
 import type {
+  GameSummary,
   GameTransport,
   GameTransportErrorData,
   InviteErrorData,
@@ -30,6 +33,7 @@ import type {
   Invites,
   OnlineGameChoice,
   OnlineGamePace,
+  OnlineGameStatus,
   OnlineGameView,
 } from '@tavli/contracts';
 import type { FlowEvent, MatchFlow, PerPlayer, PlayerId, Rng } from '@tavli/engine';
@@ -68,8 +72,10 @@ import {
   resign,
   storeFlow,
   timeOut,
+  sideOf,
   toView,
 } from './online-game';
+import { latestGames, summarizeGame } from './summaries';
 
 export interface MemoryGameServerOptions {
   /** The dice. Tests pass a seeded RNG; a dev game may pass any `Rng`. */
@@ -168,6 +174,8 @@ interface MemoryGame extends SavedGame {
   readonly flow: string;
   /** `JSON.stringify(LoggedEvent)` per event. */
   readonly events: readonly string[];
+  /** The last saved change, epoch ms (server clock). */
+  readonly updatedAt: number;
 }
 
 interface Listener {
@@ -222,8 +230,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const inviteListeners = new Set<InviteListener>();
   let nextId = 1;
 
-  function viewOf(game: MemoryGame): OnlineGameView {
-    return toView({
+  function viewInput(game: MemoryGame) {
+    return {
       gameId: game.gameId,
       version: game.version,
       choice: game.choice,
@@ -231,7 +239,21 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       turnDeadline: game.turnDeadline,
       players: game.players,
       flow: loadFlow(game.flow),
-    });
+    };
+  }
+
+  function viewOf(game: MemoryGame): OnlineGameView {
+    return toView(viewInput(game));
+  }
+
+  /** The games of `playerId` with `status`, like the Convex `listMyGames`. */
+  function myGames(playerId: string, status: OnlineGameStatus): GameSummary[] {
+    const summaries: GameSummary[] = [];
+    for (const game of games.values()) {
+      if (game.status !== status || sideOf(game.players, playerId) === null) continue;
+      summaries.push(summarizeGame({ ...viewInput(game), updatedAt: game.updatedAt }, playerId));
+    }
+    return latestGames(summaries);
   }
 
   /** Sends a view (JSON text) to `listener` on a later microtask, unless it stops first. */
@@ -271,6 +293,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       version,
       turnDeadline: nextDeadline(game.pace, flow, at),
       events: [...game.events, ...logRows(game.events.length, version, callerId, flow)],
+      updatedAt: at,
     };
     games.set(game.gameId, saved);
     notify(saved);
@@ -351,6 +374,11 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       resign(gameId) {
         return playerCall(playerId, gameId, null, false, (flow, side) => resign(flow, side, rng));
       },
+      async listMyGames(request) {
+        const { status } = copy(request);
+        await nextTick();
+        return copy(myGames(playerId, status));
+      },
     };
   }
 
@@ -366,6 +394,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     const gameId = `game-${nextId}`;
     nextId += 1;
     const version = 1;
+    const at = now();
     const game: MemoryGame = {
       gameId,
       players: copy(players),
@@ -375,8 +404,9 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       flow: storeFlow(flow),
       status: matchStatus(flow),
       version,
-      turnDeadline: nextDeadline(pace, flow, now()),
+      turnDeadline: nextDeadline(pace, flow, at),
       events: logRows(0, version, callerId, flow),
+      updatedAt: at,
     };
     games.set(gameId, game);
     return gameId;

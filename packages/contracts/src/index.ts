@@ -45,6 +45,7 @@ export { BOT_DIFFICULTIES, BotCancelledError, isBotCancelled, isDifficulty } fro
 export type { BotAnswerRequest, BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
 export {
   GAME_TRANSPORT_ERROR_CODES,
+  MAX_LISTED_GAMES,
   ONLINE_GAME_CHOICES,
   ONLINE_GAME_PACES,
   TURN_TIME_MS,
@@ -56,6 +57,8 @@ export type {
   GameTransport,
   GameTransportErrorCode,
   GameTransportErrorData,
+  GameSummary,
+  ListMyGamesRequest,
   OnlineGameChoice,
   OnlineGamePace,
   OnlineGameStatus,

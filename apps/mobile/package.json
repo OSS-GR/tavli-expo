@@ -32,16 +32,16 @@
     "@tavli/ui": "workspace:*",
     "better-auth": "1.6.33",
     "convex": "1.46.0",
-    "expo": "~58.0.19",
+    "expo": "~58.0.20",
     "expo-audio": "~58.0.10",
     "expo-constants": "~58.0.13",
-    "expo-dev-client": "~58.0.15",
+    "expo-dev-client": "~58.0.16",
     "expo-font": "~58.0.10",
     "expo-haptics": "~58.0.7",
     "expo-linking": "~58.0.14",
     "expo-localization": "~58.0.5",
     "expo-network": "~58.0.4",
-    "expo-router": "~58.0.26",
+    "expo-router": "~58.0.27",
     "expo-secure-store": "~58.0.2",
     "expo-splash-screen": "~58.0.11",
     "expo-status-bar": "~58.0.4",
@@ -78,8 +78,15 @@
     "install": {
       "exclude": [
         "expo",
+        "expo-constants",
         "expo-dev-client",
-        "expo-router"
+        "expo-font",
+        "expo-linking",
+        "expo-router",
+        "expo-splash-screen",
+        "expo-system-ui",
+        "expo-updates",
+        "jest-expo"
       ]
     }
   }

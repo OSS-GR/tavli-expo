@@ -102,7 +102,7 @@ jobs:
       - name: Format check
         run: pnpm format:check
 
-  # Vitest in every workspace but the app. The bot's tests are most of it.
+  # Vitest in every workspace but the app and the bot.
   test-packages:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -115,7 +115,24 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Test
-        run: pnpm -r --filter '!@tavli/mobile' test
+        run: pnpm -r --filter '!@tavli/mobile' --filter '!@tavli/bot' test
+
+  # The bot's Vitest alone (#287): it is the longest package. In one job it
+  # waited for the engine's tests (pnpm runs packages in build order), and
+  # its timing tests must not share a runner with the engine's.
+  test-bot:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+
+      - name: Test
+        run: pnpm --filter @tavli/bot test
 
   # The app's Jest suites, split by file into shards that run at the same time.
   test-app:
@@ -142,7 +159,7 @@ jobs:
   # The required check. It fails when any job above failed or was cancelled.
   # A skipped job (docs-only change) counts as passed.
   checks:
-    needs: [changes, static, test-packages, test-app]
+    needs: [changes, static, test-packages, test-bot, test-app]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

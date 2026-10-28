@@ -19,7 +19,6 @@
 | Q28 | **Asodio deadlocks are common:** in 400 random owner-version games (#115), 286 ended in a deadlock (A5: both armies frozen, because each side's last lagging checker is pinned by a checker of the other side that is frozen itself). Real players avoid lone lagging checkers, so real games end this way less often, but please check in playtests. If it happens a lot, an option is: a frozen checker may still move when its army has no other move. Bots (#125, 1,000 games each): 30.5% of medium-vs-medium games, 43.0% of easy-vs-easy and 27.2% of medium-vs-random games end in a deadlock, so the bot cannot reach the usual 85% win bar against random. Nearly all come from a "mutual lock" while the armies cross mid-board (each side's new quarter is the other side's rear quarter); see `packages/bot/README.md`, "Asodio strength and speed". | Many drawn games | `docs/rules/asodio.md`, #115 |
 | Q29 | **Asodio doc, research defaults vs owner:** "Turn & dice rules", "Movement rules" and edge cases 1–13 describe the research version (a 1-2 gives a chosen double and a new roll; `mustEnterAllFirst=false`), but the flag table gives the owner defaults (A3: no extra rolls; `mustEnterAllFirst=true`). The engine tests cases 1–13 with the Acey-Deucey presets. Recommended: mark those sections "research version" in the doc. | A clear rules doc | `docs/rules/asodio.md`, #115 |
 | Q30 | **Online, what is a timed-out game worth?** The rules docs do not say. The server (#133) scores it like a resign of that game: mono 1 if the late player has borne off a checker, else diplo 2 (Plakoto too). Recommended: keep this. Other option: always 1 point. | Points in online games | `docs/architecture/online-game-service.md`, #133 |
-| Q31 | **Online invites last 24 hours. OK?** A friend can accept an invite code (#252) for 24 hours; then it expires. Nothing waits on the answer: it is one constant (`INVITE_TIME_MS` in `packages/contracts/src/invite.ts`). Recommended: keep 24 hours. | How long a shared invite link works | `docs/architecture/online-game-service.md`, #252 |
 
 ## Answered
 
@@ -50,5 +49,7 @@
 | Q15 | Timers: **live 1 minute per turn, async 24 hours; time runs out = you lose that game.** | #46 |
 | Q17 | **Verifiable dice: later.** | Later |
 | Q7 | **Free at launch. No ads, ever.** If we earn money later: one-time purchase or cosmetic extras (e.g. themes) that never change gameplay. To discuss before v1.0. | `docs/vision.md`, #54 |
+| Q31 | (2026-10-28) **Online invites last 24 hours.** Kept as built (`INVITE_TIME_MS`). | `docs/architecture/online-game-service.md`, #252 |
+| Test builds | (2026-10-28) **`preview` builds use the dev Convex deployment.** Only `production` uses prod, so test games never touch real players' data. | `apps/mobile/app.config.ts`, `docs/process/running-the-app.md` |
 | Q19 | (2026-10-28) Greek label for the pip count: **none needed.** The owner removed the pip count: "please remove the pip counter, it doesn't add anything, who uses it". The strips and Settings no longer show it. | #238 |
 | New | Players can make their **own house-rule variants** ("kafeneio mode"). | Backlog epic (Later) + engine rules-as-data task (MVP1) |
