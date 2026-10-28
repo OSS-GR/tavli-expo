@@ -14,8 +14,9 @@ Tavlaki is a Greek backgammon (tavli) app for iPhone and Android. This policy sa
 
 ## The short version
 
-- You do not need an account. There are no accounts yet.
-- Your settings and games stay on your phone.
+- You do not need an account to play on your phone.
+- Your settings and the games on your phone stay on your phone.
+- **Online games with a friend** need a free guest account on our server. The app makes it only when you make or open an invite. It has a random user id, and no name and no email. The server keeps your invites and online games under that id.
 - On the first launch, the app asks if it may send **anonymous usage data**. You choose **Allow usage data** or **Don't allow**. You can change your answer any time in **Settings → Privacy**.
 - Until you answer, the app sends only anonymous **crash reports**. **Don't allow** turns off usage data **and** crash reports.
 - We never collect your name, email, phone number, contacts or location.
@@ -40,7 +41,7 @@ Deleting the app deletes all of this from your phone. If you install the app aga
 
 ## What leaves your phone
 
-Only two things: crash reports and usage data. Both follow **one switch**.
+Crash reports and usage data. Both follow **one switch**. If you play a friend online, the app also talks to our game server (see "Online games with a friend" below). That does not depend on the switch, because an online game cannot work without it.
 
 | Your answer | Usage data | Crash reports |
 |-------------|------------|---------------|
@@ -94,6 +95,7 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Tutorial skipped | You tapped Skip in the tutorial. Includes the game, and the lesson's number and name on screen |
 | Hint shown | You tapped Hint in a game. Includes the game only, never the position, the dice or the moves |
 | Review opened | You opened the review of a game. Includes the game only, never the position, the dice, the moves or the mistakes |
+| Invite made | You made an invite to play a friend online. Includes the game, the points to win and the pace (live or async) only, never the invite code or any id |
 | Screen viewed | You opened a screen. Includes the screen's name (for example "settings"), never personal data |
 
 Each event also carries technical facts: the phone maker and model (for example "iPhone 15", never the name you gave your phone), the system and its version, screen size, the app name and version, language and time zone. It carries the install id, and random ids that PostHog keeps on your phone.
@@ -109,29 +111,46 @@ Go to **Settings → Privacy** and turn off **Share anonymous usage data**. This
 
 A few events made just before you turned it off may still upload. Nothing new is collected.
 
+The switch does not cover online games with a friend: they need the game server (see the next section).
+
+### Online games with a friend (Convex)
+
+Only if you play a friend online. When you tap **Make an invite**, or **Show the invite** on an invite link, the app makes a **guest account** on our game server, once. The server runs on Convex, in the EU region `eu-west-1` (Ireland). Sign-in goes through Better Auth, on the same server.
+
+- The guest account has a **random user id**, made by the server. It has no name and no email. (The sign-in software fills in a made-up placeholder for both.)
+- The server keeps your **invites** (the invite code, the game, the points to win, the pace, if a friend accepted or declined, and when it expires) and your **online games** (the two players' user ids, the rules, every move and roll, the score, and the turn times) under that user id. Your friend's app sees the invite and the game you play together.
+- The server keeps your **sign-in session**: a random session token, when it expires, and, as the sign-in software records it, the IP address and the app's user agent (the app name and the phone system) when the session was made.
+- The app keeps the **sign-in cookie** in your phone's secure store (the iOS Keychain or the Android Keystore). The next invite uses it, so the app makes the guest account only once.
+- The invite code and the link go where **you** share them (for example a chat app). Anyone with the code can see the invite and accept it until it expires.
+- The user id **never goes to analytics** (PostHog) and never goes into crash reports (Sentry).
+
+Before your first invite, the app does not talk to the game server.
+
 ## What we never do
 
 - No ads, and no ad networks or ad ids.
 - No tracking across other apps or websites.
-- No selling or renting of your data. We do not share it with anyone except the two services below, and only to run the app.
-- No accounts, no sign-in, no contacts, no location, no microphone, no camera.
+- No selling or renting of your data. We do not share it with anyone except the three services below, and only to run the app.
+- No contacts, no location, no microphone, no camera. No sign-in with your name, email, Apple or Google account: online games use a guest account with a random id only.
 
 ## Services that process the data
 
-We use two services. They process the data for us, under their data processing terms, and may not use it for their own purposes.
+We use three services. They process the data for us, under their data processing terms, and may not use it for their own purposes.
 
 | Service | What for | Where the data is stored | How long |
 |---------|----------|--------------------------|----------|
 | **Sentry** (Functional Software, Inc., USA) | Crash reports | The EU (Frankfurt, Germany) <!-- OWNER: confirm the Sentry organization uses the EU data region. Sentry sets it when the organization is made. --> | Sentry's default. Sentry's docs say 30 days on the free (Developer) plan, 90 days on paid plans. |
 | **PostHog** (PostHog, Inc., USA) | Usage data | PostHog EU cloud, Frankfurt, Germany | PostHog's default. PostHog's docs say 1 year on the free plan, 7 years on paid plans. |
+| **Convex** (Convex, Inc., USA) | The game server for online games with a friend: the guest account, the sign-in session, invites and online games | The EU (`eu-west-1`, Ireland) <!-- OWNER: confirm both Convex deployments are in eu-west-1. --> | Until you ask us to delete them. The app does not delete old invites and games by itself yet. A sign-in session runs out 7 days after it was last renewed (Better Auth's default). |
 
-Both companies are based in the USA. Their staff or sub-processors may reach the data from outside the EU. Their data processing terms set safeguards for such transfers, such as the EU Standard Contractual Clauses. <!-- OWNER: accept both vendors' data processing terms (DPA) and check this line. -->
+All three companies are based in the USA. Their staff or sub-processors may reach the data from outside the EU. Their data processing terms set safeguards for such transfers, such as the EU Standard Contractual Clauses. <!-- OWNER: accept the three vendors' data processing terms (DPA) and check this line. -->
 
 ## Why we may use the data (legal basis)
 
 - **Usage data:** your consent (GDPR Article 6(1)(a)). You can withdraw it at any time in Settings. Withdrawing does not undo what was lawful before.
 - **Crash reports before you answer:** these hold no id at all, and we do not think they identify you. If they still count as personal data, we rely on our legitimate interest in finding and fixing crashes (GDPR Article 6(1)(f)). You can object at any time: tap **Don't allow**, or turn off the switch in Settings.
 - **Crash reports after Allow:** your consent, as for usage data.
+- **Online games with a friend:** the guest account, the sign-in session, your invites and your online games are needed to give you the online game you asked for (GDPR Article 6(1)(b)). If you do not want them, do not make or open an invite: the rest of the app works without them.
 
 ## Your rights
 
@@ -146,7 +165,7 @@ Under the GDPR you have the right to:
 
 To ask, write to **privacy@tavlaki.com**. We answer within one month.
 
-Please note: we do not know who you are. The app does not show the install id yet, so we may not be able to find your data. Tell us your phone model and roughly when you used the app, and we will do our best. The data ages out under the times in the table above. Deleting the app deletes the install id and everything on your phone.
+Please note: we do not know who you are. The app does not show the install id or the user id yet, so we may not be able to find your data. Tell us your phone model and roughly when you used the app, and we will do our best. For online games, also send an invite code you made or accepted: it leads us to your user id, and then to your invites and games. Usage data and crash reports age out under the times in the table above. Deleting the app deletes the install id, the sign-in cookie and everything on your phone, but not your invites and games on the server: write to us to delete those.
 
 ## Children
 
@@ -160,7 +179,7 @@ If you are a parent and think your child allowed usage data, write to us, and we
 
 These features are planned. They are **not** in the app today. We will update this policy before they go live and tell you in the app.
 
-- **Accounts and sign-in** (Sign in with Apple, Google, an email link, or a guest account), **friends** and **online games**. These will store your account, friends list and games on our server (Convex), with sign-in through Better Auth.
+- **Sign-in with Apple, Google or an email link**, and **friends**. These will store your account and friends list on our server (Convex), with sign-in through Better Auth. (Guest accounts and online games with a friend are live now: see above.)
 - **Push notifications** (for example "your turn"), through the Expo push service.
 - **App updates over the air** (EAS Update by Expo). The app will ask Expo's servers at launch if a newer version exists. This request carries technical facts only.
 

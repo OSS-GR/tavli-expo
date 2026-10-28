@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90). Last review: 2026-10-27.
+> The privacy policy for the app and the stores (issue #90). Last review: 2026-10-28 (#281, online play with a friend).
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy before it goes live.
 
@@ -47,14 +47,17 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 - [ ] Sentry: check that the organization uses the **EU** data region (Frankfurt). Sentry sets it when the organization is made, and it cannot change later. If it is the US region, change the table in the policy.
 - [ ] Sentry: turn on **Prevent Storing of IP Addresses** (see `packages/adapters/crash-sentry/README.md`).
 - [ ] PostHog: use an **EU** project and turn on **Discard client IP data** (see `docs/architecture/analytics-events.md`).
-- [ ] Accept both vendors' data processing terms (DPA) and check the line about transfers outside the EU.
+- [ ] Convex: check that both deployments (dev and prod) are in the EU region `eu-west-1` (Ireland), and that `BETTER_AUTH_SECRET` is set on both (`npx convex env set`, never in the repo).
+- [ ] Accept the three vendors' data processing terms (DPA: Sentry, PostHog, Convex) and check the line about transfers outside the EU.
 - [ ] Check the retention times on your Sentry and PostHog plans. The policy states each vendor's documented default (checked 2026-10-27).
 - [ ] Have the policy checked (see the note at the top).
 
 ## Ideas for later (app changes, not part of #90)
 
 - Open `https://tavlaki.com/el/privacy` when the app language is Greek.
-- Show the install id in Settings → Privacy, so people can quote it in a data request.
+- Show the install id and the online user id in Settings → Privacy, so people can quote them in a data request.
+- Delete old invites and finished online games on the server after a set time, and say how long in the policy.
+- Better Auth keeps the IP address and the user agent on each sign-in session. If we do not need them, turn that off on the server (Better Auth's `advanced.ipAddress.disableIpTracking`) and update the policy.
 - Android backup: decide if app data (the install id, saved games) should be left out of Android Auto Backup.
-- When accounts, online play, push or EAS Update go live, update the "Coming later" section first.
-- Online play (#266 wired it; the game route only reads a saved session and makes no account, so no user can make one yet): the first screen that makes a guest (`auth.signInAsGuest()` from `apps/mobile/src/services.ts`, the invite screen #256) must update the policy in the same PR. Say that opening online play makes a guest account on our server (Convex, EU region `eu-west-1`, Ireland), with a random user id; that the server keeps your games and invites under that id; that the sign-in cookie stays in the phone's secure store; and that the user id never goes to analytics. Also update `docs/store/app-privacy.md`, `docs/store/play-data-safety.md` and the iOS privacy manifest (`NSPrivacyCollectedDataTypeUserID`, for app functionality, not tracking).
+- When sign-in with Apple, Google or an email link, friends, push or EAS Update go live, update the "Coming later" section first.
+- Online play with a friend is live (#281). The policy's "Online games with a friend (Convex)" section, the store answers and the iOS manifest (`NSPrivacyCollectedDataTypeUserID`, `NSPrivacyCollectedDataTypeGameplayContent`) describe it. The guest account is made only by `signInForOnline` (`apps/mobile/src/features/online/account.ts`), when the player taps **Make an invite** or **Show the invite**. A new screen that makes a guest, or a new server table with player data, updates the policy in the same PR.
