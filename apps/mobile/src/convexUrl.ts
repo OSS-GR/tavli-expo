@@ -3,7 +3,7 @@
  *
  * `app.config.ts` picks them per app variant and puts them in `extra`:
  * - `convexUrl`: the deployment (`.convex.cloud`). The dev deployment for
- *   `development`, prod for `preview` and `production`.
+ *   `development` and `preview` (test builds), prod for `production`.
  *   `EXPO_PUBLIC_CONVEX_URL` overrides it.
  * - `convexSiteUrl`: the same deployment's site (`.convex.site`), where
  *   Better Auth signs the user in. `EXPO_PUBLIC_CONVEX_SITE_URL`

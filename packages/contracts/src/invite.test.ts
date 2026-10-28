@@ -12,7 +12,7 @@ import {
 } from './index';
 
 describe('invite constants (#252)', () => {
-  it('an invite lasts 24 hours (open question Q31)', () => {
+  it('an invite lasts 24 hours (Q31)', () => {
     expect(INVITE_TIME_MS).toBe(86_400_000);
   });
 
