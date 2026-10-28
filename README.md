@@ -77,3 +77,7 @@ Use `StyleSheet` from `react-native-unistyles` with the theme: `StyleSheet.creat
 ## Docs
 
 All project docs live in [`docs/`](docs/README.md). Start there.
+
+## License
+
+All rights reserved. You may read the code on GitHub, but you may not copy, use or change it without written permission. See [`LICENSE`](LICENSE). Third-party parts keep their own licenses ([`packages/themes/LICENSES.md`](packages/themes/LICENSES.md), [`docs/design/style/LICENSES.md`](docs/design/style/LICENSES.md)).

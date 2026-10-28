@@ -1,0 +1,49 @@
+Tavlaki - All rights reserved
+
+Copyright (c) 2026 Orestis Stefanis (GitHub: OSS-GR). All rights reserved.
+
+This repository is public so that people can read it. Reading it gives you
+no other rights. The copyright holder keeps every right that this notice
+does not give.
+
+1. What you may do
+
+   - View the source code, the docs and the art on GitHub.
+   - Fork the repository on GitHub, only as far as the GitHub Terms of
+     Service require (section D.5, "License Grant to Other Users"). A fork
+     gives you no more rights than this notice.
+
+2. What you may not do without written permission
+
+   Unless the copyright holder gives you permission in writing, you may not:
+
+   - copy, use or run this software, or any part of it, in any project;
+   - change it, translate it, or make works based on it;
+   - publish, share, sell, rent or sublicense it, or any part of it;
+   - put it, or an app built from it, in an app store or on a website;
+   - use the name "Tavlaki", the board art, the sounds or the logos;
+   - use it to train, test or improve a machine learning model.
+
+3. How to ask for permission
+
+   Contact the copyright holder through https://github.com/OSS-GR. Only a
+   written answer from the copyright holder gives permission.
+
+4. Contributions
+
+   The repository does not take outside contributions unless the copyright
+   holder asks for them. If you send one, you agree that the copyright
+   holder may use it under this notice, with no payment to you.
+
+5. Third-party parts
+
+   Some files come from other people and keep their own licenses. They are
+   listed in packages/themes/LICENSES.md and docs/design/style/LICENSES.md.
+   Packages that the project installs (node_modules) keep their own
+   licenses too. This notice does not change those licenses.
+
+6. No warranty
+
+   The software is given "as is", with no warranty of any kind. The
+   copyright holder is not liable for any claim, damage or other liability
+   that comes from the software or its use.

@@ -1,6 +1,7 @@
 {
   "name": "tavli",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Tavlaki: a Greek backgammon app for iOS and Android.",
   "packageManager": "pnpm@12.15.0",
   "engines": {
