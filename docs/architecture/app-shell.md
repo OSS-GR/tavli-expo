@@ -111,7 +111,7 @@ The second part of Kafeneio mode (#58): start from another engine preset.
 - `game_started` sends `rulesVersion`: the preset of the game in play (`flow.game.state.rules.presetId`), a value id (`docs/architecture/analytics-events.md`).
 - The rules page (`/rules/[variant]?version=<preset>`, `parseRulesVersion` and `versionSection` in `features/rules/content.ts`) starts with a section "This game: federation rules" (`rules.versions.<key>`) that says what the version changes. The rest of the page still describes the default rules. The default version adds no param and no section.
 - The engine and the bot already play every preset. The hint depth and budget are per preset (`features/hint/hint.ts`), and the review uses the game's own rules. Acey-Deucey's chosen double after a 1-2 shows the "choose a double" card (#205); the screen only sends the engine's `answer`.
-- **Scoring.** Acey-Deucey American scores 1 point per checker the loser has not borne off (`scoring.method: perChecker`). `winType` (`features/game/turnNotices.ts`) then says "+2 points", never "diplo", and `isDiplo` (history) counts only a 15-point win (no checker off) as a diplo.
+- **Scoring.** Acey-Deucey American scores 1 point per checker the loser has not borne off (`scoring.method: perChecker`). `winType` (`features/game/turnNotices.ts`) then says "+2 points", never "diplo", and `isDiplo` (history) counts only a 15-point win (no checker off) as a diplo. The analytics `result` of `game_finished` (`resultKind`) uses `isDiplo` too, so a 2-point American win is `mono`.
 
 ## Save and resume (#36)
 

@@ -124,7 +124,7 @@ export interface HistoryRecord {
  * A draw is 0 points.
  */
 export function isDiplo(
-  game: GameRecord,
+  game: Pick<GameRecord, 'winner' | 'points'>,
   scoring: RuleSet['scoring']['method'] = 'tavli',
 ): boolean {
   if (game.winner === null) return false;
