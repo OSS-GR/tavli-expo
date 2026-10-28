@@ -12,6 +12,7 @@ import {
   createConvexClient,
   createConvexGameTransport,
   createConvexInvites,
+  createConvexPushTokens,
 } from '@tavli/backend-convex';
 import { InlineBotRunner, createAnalyzer, createBot, type Analyzer } from '@tavli/bot';
 import {
@@ -24,15 +25,20 @@ import {
   type Feedback,
   type GameTransport,
   type Invites,
+  type PushNotifications,
+  type PushTokens,
   type SoundPlayer,
   type Storage,
 } from '@tavli/contracts';
 import { createSentryCrashReporter } from '@tavli/crash-sentry';
 import { createSeededRng, type Rng } from '@tavli/engine';
 import { createExpoFeedback } from '@tavli/haptics-expo';
+import { createExpoPushNotifications } from '@tavli/notifications-expo';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
 import Constants from 'expo-constants';
+import { t } from 'i18next';
+import { Platform } from 'react-native';
 
 import { APP_SCHEME, convexServer } from '@/convexUrl';
 import { botLevelsByGame } from '@/features/bot/levels';
@@ -116,14 +122,22 @@ export const botLevels: GameLevels = botLevelsByGame(bot);
  */
 export const analyzer: Analyzer = createAnalyzer();
 
+/** The EAS project id (`extra.eas.projectId`, written by `eas init`): Expo push tokens need it. */
+function easProjectId(): string | undefined {
+  const eas: unknown = Constants.expoConfig?.extra?.['eas'];
+  if (typeof eas !== 'object' || eas === null) return undefined;
+  const id: unknown = (eas as { projectId?: unknown }).projectId;
+  return typeof id === 'string' && id !== '' ? id : undefined;
+}
+
 /**
- * Online play (#266, #281): the Convex deployment of this build
+ * Online play (#266, #281, #285): the Convex deployment of this build
  * (`convexUrl.ts`), with Better Auth sign-in on its site URL. All are made
  * on first use (`onlineServices.ts`): the app makes no network call and no
  * guest account at start. `undefined` when the build has no Convex URL:
- * then online play is off. `auth`, `games` and `invites` are all set, or
- * all `undefined`. The game route connects through `useOnlineConnection`
- * (`features/online/connection.ts`).
+ * then online play is off. `auth`, `games`, `invites`, `pushTokens` and
+ * `notifications` are all set, or all `undefined`. The game route
+ * connects through `useOnlineConnection` (`features/online/connection.ts`).
  */
 const online = createOnlineServices(convexServer(), {
   createAuth: (baseURL) =>
@@ -136,6 +150,14 @@ const online = createOnlineServices(convexServer(), {
   createClient: createConvexClient,
   createGames: (client) => createConvexGameTransport({ client }),
   createInvites: (client) => createConvexInvites({ client }),
+  createPushTokens: (client) => createConvexPushTokens({ client }),
+  createNotifications: () =>
+    createExpoPushNotifications({
+      platform: Platform.OS === 'android' ? 'android' : 'ios',
+      projectId: easProjectId(),
+      // The Android channel shows this name in the phone's settings.
+      channelName: () => t('notifications.channel'),
+    }),
 });
 
 /**
@@ -154,6 +176,17 @@ export const games: GameTransport | undefined = online?.games;
  * on the in-memory server instead.
  */
 export const invites: Invites | undefined = online?.invites;
+
+/**
+ * Turn notifications (#285). `notifications` is the phone side (the
+ * permission, the Expo push token, taps on a push), `pushTokens` the
+ * server's token list, on the same client as `games`. Both are
+ * `undefined` when online play is off. Use them through
+ * `features/notifications` (`turnPushes`): it asks only after an async
+ * invite, and registers the token only for a signed-in user.
+ */
+export const notifications: PushNotifications | undefined = online?.notifications;
+export const pushTokens: PushTokens | undefined = online?.pushTokens;
 
 /**
  * Dev games (#255): one in-memory server for this app run (`@tavli/online`,

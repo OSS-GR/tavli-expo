@@ -48,8 +48,8 @@ import { sendInviteCreated } from './inviteAnalytics';
 export interface FriendSetupScreenProps {
   auth: AuthProvider;
   invites: Invites;
-  /** The server made the invite: show its code. */
-  onCreated: (code: string) => void;
+  /** The server made the invite (`game`): show its code. */
+  onCreated: (code: string, game: NewInvite) => void;
   onBack: () => void;
   /** For tests. Default: the app's analytics. */
   analytics?: Analytics;
@@ -120,7 +120,7 @@ export function FriendSetupScreen({
     }
     sendInviteCreated(game, analytics);
     // The buttons stay off while the route opens the waiting screen.
-    onCreated(code);
+    onCreated(code, game);
   };
 
   const lengthOptions: SegmentOption<`${MatchLength}`>[] = MATCH_LENGTHS.map((n) => ({

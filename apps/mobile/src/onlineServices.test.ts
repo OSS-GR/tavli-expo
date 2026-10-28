@@ -1,8 +1,10 @@
-// Online play wiring (#266, #281): built on first use, no guest at start, and
+// Online play wiring (#266, #281, #285): built on first use, no guest at start, and
 // the Jest fake of `@/services` (test/onlineFake.ts).
 import {
   createMemoryAuthProvider,
   createMemoryAuthStore,
+  createMemoryPushNotifications,
+  createMemoryPushTokens,
   type AuthProvider,
   type GameTransport,
   type Invites,
@@ -18,6 +20,8 @@ import {
   auth as servicesAuth,
   games as servicesGames,
   invites as servicesInvites,
+  notifications as servicesNotifications,
+  pushTokens as servicesPushTokens,
 } from './services';
 
 const SERVER = {
@@ -31,6 +35,7 @@ function memoryAdapters() {
   const authStore = createMemoryAuthStore();
   const server = createMemoryGameServer({ rng: createSeededRng(3), now: () => 0 });
   const made: string[] = [];
+  const phone = createMemoryPushNotifications('android');
   const adapters: OnlineAdapters<{ readonly auth: AuthProvider }> = {
     createAuth: (siteUrl) => {
       made.push(`auth ${siteUrl}`);
@@ -67,8 +72,16 @@ function memoryAdapters() {
         watchMyInvites: (onList, onError) => caller().watchMyInvites(onList, onError),
       };
     },
+    createPushTokens: ({ auth }) => {
+      made.push('pushTokens');
+      return createMemoryPushTokens(() => auth.currentUser()?.id ?? null);
+    },
+    createNotifications: () => {
+      made.push('notifications');
+      return phone;
+    },
   };
-  return { adapters, authStore, server, made };
+  return { adapters, authStore, server, made, phone };
 }
 
 /** Waits until the in-memory server has answered (it answers on later microtasks). */
@@ -172,6 +185,45 @@ describe('createOnlineServices', () => {
     expect(made).toEqual([`auth ${SERVER.siteUrl}`, `client ${SERVER.url}`, 'invites', 'games']);
   });
 
+  it('makes the push tokens on the same client, and the notifications on first use', async () => {
+    const { adapters, made, phone } = memoryAdapters();
+    const online = createOnlineServices(SERVER, adapters)!;
+    await online.auth.signInAsGuest();
+    expect(made).toEqual([`auth ${SERVER.siteUrl}`]);
+    // Reading the platform makes the notifications, and nothing on the server.
+    expect(online.notifications.platform).toBe('android');
+    expect(made).toEqual([`auth ${SERVER.siteUrl}`, 'notifications']);
+    await expect(online.notifications.permission()).resolves.toBe('undetermined');
+    await expect(online.notifications.requestPermission()).resolves.toBe('granted');
+    const token = await online.notifications.getToken();
+    expect(token).toBe(phone.token);
+    await online.pushTokens.register(token!, 'android');
+    await online.pushTokens.remove(token!);
+    expect(made).toEqual([
+      `auth ${SERVER.siteUrl}`,
+      'notifications',
+      `client ${SERVER.url}`,
+      'pushTokens',
+    ]);
+    // The other calls pass through too.
+    const taps: unknown[] = [];
+    const tokens: string[] = [];
+    const stopTaps = online.notifications.onTap((tap) => taps.push(tap));
+    const stopTokens = online.notifications.onTokenChange((next) => tokens.push(next));
+    phone.tap({ gameId: 'g1' });
+    phone.rollToken();
+    phone.tap({ gameId: 'g2' }, { opensApp: true });
+    await settle();
+    expect(taps).toEqual([{ id: 'tap-1', gameId: 'g1' }]);
+    expect(tokens).toEqual(['ExponentPushToken[memory-2]']);
+    await expect(online.notifications.lastTap()).resolves.toEqual({ id: 'tap-2', gameId: 'g2' });
+    stopTaps();
+    stopTokens();
+    // One client for the games too.
+    online.games.subscribe('game-1', () => {})();
+    expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
+  });
+
   it('passes every sign-in call through', async () => {
     const { adapters } = memoryAdapters();
     const online = createOnlineServices(SERVER, adapters)!;
@@ -190,10 +242,30 @@ describe('createOnlineServices', () => {
 });
 
 describe('the Jest fake of @/services', () => {
-  it('gives the in-memory sign-in, games and invites', () => {
+  it('gives the in-memory sign-in, games, invites and pushes', () => {
     expect(servicesAuth).toBe(onlineFake.auth);
     expect(servicesGames).toBe(onlineFake.games);
     expect(servicesInvites).toBe(onlineFake.invites);
+    expect(servicesNotifications).toBe(onlineFake.notifications);
+    expect(servicesPushTokens).toBe(onlineFake.pushTokens);
+  });
+
+  it('saves push tokens as the signed-in guest, and refuses them while nobody is signed in', async () => {
+    const token = onlineFake.notifications.token;
+    await expect(onlineFake.pushTokens.register(token, 'ios')).rejects.toMatchObject({
+      code: 'NOT_SIGNED_IN',
+    });
+    await onlineFake.auth.signInAsGuest();
+    await onlineFake.pushTokens.register(token, 'ios');
+    expect(onlineFake.pushTokens.saved).toEqual([{ playerId: 'guest-1', token, platform: 'ios' }]);
+  });
+
+  it('starts each test with notifications not asked and no saved token', async () => {
+    await expect(onlineFake.notifications.permission()).resolves.toBe('undetermined');
+    expect(onlineFake.notifications.prompts).toBe(0);
+    expect(onlineFake.pushTokens.saved).toEqual([]);
+    expect(onlineFake.pushTokens.calls).toEqual([]);
+    onlineFake.notifications.setPermission('granted');
   });
 
   it('makes invites as the signed-in guest, and refuses them while nobody is signed in', async () => {

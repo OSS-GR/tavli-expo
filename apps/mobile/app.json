@@ -133,6 +133,13 @@
           "recordAudioAndroid": false,
           "enableBackgroundPlayback": false
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#3B2A1D",
+          "defaultChannel": "default"
+        }
       ]
     ],
     "experiments": {

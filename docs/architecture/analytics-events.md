@@ -55,6 +55,7 @@ Every property value is a number, or a short id from a fixed set (the lists belo
 | `hint_shown` | The Hint button (#209) showed the best turn in an offline game (vs bot or pass-and-play). Once per tap that shows a hint; a tap that hides it sends nothing. | `game`; `variant`. Never the position, the dice or the moves. | `features/hint/hintAnalytics.ts` (from `features/match/MatchScreen.tsx`) |
 | `review_opened` | The game review (#215) opens: **Review** on the game-end sheet or the match-end screen of an offline game (vs bot or pass-and-play). Once per open. | `game`: the game picked for the match (as in `game_started`). Never the position, the dice, the moves or the mistakes. | `app/game/[id]/review.tsx` through `features/review/reviewAnalytics.ts` |
 | `invite_created` | The player made an invite on **Play a friend online** (#281): the server saved it and gave its code. Once per invite. | `game`: the game picked, as in `game_started`; `matchLength`: points to win (1, 3, 5, 7); `pace`: `live` \| `async`. Never the invite code, a game id or a user id. | `features/invites/FriendSetupScreen.tsx` through `features/invites/inviteAnalytics.ts` |
+| `push_permission_answered` | The phone answered the system prompt for turn notifications (#285), after the player tapped **Turn on** (on the prompt after an async invite, or in Settings). Once per answer. Not sent for **Not now** (the system prompt did not show). | `answer`: `granted` \| `denied`. Never the push token, a game id or a user id. | `features/notifications/turnPushes.ts` through `features/notifications/pushAnalytics.ts` |
 | `$screen` | A route change. | screen name = route pattern: `/`, `/new-game`, `/game/[id]`, `/game/[id]/match-end`, `/game/[id]/review`, `/history`, `/settings`, `/tutorial`, `/rules/[variant]`, `/friend`, `/friend/[code]`, `/invite/[code]`, `/welcome/language`, `/welcome/privacy` | `features/analytics/useAppAnalytics.ts` |
 
 Notes:
@@ -72,6 +73,7 @@ Notes:
 - `theme_changed` with `kind: app` cannot fire yet: the app has one set of colors. It is ready for more. Before #163 the board theme sent only `settings_changed` with `key: boardTheme`, so the dashboards could not see which board theme players pick.
 - `hint_shown` (#209) says only which game the hint was for. Use it to see how many players ask for hints, and in which games.
 - `review_opened` (#215) says only which game was reviewed. The review itself (the mistakes, how big they are) stays on the phone. Use it to see how many players look back at their games.
+- `push_permission_answered` (#285) says only what the phone answered. The push token goes to our game server (Convex) to send the pushes, never to analytics.
 - The match history (#142) sends no event of its own. Only its screen view (`/history`) is sent.
 - Nothing is sent before **Allow usage data**. So the events cannot show drop-off in the welcome flow, and every number counts only the players who said yes.
 
@@ -80,7 +82,7 @@ Notes:
 | Question | Events, and what they tell |
 |----------|----------------------------|
 | **Mode use** | `game_started`: which games (`game`), modes (`mode`), bot levels (`botLevel`), match lengths (`matchLength`), opening roll house rules (`openingRoll`) and rules versions (`rulesVersion`) players pick. `tutorial_started`: how many players open a tutorial, and from where (`source`). `$screen`: which screens players open (history, rules, settings). |
-| **Feature use** | `undo_used`: how much players take back moves. `hint_shown`: how much players ask for hints, per game. `review_opened`: how many players review their games, per game. `invite_created`: how many players invite a friend online, and which games, lengths and paces they pick. `settings_changed`: which settings players change (`key`). `theme_changed`: which themes players pick (themes may become a paid extra, `docs/vision.md`). |
+| **Feature use** | `undo_used`: how much players take back moves. `hint_shown`: how much players ask for hints, per game. `review_opened`: how many players review their games, per game. `invite_created`: how many players invite a friend online, and which games, lengths and paces they pick. `push_permission_answered`: how many players turn on turn notifications, and how many say no. `settings_changed`: which settings players change (`key`). `theme_changed`: which themes players pick (themes may become a paid extra, `docs/vision.md`). |
 | **Drop-off** | `game_started` → `game_finished`: how many games end. `game_abandoned`: which games players leave, and how early (`turn`). `resign` and `result: resign`: how often players give up. `tutorial_step`, `tutorial_finished`, `tutorial_skipped`: the lesson where players stop. |
 | **Return rate** | `app_opened`: active players per day and week, and how many come back (retention). `game_started` after `game_finished`: players who come back to play. |
 

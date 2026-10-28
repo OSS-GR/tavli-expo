@@ -15,6 +15,7 @@
 import type { GameTransport } from '@tavli/contracts';
 import { useEffect, useState } from 'react';
 
+import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { auth, gameTransportFor, games, onlinePlayerId } from '@/services';
 
 import { rememberOnlineAccount } from './accountHint';
@@ -45,6 +46,10 @@ export function useOnlineConnection(gameId: string): OnlineConnection {
     auth.ready().then(
       (user) => {
         if (user !== null) rememberOnlineAccount();
+        // Signed in on a phone that allows pushes: the token reaches the
+        // server once per app run, also when it changed while the app was
+        // closed (#285). Not after the route is gone.
+        if (user !== null && live) void turnPushes()?.sync();
         if (live) setSession(user === null ? 'signedOut' : { me: user.id });
       },
       () => {

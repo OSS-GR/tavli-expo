@@ -12,6 +12,8 @@ import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ToggleRow } from '@/components/settings/ToggleRow';
 import type { BotSpeed } from '@/features/bot/botSpeed';
 import { HistorySettings } from '@/features/history/HistorySettings';
+import type { TurnPushes } from '@/features/notifications/turnPushes';
+import { TurnPushSettings } from '@/features/notifications/TurnPushSettings';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
 import { TutorialSettings } from '@/features/tutorial/TutorialSettings';
@@ -40,9 +42,14 @@ export interface SettingsScreenProps {
   onLearnToPlay?: (game: TutorialGame) => void;
   /** Opens the match history (#142). The History section shows only with it. */
   onHistory?: () => void;
+  /**
+   * Turn notifications (#285). The Notifications section shows only with
+   * it: a build with no online play has none.
+   */
+  turnPushes?: TurnPushes;
 }
 
-export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps = {}) {
+export function SettingsScreen({ onLearnToPlay, onHistory, turnPushes }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
   const locales = useLocales();
 
@@ -214,6 +221,12 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
       {onHistory ? (
         <SettingsSection title={t('settings.sections.history')}>
           <HistorySettings onOpen={onHistory} />
+        </SettingsSection>
+      ) : null}
+
+      {turnPushes ? (
+        <SettingsSection title={t('settings.sections.notifications')}>
+          <TurnPushSettings pushes={turnPushes} />
         </SettingsSection>
       ) : null}
 
