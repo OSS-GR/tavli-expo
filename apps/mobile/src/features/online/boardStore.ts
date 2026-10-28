@@ -38,8 +38,9 @@ export interface OnlineBoardStore extends BoardStore {
 /**
  * The end of a game as a local game shows it: `from` (the board's last
  * flow of that game) marked over with the result of the newest record of
- * `next`, and the match of `next`. It only draws: no rule is judged. The
- * moves of a timed-out turn never counted, so they go.
+ * `next`, and the match of `next`. `from` may be a held end too: a game
+ * that ends under the sheet keeps the board it shows. It only draws: no
+ * rule is judged. The moves of a timed-out turn never counted, so they go.
  */
 export function gameEnd(from: MatchFlow, next: MatchFlow): MatchFlow {
   const record = next.match.games.at(-1);
@@ -70,8 +71,6 @@ export function onlineBoardStore(store: OnlineStore, gameId: string): OnlineBoar
   /** The newest flow of the store. */
   let latest: MatchFlow = first;
   let refusals = store.getState().refusals;
-  /** While the board holds a game end: its last flow of that game. */
-  let endedFrom: MatchFlow | null = null;
   /** The game end the board shows (`gameEnd`), or `null`. */
   let held: MatchFlow | null = null;
   let snapshot: BoardStoreState = { flow: first, matchKey, lastError: null, dispatch };
@@ -85,14 +84,14 @@ export function onlineBoardStore(store: OnlineStore, gameId: string): OnlineBoar
       latest = next;
       if (next.match.status === 'finished') {
         // Match end: the last game stays on the board, nothing waits.
-        endedFrom = null;
         held = null;
-      } else if (endedFrom !== null && held !== null) {
+      } else if (held !== null) {
         // Another game ended while the sheet was open: the sheet shows it.
-        if (next.match.games.length > held.match.games.length) held = gameEnd(endedFrom, next);
+        // The board keeps the end it shows: the moves that ended the first
+        // game stay, also when the next game ends by a time out.
+        if (next.match.games.length > held.match.games.length) held = gameEnd(held, next);
       } else if (next.match.games.length > snapshot.flow.match.games.length) {
-        endedFrom = snapshot.flow;
-        held = gameEnd(endedFrom, next);
+        held = gameEnd(snapshot.flow, next);
       }
     }
     const shown = held ?? latest;
@@ -132,7 +131,6 @@ export function onlineBoardStore(store: OnlineStore, gameId: string): OnlineBoar
     },
     release: () => {
       if (held === null) return;
-      endedFrom = null;
       held = null;
       for (const check of [...checks]) check();
     },

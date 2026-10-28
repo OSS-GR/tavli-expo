@@ -306,6 +306,44 @@ describe('onlineBoardStore between games (#286)', () => {
     expect(held.game.state.board).toEqual(start.game.state.board);
   });
 
+  it('keeps the moves that ended a game when the next game times out under the sheet', async () => {
+    const { server, gameId, store, board } = await openBoard(5);
+    while (server.getGame(gameId)!.waitingFor !== 'white') {
+      await playServerTurn(server, gameId);
+      await flush();
+    }
+    const start = store.getState().flow!;
+    const [move] = pickTurn(start.game, createSeededRng(2));
+    expect(store.getState().dispatch({ type: 'move', player: 'white', move: move! })).toBe(true);
+    const local = board.getState().flow;
+    const end = currentBoard(local.game);
+    expect(end).not.toEqual(start.game.state.board);
+
+    // Views the board only draws: your turn ended game 1 (not by time),
+    // then game 2 ends by a time out while the sheet is open.
+    const ended = (flow: MatchFlow, player: 'white' | 'black') =>
+      applyMatchAction(applyMatchAction(flow, { type: 'timeout', player }), { type: 'nextGame' });
+    const afterOne = ended(start, 'white');
+    const [one] = afterOne.match.games;
+    const won = { ...one!, winner: 'white' as const, reason: 'borneOff' as const };
+    const gameTwo: MatchFlow = {
+      ...afterOne,
+      match: { ...afterOne.match, games: [won] },
+      log: [],
+    };
+    store.setState({ flow: gameTwo });
+    expect(board.getState().flow.game.state.board).toEqual(end);
+
+    const afterTwo = ended(gameTwo, gameTwo.game.state.toMove);
+    expect(afterTwo.match.status).toBe('in-progress');
+    store.setState({ flow: { ...afterTwo, log: [] } });
+    const held = board.getState().flow;
+    expect(held.match.games).toHaveLength(2);
+    expect(held.game.result?.reason).toBe('timeout');
+    // The board still shows how game 1 ended.
+    expect(held.game.state.board).toEqual(end);
+  });
+
   it('shows a next game that ends under the sheet, and lets go when the match ends', async () => {
     const { server, store, board } = await openBoard(5);
     await timeOut(server);
