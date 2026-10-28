@@ -51,6 +51,8 @@ import {
   InviteError,
   checkAnswer,
   checkCancel,
+  checkInviteCap,
+  countOpenInvites,
   isInviteExpired,
   newInvite,
   pickInviteCodeNow,
@@ -110,8 +112,9 @@ export interface MemoryGameServer {
   /**
    * Makes an open invite from `callerId`, like the Convex `createInvite`:
    * it expires `INVITE_TIME_MS` after `now()`. The code comes from the
-   * server's `rng`. Returns the code. Throws an `InviteError`
-   * (`BAD_REQUEST`) for a bad match length.
+   * server's `rng`. Returns the code. Throws an `InviteError`:
+   * `TOO_MANY_INVITES` when `callerId` already has `MAX_OPEN_INVITES`
+   * open invites at `now()`, `BAD_REQUEST` for a bad match length.
    */
   createInvite(
     callerId: string,
@@ -418,6 +421,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     targetPoints: number,
     pace: OnlineGamePace,
   ): string {
+    // The cap first, like the Convex function (#275).
+    checkInviteCap(countOpenInvites(invites.values(), callerId, now()));
     const options = { from: callerId, choice, targetPoints, pace };
     // Check the arguments before a code is drawn, as the Convex function
     // throws before it saves anything.

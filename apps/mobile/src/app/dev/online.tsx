@@ -9,7 +9,9 @@
  * pace and length, and the screen shows its code and links. Open it with
  * the button, or on a simulator:
  * `xcrun simctl openurl booted tavlaki://invite/<code>`. When this phone
- * accepts it, the bot plays the game (as White, the inviter).
+ * accepts it, the bot plays the game (as White, the inviter). When the
+ * bot has too many open invites (`TOO_MANY_INVITES`, #275), the screen
+ * says so instead of a code.
  */
 import {
   ONLINE_GAME_CHOICES,
@@ -17,6 +19,7 @@ import {
   type OnlineGameChoice,
   type OnlineGamePace,
 } from '@tavli/contracts';
+import { InviteError } from '@tavli/online';
 import { Redirect, Stack, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -50,6 +53,7 @@ export default function DevOnlineRoute() {
   const [length, setLength] = useState<Length>('3');
   const [rng] = useState(createLocalRng);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [tooManyInvites, setTooManyInvites] = useState(false);
   // The game or invite lives while this screen is in the stack (under its
   // board or invite). When it closes (Home, or back), the bot and the
   // timers stop.
@@ -69,11 +73,21 @@ export default function DevOnlineRoute() {
 
   const start = () => {
     setInviteCode(null);
+    setTooManyInvites(false);
     const { gameId } = startDevGame({ ...match(), me: onlinePlayerId });
     router.push(gameHref(gameId));
   };
 
-  const makeInvite = () => setInviteCode(startDevInvite(match()).code);
+  const makeInvite = () => {
+    try {
+      setInviteCode(startDevInvite(match()).code);
+      setTooManyInvites(false);
+    } catch (error) {
+      if (!(error instanceof InviteError) || error.code !== 'TOO_MANY_INVITES') throw error;
+      setInviteCode(null);
+      setTooManyInvites(true);
+    }
+  };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -114,6 +128,11 @@ export default function DevOnlineRoute() {
         label={t('dev.online.makeInvite')}
         onPress={makeInvite}
       />
+      {tooManyInvites ? (
+        <Text testID="dev-online-invite-error" style={styles.intro}>
+          {t('dev.online.tooManyInvites')}
+        </Text>
+      ) : null}
       {inviteCode === null ? null : (
         <>
           <Text testID="dev-online-invite-code" style={styles.intro} selectable>

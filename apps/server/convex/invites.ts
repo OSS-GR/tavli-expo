@@ -14,6 +14,10 @@
  * `checkTimeout` does for turns. The calls check the time too, so an
  * invite is closed at `expiresAt` also when the scheduler is late.
  *
+ * Cap (#275): one player may have at most `MAX_OPEN_INVITES` (10) open
+ * invites whose time is not up. `createInvite` counts them on the
+ * `by_from` index; each one is a row and a scheduled `expireInvite`.
+ *
  * The caller is the signed-in user (#131), as in `games.ts`: every
  * public function reads the player id from `ctx.auth` (`signedInPlayer`).
  * Without a sign-in a call gets `NOT_SIGNED_IN`, also `getInvite`.
@@ -25,8 +29,11 @@ import { normalizeInviteCode } from '@tavli/contracts';
 import type { InviteErrorCode, InviteView } from '@tavli/contracts';
 import {
   InviteError,
+  MAX_OPEN_INVITES,
   checkAnswer,
   checkCancel,
+  checkInviteCap,
+  countOpenInvites,
   isInviteExpired,
   newInvite,
   pickInviteCode,
@@ -66,6 +73,24 @@ async function findByCode(ctx: QueryCtx, code: string): Promise<Doc<'invites'> |
     .unique();
 }
 
+/**
+ * The open invites of `from` whose time is not up at `now`: at most
+ * `limit`, newest first. One index range (`by_from`), so the call reads
+ * no other rows.
+ */
+async function openInvitesOf(
+  ctx: QueryCtx,
+  from: string,
+  now: number,
+  limit?: number,
+): Promise<Doc<'invites'>[]> {
+  const range = ctx.db
+    .query('invites')
+    .withIndex('by_from', (q) => q.eq('from', from).eq('status', 'open').gt('expiresAt', now))
+    .order('desc');
+  return limit === undefined ? await range.collect() : await range.take(limit);
+}
+
 /** Loads the invite of `text` (any case). Rejects a malformed or unknown code. */
 async function load(ctx: MutationCtx, text: string): Promise<Doc<'invites'>> {
   const code = normalizeInviteCode(text);
@@ -77,7 +102,8 @@ async function load(ctx: MutationCtx, text: string): Promise<Doc<'invites'>> {
 
 /**
  * Makes an open invite from the caller. It expires in 24 hours. Returns
- * the code (8 capital letters and digits).
+ * the code (8 capital letters and digits). A caller who already has
+ * `MAX_OPEN_INVITES` (10) open invites gets `TOO_MANY_INVITES` (#275).
  */
 export const createInvite = mutation({
   args: {
@@ -89,12 +115,16 @@ export const createInvite = mutation({
   returns: v.string(),
   handler: async (ctx, { choice, targetPoints, pace }) => {
     const callerId = await signedInPlayer(ctx);
+    const now = Date.now();
+    // Reading at most the cap is enough to know if the caller is at it.
+    const open = await openInvitesOf(ctx, callerId, now, MAX_OPEN_INVITES);
+    guarded(() => checkInviteCap(countOpenInvites(open, callerId, now)));
     const code = await pickInviteCode(
       createCryptoRng(),
       async (candidate) => (await findByCode(ctx, candidate)) !== null,
     );
     const options = { from: callerId, choice, targetPoints, pace };
-    const invite = guarded(() => newInvite(options, code, Date.now()));
+    const invite = guarded(() => newInvite(options, code, now));
     const inviteId = await ctx.db.insert('invites', { ...invite, gameId: null, answeredBy: null });
     await ctx.scheduler.runAt(invite.expiresAt, internal.invites.expireInvite, { inviteId });
     return code;
@@ -173,11 +203,7 @@ export const listMyInvites = query({
   handler: async (ctx): Promise<InviteView[]> => {
     const callerId = await signedInPlayer(ctx);
     const now = Date.now();
-    const open = await ctx.db
-      .query('invites')
-      .withIndex('by_from', (q) => q.eq('from', callerId).eq('status', 'open'))
-      .order('desc')
-      .collect();
+    const open = await openInvitesOf(ctx, callerId, now);
     return open
       .filter((invite) => !isInviteExpired(invite, now))
       .map((invite) => toInviteView(invite, now));

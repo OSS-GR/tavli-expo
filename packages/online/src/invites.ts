@@ -164,6 +164,48 @@ export function inviteStatus(invite: InviteRecord, now: number): InviteStatus {
   return isInviteExpired(invite, now) ? 'expired' : invite.status;
 }
 
+// ---------------------------------------------------------------------------
+// The cap on open invites (#275)
+
+/**
+ * One player may have at most this many open invites at a time. Each one
+ * is a database row and a scheduled `expireInvite`, and a guest account
+ * is free, so the cap keeps one user from filling the table. An invite
+ * frees its place once it is accepted, declined, cancelled or expired.
+ */
+export const MAX_OPEN_INVITES = 10;
+
+/**
+ * How many of `invites` are open invites from `from` at `now`: status
+ * `open` and time not up. An invite counts as expired at `expiresAt`, also
+ * before the server has marked it. The other invites in the list are
+ * skipped, so a server may pass more than the player's open ones.
+ */
+export function countOpenInvites(
+  invites: Iterable<InviteRecord>,
+  from: string,
+  now: number,
+): number {
+  let count = 0;
+  for (const invite of invites) {
+    if (invite.from === from && inviteStatus(invite, now) === 'open') count += 1;
+  }
+  return count;
+}
+
+/**
+ * Rejects a new invite from a player who already has `openCount` open
+ * invites (from `countOpenInvites`), when that is `MAX_OPEN_INVITES` or more.
+ */
+export function checkInviteCap(openCount: number): void {
+  if (openCount >= MAX_OPEN_INVITES) {
+    fail(
+      'TOO_MANY_INVITES',
+      `you have ${MAX_OPEN_INVITES} open invites: cancel one or wait until one closes`,
+    );
+  }
+}
+
 /** Rejects an invite that is not open at `now`. */
 function checkOpen(invite: InviteRecord, now: number): void {
   const status = inviteStatus(invite, now);

@@ -229,7 +229,8 @@
       "inviteIntro": "The bot makes an invite with the game, pace and length above. Open it here, or on a simulator with the command below. The bot plays the game you accept.",
       "makeInvite": "Make an invite",
       "inviteCode": "Code: {{code}}",
-      "openInvite": "Open the invite"
+      "openInvite": "Open the invite",
+      "tooManyInvites": "The bot has too many open invites. Wait until one closes."
     }
   },
   "online": {

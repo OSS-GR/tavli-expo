@@ -19,6 +19,7 @@ import { INVITE_TIME_MS, isInviteErrorData } from '@tavli/contracts';
 import type { InviteView, Invites } from '@tavli/contracts';
 import { invitesContract } from '@tavli/contracts/testing';
 import type { InvitesContractSubject } from '@tavli/contracts/testing';
+import { MAX_OPEN_INVITES } from '@tavli/online';
 
 import { api } from './_generated/api';
 import schema from './schema';
@@ -143,6 +144,17 @@ describe('the adapter on the real functions', () => {
     await network.settle();
     expect(views.at(-1)).toMatchObject({ status: 'accepted', gameId });
     stop();
+  });
+
+  it('one invite over the cap gives TOO_MANY_INVITES, as plain data (#275)', async () => {
+    const network = inviteNetwork(setup());
+    const alice = network.invitesFor(ALICE);
+    const game = { choice: 'portes', targetPoints: 1, pace: 'live' } as const;
+    for (let i = 0; i < MAX_OPEN_INVITES; i += 1) await alice.createInvite(game);
+    const reason = await reasonOf(alice.createInvite(game));
+    expect(reason).toEqual({ code: 'TOO_MANY_INVITES', message: expect.any(String) });
+    expect(reason).not.toBeInstanceOf(Error);
+    await expect(alice.listMyInvites()).resolves.toHaveLength(MAX_OPEN_INVITES);
   });
 
   it('the scheduled expiry reaches a watcher', async () => {
