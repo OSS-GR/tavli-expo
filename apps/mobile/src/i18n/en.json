@@ -552,7 +552,8 @@
       "rerollBothHint": "Each player rolls one die. The higher die starts and rolls both dice again, so a double is possible.",
       "chosenStarterRollsHint": "You choose who starts. That player rolls both dice.",
       "chosenStarterRollsHintBot": "You choose who starts: you or the bot. That player rolls both dice.",
-      "rulesVersion": "Rules version"
+      "rulesVersion": "Rules version",
+      "optionLabel": "{{group}}: {{option}}"
     },
     "rulesVersion": {
       "plakoto": "Standard",

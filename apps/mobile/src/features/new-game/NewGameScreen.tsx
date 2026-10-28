@@ -12,6 +12,8 @@
  * and how. Plakoto and Asodio also get the rules version (#241): the
  * engine preset of the match (`RULES_VERSIONS`). Its hint says what
  * changes. Games with one preset, and a Tavli match, show no version.
+ * Both groups have a "Standard" option, so each radio names its group for
+ * screen readers (#243), for example "Opening roll: Standard".
  */
 import type { Difficulty } from '@tavli/contracts';
 import { BOT_DIFFICULTIES } from '@tavli/contracts';
@@ -131,6 +133,11 @@ export function NewGameScreen({
           value: id,
           label: t(`newGame.rulesVersion.${VERSION_KEYS[id]}`),
         }));
+  // Screen readers hear the group with each house rule option (#243).
+  const houseRuleLabel =
+    (group: string) =>
+    ({ label }: { label: string }) =>
+      t('newGame.houseRules.optionLabel', { group, option: label });
   const chooseVersion = (id: RulesVersion) => {
     if (versionGame === null) return;
     setRulesVersions((old) => ({ ...old, [versionGame]: id }));
@@ -305,6 +312,7 @@ export function NewGameScreen({
             testID="new-game-opening-roll"
             label={t('newGame.houseRules.openingRoll')}
             options={openingOptions}
+            accessibilityLabelFor={houseRuleLabel(t('newGame.houseRules.openingRoll'))}
             value={openingRoll}
             onChange={setOpeningRoll}
           />
@@ -317,6 +325,7 @@ export function NewGameScreen({
                 testID="new-game-rules-version"
                 label={t('newGame.houseRules.rulesVersion')}
                 options={versionOptions}
+                accessibilityLabelFor={houseRuleLabel(t('newGame.houseRules.rulesVersion'))}
                 value={version}
                 onChange={chooseVersion}
               />
