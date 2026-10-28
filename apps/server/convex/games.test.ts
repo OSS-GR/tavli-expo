@@ -4,7 +4,7 @@
 // calls as the user whose token subject is `id`.
 
 import { convexTest } from 'convex-test';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import { TURN_TIME_MS } from '@tavli/contracts';
 import type {
@@ -17,8 +17,9 @@ import { createBoard, createSeededRng, plakoto, replay } from '@tavli/engine';
 import type { FlowEvent, GameFlow, GameState, PlayerId } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
 
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
+import { createGame as createGameFunction } from './games';
 import schema from './schema';
 import { modules, pickTurn } from './test.setup';
 
@@ -56,7 +57,8 @@ async function createGame(
   targetPoints = 1,
   pace: OnlineGamePace = 'live',
 ) {
-  return await as(t, ALICE).mutation(api.games.createGame, {
+  return await t.mutation(internal.games.createGame, {
+    callerId: ALICE,
     players: PLAYERS,
     choice,
     targetPoints,
@@ -95,6 +97,15 @@ async function events(t: Tester, gameId: Id<'games'>): Promise<FlowEvent[]> {
 }
 
 describe('createGame', () => {
+  it('is internal: a client cannot call it (#274)', () => {
+    // A game between two people starts only from an accepted invite.
+    expectTypeOf(api.games).not.toHaveProperty('createGame');
+    expectTypeOf(internal.games).toHaveProperty('createGame');
+    expect(createGameFunction.isMutation).toBe(true);
+    expect(createGameFunction.isInternal).toBe(true);
+    expect(createGameFunction).not.toHaveProperty('isPublic');
+  });
+
   it('starts a game: the server rolls the opening and the first roll', async () => {
     const t = setup();
     const gameId = await createGame(t);
@@ -112,7 +123,8 @@ describe('createGame', () => {
   it('rejects a caller who is not a player, and the same player twice', async () => {
     const t = setup();
     await rejectsWith(
-      as(t, 'eve').mutation(api.games.createGame, {
+      t.mutation(internal.games.createGame, {
+        callerId: 'eve',
         players: PLAYERS,
         choice: 'portes',
         targetPoints: 1,
@@ -121,7 +133,8 @@ describe('createGame', () => {
       'BAD_REQUEST',
     );
     await rejectsWith(
-      as(t, ALICE).mutation(api.games.createGame, {
+      t.mutation(internal.games.createGame, {
+        callerId: ALICE,
         players: { white: ALICE, black: ALICE },
         choice: 'portes',
         targetPoints: 1,
@@ -134,7 +147,8 @@ describe('createGame', () => {
   it('rejects the player id "server", which marks server events in the log', async () => {
     const t = setup();
     await rejectsWith(
-      as(t, ALICE).mutation(api.games.createGame, {
+      t.mutation(internal.games.createGame, {
+        callerId: ALICE,
         players: { white: ALICE, black: 'server' },
         choice: 'portes',
         targetPoints: 1,
@@ -314,15 +328,6 @@ describe('sign-in (#131)', () => {
     const gameId = await createGame(t);
     const v = await view(t, gameId);
     const moves = pickTurn(v.game, createSeededRng(1));
-    await rejectsWith(
-      t.mutation(api.games.createGame, {
-        players: PLAYERS,
-        choice: 'portes',
-        targetPoints: 1,
-        pace: 'live',
-      }),
-      'NOT_SIGNED_IN',
-    );
     await rejectsWith(
       t.mutation(api.games.makeMove, { gameId, expectedVersion: v.version, moves }),
       'NOT_SIGNED_IN',

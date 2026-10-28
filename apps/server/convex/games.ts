@@ -1,7 +1,9 @@
 /**
  * Online games (#126, ADR-0004): create a game, play a turn, answer a
- * question, resign, and watch a game. Turn timers (#133): each turn has a
- * deadline; when it passes, the player the server waits for loses the game.
+ * question, resign, and watch a game. A game between two people starts
+ * from an accepted invite (`invites.ts`); `createGame` is internal (#274).
+ * Turn timers (#133): each turn has a deadline; when it passes, the player
+ * the server waits for loses the game.
  *
  * Each mutation is one Convex transaction: load the game, check the call,
  * run the engine (`@tavli/online`), roll the next dice on the server, and
@@ -15,8 +17,8 @@
  * needed. `makeMove` and `answer` check the deadline too.
  *
  * The caller is the signed-in user (#131): every public function reads
- * the player id from `ctx.auth` (`signedInPlayer`), and no call takes a
- * player id. Each call checks that the caller may act. `getGame` answers
+ * the player id from `ctx.auth` (`signedInPlayer`), and no public call
+ * takes a player id. Each call checks that the caller may act. `getGame` answers
  * only the two players.
  */
 
@@ -218,7 +220,7 @@ function toMoveInput(move: Infer<typeof moveInput>): MoveInput {
 }
 
 export interface NewGame {
-  /** The signed-in caller (`signedInPlayer`). */
+  /** Who starts the game: the signed-in caller, or `createGame`'s `callerId`. */
   readonly callerId: string;
   readonly players: { readonly white: string; readonly black: string };
   readonly choice: Infer<typeof gameChoice>;
@@ -258,11 +260,16 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
 }
 
 /**
- * Creates a game between two players (see `insertGame`). The caller must
- * be one of them. Returns the id.
+ * Creates a game between two players (see `insertGame`). Internal (#274):
+ * a client cannot call it, so a game between two people starts only from
+ * an accepted invite (`acceptInvite`). Tests and the Convex dashboard use
+ * it. An internal function has no signed-in caller, so `callerId` names
+ * who starts the game; it must be one of the players (the same checks as
+ * `createGame` of the in-memory server in `@tavli/online`). Returns the id.
  */
-export const createGame = mutation({
+export const createGame = internalMutation({
   args: {
+    callerId: v.string(),
     players: v.object({ white: v.string(), black: v.string() }),
     choice: gameChoice,
     targetPoints: v.number(),
@@ -270,8 +277,7 @@ export const createGame = mutation({
     pace: gamePace,
   },
   returns: v.id('games'),
-  handler: async (ctx, args) =>
-    await insertGame(ctx, { ...args, callerId: await signedInPlayer(ctx) }),
+  handler: async (ctx, args) => await insertGame(ctx, args),
 });
 
 /**

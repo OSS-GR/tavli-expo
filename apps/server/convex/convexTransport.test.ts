@@ -28,7 +28,7 @@ import { createSeededRng } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
 import { motherPin } from '@tavli/online/testing';
 
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import schema from './schema';
 import { modules, pickTurn } from './test.setup';
@@ -146,11 +146,13 @@ function convexTestNetwork(t: Tester) {
   };
 }
 
-/** Alice creates a game: she is White, Bob is Black. */
+/** Alice creates a game: she is White, Bob is Black. `createGame` is internal (#274). */
 async function createGame(t: Tester, game: GameTransportContractGame): Promise<Id<'games'>> {
-  return await t
-    .withIdentity({ subject: ALICE })
-    .mutation(api.games.createGame, { players: PLAYERS, ...game });
+  return await t.mutation(internal.games.createGame, {
+    callerId: ALICE,
+    players: PLAYERS,
+    ...game,
+  });
 }
 
 function contractSubject(): GameTransportContractSubject {
