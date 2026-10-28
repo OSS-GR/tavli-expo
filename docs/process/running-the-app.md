@@ -228,7 +228,8 @@ The first Android build asks to make a **keystore** (the signing key). Say **yes
 | `/rules/<variant>` | How to play (a stub for now) |
 | `/settings` | Settings (language, sound, haptics, board options) |
 | `/dev/board` | **Dev only.** The board with sample positions. You can flip the board. **Dice → Throw on the board** turns on the dice throw spike (#183, [findings](../design/dice-throw-spike.md)). |
-| `/dev/online` | **Dev only.** An online game vs the bot on the in-memory server (#255). Pick a game, a pace (live: 60 s a turn; async: 24 h) and a match length, then tap **Start game**. The game lives only while the app runs. |
+| `/dev/online` | **Dev only.** An online game vs the bot on the in-memory server (#255). Pick a game, a pace (live: 60 s a turn; async: 24 h) and a match length, then tap **Start game**. **Make an invite** makes an invite from the bot instead and shows its code and links (#256). The game lives only while the app runs. |
+| `/invite/<code>` | An invite to an online game (#256). It shows the game, the length and the pace, with Accept and Decline. Opened by the link `tavlaki://invite/<code>`. |
 | `/_sitemap` | Expo Router's list of all routes. Tap one to open it. |
 
 Dev routes only work in development builds. Release builds (the `preview` profile) send them back home.
@@ -240,6 +241,14 @@ Dev routes only work in development builds. Release builds (the `preview` profil
 - Android emulator: `adb shell am start -a android.intent.action.VIEW -d "tavlaki://dev/board"`
 
 To try the online screen: open `tavlaki://dev/online` (or pick `dev/online` in `/_sitemap`). The bot plays its turns on its own, and a turn timer that runs out ends that game, as on the real server.
+
+To try an invite link (#256):
+
+1. Open `tavlaki://dev/online`, pick the game, and tap **Make an invite**. The screen shows the code, for example `ABCD2345`.
+2. Open the link: tap **Open the invite**, or on the iOS simulator run `xcrun simctl openurl booted "tavlaki://invite/ABCD2345"` (Android: `adb shell am start -a android.intent.action.VIEW -d "tavlaki://invite/ABCD2345"`).
+3. Tap **Accept**. The board opens, and the bot plays White.
+
+The invite lives on the in-memory server, so it works only while the app runs. A link that opens the app on first launch shows language and consent first, then the invite. The `https://tavlaki.com/i/<code>` link does not open the app yet: it needs universal links and app links.
 
 **Dev menu:** press `m` in the Metro terminal, shake the phone, or press `Cmd+D` (iOS simulator) / `Cmd+M` or `Ctrl+M` (Android emulator). It has reload and the performance monitor.
 

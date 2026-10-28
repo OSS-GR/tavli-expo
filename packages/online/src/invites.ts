@@ -1,14 +1,13 @@
 /**
- * The invite logic, with no Convex code (#252).
+ * The invite logic, with no Convex code (#252, moved here in #256).
  *
- * The Convex functions in `../invites.ts` load an invite, call one check
- * here, and save the result. Everything here is pure: the clock is an
- * argument (`now`, epoch milliseconds) and random values come from the
- * `Rng` the caller passes in. The server passes the secure RNG
- * (`cryptoRng.ts`); tests may pass a seeded one.
- *
- * A later issue moves this file to `@tavli/online`, for the app's
- * in-memory server. So it must not use Convex types.
+ * Two servers use it: the Convex functions in `apps/server/convex/
+ * invites.ts` load an invite, call one check here, and save the result;
+ * the in-memory server (`memory-server.ts`) does the same with a `Map`.
+ * Everything here is pure: the clock is an argument (`now`, epoch
+ * milliseconds) and random values come from the `Rng` the caller passes
+ * in. The Convex server passes its secure RNG (`cryptoRng.ts`); tests may
+ * pass a seeded one.
  */
 
 import { INVITE_CODE_ALPHABET, INVITE_CODE_LENGTH, INVITE_TIME_MS } from '@tavli/contracts';
@@ -21,7 +20,10 @@ import type {
 } from '@tavli/contracts';
 import type { Rng } from '@tavli/engine';
 
-/** A rejected call. The Convex layer turns it into a `ConvexError`. */
+/**
+ * A rejected call. The Convex layer turns it into a `ConvexError`; the
+ * in-memory server into plain `InviteErrorData`.
+ */
 export class InviteError extends Error {
   constructor(
     readonly code: InviteErrorCode,
@@ -68,19 +70,35 @@ export function newInviteCode(rng: Rng): string {
  */
 export const MAX_CODE_TRIES = 10;
 
+/** The codes to try, one per clash: at most `MAX_CODE_TRIES`. */
+function* codeTries(rng: Rng): Generator<string> {
+  for (let i = 0; i < MAX_CODE_TRIES; i++) yield newInviteCode(rng);
+}
+
+function noFreeCode(): Error {
+  return new Error(`no free invite code after ${MAX_CODE_TRIES} tries`);
+}
+
 /**
  * A new code that `isTaken` says is free. On a clash it tries again with
- * a new code, up to `MAX_CODE_TRIES` times.
+ * a new code, up to `MAX_CODE_TRIES` times. The Convex server checks its
+ * table here.
  */
 export async function pickInviteCode(
   rng: Rng,
   isTaken: (code: string) => Promise<boolean>,
 ): Promise<string> {
-  for (let i = 0; i < MAX_CODE_TRIES; i++) {
-    const code = newInviteCode(rng);
-    if (!(await isTaken(code))) return code;
-  }
-  throw new Error(`no free invite code after ${MAX_CODE_TRIES} tries`);
+  for (const code of codeTries(rng)) if (!(await isTaken(code))) return code;
+  throw noFreeCode();
+}
+
+/**
+ * `pickInviteCode` for a server that can check a code at once, such as
+ * the in-memory server (its `createInvite` answers at once).
+ */
+export function pickInviteCodeNow(rng: Rng, isTaken: (code: string) => boolean): string {
+  for (const code of codeTries(rng)) if (!isTaken(code)) return code;
+  throw noFreeCode();
 }
 
 // ---------------------------------------------------------------------------

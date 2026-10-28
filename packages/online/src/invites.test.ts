@@ -19,6 +19,7 @@ import {
   newInvite,
   newInviteCode,
   pickInviteCode,
+  pickInviteCodeNow,
   toInviteView,
 } from './invites';
 import type { InviteRecord } from './invites';
@@ -111,6 +112,34 @@ describe('pickInviteCode', () => {
         return true;
       }),
     ).rejects.toThrow(/no free invite code/);
+    expect(tries).toBe(MAX_CODE_TRIES);
+  });
+});
+
+describe('pickInviteCodeNow', () => {
+  it('picks the same codes as pickInviteCode, with a check that answers at once', async () => {
+    const takenNow: string[] = [];
+    const now = pickInviteCodeNow(createSeededRng(2), (candidate) => {
+      takenNow.push(candidate);
+      return takenNow.length < 3;
+    });
+    const takenLater: string[] = [];
+    const later = await pickInviteCode(createSeededRng(2), async (candidate) => {
+      takenLater.push(candidate);
+      return takenLater.length < 3;
+    });
+    expect(now).toBe(later);
+    expect(takenNow).toEqual(takenLater);
+  });
+
+  it(`gives up after ${MAX_CODE_TRIES} clashes, with the same error`, () => {
+    let tries = 0;
+    expect(() =>
+      pickInviteCodeNow(createSeededRng(3), () => {
+        tries += 1;
+        return true;
+      }),
+    ).toThrow(`no free invite code after ${MAX_CODE_TRIES} tries`);
     expect(tries).toBe(MAX_CODE_TRIES);
   });
 });

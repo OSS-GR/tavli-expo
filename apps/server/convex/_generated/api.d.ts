@@ -14,7 +14,6 @@ import type * as games from "../games.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as model_cryptoRng from "../model/cryptoRng.js";
-import type * as model_invites from "../model/invites.js";
 import type * as model_push from "../model/push.js";
 import type * as push from "../push.js";
 
@@ -31,7 +30,6 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   invites: typeof invites;
   "model/cryptoRng": typeof model_cryptoRng;
-  "model/invites": typeof model_invites;
   "model/push": typeof model_push;
   push: typeof push;
 }>;

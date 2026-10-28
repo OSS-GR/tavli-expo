@@ -6,7 +6,7 @@
  * decline it, the inviter can cancel it, and it expires after
  * `INVITE_TIME_MS` (24 hours).
  *
- * The checks live in `model/invites.ts` (pure, `now` as an argument).
+ * The checks live in `@tavli/online` (`invites.ts`, pure, `now` as an argument).
  * Each mutation is one Convex transaction: if anything throws, nothing
  * is saved.
  *
@@ -23,14 +23,6 @@ import { ConvexError, v } from 'convex/values';
 
 import { normalizeInviteCode } from '@tavli/contracts';
 import type { InviteErrorCode, InviteView } from '@tavli/contracts';
-
-import { internal } from './_generated/api';
-import type { Doc, Id } from './_generated/dataModel';
-import { internalMutation, mutation, query } from './_generated/server';
-import type { MutationCtx, QueryCtx } from './_generated/server';
-import { signedInPlayer } from './caller';
-import { insertGame } from './games';
-import { createCryptoRng } from './model/cryptoRng';
 import {
   InviteError,
   checkAnswer,
@@ -39,7 +31,15 @@ import {
   newInvite,
   pickInviteCode,
   toInviteView,
-} from './model/invites';
+} from '@tavli/online';
+
+import { internal } from './_generated/api';
+import type { Doc, Id } from './_generated/dataModel';
+import { internalMutation, mutation, query } from './_generated/server';
+import type { MutationCtx, QueryCtx } from './_generated/server';
+import { signedInPlayer } from './caller';
+import { insertGame } from './games';
+import { createCryptoRng } from './model/cryptoRng';
 import { gameChoice, gamePace } from './schema';
 
 /** Throws a `ConvexError` with `InviteErrorData`, so clients get the code. */

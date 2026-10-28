@@ -224,7 +224,12 @@
       "live": "Live (1 min a turn)",
       "async": "Async (24 h a turn)",
       "length": "Match length",
-      "start": "Start game"
+      "start": "Start game",
+      "inviteTitle": "Invite from the bot",
+      "inviteIntro": "The bot makes an invite with the game, pace and length above. Open it here, or on a simulator with the command below. The bot plays the game you accept.",
+      "makeInvite": "Make an invite",
+      "inviteCode": "Code: {{code}}",
+      "openInvite": "Open the invite"
     }
   },
   "online": {
@@ -256,6 +261,46 @@
       "refusedTitle": "Not accepted",
       "refused": "The server did not accept your turn. Your moves were taken back."
     }
+  },
+  "invite": {
+    "loading": "Loading the invite…",
+    "open": {
+      "title": "Game invite",
+      "from": "A friend invites you to an online match.",
+      "game": "Game",
+      "length": "Match length",
+      "lengthValue_one": "First to {{count}} point",
+      "lengthValue_other": "First to {{count}} points",
+      "pace": "Pace",
+      "live": "Live · 1 minute per turn",
+      "async": "Async · 24 hours per turn",
+      "accept": "Accept",
+      "decline": "Decline",
+      "busy": "One moment…",
+      "failed": "That did not work. Check the connection and try again."
+    },
+    "expired": {
+      "title": "This invite has expired",
+      "body": "An invite stays open for 24 hours. Ask your friend for a new one."
+    },
+    "used": {
+      "title": "This invite was already used",
+      "body": "Someone answered it, or your friend took it back. Ask for a new one."
+    },
+    "notFound": {
+      "title": "Invite not found",
+      "body": "Check the link, or ask your friend to send it again."
+    },
+    "own": {
+      "title": "This is your own invite",
+      "body": "Send the link to a friend. They accept it on their phone."
+    },
+    "failed": {
+      "title": "The invite did not load",
+      "body": "Check the connection and try again.",
+      "retry": "Try again"
+    },
+    "home": "Home"
   },
   "game": {
     "players": {

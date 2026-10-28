@@ -10,7 +10,11 @@
 
 const ids = new Set<string>();
 
-/** `startDevGame` calls it for each game it starts. */
+/**
+ * The dev game (`startDevGame`, a dev invite) and the invite route call
+ * it for each game on the in-memory server. Invites live there until they
+ * move to Convex (#256).
+ */
 export function rememberDevGame(gameId: string): void {
   ids.add(gameId);
 }
