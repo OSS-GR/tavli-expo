@@ -16,6 +16,12 @@ interface SegmentedControlProps<T extends string> {
   options: readonly SegmentOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /**
+   * The screen reader name of each option. Default: its visible label.
+   * Use it when two groups on one screen share an option name, so each
+   * radio names its group too (for example "Opening roll: Standard").
+   */
+  accessibilityLabelFor?: (option: SegmentOption<T>) => string;
   testID?: string;
 }
 
@@ -28,6 +34,7 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  accessibilityLabelFor,
   testID,
 }: SegmentedControlProps<T>) {
   return (
@@ -44,7 +51,7 @@ export function SegmentedControl<T extends string>({
             key={option.value}
             testID={testID ? `${testID}-${option.value}` : undefined}
             accessibilityRole="radio"
-            accessibilityLabel={option.label}
+            accessibilityLabel={accessibilityLabelFor?.(option) ?? option.label}
             accessibilityHint={option.accessibilityHint}
             accessibilityState={{ checked: selected, disabled }}
             disabled={disabled}

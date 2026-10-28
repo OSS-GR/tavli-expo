@@ -372,7 +372,7 @@ describe('<NewGameScreen /> house rules (#207)', () => {
       'accessibilityLabel',
       'Opening roll',
     );
-    expect(screen.getByRole('radio', { name: 'Standard' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Opening roll: Standard' })).toBeChecked();
     expect(
       screen.getByText(
         'Each player rolls one die. The higher die starts and plays both dice. The federation rule.',
@@ -389,8 +389,8 @@ describe('<NewGameScreen /> house rules (#207)', () => {
     const { ui, onStart } = show('bot');
     await render(ui);
 
-    await user.press(screen.getByRole('radio', { name: 'Roll again' }));
-    expect(screen.getByRole('radio', { name: 'Roll again' })).toBeChecked();
+    await user.press(screen.getByRole('radio', { name: 'Opening roll: Roll again' }));
+    expect(screen.getByRole('radio', { name: 'Opening roll: Roll again' })).toBeChecked();
     expect(
       screen.getByText(
         'Each player rolls one die. The higher die starts and rolls both dice again, so a double is possible.',
@@ -399,7 +399,7 @@ describe('<NewGameScreen /> house rules (#207)', () => {
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     expect(onStart).toHaveBeenLastCalledWith({ ...defaultSetup('bot'), openingRoll: 'rerollBoth' });
 
-    await user.press(screen.getByRole('radio', { name: 'Choose' }));
+    await user.press(screen.getByRole('radio', { name: 'Opening roll: Choose' }));
     expect(
       screen.getByText('You choose who starts: you or the bot. That player rolls both dice.'),
     ).toBeOnTheScreen();
@@ -411,7 +411,7 @@ describe('<NewGameScreen /> house rules (#207)', () => {
     const user = userEvent.setup();
     const { ui, onStart } = show('local');
     await render(ui);
-    await user.press(screen.getByRole('radio', { name: 'Choose' }));
+    await user.press(screen.getByRole('radio', { name: 'Opening roll: Choose' }));
     expect(
       screen.getByText('You choose who starts. That player rolls both dice.'),
     ).toBeOnTheScreen();
@@ -428,8 +428,8 @@ describe('<NewGameScreen /> house rules (#207)', () => {
       openingRoll: 'rerollBoth',
     });
     await render(ui);
-    expect(screen.getByRole('radio', { name: 'Roll again' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Standard' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Opening roll: Roll again' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Opening roll: Standard' })).not.toBeChecked();
   });
 
   it('Greek: the section, the choices and a hint', async () => {
@@ -442,7 +442,7 @@ describe('<NewGameScreen /> house rules (#207)', () => {
       expect(screen.getByRole('header', { name: 'Κανόνες καφενείου' })).toBeOnTheScreen();
       expect(screen.getByText('Πρώτη ζαριά')).toBeOnTheScreen();
       for (const name of ['Κανονικά', 'Ξαναρίχνει', 'Διαλέγουμε']) {
-        expect(screen.getByRole('radio', { name })).toBeOnTheScreen();
+        expect(screen.getByRole('radio', { name: `Πρώτη ζαριά: ${name}` })).toBeOnTheScreen();
       }
       expect(screen.getByText(/Κανόνας της ομοσπονδίας\.$/)).toBeOnTheScreen();
     } finally {
@@ -456,7 +456,9 @@ describe('<NewGameScreen /> house rules (#207)', () => {
 describe('<NewGameScreen /> rules version (#241)', () => {
   const EVERY_GAME = gameLevels(['easy', 'medium']);
   const versions = () => screen.getByTestId('new-game-rules-version');
-  const option = (name: string) => within(versions()).getByRole('radio', { name });
+  /** A version radio: screen readers hear its group first (#243). */
+  const option = (name: string, group = 'Rules version') =>
+    within(versions()).getByRole('radio', { name: `${group}: ${name}` });
   const hint = () => screen.getByTestId('new-game-rules-version-hint');
 
   it('shows the choice only for Plakoto and Asodio', async () => {
@@ -475,13 +477,13 @@ describe('<NewGameScreen /> rules version (#241)', () => {
       within(versions())
         .getAllByRole('radio')
         .map((r) => r.props.accessibilityLabel),
-    ).toEqual(['Standard', 'Federation']);
+    ).toEqual(['Rules version: Standard', 'Rules version: Federation']);
     await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
     expect(
       within(versions())
         .getAllByRole('radio')
         .map((r) => r.props.accessibilityLabel),
-    ).toEqual(['Standard', 'Greek', 'American']);
+    ).toEqual(['Rules version: Standard', 'Rules version: Greek', 'Rules version: American']);
   });
 
   it('keeps the default presets unless a version is picked', async () => {
@@ -575,17 +577,105 @@ describe('<NewGameScreen /> rules version (#241)', () => {
       await user.press(screen.getByRole('radio', { name: /^Πλακωτό/ }));
       expect(screen.getByText('Παραλλαγή')).toBeOnTheScreen();
       expect(versions()).toHaveProp('accessibilityLabel', 'Παραλλαγή');
-      for (const name of ['Κανονική', 'Ομοσπονδίας']) expect(option(name)).toBeOnTheScreen();
+      for (const name of ['Κανονική', 'Ομοσπονδίας']) {
+        expect(option(name, 'Παραλλαγή')).toBeOnTheScreen();
+      }
       await user.press(screen.getByRole('radio', { name: /^Ασόδιο/ }));
       for (const name of ['Κανονική', 'Ελληνική', 'Αμερικάνικη']) {
-        expect(option(name)).toBeOnTheScreen();
+        expect(option(name, 'Παραλλαγή')).toBeOnTheScreen();
       }
-      await user.press(option('Ελληνική'));
+      await user.press(option('Ελληνική', 'Παραλλαγή'));
       expect(hint()).toHaveTextContent(/^Ελληνικοί κανόνες: χτυπάς, δεν πλακώνεις\./);
     } finally {
       await act(async () => {
         await i18n.changeLanguage('en');
       });
     }
+  });
+});
+
+describe('<NewGameScreen /> house rule names for screen readers (#243)', () => {
+  const EVERY_GAME = gameLevels(['easy', 'medium']);
+  const names = (testID: string) =>
+    within(screen.getByTestId(testID))
+      .getAllByRole('radio')
+      .map((radio) => radio.props.accessibilityLabel as string);
+
+  const LANGUAGES = [
+    {
+      language: 'en',
+      opening: ['Opening roll: Standard', 'Opening roll: Roll again', 'Opening roll: Choose'],
+      plakoto: ['Rules version: Standard', 'Rules version: Federation'],
+      asodio: ['Rules version: Standard', 'Rules version: Greek', 'Rules version: American'],
+    },
+    {
+      language: 'el',
+      opening: ['Πρώτη ζαριά: Κανονικά', 'Πρώτη ζαριά: Ξαναρίχνει', 'Πρώτη ζαριά: Διαλέγουμε'],
+      plakoto: ['Παραλλαγή: Κανονική', 'Παραλλαγή: Ομοσπονδίας'],
+      asodio: ['Παραλλαγή: Κανονική', 'Παραλλαγή: Ελληνική', 'Παραλλαγή: Αμερικάνικη'],
+    },
+  ] as const;
+
+  describe.each(LANGUAGES)('$language', ({ language, opening, plakoto, asodio }) => {
+    beforeEach(async () => {
+      await act(async () => {
+        await i18n.changeLanguage(language);
+      });
+    });
+    afterEach(async () => {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    });
+
+    it.each([
+      ['bot', 'plakoto'],
+      ['local', 'plakoto'],
+      ['bot', 'asodio'],
+      ['local', 'asodio'],
+    ] as const)('%s, %s: every house rule radio names its group', async (mode, game) => {
+      const { ui } = show(mode, EVERY_GAME, { ...defaultSetup(mode), game });
+      await render(ui);
+      expect(names('new-game-opening-roll')).toEqual(opening);
+      expect(names('new-game-rules-version')).toEqual(game === 'plakoto' ? plakoto : asodio);
+      // No two radios on New game share a name (game, length, level, board view too).
+      const all = screen
+        .getAllByRole('radio')
+        .map((radio) => radio.props.accessibilityLabel as string);
+      expect(new Set(all).size).toBe(all.length);
+    });
+  });
+
+  it('keeps the visible text short and the selected state', async () => {
+    const user = userEvent.setup();
+    const { ui, onStart } = show('bot', EVERY_GAME, { ...defaultSetup('bot'), game: 'plakoto' });
+    await render(ui);
+    // Both groups still show a plain "Standard".
+    expect(screen.getAllByText('Standard')).toHaveLength(2);
+    expect(screen.queryByText(/^Opening roll: /)).toBeNull();
+    expect(screen.queryByText(/^Rules version: /)).toBeNull();
+
+    const openingStandard = () => screen.getByRole('radio', { name: 'Opening roll: Standard' });
+    const versionStandard = () => screen.getByRole('radio', { name: 'Rules version: Standard' });
+    expect(openingStandard()).toBeChecked();
+    expect(versionStandard()).toBeChecked();
+
+    await user.press(screen.getByRole('radio', { name: 'Rules version: Federation' }));
+    expect(screen.getByRole('radio', { name: 'Rules version: Federation' })).toBeChecked();
+    expect(versionStandard()).not.toBeChecked();
+    expect(openingStandard()).toBeChecked();
+
+    await user.press(screen.getByRole('radio', { name: 'Opening roll: Choose' }));
+    expect(screen.getByRole('radio', { name: 'Opening roll: Choose' })).toBeChecked();
+    expect(openingStandard()).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Rules version: Federation' })).toBeChecked();
+
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    expect(onStart).toHaveBeenLastCalledWith({
+      ...defaultSetup('bot'),
+      game: 'plakoto',
+      openingRoll: 'chosenStarterRolls',
+      rulesVersions: { ...defaultSetup('bot').rulesVersions, plakoto: 'plakoto.federation' },
+    });
   });
 });
