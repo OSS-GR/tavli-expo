@@ -86,6 +86,12 @@ export interface OnlineStoreState {
   readonly sending: boolean;
   readonly notice: OnlineNotice | null;
   /**
+   * How many notices this store has set, the newest included. It names
+   * each notice, so a screen reader hears the same notice again when it
+   * comes back (#255).
+   */
+  readonly noticeCount: number;
+  /**
    * The estimated server time minus the phone time, in milliseconds. 0
    * for the first view; then the highest `estimateOffset` of the newer
    * versions. A view always arrives after its save, so each estimate is
@@ -182,10 +188,21 @@ export function createOnlineStore({
             : error.code === 'STALE_VERSION'
               ? 'stale'
               : 'refused';
-        set({ flow: fresh(), sending: false, notice, lastError: errorText(error) });
+        set((s) => ({
+          flow: fresh(),
+          sending: false,
+          notice,
+          noticeCount: s.noticeCount + 1,
+          lastError: errorText(error),
+        }));
       } else {
         // A network error: keep the moves, so the player can send again.
-        set({ sending: false, notice: 'sendFailed', lastError: errorText(error) });
+        set((s) => ({
+          sending: false,
+          notice: 'sendFailed',
+          noticeCount: s.noticeCount + 1,
+          lastError: errorText(error),
+        }));
       }
     };
 
@@ -239,6 +256,7 @@ export function createOnlineStore({
       loadError: null,
       sending: false,
       notice: null,
+      noticeCount: 0,
       clockOffset: 0,
 
       dispatch: (action) => {

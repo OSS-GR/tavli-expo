@@ -22,7 +22,7 @@
  * card (who starts), the pass card (the roll and why nothing moved), the
  * mother question, the game-end sheet and the match-end screen.
  */
-import { isDouble, matchPhase, type MatchFlow, type PlayerId } from '@tavli/engine';
+import { isDouble, matchPhase, type GameFlow, type MatchFlow, type PlayerId } from '@tavli/engine';
 import type { TFunction } from 'i18next';
 
 import { moveLabel } from '@/features/accessibility/moveList';
@@ -114,4 +114,113 @@ export function turnAnnouncement(
     lines.push(isYou(next) ? t('game.pass.next_you') : t('game.pass.next', { name: nameOf(next) }));
   }
   return { key: `${key}:played`, text: lines.join(' ') };
+}
+
+// ---------------------------------------------------------------------------
+// Online games (#255)
+
+/** Asodio's chosen double after a 1-2: the state keeps it in `variantData`. */
+export function stateHasChosenDouble(game: GameFlow): boolean {
+  const data = game.state.variantData;
+  return typeof data === 'object' && data !== null && 'chosenDouble' in data;
+}
+
+/**
+ * Online, the server rolls the opening: "You start with 6-3." while the
+ * starter's first turn plays the opening dice. `null` at any other time.
+ */
+export function onlineOpeningLine(
+  game: GameFlow,
+  t: TFunction,
+  { nameOf, isYou }: AnnouncementNames,
+): string | null {
+  const { opening, starter } = game;
+  if (
+    opening === null ||
+    starter === null ||
+    opening.white === null ||
+    opening.black === null ||
+    game.lastTurn !== null ||
+    game.state.dice === null ||
+    game.state.rules.match.openingRoll !== 'useOpeningDice'
+  ) {
+    return null;
+  }
+  const high = Math.max(opening.white, opening.black);
+  const low = Math.min(opening.white, opening.black);
+  return isYou(starter)
+    ? t('game.opening.result_you', { high, low })
+    : t('game.opening.result', { name: nameOf(starter), high, low });
+}
+
+/**
+ * Online, the server passes a roll with no legal move by itself. The last
+ * turn was such a pass: "Opponent rolled 6-6. No checker can move."
+ */
+export function onlinePassLine(
+  game: GameFlow,
+  t: TFunction,
+  { nameOf, isYou }: AnnouncementNames,
+): string | null {
+  const last = game.lastTurn;
+  if (last === null || last.moves.length > 0) return null;
+  const dice = last.dice.join('-');
+  return isYou(last.player)
+    ? t('game.pass.body_you', { dice })
+    : t('game.pass.body', { name: nameOf(last.player), dice });
+}
+
+/**
+ * Online (#255): what screen readers hear when a new view arrives. The
+ * other player's whole turn comes at once, with the roll after it, so one
+ * text says both: "Opponent played: …. You rolled 5-3." A pass and the
+ * opening roll (the server does both) are read too. The game screen keys
+ * the text on the game and the view's version, so each view is read once.
+ * Your own moves on the phone are not read again: the text goes once you
+ * move, and comes back with the same key after an undo.
+ */
+export function onlineTurnAnnouncement(
+  flow: MatchFlow,
+  t: TFunction,
+  names: AnnouncementNames,
+): string | null {
+  if (matchPhase(flow) !== 'playing') return null;
+  const { nameOf, isYou } = names;
+  const game = flow.game;
+  const lines: string[] = [];
+  const last = game.lastTurn;
+  const pass = onlinePassLine(game, t, names);
+  if (pass !== null) {
+    lines.push(pass);
+  } else if (last !== null && !isYou(last.player)) {
+    const moves = last.moves.map((move) => moveLabel(t, move)).join('; ');
+    lines.push(t('game.announce.played', { name: nameOf(last.player), moves }));
+  }
+  const dice = game.state.dice;
+  if (game.phase === 'moving' && game.played.length === 0 && dice !== null) {
+    const opening = onlineOpeningLine(game, t, names);
+    const player = game.state.toMove;
+    const you = isYou(player);
+    const name = nameOf(player);
+    if (opening !== null) {
+      lines.push(opening);
+    } else if (isDouble(dice)) {
+      const value = dice[0];
+      const vars = { name, value, double: t(`game.doubles.name.${value}`) };
+      const chosen = stateHasChosenDouble(game);
+      if (chosen) {
+        lines.push(
+          you ? t('game.announce.choseDouble_you', vars) : t('game.announce.choseDouble', vars),
+        );
+      } else {
+        lines.push(
+          you ? t('game.announce.rolledDouble_you', vars) : t('game.announce.rolledDouble', vars),
+        );
+      }
+    } else {
+      const vars = { name, dice: dice.join('-') };
+      lines.push(you ? t('game.announce.rolled_you', vars) : t('game.announce.rolled', vars));
+    }
+  }
+  return lines.length > 0 ? lines.join(' ') : null;
 }

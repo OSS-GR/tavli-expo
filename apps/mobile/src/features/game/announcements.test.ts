@@ -6,11 +6,19 @@ import {
   resolveRules,
   type PlayerId,
 } from '@tavli/engine';
+import { createMemoryGameServer } from '@tavli/online';
+import { pickTurn } from '@tavli/online/testing';
 
 import { gameRuleSet, type OpeningRollRule } from '@/features/match/setup';
+import { viewFlow } from '@/features/online/onlineStore';
 import i18n from '@/i18n';
 
-import { turnAnnouncement, type AnnouncementNames } from './announcements';
+import {
+  onlineOpeningLine,
+  onlineTurnAnnouncement,
+  turnAnnouncement,
+  type AnnouncementNames,
+} from './announcements';
 import { createGameStore } from './gameStore';
 import { diceWereRolled } from './rolledDice';
 
@@ -241,5 +249,57 @@ describe('turnAnnouncement: a chosen double (#202)', () => {
     const { dispatch, announce } = afterAceDeuce('white');
     dispatch({ type: 'answer', player: 'white', choice: value });
     expect(announce()?.text).toBe(`Διάλεξες ${name}: τέσσερις κινήσεις του ${value}.`);
+  });
+});
+
+describe('online announcements (#255)', () => {
+  const online = {
+    nameOf: (p: PlayerId) => (p === 'white' ? 'You' : 'Opponent'),
+    isYou: (p: PlayerId) => p === 'white',
+  };
+  const game = () => {
+    const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => 0 });
+    const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 'live');
+    const view = () => server.getGame(gameId)!;
+    const play = async () => {
+      const player = view().waitingFor === 'white' ? 'me' : 'bot';
+      await server.transportFor(player).sendTurn({
+        gameId,
+        expectedVersion: view().version,
+        moves: pickTurn(view().game, createSeededRng(view().version)),
+      });
+    };
+    return { view, play };
+  };
+
+  it('says who starts, with the server’s opening roll', () => {
+    const { view } = game();
+    const flow = viewFlow(view());
+    const line = onlineOpeningLine(flow.game, i18n.t, online);
+    expect(line).toMatch(/^(You start|Opponent starts) with [1-6]-[1-6]\.$/);
+    // The screen reader hears the same line.
+    expect(onlineTurnAnnouncement(flow, i18n.t, online)).toBe(line);
+  });
+
+  it('reads the opponent’s whole turn and your roll in one text', async () => {
+    const { view, play } = game();
+    while (view().waitingFor !== 'black') await play();
+    await play();
+    const flow = viewFlow(view());
+    expect(onlineOpeningLine(flow.game, i18n.t, online)).toBeNull();
+    const [a, b] = flow.game.state.dice!;
+    const roll = a === b ? /You rolled double/ : new RegExp(`You rolled ${a}-${b}\\.$`);
+    const text = onlineTurnAnnouncement(flow, i18n.t, online);
+    expect(text).toMatch(/^Opponent played: Checker from point \d+ to point \d+/);
+    expect(text).toMatch(roll);
+  });
+
+  it('does not read your own turn back to you', async () => {
+    const { view, play } = game();
+    while (view().waitingFor !== 'white') await play();
+    await play();
+    const flow = viewFlow(view());
+    expect(flow.game.lastTurn?.player).toBe('white');
+    expect(onlineTurnAnnouncement(flow, i18n.t, online)).toMatch(/^Opponent rolled /);
   });
 });

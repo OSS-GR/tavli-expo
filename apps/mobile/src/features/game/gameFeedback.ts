@@ -19,7 +19,7 @@ import {
   type GameFeedback,
 } from '@/features/feedback/feedback';
 
-import type { GameStore, GameStoreState } from './gameStore';
+import type { BoardStore, BoardStoreState } from './gameStore';
 
 /** Both sides: in pass-and-play, every win is a person's win. */
 const BOTH: readonly PlayerId[] = ['white', 'black'];
@@ -78,8 +78,8 @@ export function flowEvents(
 
 /** The events of one store update. A refused action (same flow, an error) is `invalidMove`. */
 export function storeEvents(
-  prev: GameStoreState,
-  next: GameStoreState,
+  prev: BoardStoreState,
+  next: BoardStoreState,
   humans: readonly PlayerId[] = BOTH,
 ): FeedbackEvent[] {
   if (next.flow === prev.flow) return next.lastError !== null ? ['invalidMove'] : [];
@@ -92,7 +92,7 @@ export function storeEvents(
  * `humans`: the sides a person plays (default both, for pass-and-play).
  */
 export function useGameFeedback(
-  store: GameStore,
+  store: BoardStore,
   theme: ThemeManifest,
   humans: readonly PlayerId[] = BOTH,
 ): GameFeedback {

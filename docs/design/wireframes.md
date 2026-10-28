@@ -43,8 +43,9 @@
 | Tutorial | `app/tutorial.tsx` | Push from the Home card, Settings or the Portes rules page (#128); the Plakoto, Fevga and Asodio rules pages open their own lessons (`?game=`, #149, #159), and Settings → Help lets the player pick the game (#159). Not drawn; see the note under Home. |
 | Rules | `app/rules/[variant].tsx` (e.g. `/rules/portes`) | Push. Not drawn here; a scrolling text page with a small start board (`docs/architecture/app-shell.md`, "Rules pages"). |
 | Dialogs (resign, no moves, mother pinned, replace saved game) | — | Components, not routes |
+| Dev online game | `app/dev/online.tsx` | Dev builds only (#255): starts an online game vs the bot on the in-memory server, then pushes the board. Not drawn. |
 
-`[id]` is a local game id in MVP1 (for example `local-<uuid>`). Online games in MVP2 use the server id with the same route.
+`[id]` is a local game id in MVP1 (for example `local-<uuid>`). Online games in MVP2 use the server id with the same route: an id that does not start with `local-` opens the online screen (#255).
 
 ## User flow
 

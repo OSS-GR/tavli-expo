@@ -8,14 +8,15 @@
 |-------|------|--------|
 | Home | `app/index.tsx` | `features/home/HomeScreen.tsx` |
 | New game | `app/new-game.tsx?mode=bot\|local` | `features/new-game/NewGameScreen.tsx` |
-| Board | `app/game/[id]/index.tsx` | `features/match/MatchScreen.tsx` (wraps `GameScreen`) |
-| Match end | `app/game/[id]/match-end.tsx` | `features/match/MatchEndScreen.tsx` |
+| Board | `app/game/[id]/index.tsx` | `features/match/MatchScreen.tsx` (wraps `GameScreen`) for a `local-…` id; `features/online/OnlineMatchScreen.tsx` for an online id (#255) |
+| Match end | `app/game/[id]/match-end.tsx` | `features/match/MatchEndScreen.tsx` (online: `features/online/OnlineMatchEnd.tsx`) |
 | Game review | `app/game/[id]/review.tsx` | `features/review/ReviewScreen.tsx` (#215, see [Board screen](board-screen.md#game-review-215)) |
 | Rules | `app/rules/[variant].tsx` | `features/rules/RulesScreen.tsx` |
 | Settings | `app/settings.tsx` | `features/settings/SettingsScreen.tsx` |
 | History | `app/history.tsx` | `features/history/HistoryScreen.tsx` |
 | Tutorial | `app/tutorial.tsx?from=home\|rules\|settings&game=portes\|plakoto\|fevga\|asodio` | `features/tutorial/TutorialScreen.tsx` |
 | First launch | `app/welcome/language.tsx`, `app/welcome/privacy.tsx` | `features/welcome/` |
+| Dev online game | `app/dev/online.tsx` (dev builds only) | in the route file; see [Board screen → Online mode](board-screen.md#online-mode-255) |
 
 Settings sections: Game (auto-confirm, **Show hints** (the Hint button, #209), board view, **Bot speed**: Slow, Normal, Fast), Sound and feel, Language, Board (board theme; **Your home**: bottom right, the default, or bottom left, which mirrors the board, see [Board screen](board-screen.md#home-board-side-175)), Look (app colors), Accessibility (**Move list**: Automatic, On, Off; Automatic shows it while a screen reader is on, see [Board screen](board-screen.md#accessibility)), Help, History (**Match history**, **Clear history**) and Privacy. Every change saves at once.
 
@@ -190,7 +191,7 @@ The player's past local matches and simple stats, offline.
 
 ## Online games (#254)
 
-The app logic for one online game, with no screen yet. It lives in `features/online/`. The server is the truth: see "Move flow" and "Turn timers" in [Online game service](online-game-service.md).
+The app logic for one online game. It lives in `features/online/`. The screen (#255) is in [Board screen → Online mode](board-screen.md#online-mode-255). The server is the truth: see "Move flow" and "Turn timers" in [Online game service](online-game-service.md).
 
 - **`createOnlineStore({ transport, gameId, me, now })`** (`onlineStore.ts`) is a Zustand store over the `GameTransport` port. `me` is the player id of this phone; the store finds your side in `view.players`. The calls carry no player id: the transport knows the caller.
 - **Views.** The store subscribes at once. Each view with a newer `version` replaces the local flow: `{ schemaVersion, match: view.match, game: view.game, log: [] }` (`viewFlow`). A repeat or an older version is ignored, so your local moves stay. `flow` and `view` are `null` until the first view arrives. A load error (for example `NOT_FOUND`) sets `loadError`.
@@ -198,7 +199,7 @@ The app logic for one online game, with no screen yet. It lives in `features/onl
 - **Calls.** `confirm` sends every move of the turn in order (`sendTurn` with the view's `version` as `expectedVersion`). A `move` with `autoConfirm` sends the turn as soon as it is complete (the engine never confirms online). `answer` (the Plakoto mother question, the Asodio chosen double) goes through `sendAnswer`, and `resignMatch` through `resign`. The engine checks a confirm and an answer first. Online there is no game resign: `resign` is refused.
 - **Sending.** From a call until the server has it **and** its new view is here, `sending` is `true` and every action is refused. A call that fails always clears it.
 - **Refused with no call:** the steps the server does by itself (`roll`, `rollOpening`, `nextGame`, `chooseStarter`, `timeout`), an action for the other side, a move, undo, confirm or answer when it is not your turn, any action before the first view, after the match or after `dispose()`. `resignMatch` works on either turn.
-- **Errors** set `notice` (the screen shows it, then calls `clearNotice`) and `lastError`:
+- **Errors** set `notice` (the screen shows it, then calls `clearNotice`), add 1 to `noticeCount` (it names each notice, so a screen reader hears a repeated one again) and set `lastError`:
   - `STALE_VERSION` → `stale`: the local moves are dropped; the store shows the newest view.
   - `TIMED_OUT` → `timedOut` ("Your time ran out"): the local moves are dropped. The server saved the time out, so its view follows.
   - Any other server code → `refused`: the local moves are dropped.

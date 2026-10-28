@@ -43,12 +43,17 @@ export function tutorialHref(from: TutorialSource, game: TutorialGame = 'portes'
     : ({ pathname: '/tutorial', params: { from, game } } as const);
 }
 
-/** The board of a local match. */
+/** A local match id (`local-…`). Any other id names an online game (#255). */
+export function isLocalGameId(id: string): boolean {
+  return id.startsWith('local-');
+}
+
+/** The board of a local match, or of an online game (#255). */
 export function gameHref(id: string) {
   return { pathname: '/game/[id]', params: { id } } as const;
 }
 
-/** The match-end screen of a finished local match (wireframe 9). */
+/** The match-end screen of a finished match, local or online (wireframe 9). */
 export function matchEndHref(id: string) {
   return { pathname: '/game/[id]/match-end', params: { id } } as const;
 }
