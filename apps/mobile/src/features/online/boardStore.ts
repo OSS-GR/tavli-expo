@@ -10,36 +10,140 @@
  * The match key names the game (`online:<gameId>`), not the store: a new
  * store for the same game (the screen opened again) does not read the
  * same events again (#216).
+ *
+ * Between games (#286). When a game ends but the match goes on, the
+ * server's view already holds the next game and its first roll. A local
+ * game starts the next game only when its game-end sheet closes, so the
+ * board holds the end of the game (`gameEnd`), with the match of the
+ * newest view (the new record and score): the game as it ended, from the
+ * view's `previousGame` (#299). Its `lastTurn` is the turn that ended it,
+ * so the other player's winning turn flies and sounds as a remote turn
+ * (`remoteTurn`), and `GameScreen` opens the sheet only once its checkers
+ * land (`landingWait`). A server without `previousGame`
+ * gives the last flow the board showed of that game, marked over. The
+ * screen draws it as a local game end: the sheet, no dice, no buttons. A
+ * game that ends under the sheet (a time out) takes its place.
+ * `release()` (the sheet's button) shows the newest flow: only then do the
+ * next game's dice tumble and sound, and its turn is read. Only the board
+ * waits: the online store takes every view at once, so the moves, the
+ * deadlines and the time left go on. When the match ends, the board lets
+ * go by itself (match end shows the last game).
+ * Games that ended before the board was made are not held.
  */
-import type { MatchFlow } from '@tavli/engine';
+import { currentBoard, type GameFlow, type GameRecord, type MatchFlow } from '@tavli/engine';
 
 import type { BoardStore, BoardStoreState } from '@/features/game/gameStore';
 
 import type { OnlineStore, OnlineStoreState } from './onlineStore';
 
+export interface OnlineBoardStore extends BoardStore {
+  /** The game-end sheet closes: the board shows the newest view. */
+  release: () => void;
+}
+
+/**
+ * True when `ended` is the game of `record`: over, with its variant and
+ * its result. A `previousGame` that is not the newest game (a server
+ * that did not keep it) fails.
+ */
+function isGameOf(ended: GameFlow, record: GameRecord): boolean {
+  const { result } = ended;
+  return (
+    ended.phase === 'game-over' &&
+    result !== null &&
+    ended.state.variant === record.variant &&
+    result.winner === record.winner &&
+    result.points === record.points &&
+    result.reason === record.reason
+  );
+}
+
+/**
+ * The end of a game as a local game shows it, with the match of `next`.
+ * `ended` is the view's `previousGame`: the game as the server ended it,
+ * with the turn that ended it and the end board (#299). It counts only
+ * when it is the newest game of `next`, the one the sheet shows. Else (an
+ * older server), `from` (the last flow of that game) is marked over with
+ * the result of the newest record of `next`. It only draws: no rule is
+ * judged. The moves of a timed-out turn never counted, so they go.
+ */
+export function gameEnd(
+  from: MatchFlow,
+  next: MatchFlow,
+  ended: GameFlow | null = null,
+): MatchFlow {
+  const record = next.match.games.at(-1);
+  if (record === undefined) return from;
+  if (ended !== null && isGameOf(ended, record)) {
+    // An empty log: the feedback reads it as a view (`onlineStoreEvents`).
+    return { ...from, match: next.match, game: ended, log: [] };
+  }
+  const { game } = from;
+  const board = record.reason === 'timeout' ? game.state.board : currentBoard(game);
+  return {
+    ...from,
+    match: next.match,
+    game: {
+      ...game,
+      phase: 'game-over',
+      state: { ...game.state, board },
+      played: [],
+      result: { winner: record.winner, points: record.points, reason: record.reason },
+    },
+    // An empty log: the feedback reads it as a view (`onlineStoreEvents`).
+    log: [],
+  };
+}
+
 /** `null` until the store has its first view. */
-export function onlineBoardStore(store: OnlineStore, gameId: string): BoardStore | null {
+export function onlineBoardStore(store: OnlineStore, gameId: string): OnlineBoardStore | null {
   const first = store.getState().flow;
   if (first === null) return null;
   const matchKey = `online:${gameId}`;
   const dispatch = store.getState().dispatch;
-  let flow: MatchFlow = first;
+  /** The newest flow of the store. */
+  let latest: MatchFlow = first;
   let refusals = store.getState().refusals;
-  let snapshot: BoardStoreState = { flow, matchKey, lastError: null, dispatch };
+  /** The game end the board shows (`gameEnd`), or `null`. */
+  let held: MatchFlow | null = null;
+  let snapshot: BoardStoreState = { flow: first, matchKey, lastError: null, dispatch };
+  /** One per listener: it reads the store again (after `release`). */
+  const checks = new Set<() => void>();
 
   const read = (state: OnlineStoreState): BoardStoreState => {
     // A store keeps its flow once it has one; keep the last one just in case.
-    const next = state.flow ?? flow;
+    const next = state.flow ?? latest;
+    if (next !== latest) {
+      const before = latest;
+      latest = next;
+      const games = next.match.games.length;
+      if (next.match.status === 'finished') {
+        // Match end: the last game stays on the board, nothing waits.
+        held = null;
+      } else if (games > (held ?? snapshot.flow).match.games.length) {
+        // A game ended. The board shows the end of that game: the view's
+        // `previousGame` (#299), also when it ended under the sheet of the
+        // game before (the store took its views), or when more than one
+        // game ended between two views. It is the newest game (`gameEnd`
+        // checks it), so the board, the label and the Rules of the menu
+        // name the game the sheet shows; a skipped game has no turn to
+        // fly (`remoteTurn` checks the board). Without `previousGame`: the
+        // last flow of that game. Only when a view was missed is that flow
+        // gone: the board keeps the end it shows.
+        const from = before.match.games.length === games - 1 ? before : (held ?? before);
+        held = gameEnd(from, next, state.view?.previousGame ?? null);
+      }
+    }
+    const shown = held ?? latest;
     // The board buzzes on `lastError` (an unchanged flow with an error):
     // only a move this phone refused gives one. A turn that did not go
     // through, or a lost connection, sets `lastError` too, but the notice
     // tells about it. A new refusal is a new snapshot even with the same
     // text, like a `set` of the local store.
     const refused = state.refusals !== refusals;
-    if (next !== snapshot.flow || refused) {
-      flow = next;
+    if (shown !== snapshot.flow || refused) {
       refusals = state.refusals;
-      snapshot = { flow: next, matchKey, lastError: refused ? state.lastError : null, dispatch };
+      snapshot = { flow: shown, matchKey, lastError: refused ? state.lastError : null, dispatch };
     }
     return snapshot;
   };
@@ -51,13 +155,24 @@ export function onlineBoardStore(store: OnlineStore, gameId: string): BoardStore
     // have read the new one first.
     subscribe: (listener) => {
       let seen = read(store.getState());
-      return store.subscribe((state) => {
-        const next = read(state);
+      const check = () => {
+        const next = read(store.getState());
         if (next === seen) return;
         const before = seen;
         seen = next;
         listener(next, before);
-      });
+      };
+      checks.add(check);
+      const stop = store.subscribe(check);
+      return () => {
+        checks.delete(check);
+        stop();
+      };
+    },
+    release: () => {
+      if (held === null) return;
+      held = null;
+      for (const check of [...checks]) check();
     },
   };
 }

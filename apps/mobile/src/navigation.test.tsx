@@ -3,7 +3,7 @@
  * board → menu → Home. (Tests must not live in `src/app`: every file there
  * is a route.)
  */
-import type { createRecordingAnalytics } from '@tavli/contracts';
+import { INVITE_TIME_MS, type createRecordingAnalytics } from '@tavli/contracts';
 import { createGameFlow, portes } from '@tavli/engine';
 import { MAX_OPEN_INVITES } from '@tavli/online';
 import { fireEvent, within } from '@testing-library/react-native';
@@ -12,8 +12,10 @@ import { act, renderRouter, screen } from 'expo-router/testing-library';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
+import { JOINED_OPEN_MS } from '@/features/invites/InviteWaitScreen';
 import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
+import { rememberOnlineAccount } from '@/features/online/accountHint';
 import { DEV_BOT_ID, DEV_TICK_MS, devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
 import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
@@ -911,22 +913,252 @@ describe('invites (#256)', () => {
     expect(screen.queryByTestId('dev-online-invite-error')).toBeNull();
   });
 
-  it('opens an invite link straight away, in any case', async () => {
+  it('opens an invite link on the server after the free account step, in any case (#281)', async () => {
+    const user = setupUser();
     const code = onlineServer().createInvite('friend', 'plakoto', 3, 'async');
     const router = await renderRouter('./src/app', {
       initialUrl: `/invite/${code.toLowerCase()}`,
     });
+    // Opening the link makes no account: the screen asks first.
     expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
-    expect(screen.getByText('Plakoto')).toBeOnTheScreen();
+    expect(screen.getByText(/An online game needs a free account\./)).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
+    await user.press(screen.getByRole('button', { name: 'Show the invite' }));
+    expect(await screen.findByText('Plakoto')).toBeOnTheScreen();
     expect(screen.getByText('Async · 24 hours per turn')).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(1);
     expect(router.getPathname()).toBe(`/invite/${code.toLowerCase()}`);
+  });
+
+  it('a saved session shows the invite at once; Accept opens the game on the server', async () => {
+    const user = setupUser();
+    onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
+    const code = onlineServer().createInvite('friend', 'fevga', 1, 'live');
+    const router = await renderRouter('./src/app', { initialUrl: `/invite/${code}` });
+    await user.press(await screen.findByRole('button', { name: 'Accept' }));
+    const board = router.getPathname();
+    expect(board).toMatch(/^\/game\/game-\d+$/);
+    const gameId = board.split('/').at(-1)!;
+    // Not a dev game: no bot, and the board plays as the signed-in user.
+    expect(onlineServer().getGame(gameId)).toMatchObject({
+      choice: 'fevga',
+      players: { white: 'friend', black: 'guest-1' },
+    });
+    expect(devGameRunning()).toBe(false);
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
   });
 
   it('an unknown invite shows "not found", and Home goes Home', async () => {
     const user = setupUser();
+    onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
     const router = await renderRouter('./src/app', { initialUrl: '/invite/ABCD2345' });
     expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Home' }));
     expect(router.getPathname()).toBe('/');
+  });
+
+  it('a link with no code shows "not found" and makes no account', async () => {
+    await renderRouter('./src/app', { initialUrl: '/invite/ABCD234O' });
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
+  });
+});
+
+describe('play a friend online (#281)', () => {
+  type Router = { getPathname: () => string };
+
+  /** Home → Play a friend → Make an invite. Returns the code of the waiting screen. */
+  async function makeInvite(user: ReturnType<typeof setupUser>, router: Router) {
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    expect(router.getPathname()).toBe('/friend');
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
+    const code = router.getPathname().split('/').at(-1)!;
+    expect(code).toMatch(/^[0-9A-Z]{8}$/);
+    return code;
+  }
+
+  it('makes an invite, waits, and opens the game when the friend accepts', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    expect(onlineFake.authStore.guests).toBe(0);
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
+    await user.press(screen.getByRole('radio', { name: '1' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
+    const code = router.getPathname().split('/').at(-1)!;
+    expect(router.getPathname()).toBe(`/friend/${code}`);
+    expect(screen.getByText(`tavlaki://invite/${code}`)).toBeOnTheScreen();
+    // The guest was made for the invite, and owns it.
+    expect(onlineFake.authStore.guests).toBe(1);
+    expect(onlineServer().getInvite(code)).toMatchObject({
+      from: 'guest-1',
+      choice: 'asodio',
+      targetPoints: 1,
+      status: 'open',
+    });
+
+    let gameId = '';
+    await act(async () => {
+      gameId = await onlineFake.invitesFor('bob').acceptInvite(code);
+    });
+    expect(await screen.findByRole('header', { name: 'Your friend joined' })).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(JOINED_OPEN_MS);
+    });
+    expect(router.getPathname()).toBe(`/game/${gameId}`);
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    // The game replaced the waiting screen, and that replaced the setup: Back goes Home.
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe('/');
+  });
+
+  it('Cancel takes the invite back; the next invite uses the same guest', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    const first = await makeInvite(user, router);
+    await user.press(screen.getByRole('button', { name: 'Cancel the invite' }));
+    expect(router.getPathname()).toBe('/');
+    expect(onlineServer().getInvite(first)?.status).toBe('cancelled');
+
+    const second = await makeInvite(user, router);
+    expect(second).not.toBe(first);
+    expect(onlineFake.authStore.guests).toBe(1);
+    expect(onlineServer().getInvite(second)?.from).toBe('guest-1');
+  });
+
+  it('shows "expired" after 24 hours, and "Make a new invite" opens the setup', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await makeInvite(user, router);
+    await act(async () => {
+      jest.setSystemTime(Date.now() + INVITE_TIME_MS);
+      onlineFake.server().runDueTimeouts();
+    });
+    expect(await screen.findByRole('header', { name: 'The invite expired' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Make a new invite' }));
+    expect(router.getPathname()).toBe('/friend');
+  });
+
+  it('a server error keeps the setup, with a message', async () => {
+    const user = setupUser();
+    const createInvite = jest
+      .spyOn(onlineFake.invites, 'createInvite')
+      .mockRejectedValueOnce(new Error('offline'));
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(
+      await screen.findByText('The invite was not made. Check the connection and try again.'),
+    ).toBeOnTheScreen();
+    expect(router.getPathname()).toBe('/friend');
+    createInvite.mockRestore();
+  });
+
+  it('a waiting-screen link with nobody signed in shows "not found", with no call and no account', async () => {
+    const theirs = await onlineFake
+      .invitesFor('bob')
+      .createInvite({ choice: 'portes', targetPoints: 3, pace: 'live' });
+    const watchInvite = jest.spyOn(onlineFake.invites, 'watchInvite');
+    await renderRouter('./src/app', { initialUrl: `/friend/${theirs}` });
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
+    expect(watchInvite).not.toHaveBeenCalled();
+    expect(onlineFake.authStore.guests).toBe(0);
+    watchInvite.mockRestore();
+  });
+
+  it('a waiting-screen link to a friend\'s invite shows "not found"', async () => {
+    await onlineFake.auth.signInAsGuest();
+    const theirs = await onlineFake
+      .invitesFor('bob')
+      .createInvite({ choice: 'portes', targetPoints: 3, pace: 'live' });
+    await renderRouter('./src/app', { initialUrl: `/friend/${theirs}` });
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Cancel the invite' })).toBeNull();
+    expect(onlineServer().getInvite(theirs)?.status).toBe('open');
+  });
+
+  it('Back from the setup goes Home, and makes no account', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(screen.getByRole('button', { name: 'Back' }));
+    expect(router.getPathname()).toBe('/');
+    expect(onlineFake.authStore.guests).toBe(0);
+  });
+});
+
+describe('your online games on Home (#297)', () => {
+  const ME = 'guest-1';
+
+  /** A game of mine vs Bob, one second after the last change. */
+  function newGame(): string {
+    jest.advanceTimersByTime(1000);
+    return onlineFake.server().createGame(ME, { white: ME, black: 'bob' }, 'portes', 3, 'async');
+  }
+
+  it('a phone with no online account loads no session at start', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    newGame();
+    const ready = jest.spyOn(onlineFake.auth, 'ready');
+    await renderRouter('./src/app', { initialUrl: '/' });
+    expect(await screen.findByText('Greek tavli with friends')).toBeOnTheScreen();
+    expect(ready).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('home-online-games')).toBeNull();
+    ready.mockRestore();
+  });
+
+  it('after an invite, Home lists the game; a tap opens it', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
+    const code = router.getPathname().split('/').at(-1)!;
+    let gameId = '';
+    await act(async () => {
+      gameId = await onlineFake.invitesFor('bob').acceptInvite(code);
+    });
+    await user.press(await screen.findByRole('button', { name: 'Open the game' }));
+    expect(router.getPathname()).toBe(`/game/${gameId}`);
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe('/');
+    const row = await screen.findByTestId(`online-game-${gameId}`);
+    expect(row).toHaveAccessibleName(/^Portes vs friend, /);
+    await user.press(row);
+    expect(router.getPathname()).toBe(`/game/${gameId}`);
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+  });
+
+  it('"See all" lists every game, and a tap opens one', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    rememberOnlineAccount();
+    const ids = [newGame(), newGame(), newGame(), newGame()];
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('link', { name: 'See all (4)' }));
+    expect(router.getPathname()).toBe('/online-games');
+    expect(await screen.findByTestId(`online-game-${ids[0]}`)).toBeOnTheScreen();
+    expect(screen.getAllByTestId(/^online-game-/)).toHaveLength(4);
+    await user.press(screen.getByTestId(`online-game-${ids[0]}`));
+    expect(router.getPathname()).toBe(`/game/${ids[0]}`);
+  });
+
+  it('"See all" with no session says it did not load, and makes no account', async () => {
+    // ready() gives null: maybe no network, so the list offers Try again.
+    await renderRouter('./src/app', { initialUrl: '/online-games' });
+    expect(
+      await screen.findByText('Your online games did not load. Check the connection.'),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
   });
 });

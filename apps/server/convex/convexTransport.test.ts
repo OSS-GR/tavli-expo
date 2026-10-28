@@ -1,10 +1,8 @@
 // The Convex client adapter (`@tavli/backend-convex`, #253) against the
-// real Convex functions, offline. A fake Convex client runs each call
-// through convex-test as one signed-in user (`t.withIdentity`). After
-// each mutation it runs the watched queries again, like the real client,
-// which sends new query results before the mutation resolves. The
-// `GameTransport` contract checks (`@tavli/contracts/testing`) then run
-// on top.
+// real Convex functions, offline. A fake Convex client (`test.network.ts`)
+// runs each call through convex-test as one signed-in user
+// (`t.withIdentity`). The `GameTransport` contract checks
+// (`@tavli/contracts/testing`) then run on top.
 
 import { convexTest } from 'convex-test';
 import { getFunctionName } from 'convex/server';
@@ -26,11 +24,12 @@ import type {
 } from '@tavli/contracts/testing';
 import { createSeededRng } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
-import { motherPin } from '@tavli/online/testing';
+import { lastBearOff, motherPin } from '@tavli/online/testing';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import schema from './schema';
+import { convexTestNetwork } from './test.network';
 import { modules, pickTurn } from './test.setup';
 
 const ALICE = 'alice';
@@ -62,87 +61,14 @@ afterEach(() => {
 type AnyQuery = FunctionReference<'query'>;
 type AnyMutation = FunctionReference<'mutation'>;
 
-/** A query the fake client watches. */
-interface Watched {
-  readonly refresh: () => Promise<void>;
-}
-
-/**
- * Fake Convex clients over one convex-test backend, one client per
- * signed-in user. `settle()` waits until every query run has finished.
- */
-function convexTestNetwork(t: Tester) {
-  const watched = new Set<Watched>();
-  const pending = new Set<Promise<void>>();
-
-  function track(work: Promise<void>): void {
-    pending.add(work);
-    const done = () => {
-      pending.delete(work);
-    };
-    work.then(done, done);
-  }
-
-  async function refreshAll(): Promise<void> {
-    await Promise.all([...watched].map((query) => query.refresh()));
-  }
-
-  function clientFor(subject: string): ConvexGameClient {
-    const user = t.withIdentity({ subject });
-    return {
-      onUpdate(query, args, onResult, onError) {
-        let active = true;
-        // Like Convex: a result goes out only when it changed.
-        let last: string | undefined;
-        // One run at a time, so an old result never comes after a new one.
-        let queue = Promise.resolve();
-        const runOnce = async () => {
-          let key: string;
-          let deliver: () => void;
-          try {
-            const result = await user.query(query as AnyQuery, args);
-            key = `result:${JSON.stringify(result)}`;
-            deliver = () => onResult(result);
-          } catch (error) {
-            key = `error:${String(error)}`;
-            deliver = () => onError(error as Error);
-          }
-          if (!active || key === last) return;
-          last = key;
-          deliver();
-        };
-        const entry: Watched = {
-          refresh: () => {
-            queue = queue.then(runOnce);
-            track(queue);
-            return queue;
-          },
-        };
-        watched.add(entry);
-        void entry.refresh();
-        return () => {
-          active = false;
-          watched.delete(entry);
-        };
-      },
-      async mutation(fn, args) {
-        try {
-          return await user.mutation(fn as AnyMutation, args);
-        } finally {
-          // The real client has the new query results before the mutation resolves.
-          await refreshAll();
-        }
-      },
-    };
-  }
-
+/** Game transports on fake Convex clients over one backend (`test.network.ts`). */
+function gameNetwork(t: Tester) {
+  const network = convexTestNetwork(t);
   return {
     transportFor: (subject: string): GameTransport =>
-      createConvexGameTransport({ client: clientFor(subject) }),
-    settle: async () => {
-      await Promise.all([...pending]);
-      await Promise.resolve();
-    },
+      createConvexGameTransport({ client: network.clientFor(subject) }),
+    settle: network.settle,
+    refreshAll: network.refreshAll,
   };
 }
 
@@ -157,17 +83,25 @@ async function createGame(t: Tester, game: GameTransportContractGame): Promise<I
 
 function contractSubject(): GameTransportContractSubject {
   const t = setup();
-  const network = convexTestNetwork(t);
+  const network = gameNetwork(t);
   const picker = createSeededRng(8);
+  // These change the database outside a client mutation. The real client
+  // gets the new query results by itself; the fake runs its watched
+  // queries again (`watchMyGames`).
+  const refreshed = async <T>(work: Promise<T>): Promise<T> => {
+    const result = await work;
+    await network.refreshAll();
+    return result;
+  };
   return {
-    createGame: (game) => createGame(t, game),
+    createGame: (game) => refreshed(createGame(t, game)),
     createMotherQuestion: async () => {
       const gameId = await createGame(t, { choice: 'plakoto', targetPoints: 1, pace: 'live' });
       const pin = await t.run(async (ctx) => {
         const doc = await ctx.db.get(gameId);
         if (doc === null) throw new Error('no game');
         const { flow, pin } = motherPin(loadFlow(doc.flow));
-        await ctx.db.patch(gameId, { flow: storeFlow(flow) });
+        await ctx.db.patch(gameId, { flow: storeFlow(flow, null) });
         return pin;
       });
       await t.withIdentity({ subject: BOB }).mutation(api.games.makeMove, {
@@ -175,8 +109,29 @@ function contractSubject(): GameTransportContractSubject {
         expectedVersion: 1,
         moves: [...pin],
       });
+      await network.refreshAll();
       return gameId;
     },
+    createWinningTurn: async () => {
+      const gameId = await createGame(t, { choice: 'portes', targetPoints: 3, pace: 'live' });
+      await t.run(async (ctx) => {
+        const doc = await ctx.db.get(gameId);
+        if (doc === null) throw new Error('no game');
+        await ctx.db.patch(gameId, { flow: storeFlow(lastBearOff(loadFlow(doc.flow)), null) });
+      });
+      await network.refreshAll();
+      return gameId;
+    },
+    createOtherGame: () =>
+      refreshed(
+        t.mutation(internal.games.createGame, {
+          callerId: BOB,
+          players: { white: BOB, black: EVE },
+          choice: 'portes',
+          targetPoints: 1,
+          pace: 'live',
+        }),
+      ),
     missingGameId: async () => {
       const gameId = await createGame(t, { choice: 'portes', targetPoints: 1, pace: 'live' });
       await t.run(async (ctx) => ctx.db.delete(gameId));
@@ -185,6 +140,11 @@ function contractSubject(): GameTransportContractSubject {
     transportFor: (who) => network.transportFor(who === 'stranger' ? EVE : PLAYERS[who]),
     legalTurn: (view) => pickTurn(view.game, picker),
     settle: network.settle,
+    passTime: async (ms) => {
+      vi.advanceTimersByTime(ms);
+      await t.finishInProgressScheduledFunctions();
+      await network.refreshAll();
+    },
   };
 }
 
@@ -207,7 +167,7 @@ describe('the adapter on the real functions', () => {
 
   it('a late turn rejects with TIMED_OUT, and both players see the time out', async () => {
     const t = setup();
-    const network = convexTestNetwork(t);
+    const network = gameNetwork(t);
     const gameId = await createGame(t, { choice: 'portes', targetPoints: 5, pace: 'live' });
     const views: OnlineGameView[] = [];
     const stop = network.transportFor(BOB).subscribe(gameId, (view) => views.push(view));
@@ -246,10 +206,15 @@ describe('the adapter on the real functions', () => {
         loaded = t.query(query as AnyQuery, args).then(onResult, onError);
         return () => undefined;
       },
+      query: (fn, args) => t.query(fn as AnyQuery, args),
       mutation: (fn, args) => t.mutation(fn as AnyMutation, args),
     };
     const transport = createConvexGameTransport({ client: anonymous });
     expect(await reasonOf(transport.resign(gameId))).toEqual({
+      code: 'NOT_SIGNED_IN',
+      message: expect.any(String),
+    });
+    expect(await reasonOf(transport.listMyGames({ status: 'active' }))).toEqual({
       code: 'NOT_SIGNED_IN',
       message: expect.any(String),
     });
@@ -263,11 +228,20 @@ describe('the adapter on the real functions', () => {
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(errors).toHaveLength(1);
     expect(errors[0]).toEqual({ code: 'NOT_SIGNED_IN', message: expect.any(String) });
+    const listErrors: unknown[] = [];
+    transport.watchMyGames(
+      { status: 'active' },
+      () => undefined,
+      (error) => listErrors.push(error),
+    );
+    await loaded;
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(listErrors).toEqual([{ code: 'NOT_SIGNED_IN', message: expect.any(String) }]);
   });
 
   it('a string that is no game id fails argument validation: a plain error, not port data', async () => {
     const t = setup();
-    const network = convexTestNetwork(t);
+    const network = gameNetwork(t);
     const transport = network.transportFor(ALICE);
     const reason = await reasonOf(transport.resign('not-a-game-id'));
     expect(reason).toBeInstanceOf(Error);
@@ -309,6 +283,7 @@ describe('function references', () => {
       makeMove: getFunctionName(api.games.makeMove),
       answer: getFunctionName(api.games.answer),
       resign: getFunctionName(api.games.resign),
+      listMyGames: getFunctionName(api.games.listMyGames),
     });
     for (const key of Object.keys(GAME_FUNCTION_NAMES) as (keyof GameFunctions)[]) {
       expect(getFunctionName(GAME_FUNCTIONS[key])).toBe(getFunctionName(api.games[key]));
@@ -322,6 +297,9 @@ describe('function references', () => {
     expectType<Extends<WithGameId<GameFunctions['answer']>, FunctionArgs<Api['answer']>>>();
     expectType<Extends<WithGameId<GameFunctions['resign']>, FunctionArgs<Api['resign']>>>();
     expectType<
+      Extends<FunctionArgs<GameFunctions['listMyGames']>, FunctionArgs<Api['listMyGames']>>
+    >();
+    expectType<
       Extends<FunctionReturnType<Api['getGame']>, FunctionReturnType<GameFunctions['getGame']>>
     >();
     expectType<
@@ -332,6 +310,12 @@ describe('function references', () => {
     >();
     expectType<
       Extends<FunctionReturnType<Api['resign']>, FunctionReturnType<GameFunctions['resign']>>
+    >();
+    expectType<
+      Extends<
+        FunctionReturnType<Api['listMyGames']>,
+        FunctionReturnType<GameFunctions['listMyGames']>
+      >
     >();
     // A wrong type fails: the checks above are not always true.
     // @ts-expect-error -- a number is not a view.

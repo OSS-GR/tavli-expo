@@ -8,10 +8,12 @@ import {
 } from '@tavli/contracts';
 import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
+import { lastBearOff } from '@tavli/online/testing';
 import { getLayout, getTheme } from '@tavli/themes';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
+import { FLIGHT_MS, turnMoveDelay } from '@/features/board/flights';
 import { buildSources } from '@/features/board/interaction';
 import { fitBoardWithShadow, slotRect } from '@/features/board/geometry';
 import { turnView } from '@/features/game/gameStore';
@@ -66,9 +68,12 @@ async function openGame(
   targetPoints = 5,
   botThinkMs = BOT_THINK_MS,
   meTransport: (server: MemoryGameServer) => GameTransport = (server) => server.transportFor('me'),
+  /** Changes the game before anyone watches it (`setFlowForTest`). */
+  prepare?: (server: MemoryGameServer, gameId: string) => void,
 ): Promise<Game> {
   const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
   const gameId = server.createGame('me', { white: 'me', black: 'bot' }, choice, targetPoints, pace);
+  prepare?.(server, gameId);
   bot = startOnlineBot({
     transport: server.transportFor('bot'),
     gameId,
@@ -231,10 +236,158 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect.objectContaining({ winner: 'white', reason: 'timeout' }),
     ]);
     expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/You win the game/);
-    // The win jingle, as in a local game. The next game is under the
-    // sheet: its roll plays no roll sound (its dice still land).
-    expect(sounds.played.filter((s) => s !== 'diceLand')).toEqual(['gameWin']);
+    // The win jingle, as in a local game. The next game waits for the
+    // sheet to close (#286): no roll sound, no dice.
+    expect(sounds.played).toEqual(['gameWin']);
     expect(haptics.calls.filter((h) => h !== 'light')).toEqual(['success']);
+  });
+
+  describe('between games (#286)', () => {
+    /** The bot is too slow: its time runs out and you win game 1. The sheet opens. */
+    async function winGameOne(
+      user: ReturnType<typeof setupUser>,
+      choice: OnlineGameChoice = 'portes',
+      targetPoints = 5,
+    ) {
+      // The classic layout shows the game label ("Game 1 · Portes").
+      await act(async () => {
+        settingsStore.getState().setSetting('boardLayout', 'classic');
+      });
+      const game = await openGame(choice, 'live', targetPoints, TURN_TIME_MS.live * 2);
+      if (view(game).waitingFor === 'white') {
+        await untilYourTurn(game);
+        await playTurnByTaps(game);
+        await user.press(screen.getByTestId('confirm-button'));
+      }
+      expect(view(game).waitingFor).toBe('black');
+      await wait(2000);
+      await act(async () => {
+        jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+        game.server.runDueTimeouts();
+      });
+      expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/You win the game/);
+      return game;
+    }
+
+    const gameLabel = () => screen.getByTestId('game-label', { includeHiddenElements: true });
+
+    it('holds the next game’s dice and sounds until the sheet closes, then plays its roll once', async () => {
+      const announce = jest
+        .spyOn(AccessibilityInfo, 'announceForAccessibility')
+        .mockImplementation(() => {});
+      const user = setupUser();
+      const game = await winGameOne(user);
+      // The server has started game 2, with its first roll.
+      expect(view(game).match.games).toHaveLength(1);
+      expect(view(game).game.phase).toBe('moving');
+      expect(view(game).game.state.dice).not.toBeNull();
+
+      // Under the sheet the board keeps the end of game 1: no dice, no
+      // roll sound, nothing of game 2 read, however long the sheet stays.
+      sounds.played.length = 0;
+      announce.mockClear();
+      await wait(5000);
+      expect(screen.queryByTestId('board-dice')).toBeNull();
+      expect(screen.queryByTestId('confirm-button')).toBeNull();
+      expect(gameLabel()).toHaveTextContent('Game 1 · Portes');
+      expect(sounds.played).toEqual([]);
+      expect(announce).not.toHaveBeenCalled();
+      expect(screen.getByTestId('game-end-card')).toHaveTextContent(/Next: game 2 · Portes/);
+      // The new score, as after a local game.
+      const { score } = view(game).match;
+      expect(score.white).toBeGreaterThan(0);
+      expect(screen.getByTestId('game-end-card')).toHaveTextContent(
+        new RegExp(`You ${score.white} – 0 Opponent`),
+      );
+
+      // The sheet closes: game 2 shows, its dice tumble and sound once,
+      // and its first roll is read once.
+      await user.press(screen.getByTestId('next-game-button'));
+      expect(screen.queryByTestId('game-end-card')).toBeNull();
+      expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
+      expect(gameLabel()).toHaveTextContent('Game 2 · Portes');
+      await wait(3000);
+      expect(sounds.played.filter((s) => s === 'diceRoll')).toEqual(['diceRoll']);
+      expect(sounds.played).not.toContain('gameWin');
+      // "You rolled 3-6." (or who starts, or the opponent's roll), once.
+      expect(announce).toHaveBeenCalledTimes(1);
+      expect(String(announce.mock.calls[0]?.[0])).toMatch(/rolled|start/);
+      announce.mockRestore();
+    });
+
+    it('flies the bot’s winning turn to the end position before the sheet opens (#299)', async () => {
+      const game = await openGame('portes', 'live', 5, BOT_THINK_MS, undefined, (server, id) => {
+        // The bot (Black) bears off its last two checkers with its next turn.
+        server.setFlowForTest(id, lastBearOff(viewFlow(server.getGame(id)!), 'black'));
+      });
+      expect(view(game).waitingFor).toBe('black');
+      sounds.played.length = 0;
+      // The bot thinks, then its whole turn arrives.
+      for (let i = 0; i < 100 && view(game).match.games.length === 0; i++) await wait(50);
+      // Its two checkers fly off one after the other. The sheet waits until
+      // the last one lands, so it never covers them.
+      const landed = turnMoveDelay(1) + FLIGHT_MS;
+      await wait(landed - 1);
+      expect(screen.queryByTestId('game-end-card')).toBeNull();
+      expect(screen.queryByTestId('next-game-button')).toBeNull();
+      await wait(1);
+      expect(screen.getByTestId('game-end-card')).toHaveTextContent(/Opponent wins the game/);
+      await wait(2000);
+      // The server has game 2; its view keeps the bot's winning turn.
+      expect(view(game).match.games).toEqual([
+        expect.objectContaining({ winner: 'black', reason: 'borneOff' }),
+      ]);
+      const winning = view(game).previousGame?.lastTurn;
+      expect(winning?.player).toBe('black');
+      expect(winning?.moves.map((move) => move.to)).toEqual(['off', 'off']);
+      // Its checkers flew off one by one, with their sounds, as any turn of the bot.
+      expect(moveSounds()).toEqual(['bearOff', 'bearOff']);
+      expect(sounds.played).not.toContain('gameWin');
+      expect(screen.queryByTestId('board-dice')).toBeNull();
+    });
+
+    it('keeps the turn timer of the next game running under the sheet', async () => {
+      const user = setupUser();
+      const game = await winGameOne(user);
+      expect(view(game).turnDeadline).not.toBeNull();
+      // The time left of game 2 shows on the strip of the player it waits for.
+      const strip = view(game).waitingFor === 'white' ? 'strip-bottom' : 'strip-top';
+      expect(screen.getByTestId(strip, { includeHiddenElements: true })).toHaveTextContent(/\d+ s/);
+
+      // Nobody plays game 2 while the sheet is open: the server ends it.
+      sounds.played.length = 0;
+      await act(async () => {
+        jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+        game.server.runDueTimeouts();
+      });
+      expect(view(game).match.games).toHaveLength(2);
+      expect(view(game).match.games[1]).toEqual(expect.objectContaining({ reason: 'timeout' }));
+      // The sheet now tells about game 2; still no dice under it.
+      expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/Next: game 3/);
+      expect(screen.queryByTestId('board-dice')).toBeNull();
+      expect(sounds.played.filter((s) => s === 'diceRoll' || s === 'diceLand')).toEqual([]);
+
+      await user.press(screen.getByTestId('next-game-button'));
+      expect(screen.queryByTestId('game-end-card')).toBeNull();
+      expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
+      await wait(3000);
+      expect(sounds.played.filter((s) => s === 'diceRoll')).toEqual(['diceRoll']);
+    });
+
+    it('names game 2 of a Tavli match when it ends under the sheet', async () => {
+      const user = setupUser();
+      const game = await winGameOne(user, 'tavli', 15);
+      expect(gameLabel()).toHaveTextContent('Game 1 · Portes');
+      expect(screen.getByTestId('game-end-card')).toHaveTextContent(/Next: game 2 · Plakoto/);
+      // Nobody plays game 2 (Plakoto) while the sheet is open.
+      await act(async () => {
+        jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+        game.server.runDueTimeouts();
+      });
+      expect(view(game).match.games).toHaveLength(2);
+      expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/Next: game 3 · Fevga/);
+      expect(gameLabel()).toHaveTextContent('Game 2 · Plakoto');
+    });
   });
 
   it('locks the board while the server waits for the bot', async () => {
@@ -302,6 +455,8 @@ describe('<OnlineMatchScreen /> (#255)', () => {
           offline ? Promise.reject(new Error('offline')) : real.sendTurn(request),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
+        listMyGames: (request) => real.listMyGames(request),
+        watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
       };
     });
     const notSent = () =>
@@ -343,6 +498,8 @@ describe('<OnlineMatchScreen /> (#255)', () => {
           }),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
+        listMyGames: (request) => real.listMyGames(request),
+        watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
       };
     });
     await untilYourTurn(game);

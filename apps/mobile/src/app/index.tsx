@@ -1,18 +1,27 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { anyGameLevels } from '@/features/bot/levels';
 import { ContinueCard } from '@/features/home/ContinueCard';
+import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
 import { matchSessions } from '@/features/match/appSessions';
-import { gameHref, newGameHref, rulesHref, tutorialHref } from '@/features/match/routes';
+import {
+  FRIEND_HREF,
+  ONLINE_GAMES_HREF,
+  gameHref,
+  newGameHref,
+  rulesHref,
+  tutorialHref,
+} from '@/features/match/routes';
 import type { SavedMatch } from '@/features/match/savedMatch';
 import { continueSummary } from '@/features/match/summary';
+import { hasOnlineAccount } from '@/features/online/accountHint';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
-import { botLevels } from '@/services';
+import { auth, botLevels, games, invites } from '@/services';
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -33,13 +42,18 @@ function readSlot(): SlotState {
 export default function HomeRoute() {
   const { t } = useTranslation();
   const [slot, setSlot] = useState<SlotState>(readSlot);
-  // Read it again each time Home shows (back from a game).
+  // Online games (#297) only on a phone that has an online account: with
+  // none, Home does not even load the session (no network call at start).
+  const [onlineAccount, setOnlineAccount] = useState(hasOnlineAccount);
+  const focused = useIsFocused();
+  // Read them again each time Home shows (back from a game or an invite).
   useFocusEffect(
     useCallback(() => {
       // `broken` goes back to false here (the save is gone now). The toast
       // was shown already and keeps its own timer. A sticky `broken` would
       // show it again whenever the text changes (a language switch).
       setSlot(readSlot());
+      setOnlineAccount(hasOnlineAccount());
     }, []),
   );
   const { saved } = slot;
@@ -58,6 +72,17 @@ export default function HomeRoute() {
           />
         ) : null
       }
+      onlineGames={
+        onlineAccount && auth !== undefined && games !== undefined ? (
+          <HomeOnlineGames
+            auth={auth}
+            games={games}
+            focused={focused}
+            onOpen={(gameId) => router.push(gameHref(gameId))}
+            onSeeAll={() => router.push(ONLINE_GAMES_HREF)}
+          />
+        ) : null
+      }
       learnCard={
         showLearn ? (
           <LearnCard
@@ -70,6 +95,8 @@ export default function HomeRoute() {
       onSettings={() => router.push('/settings')}
       onHowToPlay={() => router.push(rulesHref('portes'))}
       onHistory={() => router.push('/history')}
+      // Online play needs the server: a build without one shows "Coming soon".
+      onPlayFriend={invites === undefined ? undefined : () => router.push(FRIEND_HREF)}
     />
   );
 }

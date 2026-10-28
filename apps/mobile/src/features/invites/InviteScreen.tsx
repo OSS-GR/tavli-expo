@@ -182,6 +182,8 @@ function OpenInvite({ view, busy, failed, onAccept, onDecline }: OpenInviteProps
     [title, from, ...rows.map((row) => `${row.label}: ${row.value}.`)].join(' '),
     `invite:${view.code}`,
   );
+  // iOS VoiceOver does not read `accessibilityRole="alert"`: read the problem.
+  useAnnouncement(failed ? t('invite.open.failed') : null);
   return (
     <View testID="invite-open" style={styles.card}>
       <Text ref={titleRef} style={styles.title} accessibilityRole="header">
@@ -212,7 +214,7 @@ function OpenInvite({ view, busy, failed, onAccept, onDecline }: OpenInviteProps
       </View>
       {busy !== null ? <Text style={styles.line}>{t('invite.open.busy')}</Text> : null}
       {failed ? (
-        <Text testID="invite-failed" style={styles.line} accessibilityRole="alert">
+        <Text testID="invite-failed" style={styles.line}>
           {t('invite.open.failed')}
         </Text>
       ) : null}

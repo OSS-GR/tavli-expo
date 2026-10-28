@@ -20,10 +20,17 @@ export interface HomeScreenProps {
   onHowToPlay: () => void;
   /** Opens the match history (#142). The link shows only with it. */
   onHistory?: () => void;
+  /**
+   * Opens "Play a friend online" (#281). Without it (a build with no
+   * online server) the button shows "Coming soon".
+   */
+  onPlayFriend?: () => void;
   /** The bot levels this build can play, easiest first (the "Play vs bot" subtitle). */
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). */
   continueCard?: ReactNode;
+  /** "Your online games" (#297), when this phone has an online account. */
+  onlineGames?: ReactNode;
   /** The "Learn to play" card, until the tutorial is done or dismissed (#128). */
   learnCard?: ReactNode;
   /** A one-time message, for example "Your saved game could not be opened." */
@@ -35,8 +42,10 @@ export function HomeScreen({
   onSettings,
   onHowToPlay,
   onHistory,
+  onPlayFriend,
   botLevels,
   continueCard,
+  onlineGames,
   learnCard,
   notice = null,
 }: HomeScreenProps) {
@@ -72,6 +81,7 @@ export function HomeScreen({
           <Text style={styles.tagline}>{t('home.tagline')}</Text>
         </View>
         {continueCard}
+        {onlineGames}
         {learnCard}
         <Text
           style={styles.section}
@@ -95,15 +105,25 @@ export function HomeScreen({
             subtitle={t('home.local.subtitle')}
             onPress={() => onNewGame('local')}
           />
-          <MenuButton
-            testID="home-friend"
-            kind="locked"
-            badge="@"
-            title={t('home.friend.title')}
-            subtitle={t('home.friend.subtitle')}
-            chip={t('common.comingSoon')}
-            onPress={() => showToast(t('home.friend.soon'))}
-          />
+          {onPlayFriend ? (
+            <MenuButton
+              testID="home-friend"
+              badge="@"
+              title={t('home.friend.title')}
+              subtitle={t('home.friend.subtitle')}
+              onPress={onPlayFriend}
+            />
+          ) : (
+            <MenuButton
+              testID="home-friend"
+              kind="locked"
+              badge="@"
+              title={t('home.friend.title')}
+              subtitle={t('home.friend.subtitle')}
+              chip={t('common.comingSoon')}
+              onPress={() => showToast(t('home.friend.soon'))}
+            />
+          )}
         </View>
         <Pressable
           testID="home-how-to-play"

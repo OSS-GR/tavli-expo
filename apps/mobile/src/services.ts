@@ -8,7 +8,11 @@
 import { createPostHogAnalytics } from '@tavli/analytics-posthog';
 import { createExpoSoundPlayer } from '@tavli/audio-expo';
 import { createBetterAuthProvider, createSecureSessionStorage } from '@tavli/auth-better-auth';
-import { createConvexClient, createConvexGameTransport } from '@tavli/backend-convex';
+import {
+  createConvexClient,
+  createConvexGameTransport,
+  createConvexInvites,
+} from '@tavli/backend-convex';
 import { InlineBotRunner, createAnalyzer, createBot, type Analyzer } from '@tavli/bot';
 import {
   createNoopAnalytics,
@@ -113,12 +117,13 @@ export const botLevels: GameLevels = botLevelsByGame(bot);
 export const analyzer: Analyzer = createAnalyzer();
 
 /**
- * Online play (#266): the Convex deployment of this build (`convexUrl.ts`),
- * with Better Auth sign-in on its site URL. Both are made on first use
- * (`onlineServices.ts`): the app makes no network call and no guest
- * account at start. `undefined` when the build has no Convex URL: then
- * online play is off. Both are set, or both are `undefined`. The game
- * route connects through `useOnlineConnection` (`features/online/connection.ts`).
+ * Online play (#266, #281): the Convex deployment of this build
+ * (`convexUrl.ts`), with Better Auth sign-in on its site URL. All are made
+ * on first use (`onlineServices.ts`): the app makes no network call and no
+ * guest account at start. `undefined` when the build has no Convex URL:
+ * then online play is off. `auth`, `games` and `invites` are all set, or
+ * all `undefined`. The game route connects through `useOnlineConnection`
+ * (`features/online/connection.ts`).
  */
 const online = createOnlineServices(convexServer(), {
   createAuth: (baseURL) =>
@@ -130,13 +135,25 @@ const online = createOnlineServices(convexServer(), {
     }),
   createClient: createConvexClient,
   createGames: (client) => createConvexGameTransport({ client }),
+  createInvites: (client) => createConvexInvites({ client }),
 });
 
-/** Sign-in for online play (guest only, for now). Call `signInAsGuest()` when the user opens online play. */
+/**
+ * Sign-in for online play (guest only, for now). Screens make the guest
+ * through `signInForOnline` (`features/online/account.ts`) when the user
+ * makes or opens an invite.
+ */
 export const auth: AuthProvider | undefined = online?.auth;
 
 /** Online games on the Convex deployment. A screen checks `games === undefined` to show that online play is off. */
 export const games: GameTransport | undefined = online?.games;
+
+/**
+ * Invites on the Convex deployment (#281): Play a friend makes them, and
+ * an invite link opens them. Dev invites (`/dev/online`) use `invitesFor`
+ * on the in-memory server instead.
+ */
+export const invites: Invites | undefined = online?.invites;
 
 /**
  * Dev games (#255): one in-memory server for this app run (`@tavli/online`,
@@ -174,9 +191,11 @@ export function gameTransportFor(playerId: string): GameTransport {
 const invitePorts = new Map<string, Invites>();
 
 /**
- * The invite port for `playerId` (#256), on the same in-memory server as
- * `gameTransportFor`: an accepted invite starts its game there. One port
- * per player for the app run. It moves to Convex with the game transport.
+ * The dev invite port for `playerId` (#256), on the same in-memory server
+ * as `gameTransportFor`: an accepted invite starts its game there. One
+ * port per player for the app run. Only dev invites (`isDevInvite`,
+ * `features/online/devGameIds.ts`) use it; every other invite is on
+ * Convex (`invites` above).
  */
 export function invitesFor(playerId: string): Invites {
   let invites = invitePorts.get(playerId);

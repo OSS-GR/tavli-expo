@@ -1,7 +1,7 @@
 /**
  * `GameTransport` on a Convex client (#253, ADR-0004).
  *
- * The client is any object with the two calls below: `ConvexClient` from
+ * The client is any object with the three calls below: `ConvexClient` from
  * `convex/browser` fits, and a test can pass a fake. The calls carry no
  * player id: the client sends the sign-in token (`setAuth`), and the
  * server reads the caller from it (#131).
@@ -11,6 +11,7 @@ import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex
 
 import { isGameTransportErrorData } from '@tavli/contracts';
 import type {
+  GameSummary,
   GameTransport,
   GameTransportErrorData,
   OnlineGameView,
@@ -20,7 +21,7 @@ import type {
 import { GAME_FUNCTIONS } from './functions';
 import type { WriteResult } from './functions';
 
-/** The two Convex client calls the adapter needs. `ConvexClient` has both. */
+/** The three Convex client calls the adapter needs. `ConvexClient` has all of them. */
 export interface ConvexGameClient {
   /**
    * Calls `onResult` with the query result now and after every change, and
@@ -32,6 +33,11 @@ export interface ConvexGameClient {
     onResult: (result: FunctionReturnType<Query>) => unknown,
     onError: (error: Error) => unknown,
   ): () => void;
+  /** Runs a query once. Resolves with its result. */
+  query<Query extends FunctionReference<'query'>>(
+    query: Query,
+    args: FunctionArgs<Query>,
+  ): Promise<Awaited<FunctionReturnType<Query>>>;
   /** Runs a mutation. Resolves with its result once the server saved it. */
   mutation<Mutation extends FunctionReference<'mutation'>>(
     mutation: Mutation,
@@ -53,7 +59,7 @@ function notFound(): GameTransportErrorData {
  * `instanceof`: when two copies of `convex/values` load (ESM and CJS), a
  * real server error is not an instance of this copy's class.
  */
-function isConvexError(error: unknown): error is { readonly data: unknown } {
+export function isConvexError(error: unknown): error is { readonly data: unknown } {
   if (error instanceof ConvexError) return true;
   return (
     typeof error === 'object' &&
@@ -84,7 +90,12 @@ function copyView(view: OnlineGameView): OnlineGameView {
   return JSON.parse(JSON.stringify(view)) as OnlineGameView;
 }
 
-/** Runs a mutation; a rejection becomes the port's error (`toTransportError`). */
+/** A copy of a list: the client may share one cached result between watchers. */
+function copyList(games: readonly GameSummary[]): GameSummary[] {
+  return JSON.parse(JSON.stringify(games)) as GameSummary[];
+}
+
+/** Runs a call; a rejection becomes the port's error (`toTransportError`). */
 async function run<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
@@ -160,6 +171,40 @@ export function createConvexGameTransport(options: ConvexGameTransportOptions): 
 
     async resign(gameId) {
       await run(() => client.mutation(GAME_FUNCTIONS.resign, { gameId }));
+    },
+
+    async listMyGames({ status }) {
+      const games = await run(() => client.query(GAME_FUNCTIONS.listMyGames, { status }));
+      // The client may share a cached result; the caller gets its own copy.
+      return copyList(games);
+    },
+
+    watchMyGames({ status }, onList, onError) {
+      let active = true;
+      // Like `subscribe`: never inside the call, never after the stop function.
+      const later = (deliver: () => void) => {
+        void Promise.resolve().then(() => {
+          if (active) deliver();
+        });
+      };
+      // `listMyGames` is a Convex query, so the client watches it: the
+      // server sends a new result whenever one of the caller's games
+      // changes (#297).
+      const stop = client.onUpdate(
+        GAME_FUNCTIONS.listMyGames,
+        { status },
+        (games) => {
+          later(() => onList(copyList(games)));
+        },
+        (error) => {
+          later(() => onError?.(toTransportError(error)));
+        },
+      );
+      return () => {
+        if (!active) return;
+        active = false;
+        stop();
+      };
     },
   };
 }

@@ -1,6 +1,6 @@
-// The invites of the in-memory server (#256): the Invites contract, and
-// what the contract leaves to each server (the game an accept starts,
-// codes, clashes, a game that cannot start).
+// The invites of the in-memory server (#256, #281): the Invites contract,
+// and what the contract leaves to each server (the game an accept starts,
+// codes, clashes, a game that cannot start, the expiry in runDueTimeouts).
 
 import { describe, expect, it } from 'vitest';
 
@@ -17,6 +17,11 @@ import { createMemoryGameServer } from './memory-server';
 const ALICE = 'alice';
 const BOB = 'bob';
 const START = Date.UTC(2026, 9, 28, 12, 0, 0);
+
+/** Lets the pending microtasks run (the server answers on later microtasks). */
+async function flush(): Promise<void> {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+}
 
 /** A server on a clock that the test moves by hand. */
 function setup(rng: Rng = createSeededRng(1)) {
@@ -35,10 +40,13 @@ function contractSubject(): InvitesContractSubject {
   const ids = { inviter: ALICE, friend: BOB, other: 'carol' } as const;
   return {
     inviterId: ALICE,
-    createInvite: async ({ choice, targetPoints, pace }) =>
-      server.createInvite(ALICE, choice, targetPoints, pace),
     invitesFor: (who) => server.invitesFor(ids[who]),
-    passTime: async (ms) => wait(ms),
+    passTime: async (ms) => {
+      wait(ms);
+      // The in-memory server runs no timers: this is its `expireInvite`.
+      server.runDueTimeouts();
+    },
+    settle: flush,
   };
 }
 
@@ -145,6 +153,59 @@ describe('in-memory invites', () => {
     expect(() => server.cancelInvite(ALICE, 'ABCD2345')).toThrow(
       expect.objectContaining({ code: 'INVITE_NOT_FOUND' }),
     );
+  });
+
+  it('an invite whose time is up shows expired, but watchers hear of it only in runDueTimeouts', async () => {
+    const { server, wait } = setup();
+    const code = server.createInvite(ALICE, 'portes', 1, 'live');
+    const views: (string | undefined)[] = [];
+    const stop = server.invitesFor(ALICE).watchInvite(code, (view) => views.push(view?.status));
+    await flush();
+    wait(INVITE_TIME_MS);
+    expect(server.getInvite(code)?.status).toBe('expired');
+    await flush();
+    expect(views).toEqual(['open']);
+    // Turn time outs are counted; invite expiries are not.
+    expect(server.runDueTimeouts()).toBe(0);
+    await flush();
+    expect(views).toEqual(['open', 'expired']);
+    // Once marked, it is not sent again.
+    server.runDueTimeouts();
+    await flush();
+    expect(views).toEqual(['open', 'expired']);
+    stop();
+  });
+
+  it('watchInvite on text that is not a code sends null', async () => {
+    const { server } = setup();
+    const views: unknown[] = [];
+    const stop = server.invitesFor(BOB).watchInvite('ABC', (view) => views.push(view));
+    await flush();
+    expect(views).toEqual([null]);
+    stop();
+  });
+
+  it('createInvite through the port: the caller is the inviter, and a bad length draws no code', async () => {
+    const draws: number[] = [];
+    const seeded = createSeededRng(4);
+    const counting: Rng = {
+      nextUint32: () => {
+        const value = seeded.nextUint32();
+        draws.push(value);
+        return value;
+      },
+    };
+    const { server } = setup(counting);
+    await expect(
+      server.invitesFor(BOB).createInvite({ choice: 'fevga', targetPoints: 0, pace: 'live' }),
+    ).rejects.toEqual({ code: 'BAD_REQUEST', message: expect.any(String) });
+    expect(draws).toEqual([]);
+    const code = await server
+      .invitesFor(BOB)
+      .createInvite({ choice: 'fevga', targetPoints: 3, pace: 'async' });
+    expect(server.getInvite(code)).toMatchObject({ from: BOB, choice: 'fevga', status: 'open' });
+    expect(await server.invitesFor(BOB).listMyInvites()).toHaveLength(1);
+    expect(await server.invitesFor(ALICE).listMyInvites()).toEqual([]);
   });
 });
 

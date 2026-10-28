@@ -3,7 +3,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ONLINE_GAME_CHOICES, TURN_TIME_MS, isGameTransportErrorData } from '@tavli/contracts';
+import {
+  MAX_LISTED_GAMES,
+  ONLINE_GAME_CHOICES,
+  TURN_TIME_MS,
+  isGameTransportErrorData,
+} from '@tavli/contracts';
 import type {
   GameTransport,
   GameTransportErrorCode,
@@ -19,7 +24,7 @@ import { SERVER_ACTOR } from './calls';
 import { createMemoryGameServer } from './memory-server';
 import type { MemoryGameServer } from './memory-server';
 import { OnlineGameError, createOnlineMatch } from './online-game';
-import { motherPin, pickChoice, pickTurn } from './testing';
+import { lastBearOff, motherPin, pickChoice, pickTurn } from './testing';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -78,7 +83,7 @@ async function rejectsWith(call: Promise<unknown>, code: GameTransportErrorCode)
 }
 
 function contractSubject(): GameTransportContractSubject {
-  const { server } = setup(7);
+  const { server, wait } = setup(7);
   const picker = createSeededRng(8);
   return {
     createGame: async ({ choice, targetPoints, pace }) =>
@@ -94,9 +99,21 @@ function contractSubject(): GameTransportContractSubject {
       await server.transportFor(BOB).sendTurn({ gameId, expectedVersion: 1, moves: pin });
       return gameId;
     },
+    createWinningTurn: async () => {
+      const gameId = server.createGame(ALICE, PLAYERS, 'portes', 3, 'live');
+      const portes = createOnlineMatch(
+        { choice: 'portes', targetPoints: 3, players: PLAYERS },
+        createSeededRng(1),
+      );
+      server.setFlowForTest(gameId, lastBearOff(portes));
+      return gameId;
+    },
+    createOtherGame: async () =>
+      server.createGame(BOB, { white: BOB, black: 'eve' }, 'portes', 1, 'live'),
     missingGameId: async () => 'game-404',
     transportFor: (who) => server.transportFor(who === 'stranger' ? 'eve' : PLAYERS[who]),
     legalTurn: (view) => pickTurn(view.game, picker),
+    passTime: async (ms) => wait(ms),
   };
 }
 
@@ -356,5 +373,44 @@ describe('calls act like a network', () => {
     expect(server.getGame(gameId)?.status).toBe('active');
     await sent;
     expect(server.getGame(gameId)?.status).toBe('finished');
+  });
+});
+
+describe('listMyGames', () => {
+  it('lists at most MAX_LISTED_GAMES games, the newest ones', async () => {
+    const { server, wait } = setup();
+    const ids: string[] = [];
+    for (let i = 0; i < MAX_LISTED_GAMES + 2; i++) {
+      ids.push(server.createGame(ALICE, PLAYERS, 'portes', 1, 'live'));
+      wait(1);
+    }
+    const listed = await server.transportFor(ALICE).listMyGames({ status: 'active' });
+    expect(listed.map((game) => game.gameId)).toEqual(ids.slice(2).reverse());
+  });
+
+  it('gives a copy: changing it changes nothing on the server', async () => {
+    const { server } = setup();
+    const gameId = server.createGame(ALICE, PLAYERS, 'plakoto', 3, 'async');
+    const transport = server.transportFor(BOB);
+    const listed = await transport.listMyGames({ status: 'active' });
+    expect(listed).toEqual([
+      expect.objectContaining({ gameId, choice: 'plakoto', targetPoints: 3, mySide: 'black' }),
+    ]);
+    (listed[0] as { score: { white: number } }).score.white = 9;
+    const again = await transport.listMyGames({ status: 'active' });
+    expect(again[0]?.score).toEqual({ white: 0, black: 0 });
+  });
+
+  it('a time out is a change: the game moves to the top', async () => {
+    const { server, wait } = setup();
+    const first = server.createGame(ALICE, PLAYERS, 'portes', 3, 'live');
+    wait(1000);
+    const second = server.createGame(ALICE, PLAYERS, 'portes', 3, 'live');
+    wait(LIVE - 500);
+    // Only the first game's deadline has passed.
+    expect(server.runDueTimeouts()).toBe(1);
+    const listed = await server.transportFor(ALICE).listMyGames({ status: 'active' });
+    expect(listed.map((game) => game.gameId)).toEqual([first, second]);
+    expect(listed[0]?.updatedAt).toBe(START + LIVE);
   });
 });

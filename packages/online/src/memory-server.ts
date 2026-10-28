@@ -7,6 +7,10 @@
  *
  * It acts like a network:
  * - `subscribe` calls `onView` on a later microtask, never inside the call.
+ * - `listMyGames` (#296) lists the caller's games with `summarizeGame`,
+ *   like the Convex `listMyGames`. `watchMyGames` (#297) sends that list
+ *   again after each change to one of the caller's games, only when the
+ *   list changed (like a Convex query watch).
  * - Every view, request and event is a copy (a JSON round trip), so a
  *   client cannot change the server state, and the server cannot change a
  *   view a client holds.
@@ -15,13 +19,15 @@
  *
  * Time comes from the `now` option. Nothing runs on a timer: call
  * `runDueTimeouts()` to apply the time outs whose deadline has passed (the
- * in-memory version of the Convex `checkTimeout`). Invites need no timer:
- * like on Convex, an open invite counts as expired once `now()` reaches
- * its `expiresAt`.
+ * in-memory version of the Convex `checkTimeout`). Like on Convex, an
+ * open invite counts as expired once `now()` reaches its `expiresAt`;
+ * `runDueTimeouts()` also marks it `expired` and tells its watchers (the
+ * in-memory version of the Convex `expireInvite`).
  */
 
 import { normalizeInviteCode } from '@tavli/contracts';
 import type {
+  GameSummary,
   GameTransport,
   GameTransportErrorData,
   InviteErrorData,
@@ -29,6 +35,7 @@ import type {
   Invites,
   OnlineGameChoice,
   OnlineGamePace,
+  OnlineGameStatus,
   OnlineGameView,
 } from '@tavli/contracts';
 import type { FlowEvent, MatchFlow, PerPlayer, PlayerId, Rng } from '@tavli/engine';
@@ -52,6 +59,7 @@ import {
   checkCancel,
   checkInviteCap,
   countOpenInvites,
+  isInviteExpired,
   newInvite,
   pickInviteCodeNow,
   toInviteView,
@@ -62,12 +70,17 @@ import {
   answerPrompt,
   createOnlineMatch,
   loadFlow,
+  loadStored,
   playTurn,
   resign,
   storeFlow,
+  storeStep,
   timeOut,
+  sideOf,
   toView,
 } from './online-game';
+import type { LoadedFlow, SteppedFlow } from './online-game';
+import { latestGames, summarizeGame } from './summaries';
 
 export interface MemoryGameServerOptions {
   /** The dice. Tests pass a seeded RNG; a dev game may pass any `Rng`. */
@@ -129,7 +142,8 @@ export interface MemoryGameServer {
   /**
    * The invites of `playerId`: every call comes from that player, as with
    * `transportFor`. `acceptInvite` starts the game as the Convex
-   * `acceptInvite` does (the inviter plays white).
+   * `acceptInvite` does (the inviter plays white). `watchInvite` sends a
+   * view on a later microtask after each change.
    */
   invitesFor(playerId: string): Invites;
   /** The invite as a client sees it at `now()` (a copy), or `null` when no invite has the code. */
@@ -143,12 +157,16 @@ export interface MemoryGameServer {
    * Convex scheduler, it runs each check at its deadline: a game that
    * waited two turn times loses two games. Returns how many time outs it
    * applied.
+   *
+   * It also marks each open invite whose time is up `expired`, and sends
+   * the new view to its watchers (not counted in the result).
    */
   runDueTimeouts(): number;
   /**
    * Tests only: replaces the stored flow of a game, like a Convex test
    * that patches `games.flow`. The version, the deadline and the log stay
-   * as they are, and no view is sent. Call it before anyone subscribes.
+   * as they are, no `previousGame` is kept, and no view is sent. Call it
+   * before anyone subscribes.
    */
   setFlowForTest(gameId: string, flow: MatchFlow): void;
 }
@@ -162,11 +180,29 @@ interface MemoryGame extends SavedGame {
   readonly flow: string;
   /** `JSON.stringify(LoggedEvent)` per event. */
   readonly events: readonly string[];
+  /** The last saved change, epoch ms (server clock). */
+  readonly updatedAt: number;
 }
 
 interface Listener {
   readonly gameId: string;
   readonly onView: (view: OnlineGameView) => void;
+  active: boolean;
+}
+
+interface ListListener {
+  readonly playerId: string;
+  readonly status: OnlineGameStatus;
+  readonly onList: (games: readonly GameSummary[]) => void;
+  /** The JSON of the last list sent, so an unchanged list is not sent again. */
+  last: string | null;
+  active: boolean;
+}
+
+interface InviteListener {
+  /** The normalized code, or `null` for text that is not a code. */
+  readonly code: string | null;
+  readonly onView: (view: InviteView | null) => void;
   active: boolean;
 }
 
@@ -204,20 +240,42 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const { rng, now } = options;
   const games = new Map<string, MemoryGame>();
   const listeners = new Set<Listener>();
-  /** By code (capital letters). */
+  const listListeners = new Set<ListListener>();
+  /** By code (capital letters). Kept in the order they were made. */
   const invites = new Map<string, InviteRecord>();
+  const inviteListeners = new Set<InviteListener>();
   let nextId = 1;
 
-  function viewOf(game: MemoryGame): OnlineGameView {
-    return toView({
+  /** The view input of `game`, without its flow. */
+  function gameInput(game: MemoryGame) {
+    return {
       gameId: game.gameId,
       version: game.version,
       choice: game.choice,
       pace: game.pace,
       turnDeadline: game.turnDeadline,
       players: game.players,
-      flow: loadFlow(game.flow),
-    });
+    };
+  }
+
+  function viewOf(game: MemoryGame): OnlineGameView {
+    const { flow, previousGame } = loadStored(game.flow);
+    return toView({ ...gameInput(game), flow, previousGame });
+  }
+
+  /** The games of `playerId` with `status`, like the Convex `listMyGames`. */
+  function myGames(playerId: string, status: OnlineGameStatus): GameSummary[] {
+    const summaries: GameSummary[] = [];
+    for (const game of games.values()) {
+      if (game.status !== status || sideOf(game.players, playerId) === null) continue;
+      summaries.push(
+        summarizeGame(
+          { ...gameInput(game), flow: loadFlow(game.flow), updatedAt: game.updatedAt },
+          playerId,
+        ),
+      );
+    }
+    return latestGames(summaries);
   }
 
   /** Sends a view (JSON text) to `listener` on a later microtask, unless it stops first. */
@@ -233,6 +291,27 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     for (const listener of listeners) {
       if (listener.gameId === game.gameId) send(listener, text);
     }
+    notifyLists(game);
+  }
+
+  /**
+   * Sends the list of `listener` as it is now on a later microtask, unless
+   * it stops first or the list did not change since the last one sent.
+   */
+  function sendList(listener: ListListener): void {
+    const text = JSON.stringify(myGames(listener.playerId, listener.status));
+    later(() => {
+      if (!listener.active || text === listener.last) return;
+      listener.last = text;
+      listener.onList(JSON.parse(text) as GameSummary[]);
+    });
+  }
+
+  /** Sends the new list to each list watcher of a player of `game`. */
+  function notifyLists(game: MemoryGame): void {
+    for (const listener of listListeners) {
+      if (sideOf(game.players, listener.playerId) !== null) sendList(listener);
+    }
   }
 
   function logRows(firstSeq: number, version: number, callerId: string, flow: MatchFlow) {
@@ -247,16 +326,26 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     });
   }
 
-  /** Saves the flow after a step: a version bump, its log rows and a new turn deadline. */
-  function save(game: MemoryGame, callerId: string, flow: MatchFlow, at: number): void {
+  /**
+   * Saves the flow after a step: a version bump, its log rows and a new
+   * turn deadline. `before` is what the step loaded its flow from.
+   */
+  function save(
+    game: MemoryGame,
+    callerId: string,
+    before: LoadedFlow,
+    flow: SteppedFlow,
+    at: number,
+  ): void {
     const version = game.version + 1;
     const saved: MemoryGame = {
       ...game,
-      flow: storeFlow(flow),
+      flow: storeStep(before, flow),
       status: matchStatus(flow),
       version,
       turnDeadline: nextDeadline(game.pace, flow, at),
       events: [...game.events, ...logRows(game.events.length, version, callerId, flow)],
+      updatedAt: at,
     };
     games.set(game.gameId, saved);
     notify(saved);
@@ -264,7 +353,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
 
   /** The player the server waits for loses the current game. */
   function applyTimeout(game: MemoryGame, at: number): void {
-    save(game, SERVER_ACTOR, timeOut(loadFlow(game.flow), rng), at);
+    const before = loadStored(game.flow);
+    save(game, SERVER_ACTOR, before, timeOut(before.flow, rng), at);
   }
 
   /**
@@ -277,7 +367,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     gameId: string,
     expectedVersion: number | null,
     timed: boolean,
-    step: (flow: MatchFlow, side: PlayerId) => MatchFlow,
+    step: (flow: MatchFlow, side: PlayerId) => SteppedFlow,
   ): Promise<void> {
     await nextTick();
     try {
@@ -287,7 +377,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         applyTimeout(game, at);
         throw new OnlineGameError(TIMED_OUT_ERROR.code, TIMED_OUT_ERROR.message);
       }
-      save(game, callerId, step(loadFlow(game.flow), side), at);
+      const before = loadStored(game.flow);
+      save(game, callerId, before, step(before.flow, side), at);
     } catch (error) {
       throw toErrorData(error);
     }
@@ -337,6 +428,21 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       resign(gameId) {
         return playerCall(playerId, gameId, null, false, (flow, side) => resign(flow, side, rng));
       },
+      async listMyGames(request) {
+        const { status } = copy(request);
+        await nextTick();
+        return copy(myGames(playerId, status));
+      },
+      watchMyGames(request, onList) {
+        const { status } = copy(request);
+        const listener: ListListener = { playerId, status, onList, last: null, active: true };
+        listListeners.add(listener);
+        sendList(listener);
+        return () => {
+          listener.active = false;
+          listListeners.delete(listener);
+        };
+      },
     };
   }
 
@@ -352,19 +458,22 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     const gameId = `game-${nextId}`;
     nextId += 1;
     const version = 1;
+    const at = now();
     const game: MemoryGame = {
       gameId,
       players: copy(players),
       choice,
       pace,
       targetPoints,
-      flow: storeFlow(flow),
+      flow: storeFlow(flow, null),
       status: matchStatus(flow),
       version,
-      turnDeadline: nextDeadline(pace, flow, now()),
+      turnDeadline: nextDeadline(pace, flow, at),
       events: logRows(0, version, callerId, flow),
+      updatedAt: at,
     };
     games.set(gameId, game);
+    notifyLists(game);
     return gameId;
   }
 
@@ -383,6 +492,55 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     const code = normalizeInviteCode(text);
     const invite = code === null ? undefined : invites.get(code);
     return invite === undefined ? null : toInviteView(invite, now());
+  }
+
+  /** Sends the view of `code` as it is now to `listener` on a later microtask, unless it stops first. */
+  function sendInvite(listener: InviteListener): void {
+    const text = JSON.stringify(listener.code === null ? null : inviteView(listener.code));
+    later(() => {
+      if (listener.active) listener.onView(JSON.parse(text) as InviteView | null);
+    });
+  }
+
+  /** Saves the invite and sends its new view to each watcher of its code. */
+  function saveInvite(invite: InviteRecord): void {
+    invites.set(invite.code, invite);
+    for (const listener of inviteListeners) {
+      if (listener.code === invite.code) sendInvite(listener);
+    }
+  }
+
+  function makeInvite(
+    callerId: string,
+    choice: OnlineGameChoice,
+    targetPoints: number,
+    pace: OnlineGamePace,
+  ): string {
+    // The cap first, like the Convex function (#275).
+    checkInviteCap(countOpenInvites(invites.values(), callerId, now()));
+    const options = { from: callerId, choice, targetPoints, pace };
+    // Check the arguments before a code is drawn, as the Convex function
+    // throws before it saves anything.
+    const invite = newInvite(options, '', now());
+    const code = pickInviteCodeNow(rng, (taken) => invites.has(taken));
+    saveInvite({ ...invite, code });
+    return code;
+  }
+
+  function cancel(callerId: string, text: string): void {
+    const invite = loadInvite(text);
+    checkCancel(invite, callerId, now());
+    saveInvite({ ...invite, status: 'cancelled' });
+  }
+
+  /** The open invites of `playerId` at `now()`, newest first, like the Convex `listMyInvites`. */
+  function openInvitesOf(playerId: string): InviteView[] {
+    const at = now();
+    return [...invites.values()]
+      .filter((invite) => invite.from === playerId && invite.status === 'open')
+      .filter((invite) => !isInviteExpired(invite, at))
+      .reverse()
+      .map((invite) => toInviteView(invite, at));
   }
 
   /** Runs `step` on a later microtask; errors reject as plain data. */
@@ -413,7 +571,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             invite.targetPoints,
             invite.pace,
           );
-          invites.set(invite.code, { ...invite, status: 'accepted', gameId });
+          saveInvite({ ...invite, status: 'accepted', gameId });
           return gameId;
         });
       },
@@ -421,8 +579,28 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         return inviteCall(() => {
           const invite = loadInvite(text);
           checkAnswer(invite, playerId, now());
-          invites.set(invite.code, { ...invite, status: 'declined' });
+          saveInvite({ ...invite, status: 'declined' });
         });
+      },
+      createInvite(game) {
+        const { choice, targetPoints, pace } = copy(game);
+        return inviteCall(() => makeInvite(playerId, choice, targetPoints, pace));
+      },
+      cancelInvite(text) {
+        return inviteCall(() => cancel(playerId, text));
+      },
+      listMyInvites() {
+        return inviteCall(() => openInvitesOf(playerId));
+      },
+      watchInvite(text, onView) {
+        // Like the Convex `getInvite`, text that is not a code sends `null`.
+        const listener: InviteListener = { code: normalizeInviteCode(text), onView, active: true };
+        inviteListeners.add(listener);
+        sendInvite(listener);
+        return () => {
+          listener.active = false;
+          inviteListeners.delete(listener);
+        };
       },
     };
   }
@@ -430,19 +608,9 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   return {
     createGame,
 
-    createInvite(callerId, choice, targetPoints, pace) {
-      checkInviteCap(countOpenInvites(invites.values(), callerId, now()));
-      const code = pickInviteCodeNow(rng, (taken) => invites.has(taken));
-      const options = { from: callerId, choice, targetPoints, pace };
-      invites.set(code, newInvite(options, code, now()));
-      return code;
-    },
+    createInvite: makeInvite,
 
-    cancelInvite(callerId, text) {
-      const invite = loadInvite(text);
-      checkCancel(invite, callerId, now());
-      invites.set(invite.code, { ...invite, status: 'cancelled' });
-    },
+    cancelInvite: cancel,
 
     invitesFor,
 
@@ -472,13 +640,16 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           game = games.get(gameId);
         }
       }
+      for (const invite of invites.values()) {
+        if (isInviteExpired(invite, at)) saveInvite({ ...invite, status: 'expired' });
+      }
       return applied;
     },
 
     setFlowForTest(gameId, flow) {
       const game = games.get(gameId);
       if (game === undefined) throw new Error(`no game ${gameId}`);
-      games.set(gameId, { ...game, flow: storeFlow(flow), status: matchStatus(flow) });
+      games.set(gameId, { ...game, flow: storeFlow(flow, null), status: matchStatus(flow) });
     },
   };
 }

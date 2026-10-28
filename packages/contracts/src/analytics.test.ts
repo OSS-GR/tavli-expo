@@ -97,6 +97,7 @@ describe('event names', () => {
       'tutorial_skipped',
       'hint_shown',
       'review_opened',
+      'invite_created',
     ]);
   });
 

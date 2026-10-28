@@ -45,6 +45,7 @@ export { BOT_DIFFICULTIES, BotCancelledError, isBotCancelled, isDifficulty } fro
 export type { BotAnswerRequest, BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
 export {
   GAME_TRANSPORT_ERROR_CODES,
+  MAX_LISTED_GAMES,
   ONLINE_GAME_CHOICES,
   ONLINE_GAME_PACES,
   TURN_TIME_MS,
@@ -56,6 +57,8 @@ export type {
   GameTransport,
   GameTransportErrorCode,
   GameTransportErrorData,
+  GameSummary,
+  ListMyGamesRequest,
   OnlineGameChoice,
   OnlineGamePace,
   OnlineGameStatus,
@@ -72,7 +75,14 @@ export {
   isInviteErrorData,
   normalizeInviteCode,
 } from './invite';
-export type { InviteErrorCode, InviteErrorData, InviteStatus, InviteView, Invites } from './invite';
+export type {
+  InviteErrorCode,
+  InviteErrorData,
+  InviteStatus,
+  InviteView,
+  Invites,
+  NewInvite,
+} from './invite';
 export {
   AUTH_ERROR_CODES,
   MEMORY_AUTH_TOKEN_PREFIX,
@@ -81,6 +91,14 @@ export {
   isAuthErrorData,
 } from './auth';
 export type { AuthErrorCode, AuthErrorData, AuthProvider, AuthUser, MemoryAuthStore } from './auth';
+export { PUSH_ERROR_CODES, createRecordingPushProvider, isPushErrorCode } from './push';
+export type {
+  PushErrorCode,
+  PushMessage,
+  PushProvider,
+  PushResult,
+  RecordingPushProvider,
+} from './push';
 export { createMemoryStorage, type Storage } from './storage';
 export { isAnonymousInstallId } from './install-id';
 export {

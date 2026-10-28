@@ -19,6 +19,11 @@ export const gamePace = v.union(...ONLINE_GAME_PACES.map((pace) => v.literal(pac
 
 export const side = v.union(v.literal('white'), v.literal('black'));
 
+export const gameStatus = v.union(v.literal('active'), v.literal('finished'));
+
+/** The phone system of a push token. */
+export const pushPlatform = v.union(v.literal('ios'), v.literal('android'));
+
 const inviteStatus = v.union(...INVITE_STATUSES.map((status) => v.literal(status)));
 
 export default defineSchema({
@@ -35,9 +40,13 @@ export default defineSchema({
     rules: v.string(),
     /** The variant of the current game. */
     variant: v.string(),
-    /** The engine `MatchFlow` without its log, JSON text. The log is in `moves`. */
+    /**
+     * The engine `MatchFlow` without its log, and the game before the
+     * current one as it ended (#299): `StoredFlow` of `@tavli/online`,
+     * JSON text. The log is in `moves`.
+     */
     flow: v.string(),
-    status: v.union(v.literal('active'), v.literal('finished')),
+    status: gameStatus,
     /** The match winner once `status` is `finished`. */
     winner: v.union(side, v.null()),
     /** Goes up by one on every change. Calls send it back as `expectedVersion`. */
@@ -49,9 +58,16 @@ export default defineSchema({
      * the match is finished. `checkTimeout` runs at this time.
      */
     turnDeadline: v.union(v.number(), v.null()),
+    /**
+     * The last saved change, epoch ms (server clock), for "my games"
+     * (#296). Optional only because games saved before #296 have none:
+     * they count their `_creationTime`, and the index puts them last.
+     */
+    updatedAt: v.optional(v.number()),
   })
-    .index('by_white', ['players.white'])
-    .index('by_black', ['players.black']),
+    // "My games" (#296): one player's games with one status, newest change first.
+    .index('by_white', ['players.white', 'status', 'updatedAt'])
+    .index('by_black', ['players.black', 'status', 'updatedAt']),
 
   /** The event log of each game: one engine `FlowEvent` per row, in order. */
   moves: defineTable({
@@ -87,4 +103,20 @@ export default defineSchema({
     // "My open invites" and the cap on them (#275): the open invites of
     // one player whose time is not up are one range (`expiresAt > now`).
     .index('by_from', ['from', 'status', 'expiresAt']),
+
+  /**
+   * The Expo push tokens of each player's phones (#280), for "your turn"
+   * pushes. See "Push" in the service doc. A token belongs to one player
+   * at a time; a player keeps at most `MAX_PUSH_TOKENS_PER_PLAYER`.
+   */
+  pushTokens: defineTable({
+    playerId: v.string(),
+    /** `ExponentPushToken[…]` or `ExpoPushToken[…]` (`isExpoPushToken`). */
+    token: v.string(),
+    platform: pushPlatform,
+    /** When the phone last registered the token, epoch ms (server clock). */
+    updatedAt: v.number(),
+  })
+    .index('by_player', ['playerId', 'updatedAt'])
+    .index('by_token', ['token']),
 });

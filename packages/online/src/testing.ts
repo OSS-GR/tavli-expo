@@ -5,7 +5,7 @@
  */
 
 import { VARIANT_REGISTRY, createBoard, getVariant, plakoto } from '@tavli/engine';
-import type { GameFlow, GameState, MatchFlow, MoveInput, Rng } from '@tavli/engine';
+import type { GameFlow, GameState, MatchFlow, MoveInput, PlayerId, Rng } from '@tavli/engine';
 
 /** A legal full turn for the player to move, picked with `rng`. */
 export function pickTurn(game: GameFlow, rng: Rng): MoveInput[] {
@@ -36,15 +36,20 @@ export interface MotherPin {
 /**
  * Puts the current game of the Plakoto match `flow` in a position where
  * Black, to move with 5-2, can pin White's mother (White's lone checker
- * on its start point). Same position as the engine test
- * `plakoto-mother.test.ts`: `w: 24 6x14 ; b: 10x14 3`.
+ * on its start point): `w: 24 7x14 ; b: 10x14 3`.
+ *
+ * White's 14 other checkers sit on point 7, so every roll after a `playOn`
+ * has a legal move: the wait stays with White whatever the server rolls
+ * (#308). (On point 6, as in the engine test `plakoto-mother.test.ts`,
+ * 6-6 has no move: White passes, and a test that expects White to move
+ * fails once in 36 runs.)
  *
  * A test saves the returned flow on the server (on Convex: patch
  * `games.flow` with `storeFlow`), then sends `pin` as Black's turn.
  */
 export function motherPin(flow: MatchFlow): MotherPin {
   const board = createBoard(
-    { white: { points: { 24: 1, 6: 14 } }, black: { points: { 10: 14, 3: 1 } } },
+    { white: { points: { 24: 1, 7: 14 } }, black: { points: { 10: 14, 3: 1 } } },
     'contrary',
   );
   const state: GameState = {
@@ -69,4 +74,40 @@ export function motherPin(flow: MatchFlow): MotherPin {
     .find((turn) => turn.moves.some((m) => m.capture === 'pin'));
   if (pin === undefined) throw new Error('no pinning turn');
   return { flow: { ...flow, game }, pin: [...pin.moves] };
+}
+
+/**
+ * Puts the current game of the Portes match `flow` in a position where
+ * `player` (White by default), to move with 6-5, bears off its last two
+ * checkers: every legal turn wins the game. The other player has borne
+ * off one checker, so the win is a single game (1 point) and a longer
+ * match goes on.
+ *
+ * A test saves the returned flow on the server (on Convex: patch
+ * `games.flow` with `storeFlow`), then sends any legal turn of `player`.
+ */
+export function lastBearOff(flow: MatchFlow, player: PlayerId = 'white'): MatchFlow {
+  const winner = { points: { 1: 2 }, off: 13 };
+  const loser = { points: { 6: 5, 5: 5, 4: 4 }, off: 1 };
+  const board = createBoard(
+    player === 'white' ? { white: winner, black: loser } : { white: loser, black: winner },
+    'contrary',
+  );
+  const state: GameState = {
+    ...flow.game.state,
+    board,
+    toMove: player,
+    dice: [6, 5],
+    turnNumber: 30,
+  };
+  const game: GameFlow = {
+    ...flow.game,
+    phase: 'moving',
+    state,
+    starter: flow.game.starter ?? player,
+    played: [],
+    lastTurn: null,
+    result: null,
+  };
+  return { ...flow, game };
 }

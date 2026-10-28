@@ -76,6 +76,22 @@
               "NSPrivacyCollectedDataTypePurposeAnalytics",
               "NSPrivacyCollectedDataTypePurposeAppFunctionality"
             ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeGameplayContent",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
           }
         ]
       }

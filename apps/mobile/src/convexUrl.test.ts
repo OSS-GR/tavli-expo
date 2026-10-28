@@ -135,7 +135,7 @@ describe('app.config.ts', () => {
   it.each([
     [undefined, DEV_URL],
     ['development', DEV_URL],
-    ['preview', PROD_URL],
+    ['preview', DEV_URL],
     ['production', PROD_URL],
   ])('APP_VARIANT=%s uses %s', (variant, url) => {
     expect(readConvexUrl(configFor(variant).extra)).toBe(url);
@@ -148,13 +148,13 @@ describe('app.config.ts', () => {
   });
 
   it('ignores an empty EXPO_PUBLIC_CONVEX_URL', () => {
-    expect(readConvexUrl(configFor('preview', '').extra)).toBe(PROD_URL);
+    expect(readConvexUrl(configFor('preview', '').extra)).toBe(DEV_URL);
   });
 
   it.each([
     [undefined, DEV_SITE],
     ['development', DEV_SITE],
-    ['preview', PROD_SITE],
+    ['preview', DEV_SITE],
     ['production', PROD_SITE],
   ])('APP_VARIANT=%s signs in at %s', (variant, site) => {
     expect(readConvexSiteUrl(configFor(variant).extra)).toBe(site);
@@ -171,7 +171,7 @@ describe('app.config.ts', () => {
     const site = 'https://my-own-123.eu-west-1.convex.site';
     expect(readConvexSiteUrl(configFor('production', undefined, site).extra)).toBe(site);
     expect(readConvexSiteUrl(configFor('preview', undefined, ` ${site} `).extra)).toBe(site);
-    expect(readConvexSiteUrl(configFor('preview', undefined, '').extra)).toBe(PROD_SITE);
+    expect(readConvexSiteUrl(configFor('preview', undefined, '').extra)).toBe(DEV_SITE);
   });
 
   it('has no site URL for a local backend unless EXPO_PUBLIC_CONVEX_SITE_URL is set', () => {

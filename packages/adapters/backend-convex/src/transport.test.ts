@@ -6,7 +6,12 @@ import { ConvexError } from 'convex/values';
 import { getFunctionName } from 'convex/server';
 import { describe, expect, it } from 'vitest';
 
-import type { GameTransportErrorData, OnlineGameView, SendTurnRequest } from '@tavli/contracts';
+import type {
+  GameSummary,
+  GameTransportErrorData,
+  OnlineGameView,
+  SendTurnRequest,
+} from '@tavli/contracts';
 
 import { GAME_FUNCTIONS, GAME_FUNCTION_NAMES } from './functions';
 import { createConvexGameTransport, toTransportError } from './transport';
@@ -31,6 +36,7 @@ interface Deferred {
 function fakeClient() {
   const subscriptions: Subscription[] = [];
   const mutations: Deferred[] = [];
+  const queries: Deferred[] = [];
   const client: ConvexGameClient = {
     onUpdate(query, args, onResult, onError) {
       const sub: Subscription = {
@@ -44,6 +50,16 @@ function fakeClient() {
       return () => {
         sub.stops += 1;
       };
+    },
+    query(fn, args) {
+      return new Promise((resolve, reject) => {
+        queries.push({
+          name: getFunctionName(fn),
+          args,
+          resolve: resolve as (value: unknown) => void,
+          reject,
+        });
+      });
     },
     mutation(fn, args) {
       return new Promise((resolve, reject) => {
@@ -60,6 +76,7 @@ function fakeClient() {
     client,
     subscriptions,
     mutations,
+    queries,
     /** The last mutation call. */
     lastMutation(): Deferred {
       const call = mutations[mutations.length - 1];
@@ -310,6 +327,110 @@ describe('sendAnswer and resign', () => {
     const call = transport.resign('g1');
     fake.lastMutation().reject(new ConvexError({ code: 'NOT_SIGNED_IN', message: 'sign in' }));
     expect(await reasonOf(call)).toEqual({ code: 'NOT_SIGNED_IN', message: 'sign in' });
+  });
+});
+
+describe('listMyGames', () => {
+  /** A summary stub: the adapter passes summaries through without reading them. */
+  function summaryStub(gameId: string): GameSummary {
+    return { gameId, score: { white: 1, black: 0 } } as GameSummary;
+  }
+
+  it('runs the listMyGames query once and resolves with a copy of its result', async () => {
+    const fake = fakeClient();
+    const transport = createConvexGameTransport({ client: fake.client });
+    const call = transport.listMyGames({ status: 'finished' });
+    expect(fake.queries).toHaveLength(1);
+    const query = fake.queries[0] as Deferred;
+    expect(query.name).toBe('games:listMyGames');
+    expect(query.args).toEqual({ status: 'finished' });
+    // The real client may hand the same cached result to every caller.
+    const shared = [summaryStub('g1'), summaryStub('g2')];
+    query.resolve(shared);
+    const games = await call;
+    expect(games).toEqual(shared);
+    expect(games).not.toBe(shared);
+    expect(games[0]).not.toBe(shared[0]);
+  });
+
+  it('a server error rejects with its plain data; any other error as it is', async () => {
+    const fake = fakeClient();
+    const transport = createConvexGameTransport({ client: fake.client });
+    const signedOut = transport.listMyGames({ status: 'active' });
+    (fake.queries[0] as Deferred).reject(
+      new ConvexError({ code: 'NOT_SIGNED_IN', message: 'sign in first' }),
+    );
+    expect(await reasonOf(signedOut)).toEqual({ code: 'NOT_SIGNED_IN', message: 'sign in first' });
+    const lost = transport.listMyGames({ status: 'active' });
+    const network = new Error('connection lost');
+    (fake.queries[1] as Deferred).reject(network);
+    expect(await reasonOf(lost)).toBe(network);
+  });
+});
+
+describe('watchMyGames', () => {
+  function summaryStub(gameId: string): GameSummary {
+    return { gameId, score: { white: 1, black: 0 } } as GameSummary;
+  }
+
+  function watchList(transport: ReturnType<typeof createConvexGameTransport>) {
+    const lists: (readonly GameSummary[])[] = [];
+    const errors: unknown[] = [];
+    const stop = transport.watchMyGames(
+      { status: 'active' },
+      (games) => lists.push(games),
+      (error) => errors.push(error),
+    );
+    return { lists, errors, stop };
+  }
+
+  it('watches the listMyGames query and sends a copy of each list on a later microtask', async () => {
+    const fake = fakeClient();
+    const transport = createConvexGameTransport({ client: fake.client });
+    const a = watchList(transport);
+    const b = watchList(transport);
+    expect(fake.subscriptions).toHaveLength(2);
+    const sub = fake.subscriptions[0] as Subscription;
+    expect(sub.name).toBe('games:listMyGames');
+    expect(sub.args).toEqual({ status: 'active' });
+    // The real client hands the same cached result to every watcher.
+    const shared = [summaryStub('g1')];
+    for (const s of fake.subscriptions) s.onResult(shared);
+    expect(a.lists).toEqual([]);
+    await flush();
+    expect(a.lists).toEqual([shared]);
+    expect(a.lists[0]).not.toBe(shared);
+    expect(a.lists[0]).not.toBe(b.lists[0]);
+    sub.onResult([summaryStub('g2'), summaryStub('g1')]);
+    await flush();
+    expect(a.lists.map((list) => list.map((game) => game.gameId))).toEqual([['g1'], ['g2', 'g1']]);
+  });
+
+  it('a server error becomes its plain data; any other error stays as it is', async () => {
+    const fake = fakeClient();
+    const watcher = watchList(createConvexGameTransport({ client: fake.client }));
+    const sub = fake.subscriptions[0] as Subscription;
+    sub.onError(new ConvexError({ code: 'NOT_SIGNED_IN', message: 'sign in first' }));
+    const network = new Error('connection lost');
+    sub.onError(network);
+    expect(watcher.errors).toEqual([]);
+    await flush();
+    expect(watcher.errors).toEqual([{ code: 'NOT_SIGNED_IN', message: 'sign in first' }, network]);
+    expect(watcher.errors[1]).toBe(network);
+  });
+
+  it('stop ends the client subscription once, and drops results not yet sent', async () => {
+    const fake = fakeClient();
+    const watcher = watchList(createConvexGameTransport({ client: fake.client }));
+    const sub = fake.subscriptions[0] as Subscription;
+    sub.onResult([summaryStub('g1')]);
+    sub.onError(new Error('late'));
+    watcher.stop();
+    watcher.stop();
+    expect(sub.stops).toBe(1);
+    await flush();
+    expect(watcher.lists).toEqual([]);
+    expect(watcher.errors).toEqual([]);
   });
 });
 

@@ -5,7 +5,8 @@
  * (#215) with its switch (#230), History (#142), the tutorial's mother
  * card (#149), the Settings game picker (#159) and the online game
  * screen with its game-end sheet and match end (#255) and the invite
- * screen (#256) follow the font size with no cut text. The game screen, its cards and
+ * screen (#256), Play a friend online with its waiting screen (#281), and
+ * your online games on Home and "See all" (#297) follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
  * cannot measure text, so `textScalingProblems` checks the layout rules
@@ -25,7 +26,12 @@ import {
   type BoardState,
   type Match,
 } from '@tavli/engine';
-import { INVITE_TIME_MS, TURN_TIME_MS } from '@tavli/contracts';
+import {
+  createMemoryAuthProvider,
+  createMemoryAuthStore,
+  INVITE_TIME_MS,
+  TURN_TIME_MS,
+} from '@tavli/contracts';
 import { createMemoryGameServer } from '@tavli/online';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
@@ -33,9 +39,12 @@ import { StyleSheet } from 'react-native';
 import { HistoryScreen } from '@/features/history/HistoryScreen';
 import type { HistoryRecord } from '@/features/history/records';
 import { ContinueCard } from '@/features/home/ContinueCard';
+import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
+import { FriendSetupScreen } from '@/features/invites/FriendSetupScreen';
 import { InviteScreen } from '@/features/invites/InviteScreen';
+import { InviteWaitScreen } from '@/features/invites/InviteWaitScreen';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
 import { GameScreen, OPENING_RESULT_MS } from '@/features/game/GameScreen';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
@@ -43,6 +52,7 @@ import { MatchScreen } from '@/features/match/MatchScreen';
 import { createSessionRegistry } from '@/features/match/sessions';
 import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
+import { MyGamesScreen } from '@/features/online/MyGamesScreen';
 import { startOnlineBot } from '@/features/online/onlineBot';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
 import { onlineSeats } from '@/features/online/seats';
@@ -547,6 +557,94 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     clock += INVITE_TIME_MS;
     await renderWithRoot(<InviteScreen code={code} {...props} />);
     expect(await screen.findByTestId('invite-home')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
+
+  it('play a friend online: the setup, the waiting screen, joined and expired (#281)', async () => {
+    let clock = Date.now();
+    const server = createMemoryGameServer({ rng: createSeededRng(4), now: () => clock });
+    const auth = createMemoryAuthProvider(createMemoryAuthStore());
+    const setup = await renderWithRoot(
+      <FriendSetupScreen
+        auth={auth}
+        invites={server.invitesFor('me')}
+        onCreated={jest.fn()}
+        onBack={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId('friend-make')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await setup.unmount();
+
+    const props = { onGame: jest.fn(), onNewInvite: jest.fn(), onHome: jest.fn() };
+    const joined = server.createInvite('me', 'tavli', 5, 'async');
+    const wait = await renderWithRoot(
+      <InviteWaitScreen code={joined} me="me" invites={server.invitesFor('me')} {...props} />,
+    );
+    expect(await screen.findByTestId('invite-wait-share')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await act(async () => {
+      await server.invitesFor('friend').acceptInvite(joined);
+    });
+    expect(await screen.findByTestId('invite-wait-open-game')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await wait.unmount();
+
+    const expired = server.createInvite('me', 'portes', 1, 'live');
+    clock += INVITE_TIME_MS;
+    await renderWithRoot(
+      <InviteWaitScreen code={expired} me="me" invites={server.invitesFor('me')} {...props} />,
+    );
+    expect(await screen.findByTestId('invite-wait-again')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
+
+  it('your online games: Home, "See all", and a list that did not load (#297)', async () => {
+    const server = createMemoryGameServer({ rng: createSeededRng(4), now: () => Date.now() });
+    const store = createMemoryAuthStore();
+    store.session = { id: 'me', isGuest: true };
+    const auth = createMemoryAuthProvider(store);
+    const games = server.transportFor('me');
+    for (const choice of ['tavli', 'asodio', 'plakoto', 'fevga'] as const) {
+      server.createGame('me', { white: 'me', black: 'friend' }, choice, 5, 'async');
+    }
+    const home = await renderWithRoot(
+      <HomeScreen
+        onNewGame={jest.fn()}
+        onSettings={jest.fn()}
+        onHowToPlay={jest.fn()}
+        botLevels={['easy']}
+        onlineGames={
+          <HomeOnlineGames
+            auth={auth}
+            games={games}
+            focused
+            onOpen={jest.fn()}
+            onSeeAll={jest.fn()}
+          />
+        }
+      />,
+    );
+    expect(await screen.findByTestId('online-games-see-all')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await home.unmount();
+
+    const all = await renderWithRoot(
+      <MyGamesScreen auth={auth} games={games} focused onOpen={jest.fn()} />,
+    );
+    expect(await screen.findAllByTestId(/^online-game-/)).toHaveLength(4);
+    expect(problems()).toEqual([]);
+    await all.unmount();
+
+    const offline = {
+      ...games,
+      watchMyGames: (_request: unknown, _onList: unknown, onError?: (error: unknown) => void) => {
+        void Promise.resolve().then(() => onError?.(new Error('offline')));
+        return () => undefined;
+      },
+    };
+    await renderWithRoot(<MyGamesScreen auth={auth} games={offline} focused onOpen={jest.fn()} />);
+    expect(await screen.findByTestId('online-games-retry')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   });
 
