@@ -13,6 +13,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 
 import { InviteWaitScreen } from '@/features/invites/InviteWaitScreen';
 import { FRIEND_HREF, gameHref, parseIdParam } from '@/features/match/routes';
+import { useTurnPushOffering } from '@/features/notifications/appTurnPushes';
 import { useOnlineAccount } from '@/features/online/account';
 import { auth, invites } from '@/services';
 
@@ -41,6 +42,8 @@ function SignedInWait({
   invites: Invites;
 }) {
   const { account } = useOnlineAccount(auth);
+  // The turn notifications offer (#285) shows over this screen after an async invite.
+  const covered = useTurnPushOffering();
   const me =
     account.status === 'loading' ? undefined : account.status === 'signedIn' ? account.me : null;
   return (
@@ -51,6 +54,7 @@ function SignedInWait({
       onGame={(gameId) => router.replace(gameHref(gameId))}
       onNewInvite={() => router.replace(FRIEND_HREF)}
       onHome={goHome}
+      covered={covered}
     />
   );
 }

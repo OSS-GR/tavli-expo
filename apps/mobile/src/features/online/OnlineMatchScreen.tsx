@@ -50,6 +50,11 @@ export interface OnlineMatchScreenProps {
   me: string;
   /** Another screen is on top (Settings). */
   paused?: boolean;
+  /**
+   * A sheet of the root layout covers the board (the turn notifications
+   * offer, #285): the screen is hidden from screen readers and paused.
+   */
+  covered?: boolean;
   onExit: () => void;
   onSettings: () => void;
   /** The rules of the game on the board, in its preset. */
@@ -113,6 +118,7 @@ function OnlineBoard({
   side,
   gameId,
   paused = false,
+  covered = false,
   onExit,
   onSettings,
   onRules,
@@ -292,8 +298,8 @@ function OnlineBoard({
         store={board}
         seats={seats}
         online={online}
-        paused={paused || overlay !== 'none'}
-        covered={content !== null}
+        paused={paused || covered || overlay !== 'none'}
+        covered={covered || content !== null}
         onOpenMenu={() => setOverlay('menu')}
         onHome={onExit}
         onMatchOver={onMatchOver}

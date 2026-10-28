@@ -11,12 +11,15 @@
  *   cancel too; the screen keeps that view back until Cancel answers, so
  *   no "cancelled" card shows (or is read) on the way Home.
  * - Screen readers: each card moves focus to its title and is read once.
- *   Large fonts scroll: no text has a line limit.
+ *   Large fonts scroll: no text has a line limit. While another sheet
+ *   covers the screen (`covered`: the turn notifications offer, #285), the
+ *   screen is hidden from screen readers, and a card takes focus and is
+ *   read only once the sheet is gone.
  *
  * Navigation stays in the route (`app/friend/[code].tsx`).
  */
 import { isInviteErrorData, type Invites } from '@tavli/contracts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, Share, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -37,6 +40,9 @@ import {
 /** How long "Your friend joined" shows before the game opens. */
 export const JOINED_OPEN_MS = 1500;
 
+/** True while another sheet covers the screen: the cards wait to take focus and be read. */
+const Covered = createContext(false);
+
 export interface InviteWaitScreenProps {
   /** The invite code, in capital letters. */
   code: string;
@@ -52,6 +58,8 @@ export interface InviteWaitScreenProps {
   /** Make a new invite. */
   onNewInvite: () => void;
   onHome: () => void;
+  /** Another sheet is over the screen (the turn notifications offer). */
+  covered?: boolean;
 }
 
 export function InviteWaitScreen({
@@ -61,6 +69,7 @@ export function InviteWaitScreen({
   onGame,
   onNewInvite,
   onHome,
+  covered = false,
 }: InviteWaitScreenProps) {
   const [state, setState] = useState<WaitState>({ kind: 'loading' });
   // Each "Try again" watches once more.
@@ -148,38 +157,48 @@ export function InviteWaitScreen({
   };
 
   return (
-    <ScrollView
-      testID="invite-wait-screen"
+    // The view that hides its content always keeps its children (#173).
+    <View
       style={styles.screen}
-      contentContainerStyle={styles.content}>
-      {shown.kind === 'loading' ? (
-        <Loading />
-      ) : shown.kind === 'open' ? (
-        <Waiting
-          code={code}
-          cancelling={cancelling}
-          cancelFailed={cancelFailed}
-          onCancel={cancel}
-        />
-      ) : shown.kind === 'joined' ? (
-        <Joined code={code} gameId={shown.gameId} onGame={onGame} />
-      ) : (
-        // A new state is a new card, so focus moves to its title again.
-        <Closed
-          key={shown.kind}
-          kind={shown.kind}
-          onRetry={retry}
-          onNewInvite={onNewInvite}
-          onHome={onHome}
-        />
-      )}
-    </ScrollView>
+      collapsable={false}
+      importantForAccessibility={covered ? 'no-hide-descendants' : 'auto'}
+      accessibilityElementsHidden={covered}>
+      <Covered value={covered}>
+        <ScrollView
+          testID="invite-wait-screen"
+          style={styles.screen}
+          contentContainerStyle={styles.content}>
+          {shown.kind === 'loading' ? (
+            <Loading />
+          ) : shown.kind === 'open' ? (
+            <Waiting
+              code={code}
+              cancelling={cancelling}
+              cancelFailed={cancelFailed}
+              onCancel={cancel}
+            />
+          ) : shown.kind === 'joined' ? (
+            <Joined code={code} gameId={shown.gameId} onGame={onGame} />
+          ) : (
+            // A new state is a new card, so focus moves to its title again.
+            <Closed
+              key={shown.kind}
+              kind={shown.kind}
+              onRetry={retry}
+              onNewInvite={onNewInvite}
+              onHome={onHome}
+            />
+          )}
+        </ScrollView>
+      </Covered>
+    </View>
   );
 }
 
 function Loading() {
   const { t } = useTranslation();
-  const titleRef = useFocusOnShow();
+  const covered = useContext(Covered);
+  const titleRef = useFocusOnShow(!covered);
   return (
     <View testID="invite-wait-loading" style={styles.loading}>
       <ActivityIndicator />
@@ -199,14 +218,15 @@ interface WaitingProps {
 
 function Waiting({ code, cancelling, cancelFailed, onCancel }: WaitingProps) {
   const { t } = useTranslation();
-  const titleRef = useFocusOnShow();
+  const covered = useContext(Covered);
+  const titleRef = useFocusOnShow(!covered);
   const title = t('friend.wait.title');
   const body = t('friend.wait.body');
   const link = inviteAppUrl(code);
   // Read once per invite in this app run (#216).
-  useAnnouncement(`${title} ${body}`, `invite-wait:${code}`);
+  useAnnouncement(covered ? null : `${title} ${body}`, `invite-wait:${code}`);
   // iOS VoiceOver does not read `accessibilityRole="alert"`: read the problem.
-  useAnnouncement(cancelFailed ? t('friend.wait.cancelFailed') : null);
+  useAnnouncement(cancelFailed && !covered ? t('friend.wait.cancelFailed') : null);
   const share = () => {
     Share.share({ message: t('friend.wait.shareMessage', { link, code }) }).catch(
       (error: unknown) => console.warn('share failed', error),
@@ -267,10 +287,11 @@ interface JoinedProps {
 
 function Joined({ code, gameId, onGame }: JoinedProps) {
   const { t } = useTranslation();
-  const titleRef = useFocusOnShow();
+  const covered = useContext(Covered);
+  const titleRef = useFocusOnShow(!covered);
   const title = t('friend.joined.title');
   const body = t('friend.joined.body');
-  useAnnouncement(`${title} ${body}`, `invite-joined:${code}`);
+  useAnnouncement(covered ? null : `${title} ${body}`, `invite-joined:${code}`);
   // The game opens once: by the timer, or by the button.
   const onGameRef = useRef(onGame);
   useEffect(() => {
@@ -312,10 +333,11 @@ interface ClosedProps {
 
 function Closed({ kind, onRetry, onNewInvite, onHome }: ClosedProps) {
   const { t } = useTranslation();
-  const titleRef = useFocusOnShow();
+  const covered = useContext(Covered);
+  const titleRef = useFocusOnShow(!covered);
   const title = t(`friend.${kind}.title`);
   const body = t(`friend.${kind}.body`);
-  useAnnouncement(`${title} ${body}`);
+  useAnnouncement(covered ? null : `${title} ${body}`);
   return (
     <View testID={`invite-wait-${kind}`} style={styles.card}>
       <Text ref={titleRef} style={styles.title} accessibilityRole="header">

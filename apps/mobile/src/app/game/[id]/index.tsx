@@ -31,6 +31,7 @@ import {
   reviewHref,
   rulesHref,
 } from '@/features/match/routes';
+import { useTurnPushOffering } from '@/features/notifications/appTurnPushes';
 import { stopDevGame } from '@/features/online/devGame';
 import { OnlineConnect } from '@/features/online/OnlineConnect';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
@@ -44,6 +45,8 @@ export default function GameRoute() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = parseIdParam(params.id);
   const focused = useIsFocused();
+  // The turn notifications offer (#285) may show over an online game.
+  const offering = useTurnPushOffering();
   // A dev game vs the bot (#255) stops when its board closes: nobody can
   // open it again. Other games go on, also when this board has no id.
   useEffect(
@@ -63,6 +66,7 @@ export default function GameRoute() {
               transport={transport}
               me={me}
               paused={!focused}
+              covered={offering}
               onExit={goHome}
               onSettings={() => router.push('/settings')}
               onRules={(variant, preset) => router.push(rulesHref(variant, preset))}

@@ -14,7 +14,7 @@ import { hasOnlineAccount, rememberOnlineAccount } from '@/features/online/accou
 
 import { TURN_PUSHES_STORAGE_KEY, createTurnPushes } from './turnPushes';
 
-function setup(storage: Storage = createMemoryStorage()) {
+function setup(storage: Storage = createMemoryStorage(), hasAccount = () => true) {
   const authStore = createMemoryAuthStore();
   const auth = createMemoryAuthProvider(authStore);
   const notifications = createMemoryPushNotifications('android');
@@ -26,8 +26,16 @@ function setup(storage: Storage = createMemoryStorage()) {
     pushTokens,
     auth,
     onAnswer: (answer) => answers.push(answer),
+    hasAccount,
   });
   return { storage, auth, authStore, notifications, pushTokens, answers, pushes };
+}
+
+/** A phone where the player tapped "Turn on" in an earlier app run. */
+function optedIn(): Storage {
+  const storage = createMemoryStorage();
+  storage.setString(TURN_PUSHES_STORAGE_KEY, JSON.stringify({ declined: false, turnedOn: true }));
+  return storage;
 }
 
 /** Lets the in-memory ports answer (they answer on later microtasks). */
@@ -50,16 +58,37 @@ describe('offer', () => {
     expect(pushes.store.getState().offering).toBe(false);
   });
 
-  it('does not show it when the phone allows pushes, and registers the token', async () => {
-    const { pushes, notifications, pushTokens, auth } = setup();
+  it('shows it also when the phone allows pushes (Android 12), and sends nothing until Turn on', async () => {
+    const { pushes, notifications, pushTokens, auth, answers } = setup();
+    await auth.signInAsGuest();
+    notifications.setPermission('granted');
+    await pushes.offer();
+    await settle();
+    expect(pushes.store.getState().offering).toBe(true);
+    // An online game opens: still no in-app choice, so no token.
+    await pushes.sync();
+    expect(pushTokens.calls).toEqual([]);
+    expect(notifications.tokenRequests).toBe(0);
+
+    await expect(pushes.turnOn()).resolves.toBe('granted');
+    await settle();
+    // No system prompt showed, so there is no answer to tell.
+    expect(notifications.prompts).toBe(0);
+    expect(answers).toEqual([]);
+    expect(pushes.store.getState()).toMatchObject({ offering: false, turnedOn: true });
+    expect(pushTokens.saved).toEqual([
+      { playerId: 'guest-1', token: notifications.token, platform: 'android' },
+    ]);
+  });
+
+  it('after "Turn on" in an earlier run, registers the token and shows nothing', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup(optedIn());
     await auth.signInAsGuest();
     notifications.setPermission('granted');
     await pushes.offer();
     await settle();
     expect(pushes.store.getState().offering).toBe(false);
-    expect(pushTokens.saved).toEqual([
-      { playerId: 'guest-1', token: notifications.token, platform: 'android' },
-    ]);
+    expect(pushTokens.saved).toHaveLength(1);
   });
 
   it('a phone with no notification system shows nothing', async () => {
@@ -76,7 +105,10 @@ describe('"Not now"', () => {
     await pushes.offer();
     pushes.notNow();
     expect(pushes.store.getState()).toMatchObject({ offering: false, declined: true });
-    expect(JSON.parse(storage.getString(TURN_PUSHES_STORAGE_KEY)!)).toEqual({ declined: true });
+    expect(JSON.parse(storage.getString(TURN_PUSHES_STORAGE_KEY)!)).toEqual({
+      declined: true,
+      turnedOn: false,
+    });
     await pushes.offer();
     expect(pushes.store.getState().offering).toBe(false);
     expect(notifications.prompts).toBe(0);
@@ -129,6 +161,13 @@ describe('turnOn', () => {
     expect(answers).toEqual(['granted']);
   });
 
+  it('a failed prompt does not leave the button off', async () => {
+    const { pushes, notifications } = setup();
+    jest.spyOn(notifications, 'requestPermission').mockRejectedValueOnce(new Error('native'));
+    await expect(pushes.turnOn()).rejects.toThrow('native');
+    expect(pushes.store.getState()).toMatchObject({ asking: false, turnedOn: false });
+  });
+
   it('a second tap while the prompt is open does nothing', async () => {
     const { pushes, notifications } = setup();
     const first = pushes.turnOn();
@@ -150,10 +189,12 @@ describe('the token on the server', () => {
     expect(pushTokens.calls).toEqual([
       { kind: 'register', playerId: 'guest-1', token: first, platform: 'android' },
     ]);
-    // Again in the same app run (an online game opens): nothing new.
+    // Again in the same app run (an online game opens): nothing new, and
+    // no new call to Expo for the token.
     await pushes.sync();
     await pushes.sync();
     expect(pushTokens.calls).toHaveLength(1);
+    expect(notifications.tokenRequests).toBe(1);
 
     // The push service gives the phone a new token.
     const second = notifications.rollToken();
@@ -166,7 +207,7 @@ describe('the token on the server', () => {
   });
 
   it('is not registered while nobody is signed in, or the phone does not allow pushes', async () => {
-    const { pushes, notifications, pushTokens, auth } = setup();
+    const { pushes, notifications, pushTokens, auth } = setup(optedIn());
     notifications.setPermission('granted');
     await pushes.sync();
     expect(pushTokens.calls).toEqual([]);
@@ -177,8 +218,18 @@ describe('the token on the server', () => {
     expect(notifications.tokenRequests).toBe(0);
   });
 
+  it('a phone that never used an online account asks the server nothing', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup(optedIn(), () => false);
+    const ready = jest.spyOn(auth, 'ready');
+    notifications.setPermission('granted');
+    await pushes.turnOn();
+    await pushes.sync();
+    expect(ready).not.toHaveBeenCalled();
+    expect(pushTokens.calls).toEqual([]);
+  });
+
   it('a failed register is tried again on the next sync', async () => {
-    const { pushes, notifications, pushTokens, authStore } = setup();
+    const { pushes, notifications, pushTokens, authStore } = setup(optedIn());
     notifications.setPermission('granted');
     const register = jest.spyOn(pushTokens, 'register').mockRejectedValueOnce(new Error('offline'));
     authStore.session = { id: 'guest-1', isGuest: true };
@@ -190,7 +241,7 @@ describe('the token on the server', () => {
   });
 
   it('a new user on the phone registers it for that user', async () => {
-    const { pushes, notifications, pushTokens, authStore } = setup();
+    const { pushes, notifications, pushTokens, authStore } = setup(optedIn());
     notifications.setPermission('granted');
     authStore.session = { id: 'guest-1', isGuest: true };
     await pushes.sync();
@@ -202,7 +253,7 @@ describe('the token on the server', () => {
   });
 
   it('is removed before sign-out, while the session can still call the server', async () => {
-    const { pushes, notifications, pushTokens, auth } = setup();
+    const { pushes, notifications, pushTokens, auth } = setup(optedIn());
     await auth.signInAsGuest();
     notifications.setPermission('granted');
     await pushes.sync();
@@ -216,8 +267,20 @@ describe('the token on the server', () => {
     expect(pushTokens.saved).toEqual([]);
   });
 
+  it('a sync asked for during the sign-out does not put the token back', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup(optedIn());
+    await auth.signInAsGuest();
+    notifications.setPermission('granted');
+    await pushes.sync();
+    const out = signOutOfOnline(auth, pushes);
+    const again = pushes.sync();
+    await Promise.all([out, again]);
+    expect(auth.currentUser()).toBeNull();
+    expect(pushTokens.saved).toEqual([]);
+  });
+
   it('a failed removal does not stop the sign-out', async () => {
-    const { pushes, notifications, pushTokens, auth } = setup();
+    const { pushes, notifications, pushTokens, auth } = setup(optedIn());
     await auth.signInAsGuest();
     notifications.setPermission('granted');
     await pushes.sync();

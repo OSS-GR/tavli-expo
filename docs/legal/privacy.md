@@ -167,7 +167,7 @@ All four companies are based in the USA. Their staff or sub-processors may reach
 - **Crash reports before you answer:** these hold no id at all, and we do not think they identify you. If they still count as personal data, we rely on our legitimate interest in finding and fixing crashes (GDPR Article 6(1)(f)). You can object at any time: tap **Don't allow**, or turn off the switch in Settings.
 - **Crash reports after Allow:** your consent, as for usage data.
 - **Online games with a friend:** the guest account, the sign-in session, your invites and your online games are needed to give you the online game you asked for (GDPR Article 6(1)(b)). If you do not want them, do not make or open an invite: the rest of the app works without them.
-- **Turn notifications:** you asked for them when you allowed them on your phone, so the push token is needed to give you that service (GDPR Article 6(1)(b)). Turn them off in your phone's settings at any time.
+- **Turn notifications:** you asked for them when you tapped **Turn on** in the app, so the push token is needed to give you that service (GDPR Article 6(1)(b)). Turn them off in your phone's settings at any time.
 
 ## Your rights
 

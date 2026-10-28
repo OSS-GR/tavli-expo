@@ -34,15 +34,17 @@ export async function signInForOnline(auth: AuthProvider): Promise<AuthUser> {
  * still lets it call the server. Else the signed-out user would still get
  * turn pushes on this phone. `pushes` is `undefined` when the build has
  * no turn notifications. A failed removal does not stop the sign-out.
- * After it, the phone forgets its account note (`accountHint.ts`, #297),
- * so Home loads no session at the next start.
+ * The sign-out runs inside the turn notifications queue
+ * (`unregister(then)`), so no token sync can run between the removal and
+ * the sign-out. After it, the phone forgets its account note
+ * (`accountHint.ts`, #297), so Home loads no session at the next start.
  */
 export async function signOutOfOnline(
   auth: AuthProvider,
-  pushes: { readonly unregister: () => Promise<void> } | undefined,
+  pushes: { readonly unregister: (then?: () => Promise<void>) => Promise<void> } | undefined,
 ): Promise<void> {
-  await pushes?.unregister().catch(() => undefined);
-  await auth.signOut();
+  if (pushes === undefined) await auth.signOut();
+  else await pushes.unregister(() => auth.signOut());
   forgetOnlineAccount();
 }
 

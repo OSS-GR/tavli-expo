@@ -8,10 +8,19 @@
  * invite, the Settings row, an online game and a tap on a push: nothing
  * at start, and no network call.
  */
+import { useStore } from 'zustand';
+import { createStore } from 'zustand/vanilla';
+
+import { hasOnlineAccount } from '@/features/online/accountHint';
 import { auth, notifications, pushTokens, storage } from '@/services';
 
 import { sendPushPermissionAnswered } from './pushAnalytics';
-import { TURN_PUSHES_STORAGE_KEY, createTurnPushes, type TurnPushes } from './turnPushes';
+import {
+  TURN_PUSHES_STORAGE_KEY,
+  createTurnPushes,
+  type TurnPushes,
+  type TurnPushesState,
+} from './turnPushes';
 
 function make(): TurnPushes | undefined {
   if (auth === undefined || notifications === undefined || pushTokens === undefined) {
@@ -23,6 +32,8 @@ function make(): TurnPushes | undefined {
     pushTokens,
     auth,
     onAnswer: (answer) => sendPushPermissionAnswered(answer),
+    // A phone that never used an online account asks the server nothing.
+    hasAccount: hasOnlineAccount,
   });
 }
 
@@ -33,6 +44,24 @@ let instance: { readonly pushes: TurnPushes | undefined } | null = null;
 export function turnPushes(): TurnPushes | undefined {
   instance ??= { pushes: make() };
   return instance.pushes;
+}
+
+/** The state of a build with no turn notifications: never offering. */
+const NO_PUSHES = createStore<TurnPushesState>()(() => ({
+  declined: false,
+  turnedOn: false,
+  permission: null,
+  offering: false,
+  asking: false,
+}));
+
+/**
+ * True while the turn notifications offer shows over the screen. A screen
+ * under it hides its content from screen readers, takes no focus and reads
+ * nothing out while this is true (#153).
+ */
+export function useTurnPushOffering(): boolean {
+  return useStore(turnPushes()?.store ?? NO_PUSHES, (s) => s.offering);
 }
 
 /**

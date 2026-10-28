@@ -4,10 +4,12 @@
 import type { createRecordingAnalytics } from '@tavli/contracts';
 import { router } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
-import { Linking, Text } from 'react-native';
+import { AccessibilityInfo, Linking, Text } from 'react-native';
 
 import RootLayout from '@/app/_layout';
 import FriendRoute from '@/app/friend/index';
+import InviteWaitRoute from '@/app/friend/[code]';
+import GameRoute from '@/app/game/[id]/index';
 import InviteRoute from '@/app/invite/[code]';
 import SettingsRoute from '@/app/settings';
 import WelcomeLanguageRoute from '@/app/welcome/language';
@@ -66,9 +68,19 @@ const routes = {
   'friend/[code]': stub('invite wait'),
 };
 
+/** The real waiting screen and game route, for the tests that need them. */
+const realRoutes = { ...routes, 'friend/[code]': InviteWaitRoute, 'game/[id]/index': GameRoute };
+
 const OFFER = { name: 'Turn notifications?' } as const;
 
+/** The player tapped "Turn on" in an earlier app run. */
+function savedTurnedOn(): void {
+  storage.setString(TURN_PUSHES_STORAGE_KEY, JSON.stringify({ declined: false, turnedOn: true }));
+}
+
 beforeEach(async () => {
+  // The recording analytics is shared by every test: start each one empty.
+  recorded.sent.length = 0;
   await act(async () => consentStore.getState().setConsent(true));
 });
 
@@ -107,7 +119,10 @@ describe('the offer', () => {
     expect(onlineFake.notifications.prompts).toBe(0);
     await user.press(screen.getByRole('button', { name: 'Not now' }));
     expect(screen.queryByRole('header', OFFER)).toBeNull();
-    expect(JSON.parse(storage.getString(TURN_PUSHES_STORAGE_KEY)!)).toEqual({ declined: true });
+    expect(JSON.parse(storage.getString(TURN_PUSHES_STORAGE_KEY)!)).toEqual({
+      declined: true,
+      turnedOn: false,
+    });
 
     // The next async invite does not offer again.
     await act(async () => {
@@ -162,14 +177,52 @@ describe('the offer', () => {
     expect(screen.queryByRole('header', OFFER)).toBeNull();
   });
 
-  it('a phone that already allows pushes is not asked, and its token is registered', async () => {
+  it('a phone that allows pushes by default (Android 12) still gets the offer; only "Turn on" sends the token', async () => {
     onlineFake.notifications.setPermission('granted');
-    await makeInvite('Async');
-    expect(screen.queryByRole('header', OFFER)).toBeNull();
+    const user = await makeInvite('Async');
+    expect(screen.getByRole('header', OFFER)).toBeOnTheScreen();
+    expect(onlineFake.pushTokens.calls).toEqual([]);
+    expect(onlineFake.notifications.tokenRequests).toBe(0);
+    await user.press(screen.getByRole('button', { name: 'Turn on' }));
+    await flush();
+    // No system prompt, so no answer to tell.
     expect(onlineFake.notifications.prompts).toBe(0);
+    expect(
+      recorded.sent.some((s) => s.type === 'track' && s.event === 'push_permission_answered'),
+    ).toBe(false);
     expect(onlineFake.pushTokens.saved).toEqual([
       { playerId: 'guest-1', token: onlineFake.notifications.token, platform: 'ios' },
     ]);
+  });
+
+  it('a phone that allows pushes by default and says "Not now" sends no token', async () => {
+    onlineFake.notifications.setPermission('granted');
+    const user = await makeInvite('Async');
+    await user.press(screen.getByRole('button', { name: 'Not now' }));
+    await flush();
+    expect(onlineFake.pushTokens.calls).toEqual([]);
+  });
+
+  it('hides the waiting screen from screen readers while it shows, and reads it after', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    const user = setupUser();
+    await renderRouter(realRoutes, { initialUrl: '/friend' });
+    await user.press(screen.getByRole('radio', { name: 'Async' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await flush();
+    expect(screen.getByRole('header', OFFER)).toBeOnTheScreen();
+    expect(screen.queryByTestId('invite-wait-screen')).toBeNull();
+    expect(
+      screen.getByTestId('invite-wait-screen', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    const waitRead = () => announce.mock.calls.some(([text]) => text.startsWith('Send the invite'));
+    expect(waitRead()).toBe(false);
+
+    await user.press(screen.getByRole('button', { name: 'Not now' }));
+    await flush();
+    expect(screen.getByTestId('invite-wait-screen')).toBeOnTheScreen();
+    expect(waitRead()).toBe(true);
+    announce.mockRestore();
   });
 
   it('never shows at first launch', async () => {
@@ -186,6 +239,28 @@ describe('the offer', () => {
     expect(screen).toHavePathname('/');
     expect(screen.queryByRole('header', OFFER)).toBeNull();
     expect(onlineFake.notifications.prompts).toBe(0);
+  });
+});
+
+describe('an online game route', () => {
+  it('registers no token without "Turn on", also when the phone allows pushes', async () => {
+    onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
+    onlineFake.notifications.setPermission('granted');
+    await renderRouter(realRoutes, { initialUrl: '/game/k57abc' });
+    await flush();
+    expect(onlineFake.pushTokens.calls).toEqual([]);
+    expect(onlineFake.notifications.tokenRequests).toBe(0);
+  });
+
+  it('registers the token once after "Turn on" in an earlier run', async () => {
+    savedTurnedOn();
+    onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
+    onlineFake.notifications.setPermission('granted');
+    await renderRouter(realRoutes, { initialUrl: '/game/k57abc' });
+    await flush();
+    expect(onlineFake.pushTokens.saved).toEqual([
+      { playerId: 'guest-1', token: onlineFake.notifications.token, platform: 'ios' },
+    ]);
   });
 });
 
@@ -232,9 +307,9 @@ describe('a tap on a push', () => {
 });
 
 describe('Settings', () => {
-  it('"Turn notifications" shows the state, turns them on, and opens the phone settings when off', async () => {
+  it('"Turn notifications" shows the state and turns them on', async () => {
     const user = setupUser();
-    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue();
+    const ready = jest.spyOn(onlineFake.auth, 'ready');
     await renderRouter(routes, { initialUrl: '/settings' });
     await flush();
     expect(screen.getByRole('header', { name: 'Notifications' })).toBeOnTheScreen();
@@ -245,9 +320,22 @@ describe('Settings', () => {
     expect(onlineFake.notifications.prompts).toBe(1);
     expect(screen.getByText(/^On\./)).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Turn on' })).toBeNull();
-    // Nobody is signed in: no token goes to the server.
+    // This phone never used an online account: no server call at all.
+    expect(ready).not.toHaveBeenCalled();
     expect(onlineFake.pushTokens.calls).toEqual([]);
-    openSettings.mockRestore();
+    ready.mockRestore();
+  });
+
+  it('a phone that allows pushes but was never turned on in the app shows "Off"', async () => {
+    const user = setupUser();
+    onlineFake.notifications.setPermission('granted');
+    await renderRouter(routes, { initialUrl: '/settings' });
+    await flush();
+    expect(screen.getByText(/^Off\. Turn them on/)).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Turn on' }));
+    await flush();
+    expect(onlineFake.notifications.prompts).toBe(0);
+    expect(screen.getByText(/^On\./)).toBeOnTheScreen();
   });
 
   it('a "no" on the phone shows the way to the phone settings', async () => {
