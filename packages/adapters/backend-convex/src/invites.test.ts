@@ -240,9 +240,10 @@ describe('watchInvite', () => {
 
 describe('toInviteError', () => {
   it('keeps only code and message of invite data, and leaves other values alone', () => {
-    expect(toInviteError(new ConvexError({ code: 'OWN_INVITE', message: 'no', more: 1 }))).toEqual(
-      { code: 'OWN_INVITE', message: 'no' },
-    );
+    expect(toInviteError(new ConvexError({ code: 'OWN_INVITE', message: 'no', more: 1 }))).toEqual({
+      code: 'OWN_INVITE',
+      message: 'no',
+    });
     const plain = { code: 'OWN_INVITE', message: 'not a ConvexError' };
     expect(toInviteError(plain)).toBe(plain);
   });

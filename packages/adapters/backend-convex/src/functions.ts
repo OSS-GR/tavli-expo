@@ -83,12 +83,7 @@ export interface InviteFunctions {
   readonly acceptInvite: FunctionReference<'mutation', 'public', { code: string }, string>;
   readonly declineInvite: FunctionReference<'mutation', 'public', { code: string }, null>;
   readonly cancelInvite: FunctionReference<'mutation', 'public', { code: string }, null>;
-  readonly listMyInvites: FunctionReference<
-    'query',
-    'public',
-    Record<string, never>,
-    InviteView[]
-  >;
+  readonly listMyInvites: FunctionReference<'query', 'public', Record<string, never>, InviteView[]>;
 }
 
 /** The Convex function names (`module:function`) of the invite calls. */
