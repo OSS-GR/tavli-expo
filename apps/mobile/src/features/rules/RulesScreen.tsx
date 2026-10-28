@@ -16,11 +16,11 @@ import { TUTORIAL_GAMES } from '@/features/match/routes';
 import type { OtherVersion } from '@/features/match/setup';
 
 import {
-  RULES_PAGES,
   TAVLI_GAMES,
   TAVLI_SECTION,
   isRulesGame,
   paragraphs,
+  rulesPage,
   rulesTitleKey,
   versionSection,
   type RulesGame,
@@ -77,7 +77,7 @@ export function RulesScreen({
         <Section section={versionSection(version)} />
       ) : null}
       {isRulesGame(variant) ? (
-        RULES_PAGES[variant].map((section) => (
+        rulesPage(variant, version).map((section) => (
           <Section key={section.id} section={section} game={variant} />
         ))
       ) : variant === 'tavli' ? (

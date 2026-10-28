@@ -22,7 +22,7 @@ export interface GameEndSheetProps {
   title: string;
   /** "Diplo · +2 points". */
   chip: string;
-  /** Diplo (or more) gets a filled chip, mono an outlined one. */
+  /** Diplo (or a Tavli backgammon) gets a filled chip; mono and a per-checker win an outlined one. */
   strongChip: boolean;
   /** "Bot did not bear off any checker." or "Mono: Maria resigned the game." */
   reason: string | null;
@@ -72,7 +72,7 @@ export function GameEndSheet({
           <Text ref={titleRef} style={styles.title} accessibilityRole="header">
             {title}
           </Text>
-          <View style={styles.chip(strongChip)}>
+          <View testID="game-end-chip" style={styles.chip(strongChip)}>
             <Text style={styles.chipText(strongChip)}>{chip}</Text>
           </View>
           {reason ? <Text style={styles.reason}>{reason}</Text> : null}

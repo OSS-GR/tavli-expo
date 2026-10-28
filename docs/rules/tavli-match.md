@@ -183,7 +183,10 @@ scores. These are the app rules (owner, #63 and #181).
   is worth now: diplo (2 points) if the resigning player has borne off no
   checker, else mono (1 point). With `backgammonScores3` (Portes, off by
   default) a backgammon position gives 3. A variant may score it in its own
-  way (Plakoto `offerConcede`: 2). The points count in the match like any
+  way (Plakoto `offerConcede`: 2). With `scoring="perChecker"` (Acey-Deucey
+  American) the opponent gets 1 point per checker the resigning player has
+  not borne off, as at the end of the game (`pointsForLoss` in the engine,
+  #245). The points count in the match like any
   other win, so a resigned game can win the match.
 - **Resign match:** the match ends at once and the opponent wins it.
   - The score stays as it is: the points of the finished games count. The

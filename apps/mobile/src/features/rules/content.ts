@@ -192,6 +192,27 @@ export function parseRulesVersion(
   return otherVersion(id);
 }
 
+/** The Points section of a game that scores 1 per checker left (Acey-Deucey American, #245). */
+const perCheckerScoring: RulesSection = {
+  ...scoring,
+  body: ['rules.common.scoring.bodyPerChecker'],
+};
+
+/**
+ * The sections of a game's page in `version` (null: the default rules).
+ * The Points section follows the version's `scoring.method` (#245): with
+ * `perChecker` it says 1 point per checker left, not mono and diplo. The
+ * other sections stay; the version section on top says what else changes.
+ */
+export function rulesPage(
+  game: RulesGame,
+  version: OtherVersion | null = null,
+): readonly RulesSection[] {
+  const sections = RULES_PAGES[game];
+  if (version === null || getPreset(version).scoring.method !== 'perChecker') return sections;
+  return sections.map((section) => (section.id === 'scoring' ? perCheckerScoring : section));
+}
+
 /** The section on top of a page in another rules version: what it changes. */
 export function versionSection(version: OtherVersion): RulesSection {
   const key = VERSION_KEYS[version];
