@@ -21,6 +21,7 @@
   "devDependencies": {
     "@edge-runtime/vm": "5.0.0",
     "@tavli/backend-convex": "workspace:*",
-    "convex-test": "0.0.61"
+    "convex-test": "0.0.61",
+    "typescript": "~6.0.3"
   }
 }
