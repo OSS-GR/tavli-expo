@@ -140,6 +140,13 @@
       "reactCompiler": true
     },
     "extra": {
+      "convexUrl": "https://exciting-reindeer-792.eu-west-1.convex.cloud",
+      "convexSiteUrl": "https://exciting-reindeer-792.eu-west-1.convex.site",
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
       "eas": {
         "projectId": "ab412a0d-e0c2-4f38-878d-57249f4db757"
       }
