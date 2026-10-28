@@ -13,7 +13,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
-import { devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
+import { DEV_TICK_MS, devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
 import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
@@ -824,6 +824,84 @@ describe('online games (#255)', () => {
     expect(screen.queryByRole('button', { name: /^Rematch/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Change settings' })).toBeNull();
     expect(historyStore.getState().records).toEqual([]);
+    await user.press(screen.getByRole('button', { name: 'Home' }));
+    expect(router.getPathname()).toBe('/');
+  });
+});
+
+describe('invites (#256)', () => {
+  afterEach(() => stopAnyDevGame());
+
+  /** Dev online → "Make an invite" → "Open the invite". Returns the code. */
+  async function openDevInvite(user: ReturnType<typeof setupUser>) {
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    const code = /Code: (\w+)/.exec(
+      String(screen.getByTestId('dev-online-invite-code').props.children),
+    )?.[1];
+    expect(code).toMatch(/^[0-9A-Z]{8}$/);
+    expect(screen.getByText(`tavlaki://invite/${code}`)).toBeOnTheScreen();
+    expect(screen.getByText(`https://tavlaki.com/i/${code}`)).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Open the invite' }));
+    return code!;
+  }
+
+  it('the dev bot makes an invite; Accept opens the online game', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
+    await user.press(screen.getByRole('radio', { name: '1' }));
+    const code = await openDevInvite(user);
+    expect(router.getPathname()).toBe(`/invite/${code}`);
+    expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
+    expect(screen.getByText('First to 1 point')).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('button', { name: 'Accept' }));
+    const board = router.getPathname();
+    expect(board).toMatch(/^\/game\/game-\d+$/);
+    const gameId = board.split('/').at(-1)!;
+    // The bot made the invite, so it plays White.
+    expect(onlineServer().getGame(gameId)).toMatchObject({
+      choice: 'portes',
+      players: { white: 'bot', black: 'me' },
+    });
+    expect(onlineServer().getInvite(code)).toMatchObject({ status: 'accepted', gameId });
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    // Accept replaced the invite: Back does not return to it.
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe('/dev/online');
+  });
+
+  it('Decline closes the invite and goes Home', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
+    const code = await openDevInvite(user);
+    expect(devGameRunning()).toBe(true);
+    await user.press(await screen.findByRole('button', { name: 'Decline' }));
+    expect(router.getPathname()).toBe('/');
+    expect(onlineServer().getInvite(code)?.status).toBe('declined');
+    // The dev invite sees the answer on its next tick, and stops.
+    await act(async () => {
+      jest.advanceTimersByTime(DEV_TICK_MS);
+    });
+    expect(devGameRunning()).toBe(false);
+  });
+
+  it('opens an invite link straight away, in any case', async () => {
+    const code = onlineServer().createInvite('friend', 'plakoto', 3, 'async');
+    const router = await renderRouter('./src/app', {
+      initialUrl: `/invite/${code.toLowerCase()}`,
+    });
+    expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
+    expect(screen.getByText('Plakoto')).toBeOnTheScreen();
+    expect(screen.getByText('Async · 24 hours per turn')).toBeOnTheScreen();
+    expect(router.getPathname()).toBe(`/invite/${code.toLowerCase()}`);
+  });
+
+  it('an unknown invite shows "not found", and Home goes Home', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/invite/ABCD2345' });
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Home' }));
     expect(router.getPathname()).toBe('/');
   });

@@ -111,3 +111,31 @@ export function isInviteErrorData(value: unknown): value is InviteErrorData {
     (INVITE_ERROR_CODES as readonly string[]).includes(code)
   );
 }
+
+/**
+ * The invite port (#256): what the app needs to answer an invite. The
+ * adapter knows who the caller is (the signed-in user), as in
+ * `GameTransport`, so no call carries a player id. Each call takes the
+ * code in any case.
+ *
+ * Making and sharing an invite from the app is a later issue, so the
+ * port has no `createInvite` yet. The contract checks are
+ * `invitesContract` in `@tavli/contracts/testing`.
+ */
+export interface Invites {
+  /**
+   * The invite with this code, or `null` when no invite has it (also for
+   * text that cannot be a code). An open invite whose time is up shows
+   * `expired`.
+   */
+  getInvite(code: string): Promise<InviteView | null>;
+  /**
+   * Accepts the invite and starts the game (the inviter plays white).
+   * Resolves with the `gameId`. Rejects with `InviteErrorData`:
+   * `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`
+   * or `BAD_REQUEST`.
+   */
+  acceptInvite(code: string): Promise<string>;
+  /** Says no to the invite. Rejects like `acceptInvite`. */
+  declineInvite(code: string): Promise<void>;
+}

@@ -1,17 +1,27 @@
 // The small parts of the online screen (#255): the remote turn, the clock
-// text, the board store and the online bot, over the in-memory server.
+// text, the board store, the online bot and the dev invite (#256), over
+// the in-memory server.
 import { ONLINE_GAME_CHOICES, TURN_TIME_MS, type OnlineGameChoice } from '@tavli/contracts';
 import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
 import { pickTurn } from '@tavli/online/testing';
 
 import { storeEvents } from '@/features/game/gameFeedback';
+import { inviteAccepted } from '@/features/invites/acceptedInvite';
 import i18n from '@/i18n';
 import { botLevels, botRunner } from '@/services';
 
 import { onlineBoardStore } from './boardStore';
 import { clockText, clockTickMs } from './clock';
-import { DEV_BOT_ID, devGameRunning, startDevGame, stopAnyDevGame, stopDevGame } from './devGame';
+import {
+  DEV_BOT_ID,
+  DEV_TICK_MS,
+  devGameRunning,
+  startDevGame,
+  startDevInvite,
+  stopAnyDevGame,
+  stopDevGame,
+} from './devGame';
 import { MAX_TRIES_PER_TURN, startOnlineBot, type OnlineBot } from './onlineBot';
 import { createOnlineStore, viewFlow, type OnlineStore } from './onlineStore';
 import { remoteTurn } from './remoteTurn';
@@ -342,4 +352,113 @@ describe('startOnlineBot', () => {
       expect(view.match.games.every((g) => g.reason !== 'timeout')).toBe(true);
     },
   );
+});
+
+describe('startDevInvite (#256)', () => {
+  afterEach(() => stopAnyDevGame());
+
+  function devInvite() {
+    const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => Date.now() });
+    const invite = startDevInvite({
+      server,
+      choice: 'portes',
+      pace: 'live',
+      targetPoints: 1,
+      difficulty: botLevels.portes[0]!,
+      runner: botRunner,
+      rng: createSeededRng(2),
+      timing: { thinkMs: () => 0 },
+    });
+    return { server, code: invite.code };
+  }
+
+  it('the bot makes the invite, and plays the game once it is accepted', async () => {
+    const { server, code } = devInvite();
+    expect(server.getInvite(code)).toMatchObject({
+      from: DEV_BOT_ID,
+      status: 'open',
+      choice: 'portes',
+      targetPoints: 1,
+      pace: 'live',
+    });
+    const gameId = await server.invitesFor('me').acceptInvite(code);
+    // The bot made the invite, so it plays White. Let it be White's turn.
+    const first = server.getGame(gameId)!;
+    if (first.waitingFor === 'black') {
+      await server.transportFor('me').sendTurn({
+        gameId,
+        expectedVersion: first.version,
+        moves: pickTurn(first.game, createSeededRng(9)),
+      });
+    }
+    const before = server.getGame(gameId)!;
+    expect(before.waitingFor).toBe('white');
+
+    // The dev invite sees the answer on its next tick, then the bot plays.
+    for (let i = 0; i < 50 && server.getGame(gameId)!.version === before.version; i++) {
+      jest.advanceTimersByTime(DEV_TICK_MS / 4);
+      await flush();
+    }
+    expect(server.getGame(gameId)!.version).toBeGreaterThan(before.version);
+  });
+
+  it('stops when the invite is declined', async () => {
+    const { server, code } = devInvite();
+    expect(jest.getTimerCount()).toBe(1);
+    await server.invitesFor('me').declineInvite(code);
+    jest.advanceTimersByTime(DEV_TICK_MS);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('starts the bot at once after Accept on this phone, not on the next tick', async () => {
+    const { server, code } = devInvite();
+    const gameId = await server.invitesFor('me').acceptInvite(code);
+    inviteAccepted(gameId);
+    // No time has passed, and the dev game of the invite runs.
+    expect(devGameRunning()).toBe(true);
+    stopDevGame(gameId);
+    expect(devGameRunning()).toBe(false);
+  });
+
+  it('an Accept of another invite leaves the open dev invite alone', () => {
+    const { server, code } = devInvite();
+    inviteAccepted('another-game');
+    expect(server.getInvite(code)?.status).toBe('open');
+    expect(devGameRunning()).toBe(true);
+  });
+
+  it('cancels an open invite when it stops, so a late Accept is refused', async () => {
+    const { server, code } = devInvite();
+    stopAnyDevGame();
+    expect(server.getInvite(code)?.status).toBe('cancelled');
+    await expect(server.invitesFor('me').acceptInvite(code)).rejects.toMatchObject({
+      code: 'INVITE_CLOSED',
+    });
+  });
+
+  it('cancels the old invite when a new invite or a dev game starts', () => {
+    const first = devInvite();
+    const second = devInvite();
+    expect(first.server.getInvite(first.code)?.status).toBe('cancelled');
+    expect(second.server.getInvite(second.code)?.status).toBe('open');
+    startDevGame({
+      server: second.server,
+      me: 'me',
+      choice: 'portes',
+      pace: 'live',
+      targetPoints: 1,
+      difficulty: botLevels.portes[0]!,
+      runner: botRunner,
+      rng: createSeededRng(2),
+      timing: { thinkMs: () => 0 },
+    });
+    expect(second.server.getInvite(second.code)?.status).toBe('cancelled');
+  });
+
+  it('keeps an accepted invite as it is when it stops', async () => {
+    const { server, code } = devInvite();
+    await server.invitesFor('me').acceptInvite(code);
+    stopAnyDevGame();
+    expect(server.getInvite(code)?.status).toBe('accepted');
+  });
 });

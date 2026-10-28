@@ -11,6 +11,8 @@
  * - `onlineServer()` and `gameTransportFor(playerId)` are the dev game
  *   parts (`/dev/online`): the server itself, and one cached transport
  *   per player.
+ * - `invitesFor(playerId)` is the `Invites` port of a player on the same
+ *   server (#256), so an accepted invite starts its game there.
  *
  * A test makes games with `onlineFake.server().createGame(...)`. Each test
  * starts with a new server, no cached transports and nobody signed in
@@ -22,6 +24,7 @@ import {
   createMemoryAuthStore,
   type GameTransport,
   type GameTransportErrorData,
+  type Invites,
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
@@ -40,6 +43,7 @@ const authStore = createMemoryAuthStore();
 const auth = createMemoryAuthProvider(authStore);
 let server = newServer();
 const transports = new Map<string, GameTransport>();
+const invitePorts = new Map<string, Invites>();
 
 /** One transport per player on the current server, like `gameTransportFor` in the app. */
 function transportFor(playerId: string): GameTransport {
@@ -49,6 +53,16 @@ function transportFor(playerId: string): GameTransport {
     transports.set(playerId, transport);
   }
   return transport;
+}
+
+/** One `Invites` port per player on the current server, like `invitesFor` in the app. */
+function invitesFor(playerId: string): Invites {
+  let invites = invitePorts.get(playerId);
+  if (invites === undefined) {
+    invites = server.invitesFor(playerId);
+    invitePorts.set(playerId, invites);
+  }
+  return invites;
 }
 
 /** The transport of the signed-in user, or `null` when nobody is signed in. */
@@ -84,12 +98,15 @@ export const onlineFake = {
   server: () => server,
   /** The cached transport of `playerId` on the current server. */
   transportFor,
+  /** The cached `Invites` port of `playerId` on the current server. */
+  invitesFor,
 };
 
-/** A new server, no cached transports, and nobody signed in. */
+/** A new server, no cached transports or invite ports, and nobody signed in. */
 export function resetOnlineFake(): void {
   authStore.session = null;
   authStore.guests = 0;
   server = newServer();
   transports.clear();
+  invitePorts.clear();
 }

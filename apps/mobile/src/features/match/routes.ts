@@ -53,6 +53,11 @@ export function gameHref(id: string) {
   return { pathname: '/game/[id]', params: { id } } as const;
 }
 
+/** The invite screen of an invite code (#256): what `tavlaki://invite/<code>` opens. */
+export function inviteHref(code: string) {
+  return { pathname: '/invite/[code]', params: { code } } as const;
+}
+
 /** The match-end screen of a finished match, local or online (wireframe 9). */
 export function matchEndHref(id: string) {
   return { pathname: '/game/[id]/match-end', params: { id } } as const;
