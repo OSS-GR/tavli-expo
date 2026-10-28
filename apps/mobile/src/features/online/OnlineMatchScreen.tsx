@@ -127,17 +127,21 @@ function OnlineBoard({
   const view = useOnlineStore(store, (s) => s.view);
   const sending = useOnlineStore(store, (s) => s.sending);
   const notice = useOnlineStore(store, (s) => s.notice);
+  const noticeCount = useOnlineStore(store, (s) => s.noticeCount);
   const clockOffset = useOnlineStore(store, (s) => s.clockOffset);
   const [overlay, setOverlay] = useState<Overlay>('none');
   const close = () => setOverlay('none');
 
-  // The clock: a new time each second live, each half minute async.
+  // The clock: a new time each second live, each half minute async. It
+  // ticks only while a clock shows: not after the match.
   const pace = view?.pace ?? 'live';
+  const ticking = view !== null && view.status !== 'finished' && view.waitingFor !== null;
   const [clockNow, setClockNow] = useState(now);
   useEffect(() => {
+    if (!ticking) return;
     const timer = setInterval(() => setClockNow(now()), clockTickMs(pace));
     return () => clearInterval(timer);
-  }, [pace, now]);
+  }, [pace, now, ticking]);
 
   // Games that end while the screen is open show their game-end sheet.
   // Games that ended before it opened do not.
@@ -169,7 +173,8 @@ function OnlineBoard({
     notice === null
       ? null
       : {
-          key: `${matchKey}:v${view.version}:${notice}`,
+          // A new name for each notice: the same notice twice is read twice.
+          key: `${matchKey}:n${noticeCount}:${notice}`,
           title: t(NOTICE_KEYS[notice].title),
           text: t(NOTICE_KEYS[notice].text),
           onClose: () => store.getState().clearNotice(),

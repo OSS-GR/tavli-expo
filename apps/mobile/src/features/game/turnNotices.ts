@@ -1,7 +1,17 @@
 /**
  * Turn notices the board screen shows. Pure.
  */
-import type { Dice, GameFlow, MatchFlow, PlayerId, RuleSet } from '@tavli/engine';
+import {
+  gameRules,
+  STANDARD_VARIANT_IDS,
+  type Dice,
+  type GameFlow,
+  type GameRecord,
+  type Match,
+  type MatchFlow,
+  type PlayerId,
+  type RuleSet,
+} from '@tavli/engine';
 
 /** The last turn was a pass: the player rolled and no checker could move (wireframe 6f). */
 export interface PassNotice {
@@ -35,6 +45,19 @@ export type WinType = 'mono' | 'diplo' | 'points' | 'perChecker';
  * With `perChecker` scoring every win is `perChecker`, whatever the points:
  * there is no mono or diplo, and the screens count the checkers instead.
  */
+/**
+ * How the match scored a finished game: the scoring of that game's own
+ * rules in the match (`gameRules`), not of the game on the board now. The
+ * online game-end sheet (#255) shows a record after the next game began,
+ * and the two games can score in different ways.
+ */
+export function recordScoring(match: Match, record: GameRecord): RuleSet['scoring']['method'] {
+  const variant = STANDARD_VARIANT_IDS.find((id) => id === record.variant);
+  return variant === undefined
+    ? match.rules.scoring.method
+    : gameRules(match, variant).scoring.method;
+}
+
 export function winType(
   result: { readonly points: number },
   scoring: RuleSet['scoring']['method'] = 'tavli',

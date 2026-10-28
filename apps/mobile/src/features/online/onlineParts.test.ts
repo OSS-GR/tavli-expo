@@ -10,7 +10,7 @@ import { botLevels, botRunner } from '@/services';
 
 import { onlineBoardStore } from './boardStore';
 import { clockText, clockTickMs } from './clock';
-import { startOnlineBot, type OnlineBot } from './onlineBot';
+import { MAX_TRIES_PER_TURN, startOnlineBot, type OnlineBot } from './onlineBot';
 import { createOnlineStore, viewFlow, type OnlineStore } from './onlineStore';
 import { remoteTurn } from './remoteTurn';
 
@@ -152,6 +152,41 @@ describe('onlineBoardStore', () => {
 });
 
 describe('startOnlineBot', () => {
+  it('gives up on a turn the server keeps refusing, then waits for a new view', async () => {
+    const { server, gameId } = serverWithGame();
+    while (server.getGame(gameId)!.waitingFor !== 'black') await playServerTurn(server, gameId);
+    const real = server.transportFor('bot');
+    const sendTurn = jest.fn(() =>
+      Promise.reject({ code: 'BAD_REQUEST', message: 'refused for the test' }),
+    );
+    const errors: unknown[] = [];
+    open.push(
+      startOnlineBot({
+        transport: {
+          subscribe: (id, onView, onError) => real.subscribe(id, onView, onError),
+          sendTurn,
+          sendAnswer: (request) => real.sendAnswer(request),
+          resign: (id) => real.resign(id),
+        },
+        gameId,
+        botId: 'bot',
+        difficulty: botLevels.portes[0]!,
+        runner: botRunner,
+        rng: createSeededRng(2),
+        timing: { thinkMs: () => 0 },
+        onError: (error) => errors.push(error),
+      }),
+    );
+    // Well within the turn time: the bot does not try again and again.
+    for (let i = 0; i < 200; i++) {
+      jest.advanceTimersByTime(100);
+      await flush();
+    }
+    expect(sendTurn).toHaveBeenCalledTimes(MAX_TRIES_PER_TURN);
+    expect(errors.map(String)).toContainEqual(expect.stringMatching(/gave up on version/));
+    expect(server.getGame(gameId)!.waitingFor).toBe('black');
+  });
+
   // Two bots, each on its own transport, play whole matches. They follow
   // `waitingFor` and the questions: an Asodio turn can keep the same player.
   it.each(ONLINE_GAME_CHOICES.filter((c) => botLevels[c].length > 0))(

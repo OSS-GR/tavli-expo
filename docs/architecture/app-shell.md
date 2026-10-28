@@ -199,7 +199,7 @@ The app logic for one online game. It lives in `features/online/`. The screen (#
 - **Calls.** `confirm` sends every move of the turn in order (`sendTurn` with the view's `version` as `expectedVersion`). A `move` with `autoConfirm` sends the turn as soon as it is complete (the engine never confirms online). `answer` (the Plakoto mother question, the Asodio chosen double) goes through `sendAnswer`, and `resignMatch` through `resign`. The engine checks a confirm and an answer first. Online there is no game resign: `resign` is refused.
 - **Sending.** From a call until the server has it **and** its new view is here, `sending` is `true` and every action is refused. A call that fails always clears it.
 - **Refused with no call:** the steps the server does by itself (`roll`, `rollOpening`, `nextGame`, `chooseStarter`, `timeout`), an action for the other side, a move, undo, confirm or answer when it is not your turn, any action before the first view, after the match or after `dispose()`. `resignMatch` works on either turn.
-- **Errors** set `notice` (the screen shows it, then calls `clearNotice`) and `lastError`:
+- **Errors** set `notice` (the screen shows it, then calls `clearNotice`), add 1 to `noticeCount` (it names each notice, so a screen reader hears a repeated one again) and set `lastError`:
   - `STALE_VERSION` → `stale`: the local moves are dropped; the store shows the newest view.
   - `TIMED_OUT` → `timedOut` ("Your time ran out"): the local moves are dropped. The server saved the time out, so its view follows.
   - Any other server code → `refused`: the local moves are dropped.

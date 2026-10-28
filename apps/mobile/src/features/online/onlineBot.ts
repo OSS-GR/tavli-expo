@@ -41,6 +41,14 @@ export interface OnlineBot {
   stop: () => void;
 }
 
+/**
+ * The bot sends a turn on one view at most this many times. Then it gives up on
+ * that view and waits for a new one (the server's turn timer ends the
+ * game if none comes), so a server that keeps refusing never makes it
+ * loop.
+ */
+export const MAX_TRIES_PER_TURN = 3;
+
 /** No pauses between the bot's moves: nobody sees them. */
 const HIDDEN_MOVES: Partial<BotTiming> = {
   beforeRollMs: 0,
@@ -58,14 +66,25 @@ export function startOnlineBot(options: OnlineBotOptions): OnlineBot {
   let turn: BotTurnHandle | null = null;
   /** The view version the bot plays now. A new version is a new turn. */
   let playing: number | null = null;
+  /** The view version the last refused turn was on, and how many tries it had. */
+  let failedOn: number | null = null;
+  let tries = 0;
 
   const check = () => {
     if (stopped) return;
     const { view, flow, side, sending, notice } = store.getState();
     if (notice !== null) {
-      // The turn did not go through (stale, refused, not sent): play again.
+      // The turn did not go through (stale, refused, not sent): play again,
+      // up to MAX_TRIES_PER_TURN times on the same view.
       options.onError?.(new Error(`online bot: ${notice} (${store.getState().lastError ?? ''})`));
-      playing = null;
+      tries = failedOn === playing ? tries + 1 : 1;
+      failedOn = playing;
+      if (tries >= MAX_TRIES_PER_TURN) {
+        options.onError?.(new Error(`online bot: gave up on version ${playing ?? '?'}`));
+        // `playing` stays: the bot waits for a newer view.
+      } else {
+        playing = null;
+      }
       store.getState().clearNotice();
       return;
     }

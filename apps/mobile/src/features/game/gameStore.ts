@@ -63,7 +63,12 @@ export interface GameStoreOptions {
  */
 export interface BoardStoreState {
   readonly flow: MatchFlow;
-  /** Names the match for this app run: screen reader events key on it (#216). */
+  /**
+   * Names the match for this app run, never a time. The local store counts
+   * `m1`, `m2`, … (new for each store and each rematch); an online board
+   * uses `online:<gameId>`. Screen reader events put it in their key, so
+   * each one is read once (#216).
+   */
   readonly matchKey: string;
   /** The last action that was refused, for logs and tests. `null` after a good one. */
   readonly lastError: string | null;
@@ -78,12 +83,6 @@ export type BoardStore = Pick<
 >;
 
 export interface GameStoreState extends BoardStoreState {
-  /**
-   * Names the match on this store for this app run: `m1`, `m2`, … from a
-   * counter, new for each store and each rematch (never a time). Screen
-   * reader events put it in their key, so each one is read once (#216).
-   */
-  readonly matchKey: string;
   /** A new match with the same players and rules; the last winner starts. */
   rematch: () => void;
 }

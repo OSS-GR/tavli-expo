@@ -1,8 +1,14 @@
-import { TURN_TIME_MS, type OnlineGameChoice, type OnlineGamePace } from '@tavli/contracts';
+import {
+  TURN_TIME_MS,
+  type GameTransport,
+  type OnlineGameChoice,
+  type OnlineGamePace,
+} from '@tavli/contracts';
 import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { getLayout, getTheme } from '@tavli/themes';
 import { act, fireEvent, screen } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
 
 import { buildSources } from '@/features/board/interaction';
 import { fitBoardWithShadow, slotRect } from '@/features/board/geometry';
@@ -53,6 +59,7 @@ async function openGame(
   pace: OnlineGamePace = 'live',
   targetPoints = 5,
   botThinkMs = BOT_THINK_MS,
+  meTransport: (server: MemoryGameServer) => GameTransport = (server) => server.transportFor('me'),
 ): Promise<Game> {
   const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
   const gameId = server.createGame('me', { white: 'me', black: 'bot' }, choice, targetPoints, pace);
@@ -69,7 +76,7 @@ async function openGame(
   await renderWithRoot(
     <OnlineMatchScreen
       gameId={gameId}
-      transport={server.transportFor('me')}
+      transport={meTransport(server)}
       me="me"
       onExit={jest.fn()}
       onSettings={jest.fn()}
@@ -184,6 +191,46 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     expect(screen.queryByTestId('game-end-card')).toBeNull();
     expect(screen.getByTestId('game-board', { includeHiddenElements: true })).toBeOnTheScreen();
     expect(game.onMatchOver).not.toHaveBeenCalled();
+  });
+
+  it('reads the same notice again when it comes back', async () => {
+    const announce = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .mockImplementation(() => {});
+    const user = setupUser();
+    // Your turns do not reach the server (no network) until `offline` is false.
+    let offline = true;
+    const game = await openGame('portes', 'live', 5, BOT_THINK_MS, (server) => {
+      const real = server.transportFor('me');
+      return {
+        subscribe: (id, onView, onError) => real.subscribe(id, onView, onError),
+        sendTurn: (request) =>
+          offline ? Promise.reject(new Error('offline')) : real.sendTurn(request),
+        sendAnswer: (request) => real.sendAnswer(request),
+        resign: (id) => real.resign(id),
+      };
+    });
+    const notSent = () =>
+      announce.mock.calls.filter(([text]) => String(text).startsWith('Not sent')).length;
+    await untilYourTurn(game);
+    await playTurnByTaps(game);
+
+    // Twice the same notice on the same view: it is read both times.
+    for (const times of [1, 2]) {
+      await user.press(screen.getByTestId('confirm-button'));
+      expect(await screen.findByTestId('online-notice-card')).toHaveTextContent(/Not sent/);
+      expect(notSent()).toBe(times);
+      await user.press(screen.getByTestId('online-notice-ok-button'));
+      expect(screen.queryByTestId('online-notice-card')).toBeNull();
+    }
+    // Your moves stayed: Confirm sends them once the network is back.
+    offline = false;
+    const before = view(game).version;
+    await user.press(screen.getByTestId('confirm-button'));
+    expect(view(game).version).toBeGreaterThan(before);
+    expect(view(game).game.lastTurn?.player).toBe('white');
+    expect(notSent()).toBe(2);
+    announce.mockRestore();
   });
 
   it('resigns the match from the menu, then opens match end', async () => {

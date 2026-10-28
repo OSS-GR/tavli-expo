@@ -114,7 +114,7 @@ import { OpeningCard } from './OpeningCard';
 import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
 import { diceWereChosen, diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
-import { isStrongWin, passNotice, winType, type WinType } from './turnNotices';
+import { isStrongWin, passNotice, recordScoring, winType, type WinType } from './turnNotices';
 import { useAnnouncement } from './useAnnouncement';
 
 /** How long the opening result ("Maria starts with 6-3.") stays, unless a tap closes it (#176). */
@@ -942,8 +942,8 @@ export function GameScreen({
           result: ended.record,
           // The record has no board: a resign reads as a plain resign.
           off: { white: 1, black: 1 },
-          method:
-            ended.record.variant === game.state.variant ? rules.scoring.method : ('tavli' as const),
+          // The record's own game: the board may show another game now.
+          method: recordScoring(match, ended.record),
           key: ended.key,
         }
       : gameOver && game.result !== null
