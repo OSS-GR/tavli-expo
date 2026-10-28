@@ -60,8 +60,9 @@ export function isGameChoice(value: unknown): value is GameChoice {
 /**
  * The rules versions (#241, a part of Kafeneio mode #58): the engine
  * presets a game can start from, the default (`DEFAULT_PRESET_BY_GAME`)
- * first. Only Plakoto and Asodio have more than one. A Tavli match keeps
- * the default preset of each game.
+ * first. Only Plakoto and Asodio have more than one. The Plakoto game of a
+ * Tavli match plays the Plakoto version too (#247); its Portes and Fevga
+ * games have one preset.
  */
 export const RULES_VERSIONS = {
   plakoto: ['plakoto', 'plakoto.federation'],
@@ -85,6 +86,16 @@ export const DEFAULT_RULES_VERSIONS: RulesVersions = {
 
 export function isVersionedGame(game: unknown): game is VersionedGame {
   return game === 'plakoto' || game === 'asodio';
+}
+
+/**
+ * The game whose rules version a match of `game` plays: the game itself
+ * for Plakoto and Asodio, Plakoto for a Tavli match (its Plakoto game,
+ * #247), else `null` (Portes and Fevga have one preset).
+ */
+export function versionedGameOf(game: GameChoice): VersionedGame | null {
+  if (game === 'tavli') return 'plakoto';
+  return isVersionedGame(game) ? game : null;
 }
 
 /** True when `value` is a rules version of `game`. */
@@ -115,12 +126,38 @@ const GAME_PRESETS: { readonly [G in GameChoice]: PresetId } = {
   asodio: DEFAULT_PRESET_BY_GAME.asodio,
 };
 
-/** The engine preset of a match of `game`: its chosen rules version, if it has a choice. */
+/**
+ * The engine preset of a match of `game`: its chosen rules version, if it
+ * has a choice. A Tavli match (#247) is the `tavli` preset with the default
+ * Plakoto, else the chosen Plakoto version with the Tavli rotation: the
+ * engine plays that preset in the Plakoto game only, and the default
+ * presets in Portes and Fevga (`gameRules`, `docs/rules/tavli-match.md`).
+ */
 export function gamePreset(
   game: GameChoice,
   versions: RulesVersions = DEFAULT_RULES_VERSIONS,
 ): PresetId {
+  if (game === 'tavli') return otherVersion(versions.plakoto) ?? GAME_PRESETS.tavli;
   return isVersionedGame(game) ? versions[game] : GAME_PRESETS[game];
+}
+
+/**
+ * The rules versions that `preset`, the match preset of a match of `game`,
+ * stands for, on top of `base` (the reverse of `gamePreset`): a version of
+ * the game's versioned game (`versionedGameOf`) is that version, the
+ * game's default preset (`tavli` for a Tavli match) is the default
+ * version. Any other preset leaves `base` as it is.
+ */
+export function versionsOfPreset(
+  game: GameChoice,
+  preset: unknown,
+  base: RulesVersions = DEFAULT_RULES_VERSIONS,
+): RulesVersions {
+  const versioned = versionedGameOf(game);
+  if (versioned === null) return base;
+  if (isRulesVersion(versioned, preset)) return { ...base, [versioned]: preset };
+  const standard = { ...base, [versioned]: DEFAULT_RULES_VERSIONS[versioned] };
+  return preset === gamePreset(game) ? standard : base;
 }
 
 /**
@@ -200,19 +237,18 @@ export function isOpeningRollRule(value: unknown): value is OpeningRollRule {
  * one-game match plays only that game: the Plakoto and Fevga presets keep
  * the shared rotation Portes → Plakoto → Fevga (`NEUTRAL` in the engine), so
  * we set `match.rotation` to the game ("single game" in `tavli-match.md`).
- * Tavli keeps its rotation. `openingRoll` is the house rule (#207); the
- * preset's own value (the federation rule) is the default. `versions`
- * picks the preset of Plakoto and Asodio (#241); Tavli always uses the
- * default presets.
+ * Tavli keeps its rotation Portes → Plakoto → Fevga. `openingRoll` is the
+ * house rule (#207); the preset's own value (the federation rule) is the
+ * default. `versions` picks the preset of Plakoto and Asodio (#241), and
+ * of the Plakoto game of a Tavli match (#247, `gamePreset`).
  */
 export function gameRuleSet(
   game: GameChoice,
   openingRoll: OpeningRollRule = DEFAULT_OPENING_ROLL,
   versions: RulesVersions = DEFAULT_RULES_VERSIONS,
 ): RuleSet {
-  const only = singleGame(game);
   return resolveRules(gamePreset(game, versions), {
-    match: { openingRoll, ...(only === null ? {} : { rotation: [only] }) },
+    match: { openingRoll, rotation: gameRotation(game) },
   });
 }
 

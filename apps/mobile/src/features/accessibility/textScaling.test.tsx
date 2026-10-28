@@ -151,8 +151,8 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(problems()).toEqual([]);
   });
 
-  it.each(['plakoto', 'asodio'] as const)(
-    'New game with the rules version of %s (#241)',
+  it.each(['plakoto', 'asodio', 'tavli'] as const)(
+    'New game with the rules version of %s (#241, #247)',
     async (game) => {
       await renderWithRoot(
         <NewGameScreen

@@ -157,6 +157,7 @@
     "onPhone": "Saved only on this phone: your last {{max}} matches.",
     "openingRoll": "Opening roll: {{rule}}",
     "rulesVersion": "Rules version: {{version}}",
+    "rulesVersionPlakoto": "Rules version (Plakoto): {{version}}",
     "result": {
       "won": "Won",
       "lost": "Lost",
@@ -568,6 +569,7 @@
       "chosenStarterRollsHint": "You choose who starts. That player rolls both dice.",
       "chosenStarterRollsHintBot": "You choose who starts: you or the bot. That player rolls both dice.",
       "rulesVersion": "Rules version",
+      "rulesVersionPlakoto": "Rules version (Plakoto)",
       "optionLabel": "{{group}}: {{option}}"
     },
     "rulesVersion": {
