@@ -8,7 +8,9 @@
  * It acts like a network:
  * - `subscribe` calls `onView` on a later microtask, never inside the call.
  * - `listMyGames` (#296) lists the caller's games with `summarizeGame`,
- *   like the Convex `listMyGames`.
+ *   like the Convex `listMyGames`. `watchMyGames` (#297) sends that list
+ *   again after each change to one of the caller's games, only when the
+ *   list changed (like a Convex query watch).
  * - Every view, request and event is a copy (a JSON round trip), so a
  *   client cannot change the server state, and the server cannot change a
  *   view a client holds.
@@ -188,6 +190,15 @@ interface Listener {
   active: boolean;
 }
 
+interface ListListener {
+  readonly playerId: string;
+  readonly status: OnlineGameStatus;
+  readonly onList: (games: readonly GameSummary[]) => void;
+  /** The JSON of the last list sent, so an unchanged list is not sent again. */
+  last: string | null;
+  active: boolean;
+}
+
 interface InviteListener {
   /** The normalized code, or `null` for text that is not a code. */
   readonly code: string | null;
@@ -229,6 +240,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const { rng, now } = options;
   const games = new Map<string, MemoryGame>();
   const listeners = new Set<Listener>();
+  const listListeners = new Set<ListListener>();
   /** By code (capital letters). Kept in the order they were made. */
   const invites = new Map<string, InviteRecord>();
   const inviteListeners = new Set<InviteListener>();
@@ -278,6 +290,27 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     const text = JSON.stringify(viewOf(game));
     for (const listener of listeners) {
       if (listener.gameId === game.gameId) send(listener, text);
+    }
+    notifyLists(game);
+  }
+
+  /**
+   * Sends the list of `listener` as it is now on a later microtask, unless
+   * it stops first or the list did not change since the last one sent.
+   */
+  function sendList(listener: ListListener): void {
+    const text = JSON.stringify(myGames(listener.playerId, listener.status));
+    later(() => {
+      if (!listener.active || text === listener.last) return;
+      listener.last = text;
+      listener.onList(JSON.parse(text) as GameSummary[]);
+    });
+  }
+
+  /** Sends the new list to each list watcher of a player of `game`. */
+  function notifyLists(game: MemoryGame): void {
+    for (const listener of listListeners) {
+      if (sideOf(game.players, listener.playerId) !== null) sendList(listener);
     }
   }
 
@@ -400,6 +433,16 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         await nextTick();
         return copy(myGames(playerId, status));
       },
+      watchMyGames(request, onList) {
+        const { status } = copy(request);
+        const listener: ListListener = { playerId, status, onList, last: null, active: true };
+        listListeners.add(listener);
+        sendList(listener);
+        return () => {
+          listener.active = false;
+          listListeners.delete(listener);
+        };
+      },
     };
   }
 
@@ -430,6 +473,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       updatedAt: at,
     };
     games.set(gameId, game);
+    notifyLists(game);
     return gameId;
   }
 

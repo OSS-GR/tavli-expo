@@ -10,6 +10,7 @@ Version: `convex` 1.46.0, a peer dependency (the app installs it). Keep it on th
 - **Sign-in changes.** Convex asks for a token on `setAuth`, and again only when the server refuses one; a first `null` (nobody signed in yet) leaves the client signed out for good. So `createConvexClient` calls `setAuth` again on each `auth.onChange` (#281): a guest made after the client opened is signed in at once.
 - **`subscribe`** watches the `getGame` query. Each result goes to `onView`. A `null` result (no such game) goes to `onError` as `NOT_FOUND`. Neither is ever called inside `subscribe`, or after its stop function: each result waits one microtask.
 - **`listMyGames({ status })`** (#296) runs the `listMyGames` query once (`client.query`) and resolves with a copy of the list: the caller's games with that status, newest change first, at most 50. It is a call, not a live list: call it again to see changes.
+- **`watchMyGames({ status }, onList, onError)`** (#297) is the live list: it watches the same query (`client.onUpdate`). Each list is a copy and waits one microtask, so nothing arrives inside the call or after the stop function. Errors map like the calls.
 - **`sendTurn` / `sendAnswer`** call `makeMove` / `answer` and resolve once the mutation resolves (the Convex client has the new view by then). When the turn time ran out first, the server saves the time out and returns `{ ok: false, error: { code: 'TIMED_OUT' } }`; the adapter rejects with that data. **`resign`** calls `resign`.
 - **Errors.** A server error is a `ConvexError` whose `data` is `GameTransportErrorData`: the adapter rejects (or calls `onError`) with that data, as a plain object. Every server code maps the same way, `NOT_SIGNED_IN` too. Any other error (the network, a bad argument) stays as it is.
 - **Moves are copied** with only the fields the server takes (`from`, `to`, `die`, `capture`). The server checks its arguments strictly, so an extra field would fail the call.
@@ -30,7 +31,7 @@ Version: `convex` 1.46.0, a peer dependency (the app installs it). Keep it on th
 | `src/functions.ts`      | `GAME_FUNCTIONS` and `INVITE_FUNCTIONS`: typed references to the server functions, by name (`GAME_FUNCTION_NAMES`, `INVITE_FUNCTION_NAMES`) |
 | `src/invites.ts`        | `createConvexInvites({ client })`: the `Invites` port, and `toInviteError`                                                                  |
 | `src/client.ts`         | `createConvexGameTransportFromUrl(url, auth)`, `createConvexClient(url, auth)` and `authTokenFetcher(auth)`                                 |
-| `src/transport.test.ts` | The mapping on a fake client: views, `NOT_FOUND`, errors, `TIMED_OUT`, unsubscribe, `listMyGames`                                           |
+| `src/transport.test.ts` | The mapping on a fake client: views, `NOT_FOUND`, errors, `TIMED_OUT`, unsubscribe, `listMyGames`, `watchMyGames`                           |
 | `src/client.test.ts`    | The token fetcher and the URL factory (`convex/browser` mocked, no socket)                                                                  |
 | `src/invites.test.ts`   | The invites mapping on a fake client: arguments, copies, errors, `watchInvite` and its stop                                                 |
 
