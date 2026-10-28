@@ -297,14 +297,14 @@ The test files and `test.setup.ts` have two dots in their names, so Convex does 
 
 The Convex project has two deployments (#129), both in the EU (`eu-west-1`):
 
-| Target | Deployment | URL | Deploy key (repo secret) | App variants |
+| Target | Deployment | URL | Deploy key (GitHub secret) | App variants |
 |---|---|---|---|---|
 | dev | `exciting-reindeer-792` | `https://exciting-reindeer-792.eu-west-1.convex.cloud` | `CONVEX_DEPLOY_KEY_DEV` | `development` |
 | prod | `superb-dog-503` | `https://superb-dog-503.eu-west-1.convex.cloud` | `CONVEX_DEPLOY_KEY_PROD` | `preview`, `production` |
 
-The URLs are public client config. They live in `apps/mobile/app.config.ts` (see [Running the app](../process/running-the-app.md#which-server-the-app-uses)). The deploy keys are secrets. They live only in GitHub, never in the repo.
+The URLs are public client config. They live in `apps/mobile/app.config.ts` (see [Running the app](../process/running-the-app.md#which-server-the-app-uses)). The deploy keys are secrets. They live only in GitHub, never in the repo. `CONVEX_DEPLOY_KEY_DEV` is a repo secret. `CONVEX_DEPLOY_KEY_PROD` is a secret of the GitHub environment `production`, which only `main` may use, so no other branch or workflow can read it. Do not keep a repo secret of the same name as well.
 
-Each deployment also needs the secret `BETTER_AUTH_SECRET` ([Sign-in](#sign-in)). The deploy does not set it: the owner sets it once per deployment with `npx convex env set BETTER_AUTH_SECRET <value>` (dev, then `--prod`). Without it, sign-in fails.
+Each deployment also needs the secret `BETTER_AUTH_SECRET` ([Sign-in](#sign-in)). The deploy does not set it: the owner sets it once per deployment, with a new random value for each (`openssl rand -base64 32`). The easy way is the Convex dashboard: the deployment → **Settings** → **Environment Variables**. The CLI works too, from `apps/server`: `pnpm exec convex env set BETTER_AUTH_SECRET <value>` (dev, then `--prod`). Without it, sign-in fails. Both deployments have it (set 2026-10-28).
 
 ### How a deploy happens
 
@@ -321,7 +321,7 @@ It never runs on pull requests, so PR code never sees a deploy key. Two deploys 
 
 1. Merge the change to `main`. Wait for the dev deploy to pass, and try it on a `development` build.
 2. GitHub → **Actions** → **Deploy server** → **Run workflow**. Pick the branch `main` and the target `prod`.
-3. The job runs in the GitHub environment `production`. GitHub makes it on the first run. The owner can add **required reviewers** there (Settings → Environments → `production`). Then each prod deploy waits for an approval. Dev runs use the environment `development`, with no rules.
+3. The job runs in the GitHub environment `production`, which holds `CONVEX_DEPLOY_KEY_PROD` and allows only `main`. The owner can add **required reviewers** there (Settings → Environments → `production`). Then each prod deploy waits for an approval. Dev runs use the environment `development`, with no rules.
 
 A prod run from any branch but `main` fails at the first step.
 

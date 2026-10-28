@@ -117,7 +117,7 @@ The workflow `.github/workflows/deploy-server.yml` deploys the Convex functions 
 - **Prod:** only by hand, with target `prod`, from `main`. The job uses the GitHub environment `production`.
 - **Steps:** check the deploy key, install, server typecheck and tests, then `convex deploy --typecheck enable` in `apps/server`.
 - **Never on PRs:** it has no `pull_request` or `pull_request_target` trigger, so PR code never sees the deploy keys. Keep it that way.
-- **Secrets:** `CONVEX_DEPLOY_KEY_DEV` and `CONVEX_DEPLOY_KEY_PROD`. The first step fails with a clear error when the key is missing or is for another deployment.
+- **Secrets:** `CONVEX_DEPLOY_KEY_DEV` (repo secret) and `CONVEX_DEPLOY_KEY_PROD` (secret of the environment `production`, `main` only). The first step fails with a clear error when the key is missing or is for another deployment.
 
 How a deploy works, and how to roll back: [online game service](../architecture/online-game-service.md#deploy).
 
