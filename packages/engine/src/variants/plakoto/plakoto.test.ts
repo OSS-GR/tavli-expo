@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DIE_VALUES } from '../../dice';
+import { DISTINCT_ROLLS } from '../../dice';
 import type { Dice } from '../../dice';
 import { formatMove, formatTurn } from '../../move';
 import { getPreset, resolveRules } from '../../presets';
@@ -34,10 +34,8 @@ function after(text: string, dice: Dice, turn: string, rules: Rules = {}): strin
   return formatPlakoto(play(state(text, rules), dice, turn).board);
 }
 
-function allRolls(): Dice[] {
-  const rolls: Dice[] = [];
-  for (const a of DIE_VALUES) for (const b of DIE_VALUES) if (b <= a) rolls.push([a, b]);
-  return rolls;
+function allRolls(): readonly Dice[] {
+  return DISTINCT_ROLLS.map(({ dice }) => dice);
 }
 
 const illegal = expect.objectContaining({ code: 'ILLEGAL_TURN' });

@@ -52,6 +52,9 @@ interface BoardState {
 
 - `Dice` is `readonly [DieValue, DieValue]`. `diceMoves(dice)` gives 2 moves,
   or 4 for a double.
+- `DISTINCT_ROLLS` lists the 21 distinct rolls (higher die first) with their
+  chance: 1/36 for a double, 2/36 for the rest. Use it to loop over every
+  roll; do not build the list again.
 - `Rng` has one method: `nextUint32()`. `rollDie` / `rollDice` use rejection
   sampling, so every face is equally likely.
 - `createSeededRng(seed)` is xoshiro128\*\* (seeded with splitmix32). It is

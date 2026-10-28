@@ -130,7 +130,8 @@ analyzer.evaluate(state); // the chances of state.toMove, before the roll
    (`TWO_PLY_MARGIN`, a near tie), at most 16 in all
    (`TWO_PLY_MAX_CANDIDATES`).
 2. For each candidate, play it, then average over the 21 different rolls
-   of the next player (a double 1/36, the others 2/36) the result after
+   of the next player (`DISTINCT_ROLLS` from the engine: a double 1/36,
+   the others 2/36) the result after
    their best 1-ply reply (the turn hard plays at temperature 0).
 3. Rank the candidates by that 2-ply equity. A turn that wins at once is
    still the best (its value is exact). The other turns follow in their
