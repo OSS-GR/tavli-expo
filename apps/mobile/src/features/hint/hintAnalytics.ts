@@ -8,7 +8,7 @@
  */
 import type { Analytics, MatchGame } from '@tavli/contracts';
 
-import { quietly } from '@/features/game/gameStore';
+import { quietly } from '@/features/analytics/quietly';
 import { analytics as appAnalytics } from '@/services';
 
 export function sendHintShown(
