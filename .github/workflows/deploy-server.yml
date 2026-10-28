@@ -9,7 +9,9 @@ name: Deploy server
 # Never add a `pull_request` or `pull_request_target` trigger: PR code must
 # never see the deploy keys.
 #
-# Needs the repo secrets CONVEX_DEPLOY_KEY_DEV and CONVEX_DEPLOY_KEY_PROD.
+# Needs the secrets CONVEX_DEPLOY_KEY_DEV (a repo secret) and
+# CONVEX_DEPLOY_KEY_PROD (a secret of the environment `production`, which
+# only main may use).
 # See docs/architecture/online-game-service.md ("Deploy").
 on:
   push:
@@ -51,7 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Both environments are made by GitHub on the first run if they do not
-    # exist. The deploy keys are repo secrets, so either works without setup.
+    # exist. The prod key lives in `production`, so only a prod run from
+    # main can read it.
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'prod' && 'production' || 'development' }}
     env:
       TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'dev' }}
@@ -77,14 +80,14 @@ jobs:
           fi
 
           if [ -z "$CONVEX_DEPLOY_KEY" ]; then
-            echo "::error::The repo secret $secret is empty or missing. Add it in Settings > Secrets and variables > Actions (see docs/architecture/online-game-service.md)."
+            echo "::error::The secret $secret is empty or missing. Add the dev key in Settings > Secrets and variables > Actions, and the prod key in Settings > Environments > production (see docs/architecture/online-game-service.md)."
             exit 1
           fi
 
           # A space or a line break around a pasted key breaks the deploy.
           case "$CONVEX_DEPLOY_KEY" in
             [[:space:]]*|*[[:space:]])
-              echo "::error::The repo secret $secret has a space or a line break at the start or end. Paste the key again without them."
+              echo "::error::The secret $secret has a space or a line break at the start or end. Paste the key again without them."
               exit 1
               ;;
           esac
@@ -110,7 +113,7 @@ jobs:
                 project:*|preview:*) hint=" A ${prefix%%:*} key does not name one deployment." ;;
                 *) hint="" ;;
               esac
-              echo "::error::The repo secret $secret must be a deploy key for $deployment (it starts with \"$deployment|\"). It holds $found.$hint Make one in the Convex dashboard: the ${deployment%%:*} deployment ${deployment#*:} > Settings > URL and Deploy Key > Generate."
+              echo "::error::The secret $secret must be a deploy key for $deployment (it starts with \"$deployment|\"). It holds $found.$hint Make one in the Convex dashboard: the ${deployment%%:*} deployment ${deployment#*:} > Settings > URL and Deploy Key > Generate."
               exit 1
               ;;
           esac
@@ -129,7 +132,9 @@ jobs:
 
       # `convex deploy` typechecks the functions (convex/tsconfig.json),
       # bundles them and pushes them. `--typecheck enable` fails the deploy
-      # when the typecheck fails or cannot run.
+      # when the typecheck fails or cannot run. It looks for
+      # apps/server/node_modules/typescript, so apps/server lists
+      # typescript in its own devDependencies.
       - name: Deploy to Convex (${{ env.TARGET }})
         working-directory: apps/server
         env:

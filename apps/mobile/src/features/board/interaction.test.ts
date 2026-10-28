@@ -17,7 +17,15 @@ import { getLayout, getTheme } from '@tavli/themes';
 import { boardLayout, portraitLayout } from './BoardCanvas';
 import { layoutBoard, type BoardView } from './boardModel';
 import { flowPaths } from './combined';
-import { FLIGHT_MS, HIT_DELAY_MS, flightMs, moveFlights, pathFlights } from './flights';
+import {
+  FLIGHT_MS,
+  HIT_DELAY_MS,
+  TURN_MOVE_GAP_MS,
+  flightMs,
+  moveFlights,
+  pathFlights,
+  turnFlights,
+} from './flights';
 import {
   fitBoard,
   fitBoardWithShadow,
@@ -229,6 +237,74 @@ describe('picking', () => {
     expect(resolveDrop(sources, s13, home.x, home.y)).toEqual({ kind: 'cancel' });
     const p12 = center(slotRect(geo, { kind: 'point', index: 12 }));
     expect(resolveDrop(sources, s13, p12.x, p12.y)).toEqual({ kind: 'illegal' });
+  });
+});
+
+describe('turnFlights (#255)', () => {
+  it('flies the moves of a whole turn one after the other', () => {
+    const before = portes.initialState({ startingPlayer: 'white' }).board;
+    const moves: Move[] = [
+      { from: 13, to: 7, die: 6, capture: 'none' },
+      { from: 7, to: 2, die: 5, capture: 'none' },
+    ];
+    const flights = turnFlights(geo, WHITE, 'white', moves, before, {
+      id: 'r',
+      direction: 'contrary',
+    });
+    expect(flights.map((f) => [f.id, f.delay])).toEqual([
+      ['r:0:0', 0],
+      ['r:1:0', FLIGHT_MS + TURN_MOVE_GAP_MS],
+    ]);
+    // The second move starts where the first one landed.
+    expect(flights[1]!.from).toEqual(flights[0]!.to);
+    expect(flights[1]!.to).toMatchObject(stackPosition(geo, { kind: 'point', index: 2 }, 1, 0));
+    // It is the same checker: it shows there only once the first flight is down.
+    expect(flights[0]!.hiddenMs).toBeUndefined();
+    expect(flights[1]!.hiddenMs).toBe(FLIGHT_MS);
+  });
+
+  it('hides each later move of one checker until it lands (a double)', () => {
+    const before = portes.initialState({ startingPlayer: 'white' }).board;
+    const moves: Move[] = [
+      { from: 13, to: 11, die: 2, capture: 'none' },
+      { from: 11, to: 9, die: 2, capture: 'none' },
+      { from: 9, to: 7, die: 2, capture: 'none' },
+      { from: 13, to: 11, die: 2, capture: 'none' },
+    ];
+    const flights = turnFlights(geo, WHITE, 'white', moves, before, {
+      id: 'r',
+      direction: 'contrary',
+    });
+    const step = FLIGHT_MS + TURN_MOVE_GAP_MS;
+    expect(flights.map((f) => [f.delay, f.hiddenMs])).toEqual([
+      [0, undefined],
+      [step, FLIGHT_MS],
+      [2 * step, step + FLIGHT_MS],
+      // Another checker: it waits in sight at its start.
+      [3 * step, undefined],
+    ]);
+  });
+
+  it('sends a hit checker to the bar after its own move lands', () => {
+    const board = createBoard(
+      { white: { points: { 13: 15 } }, black: { points: { 18: 1, 1: 14 } } },
+      'contrary',
+    );
+    const moves: Move[] = [
+      { from: 13, to: 12, die: 1, capture: 'none' },
+      { from: 13, to: 7, die: 6, capture: 'hit' },
+    ];
+    const flights = turnFlights(geo, WHITE, 'white', moves, board, {
+      id: 'r',
+      direction: 'contrary',
+    });
+    expect(flights.map((f) => [f.id, f.owner, f.delay])).toEqual([
+      ['r:0:0', 'white', 0],
+      ['r:1:0', 'white', FLIGHT_MS + TURN_MOVE_GAP_MS],
+      ['r:1:1', 'black', FLIGHT_MS + TURN_MOVE_GAP_MS + HIT_DELAY_MS],
+    ]);
+    // Two checkers and a blot: each waits in sight where it stands.
+    expect(flights.map((f) => f.hiddenMs)).toEqual([undefined, undefined, undefined]);
   });
 });
 

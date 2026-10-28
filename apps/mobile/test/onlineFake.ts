@@ -1,17 +1,21 @@
 /**
- * Online play in Jest (#266): `auth` and `games` of the `@/services` fake
- * (`jest.setup.ts`).
+ * Online play in Jest (#255, #266): the online parts of the `@/services`
+ * fake (`jest.setup.ts`). One in-memory server (`createMemoryGameServer`
+ * from `@tavli/online`, seeded dice) serves all of them:
  *
  * - `auth` is the in-memory `AuthProvider` (`createMemoryAuthProvider`):
  *   guests `guest-1`, `guest-2`, … Nobody is signed in at the start.
- * - `games` is a `GameTransport` on the in-memory server
- *   (`createMemoryGameServer` from `@tavli/online`). Each call comes from
- *   the user signed in to `auth` at that moment, like the Convex adapter
- *   with the sign-in token. With nobody signed in it fails `NOT_SIGNED_IN`.
+ * - `games` is a `GameTransport` on the server. Each call comes from the
+ *   user signed in to `auth` at that moment, like the Convex adapter with
+ *   the sign-in token. With nobody signed in it fails `NOT_SIGNED_IN`.
+ * - `onlineServer()` and `gameTransportFor(playerId)` are the dev game
+ *   parts (`/dev/online`): the server itself, and one cached transport
+ *   per player.
  *
  * A test makes games with `onlineFake.server().createGame(...)`. Each test
- * starts with a new server and nobody signed in (`resetOnlineFake`, called
- * in `test/afterEnv.ts`).
+ * starts with a new server, no cached transports and nobody signed in
+ * (`resetOnlineFake`, called in `test/afterEnv.ts`). The server clock is
+ * `Date.now`, which the fake timers move.
  */
 import {
   createMemoryAuthProvider,
@@ -28,18 +32,29 @@ const NOT_SIGNED_IN: GameTransportErrorData = {
 };
 
 function newServer(): MemoryGameServer {
-  // Fixed dice, so tests are repeatable. The clock follows Jest's fake timers.
-  return createMemoryGameServer({ rng: createSeededRng(7), now: () => Date.now() });
+  // Fixed dice, so tests are repeatable.
+  return createMemoryGameServer({ rng: createSeededRng(11), now: () => Date.now() });
 }
 
 const authStore = createMemoryAuthStore();
 const auth = createMemoryAuthProvider(authStore);
 let server = newServer();
+const transports = new Map<string, GameTransport>();
+
+/** One transport per player on the current server, like `gameTransportFor` in the app. */
+function transportFor(playerId: string): GameTransport {
+  let transport = transports.get(playerId);
+  if (transport === undefined) {
+    transport = server.transportFor(playerId);
+    transports.set(playerId, transport);
+  }
+  return transport;
+}
 
 /** The transport of the signed-in user, or `null` when nobody is signed in. */
 function caller(): GameTransport | null {
   const user = auth.currentUser();
-  return user === null ? null : server.transportFor(user.id);
+  return user === null ? null : transportFor(user.id);
 }
 
 const games: GameTransport = {
@@ -67,11 +82,14 @@ export const onlineFake = {
   authStore,
   /** The in-memory server of the current test. */
   server: () => server,
+  /** The cached transport of `playerId` on the current server. */
+  transportFor,
 };
 
-/** A new server, and nobody signed in. */
+/** A new server, no cached transports, and nobody signed in. */
 export function resetOnlineFake(): void {
   authStore.session = null;
   authStore.guests = 0;
   server = newServer();
+  transports.clear();
 }

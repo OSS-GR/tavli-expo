@@ -76,6 +76,12 @@ export interface OnlineStoreState {
   readonly matchKey: string;
   /** The last action the store or the server refused, for logs and tests. `null` after a good one. */
   readonly lastError: string | null;
+  /**
+   * How many actions this store refused with no call. The same refusal
+   * twice gives the same `lastError`; the count still changes, so the
+   * board plays its "invalid move" feedback each time.
+   */
+  readonly refusals: number;
   /** Set when the game could not load. */
   readonly loadError: OnlineLoadError | null;
   /**
@@ -85,6 +91,12 @@ export interface OnlineStoreState {
    */
   readonly sending: boolean;
   readonly notice: OnlineNotice | null;
+  /**
+   * How many notices this store has set, the newest included. It names
+   * each notice, so a screen reader hears the same notice again when it
+   * comes back (#255).
+   */
+  readonly noticeCount: number;
   /**
    * The estimated server time minus the phone time, in milliseconds. 0
    * for the first view; then the highest `estimateOffset` of the newer
@@ -153,7 +165,7 @@ export function createOnlineStore({
 
   const store = createStore<OnlineStoreState>()((set, get) => {
     const refuse = (message: string): false => {
-      set({ lastError: message });
+      set((s) => ({ lastError: message, refusals: s.refusals + 1 }));
       return false;
     };
 
@@ -182,10 +194,21 @@ export function createOnlineStore({
             : error.code === 'STALE_VERSION'
               ? 'stale'
               : 'refused';
-        set({ flow: fresh(), sending: false, notice, lastError: errorText(error) });
+        set((s) => ({
+          flow: fresh(),
+          sending: false,
+          notice,
+          noticeCount: s.noticeCount + 1,
+          lastError: errorText(error),
+        }));
       } else {
         // A network error: keep the moves, so the player can send again.
-        set({ sending: false, notice: 'sendFailed', lastError: errorText(error) });
+        set((s) => ({
+          sending: false,
+          notice: 'sendFailed',
+          noticeCount: s.noticeCount + 1,
+          lastError: errorText(error),
+        }));
       }
     };
 
@@ -236,9 +259,11 @@ export function createOnlineStore({
       side: null,
       matchKey: nextMatchKey(),
       lastError: null,
+      refusals: 0,
       loadError: null,
       sending: false,
       notice: null,
+      noticeCount: 0,
       clockOffset: 0,
 
       dispatch: (action) => {

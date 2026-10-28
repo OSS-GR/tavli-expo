@@ -3,7 +3,8 @@
  * (#153; choose a double, #205; the opening roll house rule cards, #207),
  * the game menu and resign dialog, the end screens, the game review
  * (#215) with its switch (#230), History (#142), the tutorial's mother
- * card (#149) and the Settings game picker (#159)
+ * card (#149), the Settings game picker (#159) and the online game
+ * screen with its game-end sheet and match end (#255)
  * follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
@@ -24,6 +25,8 @@ import {
   type BoardState,
   type Match,
 } from '@tavli/engine';
+import { TURN_TIME_MS } from '@tavli/contracts';
+import { createMemoryGameServer } from '@tavli/online';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
@@ -39,6 +42,9 @@ import { MatchScreen } from '@/features/match/MatchScreen';
 import { createSessionRegistry } from '@/features/match/sessions';
 import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
+import { startOnlineBot } from '@/features/online/onlineBot';
+import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
+import { onlineSeats } from '@/features/online/seats';
 import { ReviewScreen } from '@/features/review/ReviewScreen';
 import {
   BOARD_LAYOUT_MODES,
@@ -49,6 +55,7 @@ import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { settingsStore } from '@/features/settings/store';
 import { TutorialScreen } from '@/features/tutorial/TutorialScreen';
 import i18n from '@/i18n';
+import { botRunner } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
@@ -454,6 +461,70 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       />,
     );
     expect(problems()).toEqual([]);
+  });
+
+  it('the online game: your turn with its clock, the game-end sheet, match end (#255)', async () => {
+    const user = setupUser();
+    const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
+    const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 'live');
+    const bot = startOnlineBot({
+      transport: server.transportFor('bot'),
+      gameId,
+      botId: 'bot',
+      difficulty: 'easy',
+      runner: botRunner,
+      rng: createSeededRng(3),
+      timing: { thinkMs: () => 2000 },
+    });
+    try {
+      const { unmount } = await renderWithRoot(
+        <OnlineMatchScreen
+          gameId={gameId}
+          transport={server.transportFor('me')}
+          me="me"
+          onExit={jest.fn()}
+          onSettings={jest.fn()}
+          onRules={jest.fn()}
+          onMatchOver={jest.fn()}
+        />,
+      );
+      await screen.findByTestId('game-board', { includeHiddenElements: true });
+      for (let i = 0; i < 40 && server.getGame(gameId)!.waitingFor !== 'white'; i++) {
+        await act(async () => {
+          jest.advanceTimersByTime(250);
+        });
+      }
+      expect(await screen.findByTestId('confirm-button')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
+
+      // You run out of time: the game-end sheet.
+      await act(async () => {
+        jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+        server.runDueTimeouts();
+      });
+      expect(await screen.findByTestId('game-end-card')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
+      await user.press(screen.getByTestId('next-game-button'));
+      await unmount();
+
+      // Match end of an online match: no Rematch, names "You" and "Opponent".
+      await server.transportFor('me').resign(gameId);
+      const view = server.getGame(gameId)!;
+      await renderWithRoot(
+        <MatchEndScreen
+          match={view.match}
+          online={{
+            seats: onlineSeats('white', i18n.t),
+            me: 'white',
+            label: i18n.t('online.label', { game: i18n.t('games.portes') }),
+          }}
+          onHome={jest.fn()}
+        />,
+      );
+      expect(problems()).toEqual([]);
+    } finally {
+      bot.stop();
+    }
   });
 
   it('the game review: busy, three mistakes with their switch, and "Well played" (#215, #230)', async () => {
