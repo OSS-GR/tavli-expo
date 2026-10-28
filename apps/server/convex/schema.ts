@@ -21,6 +21,9 @@ export const side = v.union(v.literal('white'), v.literal('black'));
 
 export const gameStatus = v.union(v.literal('active'), v.literal('finished'));
 
+/** The phone system of a push token. */
+export const pushPlatform = v.union(v.literal('ios'), v.literal('android'));
+
 const inviteStatus = v.union(...INVITE_STATUSES.map((status) => v.literal(status)));
 
 export default defineSchema({
@@ -96,4 +99,20 @@ export default defineSchema({
     // "My open invites" and the cap on them (#275): the open invites of
     // one player whose time is not up are one range (`expiresAt > now`).
     .index('by_from', ['from', 'status', 'expiresAt']),
+
+  /**
+   * The Expo push tokens of each player's phones (#280), for "your turn"
+   * pushes. See "Push" in the service doc. A token belongs to one player
+   * at a time; a player keeps at most `MAX_PUSH_TOKENS_PER_PLAYER`.
+   */
+  pushTokens: defineTable({
+    playerId: v.string(),
+    /** `ExponentPushToken[…]` or `ExpoPushToken[…]` (`isExpoPushToken`). */
+    token: v.string(),
+    platform: pushPlatform,
+    /** When the phone last registered the token, epoch ms (server clock). */
+    updatedAt: v.number(),
+  })
+    .index('by_player', ['playerId', 'updatedAt'])
+    .index('by_token', ['token']),
 });

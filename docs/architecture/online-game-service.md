@@ -1,6 +1,6 @@
 # Online game service
 
-Status: first version (#126, part of #46), with turn timers (#133), invites by code (#252), [my games](#my-games) (#296), [sign-in](#sign-in) (#131) and a [Convex client adapter](#the-convex-adapter) (#253). The game model is in the pure package `@tavli/online`, with an [in-memory server](#the-in-memory-server) (#251). It runs and is tested **offline**, with no Convex account. CI deploys it to Convex (#257, see [Deploy](#deploy)).
+Status: first version (#126, part of #46), with turn timers (#133), invites by code (#252), [my games](#my-games) (#296), ["your turn" pushes](#push) (#280), [sign-in](#sign-in) (#131) and a [Convex client adapter](#the-convex-adapter) (#253). The game model is in the pure package `@tavli/online`, with an [in-memory server](#the-in-memory-server) (#251). It runs and is tested **offline**, with no Convex account. CI deploys it to Convex (#257, see [Deploy](#deploy)).
 
 Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0002](../decisions/0002-modular-architecture.md).
 
@@ -8,7 +8,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 
 | Path | What it holds |
 |---|---|
-| `apps/server/convex/schema.ts` | The tables: `games`, `moves` and `invites` |
+| `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `invites` and `pushTokens` |
 | `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
 | `apps/server/convex/caller.ts` | `signedInPlayer(ctx)`: the caller's player id from the sign-in token ([Sign-in](#sign-in)) |
 | `apps/server/convex/convex.config.ts` | The Convex app: it uses the Better Auth component |
@@ -22,6 +22,10 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `packages/online/src/invites.ts` | The invite checks and codes, shared by both servers. Pure: `now` and the `Rng` are arguments (moved from `apps/server/convex/model/` in #256) |
 | `apps/server/convex/model/cryptoRng.ts` | The dice RNG: `crypto.getRandomValues` |
 | `apps/server/convex/invites.ts` | The invite functions ([Invites](#invites)) |
+| `apps/server/convex/push.ts` | Push tokens and "your turn" pushes ([Push](#push)): `registerPushToken`, `removePushToken`, `scheduleTurnPush` and the action `sendTurnPush` |
+| `apps/server/convex/model/push.ts` | The pure push parts: who gets a push (`turnWait`, `turnPushSide`), the text (`TURN_PUSH_TEXT`), the retry (`retryTokens`), the token cap |
+| `packages/contracts/src/push.ts` | The `PushProvider` port, the push error codes and the recording provider |
+| `packages/adapters/push-expo` | `PushProvider` on the Expo Push Service, with `fetch` only, and `isExpoPushToken` (its `README.md`) |
 | `packages/contracts/src/invite.ts` | The `Invites` port, `InviteView`, the statuses, the error codes, the code alphabet and `INVITE_TIME_MS` |
 | `apps/server/convex/_generated/` | Convex codegen output, committed (see [Codegen](#codegen-without-a-deployment)) |
 | `apps/server/convex/tsconfig.json` | The typecheck that `convex deploy` runs before it pushes |
@@ -307,12 +311,75 @@ One player may have at most **10** open invites at a time (`MAX_OPEN_INVITES`, #
 
 A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }` (`InviteErrorData`, `isInviteErrorData` in contracts). The codes are `INVITE_ERROR_CODES`: `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`, `NOT_YOUR_INVITE`, `TOO_MANY_INVITES` (only `createInvite`), `BAD_REQUEST` and `NOT_SIGNED_IN`. If `insertGame` fails inside `acceptInvite`, the error is a game error (`GameTransportErrorData`).
 
+## Push
+
+ADR-0004 point 7: the server tells a player "your turn" in an **async** game, through the Expo Push Service, from a Convex action, behind the `PushProvider` port (#280). This is the server part. The app part (ask for permission, get the token, register it, open the game on a tap) is a later issue.
+
+### `pushTokens`
+
+| Field | Type | Notes |
+|---|---|---|
+| `playerId` | string | The owner (the sign-in subject) |
+| `token` | string | `ExponentPushToken[…]` or `ExpoPushToken[…]` (`isExpoPushToken` in `@tavli/push-expo`). One player at a time. |
+| `platform` | `ios` · `android` | |
+| `updatedAt` | number | Epoch ms (server clock) of the last register |
+
+Indexes: `by_player` (on `[playerId, updatedAt]`, oldest first) and `by_token`.
+
+### Calls
+
+| Call | Who may call | What it does |
+|---|---|---|
+| `registerPushToken(token, platform)` | anyone signed in | Saves the token for the caller, or marks it fresh. A token of another player moves to the caller (the phone signed in to another account). Keeps at most `MAX_PUSH_TOKENS_PER_PLAYER` (5) per player: a new one drops the oldest, but never the token just registered (`tokensOverCap`), even on a tie of `updatedAt` or when another call's clock was ahead. A bad token shape is `BAD_REQUEST`. |
+| `removePushToken(token)` | anyone signed in | Removes the token if it is the caller's (for example on sign-out). Another player's token stays, and the call does not say so. A bad token shape is `BAD_REQUEST`. |
+| `turnPushTokens`, `removeDeadTokens`, `sendTurnPush` | internal | The send, below |
+
+Neither public call takes a player id: both use `signedInPlayer(ctx)`.
+
+### When a push goes out
+
+Every save in `games.ts` (`save`, and `insertGame` for a new game) calls `scheduleTurnPush(ctx, game, version, before, after, callerId)`. `before` and `after` are what the server waited for before and after the save (`turnWait`: the side from `waitingFor`, the side to move or the side that must answer a question, and the game number in the match, `match.games.length`). For a new game `before` is nobody. `callerId` is the player who caused the save, or `server` for a time out. `turnPushSide` picks the side to tell:
+
+- only in an **async** game: a live game never pushes, both players are in the app;
+- never the caller: they are in the app (a new game they started, a game they ended);
+- only when the wait **moved to the other side**, or a **new game** of the match started. A time out ends a game, and the next game may wait for the same side again (with `nextGameStarter: "alternate"` or `"openingRoll"`); that player still gets a push. When the same side waits again in the same game (an Asodio extra roll, or White plays on after the mother question), there is no push;
+- never when the match is over.
+
+If that player has a token, the mutation schedules `sendTurnPush({ gameId, version, playerId })` with `runAfter(0)`. The action runs after the save is committed, so a push problem never fails or undoes a move. It reads the player's tokens and the turn deadline (`turnPushTokens`, newest first; no tokens when the game is no longer at `version`, so a late push is dropped), sends one message per token, and removes the tokens the push service calls dead (`DeviceNotRegistered`, `removeDeadTokens`). A player with no token costs no action.
+
+Each message has `priority: 'high'`, so the phone shows it at once, and a **time to live** (`ttlSeconds`, Expo's `ttl`): the whole seconds left until the turn deadline (`turnPushTtl`). The push service drops the push after that, so a phone that comes back online days later never shows a stale "Your turn": the turn has timed out by then. An async turn is 24 hours, so a push lives at most 24 hours; a retry lives 30 s less. With no full second left (or no deadline), the action sends nothing.
+
+A token whose push failed with `Failed` (the network, a request with no answer in 10 s, an HTTP 429 or 5xx, an answer we cannot read) or `MessageRateExceeded` gets **one** more try: the action schedules itself again after `PUSH_RETRY_MS` (30 s) with `attempt: 1` and only those `tokens` (`retryTokens`). The retry does the same version check, so it is dropped when the player has played since. A retry that fails again is not retried (`MAX_PUSH_RETRIES` = 1), and a failed token is not removed.
+
+### The text
+
+`TURN_PUSH_TEXT` in `convex/model/push.ts`, the one place: title "Your turn", body "An online game is waiting for your move." English only for now: the server does not know the player's language. A later issue adds a locale field (on the token or the player) and picks the text by it. No names and no emails. `data` holds only `gameId`, so the app can open the game.
+
+### The port and the adapter
+
+- **Port:** `PushProvider` (`packages/contracts/src/push.ts`): `send(messages)` with `{ to, title, body, data: { gameId }, priority?, ttlSeconds? }`. It resolves with one `PushResult` per message, in order: `{ ok: true }` or `{ ok: false, error, message }`, where `error` is one of `PUSH_ERROR_CODES` (`DeviceNotRegistered`, `MessageTooBig`, `MessageRateExceeded`, `InvalidCredentials`, `Failed`). It never rejects.
+- **Contract checks:** `pushProviderContract()` in `@tavli/contracts/testing`, plain async functions. The recording provider (`createRecordingPushProvider`) and the Expo adapter (on a fake `fetch`) run them.
+- **Adapter:** `@tavli/push-expo` POSTs to `https://exp.host/--/api/v2/push/send`, at most 100 messages per request, with `fetch` only. A request with no answer in `EXPO_PUSH_TIMEOUT_MS` (10 s, option `timeoutMs`) is cut off (an `AbortSignal`, and the adapter stops waiting even when `fetch` ignores it): its messages are `Failed`, so they get the retry long before the Convex action's time limit. No access token is needed now. If push security is turned on for the Expo project, set `EXPO_ACCESS_TOKEN` on the deployment (`npx convex env set`); `push.ts` passes it. Never put it in the repo.
+
+### How tests fake the sender
+
+`push.ts` makes the Expo sender on first use and keeps it in a module variable. `setPushProvider(provider)` swaps it; `null` goes back to Expo. convex-test loads the modules in the test's own Vite module graph (`modules` in `test.setup.ts`), so the action sees the swap. `push.test.ts` sets a recording provider in `beforeEach` (`kill(token)` makes a dead token, `fail(token, error)` a failing one, `revive(token)` makes it work again) and clears it in `afterEach`. The retry runs on the fake clock: `vi.advanceTimersByTime(PUSH_RETRY_MS)` + `t.finishInProgressScheduledFunctions()`. No test reaches the network. A pure function that takes the sender would also work, but the test would then skip the real action, its version check and the token cleanup.
+
+### Notes and open points
+
+- **Sign-out:** `removePushToken` needs a live session (`signedInPlayer`). The app must call it **before** it signs out; after sign-out the call gets `NOT_SIGNED_IN` and the token stays with the old player until another player registers it, the push service calls it dead, or the cap drops it.
+- **A token moves to the newest caller on purpose:** `registerPushToken` with a token another player holds moves it to the caller. One phone has one token, and it now belongs to the user signed in on it. So a token is treated as a **secret of the phone**: the app never shows it, never logs it and never sends it anywhere but `registerPushToken` and `removePushToken`. Someone who knows another phone's token could move it to their own account: that phone would then stop getting its owner's pushes. A push holds only a fixed text and a game id, so nothing else leaks.
+- **Language:** the push text is English only (see [The text](#the-text)). A locale field comes later.
+- **No expiry job yet:** a player keeps at most 5 tokens (`MAX_PUSH_TOKENS_PER_PLAYER`), and a token is dropped when the push service answers `DeviceNotRegistered`. Nothing removes a token that only went quiet. A scheduled job that removes tokens by an old `updatedAt` is a follow-up.
+
 ## Tests (offline)
 
 `pnpm test` runs Vitest in `apps/server` with the **edge runtime** environment (`@edge-runtime/vm`), as the convex-test docs say. convex-test runs the real functions against an in-memory database, with schema checks.
 
 - `convex/games.test.ts` (convex-test): a full Portes game between two players with server dice (and the log replays to the saved game), an illegal move, a wrong player and a stranger, an old version (two phones at once), resign ends the match, the Plakoto mother question (only the pinned player answers; `playOn` and `resign`; a late answer times out), a missing game. Turn timers with `vi.useFakeTimers()` and `t.finishInProgressScheduledFunctions()`: a live time out loses the game and the next game starts; the match ends on the last point; a move just in time is fine and the old check does nothing; a late move gets `TIMED_OUT` and the time out is saved; async is 24 hours; resign stops the clock. Sign-in (#131): each call runs as a convex-test identity (`t.withIdentity({ subject })`); every function refuses a call with no identity (`NOT_SIGNED_IN`, nothing saved); a stranger cannot read a game (`NOT_A_PLAYER`); a new session of the same user plays on; bad subjects get `BAD_REQUEST`. `listMyGames` (#296): at most 50 games, the newest of both sides; a save moves a game to the top and a resign to `finished`; a game with no `updatedAt` comes last; no other player's id. Every test in the file uses fake timers, so no turn check fires on its own.
 - `convex/model/cryptoRng.test.ts`: the secure RNG.
+- `convex/push.test.ts` (convex-test, fake timers, a recording sender): register and remove; no sign-in; a bad token shape; a stranger cannot remove a token; a token moves to the new player; the cap of 5, which never drops the token just registered; a turn in an async game sends one push to the other player; a live game sends none; a new game tells the first player only when they did not start it; every phone of the player; no token, no action; a dead token is removed; the same player again (after the mother question) sends none; resign sends none; a late push does nothing; a push after the turn deadline does nothing; a failed push leaves the game alone; a time out tells the winner who starts the next game, and tells the side that ran out of time when the next game waits for it again (`alternate`); a failed push is tried once more after 30 s for the failed tokens only (with the time to live left in the turn), and not a third time; a rate-limited push goes out on the retry; a retry is dropped when the player has played since.
+- `convex/model/push.test.ts` (pure): `turnPushSide` (a new game of the match, never the caller), `turnWait`, the messages (high priority, the ttl), `turnPushTtl`, the dead tokens, the retry tokens and the cap (it keeps the token just registered).
 - `convex/invites.test.ts` (convex-test, fake timers): create and accept starts a game that `getGame` shows (the inviter is white); accept twice; your own invite; decline and cancel (and who may call them); an unknown and a malformed code; codes in any case; a code clash (a spy on `crypto.getRandomValues`); the cap on open invites (`TOO_MANY_INVITES` and nothing saved; accept, decline, cancel and expiry free a place, also before the scheduler runs; another player is not affected); a game error rolls the accept back; the invite expires at 24 hours and accept, decline and cancel then fail; an accept just in time; `listMyInvites`; every call refuses a call with no identity; the inviter is the identity; a stranger cannot read the new game. It also runs the `invitesContract()` checks on the real functions (#256).
 - `convex/auth.test.ts` (convex-test with the Better Auth component, `register` from `@convex-dev/better-auth/test`): the `/api/auth` routes answer; a guest signs in over HTTP and gets a Convex token whose `sub` is the user id; that identity makes an invite.
 - `convex/convexTransport.test.ts` (convex-test, fake timers): the `GameTransport` contract checks on the [Convex adapter](#the-convex-adapter) with the real functions; a late turn, no sign-in and a bad id through the adapter; the adapter's function names and types against `api`.
@@ -345,7 +412,7 @@ Each deployment also needs the secret `BETTER_AUTH_SECRET` ([Sign-in](#sign-in))
 
 The workflow `.github/workflows/deploy-server.yml` does it:
 
-1. **Dev, by itself:** on each push to `main` that changes `apps/server/**`, `packages/engine/**`, `packages/contracts/**`, `packages/online/**`, `pnpm-lock.yaml`, the root config (`package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.nvmrc`), the setup action or the workflow. When the functions import another package, add its path there.
+1. **Dev, by itself:** on each push to `main` that changes `apps/server/**`, `packages/engine/**`, `packages/contracts/**`, `packages/online/**`, `packages/adapters/push-expo/**`, `pnpm-lock.yaml`, the root config (`package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.nvmrc`), the setup action or the workflow. When the functions import another package, add its path there.
 2. **Check the key.** The first step runs before any repo code. It fails with an `::error::` when the secret is empty, or when the key is for another deployment (a deploy key starts with `dev:<name>|` or `prod:<name>|`). It never prints the key. It also fails on a space or a line break around the key. For a Convex key of the wrong deployment or type, the error shows only the part before `|` (the key type and the public names), so you can see which key is stored; for any other text it shows nothing of it. A `project:` or `preview:` key fails too: it does not name one deployment.
 3. **Test.** Install (`.github/actions/setup`), then `pnpm --filter @tavli/server typecheck` and `pnpm --filter @tavli/server test`.
 4. **Deploy.** `pnpm exec convex deploy --typecheck enable` in `apps/server`, with `CONVEX_DEPLOY_KEY` from the secret. Convex typechecks with `convex/tsconfig.json`, writes `_generated/` again, bundles the functions, and pushes the functions, the schema and the indexes. With `--typecheck enable`, the deploy fails when the typecheck fails or cannot run. (The default, `try`, skips the typecheck when `convex/tsconfig.json` is missing.)
@@ -413,5 +480,6 @@ Run it after you add or rename a file in `convex/`. The push also checks what a 
 - **A bad game id:** `getGame` and the mutations take `v.id('games')`. A string that is not a game id (for example from a broken link) fails argument validation, a plain error, not `NOT_FOUND`. The app should treat any non-port error on load as "cannot open this game".
 - **Verify on a real deployment** that a mutation resolves only after the watched `getGame` shows its change (the offline test assumes it, as the Convex docs say).
 - **Clock skew:** `turnDeadline` is on the server clock. A phone should show the time left from the server time (for example the offset seen when the view arrives), not trust its own clock.
-- **Friends, usernames, users, presence, push**: later issues. The invite app screen and link route: #256.
+- **Push follow-ups:** the app part (permission, token, register on sign-in, remove on sign-out, open the game on a tap); push receipts (Expo can also report a dead token later, in a receipt: a scheduled check of the receipts would remove those too); the text in the player's language; a push when a game ends on time.
+- **Friends, usernames, users, presence**: later issues. The invite app screen and link route: #256.
 - **Document size**: one game row holds the whole match flow (a few KB). The log is in `moves`, so the row does not grow with the game.

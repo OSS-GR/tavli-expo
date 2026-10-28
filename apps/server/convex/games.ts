@@ -16,6 +16,11 @@
  * change bumps the version, so an old check does nothing: no cancel is
  * needed. `makeMove` and `answer` check the deadline too.
  *
+ * Push (#280): a save that moves the wait to the other player of an async
+ * game, or starts the next game of the match, schedules a "your turn"
+ * push (`scheduleTurnPush` in `push.ts`). It is sent after the save, so
+ * it never fails a move.
+ *
  * The caller is the signed-in user (#131): every public function reads
  * the player id from `ctx.auth` (`signedInPlayer`), and no public call
  * takes a player id. Each call checks that the caller may act. `getGame` answers
@@ -64,6 +69,8 @@ import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { signedInPlayer } from './caller';
 import { createCryptoRng } from './model/cryptoRng';
+import { turnWait } from './model/push';
+import { scheduleTurnPush } from './push';
 import { gameChoice, gamePace, gameStatus } from './schema';
 
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
@@ -150,13 +157,16 @@ async function startClock(
 }
 
 /**
- * Saves the flow after a step: a version bump, its log rows and a new
- * turn deadline.
+ * Saves `flow` after a step from `before` (the saved flow): a version
+ * bump, its log rows, a new turn deadline, and a "your turn" push when
+ * the wait moved to the other player of an async game, or a new game
+ * started (#280).
  */
 async function save(
   ctx: MutationCtx,
   game: Doc<'games'>,
   callerId: string,
+  before: MatchFlow,
   flow: MatchFlow,
   now: number,
 ): Promise<number> {
@@ -170,6 +180,7 @@ async function save(
     turnDeadline,
     updatedAt: now,
   });
+  await scheduleTurnPush(ctx, game, version, turnWait(before), turnWait(flow), callerId);
   return version;
 }
 
@@ -181,7 +192,7 @@ async function applyTimeout(
   now: number,
 ): Promise<number> {
   const next = guarded(() => timeOut(flow, createCryptoRng()));
-  return await save(ctx, game, SERVER_ACTOR, next, now);
+  return await save(ctx, game, SERVER_ACTOR, flow, next, now);
 }
 
 /**
@@ -246,7 +257,8 @@ export interface NewGame {
  * Creates a game between two players, in the caller's transaction.
  * `createGame` and `acceptInvite` (`invites.ts`) both use it. The server
  * rolls the opening at once, so the game starts with the first player to
- * move, and that player's clock runs. Returns the id.
+ * move, and that player's clock runs. In an async game that player gets a
+ * "your turn" push when it is not the caller (#280). Returns the id.
  */
 export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'games'>> {
   const { callerId, choice, targetPoints, pace } = game;
@@ -272,6 +284,17 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
   const eventCount = await writeEvents(ctx, gameId, 0, version, callerId, flow);
   const turnDeadline = await startClock(ctx, gameId, version, pace, flow, now);
   await ctx.db.patch(gameId, { eventCount, turnDeadline });
+  // Nobody was waited for before. The caller started the game and is in
+  // the app, so only the other player can get a push.
+  const before = { side: null, game: 0 };
+  await scheduleTurnPush(
+    ctx,
+    { _id: gameId, pace, players },
+    version,
+    before,
+    turnWait(flow),
+    callerId,
+  );
   return gameId;
 }
 
@@ -315,7 +338,7 @@ export const makeMove = mutation({
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
     return await onTime(ctx, game, flow, async (now) => {
       const next = guarded(() => playTurn(flow, side, moves.map(toMoveInput), createCryptoRng()));
-      return await save(ctx, game, callerId, next, now);
+      return await save(ctx, game, callerId, flow, next, now);
     });
   },
 });
@@ -336,7 +359,7 @@ export const answer = mutation({
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
     return await onTime(ctx, game, flow, async (now) => {
       const next = guarded(() => answerPrompt(flow, side, choice, createCryptoRng()));
-      return await save(ctx, game, callerId, next, now);
+      return await save(ctx, game, callerId, flow, next, now);
     });
   },
 });
@@ -353,7 +376,7 @@ export const resign = mutation({
     const callerId = await signedInPlayer(ctx);
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, null);
     const next = guarded(() => resignMatch(flow, side, createCryptoRng()));
-    return await save(ctx, game, callerId, next, Date.now());
+    return await save(ctx, game, callerId, flow, next, Date.now());
   },
 });
 
