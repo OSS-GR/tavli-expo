@@ -59,6 +59,12 @@ export interface InviteView {
   readonly code: string;
   /** The player id of the inviter. The inviter plays white. */
   readonly from: string;
+  /**
+   * The inviter's username (#317), or `null` when they have not picked
+   * one. The same for every caller, so the friend who opens the link sees
+   * who invites them.
+   */
+  readonly fromName: string | null;
   /** The game the inviter picked. */
   readonly choice: OnlineGameChoice;
   /** The match length in points. */

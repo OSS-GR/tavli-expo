@@ -84,6 +84,13 @@ export type {
   NewInvite,
 } from './invite';
 export {
+  PROFILE_ERROR_CODES,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  isProfileErrorData,
+} from './profile';
+export type { Profile, ProfileErrorCode, ProfileErrorData, Profiles } from './profile';
+export {
   AUTH_ERROR_CODES,
   MEMORY_AUTH_TOKEN_PREFIX,
   createMemoryAuthProvider,

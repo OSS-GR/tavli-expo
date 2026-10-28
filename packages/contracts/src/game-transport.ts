@@ -81,6 +81,13 @@ export interface OnlineGameView {
   readonly turnDeadline: number | null;
   /** The player id (account) on each side. */
   readonly players: PerPlayer<string>;
+  /**
+   * The username of the other player (#317), as the caller sees it, or
+   * `null` when they have not picked one (or deleted their account). So
+   * the two players' views differ here. It can change while the game runs:
+   * a new name comes as a new view with the same `version`.
+   */
+  readonly opponentName: string | null;
   /** The match: rules, score, finished games and the winner. */
   readonly match: Match;
   /**
@@ -112,8 +119,8 @@ export const MAX_LISTED_GAMES = 50;
 
 /**
  * One online game in the caller's list (#296): enough to show it on Home
- * and open it. It says nothing about the other player but their side.
- * Open the game (`subscribe`) for the full view.
+ * and open it. It says nothing about the other player but their side and
+ * their username (#317). Open the game (`subscribe`) for the full view.
  */
 export interface GameSummary {
   readonly gameId: string;
@@ -128,6 +135,8 @@ export interface GameSummary {
   readonly pace: OnlineGamePace;
   /** The caller's side. The other player has the other side. */
   readonly mySide: PlayerId;
+  /** As in the view: the other player's username, or `null` (#317). */
+  readonly opponentName: string | null;
   /** The side the server waits for, as in the view. `null` when finished. */
   readonly waitingFor: PlayerId | null;
   /** True when the server waits for the caller. */
