@@ -32,7 +32,9 @@ export const INVITE_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
  * `abcd2345` and `ABCD2345` are the same code.
  */
 export function normalizeInviteCode(text: string): string | null {
-  const code = text.trim().toUpperCase();
+  // Only ASCII letters change case: `toUpperCase` would turn 'ſ' into 'S'
+  // and 'ß' into 'SS', so text that is not a code could pass.
+  const code = text.trim().replace(/[a-z]/g, (char) => char.toUpperCase());
   if (code.length !== INVITE_CODE_LENGTH) return null;
   for (const char of code) {
     if (!INVITE_CODE_ALPHABET.includes(char)) return null;

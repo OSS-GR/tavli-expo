@@ -47,6 +47,9 @@ describe('normalizeInviteCode', () => {
     expect(normalizeInviteCode('ABCD234l')).toBeNull();
     expect(normalizeInviteCode('ABCD234i')).toBeNull();
     expect(normalizeInviteCode('ABCD234-')).toBeNull();
+    // Only ASCII letters change case: 'ſ' must not become 'S', 'ß' not 'SS'.
+    expect(normalizeInviteCode('ABCD234ſ')).toBeNull();
+    expect(normalizeInviteCode('ABCD23ß')).toBeNull();
   });
 });
 
