@@ -206,7 +206,7 @@ Every public function in `games.ts` and `invites.ts` gets the caller from `signe
 
 ## Invites
 
-Owner answer Q10: friends find each other by invite link (and later by username). Issue #252 builds the server part. A player makes an invite and shares its code, later as the link `https://tavlaki.com/i/<code>` (the app screen and the link route are #256). A friend accepts it, and the server starts the game.
+Owner answer Q10: friends find each other by invite link (and later by username). Issue #252 builds the server part. A player makes an invite and shares its code, later as the link `https://tavlaki.com/i/<code>`. A friend accepts it, and the server starts the game. The app screen and the link route (`tavlaki://invite/<code>`) are in [App shell → Invites](app-shell.md#invites-256) (#256); they use the `Invites` port on the in-memory server until sign-in is wired.
 
 ### `invites`
 

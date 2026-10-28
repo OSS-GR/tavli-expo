@@ -38,6 +38,15 @@ export function inviteCodeFromLink(link: string): string | null {
   return null;
 }
 
+/**
+ * The invite code in a router path (`/invite/<code>`, what Expo Router
+ * makes of `tavlaki://invite/<code>`), in capital letters, or `null`.
+ */
+export function inviteCodeFromPath(pathname: string): string | null {
+  const code = /^\/invite\/([0-9a-z]+)\/?$/i.exec(pathname)?.[1];
+  return code === undefined ? null : normalizeInviteCode(code);
+}
+
 /** The share link of an invite: `https://tavlaki.com/i/<CODE>`. */
 export function inviteUrl(code: string): string {
   return `${INVITE_LINK_ORIGIN}/i/${checked(code)}`;

@@ -5,7 +5,9 @@ import { useUnistyles } from 'react-native-unistyles';
 
 import { useAppAnalytics } from '@/features/analytics/useAppAnalytics';
 import { CrashBoundary } from '@/features/crash/CrashBoundary';
+import { usePendingInvite } from '@/features/invites/pendingInvite';
 import { matchSessions } from '@/features/match/appSessions';
+import { inviteHref } from '@/features/match/routes';
 import { useSaveOnBackground } from '@/features/match/useSaveOnBackground';
 import { needsWelcome } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
@@ -30,6 +32,9 @@ function RootStack() {
   // welcome routes after it. When the guard flips, the router drops the
   // routes that are now guarded, so Back cannot return to the welcome flow.
   const welcome = needsWelcome(useConsent((s) => s.status));
+  // An invite link that opened the app before the answer (#256): after the
+  // welcome flow, the invite opens instead of Home.
+  const pendingInvite = usePendingInvite(welcome);
 
   return (
     // Gesture Handler needs a root view (the board's drag gesture).
@@ -65,8 +70,12 @@ function RootStack() {
           <Stack.Screen name="game/[id]/review" options={{ headerShown: true }} />
           <Stack.Screen name="dev/board" />
           <Stack.Screen name="dev/online" />
+          {/* An invite link (#256): `tavlaki://invite/<code>`. */}
+          <Stack.Screen name="invite/[code]" />
         </Stack.Protected>
-        <Stack.Protected guard={welcome} redirectTo="/">
+        <Stack.Protected
+          guard={welcome}
+          redirectTo={pendingInvite === null ? '/' : inviteHref(pendingInvite)}>
           {/* No swipe back out of the first step before the user answers. */}
           <Stack.Screen name="welcome/language" options={{ gestureEnabled: false }} />
           <Stack.Screen name="welcome/privacy" />

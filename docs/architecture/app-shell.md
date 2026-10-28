@@ -17,6 +17,7 @@
 | Tutorial | `app/tutorial.tsx?from=home\|rules\|settings&game=portes\|plakoto\|fevga\|asodio` | `features/tutorial/TutorialScreen.tsx` |
 | First launch | `app/welcome/language.tsx`, `app/welcome/privacy.tsx` | `features/welcome/` |
 | Dev online game | `app/dev/online.tsx` (dev builds only) | in the route file; see [Board screen → Online mode](board-screen.md#online-mode-255) |
+| Invite | `app/invite/[code].tsx` | `features/invites/InviteScreen.tsx` (#256, see [Invites](#invites-256)) |
 
 Settings sections: Game (auto-confirm, **Show hints** (the Hint button, #209), board view, **Bot speed**: Slow, Normal, Fast), Sound and feel, Language, Board (board theme; **Your home**: bottom right, the default, or bottom left, which mirrors the board, see [Board screen](board-screen.md#home-board-side-175)), Look (app colors), Accessibility (**Move list**: Automatic, On, Off; Automatic shows it while a screen reader is on, see [Board screen](board-screen.md#accessibility)), Help, History (**Match history**, **Clear history**) and Privacy. Every change saves at once.
 
@@ -208,6 +209,20 @@ The app logic for one online game. It lives in `features/online/`. The screen (#
 - **`dispose()`** stops the subscription. The store then ignores every later view and call result.
 - **Not like `GameStoreState`.** The store has `flow`, `matchKey` (`o1`, `o2`, …), `lastError` and `dispatch` like the local store, so `GameScreen` can read it with few changes. But `flow` is `null` until the first view, there is no `rematch` (an online match has no rematch yet), and `dispatch(confirm)` returning `true` only means the call started: the result comes later (`sending`, `notice`, the next view). No analytics events are sent yet.
 - **Tests** (`onlineStore.test.ts`, `timeLeft.test.ts`) run the real server model: `createMemoryGameServer` from `@tavli/online` with two stores, one per player. The server runs no timers: a test moves its `now` and calls `runDueTimeouts()`. A wrapper transport rejects with a plain `Error` for a network error.
+
+## Invites (#256)
+
+A friend sends a link. This phone opens it, sees the invite, and accepts or declines it. Code: `apps/mobile/src/features/invites/`. The server side is in [Online game service → Invites](online-game-service.md).
+
+- **Links** (`link.ts`, pure). `inviteCodeFromLink(link)` reads `tavlaki://invite/<code>` and `https://tavlaki.com/i/<code>` (also `www.`), in any case, with or without a trailing slash, query or hash. It gives the code in capital letters, or `null` when the code has a letter that is not in the code alphabet. `inviteUrl(code)` builds the share link (`https://tavlaki.com/i/<code>`) and `inviteAppUrl(code)` the app link. The app opens only the app link today: the `https` link needs universal links and app links, which come later.
+- **Route.** `app/invite/[code].tsx` is in the guarded app group of `app/_layout.tsx`. It renders `InviteScreen` with `invitesFor(onlinePlayerId)` from `@/services`. Accept calls `router.replace` to `game/<gameId>`, so Back does not return to the invite. Decline and Home go back to Home (`router.dismissTo('/')`).
+- **First launch.** An invite link that opens the app before the consent answer goes through language and consent first. `usePendingInvite` (`pendingInvite.ts`) sees the invite path before the guard redirects it, and keeps the code. The welcome group's `redirectTo` is then the invite, not Home. A link with a bad code goes Home.
+- **Screen states** (`inviteState.ts`): loading, open, expired, already used (accepted, declined or cancelled), not found, your own invite, and "did not load" (any error that is not an invite error) with **Try again**. A link whose code is not a code shows "not found" at once, with no server call. If Accept or Decline gets an invite error (for example, the invite expired while the screen was open), the screen shows that state. Any other error keeps the invite open and says "That did not work".
+- **The open invite** shows the game, the match length and the pace (live: 1 minute per turn; async: 24 hours per turn), with **Accept** and **Decline**. It says "A friend invites you": there are no display names yet. The person who made the invite plays White.
+- **Screen readers.** Focus moves to the title of each state (`useFocusOnShow`; each state is its own keyed card). The open invite is read once (`useAnnouncement`, key `invite:<code>`). Each detail row is one element. Large fonts scroll (`ScrollView`).
+- **Services.** `invitesFor(playerId)` in `services.ts` gives the `Invites` port of the same in-memory server as `gameTransportFor` (one port per player). The Jest fake in `jest.setup.ts` has it too. The server is in memory until sign-in (#131), so an invite works only inside one app run.
+- **Dev invite.** The dev online route (`app/dev/online.tsx`) has **Make an invite**: the bot makes an invite with the chosen game, pace and length (`startDevInvite`, `features/online/devGame.ts`). The screen shows the code, the app link, the simulator command and the share link, and **Open the invite** pushes the invite route. When this phone accepts it, the bot plays the game (as White).
+- **Tests.** `link.test.ts` (both link forms, cases, bad letters, the builders), `InviteScreen.test.tsx` (each state, Accept, Decline, errors, focus and the announcement, Greek), `welcomeFlow.test.tsx` (an invite link on first launch opens the invite after consent; a bad code goes Home), `navigation.test.tsx` (the dev invite → Accept → online board; Decline → Home; a link straight to an invite; an unknown code), `onlineParts.test.ts` (the dev invite starts the bot after Accept and stops after Decline) and `textScaling.test.tsx` (the open and expired invite).
 
 ## Differences from the wireframes
 

@@ -4,8 +4,8 @@
  * the game menu and resign dialog, the end screens, the game review
  * (#215) with its switch (#230), History (#142), the tutorial's mother
  * card (#149), the Settings game picker (#159) and the online game
- * screen with its game-end sheet and match end (#255)
- * follow the font size with no cut text. The game screen, its cards and
+ * screen with its game-end sheet and match end (#255) and the invite
+ * screen (#256) follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
  * cannot measure text, so `textScalingProblems` checks the layout rules
@@ -25,7 +25,7 @@ import {
   type BoardState,
   type Match,
 } from '@tavli/engine';
-import { TURN_TIME_MS } from '@tavli/contracts';
+import { INVITE_TIME_MS, TURN_TIME_MS } from '@tavli/contracts';
 import { createMemoryGameServer } from '@tavli/online';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
@@ -35,6 +35,7 @@ import type { HistoryRecord } from '@/features/history/records';
 import { ContinueCard } from '@/features/home/ContinueCard';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
+import { InviteScreen } from '@/features/invites/InviteScreen';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
 import { GameScreen, OPENING_RESULT_MS } from '@/features/game/GameScreen';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
@@ -525,6 +526,28 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     } finally {
       bot.stop();
     }
+  });
+
+  it('the invite: open, and expired (#256)', async () => {
+    let clock = Date.now();
+    const server = createMemoryGameServer({ rng: createSeededRng(4), now: () => clock });
+    const code = server.createInvite('friend', 'tavli', 5, 'async');
+    const props = {
+      invites: server.invitesFor('me'),
+      me: 'me',
+      onAccepted: jest.fn(),
+      onDeclined: jest.fn(),
+      onHome: jest.fn(),
+    };
+    const { unmount } = await renderWithRoot(<InviteScreen code={code} {...props} />);
+    expect(await screen.findByTestId('invite-accept')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+    await unmount();
+
+    clock += INVITE_TIME_MS;
+    await renderWithRoot(<InviteScreen code={code} {...props} />);
+    expect(await screen.findByTestId('invite-home')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
   });
 
   it('the game review: busy, three mistakes with their switch, and "Well played" (#215, #230)', async () => {

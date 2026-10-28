@@ -8,6 +8,10 @@
  * `runDueTimeouts()` every second: a turn timer that ran out ends that
  * game, as on the real server. One dev game runs at a time: a new one
  * stops the last one. A finished match stops by itself.
+ *
+ * A dev invite (#256) works the same way: the bot makes an invite, and
+ * when this phone accepts it, the bot plays the new game (the bot is the
+ * inviter, so it plays White).
  */
 import { thinkingDelayMs } from '@tavli/bot';
 import type { BotRunner, Difficulty, OnlineGameChoice, OnlineGamePace } from '@tavli/contracts';
@@ -28,13 +32,9 @@ export const DEV_TICK_MS = 1000;
  */
 export const DEV_BOT_MIN_THINK_MS = 1500;
 
-export interface DevGameOptions {
+/** What the bot needs to play a dev game. */
+export interface DevBotOptions {
   readonly server: MemoryGameServer;
-  /** The player id of this phone. It plays White. */
-  readonly me: string;
-  readonly choice: OnlineGameChoice;
-  readonly pace: OnlineGamePace;
-  readonly targetPoints: number;
   readonly difficulty: Difficulty;
   readonly runner: BotRunner;
   readonly rng: Rng;
@@ -42,12 +42,25 @@ export interface DevGameOptions {
   readonly timing?: Partial<BotTiming>;
 }
 
+/** The game the bot offers: in a dev game, or in a dev invite. */
+export interface DevMatchOptions extends DevBotOptions {
+  readonly choice: OnlineGameChoice;
+  readonly pace: OnlineGamePace;
+  readonly targetPoints: number;
+}
+
+export interface DevGameOptions extends DevMatchOptions {
+  /** The player id of this phone. It plays White. */
+  readonly me: string;
+}
+
 export interface DevGame {
   readonly gameId: string;
   stop: () => void;
 }
 
-let current: DevGame | null = null;
+/** The dev game or dev invite that runs now. */
+let current: { stop: () => void } | null = null;
 
 /** Starts a dev game and returns its id. The game before it stops. */
 export function startDevGame(options: DevGameOptions): DevGame {
@@ -60,6 +73,12 @@ export function startDevGame(options: DevGameOptions): DevGame {
     options.targetPoints,
     options.pace,
   );
+  return playDevGame(gameId, options);
+}
+
+/** The bot plays its side of `gameId`, and the server's turn timers run. */
+function playDevGame(gameId: string, options: DevBotOptions): DevGame {
+  const { server } = options;
   const bot = startOnlineBot({
     transport: server.transportFor(DEV_BOT_ID),
     gameId,
@@ -90,7 +109,40 @@ export function startDevGame(options: DevGameOptions): DevGame {
   return game;
 }
 
-/** Stops the running dev game, if any (tests call it after each test). */
+export interface DevInvite {
+  /** The invite code, in capital letters. */
+  readonly code: string;
+  stop: () => void;
+}
+
+/**
+ * The bot makes an invite (#256). Every `DEV_TICK_MS` the dev invite
+ * looks at it: once it is accepted, the bot plays the new game; once it
+ * is declined or expired, it stops. The game or invite before it stops.
+ */
+export function startDevInvite(options: DevMatchOptions): DevInvite {
+  current?.stop();
+  const { server } = options;
+  const code = server.createInvite(DEV_BOT_ID, options.choice, options.targetPoints, options.pace);
+  const timer = setInterval(() => {
+    const view = server.getInvite(code);
+    if (view?.status === 'open') return;
+    invite.stop();
+    // `playDevGame` becomes the running dev game.
+    if (view?.status === 'accepted' && view.gameId !== null) playDevGame(view.gameId, options);
+  }, DEV_TICK_MS);
+  const invite: DevInvite = {
+    code,
+    stop: () => {
+      clearInterval(timer);
+      if (current === invite) current = null;
+    },
+  };
+  current = invite;
+  return invite;
+}
+
+/** Stops the running dev game or dev invite, if any (tests call it after each test). */
 export function stopDevGame(): void {
   current?.stop();
 }

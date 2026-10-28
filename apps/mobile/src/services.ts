@@ -16,6 +16,7 @@ import {
   type CrashReporter,
   type Feedback,
   type GameTransport,
+  type Invites,
   type SoundPlayer,
   type Storage,
 } from '@tavli/contracts';
@@ -137,4 +138,20 @@ export function gameTransportFor(playerId: string): GameTransport {
     transports.set(playerId, transport);
   }
   return transport;
+}
+
+const invitePorts = new Map<string, Invites>();
+
+/**
+ * The invite port for `playerId` (#256), on the same in-memory server as
+ * `gameTransportFor`: an accepted invite starts its game there. One port
+ * per player for the app run. It moves to Convex with the game transport.
+ */
+export function invitesFor(playerId: string): Invites {
+  let invites = invitePorts.get(playerId);
+  if (invites === undefined) {
+    invites = onlineServer.invitesFor(playerId);
+    invitePorts.set(playerId, invites);
+  }
+  return invites;
 }

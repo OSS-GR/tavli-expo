@@ -4,6 +4,12 @@
  * online screen, and the bot plays the remote player through its own
  * transport (`features/online/devGame.ts`). Not linked from the app.
  * Release builds go home.
+ *
+ * "Make an invite" (#256): the bot makes an invite with the same game,
+ * pace and length, and the screen shows its code and links. Open it with
+ * the button, or on a simulator:
+ * `xcrun simctl openurl booted tavlaki://invite/<code>`. When this phone
+ * accepts it, the bot plays the game (as White, the inviter).
  */
 import {
   ONLINE_GAME_CHOICES,
@@ -19,8 +25,9 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 import { SegmentedControl } from '@/components/settings/SegmentedControl';
-import { gameHref } from '@/features/match/routes';
-import { startDevGame } from '@/features/online/devGame';
+import { inviteAppUrl, inviteUrl } from '@/features/invites/link';
+import { gameHref, inviteHref } from '@/features/match/routes';
+import { startDevGame, startDevInvite } from '@/features/online/devGame';
 import { botLevels, botRunner, createLocalRng, onlinePlayerId, onlineServer } from '@/services';
 
 const LENGTHS = ['1', '3', '5'] as const;
@@ -42,23 +49,27 @@ export default function DevOnlineRoute() {
   const [pace, setPace] = useState<OnlineGamePace>('live');
   const [length, setLength] = useState<Length>('3');
   const [rng] = useState(createLocalRng);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   if (!__DEV__) return <Redirect href="/" />;
 
+  const match = () => ({
+    server: onlineServer,
+    choice,
+    pace,
+    targetPoints: Number(length),
+    difficulty: games.find((g) => g.choice === choice)?.level ?? 'easy',
+    runner: botRunner,
+    rng,
+  });
+
   const start = () => {
-    const level = games.find((g) => g.choice === choice)?.level ?? 'easy';
-    const { gameId } = startDevGame({
-      server: onlineServer,
-      me: onlinePlayerId,
-      choice,
-      pace,
-      targetPoints: Number(length),
-      difficulty: level,
-      runner: botRunner,
-      rng,
-    });
+    setInviteCode(null);
+    const { gameId } = startDevGame({ ...match(), me: onlinePlayerId });
     router.push(gameHref(gameId));
   };
+
+  const makeInvite = () => setInviteCode(startDevInvite(match()).code);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -89,6 +100,38 @@ export default function DevOnlineRoute() {
         options={LENGTHS.map((value) => ({ value, label: value }))}
       />
       <ActionButton testID="dev-online-start" label={t('dev.online.start')} onPress={start} />
+      <Text style={styles.heading} accessibilityRole="header">
+        {t('dev.online.inviteTitle')}
+      </Text>
+      <Text style={styles.intro}>{t('dev.online.inviteIntro')}</Text>
+      <ActionButton
+        testID="dev-online-invite"
+        kind="secondary"
+        label={t('dev.online.makeInvite')}
+        onPress={makeInvite}
+      />
+      {inviteCode === null ? null : (
+        <>
+          <Text testID="dev-online-invite-code" style={styles.intro} selectable>
+            {t('dev.online.inviteCode', { code: inviteCode })}
+          </Text>
+          {/* Links and the simulator command, to copy. */}
+          <Text style={styles.code} selectable>
+            {inviteAppUrl(inviteCode)}
+          </Text>
+          <Text style={styles.code} selectable>
+            {`xcrun simctl openurl booted ${inviteAppUrl(inviteCode)}`}
+          </Text>
+          <Text style={styles.code} selectable>
+            {inviteUrl(inviteCode)}
+          </Text>
+          <ActionButton
+            testID="dev-online-open-invite"
+            label={t('dev.online.openInvite')}
+            onPress={() => router.push(inviteHref(inviteCode))}
+          />
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -107,5 +150,14 @@ const styles = StyleSheet.create((theme, rt) => ({
   intro: {
     ...theme.type.body,
     color: theme.colors.text,
+  },
+  heading: {
+    ...theme.type.title,
+    color: theme.colors.text,
+    marginTop: theme.space.md,
+  },
+  code: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
   },
 }));

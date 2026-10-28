@@ -39,6 +39,7 @@ const routes = {
   'game/[id]/review': stub('review'),
   'dev/board': stub('dev board'),
   'dev/online': stub('dev online'),
+  'invite/[code]': stub('invite'),
 };
 
 /** A URL for each app route (not the layout, not the welcome flow). */
@@ -48,7 +49,8 @@ const appUrls = Object.keys(routes)
     `/${name}`
       .replace(/\/?index$/, '')
       .replace('[id]', 'local-abc')
-      .replace('[variant]', 'portes'),
+      .replace('[variant]', 'portes')
+      .replace('[code]', 'ABCD2345'),
   )
   .map((url) => url || '/');
 
@@ -183,6 +185,27 @@ describe('first launch', () => {
 
     expect(screen).toHavePathname('/');
     expect(router.canGoBack()).toBe(false);
+  });
+
+  it('opens an invite link after the welcome flow, not Home (#256)', async () => {
+    const user = userEvent.setup();
+    await openApp('/invite/abcd2345');
+    expect(screen).toHavePathname('/welcome/language');
+    await user.press(screen.getByRole('button', { name: 'Continue' }));
+    await user.press(screen.getByRole('button', { name: "Don't allow" }));
+
+    expect(screen).toHavePathname('/invite/ABCD2345');
+    expect(screen.getByText('invite')).toBeOnTheScreen();
+    // No welcome screen behind it.
+    expect(router.canGoBack()).toBe(false);
+  });
+
+  it('goes Home after the welcome flow when the invite link has no code', async () => {
+    const user = userEvent.setup();
+    await openApp('/invite/ABCD234O');
+    await user.press(screen.getByRole('button', { name: 'Continue' }));
+    await user.press(screen.getByRole('button', { name: 'Allow usage data' }));
+    expect(screen).toHavePathname('/');
   });
 
   it('sends a user who answered away from the welcome routes', async () => {

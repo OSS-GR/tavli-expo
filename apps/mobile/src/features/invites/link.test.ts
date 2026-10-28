@@ -1,4 +1,4 @@
-import { inviteAppUrl, inviteCodeFromLink, inviteUrl } from './link';
+import { inviteAppUrl, inviteCodeFromLink, inviteCodeFromPath, inviteUrl } from './link';
 
 const CODE = 'ABCD2345';
 
@@ -46,6 +46,20 @@ describe('inviteCodeFromLink', () => {
   ])('refuses %j', (link) => {
     expect(inviteCodeFromLink(link)).toBeNull();
   });
+});
+
+describe('inviteCodeFromPath', () => {
+  it('reads the code from the invite route path, in any case', () => {
+    expect(inviteCodeFromPath('/invite/abcd2345')).toBe(CODE);
+    expect(inviteCodeFromPath('/invite/ABCD2345/')).toBe(CODE);
+  });
+
+  it.each([['/invite/ABCD234O'], ['/invite/ABC'], ['/invite'], ['/game/ABCD2345'], ['/']])(
+    'refuses %j',
+    (path) => {
+      expect(inviteCodeFromPath(path)).toBeNull();
+    },
+  );
 });
 
 describe('invite links', () => {

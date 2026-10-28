@@ -31,6 +31,8 @@ jest.mock('@/services', () => {
     now: () => Date.now(),
   });
   const transports = new Map();
+  // Invites (#256) on the same server, so an accept starts a game there.
+  const invitePorts = new Map();
   return {
     storage: createMemoryStorage(),
     feedback: createRecordingFeedback(),
@@ -46,6 +48,10 @@ jest.mock('@/services', () => {
     gameTransportFor: (playerId: string) => {
       if (!transports.has(playerId)) transports.set(playerId, onlineServer.transportFor(playerId));
       return transports.get(playerId);
+    },
+    invitesFor: (playerId: string) => {
+      if (!invitePorts.has(playerId)) invitePorts.set(playerId, onlineServer.invitesFor(playerId));
+      return invitePorts.get(playerId);
     },
   };
 });
