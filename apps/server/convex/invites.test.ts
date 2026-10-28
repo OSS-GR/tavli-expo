@@ -1,5 +1,6 @@
 // The invite functions (#252), run offline with convex-test. Codes come
-// from the server's own RNG (Web Crypto).
+// from the server's own RNG (Web Crypto). Each call is signed in with a
+// convex-test identity (#131): `as(t, id)` calls as the user `id`.
 
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,6 +33,11 @@ function setup() {
   return convexTest(schema, modules);
 }
 
+/** Calls as the signed-in user `id` (the token `subject`, the player id). */
+function as(t: Tester, id: string) {
+  return t.withIdentity({ subject: id });
+}
+
 // Every invite schedules its expiry, and every game a turn timer. Fake
 // timers keep those from firing on their own; the expiry tests move the
 // clock by hand.
@@ -55,16 +61,17 @@ async function wait(t: Tester, ms: number) {
 
 async function createInvite(
   t: Tester,
-  callerId = ALICE,
+  from = ALICE,
   choice: OnlineGameChoice = 'portes',
   targetPoints = 3,
   pace: OnlineGamePace = 'live',
 ) {
-  return await t.mutation(api.invites.createInvite, { callerId, choice, targetPoints, pace });
+  return await as(t, from).mutation(api.invites.createInvite, { choice, targetPoints, pace });
 }
 
+/** The invite as Carol (neither inviter nor answerer) sees it. */
 async function invite(t: Tester, code: string): Promise<InviteView> {
-  const view = await t.query(api.invites.getInvite, { code });
+  const view = await as(t, CAROL).query(api.invites.getInvite, { code });
   if (view === null) throw new Error('no invite');
   return view;
 }
@@ -155,10 +162,10 @@ describe('getInvite', () => {
   it('returns null for an unknown or malformed code', async () => {
     const t = setup();
     const code = await createInvite(t);
-    expect(await t.query(api.invites.getInvite, { code: otherCode(code) })).toBeNull();
-    expect(await t.query(api.invites.getInvite, { code: code.slice(1) })).toBeNull();
-    expect(await t.query(api.invites.getInvite, { code: 'ABCD234O' })).toBeNull();
-    expect(await t.query(api.invites.getInvite, { code: '' })).toBeNull();
+    expect(await as(t, BOB).query(api.invites.getInvite, { code: otherCode(code) })).toBeNull();
+    expect(await as(t, BOB).query(api.invites.getInvite, { code: code.slice(1) })).toBeNull();
+    expect(await as(t, BOB).query(api.invites.getInvite, { code: 'ABCD234O' })).toBeNull();
+    expect(await as(t, BOB).query(api.invites.getInvite, { code: '' })).toBeNull();
   });
 });
 
@@ -166,10 +173,11 @@ describe('acceptInvite', () => {
   it('starts the game: the inviter plays white, and getGame shows it', async () => {
     const t = setup();
     const code = await createInvite(t, ALICE, 'fevga', 3, 'async');
-    const gameId = await t.mutation(api.invites.acceptInvite, { callerId: BOB, code });
-    const game = await t.query(api.games.getGame, { gameId });
+    const gameId = await as(t, BOB).mutation(api.invites.acceptInvite, { code });
+    const game = await as(t, BOB).query(api.games.getGame, { gameId });
     expect(game).not.toBeNull();
     expect(game?.players).toEqual({ white: ALICE, black: BOB });
+    expect(await as(t, ALICE).query(api.games.getGame, { gameId })).toEqual(game);
     expect(game?.choice).toBe('fevga');
     expect(game?.pace).toBe('async');
     expect(game?.match.targetPoints).toBe(3);
@@ -192,8 +200,7 @@ describe('acceptInvite', () => {
   it('accepts a code in any case', async () => {
     const t = setup();
     const code = await createInvite(t);
-    const gameId = await t.mutation(api.invites.acceptInvite, {
-      callerId: BOB,
+    const gameId = await as(t, BOB).mutation(api.invites.acceptInvite, {
       code: code.toLowerCase(),
     });
     expect((await invite(t, code)).gameId).toBe(gameId);
@@ -202,15 +209,9 @@ describe('acceptInvite', () => {
   it('fails the second time, for the same and for another player', async () => {
     const t = setup();
     const code = await createInvite(t);
-    await t.mutation(api.invites.acceptInvite, { callerId: BOB, code });
-    await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: BOB, code }),
-      'INVITE_CLOSED',
-    );
-    await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: CAROL, code }),
-      'INVITE_CLOSED',
-    );
+    await as(t, BOB).mutation(api.invites.acceptInvite, { code });
+    await rejectsWith(as(t, BOB).mutation(api.invites.acceptInvite, { code }), 'INVITE_CLOSED');
+    await rejectsWith(as(t, CAROL).mutation(api.invites.acceptInvite, { code }), 'INVITE_CLOSED');
     const games = await t.run(async (ctx) => ctx.db.query('games').collect());
     expect(games).toHaveLength(1);
   });
@@ -218,10 +219,7 @@ describe('acceptInvite', () => {
   it('rejects your own invite, and makes no game', async () => {
     const t = setup();
     const code = await createInvite(t);
-    await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: ALICE, code }),
-      'OWN_INVITE',
-    );
+    await rejectsWith(as(t, ALICE).mutation(api.invites.acceptInvite, { code }), 'OWN_INVITE');
     expect((await invite(t, code)).status).toBe('open');
     const games = await t.run(async (ctx) => ctx.db.query('games').collect());
     expect(games).toHaveLength(0);
@@ -231,26 +229,29 @@ describe('acceptInvite', () => {
     const t = setup();
     const code = await createInvite(t);
     await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: BOB, code: otherCode(code) }),
+      as(t, BOB).mutation(api.invites.acceptInvite, { code: otherCode(code) }),
       'INVITE_NOT_FOUND',
     );
     await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: BOB, code: code.slice(1) }),
+      as(t, BOB).mutation(api.invites.acceptInvite, { code: code.slice(1) }),
       'BAD_REQUEST',
     );
     await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: BOB, code: 'ABCDEFG0' }),
+      as(t, BOB).mutation(api.invites.acceptInvite, { code: 'ABCDEFG0' }),
       'BAD_REQUEST',
     );
   });
 
-  it('rejects the player id "server" and an empty id in every call', async () => {
+  it('rejects the token subject "server" and an empty one in every call', async () => {
     const t = setup();
     const code = await createInvite(t);
-    for (const callerId of ['server', '', '  ']) {
-      await rejectsWith(t.mutation(api.invites.acceptInvite, { callerId, code }), 'BAD_REQUEST');
-      await rejectsWith(t.mutation(api.invites.declineInvite, { callerId, code }), 'BAD_REQUEST');
-      await rejectsWith(t.mutation(api.invites.cancelInvite, { callerId, code }), 'BAD_REQUEST');
+    for (const id of ['server', '', '  ']) {
+      const caller = as(t, id);
+      await rejectsWith(caller.mutation(api.invites.acceptInvite, { code }), 'BAD_REQUEST');
+      await rejectsWith(caller.mutation(api.invites.declineInvite, { code }), 'BAD_REQUEST');
+      await rejectsWith(caller.mutation(api.invites.cancelInvite, { code }), 'BAD_REQUEST');
+      await rejectsWith(caller.query(api.invites.getInvite, { code }), 'BAD_REQUEST');
+      await rejectsWith(caller.query(api.invites.listMyInvites, {}), 'BAD_REQUEST');
     }
     await rejectsWith(createInvite(t, '  '), 'BAD_REQUEST');
     expect((await invite(t, code)).status).toBe('open');
@@ -267,8 +268,8 @@ describe('acceptInvite', () => {
         .unique();
       if (row !== null) await ctx.db.patch(row._id, { targetPoints: 0 });
     });
-    const error: unknown = await t
-      .mutation(api.invites.acceptInvite, { callerId: BOB, code })
+    const error: unknown = await as(t, BOB)
+      .mutation(api.invites.acceptInvite, { code })
       .catch((e: unknown) => e);
     expect(isGameTransportErrorData((error as { data?: unknown }).data)).toBe(true);
     expect((await invite(t, code)).status).toBe('open');
@@ -281,55 +282,37 @@ describe('declineInvite and cancelInvite', () => {
   it('a friend declines: the invite closes and cannot be accepted', async () => {
     const t = setup();
     const code = await createInvite(t);
-    await t.mutation(api.invites.declineInvite, { callerId: BOB, code });
+    await as(t, BOB).mutation(api.invites.declineInvite, { code });
     expect((await invite(t, code)).status).toBe('declined');
-    await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: CAROL, code }),
-      'INVITE_CLOSED',
-    );
-    await rejectsWith(
-      t.mutation(api.invites.declineInvite, { callerId: BOB, code }),
-      'INVITE_CLOSED',
-    );
-    await rejectsWith(
-      t.mutation(api.invites.cancelInvite, { callerId: ALICE, code }),
-      'INVITE_CLOSED',
-    );
+    await rejectsWith(as(t, CAROL).mutation(api.invites.acceptInvite, { code }), 'INVITE_CLOSED');
+    await rejectsWith(as(t, BOB).mutation(api.invites.declineInvite, { code }), 'INVITE_CLOSED');
+    await rejectsWith(as(t, ALICE).mutation(api.invites.cancelInvite, { code }), 'INVITE_CLOSED');
   });
 
   it('the inviter cannot decline, and another player cannot cancel', async () => {
     const t = setup();
     const code = await createInvite(t);
-    await rejectsWith(
-      t.mutation(api.invites.declineInvite, { callerId: ALICE, code }),
-      'OWN_INVITE',
-    );
-    await rejectsWith(
-      t.mutation(api.invites.cancelInvite, { callerId: BOB, code }),
-      'NOT_YOUR_INVITE',
-    );
+    await rejectsWith(as(t, ALICE).mutation(api.invites.declineInvite, { code }), 'OWN_INVITE');
+    await rejectsWith(as(t, BOB).mutation(api.invites.cancelInvite, { code }), 'NOT_YOUR_INVITE');
     expect((await invite(t, code)).status).toBe('open');
   });
 
   it('the inviter cancels: the invite closes and cannot be accepted', async () => {
     const t = setup();
     const code = await createInvite(t);
-    await t.mutation(api.invites.cancelInvite, { callerId: ALICE, code: code.toLowerCase() });
+    await as(t, ALICE).mutation(api.invites.cancelInvite, { code: code.toLowerCase() });
     expect((await invite(t, code)).status).toBe('cancelled');
-    await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: BOB, code }),
-      'INVITE_CLOSED',
-    );
+    await rejectsWith(as(t, BOB).mutation(api.invites.acceptInvite, { code }), 'INVITE_CLOSED');
   });
 
   it('rejects an unknown code', async () => {
     const t = setup();
     await rejectsWith(
-      t.mutation(api.invites.declineInvite, { callerId: BOB, code: 'ABCD2345' }),
+      as(t, BOB).mutation(api.invites.declineInvite, { code: 'ABCD2345' }),
       'INVITE_NOT_FOUND',
     );
     await rejectsWith(
-      t.mutation(api.invites.cancelInvite, { callerId: ALICE, code: 'ABCD2345' }),
+      as(t, ALICE).mutation(api.invites.cancelInvite, { code: 'ABCD2345' }),
       'INVITE_NOT_FOUND',
     );
   });
@@ -356,18 +339,9 @@ describe('expiry (24 hours)', () => {
     const t = setup();
     const code = await createInvite(t);
     await wait(t, INVITE_TIME_MS);
-    await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: BOB, code }),
-      'INVITE_EXPIRED',
-    );
-    await rejectsWith(
-      t.mutation(api.invites.declineInvite, { callerId: BOB, code }),
-      'INVITE_EXPIRED',
-    );
-    await rejectsWith(
-      t.mutation(api.invites.cancelInvite, { callerId: ALICE, code }),
-      'INVITE_EXPIRED',
-    );
+    await rejectsWith(as(t, BOB).mutation(api.invites.acceptInvite, { code }), 'INVITE_EXPIRED');
+    await rejectsWith(as(t, BOB).mutation(api.invites.declineInvite, { code }), 'INVITE_EXPIRED');
+    await rejectsWith(as(t, ALICE).mutation(api.invites.cancelInvite, { code }), 'INVITE_EXPIRED');
     const games = await t.run(async (ctx) => ctx.db.query('games').collect());
     expect(games).toHaveLength(0);
   });
@@ -378,18 +352,15 @@ describe('expiry (24 hours)', () => {
     // The clock reaches the time, but the scheduled expiry has not run.
     vi.setSystemTime(START + INVITE_TIME_MS);
     expect((await invite(t, code)).status).toBe('expired');
-    await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: BOB, code }),
-      'INVITE_EXPIRED',
-    );
-    expect(await t.query(api.invites.listMyInvites, { callerId: ALICE })).toEqual([]);
+    await rejectsWith(as(t, BOB).mutation(api.invites.acceptInvite, { code }), 'INVITE_EXPIRED');
+    expect(await as(t, ALICE).query(api.invites.listMyInvites, {})).toEqual([]);
   });
 
   it('an accept just in time works, and the expiry later does nothing', async () => {
     const t = setup();
     const code = await createInvite(t, ALICE, 'portes', 3, 'async');
     vi.setSystemTime(START + INVITE_TIME_MS - 1);
-    const gameId = await t.mutation(api.invites.acceptInvite, { callerId: BOB, code });
+    const gameId = await as(t, BOB).mutation(api.invites.acceptInvite, { code });
     await wait(t, 1);
     expect(await invite(t, code)).toMatchObject({ status: 'accepted', gameId });
   });
@@ -398,8 +369,8 @@ describe('expiry (24 hours)', () => {
     const t = setup();
     const declined = await createInvite(t);
     const cancelled = await createInvite(t);
-    await t.mutation(api.invites.declineInvite, { callerId: BOB, code: declined });
-    await t.mutation(api.invites.cancelInvite, { callerId: ALICE, code: cancelled });
+    await as(t, BOB).mutation(api.invites.declineInvite, { code: declined });
+    await as(t, ALICE).mutation(api.invites.cancelInvite, { code: cancelled });
     await wait(t, INVITE_TIME_MS);
     expect((await invite(t, declined)).status).toBe('declined');
     expect((await invite(t, cancelled)).status).toBe('cancelled');
@@ -416,10 +387,10 @@ describe('listMyInvites', () => {
     const accepted = await createInvite(t, ALICE);
     const cancelled = await createInvite(t, ALICE);
     await createInvite(t, BOB);
-    await t.mutation(api.invites.acceptInvite, { callerId: BOB, code: accepted });
-    await t.mutation(api.invites.cancelInvite, { callerId: ALICE, code: cancelled });
+    await as(t, BOB).mutation(api.invites.acceptInvite, { code: accepted });
+    await as(t, ALICE).mutation(api.invites.cancelInvite, { code: cancelled });
 
-    const mine = await t.query(api.invites.listMyInvites, { callerId: ALICE });
+    const mine = await as(t, ALICE).query(api.invites.listMyInvites, {});
     expect(mine.map((view) => view.code)).toEqual([second, first]);
     expect(mine[0]).toMatchObject({
       from: ALICE,
@@ -427,7 +398,7 @@ describe('listMyInvites', () => {
       targetPoints: 5,
       status: 'open',
     });
-    expect(await t.query(api.invites.listMyInvites, { callerId: CAROL })).toEqual([]);
+    expect(await as(t, CAROL).query(api.invites.listMyInvites, {})).toEqual([]);
   });
 
   it('drops invites once they expire', async () => {
@@ -436,8 +407,44 @@ describe('listMyInvites', () => {
     await wait(t, INVITE_TIME_MS / 2);
     const fresh = await createInvite(t, ALICE);
     await wait(t, INVITE_TIME_MS / 2);
-    const mine = await t.query(api.invites.listMyInvites, { callerId: ALICE });
+    const mine = await as(t, ALICE).query(api.invites.listMyInvites, {});
     expect(mine.map((view) => view.code)).toEqual([fresh]);
     expect((await invite(t, old)).status).toBe('expired');
+  });
+});
+
+describe('sign-in (#131)', () => {
+  it('refuses every call without a sign-in, and saves nothing', async () => {
+    const t = setup();
+    const code = await createInvite(t);
+    await rejectsWith(
+      t.mutation(api.invites.createInvite, { choice: 'portes', targetPoints: 3, pace: 'live' }),
+      'NOT_SIGNED_IN',
+    );
+    await rejectsWith(t.query(api.invites.getInvite, { code }), 'NOT_SIGNED_IN');
+    await rejectsWith(t.mutation(api.invites.acceptInvite, { code }), 'NOT_SIGNED_IN');
+    await rejectsWith(t.mutation(api.invites.declineInvite, { code }), 'NOT_SIGNED_IN');
+    await rejectsWith(t.mutation(api.invites.cancelInvite, { code }), 'NOT_SIGNED_IN');
+    await rejectsWith(t.query(api.invites.listMyInvites, {}), 'NOT_SIGNED_IN');
+    // The error is a game error too, so a client can treat both the same.
+    const error: unknown = await t.query(api.invites.listMyInvites, {}).catch((e: unknown) => e);
+    expect(isGameTransportErrorData((error as { data?: unknown }).data)).toBe(true);
+    expect((await invite(t, code)).status).toBe('open');
+    const rows = await t.run(async (ctx) => ctx.db.query('invites').collect());
+    expect(rows).toHaveLength(1);
+  });
+
+  it('the inviter is the signed-in user: the invite, the game and the list use that id', async () => {
+    const t = setup();
+    const code = await createInvite(t, ALICE);
+    expect((await invite(t, code)).from).toBe(ALICE);
+    expect((await as(t, ALICE).query(api.invites.listMyInvites, {})).map((i) => i.code)).toEqual([
+      code,
+    ]);
+    expect(await as(t, BOB).query(api.invites.listMyInvites, {})).toEqual([]);
+    const gameId = await as(t, BOB).mutation(api.invites.acceptInvite, { code });
+    await expect(as(t, CAROL).query(api.games.getGame, { gameId })).rejects.toMatchObject({
+      data: { code: 'NOT_A_PLAYER' },
+    });
   });
 });

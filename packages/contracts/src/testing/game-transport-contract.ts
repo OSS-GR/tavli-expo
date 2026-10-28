@@ -284,6 +284,33 @@ export function gameTransportContract(): GameTransportContractCheck[] {
       },
     },
     {
+      name: 'a stranger cannot watch a game: subscribe gets NOT_A_PLAYER',
+      run: async (subject) => {
+        const gameId = await subject.createGame(PORTES);
+        const watcher = watch(subject.transportFor('stranger'), gameId);
+        same(watcher.errors.length, 0, 'errors inside subscribe()');
+        await waitUntil(subject, () => watcher.errors.length > 0, 'the NOT_A_PLAYER error');
+        const error = watcher.errors[0];
+        if (!isGameTransportErrorData(error)) {
+          throw new Error(`subscribe: the error is not GameTransportErrorData: ${String(error)}`);
+        }
+        same(error.code, 'NOT_A_PLAYER', 'subscribe error code');
+        // The players play on; the stranger still sees nothing.
+        const { watchers, view } = await startGame(subject, gameId);
+        await subject.transportFor(waiting(view)).sendTurn({
+          gameId,
+          expectedVersion: view.version,
+          moves: subject.legalTurn(view),
+        });
+        await viewAt(subject, watchers.white, view.version + 1);
+        await stayQuiet(subject);
+        same(watcher.views, [], 'views of a stranger');
+        watcher.stop();
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
       name: 'an incomplete turn gets ILLEGAL_MOVE',
       run: async (subject) => {
         const { gameId, watchers, view } = await startGame(

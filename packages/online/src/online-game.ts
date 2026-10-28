@@ -5,7 +5,7 @@
  * Two servers do this: the Convex functions (`apps/server/convex/games.ts`)
  * and the in-memory server (`memory-server.ts`). Everything here is pure:
  * dice come from the `Rng` the caller passes in. The Convex server passes
- * the secure RNG (`apps/server/convex/model/crypto-rng.ts`); tests may pass
+ * the secure RNG (`apps/server/convex/model/cryptoRng.ts`); tests may pass
  * a seeded one.
  *
  * The server keeps a game at rest in a phase where it waits for a player:

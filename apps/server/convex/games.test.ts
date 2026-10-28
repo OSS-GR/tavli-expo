@@ -1,5 +1,7 @@
 // The Convex functions, run offline with convex-test. The dice come from
 // the server's own RNG (Web Crypto); the tests read them from `getGame`.
+// Each call is signed in with a convex-test identity (#131): `as(t, id)`
+// calls as the user whose token subject is `id`.
 
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -30,6 +32,11 @@ function setup() {
   return convexTest(schema, modules);
 }
 
+/** Calls as the signed-in user `id` (the token `subject`, the player id). */
+function as(t: Tester, id: string) {
+  return t.withIdentity({ subject: id });
+}
+
 // Every game schedules a turn timer. Fake timers keep those checks from
 // firing on their own; the timer tests move the clock by hand.
 const START = Date.UTC(2026, 9, 27, 12, 0, 0);
@@ -49,8 +56,7 @@ async function createGame(
   targetPoints = 1,
   pace: OnlineGamePace = 'live',
 ) {
-  return await t.mutation(api.games.createGame, {
-    callerId: ALICE,
+  return await as(t, ALICE).mutation(api.games.createGame, {
     players: PLAYERS,
     choice,
     targetPoints,
@@ -58,8 +64,9 @@ async function createGame(
   });
 }
 
+/** The game as White (Alice) sees it. */
 async function view(t: Tester, gameId: Id<'games'>): Promise<OnlineGameView> {
-  const game = await t.query(api.games.getGame, { gameId });
+  const game = await as(t, ALICE).query(api.games.getGame, { gameId });
   if (game === null) throw new Error('no game');
   return game;
 }
@@ -105,8 +112,7 @@ describe('createGame', () => {
   it('rejects a caller who is not a player, and the same player twice', async () => {
     const t = setup();
     await rejectsWith(
-      t.mutation(api.games.createGame, {
-        callerId: 'eve',
+      as(t, 'eve').mutation(api.games.createGame, {
         players: PLAYERS,
         choice: 'portes',
         targetPoints: 1,
@@ -115,8 +121,7 @@ describe('createGame', () => {
       'BAD_REQUEST',
     );
     await rejectsWith(
-      t.mutation(api.games.createGame, {
-        callerId: ALICE,
+      as(t, ALICE).mutation(api.games.createGame, {
         players: { white: ALICE, black: ALICE },
         choice: 'portes',
         targetPoints: 1,
@@ -129,8 +134,7 @@ describe('createGame', () => {
   it('rejects the player id "server", which marks server events in the log', async () => {
     const t = setup();
     await rejectsWith(
-      t.mutation(api.games.createGame, {
-        callerId: ALICE,
+      as(t, ALICE).mutation(api.games.createGame, {
         players: { white: ALICE, black: 'server' },
         choice: 'portes',
         targetPoints: 1,
@@ -174,9 +178,8 @@ describe('a full Portes game between two players', () => {
     while (v.status === 'active') {
       const side = v.waitingFor;
       if (side === null) throw new Error('nobody to wait for');
-      const result = await t.mutation(api.games.makeMove, {
+      const result = await as(t, idOf(side)).mutation(api.games.makeMove, {
         gameId,
-        callerId: idOf(side),
         expectedVersion: v.version,
         moves: pickTurn(v.game, picker),
       });
@@ -209,9 +212,8 @@ describe('makeMove', () => {
     const gameId = await createGame(t);
     const v = await view(t, gameId);
     await rejectsWith(
-      t.mutation(api.games.makeMove, {
+      as(t, idOf(v.game.state.toMove)).mutation(api.games.makeMove, {
         gameId,
-        callerId: idOf(v.game.state.toMove),
         expectedVersion: v.version,
         moves: [{ from: 1, to: 'off', die: 1 }],
       }),
@@ -219,9 +221,8 @@ describe('makeMove', () => {
     );
     // A die the roll does not have, or no die at all.
     await rejectsWith(
-      t.mutation(api.games.makeMove, {
+      as(t, idOf(v.game.state.toMove)).mutation(api.games.makeMove, {
         gameId,
-        callerId: idOf(v.game.state.toMove),
         expectedVersion: v.version,
         moves: [{ from: 24, to: 17, die: 7 }],
       }),
@@ -236,18 +237,16 @@ describe('makeMove', () => {
     const v = await view(t, gameId);
     const moves = pickTurn(v.game, createSeededRng(1));
     await rejectsWith(
-      t.mutation(api.games.makeMove, {
+      as(t, idOf(otherSide(v.game.state.toMove))).mutation(api.games.makeMove, {
         gameId,
-        callerId: idOf(otherSide(v.game.state.toMove)),
         expectedVersion: v.version,
         moves,
       }),
       'NOT_YOUR_TURN',
     );
     await rejectsWith(
-      t.mutation(api.games.makeMove, {
+      as(t, 'eve').mutation(api.games.makeMove, {
         gameId,
-        callerId: 'eve',
         expectedVersion: v.version,
         moves,
       }),
@@ -260,21 +259,21 @@ describe('makeMove', () => {
     const t = setup();
     const gameId = await createGame(t);
     const v = await view(t, gameId);
+    const phone = as(t, idOf(v.game.state.toMove));
     const turn = {
       gameId,
-      callerId: idOf(v.game.state.toMove),
       expectedVersion: v.version,
       moves: pickTurn(v.game, createSeededRng(1)),
     };
     const results = await Promise.allSettled([
-      t.mutation(api.games.makeMove, turn),
-      t.mutation(api.games.makeMove, turn),
+      phone.mutation(api.games.makeMove, turn),
+      phone.mutation(api.games.makeMove, turn),
     ]);
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     const failed = results.find((r) => r.status === 'rejected');
     expect(failed?.reason).toMatchObject({ data: { code: 'STALE_VERSION' } });
     // Sent again later, the old turn is still stale.
-    await rejectsWith(t.mutation(api.games.makeMove, turn), 'STALE_VERSION');
+    await rejectsWith(phone.mutation(api.games.makeMove, turn), 'STALE_VERSION');
     expect((await view(t, gameId)).version).toBe(v.version + 1);
   });
 
@@ -283,10 +282,82 @@ describe('makeMove', () => {
     const gameId = await createGame(t);
     await t.run(async (ctx) => ctx.db.delete(gameId));
     await rejectsWith(
-      t.mutation(api.games.makeMove, { gameId, callerId: ALICE, expectedVersion: 1, moves: [] }),
+      as(t, ALICE).mutation(api.games.makeMove, { gameId, expectedVersion: 1, moves: [] }),
       'NOT_FOUND',
     );
-    expect(await t.query(api.games.getGame, { gameId })).toBeNull();
+    expect(await as(t, ALICE).query(api.games.getGame, { gameId })).toBeNull();
+    expect(await as(t, 'eve').query(api.games.getGame, { gameId })).toBeNull();
+  });
+});
+
+describe('sign-in (#131)', () => {
+  it('the player id is the token subject, so a new session of the same user plays on', async () => {
+    const t = setup();
+    const gameId = await createGame(t);
+    const v = await view(t, gameId);
+    // Another session (another issuer string, another token) of the same subject.
+    const again = t.withIdentity({
+      subject: idOf(v.game.state.toMove),
+      issuer: 'https://example.test',
+      sessionId: 'second-session',
+    });
+    const result = await again.mutation(api.games.makeMove, {
+      gameId,
+      expectedVersion: v.version,
+      moves: pickTurn(v.game, createSeededRng(1)),
+    });
+    expect(result).toEqual({ ok: true, version: v.version + 1 });
+  });
+
+  it('refuses every call without a sign-in, and saves nothing', async () => {
+    const t = setup();
+    const gameId = await createGame(t);
+    const v = await view(t, gameId);
+    const moves = pickTurn(v.game, createSeededRng(1));
+    await rejectsWith(
+      t.mutation(api.games.createGame, {
+        players: PLAYERS,
+        choice: 'portes',
+        targetPoints: 1,
+        pace: 'live',
+      }),
+      'NOT_SIGNED_IN',
+    );
+    await rejectsWith(
+      t.mutation(api.games.makeMove, { gameId, expectedVersion: v.version, moves }),
+      'NOT_SIGNED_IN',
+    );
+    await rejectsWith(
+      t.mutation(api.games.answer, { gameId, expectedVersion: v.version, choice: 'playOn' }),
+      'NOT_SIGNED_IN',
+    );
+    await rejectsWith(t.mutation(api.games.resign, { gameId }), 'NOT_SIGNED_IN');
+    await rejectsWith(t.query(api.games.getGame, { gameId }), 'NOT_SIGNED_IN');
+    // Also for a game that does not exist.
+    await t.run(async (ctx) => ctx.db.delete(gameId));
+    await rejectsWith(t.query(api.games.getGame, { gameId }), 'NOT_SIGNED_IN');
+    const games = await t.run(async (ctx) => ctx.db.query('games').collect());
+    expect(games).toHaveLength(0);
+  });
+
+  it('a stranger cannot read a game; both players can', async () => {
+    const t = setup();
+    const gameId = await createGame(t);
+    await rejectsWith(as(t, 'eve').query(api.games.getGame, { gameId }), 'NOT_A_PLAYER');
+    const white = await as(t, ALICE).query(api.games.getGame, { gameId });
+    const black = await as(t, BOB).query(api.games.getGame, { gameId });
+    expect(white).not.toBeNull();
+    expect(black).toEqual(white);
+  });
+
+  it('rejects the token subject "server" and an empty one', async () => {
+    const t = setup();
+    const gameId = await createGame(t);
+    for (const id of ['server', '', '  ']) {
+      await rejectsWith(as(t, id).mutation(api.games.resign, { gameId }), 'BAD_REQUEST');
+      await rejectsWith(as(t, id).query(api.games.getGame, { gameId }), 'BAD_REQUEST');
+    }
+    expect((await view(t, gameId)).status).toBe('active');
   });
 });
 
@@ -297,23 +368,22 @@ describe('resign', () => {
     const before = await view(t, gameId);
     // The player who is not to move may resign too.
     const resigner = otherSide(before.game.state.toMove);
-    await t.mutation(api.games.resign, { gameId, callerId: idOf(resigner) });
+    await as(t, idOf(resigner)).mutation(api.games.resign, { gameId });
     const v = await view(t, gameId);
     expect(v.status).toBe('finished');
     expect(v.match.winner).toBe(otherSide(resigner));
     expect(v.match.resignedBy).toBe(resigner);
     expect(v.waitingFor).toBeNull();
     await rejectsWith(
-      t.mutation(api.games.makeMove, {
+      as(t, idOf(before.game.state.toMove)).mutation(api.games.makeMove, {
         gameId,
-        callerId: idOf(before.game.state.toMove),
         expectedVersion: v.version,
         moves: pickTurn(before.game, createSeededRng(1)),
       }),
       'GAME_OVER',
     );
-    await rejectsWith(t.mutation(api.games.resign, { gameId, callerId: ALICE }), 'GAME_OVER');
-    await rejectsWith(t.mutation(api.games.resign, { gameId, callerId: 'eve' }), 'NOT_A_PLAYER');
+    await rejectsWith(as(t, ALICE).mutation(api.games.resign, { gameId }), 'GAME_OVER');
+    await rejectsWith(as(t, 'eve').mutation(api.games.resign, { gameId }), 'NOT_A_PLAYER');
   });
 });
 
@@ -358,9 +428,8 @@ describe('the Plakoto mother question', () => {
       .legalTurns(state, [5, 2])
       .find((turn) => turn.moves.some((m) => m.capture === 'pin'));
     if (pin === undefined) throw new Error('no pinning turn');
-    await t.mutation(api.games.makeMove, {
+    await as(t, BOB).mutation(api.games.makeMove, {
       gameId,
-      callerId: BOB,
       expectedVersion: v.version,
       moves: [...pin.moves],
     });
@@ -383,19 +452,19 @@ describe('the Plakoto mother question', () => {
 
     const call = { gameId, expectedVersion: v.version };
     await rejectsWith(
-      t.mutation(api.games.answer, { ...call, callerId: BOB, choice: 'playOn' }),
+      as(t, BOB).mutation(api.games.answer, { ...call, choice: 'playOn' }),
       'NOT_YOUR_TURN',
     );
     await rejectsWith(
-      t.mutation(api.games.answer, { ...call, callerId: ALICE, choice: 'maybe' }),
+      as(t, ALICE).mutation(api.games.answer, { ...call, choice: 'maybe' }),
       'ILLEGAL_ACTION',
     );
     await rejectsWith(
-      t.mutation(api.games.makeMove, { ...call, callerId: ALICE, moves: [] }),
+      as(t, ALICE).mutation(api.games.makeMove, { ...call, moves: [] }),
       'ILLEGAL_ACTION',
     );
 
-    await t.mutation(api.games.answer, { ...call, callerId: ALICE, choice: 'playOn' });
+    await as(t, ALICE).mutation(api.games.answer, { ...call, choice: 'playOn' });
     const after = await view(t, gameId);
     expect(after.version).toBe(v.version + 1);
     expect(after.status).toBe('active');
@@ -408,7 +477,7 @@ describe('the Plakoto mother question', () => {
         : after.game.lastTurn?.player === 'white';
     expect(rolledForWhite).toBe(true);
     await rejectsWith(
-      t.mutation(api.games.answer, { ...call, callerId: ALICE, choice: 'playOn' }),
+      as(t, ALICE).mutation(api.games.answer, { ...call, choice: 'playOn' }),
       'STALE_VERSION',
     );
   });
@@ -417,9 +486,8 @@ describe('the Plakoto mother question', () => {
     const t = setup();
     const gameId = await pinTheMother(t);
     const v = await view(t, gameId);
-    await t.mutation(api.games.answer, {
+    await as(t, ALICE).mutation(api.games.answer, {
       gameId,
-      callerId: ALICE,
       expectedVersion: v.version,
       choice: 'resign',
     });
@@ -435,9 +503,8 @@ describe('the Plakoto mother question', () => {
     const v = await view(t, gameId);
     expect(v.turnDeadline).toBe(START + TURN_TIME_MS.live);
     vi.setSystemTime(START + TURN_TIME_MS.live);
-    const result = await t.mutation(api.games.answer, {
+    const result = await as(t, ALICE).mutation(api.games.answer, {
       gameId,
-      callerId: ALICE,
       expectedVersion: v.version,
       choice: 'playOn',
     });
@@ -467,9 +534,8 @@ describe('turn timers (#133)', () => {
 
   async function playOneTurn(t: Tester, gameId: Id<'games'>) {
     const v = await view(t, gameId);
-    return await t.mutation(api.games.makeMove, {
+    return await as(t, idOf(waiting(v))).mutation(api.games.makeMove, {
       gameId,
-      callerId: idOf(waiting(v)),
       expectedVersion: v.version,
       moves: pickTurn(v.game, createSeededRng(v.version)),
     });
@@ -558,9 +624,8 @@ describe('turn timers (#133)', () => {
     const late = waiting(before);
     // The clock reaches the deadline before the scheduled check runs.
     vi.setSystemTime(START + LIVE);
-    const result = await t.mutation(api.games.makeMove, {
+    const result = await as(t, idOf(late)).mutation(api.games.makeMove, {
       gameId,
-      callerId: idOf(late),
       expectedVersion: before.version,
       moves: pickTurn(before.game, createSeededRng(1)),
     });
@@ -598,7 +663,7 @@ describe('turn timers (#133)', () => {
   it('resign stops the clock: the check at the deadline does nothing', async () => {
     const t = setup();
     const gameId = await createGame(t, 'portes', 5);
-    await t.mutation(api.games.resign, { gameId, callerId: BOB });
+    await as(t, BOB).mutation(api.games.resign, { gameId });
     const v = await view(t, gameId);
     expect(v.turnDeadline).toBeNull();
     await wait(t, LIVE);

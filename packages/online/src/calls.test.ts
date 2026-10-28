@@ -11,6 +11,7 @@ import {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkViewer,
   eventActor,
   matchStatus,
   nextDeadline,
@@ -56,6 +57,19 @@ describe('checkCall', () => {
     expect(code(() => checkCall(GAME, 'eve', 2))).toBe('NOT_A_PLAYER');
     expect(code(() => checkCall(GAME, 'alice', 2))).toBe('STALE_VERSION');
     expect(code(() => checkCall(GAME, 'alice', 4))).toBe('STALE_VERSION');
+  });
+});
+
+describe('checkViewer (#131)', () => {
+  it('lets the two players watch, and gives null for a missing game', () => {
+    expect(checkViewer(GAME, 'alice')).toBe(GAME);
+    expect(checkViewer(GAME, 'bob')).toBe(GAME);
+    expect(checkViewer(null, 'eve')).toBeNull();
+  });
+
+  it('rejects a stranger with NOT_A_PLAYER', () => {
+    expect(code(() => checkViewer(GAME, 'eve'))).toBe('NOT_A_PLAYER');
+    expect(code(() => checkViewer(GAME, SERVER_ACTOR))).toBe('NOT_A_PLAYER');
   });
 });
 
