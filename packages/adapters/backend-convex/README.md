@@ -28,21 +28,19 @@ The contract checks (`gameTransportContract`) run in `apps/server`, against the 
 
 The adapter does not import `apps/server/convex/_generated/api`. Its types pull in every server module (and Better Auth), so the app's type check would compile the server. And `apps/server` depends on this package for its tests, so the import would make a cycle. If you rename or change a function in `games.ts`, change `src/functions.ts` too: the server test fails until they match.
 
-## How the app will use it
+## How the app uses it
 
-The app wiring is a later issue. It will look like this, in `apps/mobile/src/services.ts`:
+`apps/mobile/src/services.ts` makes it (#266), through `createOnlineServices` (`apps/mobile/src/onlineServices.ts`):
 
 ```ts
-import { createConvexGameTransportFromUrl } from '@tavli/backend-convex';
-
-import { convexUrl } from './convexUrl';
-
-// `auth` is the AuthProvider (`@tavli/auth-better-auth`).
-const url = convexUrl();
-const games = url === undefined ? undefined : createConvexGameTransportFromUrl(url, auth);
+createClient: createConvexClient, // (server.url, auth): one ConvexClient per app
+createGames: (client) => createConvexGameTransport({ client }),
 ```
 
-`createConvexClient(url, auth)` makes the signed-in `ConvexClient` alone, so the invite calls can share one client (one socket) with the games later: `createConvexGameTransport({ client })`.
+- `services.ts` exports the transport as `games`. It is `undefined` when the build has no Convex URL: then online play is off, and a screen checks `games === undefined`.
+- The `ConvexClient` opens its socket on the first call to `games`, not at app start. It sends the token of `auth` (`@tavli/auth-better-auth`). With nobody signed in, calls fail `NOT_SIGNED_IN`.
+- Later the invite calls take the same client (one socket).
+- `createConvexGameTransportFromUrl(url, auth)` does both steps in one call, for a tool or a test that needs no shared client.
 
 ## Setup
 

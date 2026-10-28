@@ -27,6 +27,7 @@ import { analytics, onlineServer, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../test/clock';
 import { nativePath } from '../test/nativeParent';
+import { onlineFake } from '../test/onlineFake';
 import { layoutTutorialBoard, playLessonByTaps } from '../test/tutorialTaps';
 
 const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
@@ -752,6 +753,27 @@ describe('online games (#255)', () => {
   it('shows "could not be opened" for an unknown online game', async () => {
     await renderRouter('./src/app', { initialUrl: '/game/game-nope' });
     expect(await screen.findByText('This game could not be opened.')).toBeOnTheScreen();
+  });
+
+  it('opens a game that is not a dev game on `games`, as the signed-in user (#266)', async () => {
+    onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
+    const gameId = onlineFake
+      .server()
+      .createGame('guest-1', { white: 'guest-1', black: 'bob' }, 'portes', 3, 'live');
+    await renderRouter('./src/app', { initialUrl: `/game/${gameId}` });
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
+  });
+
+  it('makes no guest for a game link when nobody is signed in (#266)', async () => {
+    const gameId = onlineFake
+      .server()
+      .createGame('guest-1', { white: 'guest-1', black: 'bob' }, 'portes', 3, 'live');
+    await renderRouter('./src/app', { initialUrl: `/game/${gameId}` });
+    expect(await screen.findByText('This game could not be opened.')).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
   });
 
   it('stops the dev game (bot and turn timers) when its board closes', async () => {
