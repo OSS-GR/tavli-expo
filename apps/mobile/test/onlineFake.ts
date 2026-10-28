@@ -15,7 +15,8 @@
  *   per player.
  * - `invites` is the `Invites` port on the server as the signed-in user
  *   (#281), like the Convex adapter. With nobody signed in it fails
- *   `NOT_SIGNED_IN`.
+ *   `NOT_SIGNED_IN`. Its watches (`watchInvite`, `watchMyInvites`, #314)
+ *   act as the user signed in when the watch starts.
  * - `invitesFor(playerId)` is the `Invites` port of a player on the same
  *   server (#256): the dev invites, and a friend in a test.
  * - `notifications` is the phone's notifications in memory (#285): it
@@ -124,6 +125,12 @@ const invites: Invites = {
   declineInvite: (code) => inviter()?.declineInvite(code) ?? notSignedIn(),
   cancelInvite: (code) => inviter()?.cancelInvite(code) ?? notSignedIn(),
   listMyInvites: () => inviter()?.listMyInvites() ?? notSignedIn(),
+  // The user signed in when the watch starts, like `games.watchMyGames`.
+  watchMyInvites(onList, onError) {
+    const port = inviter();
+    if (port !== null) return port.watchMyInvites(onList, onError);
+    return signedOutWatch(onError);
+  },
 };
 
 const games: GameTransport = {

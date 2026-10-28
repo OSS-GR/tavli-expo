@@ -20,6 +20,7 @@ Version: `convex` 1.46.0, a peer dependency (the app installs it). Keep it on th
 - **`createConvexInvites({ client })`** needs `onUpdate`, `mutation` and `query` (`ConvexInvitesClient`; `ConvexClient` has all three).
 - **`createInvite`** sends only `choice`, `targetPoints` and `pace`, and resolves with the code. **`getInvite`** and **`listMyInvites`** run a query once. **`acceptInvite`**, **`declineInvite`** and **`cancelInvite`** call their mutations with the code.
 - **`watchInvite`** watches `getInvite`, like `subscribe`: each view (or `null`) waits one microtask, and nothing arrives after the stop function.
+- **`watchMyInvites(onList, onError)`** (#314) watches `listMyInvites` (`client.onUpdate`), like `watchMyGames`: each list is a copy and waits one microtask. The list follows each new invite, answer, cancel and the scheduled `expireInvite`; it does not change when time alone passes.
 - **Views are copies**: the Convex client shares one cached object between watchers.
 - **Errors.** A `ConvexError` with `InviteErrorData` rejects (or goes to `onError`) with `{ code, message }` (`toInviteError`), `NOT_SIGNED_IN` and `TOO_MANY_INVITES` too. Any other error stays as it is.
 

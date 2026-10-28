@@ -10,7 +10,8 @@
  * - `listMyGames` (#296) lists the caller's games with `summarizeGame`,
  *   like the Convex `listMyGames`. `watchMyGames` (#297) sends that list
  *   again after each change to one of the caller's games, only when the
- *   list changed (like a Convex query watch).
+ *   list changed (like a Convex query watch). `watchMyInvites` (#314)
+ *   does the same for the caller's open invites.
  * - Every view, request and event is a copy (a JSON round trip), so a
  *   client cannot change the server state, and the server cannot change a
  *   view a client holds.
@@ -206,6 +207,14 @@ interface InviteListener {
   active: boolean;
 }
 
+interface InviteListListener {
+  readonly playerId: string;
+  readonly onList: (invites: readonly InviteView[]) => void;
+  /** The JSON of the last list sent, so an unchanged list is not sent again. */
+  last: string | null;
+  active: boolean;
+}
+
 function copy<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -244,6 +253,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   /** By code (capital letters). Kept in the order they were made. */
   const invites = new Map<string, InviteRecord>();
   const inviteListeners = new Set<InviteListener>();
+  const inviteListListeners = new Set<InviteListListener>();
   let nextId = 1;
 
   /** The view input of `game`, without its flow. */
@@ -502,11 +512,31 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     });
   }
 
-  /** Saves the invite and sends its new view to each watcher of its code. */
+  /**
+   * Sends the open invites of `listener` as they are now on a later
+   * microtask, unless it stops first or the list did not change since the
+   * last one sent.
+   */
+  function sendInviteList(listener: InviteListListener): void {
+    const text = JSON.stringify(openInvitesOf(listener.playerId));
+    later(() => {
+      if (!listener.active || text === listener.last) return;
+      listener.last = text;
+      listener.onList(JSON.parse(text) as InviteView[]);
+    });
+  }
+
+  /**
+   * Saves the invite and sends its new view to each watcher of its code,
+   * and the inviter's new list to each watcher of that list.
+   */
   function saveInvite(invite: InviteRecord): void {
     invites.set(invite.code, invite);
     for (const listener of inviteListeners) {
       if (listener.code === invite.code) sendInvite(listener);
+    }
+    for (const listener of inviteListListeners) {
+      if (listener.playerId === invite.from) sendInviteList(listener);
     }
   }
 
@@ -591,6 +621,15 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       },
       listMyInvites() {
         return inviteCall(() => openInvitesOf(playerId));
+      },
+      watchMyInvites(onList) {
+        const listener: InviteListListener = { playerId, onList, last: null, active: true };
+        inviteListListeners.add(listener);
+        sendInviteList(listener);
+        return () => {
+          listener.active = false;
+          inviteListListeners.delete(listener);
+        };
       },
       watchInvite(text, onView) {
         // Like the Convex `getInvite`, text that is not a code sends `null`.

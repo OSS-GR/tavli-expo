@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { anyGameLevels } from '@/features/bot/levels';
 import { ContinueCard } from '@/features/home/ContinueCard';
+import { HomeInvites } from '@/features/home/HomeInvites';
 import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
@@ -12,6 +13,7 @@ import {
   FRIEND_HREF,
   ONLINE_GAMES_HREF,
   gameHref,
+  inviteWaitHref,
   newGameHref,
   rulesHref,
   tutorialHref,
@@ -42,8 +44,9 @@ function readSlot(): SlotState {
 export default function HomeRoute() {
   const { t } = useTranslation();
   const [slot, setSlot] = useState<SlotState>(readSlot);
-  // Online games (#297) only on a phone that has an online account: with
-  // none, Home does not even load the session (no network call at start).
+  // Online games (#297) and invites (#314) only on a phone that has an
+  // online account: with none, Home does not even load the session (no
+  // network call at start).
   const [onlineAccount, setOnlineAccount] = useState(hasOnlineAccount);
   const focused = useIsFocused();
   // Read them again each time Home shows (back from a game or an invite).
@@ -80,6 +83,16 @@ export default function HomeRoute() {
             focused={focused}
             onOpen={(gameId) => router.push(gameHref(gameId))}
             onSeeAll={() => router.push(ONLINE_GAMES_HREF)}
+          />
+        ) : null
+      }
+      invites={
+        onlineAccount && auth !== undefined && invites !== undefined ? (
+          <HomeInvites
+            auth={auth}
+            invites={invites}
+            focused={focused}
+            onOpen={(code) => router.push(inviteWaitHref(code))}
           />
         ) : null
       }

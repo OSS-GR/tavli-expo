@@ -96,6 +96,27 @@ function watch(invites: Invites, code: string) {
   };
 }
 
+/** Watches the open invites of a player and keeps every list and error that arrives. */
+function watchList(invites: Invites) {
+  const lists: (readonly InviteView[])[] = [];
+  const errors: unknown[] = [];
+  const stop = invites.watchMyInvites(
+    (list) => lists.push(list),
+    (error) => errors.push(error),
+  );
+  return {
+    lists,
+    errors,
+    stop,
+    /** The codes of the newest list. Throws when none came yet. */
+    codes(): string[] {
+      const list = lists[lists.length - 1];
+      if (list === undefined) throw new Error('watchMyInvites: no list yet');
+      return list.map((view) => view.code);
+    },
+  };
+}
+
 /** Expects `call` to reject with `InviteErrorData` of this code. */
 async function rejectsWith(
   call: Promise<unknown>,
@@ -419,6 +440,88 @@ export function invitesContract(): InvitesContractCheck[] {
         same(b.last()?.status, 'open', 'the view of the other watcher');
         same((await viewOf(friend, code)).status, 'open', 'the status on the server');
         for (const w of [unknown, a, b]) w.stop();
+      },
+    },
+    {
+      name: 'watchMyInvites sends the list later, then each change, newest first',
+      run: async (subject) => {
+        const inviter = subject.invitesFor('inviter');
+        const watcher = watchList(inviter);
+        same(watcher.lists.length, 0, 'the lists inside watchMyInvites');
+        await subject.settle();
+        same(watcher.codes(), [], 'the first list');
+
+        const first = await createFrom(subject);
+        await subject.settle();
+        same(watcher.codes(), [first], 'the list after a new invite');
+        same(watcher.lists[watcher.lists.length - 1]?.[0], await viewOf(inviter, first), 'a view');
+        await subject.passTime(1000);
+        const second = await createFrom(subject, {
+          choice: 'portes',
+          targetPoints: 1,
+          pace: 'live',
+        });
+        const third = await createFrom(subject);
+        await subject.settle();
+        same(watcher.codes(), [third, second, first], 'the list after three invites');
+
+        // An answer or a cancel takes an invite off the list.
+        await subject.invitesFor('friend').acceptInvite(first);
+        await subject.settle();
+        same(watcher.codes(), [third, second], 'the list after an accept');
+        await subject.invitesFor('friend').declineInvite(second);
+        await subject.settle();
+        same(watcher.codes(), [third], 'the list after a decline');
+        await inviter.cancelInvite(third);
+        await subject.settle();
+        same(watcher.codes(), [], 'the list after a cancel');
+
+        // The server marks an invite expired: it leaves the list.
+        const late = await createFrom(subject);
+        await subject.settle();
+        same(watcher.codes(), [late], 'the list before the time is up');
+        await subject.passTime(INVITE_TIME_MS);
+        await subject.settle();
+        same(watcher.codes(), [], 'the list after the time is up');
+        same(watcher.errors, [], 'the errors');
+        watcher.stop();
+      },
+    },
+    {
+      name: 'watchMyInvites lists only my own invites, gives copies, and sends nothing after stop',
+      run: async (subject) => {
+        const inviter = subject.invitesFor('inviter');
+        // Stopped at once: not even the first list comes.
+        const early = watchList(inviter);
+        early.stop();
+        const a = watchList(inviter);
+        const b = watchList(inviter);
+        const friend = watchList(subject.invitesFor('friend'));
+        await subject.settle();
+        const code = await createFrom(subject);
+        await subject.settle();
+        same(a.codes(), [code], 'my list');
+        same(friend.codes(), [], 'the list of another player');
+
+        const list = a.lists[a.lists.length - 1];
+        const view = list?.[0];
+        if (list === undefined || view === undefined) throw new Error('no list');
+        if (list === b.lists[b.lists.length - 1]) throw new Error('two watchers got the same list');
+        (view as { status: string }).status = 'accepted';
+        same(b.lists[b.lists.length - 1]?.[0]?.status, 'open', 'the list of the other watcher');
+        same((await viewOf(inviter, code)).status, 'open', 'the status on the server');
+
+        a.stop();
+        a.stop();
+        const seen = a.lists.length;
+        await createFrom(subject);
+        await subject.settle();
+        same(a.lists.length, seen, 'the lists after stop');
+        same(b.codes().length, 2, 'the list of the watcher that did not stop');
+        same(early.lists.length, 0, 'the lists after a stop in the same tick');
+        same([...a.errors, ...b.errors, ...friend.errors, ...early.errors], [], 'the errors');
+        b.stop();
+        friend.stop();
       },
     },
   ];

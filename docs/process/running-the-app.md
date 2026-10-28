@@ -168,18 +168,20 @@ EAS builds the app on Expo's servers. Use it when you do not want to wait for a 
 
 ### Link the project once
 
-You only do this once. Then commit the change in a PR.
+**Done (2026-10-28, #323).** The project is `@oss_gr-org/tavlaki` (id `ab412a0d-e0c2-4f38-878d-57249f4db757`). `apps/mobile/app.json` holds `owner`, `extra.eas.projectId` and `updates.url`. The id is public config, not a secret. You only need `eas login` on a new computer.
+
+How it was done, for a new project:
 
 ```bash
 npm install --global eas-cli
 eas login              # your Expo account
 cd apps/mobile
 eas init               # links the project, writes extra.eas.projectId to app.json
-eas update:configure   # writes updates.url to app.json (no update is published)
+eas update:configure   # see the note below
 cd ../.. && pnpm format   # EAS CLI writes app.json in its own style
 ```
 
-Commit `apps/mobile/app.json`. Do **not** run `eas update` yet.
+`eas update:configure` cannot write to a dynamic config (`app.config.ts`) and fails. It prints the `updates.url` to add: put it in `app.json` by hand. Do **not** run `eas update` yet.
 
 ### Build profiles (`apps/mobile/eas.json`)
 

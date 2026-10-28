@@ -44,6 +44,7 @@ function setup() {
     declineInvite: (code) => caller().declineInvite(code),
     cancelInvite: (code) => caller().cancelInvite(code),
     listMyInvites: () => caller().listMyInvites(),
+    watchMyInvites: (onList, onError) => caller().watchMyInvites(onList, onError),
   };
   const analytics = createRecordingAnalytics();
   analytics.optIn();

@@ -176,6 +176,30 @@ describe('in-memory invites', () => {
     stop();
   });
 
+  it('watchMyInvites hears of an expiry only in runDueTimeouts, and of invites made on the server', async () => {
+    const { server, wait } = setup();
+    const lists: string[][] = [];
+    const stop = server
+      .invitesFor(ALICE)
+      .watchMyInvites((list) => lists.push(list.map((view) => view.code)));
+    await flush();
+    const code = server.createInvite(ALICE, 'portes', 1, 'live');
+    await flush();
+    expect(lists).toEqual([[], [code]]);
+    wait(INVITE_TIME_MS);
+    expect(await server.invitesFor(ALICE).listMyInvites()).toEqual([]);
+    await flush();
+    expect(lists).toEqual([[], [code]]);
+    server.runDueTimeouts();
+    await flush();
+    expect(lists).toEqual([[], [code], []]);
+    // Another player's invite does not send the same list again.
+    server.createInvite(BOB, 'portes', 1, 'live');
+    await flush();
+    expect(lists).toHaveLength(3);
+    stop();
+  });
+
   it('watchInvite on text that is not a code sends null', async () => {
     const { server } = setup();
     const views: unknown[] = [];
