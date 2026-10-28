@@ -234,6 +234,11 @@ export function pathFlights(
 /** The pause between two moves of a turn that arrives whole (online, #255). */
 export const TURN_MOVE_GAP_MS = 100;
 
+/** When move `i` (from 0) of a turn that arrives whole starts to fly, in ms. */
+export function turnMoveDelay(i: number): number {
+  return i * (FLIGHT_MS + TURN_MOVE_GAP_MS);
+}
+
 /**
  * The flights of a whole turn that arrives at once: the other player's
  * turn in an online game (#255). The moves fly one after the other, each
@@ -255,7 +260,7 @@ export function turnFlights(
   let board = before;
   moves.forEach((move, i) => {
     const after = applyMoveToBoard(board, mover, move, options.direction);
-    const delay = i * (FLIGHT_MS + TURN_MOVE_GAP_MS);
+    const delay = turnMoveDelay(i);
     const earlier = flights.length;
     for (const f of moveFlights(geo, view, mover, move, board, after, {
       id: `${options.id}:${i}`,

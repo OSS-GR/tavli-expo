@@ -10,7 +10,9 @@ import './src/i18n';
 // `crashReporter` every report and `analytics` every event it would send
 // (it follows the opt-in rules); dice come from a fixed seed, so tests are
 // repeatable. The bot is the real inline runner and the real Analyzer (both
-// are pure TypeScript).
+// are pure TypeScript). Online play (`auth`, `games`) and the dev games
+// (`onlineServer`, `gameTransportFor`) share one in-memory sign-in and game
+// server, new for each test (test/onlineFake.ts).
 jest.mock('@/services', () => {
   const {
     createMemoryStorage,
@@ -22,18 +24,8 @@ jest.mock('@/services', () => {
   const { createSeededRng } = jest.requireActual('@tavli/engine');
   const { InlineBotRunner, createAnalyzer, createBot } = jest.requireActual('@tavli/bot');
   const { botLevelsByGame } = jest.requireActual('@/features/bot/levels');
-  const { createMemoryGameServer } = jest.requireActual('@tavli/online');
+  const { onlineFake } = jest.requireActual('./test/onlineFake');
   const bot = createBot();
-  // Online games (#255): one in-memory server with seeded dice. Its clock is
-  // `Date.now`, which the fake timers move.
-  let memoryServer: ReturnType<typeof createMemoryGameServer> | null = null;
-  const onlineServer = () => {
-    memoryServer ??= createMemoryGameServer({ rng: createSeededRng(11), now: () => Date.now() });
-    return memoryServer;
-  };
-  const transports = new Map();
-  // Invites (#256) on the same server, so an accept starts a game there.
-  const invitePorts = new Map();
   return {
     storage: createMemoryStorage(),
     feedback: createRecordingFeedback(),
@@ -44,18 +36,12 @@ jest.mock('@/services', () => {
     botRunner: new InlineBotRunner(bot),
     botLevels: botLevelsByGame(bot),
     analyzer: createAnalyzer(),
-    onlineServer,
+    auth: onlineFake.auth,
+    games: onlineFake.games,
+    onlineServer: onlineFake.server,
     onlinePlayerId: 'me',
-    gameTransportFor: (playerId: string) => {
-      if (!transports.has(playerId))
-        transports.set(playerId, onlineServer().transportFor(playerId));
-      return transports.get(playerId);
-    },
-    invitesFor: (playerId: string) => {
-      if (!invitePorts.has(playerId))
-        invitePorts.set(playerId, onlineServer().invitesFor(playerId));
-      return invitePorts.get(playerId);
-    },
+    gameTransportFor: onlineFake.transportFor,
+    invitesFor: onlineFake.invitesFor,
   };
 });
 

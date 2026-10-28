@@ -19,3 +19,4 @@ export {
   type BetterAuthUserData,
   type FromBetterAuthClientOptions,
 } from './provider';
+export { createSecureSessionStorage } from './secureStore';

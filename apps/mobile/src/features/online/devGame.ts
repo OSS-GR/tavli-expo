@@ -24,6 +24,7 @@ import type { MemoryGameServer } from '@tavli/online';
 import type { BotTiming } from '@/features/bot/botTurn';
 import { onInviteAccepted } from '@/features/invites/acceptedInvite';
 
+import { rememberDevGame } from './devGameIds';
 import { startOnlineBot } from './onlineBot';
 
 /** The bot's player id in a dev game. */
@@ -83,6 +84,7 @@ export function startDevGame(options: DevGameOptions): DevGame {
 /** The bot plays its side of `gameId`, and the server's turn timers run. */
 function playDevGame(gameId: string, options: DevBotOptions): DevGame {
   const { server } = options;
+  rememberDevGame(gameId);
   const bot = startOnlineBot({
     transport: server.transportFor(DEV_BOT_ID),
     gameId,
