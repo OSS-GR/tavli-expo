@@ -15,14 +15,25 @@
  *   it has no winner.
  */
 import { isDifficulty, type Difficulty } from '@tavli/contracts';
-import { type GameRecord, type Match, type PerPlayer, type PlayerId } from '@tavli/engine';
+import {
+  CHECKERS_PER_PLAYER,
+  type GameRecord,
+  type Match,
+  type PerPlayer,
+  type PlayerId,
+  type PresetId,
+  type RuleSet,
+} from '@tavli/engine';
 
 import { timedOutBy } from '@/features/match/summary';
 import {
   DEFAULT_OPENING_ROLL,
+  gamePreset,
   isGameChoice,
   isMatchMode,
   isOpeningRollRule,
+  isRulesVersion,
+  isVersionedGame,
   type GameChoice,
   type MatchMode,
   type MatchSetup,
@@ -87,19 +98,44 @@ export interface HistoryRecord {
    * federation rule (`useOpeningDice`), the only rule the app had then.
    */
   readonly openingRoll: OpeningRollRule;
+  /**
+   * The engine preset of the match (#241, `match.rules.presetId`): the
+   * rules version of Plakoto and Asodio, else the game's one preset
+   * (`tavli` for a Tavli match). Records made before #241 (or with a
+   * preset that is not one of the game's) load with the default preset.
+   */
+  readonly preset: PresetId;
 }
 
 /**
- * A won game worth 2 points or more is a diplo (mars). The app's games all
- * use the shared Tavli scoring (`docs/rules/tavli-match.md`, "Winning &
- * scoring"): a single is 1 point, a double is 2. Every way to a double
- * gives 2: no checker borne off, a pinned mother (Plakoto), or a resign or
- * a timeout in such a position (the opponent wins what the position is
- * worth, `resignGame`). Only the `backgammonScores3` flag (Portes, off by
- * default) gives 3, and that is a double too. A draw is 0 points.
+ * Is a won game a diplo (mars)? It depends on the scoring of its rules
+ * (`scoring.method`):
+ *
+ * - `tavli` (every game but Acey-Deucey American; `docs/rules/tavli-match.md`,
+ *   "Winning & scoring"): a single is 1 point, a double is 2. Every way to a
+ *   double gives 2: no checker borne off, a pinned mother (Plakoto), or a
+ *   resign or a timeout in such a position (the opponent wins what the
+ *   position is worth, `resignGame`). Only the `backgammonScores3` flag
+ *   (Portes, off by default) gives 3, and that is a double too.
+ * - `perChecker` (Acey-Deucey American, #241): 1 point per checker the
+ *   loser has not borne off. Only a loser with none off gives a diplo: 15.
+ * - `singleOnly`: every win is 1 point, never a diplo.
+ *
+ * A draw is 0 points.
  */
-export function isDiplo(game: GameRecord): boolean {
-  return game.winner !== null && game.points >= 2;
+export function isDiplo(
+  game: Pick<GameRecord, 'winner' | 'points'>,
+  scoring: RuleSet['scoring']['method'] = 'tavli',
+): boolean {
+  if (game.winner === null) return false;
+  switch (scoring) {
+    case 'tavli':
+      return game.points >= 2;
+    case 'perChecker':
+      return game.points >= CHECKERS_PER_PLAYER;
+    case 'singleOnly':
+      return false;
+  }
 }
 
 /**
@@ -116,9 +152,12 @@ export function historyRecord(
 ): HistoryRecord {
   const diploWins = { white: 0, black: 0 };
   let draws = 0;
+  // Every game of an app match scores like the match rules: a one-game
+  // match plays its preset, and a Tavli match only games with Tavli scoring.
+  const scoring = match.rules.scoring.method;
   for (const game of match.games) {
     if (game.winner === null) draws += 1;
-    else if (isDiplo(game)) diploWins[game.winner] += 1;
+    else if (isDiplo(game, scoring)) diploWins[game.winner] += 1;
   }
   const bot = setup.mode === 'bot';
   return {
@@ -139,6 +178,7 @@ export function historyRecord(
     draws,
     matchNumber,
     openingRoll: match.rules.match.openingRoll,
+    preset: match.rules.presetId,
   };
 }
 
@@ -231,6 +271,9 @@ function parseRecord(raw: unknown): HistoryRecord | null {
   // Records before #207 have no opening roll rule: the federation rule. An
   // unknown one gets it too: the rule is a detail, never a reason to lose a match.
   const opening = isOpeningRollRule(raw['openingRoll']) ? raw['openingRoll'] : DEFAULT_OPENING_ROLL;
+  // Records before #241 have no preset: the game's default. So does a
+  // preset that is not one of the game's: it is a detail too.
+  const preset = recordPreset(game, raw['preset']);
   return {
     id,
     endedAt,
@@ -249,7 +292,14 @@ function parseRecord(raw: unknown): HistoryRecord | null {
     draws,
     matchNumber,
     openingRoll: opening,
+    preset,
   };
+}
+
+/** `raw` when it is a preset a match of `game` can have, else the game's default preset. */
+export function recordPreset(game: GameChoice, raw: unknown): PresetId {
+  if (isVersionedGame(game) && isRulesVersion(game, raw)) return raw;
+  return gamePreset(game);
 }
 
 /**

@@ -1,7 +1,8 @@
 /** Links and route params of the app shell (wireframes, "Route map"). Pure. */
 import type { TutorialGame, TutorialSource } from '@tavli/contracts';
+import type { PresetId } from '@tavli/engine';
 
-import { isMatchMode, type MatchMode } from './setup';
+import { isMatchMode, otherVersion, type MatchMode } from './setup';
 
 type Param = string | string[] | undefined;
 
@@ -51,9 +52,16 @@ export function reviewHref(id: string) {
   return { pathname: '/game/[id]/review', params: { id } } as const;
 }
 
-/** The rules page of a game (`/rules/portes`, …). */
-export function rulesHref(variant: string) {
-  return { pathname: '/rules/[variant]', params: { variant } } as const;
+/**
+ * The rules page of a game (`/rules/portes`, …). `preset` is the engine
+ * preset in play or chosen: a rules version that is not the default
+ * (#241) adds `version` (`/rules/plakoto?version=plakoto.federation`).
+ */
+export function rulesHref(variant: string, preset?: PresetId) {
+  const version = preset === undefined ? null : otherVersion(preset);
+  return version === null
+    ? ({ pathname: '/rules/[variant]', params: { variant } } as const)
+    : ({ pathname: '/rules/[variant]', params: { variant, version } } as const);
 }
 
 /** The `mode` param of the new-game screen. Anything else means vs bot. */

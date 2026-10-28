@@ -1,5 +1,6 @@
 import { act, render, screen, userEvent } from '@testing-library/react-native';
 
+import { gamePreset } from '@/features/match/setup';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import i18n from '@/i18n';
 import { storage } from '@/services';
@@ -30,6 +31,7 @@ function rec(over: Partial<HistoryRecord>): HistoryRecord {
     draws: 0,
     matchNumber: 1,
     openingRoll: 'useOpeningDice',
+    preset: gamePreset(over.game ?? 'portes'),
     ...over,
   };
 }
@@ -109,6 +111,17 @@ describe('<HistoryScreen />', () => {
     // The federation rule shows nothing extra (texts: `history.test.ts`).
     expect(screen.getByTestId('history-row-1')).toHaveAccessibleName(
       'Portes · vs Bot (Easy), You 3 – 1 Bot · first to 3, Won, Oct 27, 2026',
+    );
+  });
+
+  it('shows the rules version in the row and its label (#241)', async () => {
+    const records = [rec({ id: 'b', game: 'plakoto', preset: 'plakoto.federation' })];
+    await render(<HistoryScreen records={records} onPlay={jest.fn()} />);
+
+    const score = 'You 3 – 1 Bot · first to 3 · Rules version: Federation';
+    expect(screen.getByText(score)).toBeOnTheScreen();
+    expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
+      `Plakoto · vs Bot (Easy), ${score}, Won, Oct 27, 2026`,
     );
   });
 

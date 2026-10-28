@@ -5,9 +5,14 @@ import { seatsFor } from '@/features/match/seats';
 import {
   DEFAULT_OPENING_ROLL,
   HUMAN_SIDE,
+  VERSION_KEYS,
   defaultSetup,
+  gamePreset,
   isMatchLength,
   isOpeningRollRule,
+  isRulesVersion,
+  isVersionedGame,
+  otherVersion,
   type MatchSetup,
 } from '@/features/match/setup';
 import { matchLabel } from '@/features/match/summary';
@@ -20,17 +25,25 @@ import { winRate, type StatLine } from './stats';
  * labels). A length the new-game screen does not offer gets the default
  * here; the row still shows the real one ("first to 9"). It keeps the
  * record's opening roll house rule (#207), so the setup is correct; an
- * unknown rule gets the federation rule, as in `records.ts`.
+ * unknown rule gets the federation rule, as in `records.ts`. It keeps the
+ * record's rules version (#241) too; one that is not the game's gets the
+ * default.
  */
 export function recordSetup(record: HistoryRecord): MatchSetup {
   const base = defaultSetup(record.mode);
+  const { game, preset } = record;
+  const rulesVersions =
+    isVersionedGame(game) && isRulesVersion(game, preset)
+      ? { ...base.rulesVersions, [game]: preset }
+      : base.rulesVersions;
   return {
     ...base,
-    game: record.game,
+    game,
     targetPoints: isMatchLength(record.targetPoints) ? record.targetPoints : base.targetPoints,
     botLevel: record.botLevel ?? 'easy',
     names: record.names,
     openingRoll: isOpeningRollRule(record.openingRoll) ? record.openingRoll : DEFAULT_OPENING_ROLL,
+    rulesVersions,
   };
 }
 
@@ -42,7 +55,8 @@ export interface HistoryRow {
   readonly title: string;
   /**
    * "You 3 – 1 Bot · first to 3". A house rule follows the length, with
-   * New game's short label: "· Opening roll: Roll again" (#221).
+   * New game's short label: "· Opening roll: Roll again" (#221), "· Rules
+   * version: Federation" (#241).
    */
   readonly score: string;
   readonly badge: ResultBadge;
@@ -104,6 +118,7 @@ export function formatDate(ms: number, locale: string): string {
 
 export function historyRow(record: HistoryRecord, t: TFunction, locale: string): HistoryRow {
   const setup = recordSetup(record);
+  const version = otherVersion(gamePreset(setup.game, setup.rulesVersions));
   const seats = seatsFor(setup, t);
   const title = matchLabel(setup, t);
   const score = [
@@ -118,6 +133,10 @@ export function historyRow(record: HistoryRecord, t: TFunction, locale: string):
     setup.openingRoll === DEFAULT_OPENING_ROLL
       ? null
       : t('history.openingRoll', { rule: t(`newGame.houseRules.${setup.openingRoll}`) }),
+    // The rules version (#241); the default preset shows nothing.
+    version === null
+      ? null
+      : t('history.rulesVersion', { version: t(`newGame.rulesVersion.${VERSION_KEYS[version]}`) }),
     // A resigned match keeps its score (#181): say who resigned it.
     record.resignedBy === null
       ? null

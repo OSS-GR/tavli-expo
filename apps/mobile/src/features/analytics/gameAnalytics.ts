@@ -16,8 +16,9 @@
  * Event plan: `docs/architecture/analytics-events.md`.
  */
 import type { Analytics, Difficulty, GameMode, GameResultKind, MatchGame } from '@tavli/contracts';
-import type { GameResult, MatchAction, MatchFlow } from '@tavli/engine';
+import type { GameResult, MatchAction, MatchFlow, RuleSet } from '@tavli/engine';
 
+import { isDiplo } from '@/features/history/records';
 import { analytics as appAnalytics } from '@/services';
 
 export interface GameAnalyticsSetup {
@@ -46,12 +47,20 @@ export interface GameAnalytics {
   gameAbandoned: (flow: MatchFlow) => void;
 }
 
-/** mono (1 point), diplo (2 or more), resign, draw, or timeout (a turn timer ran out). */
-export function resultKind(result: GameResult): GameResultKind {
+/**
+ * mono, diplo, resign, draw, or timeout (a turn timer ran out). A win is a
+ * diplo by the scoring of its rules, as in History (`isDiplo`): with Tavli
+ * scoring 2 points or more; with `perChecker` (Acey-Deucey American, #241)
+ * only 15, when the loser bore off nothing. Every other win is mono.
+ */
+export function resultKind(
+  result: GameResult,
+  scoring: RuleSet['scoring']['method'] = 'tavli',
+): GameResultKind {
   if (result.reason === 'resigned') return 'resign';
   if (result.reason === 'timeout') return 'timeout';
   if (result.winner === null) return 'draw';
-  return result.points >= 2 ? 'diplo' : 'mono';
+  return isDiplo(result, scoring) ? 'diplo' : 'mono';
 }
 
 /** Turns played: the engine's `turnNumber` is the turn in progress (1 at the start). */
@@ -116,6 +125,8 @@ export function createGameAnalytics(
         ...(mode === 'bot' && botLevel !== undefined ? { botLevel } : {}),
         // The house rule (#207), from the match rules: a value id only.
         openingRoll: flow.match.rules.match.openingRoll,
+        // The rules version (#241): the preset of the game in play.
+        rulesVersion: flow.game.state.rules.presetId,
       }),
     );
   };
@@ -129,7 +140,7 @@ export function createGameAnalytics(
       }
 
       if (!gameIsOver(previous) && gameIsOver(next) && next.game.result !== null) {
-        finished(next, resultKind(next.game.result));
+        finished(next, resultKind(next.game.result, next.game.state.rules.scoring.method));
       } else if (action.type === 'resignMatch' && !gameIsOver(previous)) {
         // Resigning the match mid-game also ends the game in play.
         finished(next, 'resign');

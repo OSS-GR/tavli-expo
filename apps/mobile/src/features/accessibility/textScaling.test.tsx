@@ -151,6 +151,28 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(problems()).toEqual([]);
   });
 
+  it.each(['plakoto', 'asodio'] as const)(
+    'New game with the rules version of %s (#241)',
+    async (game) => {
+      await renderWithRoot(
+        <NewGameScreen
+          mode="local"
+          initial={{
+            ...defaultSetup('local'),
+            game,
+            rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyAmerican' },
+          }}
+          botLevels={{ portes: [], plakoto: [], fevga: [], tavli: [], asodio: [] }}
+          onBack={jest.fn()}
+          onStart={jest.fn()}
+        />,
+      );
+      expect(screen.getByTestId('new-game-rules-version')).toBeOnTheScreen();
+      expect(screen.getByTestId('new-game-rules-version-hint')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
+    },
+  );
+
   /** The game screen in the tall or the classic layout (#184). */
   async function pickLayout(boardLayout: BoardLayoutMode) {
     await act(async () => {
@@ -479,6 +501,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       draws: 1,
       matchNumber: 1,
       openingRoll: 'useOpeningDice',
+      preset: 'tavli',
     };
     const bot: HistoryRecord = { ...record, id: 'b', mode: 'bot', botLevel: 'medium' };
     // A house rule adds to the score line (#221).

@@ -156,6 +156,7 @@
     "matches": "Matches",
     "onPhone": "Saved only on this phone: your last {{max}} matches.",
     "openingRoll": "Opening roll: {{rule}}",
+    "rulesVersion": "Rules version: {{version}}",
     "result": {
       "won": "Won",
       "lost": "Lost",
@@ -550,7 +551,20 @@
       "useOpeningDiceHint": "Each player rolls one die. The higher die starts and plays both dice. The federation rule.",
       "rerollBothHint": "Each player rolls one die. The higher die starts and rolls both dice again, so a double is possible.",
       "chosenStarterRollsHint": "You choose who starts. That player rolls both dice.",
-      "chosenStarterRollsHintBot": "You choose who starts: you or the bot. That player rolls both dice."
+      "chosenStarterRollsHintBot": "You choose who starts: you or the bot. That player rolls both dice.",
+      "rulesVersion": "Rules version"
+    },
+    "rulesVersion": {
+      "plakoto": "Standard",
+      "plakotoHint": "If your mother is pinned, you choose: resign (2 points) or play on.",
+      "plakotoFederation": "Federation",
+      "plakotoFederationHint": "Federation rules: pin the mother and win 2 points once your own point 24 is empty. Both mothers pinned: a draw.",
+      "asodioKafeneio": "Standard",
+      "asodioKafeneioHint": "Kafeneio rules: all 15 enter first, the army moves quarter by quarter, and you pin, not hit.",
+      "asodioGreek": "Greek",
+      "asodioGreekHint": "Acey-Deucey, Greek rules: you hit, not pin. After a 1-2, choose a double, then roll again. A double rolls again too.",
+      "asodioAmerican": "American",
+      "asodioAmericanHint": "Acey-Deucey, American rules: you hit, not pin, and the board is open from the start. After a 1-2, choose a double, then roll again. 1 point per checker left."
     },
     "start": "Start game",
     "boardView": "Board view",
@@ -672,6 +686,20 @@
     "tavli": {
       "title": "A Tavli match",
       "body": "A Tavli match plays three games in turn: Portes, then Plakoto, then Fevga, and then Portes again.\nEach game gives 1 or 2 points, as its own rules say. A Plakoto game can also end in a draw (both mothers pinned): nobody gets points, and the match goes on with the next game.\nThe first player to reach the match points wins."
+    },
+    "versions": {
+      "plakotoFederation": {
+        "title": "This game: federation rules",
+        "body": "This game plays the federation rules (ΕΟΠΤ). Only the mother rule is different from the page below.\nIf you pin the other player's mother, you win 2 points (diplo) as soon as none of your checkers is left on your own point 24. Until then the game goes on, and your own mother can still be pinned.\nIf both mothers are pinned at the same time, the game is a draw.\nNobody is asked to resign or play on."
+      },
+      "asodioGreek": {
+        "title": "This game: Greek rules",
+        "body": "This game plays Acey-Deucey with the Greek rules. They change the page below:\nYou hit, you do not pin. A lone checker that is hit goes out, to the middle of the board. It enters again in your starting quarter, but only with a 1-2 or a double.\nThe board still opens only with a 1-2 or a double. After that, checkers on the board may move before all 15 are in, and no quarter freezes.\nAfter a 1-2 you play the 1 and the 2, then choose any double and play it, then roll again.\nAfter a double that you play in full, you roll again too.\nYou cannot bear off while a checker is still outside the board."
+      },
+      "asodioAmerican": {
+        "title": "This game: American rules",
+        "body": "This game plays Acey-Deucey with the American rules. They change the page below:\nYou hit, you do not pin. A lone checker that is hit goes out, to the middle of the board, and enters again in your starting quarter.\nThe board is open from the start: any roll can enter checkers. Checkers on the board may move before all 15 are in, and no quarter freezes.\nAfter a 1-2 you play the 1 and the 2, then choose any double and play it, then roll again.\nThe winner gets 1 point for each checker the loser has not borne off.\nYou cannot bear off while a checker is still outside the board."
+      }
     }
   },
   "time": {

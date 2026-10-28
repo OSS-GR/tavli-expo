@@ -1,8 +1,10 @@
 import { createMemoryStorage } from '@tavli/contracts';
 import {
+  DEFAULT_PRESET_BY_GAME,
   VARIANT_REGISTRY,
   createGameFlow,
   createSeededRng,
+  getPreset,
   portes,
   type BoardState,
 } from '@tavli/engine';
@@ -16,17 +18,21 @@ import { gameHref, newGameHref, parseIdParam, parseModeParam, rulesHref } from '
 import { seatsFor } from './seats';
 import { createSessionRegistry, newMatchId } from './sessions';
 import {
+  DEFAULT_RULES_VERSIONS,
   GAME_CHOICES,
   OPENING_ROLL_RULES,
+  RULES_VERSIONS,
   cleanName,
   defaultSetup,
   enginePlayers,
   firstGameSetup,
   gameLevels,
+  gamePreset,
   gameRotation,
   gameRuleSet,
   isGameBuilt,
   isGameOpen,
+  otherVersion,
   sanitizeSetup,
   type MatchSetup,
 } from './setup';
@@ -46,6 +52,7 @@ describe('match setup', () => {
       botLevel: 'easy',
       names: { white: '', black: '' },
       openingRoll: 'useOpeningDice',
+      rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.kafeneio' },
     });
   });
 
@@ -74,6 +81,95 @@ describe('match setup', () => {
         openingRoll: 'useOpeningDice',
       });
     }
+  });
+
+  it('the first game after the tutorial uses the default rules version of its game (#241)', () => {
+    const last: MatchSetup = {
+      ...defaultSetup('bot'),
+      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' },
+    };
+    // The lessons' game gets its default; the other game keeps the last choice.
+    expect(firstGameSetup(last, undefined, 'plakoto').rulesVersions).toEqual({
+      plakoto: 'plakoto',
+      asodio: 'asodio.aceyDeuceyGreek',
+    });
+    expect(firstGameSetup(last, undefined, 'asodio').rulesVersions).toEqual({
+      plakoto: 'plakoto.federation',
+      asodio: 'asodio.kafeneio',
+    });
+    expect(firstGameSetup(last, undefined, 'portes').rulesVersions).toEqual(last.rulesVersions);
+  });
+
+  it('offers a rules version only for Plakoto and Asodio, the default first (#241)', () => {
+    expect(Object.keys(RULES_VERSIONS)).toEqual(['plakoto', 'asodio']);
+    expect(RULES_VERSIONS.plakoto).toEqual(['plakoto', 'plakoto.federation']);
+    expect(RULES_VERSIONS.asodio).toEqual([
+      'asodio.kafeneio',
+      'asodio.aceyDeuceyGreek',
+      'asodio.aceyDeuceyAmerican',
+    ]);
+    expect(DEFAULT_RULES_VERSIONS).toEqual({
+      plakoto: DEFAULT_PRESET_BY_GAME.plakoto,
+      asodio: DEFAULT_PRESET_BY_GAME.asodio,
+    });
+    // Each version is an engine preset of its game.
+    for (const [game, versions] of Object.entries(RULES_VERSIONS)) {
+      for (const id of versions) expect(getPreset(id).match.rotation).toContain(game);
+    }
+    expect(otherVersion('plakoto')).toBeNull();
+    expect(otherVersion('asodio.kafeneio')).toBeNull();
+    expect(otherVersion('tavli')).toBeNull();
+    expect(otherVersion('portes')).toBeNull();
+    expect(otherVersion('plakoto.federation')).toBe('plakoto.federation');
+    expect(otherVersion('asodio.aceyDeuceyAmerican')).toBe('asodio.aceyDeuceyAmerican');
+  });
+
+  it('keeps the rules versions (#241); a bad or missing one is the default', () => {
+    expect(defaultSetup('bot').rulesVersions).toEqual(DEFAULT_RULES_VERSIONS);
+    // Saves and last choices before #241 have none.
+    expect(sanitizeSetup({ game: 'asodio' }, 'local').rulesVersions).toEqual(
+      DEFAULT_RULES_VERSIONS,
+    );
+    expect(
+      sanitizeSetup(
+        { rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyAmerican' } },
+        'bot',
+      ).rulesVersions,
+    ).toEqual({ plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyAmerican' });
+    // A version of another game, or junk, is the default; the other one stays.
+    expect(
+      sanitizeSetup(
+        { rulesVersions: { plakoto: 'asodio.aceyDeuceyGreek', asodio: 'asodio.aceyDeuceyGreek' } },
+        'bot',
+      ).rulesVersions,
+    ).toEqual({ plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyGreek' });
+    expect(sanitizeSetup({ rulesVersions: 'federation' }, 'bot').rulesVersions).toEqual(
+      DEFAULT_RULES_VERSIONS,
+    );
+  });
+
+  it('plays the chosen rules version of Plakoto and Asodio, and the default elsewhere (#241)', () => {
+    const versions = { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' } as const;
+    const federation = gameRuleSet('plakoto', 'useOpeningDice', versions);
+    expect(federation.presetId).toBe('plakoto.federation');
+    expect(federation.mother.motherRule).toBe('federation');
+    expect(federation.match.rotation).toEqual(['plakoto']);
+    const greek = gameRuleSet('asodio', 'rerollBoth', versions);
+    expect(greek.presetId).toBe('asodio.aceyDeuceyGreek');
+    expect(greek.specialRolls.aceDeuceChoosesDouble).toBe(true);
+    expect(greek.match.openingRoll).toBe('rerollBoth');
+    const american = gameRuleSet('asodio', 'useOpeningDice', {
+      ...versions,
+      asodio: 'asodio.aceyDeuceyAmerican',
+    });
+    expect(american.scoring.method).toBe('perChecker');
+    // Games with one preset, and a Tavli match, keep their default presets.
+    for (const game of ['portes', 'fevga', 'tavli'] as const) {
+      expect(gameRuleSet(game, 'useOpeningDice', versions).presetId).toBe(gamePreset(game));
+    }
+    expect(gamePreset('tavli', versions)).toBe('tavli');
+    expect(gameRuleSet('plakoto').presetId).toBe('plakoto');
+    expect(gameRuleSet('asodio').presetId).toBe('asodio.kafeneio');
   });
 
   it('puts the opening roll rule into the rules of every game (#207)', () => {
@@ -153,6 +249,16 @@ describe('routes', () => {
       pathname: '/rules/[variant]',
       params: { variant: 'portes' },
     });
+    // A rules version that is not the default names itself (#241).
+    expect(rulesHref('plakoto', 'plakoto.federation')).toEqual({
+      pathname: '/rules/[variant]',
+      params: { variant: 'plakoto', version: 'plakoto.federation' },
+    });
+    expect(rulesHref('asodio', 'asodio.kafeneio')).toEqual({
+      pathname: '/rules/[variant]',
+      params: { variant: 'asodio' },
+    });
+    expect(rulesHref('portes', 'portes')).toEqual(rulesHref('portes'));
   });
 
   it('reads params safely', () => {

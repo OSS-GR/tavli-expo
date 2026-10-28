@@ -407,3 +407,54 @@ describe('the opening roll house rule in the save (#207)', () => {
     expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
   });
 });
+
+describe('the rules version in the save (#241)', () => {
+  const versions = { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' } as const;
+
+  it.each([
+    ['plakoto', 'plakoto.federation'],
+    ['asodio', 'asodio.aceyDeuceyGreek'],
+  ] as const)('resumes a %s match in its rules version', (game, preset) => {
+    const storage = createMemoryStorage();
+    const s = registry(storage).start({ ...defaultSetup('local'), game, rulesVersions: versions });
+    expect(flowOf(s).match.rules.presetId).toBe(preset);
+    expect(flowOf(s).game.state.rules.presetId).toBe(preset);
+
+    const restored = registry(storage).get(s.id);
+    expect(restored?.setup.rulesVersions).toEqual(versions);
+    expect(restored && flowOf(restored).game.state.rules.presetId).toBe(preset);
+  });
+
+  it('loads a save from before #241 (no versions) with the default presets', () => {
+    for (const game of ['plakoto', 'asodio'] as const) {
+      const s = registry(createMemoryStorage()).start({ ...defaultSetup('local'), game });
+      const old = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+      delete old.setup.rulesVersions;
+      const result = parseSavedMatch(JSON.stringify(old), LEVELS);
+      expect(result.kind).toBe('ok');
+      if (result.kind !== 'ok') return;
+      expect(result.saved.setup.rulesVersions).toEqual({
+        plakoto: 'plakoto',
+        asodio: 'asodio.kafeneio',
+      });
+      expect(result.saved.flow.match.rules.presetId).toBe(
+        game === 'plakoto' ? 'plakoto' : 'asodio.kafeneio',
+      );
+    }
+  });
+
+  it('drops a save whose setup and log name another version', () => {
+    const s = registry(createMemoryStorage()).start({
+      ...defaultSetup('local'),
+      game: 'asodio',
+      rulesVersions: versions,
+    });
+    const bad = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    bad.setup.rulesVersions = { ...versions, asodio: 'asodio.aceyDeuceyAmerican' };
+    expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
+    // The version of another game does not matter: only `game` is played.
+    const fine = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    fine.setup.rulesVersions = { ...versions, plakoto: 'plakoto' };
+    expect(parseSavedMatch(JSON.stringify(fine), LEVELS).kind).toBe('ok');
+  });
+});

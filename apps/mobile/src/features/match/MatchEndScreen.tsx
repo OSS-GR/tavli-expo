@@ -131,7 +131,9 @@ export function MatchEndScreen({
                     : t(onTime ? 'matchEnd.wonOnTime' : 'matchEnd.won', {
                         name: name(record.winner),
                       });
-              const type = record.winner === null ? 'points' : winType(record);
+              // Every game of an app match scores like the match rules (#241).
+              const type =
+                record.winner === null ? 'points' : winType(record, match.rules.scoring.method);
               const chip = type === 'points' ? null : t(`matchEnd.${type}`);
               return (
                 <View

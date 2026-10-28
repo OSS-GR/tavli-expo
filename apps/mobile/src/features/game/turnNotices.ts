@@ -1,7 +1,7 @@
 /**
  * Turn notices the board screen shows. Pure.
  */
-import type { Dice, GameFlow, GameResult, MatchFlow, PlayerId } from '@tavli/engine';
+import type { Dice, GameFlow, MatchFlow, PlayerId, RuleSet } from '@tavli/engine';
 
 /** The last turn was a pass: the player rolled and no checker could move (wireframe 6f). */
 export interface PassNotice {
@@ -26,8 +26,16 @@ export function passNotice(flow: MatchFlow): PassNotice | null {
 /** How the game was won: mono (1), diplo (2), or another number of points. */
 export type WinType = 'mono' | 'diplo' | 'points';
 
-export function winType(result: GameResult): WinType {
+/**
+ * The win type of a game worth `points`, by the scoring of its rules.
+ * With `perChecker` scoring (Acey-Deucey American, #241) 2 points are two
+ * checkers left, not a diplo: the screens say "+2 points".
+ */
+export function winType(
+  result: { readonly points: number },
+  scoring: RuleSet['scoring']['method'] = 'tavli',
+): WinType {
   if (result.points === 1) return 'mono';
-  if (result.points === 2) return 'diplo';
+  if (result.points === 2 && scoring !== 'perChecker') return 'diplo';
   return 'points';
 }

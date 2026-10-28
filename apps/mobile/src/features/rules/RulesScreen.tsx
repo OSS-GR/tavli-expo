@@ -13,6 +13,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 import { TUTORIAL_GAMES } from '@/features/match/routes';
+import type { OtherVersion } from '@/features/match/setup';
 
 import {
   RULES_PAGES,
@@ -21,6 +22,7 @@ import {
   isRulesGame,
   paragraphs,
   rulesTitleKey,
+  versionSection,
   type RulesGame,
   type RulesSection,
   type RulesVariant,
@@ -30,6 +32,11 @@ import { StartPicture } from './StartPicture';
 export interface RulesScreenProps {
   /** `null`: an id with no rules page. */
   variant: RulesVariant | null;
+  /**
+   * The rules version of the game in play or chosen, when it is not the
+   * default (#241, `parseRulesVersion`). A section on top says what it changes.
+   */
+  version?: OtherVersion | null;
   /** Opens the page of one game (links on the Tavli page). */
   onOpenRules: (game: RulesGame) => void;
   /**
@@ -44,7 +51,12 @@ function tutorialGameOf(variant: RulesVariant | null): TutorialGame | null {
   return TUTORIAL_GAMES.find((game) => game === variant) ?? null;
 }
 
-export function RulesScreen({ variant, onOpenRules, onLearnToPlay }: RulesScreenProps) {
+export function RulesScreen({
+  variant,
+  version = null,
+  onOpenRules,
+  onLearnToPlay,
+}: RulesScreenProps) {
   const { t } = useTranslation();
   const lessons = tutorialGameOf(variant);
   return (
@@ -60,6 +72,9 @@ export function RulesScreen({ variant, onOpenRules, onLearnToPlay }: RulesScreen
           label={t('tutorial.openFromRules')}
           onPress={() => onLearnToPlay(lessons)}
         />
+      ) : null}
+      {isRulesGame(variant) && version !== null ? (
+        <Section section={versionSection(version)} />
       ) : null}
       {isRulesGame(variant) ? (
         RULES_PAGES[variant].map((section) => (

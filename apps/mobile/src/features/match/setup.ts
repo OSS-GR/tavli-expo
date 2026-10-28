@@ -57,7 +57,56 @@ export function isGameChoice(value: unknown): value is GameChoice {
   return (GAME_CHOICES as readonly unknown[]).includes(value);
 }
 
-/** The engine preset of each game. */
+/**
+ * The rules versions (#241, a part of Kafeneio mode #58): the engine
+ * presets a game can start from, the default (`DEFAULT_PRESET_BY_GAME`)
+ * first. Only Plakoto and Asodio have more than one. A Tavli match keeps
+ * the default preset of each game.
+ */
+export const RULES_VERSIONS = {
+  plakoto: ['plakoto', 'plakoto.federation'],
+  asodio: ['asodio.kafeneio', 'asodio.aceyDeuceyGreek', 'asodio.aceyDeuceyAmerican'],
+} as const satisfies { readonly [G in GameChoice]?: readonly [PresetId, ...PresetId[]] };
+
+/** A game with a rules version choice. */
+export type VersionedGame = keyof typeof RULES_VERSIONS;
+
+/** A rules version (an engine preset id) of `G`. */
+export type RulesVersion<G extends VersionedGame = VersionedGame> =
+  (typeof RULES_VERSIONS)[G][number];
+
+/** The chosen rules version of each game that has a choice. */
+export type RulesVersions = { readonly [G in VersionedGame]: RulesVersion<G> };
+
+export const DEFAULT_RULES_VERSIONS: RulesVersions = {
+  plakoto: RULES_VERSIONS.plakoto[0],
+  asodio: RULES_VERSIONS.asodio[0],
+};
+
+export function isVersionedGame(game: unknown): game is VersionedGame {
+  return game === 'plakoto' || game === 'asodio';
+}
+
+/** True when `value` is a rules version of `game`. */
+export function isRulesVersion<G extends VersionedGame>(
+  game: G,
+  value: unknown,
+): value is RulesVersion<G> {
+  return (RULES_VERSIONS[game] as readonly unknown[]).includes(value);
+}
+
+/** Any saved value as rules versions: a missing or wrong one is the default (#241). */
+export function sanitizeVersions(raw: unknown): RulesVersions {
+  const input = isRecord(raw) ? raw : {};
+  const plakoto = input['plakoto'];
+  const asodio = input['asodio'];
+  return {
+    plakoto: isRulesVersion('plakoto', plakoto) ? plakoto : DEFAULT_RULES_VERSIONS.plakoto,
+    asodio: isRulesVersion('asodio', asodio) ? asodio : DEFAULT_RULES_VERSIONS.asodio,
+  };
+}
+
+/** The default engine preset of each game. */
 const GAME_PRESETS: { readonly [G in GameChoice]: PresetId } = {
   portes: DEFAULT_PRESET_BY_GAME.portes,
   plakoto: DEFAULT_PRESET_BY_GAME.plakoto,
@@ -66,9 +115,42 @@ const GAME_PRESETS: { readonly [G in GameChoice]: PresetId } = {
   asodio: DEFAULT_PRESET_BY_GAME.asodio,
 };
 
-export function gamePreset(game: GameChoice): PresetId {
-  return GAME_PRESETS[game];
+/** The engine preset of a match of `game`: its chosen rules version, if it has a choice. */
+export function gamePreset(
+  game: GameChoice,
+  versions: RulesVersions = DEFAULT_RULES_VERSIONS,
+): PresetId {
+  return isVersionedGame(game) ? versions[game] : GAME_PRESETS[game];
 }
+
+type DefaultVersion = { [G in VersionedGame]: (typeof RULES_VERSIONS)[G][0] }[VersionedGame];
+
+/** A rules version that is not its game's default (#241). */
+export type OtherVersion = Exclude<RulesVersion, DefaultVersion>;
+
+/**
+ * The rules version of a preset when it is not its game's default, else
+ * `null` (a default preset, `tavli`, or a game with no choice). History and
+ * the rules page name only such a version.
+ */
+export function otherVersion(presetId: PresetId): OtherVersion | null {
+  for (const versions of Object.values(RULES_VERSIONS)) {
+    if ((versions as readonly PresetId[]).indexOf(presetId) > 0) return presetId as OtherVersion;
+  }
+  return null;
+}
+
+/**
+ * The text key of each rules version (`newGame.rulesVersion.<key>`): an
+ * engine id has a dot, and a dot nests keys in i18next.
+ */
+export const VERSION_KEYS = {
+  plakoto: 'plakoto',
+  'plakoto.federation': 'plakotoFederation',
+  'asodio.kafeneio': 'asodioKafeneio',
+  'asodio.aceyDeuceyGreek': 'asodioGreek',
+  'asodio.aceyDeuceyAmerican': 'asodioAmerican',
+} as const satisfies { readonly [V in RulesVersion]: string };
 
 /** The game itself for a one-game match; `null` for the Tavli rotation. */
 function singleGame(game: GameChoice): StandardVariantId | null {
@@ -107,14 +189,17 @@ export function isOpeningRollRule(value: unknown): value is OpeningRollRule {
  * the shared rotation Portes → Plakoto → Fevga (`NEUTRAL` in the engine), so
  * we set `match.rotation` to the game ("single game" in `tavli-match.md`).
  * Tavli keeps its rotation. `openingRoll` is the house rule (#207); the
- * preset's own value (the federation rule) is the default.
+ * preset's own value (the federation rule) is the default. `versions`
+ * picks the preset of Plakoto and Asodio (#241); Tavli always uses the
+ * default presets.
  */
 export function gameRuleSet(
   game: GameChoice,
   openingRoll: OpeningRollRule = DEFAULT_OPENING_ROLL,
+  versions: RulesVersions = DEFAULT_RULES_VERSIONS,
 ): RuleSet {
   const only = singleGame(game);
-  return resolveRules(gamePreset(game), {
+  return resolveRules(gamePreset(game, versions), {
     match: { openingRoll, ...(only === null ? {} : { rotation: [only] }) },
   });
 }
@@ -195,6 +280,12 @@ export interface MatchSetup {
   readonly names: PerPlayer<string>;
   /** The house rule for the opening roll (#207). Default: the federation rule. */
   readonly openingRoll: OpeningRollRule;
+  /**
+   * The rules version of Plakoto and Asodio (#241). Each game keeps its
+   * own, so the last choice of one game stays when another is picked; only
+   * the one of `game` is played. Default: `DEFAULT_PRESET_BY_GAME`.
+   */
+  readonly rulesVersions: RulesVersions;
 }
 
 export function defaultSetup(mode: MatchMode): MatchSetup {
@@ -205,6 +296,7 @@ export function defaultSetup(mode: MatchMode): MatchSetup {
     botLevel: 'easy',
     names: { white: '', black: '' },
     openingRoll: DEFAULT_OPENING_ROLL,
+    rulesVersions: DEFAULT_RULES_VERSIONS,
   };
 }
 
@@ -213,16 +305,27 @@ export function defaultSetup(mode: MatchMode): MatchSetup {
  * lessons (Portes, or Plakoto, Fevga or Asodio after their lessons, #149,
  * #159) vs the
  * Easy bot (or the easiest level this build has), with the standard
- * opening roll: the tutorial teaches no house rule (#207). The match length
- * comes from `base` (the last choices).
+ * opening roll and the default rules version of the game: the tutorial
+ * teaches no house rule (#207, #241). The match length and the versions of
+ * the other games come from `base` (the last choices).
  */
 export function firstGameSetup(
   base: MatchSetup,
   levels: GameLevels = ALL_GAME_LEVELS,
   game: TutorialGame = 'portes',
 ): MatchSetup {
+  const rulesVersions = isVersionedGame(game)
+    ? { ...base.rulesVersions, [game]: DEFAULT_RULES_VERSIONS[game] }
+    : base.rulesVersions;
   return sanitizeSetup(
-    { ...base, mode: 'bot', game, botLevel: 'easy', openingRoll: DEFAULT_OPENING_ROLL },
+    {
+      ...base,
+      mode: 'bot',
+      game,
+      botLevel: 'easy',
+      openingRoll: DEFAULT_OPENING_ROLL,
+      rulesVersions,
+    },
     'bot',
     levels,
   );
@@ -248,7 +351,7 @@ export interface SanitizeOptions {
 
 /**
  * Turns any saved value into a valid setup for `mode`. Bad fields fall
- * back to the defaults (an unknown opening roll rule too). A game that is
+ * back to the defaults (an unknown opening roll rule or rules version too). A game that is
  * locked in this mode becomes Portes. A bot level this build cannot play
  * for the game becomes the easiest one it can (`levels`).
  */
@@ -279,6 +382,8 @@ export function sanitizeSetup(
     names: { white: cleanName(names['white']), black: cleanName(names['black']) },
     // Saves and last choices before #207 have none: the federation rule.
     openingRoll: isOpeningRollRule(input['openingRoll']) ? input['openingRoll'] : d.openingRoll,
+    // Saves and last choices before #241 have none: the default presets.
+    rulesVersions: sanitizeVersions(input['rulesVersions']),
   };
 }
 

@@ -23,6 +23,11 @@
  * The opening roll house rule (#207) is `setup.openingRoll`; the log's
  * rules hold it too, and the two must agree. Saves before #207 have none:
  * they load with the federation rule, which their logs hold.
+ *
+ * The rules version of Plakoto and Asodio (#241) is `setup.rulesVersions`;
+ * the preset of the log's rules must be the one of `setup.game`. Saves
+ * before #241 have none: they load with the default presets, which their
+ * logs hold.
  */
 import { MATCH_FLOW_SCHEMA_VERSION, replay, type FlowEvent, type MatchFlow } from '@tavli/engine';
 
@@ -135,7 +140,7 @@ export function parseSavedMatch(text: string | undefined, levels: GameLevels): S
   const { rules } = flow.match;
   const rotation = gameRotation(setup.game);
   if (
-    rules.presetId !== gamePreset(setup.game) ||
+    rules.presetId !== gamePreset(setup.game, setup.rulesVersions) ||
     rules.match.rotation.length !== rotation.length ||
     rules.match.rotation.some((variant, i) => variant !== rotation[i]) ||
     rules.match.openingRoll !== setup.openingRoll

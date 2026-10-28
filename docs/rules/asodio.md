@@ -233,6 +233,8 @@ or as an optional extra in a custom rotation.
 | `aceyDeuceyGreek` | `captureMode=hit`, `aceDeuceExtraRoll=true`, `doublesGiveExtraRoll=true`, `barEntryNeedsSpecial=true` |
 | `aceyDeuceyAmerican` | `captureMode=hit`, `firstEntryGate=false`, `scoring=perChecker` |
 
+The app offers all three on New game → House rules → Rules version (#241): **Standard** (`kafeneio`), **Greek** and **American**. A Tavli match has no Asodio, so it never uses them.
+
 Owner edge cases (add tests for each):
 
 14. `kafeneio`: first roll 5-3 → board locked, no move, turn passes.

@@ -201,6 +201,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - **Bot level:** **Easy / Medium / Hard**. A level the bot cannot play in the chosen game shows locked, with "coming soon" under it. Helper text explains the selected level.
   - Info box "Who starts? Each player rolls one die. High die starts." Since #207 the **House rules** part (below) replaces it: its hint says who starts under the chosen rule.
   - **House rules** (#207, both modes): **Opening roll**: **Standard** (default, the federation rule: the starter plays the two opening dice) / **Roll again** (the starter rolls both dice again) / **Choose** (the players pick who starts). Helper text explains the selected rule.
+  - **Rules version** (#241, Plakoto and Asodio only, under Opening roll): Plakoto **Standard** (default) / **Federation**; Asodio **Standard** (default, the kafeneio rules) / **Greek** / **American** (Acey-Deucey). Helper text says what the selected version changes. Portes, Fevga and Tavli show no version.
   - **Start game** (main button, bottom).
 - **States:**
   - The screen remembers the last choices. On the very first game the bot level is Easy.
