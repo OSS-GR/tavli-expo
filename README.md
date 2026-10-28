@@ -10,6 +10,8 @@ Planning stage (milestone **M0 Foundation**). See the [roadmap](docs/roadmap.md)
 
 ## How to run
 
+These steps are for the owner and for people the owner gave permission to (see [License](#license)).
+
 You need **Node 22** (see `.nvmrc`) and **pnpm**. The repo pins pnpm 12 in `package.json`. pnpm 9.7 or newer switches to that version by itself.
 
 1. Install everything from the repo root:
