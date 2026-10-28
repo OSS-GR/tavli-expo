@@ -505,7 +505,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       expect(await screen.findByTestId('game-end-card')).toBeOnTheScreen();
       expect(problems()).toEqual([]);
       await user.press(screen.getByTestId('next-game-button'));
-      unmount();
+      await unmount();
 
       // Match end of an online match: no Rematch, names "You" and "Opponent".
       await server.transportFor('me').resign(gameId);
