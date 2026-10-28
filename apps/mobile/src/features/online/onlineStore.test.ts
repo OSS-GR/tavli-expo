@@ -525,6 +525,15 @@ describe('createOnlineStore', () => {
     expect(timeLeft(view, phone, other.getState().clockOffset)).toBe(LIVE);
     phone += 20_000;
     expect(timeLeft(view, phone, other.getState().clockOffset)).toBe(LIVE - 20_000);
+
+    // A view that arrives late (an hour after its save) keeps the best estimate.
+    play(other, pickTurn(viewOf(other).game, createSeededRng(16)));
+    expect(confirm(other)).toBe(true);
+    phone += 60 * 60 * 1000;
+    await flush();
+    expect(viewOf(mover).version).toBeGreaterThan(view.version);
+    expect(mover.getState().clockOffset).toBe(-5_000);
+    expect(other.getState().clockOffset).toBe(-5_000);
   });
 
   it('unsubscribes on dispose and ignores later views', async () => {

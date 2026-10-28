@@ -87,8 +87,10 @@ export interface OnlineStoreState {
   readonly notice: OnlineNotice | null;
   /**
    * The estimated server time minus the phone time, in milliseconds. 0
-   * for the first view; then set from each new version (`estimateOffset`).
-   * Pass it to `timeLeft`.
+   * for the first view; then the highest `estimateOffset` of the newer
+   * versions. A view always arrives after its save, so each estimate is
+   * at most the true offset: a late view (after a reconnect) cannot pull
+   * it down. Pass it to `timeLeft`.
    */
   readonly clockOffset: number;
   /**
@@ -146,6 +148,8 @@ export function createOnlineStore({
    * stays on until a newer view arrives, so you never act on the old one.
    */
   let sentOn: number | null = null;
+  /** The best clock offset so far (see `clockOffset`), `null` before the first estimate. */
+  let measured: number | null = null;
 
   const store = createStore<OnlineStoreState>()((set, get) => {
     const refuse = (message: string): false => {
@@ -312,7 +316,9 @@ export function createOnlineStore({
     const current = store.getState().view;
     // Same or older version (a repeat, or out of order): keep the local moves.
     if (current !== null && view.version <= current.version) return;
-    const estimate = current === null ? 0 : estimateOffset(view, now());
+    // The first view may be old (the game was opened later): no estimate.
+    const estimate = current === null ? null : estimateOffset(view, now());
+    if (estimate !== null) measured = measured === null ? estimate : Math.max(measured, estimate);
     const done = !inFlight && sentOn !== null && view.version > sentOn;
     if (done) sentOn = null;
     store.setState({
@@ -320,7 +326,7 @@ export function createOnlineStore({
       flow: viewFlow(view),
       side: sideOf(view.players, me),
       loadError: null,
-      ...(estimate === null ? {} : { clockOffset: estimate }),
+      ...(measured === null ? {} : { clockOffset: measured }),
       ...(done ? { sending: false } : {}),
     });
   };
