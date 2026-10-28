@@ -332,7 +332,7 @@ A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }
 
 ## Push
 
-ADR-0004 point 7: the server tells a player "your turn" in an **async** game, through the Expo Push Service, from a Convex action, behind the `PushProvider` port (#280). When an async match ends, it tells the player who did not end it "game over" (#316, [Game over](#game-over)). This is the server part. The app part (ask for permission, get the token, register it, open the game on a tap) is a later issue.
+ADR-0004 point 7: the server tells a player "your turn" in an **async** game, through the Expo Push Service, from a Convex action, behind the `PushProvider` port (#280). When an async match ends, it tells the player who did not end it "game over" (#316, [Game over](#game-over)). This is the server part. The app part (ask for permission, get the token, register it, open the game on a tap) is #285: see [App shell → Turn notifications](app-shell.md#turn-notifications-285). The app calls `registerPushToken` and `removePushToken` through `createConvexPushTokens` (`@tavli/backend-convex`, `PUSH_FUNCTIONS`).
 
 ### `pushTokens`
 
@@ -560,7 +560,7 @@ Run it after you add or rename a file in `convex/`. The push also checks what a 
 - **A bad game id:** `getGame` and the mutations take `v.id('games')`. A string that is not a game id (for example from a broken link) fails argument validation, a plain error, not `NOT_FOUND`. The app should treat any non-port error on load as "cannot open this game".
 - **Verify on a real deployment** that a mutation resolves only after the watched `getGame` shows its change (the offline test assumes it, as the Convex docs say).
 - **Clock skew:** `turnDeadline` is on the server clock. A phone should show the time left from the server time (for example the offset seen when the view arrives), not trust its own clock.
-- **Push follow-ups:** the app part (permission, token, register on sign-in, remove on sign-out, open the game on a tap); push receipts (Expo can also report a dead token later, in a receipt: a scheduled check of the receipts would remove those too); the text in the player's language.
+- **Push follow-ups:** push receipts (Expo can also report a dead token later, in a receipt: a scheduled check of the receipts would remove those too); the text in the player's language.
 - **Account deletion follow-ups:** the app screen (it calls `deleteMyAccount`, then signs out); a check of the Better Auth user on every call, so a deleted user's token stops at once ([Errors](#errors-2)); clear any name or profile field a later issue adds ([What is kept](#what-is-kept)).
 - **Friends, usernames, users, presence**: later issues. The invite app screen and link route: #256. Play a friend (make, share, wait): #281.
 - **Document size**: one game row holds the whole match flow (a few KB). The log is in `moves`, so the row does not grow with the game.

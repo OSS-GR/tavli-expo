@@ -11,11 +11,19 @@ import { AccessibilityInfo, type HostInstance } from 'react-native';
 /**
  * Returns a ref for the view (a card's title) that gets screen reader
  * focus when it first shows. Without a screen reader nothing happens.
+ *
+ * `active` false holds the focus back, for a card under another sheet
+ * (the turn notifications offer, #285): the card gets focus once, when
+ * `active` first turns true.
  */
-export function useFocusOnShow() {
+export function useFocusOnShow(active = true) {
   const ref = useRef<HostInstance>(null);
+  const done = useRef(false);
+  // No deps: a title that is not there yet gets focus on a later render.
   useEffect(() => {
-    if (ref.current) AccessibilityInfo.sendAccessibilityEvent(ref.current, 'focus');
-  }, []);
+    if (!active || done.current || ref.current === null) return;
+    done.current = true;
+    AccessibilityInfo.sendAccessibilityEvent(ref.current, 'focus');
+  });
   return ref;
 }

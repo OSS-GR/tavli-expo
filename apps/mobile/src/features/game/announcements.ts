@@ -25,7 +25,7 @@
 import { isDouble, matchPhase, type GameFlow, type MatchFlow, type PlayerId } from '@tavli/engine';
 import type { TFunction } from 'i18next';
 
-import { moveLabel } from '@/features/accessibility/moveList';
+import { moveLabel } from '@/features/accessibility/moveChoices';
 
 import { openingDiceInPlay } from './opening';
 import { diceWereRolled } from './rolledDice';

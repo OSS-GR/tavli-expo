@@ -15,7 +15,7 @@
 import type { AuthProvider, AuthUser } from '@tavli/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { rememberOnlineAccount } from './accountHint';
+import { forgetOnlineAccount, rememberOnlineAccount } from './accountHint';
 
 /**
  * The user of the saved session, or a new guest when there is none. Notes
@@ -26,6 +26,26 @@ export async function signInForOnline(auth: AuthProvider): Promise<AuthUser> {
   const user = (await auth.ready()) ?? (await auth.signInAsGuest());
   rememberOnlineAccount();
   return user;
+}
+
+/**
+ * Signs the user out. Never call `auth.signOut()` by itself: first this
+ * takes the phone's push token off the server (#285), while the session
+ * still lets it call the server. Else the signed-out user would still get
+ * turn pushes on this phone. `pushes` is `undefined` when the build has
+ * no turn notifications. A failed removal does not stop the sign-out.
+ * The sign-out runs inside the turn notifications queue
+ * (`unregister(then)`), so no token sync can run between the removal and
+ * the sign-out. After it, the phone forgets its account note
+ * (`accountHint.ts`, #297), so Home loads no session at the next start.
+ */
+export async function signOutOfOnline(
+  auth: AuthProvider,
+  pushes: { readonly unregister: (then?: () => Promise<void>) => Promise<void> } | undefined,
+): Promise<void> {
+  if (pushes === undefined) await auth.signOut();
+  else await pushes.unregister(() => auth.signOut());
+  forgetOnlineAccount();
 }
 
 export type OnlineAccount =

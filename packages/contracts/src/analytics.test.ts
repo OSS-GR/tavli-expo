@@ -98,6 +98,7 @@ describe('event names', () => {
       'hint_shown',
       'review_opened',
       'invite_created',
+      'push_permission_answered',
     ]);
   });
 

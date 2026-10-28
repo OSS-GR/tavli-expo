@@ -1,7 +1,7 @@
 /**
  * Ports (interfaces) and shared types.
  *
- * Each outside service (auth, backend, push, analytics, crash reports) gets an interface
+ * Each outside service (auth, backend, push, notifications, analytics, crash reports) gets an interface
  * here. Vendor code lives in `packages/adapters/*` and implements these
  * interfaces. This package has no runtime dependencies. It uses types from
  * `@tavli/engine` only (`import type`).
@@ -99,6 +99,25 @@ export type {
   PushResult,
   RecordingPushProvider,
 } from './push';
+export {
+  PUSH_PERMISSIONS,
+  PUSH_PLATFORMS,
+  createMemoryPushNotifications,
+  createMemoryPushTokens,
+  gameIdOfPush,
+  isPushPermission,
+} from './push-notifications';
+export type {
+  MemoryPushNotifications,
+  MemoryPushTokens,
+  PushNotifications,
+  PushPermission,
+  PushPlatform,
+  PushTap,
+  PushTokenCall,
+  PushTokens,
+  SavedPushToken,
+} from './push-notifications';
 export { createMemoryStorage, type Storage } from './storage';
 export { isAnonymousInstallId } from './install-id';
 export {

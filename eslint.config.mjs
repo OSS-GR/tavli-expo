@@ -46,6 +46,8 @@ const vendorImports = {
     'expo-audio',
     // The sign-in cookie: use the `AuthProvider` port and `@tavli/auth-better-auth`.
     'expo-secure-store',
+    // Push permission, token and taps: use the `PushNotifications` port and `@tavli/notifications-expo`.
+    'expo-notifications',
   ],
   message:
     'Vendor SDKs belong in packages/adapters/* (or apps/server). Use a port from @tavli/contracts instead. See ADR-0002.',

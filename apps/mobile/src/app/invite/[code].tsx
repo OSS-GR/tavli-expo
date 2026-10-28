@@ -14,14 +14,17 @@
  *
  * Accept replaces this screen with the online game (`game/<gameId>`), so
  * Back does not return to an answered invite. Decline and Home go Home.
+ * Accepting an async invite on the server offers turn notifications
+ * (#285); a dev invite never does.
  */
-import { normalizeInviteCode } from '@tavli/contracts';
+import { normalizeInviteCode, type InviteView } from '@tavli/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { inviteAccepted } from '@/features/invites/acceptedInvite';
 import { InviteAccountGate } from '@/features/invites/InviteAccountGate';
 import { InviteScreen } from '@/features/invites/InviteScreen';
 import { gameHref, parseIdParam } from '@/features/match/routes';
+import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { isDevInvite } from '@/features/online/devGameIds';
 import { auth, invites, invitesFor, onlinePlayerId } from '@/services';
 
@@ -34,6 +37,12 @@ function accepted(gameId: string) {
   // Listeners such as the dev invite's bot start now.
   inviteAccepted(gameId);
   router.replace(gameHref(gameId));
+}
+
+/** An invite on the server: an async game also offers turn notifications (#285). */
+function acceptedOnServer(gameId: string, invite: InviteView | null) {
+  accepted(gameId);
+  if (invite?.pace === 'async') void turnPushes()?.offer();
 }
 
 export default function InviteRoute() {
@@ -62,7 +71,13 @@ export default function InviteRoute() {
     <InviteAccountGate key={code} auth={invites === undefined ? undefined : auth} onHome={goHome}>
       {(me) =>
         invites === undefined ? null : (
-          <InviteScreen code={code} invites={invites} me={me} {...answers} />
+          <InviteScreen
+            code={code}
+            invites={invites}
+            me={me}
+            {...answers}
+            onAccepted={acceptedOnServer}
+          />
         )
       }
     </InviteAccountGate>

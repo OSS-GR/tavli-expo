@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90). Last review: 2026-10-28 (#281, online play with a friend).
+> The privacy policy for the app and the stores (issue #90). Last review: 2026-10-28 (#285, turn notifications).
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy before it goes live.
 
@@ -48,16 +48,14 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 - [ ] Sentry: turn on **Prevent Storing of IP Addresses** (see `packages/adapters/crash-sentry/README.md`).
 - [ ] PostHog: use an **EU** project and turn on **Discard client IP data** (see `docs/architecture/analytics-events.md`).
 - [ ] Convex: check that both deployments (dev and prod) are in the EU region `eu-west-1` (Ireland), and that `BETTER_AUTH_SECRET` is set on both (`npx convex env set`, never in the repo).
-- [ ] Accept the three vendors' data processing terms (DPA: Sentry, PostHog, Convex) and check the line about transfers outside the EU.
+- [ ] Expo: check where Expo's push service processes the data and whether its terms need a data processing agreement. Then fix the Expo row in the policy (both languages, the `OWNER` comment).
+- [ ] Accept the four vendors' data processing terms (DPA: Sentry, PostHog, Convex, Expo) and check the line about transfers outside the EU.
 - [ ] Check the retention times on your Sentry and PostHog plans. The policy states each vendor's documented default (checked 2026-10-27).
 - [ ] Have the policy checked (see the note at the top).
 
 ## Server data that is not live yet
 
 The server can keep data that the app does not send yet. The policy changes when the app starts to send it, in that PR.
-
-- **Push tokens (#280).** The server table `pushTokens` keeps, per player: the Expo push token of each phone, the platform (`ios` or `android`) and when the phone last registered it. That is at most 5 tokens per player. A token is removed on sign-out (`removePushToken`), when Expo says the phone is no longer registered, when the player adds a sixth phone (the oldest goes), and when another account signs in on that phone (the token moves to that account). To send a push, the server gives Expo the token, a fixed text ("Your turn", or "Your game is over. See the result." when an async match ends, #316) and the game id. No names and no emails. See "Push" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md).
-  - When the app part ships: update the "Push notifications" item in "Coming later" (all four files) to say what is kept, why (to tell you it is your turn), for how long, and that Expo carries the push (check where Expo processes the data). Add Expo to the vendor list, and update the store privacy answers. Check whether Expo's terms need a data processing agreement.
 
 - **Account deletion (#302).** The server mutation `deleteMyAccount` deletes, for the signed-in user: the sign-in user, its sessions and linked accounts (Better Auth), every invite the user sent, and every push token. It resigns the user's running games, so the other player wins. It **keeps** finished games and their move logs for the other player. They hold the user's random user id, but no name and no email, and once the sign-in user is gone the id names nobody. Invites someone else sent that the user answered stay with their sender. See "Delete an account" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md#delete-an-account).
   - When the app screen ships: say in the policy (all four files) how to delete the account in the app, what is deleted at once, and what is kept (finished games, under an id that no longer leads to an account). Update the store answers: App Store Connect and the Play Console ask whether users can delete their account and data.
@@ -69,5 +67,6 @@ The server can keep data that the app does not send yet. The policy changes when
 - Delete old invites and finished online games on the server after a set time, and say how long in the policy.
 - Better Auth keeps the IP address and the user agent on each sign-in session. If we do not need them, turn that off on the server (Better Auth's `advanced.ipAddress.disableIpTracking`) and update the policy.
 - Android backup: decide if app data (the install id, saved games) should be left out of Android Auto Backup.
-- When sign-in with Apple, Google or an email link, friends, push or EAS Update go live, update the "Coming later" section first.
+- When sign-in with Apple, Google or an email link, friends or EAS Update go live, update the "Coming later" section first.
 - Online play with a friend is live (#281). The policy's "Online games with a friend (Convex)" section, the store answers and the iOS manifest (`NSPrivacyCollectedDataTypeUserID`, `NSPrivacyCollectedDataTypeGameplayContent`) describe it. The guest account is made only by `signInForOnline` (`apps/mobile/src/features/online/account.ts`), when the player taps **Make an invite** or **Show the invite**. A new screen that makes a guest, or a new server table with player data, updates the policy in the same PR.
+- Turn notifications are live (#285). The policy's "Turn notifications (Expo)" section, the Expo row in the vendor table, the store answers and the iOS manifest (`NSPrivacyCollectedDataTypeDeviceID`) describe them. The app asks only after the player makes or accepts an async invite (`apps/mobile/src/features/notifications/`), and sends the push token only to our server, and only after the player taps **Turn on** in the app (also on a phone that allows pushes already, such as Android 12). A change to when the app asks, or to what the server keeps per token, updates the policy in the same PR.

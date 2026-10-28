@@ -82,7 +82,8 @@
       "accessibility": "Accessibility",
       "privacy": "Privacy",
       "help": "Help",
-      "history": "History"
+      "history": "History",
+      "notifications": "Notifications"
     },
     "autoConfirm": {
       "label": "Auto-confirm moves",
@@ -404,6 +405,23 @@
     },
     "again": "Make a new invite",
     "home": "Home"
+  },
+  "notifications": {
+    "channel": "Your turn",
+    "offer": {
+      "title": "Turn notifications?",
+      "why": "We tell you when it is your turn, so you do not have to keep the app open.",
+      "turnOn": "Turn on",
+      "notNow": "Not now"
+    },
+    "settings": {
+      "label": "Turn notifications",
+      "on": "On. We tell you when it is your turn in an online game.",
+      "undetermined": "Off. Turn them on to hear when it is your turn.",
+      "denied": "Off in the phone settings.",
+      "turnOn": "Turn on",
+      "openSettings": "Open phone settings"
+    }
   },
   "game": {
     "players": {

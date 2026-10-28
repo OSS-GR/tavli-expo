@@ -13,6 +13,17 @@
  * `app.json` holds the base config. EAS CLI writes there (for example the
  * project id from `eas init`). This file reads it through `config`. Only
  * settings that depend on build env vars belong here.
+ *
+ * The result goes into the fingerprint (the runtime version). EAS Build
+ * makes the fingerprint on your computer and again on the build server, and
+ * the build fails when the two differ. So read only env vars that both
+ * places see: a profile's `env` in `eas.json`, or a plain-text or sensitive
+ * EAS variable. Never read a secret EAS variable (your computer never gets
+ * it) or a value that is only in `.env.local` (git ignores it, so EAS never
+ * gets it). `src/convexUrl.test.ts` lists the env vars this file may read.
+ * That test reads this file's text, so read each var here, in the dot form
+ * that `readVariant` uses. The test fails on a destructured or bracket read,
+ * and it cannot see a read in another file.
  * See docs/process/running-the-app.md.
  */
 import type { ConfigContext, ExpoConfig } from 'expo/config';
@@ -34,28 +45,6 @@ type Variant = keyof typeof VARIANTS;
 
 function isVariant(value: string): value is Variant {
   return Object.hasOwn(VARIANTS, value);
-}
-
-/**
- * Sentry config plugin (`@sentry/react-native/expo`). It adds the steps
- * that upload source maps and debug files during EAS Build.
- *
- * The upload needs `SENTRY_AUTH_TOKEN`, a secret. It is never in the repo:
- * the owner adds it as an EAS environment variable (see
- * packages/adapters/crash-sentry/README.md). Without it the upload is
- * skipped, so builds still work.
- */
-function sentryPlugin(): [string, Record<string, unknown>] {
-  const env = process.env;
-  return [
-    '@sentry/react-native/expo',
-    {
-      url: env.SENTRY_URL || 'https://sentry.io/',
-      ...(env.SENTRY_ORG ? { organization: env.SENTRY_ORG } : {}),
-      ...(env.SENTRY_PROJECT ? { project: env.SENTRY_PROJECT } : {}),
-      disableAutoUpload: !env.SENTRY_AUTH_TOKEN,
-    },
-  ];
 }
 
 function readVariant(): Variant {
@@ -110,7 +99,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     slug,
     ios: { ...config.ios, bundleIdentifier: `${bundleIdentifier}${idSuffix}` },
     android: { ...config.android, package: `${androidPackage}${idSuffix}` },
-    plugins: [...(config.plugins ?? []), sentryPlugin()],
     extra: { ...config.extra, convexUrl: url, ...(siteUrl ? { convexSiteUrl: siteUrl } : {}) },
   };
 };
