@@ -81,7 +81,6 @@ export function createExpoPushProvider(options: ExpoPushOptions): PushProvider {
   const url = options.url ?? EXPO_PUSH_URL;
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    'Accept-Encoding': 'gzip, deflate',
     'Content-Type': 'application/json',
   };
   if (options.accessToken !== undefined && options.accessToken !== '') {

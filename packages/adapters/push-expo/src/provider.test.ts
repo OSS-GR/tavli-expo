@@ -77,7 +77,6 @@ describe('createExpoPushProvider', () => {
         url: EXPO_PUSH_URL,
         headers: {
           Accept: 'application/json',
-          'Accept-Encoding': 'gzip, deflate',
           'Content-Type': 'application/json',
         },
         body: [
