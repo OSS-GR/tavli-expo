@@ -13,7 +13,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { Celebration } from '@/features/game/Celebration';
 import { isHumanWin } from '@/features/game/gameFeedback';
-import { winType } from '@/features/game/turnNotices';
+import { winType, type WinType } from '@/features/game/turnNotices';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 
 import { seatsFor } from './seats';
@@ -35,6 +35,22 @@ export interface MatchEndScreenProps {
    * it, every time the screen mounts.
    */
   announceKey?: string;
+}
+
+/**
+ * The chip of a game row: Mono or Diplo. A Tavli backgammon (3 points) and
+ * a per-checker win (Acey-Deucey American, #245) show only their points.
+ */
+function winChipKey(type: WinType): 'matchEnd.mono' | 'matchEnd.diplo' | null {
+  switch (type) {
+    case 'mono':
+      return 'matchEnd.mono';
+    case 'diplo':
+      return 'matchEnd.diplo';
+    case 'points':
+    case 'perChecker':
+      return null;
+  }
 }
 
 export function MatchEndScreen({
@@ -134,7 +150,8 @@ export function MatchEndScreen({
               // Every game of an app match scores like the match rules (#241).
               const type =
                 record.winner === null ? 'points' : winType(record, match.rules.scoring.method);
-              const chip = type === 'points' ? null : t(`matchEnd.${type}`);
+              const chipKey = winChipKey(type);
+              const chip = chipKey === null ? null : t(chipKey);
               return (
                 <View
                   key={i}

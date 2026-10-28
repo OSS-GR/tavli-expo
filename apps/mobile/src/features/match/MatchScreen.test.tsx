@@ -44,6 +44,13 @@ const FAST = {
 };
 const WAIT = { timeout: 4000 };
 
+/** The game-end chip is filled (diplo) or outlined (mono, per checker, #245). */
+const expectChip = (filled: boolean) => {
+  const chip = screen.getByTestId('game-end-chip');
+  if (filled) expect(chip).not.toHaveStyle({ backgroundColor: 'transparent' });
+  else expect(chip).toHaveStyle({ backgroundColor: 'transparent' });
+};
+
 function session(setup: MatchSetup, seed = 11): MatchSession {
   return createSessionRegistry({ createRng: () => createSeededRng(seed) }).start(setup);
 }
@@ -169,6 +176,7 @@ describe('<MatchScreen /> vs bot', () => {
       within(card).getByText('Diplo: you resigned before you bore off a checker.'),
     ).toBeOnTheScreen();
     expect(within(card).getByText('You 0 – 2 Bot')).toBeOnTheScreen();
+    expectChip(true);
     // Vs the bot, a bot win is not celebrated.
     expect(screen.queryByTestId('game-celebration', { includeHiddenElements: true })).toBeNull();
 
@@ -336,6 +344,7 @@ describe('<MatchScreen /> pass-and-play', () => {
     const card = screen.getByTestId('game-end-card');
     expect(within(card).getByText('Mono · +1 point')).toBeOnTheScreen();
     expect(within(card).getByText('Mono: Maria resigned the game.')).toBeOnTheScreen();
+    expectChip(false);
     expect(within(card).getByText('Maria 0 – 1 Nikos')).toBeOnTheScreen();
   });
 
@@ -637,6 +646,8 @@ describe('<MatchScreen /> Acey-Deucey American scoring (#245)', () => {
     expect(card.getByText('+5 points')).toBeOnTheScreen();
     expect(card.getByText('Nikos did not bear off 5 checkers: 1 point each.')).toBeOnTheScreen();
     expect(card.getByText('Maria 5 – 0 Nikos')).toBeOnTheScreen();
+    // 5 points, but not a diplo: the chip stays outlined.
+    expectChip(false);
     expect(card.queryByText(/Mono|Diplo|any checker/)).toBeNull();
   });
 
@@ -686,6 +697,7 @@ describe('<MatchScreen /> Acey-Deucey American scoring (#245)', () => {
       card.getByText('You resigned and did not bear off 5 checkers: 1 point each.'),
     ).toBeOnTheScreen();
     expect(card.getByText('You 0 – 5 Bot')).toBeOnTheScreen();
+    expectChip(false);
   });
 
   it('vs the bot: a bear-off loss says how many of your checkers count', async () => {

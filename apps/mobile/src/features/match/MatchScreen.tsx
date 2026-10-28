@@ -143,26 +143,25 @@ export function MatchScreen({
   } else if (overlay === 'resignGame' && gameResignable) {
     const { result, score: after } = previewResign(flow, resigner);
     const winner = opponent(resigner);
-    const scoring = flow.game.state.rules.scoring.method;
-    const type = winType(result, scoring);
     const you = seats[resigner].you;
     const vars = { winner: name(winner), loser: name(resigner), count: result.points };
-    // Acey-Deucey American (#245): the engine's points are the checkers the
-    // resigning player has not borne off. The dialog says so.
-    const body =
-      scoring === 'perChecker'
-        ? you
-          ? t('game.resign.perCheckerYou', vars)
-          : t('game.resign.perChecker', vars)
-        : type === 'points'
-          ? t('game.resign.points', vars)
-          : type === 'diplo'
-            ? you
-              ? t('game.resign.diplo_you', vars)
-              : t('game.resign.diplo', vars)
-            : you
-              ? t('game.resign.mono_you', vars)
-              : t('game.resign.mono', vars);
+    let body: string;
+    switch (winType(result, flow.game.state.rules.scoring.method)) {
+      case 'mono':
+        body = you ? t('game.resign.mono_you', vars) : t('game.resign.mono', vars);
+        break;
+      case 'diplo':
+        body = you ? t('game.resign.diplo_you', vars) : t('game.resign.diplo', vars);
+        break;
+      case 'points':
+        body = t('game.resign.points', vars);
+        break;
+      case 'perChecker':
+        // Acey-Deucey American (#245): the engine's points are the checkers
+        // the resigning player has not borne off. The dialog says so.
+        body = you ? t('game.resign.perCheckerYou', vars) : t('game.resign.perChecker', vars);
+        break;
+    }
     content = (
       <ConfirmDialog
         testID="resign-game-dialog"

@@ -97,7 +97,7 @@ import { OpeningCard } from './OpeningCard';
 import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
 import { diceWereChosen, diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
-import { passNotice, winType } from './turnNotices';
+import { isStrongWin, passNotice, winType, type WinType } from './turnNotices';
 import { useAnnouncement } from './useAnnouncement';
 
 /** How long the opening result ("Maria starts with 6-3.") stays, unless a tap closes it (#176). */
@@ -615,26 +615,55 @@ export function GameScreen({
   // A resigned game says why it gives these points (#181): "Diplo: you
   // resigned before you bore off a checker." The diplo reason shows only when
   // it is true: a variant may score a resign 2 for another reason.
-  // With `perChecker` scoring (Acey-Deucey American, #245) the engine's
-  // points are the checkers the loser did not bear off: the line says that.
-  const resignedLine = (
-    loser: PlayerId,
-    type: ReturnType<typeof winType>,
-    off: number,
-    perChecker: { readonly count: number } | null,
-  ) => {
-    if (perChecker !== null) {
-      return isYou(loser)
-        ? t('game.end.resignedPerCheckerYou', perChecker)
-        : t('game.end.resignedPerChecker', { ...perChecker, name: nameOf(loser) });
+  // A `perChecker` win (Acey-Deucey American, #245) counts the checkers the
+  // loser did not bear off: `count` is the engine's points.
+  const resignedLine = (loser: PlayerId, type: WinType, off: number, count: number) => {
+    let key: 'resignedDiplo' | 'resignedMono' | 'resignedGame';
+    switch (type) {
+      case 'perChecker':
+        return isYou(loser)
+          ? t('game.end.resignedPerCheckerYou', { count })
+          : t('game.end.resignedPerChecker', { count, name: nameOf(loser) });
+      case 'diplo':
+        key = off === 0 ? 'resignedDiplo' : 'resignedGame';
+        break;
+      case 'mono':
+        key = 'resignedMono';
+        break;
+      case 'points':
+        key = 'resignedGame';
+        break;
     }
-    const key =
-      type === 'diplo' && off === 0
-        ? 'resignedDiplo'
-        : type === 'mono'
-          ? 'resignedMono'
-          : 'resignedGame';
     return isYou(loser) ? t(`game.end.${key}_you`) : t(`game.end.${key}`, { name: nameOf(loser) });
+  };
+  // Why a game that ended by bearing off gives these points: a diplo says
+  // the loser bore off nothing; a per-checker win counts the checkers left.
+  const borneOffLine = (loser: PlayerId, type: WinType, count: number): string | null => {
+    switch (type) {
+      case 'perChecker':
+        return isYou(loser)
+          ? t('game.end.checkersLeftYou', { count })
+          : t('game.end.checkersLeft', { count, name: nameOf(loser) });
+      case 'diplo':
+        return isYou(loser)
+          ? t('game.end.noBearOff_you')
+          : t('game.end.noBearOff', { name: nameOf(loser) });
+      case 'mono':
+      case 'points':
+        return null;
+    }
+  };
+  // The win type chip: "Mono · +1 point", "Diplo · +2 points", "+3 points".
+  const chipLine = (type: WinType, count: number): string => {
+    switch (type) {
+      case 'mono':
+        return t('game.end.mono');
+      case 'diplo':
+        return t('game.end.diplo');
+      case 'points':
+      case 'perChecker':
+        return t('game.end.points', { count });
+    }
   };
   const timeoutLine = (loser: PlayerId) =>
     isYou(loser) ? t('game.end.timeout_you') : t('game.end.timeout', { name: nameOf(loser) });
@@ -768,25 +797,16 @@ export function GameScreen({
     const { result } = game;
     const winner = result.winner;
     const loser = winner === null ? null : other(winner);
-    const scoring = game.state.rules.scoring.method;
-    const type = winType(result, scoring);
-    // Acey-Deucey American (#245): 1 point per checker the loser did not
-    // bear off. The count is the engine's points; the app adds no rule.
-    const perChecker = scoring === 'perChecker' ? { count: result.points } : null;
+    // The points are the engine's; the win type only names them (#245).
+    const type = winType(result, game.state.rules.scoring.method);
     let reason: string | null = null;
     if (result.reason === 'resigned' && loser !== null) {
-      reason = resignedLine(loser, type, game.state.board.off[loser], perChecker);
+      reason = resignedLine(loser, type, game.state.board.off[loser], result.points);
     } else if (result.reason === 'timeout' && loser !== null) {
       // An online turn timer ran out (#170). The sheet reads this line too.
       reason = timeoutLine(loser);
-    } else if (result.reason === 'borneOff' && perChecker !== null && loser !== null) {
-      reason = isYou(loser)
-        ? t('game.end.checkersLeftYou', perChecker)
-        : t('game.end.checkersLeft', { ...perChecker, name: nameOf(loser) });
-    } else if (result.reason === 'borneOff' && type === 'diplo' && loser !== null) {
-      reason = isYou(loser)
-        ? t('game.end.noBearOff_you')
-        : t('game.end.noBearOff', { name: nameOf(loser) });
+    } else if (result.reason === 'borneOff' && loser !== null) {
+      reason = borneOffLine(loser, type, result.points);
     } else if (result.reason === 'deadlock') {
       // Asodio A5: no one can ever move again.
       reason = t('game.end.deadlock');
@@ -804,10 +824,10 @@ export function GameScreen({
               ? t('game.end.gameWinner_you')
               : t('game.end.gameWinner', { name: nameOf(winner) })
         }
-        chip={
-          winner === null ? t('game.end.drawChip') : t(`game.end.${type}`, { count: result.points })
-        }
-        strongChip={result.points >= 2}
+        chip={winner === null ? t('game.end.drawChip') : chipLine(type, result.points)}
+        // Filled for a diplo (or a Tavli backgammon), never for a draw or a
+        // per-checker win (#245).
+        strongChip={winner !== null && isStrongWin(type)}
         reason={reason}
         {...(nextGameLabel ? { next: nextGameLabel } : {})}
         matchLabel={t('game.end.matchLabel')}

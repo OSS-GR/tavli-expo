@@ -311,6 +311,29 @@ describe('<MatchEndScreen />', () => {
     expect(rows.getByText('Game 3 · Fevga')).toBeOnTheScreen();
     expect(rows.getByLabelText('Game 4 · Portes, You won, Mono, 1 point')).toBeOnTheScreen();
   });
+
+  it('Acey-Deucey American rows show the points, never Mono or Diplo (#245)', async () => {
+    let match = createMatch({
+      rules: getPreset('asodio.aceyDeuceyAmerican'),
+      targetPoints: 7,
+      players: { white: 'a', black: 'b' },
+    });
+    for (const [winner, points] of [
+      ['white', 1],
+      ['black', 2],
+      ['white', 6],
+    ] as const) {
+      const result: GameResult = { winner, points, reason: 'borneOff' };
+      match = recordGameResult(match, result, { starter: match.nextStarter ?? 'white' });
+    }
+    await show({ ...botSetup, game: 'asodio', targetPoints: 7 }, match).view;
+
+    const rows = within(screen.getByTestId('match-games'));
+    expect(rows.getByLabelText('Game 1 · Asodio, You won, 1 point')).toBeOnTheScreen();
+    expect(rows.getByLabelText('Game 2 · Asodio, Bot won, 2 points')).toBeOnTheScreen();
+    expect(rows.getByLabelText('Game 3 · Asodio, You won, 6 points')).toBeOnTheScreen();
+    expect(rows.queryByText(/^(Mono|Diplo)$/)).toBeNull();
+  });
 });
 
 describe('<MatchEndScreen /> announcement after a remount (#216)', () => {
