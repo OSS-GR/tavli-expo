@@ -129,7 +129,9 @@ jobs:
 
       # `convex deploy` typechecks the functions (convex/tsconfig.json),
       # bundles them and pushes them. `--typecheck enable` fails the deploy
-      # when the typecheck fails or cannot run.
+      # when the typecheck fails or cannot run. It looks for
+      # apps/server/node_modules/typescript, so apps/server lists
+      # typescript in its own devDependencies.
       - name: Deploy to Convex (${{ env.TARGET }})
         working-directory: apps/server
         env:

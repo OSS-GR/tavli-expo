@@ -381,6 +381,9 @@ importers:
       convex-test:
         specifier: 0.0.61
         version: 0.0.61(convex@1.46.0(react@19.3.0))
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
 
   packages/adapters/analytics-posthog:
     dependencies:
