@@ -52,6 +52,9 @@ import type { MutationCtx } from './_generated/server';
 import { createCryptoRng } from './model/crypto-rng';
 import { gameChoice, gamePace } from './schema';
 
+/** The `actor` of events the server plays itself (`invites.ts` uses it too). */
+export { SERVER_ACTOR };
+
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
 function reject(error: OnlineGameError): never {
   // A plain object literal, so it fits Convex's `Value` type.
@@ -213,11 +216,46 @@ function toMoveInput(move: Infer<typeof moveInput>): MoveInput {
   return move.capture === undefined ? base : { ...base, capture: move.capture };
 }
 
+export interface NewGame {
+  readonly callerId: string;
+  readonly players: { readonly white: string; readonly black: string };
+  readonly choice: Infer<typeof gameChoice>;
+  readonly targetPoints: number;
+  readonly pace: OnlineGamePace;
+}
+
 /**
- * Creates a game between two players. The server rolls the opening at
- * once, so the game starts with the first player to move, and that
- * player's clock runs. Returns the id.
+ * Creates a game between two players, in the caller's transaction.
+ * `createGame` and `acceptInvite` (`invites.ts`) both use it. The server
+ * rolls the opening at once, so the game starts with the first player to
+ * move, and that player's clock runs. Returns the id.
  */
+export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'games'>> {
+  const { callerId, choice, targetPoints, pace } = game;
+  const players = { white: game.players.white, black: game.players.black };
+  guarded(() => checkNewGame(callerId, players));
+  const flow = guarded(() =>
+    createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
+  );
+  const version = 1;
+  const gameId = await ctx.db.insert('games', {
+    players,
+    choice,
+    pace,
+    targetPoints,
+    rules: serializeRules(flow.match.rules),
+    ...gameFields(flow),
+    version,
+    eventCount: 0,
+    turnDeadline: null,
+  });
+  const eventCount = await writeEvents(ctx, gameId, 0, version, callerId, flow);
+  const turnDeadline = await startClock(ctx, gameId, version, pace, flow, Date.now());
+  await ctx.db.patch(gameId, { eventCount, turnDeadline });
+  return gameId;
+}
+
+/** Creates a game between two players (see `insertGame`). Returns the id. */
 export const createGame = mutation({
   args: {
     callerId: v.string(),
@@ -228,28 +266,7 @@ export const createGame = mutation({
     pace: gamePace,
   },
   returns: v.id('games'),
-  handler: async (ctx, { callerId, players, choice, targetPoints, pace }) => {
-    guarded(() => checkNewGame(callerId, players));
-    const flow = guarded(() =>
-      createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
-    );
-    const version = 1;
-    const gameId = await ctx.db.insert('games', {
-      players,
-      choice,
-      pace,
-      targetPoints,
-      rules: serializeRules(flow.match.rules),
-      ...gameFields(flow),
-      version,
-      eventCount: 0,
-      turnDeadline: null,
-    });
-    const eventCount = await writeEvents(ctx, gameId, 0, version, callerId, flow);
-    const turnDeadline = await startClock(ctx, gameId, version, pace, flow, Date.now());
-    await ctx.db.patch(gameId, { eventCount, turnDeadline });
-    return gameId;
-  },
+  handler: async (ctx, args) => await insertGame(ctx, args),
 });
 
 /**

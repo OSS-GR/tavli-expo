@@ -63,6 +63,16 @@ export type {
   SendAnswerRequest,
   SendTurnRequest,
 } from './game-transport';
+export {
+  INVITE_CODE_ALPHABET,
+  INVITE_CODE_LENGTH,
+  INVITE_ERROR_CODES,
+  INVITE_STATUSES,
+  INVITE_TIME_MS,
+  isInviteErrorData,
+  normalizeInviteCode,
+} from './invite';
+export type { InviteErrorCode, InviteErrorData, InviteStatus, InviteView } from './invite';
 export { createMemoryStorage, type Storage } from './storage';
 export { isAnonymousInstallId } from './install-id';
 export {
