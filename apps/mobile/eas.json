@@ -5,10 +5,7 @@
   },
   "build": {
     "base": {
-      "pnpm": "12.15.0",
-      "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
-      }
+      "pnpm": "12.15.0"
     },
     "development": {
       "extends": "base",

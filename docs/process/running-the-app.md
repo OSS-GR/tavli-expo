@@ -207,7 +207,7 @@ The first Android build asks to make a **keystore** (the signing key). Say **yes
 
 **Run `pnpm install` before `eas build`.** EAS makes the fingerprint (the runtime version, see [EAS Update](#eas-update-over-the-air-updates-for-later)) on your computer and again on the build server. When the two differ, the build fails. Old packages in your `node_modules` make them differ, and so does a value in `apps/mobile/.env.local` that changes the app config, because git ignores that file and EAS never gets it.
 
-**Sentry uploads are off** (`SENTRY_DISABLE_AUTO_UPLOAD` in `eas.json`) until the owner adds the Sentry token. See the [crash-sentry README](../../packages/adapters/crash-sentry/README.md#owner-setup-one-time).
+**Sentry uploads run in every preview and production build** (#338): the build sends its source maps and debug files to Sentry with the `SENTRY_AUTH_TOKEN` EAS variable, so crash reports point to our source. Debug builds never upload. If a build fails at the Sentry upload step, see step 4 of the [crash-sentry README](../../packages/adapters/crash-sentry/README.md#owner-setup-one-time).
 
 **Send an iOS build to TestFlight** (#334):
 
