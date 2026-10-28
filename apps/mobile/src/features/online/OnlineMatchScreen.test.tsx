@@ -456,6 +456,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
         listMyGames: (request) => real.listMyGames(request),
+        watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
       };
     });
     const notSent = () =>
@@ -498,6 +499,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
         listMyGames: (request) => real.listMyGames(request),
+        watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
       };
     });
     await untilYourTurn(game);

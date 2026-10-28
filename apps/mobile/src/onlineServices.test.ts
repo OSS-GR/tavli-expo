@@ -50,6 +50,7 @@ function memoryAdapters() {
         sendAnswer: (request) => caller().sendAnswer(request),
         resign: (gameId) => caller().resign(gameId),
         listMyGames: (request) => caller().listMyGames(request),
+        watchMyGames: (request, onList, onError) => caller().watchMyGames(request, onList, onError),
       };
     },
     createInvites: ({ auth }): Invites => {

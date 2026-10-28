@@ -99,6 +99,7 @@ function spy(inner: GameTransport) {
     sendAnswer: (request) => send('sendAnswer', () => inner.sendAnswer(request)),
     resign: (gameId) => send('resign', () => inner.resign(gameId)),
     listMyGames: (request) => send('listMyGames', () => inner.listMyGames(request)),
+    watchMyGames: (request, onList, onError) => inner.watchMyGames(request, onList, onError),
   };
   return {
     transport,

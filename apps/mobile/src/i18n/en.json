@@ -36,6 +36,21 @@
       "target": "first to {{target}}",
       "broken": "Your saved game could not be opened."
     },
+    "online": {
+      "title": "Your online games",
+      "vsFriend": "{{game}} vs friend",
+      "yourTurn": "Your turn",
+      "waiting": "Waiting for your friend",
+      "score": "{{me}}–{{friend}}",
+      "scoreSpoken": "{{me}} to {{friend}}",
+      "timeLeft": "{{time}} left",
+      "loading": "Loading your online games…",
+      "failed": "Your online games did not load. Check the connection.",
+      "stale": "This list may be out of date. Check the connection.",
+      "retry": "Try again",
+      "seeAll": "See all ({{count}})",
+      "empty": "No online games right now. Play a friend to start one."
+    },
     "learn": {
       "title": "Learn to play",
       "subtitle": "A one-minute lesson on the board: move, hit and bear off.",
