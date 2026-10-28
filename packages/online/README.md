@@ -26,6 +26,7 @@ turn timers and the data model.
 | `src/online-game.ts`   | The game model: `onlineGameRules`, `createOnlineMatch`, `playTurn`, `answerPrompt`, `resign`, `timeOut`, `advance`, `toView`, `storeFlow` / `loadFlow`, the timer helpers `deadlineAfter` / `isTimedOut`, and `OnlineGameError`                                                                        |
 | `src/calls.ts`         | The call checks both servers share: `checkNewGame`, `checkCall` (game, caller, version), `checkViewer` (who may read a game), `callTimedOut` + `TIMED_OUT_ERROR`, `scheduledCheck` (the turn timer check), `nextDeadline`, `matchStatus`, `eventActor`, `SERVER_ACTOR`                                 |
 | `src/invites.ts`       | The invite checks and codes (#252, moved here in #256): `newInviteCode`, `pickInviteCode`, `pickInviteCodeNow`, `newInvite`, `checkAnswer`, `checkCancel`, the cap on open invites (`MAX_OPEN_INVITES`, `countOpenInvites`, `checkInviteCap`, #275), `inviteStatus`, `toInviteView`, and `InviteError` |
+| `src/summaries.ts`     | "My games" (#296): `summarizeGame` (one stored game as a `GameSummary` for one of its players), `newestFirst` and `latestGames` (newest change first, at most `MAX_LISTED_GAMES`)                                                                                                                      |
 | `src/memory-server.ts` | `createMemoryGameServer({ rng, now })`                                                                                                                                                                                                                                                                 |
 | `src/testing.ts`       | `@tavli/online/testing`, for tests only: `pickTurn`, `pickChoice`, `motherPin` (a Plakoto position for the mother question)                                                                                                                                                                            |
 
@@ -67,6 +68,9 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
   its deadline, like the Convex scheduler, so a game that waited three
   turn times loses three games. A late `sendTurn` or `sendAnswer` gets
   `TIMED_OUT`, and the time out is saved, as on the server.
+- `listMyGames({ status })` (#296) on a transport lists that player's
+  games with `summarizeGame` and `latestGames`, as the Convex query
+  does. Each save sets the game's `updatedAt` to `now()`.
 - `getGame(gameId)` gives the view, and `events(gameId)` the event log
   (`{ seq, version, actor, event }`, like the Convex `moves` rows).
   `replay(events.map((row) => row.event))` rebuilds the game.
@@ -97,7 +101,8 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
 - `memory-server.test.ts`: the `GameTransport` contract checks
   (`gameTransportContract` from `@tavli/contracts/testing`), a whole
   match of each game choice through two transports (the log replays to
-  the last view), and the turn timers on a fake clock.
+  the last view), the turn timers on a fake clock, and `listMyGames`.
+- `summaries.test.ts`: `summarizeGame` and the list order.
 - `invites.test.ts`: the invite checks and codes with a seeded RNG (moved
   from `apps/server`).
 - `memory-invites.test.ts`: the `Invites` contract checks

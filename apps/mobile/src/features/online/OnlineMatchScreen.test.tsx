@@ -302,6 +302,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
           offline ? Promise.reject(new Error('offline')) : real.sendTurn(request),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
+        listMyGames: (request) => real.listMyGames(request),
       };
     });
     const notSent = () =>
@@ -343,6 +344,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
           }),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
+        listMyGames: (request) => real.listMyGames(request),
       };
     });
     await untilYourTurn(game);
