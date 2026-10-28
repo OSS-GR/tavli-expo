@@ -321,7 +321,7 @@ describe('InviteWaitScreen', () => {
     expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
   });
 
-  it("shows \"not found\" for someone else's invite, with no Share or Cancel", async () => {
+  it('shows "not found" for someone else\'s invite, with no Share or Cancel', async () => {
     const { server } = setup();
     const theirs = server.createInvite(FRIEND, 'portes', 3, 'live');
     await openWait(theirs, server.invitesFor(ME));

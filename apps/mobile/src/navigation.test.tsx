@@ -1072,7 +1072,7 @@ describe('play a friend online (#281)', () => {
     watchInvite.mockRestore();
   });
 
-  it("a waiting-screen link to a friend's invite shows \"not found\"", async () => {
+  it('a waiting-screen link to a friend\'s invite shows "not found"', async () => {
     await onlineFake.auth.signInAsGuest();
     const theirs = await onlineFake
       .invitesFor('bob')
