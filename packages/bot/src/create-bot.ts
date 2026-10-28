@@ -16,9 +16,10 @@
  *
  * The variant heuristics: Portes (`portes-heuristic.ts`), Plakoto
  * (`plakoto-heuristic.ts`), Fevga (`fevga-heuristic.ts`) and Asodio
- * (`asodio-heuristic.ts`). Hard has a trained net for Portes
- * (`portes-net.ts`, #147), Plakoto (`plakoto-net.ts`) and Fevga
- * (`fevga-net.ts`, #156); Asodio throws `NOT_IMPLEMENTED` for hard.
+ * (`asodio-heuristic.ts`). Hard has a trained net for each: Portes
+ * (`portes-net.ts`, #147), Plakoto (`plakoto-net.ts`), Fevga
+ * (`fevga-net.ts`, #156) and Asodio (`asodio-net.ts`, #164). A custom
+ * registry with no hard evaluator throws `NOT_IMPLEMENTED` for hard.
  * Easy for a variant with no evaluator falls back to a random turn, but
  * still takes a turn that wins at once. Medium and hard need an evaluator.
  */
@@ -30,6 +31,7 @@ import { VARIANT_REGISTRY, getVariant } from '@tavli/engine';
 import { questionOf, scoreAnswers } from './answer';
 import { BotError } from './errors';
 import { asodioHeuristic } from './evaluators/asodio-heuristic';
+import { asodioNet } from './evaluators/asodio-net';
 import { fevgaHeuristic } from './evaluators/fevga-heuristic';
 import { fevgaNet } from './evaluators/fevga-net';
 import { plakotoHeuristic } from './evaluators/plakoto-heuristic';
@@ -56,13 +58,13 @@ export const EMPTY_EVALUATOR_REGISTRY: EvaluatorRegistry = new Map();
 
 /**
  * The built-in evaluators: one heuristic per variant, for easy and medium,
- * and a trained net for hard in Portes, Plakoto and Fevga.
+ * and a trained net for hard in every game.
  */
 export const DEFAULT_EVALUATORS: EvaluatorRegistry = new Map([
   ['portes', { easy: portesHeuristic, medium: portesHeuristic, hard: portesNet }],
   ['plakoto', { easy: plakotoHeuristic, medium: plakotoHeuristic, hard: plakotoNet }],
   ['fevga', { easy: fevgaHeuristic, medium: fevgaHeuristic, hard: fevgaNet }],
-  ['asodio', { easy: asodioHeuristic, medium: asodioHeuristic }],
+  ['asodio', { easy: asodioHeuristic, medium: asodioHeuristic, hard: asodioNet }],
 ]);
 
 /**
@@ -143,7 +145,8 @@ export function pickTurn<T = Turn>(
   );
 }
 
-function checkRegistry(variants: VariantRegistry, evaluators: EvaluatorRegistry): void {
+/** Throws `INVALID_REGISTRY` if an evaluator sits under the wrong variant id. Shared with `createAnalyzer`. */
+export function checkRegistry(variants: VariantRegistry, evaluators: EvaluatorRegistry): void {
   for (const [variantId, set] of evaluators) {
     if (!variants.has(variantId)) {
       throw new BotError('INVALID_REGISTRY', `evaluators for unknown variant "${variantId}"`);
@@ -157,6 +160,21 @@ function checkRegistry(variants: VariantRegistry, evaluators: EvaluatorRegistry)
       }
     }
   }
+}
+
+/** Throws `INVALID_REQUEST` if `state.dice` is set and differs from `dice`. */
+export function checkDice(state: GameState, dice: Dice): void {
+  if (state.dice !== null && (state.dice[0] !== dice[0] || state.dice[1] !== dice[1])) {
+    throw new BotError(
+      'INVALID_REQUEST',
+      `the state has dice ${state.dice.join('-')}, not ${dice.join('-')}`,
+    );
+  }
+}
+
+/** The default evaluators, for the variants in `variants` only. */
+export function defaultEvaluatorsFor(variants: VariantRegistry): EvaluatorRegistry {
+  return new Map([...DEFAULT_EVALUATORS].filter(([variantId]) => variants.has(variantId)));
 }
 
 function checkPolicies(policies: Readonly<Record<Difficulty, LevelPolicy>>): void {
@@ -179,9 +197,7 @@ function checkPolicies(policies: Readonly<Record<Difficulty, LevelPolicy>>): voi
 export function createBot(registry: BotRegistry = {}): ConfiguredBot {
   const variants = registry.variants ?? VARIANT_REGISTRY;
   // The defaults only cover the variants this bot knows (a custom registry may lack Portes).
-  const evaluators =
-    registry.evaluators ??
-    new Map([...DEFAULT_EVALUATORS].filter(([variantId]) => variants.has(variantId)));
+  const evaluators = registry.evaluators ?? defaultEvaluatorsFor(variants);
   const policies = { ...DEFAULT_LEVEL_POLICIES, ...registry.policies };
   checkRegistry(variants, evaluators);
   checkPolicies(policies);
@@ -193,12 +209,7 @@ export function createBot(registry: BotRegistry = {}): ConfiguredBot {
       return BOT_DIFFICULTIES.filter((level) => level === 'easy' || set?.[level] !== undefined);
     },
     chooseTurn(state: GameState, dice: Dice, level: BotLevel, opts: BotOptions): Turn {
-      if (state.dice !== null && (state.dice[0] !== dice[0] || state.dice[1] !== dice[1])) {
-        throw new BotError(
-          'INVALID_REQUEST',
-          `the state has dice ${state.dice.join('-')}, not ${dice.join('-')}`,
-        );
-      }
+      checkDice(state, dice);
       const variant = getVariant(variants, state.variant);
       // `legalTurns` throws ILLEGAL_TURN on a finished game, and never returns an empty list.
       const turns = variant.legalTurns(state, dice);

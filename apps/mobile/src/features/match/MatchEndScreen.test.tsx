@@ -96,6 +96,32 @@ describe('<MatchEndScreen />', () => {
     expect(props.onHome).toHaveBeenCalledTimes(1);
   });
 
+  it('offers Review of the last game when the route gives it (#215)', async () => {
+    const user = userEvent.setup();
+    const match = playedMatch([
+      ['white', 2],
+      ['white', 1],
+    ]);
+    const onReview = jest.fn();
+    await renderWithRoot(
+      <MatchEndScreen
+        setup={botSetup}
+        match={match}
+        onRematch={jest.fn()}
+        onReview={onReview}
+        onChangeSettings={jest.fn()}
+        onHome={jest.fn()}
+      />,
+    );
+    await user.press(screen.getByRole('button', { name: 'Review' }));
+    expect(onReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no Review button without a review to open', async () => {
+    await show(botSetup, playedMatch([['white', 3]])).view;
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull();
+  });
+
   it('a lost match looks the same, with no celebration', async () => {
     await show(
       botSetup,
@@ -284,5 +310,70 @@ describe('<MatchEndScreen />', () => {
     expect(rows.getByText('Game 2 · Plakoto')).toBeOnTheScreen();
     expect(rows.getByText('Game 3 · Fevga')).toBeOnTheScreen();
     expect(rows.getByLabelText('Game 4 · Portes, You won, Mono, 1 point')).toBeOnTheScreen();
+  });
+
+  it('Acey-Deucey American rows show the points, never Mono or Diplo (#245)', async () => {
+    let match = createMatch({
+      rules: getPreset('asodio.aceyDeuceyAmerican'),
+      targetPoints: 7,
+      players: { white: 'a', black: 'b' },
+    });
+    for (const [winner, points] of [
+      ['white', 1],
+      ['black', 2],
+      ['white', 6],
+    ] as const) {
+      const result: GameResult = { winner, points, reason: 'borneOff' };
+      match = recordGameResult(match, result, { starter: match.nextStarter ?? 'white' });
+    }
+    await show({ ...botSetup, game: 'asodio', targetPoints: 7 }, match).view;
+
+    const rows = within(screen.getByTestId('match-games'));
+    expect(rows.getByLabelText('Game 1 · Asodio, You won, 1 point')).toBeOnTheScreen();
+    expect(rows.getByLabelText('Game 2 · Asodio, Bot won, 2 points')).toBeOnTheScreen();
+    expect(rows.getByLabelText('Game 3 · Asodio, You won, 6 points')).toBeOnTheScreen();
+    expect(rows.queryByText(/^(Mono|Diplo)$/)).toBeNull();
+  });
+});
+
+describe('<MatchEndScreen /> announcement after a remount (#216)', () => {
+  const props = { onRematch: jest.fn(), onChangeSettings: jest.fn(), onHome: jest.fn() };
+  const match = playedMatch([
+    ['white', 1],
+    ['white', 2],
+  ]);
+  const result = 'You won the match! You 3 – 0 Bot';
+
+  // React Native's Jest setup makes it a `jest.fn` that keeps calls between tests.
+  const spyOnAnnounce = () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    announce.mockClear();
+    return announce;
+  };
+
+  it('reads the result once per match: a remount does not read it again', async () => {
+    const announce = spyOnAnnounce();
+    await renderWithRoot(
+      <MatchEndScreen setup={botSetup} match={match} announceKey="m1" {...props} />,
+    );
+    await screen.unmount();
+    await renderWithRoot(
+      <MatchEndScreen setup={botSetup} match={match} announceKey="m1" {...props} />,
+    );
+    expect(announce.mock.calls).toEqual([[result]]);
+    // Another match (a rematch has a new key) is read.
+    await screen.unmount();
+    await renderWithRoot(
+      <MatchEndScreen setup={botSetup} match={match} announceKey="m2" {...props} />,
+    );
+    expect(announce.mock.calls).toEqual([[result], [result]]);
+  });
+
+  it('without a key, reads the result on every mount', async () => {
+    const announce = spyOnAnnounce();
+    await renderWithRoot(<MatchEndScreen setup={botSetup} match={match} {...props} />);
+    await screen.unmount();
+    await renderWithRoot(<MatchEndScreen setup={botSetup} match={match} {...props} />);
+    expect(announce).toHaveBeenCalledTimes(2);
   });
 });

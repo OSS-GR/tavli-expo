@@ -12,6 +12,11 @@
  *
  * CI runs `GAMES` games per match. Raise `GAMES` locally for tighter
  * numbers.
+ *
+ * Hard (the Asodio net, #164) has its own bar, set by the owner: at least
+ * 60 % of the games that someone wins, and more points than medium. About
+ * a quarter of the games end in a lock draw, so the 60 %-of-all-games bar
+ * of the other games does not fit (README, "The Asodio net").
  */
 
 import { describe, expect, it } from 'vitest';
@@ -38,11 +43,19 @@ const EASY_VS_RANDOM = 0.4;
 const MEDIUM_VS_EASY = 0.35;
 /** Medium's share of the medium-vs-easy games that someone wins. */
 const DECIDED_MEDIUM_VS_EASY = 0.65;
+/**
+ * Hard's share of the hard-vs-medium games that someone wins (#164). With
+ * the seed below (200 games): 102 wins, 43 losses (70 %), 55 draws, and
+ * 187 points against 73.
+ */
+const DECIDED_HARD_VS_MEDIUM = 0.6;
 
 interface Score {
   readonly wins: number;
   readonly losses: number;
   readonly draws: number;
+  /** Points won by `a` and by `b`. */
+  readonly points: readonly [number, number];
 }
 
 /** `a` against `b` over `GAMES` games, half with each colour. */
@@ -74,6 +87,7 @@ function match(a: BotLevel, b: BotLevel, seed: number): Score {
     wins: first.wins[0] + second.wins[1],
     losses: first.wins[1] + second.wins[0],
     draws: first.draws + second.draws,
+    points: [first.points[0] + second.points[1], first.points[1] + second.points[0]],
   };
 }
 
@@ -96,5 +110,12 @@ describe(`asodio level strength (${GAMES} games each)`, () => {
     expect(score.wins).toBeGreaterThanOrEqual(MEDIUM_VS_EASY * GAMES);
     // Of the games that do not end in a draw, medium wins most.
     expect(score.wins).toBeGreaterThanOrEqual(DECIDED_MEDIUM_VS_EASY * (score.wins + score.losses));
+  });
+
+  // The Asodio net (#164). Draws are reported but do not count.
+  it('hard wins most decided games against medium, and more points', { timeout: TIMEOUT }, () => {
+    const score = match('hard', 'medium', 2029);
+    expect(score.wins).toBeGreaterThanOrEqual(DECIDED_HARD_VS_MEDIUM * (score.wins + score.losses));
+    expect(score.points[0]).toBeGreaterThan(score.points[1]);
   });
 });

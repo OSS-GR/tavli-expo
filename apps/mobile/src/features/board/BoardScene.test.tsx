@@ -3,12 +3,15 @@ import { getLayout, getTheme } from '@tavli/themes';
 
 import { getPreset } from '@tavli/engine';
 
+import type { HomeBoardSide } from '@/features/settings/settings';
+
 import { asodioMarks } from './asodio';
+import { boardLayout, portraitLayout } from './BoardCanvas';
 import { layoutBoard, type BoardView } from './boardModel';
-import { fitBoard } from './geometry';
+import { fitBoard, fitBoardWithShadow } from './geometry';
 import { rgba } from './paint';
 import { SAMPLE_DIRECTIONS, SAMPLE_POSITIONS } from './positions';
-import { BoardScene, FROZEN_MARK, PIN_RING_WIDTH } from './skia/BoardScene';
+import { BoardScene, COMBINED_MARK, FROZEN_MARK, PIN_RING_WIDTH } from './skia/BoardScene';
 import { StaticBoard } from './StaticBoard';
 import { THEME_IMAGES } from './themeImages';
 import { layoutImageKeys } from './useBoardAssets';
@@ -144,6 +147,32 @@ describe('<BoardScene />', () => {
     expect(count('Image')).toBe(layout.layers.length);
   });
 
+  // The classic board (#184) has its trays on one side. With your home on
+  // the bottom left its art is mirrored with the slots; the tall art is not.
+  it.each([
+    ['tall', false],
+    ['classic', true],
+  ] as const)('mirrors the art of the %s board for the bottom left: %s', async (mode, flips) => {
+    const image = { width: () => 160, height: () => 160 } as never;
+    const left = boardLayout(theme, mode, 'left');
+    const g = fitBoard(left, { width: 377, height: 630 });
+    const images = Object.fromEntries(layoutImageKeys(theme, left).map((k) => [k, image]));
+    const picture = layoutBoard(g, SAMPLE_POSITIONS.start, WHITE);
+    await render(
+      <BoardScene theme={theme} geo={g} images={images} picture={picture} font={font} />,
+    );
+    const mirrored = find(
+      (n) =>
+        n.type === 'Group' &&
+        JSON.stringify(n.props.transform) ===
+          JSON.stringify([{ translateX: 2 * g.x + g.width }, { scaleX: -1 }]),
+    );
+    expect(mirrored).toHaveLength(flips ? 2 : 0);
+    const inside = mirrored.reduce((sum, group) => sum + countNodes(group, 'Image'), 0);
+    expect(inside).toBe(flips ? left.layers.length : 0);
+    expect(count('Image')).toBe(left.layers.length);
+  });
+
   it('hides a checker and draws highlights', async () => {
     const picture = layoutBoard(geo, SAMPLE_POSITIONS.start, WHITE);
     const all = picture.checkers.length;
@@ -168,6 +197,50 @@ describe('<BoardScene />', () => {
     const rims = find((n) => n.type === 'Circle' && n.props.r === rimR);
     expect(rims).toHaveLength(all - 1);
   });
+  // #180: a target for one checker with several dice looks different from
+  // a one-die target: no fill, a dotted ring, and one dot per die.
+  it('draws a combined target with a dotted ring and one dot per die', async () => {
+    const picture = layoutBoard(geo, SAMPLE_POSITIONS.start, WHITE);
+    const c = picture.checkers[0]!;
+    const hl = theme.highlights.target;
+    const fill = rgba(hl.color, hl.fillOpacity);
+    await render(
+      <BoardScene
+        theme={theme}
+        geo={geo}
+        images={{}}
+        picture={picture}
+        font={null}
+        highlights={{
+          select: { key: c.key, x: c.x, y: c.y, r: c.r },
+          targets: [
+            { key: 'p10', x: 10, y: 10, r: c.r },
+            { key: 'p5', x: 50, y: 10, r: c.r, steps: 2 },
+            { key: 'p1', x: 90, y: 10, r: c.r, steps: 4 },
+          ],
+        }}
+      />,
+    );
+    // Every target has its ring; only the one-die target has the fill.
+    expect(count('DashPathEffect')).toBe(3);
+    expect(find((n) => n.type === 'Circle' && n.props.color === fill)).toHaveLength(1);
+    const dashes = find((n) => n.type === 'DashPathEffect').map(
+      (n) => (n.props.intervals as number[])[0],
+    );
+    expect(dashes[0]).toBeCloseTo(hl.dash[0] * c.r);
+    expect(dashes[1]).toBeCloseTo(hl.dash[0] * COMBINED_MARK.dash * c.r);
+    // 2 + 4 dots, each filled in the target color.
+    const dots = find(
+      (n) => n.type === 'Circle' && n.props.r === COMBINED_MARK.dot * c.r && !n.props.style,
+    );
+    expect(dots).toHaveLength(6);
+    expect(dots.every((d) => d.props.color === hl.color)).toBe(true);
+    // The dots of one target sit in a row around its center.
+    const xs = dots.filter((d) => d.props.cy === 10 && (d.props.cx as number) < 70);
+    expect(xs.map((d) => d.props.cx as number).reduce((a, b) => a + b, 0) / xs.length).toBeCloseTo(
+      50,
+    );
+  });
 });
 
 describe('<StaticBoard />', () => {
@@ -181,6 +254,46 @@ describe('<StaticBoard />', () => {
     });
     const canvas = screen.getByTestId('board-canvas');
     expect(canvas.props.style).toEqual({ width: 375, height: 455 });
+  });
+
+  // #175: Settings → Home board on the bottom left mirrors the drawing.
+  it('draws the mirrored board when the home is on the bottom left', async () => {
+    const size = { width: 377, height: 630 };
+    /** The centers of White's drawn checkers (their rim strokes). */
+    const whiteCheckers = async (side: HomeBoardSide) => {
+      await render(
+        <StaticBoard testID="board" board={SAMPLE_POSITIONS.start} view={WHITE} homeSide={side} />,
+      );
+      await act(async () => {
+        fireEvent(screen.getByTestId('board'), 'layout', {
+          nativeEvent: { layout: { x: 0, y: 0, ...size } },
+        });
+      });
+      return find(
+        (n) =>
+          n.type === 'Circle' &&
+          n.props.style === 'stroke' &&
+          n.props.color === theme.checkers.light.rim.color,
+      ).map((n) => ({ x: n.props.cx as number, y: n.props.cy as number }));
+    };
+    const normal = await whiteCheckers('right');
+    const mirrored = await whiteCheckers('left');
+    expect(normal).toHaveLength(15); // 2 + 5 + 3 + 5
+    const board = fitBoardWithShadow(layout, size);
+    const flipX = (x: number) => 2 * board.x + board.width - x;
+    const key = (p: { x: number; y: number }) => `${p.x.toFixed(2)}:${p.y.toFixed(2)}`;
+    expect(mirrored.map(key).sort()).toEqual(
+      normal.map((p) => key({ x: flipX(p.x), y: p.y })).sort(),
+    );
+    // White starts at the bottom left now: its 24 is left of the middle.
+    const start = mirrored.filter((p) => p.y > board.y + board.height * 0.8);
+    expect(start.every((p) => p.x < board.x + board.width / 2)).toBe(true);
+  });
+
+  it('keeps one mirrored layout per theme', () => {
+    expect(portraitLayout(theme, 'right')).toBe(layout);
+    expect(portraitLayout(theme, 'left')).toBe(portraitLayout(theme, 'left'));
+    expect(portraitLayout(theme, 'left')).not.toBe(layout);
   });
 });
 

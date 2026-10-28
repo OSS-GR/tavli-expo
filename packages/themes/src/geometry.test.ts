@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { imageFileName, imageFileNames, pickScale } from './assets';
 import { contrastRatio, relativeLuminance, resolvePalette } from './color';
-import { pointTriangle, rectsOverlap, stackCenters, trayRects } from './geometry';
+import {
+  isMirrorSymmetric,
+  mirrorLayout,
+  mirrorRect,
+  pointTriangle,
+  rectsOverlap,
+  stackCenters,
+  trayRects,
+} from './geometry';
+import { getLayout, getTheme } from './registry';
 import type { BoardLayout, ImageAsset, PointSlot, ThemeManifest } from './types';
 
 // A tiny square board with one point on each side, for exact numbers.
@@ -77,6 +86,83 @@ describe('trayRects', () => {
     expect(slices).toHaveLength(15);
     expect(slices[0]?.x).toBeCloseTo(0.68, 9);
     for (const r of slices) expect(r.x).toBeGreaterThanOrEqual(0.5 - 1e-9);
+  });
+});
+
+describe('mirrorLayout', () => {
+  const portrait = getLayout(getTheme('walnut-kafeneio'), 'portrait-rotated');
+  const mirrored = mirrorLayout(portrait);
+
+  it('mirrors a rect across the middle of the board', () => {
+    expect(mirrorRect({ x: 0.1, y: 0.2, w: 0.3, h: 0.4 })).toEqual({
+      x: expect.closeTo(0.6, 9),
+      y: 0.2,
+      w: 0.3,
+      h: 0.4,
+    });
+  });
+
+  it('moves every point to the other side and keeps its number and tone', () => {
+    for (const p of portrait.points) {
+      const m = mirrored.points.find((q) => q.index === p.index);
+      expect(m?.tone).toBe(p.tone);
+      expect(m?.rect).toEqual(mirrorRect(p.rect));
+      expect(m?.base).toBe(p.base === 'left' ? 'right' : 'left');
+    }
+  });
+
+  it('mirrors the bar halves, the trays, the fields and the dice area', () => {
+    expect(mirrored.bar.player.rect).toEqual(mirrorRect(portrait.bar.player.rect));
+    expect(mirrored.bar.player.base).toBe('right');
+    expect(mirrored.trays.player.rect).toEqual(mirrorRect(portrait.trays.player.rect));
+    expect(mirrored.trays.player.base).toBe('right');
+    expect(mirrored.trays.opponent.base).toBe('left');
+    expect(mirrored.fields).toEqual(portrait.fields.map(mirrorRect));
+    expect(mirrored.diceArea).toEqual(mirrorRect(portrait.diceArea));
+  });
+
+  it('keeps the art, the shadow and the lamp', () => {
+    expect(mirrored.layers).toBe(portrait.layers);
+    expect(mirrored.shadow).toBe(portrait.shadow);
+    expect(mirrored.overlay).toBe(portrait.overlay);
+    expect(mirrored.checker).toBe(portrait.checker);
+  });
+
+  it('gives the layout back when mirrored twice', () => {
+    const twice = mirrorLayout(mirrored);
+    portrait.points.forEach((p, i) => {
+      const q = twice.points[i];
+      expect(q?.base).toBe(p.base);
+      expect(q?.rect.x).toBeCloseTo(p.rect.x, 9);
+    });
+  });
+
+  it('keeps the art the right way round when it fits both ways', () => {
+    expect(mirrored.artMirrored).toBeUndefined();
+  });
+
+  // The classic board (#184) has its trays on one side, so its art is mirrored too.
+  it('mirrors the art of a layout that is not symmetric, and turns it back when mirrored twice', () => {
+    const landscape = getLayout(getTheme('walnut-kafeneio'), 'landscape');
+    expect(isMirrorSymmetric(landscape)).toBe(false);
+    expect(landscape.artMirrored).toBeUndefined();
+    const once = mirrorLayout(landscape);
+    expect(once.artMirrored).toBe(true);
+    expect(once.layers).toBe(landscape.layers);
+    expect(once.trays.player.rect).toEqual(mirrorRect(landscape.trays.player.rect));
+    expect(mirrorLayout(once).artMirrored).toBeUndefined();
+  });
+
+  it('finds a layout whose art would not fit when mirrored', () => {
+    expect(isMirrorSymmetric(portrait)).toBe(true);
+    const lopsided: BoardLayout = {
+      ...portrait,
+      trays: {
+        ...portrait.trays,
+        player: { ...portrait.trays.player, rect: { ...portrait.trays.player.rect, w: 0.3 } },
+      },
+    };
+    expect(isMirrorSymmetric(lopsided)).toBe(false);
   });
 });
 

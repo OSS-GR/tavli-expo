@@ -7,8 +7,17 @@
  *
  * While a checker flies, the checker at its landing place is hidden, so the
  * player sees one checker travel, not one that jumps and one that flies.
+ *
+ * One checker moved with several dice (#180) flies one path: it stops on
+ * each middle point on the way (`Flight.via`), one leg per die.
  */
-import type { BoardState, Move, PlayerId } from '@tavli/engine';
+import {
+  applyMoveToBoard,
+  type BoardState,
+  type Direction,
+  type Move,
+  type PlayerId,
+} from '@tavli/engine';
 
 import {
   countIn,
@@ -37,6 +46,23 @@ export interface Flight {
   /** The checker (a `layoutBoard` key) to hide until this flight lands. */
   readonly hide: string | null;
   readonly delay: number;
+  /**
+   * Stops on the way, in order (a move with several dice). The flight has
+   * one leg of `FLIGHT_MS` per stop, plus the last one.
+   */
+  readonly via?: readonly { readonly x: number; readonly y: number; readonly r: number }[];
+  /**
+   * Not drawn for this long after it starts (a whole turn, #255): the
+   * checker waits where an earlier flight lands, and that one is still in
+   * the air. Without it, one checker shows twice.
+   */
+  readonly hiddenMs?: number;
+}
+
+/** How long a flight is in the air: one `FLIGHT_MS` per leg. */
+export function flightMs(flight: Flight): number {
+  'worklet';
+  return FLIGHT_MS * (1 + (flight.via?.length ?? 0));
 }
 
 /** The key of the top checker of a slot, if it is a drawn checker that only this flight brings. */
@@ -134,4 +160,132 @@ export function moveFlights(
     }
   }
   return flights;
+}
+
+export interface PathFlightOptions extends MoveFlightOptions {
+  /** The engine's movement direction (to replay the steps on the board). */
+  readonly direction: Direction;
+}
+
+/**
+ * The flights that show one checker moved with several dice (#180), or
+ * their undo: one flight for the checker, through each middle point, and
+ * one for each checker hit on the way.
+ *
+ * `before` is the board before the first step. For an undo, that is the
+ * board after the undo. The steps are replayed on it with the
+ * engine's `applyMoveToBoard`, so every leg starts and ends where the
+ * checker is drawn at that moment.
+ *
+ * A checker hit on a middle point leaves when the mover gets there (one
+ * leg later per step). On an undo it comes back as the mover passes.
+ */
+export function pathFlights(
+  geo: BoardGeometry,
+  view: BoardView,
+  mover: PlayerId,
+  steps: readonly Move[],
+  before: BoardState,
+  options: PathFlightOptions,
+): Flight[] {
+  const undo = options.undo === true;
+  const boards: BoardState[] = [before];
+  for (const step of steps) {
+    boards.push(
+      applyMoveToBoard(boards[boards.length - 1] as BoardState, mover, step, options.direction),
+    );
+  }
+  // Each step as its own flights, in the order the checker flies them.
+  const order = steps.map((_, i) => (undo ? steps.length - 1 - i : i));
+  const legs: Flight[] = [];
+  const others: Flight[] = [];
+  order.forEach((i, leg) => {
+    const step = steps[i] as Move;
+    const start = boards[undo ? i + 1 : i] as BoardState;
+    const end = boards[undo ? i : i + 1] as BoardState;
+    const parts = moveFlights(geo, view, mover, step, start, end, {
+      id: `${options.id}:${leg}`,
+      ...(leg === 0 && options.from ? { from: options.from } : {}),
+      ...(undo ? { undo: true } : {}),
+    });
+    // `moveFlights` names the moved checker `<id>:0` and a hit checker `<id>:1`.
+    for (const f of parts) {
+      if (f.id.endsWith(':0')) legs.push(f);
+      else others.push({ ...f, delay: f.delay + leg * FLIGHT_MS });
+    }
+  });
+  const first = legs[0];
+  const last = legs[legs.length - 1];
+  if (first === undefined || last === undefined) return others;
+  const checker: Flight = {
+    id: `${options.id}:0`,
+    owner: mover,
+    from: first.from,
+    to: last.to,
+    fromR: first.fromR,
+    toR: last.toR,
+    hide: last.hide,
+    delay: 0,
+    via: legs.slice(0, -1).map((f) => ({ x: f.to.x, y: f.to.y, r: f.toR })),
+  };
+  return [checker, ...others.map((f, n) => ({ ...f, id: `${options.id}:hit${n}` }))];
+}
+
+/** The pause between two moves of a turn that arrives whole (online, #255). */
+export const TURN_MOVE_GAP_MS = 100;
+
+/** When move `i` (from 0) of a turn that arrives whole starts to fly, in ms. */
+export function turnMoveDelay(i: number): number {
+  return i * (FLIGHT_MS + TURN_MOVE_GAP_MS);
+}
+
+/**
+ * The flights of a whole turn that arrives at once: the other player's
+ * turn in an online game (#255). The moves fly one after the other, each
+ * `FLIGHT_MS + TURN_MOVE_GAP_MS` after the one before. Until its turn
+ * comes, a checker waits at its start. A checker that moves again (a
+ * double) waits where its last flight lands: it stays hidden until that
+ * flight is down (`hiddenMs`). `before` is the board before the first
+ * move; the moves are replayed on it with the engine's `applyMoveToBoard`.
+ */
+export function turnFlights(
+  geo: BoardGeometry,
+  view: BoardView,
+  mover: PlayerId,
+  moves: readonly Move[],
+  before: BoardState,
+  options: PathFlightOptions,
+): Flight[] {
+  const flights: Flight[] = [];
+  let board = before;
+  moves.forEach((move, i) => {
+    const after = applyMoveToBoard(board, mover, move, options.direction);
+    const delay = turnMoveDelay(i);
+    const earlier = flights.length;
+    for (const f of moveFlights(geo, view, mover, move, board, after, {
+      id: `${options.id}:${i}`,
+    })) {
+      const flight = { ...f, delay: f.delay + delay };
+      const lands = landsAt(flights.slice(0, earlier), flight);
+      flights.push(lands === null ? flight : { ...flight, hiddenMs: lands });
+    }
+    board = after;
+  });
+  return flights;
+}
+
+/**
+ * When the last of `earlier` that lands where `flight` starts is down (ms
+ * from the start), or `null` when none does.
+ */
+function landsAt(earlier: readonly Flight[], flight: Flight): number | null {
+  let down: number | null = null;
+  for (const e of earlier) {
+    const same =
+      e.owner === flight.owner &&
+      Math.abs(e.to.x - flight.from.x) < 0.5 &&
+      Math.abs(e.to.y - flight.from.y) < 0.5;
+    if (same) down = Math.max(down ?? 0, e.delay + flightMs(e));
+  }
+  return down;
 }

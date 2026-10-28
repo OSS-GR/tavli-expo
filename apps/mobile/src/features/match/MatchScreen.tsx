@@ -1,11 +1,13 @@
 /**
  * A local match on the board screen: the board (GameScreen), the bot vs
- * the human, the in-game menu and the resign dialogs. When the match is
+ * the human, the in-game menu and the resign dialogs. Both modes get the
+ * Hint button (#209): the screen passes the bot's Analyzer. When the match is
  * over it calls `onMatchOver` (the match-end screen, wireframe 9).
  *
  * Navigation stays in the route (`app/game/[id].tsx`); this screen only
  * calls the `on…` props.
  */
+import type { Analyzer } from '@tavli/bot';
 import type { BotRunner } from '@tavli/contracts';
 import { opponent, type PlayerId } from '@tavli/engine';
 import { useState } from 'react';
@@ -13,11 +15,13 @@ import { useTranslation } from 'react-i18next';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Sheet } from '@/components/Sheet';
-import type { BotTiming } from '@/features/bot/botTurn';
+import { BOT_SPEED_TIMING, type BotTiming } from '@/features/bot/botTurn';
 import { useGameStore } from '@/features/game/gameStore';
 import { GameScreen, type BotSeat } from '@/features/game/GameScreen';
 import { winType } from '@/features/game/turnNotices';
-import { botRunner, createLocalRng } from '@/services';
+import { sendHintShown } from '@/features/hint/hintAnalytics';
+import { useSettings } from '@/features/settings/store';
+import { analyzer as appAnalyzer, botRunner, createLocalRng } from '@/services';
 
 import { GameMenu } from './GameMenu';
 import { canResignGame, previewResign, resigningPlayer } from './resign';
@@ -35,9 +39,13 @@ export interface MatchScreenProps {
   onRules: () => void;
   /** The match is over: open the match-end screen. */
   onMatchOver: () => void;
-  /** For tests: another runner or faster bot timing. */
+  /** "Review" on the game-end sheet: the review of the game that just ended (#215). */
+  onReview?: () => void;
+  /** For tests: another runner, or bot timing on top of the Bot speed setting. */
   runner?: BotRunner;
   botTiming?: Partial<BotTiming>;
+  /** For tests: another Analyzer for the Hint button. */
+  analyzer?: Analyzer;
 }
 
 type Overlay = 'none' | 'menu' | 'resignGame' | 'resignMatch';
@@ -49,8 +57,10 @@ export function MatchScreen({
   onSettings,
   onRules,
   onMatchOver,
+  onReview,
   runner = botRunner,
   botTiming,
+  analyzer = appAnalyzer,
 }: MatchScreenProps) {
   const { t } = useTranslation();
   const { setup, store } = session;
@@ -58,6 +68,8 @@ export function MatchScreen({
   const dispatch = useGameStore(store, (s) => s.dispatch);
   const [overlay, setOverlay] = useState<Overlay>('none');
   const [uiRng] = useState(() => createLocalRng());
+  // A new speed applies from the bot's next turn.
+  const botSpeed = useSettings((s) => s.botSpeed);
 
   const seats = seatsFor(setup, t);
   const name = (player: PlayerId) => seats[player].name;
@@ -68,7 +80,7 @@ export function MatchScreen({
           difficulty: setup.botLevel,
           runner,
           rng: uiRng,
-          ...(botTiming ? { timing: botTiming } : {}),
+          timing: { ...BOT_SPEED_TIMING[botSpeed], ...botTiming },
         }
       : undefined;
 
@@ -99,6 +111,7 @@ export function MatchScreen({
   if (overlay === 'menu') {
     content = (
       <GameMenu
+        gameLabel={gameLabel}
         summary={summary}
         resignGameHint={
           gameResignable ? t('game.menu.resignGameHint', { name: name(opponent(resigner)) }) : null
@@ -130,19 +143,25 @@ export function MatchScreen({
   } else if (overlay === 'resignGame' && gameResignable) {
     const { result, score: after } = previewResign(flow, resigner);
     const winner = opponent(resigner);
-    const type = winType(result);
     const you = seats[resigner].you;
     const vars = { winner: name(winner), loser: name(resigner), count: result.points };
-    const body =
-      type === 'points'
-        ? t('game.resign.points', vars)
-        : type === 'diplo'
-          ? you
-            ? t('game.resign.diplo_you', vars)
-            : t('game.resign.diplo', vars)
-          : you
-            ? t('game.resign.mono_you', vars)
-            : t('game.resign.mono', vars);
+    let body: string;
+    switch (winType(result, flow.game.state.rules.scoring.method)) {
+      case 'mono':
+        body = you ? t('game.resign.mono_you', vars) : t('game.resign.mono', vars);
+        break;
+      case 'diplo':
+        body = you ? t('game.resign.diplo_you', vars) : t('game.resign.diplo', vars);
+        break;
+      case 'points':
+        body = t('game.resign.points', vars);
+        break;
+      case 'perChecker':
+        // Acey-Deucey American (#245): the engine's points are the checkers
+        // the resigning player has not borne off. The dialog says so.
+        body = you ? t('game.resign.perCheckerYou', vars) : t('game.resign.perChecker', vars);
+        break;
+    }
     content = (
       <ConfirmDialog
         testID="resign-game-dialog"
@@ -196,14 +215,19 @@ export function MatchScreen({
         onOpenMenu={() => setOverlay('menu')}
         onHome={onExit}
         onMatchOver={onMatchOver}
+        {...(onReview ? { onReview } : {})}
         gameLabel={gameLabel}
         {...(nextLabel ? { nextGameLabel: nextLabel } : {})}
+        analyzer={analyzer}
+        onHintShown={() => sendHintShown(setup.game, flow.game.state.variant)}
       />
       <Sheet
         visible={content !== null}
         onClose={close}
         closeLabel={t('game.menu.resume')}
-        look={overlay === 'menu' ? 'sheet' : 'dialog'}>
+        look={overlay === 'menu' ? 'sheet' : 'dialog'}
+        // The game screen turns with the phone (#185); its menu and dialogs too.
+        turns>
         {content}
       </Sheet>
     </>

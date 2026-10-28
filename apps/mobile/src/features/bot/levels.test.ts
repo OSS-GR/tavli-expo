@@ -2,7 +2,9 @@ import { BotError, createBot, type Bot } from '@tavli/bot';
 import type { Difficulty } from '@tavli/contracts';
 import type { VariantId } from '@tavli/engine';
 
-import { botLevelsByGame, supportedBotLevels, type LevelBot } from './levels';
+import { gameLevels } from '@/features/match/setup';
+
+import { anyGameLevels, botLevelsByGame, supportedBotLevels, type LevelBot } from './levels';
 
 /** A bot with no `supportedLevels`: it plays `levels` in `variants`, else throws NOT_IMPLEMENTED. */
 function probedBot(variants: readonly VariantId[], levels: readonly Difficulty[]): LevelBot {
@@ -27,12 +29,12 @@ function listingBot(levels: Partial<Record<VariantId, readonly Difficulty[]>>): 
 }
 
 describe('supportedBotLevels', () => {
-  it('finds easy and medium for each built game today, and hard for Portes, Plakoto and Fevga', () => {
+  it('finds easy, medium and hard for each built game (#164)', () => {
     const bot = createBot();
     expect(supportedBotLevels(bot)).toEqual(['easy', 'medium', 'hard']);
     expect(supportedBotLevels(bot, 'plakoto')).toEqual(['easy', 'medium', 'hard']);
     expect(supportedBotLevels(bot, 'fevga')).toEqual(['easy', 'medium', 'hard']);
-    expect(supportedBotLevels(bot, 'asodio')).toEqual(['easy', 'medium']);
+    expect(supportedBotLevels(bot, 'asodio')).toEqual(['easy', 'medium', 'hard']);
   });
 
   it('probes Asodio like any other built game', () => {
@@ -63,14 +65,14 @@ describe('supportedBotLevels', () => {
 });
 
 describe('botLevelsByGame', () => {
-  it('opens every built game in the bot package today (Hard for all but Asodio)', () => {
-    // Tavli needs a level in Portes, Plakoto and Fevga: all three have Hard now (#156).
+  it('opens every built game in the bot package, with Hard in all of them (#164)', () => {
+    // Tavli needs a level in Portes, Plakoto and Fevga: all three have Hard (#156).
     expect(botLevelsByGame(createBot())).toEqual({
       portes: ['easy', 'medium', 'hard'],
       plakoto: ['easy', 'medium', 'hard'],
       fevga: ['easy', 'medium', 'hard'],
       tavli: ['easy', 'medium', 'hard'],
-      asodio: ['easy', 'medium'],
+      asodio: ['easy', 'medium', 'hard'],
     });
   });
 
@@ -92,5 +94,19 @@ describe('botLevelsByGame', () => {
     );
     expect(levels.tavli).toEqual(['easy']);
     expect(levels.portes).toEqual(['easy', 'medium', 'hard']);
+  });
+});
+
+describe('anyGameLevels', () => {
+  it('lists each level that works in at least one game, easiest first', () => {
+    expect(anyGameLevels(gameLevels(['easy'], { fevga: ['hard', 'easy'] }))).toEqual([
+      'easy',
+      'hard',
+    ]);
+    expect(anyGameLevels(gameLevels([]))).toEqual([]);
+  });
+
+  it('has Easy, Medium and Hard with the real bot', () => {
+    expect(anyGameLevels(botLevelsByGame(createBot()))).toEqual(['easy', 'medium', 'hard']);
   });
 });

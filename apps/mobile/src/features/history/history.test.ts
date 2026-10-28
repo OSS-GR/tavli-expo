@@ -16,12 +16,13 @@ import {
   MATCH_LENGTHS,
   defaultSetup,
   gameLevels,
+  gamePreset,
   gameRotation,
   type MatchSetup,
 } from '@/features/match/setup';
 import i18n from '@/i18n';
 
-import { dateLocale, formatDate, historyRow, statParts } from './format';
+import { dateLocale, formatDate, historyRow, recordSetup, statParts } from './format';
 import { createHistoryStore } from './historyStore';
 import {
   HISTORY_STORAGE_KEY,
@@ -60,6 +61,8 @@ function rec(over: Partial<HistoryRecord> = {}): HistoryRecord {
     diploWins: { white: 1, black: 0 },
     draws: 0,
     matchNumber: 1,
+    openingRoll: 'useOpeningDice',
+    preset: gamePreset(over.game ?? 'portes'),
     ...over,
   };
 }
@@ -141,8 +144,43 @@ describe('a record is saved when a match ends', () => {
         diploWins: { white: 0, black: 0 },
         draws: 0,
         matchNumber: 1,
+        openingRoll: 'useOpeningDice',
+        preset: 'plakoto',
       },
     ]);
+  });
+
+  it('keeps the opening roll house rule of the match (#207)', () => {
+    const { sessions, history } = registry();
+    const s = sessions.start({ ...defaultSetup('local'), openingRoll: 'chosenStarterRolls' });
+    s.store.getState().dispatch({ type: 'chooseStarter', player: 'black' });
+    s.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    expect(history.getState().records[0]?.openingRoll).toBe('chosenStarterRolls');
+  });
+
+  it('keeps the rules version of the match: its preset (#241)', () => {
+    const { sessions, history } = registry();
+    const plakoto = sessions.start({
+      ...defaultSetup('local'),
+      game: 'plakoto',
+      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' },
+    });
+    plakoto.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    expect(history.getState().records[0]?.preset).toBe('plakoto.federation');
+    const tavli = sessions.start({ ...defaultSetup('local'), game: 'tavli' });
+    tavli.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    expect(history.getState().records[0]?.preset).toBe('tavli');
+    // A Tavli match keeps the version of its Plakoto game (#247).
+    const federation = sessions.start({
+      ...defaultSetup('local'),
+      game: 'tavli',
+      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' },
+    });
+    federation.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    expect(history.getState().records[0]).toMatchObject({
+      game: 'tavli',
+      preset: 'plakoto.federation',
+    });
   });
 
   it('vs bot: you resign the only game at the start, the bot wins a diplo', () => {
@@ -576,27 +614,74 @@ describe('diplo wins', () => {
     );
     expect(record.diploWins).toEqual({ white: 3, black: 2 });
     expect(record.draws).toBe(1);
-    expect(games.map(isDiplo)).toEqual([false, true, true, true, false, true, true, false]);
+    expect(games.map((g) => isDiplo(g))).toEqual([
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+    ]);
   });
 
-  it('holds because every game of the app uses Tavli scoring: single 1, double 2', () => {
-    // `perChecker` scoring (an Acey-Deucey preset the app does not offer)
-    // would give 2+ points for a single win. Then `isDiplo` must change.
+  it('every game of the app uses Tavli scoring, but Acey-Deucey American (#241)', () => {
     const { sessions } = registry();
-    for (const choice of GAME_CHOICES) {
-      const { match } = sessions
-        .start({ ...defaultSetup('bot'), game: choice })
-        .store.getState().flow;
-      for (const variant of gameRotation(choice)) {
-        const { method, backgammonScores3 } = gameRules(match, variant).scoring;
-        expect({ choice, variant, method, backgammonScores3 }).toEqual({
-          choice,
-          variant,
-          method: 'tavli',
-          backgammonScores3: false,
-        });
+    const versions = [
+      { plakoto: 'plakoto', asodio: 'asodio.kafeneio' },
+      { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' },
+      { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+    ] as const;
+    for (const rulesVersions of versions) {
+      for (const choice of GAME_CHOICES) {
+        const { match } = sessions
+          .start({ ...defaultSetup('bot'), game: choice, rulesVersions })
+          .store.getState().flow;
+        const american = match.rules.presetId === 'asodio.aceyDeuceyAmerican';
+        for (const variant of gameRotation(choice)) {
+          const { method, backgammonScores3 } = gameRules(match, variant).scoring;
+          // `historyRecord` reads the scoring from the match rules: right for
+          // every game, since only a one-game match can change it.
+          expect({ choice, variant, method, backgammonScores3 }).toEqual({
+            choice,
+            variant,
+            method: match.rules.scoring.method,
+            backgammonScores3: false,
+          });
+          expect(method).toBe(american ? 'perChecker' : 'tavli');
+        }
       }
     }
+  });
+
+  it('with perChecker scoring only 15 points (no checker off) is a diplo (#241)', () => {
+    expect(isDiplo(game('white', 2, 'borneOff'), 'perChecker')).toBe(false);
+    expect(isDiplo(game('white', 14, 'borneOff'), 'perChecker')).toBe(false);
+    expect(isDiplo(game('white', 15, 'borneOff'), 'perChecker')).toBe(true);
+    expect(isDiplo(game('black', 15, 'resigned'), 'perChecker')).toBe(true);
+    expect(isDiplo(game(null, 0, 'deadlock'), 'perChecker')).toBe(false);
+    expect(isDiplo(game('white', 2, 'borneOff'), 'tavli')).toBe(true);
+    expect(isDiplo(game('white', 1, 'borneOff'), 'singleOnly')).toBe(false);
+
+    const { sessions } = registry();
+    const { match } = sessions
+      .start({
+        ...defaultSetup('bot'),
+        game: 'asodio',
+        rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+      })
+      .store.getState().flow;
+    const games = [game('white', 5, 'borneOff'), game('black', 15, 'borneOff')];
+    const record = historyRecord(
+      'local-x',
+      defaultSetup('bot'),
+      { ...match, games },
+      1,
+      'finished',
+      1,
+    );
+    expect(record.diploWins).toEqual({ white: 0, black: 1 });
   });
 });
 
@@ -752,6 +837,79 @@ describe('history list', () => {
     expect(parseHistory(text)).toEqual([rec({ matchNumber: null })]);
   });
 
+  it('saves and loads the opening roll rule; a record from before #207 has the federation rule', () => {
+    const records = [
+      rec({ id: 'a', openingRoll: 'rerollBoth' }),
+      rec({ id: 'b', openingRoll: 'chosenStarterRolls' }),
+    ];
+    expect(parseHistory(serializeHistory(records))).toEqual(records);
+    const { openingRoll: _, ...old } = rec();
+    const text = JSON.stringify({ v: HISTORY_VERSION, records: [old] });
+    expect(parseHistory(text)).toEqual([rec({ openingRoll: 'useOpeningDice' })]);
+  });
+
+  it('saves and loads the rules version; a record from before #241 has the default preset', () => {
+    const records = [
+      rec({ id: 'a', game: 'plakoto', preset: 'plakoto.federation' }),
+      rec({ id: 'b', game: 'asodio', preset: 'asodio.aceyDeuceyAmerican' }),
+      rec({ id: 'c', game: 'tavli' }),
+      rec({ id: 'd', game: 'tavli', preset: 'plakoto.federation' }),
+    ];
+    expect(parseHistory(serializeHistory(records))).toEqual(records);
+    const old = (over: Partial<HistoryRecord>) => {
+      const { preset: _, ...rest } = rec(over);
+      return rest;
+    };
+    const text = JSON.stringify({
+      v: HISTORY_VERSION,
+      records: [
+        old({ id: 'a', game: 'plakoto' }),
+        old({ id: 'b', game: 'asodio' }),
+        old({ id: 'c' }),
+      ],
+    });
+    expect(parseHistory(text).map((r) => r.preset)).toEqual([
+      'plakoto',
+      'asodio.kafeneio',
+      'portes',
+    ]);
+  });
+
+  it('keeps a record whose preset is not one of its game, with the default preset (#241)', () => {
+    const text = JSON.stringify({
+      v: HISTORY_VERSION,
+      records: [
+        { ...rec({ id: 'a', game: 'plakoto' }), preset: 'asodio.aceyDeuceyGreek' },
+        { ...rec({ id: 'b', game: 'portes' }), preset: 'plakoto.federation' },
+        { ...rec({ id: 'c', game: 'asodio' }), preset: 'chess' },
+        // A Tavli match plays no Asodio, and `plakoto` is never its preset (#247).
+        { ...rec({ id: 'd', game: 'tavli' }), preset: 'asodio.aceyDeuceyGreek' },
+        { ...rec({ id: 'e', game: 'tavli' }), preset: 'plakoto' },
+      ],
+    });
+    expect(parseHistory(text).map((r) => r.preset)).toEqual([
+      'plakoto',
+      'portes',
+      'asodio.kafeneio',
+      'tavli',
+      'tavli',
+    ]);
+  });
+
+  it('keeps a record with an unknown opening roll rule, with the federation rule (#207)', () => {
+    const text = JSON.stringify({
+      v: HISTORY_VERSION,
+      records: [
+        { ...rec({ id: 'a' }), openingRoll: 'coinFlip' },
+        { ...rec({ id: 'b' }), openingRoll: 42 },
+      ],
+    });
+    expect(parseHistory(text)).toEqual([
+      rec({ id: 'a', openingRoll: 'useOpeningDice' }),
+      rec({ id: 'b', openingRoll: 'useOpeningDice' }),
+    ]);
+  });
+
   it('keeps one record per id, the first (newest)', () => {
     const text = serializeHistory([
       rec({ id: 'a', endedAt: 3 }),
@@ -900,6 +1058,118 @@ describe('history texts', () => {
       badge: 'winner',
       result: 'Maria won on time',
     });
+  });
+
+  it('shows the opening roll house rule after the length (#221)', () => {
+    const el = i18n.getFixedT('el');
+    const reroll = rec({ openingRoll: 'rerollBoth' });
+    expect(historyRow(reroll, t, 'en')).toMatchObject({
+      score: 'You 3 – 1 Bot · first to 3 · Opening roll: Roll again',
+      label:
+        'Portes · vs Bot (Easy), You 3 – 1 Bot · first to 3 · Opening roll: Roll again, Won, Jan 1, 1970',
+    });
+    expect(historyRow(reroll, el, 'el').score).toBe(
+      'Εσύ 3 – 1 Υπολογιστής · στους 3 · Πρώτη ζαριά: Ξαναρίχνει',
+    );
+    const chosen = rec({ openingRoll: 'chosenStarterRolls' });
+    expect(historyRow(chosen, t, 'en').score).toBe(
+      'You 3 – 1 Bot · first to 3 · Opening roll: Choose',
+    );
+    expect(historyRow(chosen, el, 'el').score).toBe(
+      'Εσύ 3 – 1 Υπολογιστής · στους 3 · Πρώτη ζαριά: Διαλέγουμε',
+    );
+    // The federation rule shows nothing extra.
+    expect(historyRow(rec(), t, 'en').score).toBe('You 3 – 1 Bot · first to 3');
+    expect(historyRow(rec(), el, 'el').score).toBe('Εσύ 3 – 1 Υπολογιστής · στους 3');
+    // It comes before the resign note.
+    const resigned = rec({ openingRoll: 'rerollBoth', winner: 'black', resignedBy: 'white' });
+    expect(historyRow(resigned, t, 'en').score).toBe(
+      'You 3 – 1 Bot · first to 3 · Opening roll: Roll again · you resigned',
+    );
+  });
+
+  it("keeps the record's opening roll in its setup (#221)", () => {
+    for (const openingRoll of ['useOpeningDice', 'rerollBoth', 'chosenStarterRolls'] as const) {
+      expect(recordSetup(rec({ openingRoll })).openingRoll).toBe(openingRoll);
+      const local = rec({ mode: 'local', botLevel: null, openingRoll });
+      expect(recordSetup(local)).toMatchObject({ mode: 'local', openingRoll });
+    }
+  });
+
+  it('gives an unknown opening roll the federation rule and shows nothing for it (#221)', () => {
+    // A record is typed, but one built in code could still carry a bad value.
+    const odd = rec({ openingRoll: 'tossACoin' as HistoryRecord['openingRoll'] });
+    expect(recordSetup(odd).openingRoll).toBe('useOpeningDice');
+    expect(historyRow(odd, t, 'en').score).toBe('You 3 – 1 Bot · first to 3');
+  });
+
+  it('shows the rules version after the length (#241)', () => {
+    const el = i18n.getFixedT('el');
+    const federation = rec({ game: 'plakoto', preset: 'plakoto.federation' });
+    expect(historyRow(federation, t, 'en')).toMatchObject({
+      title: 'Plakoto · vs Bot (Easy)',
+      score: 'You 3 – 1 Bot · first to 3 · Rules version: Federation',
+      label:
+        'Plakoto · vs Bot (Easy), You 3 – 1 Bot · first to 3 · Rules version: Federation, Won, Jan 1, 1970',
+    });
+    expect(historyRow(federation, el, 'el').score).toBe(
+      'Εσύ 3 – 1 Υπολογιστής · στους 3 · Παραλλαγή: Ομοσπονδίας',
+    );
+    const greek = rec({
+      game: 'asodio',
+      preset: 'asodio.aceyDeuceyGreek',
+      openingRoll: 'rerollBoth',
+    });
+    expect(historyRow(greek, t, 'en').score).toBe(
+      'You 3 – 1 Bot · first to 3 · Opening roll: Roll again · Rules version: Greek',
+    );
+    expect(historyRow(greek, el, 'el').score).toBe(
+      'Εσύ 3 – 1 Υπολογιστής · στους 3 · Πρώτη ζαριά: Ξαναρίχνει · Παραλλαγή: Ελληνική',
+    );
+    const american = rec({ game: 'asodio', preset: 'asodio.aceyDeuceyAmerican' });
+    expect(historyRow(american, t, 'en').score).toBe(
+      'You 3 – 1 Bot · first to 3 · Rules version: American',
+    );
+    // The default preset shows nothing extra.
+    for (const game of ['plakoto', 'asodio', 'tavli', 'portes'] as const) {
+      expect(historyRow(rec({ game }), t, 'en').score).toBe('You 3 – 1 Bot · first to 3');
+    }
+  });
+
+  it('names the game of the version in a Tavli match (#247)', () => {
+    const el = i18n.getFixedT('el');
+    const federation = rec({ game: 'tavli', preset: 'plakoto.federation' });
+    expect(historyRow(federation, t, 'en')).toMatchObject({
+      title: 'Tavli · vs Bot (Easy)',
+      score: 'You 3 – 1 Bot · first to 3 · Rules version (Plakoto): Federation',
+    });
+    expect(historyRow(federation, el, 'el').score).toBe(
+      'Εσύ 3 – 1 Υπολογιστής · στους 3 · Παραλλαγή (Πλακωτό): Ομοσπονδίας',
+    );
+    expect(recordSetup(federation).rulesVersions).toEqual({
+      plakoto: 'plakoto.federation',
+      asodio: 'asodio.kafeneio',
+    });
+    expect(recordSetup(rec({ game: 'tavli' })).rulesVersions).toEqual({
+      plakoto: 'plakoto',
+      asodio: 'asodio.kafeneio',
+    });
+  });
+
+  it("keeps the record's rules version in its setup (#241)", () => {
+    expect(
+      recordSetup(rec({ game: 'plakoto', preset: 'plakoto.federation' })).rulesVersions,
+    ).toEqual({ plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' });
+    expect(
+      recordSetup(rec({ game: 'asodio', preset: 'asodio.aceyDeuceyGreek' })).rulesVersions,
+    ).toEqual({ plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyGreek' });
+    // A preset that is not one of the game gets the default and shows nothing.
+    const odd = rec({ game: 'portes', preset: 'plakoto.federation' });
+    expect(recordSetup(odd).rulesVersions).toEqual({
+      plakoto: 'plakoto',
+      asodio: 'asodio.kafeneio',
+    });
+    expect(historyRow(odd, t, 'en').score).toBe('You 3 – 1 Bot · first to 3');
   });
 
   it('shows a match length the new-game screen does not offer as it is', () => {

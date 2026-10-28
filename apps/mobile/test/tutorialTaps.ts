@@ -1,14 +1,20 @@
 /**
  * Plays the tutorial (#128, #149) like a finger would: tap a lit checker,
- * then its target. `game` picks the lesson set (default Portes).
+ * then its target. `game` picks the lesson set (default Portes). The taps
+ * follow Settings → Home board (#175), like the board does, and the window:
+ * in a landscape window (`test/window.ts`) the board is the classic one (#185).
  */
 import { currentBoard } from '@tavli/engine';
-import { getLayout, getTheme } from '@tavli/themes';
+import { getTheme } from '@tavli/themes';
 import { act, fireEvent, screen } from '@testing-library/react-native';
+import { Dimensions } from 'react-native';
 
+import { boardLayout } from '@/features/board/BoardCanvas';
 import type { BoardView } from '@/features/board/boardModel';
 import { fitBoardWithShadow, slotRect, type ScreenRect } from '@/features/board/geometry';
 import { buildSources } from '@/features/board/interaction';
+import { isLandscapeWindow } from '@/features/board/screenLayout';
+import { settingsStore } from '@/features/settings/store';
 import {
   LESSON_SETS,
   lessonDirection,
@@ -21,10 +27,22 @@ import {
 import { touch } from './gestureHandlerMock';
 
 export const TUTORIAL_BOARD_SIZE = { width: 375, height: 460 };
-export const tutorialGeo = fitBoardWithShadow(
-  getLayout(getTheme('walnut-kafeneio'), 'portrait-rotated'),
-  TUTORIAL_BOARD_SIZE,
-);
+/** The board's space in a landscape window: right of the lesson column. */
+export const TUTORIAL_LANDSCAPE_BOARD_SIZE = { width: 410, height: 340 };
+
+const landscapeNow = () => isLandscapeWindow(Dimensions.get('window'));
+const boardSize = () => (landscapeNow() ? TUTORIAL_LANDSCAPE_BOARD_SIZE : TUTORIAL_BOARD_SIZE);
+
+/** The tutorial board as drawn now (it follows the home board side in Settings and the window). */
+export const tutorialGeo = () =>
+  fitBoardWithShadow(
+    boardLayout(
+      getTheme('walnut-kafeneio'),
+      landscapeNow() ? 'classic' : 'tall',
+      settingsStore.getState().homeBoardSide,
+    ),
+    boardSize(),
+  );
 const viewOf = (game: TutorialGame): BoardView => ({
   viewer: 'white',
   direction: lessonDirection(game),
@@ -37,7 +55,7 @@ export const center = (r: ScreenRect) => ({ x: r.x + r.width / 2, y: r.y + r.hei
 export async function layoutTutorialBoard(): Promise<void> {
   await act(async () => {
     fireEvent(screen.getByTestId('tutorial-board'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, ...TUTORIAL_BOARD_SIZE } },
+      nativeEvent: { layout: { x: 0, y: 0, ...boardSize() } },
     });
   });
 }
@@ -47,7 +65,7 @@ export function tutorialSources(index: number, game: TutorialGame = 'portes') {
   const lesson = LESSON_SETS[game][index]!;
   const flow = startLesson(lesson);
   return buildSources(
-    tutorialGeo,
+    tutorialGeo(),
     currentBoard(flow),
     viewOf(game),
     'white',
@@ -64,7 +82,7 @@ export async function playLessonByTaps(
   let flow = startLesson(lesson);
   while (!lesson.done(flow)) {
     const sources = buildSources(
-      tutorialGeo,
+      tutorialGeo(),
       currentBoard(flow),
       viewOf(game),
       'white',
@@ -80,5 +98,5 @@ export async function playLessonByTaps(
 
 /** Taps point `index` (default 6: your checkers there are not lit in Portes lessons 1 to 6). */
 export async function tapWrongPlace(index = 6): Promise<void> {
-  await touch(PAN, [center(slotRect(tutorialGeo, { kind: 'point', index }))]);
+  await touch(PAN, [center(slotRect(tutorialGeo(), { kind: 'point', index }))]);
 }

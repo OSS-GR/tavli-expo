@@ -52,6 +52,9 @@ interface BoardState {
 
 - `Dice` is `readonly [DieValue, DieValue]`. `diceMoves(dice)` gives 2 moves,
   or 4 for a double.
+- `DISTINCT_ROLLS` lists the 21 distinct rolls (higher die first) with their
+  chance: 1/36 for a double, 2/36 for the rest. Use it to loop over every
+  roll; do not build the list again.
 - `Rng` has one method: `nextUint32()`. `rollDie` / `rollDice` use rejection
   sampling, so every face is equally likely.
 - `createSeededRng(seed)` is xoshiro128\*\* (seeded with splitmix32). It is
@@ -783,7 +786,10 @@ interface Match {
   rotation entry. `missingVariants(match)` lists them up front.
 - `gameRules(match, variant)`: the game of `match.rules` uses those rules.
   The other games use their default preset with the same `match` group.
-  With the `tavli` match preset, every game uses its default preset.
+  With the `tavli` match preset, every game uses its default preset. A
+  rotation on a game preset plays that preset in that game only: the app's
+  Tavli match with Federation Plakoto (#247) is `plakoto.federation` with
+  the rotation Portes → Plakoto → Fevga.
 - `validateMatch(value)` checks a match from outside. Besides the shape, it
   checks that `score`, `rotationIndex`, `status`, `winner` and
   `nextStarter` fit the list of games. So the stored totals can never drift

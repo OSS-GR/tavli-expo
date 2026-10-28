@@ -4,8 +4,10 @@
  * The engine stores points in White's numbering ("absolute"). The theme
  * layout numbers points from the view of the player at the bottom of the
  * screen (the "viewer"). So the viewer always moves 24 -> 1, with home at
- * the bottom left (portrait layout). Turning the board to the other player
- * (pass-and-play "flip") is only a change of viewer.
+ * the bottom left (portrait layout), or at the bottom right when Settings →
+ * Home board mirrors the layout (#175). Turning the board to the other
+ * player (pass-and-play "flip") is only a change of viewer. Nothing in this
+ * file knows about the mirror: it lives in the layout.
  *
  * Checker colors stay with the player: White uses the theme's light style,
  * Black the dark style, whoever sits at the bottom.

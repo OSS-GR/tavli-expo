@@ -183,7 +183,21 @@ export interface MoveContext {
   readonly highest: number;
 }
 
+/** A `MoveContext` that `fillMoveContext` can fill again (the shot search keeps one per depth). */
+export type MutableMoveContext = { -readonly [K in keyof MoveContext]: MoveContext[K] };
+
 export function moveContext(me: AsodioSide, options: AsodioOptions): MoveContext {
+  const ctx: MutableMoveContext = { bar: 0, outside: 0, rear: 0, bearOff: false, highest: 0 };
+  fillMoveContext(ctx, me, options);
+  return ctx;
+}
+
+/** Writes the `MoveContext` of `me` into `ctx`, with no new object. */
+export function fillMoveContext(
+  ctx: MutableMoveContext,
+  me: AsodioSide,
+  options: AsodioOptions,
+): void {
   const bar = me[BAR] ?? 0;
   const outside = (me[WAIT] ?? 0) - bar;
   let bearOff = bar === 0 && outside === 0;
@@ -195,7 +209,32 @@ export function moveContext(me: AsodioSide, options: AsodioOptions): MoveContext
   if (bearOff) {
     for (let p = 6; p >= 1 && highest === 0; p -= 1) if ((me[p] ?? 0) > 0) highest = p;
   }
-  return { bar, outside, rear: options.quarterLock ? rearQuarter(me) : 0, bearOff, highest };
+  ctx.bar = bar;
+  ctx.outside = outside;
+  ctx.rear = options.quarterLock ? rearQuarter(me) : 0;
+  ctx.bearOff = bearOff;
+  ctx.highest = highest;
+}
+
+/**
+ * The lowest own point a checker on the board may move from with `die`:
+ * `canMove` is false for every point below it (25: only an entry can
+ * move). A search can skip those points; the answer is the same.
+ */
+export function lowestFrom(die: number, ctx: MoveContext, options: AsodioOptions): number {
+  // Hit checkers enter first.
+  if (ctx.bar > 0) return WAIT;
+  let low = 1;
+  if (ctx.outside > 0) {
+    if (!options.moveWhileLoading) return WAIT;
+    // The move must stay in the starting quarter (19–24).
+    if (options.mustEnterAllFirst) low = 19 + die;
+  }
+  // A checker in front of the rear quarter is frozen (quarter > rear).
+  if (options.quarterLock && !options.moveInsideFrozenQuarter) {
+    low = Math.max(low, 19 - 6 * ctx.rear);
+  }
+  return Math.min(low, WAIT);
 }
 
 /**
@@ -234,33 +273,85 @@ export function canMove(
   return to === 0 || (!options.exactBearOff && from === ctx.highest);
 }
 
-/** Plays one move that `canMove` allowed, on copies. Returns the capture too. */
-export function moveOne(
+// What `playOne` changed besides the checker itself, so `undoOne` can take it back.
+const TOOK_BAR = 1;
+const FREED_PIN = 2;
+const PINNED_ONE = 4;
+const HIT_ONE = 8;
+
+/**
+ * Plays one move that `canMove` allowed, in place: it changes `me` and
+ * `them`. Returns a code for `undoOne`, which must get the same `from` and
+ * `die`. The shot search plays and takes back moves this way, so it copies
+ * no arrays.
+ */
+export function playOne(
   me: AsodioSide,
   them: AsodioSide,
   from: number,
   die: number,
   options: AsodioOptions,
-): { readonly me: AsodioSide; readonly them: AsodioSide; readonly capture: string } {
-  const a = me.slice();
-  const b = them.slice();
+): number {
+  let code = 0;
   let to: number;
   if (from === WAIT) {
-    a[WAIT] = (a[WAIT] ?? 0) - 1;
-    if ((a[BAR] ?? 0) > 0) a[BAR] = (a[BAR] ?? 0) - 1;
+    me[WAIT] = (me[WAIT] ?? 0) - 1;
+    if ((me[BAR] ?? 0) > 0) {
+      me[BAR] = (me[BAR] ?? 0) - 1;
+      code |= TOOK_BAR;
+    }
     to = 25 - die;
   } else {
-    a[from] = (a[from] ?? 0) - 1;
-    if (a[from] === 0) b[PINNED + 25 - from] = 0;
+    me[from] = (me[from] ?? 0) - 1;
+    // Phase 3.4: the last pinner leaves, the pinned checker is free.
+    if (me[from] === 0 && them[PINNED + 25 - from] === 1) {
+      them[PINNED + 25 - from] = 0;
+      code |= FREED_PIN;
+    }
     to = Math.max(0, from - die);
   }
-  let capture = 'none';
-  if (to > 0 && (b[25 - to] ?? 0) === 1 && b[PINNED + 25 - to] !== 1 && a[PINNED + to] !== 1) {
-    capture = options.pin ? 'pin' : 'hit';
-    applyCapture(b, 25 - to, capture);
+  if (
+    to > 0 &&
+    (them[25 - to] ?? 0) === 1 &&
+    them[PINNED + 25 - to] !== 1 &&
+    me[PINNED + to] !== 1
+  ) {
+    if (options.pin) {
+      them[PINNED + 25 - to] = 1;
+      code |= PINNED_ONE;
+    } else {
+      applyCapture(them, 25 - to, 'hit');
+      code |= HIT_ONE;
+    }
   }
-  a[to] = (a[to] ?? 0) + 1;
-  return { me: a, them: b, capture };
+  me[to] = (me[to] ?? 0) + 1;
+  return code;
+}
+
+/** Takes back the move `playOne` played (`code` is what it returned). */
+export function undoOne(
+  me: AsodioSide,
+  them: AsodioSide,
+  from: number,
+  die: number,
+  code: number,
+): void {
+  const to = from === WAIT ? 25 - die : Math.max(0, from - die);
+  me[to] = (me[to] ?? 0) - 1;
+  if ((code & PINNED_ONE) !== 0) {
+    them[PINNED + 25 - to] = 0;
+  } else if ((code & HIT_ONE) !== 0) {
+    them[25 - to] = (them[25 - to] ?? 0) + 1;
+    them[WAIT] = (them[WAIT] ?? 0) - 1;
+    them[BAR] = (them[BAR] ?? 0) - 1;
+  }
+  if (from === WAIT) {
+    me[WAIT] = (me[WAIT] ?? 0) + 1;
+    if ((code & TOOK_BAR) !== 0) me[BAR] = (me[BAR] ?? 0) + 1;
+  } else {
+    if ((code & FREED_PIN) !== 0) them[PINNED + 25 - from] = 1;
+    me[from] = (me[from] ?? 0) + 1;
+  }
 }
 
 /** For each die 1–6: true when `me` has a legal single move with it (gates aside). */

@@ -10,6 +10,7 @@ import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ToggleRow } from '@/components/settings/ToggleRow';
+import type { BotSpeed } from '@/features/bot/botSpeed';
 import { HistorySettings } from '@/features/history/HistorySettings';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
@@ -17,6 +18,8 @@ import { TutorialSettings } from '@/features/tutorial/TutorialSettings';
 import { pickDeviceLanguage, type LanguagePreference } from '@/i18n/languages';
 
 import { BoardThemePicker } from './BoardThemePicker';
+import { BoardLayoutPicker } from './BoardLayoutPicker';
+import { HomeBoardSidePicker } from './HomeBoardSidePicker';
 import type { BoardFlipMode, MoveListMode } from './settings';
 import { useSettings } from './store';
 
@@ -47,10 +50,11 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
   const haptics = useSettings((s) => s.haptics);
   const language = useSettings((s) => s.language);
   const autoConfirmMoves = useSettings((s) => s.autoConfirmMoves);
-  const showPipCounts = useSettings((s) => s.showPipCounts);
+  const showHints = useSettings((s) => s.showHints);
   const boardFlipMode = useSettings((s) => s.boardFlipMode);
   const theme = useSettings((s) => s.theme);
   const moveList = useSettings((s) => s.moveList);
+  const botSpeed = useSettings((s) => s.botSpeed);
   const setSetting = useSettings((s) => s.setSetting);
   const shareUsageData = useConsent((s) => s.status === 'granted');
   const setConsent = useConsent((s) => s.setConsent);
@@ -84,6 +88,12 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
     { value: 'off', label: t('settings.moveList.off') },
   ];
 
+  const botSpeedOptions: SegmentOption<BotSpeed>[] = [
+    { value: 'slow', label: t('settings.botSpeed.slow') },
+    { value: 'normal', label: t('settings.botSpeed.normal') },
+    { value: 'fast', label: t('settings.botSpeed.fast') },
+  ];
+
   const themeOptions = THEME_IDS.map((id) => ({ value: id, label: t(`themes.${id}`) }));
 
   const version = Constants.expoConfig?.version ?? '';
@@ -103,11 +113,11 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
           onValueChange={(value) => setSetting('autoConfirmMoves', value)}
         />
         <ToggleRow
-          testID="settings-pip-counts"
-          label={t('settings.pipCounts.label')}
-          hint={t('settings.pipCounts.hint')}
-          value={showPipCounts}
-          onValueChange={(value) => setSetting('showPipCounts', value)}
+          testID="settings-hints"
+          label={t('settings.hints.label')}
+          hint={t('settings.hints.hint')}
+          value={showHints}
+          onValueChange={(value) => setSetting('showHints', value)}
         />
         <Text style={styles.label}>{t('settings.boardView.label')}</Text>
         <SegmentedControl
@@ -127,6 +137,15 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
             : t('settings.boardView.fixedHint')}
         </Text>
         <Text style={styles.hint}>{t('settings.boardView.faceToFaceSoon')}</Text>
+        <Text style={styles.label}>{t('settings.botSpeed.label')}</Text>
+        <SegmentedControl
+          testID="settings-bot-speed"
+          label={t('settings.botSpeed.label')}
+          options={botSpeedOptions}
+          value={botSpeed}
+          onChange={(value) => setSetting('botSpeed', value)}
+        />
+        <Text style={styles.hint}>{t(`settings.botSpeed.${botSpeed}Hint`)}</Text>
       </SettingsSection>
 
       <SettingsSection title={t('settings.sections.soundAndFeel')}>
@@ -158,6 +177,8 @@ export function SettingsScreen({ onLearnToPlay, onHistory }: SettingsScreenProps
 
       <SettingsSection title={t('settings.sections.board')}>
         <BoardThemePicker testID="settings-board-theme" />
+        <BoardLayoutPicker testID="settings-board-layout" />
+        <HomeBoardSidePicker testID="settings-home-board" />
       </SettingsSection>
 
       <SettingsSection title={t('settings.sections.look')}>

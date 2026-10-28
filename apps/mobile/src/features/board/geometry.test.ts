@@ -1,7 +1,8 @@
-import { getLayout, getTheme } from '@tavli/themes';
+import { getLayout, getTheme, mirrorLayout } from '@tavli/themes';
 
 import {
   barCheckerRadius,
+  boxRatioWithShadow,
   checkerRadius,
   distanceToRect,
   fitBoard,
@@ -54,6 +55,19 @@ describe('fitBoard', () => {
     const big = fitBoardWithShadow(layout, { width: 430, height: 2000 });
     expect(big.x).toBeGreaterThan(5);
     expect(big.x + big.width).toBeLessThan(430 - 5);
+  });
+  // The classic board (#184): a box of this shape is filled edge to edge.
+  it('gives the shape of a box the board and its shadow fill', () => {
+    const classic = getLayout(getTheme('walnut-kafeneio'), 'landscape');
+    for (const width of [375, 440]) {
+      const box = { width, height: width / boxRatioWithShadow(classic) };
+      const fit = fitBoardWithShadow(classic, box);
+      const room = width - 2 * Math.ceil((classic.shadow.dy + classic.shadow.blur) * width);
+      // As wide as the box less the shadow room (the room is rounded up to whole points).
+      expect(fit.width).toBeLessThanOrEqual(room + 1e-6);
+      expect(fit.width).toBeGreaterThan(room - 2);
+      expect(fit.width / fit.height).toBeCloseTo(classic.aspectRatio, 6);
+    }
   });
 });
 
@@ -216,5 +230,88 @@ describe('hit-testing', () => {
     expect(pickRect(rects, 18, 5, 12)).toBe(0);
     expect(pickRect(rects, 26, 5, 12)).toBe(1);
     expect(pickRect(rects, 100, 5, 12)).toBe(-1);
+  });
+});
+
+// Settings → Home board: bottom left (#175). The layout is mirrored left to
+// right; every rect, stack and hit area must be the mirror image of the
+// normal board, so what the player sees is still what the player touches.
+describe('home board on the bottom left (mirrored layout)', () => {
+  const mirrored = fitBoard(mirrorLayout(layout), { width: 377, height: 630 });
+  const flipX = (x: number) => 2 * geo.x + geo.width - x;
+  const flipRect = (r: ScreenRect): ScreenRect => ({ ...r, x: flipX(r.x + r.width) });
+  const close = (a: ScreenRect, b: ScreenRect) => {
+    expect(a.x).toBeCloseTo(b.x, 6);
+    expect(a.y).toBeCloseTo(b.y, 6);
+    expect(a.width).toBeCloseTo(b.width, 6);
+    expect(a.height).toBeCloseTo(b.height, 6);
+  };
+  const slots = hitAreas(geo).map((a) => a.slot);
+
+  it('puts point 1 at the bottom right and point 24 at the bottom left', () => {
+    const p1 = slotRect(mirrored, { kind: 'point', index: 1 });
+    const p24 = slotRect(mirrored, { kind: 'point', index: 24 });
+    expect(p1.x).toBeGreaterThan(p24.x);
+    expect(p1.y).toBeCloseTo(p24.y, 6);
+    // Your tray is under your home, at the bottom right.
+    const tray = slotRect(mirrored, { kind: 'tray', side: 'player' });
+    expect(tray.x).toBeGreaterThanOrEqual(p1.x - 1);
+    expect(tray.y).toBeGreaterThan(p1.y);
+  });
+
+  it('mirrors every point, bar half and tray', () => {
+    for (const slot of slots) close(slotRect(mirrored, slot), flipRect(slotRect(geo, slot)));
+  });
+
+  it('mirrors the point triangles', () => {
+    for (const index of [1, 6, 7, 12, 13, 24]) {
+      const normal = pointCorners(geo, index);
+      pointCorners(mirrored, index).forEach((c, i) => {
+        expect(c.x).toBeCloseTo(flipX(normal[i]!.x), 6);
+        expect(c.y).toBeCloseTo(normal[i]!.y, 6);
+      });
+    }
+  });
+
+  it('mirrors stacks on points and on the bar, pinned ones too', () => {
+    const cases = [
+      { slot: { kind: 'point', index: 6 }, pinned: false },
+      { slot: { kind: 'point', index: 6 }, pinned: true },
+      { slot: { kind: 'point', index: 13 }, pinned: true },
+      { slot: { kind: 'bar', side: 'player' }, pinned: false },
+      { slot: { kind: 'bar', side: 'opponent' }, pinned: false },
+    ] as const;
+    for (const { slot, pinned } of cases) {
+      const normal = stackGeometry(geo, slot, 7, pinned);
+      const flipped = stackGeometry(mirrored, slot, 7, pinned);
+      expect(flipped.badge).toBe(normal.badge);
+      expect(flipped.radius).toBeCloseTo(normal.radius, 6);
+      flipped.centers.forEach((c, i) => {
+        expect(c.x).toBeCloseTo(flipX(normal.centers[i]!.x), 6);
+        expect(c.y).toBeCloseTo(normal.centers[i]!.y, 6);
+      });
+    }
+    // Your bar half now starts at the middle and grows to the left.
+    const bar = stackGeometry(mirrored, { kind: 'bar', side: 'player' }, 2);
+    expect(bar.centers[1]!.x).toBeLessThan(bar.centers[0]!.x);
+  });
+
+  it('mirrors the trays and fills them from the other end', () => {
+    for (const side of ['player', 'opponent'] as const) {
+      const normal = trayGeometry(geo, side, 6);
+      trayGeometry(mirrored, side, 6).forEach((r, i) => close(r, flipRect(normal[i]!)));
+    }
+    expect(trayLanding(mirrored, 'player', 2).x).toBeLessThan(trayLanding(mirrored, 'player', 0).x);
+  });
+
+  it('hit-tests the mirrored areas', () => {
+    const areas = hitAreas(mirrored);
+    for (const slot of slots) {
+      const c = center(slotRect(geo, slot));
+      expect(hitTest(areas, flipX(c.x), c.y)).toEqual(slot);
+    }
+    // Where point 1 sits on the normal board, the mirrored board has point 24.
+    const p1 = center(slotRect(geo, { kind: 'point', index: 1 }));
+    expect(hitTest(areas, p1.x, p1.y)).toEqual({ kind: 'point', index: 24 });
   });
 });

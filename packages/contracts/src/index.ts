@@ -63,6 +63,24 @@ export type {
   SendAnswerRequest,
   SendTurnRequest,
 } from './game-transport';
+export {
+  INVITE_CODE_ALPHABET,
+  INVITE_CODE_LENGTH,
+  INVITE_ERROR_CODES,
+  INVITE_STATUSES,
+  INVITE_TIME_MS,
+  isInviteErrorData,
+  normalizeInviteCode,
+} from './invite';
+export type { InviteErrorCode, InviteErrorData, InviteStatus, InviteView } from './invite';
+export {
+  AUTH_ERROR_CODES,
+  MEMORY_AUTH_TOKEN_PREFIX,
+  createMemoryAuthProvider,
+  createMemoryAuthStore,
+  isAuthErrorData,
+} from './auth';
+export type { AuthErrorCode, AuthErrorData, AuthProvider, AuthUser, MemoryAuthStore } from './auth';
 export { createMemoryStorage, type Storage } from './storage';
 export { isAnonymousInstallId } from './install-id';
 export {
@@ -77,6 +95,7 @@ export {
   type GameMode,
   type GameResultKind,
   type MatchGame,
+  type OpeningRollRule,
   type ThemeKind,
   type TutorialGame,
   type TutorialSource,

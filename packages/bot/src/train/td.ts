@@ -30,7 +30,7 @@
  */
 
 import { createSeededRng, opponent, rollDice } from '@tavli/engine';
-import type { GameState, PlayerId, Rng, Variant } from '@tavli/engine';
+import type { GameState, PlayerId, Rng, Turn, Variant } from '@tavli/engine';
 
 import { pickTurn } from '../create-bot';
 import { encodeFloat32 } from '../evaluators/float-codec';
@@ -68,15 +68,21 @@ export function toTrainable(net: Net): TrainableNet {
   };
 }
 
-/** The shipped form of a net (Float32, base64). */
-export function toNetFile(net: Net, id: string, notes?: string): NetFile {
+/** The shipped form of a net (Float32, base64). `game` is the variant id it was trained for. */
+export function toNetFile(net: Net, id: string, notes?: string, game?: string): NetFile {
   const all = new Float32Array(net.w1.length + net.b1.length + net.w2.length + net.b2.length);
   let at = 0;
   for (const part of [net.w1, net.b1, net.w2, net.b2]) {
     all.set(part, at);
     at += part.length;
   }
-  const file = { id, inputs: net.inputs, hidden: net.hidden, data: encodeFloat32(all) };
+  const file: NetFile = {
+    id,
+    ...(game === undefined ? {} : { game }),
+    inputs: net.inputs,
+    hidden: net.hidden,
+    data: encodeFloat32(all),
+  };
   return notes === undefined ? file : { ...file, notes };
 }
 
@@ -186,6 +192,21 @@ export function playOn(variant: Variant, state: GameState): GameState {
   return next;
 }
 
+/**
+ * Plays a turn with the engine and answers any question after it. The 1-ply
+ * scores and the λ-returns flip the view each turn, so this throws if the
+ * same player moves again (`scoreNetCandidates`).
+ */
+function playTurn(variant: Variant, rolled: GameState, turn: Turn): GameState {
+  const next = playOn(variant, variant.applyTurn(rolled, turn));
+  if (next.toMove === rolled.toMove) {
+    throw new Error(
+      `${variant.id}: ${next.toMove} moves again, but the net code needs turns to alternate`,
+    );
+  }
+  return next;
+}
+
 /** The default `maxTurns`: far more than a real game (Portes, Plakoto and Fevga games take 50–120 turns). */
 export const DEFAULT_MAX_TURNS = 1000;
 
@@ -235,13 +256,13 @@ export function trainEpisode<S, C>(
       break;
     }
     const value: Triple = [pick.next.win, pick.next.winDouble, pick.next.loseDouble];
-    if (!game.usesNet(pick.theirs, pick.mine)) {
+    if (!game.usesNet(pick.theirs, pick.mine, context)) {
       handOff = true;
       last = flip(value);
       break;
     }
     values.push(value);
-    state = playOn(variant, variant.applyTurn(rolled, turn));
+    state = playTurn(variant, rolled, turn);
     roller = pick.theirs;
     waiter = pick.mine;
   }
@@ -305,7 +326,7 @@ export function heuristicPositions<S, C>(
     let roller = game.sideOf(state, state.toMove);
     let waiter = game.sideOf(state, opponent(state.toMove));
     for (let turnCount = 0; turnCount < DEFAULT_MAX_TURNS; turnCount += 1) {
-      if (out.length >= count || !game.usesNet(roller, waiter)) break;
+      if (out.length >= count || !game.usesNet(roller, waiter, context)) break;
       const e = game.fallback(roller, waiter, context);
       out.push({ roller, waiter, target: [e.win, e.winDouble, e.loseDouble] });
       const dice = rollDice(rng);
@@ -331,7 +352,7 @@ export function heuristicPositions<S, C>(
       });
       const turn = turns[bestIndex];
       if (turn === undefined || ended) break;
-      state = playOn(variant, variant.applyTurn(rolled, turn));
+      state = playTurn(variant, rolled, turn);
       roller = next[1];
       waiter = next[0];
     }

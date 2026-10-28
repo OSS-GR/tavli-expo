@@ -1,6 +1,6 @@
 import type { createRecordingFeedback, createRecordingSoundPlayer } from '@tavli/contracts';
 import { createSeededRng, rollDie } from '@tavli/engine';
-import { act, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen } from '@testing-library/react-native';
 
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
@@ -31,7 +31,7 @@ function newStore(seed = seedWithoutTie()) {
   });
 }
 
-// The opening result closes by itself after 1.5 s (a timer).
+// The opening result closes by itself after 3 s (a timer).
 runOnFakeTimers();
 
 beforeEach(async () => {
@@ -63,10 +63,18 @@ describe('<GameScreen /> dice', () => {
     const low = Math.min(game.opening!.white!, game.opening!.black!);
     const starter = game.starter === 'white' ? 'Ann' : 'Bob';
     expect(screen.getByText(`${starter} starts with ${high}-${low}.`)).toBeOnTheScreen();
-    // The starter plays the two opening dice: they show in the controls row.
-    expect(
-      screen.getByLabelText(`Dice ${game.state.dice!.join('-')}, 2 left to play`),
-    ).toBeOnTheScreen();
+    // The starter plays the two opening dice: they lie on the board once it
+    // has its size (#184), under the result card until it closes.
+    await act(async () => {
+      fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 500 } },
+      });
+    });
+    const diceLabel = `Dice ${game.state.dice!.join('-')}, 2 left to play`;
+    expect(screen.queryByLabelText(diceLabel)).toBeNull();
+    expect(screen.getByLabelText(diceLabel, { includeHiddenElements: true })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'OK' }));
+    expect(screen.getByLabelText(diceLabel)).toBeOnTheScreen();
     // A haptic for each die that landed, and the dice sounds.
     expect(haptics.calls).toEqual(['light', 'light']);
     expect(sounds.played).toContain('diceRoll');
@@ -92,7 +100,7 @@ describe('<GameScreen /> dice', () => {
       store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 4 });
       store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 4 });
     });
-    expect(screen.getByText('Tie! Both rolled 4. Roll again.')).toBeOnTheScreen();
+    expect(screen.getByText('Tie: both rolled 4. Roll again.')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Ann: roll, or tap the board' })).toBeOnTheScreen();
   });
 

@@ -29,10 +29,24 @@ describe('<SettingsScreen />', () => {
     expect(screen.getByRole('switch', { name: 'Sound' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Haptics' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Auto-confirm moves' })).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Show pip counts' })).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Show hints' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Phone language' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Flip' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Face-to-face' })).toBeDisabled();
+  });
+
+  it('has no pip count row (#238), in English and in Greek', async () => {
+    const user = userEvent.setup();
+    await render(<SettingsScreen />);
+    expect(screen.queryByTestId('settings-pip-counts')).toBeNull();
+    expect(screen.queryByText(/pip/i)).toBeNull();
+
+    await user.press(screen.getByRole('radio', { name: 'Ελληνικά' }));
+    expect(await screen.findByRole('header', { name: 'Παιχνίδι' })).toBeOnTheScreen();
+    expect(screen.queryByText('Μετρητής πόντων')).toBeNull();
+
+    await user.press(screen.getByRole('radio', { name: 'Γλώσσα κινητού' }));
+    expect(await screen.findByRole('switch', { name: 'Sound' })).toBeOnTheScreen();
   });
 
   it('switches to Greek at once when the user picks Ελληνικά', async () => {
@@ -64,6 +78,25 @@ describe('<SettingsScreen />', () => {
     expect(screen.getByRole('switch', { name: 'Sound' })).not.toBeChecked();
   });
 
+  it('turns the Hint button off and on (#209), and sends only the key', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      consentStore.setState({ status: 'granted' });
+    });
+    await render(<SettingsScreen />);
+
+    await user.press(screen.getByRole('switch', { name: 'Show hints' }));
+    expect(settingsStore.getState().showHints).toBe(false);
+    expect(screen.getByRole('switch', { name: 'Show hints' })).not.toBeChecked();
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'showHints' },
+    });
+    await user.press(screen.getByRole('switch', { name: 'Show hints' }));
+    expect(settingsStore.getState().showHints).toBe(true);
+  });
+
   it('changes the board view and ignores the locked option', async () => {
     const user = userEvent.setup();
     await render(<SettingsScreen />);
@@ -74,6 +107,118 @@ describe('<SettingsScreen />', () => {
 
     await user.press(screen.getByRole('radio', { name: 'Face-to-face' }));
     expect(settingsStore.getState().boardFlipMode).toBe('fixed');
+  });
+
+  it('picks where your home is: bottom right by default, or bottom left (#175)', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      consentStore.setState({ status: 'granted' });
+    });
+    await render(<SettingsScreen />);
+
+    const group = screen.getByTestId('settings-home-board');
+    expect(group).toHaveAccessibleName('Your home');
+    expect(within(group).getByRole('radio', { name: 'Bottom right' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Bottom left' })).not.toBeChecked();
+    expect(screen.getByText('Your checkers go round counterclockwise.')).toBeOnTheScreen();
+    expect(screen.getByText('Your checkers go round clockwise.')).toBeOnTheScreen();
+    // A small board picture for each side, hidden from screen readers.
+    for (const side of ['right', 'left']) {
+      const preview = `settings-home-board-${side}-preview`;
+      expect(screen.queryByTestId(preview)).toBeNull();
+      expect(screen.getByTestId(preview, { includeHiddenElements: true })).toBeTruthy();
+    }
+
+    await user.press(within(group).getByRole('radio', { name: 'Bottom left' }));
+    expect(settingsStore.getState().homeBoardSide).toBe('left');
+    expect(within(group).getByRole('radio', { name: 'Bottom left' })).toBeChecked();
+    // Only the key goes out, never the value.
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'homeBoardSide' },
+    });
+
+    await user.press(within(group).getByRole('radio', { name: 'Bottom right' }));
+    expect(settingsStore.getState().homeBoardSide).toBe('right');
+  });
+
+  it('names the home board sides in Greek', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    try {
+      await render(<SettingsScreen />);
+      const group = screen.getByTestId('settings-home-board');
+      expect(group).toHaveAccessibleName('Το σπίτι σου');
+      expect(within(group).getByRole('radio', { name: 'Κάτω δεξιά' })).toBeChecked();
+      expect(within(group).getByRole('radio', { name: 'Κάτω αριστερά' })).toBeOnTheScreen();
+      expect(screen.getByText('Τα πούλια σου γυρίζουν δεξιόστροφα.')).toBeOnTheScreen();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
+  it('picks the board layout: tall by default, or classic (#184)', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      consentStore.setState({ status: 'granted' });
+    });
+    await render(<SettingsScreen />);
+
+    const group = screen.getByTestId('settings-board-layout');
+    expect(group).toHaveAccessibleName('Board layout');
+    expect(within(group).getByRole('radio', { name: 'Tall' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Classic' })).not.toBeChecked();
+    expect(
+      screen.getByText('The board on its side, as big as the screen allows. Bigger checkers.'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByText('The board as on a table, as wide as the screen. Smaller checkers.'),
+    ).toBeOnTheScreen();
+    // A small picture of each layout, hidden from screen readers.
+    for (const mode of ['tall', 'classic']) {
+      const preview = `settings-board-layout-${mode}-preview`;
+      expect(screen.queryByTestId(preview)).toBeNull();
+      expect(screen.getByTestId(preview, { includeHiddenElements: true })).toBeTruthy();
+    }
+
+    await user.press(within(group).getByRole('radio', { name: 'Classic' }));
+    expect(settingsStore.getState().boardLayout).toBe('classic');
+    expect(within(group).getByRole('radio', { name: 'Classic' })).toBeChecked();
+    // Only the key goes out, never the value.
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'boardLayout' },
+    });
+
+    await user.press(within(group).getByRole('radio', { name: 'Tall' }));
+    expect(settingsStore.getState().boardLayout).toBe('tall');
+  });
+
+  it('names the board layouts in Greek', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    try {
+      await render(<SettingsScreen />);
+      const group = screen.getByTestId('settings-board-layout');
+      expect(group).toHaveAccessibleName('Διάταξη ταμπλό');
+      expect(within(group).getByRole('radio', { name: 'Ψηλό' })).toBeChecked();
+      expect(within(group).getByRole('radio', { name: 'Κλασικό' })).toBeOnTheScreen();
+      expect(
+        screen.getByText(
+          'Μόνο για το παιχνίδι. Το μάθημα και οι κανόνες δείχνουν πάντα το ψηλό ταμπλό.',
+        ),
+      ).toBeOnTheScreen();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
   });
 
   it('picks the move list: automatic by default, then on or off (#134)', async () => {
@@ -93,6 +238,54 @@ describe('<SettingsScreen />', () => {
     await user.press(screen.getByRole('radio', { name: 'Off' }));
     expect(settingsStore.getState().moveList).toBe('off');
     expect(screen.getByText('Play on the board only.')).toBeOnTheScreen();
+  });
+
+  it('picks the bot speed: Normal by default, then Slow or Fast (#172)', async () => {
+    const user = userEvent.setup();
+    await render(<SettingsScreen />);
+
+    expect(screen.getByRole('radio', { name: 'Normal' })).toBeChecked();
+    expect(screen.getByText('The bot plays at a pace that is easy to follow.')).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('radio', { name: 'Slow' }));
+    expect(settingsStore.getState().botSpeed).toBe('slow');
+    expect(
+      screen.getByText('The bot takes its time, so you can follow each move.'),
+    ).toBeOnTheScreen();
+
+    await user.press(screen.getByRole('radio', { name: 'Fast' }));
+    expect(settingsStore.getState().botSpeed).toBe('fast');
+    expect(screen.getByText('The bot plays quickly.')).toBeOnTheScreen();
+  });
+
+  it('shows the bot speed in Greek', async () => {
+    const user = userEvent.setup();
+    await render(<SettingsScreen />);
+
+    await user.press(screen.getByRole('radio', { name: 'Ελληνικά' }));
+    expect(await screen.findByText('Ταχύτητα υπολογιστή')).toBeOnTheScreen();
+    expect(screen.getByRole('radio', { name: 'Κανονικά' })).toBeChecked();
+    await user.press(screen.getByRole('radio', { name: 'Αργά' }));
+    expect(settingsStore.getState().botSpeed).toBe('slow');
+    expect(screen.getByRole('radio', { name: 'Γρήγορα' })).not.toBeChecked();
+
+    await user.press(screen.getByRole('radio', { name: 'Γλώσσα κινητού' }));
+    expect(await screen.findByRole('radio', { name: 'Slow' })).toBeChecked();
+  });
+
+  it('sends the bot speed key, never the value, when usage data is on', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      consentStore.setState({ status: 'granted' });
+    });
+    await render(<SettingsScreen />);
+
+    await user.press(screen.getByRole('radio', { name: 'Fast' }));
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'botSpeed' },
+    });
   });
 
   it('turns usage data on and off from Privacy (one switch for the Analytics port)', async () => {

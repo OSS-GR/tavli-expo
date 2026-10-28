@@ -9,6 +9,8 @@
  */
 import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
 
+import type { MovePath } from './combined';
+
 import {
   countIn,
   pinnedIn,
@@ -68,7 +70,13 @@ export interface MoveTarget {
   readonly landing: ScreenPoint;
   /** Radius of the ghost checker. */
   readonly r: number;
+  /** The first move (for a single die: the move). */
   readonly move: Move;
+  /**
+   * Every move in the order it is played: one for a single die, two or more
+   * for one checker moved with several dice (#180, `combined.ts`).
+   */
+  readonly moves: readonly Move[];
 }
 
 /** A checker the player may move now: the top checker of a point or the bar. */
@@ -109,7 +117,7 @@ export function slotTop(geo: BoardGeometry, slot: Slot, count: number, pinned = 
  * pinned checker under it if `pinned`). A hit lands on the blot. A pin
  * (Plakoto) lands on top of the blot, which then peeks out under it.
  */
-function landingOn(
+export function landingOn(
   geo: BoardGeometry,
   slot: Slot,
   count: number,
@@ -126,6 +134,10 @@ function landingOn(
  * Every checker `mover` may move now, with its targets, in screen points.
  * When two dice reach the same target (bearing off), the lower die is used,
  * so the higher one stays for later.
+ *
+ * `paths` (#180, `combinedPaths`): targets one checker reaches with several
+ * dice. They come after the single targets of their source, so a tap that
+ * hits both picks the single one.
  */
 export function buildSources(
   geo: BoardGeometry,
@@ -133,9 +145,27 @@ export function buildSources(
   view: BoardView,
   mover: PlayerId,
   legal: readonly SourceMoves[],
+  paths: readonly MovePath[] = [],
 ): MovableSource[] {
   const R = checkerRadius(geo);
   const sources: MovableSource[] = [];
+  const targetOf = (moves: readonly Move[]): MoveTarget | null => {
+    const move = moves[0];
+    const last = moves[moves.length - 1];
+    if (move === undefined || last === undefined) return null;
+    const to = slotOfDestination(last.to, mover, view);
+    const key = slotKey(to);
+    const rect = slotRect(geo, to);
+    const landing = landingOn(
+      geo,
+      to,
+      countIn(board, to, view),
+      pinnedIn(board, to, view),
+      last.capture,
+    );
+    const r = to.kind === 'tray' ? Math.min(R, rect.height / 2) : R;
+    return { key, slot: to, rect, landing, r, move, moves };
+  };
   for (const group of legal) {
     const slot = slotOfOrigin(group.from, mover, view);
     const count = countIn(board, slot, view);
@@ -144,27 +174,24 @@ export function buildSources(
     if (top === null || checkerKey === null) continue;
     const byTarget = new Map<string, MoveTarget>();
     for (const move of group.moves) {
-      const to = slotOfDestination(move.to, mover, view);
-      const key = slotKey(to);
+      const key = slotKey(slotOfDestination(move.to, mover, view));
       const old = byTarget.get(key);
       if (old !== undefined && old.move.die <= move.die) continue;
-      const rect = slotRect(geo, to);
-      const landing = landingOn(
-        geo,
-        to,
-        countIn(board, to, view),
-        pinnedIn(board, to, view),
-        move.capture,
-      );
-      const r = to.kind === 'tray' ? Math.min(R, rect.height / 2) : R;
-      byTarget.set(key, { key, slot: to, rect, landing, r, move });
+      const target = targetOf([move]);
+      if (target) byTarget.set(key, target);
+    }
+    const combined: MoveTarget[] = [];
+    for (const path of paths) {
+      if (path.from !== group.from) continue;
+      const target = targetOf(path.steps);
+      if (target && !byTarget.has(target.key)) combined.push(target);
     }
     sources.push({
       key: slotKey(slot),
       slot,
       rect: slotRect(geo, slot),
       checker: { key: checkerKey, ...top },
-      targets: [...byTarget.values()],
+      targets: [...byTarget.values(), ...combined],
     });
   }
   return sources;

@@ -16,6 +16,7 @@ import { DEFAULT_THEME_ID, isThemeId, type ThemeId } from '@tavli/ui';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { createStore } from 'zustand/vanilla';
 
+import { BOT_SPEEDS, type BotSpeed } from '@/features/bot/botSpeed';
 import { LANGUAGE_PREFERENCES, type LanguagePreference } from '@/i18n/languages';
 
 /**
@@ -37,15 +38,48 @@ export type MoveListMode = 'auto' | 'on' | 'off';
 
 export const MOVE_LIST_MODES: readonly MoveListMode[] = ['auto', 'on', 'off'];
 
+/**
+ * Where your home is, as on a real board seen from your seat (#175).
+ * The phone shows the board on its side (portrait), so on screen your home
+ * is always at the bottom.
+ * - `right` (default): home on the bottom right of a real board. Checkers go
+ *   round counterclockwise. On screen: home bottom left, start bottom right.
+ * - `left`: home on the bottom left of a real board. The board is mirrored
+ *   left to right, so checkers go round clockwise. On screen: home bottom
+ *   right, start bottom left.
+ */
+export type HomeBoardSide = 'right' | 'left';
+
+export const HOME_BOARD_SIDES: readonly HomeBoardSide[] = ['right', 'left'];
+
+/**
+ * How the game screen shows the board in portrait (#184).
+ * - `tall` (default): the board on its side, as large as the screen allows.
+ *   The long side runs from the top to the bottom of the screen.
+ * - `classic`: the board as it lies on a table, seen from your seat, as wide
+ *   as the screen and centred on it.
+ * The tutorial and the small board pictures always use `tall`.
+ */
+export type BoardLayoutMode = 'tall' | 'classic';
+
+export const BOARD_LAYOUT_MODES: readonly BoardLayoutMode[] = ['tall', 'classic'];
+
 export interface Settings {
   sound: boolean;
   haptics: boolean;
   language: LanguagePreference;
   /** End the turn as soon as all dice are used, without a Confirm tap. */
   autoConfirmMoves: boolean;
-  showPipCounts: boolean;
+  /** Offline games: a Hint button shows the best turn for the roll (#209). */
+  showHints: boolean;
   boardFlipMode: BoardFlipMode;
+  /** Where your home is (a real board seen from your seat). `left` mirrors the board. */
+  homeBoardSide: HomeBoardSide;
+  /** The game screen layout: the tall board on its side, or the classic wide board (#184). */
+  boardLayout: BoardLayoutMode;
   moveList: MoveListMode;
+  /** How fast the bot plays its turn (#172, timings in `features/bot/botSpeed.ts`). */
+  botSpeed: BotSpeed;
   /** The app colors (`@tavli/ui`). */
   theme: ThemeId;
   /** The board theme (`@tavli/themes`): the game, the tutorial and the rules pictures use it. */
@@ -57,9 +91,12 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   haptics: true,
   language: 'system',
   autoConfirmMoves: false,
-  showPipCounts: true,
+  showHints: true,
   boardFlipMode: 'flip',
+  homeBoardSide: 'right',
+  boardLayout: 'tall',
   moveList: 'auto',
+  botSpeed: 'normal',
   theme: DEFAULT_THEME_ID,
   boardTheme: DEFAULT_BOARD_THEME_ID,
 };
@@ -91,7 +128,10 @@ function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
-/** Turns any saved value into valid settings. Unknown keys are dropped. */
+/**
+ * Turns any saved value into valid settings. Unknown keys are dropped, and so
+ * are removed settings: `showPipCounts` (the pip count, removed in #238).
+ */
 export function sanitizeSettings(raw: unknown): Settings {
   const input = isRecord(raw) ? raw : {};
   const d = DEFAULT_SETTINGS;
@@ -100,9 +140,16 @@ export function sanitizeSettings(raw: unknown): Settings {
     haptics: bool(input['haptics'], d.haptics),
     language: oneOf(LANGUAGE_PREFERENCES, input['language'], d.language),
     autoConfirmMoves: bool(input['autoConfirmMoves'], d.autoConfirmMoves),
-    showPipCounts: bool(input['showPipCounts'], d.showPipCounts),
+    // Saves from before #209 have no value: hints start on.
+    showHints: bool(input['showHints'], d.showHints),
     boardFlipMode: oneOf(BOARD_FLIP_MODES, input['boardFlipMode'], d.boardFlipMode),
+    // Saves from before #175 have no value: they load as `right`, the board as it was.
+    homeBoardSide: oneOf(HOME_BOARD_SIDES, input['homeBoardSide'], d.homeBoardSide),
+    // Saves from before #184 have no layout: they load as `tall`, close to the board they had.
+    boardLayout: oneOf(BOARD_LAYOUT_MODES, input['boardLayout'], d.boardLayout),
     moveList: oneOf(MOVE_LIST_MODES, input['moveList'], d.moveList),
+    // Saves from before #172 have no bot speed: they load as Normal.
+    botSpeed: oneOf(BOT_SPEEDS, input['botSpeed'], d.botSpeed),
     theme: isThemeId(input['theme']) ? input['theme'] : d.theme,
     boardTheme:
       typeof input['boardTheme'] === 'string' && hasTheme(input['boardTheme'])
@@ -141,9 +188,12 @@ function pickSettings(state: SettingsState): Settings {
     haptics: state.haptics,
     language: state.language,
     autoConfirmMoves: state.autoConfirmMoves,
-    showPipCounts: state.showPipCounts,
+    showHints: state.showHints,
     boardFlipMode: state.boardFlipMode,
+    homeBoardSide: state.homeBoardSide,
+    boardLayout: state.boardLayout,
     moveList: state.moveList,
+    botSpeed: state.botSpeed,
     theme: state.theme,
     boardTheme: state.boardTheme,
   };

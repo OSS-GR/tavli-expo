@@ -1,7 +1,7 @@
 import { createSeededRng, rollDie, type GameFlow } from '@tavli/engine';
 
 import { createGameStore, diceView, turnView } from './gameStore';
-import { nextOpeningRoller, openingStatus } from './opening';
+import { nextOpeningRoller, openingDice, openingStatus } from './opening';
 
 const players = { white: 'Ann', black: 'Bob' };
 
@@ -43,6 +43,22 @@ describe('createGameStore', () => {
     expect(white).not.toBe(black);
     expect(game.starter).toBe(white! > black! ? 'white' : 'black');
     expect([...game.state.dice!].sort()).toEqual([white, black].sort());
+  });
+
+  it('names each match with a key of its own: per store and per rematch (#216)', () => {
+    const store = newStore();
+    const first = store.getState().matchKey;
+    // Moves keep the key: it names the match, not the position.
+    finishOpening(store);
+    expect(store.getState().matchKey).toBe(first);
+    // Another store (a new match, or a saved one loaded again) gets a new key.
+    const other = newStore().getState().matchKey;
+    expect(other).not.toBe(first);
+    store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    expect(store.getState().matchKey).toBe(first);
+    store.getState().rematch();
+    const rematch = store.getState().matchKey;
+    expect([first, other]).not.toContain(rematch);
   });
 
   it('keeps the flow and reports an action the engine refuses', () => {
@@ -91,7 +107,6 @@ describe('turnView', () => {
     const view = turnView(newStore().getState().flow);
     expect(view.dice).toEqual([]);
     expect(view.legal).toEqual([]);
-    expect(view.pips).toEqual({ white: 167, black: 167 });
   });
 
   it('shows the dice of the turn and the legal moves', () => {
@@ -134,7 +149,7 @@ describe('opening status', () => {
   it('shows the dice as players roll, then the result', () => {
     const store = newStore(3);
     const game = (): GameFlow => store.getState().flow.game;
-    expect(openingStatus(game())).toEqual({ kind: 'rolling', white: null, black: null, tie: null });
+    expect(openingStatus(game())).toEqual({ kind: 'rolling', white: null, black: null, round: 0 });
     expect(nextOpeningRoller(game())).toBe('white');
     store.getState().dispatch({ type: 'rollOpening', player: 'white' });
     expect(nextOpeningRoller(game())).toBe('black');
@@ -144,15 +159,35 @@ describe('opening status', () => {
     expect(nextOpeningRoller(game())).toBeNull();
   });
 
-  it('reports a tie', () => {
+  it('keeps a tie on the card until the next roll, then starts a new round (#176)', () => {
     const store = newStore();
+    const game = (): GameFlow => store.getState().flow.game;
     store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 4 });
+    expect(openingStatus(game())).toEqual({ kind: 'rolling', white: 4, black: null, round: 0 });
     store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 4 });
-    expect(openingStatus(store.getState().flow.game)).toEqual({
-      kind: 'rolling',
-      white: null,
-      black: null,
-      tie: 4,
+    const tie = openingStatus(game());
+    expect(tie).toEqual({ kind: 'tie', value: 4, round: 0 });
+    // Both dice still show the tie.
+    expect(openingDice(tie!)).toEqual({ white: 4, black: 4 });
+    expect(nextOpeningRoller(game())).toBe('white');
+
+    // The next roll starts round 1: the other die is blank again.
+    store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 2 });
+    const next = openingStatus(game());
+    expect(next).toEqual({ kind: 'rolling', white: 2, black: null, round: 1 });
+    expect(openingDice(next!)).toEqual({ white: 2, black: null });
+
+    // A second tie is round 1.
+    store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 2 });
+    expect(openingStatus(game())).toEqual({ kind: 'tie', value: 2, round: 1 });
+    store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+    store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+    expect(openingStatus(game())).toEqual({
+      kind: 'decided',
+      white: 6,
+      black: 3,
+      starter: 'white',
+      round: 2,
     });
   });
 

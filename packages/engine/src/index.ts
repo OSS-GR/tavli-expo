@@ -35,8 +35,16 @@ export type { BoardState, PointState, SideLayout } from './board';
 export { createSeededRng, rngFromState } from './rng';
 export type { Rng, RngState, SeededRng } from './rng';
 
-export { DIE_VALUES, diceMoves, isDieValue, isDouble, rollDice, rollDie } from './dice';
-export type { Dice, DieValue } from './dice';
+export {
+  DIE_VALUES,
+  DISTINCT_ROLLS,
+  diceMoves,
+  isDieValue,
+  isDouble,
+  rollDice,
+  rollDie,
+} from './dice';
+export type { Dice, DieValue, WeightedRoll } from './dice';
 
 export { formatMove, formatTurn, locationNumber, sameMove, sameTurn } from './move';
 export type { Capture, Destination, Move, Origin, Turn } from './move';

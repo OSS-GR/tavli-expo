@@ -24,6 +24,8 @@ module.exports = {
   transform,
   // The Unistyles mocks must load before our Unistyles config (unistyl.es/v3/start/testing).
   setupFiles: ['react-native-unistyles/mocks', '<rootDir>/jest.setup.ts'],
+  // Resets per-test state that lives in app modules (test/afterEnv.ts).
+  setupFilesAfterEnv: ['<rootDir>/test/afterEnv.ts'],
   // pnpm keeps packages in node_modules/.pnpm, so we use Expo's pnpm pattern.
   // `standard-navigation` is ESM that expo-router/testing-library loads.
   transformIgnorePatterns: [
@@ -35,4 +37,6 @@ module.exports = {
   // 15-18 s on a busy machine (`jest --no-cache` with the CPU in use), so a
   // short timeout fails at random. 30 s still catches a test that hangs.
   testTimeout: 30_000,
+  // Splits the files evenly between CI shards (test/shardSequencer.js).
+  testSequencer: '<rootDir>/test/shardSequencer.js',
 };

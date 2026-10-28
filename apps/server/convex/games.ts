@@ -1,20 +1,25 @@
 /**
  * Online games (#126, ADR-0004): create a game, play a turn, answer a
- * question, resign, and watch a game. Turn timers (#133): each turn has a
- * deadline; when it passes, the player the server waits for loses the game.
+ * question, resign, and watch a game. A game between two people starts
+ * from an accepted invite (`invites.ts`); `createGame` is internal (#274).
+ * Turn timers (#133): each turn has a deadline; when it passes, the player
+ * the server waits for loses the game.
  *
  * Each mutation is one Convex transaction: load the game, check the call,
- * run the engine (`model/online-game.ts`), roll the next dice on the
- * server, and save with a version bump. If anything throws, nothing is
- * saved.
+ * run the engine (`@tavli/online`), roll the next dice on the server, and
+ * save with a version bump. If anything throws, nothing is saved. The
+ * call checks are pure helpers in `@tavli/online` too (#251), shared with
+ * the in-memory server; this file keeps the database and scheduler parts.
  *
  * Timers: every save that leaves the match running sets a new
  * `turnDeadline` and schedules `checkTimeout` for that version. A later
  * change bumps the version, so an old check does nothing: no cancel is
  * needed. `makeMove` and `answer` check the deadline too.
  *
- * Auth comes later: for now the caller passes its player id
- * (`callerId`). Each call checks that the caller may act.
+ * The caller is the signed-in user (#131): every public function reads
+ * the player id from `ctx.auth` (`signedInPlayer`), and no public call
+ * takes a player id. Each call checks that the caller may act. `getGame` answers
+ * only the two players.
  */
 
 import { ConvexError, v } from 'convex/values';
@@ -22,39 +27,36 @@ import type { Infer } from 'convex/values';
 
 import type { GameTransportErrorData, OnlineGamePace, OnlineGameView } from '@tavli/contracts';
 import { serializeRules } from '@tavli/engine';
-import type { FlowEvent, MatchFlow, MoveInput, PlayerId } from '@tavli/engine';
+import type { MatchFlow, MoveInput, PlayerId } from '@tavli/engine';
+import {
+  OnlineGameError,
+  SERVER_ACTOR,
+  TIMED_OUT_ERROR,
+  answerPrompt,
+  callTimedOut,
+  checkCall,
+  checkNewGame,
+  checkViewer,
+  createOnlineMatch,
+  eventActor,
+  loadFlow,
+  matchStatus,
+  nextDeadline,
+  playTurn,
+  resign as resignMatch,
+  scheduledCheck,
+  storeFlow,
+  timeOut,
+  toView,
+} from '@tavli/online';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
-import { createCryptoRng } from './model/crypto-rng';
-import {
-  OnlineGameError,
-  answerPrompt,
-  createOnlineMatch,
-  deadlineAfter,
-  isTimedOut,
-  loadFlow,
-  playTurn,
-  resign as resignMatch,
-  sideOf,
-  storeFlow,
-  timeOut,
-  toView,
-} from './model/online-game';
+import { signedInPlayer } from './caller';
+import { createCryptoRng } from './model/cryptoRng';
 import { gameChoice, gamePace } from './schema';
-
-/** The `actor` of events the server plays itself. */
-const SERVER_ACTOR = 'server';
-
-const SERVER_EVENTS: ReadonlySet<FlowEvent['type']> = new Set([
-  'start',
-  'rollOpening',
-  'roll',
-  'nextGame',
-  'timeout',
-]);
 
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
 function reject(error: OnlineGameError): never {
@@ -76,10 +78,6 @@ function guarded<T>(step: () => T): T {
   }
 }
 
-function fail(code: GameTransportErrorData['code'], message: string): never {
-  reject(new OnlineGameError(code, message));
-}
-
 /** Appends the new events of `flow.log` to `moves`. */
 async function writeEvents(
   ctx: MutationCtx,
@@ -95,7 +93,7 @@ async function writeEvents(
       gameId,
       seq,
       version,
-      actor: SERVER_EVENTS.has(event.type) ? SERVER_ACTOR : callerId,
+      actor: eventActor(event, callerId),
       event: JSON.stringify(event),
     });
     seq += 1;
@@ -107,25 +105,20 @@ function gameFields(flow: MatchFlow) {
   return {
     variant: flow.game.state.variant,
     flow: storeFlow(flow),
-    status: flow.match.status === 'finished' ? ('finished' as const) : ('active' as const),
+    status: matchStatus(flow),
     winner: flow.match.winner,
   };
 }
 
-/** Loads a game for `callerId` and checks the version. */
+/** Loads a game for `callerId` and checks the version (`checkCall`). */
 async function loadForCaller(
   ctx: MutationCtx,
   gameId: Id<'games'>,
   callerId: string,
   expectedVersion: number | null,
 ): Promise<{ game: Doc<'games'>; side: PlayerId; flow: MatchFlow }> {
-  const game = await ctx.db.get(gameId);
-  if (game === null) fail('NOT_FOUND', 'no such game');
-  const side = sideOf(game.players, callerId);
-  if (side === null) fail('NOT_A_PLAYER', 'you are not a player of this game');
-  if (expectedVersion !== null && expectedVersion !== game.version) {
-    fail('STALE_VERSION', `the game is at version ${game.version}, not ${expectedVersion}`);
-  }
+  const loaded = await ctx.db.get(gameId);
+  const { game, side } = guarded(() => checkCall(loaded, callerId, expectedVersion));
   return { game, side, flow: loadFlow(game.flow) };
 }
 
@@ -142,8 +135,8 @@ async function startClock(
   flow: MatchFlow,
   now: number,
 ): Promise<number | null> {
-  if (flow.match.status === 'finished') return null;
-  const deadline = deadlineAfter(pace, now);
+  const deadline = nextDeadline(pace, flow, now);
+  if (deadline === null) return null;
   await ctx.scheduler.runAt(deadline, internal.games.checkTimeout, { gameId, version });
   return deadline;
 }
@@ -206,9 +199,9 @@ async function onTime(
   play: (now: number) => Promise<number>,
 ): Promise<WriteResult> {
   const now = Date.now();
-  if (game.status === 'active' && isTimedOut(game.turnDeadline, now)) {
+  if (callTimedOut(game, now)) {
     const version = await applyTimeout(ctx, game, flow, now);
-    return { ok: false, version, error: { code: 'TIMED_OUT', message: 'the turn time ran out' } };
+    return { ok: false, version, error: { ...TIMED_OUT_ERROR } };
   }
   return { ok: true, version: await play(now) };
 }
@@ -226,12 +219,55 @@ function toMoveInput(move: Infer<typeof moveInput>): MoveInput {
   return move.capture === undefined ? base : { ...base, capture: move.capture };
 }
 
+export interface NewGame {
+  /** Who starts the game: the signed-in caller, or `createGame`'s `callerId`. */
+  readonly callerId: string;
+  readonly players: { readonly white: string; readonly black: string };
+  readonly choice: Infer<typeof gameChoice>;
+  readonly targetPoints: number;
+  readonly pace: OnlineGamePace;
+}
+
 /**
- * Creates a game between two players. The server rolls the opening at
- * once, so the game starts with the first player to move, and that
- * player's clock runs. Returns the id.
+ * Creates a game between two players, in the caller's transaction.
+ * `createGame` and `acceptInvite` (`invites.ts`) both use it. The server
+ * rolls the opening at once, so the game starts with the first player to
+ * move, and that player's clock runs. Returns the id.
  */
-export const createGame = mutation({
+export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'games'>> {
+  const { callerId, choice, targetPoints, pace } = game;
+  const players = { white: game.players.white, black: game.players.black };
+  guarded(() => checkNewGame(callerId, players));
+  const flow = guarded(() =>
+    createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
+  );
+  const version = 1;
+  const gameId = await ctx.db.insert('games', {
+    players,
+    choice,
+    pace,
+    targetPoints,
+    rules: serializeRules(flow.match.rules),
+    ...gameFields(flow),
+    version,
+    eventCount: 0,
+    turnDeadline: null,
+  });
+  const eventCount = await writeEvents(ctx, gameId, 0, version, callerId, flow);
+  const turnDeadline = await startClock(ctx, gameId, version, pace, flow, Date.now());
+  await ctx.db.patch(gameId, { eventCount, turnDeadline });
+  return gameId;
+}
+
+/**
+ * Creates a game between two players (see `insertGame`). Internal (#274):
+ * a client cannot call it, so a game between two people starts only from
+ * an accepted invite (`acceptInvite`). Tests and the Convex dashboard use
+ * it. An internal function has no signed-in caller, so `callerId` names
+ * who starts the game; it must be one of the players (the same checks as
+ * `createGame` of the in-memory server in `@tavli/online`). Returns the id.
+ */
+export const createGame = internalMutation({
   args: {
     callerId: v.string(),
     players: v.object({ white: v.string(), black: v.string() }),
@@ -241,34 +277,7 @@ export const createGame = mutation({
     pace: gamePace,
   },
   returns: v.id('games'),
-  handler: async (ctx, { callerId, players, choice, targetPoints, pace }) => {
-    if (sideOf(players, callerId) === null) {
-      fail('BAD_REQUEST', 'the caller must be one of the players');
-    }
-    // The move log marks server events with SERVER_ACTOR, so no player may use that id.
-    if (players.white === SERVER_ACTOR || players.black === SERVER_ACTOR) {
-      fail('BAD_REQUEST', `"${SERVER_ACTOR}" is not a valid player id`);
-    }
-    const flow = guarded(() =>
-      createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
-    );
-    const version = 1;
-    const gameId = await ctx.db.insert('games', {
-      players,
-      choice,
-      pace,
-      targetPoints,
-      rules: serializeRules(flow.match.rules),
-      ...gameFields(flow),
-      version,
-      eventCount: 0,
-      turnDeadline: null,
-    });
-    const eventCount = await writeEvents(ctx, gameId, 0, version, callerId, flow);
-    const turnDeadline = await startClock(ctx, gameId, version, pace, flow, Date.now());
-    await ctx.db.patch(gameId, { eventCount, turnDeadline });
-    return gameId;
-  },
+  handler: async (ctx, args) => await insertGame(ctx, args),
 });
 
 /**
@@ -281,12 +290,12 @@ export const createGame = mutation({
 export const makeMove = mutation({
   args: {
     gameId: v.id('games'),
-    callerId: v.string(),
     expectedVersion: v.number(),
     moves: v.array(moveInput),
   },
   returns: writeResult,
-  handler: async (ctx, { gameId, callerId, expectedVersion, moves }) => {
+  handler: async (ctx, { gameId, expectedVersion, moves }) => {
+    const callerId = await signedInPlayer(ctx);
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
     return await onTime(ctx, game, flow, async (now) => {
       const next = guarded(() => playTurn(flow, side, moves.map(toMoveInput), createCryptoRng()));
@@ -302,12 +311,12 @@ export const makeMove = mutation({
 export const answer = mutation({
   args: {
     gameId: v.id('games'),
-    callerId: v.string(),
     expectedVersion: v.number(),
     choice: v.string(),
   },
   returns: writeResult,
-  handler: async (ctx, { gameId, callerId, expectedVersion, choice }) => {
+  handler: async (ctx, { gameId, expectedVersion, choice }) => {
+    const callerId = await signedInPlayer(ctx);
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
     return await onTime(ctx, game, flow, async (now) => {
       const next = guarded(() => answerPrompt(flow, side, choice, createCryptoRng()));
@@ -322,9 +331,10 @@ export const answer = mutation({
  * just moved. It does not look at the turn timer. Returns the new version.
  */
 export const resign = mutation({
-  args: { gameId: v.id('games'), callerId: v.string() },
+  args: { gameId: v.id('games') },
   returns: v.number(),
-  handler: async (ctx, { gameId, callerId }) => {
+  handler: async (ctx, { gameId }) => {
+    const callerId = await signedInPlayer(ctx);
     const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, null);
     const next = guarded(() => resignMatch(flow, side, createCryptoRng()));
     return await save(ctx, game, callerId, next, Date.now());
@@ -342,10 +352,10 @@ export const checkTimeout = internalMutation({
   returns: v.null(),
   handler: async (ctx, { gameId, version }) => {
     const game = await ctx.db.get(gameId);
-    if (game === null || game.version !== version || game.status !== 'active') return null;
-    if (game.turnDeadline === null) return null;
     const now = Date.now();
-    if (!isTimedOut(game.turnDeadline, now)) {
+    const check = scheduledCheck(game, version, now);
+    if (game === null || game.turnDeadline === null || check === 'skip') return null;
+    if (check === 'early') {
       // Too early (the scheduler ran before the deadline): check again then.
       await ctx.scheduler.runAt(game.turnDeadline, internal.games.checkTimeout, {
         gameId,
@@ -361,12 +371,15 @@ export const checkTimeout = internalMutation({
 /**
  * The game as a client may see it, or `null` when there is no such game.
  * It never holds dice that are not rolled yet. Both players watch this
- * query, so their screens update after every change.
+ * query, so their screens update after every change. Only the two
+ * players may read it: anyone else gets `NOT_A_PLAYER` (#131).
  */
 export const getGame = query({
   args: { gameId: v.id('games') },
   handler: async (ctx, { gameId }): Promise<OnlineGameView | null> => {
-    const game = await ctx.db.get(gameId);
+    const callerId = await signedInPlayer(ctx);
+    const loaded = await ctx.db.get(gameId);
+    const game = guarded(() => checkViewer(loaded, callerId));
     if (game === null) return null;
     return toView({
       gameId: game._id,

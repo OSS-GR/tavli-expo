@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { DIE_VALUES } from '../../dice';
+import { DIE_VALUES, DISTINCT_ROLLS } from '../../dice';
 import type { Dice } from '../../dice';
 import { formatMove, formatTurn } from '../../move';
 import type { Move } from '../../move';
@@ -85,15 +85,13 @@ describe('fevga.md edge cases', () => {
 
   it('fevga.md #2: first turn, any roll — only the runner may move', () => {
     const start = fevgaState(START);
-    for (const a of DIE_VALUES) {
-      for (const b of DIE_VALUES) {
-        if (b > a || (a === 5 && b === 5)) continue; // 5-5 passes 11 mid-turn (#6)
-        for (const turn of fevga.legalTurns(start, [a, b])) {
-          // One checker: the first move leaves 24, each next move goes on from there.
-          turn.moves.forEach((move, i) => {
-            expect(move.from).toBe(i === 0 ? 24 : turn.moves[i - 1]?.to);
-          });
-        }
+    for (const { dice } of DISTINCT_ROLLS) {
+      if (dice[0] === 5 && dice[1] === 5) continue; // 5-5 passes 11 mid-turn (#6)
+      for (const turn of fevga.legalTurns(start, dice)) {
+        // One checker: the first move leaves 24, each next move goes on from there.
+        turn.moves.forEach((move, i) => {
+          expect(move.from).toBe(i === 0 ? 24 : turn.moves[i - 1]?.to);
+        });
       }
     }
     // After the first move, only the runner is offered.

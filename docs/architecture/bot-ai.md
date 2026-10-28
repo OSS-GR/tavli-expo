@@ -80,10 +80,10 @@ All levels use the same pipeline:
 |---|---|---|---|
 | Easy | Heuristic | 1-ply | Softmax over scores, temperature 0.15. About half of its moves are not the best, but most of those cost little. Never passes a winning turn (e.g. a bear-off that wins). |
 | Medium | Heuristic (tuned) | 1-ply | Softmax, temperature 0.01. Small, plausible mistakes only. |
-| Hard | Neural net (Portes #147, Plakoto and Fevga #156; not Asodio yet) | 1-ply (2-ply was tried: no gain, much slower; see 5.7) | Softmax, temperature 0.01, like medium. |
-| (Later) Expert / Hints | Neural net | 2-ply, wider, longer time budget | None |
+| Hard | Neural net (Portes #147, Plakoto and Fevga #156, Asodio #164) | 1-ply (2-ply was tried: no gain, much slower; see 5.7) | Softmax, temperature 0.01, like medium. |
+| Hints (`Analyzer`) | Neural net | 1-ply, or 2-ply on the best 8 (#212) with a work budget (#237). The app's Hint: 2-ply in every game (#219, #237) | None |
 
-Why softmax noise and not random moves: a softmax picks good moves more often and bad moves rarely. The bot then looks like a weaker human, not a broken program. Track the **average equity loss per move** of each level in bot-vs-bot tests. Tune temperature until the levels are clearly apart (e.g. Hard beats Medium ~70%+, Medium beats Easy ~70%+).
+Why softmax noise and not random moves: a softmax picks good moves more often and bad moves rarely. The bot then looks like a weaker human, not a broken program. Track the **average equity loss per move** of each level in bot-vs-bot tests. Tune temperature until the levels are clearly apart (e.g. Hard beats Medium ~70%+, Medium beats Easy ~70%+). Asodio is the exception: about a quarter of its games end in a lock draw, so its bars count only the games someone wins. Hard must win at least 60% of those against Medium and score more points (owner decision, #164; see 5.9).
 
 **Measured (Portes, #28, 1,000 games, seed 1):** medium beats random 99.9%, medium beats easy 78.1%, and easy beats random 98.5%. Medium decides in 0.09 ms median and 3.9 ms worst (Node, 300 random positions). At "1 in 3 not best", medium beat easy only 57%, so easy uses more noise to keep the 70%+ gap.
 
@@ -122,14 +122,14 @@ A position score = weighted sum of features. Weights start hand-picked, then get
 ### 4.3 Feel human
 
 - **Think time:** wait 500–1500 ms before moving. Shorter for forced or only-one moves (~300 ms). Longer for doubles and close decisions. Add small random jitter. Compute runs during this wait, so the user never sees the real cost.
-- **Move checkers one by one** with the normal animation (~250–400 ms each), not all at once.
+- **Move checkers one by one** with the normal animation, not all at once. Each move lands before the next one starts (about 0.9 s apart at Normal speed, #172; see [Bot turn timing](board-screen.md#bot-turn-timing-172)).
 - **Mistakes look natural** (softmax over good options, see 4.1). Easy should still bear off and take obvious safe moves.
 - **Optional:** bot names and avatars per level ("Yiayia", "Kafeneio regular", "Champion").
 
 ### 4.4 Fairness and anti-cheating
 
 - **Dice fairness:** players often think bots cheat with dice. The bot never sees future dice. `chooseMove` only gets the current dice. The dice RNG and the bot RNG are separate objects. Later we can show dice statistics after a game.
-- **Hints and analysis:** the same `Analyzer` gives hints and post-game review. Hints are **off in online games** (both players must agree for friendly games; never in ranked).
+- **Hints and analysis:** the same `Analyzer` gives hints and post-game review. `createAnalyzer` (`packages/bot/src/analyzer.ts`, #206) ranks the legal turns for a roll with the variant's best evaluator (hard net, else medium) and the bot's 1-ply core (`scoreTurns`). Its best turn is what hard plays at temperature 0. It has no randomness. `plies: 2` (#212) looks one roll deeper on the best 8 turns at 1 ply (plus near ties within 0.02 points, at most 16): for each, it averages over the next player's 21 rolls the result after their best 1-ply reply, and ranks by that. It follows `toMove` (an Asodio extra roll or chosen double makes the "reply" the mover's own next turn) and lets the engine handle questions (`prompt`). `budget` (#237) caps the work of one call by the positions the evaluator scores (deterministic, never a clock): the candidates get their deeper look in 1-ply order, and when the next one would pass the budget, it and the later ones keep their 1-ply values. The app hints at 2 ply in every game with the budget of its preset (`TWO_PLY_HINT_BUDGETS`, smaller for Asodio, whose positions cost more time), so the worst hint of each preset is about as fast as Plakoto's (#219, #233, #237; numbers in "2-ply budget" in `packages/bot/README.md`). `packages/bot/src/analyzer-work.test.ts` checks the budget for every game and preset. See "The Analyzer" in `packages/bot/README.md`. Hints are **off in online games** (both players must agree for friendly games; never in ranked).
 - **Bot use in online games:** online, the server decides dice and checks moves, but it cannot stop a player from running a bot on a second device. For ranked play later, compare each player's moves with the hard bot on the server. Flag accounts with an error rate that is too low over many games. This is how chess sites detect engines.
 - **Do not ship the hard bot's weights as a server secret.** They will be in the app bundle. That is fine; a bot is not a secret.
 
@@ -180,7 +180,7 @@ Variant extras:
 | Portes | Bar per player (2). Expert features: pip difference, number of shots on my blots, longest prime, home points made. (~210 total) |
 | Plakoto | Per point: "my checker pinned here" and "their checker pinned here" (48). Mother-checker pinned flags (2). Pinned counts (2). Pin threat on my single checkers. (~250 total) |
 | Fevga | Per point we only need "held" + count (fits the base encoding). Extras: blocking prime length in front of each side, checkers not yet past the opponent's start area, pip difference. (~200 total) |
-| Asodio | Base encoding + rule-specific flags. Decide after the rules doc. |
+| Asodio | Base encoding + pins (48), loading, the quarter lock and the heuristic's lock shots (279 total; see 5.9). |
 
 Outputs (sigmoid): **P(win)**, **P(win double/mars)**, **P(lose double/mars)**. Greek scoring uses 1 or 2 points, so we do not need backgammon (triple) outputs. Equity = 2·P(win) − 1 + P(win double) − P(lose double). Check this against each rules doc.
 
@@ -224,7 +224,18 @@ What differs from the plan above, and why:
 - **Fevga** has no pins or bar. Inputs: the TD-Gammon units (192), off and pips (4), the heuristic's block features per side (prime, trapped checkers, points ahead, blocked landings, dead dice, runner lock and distance, home points, start checkers, stacks: 20), and the contact score (1): 217.
 - **Training:** TD(λ) as in 5.7, λ 0.7, 40 hidden units, no warm start, one core per run. Plakoto: 45,000 games (28 minutes). Fevga: 100,000 games in two runs (about 43 minutes). Self-play answers the Plakoto mother question with "play on". A game longer than 1,000 turns is dropped. Each match against medium uses its own seed, and the best checkpoints were played again on a fresh seed.
 
-**Measured (#156):** Plakoto hard (`plakoto-net-v1`, 251 → 40 → 3, 55 KB file) beat medium in 732 of 1,000 games (`simulate`, seed 1, 6 draws) and 736 of 1,000 paired games (seed 2026): about 73%. Fevga hard (`fevga-net-v1`, 217 → 40 → 3, 48 KB file) won 810 and 807 of 1,000: about 81%. Both are above the 70% target. Median decision time 0.20 ms (Plakoto) and 0.07 ms (Fevga), worst 3 ms. Details: `packages/bot/README.md`, "The Plakoto and Fevga nets". With all three games of a Tavli match at Hard, the app now offers Hard for Tavli too. Asodio has no net yet.
+**Measured (#156):** Plakoto hard (`plakoto-net-v1`, 251 → 40 → 3, 55 KB file) beat medium in 732 of 1,000 games (`simulate`, seed 1, 6 draws) and 736 of 1,000 paired games (seed 2026): about 73%. Fevga hard (`fevga-net-v1`, 217 → 40 → 3, 48 KB file) won 810 and 807 of 1,000: about 81%. Both are above the 70% target. Median decision time 0.20 ms (Plakoto) and 0.07 ms (Fevga), worst 3 ms. Details: `packages/bot/README.md`, "The Plakoto and Fevga nets". With all three games of a Tavli match at Hard, the app now offers Hard for Tavli too.
+
+### 5.9 Asodio (#164)
+
+- **The net plays the owner version only** (`asodio.kafeneio`). For any other rule set (the Acey-Deucey presets with hits and roll chains, or a changed army flag) hard uses the heuristic for every position (`isAsodioNetRules`).
+- **A mutual lock goes to the heuristic**, as well as the race. Both armies hold each other forever, so the game is a sure draw (0), and training games stop there. The net counts a draw as half a win (target `[0.5, 0, 0]`); the heuristic's numbers are put in the same terms, with the same equity.
+- **Inputs:** the TD-Gammon units (192), pin units (48), loading (outside checkers, the first-entry gate: 4), off and pips (4), the quarter lock (rear quarter and lowest pinned quarter, one-hot: 16; frozen checkers and a pinned rear: 4), dead dice and a frozen army (4), pin shots and lock shots (4), the heuristic's mars shares (2) and contact score (1): 279.
+- **Training:** TD(λ) as in 5.7, 40 hidden units, λ 0.5, α 0.05 → 0.005, no warm start: 35,000 games (58 minutes). Runs with λ 0.7, 60 hidden units, a longer run, training against medium, and 2-ply with the heuristic gave no more.
+
+**Measured (#164):** Asodio hard (`asodio-net-v1`, 279 → 40 → 3, 61 KB file) beat medium in 489 of 1,000 games (`simulate`, seed 1: 261 losses, 250 draws, +0.47 points per game) and 488 of 1,000 paired games (seed 2026). That is about 50% of all games, below the 70% target: about a quarter of the games end in a deadlock draw, and most of those draws come from the dice (the quarter lock leaves few choices). Medium against medium wins 35% and draws 30%.
+
+**The Asodio bar (owner decision, #164).** Because of the lock draws, the Asodio test does not ask for 60% of all games, like the other games. Hard must win at least 60% of the games that someone wins (wins / (wins + losses)) and score more points than medium, in 200 paired games; draws are reported but do not count. The CI match (seed 2029): 102 wins, 43 losses, 55 draws, so 70% of the decided games, and 187 points against 73. Median decision time 0.006 ms, p99 7 ms. Details: `packages/bot/README.md`, "The Asodio net".
 
 ## 6. On-device inference and threading
 
@@ -241,7 +252,7 @@ Hermes interprets bytecode (no JIT), so JS math is slower than in Node. Plan: bu
 Rough math for hard mode with a 30k-weight net:
 
 - 1-ply: ~20 candidates (up to a few hundred for doubles before dedupe) × 30k = ~0.6M ops. Fast.
-- 2-ply on top 4 candidates: 4 × 21 rolls × ~20 replies × 30k ≈ 50M ops. Maybe 0.3–1 s in Hermes. That is why we only go 2-ply on the top few, with a time budget.
+- 2-ply on top 4 candidates: 4 × 21 rolls × ~20 replies × 30k ≈ 50M ops. Maybe 0.3–1 s in Hermes. That is why we only go 2-ply on the top few, with a work budget (#237: positions scored, not time, so a hint stays the same on every phone).
 - Speed tricks: flat `Float32Array` weights, no object allocation in loops, dedupe positions, cache evaluations by position hash, **incremental first layer** (update only the inputs that changed).
 
 ### 6.2 Keep the UI smooth
@@ -296,13 +307,15 @@ export interface Bot {
   ): Turn; // a Turn = the full list of single moves (Move[]) for this roll
 }
 
-/** Same machinery, used for hints and post-game review. */
+/** Same machinery, used for hints and post-game review. Built: `createAnalyzer` (#206, 2-ply #212). */
 export interface Analyzer {
   rankTurns(
     state: GameState,
     dice: Dice,
-    opts?: { plies?: 1 | 2; top?: number },
-  ): Array<{ turn: Turn; evaluation: Evaluation; equityLoss: number }>;
+    opts?: RankOptions, // { plies?: 1 | 2; top?: number; budget?: number }
+  ): readonly RankedTurn[]; // { turn, evaluation, equityLoss }, best first
+  // With plies: 2 only the first turns (the candidates) carry 2-ply values;
+  // the rest keep 1-ply values. Do not compare values across that boundary.
   evaluate(state: GameState): Evaluation;
 }
 ```
@@ -360,15 +373,15 @@ Tests the bot package must have:
 
 1. `tools/bot-training`: TD(λ) self-play in Node with `worker_threads`. Start with Portes.
 2. Neural evaluator in pure TS. Load weights from a bundled binary file.
-3. 2-ply search on top candidates, with a time budget and a position cache.
+3. 2-ply search on top candidates, with a work budget (#237) and a position cache.
 4. Bearoff table for the race end.
 5. `WorkletBotRunner` (react-native-worklets, Bundle Mode) so hard mode never blocks the UI.
-6. Train and ship nets for Plakoto, Fevga, Asodio. Measure each vs medium and vs the previous net. (Plakoto and Fevga: done, #156.)
+6. Train and ship nets for Plakoto, Fevga, Asodio. Measure each vs medium and vs the previous net. (Plakoto and Fevga: done, #156. Asodio: done, #164, with its own bar: 60% of the decided games, see 5.9.)
 7. Benchmark the Portes net vs gnubg and wildbg locally (dev only).
 
 ### Phase 3 — Later
 
-- Hints and post-game review with the `Analyzer` (roadmap "Later").
+- Hints and post-game review with the `Analyzer` (roadmap "Later"). `createAnalyzer` is built, 1-ply (#206) and 2-ply (#212). The app's Hint button (#209, offline games, `docs/architecture/board-screen.md`, "Hint") uses 2 ply in every game, with a work budget per preset (#219, #237, `hintPlies`, `hintRankOptions`; numbers in "2-ply budget" in `packages/bot/README.md`). The game review stays at 1 ply (#215, `apps/mobile/src/features/review/`, "Game review" in the same doc).
 - Match-score-aware play (Tavli match to 5 or 7 points) using a match equity table.
 - Server-side move analysis for ranked anti-cheat.
 - Optional: stronger nets with rollouts + supervised training (wildbg style), or a port of the wildbg Portes evaluator if its licence and rules fit.

@@ -1,18 +1,30 @@
+import type { createRecordingAnalytics } from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
+  asodio,
+  createBoard,
   createGameFlow,
   createSeededRng,
   getVariant,
   portes,
   type Dice,
+  type PerPlayer,
   type PlayerId,
+  type SideLayout,
 } from '@tavli/engine';
-import { act, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 
+import { BOT_SPEED_TIMING, type BotTiming } from '@/features/bot/botTurn';
 import { SAMPLE_POSITIONS } from '@/features/board/positions';
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
-import { DEFAULT_SETTINGS } from '@/features/settings/settings';
+import {
+  BOARD_LAYOUT_MODES,
+  DEFAULT_SETTINGS,
+  type BoardLayoutMode,
+} from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import i18n from '@/i18n';
+import { analytics } from '@/services';
 
 import { MatchScreen } from './MatchScreen';
 import { createSessionRegistry, type MatchSession } from './sessions';
@@ -21,8 +33,23 @@ import { defaultSetup, type MatchSetup } from './setup';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 
-const FAST = { beforeRollMs: 20, moveMs: 5, thinkMs: () => 5 };
+const FAST = {
+  beforeRollMs: 20,
+  afterRollMs: 5,
+  doubleMs: 5,
+  moveMs: 5,
+  hitMs: 0,
+  landMs: 5,
+  thinkMs: () => 5,
+};
 const WAIT = { timeout: 4000 };
+
+/** The game-end chip is filled (diplo) or outlined (mono, per checker, #245). */
+const expectChip = (filled: boolean) => {
+  const chip = screen.getByTestId('game-end-chip');
+  if (filled) expect(chip).not.toHaveStyle({ backgroundColor: 'transparent' });
+  else expect(chip).toHaveStyle({ backgroundColor: 'transparent' });
+};
 
 function session(setup: MatchSetup, seed = 11): MatchSession {
   return createSessionRegistry({ createRng: () => createSeededRng(seed) }).start(setup);
@@ -36,7 +63,7 @@ function startWith(s: MatchSession, starter: PlayerId) {
   });
 }
 
-function show(s: MatchSession, timing = FAST) {
+function show(s: MatchSession, timing: Partial<BotTiming> = FAST) {
   const props = {
     onExit: jest.fn(),
     onSettings: jest.fn(),
@@ -76,7 +103,7 @@ describe('<MatchScreen /> vs bot', () => {
   it('plays the bot turn through the flow and locks your controls meanwhile', async () => {
     const s = session(defaultSetup('bot'));
     startWith(s, 'black');
-    await show(s, { beforeRollMs: 150, moveMs: 5, thinkMs: () => 5 }).view;
+    await show(s, { ...FAST, beforeRollMs: 150 }).view;
 
     // The bot's turn: a locked box, no Roll button, the bot strip is active.
     expect(screen.getByTestId('bot-turn')).toHaveTextContent("Bot's turn…");
@@ -97,7 +124,7 @@ describe('<MatchScreen /> vs bot', () => {
     startWith(s, 'black');
     // The bot waits 600 ms before it rolls. On the fake clock the tap on the
     // menu takes 130 ms (setupUser), so the menu opens before the bot rolls.
-    await show(s, { beforeRollMs: 600, moveMs: 5, thinkMs: () => 5 }).view;
+    await show(s, { ...FAST, beforeRollMs: 600 }).view;
 
     await user.press(button('Game menu'));
     expect(screen.getByTestId('game-menu')).toBeOnTheScreen();
@@ -149,11 +176,49 @@ describe('<MatchScreen /> vs bot', () => {
       within(card).getByText('Diplo: you resigned before you bore off a checker.'),
     ).toBeOnTheScreen();
     expect(within(card).getByText('You 0 – 2 Bot')).toBeOnTheScreen();
+    expectChip(true);
     // Vs the bot, a bot win is not celebrated.
     expect(screen.queryByTestId('game-celebration', { includeHiddenElements: true })).toBeNull();
 
     await user.press(within(card).getByRole('button', { name: 'Home' }));
     expect(props.onExit).toHaveBeenCalled();
+  });
+
+  it('offers Review on the game-end sheet when the route gives it (#215)', async () => {
+    const user = setupUser();
+    const s = session(defaultSetup('bot'));
+    startWith(s, 'white');
+    const onReview = jest.fn();
+    await renderWithRoot(
+      <MatchScreen
+        session={s}
+        botTiming={FAST}
+        onExit={jest.fn()}
+        onSettings={jest.fn()}
+        onRules={jest.fn()}
+        onMatchOver={jest.fn()}
+        onReview={onReview}
+      />,
+    );
+    await act(async () => {
+      s.store.getState().dispatch({ type: 'resign', player: 'black' });
+    });
+    const card = screen.getByTestId('game-end-card');
+    await user.press(within(card).getByRole('button', { name: 'Review' }));
+    expect(onReview).toHaveBeenCalledTimes(1);
+    // The sheet stays: Back from the review returns to it.
+    expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
+  });
+
+  it('has no Review button without a review to open', async () => {
+    const s = session(defaultSetup('bot'));
+    startWith(s, 'white');
+    await show(s).view;
+    await act(async () => {
+      s.store.getState().dispatch({ type: 'resign', player: 'black' });
+    });
+    expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull();
   });
 
   it('resigns the match and asks for the match-end screen', async () => {
@@ -279,6 +344,7 @@ describe('<MatchScreen /> pass-and-play', () => {
     const card = screen.getByTestId('game-end-card');
     expect(within(card).getByText('Mono · +1 point')).toBeOnTheScreen();
     expect(within(card).getByText('Mono: Maria resigned the game.')).toBeOnTheScreen();
+    expectChip(false);
     expect(within(card).getByText('Maria 0 – 1 Nikos')).toBeOnTheScreen();
   });
 
@@ -306,6 +372,26 @@ describe('<MatchScreen /> pass-and-play', () => {
     expect(screen.queryByTestId('resign-game-dialog')).toBeNull();
     expect(screen.getByTestId('game-board')).toBeOnTheScreen();
     expect(screen.getByTestId('strip-bottom')).toBeOnTheScreen();
+  });
+
+  it('the menu and the resign dialogs turn with the game screen (#185)', async () => {
+    const user = setupUser();
+    const s = session(defaultSetup('local'));
+    startWith(s, 'white');
+    await show(s).view;
+    /** The Modal around a sheet: on iOS it would turn the screen upright without landscape. */
+    const modalOf = (testID: string) => {
+      let node = screen.getByTestId(testID).parent;
+      while (node !== null && node.type !== 'Modal') node = node.parent;
+      return node;
+    };
+    await user.press(button('Game menu'));
+    expect(modalOf('game-menu')?.props.supportedOrientations).toEqual(['portrait', 'landscape']);
+    await user.press(screen.getByTestId('menu-resign-game'));
+    expect(modalOf('resign-game-dialog')?.props.supportedOrientations).toEqual([
+      'portrait',
+      'landscape',
+    ]);
   });
 });
 
@@ -363,54 +449,104 @@ describe('<MatchScreen /> pass-and-play turns', () => {
   it('never flips vs the bot, whatever Settings say', async () => {
     const s = session(defaultSetup('bot'));
     startWith(s, 'black');
-    await show(s, { beforeRollMs: 10_000, moveMs: 5, thinkMs: () => 5 }).view;
+    await show(s, { ...FAST, beforeRollMs: 10_000 }).view;
     expect(bottom().getByText('You')).toBeOnTheScreen();
   });
+
+  it.each(['slow', 'normal', 'fast'] as const)(
+    'waits as long as Settings → Bot speed says before the bot rolls (%s, #172)',
+    async (speed) => {
+      await act(async () => {
+        settingsStore.setState({ botSpeed: speed });
+      });
+      const s = session(defaultSetup('bot'));
+      startWith(s, 'black');
+      // Only the think time is set: the rest comes from the setting.
+      await show(s, { thinkMs: () => 0 }).view;
+      const { beforeRollMs } = BOT_SPEED_TIMING[speed];
+
+      await act(async () => {
+        jest.advanceTimersByTime(beforeRollMs - 1);
+      });
+      expect(game(s).phase).toBe('awaiting-roll');
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(game(s).phase).not.toBe('awaiting-roll');
+    },
+  );
 });
 
 describe('<MatchScreen /> the chosen game (#109)', () => {
-  it('names the game of the Tavli rotation on the board and the next one after each game', async () => {
-    const user = setupUser();
-    const s = session({ ...defaultSetup('local'), game: 'tavli', targetPoints: 5 });
-    expect(s.store.getState().flow.match.rules.presetId).toBe('tavli');
-    startWith(s, 'white');
-    const { props, view } = show(s);
-    await view;
-
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 1 · Portes');
+  /**
+   * The game label: on the screen in the classic layout; in the menu in
+   * both (the tall layout has no room for it, #184).
+   */
+  async function expectGameLabel(
+    user: ReturnType<typeof setupUser>,
+    layout: BoardLayoutMode,
+    text: string,
+  ) {
+    if (layout === 'classic') expect(screen.getByTestId('game-label')).toHaveTextContent(text);
+    else expect(screen.queryByTestId('game-label', { includeHiddenElements: true })).toBeNull();
     await user.press(button('Game menu'));
-    expect(
-      within(screen.getByTestId('game-menu')).getByText(
-        'Tavli · pass-and-play · Player 1 0 – 0 Player 2',
-      ),
-    ).toBeOnTheScreen();
-    await user.press(button(/^Resign game/));
-    await user.press(button('Resign'));
+    expect(screen.getByTestId('menu-game-label')).toHaveTextContent(text);
+    await user.press(button(/^Resume/));
+  }
 
-    let card = screen.getByTestId('game-end-card');
-    expect(within(card).getByTestId('next-game-label')).toHaveTextContent('Next: game 2 · Plakoto');
-    // The finished game keeps its own label until Next game (under the sheet,
-    // so screen readers skip it).
-    expect(screen.getByTestId('game-label', { includeHiddenElements: true })).toHaveTextContent(
-      'Game 1 · Portes',
-    );
-    await user.press(within(card).getByRole('button', { name: /^Next game/ }));
+  it.each(BOARD_LAYOUT_MODES)(
+    'names the game of the Tavli rotation and the next one after each game (%s layout)',
+    async (layout) => {
+      await act(async () => {
+        settingsStore.getState().setSetting('boardLayout', layout);
+      });
+      const user = setupUser();
+      const s = session({ ...defaultSetup('local'), game: 'tavli', targetPoints: 5 });
+      expect(s.store.getState().flow.match.rules.presetId).toBe('tavli');
+      startWith(s, 'white');
+      const { props, view } = show(s);
+      await view;
 
-    expect(game(s).state.variant).toBe('plakoto');
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 2 · Plakoto');
-    await user.press(button('Game menu'));
-    await user.press(button('How to play Plakoto'));
-    expect(props.onRules).toHaveBeenCalled();
+      await expectGameLabel(user, layout, 'Game 1 · Portes');
+      await user.press(button('Game menu'));
+      expect(
+        within(screen.getByTestId('game-menu')).getByText(
+          'Tavli · pass-and-play · Player 1 0 – 0 Player 2',
+        ),
+      ).toBeOnTheScreen();
+      await user.press(button(/^Resign game/));
+      await user.press(button('Resign'));
 
-    await user.press(button('Game menu'));
-    await user.press(button(/^Resign game/));
-    await user.press(button('Resign'));
-    card = screen.getByTestId('game-end-card');
-    expect(within(card).getByTestId('next-game-label')).toHaveTextContent('Next: game 3 · Fevga');
-    await user.press(within(card).getByRole('button', { name: /^Next game/ }));
-    expect(game(s).state.variant).toBe('fevga');
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 3 · Fevga');
-  });
+      let card = screen.getByTestId('game-end-card');
+      expect(within(card).getByTestId('next-game-label')).toHaveTextContent(
+        'Next: game 2 · Plakoto',
+      );
+      if (layout === 'classic') {
+        // The finished game keeps its own label until Next game (under the
+        // sheet, so screen readers skip it).
+        expect(screen.queryByTestId('game-label')).toBeNull();
+        expect(screen.getByTestId('game-label', { includeHiddenElements: true })).toHaveTextContent(
+          'Game 1 · Portes',
+        );
+      }
+      await user.press(within(card).getByRole('button', { name: /^Next game/ }));
+
+      expect(game(s).state.variant).toBe('plakoto');
+      await expectGameLabel(user, layout, 'Game 2 · Plakoto');
+      await user.press(button('Game menu'));
+      await user.press(button('How to play Plakoto'));
+      expect(props.onRules).toHaveBeenCalled();
+
+      await user.press(button('Game menu'));
+      await user.press(button(/^Resign game/));
+      await user.press(button('Resign'));
+      card = screen.getByTestId('game-end-card');
+      expect(within(card).getByTestId('next-game-label')).toHaveTextContent('Next: game 3 · Fevga');
+      await user.press(within(card).getByRole('button', { name: /^Next game/ }));
+      expect(game(s).state.variant).toBe('fevga');
+      await expectGameLabel(user, layout, 'Game 3 · Fevga');
+    },
+  );
 
   it('plays a one-game match of Fevga: every game is Fevga', async () => {
     const user = setupUser();
@@ -418,8 +554,196 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
     expect(game(s).state.variant).toBe('fevga');
     expect(s.store.getState().flow.match.rules.match.rotation).toEqual(['fevga']);
     await show(s).view;
-    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 1 · Fevga');
     await user.press(button('Game menu'));
+    expect(screen.getByTestId('menu-game-label')).toHaveTextContent('Game 1 · Fevga');
     expect(button('How to play Fevga')).toBeOnTheScreen();
+  });
+});
+
+describe('<MatchScreen /> Hint (#209)', () => {
+  const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
+
+  beforeEach(() => {
+    recorded.optIn();
+    recorded.sent.length = 0;
+  });
+  afterEach(() => {
+    recorded.optOut();
+  });
+
+  it.each(['bot', 'local'] as const)(
+    'shows the best turn in a %s match and sends hint_shown with the game only',
+    async (mode) => {
+      const s = session({ ...defaultSetup(mode), game: 'tavli' });
+      startWith(s, 'white');
+      await show(s).view;
+      await act(async () => {
+        s.store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 5] });
+      });
+      await act(async () => {
+        fireEvent.press(button('Hint'));
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(0);
+      });
+      expect(screen.getByTestId('hint-text')).toHaveTextContent(/^Hint: /);
+      expect(recorded.sent.filter((e) => e.type === 'track' && e.event === 'hint_shown')).toEqual([
+        { type: 'track', event: 'hint_shown', props: { game: 'tavli', variant: 'portes' } },
+      ]);
+    },
+  );
+});
+
+describe('<MatchScreen /> Acey-Deucey American scoring (#245)', () => {
+  // 1 point per checker the loser has not borne off (`perChecker`). The
+  // points come from the engine; the texts say how they were counted.
+  const american = (mode: MatchSetup['mode']): MatchSetup => ({
+    ...defaultSetup(mode),
+    game: 'asodio',
+    targetPoints: 7,
+    names: mode === 'local' ? { white: 'Maria', black: 'Nikos' } : { white: '', black: '' },
+    rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+  });
+
+  /** `toMove` is to roll on `layout` (each side in its own numbering). */
+  function startAt(s: MatchSession, layout: PerPlayer<SideLayout>, toMove: PlayerId = 'white') {
+    const { rules } = game(s).state;
+    expect(rules.scoring.method).toBe('perChecker');
+    const state = {
+      ...asodio.initialState({ startingPlayer: toMove, rules }),
+      board: createBoard(layout, rules.movement.direction),
+    };
+    s.store.setState({
+      flow: { ...s.store.getState().flow, game: createGameFlow({ state, starter: toMove }) },
+    });
+  }
+
+  /** `player` rolls 3-2, bears off from point 1 with the 3 and confirms. */
+  async function bearOffLast(s: MatchSession, player: PlayerId) {
+    await act(async () => {
+      const { dispatch } = s.store.getState();
+      expect(dispatch({ type: 'roll', player, dice: [3, 2] })).toBe(true);
+      expect(dispatch({ type: 'move', player, move: { from: 1, to: 'off', die: 3 } })).toBe(true);
+      expect(dispatch({ type: 'confirm', player })).toBe(true);
+    });
+  }
+
+  // White bears off her last checker; Black has 3 on the board and 2 outside.
+  const lastChecker: PerPlayer<SideLayout> = {
+    white: { points: { 1: 1 }, off: 14 },
+    black: { points: { 6: 3 }, outside: 2, off: 10 },
+  };
+
+  it('a finished game says 1 point for each checker the loser did not bear off', async () => {
+    const s = session(american('local'));
+    startAt(s, lastChecker);
+    await show(s).view;
+    await bearOffLast(s, 'white');
+
+    expect(game(s).result).toEqual({ winner: 'white', points: 5, reason: 'borneOff' });
+    const card = within(screen.getByTestId('game-end-card'));
+    expect(card.getByText('Maria wins the game!')).toBeOnTheScreen();
+    expect(card.getByText('+5 points')).toBeOnTheScreen();
+    expect(card.getByText('Nikos did not bear off 5 checkers: 1 point each.')).toBeOnTheScreen();
+    expect(card.getByText('Maria 5 – 0 Nikos')).toBeOnTheScreen();
+    // 5 points, but not a diplo: the chip stays outlined.
+    expectChip(false);
+    expect(card.queryByText(/Mono|Diplo|any checker/)).toBeNull();
+  });
+
+  it('a resign with one checker left: 1 point, not a mono', async () => {
+    const user = setupUser();
+    const s = session(american('local'));
+    startAt(s, lastChecker);
+    await show(s).view;
+
+    await user.press(button('Game menu'));
+    await user.press(button('Resign game, Nikos wins this game'));
+    const dialog = within(screen.getByTestId('resign-game-dialog'));
+    expect(
+      dialog.getByText('Nikos wins 1 point, because Maria has 1 checker left to bear off.'),
+    ).toBeOnTheScreen();
+    expect(dialog.getByText('Match after resign: Maria 0 – 1 Nikos (to 7)')).toBeOnTheScreen();
+    await user.press(button('Resign'));
+
+    expect(game(s).result).toEqual({ winner: 'black', points: 1, reason: 'resigned' });
+    const card = within(screen.getByTestId('game-end-card'));
+    expect(card.getByText('+1 point')).toBeOnTheScreen();
+    expect(
+      card.getByText('Maria resigned and did not bear off 1 checker: 1 point.'),
+    ).toBeOnTheScreen();
+    expect(card.queryByText(/Mono|Diplo/)).toBeNull();
+  });
+
+  it('vs the bot: your resign counts your checkers left', async () => {
+    const user = setupUser();
+    const s = session(american('bot'));
+    startAt(s, { white: { points: { 6: 2, 13: 3 }, off: 10 }, black: { points: { 6: 15 } } });
+    await show(s).view;
+
+    await user.press(button('Game menu'));
+    await user.press(button('Resign game, Bot wins this game'));
+    expect(
+      within(screen.getByTestId('resign-game-dialog')).getByText(
+        'Bot wins 5 points, because you have 5 checkers left to bear off: 1 point each.',
+      ),
+    ).toBeOnTheScreen();
+    await user.press(button('Resign'));
+
+    expect(game(s).result).toEqual({ winner: 'black', points: 5, reason: 'resigned' });
+    const card = within(screen.getByTestId('game-end-card'));
+    expect(card.getByText('+5 points')).toBeOnTheScreen();
+    expect(
+      card.getByText('You resigned and did not bear off 5 checkers: 1 point each.'),
+    ).toBeOnTheScreen();
+    expect(card.getByText('You 0 – 5 Bot')).toBeOnTheScreen();
+    expectChip(false);
+  });
+
+  it('vs the bot: a bear-off loss says how many of your checkers count', async () => {
+    const s = session(american('bot'));
+    // The bot (Black) bears off its last checker; you have 6 left.
+    startAt(
+      s,
+      { white: { points: { 13: 6 }, off: 9 }, black: { points: { 1: 1 }, off: 14 } },
+      'black',
+    );
+    await bearOffLast(s, 'black');
+    expect(game(s).result).toEqual({ winner: 'black', points: 6, reason: 'borneOff' });
+    await show(s).view;
+
+    const card = within(screen.getByTestId('game-end-card'));
+    expect(card.getByText('Bot wins the game!')).toBeOnTheScreen();
+    expect(card.getByText('+6 points')).toBeOnTheScreen();
+    expect(card.getByText('You did not bear off 6 checkers: 1 point each.')).toBeOnTheScreen();
+  });
+
+  it('Greek: the resign dialog and the game-end line', async () => {
+    const user = setupUser();
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    try {
+      const s = session(american('local'));
+      startAt(s, lastChecker);
+      await show(s).view;
+      await user.press(button('Μενού παιχνιδιού'));
+      await user.press(button(/^Παραίτηση από την παρτίδα/));
+      expect(
+        within(screen.getByTestId('resign-game-dialog')).getByText(
+          'Nikos: κερδίζει 1 βαθμό, γιατί Maria: έχει ακόμα 1 πούλι να μαζέψει.',
+        ),
+      ).toBeOnTheScreen();
+      await user.press(button('Παραίτηση'));
+      const card = within(screen.getByTestId('game-end-card'));
+      expect(card.getByText('+1 βαθμός')).toBeOnTheScreen();
+      expect(
+        card.getByText('Maria: παραιτήθηκε χωρίς να μαζέψει 1 πούλι, 1 βαθμός.'),
+      ).toBeOnTheScreen();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
   });
 });

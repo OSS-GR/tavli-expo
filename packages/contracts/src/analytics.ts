@@ -18,6 +18,8 @@
  * Adapters: `@tavli/analytics-posthog` (the app), `createNoopAnalytics` (no
  * key, local dev) and `createRecordingAnalytics` (tests).
  */
+import type { PresetId } from '@tavli/engine';
+
 import type { Difficulty } from './bot-runner';
 import { isAnonymousInstallId } from './install-id';
 
@@ -30,6 +32,13 @@ export type GameMode = 'bot' | 'local' | 'online';
  * events is the game in play, so only this property tells a Tavli match apart.
  */
 export type MatchGame = 'portes' | 'plakoto' | 'fevga' | 'tavli' | 'asodio';
+
+/**
+ * The opening roll house rule of the match (#207), the engine flag
+ * `match.openingRoll`: `useOpeningDice` (the federation rule, default),
+ * `rerollBoth` or `chosenStarterRolls`. A value id only.
+ */
+export type OpeningRollRule = 'useOpeningDice' | 'rerollBoth' | 'chosenStarterRolls';
 
 /** What a `theme_changed` event is about: the app colors or the board. */
 export type ThemeKind = 'app' | 'board';
@@ -62,6 +71,13 @@ export interface AnalyticsEvents {
     matchLength: number;
     /** Only for `mode: 'bot'`. */
     botLevel?: Difficulty;
+    /** The opening roll house rule (#207). */
+    openingRoll: OpeningRollRule;
+    /**
+     * The rules version of the game in play (#241): its engine preset id,
+     * for example `plakoto.federation`. A value id only.
+     */
+    rulesVersion: PresetId;
   };
   game_finished: {
     mode: GameMode;
@@ -97,6 +113,20 @@ export interface AnalyticsEvents {
   tutorial_finished: { game: TutorialGame };
   /** Skip was tapped. `step` is the lesson on screen, from 1. */
   tutorial_skipped: { game: TutorialGame; step: number; lesson: string };
+  /**
+   * The Hint button (#209) showed the best turn. Only which game: never the
+   * position, the dice or the moves.
+   */
+  hint_shown: {
+    game: MatchGame;
+    /** Engine variant id: the game in play. */
+    variant: string;
+  };
+  /**
+   * The game review (#215) opened after a game. Only which game was picked
+   * for the match: never the position, the dice, the moves or the mistakes.
+   */
+  review_opened: { game: MatchGame };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
@@ -130,6 +160,8 @@ export const ANALYTICS_EVENTS = [
   'tutorial_step',
   'tutorial_finished',
   'tutorial_skipped',
+  'hint_shown',
+  'review_opened',
 ] as const satisfies readonly AnalyticsEventName[];
 
 type MissingEvent = Exclude<AnalyticsEventName, (typeof ANALYTICS_EVENTS)[number]>;

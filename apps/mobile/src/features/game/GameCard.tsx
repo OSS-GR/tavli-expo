@@ -18,17 +18,30 @@ export interface GameCardProps {
   title: string;
   /** Lines under the title. */
   lines?: readonly string[];
-  /** Small text at the bottom, e.g. "Closes by itself after 3 s." */
+  /** Small text at the bottom, e.g. "Closes by itself after 3.5 s." */
   footnote?: string;
   /** Buttons. */
   children?: ReactNode;
+  /**
+   * Names the game event the card shows, for this app run (#216). With it
+   * the card is read once: a remount does not read it again. Without it,
+   * every time it opens.
+   */
+  announceKey?: string;
   testID?: string;
 }
 
-export function GameCard({ title, lines = [], footnote, children, testID }: GameCardProps) {
+export function GameCard({
+  title,
+  lines = [],
+  footnote,
+  children,
+  announceKey,
+  testID,
+}: GameCardProps) {
   const titleRef = useFocusOnShow();
   // Read on both platforms (a live region works on Android only).
-  useAnnouncement([title, ...lines].join(' '));
+  useAnnouncement([title, ...lines].join(' '), announceKey);
   return (
     <View testID={testID} style={styles.card}>
       <Text ref={titleRef} style={styles.title} accessibilityRole="header">

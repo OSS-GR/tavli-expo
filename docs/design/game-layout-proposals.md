@@ -1,6 +1,14 @@
 # Game screen layout: proposals
 
-> Issues #184 (portrait) and #185 (landscape), step 1. These are pictures for the owner to pick from. The app does not change yet. Last review: 2026-10-27.
+> Issues #184 (portrait) and #185 (landscape), step 1. These are pictures for the owner to pick from. Last review: 2026-10-27.
+
+## Decision (owner, 2026-10-27)
+
+- **Portrait: both layouts ship (#184).** **B, the tall board, is the default.** **A, the classic board, is a setting** (Settings → Board → Board layout: **Tall** / **Classic**), and it is **centred on the screen**, not pushed to the bottom.
+- Both layouts: one-line strips (36 pt), the dice on the board (in the theme's dice area, at least 32 pt so they are easy to read), one row of two big buttons (Undo · Confirm, or one Roll) at the bottom. Every text stays upright.
+- Tall: the menu sits in the top strip and the game label moves into the menu. Classic: the menu and the game label sit at the top; the strips hug the board.
+- How it is built: [Board screen → Board layouts](../architecture/board-screen.md#board-layouts-184).
+- **Landscape (#185): built as drawn below.** Only the game screen and the tutorial board turn with the phone; every other screen stays upright. The classic board sits in the middle; the left column holds the menu, both players and Undo, the right column the game label, the dice and Roll or Confirm. Changes from the picture: the columns are 128 pt (not 96 pt), so Greek "Επιβεβαίωση" fits on one line; the board is then a little smaller (checker 25 pt on the SE, 35 pt on the Pro Max). The strips show the color and the score on the first line, then the pill and the name (no pip count since #238). How it is built: [Board screen → Landscape](../architecture/board-screen.md#landscape-185).
 
 ## How to read the pictures
 
@@ -84,11 +92,11 @@ The UI turns with the phone. The classic board sits in the middle. The left colu
 - On the SE the width limits the board (two 96 pt columns): checkers 28 pt, with 57 pt free above and below.
 - All three themes already have a `landscape` layout with its own images, and the board code already handles both layouts (`boardModel.test.ts` checks both). So the board itself needs little new work.
 
-Points to solve when we build it:
+Points to solve when we build it (all solved in #185):
 
-- Greek "Επιβεβαίωση" is about 102 pt at 17 pt. It does not fit a 96 pt column on the SE. We need a smaller text, an icon with a label, or wider columns (a smaller board).
-- Every card and sheet (opening, pass, mother, game end, menu, resign) must fit 375 pt of height or scroll.
-- Turning the phone mid-turn must keep the dice, the moves made and a picked-up checker.
+- Greek "Επιβεβαίωση" is about 102 pt at 17 pt. It does not fit a 96 pt column on the SE. We need a smaller text, an icon with a label, or wider columns (a smaller board). **#185: wider columns (128 pt) and compact side buttons.**
+- Every card and sheet (opening, pass, mother, game end, menu, resign) must fit 375 pt of height or scroll. **#185: they scroll; sheets are at most 560 pt wide.**
+- Turning the phone mid-turn must keep the dice, the moves made and a picked-up checker. **#185: the board and the dice keep their place in the tree, so nothing remounts.**
 
 ## How the proposals fit together
 
@@ -98,13 +106,13 @@ Points to solve when we build it:
 
 ## Open questions for the owner
 
-1. **Portrait:** A, B, or keep today's layout?
-2. **Which screens turn in landscape?** (a) only the game board and the tutorial board, or (b) every screen. Suggestion: (a). Home, New game, Settings and Rules stay in portrait, so we test fewer layouts.
-3. **Landscape sides:** players on the left and the dice on the right, as drawn? Do left-handed players need a "swap sides" setting?
-4. **Dice:** on the board (A, B) or in the button row (today)? On the board they are smaller unless we raise the theme's dice size.
-5. **Proposal A only:** what goes into the free space: the match score, the last moves, the move list, or nothing?
-6. **Strips:** one line is enough (name, pips, checkers off, score, turn)? The match score and "checkers off" can also move to the menu.
-7. **Rotation lock:** the phone's own rotation lock is always respected. Do we also want an in-app "keep portrait" setting?
+1. **Portrait:** A, B, or keep today's layout? **Answered: B by default, A as a setting, centred (#184).**
+2. **Which screens turn in landscape?** (a) only the game board and the tutorial board, or (b) every screen. Suggestion: (a). Home, New game, Settings and Rules stay in portrait, so we test fewer layouts. **Answered: (a) (#185).**
+3. **Landscape sides:** players on the left and the dice on the right, as drawn? Do left-handed players need a "swap sides" setting? **#185: as drawn. No "swap sides" setting yet.**
+4. **Dice:** on the board (A, B) or in the button row (today)? On the board they are smaller unless we raise the theme's dice size. **Answered: on the board (#184); the app draws them at least 32 pt.**
+5. **Proposal A only:** what goes into the free space: the match score, the last moves, the move list, or nothing? **For now nothing (#184): the board is centred, so the free space is split above and below it.**
+6. **Strips:** one line is enough (name, pips, checkers off, score, turn)? The match score and "checkers off" can also move to the menu. **#184: one line with the name, pips, score and turn (no "checkers off": the trays show them). A long name, Greek or a large font wraps it to two lines. #238 removed the pips.**
+7. **Rotation lock:** the phone's own rotation lock is always respected. Do we also want an in-app "keep portrait" setting? **#185: not built; the phone's lock is enough for now.**
 
 ## How the pictures were made
 

@@ -48,12 +48,18 @@ export function MenuRow({ icon, title, hint, disabled = false, onPress, testID }
 }
 
 export interface GameMenuProps {
+  /**
+   * The game on the board: "Game 2 · Plakoto" (#109). The tall game screen
+   * has no room for it, so the menu shows it (#184).
+   */
+  gameLabel?: string;
   summary: string;
   /** `null` hides the hint and disables the row. */
   resignGameHint: string | null;
   resignMatchHint: string | null;
   rulesLabel: string;
-  onResignGame: () => void;
+  /** Without it there is no Resign game row: online you resign the whole match (#255). */
+  onResignGame?: () => void;
   onResignMatch: () => void;
   onRules: () => void;
   onSettings: () => void;
@@ -69,15 +75,22 @@ export function GameMenu(props: GameMenuProps) {
       <Text style={styles.heading} accessibilityRole="header">
         {t('game.menu.title')}
       </Text>
+      {props.gameLabel ? (
+        <Text testID="menu-game-label" style={styles.gameLabel}>
+          {props.gameLabel}
+        </Text>
+      ) : null}
       <Text style={styles.summary}>{props.summary}</Text>
-      <MenuRow
-        testID="menu-resign-game"
-        icon="!"
-        title={t('game.menu.resignGame')}
-        {...(props.resignGameHint ? { hint: props.resignGameHint } : {})}
-        disabled={props.resignGameHint === null}
-        onPress={props.onResignGame}
-      />
+      {props.onResignGame ? (
+        <MenuRow
+          testID="menu-resign-game"
+          icon="!"
+          title={t('game.menu.resignGame')}
+          {...(props.resignGameHint ? { hint: props.resignGameHint } : {})}
+          disabled={props.resignGameHint === null}
+          onPress={props.onResignGame}
+        />
+      ) : null}
       <MenuRow
         testID="menu-resign-match"
         icon="!!"
@@ -113,6 +126,10 @@ const styles = StyleSheet.create((theme) => ({
   },
   heading: {
     ...theme.type.title,
+    color: theme.colors.text,
+  },
+  gameLabel: {
+    ...theme.type.bodyStrong,
     color: theme.colors.text,
   },
   summary: {

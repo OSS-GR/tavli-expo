@@ -4,13 +4,16 @@
  * is a route.)
  */
 import type { createRecordingAnalytics } from '@tavli/contracts';
-import { within } from '@testing-library/react-native';
+import { createGameFlow, portes } from '@tavli/engine';
+import { fireEvent, within } from '@testing-library/react-native';
 import { router as appRouter } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
+import { devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
 import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
@@ -20,9 +23,11 @@ import { settingsStore } from '@/features/settings/store';
 import { LESSON_SETS, LESSONS } from '@/features/tutorial/lessons';
 import { TUTORIAL_STORAGE_KEY, tutorialStorageKey } from '@/features/tutorial/progress';
 import { tutorialStore } from '@/features/tutorial/store';
-import { analytics, storage } from '@/services';
+import { analytics, onlineServer, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../test/clock';
+import { nativePath } from '../test/nativeParent';
+import { onlineFake } from '../test/onlineFake';
 import { layoutTutorialBoard, playLessonByTaps } from '../test/tutorialTaps';
 
 const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
@@ -76,7 +81,36 @@ beforeEach(async () => {
   await act(async () => historyStore.getState().clear());
 });
 
+/** The orientation lock of the native screen that holds `element` (react-native-screens). */
+function orientationOf(element: ReturnType<typeof screen.getByTestId>): unknown {
+  let node = element.parent;
+  while (node !== null && node.type !== 'RNSScreen') node = node.parent;
+  return node?.props.screenOrientation;
+}
+
 describe('app navigation', () => {
+  it('turns only the game board and the tutorial with the phone (#185)', async () => {
+    const user = setupUser();
+    await renderRouter('./src/app', { initialUrl: '/' });
+    const playVsBot = screen.getByRole('button', { name: /^Play vs bot/ });
+    expect(orientationOf(playVsBot)).toBe('portrait_up');
+    await user.press(playVsBot);
+    expect(orientationOf(screen.getByRole('button', { name: 'Start game' }))).toBe('portrait_up');
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    // The game screen follows the phone: portrait or landscape (not upside down on iPhone).
+    expect(orientationOf(screen.getByTestId('game-board', { includeHiddenElements: true }))).toBe(
+      'default',
+    );
+
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: /^Settings/ }));
+    expect(orientationOf(screen.getByTestId('settings-learn-to-play'))).toBe('portrait_up');
+    await act(async () => appRouter.push('/tutorial'));
+    expect(orientationOf(screen.getByTestId('tutorial-board'))).toBe('default');
+    await act(async () => appRouter.push('/history'));
+    expect(orientationOf(screen.getByTestId('history-screen'))).toBe('portrait_up');
+  });
+
   it('starts a game vs the bot and goes back home from the menu', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
@@ -161,6 +195,69 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: 'Home' }));
     expect(router.getPathname()).toBe('/');
     expect(screen.queryByRole('button', { name: /^Continue game/ })).toBeNull();
+  });
+
+  it('opens the game review from the game-end sheet and from match end (#215)', async () => {
+    const user = setupUser();
+    // Usage data allowed: the review sends `review_opened`.
+    await act(async () => consentStore.setState({ status: 'granted' }));
+    recorded.sent.length = 0;
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const session = matchSessions.current()!;
+    const board = `/game/${session.id}`;
+
+    // You start with 5-3; the bot resigns the game: the game-end sheet shows.
+    await act(async () => {
+      const { dispatch } = session.store.getState();
+      dispatch({ type: 'rollOpening', player: 'white', die: 5 });
+      dispatch({ type: 'rollOpening', player: 'black', die: 3 });
+      dispatch({ type: 'resign', player: 'black' });
+    });
+    await user.press(
+      within(screen.getByTestId('game-end-card')).getByRole('button', { name: 'Review' }),
+    );
+    expect(router.getPathname()).toBe(`${board}/review`);
+    expect(screen.getByRole('header', { name: 'Game 1 · Portes' })).toBeOnTheScreen();
+    // Nobody finished a turn in that game.
+    expect(await screen.findByText('No moves to review in this game.')).toBeOnTheScreen();
+
+    // Back: the board with its sheet.
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe(board);
+    expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
+
+    // The next game, then the bot resigns the match: Review from match end.
+    await act(async () => {
+      const { dispatch } = session.store.getState();
+      dispatch({ type: 'nextGame' });
+      dispatch({ type: 'resignMatch', player: 'black' });
+    });
+    await expectMatchEndAfterDelay(router, `${board}/match-end`);
+    await user.press(screen.getByRole('button', { name: 'Review' }));
+    expect(router.getPathname()).toBe(`${board}/review`);
+    expect(screen.getByRole('header', { name: 'Game 2 · Portes' })).toBeOnTheScreen();
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe(`${board}/match-end`);
+
+    const reviews = recorded.sent.filter((e) => e.type === 'track' && e.event === 'review_opened');
+    expect(reviews).toEqual([
+      { type: 'track', event: 'review_opened', props: { game: 'portes' } },
+      { type: 'track', event: 'review_opened', props: { game: 'portes' } },
+    ]);
+  });
+
+  it('the review of a game still in play goes to the board; an unknown game cannot be opened', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const session = matchSessions.current()!;
+    await act(async () => appRouter.push(`/game/${session.id}/review`));
+    expect(router.getPathname()).toBe(`/game/${session.id}`);
+    await act(async () => appRouter.push('/game/local-nope/review'));
+    expect(screen.getByText('This game could not be opened.')).toBeOnTheScreen();
   });
 
   it('adds a finished match to History, opened from Home and Settings (#142)', async () => {
@@ -269,6 +366,30 @@ describe('app navigation', () => {
     expect(router.getPathname()).toBe('/rules/portes');
   });
 
+  it('opens the rules of the Plakoto game of a Tavli match in its version (#247)', async () => {
+    const user = setupUser();
+    const session = matchSessions.start({
+      ...defaultSetup('local'),
+      game: 'tavli',
+      rulesVersions: { ...defaultSetup('local').rulesVersions, plakoto: 'plakoto.federation' },
+    });
+    const { dispatch } = session.store.getState();
+    // Game 1 (Portes, its default rules) ends with a resign; game 2 is Plakoto.
+    dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+    dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+    expect(session.store.getState().flow.game.state.rules.presetId).toBe('portes');
+    dispatch({ type: 'resign', player: 'white' });
+    dispatch({ type: 'nextGame' });
+    expect(session.store.getState().flow.game.state.rules.presetId).toBe('plakoto.federation');
+
+    const router = await renderRouter('./src/app', { initialUrl: `/game/${session.id}` });
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: 'How to play Plakoto' }));
+    expect(router.getPathname()).toBe('/rules/plakoto');
+    expect(router.getSearchParams()).toMatchObject({ version: 'plakoto.federation' });
+    expect(screen.getByTestId('rules-section-version')).toBeOnTheScreen();
+  });
+
   it('opens the Plakoto rules page', async () => {
     await renderRouter('./src/app', { initialUrl: '/rules/plakoto' });
     expect(screen.getByTestId('rules-section-mother')).toBeOnTheScreen();
@@ -304,6 +425,86 @@ describe('app navigation', () => {
       settingsStore.setState({ language: 'el' });
     });
     expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');
+  });
+
+  // On iOS a Skia canvas that moves to another native parent loses its
+  // drawing. The dice did, when the menu hid the screen from screen readers
+  // (#173). They stayed blank until a move drew them again.
+  it('keeps the dice drawn through the menu, Settings and back, and the background (#173)', async () => {
+    // React Native's Jest setup makes `AppState.addEventListener` a mock. The
+    // listeners the app adds from here on let the test send it to the background.
+    const addListener = jest.mocked(AppState.addEventListener);
+    expect(jest.isMockFunction(addListener)).toBe(true);
+    const firstCall = addListener.mock.calls.length;
+    const sendAppState = (state: AppStateStatus) => {
+      for (const [type, fn] of addListener.mock.calls.slice(firstCall)) {
+        if (type === 'change') (fn as (next: AppStateStatus) => void)(state);
+      }
+    };
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const session = matchSessions.current()!;
+    const board = `/game/${session.id}`;
+    // You (White) roll first; no opening roll.
+    await act(async () => {
+      const { flow } = session.store.getState();
+      const state = portes.initialState({ startingPlayer: 'white' });
+      session.store.setState({
+        flow: { ...flow, game: createGameFlow({ state, starter: 'white' }) },
+      });
+    });
+    await user.press(screen.getByRole('button', { name: 'Roll dice, or tap the board' }));
+    // The board draws once it knows its size.
+    await act(async () => {
+      fireEvent(screen.getByTestId('game-board'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 500 } },
+      });
+    });
+
+    const hidden = { includeHiddenElements: true };
+    const dice = screen.getByTestId('dice-row');
+    const label = dice.props.accessibilityLabel as string;
+    expect(label).toMatch(/^Dice \d-\d, \d left to play$/);
+    const path = nativePath(dice);
+    expect(path).not.toBe('');
+    const boardPath = nativePath(screen.getByTestId('game-board-canvas', hidden));
+    /**
+     * The dice are the same canvas, in the same native views, with the same
+     * values. The board canvas does not move either.
+     */
+    const expectSameDice = () => {
+      const now = screen.getByTestId('dice-row', hidden);
+      expect(now === dice).toBe(true);
+      expect(nativePath(now)).toBe(path);
+      expect(now).toHaveAccessibleName(label);
+      expect(nativePath(screen.getByTestId('game-board-canvas', hidden))).toBe(boardPath);
+    };
+
+    // The menu hides the screen from screen readers: the dice stay in place.
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    expectSameDice();
+    await user.press(screen.getByRole('button', { name: /^Settings/ }));
+    expect(router.getPathname()).toBe('/settings');
+    expectSameDice();
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe(board);
+    expectSameDice();
+    expect(screen.getByTestId('dice-row')).toBeOnTheScreen();
+
+    // Resume from the menu, then the app goes to the background and back.
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: /^Resume/ }));
+    expectSameDice();
+    expect(addListener.mock.calls.length).toBeGreaterThan(firstCall);
+    storage.remove(SAVED_MATCH_KEY);
+    await act(async () => sendAppState('background'));
+    // Going to the background saves the match (#36): the listeners ran.
+    expect(JSON.parse(storage.getString(SAVED_MATCH_KEY) ?? '{}').id).toBe(session.id);
+    await act(async () => sendAppState('active'));
+    expectSameDice();
+    expect(session.store.getState().flow.game.phase).toBe('moving');
   });
 });
 
@@ -543,5 +744,87 @@ describe('tutorial from Settings (#159)', () => {
     expect(router.getPathname()).toBe('/tutorial');
     expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'asodio' });
     expect(screen.getByRole('header', { name: 'Learn Asodio' })).toBeOnTheScreen();
+  });
+});
+
+describe('online games (#255)', () => {
+  afterEach(() => stopAnyDevGame());
+
+  it('shows "could not be opened" for an unknown online game', async () => {
+    await renderRouter('./src/app', { initialUrl: '/game/game-nope' });
+    expect(await screen.findByText('This game could not be opened.')).toBeOnTheScreen();
+  });
+
+  it('opens a game that is not a dev game on `games`, as the signed-in user (#266)', async () => {
+    onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
+    const gameId = onlineFake
+      .server()
+      .createGame('guest-1', { white: 'guest-1', black: 'bob' }, 'portes', 3, 'live');
+    await renderRouter('./src/app', { initialUrl: `/game/${gameId}` });
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
+  });
+
+  it('makes no guest for a game link when nobody is signed in (#266)', async () => {
+    const gameId = onlineFake
+      .server()
+      .createGame('guest-1', { white: 'guest-1', black: 'bob' }, 'portes', 3, 'live');
+    await renderRouter('./src/app', { initialUrl: `/game/${gameId}` });
+    expect(await screen.findByText('This game could not be opened.')).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
+  });
+
+  it('stops the dev game (bot and turn timers) when its board closes', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const gameId = router.getPathname().split('/').at(-1)!;
+    expect(devGameRunning()).toBe(true);
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByTestId('menu-exit'));
+    expect(router.getPathname()).toBe('/');
+    // The game is not over, but nobody plays it now.
+    expect(onlineServer().getGame(gameId)?.status).toBe('active');
+    expect(devGameRunning()).toBe(false);
+  });
+
+  it('starts a dev game vs the bot, resigns it and opens match end', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
+    await user.press(screen.getByRole('radio', { name: '1' }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const board = router.getPathname();
+    expect(board).toMatch(/^\/game\/game-\d+$/);
+    const gameId = board.split('/').at(-1)!;
+    expect(onlineServer().getGame(gameId)).toMatchObject({ choice: 'portes', pace: 'live' });
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    // Online games stay out of the save slot.
+    expect(storage.getString(SAVED_MATCH_KEY)).toBeUndefined();
+    expect(matchSessions.current()).toBeNull();
+
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: /^Resign match/ }));
+    await user.press(screen.getByRole('button', { name: 'Resign' }));
+    await act(async () => {
+      jest.advanceTimersByTime(MATCH_END_DELAY_MS);
+    });
+    expect(router.getPathname()).toBe(`${board}/match-end`);
+    expect(
+      await screen.findByRole('header', { name: 'Opponent wins the match!' }),
+    ).toBeOnTheScreen();
+    expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
+    // No rematch online, and no History record.
+    expect(screen.queryByRole('button', { name: /^Rematch/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Change settings' })).toBeNull();
+    expect(historyStore.getState().records).toEqual([]);
+    await user.press(screen.getByRole('button', { name: 'Home' }));
+    expect(router.getPathname()).toBe('/');
   });
 });

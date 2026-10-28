@@ -39,21 +39,79 @@ describe('game events for real matches (#61)', () => {
         variant: 'portes',
         matchLength: 5,
         botLevel: 'easy',
+        openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
       },
     ]);
+  });
+
+  it('sends the opening roll house rule as a value id (#207)', () => {
+    matchSessions.start({ ...localSetup, openingRoll: 'rerollBoth' });
+    expect(tracked()[0]).toMatchObject({ event: 'game_started', openingRoll: 'rerollBoth' });
+  });
+
+  it('sends the rules version as a value id: the preset of the game in play (#241)', () => {
+    matchSessions.start({
+      ...localSetup,
+      game: 'asodio',
+      rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+    });
+    expect(tracked()[0]).toMatchObject({
+      event: 'game_started',
+      game: 'asodio',
+      rulesVersion: 'asodio.aceyDeuceyAmerican',
+    });
   });
 
   it('sends game: tavli for a Tavli match, and the game in play as variant', () => {
     matchSessions.start({ ...localSetup, game: 'tavli' });
     expect(tracked()).toEqual([
-      { event: 'game_started', mode: 'local', game: 'tavli', variant: 'portes', matchLength: 3 },
+      {
+        event: 'game_started',
+        mode: 'local',
+        game: 'tavli',
+        variant: 'portes',
+        matchLength: 3,
+        openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
+      },
+    ]);
+  });
+
+  it('a Tavli match sends the Plakoto version only for its Plakoto game (#247)', () => {
+    const { store } = matchSessions.start({
+      ...localSetup,
+      game: 'tavli',
+      targetPoints: 7,
+      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' },
+    });
+    const { dispatch } = store.getState();
+    for (let game = 0; game < 2; game += 1) {
+      dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+      dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+      dispatch({ type: 'resign', player: 'white' });
+      dispatch({ type: 'nextGame' });
+    }
+    const started = tracked().filter((e) => e.event === 'game_started');
+    expect(started).toMatchObject([
+      { game: 'tavli', variant: 'portes', rulesVersion: 'portes' },
+      { game: 'tavli', variant: 'plakoto', rulesVersion: 'plakoto.federation' },
+      { game: 'tavli', variant: 'fevga', rulesVersion: 'fevga' },
     ]);
   });
 
   it('sends game_started for pass-and-play, with no player names', () => {
     matchSessions.start(localSetup);
     expect(tracked()).toEqual([
-      { event: 'game_started', mode: 'local', game: 'portes', variant: 'portes', matchLength: 3 },
+      {
+        event: 'game_started',
+        mode: 'local',
+        game: 'portes',
+        variant: 'portes',
+        matchLength: 3,
+        openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
+      },
     ]);
     expect(JSON.stringify(recorded.sent)).not.toContain('Maria');
   });

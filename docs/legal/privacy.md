@@ -6,7 +6,7 @@ This is not legal advice. The owner should have a lawyer or a GDPR expert check 
 
 # Tavlaki privacy policy
 
-**Last updated:** 27 October 2026
+**Last updated:** 28 October 2026
 
 Ελληνικά: [tavlaki.com/el/privacy](https://tavlaki.com/el/privacy)
 
@@ -31,7 +31,7 @@ Contact: **privacy@tavlaki.com** <!-- OWNER: confirm this address works before p
 
 The app saves these things on your phone only. They never leave it.
 
-- **Your settings:** sound, haptics, language, board theme, board turn, auto-confirm, pip counts.
+- **Your settings:** sound, haptics, language, board theme, board turn, auto-confirm.
 - **Your games:** the match you are playing, so you can go back to it, and your last choices on the New game screen. In pass-and-play, this includes the player names you type. Names are never sent anywhere.
 - **Your privacy answer** (allow or don't allow).
 - **An install id:** a random code, made on your phone. It is not your name, email, phone number or a device id. It does not come from your phone's hardware. The app makes it only after you tap **Allow usage data**.
@@ -81,7 +81,7 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Event | When |
 |-------|------|
 | App opened | Once each time the app starts |
-| Game started | A game begins. Includes: against the bot or pass-and-play; which game (Portes, Plakoto, Fevga, Asodio, or Tavli: all three in turn); points to win; bot level |
+| Game started | A game begins. Includes: against the bot or pass-and-play; which game (Portes, Plakoto, Fevga, Asodio, or Tavli: all three in turn); points to win; bot level; the house rule for the first roll (one of three fixed choices); the rules version (one of a fixed list) |
 | Game finished | A game ends. Includes: the game; how it ended (single, double, resign, draw, time-out); number of turns; length in seconds |
 | Game left | You start a new match while a game is not over. Includes: against the bot or pass-and-play; the game; the turn number |
 | Undo used | You took back a move |
@@ -92,6 +92,8 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Tutorial step | You finished a lesson of the tutorial. Includes the game, and the lesson's number and name (for example "hit") |
 | Tutorial finished | You finished the last lesson of the tutorial. Includes the game |
 | Tutorial skipped | You tapped Skip in the tutorial. Includes the game, and the lesson's number and name on screen |
+| Hint shown | You tapped Hint in a game. Includes the game only, never the position, the dice or the moves |
+| Review opened | You opened the review of a game. Includes the game only, never the position, the dice, the moves or the mistakes |
 | Screen viewed | You opened a screen. Includes the screen's name (for example "settings"), never personal data |
 
 Each event also carries technical facts: the phone maker and model (for example "iPhone 15", never the name you gave your phone), the system and its version, screen size, the app name and version, language and time zone. It carries the install id, and random ids that PostHog keeps on your phone.

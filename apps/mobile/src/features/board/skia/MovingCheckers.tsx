@@ -17,7 +17,7 @@ import {
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { toneOf } from '../boardModel';
-import { FLIGHT_MS, type Flight } from '../flights';
+import { FLIGHT_MS, flightMs, type Flight } from '../flights';
 
 import { CheckerShape } from './CheckerShape';
 
@@ -38,11 +38,30 @@ function UnitChecker({ theme, owner }: { theme: ThemeManifest; owner: PlayerId }
 export function flightPose(flight: Flight, p: number) {
   'worklet';
   const t = Math.min(1, Math.max(0, p));
-  const lift = Math.sin(t * Math.PI) * 0.12;
+  const via = flight.via ?? [];
+  if (via.length === 0) {
+    const lift = Math.sin(t * Math.PI) * 0.12;
+    return {
+      x: flight.from.x + (flight.to.x - flight.from.x) * t,
+      y: flight.from.y + (flight.to.y - flight.from.y) * t,
+      r: (flight.fromR + (flight.toR - flight.fromR) * t) * (1 + lift),
+    };
+  }
+  // A path (#180): `p` runs evenly over the legs. Each leg slows down at its
+  // end, so the checker visibly stops on each middle point.
+  const start = { x: flight.from.x, y: flight.from.y, r: flight.fromR };
+  const stops = [start, ...via, { x: flight.to.x, y: flight.to.y, r: flight.toR }];
+  const legs = stops.length - 1;
+  const leg = Math.min(legs - 1, Math.floor(t * legs));
+  const local = t * legs - leg;
+  const eased = 1 - (1 - local) * (1 - local) * (1 - local);
+  const a = stops[leg] ?? start;
+  const b = stops[leg + 1] ?? a;
+  const lift = Math.sin(eased * Math.PI) * 0.12;
   return {
-    x: flight.from.x + (flight.to.x - flight.from.x) * t,
-    y: flight.from.y + (flight.to.y - flight.from.y) * t,
-    r: (flight.fromR + (flight.toR - flight.fromR) * t) * (1 + lift),
+    x: a.x + (b.x - a.x) * eased,
+    y: a.y + (b.y - a.y) * eased,
+    r: (a.r + (b.r - a.r) * eased) * (1 + lift),
   };
 }
 
@@ -56,13 +75,24 @@ export function FlightChecker({
   onDone: (id: string) => void;
 }) {
   const progress = useSharedValue(0);
+  const shown = useSharedValue(flight.hiddenMs === undefined ? 1 : 0);
   useEffect(() => {
+    if (flight.hiddenMs !== undefined) {
+      shown.set(withDelay(flight.hiddenMs, withTiming(1, { duration: 0 })));
+    }
     progress.set(
       withDelay(
         flight.delay,
-        withTiming(1, { duration: FLIGHT_MS, easing: Easing.out(Easing.cubic) }, (finished) => {
-          if (finished) scheduleOnRN(onDone, flight.id);
-        }),
+        withTiming(
+          1,
+          // A path eases each leg itself (`flightPose`), so its clock runs evenly.
+          flight.via?.length
+            ? { duration: flightMs(flight), easing: Easing.linear }
+            : { duration: FLIGHT_MS, easing: Easing.out(Easing.cubic) },
+          (finished) => {
+            if (finished) scheduleOnRN(onDone, flight.id);
+          },
+        ),
       ),
     );
     // A flight runs once, when it mounts.
@@ -73,7 +103,7 @@ export function FlightChecker({
     return [{ translateX: pose.x }, { translateY: pose.y }, { scale: pose.r }];
   });
   return (
-    <Group transform={transform}>
+    <Group transform={transform} opacity={shown}>
       <UnitChecker theme={theme} owner={flight.owner} />
     </Group>
   );

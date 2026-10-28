@@ -12,7 +12,7 @@ import { createBot } from './create-bot';
 import { simulate } from './simulate';
 import type { SimulationResult } from './simulate';
 import { isBotLevel } from './types';
-import type { BotLevel } from './types';
+import type { Bot, BotLevel } from './types';
 
 export interface SimulateArgs {
   readonly games: number;
@@ -125,8 +125,11 @@ export interface CliIo {
   readonly now: () => number;
 }
 
-/** Runs the command. Returns the exit code: 0 ok, 1 failed games, 2 bad input. */
-export function runSimulateCli(argv: readonly string[], io: CliIo): number {
+/**
+ * Runs the command. Returns the exit code: 0 ok, 1 failed games, 2 bad input.
+ * `bot` is for tests (default `createBot()`).
+ */
+export function runSimulateCli(argv: readonly string[], io: CliIo, bot: Bot = createBot()): number {
   let args: SimulateArgs;
   let rules: RuleSet | undefined;
   try {
@@ -145,7 +148,6 @@ export function runSimulateCli(argv: readonly string[], io: CliIo): number {
     io.error(`${error instanceof Error ? error.message : String(error)}\n\n${SIMULATE_USAGE}`);
     return 2;
   }
-  const bot = createBot();
   const start = io.now();
   const result = simulate({
     variant: getVariant(VARIANT_REGISTRY, args.variant),

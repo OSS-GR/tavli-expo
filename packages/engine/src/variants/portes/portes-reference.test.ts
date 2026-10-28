@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { DIE_VALUES } from '../../dice';
+import { DISTINCT_ROLLS } from '../../dice';
 import type { Dice } from '../../dice';
 import type { GameState } from '../../state';
 import { referenceFinals, sideKey, sideOf } from '../../testing/portes-oracle';
@@ -37,12 +37,8 @@ describe('Portes generator vs. the slow reference', () => {
 
   it('agrees on every roll in 25 random positions', () => {
     for (const state of randomPositions(57, 25, 11)) {
-      for (const a of DIE_VALUES) {
-        for (const b of DIE_VALUES) {
-          if (b > a) continue;
-          const dice: Dice = [a, b];
-          expect(new Set(engineFinals(state, dice))).toEqual(referenceFinals(state, dice));
-        }
+      for (const { dice } of DISTINCT_ROLLS) {
+        expect(new Set(engineFinals(state, dice))).toEqual(referenceFinals(state, dice));
       }
     }
   });

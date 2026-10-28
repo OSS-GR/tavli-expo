@@ -17,7 +17,6 @@ import {
   getPreset,
   legalNextMoves,
   matchPhase,
-  pipCount,
   remainingDice,
   type BoardState,
   type DieValue,
@@ -36,6 +35,7 @@ import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
 import type { GameAnalytics } from '@/features/analytics/gameAnalytics';
+import { quietly } from '@/features/analytics/quietly';
 
 export interface GameStoreOptions {
   players: PerPlayer<string>;
@@ -56,29 +56,44 @@ export interface GameStoreOptions {
   analytics?: GameAnalytics;
 }
 
-export interface GameStoreState {
+/**
+ * What the board screen (`GameScreen`) reads from a store: a local match
+ * (`GameStoreState`), or an online game (`features/online/boardStore.ts`,
+ * #255). The screen only reads it and sends actions.
+ */
+export interface BoardStoreState {
   readonly flow: MatchFlow;
-  /** The last action the engine refused, for logs and tests. `null` after a good one. */
+  /**
+   * Names the match for this app run, never a time. The local store counts
+   * `m1`, `m2`, … (new for each store and each rematch); an online board
+   * uses `online:<gameId>`. Screen reader events put it in their key, so
+   * each one is read once (#216).
+   */
+  readonly matchKey: string;
+  /** The last action that was refused, for logs and tests. `null` after a good one. */
   readonly lastError: string | null;
-  /** Applies one action. Returns `false` (and keeps the flow) if the engine refuses it. */
+  /** Applies one action. Returns `false` (and keeps the flow) when it is refused. */
   dispatch: (action: MatchAction) => boolean;
+}
+
+/** A store the board screen can read: `getState` and `subscribe`, no `setState`. */
+export type BoardStore = Pick<
+  StoreApi<BoardStoreState>,
+  'getState' | 'getInitialState' | 'subscribe'
+>;
+
+export interface GameStoreState extends BoardStoreState {
   /** A new match with the same players and rules; the last winner starts. */
   rematch: () => void;
 }
 
 export type GameStore = StoreApi<GameStoreState>;
 
-/**
- * Runs an analytics call and drops its errors. The move is already played
- * when it runs: analytics must never fail or undo it.
- */
-function quietly(send: () => void): void {
-  try {
-    send();
-  } catch (error) {
-    console.warn('analytics failed', error);
-  }
-}
+let matchCount = 0;
+const nextMatchKey = () => {
+  matchCount += 1;
+  return `m${matchCount}`;
+};
 
 export function createGameStore({
   players,
@@ -102,6 +117,7 @@ export function createGameStore({
   if (!saved && analytics) quietly(() => analytics.gameStarted(flow));
   return createStore<GameStoreState>()((set, get) => ({
     flow,
+    matchKey: nextMatchKey(),
     lastError: null,
     dispatch: (action) => {
       const previous = get().flow;
@@ -119,14 +135,17 @@ export function createGameStore({
     },
     rematch: () => {
       const next = createRematchFlow(get().flow, ctx);
-      set({ flow: next, lastError: null });
+      set({ flow: next, matchKey: nextMatchKey(), lastError: null });
       if (analytics) quietly(() => analytics.gameStarted(next));
     },
   }));
 }
 
-/** Reads the store in a component. */
-export function useGameStore<T>(store: GameStore, selector: (state: GameStoreState) => T): T {
+/** Reads the store (a local `GameStore`, or any `BoardStore`) in a component. */
+export function useGameStore<S extends BoardStoreState, T>(
+  store: Pick<StoreApi<S>, 'getState' | 'getInitialState' | 'subscribe'>,
+  selector: (state: S) => T,
+): T {
   return useStore(store, selector);
 }
 
@@ -153,7 +172,6 @@ export interface TurnView {
   readonly dice: readonly DieView[];
   readonly canConfirm: boolean;
   readonly canUndo: boolean;
-  readonly pips: PerPlayer<number>;
 }
 
 /**
@@ -179,7 +197,6 @@ export function diceView(
 export function turnView(flow: MatchFlow): TurnView {
   const game = flow.game;
   const board = currentBoard(game);
-  const direction = game.state.rules.movement.direction;
   const roll = game.state.dice;
   const rolled = roll !== null && (game.phase === 'moving' || game.phase === 'awaiting-confirm');
   return {
@@ -192,9 +209,5 @@ export function turnView(flow: MatchFlow): TurnView {
     dice: rolled ? diceView(roll, remainingDice(game)) : [],
     canConfirm: canConfirm(game),
     canUndo: canUndo(game),
-    pips: {
-      white: pipCount(board, 'white', direction),
-      black: pipCount(board, 'black', direction),
-    },
   };
 }

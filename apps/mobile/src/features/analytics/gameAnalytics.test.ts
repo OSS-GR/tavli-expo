@@ -47,7 +47,15 @@ describe('gameAnalytics with the game store', () => {
   it('sends game_started when the store starts a match', () => {
     const { analytics } = setup();
     expect(events(analytics)).toEqual([
-      { event: 'game_started', mode: 'local', game: 'portes', variant: 'portes', matchLength: 3 },
+      {
+        event: 'game_started',
+        mode: 'local',
+        game: 'portes',
+        variant: 'portes',
+        matchLength: 3,
+        openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
+      },
     ]);
   });
 
@@ -60,6 +68,8 @@ describe('gameAnalytics with the game store', () => {
       variant: 'portes',
       matchLength: 3,
       botLevel: 'easy',
+      openingRoll: 'useOpeningDice',
+      rulesVersion: 'portes',
     });
   });
 
@@ -108,6 +118,8 @@ describe('gameAnalytics with the game store', () => {
         game: 'portes',
         variant: store.getState().flow.game.state.variant,
         matchLength: 3,
+        openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
       },
     ]);
   });
@@ -310,5 +322,25 @@ describe('resultKind', () => {
     // A time-out is its own result, whatever the points (1, or 2 for a diplo).
     expect(resultKind({ winner: 'black', points: 1, reason: 'timeout' })).toBe('timeout');
     expect(resultKind({ winner: 'white', points: 2, reason: 'timeout' })).toBe('timeout');
+  });
+
+  it('follows the scoring of the rules: Tavli scoring stays, perChecker diplo is 15 (#241)', () => {
+    for (const points of [2, 3]) {
+      expect(resultKind({ winner: 'white', points, reason: 'borneOff' }, 'tavli')).toBe('diplo');
+    }
+    expect(resultKind({ winner: 'white', points: 1, reason: 'borneOff' }, 'tavli')).toBe('mono');
+    // Acey-Deucey American: 1 point per checker the loser has not borne off.
+    for (const points of [1, 2, 14]) {
+      expect(resultKind({ winner: 'white', points, reason: 'borneOff' }, 'perChecker')).toBe(
+        'mono',
+      );
+    }
+    expect(resultKind({ winner: 'black', points: 15, reason: 'borneOff' }, 'perChecker')).toBe(
+      'diplo',
+    );
+    expect(resultKind({ winner: 'white', points: 5, reason: 'resigned' }, 'perChecker')).toBe(
+      'resign',
+    );
+    expect(resultKind({ winner: null, points: 0, reason: 'deadlock' }, 'perChecker')).toBe('draw');
   });
 });

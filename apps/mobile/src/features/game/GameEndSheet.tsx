@@ -11,6 +11,7 @@ import type { ReactNode } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { MAX_SHEET_WIDTH } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 
 import { CELEBRATION_HEIGHT, Celebration } from './Celebration';
@@ -21,7 +22,7 @@ export interface GameEndSheetProps {
   title: string;
   /** "Diplo · +2 points". */
   chip: string;
-  /** Diplo (or more) gets a filled chip, mono an outlined one. */
+  /** Diplo (or a Tavli backgammon) gets a filled chip; mono and a per-checker win an outlined one. */
   strongChip: boolean;
   /** "Bot did not bear off any checker." or "Mono: Maria resigned the game." */
   reason: string | null;
@@ -37,6 +38,11 @@ export interface GameEndSheetProps {
   celebrate: boolean;
   /** Next game and Home. */
   children: ReactNode;
+  /**
+   * Names this game end for this app run (#216): the result is read once,
+   * and a remount does not read it again. Without it, every time it opens.
+   */
+  announceKey?: string;
   testID?: string;
 }
 
@@ -51,10 +57,11 @@ export function GameEndSheet({
   target,
   celebrate,
   children,
+  announceKey,
   testID,
 }: GameEndSheetProps) {
   const titleRef = useFocusOnShow();
-  useAnnouncement([title, chip, reason, score, next].filter(Boolean).join(' '));
+  useAnnouncement([title, chip, reason, score, next].filter(Boolean).join(' '), announceKey);
   return (
     <View style={styles.root}>
       <View style={styles.scrim} />
@@ -65,7 +72,7 @@ export function GameEndSheet({
           <Text ref={titleRef} style={styles.title} accessibilityRole="header">
             {title}
           </Text>
-          <View style={styles.chip(strongChip)}>
+          <View testID="game-end-chip" style={styles.chip(strongChip)}>
             <Text style={styles.chipText(strongChip)}>{chip}</Text>
           </View>
           {reason ? <Text style={styles.reason}>{reason}</Text> : null}
@@ -98,6 +105,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   root: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
+    // In landscape (#185) the sheet keeps a readable width in the middle.
+    alignItems: 'center',
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
@@ -108,6 +117,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     // Never taller than the screen: the content scrolls instead.
     flexShrink: 1,
     maxHeight: '100%',
+    width: '100%',
+    maxWidth: MAX_SHEET_WIDTH,
     borderTopLeftRadius: theme.radii.xl,
     borderTopRightRadius: theme.radii.xl,
     backgroundColor: theme.colors.surface,

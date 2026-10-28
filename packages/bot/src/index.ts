@@ -22,6 +22,7 @@ export type {
   EvaluatorRegistry,
   EvaluatorSet,
   LevelPolicy,
+  RankOptions,
   RankedTurn,
   TurnScore,
 } from './types';
@@ -39,6 +40,14 @@ export {
   pickTurn,
   scoreTurns,
 } from './create-bot';
+export {
+  TWO_PLY_CANDIDATES,
+  TWO_PLY_HINT_BUDGET,
+  TWO_PLY_HINT_BUDGETS,
+  TWO_PLY_MARGIN,
+  TWO_PLY_MAX_CANDIDATES,
+  createAnalyzer,
+} from './analyzer';
 export {
   PORTES_DEFAULT_WEIGHTS,
   PORTES_HEURISTIC_ID,
@@ -66,6 +75,15 @@ export {
   plakotoNetGame,
   shippedPlakotoNet,
 } from './evaluators/plakoto-net';
+export {
+  ASODIO_NET_INPUTS,
+  asodioNet,
+  asodioNetGame,
+  createAsodioNetEvaluator,
+  isAsodioNetRules,
+  loadAsodioNet,
+  shippedAsodioNet,
+} from './evaluators/asodio-net';
 export {
   FEVGA_NET_INPUTS,
   createFevgaNetEvaluator,

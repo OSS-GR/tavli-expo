@@ -33,6 +33,7 @@ import { passNotice } from './turnNotices';
 
 import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
+import { pressOpeningRoll } from '../../../test/openingRoll';
 import { renderWithRoot } from '../../../test/render';
 
 const SIZE = { width: 375, height: 520 };
@@ -107,7 +108,7 @@ async function playToTheEnd(store: GameStore) {
       questions++;
       await press('mother-play-on-button');
     } else if (passNotice(flow) && card('pass-ok-button')) await press('pass-ok-button');
-    else if (view.phase === 'opening-roll') await press('roll-button');
+    else if (view.phase === 'opening-roll') await pressOpeningRoll();
     else if (openingStatus(view.game) && card('opening-overlay')) await press('opening-overlay');
     else if (view.phase === 'awaiting-roll') await press('roll-button');
     else if (view.phase === 'awaiting-confirm') await press('confirm-button');
@@ -282,7 +283,15 @@ describe('<GameScreen /> Plakoto mother question vs the bot', () => {
     difficulty: 'easy' as const,
     runner,
     rng: createSeededRng(1),
-    timing: { beforeRollMs: 150, moveMs: 0, thinkMs: () => 0 },
+    timing: {
+      beforeRollMs: 150,
+      afterRollMs: 0,
+      doubleMs: 0,
+      moveMs: 0,
+      hitMs: 0,
+      landMs: 0,
+      thinkMs: () => 0,
+    },
   };
 
   it('the bot answers its own question ("play on") and plays its turn', async () => {

@@ -15,6 +15,29 @@ export type Dice = readonly [DieValue, DieValue];
 
 export const DIE_VALUES: readonly DieValue[] = [1, 2, 3, 4, 5, 6];
 
+/** One roll of two dice, with its chance out of all 36 rolls. */
+export interface WeightedRoll {
+  readonly dice: Dice;
+  /** 1/36 for a double, 2/36 for the rest (both orders of the dice). */
+  readonly weight: number;
+}
+
+/**
+ * The 21 distinct rolls: 6 doubles and 15 others. Each roll is higher die
+ * first. The order is fixed: by the higher die, then by the lower die
+ * (1-1, 2-1, 2-2, 3-1, …, 6-6). The weights add up to 1.
+ */
+export const DISTINCT_ROLLS: readonly WeightedRoll[] = Object.freeze(
+  DIE_VALUES.flatMap((high) =>
+    DIE_VALUES.filter((low) => low <= high).map((low): WeightedRoll =>
+      Object.freeze({
+        dice: Object.freeze([high, low] as const),
+        weight: high === low ? 1 / 36 : 2 / 36,
+      }),
+    ),
+  ),
+);
+
 export function isDieValue(value: unknown): value is DieValue {
   return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 6;
 }

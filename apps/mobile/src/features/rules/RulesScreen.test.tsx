@@ -13,9 +13,12 @@ import {
   TAVLI_SECTION,
   paragraphs,
   parseRulesVariant,
+  parseRulesVersion,
   rulesDirection,
+  rulesPage,
   rulesTitleKey,
   startBoard,
+  versionSection,
   type RulesKey,
   type RulesVariant,
 } from './content';
@@ -80,16 +83,26 @@ describe('rules texts', () => {
   });
 
   it('uses every rules key on some page', () => {
+    const versions = (
+      ['plakoto.federation', 'asodio.aceyDeuceyGreek', 'asodio.aceyDeuceyAmerican'] as const
+    ).map(versionSection);
     const used = new Set<string>(
-      [...RULES_GAMES.flatMap((game) => RULES_PAGES[game]), TAVLI_SECTION].flatMap((section) => [
-        section.title,
-        ...section.body,
-      ]),
+      [
+        ...RULES_GAMES.flatMap((game) => RULES_PAGES[game]),
+        ...rulesPage('asodio', 'asodio.aceyDeuceyAmerican'),
+        TAVLI_SECTION,
+        ...versions,
+      ].flatMap((section) => [section.title, ...section.body]),
     );
     for (const id of ['portes', 'plakoto', 'fevga', 'asodio', 'tavli', null] as const) {
       used.add(rulesTitleKey(id));
     }
-    for (const key of ['rules.unknown', 'rules.picture.label', 'rules.picture.caption']) {
+    for (const key of [
+      'rules.unknown',
+      'rules.picture.label',
+      'rules.picture.caption',
+      'rules.picture.captionMirrored',
+    ]) {
       used.add(key);
     }
     expect(enRules.filter((key) => !used.has(key))).toEqual([]);
@@ -103,6 +116,23 @@ describe('content', () => {
     expect(parseRulesVariant('asodio')).toBe('asodio');
     expect(parseRulesVariant('chess')).toBeNull();
     expect(parseRulesVariant(undefined)).toBeNull();
+  });
+
+  it('reads the version param (#241): only a rules version of the game that is not its default', () => {
+    expect(parseRulesVersion('plakoto', 'plakoto.federation')).toBe('plakoto.federation');
+    expect(parseRulesVersion('asodio', ['asodio.aceyDeuceyGreek'])).toBe('asodio.aceyDeuceyGreek');
+    expect(parseRulesVersion('asodio', 'asodio.aceyDeuceyAmerican')).toBe(
+      'asodio.aceyDeuceyAmerican',
+    );
+    // The default version, another game's version, a game with one preset, junk.
+    expect(parseRulesVersion('plakoto', 'plakoto')).toBeNull();
+    expect(parseRulesVersion('asodio', 'asodio.kafeneio')).toBeNull();
+    expect(parseRulesVersion('asodio', 'plakoto.federation')).toBeNull();
+    expect(parseRulesVersion('portes', 'plakoto.federation')).toBeNull();
+    expect(parseRulesVersion('tavli', 'tavli')).toBeNull();
+    expect(parseRulesVersion(null, 'plakoto.federation')).toBeNull();
+    expect(parseRulesVersion('plakoto', undefined)).toBeNull();
+    expect(parseRulesVersion('plakoto', 'chess')).toBeNull();
   });
 
   it('builds each start position from the default preset', () => {
@@ -156,6 +186,67 @@ describe('<RulesScreen />', () => {
     },
   );
 
+  it.each([
+    ['plakoto', 'plakoto.federation', 'This game: federation rules'],
+    ['asodio', 'asodio.aceyDeuceyGreek', 'This game: Greek rules'],
+    ['asodio', 'asodio.aceyDeuceyAmerican', 'This game: American rules'],
+  ] as const)(
+    'a %s game in %s says on top what its version changes (#241)',
+    async (game, version, title) => {
+      await render(<RulesScreen variant={game} version={version} onOpenRules={jest.fn()} />);
+      const headers = screen.getAllByRole('header').map((h) => h.props.children);
+      expect(headers[0]).toBe(title);
+      expect(headers.slice(1)).toEqual(RULES_PAGES[game].map((section) => tr(section.title)));
+      const box = screen.getByTestId('rules-section-version');
+      for (const line of paragraphs(versionSection(version).body.map(tr))) {
+        expect(within(box).getByText(line)).toBeOnTheScreen();
+      }
+    },
+  );
+
+  it.each([
+    ['en', 'asodio.aceyDeuceyAmerican', /^You win 1 point for each checker the other player/],
+    ['el', 'asodio.aceyDeuceyAmerican', /^Κερδίζεις 1 βαθμό για κάθε πούλι/],
+    ['en', 'asodio.aceyDeuceyGreek', /^Mono \(μονό\): you win 1 point/],
+    ['en', null, /^Mono \(μονό\): you win 1 point/],
+    ['el', null, /^Μονό: κερδίζεις 1 βαθμό/],
+  ] as const)(
+    'the %s Asodio Points section in %s follows its scoring (#245)',
+    async (language, version, first) => {
+      await act(async () => {
+        settingsStore.setState({ ...DEFAULT_SETTINGS, language });
+      });
+      await render(<RulesScreen variant="asodio" version={version} onOpenRules={jest.fn()} />);
+      const box = within(screen.getByTestId('rules-section-scoring'));
+      expect(box.getByRole('header')).toHaveTextContent(language === 'el' ? 'Βαθμοί' : 'Points');
+      expect(box.getByText(first)).toBeOnTheScreen();
+      if (version === 'asodio.aceyDeuceyAmerican') {
+        expect(box.queryByText(/^(Mono|Μονό|Diplo|Διπλό)/)).toBeNull();
+        expect(
+          box.getByText(language === 'el' ? /^Με παραίτηση μετράει το ίδιο/ : /^A resign counts/),
+        ).toBeOnTheScreen();
+      } else {
+        expect(box.getByText(/^(Diplo|Διπλό)/)).toBeOnTheScreen();
+      }
+    },
+  );
+
+  it('keeps mono and diplo on the other pages (#245)', () => {
+    for (const game of RULES_GAMES) expect(rulesPage(game)).toBe(RULES_PAGES[game]);
+    expect(rulesPage('plakoto', 'plakoto.federation')).toBe(RULES_PAGES.plakoto);
+    expect(rulesPage('asodio', 'asodio.aceyDeuceyGreek')).toBe(RULES_PAGES.asodio);
+    const american = rulesPage('asodio', 'asodio.aceyDeuceyAmerican');
+    expect(american.map((s) => s.id)).toEqual(RULES_PAGES.asodio.map((s) => s.id));
+    expect(american.find((s) => s.id === 'scoring')?.body).toEqual([
+      'rules.common.scoring.bodyPerChecker',
+    ]);
+  });
+
+  it('shows no version section for the default rules', async () => {
+    await render(<RulesScreen variant="plakoto" version={null} onOpenRules={jest.fn()} />);
+    expect(screen.queryByTestId('rules-section-version')).not.toBeOnTheScreen();
+  });
+
   it.each(['tavli'] as const)('has no lessons on the %s page', async (variant) => {
     await render(
       <RulesScreen variant={variant} onOpenRules={jest.fn()} onLearnToPlay={jest.fn()} />,
@@ -186,6 +277,18 @@ describe('<RulesScreen />', () => {
       });
     });
     expect(within(picture).getByTestId('rules-board-fevga-canvas')).toBeOnTheScreen();
+  });
+
+  // #175: with the home on the bottom left the picture is mirrored, and so
+  // is the path the caption tells.
+  it('tells the mirrored path under the picture when the home is bottom left', async () => {
+    await show('portes').view;
+    expect(screen.getByText(tr('rules.picture.caption'))).toBeOnTheScreen();
+    await act(async () => {
+      settingsStore.getState().setSetting('homeBoardSide', 'left');
+    });
+    expect(screen.getByText(/Your home is the bottom-right quarter/)).toBeOnTheScreen();
+    expect(screen.queryByText(tr('rules.picture.caption'))).toBeNull();
   });
 
   it('explains the owner mother rule in Plakoto', async () => {

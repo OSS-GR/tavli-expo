@@ -1,6 +1,6 @@
 # Running the app
 
-> Living document. Last review: 2026-10-26. Issue #39.
+> Living document. Last review: 2026-10-28. Issues #39, #257.
 
 This guide is for the owner. It shows every way to run Tavlaki without paid Apple or Google accounts. Follow the parts in order the first time.
 
@@ -25,6 +25,42 @@ This guide is for the owner. It shows every way to run Tavlaki without paid Appl
 | `production` | Tavlaki | `com.tavlaki` | EAS `production` profile (store, later) |
 
 The `APP_VARIANT` env var picks the variant (see `apps/mobile/app.config.ts`). Local builds use `development`. **Why:** a free Apple ID reserves every bundle id it signs. A reserved `com.tavlaki` could block the paid Apple account at launch. So we only sign `com.tavlaki` once the paid account exists.
+
+### Which server the app uses
+
+Online games talk to a Convex deployment (#257). The variant picks it:
+
+| Variant | Convex deployment | URL |
+| --- | --- | --- |
+| `development` | dev | `https://exciting-reindeer-792.eu-west-1.convex.cloud` |
+| `preview` | prod | `https://superb-dog-503.eu-west-1.convex.cloud` |
+| `production` | prod | `https://superb-dog-503.eu-west-1.convex.cloud` |
+
+Sign-in (Better Auth, #266) uses the same deployment's **site URL**: the same name with `.convex.site` in place of `.convex.cloud` (for example `https://superb-dog-503.eu-west-1.convex.site`).
+
+**How it works.** `apps/mobile/app.config.ts` puts the URL in `extra.convexUrl` and the site URL in `extra.convexSiteUrl`. The app reads them in one place: `apps/mobile/src/convexUrl.ts` (`convexServer()`, used by `services.ts`). Without both URLs, online play is off (`auth` and `games` in `services.ts` are `undefined`). Expo evaluates `app.config.ts` both for `npx expo start` (Metro sends the config to the dev build) and for EAS builds (the config is built into the app). So one table covers local runs and cloud builds, and `eas.json` needs no URL: its profiles only set `APP_VARIANT`. The URLs are public, so they may be in the repo. The deploy keys are not (see [online game service](../architecture/online-game-service.md#deploy)).
+
+**Use your own deployment.** Set `EXPO_PUBLIC_CONVEX_URL`. It wins over the variant. Then restart Metro:
+
+```bash
+# for one run
+EXPO_PUBLIC_CONVEX_URL=https://your-name-123.eu-west-1.convex.cloud npx expo start
+
+# or keep it in apps/mobile/.env.local (git ignores it)
+echo 'EXPO_PUBLIC_CONVEX_URL=https://your-name-123.eu-west-1.convex.cloud' > .env.local
+```
+
+The site URL follows: `https://your-name-123.eu-west-1.convex.site`. Set `EXPO_PUBLIC_CONVEX_SITE_URL` only when it is somewhere else, for example a custom domain.
+
+For a local Convex backend, an `http://` URL works too. A local backend has no `.convex.cloud` name, so also set its site URL, or online play stays off:
+
+```bash
+EXPO_PUBLIC_CONVEX_URL=http://127.0.0.1:3210 EXPO_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211 npx expo start
+```
+
+To try prod from a dev build, set `EXPO_PUBLIC_CONVEX_URL` to the prod URL. An EAS build reads both variables from the EAS environment variables, if you set them there. Check the result with `npx expo config --type public` (look at `extra.convexUrl` and `extra.convexSiteUrl`).
+
+**Updates (`eas update`) carry the URL too.** The URL is fixed when the bundle is built. Run `eas update` with the same `APP_VARIANT` as the build it targets (for example `APP_VARIANT=production eas update --channel production`). Without `APP_VARIANT`, the bundle gets the dev URL, and a store build that loads it talks to dev. A stray `EXPO_PUBLIC_CONVEX_URL` or `EXPO_PUBLIC_CONVEX_SITE_URL` in your shell or `.env.local` also goes into the bundle, so clear it first.
 
 **Setup once** (all parts):
 
@@ -191,7 +227,8 @@ The first Android build asks to make a **keystore** (the signing key). Say **yes
 | `/game/<id>` | The board for a match (opened from New game or Continue) |
 | `/rules/<variant>` | How to play (a stub for now) |
 | `/settings` | Settings (language, sound, haptics, board options) |
-| `/dev/board` | **Dev only.** The board with sample positions. You can flip the board. |
+| `/dev/board` | **Dev only.** The board with sample positions. You can flip the board. **Dice → Throw on the board** turns on the dice throw spike (#183, [findings](../design/dice-throw-spike.md)). |
+| `/dev/online` | **Dev only.** An online game vs the bot on the in-memory server (#255). Pick a game, a pace (live: 60 s a turn; async: 24 h) and a match length, then tap **Start game**. The game lives only while the app runs. |
 | `/_sitemap` | Expo Router's list of all routes. Tap one to open it. |
 
 Dev routes only work in development builds. Release builds (the `preview` profile) send them back home.
@@ -202,6 +239,8 @@ Dev routes only work in development builds. Release builds (the `preview` profil
 - iPhone: type `tavlaki://dev/board` in Safari's address bar.
 - Android emulator: `adb shell am start -a android.intent.action.VIEW -d "tavlaki://dev/board"`
 
+To try the online screen: open `tavlaki://dev/online` (or pick `dev/online` in `/_sitemap`). The bot plays its turns on its own, and a turn timer that runs out ends that game, as on the real server.
+
 **Dev menu:** press `m` in the Metro terminal, shake the phone, or press `Cmd+D` (iOS simulator) / `Cmd+M` or `Ctrl+M` (Android emulator). It has reload and the performance monitor.
 
 ## 6. Common errors and fixes
@@ -209,7 +248,7 @@ Dev routes only work in development builds. Release builds (the `preview` profil
 | You see | Fix |
 | --- | --- |
 | Pressing `i` or `a` opens **Expo Go**, or "No development build installed" | Build and install the dev build first: `npx expo run:ios` or `npx expo run:android`. |
-| Red screen: a native module is missing (for example `NitroModules`, `RNSkia`, `MMKV`, `Worklets`) | The native app is older than the code. Rebuild: `npx expo run:ios` / `npx expo run:android`. |
+| Red screen: a native module is missing (for example `NitroModules`, `RNSkia`, `MMKV`, `Worklets`, `ExpoSecureStore`) | The native app is older than the code. Rebuild: `npx expo run:ios` / `npx expo run:android`. |
 | Strange errors after pulling new code | Run `pnpm install` in the repo root, then `npx expo start --clear`. |
 | Native build fails after a native package change | `npx expo prebuild --clean`, then `npx expo run:ios` / `run:android` again. |
 | "Xcode must be 26.4 or newer" or iOS SDK errors | Update Xcode in the Mac App Store. Then `npx expo prebuild --clean`. |

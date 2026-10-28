@@ -54,20 +54,21 @@ interface Evaluation {
   owner version (`asodio.kafeneio`) asks nothing.
 - `createBot({ variants?, evaluators?, policies? })` builds a bot. Default:
   the engine's `VARIANT_REGISTRY`, `DEFAULT_EVALUATORS` (the Portes,
-  Plakoto, Fevga and Asodio heuristics for easy and medium, and the Portes
-  net for Portes hard) and `DEFAULT_LEVEL_POLICIES`.
-- `bot.supportedLevels(v)` is `['easy', 'medium', 'hard']` for `portes`
-  and `['easy', 'medium']` for `plakoto`, `fevga` and `asodio`. Easy works
-  for every known variant; medium and hard need an evaluator. The app's
+  Plakoto, Fevga and Asodio heuristics for easy and medium, and a trained
+  net per game for hard) and `DEFAULT_LEVEL_POLICIES`.
+- `bot.supportedLevels(v)` is `['easy', 'medium', 'hard']` for `portes`,
+  `plakoto`, `fevga` and `asodio`. Easy works for every known variant;
+  medium and hard need an evaluator. The app's
   level picker can use it, or probe `chooseTurn` and catch
   `NOT_IMPLEMENTED`: both give the same answer.
 - `scoreTurns(variant, evaluator, state, turns)` and `pickTurn` are the
-  1-ply core. `Analyzer` (hints, post-game review) is only a type for now.
+  1-ply core. `createAnalyzer` ranks the turns for hints (see "The
+  Analyzer").
 
 Errors:
 
 - `BotError('NOT_IMPLEMENTED')`: no evaluator for this level and variant
-  (today: hard for Plakoto, Fevga and Asodio).
+  (only with a custom registry: the default one has every level).
 - `BotError('INVALID_REQUEST')`: `dice` differs from `state.dice`, a
   runner request names another variant than its state, or `chooseAnswer`
   gets a state with no question.
@@ -76,6 +77,241 @@ Errors:
 - Engine errors pass through: `ILLEGAL_TURN` for a finished game (or a
   Plakoto state that waits for its answer), `UNKNOWN_VARIANT`,
   `OUT_OF_RANGE` for a bad seed.
+
+## The Analyzer (hints)
+
+`createAnalyzer({ variants?, evaluators? })` builds an `Analyzer` (#206),
+for hints and later for post-game review. Same defaults as `createBot`.
+
+```ts
+const analyzer = createAnalyzer();
+const ranked = analyzer.rankTurns(state, dice, { top: 3 }); // best first
+ranked[0].turn; // the hint
+ranked[1].equityLoss; // points lost against the best turn
+analyzer.rankTurns(state, dice, { plies: 2, top: 3 }); // one roll deeper (#212)
+analyzer.rankTurns(state, dice, { plies: 2, top: 1, budget: 25_000 }); // with a work budget (#237)
+analyzer.evaluate(state); // the chances of state.toMove, before the roll
+```
+
+- It uses the variant's best evaluator: hard (the net) if there is one,
+  else medium. The default registry has a net for every game.
+- `rankTurns` (`plies: 1`, the default) scores every legal turn with
+  `scoreTurns` (1-ply), like the bot. A turn that wins at once ranks first
+  (more points first), then the rest by score. Its best turn is what hard
+  plays at temperature 0.
+- Each `RankedTurn` has the `evaluation` after the turn, from the view of
+  the mover (`state.toMove`), and `equityLoss` against the best turn (0 for
+  the best, never below 0). At 1 ply, `evaluation.equity` is the turn's
+  score. At 2 plies, a candidate's evaluation is the average over the 21
+  replies, and the other turns keep their 1-ply evaluation (see "2-ply"
+  below). When the turn ends the game, the evaluation is the true result.
+- It follows `state.toMove`: an Asodio extra roll keeps the same player,
+  and then the view after the turn is already the mover's. If
+  `state.dice` is set (the chosen double), `dice` must equal it.
+- No randomness. The same input gives the same output, and equal scores
+  keep the engine's order of `legalTurns`.
+- A forced turn (or a pass) is a list of one with `equityLoss` 0.
+- `top` keeps the best `top` turns (an integer >= 1). Default: all.
+- `budget` (2 plies only) caps the positions one call scores: an
+  integer of at least 0, or `Infinity` (the default). See "2-ply budget"
+  below.
+- `evaluate` of a finished game gives the true result (a draw is half a
+  win, like in the nets).
+- Errors: `NOT_IMPLEMENTED` (no hard or medium evaluator),
+  `INVALID_REQUEST` (`dice` differs from `state.dice`, a bad `top`,
+  `plies` or `budget`, or at 2 plies a question the variant cannot take
+  an answer for: `prompt` with no `answerPrompt`, or a variant that still asks after
+  8 answers in a row), `INVALID_REGISTRY` like
+  `createBot`, and the engine's errors
+  (a finished game in `rankTurns`, an unknown variant).
+
+### 2-ply (#212)
+
+`plies: 2` looks one roll deeper, for better hints and a fairer review:
+
+1. Score every turn at 1 ply. The candidates are the best 8
+   (`TWO_PLY_CANDIDATES`), plus any turn within 0.02 points of the best
+   (`TWO_PLY_MARGIN`, a near tie), at most 16 in all
+   (`TWO_PLY_MAX_CANDIDATES`).
+2. For each candidate, play it, then average over the 21 different rolls
+   of the next player (`DISTINCT_ROLLS` from the engine: a double 1/36,
+   the others 2/36) the result after
+   their best 1-ply reply (the turn hard plays at temperature 0).
+   The shot counts and the bear-off table read the same rolls through
+   `evaluators/rolls.ts` (#234): low die first, weights out of 36, in the
+   order their scores were made with (`rolls.test.ts` checks it).
+3. Rank the candidates by that 2-ply equity. A turn that wins at once is
+   still the best (its value is exact). The other turns follow in their
+   1-ply order, with their 1-ply evaluation; their `equityLoss` is their
+   1-ply loss, but never less than the last candidate's, so the list stays
+   sorted. A candidate's `evaluation` is the average of the chances after
+   each reply, from the mover's view, with the 2-ply equity.
+
+**Two scales.** The candidates (first in the list) have 2-ply values; the
+turns after them have 1-ply values, with `equityLoss` raised to at least
+the last candidate's loss. Values across that boundary cannot be compared:
+a 1-ply equity is not a 2-ply equity. A review that grades each turn (for
+example "a blunder lost 0.3 points") should use `plies: 1`, or use 2-ply
+values only for turns inside the candidates.
+
+The engine drives every step, and the next player is always `toMove`:
+
+- A question after the turn (Plakoto "resign or play on", the Asodio
+  chosen double) gets the best 1-ply answer of the player asked
+  (`scoreAnswers`, as the bot answers). Then play goes on.
+- A state that holds dice (the Asodio chosen double) plays those dice: the
+  value is the best reply with them, with no average over rolls.
+- An Asodio extra roll keeps the same player to move. Then the "reply" is
+  the mover's own next roll, so its value counts for the mover.
+
+Why these numbers: on 189 random positions of all games with more than
+one turn, 2-ply on the best 16 found its best turn in the 1-ply top 3 in
+96 % of them, and outside the top 8 only twice. The margin adds near ties
+past the top 8; the cap stops Asodio rolls with dozens of near-equal turns
+from taking seconds.
+
+**Time** (Node 22, dev container, after warm-up): the middle-game Portes
+position in `src/analyzer-perf.test.ts` (4-2) ranks in about 110 ms; that
+test checks < 2 s. Over 30 random positions per game: Portes median 34 ms
+(worst 200 ms), Plakoto 87 ms (313 ms), Fevga 35 ms (140 ms), Asodio
+3 ms (1.1 s). Acey-Deucey was slow: median 0.45 s, worst 7 s. Its rules
+are not the net's, so it uses the Asodio heuristic, which cost about
+0.2–0.4 ms per position against 0.03 ms for the Portes net. Since #225
+it costs 4–4.9× less in Acey-Deucey and 2.4× less in the owner version
+(see the table below). Hermes on a phone is several times slower than
+Node. Without a budget, a 2-ply hint fit the 1 s phone budget for
+Portes, Plakoto and Fevga, but not for Asodio (see "Asodio and 2 ply"
+below). With the work budget of #237 (see "2-ply budget" below), it fits
+for every preset. The bot's own play (`chooseTurn`) stays 1-ply.
+
+**In the app (#219, #237).** The Hint asks for 2 ply in every game, with
+the work budget of its preset: `hintPlies` and `hintRankOptions` in
+`apps/mobile/src/features/hint/hint.ts`, `TWO_PLY_HINT_BUDGETS` here. The
+game review stays at 1 ply (see "Two scales").
+
+**Asodio and 2 ply (#233).** `pnpm --filter @tavli/bot bench:hint` times
+one 2-ply hint (`rankTurns` with `plies: 2, top: 1`) on 500 seeded
+positions per game (250 from best play, 250 from random play,
+`src/testing/hint-work.ts`). The rule: a game hints at 2 ply only when
+its worst hint is no slower than Plakoto's, the slowest game that already
+did. Without a budget (`--budget=none`), after #225, Node 22, dev
+container, three seeds (219, 233, 7), so 1,500 positions per game:
+
+| Game or preset       | Median (ms) | Worst per seed (ms) | Worst positions scored |
+| -------------------- | ----------- | ------------------- | ---------------------- |
+| Plakoto              | 28–34       | 322, 245, 330       | 21,264                 |
+| `asodio.kafeneio`    | 4           | 481, 934, 1,207     | 17,461                 |
+| Acey-Deucey Greek    | 22–23       | 1,468, 1,209, 2,517 | 74,010                 |
+| Acey-Deucey American | 67–82       | 876, 1,686, 1,002   | 44,879                 |
+
+So without a budget every Asodio preset stayed at 1 ply. Most Asodio
+hints are fast (the owner version's median is a tenth of Plakoto's), but
+the worst ones are not. The owner version uses the net, and in its
+slowest hints a position costs about 0.03–0.08 ms (mostly the shot
+count), 3–6 times a Plakoto position, so even its worst count, below
+Plakoto's, takes 1.2 s. In Acey-Deucey a few rolls also score far more
+positions (Greek up to 74,010). Most of the worst are doubles, some of
+them the chosen double after a 1-2.
+
+**2-ply budget (#237).** `rankTurns(state, dice, { plies: 2, budget })`
+caps the work of one call.
+The unit is a scored position: each `evaluate` call, and each turn given
+to a `scoreTurns` fast path (the same count as `analyzer-work.test.ts`).
+It never reads a clock, so the same input with the same budget always
+gives the same output, on any phone.
+
+1. The 1-ply scores of every turn always run in full, and they count.
+2. The candidates get their deeper look one by one, in 1-ply order. Each
+   look runs on a metered evaluator. When the next scoring would pass the
+   budget, the look stops there (its work so far is thrown away), and that
+   candidate and every later one keep their 1-ply values.
+3. The list is built as without a budget: the looked-at candidates first,
+   by 2-ply equity, then the rest in 1-ply order with `equityLoss` raised
+   to at least the last candidate's (the two scales above). A turn that
+   ends the game needs no look and costs nothing, so a turn that wins at
+   once still ranks first. With no look at all (budget 0), the result is
+   the 1-ply ranking.
+
+So one call scores at most `max(budget, 1-ply scores)` positions, plus one
+evaluation per returned turn with a 1-ply value (one for a hint with
+`top: 1`, and only when no look fit). The default is no budget. The app's
+Hint uses `TWO_PLY_HINT_BUDGETS`, one per rules preset:
+
+- Portes, Plakoto, Fevga: 25,000 (`TWO_PLY_HINT_BUDGET`), Plakoto's old
+  work bound, about 1.3 times its worst hint over 500 positions. It almost
+  never cuts a hint there.
+- Every Asodio preset: 3,500. An Asodio position costs 3–6 times a
+  Plakoto position in time, so a smaller budget keeps its worst hint below
+  Plakoto's. At 4,000 the worst Asodio hints were 333 ms (owner version)
+  and 321 ms (American) against Plakoto's 337 ms: too close to the bar
+  for a noisy clock.
+
+`pnpm --filter @tavli/bot bench:hint` uses these budgets (`--budget=N`
+sets one for every game, `none` none). With `--compare` it also ranks each
+position without a budget and counts the hints the budget cut, and how
+many of those got another best turn. Node 22, dev container, seeds 219,
+233 and 7 (500 positions each, 1,500 per game):
+
+| Game or preset       | Budget | Median (ms) | Worst per seed (ms) | Hints cut | Other best turn |
+| -------------------- | ------ | ----------- | ------------------- | --------- | --------------- |
+| Portes               | 25,000 | 12–23       | 236, 135, 161       | 0         | 0               |
+| Plakoto              | 25,000 | 30–35       | 337, 260, 315       | 0         | 0               |
+| Fevga                | 25,000 | 11–16       | 137, 177, 122       | 2         | 0               |
+| `asodio.kafeneio`    | 3,500  | 4–5         | 236, 283, 293       | 145       | 14              |
+| Acey-Deucey Greek    | 3,500  | 21–24       | 200, 223, 214       | 405       | 64              |
+| Acey-Deucey American | 3,500  | 64–73       | 263, 280, 246       | 657       | 45              |
+
+So every preset hints at 2 ply: the worst Asodio hint (293 ms) is below
+Plakoto's worst (337 ms). The two Fevga hints cut on seed 233 kept their
+best turn. The budget
+cuts many Asodio hints (most in Acey-Deucey American, whose median hint
+scores about 2,700–3,300 positions), but a cut hint still looks deeper at
+its best candidates, and only 123 of the 4,500 Asodio hints (2.7 %) end
+on another best turn than a 2-ply hint without a budget. Before #237
+every Asodio hint was a 1-ply hint. If a heuristic or net gets faster,
+measure again with the bench and raise its budget.
+
+**Work check.** `src/analyzer-work.test.ts` plays 60 positions per game
+and preset (seeds 219, 233 and 237; at each, 10 from games where both
+players play the 1-ply best turn and 10 from random play) and checks that
+one hint never scores more than its budget plus one position (or the 1-ply
+count, if that alone is larger). `src/analyzer-budget.test.ts` checks the
+rule: budget 0 is 1 ply, a win now ranks first, the cut falls exactly at
+the budget in 1-ply order, a large budget equals no budget, and the
+ranking stays complete, sorted and the same for every game and preset. A
+scored position costs about 0.01–0.015 ms in Node with the Portes,
+Plakoto and Fevga nets, and 0.03–0.08 ms in Asodio.
+
+**The Asodio heuristic, before and after #225** (same scores; Node 22,
+dev container, `pnpm --filter @tavli/bot bench:asodio`, on the 2,100
+golden positions). "Position" is one `evaluateAsodioSides`; "turn" is
+`scoreTurns` per legal turn (in Acey-Deucey it includes the engine's
+`applyTurn`). The 2-ply rows are `rankTurns` with `plies: 2` on the same
+30 random positions per preset, before and after:
+
+| Preset               | Position (µs) | Turn (µs) | 2-ply median (ms) | 2-ply worst (ms) |
+| -------------------- | ------------- | --------- | ----------------- | ---------------- |
+| `asodio.kafeneio`    | 33 → 14       | 59 → 22   | 20 → 11           | 562 → 170        |
+| Acey-Deucey Greek    | 60 → 15       | 79 → 21   | 95 → 44           | 2,447 → 516      |
+| Acey-Deucey American | 177 → 36      | 206 → 41  | 407 → 92          | 3,957 → 690      |
+
+Almost all of the time is the shot count (`asodio-shots.ts`). It now plays
+moves in place and takes them back, shares the work of the 15 rolls with
+two different dice, and skips branches that cannot land on a target. The
+golden test (`asodio-heuristic.golden.test.ts`) checks that every score
+stays exactly the same, and `asodio-shots.test.ts` compares the new shot
+count with the first one (`src/testing/asodio-shots-reference.ts`) on
+about 30,000 positions. The Acey-Deucey presets gain 4–4.9× per position.
+The owner version gains 2.4×: there, most of the time is the search of the
+doubles under the quarter lock, and a stronger cut there would need new
+rules about the army in the search, which could change a score. The
+Asodio net (hard, owner version) uses the same shot count, so it is faster
+too.
+
+The fixture `asodio-heuristic.golden.json` holds the scores from before
+the speed work. Write it again (`pnpm --filter @tavli/bot golden:asodio`)
+only when changing a score is the point, such as new weights. Never write
+it again to make a speed change pass.
 
 ## The levels
 
@@ -90,12 +326,12 @@ Every level but `random` runs the same pipeline (bot-ai.md, section 4.1):
    with the score in points. This is the noise. A bad turn is rare, a
    nearly-best turn is common, so mistakes look human.
 
-| Level  | Evaluator         | Noise (`T`) | How it plays                                                                                                                                                                          |
-| ------ | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| random | none              | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                                                               |
-| easy   | variant heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now.                                                |
-| medium | variant heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                                                                    |
-| hard   | variant net       | 0.01        | Portes (#147), Plakoto and Fevga (#156): a trained net, 1-ply, with the same small noise as medium. See "The Portes net" and "The Plakoto and Fevga nets". Asodio: `NOT_IMPLEMENTED`. |
+| Level  | Evaluator         | Noise (`T`) | How it plays                                                                                                                                                                                |
+| ------ | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| random | none              | uniform     | A uniformly random legal turn (`chooseRandomTurn`). Seeded, so it repeats. For tests and as a baseline. Not in the app.                                                                     |
+| easy   | variant heuristic | 0.15        | About half its turns are not the best, but most of those cost little; about 1 in 5 loses more than 0.1 points. Never misses a win now.                                                      |
+| medium | variant heuristic | 0.01        | Small noise: it only mixes turns that are almost equal (average loss about 0.001 points per turn).                                                                                          |
+| hard   | variant net       | 0.01        | Portes (#147), Plakoto and Fevga (#156), Asodio (#164): a trained net, 1-ply, with the same small noise as medium. See "The Portes net", "The Plakoto and Fevga nets" and "The Asodio net". |
 
 - Change the noise with `createBot({ policies: { medium: { temperature: 0.03 } } })`.
   `0` means "always a best turn" (ties at random).
@@ -253,7 +489,7 @@ slower than Node, and the budget there is 200 ms.
 The hard level for Portes (#147): a small neural net, trained by TD(λ)
 self-play in the style of TD-Gammon (bot-ai.md, section 5). Code:
 `src/evaluators/portes-net.ts` (the Portes inputs), `src/evaluators/net.ts`
-(the net code shared with Plakoto and Fevga: the forward pass, loading, the
+(the net code shared with Plakoto, Fevga and Asodio: the forward pass, loading, the
 evaluator and the 1-ply scoring), `src/train/` (training, dev only, for
 every game), `scripts/train.ts` (the Node entry point).
 
@@ -375,7 +611,10 @@ there with the heuristic's value as the target):
   "The mother question": the pinned side scores about −1.8), and the
   heuristic's number for it is close. So the net learns the play before a
   mother falls, and the training games stay short. After a pin, hard plays
-  like medium. The mother question: hard scores "play on" like medium does,
+  like medium. This holds for every `motherRule` (`offerConcede`,
+  `instant`, `federation`): `usesNet` looks only at the board, so the
+  heuristic scores every position with a pinned mother, whatever the rule
+  does next. The mother question: hard scores "play on" like medium does,
   so it plays on.
 - Fevga (`fevga-net.ts`): a race and a finished game. The runner rule and
   the prime bans come from the engine's legal turns.
@@ -457,7 +696,125 @@ Seeds 1 and 2026 are fresh: no checkpoint was picked on them.
 | Fevga hard   | 0.07 ms | 0.22 ms | 0.66 ms | 1.1 ms |
 
 `src/hard-perf.test.ts` checks a median under 50 ms and a p99 under 300 ms
-for Portes, Plakoto and Fevga.
+for every net (Asodio: see "The Asodio net").
+
+## The Asodio net
+
+The hard level for Asodio (#164), owner version (`asodio.kafeneio`), built
+like the other nets: 279 inputs → 40 hidden units (sigmoid) → 3 outputs,
+1-ply, temperature 0.01. Code: `src/evaluators/asodio-net.ts`.
+
+**What it scores.** Contact positions with no **mutual lock**. The Asodio
+heuristic scores the rest: a race, a finished game, and a mutual lock
+(both armies hold each other forever: a sure draw, scored 0). Training
+games stop there too. The net counts a draw as half a win (the trainer's
+target for a draw is `[0.5, 0, 0]`), so the heuristic's numbers are put in
+the same terms (`evaluateAsodioFallback`: the same equity, with half the
+draw chance in `win`).
+
+**Only the owner rules.** The net was trained on `asodio.kafeneio`. For any
+other rule set (the Acey-Deucey presets, with hits and roll chains, or a
+changed army flag) the hard evaluator is the heuristic, for every position
+(`isAsodioNetRules` compares the move flags with the owner version). So
+hard plays like medium there, and the `chooseDouble` question goes to the
+heuristic too. The owner version asks no question, so self-play never
+meets a prompt (the trainer would answer one with `playOn`).
+
+**Inputs** (the roller's side first, then the waiter's):
+
+| Inputs | What                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------ |
+| 192    | per own point 1–24, 4 units (TD-Gammon): n ≥ 1, n ≥ 2, n ≥ 3, (n − 3) / 2                  |
+| 48     | pin units: the side's checker on own point 1–24 is pinned                                  |
+| 4      | loading: checkers still outside / 15; the first-entry gate holds (all 15 outside)          |
+| 4      | borne off / 15, pip counts / 100 (a waiting checker counts 25)                             |
+| 8      | the quarter lock: the side's rear quarter, one-hot                                         |
+| 8      | the quarter of the side's lowest pinned checker, one-hot (none when nothing is pinned)     |
+| 4      | checkers frozen in front of the rear quarter / 15; a pinned checker holds the rear quarter |
+| 4      | die values with no legal single move / 6; no die moves at all                              |
+| 4      | rolls out of 36 that pin some checker, and that make a mutual lock, per side               |
+| 2      | the heuristic's share of losses that are doubles (mars), per side                          |
+| 1      | the heuristic's contact score in logits / 4                                                |
+
+The heuristic inputs tie the net to `ASODIO_DEFAULT_WEIGHTS`: if you
+retune the heuristic, retrain the net (a test pins the net's value of the
+start).
+
+**Weights:** `src/evaluators/asodio-net-weights.ts` (11,323 weights, 45 KB
+as Float32, a 61 KB file), under the 100 KB budget.
+
+**Training** (the shared trainer; Node 22, dev container, 4 cores, up to 4
+runs side by side, no warm start). About 25 self-play games per second on
+a free core (a game is about 75 turns before the hand-off; most loading
+turns are forced), plus a 600-game match every 5,000 games:
+
+```sh
+pnpm --filter @tavli/bot train -- train --game asodio --out /tmp/asodio-net --hidden 40 --games 50000 --lambda 0.5 --alpha 0.05 --alpha-end 0.005 --seed 42 --eval-every 5000 --eval-games 600
+pnpm --filter @tavli/bot train -- eval --game asodio --file /tmp/asodio-net/games-35000.json --games 1000 --seed 99
+pnpm --filter @tavli/bot train -- export --game asodio --file /tmp/asodio-net/games-35000.json
+```
+
+| Run | Hidden | λ   | α (start → end)             | Seed | Games  | Time   | Best checkpoints (1,000 paired games, seed 99) |
+| --- | ------ | --- | --------------------------- | ---- | ------ | ------ | ---------------------------------------------- |
+| A   | 40     | 0.7 | 0.1 → 0.01                  | 41   | 50,000 | 88 min | 45k: 52.4 %; 50k: 49.5 %                       |
+| B   | 40     | 0.5 | 0.05 → 0.005                | 42   | 50,000 | 88 min | **35k: 51.7 %**; 45k: 49.4 %; 50k: 49.5 %      |
+| C   | 60     | 0.7 | 0.1 → 0.01 (stopped at 45k) | 43   | 45,000 | 78 min | 25k: 50.8 %                                    |
+| E   | 40     | 0.7 | 0.03 → 0.003, from B at 35k | 45   | 10,000 | 19 min | 10k: 49.3 % (600 games; stopped)               |
+
+The 600-game matches during training rose from about 40 % wins at 5,000
+games to 47–51 % from 25,000 games on, then stayed flat. We ship B at
+35,000 games (58 minutes of training): `asodio-net-v1`. A at 45,000 games
+did a little better on seed 99, but worse on the fresh seed 2026 (47.4 %).
+
+Tried and dropped (offline scripts, not in the repo):
+
+- **2-ply with the heuristic** (the top 3 turns, all 21 replies): 75 wins,
+  64 losses and 61 draws in 200 paired games against medium. No better
+  than medium, and about 25 times slower.
+- **Training against medium** half of the time (TD on games of the net
+  against the heuristic, from B at 10,000 games): 48.0 %, then 43.3 %
+  (600 games each). No gain.
+- **Picking turns by the win chance only** (no doubles): 165 wins, against
+  187 when it picks by equity (400 paired games).
+
+**Strength** of hard (the shipped net) against medium. A draw is not a win:
+
+| Match                                                                    | Hard wins    | Losses | Draws | Points per game   |
+| ------------------------------------------------------------------------ | ------------ | ------ | ----- | ----------------- |
+| `simulate -- --variant asodio --games 1000 --a hard --b medium --seed 1` | 489 (48.9 %) | 261    | 250   | +0.47 (909 : 442) |
+| 1,000 paired games, seed 1 (`train -- eval`)                             | 515 (51.5 %) | 243    | 242   | +0.54             |
+| 1,000 paired games, seed 2026                                            | 488 (48.8 %) | 257    | 255   | +0.47             |
+| 1,000 paired games, seed 99 (used to pick the checkpoint)                | 517 (51.7 %) | 227    | 256   | +0.57             |
+| `asodio-strength.test.ts`: 200 paired games, seed 2029                   | 102 (51.0 %) | 43     | 55    | +0.57 (187 : 73)  |
+
+For comparison, medium against medium wins 34.6 % and draws 30.5 % ("Asodio
+strength and speed"). So hard wins about half of its games against medium,
+and about two thirds of the games that someone wins. Seeds 1 and 2026 are
+fresh: no checkpoint was picked on them.
+
+**The Asodio bar (owner decision, #164).** The other games ask hard to win
+60 % of all 200 CI games against medium. Asodio does not: about a quarter
+of its games end in a lock draw (see below), so 60 % of all games is out of
+reach. In Asodio, hard must win **at least 60 % of the games that someone
+wins** (wins / (wins + losses)) **and score more points than medium**, in
+200 paired games. Draws are reported but do not count. The CI match
+(`asodio-strength.test.ts`, seed 2029) gives 102 wins, 43 losses and 55
+draws: 70 % of the decided games, 187 points against 73. The epic target
+of 70 % of all games (#52) is not met in Asodio.
+
+**Why the bar is hard to reach:** about a quarter of the games end in a
+deadlock draw. In 300 games of an early net (B at 10,000 games) against
+medium, 75 were draws. Medium made the locking pin in 45 of them (in 41,
+hard was ahead), and hard in 30 (in 21, hard was behind: a draw was its
+best result). Before 38 of medium's 45 locks, hard's last turn had no play
+with fewer lock shots (27 of those turns were forced). The quarter lock
+leaves little choice, so most draws come from the dice, not from the play.
+
+**Decision time** (Node 22, dev container, best of 3 runs, after warm-up,
+300 random positions): hard median 0.006 ms, p90 1.4 ms, p99 6.9 ms, max
+8.3 ms (medium on the same run: 0.005, 1.2, 6.5 and 8.1 ms). Most loading
+turns are forced, so the median is tiny. `src/hard-perf.test.ts` checks a
+median under 50 ms and a p99 under 300 ms.
 
 ## The Plakoto heuristic
 
@@ -985,9 +1342,31 @@ games take about 2 s; 1,000 medium-vs-easy games about 4–5 s. See
 ## Tests
 
 `pnpm test` from the repo root, or `pnpm --filter @tavli/bot test` (about
-45 s in the dev container; the Asodio strength test takes about 20 s and
+45 s in the dev container; the Asodio strength test takes about 40 s with hard vs medium, and
 the Plakoto one about 15 s with hard vs medium; the files run in parallel).
 
+- `analyzer.test.ts`: a forced turn is one turn with no loss, a win now
+  ranks first (even when the evaluator likes another turn), for every
+  game the ranking holds every legal turn once, sorted, with `equityLoss`
+  > = 0, the best turn is hard at temperature 0, the evaluations are from
+  > the mover's view, the same input gives the same output, Acey-Deucey
+  > roll chains, `top`, the evaluator choice and the errors.
+- `analyzer-2ply.test.ts` (#212): 2-ply and 1-ply agree on a forced turn
+  and a win now; every game's 2-ply ranking holds every legal turn once,
+  sorted, the same for the same input; the candidates rank first and the
+  rest keep their 1-ply order; a candidate's equity equals a count by hand
+  over the 36 rolls; a race-only test evaluator splits into a direct shot
+  at 1 ply but stays safe at 2 ply; the Plakoto mother question; Asodio
+  extra rolls and chosen doubles; the errors (also a stub variant that
+  asks a question with no `answerPrompt`).
+- `analyzer-work.test.ts` (#219, #237): one 2-ply hint never scores more
+  than its preset's budget (+1), for every game and preset, on seeded
+  positions (see "2-ply budget").
+- `analyzer-budget.test.ts` (#237): the budget rule (budget 0 is 1 ply, a
+  win now first, the exact cut in 1-ply order, a large budget equals none,
+  complete, sorted and deterministic rankings, the errors).
+- `analyzer-perf.test.ts`: a 2-ply hint for a middle-game Portes position
+  takes < 2 s.
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for
   a seed; passes; a win now is never missed (easy, medium, the fallback,
   even with a huge temperature and an evaluator that wants to lose);
@@ -1044,13 +1423,17 @@ the Plakoto one about 15 s with hard vs medium; the files run in parallel).
   stay under 100 KB, outputs in range, the heuristic for a race (and for a
   pinned mother in Plakoto), the fast path equals the engine path (every
   mother rule; with and without the runner rule), and a pinned value for
-  the start. `evaluators/float-codec.test.ts`: the base64 Float32 round
+  the start. `evaluators/asodio-net.test.ts`: the same checks for the
+  Asodio net, plus the mutual lock as a draw (half a win) and the heuristic
+  for every rule set but the owner version. `evaluators/float-codec.test.ts`: the base64 Float32 round
   trip and bad lengths. `train/td.test.ts`: a gradient step; for each
   game, a self-play game repeats for a seed, a game past `maxTurns` is
-  dropped, the warm-start labels; the mother question is answered "play
+  dropped, the warm-start labels, the bot's score-only path gives the
+  trainer's scores; the mother question is answered "play
   on"; game-end targets; save and load; the train script's flag parser.
 - `strength.test.ts` (300 games per match; hard vs medium 200 games),
-  hard vs medium in `plakoto-strength.test.ts` and `fevga-strength.test.ts`
-  (200 games each), `perf.test.ts`, `hard-perf.test.ts` (all three nets),
+  hard vs medium in `plakoto-strength.test.ts`, `fevga-strength.test.ts`
+  and `asodio-strength.test.ts` (200 games each; Asodio counts only the
+  decided games, see "The Asodio net"), `perf.test.ts`, `hard-perf.test.ts` (all four nets),
   `simulate.test.ts` (1,000 random-vs-random games), `tune.test.ts` (a tiny
   search), and the runner and the command line.

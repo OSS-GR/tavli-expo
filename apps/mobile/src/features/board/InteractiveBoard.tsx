@@ -6,17 +6,37 @@
  * - Drag and drop on a target moves it. A drop anywhere else flies back
  *   with a short animation and a warning haptic.
  * - A tap selects a checker; a tap on one of its targets moves it.
+ * - With `paths` (#180) a checker also lights the targets it reaches with
+ *   several dice ("2+3"). A tap or a drop there plays each step in order.
  * - Moves, hits and undos fly as short animations (`flights.ts`).
+ * - With `hint` (#209) the hint's checkers and targets get the same rings
+ *   while no checker is selected (`hintMarks.ts`).
  *
  * Two gestures race (`BOARD_GESTURES`, #174): a pan for the drag and a tap
  * for tap-tap. Hit-testing uses the same rects that draw the points
- * (`geometry.ts`). The gestures and the animations run on the UI thread;
- * only the result of a touch (select, move, cancel) goes to the JS thread.
+ * (`geometry.ts`). The layout comes from `boardLayout`: the tall or the
+ * classic board (`layout`, #184), mirrored with Settings → Home board on
+ * the bottom left (#175), so the touches follow it.
+ *
+ * When the phone turns (#185) the space changes (`spaceKey`). Until the
+ * board has measured its new space, it keeps drawing the old layout at the
+ * old size and reports no geometry, so nothing is placed with a new layout
+ * on an old size. The gestures and the
+ * animations run on the UI thread; only the result of a touch (select,
+ * move, cancel) goes to the JS thread.
  */
 import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentRef,
+} from 'react';
+import { View, type LayoutChangeEvent } from 'react-native';
 import {
   GestureDetector,
   useCompetingGestures,
@@ -27,10 +47,14 @@ import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { StyleSheet } from 'react-native-unistyles';
 
-import { BoardCanvas, portraitLayout, useBoardSpace } from './BoardCanvas';
+import type { BoardLayoutMode } from '@/features/settings/settings';
+
+import { BoardCanvas, boardLayout, useHomeBoardSide, type Size } from './BoardCanvas';
 import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
+import type { MovePath } from './combined';
 import type { Flight } from './flights';
 import { fitBoardWithShadow, type BoardGeometry } from './geometry';
+import { hintHighlights } from './hintMarks';
 import {
   BOARD_GESTURES,
   buildSources,
@@ -49,6 +73,17 @@ export const RETURN_MS = 160;
 
 export interface InteractiveBoardProps {
   theme: ThemeManifest;
+  /**
+   * The tall board on its side (default: the tutorial) or the classic wide
+   * board (the game screen with Settings → Board layout → Classic, #184).
+   */
+  layout?: BoardLayoutMode;
+  /**
+   * Names the space the board gets: it changes when the phone turns or the
+   * window changes size (#185). After a change the board waits for its new
+   * size before it draws the new layout and calls `onGeometry`.
+   */
+  spaceKey?: string;
   /** The board as it is now (with the moves of this turn). */
   board: BoardState;
   view: BoardView;
@@ -66,6 +101,20 @@ export interface InteractiveBoardProps {
    * Returns `false` if the move was not played (the checker flies back).
    */
   onMove: (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => boolean;
+  /**
+   * One checker moved with several dice (#180, `flowPaths`): targets past
+   * the single ones. Lit only with `onSteps`. Default: none (the tutorial).
+   */
+  paths?: readonly MovePath[];
+  /**
+   * A combined target was chosen: play `steps` in order. Same `from` as
+   * `onMove`. Returns `false` if nothing was played (the checker flies back).
+   */
+  onSteps?: (
+    steps: readonly Move[],
+    geo: BoardGeometry,
+    from: { x: number; y: number } | null,
+  ) => boolean;
   /** A tap that did not touch a movable checker (e.g. tap the board to roll). */
   onBoardTap?: () => void;
   /** A checker was selected, and the next tap hit no target (the selection is dropped). */
@@ -78,10 +127,19 @@ export interface InteractiveBoardProps {
   /** A checker was picked up / dropped where it may not go. */
   onPickUp?: () => void;
   onIllegalDrop?: () => void;
-  /** Called with the board geometry after each layout (the screen needs it for undo flights). */
+  /**
+   * Called with the board geometry after each layout (the screen needs it
+   * for undo flights and the dice). Only with a size measured for the
+   * current `spaceKey`.
+   */
   onGeometry?: (geo: BoardGeometry) => void;
   /** Extra marks: Asodio checkers frozen by the quarter lock. */
   marks?: BoardMarks;
+  /**
+   * The moves of a hint (#209), the rest of the turn in order: their
+   * checkers and targets get rings while no checker is selected.
+   */
+  hint?: readonly Move[] | null;
   /** What a screen reader says for the board, e.g. which checkers are pinned. */
   accessibilityLabel?: string;
   testID?: string;
@@ -100,12 +158,15 @@ function highlightsFor(
     x: t.landing.x,
     y: t.landing.y,
     r: t.r,
+    ...(t.moves.length > 1 ? { steps: t.moves.length } : {}),
   }));
   return { select: source.checker, targets };
 }
 
 export function InteractiveBoard({
   theme,
+  layout = 'tall',
+  spaceKey = '',
   board,
   view,
   mover,
@@ -114,6 +175,8 @@ export function InteractiveBoard({
   flights,
   onFlightDone,
   onMove,
+  paths,
+  onSteps,
   onBoardTap,
   onMissTap,
   cue = false,
@@ -121,19 +184,56 @@ export function InteractiveBoard({
   onIllegalDrop,
   onGeometry,
   marks,
+  hint,
   accessibilityLabel,
   testID,
 }: InteractiveBoardProps) {
-  const [size, onLayout] = useBoardSpace();
+  // The measured space, with the space key and the layout it was measured for.
+  const [measured, setMeasured] = useState<{
+    size: Size;
+    key: string;
+    mode: BoardLayoutMode;
+  } | null>(null);
+  const keep = (width: number, height: number) =>
+    setMeasured((old) =>
+      old &&
+      old.size.width === width &&
+      old.size.height === height &&
+      old.key === spaceKey &&
+      old.mode === layout
+        ? old
+        : { size: { width, height }, key: spaceKey, mode: layout },
+    );
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    keep(width, height);
+  };
+  // A new space may keep its size, and then no layout event comes: measure
+  // it at once (on the phone `measure` answers before the frame is drawn).
+  const spaceRef = useRef<ComponentRef<typeof View>>(null);
+  const measureNow = useEffectEvent(() => {
+    spaceRef.current?.measure((_x, _y, width, height) => {
+      if (width > 0 && height > 0) keep(width, height);
+    });
+  });
+  useLayoutEffect(() => {
+    measureNow();
+  }, [spaceKey]);
+  const fresh = measured !== null && measured.key === spaceKey;
+  // Not measured for this space yet: the old layout at the old size, as drawn before.
+  const drawn = measured === null || fresh ? layout : measured.mode;
+  const size = measured?.size ?? null;
+  const homeSide = useHomeBoardSide();
   const geo = useMemo(
-    () => (size ? fitBoardWithShadow(portraitLayout(theme), size) : null),
-    [size, theme],
+    () => (size ? fitBoardWithShadow(boardLayout(theme, drawn, homeSide), size) : null),
+    [size, theme, drawn, homeSide],
   );
   useEffect(() => {
-    if (geo) onGeometry?.(geo);
-  }, [geo, onGeometry]);
+    if (geo && fresh) onGeometry?.(geo);
+  }, [geo, fresh, onGeometry]);
   const picture = geo ? layoutBoard(geo, board, view, marks) : null;
-  const sources = geo ? buildSources(geo, board, view, mover, legal) : [];
+  const combined = onSteps && legal.length > 0 ? (paths ?? []) : [];
+  const sources = geo ? buildSources(geo, board, view, mover, legal, combined) : [];
 
   // JS state: the selected source (tap-tap, or the one being dragged) and
   // the checker hidden while it is dragged. Both belong to one position:
@@ -189,9 +289,14 @@ export function InteractiveBoard({
   };
 
   const doMove = (source: number, target: number, from: { x: number; y: number } | null) => {
-    const move = sources[source]?.targets[target]?.move;
+    const moves = sources[source]?.targets[target]?.moves ?? [];
+    const [move] = moves;
     setSelected(null);
-    if (move && geo && onMove(move, geo, from)) {
+    const played =
+      move !== undefined &&
+      geo !== null &&
+      (moves.length > 1 ? (onSteps?.(moves, geo, from) ?? false) : onMove(move, geo, from));
+    if (played) {
       if (from) dropped.current = true;
       setDragKey(null);
     } else if (from) {
@@ -309,7 +414,11 @@ export function InteractiveBoard({
   const gesture = useCompetingGestures(pan, tap);
 
   const current = selected === null ? undefined : sources[selected];
-  const highlights = highlightsFor(current, cue && !dragKey ? sources : []);
+  // A selected checker wins over the hint; the hint comes back when it is dropped.
+  const highlights =
+    current === undefined && hint && hint.length > 0 && geo
+      ? hintHighlights(geo, board, view, mover, hint)
+      : highlightsFor(current, cue && !dragKey ? sources : []);
   const hidden = new Set<string>();
   for (const f of flights) if (f.hide) hidden.add(f.hide);
   if (dragKey) hidden.add(dragKey);
@@ -317,6 +426,7 @@ export function InteractiveBoard({
   return (
     <GestureDetector gesture={gesture}>
       <View
+        ref={spaceRef}
         testID={testID}
         style={styles.space}
         onLayout={onLayout}

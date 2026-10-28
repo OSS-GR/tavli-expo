@@ -14,6 +14,11 @@
  * (`MotherLessonCard`) over the board. In Asodio the board marks the
  * checkers the quarter lock freezes, as in a real game.
  *
+ * Landscape (#185): the screen turns with the phone. The lesson text, the
+ * dice and Next (under the dice) sit in a column on the left that scrolls;
+ * the classic wide board fills the rest. The board keeps its place in the
+ * tree, so turning the phone keeps a picked-up checker.
+ *
  * The lessons and their rules live in `lessons.ts`; the engine decides
  * what is legal. This screen only shows them. The route sends analytics
  * and saves the tutorial status (callbacks).
@@ -27,7 +32,7 @@ import {
 } from '@tavli/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -47,6 +52,7 @@ import { DiceRow } from '@/features/board/DiceRow';
 import { moveFlights, type Flight } from '@/features/board/flights';
 import type { BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
+import { isLandscapeWindow, spaceKeyFor } from '@/features/board/screenLayout';
 import { createGameFeedback, loadThemeSounds } from '@/features/feedback/feedback';
 import { Celebration } from '@/features/game/Celebration';
 import { diceView } from '@/features/game/gameStore';
@@ -137,6 +143,16 @@ export function TutorialScreen({
   );
 
   const showMoveList = useMoveListShown();
+  // Portrait: the tall board, as before. Landscape: the classic wide board.
+  const windowSize = useWindowDimensions();
+  const landscape = isLandscapeWindow(windowSize);
+  const spaceKey = spaceKeyFor(landscape ? 'landscape' : 'tall', windowSize);
+  // A checker in the air flies in the board's old place: it just lands.
+  const [flightLandscape, setFlightLandscape] = useState(landscape);
+  if (flightLandscape !== landscape) {
+    setFlightLandscape(landscape);
+    setFlights([]);
+  }
   const geoRef = useRef<BoardGeometry | null>(null);
   const onGeometry = useCallback((geo: BoardGeometry) => {
     geoRef.current = geo;
@@ -206,7 +222,7 @@ export function TutorialScreen({
 
   if (lesson === undefined) {
     return (
-      <View testID="tutorial-screen" style={styles.screen}>
+      <View testID="tutorial-screen" style={styles.screen(landscape)}>
         <View testID="tutorial-end" style={styles.end}>
           <Celebration kind="game" />
           <Text style={styles.endTitle} accessibilityRole="header">
@@ -235,54 +251,109 @@ export function TutorialScreen({
   // Asodio: the frozen checkers look darker. Other games have no marks.
   const marks = asodioMarks(board, flow.state.rules, view);
 
-  return (
-    <View testID="tutorial-screen" style={styles.screen}>
-      <View style={styles.topBar}>
-        <View style={styles.titles}>
-          <Text style={styles.title} accessibilityRole="header">
-            {t(texts.title)}
-          </Text>
-          <Text testID="tutorial-progress" style={styles.progress}>
-            {t('tutorial.progress', { step: index + 1, count: lessons.length })}
-          </Text>
-        </View>
-        <Pressable
-          testID="tutorial-skip"
-          accessibilityRole="button"
-          accessibilityLabel={t('tutorial.skip')}
-          accessibilityHint={t(texts.skipHint)}
-          hitSlop={8}
-          onPress={() => onSkip(index + 1, lesson.id)}
-          style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
-          <Text style={styles.skipText}>{t('tutorial.skip')}</Text>
-        </Pressable>
-      </View>
-
-      <Animated.View testID="tutorial-card" style={[styles.card, shakeStyle]}>
-        <Text style={styles.lessonTitle} accessibilityRole="header">
-          {t(`tutorial.lessons.${lesson.id}.title`)}
+  const topBar = (
+    <View style={styles.topBar}>
+      <View style={styles.titles}>
+        <Text style={styles.title} accessibilityRole="header">
+          {t(texts.title)}
         </Text>
-        <Text style={styles.body}>{t(`tutorial.lessons.${lesson.id}.body`)}</Text>
-        {status !== null ? (
-          <Text
-            testID={done ? 'tutorial-success' : 'tutorial-hint'}
-            style={done ? styles.success : styles.hint}
-            accessibilityLiveRegion="polite">
-            {status}
-          </Text>
-        ) : null}
-      </Animated.View>
+        <Text testID="tutorial-progress" style={styles.progress}>
+          {t('tutorial.progress', { step: index + 1, count: lessons.length })}
+        </Text>
+      </View>
+      <Pressable
+        testID="tutorial-skip"
+        accessibilityRole="button"
+        accessibilityLabel={t('tutorial.skip')}
+        accessibilityHint={t(texts.skipHint)}
+        hitSlop={8}
+        onPress={() => onSkip(index + 1, lesson.id)}
+        style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
+        <Text style={styles.skipText}>{t('tutorial.skip')}</Text>
+      </Pressable>
+    </View>
+  );
 
-      <View style={styles.boardArea}>
-        {/* While the mother card covers the board, screen readers skip the board. */}
+  const card = (
+    <Animated.View testID="tutorial-card" style={[styles.card, shakeStyle]}>
+      <Text style={styles.lessonTitle} accessibilityRole="header">
+        {t(`tutorial.lessons.${lesson.id}.title`)}
+      </Text>
+      <Text style={styles.body}>{t(`tutorial.lessons.${lesson.id}.body`)}</Text>
+      {status !== null ? (
+        <Text
+          testID={done ? 'tutorial-success' : 'tutorial-hint'}
+          style={done ? styles.success : styles.hint}
+          accessibilityLiveRegion="polite">
+          {status}
+        </Text>
+      ) : null}
+    </Animated.View>
+  );
+
+  const moveList = showMoveList ? (
+    <MoveList
+      testID="tutorial-move-list"
+      legal={legal}
+      onMove={(move) => onMove(move, geoRef.current, null)}
+    />
+  ) : null;
+
+  // Portrait: the dice and Next side by side. Landscape: Next under the
+  // dice, as wide as the column, so a long label or a large font has room.
+  const controls = (
+    <View testID="tutorial-controls" style={styles.controls(landscape)}>
+      <View style={styles.diceSlot}>
+        <DiceRow testID="tutorial-dice" theme={theme} dice={dice} rollKey={null} />
+      </View>
+      {done ? (
+        <ActionButton
+          testID="tutorial-next"
+          label={t('tutorial.next')}
+          onPress={goNext}
+          grow={!landscape}
+        />
+      ) : null}
+    </View>
+  );
+
+  return (
+    <View testID="tutorial-screen" style={styles.screen(landscape)}>
+      {landscape ? (
+        // The left column scrolls when the lesson, the move list or a large
+        // font make it taller than the screen; the dice and Next sit at its end.
+        <ScrollView
+          testID="tutorial-side"
+          style={styles.side}
+          contentContainerStyle={styles.sideContent}
+          alwaysBounceVertical={false}>
+          {topBar}
+          {card}
+          {moveList}
+          {controls}
+        </ScrollView>
+      ) : (
+        <View style={styles.lead}>
+          {topBar}
+          {card}
+        </View>
+      )}
+
+      <View style={styles.boardArea} collapsable={false}>
+        {/* While the mother card covers the board, screen readers skip the board.
+            It never flattens (`collapsable={false}`), so the board canvas keeps
+            its native parent when those props change (#173). */}
         <View
           style={styles.boardLayer}
+          collapsable={false}
           importantForAccessibility={motherCard ? 'no-hide-descendants' : 'auto'}
           accessibilityElementsHidden={motherCard}>
           <InteractiveBoard
             testID="tutorial-board"
             accessibilityLabel={t(`tutorial.lessons.${lesson.id}.board`)}
             theme={theme}
+            layout={landscape ? 'classic' : 'tall'}
+            spaceKey={spaceKey}
             board={board}
             view={view}
             mover="white"
@@ -311,33 +382,37 @@ export function TutorialScreen({
         ) : null}
       </View>
 
-      {showMoveList ? (
-        <MoveList
-          testID="tutorial-move-list"
-          legal={legal}
-          onMove={(move) => onMove(move, geoRef.current, null)}
-        />
-      ) : null}
-
-      <View style={styles.controls}>
-        <View style={styles.diceSlot}>
-          <DiceRow testID="tutorial-dice" theme={theme} dice={dice} rollKey={null} />
-        </View>
-        {done ? (
-          <ActionButton testID="tutorial-next" label={t('tutorial.next')} onPress={goNext} grow />
-        ) : null}
-      </View>
+      {landscape ? null : moveList}
+      {landscape ? null : controls}
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
-  screen: {
+  // Landscape keeps the notch, the round corners and the home bar free.
+  screen: (landscape: boolean) => ({
     flex: 1,
+    flexDirection: landscape ? 'row' : 'column',
     gap: theme.space.sm,
     backgroundColor: theme.colors.background,
     paddingTop: rt.insets.top + theme.space.xs,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.sm),
+    paddingLeft: landscape ? rt.insets.left : 0,
+    paddingRight: landscape ? Math.max(rt.insets.right, theme.space.xs) : 0,
+  }),
+  lead: {
+    gap: theme.space.sm,
+  },
+  // The left column in landscape (#185): room to read, the board gets the rest.
+  side: {
+    width: '38%',
+    minWidth: 240,
+    maxWidth: 340,
+    flexGrow: 0,
+  },
+  sideContent: {
+    flexGrow: 1,
+    gap: theme.space.sm,
   },
   topBar: {
     flexDirection: 'row',
@@ -409,13 +484,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: 'center',
     paddingVertical: theme.space.sm,
   },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.md,
+  controls: (landscape: boolean) => ({
+    flexDirection: landscape ? 'column' : 'row',
+    alignItems: landscape ? 'stretch' : 'center',
+    gap: landscape ? theme.space.sm : theme.space.md,
     minHeight: theme.touch.button + theme.space.lg,
     paddingHorizontal: theme.space.lg,
-  },
+    paddingBottom: landscape ? theme.space.xs : 0,
+    marginTop: 'auto',
+  }),
   diceSlot: {
     alignItems: 'center',
   },

@@ -1,7 +1,9 @@
 name: CI
 
 # Lint, typecheck, test and format check on every pull request and on main.
-# The job is called `checks`. Require that name in the main branch ruleset.
+# The work runs in parallel jobs (#248). The last job is called `checks`:
+# it passes only when every other job passed or was skipped. Require that
+# name in the main branch ruleset; the other job names can change freely.
 on:
   pull_request:
   push:
@@ -10,8 +12,9 @@ on:
 # Why there is no `paths-ignore` here:
 # `checks` is a required status check. If `paths-ignore` skips the whole
 # workflow on a docs-only PR, GitHub never reports `checks`, and the PR waits
-# for it forever. So the workflow always runs. The first step looks at the
-# changed files. If only docs changed, it skips the rest and the job passes.
+# for it forever. So the workflow always runs. The first job looks at the
+# changed files. If only docs changed, the other jobs are skipped and
+# `checks` passes.
 
 permissions:
   contents: read
@@ -22,9 +25,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  checks:
+  changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -70,39 +75,86 @@ jobs:
           echo "code=false" >> "$GITHUB_OUTPUT"
           echo "Only docs changed. Skipping the checks. The job still passes."
 
-      # No `version` input: the action reads `packageManager` from package.json.
-      - uses: pnpm/action-setup@v6
-        if: steps.changes.outputs.code == 'true'
-
-      - uses: actions/setup-node@v7
-        if: steps.changes.outputs.code == 'true'
+  # Everything except the tests: about a minute of work.
+  static:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install
-        if: steps.changes.outputs.code == 'true'
-        run: pnpm install --frozen-lockfile
+          persist-credentials: false
+      - uses: ./.github/actions/setup
 
       # Expo pins exact React / React Native versions per SDK. This fails when a
       # dependency drifts from what the SDK expects (see #70).
       - name: Expo dependency versions
-        if: steps.changes.outputs.code == 'true'
         working-directory: apps/mobile
         run: pnpm exec expo install --check
 
       - name: Lint
-        if: steps.changes.outputs.code == 'true'
         run: pnpm lint
 
       - name: Typecheck
-        if: steps.changes.outputs.code == 'true'
         run: pnpm typecheck
 
-      - name: Test
-        if: steps.changes.outputs.code == 'true'
-        run: pnpm test
-
       - name: Format check
-        if: steps.changes.outputs.code == 'true'
         run: pnpm format:check
+
+  # Vitest in every workspace but the app. The bot's tests are most of it.
+  test-packages:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+
+      - name: Test
+        run: pnpm -r --filter '!@tavli/mobile' test
+
+  # The app's Jest suites, split by file into shards that run at the same time.
+  test-app:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      # Let every shard finish, so one run shows all failing files.
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    name: test-app (${{ matrix.shard }}/2)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+
+      - name: Test
+        working-directory: apps/mobile
+        run: pnpm exec jest --shard=${{ matrix.shard }}/2
+
+  # The required check. It fails when any job above failed or was cancelled.
+  # A skipped job (docs-only change) counts as passed.
+  checks:
+    needs: [changes, static, test-packages, test-app]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::A job ended with '$result'."; exit 1 ;;
+            esac
+          done

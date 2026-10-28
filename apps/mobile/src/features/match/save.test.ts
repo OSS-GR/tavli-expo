@@ -13,7 +13,7 @@ import i18n from '@/i18n';
 
 import { SAVED_MATCH_KEY, SAVE_VERSION, parseSavedMatch, serializeSavedMatch } from './savedMatch';
 import { createSessionRegistry, isRestPoint, type MatchSession } from './sessions';
-import { defaultSetup, gameLevels, type MatchSetup } from './setup';
+import { DEFAULT_RULES_VERSIONS, defaultSetup, gameLevels, type MatchSetup } from './setup';
 import { continueSummary, timeAgo } from './summary';
 import { useSaveOnBackground } from './useSaveOnBackground';
 
@@ -355,6 +355,164 @@ describe('the saved game (#109)', () => {
   it('drops a one-game save whose log plays the Tavli rotation', () => {
     const tavli = JSON.parse(savedText(tavliSetup).text);
     const bad = { ...tavli, setup: { ...tavliSetup, game: 'portes' } };
+    expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
+  });
+});
+
+describe('the opening roll house rule in the save (#207)', () => {
+  it.each(['rerollBoth', 'chosenStarterRolls'] as const)(
+    'resumes a %s match with the same rule, still before the first roll',
+    (openingRoll) => {
+      const storage = createMemoryStorage();
+      const setup: MatchSetup = { ...defaultSetup('local'), openingRoll };
+      const s = registry(storage).start(setup);
+      expect(flowOf(s).match.rules.match.openingRoll).toBe(openingRoll);
+
+      const restored = registry(storage).get(s.id);
+      expect(restored?.setup.openingRoll).toBe(openingRoll);
+      const flow = restored && flowOf(restored);
+      expect(flow?.match.rules.match.openingRoll).toBe(openingRoll);
+      expect(flow?.game.phase).toBe('opening-roll');
+      // `chosenStarterRolls` waits for a pick; the others for the opening roll.
+      expect(flow?.game.opening === null).toBe(openingRoll === 'chosenStarterRolls');
+    },
+  );
+
+  it('resumes a chosen starter: the pick is in the log', () => {
+    const storage = createMemoryStorage();
+    const s = registry(storage).start({
+      ...defaultSetup('bot'),
+      openingRoll: 'chosenStarterRolls',
+    });
+    expect(s.store.getState().dispatch({ type: 'chooseStarter', player: 'black' })).toBe(true);
+
+    const restored = registry(storage).get(s.id);
+    const game = restored && flowOf(restored).game;
+    expect(game?.phase).toBe('awaiting-roll');
+    expect(game?.starter).toBe('black');
+  });
+
+  it('loads a save from before #207 (no rule) with the federation rule', () => {
+    const s = registry(createMemoryStorage()).start(botSetup);
+    const old = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    delete old.setup.openingRoll;
+    const result = parseSavedMatch(JSON.stringify(old), LEVELS);
+    expect(result.kind === 'ok' && result.saved.setup.openingRoll).toBe('useOpeningDice');
+  });
+
+  it('drops a save whose setup and log name another rule', () => {
+    const s = registry(createMemoryStorage()).start(botSetup);
+    const bad = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    bad.setup.openingRoll = 'rerollBoth';
+    expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
+  });
+});
+
+describe('the rules version in the save (#241)', () => {
+  const versions = { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' } as const;
+
+  it.each([
+    ['plakoto', 'plakoto.federation'],
+    ['asodio', 'asodio.aceyDeuceyGreek'],
+  ] as const)('resumes a %s match in its rules version', (game, preset) => {
+    const storage = createMemoryStorage();
+    const s = registry(storage).start({ ...defaultSetup('local'), game, rulesVersions: versions });
+    expect(flowOf(s).match.rules.presetId).toBe(preset);
+    expect(flowOf(s).game.state.rules.presetId).toBe(preset);
+
+    const restored = registry(storage).get(s.id);
+    expect(restored?.setup.rulesVersions).toEqual(versions);
+    expect(restored && flowOf(restored).game.state.rules.presetId).toBe(preset);
+  });
+
+  it('loads a save from before #241 (no versions) with the default presets', () => {
+    for (const game of ['plakoto', 'asodio'] as const) {
+      const s = registry(createMemoryStorage()).start({ ...defaultSetup('local'), game });
+      const old = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+      delete old.setup.rulesVersions;
+      const result = parseSavedMatch(JSON.stringify(old), LEVELS);
+      expect(result.kind).toBe('ok');
+      if (result.kind !== 'ok') return;
+      expect(result.saved.setup.rulesVersions).toEqual({
+        plakoto: 'plakoto',
+        asodio: 'asodio.kafeneio',
+      });
+      expect(result.saved.flow.match.rules.presetId).toBe(
+        game === 'plakoto' ? 'plakoto' : 'asodio.kafeneio',
+      );
+    }
+  });
+
+  it('drops a save whose setup and log name another version', () => {
+    const s = registry(createMemoryStorage()).start({
+      ...defaultSetup('local'),
+      game: 'asodio',
+      rulesVersions: versions,
+    });
+    const bad = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    bad.setup.rulesVersions = { ...versions, asodio: 'asodio.aceyDeuceyAmerican' };
+    expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
+    // The version of another game does not matter: only `game` is played.
+    const fine = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    fine.setup.rulesVersions = { ...versions, plakoto: 'plakoto' };
+    expect(parseSavedMatch(JSON.stringify(fine), LEVELS).kind).toBe('ok');
+  });
+});
+
+describe('the Plakoto version of a Tavli match in the save (#247)', () => {
+  const federation = { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' } as const;
+  const tavli: MatchSetup = { ...defaultSetup('local'), game: 'tavli', rulesVersions: federation };
+
+  /** Ends the game in play with a resign, then starts the next one. */
+  function nextGame(s: MatchSession) {
+    if (flowOf(s).game.phase === 'opening-roll') openGame(s);
+    s.store.getState().dispatch({ type: 'resign', player: flowOf(s).game.state.toMove });
+    s.store.getState().dispatch({ type: 'nextGame' });
+  }
+
+  it('resumes in the middle: Portes plays its default, Plakoto plakoto.federation', () => {
+    const storage = createMemoryStorage();
+    const s = registry(storage).start({ ...tavli, targetPoints: 7 });
+    expect(flowOf(s).match.rules.presetId).toBe('plakoto.federation');
+    expect(flowOf(s).game.state.rules.presetId).toBe('portes');
+    openGame(s);
+
+    // A restart in the Portes game keeps the version for the Plakoto game.
+    let restored = registry(storage).get(s.id)!;
+    expect(restored.setup.rulesVersions).toEqual(federation);
+    expect(flowOf(restored).game.state.rules.presetId).toBe('portes');
+    nextGame(restored);
+    expect(flowOf(restored).game.state.variant).toBe('plakoto');
+    expect(flowOf(restored).game.state.rules.presetId).toBe('plakoto.federation');
+
+    // And a restart in the Plakoto game.
+    restored = registry(storage).get(s.id)!;
+    expect(flowOf(restored).game.state.rules.presetId).toBe('plakoto.federation');
+    expect(flowOf(restored).game.state.rules.mother.motherRule).toBe('federation');
+    nextGame(restored);
+    expect(flowOf(restored).game.state.rules.presetId).toBe('fevga');
+  });
+
+  it('loads a Tavli save from before #247 with the default Plakoto', () => {
+    // Before #247 a Tavli match always played `tavli`, whatever the setup said.
+    const s = registry(createMemoryStorage()).start(tavli);
+    const old = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    const standard = registry(createMemoryStorage()).start({
+      ...tavli,
+      rulesVersions: DEFAULT_RULES_VERSIONS,
+    });
+    old.log = flowOf(standard).log;
+    const result = parseSavedMatch(JSON.stringify(old), LEVELS);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.saved.flow.match.rules.presetId).toBe('tavli');
+    expect(result.saved.setup.rulesVersions).toEqual(DEFAULT_RULES_VERSIONS);
+  });
+
+  it('drops a Tavli save whose log plays another Plakoto version than the setup', () => {
+    const s = registry(createMemoryStorage()).start(tavli);
+    const bad = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    bad.setup.rulesVersions = DEFAULT_RULES_VERSIONS;
     expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
   });
 });

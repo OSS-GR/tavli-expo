@@ -1,6 +1,6 @@
 # Open Questions
 
-> Living list. When the owner answers, move the answer to **Answered** and update the doc it affects. Last review: 2026-10-27.
+> Living list. When the owner answers, move the answer to **Answered** and update the doc it affects. Last review: 2026-10-28.
 
 ## Waiting on the owner
 
@@ -8,7 +8,6 @@
 |---|----------|----------------|---------|
 | Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
 | Q18 | **Sentry project:** create a free Sentry React Native project and add the DSN, org and project slugs, and an auth token to EAS (steps in `packages/adapters/crash-sentry/README.md`). Until then, builds send no crash reports. | We see crashes from test builds | #43 |
-| Q19 | Greek label for the **pip count** in the player strips: draft "Πόντοι 167". Other options: "Πιπς", "Δρόμος". Match points use "βαθμοί". | Clear Greek UI | #32 |
 | Q20 | **PostHog project:** create a free PostHog project in the **EU** region, turn on "Discard client IP data", and add the project API key as `EXPO_PUBLIC_POSTHOG_KEY` (`.env.local` and EAS). Steps in `docs/architecture/analytics-events.md`. Until then, builds send no usage data. Also: does `tavlaki.com/privacy` exist yet? The consent screen and Settings link to it. | We see which modes testers use | #61 |
 | Q21 | **Fevga, P3 "the opponent's full rules":** the engine (#99) reads this as movement, the runner rule and bearing off. It does not apply the prime bans P1/P2 to the opponent's one test move, because those judge a whole turn's end position. OK? | Which plays count as "blocking the opponent" | `docs/rules/fevga.md`, #99 |
 | Q22 | **Fevga, both players blocked forever:** the rules doc gives no outcome. It never happened in 2,700 test games. Recommended: a draw. | A game that cannot end | `docs/rules/fevga.md` |
@@ -20,6 +19,7 @@
 | Q28 | **Asodio deadlocks are common:** in 400 random owner-version games (#115), 286 ended in a deadlock (A5: both armies frozen, because each side's last lagging checker is pinned by a checker of the other side that is frozen itself). Real players avoid lone lagging checkers, so real games end this way less often, but please check in playtests. If it happens a lot, an option is: a frozen checker may still move when its army has no other move. Bots (#125, 1,000 games each): 30.5% of medium-vs-medium games, 43.0% of easy-vs-easy and 27.2% of medium-vs-random games end in a deadlock, so the bot cannot reach the usual 85% win bar against random. Nearly all come from a "mutual lock" while the armies cross mid-board (each side's new quarter is the other side's rear quarter); see `packages/bot/README.md`, "Asodio strength and speed". | Many drawn games | `docs/rules/asodio.md`, #115 |
 | Q29 | **Asodio doc, research defaults vs owner:** "Turn & dice rules", "Movement rules" and edge cases 1–13 describe the research version (a 1-2 gives a chosen double and a new roll; `mustEnterAllFirst=false`), but the flag table gives the owner defaults (A3: no extra rolls; `mustEnterAllFirst=true`). The engine tests cases 1–13 with the Acey-Deucey presets. Recommended: mark those sections "research version" in the doc. | A clear rules doc | `docs/rules/asodio.md`, #115 |
 | Q30 | **Online, what is a timed-out game worth?** The rules docs do not say. The server (#133) scores it like a resign of that game: mono 1 if the late player has borne off a checker, else diplo 2 (Plakoto too). Recommended: keep this. Other option: always 1 point. | Points in online games | `docs/architecture/online-game-service.md`, #133 |
+| Q31 | **Online invites last 24 hours. OK?** A friend can accept an invite code (#252) for 24 hours; then it expires. Nothing waits on the answer: it is one constant (`INVITE_TIME_MS` in `packages/contracts/src/invite.ts`). Recommended: keep 24 hours. | How long a shared invite link works | `docs/architecture/online-game-service.md`, #252 |
 
 ## Answered
 
@@ -40,7 +40,7 @@
 | Q8 | **Greek + English** from day one. | #37 (i18n setup) |
 | Q9 | Repo stays **private**. Note: private repos get 2,000 free GitHub Actions minutes per month; CI must stay lean. | ADR-0006, `docs/process/github-workflow.md` |
 | Design (#64) | **Both wooden themes.** First theme: **walnut kafeneio** (Concept B) with **ivory and black** checkers. Second theme: olive inlay (Concept A) in v1.0. | #38, #53 |
-| Wireframes (#63) | Accepted all defaults: board turned 90°; face-to-face mode after MVP1; resign gives mono or diplo by board state, plus "Resign match"; opening roll one tap vs bot, one tap per player in pass-and-play; auto-confirm off; pip counts on (can hide). | `docs/design/wireframes.md` |
+| Wireframes (#63) | Accepted all defaults: board turned 90°; face-to-face mode after MVP1; resign gives mono or diplo by board state, plus "Resign match"; opening roll one tap vs bot, one tap per player in pass-and-play; auto-confirm off; pip counts on (can hide). The pip count was removed later (Q19, #238). | `docs/design/wireframes.md` |
 | Accounts | **All paid accounts move to the end (v1.0 launch).** Apple Developer and Google Play are opened just before store release. Until then: simulators on the Mac, the owner's iPhone via a free Apple ID in Xcode, and Android test builds (APK) installed directly. Note: friends on iPhones can only test once the Apple account exists. Google Play needs a 14-day closed test with 12 testers before release; the owner accepts that it adds time at the end. | #3, #41, #54 |
 | Q1 | **Budget:** use free plans only until launch. The PM asks the owner before adding anything paid. | ADR-0004 |
 | Q12 | **No time estimates.** Agents work as fast as they can; the roadmap has milestones, not dates. | `docs/roadmap.md` |
@@ -50,4 +50,5 @@
 | Q15 | Timers: **live 1 minute per turn, async 24 hours; time runs out = you lose that game.** | #46 |
 | Q17 | **Verifiable dice: later.** | Later |
 | Q7 | **Free at launch. No ads, ever.** If we earn money later: one-time purchase or cosmetic extras (e.g. themes) that never change gameplay. To discuss before v1.0. | `docs/vision.md`, #54 |
+| Q19 | (2026-10-28) Greek label for the pip count: **none needed.** The owner removed the pip count: "please remove the pip counter, it doesn't add anything, who uses it". The strips and Settings no longer show it. | #238 |
 | New | Players can make their **own house-rule variants** ("kafeneio mode"). | Backlog epic (Later) + engine rules-as-data task (MVP1) |

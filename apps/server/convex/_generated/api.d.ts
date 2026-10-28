@@ -8,33 +8,56 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
+import type * as caller from "../caller.js";
+import type * as games from "../games.js";
+import type * as http from "../http.js";
+import type * as invites from "../invites.js";
+import type * as model_cryptoRng from "../model/cryptoRng.js";
+import type * as model_invites from "../model/invites.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as games from "../games.js";
-import type * as model_crypto_rng from "../model/crypto-rng.js";
-import type * as model_online_game from "../model/online-game.js";
+
+declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
+  caller: typeof caller;
+  games: typeof games;
+  http: typeof http;
+  invites: typeof invites;
+  "model/cryptoRng": typeof model_cryptoRng;
+  "model/invites": typeof model_invites;
+}>;
 
 /**
- * A utility for referencing Convex functions in your app's API.
+ * A utility for referencing Convex functions in your app's public API.
  *
  * Usage:
  * ```js
  * const myFunctionReference = api.myModule.myFunction;
  * ```
  */
-declare const fullApi: ApiFromModules<{
-  games: typeof games;
-  "model/crypto-rng": typeof model_crypto_rng;
-  "model/online-game": typeof model_online_game;
-}>;
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
+
+export declare const components: {
+  betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
+};

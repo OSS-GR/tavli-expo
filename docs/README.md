@@ -10,7 +10,7 @@
 | [Roadmap](roadmap.md) | Milestones M0 → MVP1 → MVP2 → MVP3 → v1.0 → MVP4 |
 | [Open questions](open-questions.md) | Things the owner must answer or decide |
 | [How we work on GitHub](process/github-workflow.md) | Labels, issue types, board, Definition of Done |
-| [Running the app](process/running-the-app.md) | Simulator, iPhone (free Apple ID), Android emulator, EAS builds, dev routes, common errors |
+| [Running the app](process/running-the-app.md) | Simulator, iPhone (free Apple ID), Android emulator, which server each variant uses, EAS builds, dev routes, common errors |
 
 ## Legal
 
@@ -47,7 +47,8 @@
 |-----|-------|
 | [Expo / React Native best practices](architecture/expo-best-practices.md) | Stack, tooling, releases |
 | [Backend, multiplayer, auth options](architecture/backend-options.md) | Vendors, costs, recommended design |
-| [Online game service](architecture/online-game-service.md) | Convex server (`apps/server`): data model, move flow, dice, offline tests and codegen, open points |
+| [Online game service](architecture/online-game-service.md) | Convex server (`apps/server`): data model, move flow, dice, offline tests, deploy and rollback, codegen, open points |
+| [Online package](../packages/online/README.md) | `@tavli/online`: the pure game model, the shared call checks and the in-memory game server |
 | [Bot AI](architecture/bot-ai.md) | Bot levels, training, on-device play |
 | [Board screen](architecture/board-screen.md) | How the app draws the board (Skia), board flip, tests and screenshots |
 | [App shell](architecture/app-shell.md) | Home, new game, local matches, the bot turn, in-game menu |
@@ -63,6 +64,7 @@
 | [Themes package](../packages/themes/README.md) | How a board theme is built (manifest, layouts, assets) and how to add one |
 | [Wireframes](design/wireframes.md) | MVP1 screens, user flow, portrait board layout |
 | [Game screen layout proposals](design/game-layout-proposals.md) | Portrait A and B, landscape, today's layout, for the owner to pick (#184, #185) |
+| [Dice throw spike](design/dice-throw-spike.md) | Swipe to throw the dice onto the board: prototype, cost, risks, recommendation (#183) |
 | [App icon and splash](design/app-icon.md) | Three icon concepts, the pick, files and rebuild |
 
 ## Decisions (ADRs)

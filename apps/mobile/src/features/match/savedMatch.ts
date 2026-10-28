@@ -19,6 +19,17 @@
  * rematch, and so on. With the session id it names one match, so a save
  * of a match the history already holds can be told apart from a rematch.
  * Older saves have none (`null`); the envelope version did not change.
+ *
+ * The opening roll house rule (#207) is `setup.openingRoll`; the log's
+ * rules hold it too, and the two must agree. Saves before #207 have none:
+ * they load with the federation rule, which their logs hold.
+ *
+ * The rules version of Plakoto and Asodio (#241) is `setup.rulesVersions`;
+ * the preset of the log's rules must be the one of `setup.game`. Saves
+ * before #241 have none: they load with the default presets, which their
+ * logs hold. The Plakoto game of a Tavli match plays the Plakoto version
+ * (#247). A Tavli save from before #247 holds the `tavli` preset, whatever
+ * its setup says: it loads with the default Plakoto version.
  */
 import { MATCH_FLOW_SCHEMA_VERSION, replay, type FlowEvent, type MatchFlow } from '@tavli/engine';
 
@@ -28,6 +39,7 @@ import {
   isGameChoice,
   isMatchMode,
   sanitizeSetup,
+  versionsOfPreset,
   type GameLevels,
   type MatchSetup,
 } from './setup';
@@ -130,10 +142,16 @@ export function parseSavedMatch(text: string | undefined, levels: GameLevels): S
   if (flow.match.targetPoints !== setup.targetPoints) return broken('setup and log differ');
   const { rules } = flow.match;
   const rotation = gameRotation(setup.game);
+  // A Tavli save from before #247 played the default Plakoto, whatever its setup says.
+  const rulesVersions =
+    setup.game === 'tavli' && rules.presetId === gamePreset('tavli')
+      ? versionsOfPreset('tavli', rules.presetId, setup.rulesVersions)
+      : setup.rulesVersions;
   if (
-    rules.presetId !== gamePreset(setup.game) ||
+    rules.presetId !== gamePreset(setup.game, rulesVersions) ||
     rules.match.rotation.length !== rotation.length ||
-    rules.match.rotation.some((variant, i) => variant !== rotation[i])
+    rules.match.rotation.some((variant, i) => variant !== rotation[i]) ||
+    rules.match.openingRoll !== setup.openingRoll
   ) {
     return broken('setup and log differ');
   }
@@ -143,5 +161,8 @@ export function parseSavedMatch(text: string | undefined, levels: GameLevels): S
   const number = raw['matchNumber'];
   const matchNumber =
     typeof number === 'number' && Number.isSafeInteger(number) && number >= 1 ? number : null;
-  return { kind: 'ok', saved: { id, setup, savedAt, matchNumber, flow } };
+  return {
+    kind: 'ok',
+    saved: { id, setup: { ...setup, rulesVersions }, savedAt, matchNumber, flow },
+  };
 }

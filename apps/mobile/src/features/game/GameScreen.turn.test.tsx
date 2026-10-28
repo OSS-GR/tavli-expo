@@ -1,26 +1,31 @@
+import { InlineBotRunner, createBot } from '@tavli/bot';
 import {
   createBoard,
   createGameFlow,
   createSeededRng,
   portes,
   type BoardState,
+  type PerPlayer,
   type PlayerId,
 } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
-import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
 import { fitBoardWithShadow, slotRect, stackPosition } from '@/features/board/geometry';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import i18n from '@/i18n';
 
 import { createGameStore, type GameStore } from './gameStore';
-import { GameScreen, MATCH_END_DELAY_MS, PASS_NOTICE_MS } from './GameScreen';
+import { BOT_PASS_NOTICE_MS, GameScreen, MATCH_END_DELAY_MS, type BotSeat } from './GameScreen';
+import type { Seat } from './seats';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
+import { LANDSCAPE_SE, PORTRAIT_SE, resetWindow, setWindow } from '../../../test/window';
 
 const SIZE = { width: 375, height: 500 };
 const geo = fitBoardWithShadow(getLayout(getTheme('walnut-kafeneio'), 'portrait-rotated'), SIZE);
@@ -134,13 +139,13 @@ describe('<GameScreen /> turn indicator', () => {
     expect(bottom().getByText('Ann')).toBeOnTheScreen();
     expect(bottom().getByText('YOUR TURN')).toBeOnTheScreen();
     expect(upper().queryByText('YOUR TURN')).toBeNull();
-    expect(bottom().getByText('Pips 167')).toBeOnTheScreen();
-    expect(upper().getByText('Pips 167')).toBeOnTheScreen();
 
     await touch(PAN, [top(13, 5), point(7)]);
     await touch(PAN, [top(8, 3), point(7)]);
-    // The pip count follows the moves of the turn: 167 - 6 - 1.
-    expect(bottom().getByText('Pips 160')).toBeOnTheScreen();
+    // The moves change nothing in the strip: it has no pip count (#238).
+    expect(screen.getByTestId('strip-bottom')).toHaveAccessibleName(
+      'Ann, 0 of 3 points, Your turn',
+    );
     await user.press(button('Confirm'));
     expect(bottom().getByText('Bob')).toBeOnTheScreen();
     expect(bottom().getByText('YOUR TURN')).toBeOnTheScreen();
@@ -162,14 +167,46 @@ describe('<GameScreen /> turn indicator', () => {
     expect(bottom.queryByText('YOUR TURN')).toBeNull();
     expect(within(screen.getByTestId('strip-top')).getByText('YOUR TURN')).toBeOnTheScreen();
   });
+});
 
-  it('hides pip counts when the setting is off', async () => {
+// The strips show no pip count (#238): the owner removed it.
+describe('<GameScreen /> strips without a pip count (#238)', () => {
+  afterEach(async () => {
     await act(async () => {
-      settingsStore.getState().setSetting('showPipCounts', false);
+      await i18n.changeLanguage('en');
     });
-    await annMoves61();
-    expect(screen.queryByText(/^Pips/)).toBeNull();
+    await resetWindow();
   });
+
+  it.each([
+    ['portrait', 'en', PORTRAIT_SE, 'Ann, 0 of 3 points, Your turn', 'Bob, 0 of 3 points'],
+    ['landscape', 'en', LANDSCAPE_SE, 'Ann, 0 of 3 points, Your turn', 'Bob, 0 of 3 points'],
+    ['portrait', 'el', PORTRAIT_SE, 'Ann, 0 από 3 βαθμούς, Σειρά σου', 'Bob, 0 από 3 βαθμούς'],
+    ['landscape', 'el', LANDSCAPE_SE, 'Ann, 0 από 3 βαθμούς, Σειρά σου', 'Bob, 0 από 3 βαθμούς'],
+  ] as const)(
+    '%s, %s: only the name, the score and the turn',
+    async (layout, language, window, you, them) => {
+      await setWindow(window);
+      await act(async () => {
+        await i18n.changeLanguage(language);
+      });
+      await annMoves61();
+      const bottom = screen.getByTestId('strip-bottom');
+      const upper = screen.getByTestId('strip-top');
+      if (layout === 'landscape') {
+        // The stacked strips of the left column.
+        expect(within(screen.getByTestId('game-left')).getByTestId('strip-top')).toBe(upper);
+      }
+      expect(bottom).toHaveAccessibleName(you);
+      expect(upper).toHaveAccessibleName(them);
+      for (const strip of [bottom, upper]) {
+        // No "Pips 167" or «Πόντοι 167».
+        expect(strip).not.toHaveTextContent(/pip|πόντ|167/i);
+        // No "·" is left after the name: Portes has no note.
+        expect(strip).not.toHaveTextContent(/·/);
+      }
+    },
+  );
 });
 
 // Ann is on the bar and Bob holds all six entry points.
@@ -195,7 +232,10 @@ describe('<GameScreen /> no legal moves', () => {
     expect(store.getState().flow.game.state.toMove).toBe('black');
     expect(screen.getByText('No legal moves')).toBeOnTheScreen();
     expect(screen.getByText('Ann rolled 6-6. No checker can move.')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Dice 6-6-6-6, 0 left to play')).toBeOnTheScreen();
+    // The faded dice stay on the board, under the card (it says the roll).
+    expect(
+      screen.getByLabelText('Dice 6-6-6-6, 0 left to play', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
     // The board stays with Ann until the card closes.
     expect(within(screen.getByTestId('strip-bottom')).getByText('Ann')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Roll dice, or tap the board' })).toBeNull();
@@ -206,37 +246,126 @@ describe('<GameScreen /> no legal moves', () => {
     expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
   });
 
-  it('closes by itself after 3 s', async () => {
+  it('your own pass waits for OK: it does not close by itself (#178)', async () => {
+    const user = setupUser();
     const store = newStore();
     setPosition(store, closed);
     await show(store);
     await act(async () => {
       store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
     });
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    // A settings change draws the screen again meanwhile.
     await act(async () => {
-      jest.advanceTimersByTime(PASS_NOTICE_MS + 10);
+      jest.advanceTimersByTime(30_000);
     });
+    await act(async () => {
+      settingsStore.setState({ showHints: false });
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(30_000);
+    });
+    const card = within(screen.getByTestId('pass-card'));
+    expect(card.getByText('Ann rolled 5-2. No checker can move.')).toBeOnTheScreen();
+    expect(card.queryByText(/Closes by itself/)).toBeNull();
+    await user.press(button('OK'));
     expect(screen.queryByTestId('pass-card')).toBeNull();
   });
+});
 
-  it('closes after 3 s even when the screen draws again meanwhile', async () => {
+describe('<GameScreen /> no legal moves vs the bot (#178)', () => {
+  const seats: PerPlayer<Seat> = {
+    white: { name: 'You', label: 'You', turnLabel: 'Your turn', you: true },
+    black: { name: 'Bot', label: 'Bot · Easy', turnLabel: 'Playing', you: false },
+  };
+  const bot: BotSeat = {
+    player: 'black',
+    difficulty: 'easy',
+    runner: new InlineBotRunner(createBot()),
+    rng: createSeededRng(1),
+    timing: { beforeRollMs: 0, moveMs: 0, thinkMs: () => 0 },
+  };
+  // The bot (Black) is on the bar and you hold all six entry points.
+  const botClosed = createBoard(
+    {
+      white: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
+      black: { points: { 6: 14 }, bar: 1 },
+    },
+    'contrary',
+  );
+  const tick = async (ms: number) => {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+    });
+  };
+  /** The bot rolls (no wait before the roll) and passes; its card shows. */
+  async function botPasses(paused = false) {
     const store = newStore();
-    setPosition(store, closed);
-    await show(store);
+    setPosition(store, botClosed, 'black');
+    await show(store, { seats, bot });
+    await tick(0);
+    expect(store.getState().flow.game.state.toMove).toBe('white');
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    if (paused) await screen.rerender(<GameScreen store={store} seats={seats} bot={bot} paused />);
+    return store;
+  }
+
+  it('your pass waits for OK; then the bot plays its turn', async () => {
+    const user = setupUser();
+    const store = newStore();
+    setPosition(store, closedBoard);
+    await show(store, { seats, bot });
     await act(async () => {
-      store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
     });
-    await act(async () => {
-      jest.advanceTimersByTime(PASS_NOTICE_MS - 1000);
+    expect(screen.getByText('You rolled 6-6. No checker can move.')).toBeOnTheScreen();
+    expect(screen.getByText('The turn passes to Bot.')).toBeOnTheScreen();
+    // The bot waits while the card shows: it has not rolled.
+    await tick(30_000);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    expect(store.getState().flow.game.state.dice).toBeNull();
+    expect(screen.queryByText(/Closes by itself/)).toBeNull();
+
+    await user.press(button('OK'));
+    expect(screen.queryByTestId('pass-card')).toBeNull();
+    // A whole bot turn at Normal speed (#172) takes a few seconds of fake time.
+    await waitFor(() => expect(store.getState().flow.game.state.toMove).toBe('white'), {
+      timeout: 30_000,
     });
-    // A settings change draws the screen again; the timer keeps running.
-    await act(async () => {
-      settingsStore.setState({ showPipCounts: false });
-    });
-    await act(async () => {
-      jest.advanceTimersByTime(1010);
-    });
+    const rolls = store.getState().flow.log.filter((e) => e.type === 'roll');
+    expect(rolls.length).toBeGreaterThan(1);
+  });
+
+  it('the bot’s pass shows 3.5 s, then you can roll', async () => {
+    await botPasses();
+    const card = within(screen.getByTestId('pass-card'));
+    expect(card.getByText(/^Bot rolled \d-\d\. No checker can move\.$/)).toBeOnTheScreen();
+    expect(card.getByText('Your turn.')).toBeOnTheScreen();
+    expect(card.getByText('Closes by itself after 3.5 s.')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Roll dice, or tap the board' })).toBeNull();
+    await tick(BOT_PASS_NOTICE_MS - 100);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    await tick(110);
+    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
+  });
+
+  it('OK closes the bot’s pass sooner', async () => {
+    const user = setupUser();
+    await botPasses();
+    await user.press(button('OK'));
+    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
+  });
+
+  it('the bot’s pass does not close while the screen is paused (menu open)', async () => {
+    const store = await botPasses(true);
+    await tick(BOT_PASS_NOTICE_MS * 3);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    // Back from the menu: the card shows its full time again.
+    await screen.rerender(<GameScreen store={store} seats={seats} bot={bot} />);
+    await tick(BOT_PASS_NOTICE_MS - 100);
+    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    await tick(110);
     expect(screen.queryByTestId('pass-card')).toBeNull();
   });
 });

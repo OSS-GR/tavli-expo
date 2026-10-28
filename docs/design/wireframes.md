@@ -38,12 +38,14 @@
 | In-game menu | `app/game/[id]/menu.tsx` | Modal, `presentation: "formSheet"` |
 | Game end | — | Overlay state inside the board screen, so the final position stays visible |
 | Match end | `app/game/[id]/match-end.tsx` | `router.replace`, so "back" does not return to a finished board |
+| Game review | `app/game/[id]/review.tsx` | Push from the game-end sheet or match end (#215). Not drawn here; see `docs/architecture/board-screen.md`, "Game review". |
 | Settings | `app/settings.tsx` | Push from Home; modal from the in-game menu |
 | Tutorial | `app/tutorial.tsx` | Push from the Home card, Settings or the Portes rules page (#128); the Plakoto, Fevga and Asodio rules pages open their own lessons (`?game=`, #149, #159), and Settings → Help lets the player pick the game (#159). Not drawn; see the note under Home. |
 | Rules | `app/rules/[variant].tsx` (e.g. `/rules/portes`) | Push. Not drawn here; a scrolling text page with a small start board (`docs/architecture/app-shell.md`, "Rules pages"). |
 | Dialogs (resign, no moves, mother pinned, replace saved game) | — | Components, not routes |
+| Dev online game | `app/dev/online.tsx` | Dev builds only (#255): starts an online game vs the bot on the in-memory server, then pushes the board. Not drawn. |
 
-`[id]` is a local game id in MVP1 (for example `local-<uuid>`). Online games in MVP2 use the server id with the same route.
+`[id]` is a local game id in MVP1 (for example `local-<uuid>`). Online games in MVP2 use the server id with the same route: an id that does not start with `local-` opens the online screen (#255).
 
 ## User flow
 
@@ -94,7 +96,7 @@ flowchart TD
   FlipQ -->|no| Roll
   Flip --> Roll[Tap Roll or the board]
   Roll --> Legal{Any legal move?}
-  Legal -->|no| NoMove[Notice: no legal moves<br/>turn passes after 3 s]
+  Legal -->|no| NoMove[Notice: no legal moves<br/>turn passes on OK]
   Legal -->|yes| Move[Drag or tap-tap a checker<br/>Undo at any time]
   Move --> Used{All dice used<br/>or no move left?}
   Used -->|no| Move
@@ -164,7 +166,7 @@ Notes:
   - **Continue game** card (only when a saved game exists): game, opponent, match score, target and time since last move. The whole card is one target.
   - **Learn to play** card (#128, not drawn): title, one line, **Start the lesson** (filled) and **Not now** (text). Shows until the tutorial is finished or dismissed.
   - "New game" section:
-    - **Play vs bot** (main button, subtitle "Easy or Medium").
+    - **Play vs bot** (main button). The subtitle lists the bot levels, for example "Easy, Medium or Hard". The app builds it from the levels the bot plays in at least one game (#182).
     - **Pass-and-play** (subtitle "2 players, 1 phone").
     - **Play a friend** (disabled look, "Coming soon" chip).
   - **How to play** link (opens `/rules/portes`).
@@ -196,9 +198,12 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 - **Elements:**
   - Back button, title "Play vs bot".
   - **Game:** one card per open game: Portes (selected by default), Plakoto, Fevga, Tavli (all three in rotation) (#109). A game the bot cannot play yet, and Asodio (not built), show as locked chips. A tap on a locked chip shows "Coming soon".
-  - **Match length:** segmented control **1 / 3 / 5 / 7**, default **3**. Helper text: "First to 3 points. Mono = 1, diplo = 2."
-  - **Bot level:** **Easy / Medium**, with Hard locked (v1.0). Helper text explains the selected level.
-  - Info box "Who starts? Each player rolls one die. High die starts."
+  - **Match length:** segmented control **1 / 3 / 5 / 7**, default **3**. Helper text: "First to 3 points. Mono = 1, diplo = 2." With Asodio's **American** version: "First to 3 points. 1 point per checker left." (#245).
+  - **Bot level:** **Easy / Medium / Hard**. A level the bot cannot play in the chosen game shows locked, with "coming soon" under it. Helper text explains the selected level.
+  - Info box "Who starts? Each player rolls one die. High die starts." Since #207 the **House rules** part (below) replaces it: its hint says who starts under the chosen rule.
+  - **House rules** (#207, both modes): **Opening roll**: **Standard** (default, the federation rule: the starter plays the two opening dice) / **Roll again** (the starter rolls both dice again) / **Choose** (the players pick who starts). Helper text explains the selected rule.
+  - **Rules version** (#241, Plakoto and Asodio only, under Opening roll): Plakoto **Standard** (default) / **Federation**; Asodio **Standard** (default, the kafeneio rules) / **Greek** / **American** (Acey-Deucey). Helper text says what the selected version changes. Tavli shows the Plakoto choice for its Plakoto game, titled **Rules version (Plakoto)** («Παραλλαγή (Πλακωτό)», #247). Portes and Fevga show no version.
+  - Both groups have a **Standard** option, so a screen reader hears the group with each option: "Opening roll: Standard", "Rules version: Standard" («Πρώτη ζαριά: Κανονικά», «Παραλλαγή: Κανονική») (#243). The visible text stays short.
   - **Start game** (main button, bottom).
 - **States:**
   - The screen remembers the last choices. On the very first game the bot level is Easy.
@@ -223,13 +228,16 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 - **Route:** `app/game/[id]/index.tsx`
 - **Purpose:** Play the game. This is where players spend 95% of their time.
-- **Layout (top to bottom):**
-  1. **Menu button** (44 pt) and the **opponent strip**: name, pip count, match score ("0 /3").
-  2. **Board**, rotated 90° (see [Board layout](#board-layout-recommendation)). Bear-off trays sit at the bottom of the board.
-  3. **Your strip**: name, pip count, match score, turn pill.
-  4. **Controls**: Undo · dice · Confirm, or one big Roll button.
+- **Layout (top to bottom)**, Settings → Board → Board layout **Tall** (default since #184):
+  1. **Menu button** (36 pt circle, 44 pt touch area) inside the row of the **opponent strip**: name and match score ("0 /3"), on one line (36 pt).
+  2. **Board**, rotated 90° (see [Board layout](#board-layout-recommendation)), as large as the screen allows. Bear-off trays sit at the bottom of the board. The **dice** lie on the board, in the theme's dice area.
+  3. **Your strip**: name, match score, turn pill, on one line.
+  4. **Controls**: one row of two big buttons, Undo · Confirm, or one big Roll button.
+  - The game label ("Game 2 · Plakoto") is in the menu.
+- **Classic** layout (a setting, #184): the board as on a table, as wide as the screen, with its strips right above and below it, centred on the screen. The menu and the game label sit at the top; the buttons stay at the bottom. Pictures: [game-layout-proposals.md](game-layout-proposals.md) (proposal A, but centred).
+- The pictures below are the first layout (before #184): two-line strips and the dice between Undo and Confirm. They also show a pip count ("Pips 167"), which the app no longer has (#238). The states they show are the same.
 - **Turn indicator:** the active player's strip gets a thick border and a pill ("YOUR TURN", "PLAYING", or the player's name in pass-and-play).
-- **Pip counts:** shown in both strips by default; Settings → Show pip counts hides them (#32).
+- **No pip count:** the strips show no pip count, and Settings has no switch for it. The owner removed it (#238, Q19 in `docs/open-questions.md`).
 - **Count badge:** a stack of more than 5 checkers shows 5 checkers and a number badge on the last one (#29).
 
 ### 6a. Opening roll
@@ -238,8 +246,8 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 - Card over the dimmed starting position: "Who starts?", two empty dice for **You** and **Bot**.
 - One tap on **Roll to start** (or on the board) rolls one die for each player.
-- *Tie:* "Tie! Roll again." The card stays.
-- *Result:* "You rolled 5, Bot rolled 3. You start with 5-3." After about 1.5 s the card closes. The starter plays those two dice (`useOpeningDice`, so the first roll is never a double).
+- *Tie:* "Tie: both rolled 4. Roll again." Both dice stay on the card until the next roll (#176).
+- *Result:* "You start with 5-3." The card closes on OK, on a tap, or after 3 s (#176). The starter plays those two dice (`useOpeningDice`, so the first roll is never a double).
 
 ### 6b. Your turn: roll
 
@@ -252,7 +260,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 <img src="wireframes/08-board-moving.png" width="300" alt="Board: moving checkers">
 
-- Dice sit between Undo and Confirm. A used die fades (#30). Here the 6 is used (13/7) and the 3 is left.
+- Dice sit between Undo and Confirm (since #184: on the board). A used die fades (#30). Here the 6 is used (13/7) and the 3 is left.
 - Touch a checker that can move: it gets a ring. Its legal target points get a dashed outline and a ghost checker (#31).
 - **Drag** to a target, or **tap** the checker and then the target. A drop on an illegal point returns the checker. Double-tap moves by the higher die.
 - When bearing off is legal, your tray (bottom left) is highlighted as a target.
@@ -275,7 +283,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 - The bot's strip is active ("PLAYING").
 - The controls area turns into a locked box: the bot's dice and "Bot rolled 4-2 and is moving…".
-- The bot's moves animate one by one, about 0.4 s each. The bot waits at least 0.6 s before it moves, so it feels natural.
+- The bot's moves animate one by one. The bot's dice stay on screen before its first move, and each move lands before the next one starts (#172: about 0.9 s per move at Normal speed). Settings → Bot speed makes it slower or faster. Numbers: [Bot turn timing](../architecture/board-screen.md#bot-turn-timing-172).
 - The bot's last move arrows stay until you roll.
 - **Pass-and-play:** there is no locked state. After Confirm, the board flips (Flip mode) and the other player sees 6b with their name in the pill.
 
@@ -285,8 +293,8 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 - The dice still show (faded) and are recorded (`tavli-match.md`, edge case 13).
 - A card explains why in plain words: "You rolled 6-6. Your checker on the bar cannot enter: point 19 is blocked. Your turn passes."
-- **OK** closes it. It also closes by itself after 3 s.
-- When the bot cannot move: "Bot cannot move. Your turn." It closes after 2 s.
+- **OK** closes it. Your own pass waits for OK, so there is time to read why (#178). The image still shows the old "Closes by itself after 3 s." line.
+- When the bot cannot move: "Bot cannot move. Your turn." It closes by itself after 3.5 s; OK closes it sooner.
 
 ### Board: other states
 
@@ -339,6 +347,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - Title: "You win the game!" / "Bot wins the game" / "Maria wins the game!".
   - Win type chip: **Mono · +1 point** or **Diplo · +2 points**. The English UI keeps the Greek names (`tavli-match.md`). The rules page explains them ("single" and "double").
   - Reason line, for example "Bot did not bear off any checker." or, after a resign, why it gives these points: "Diplo: Maria resigned before bearing off a checker." / "Mono: you resigned the game." (#181)
+  - Acey-Deucey American (1 point per checker left, #245): the chip is "+5 points" (no Mono or Diplo), and the reason line counts the checkers: "Bot did not bear off 5 checkers: 1 point each." / "You resigned and did not bear off 5 checkers: 1 point each."
   - Match box: "You 2 – 0 Bot", "first to 3".
   - **Next game** (main button, "You start (winner starts)").
   - **Home** (text button). The match is saved, so Home shows "Continue game".
@@ -373,10 +382,11 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 - **Route:** `app/settings.tsx`
 - **Purpose:** Change app options (#37). All settings save on the phone at once (MMKV). There is no Save button.
 - **Elements:**
-  - **Game:** Auto-confirm moves (toggle, default off). Board view for pass-and-play (**Flip / Face-to-face / Fixed**, default Flip).
+  - **Game:** Auto-confirm moves (toggle, default off). Board view for pass-and-play (**Flip / Face-to-face / Fixed**, default Flip). Bot speed (**Slow / Normal / Fast**, default Normal; #172, not drawn).
   - **Sound and feel:** Sound (toggle). Haptics (toggle). Sound also follows the phone's silent switch.
   - **Language:** **Ελληνικά / English**. The app switches at once.
   - **Look:** Board theme (MVP1 has one wooden board; the row says "more boards later").
+  - **Board** (#175, #184, not drawn): the board theme, **Board layout** (**Tall** / **Classic**, a small picture of the game screen each) and **Your home** (bottom right / bottom left).
   - **Help** (#128, not drawn): **Learn to play ›** opens a sheet with Portes, Plakoto, Fevga and Asodio (#159); a pick opens that game's lessons.
   - **Privacy:** Share anonymous usage data (toggle; calls `optIn()` / `optOut()` on the Analytics port, #61). Privacy policy link. Events: `docs/architecture/analytics-events.md`.
   - Footer: app version, build, licenses.
@@ -387,7 +397,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 ## Board layout recommendation
 
-> New layout proposals for portrait and landscape (#184, #185): [game-layout-proposals.md](game-layout-proposals.md).
+> New layout proposals for portrait and landscape (#184, #185): [game-layout-proposals.md](game-layout-proposals.md). **Decision (#184):** both portrait layouts ship. Option B (rotated, as large as the screen) is the default; option A (the classic board, centred) is a setting.
 
 A tavli board is wide (about 1.6 : 1). A portrait phone is tall (about 1 : 2.2). We need 24 points, the bar, two bear-off trays and a dice area.
 
@@ -410,7 +420,7 @@ A tavli board is wide (about 1.6 : 1). A portrait phone is tall (about 1 : 2.2).
 - Your checkers move from 24 (bottom right) **up** the right column, across the top, and **down** the left column into your home. Then they bear off into **your tray** right below your home.
 - **Bar:** a horizontal band in the middle. Your hit checkers wait on the right half, next to where they enter (points 19–24). The opponent's wait on the left half.
 - **Trays:** a strip under the board. Yours at bottom left, the opponent's at bottom right. Both are near the thumb.
-- **Dice:** in the controls row under the board, between Undo and Confirm. The roll, the dice and the confirm are all in one thumb zone.
+- **Dice:** in the controls row under the board, between Undo and Confirm. The roll, the dice and the confirm are all in one thumb zone. (Since #184 the dice lie on the board, in the theme's dice area, and the controls row has two big buttons.)
 - Sizes on a 390 × 844 phone: board **374 × 570 pt**, point **40 pt tall × 178 pt deep**, checker **36 pt**.
 - On an iPhone SE (375 × 667) the point height drops to about **31 pt** (checker about 27 pt). The point is still 170 pt deep. To keep tapping easy, a tap snaps to the **nearest legal target** within 22 pt, and drags use extra hit slop.
 - On large phones (430 × 932) points reach 44 pt.
@@ -440,7 +450,7 @@ Why B:
 - Checkers and points are big enough to drag with a thumb. This is the core of the game, and we play it hundreds of times per match.
 - The board fills the screen. There is no dead space.
 - Roll, move, bear off and confirm all happen in the lower half.
-- Flip mode is simple. To turn the board to the other player we mirror it left to right. The current player's home is then always at the bottom left, and their path is always the same U shape.
+- Flip mode is simple. To turn the board to the other player we mirror it left to right. The current player's home is then always at the bottom left, and their path is always the same U shape. (Settings → Board → Your home → Bottom left mirrors the whole board, #175: the home is then always at the bottom right.)
 
 Costs and follow-ups:
 
@@ -473,4 +483,4 @@ Rule of thumb: plan **+100%** for labels under 12 characters and **+30%** for se
 2. **Resign points in Portes:** How many points does the opponent get? Proposal: what the position is worth now, so diplo (2) if the resigning player has borne off no checker, else mono (1). Do we also want "Resign match"?
 3. **Opening roll:** Does one tap roll both opening dice (fast), or does each player tap for their own die (more like the kafeneio)? Proposal: one tap vs bot, one tap per player in pass-and-play.
 4. **Auto-confirm default:** Off (safer; you always see Confirm and can undo) or on (faster)? Proposal: off.
-5. **Pip counts:** Always shown (proposal), or a setting, since some kafeneio players see pip counts as "help"?
+5. **Pip counts:** Always shown (proposal), or a setting, since some kafeneio players see pip counts as "help"? **Answer:** first a setting, shown by default (#32); later the owner removed the pip count (#238).

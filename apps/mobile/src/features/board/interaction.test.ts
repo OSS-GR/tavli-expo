@@ -14,9 +14,26 @@ import {
 } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
 
+import { boardLayout, portraitLayout } from './BoardCanvas';
 import { layoutBoard, type BoardView } from './boardModel';
-import { moveFlights, HIT_DELAY_MS } from './flights';
-import { fitBoard, slotRect, stackPosition, type ScreenRect } from './geometry';
+import { flowPaths } from './combined';
+import {
+  FLIGHT_MS,
+  HIT_DELAY_MS,
+  TURN_MOVE_GAP_MS,
+  flightMs,
+  moveFlights,
+  pathFlights,
+  turnFlights,
+} from './flights';
+import {
+  fitBoard,
+  fitBoardWithShadow,
+  slotRect,
+  stackPosition,
+  type BoardGeometry,
+  type ScreenRect,
+} from './geometry';
 import {
   BOARD_GESTURES,
   SNAP_DISTANCE,
@@ -31,6 +48,7 @@ import {
   resolveTap,
   type MovableSource,
 } from './interaction';
+import { flightPose } from './skia/MovingCheckers';
 
 const layout = getLayout(getTheme('walnut-kafeneio'), 'portrait-rotated');
 const geo = fitBoard(layout, { width: 377, height: 630 });
@@ -222,6 +240,74 @@ describe('picking', () => {
   });
 });
 
+describe('turnFlights (#255)', () => {
+  it('flies the moves of a whole turn one after the other', () => {
+    const before = portes.initialState({ startingPlayer: 'white' }).board;
+    const moves: Move[] = [
+      { from: 13, to: 7, die: 6, capture: 'none' },
+      { from: 7, to: 2, die: 5, capture: 'none' },
+    ];
+    const flights = turnFlights(geo, WHITE, 'white', moves, before, {
+      id: 'r',
+      direction: 'contrary',
+    });
+    expect(flights.map((f) => [f.id, f.delay])).toEqual([
+      ['r:0:0', 0],
+      ['r:1:0', FLIGHT_MS + TURN_MOVE_GAP_MS],
+    ]);
+    // The second move starts where the first one landed.
+    expect(flights[1]!.from).toEqual(flights[0]!.to);
+    expect(flights[1]!.to).toMatchObject(stackPosition(geo, { kind: 'point', index: 2 }, 1, 0));
+    // It is the same checker: it shows there only once the first flight is down.
+    expect(flights[0]!.hiddenMs).toBeUndefined();
+    expect(flights[1]!.hiddenMs).toBe(FLIGHT_MS);
+  });
+
+  it('hides each later move of one checker until it lands (a double)', () => {
+    const before = portes.initialState({ startingPlayer: 'white' }).board;
+    const moves: Move[] = [
+      { from: 13, to: 11, die: 2, capture: 'none' },
+      { from: 11, to: 9, die: 2, capture: 'none' },
+      { from: 9, to: 7, die: 2, capture: 'none' },
+      { from: 13, to: 11, die: 2, capture: 'none' },
+    ];
+    const flights = turnFlights(geo, WHITE, 'white', moves, before, {
+      id: 'r',
+      direction: 'contrary',
+    });
+    const step = FLIGHT_MS + TURN_MOVE_GAP_MS;
+    expect(flights.map((f) => [f.delay, f.hiddenMs])).toEqual([
+      [0, undefined],
+      [step, FLIGHT_MS],
+      [2 * step, step + FLIGHT_MS],
+      // Another checker: it waits in sight at its start.
+      [3 * step, undefined],
+    ]);
+  });
+
+  it('sends a hit checker to the bar after its own move lands', () => {
+    const board = createBoard(
+      { white: { points: { 13: 15 } }, black: { points: { 18: 1, 1: 14 } } },
+      'contrary',
+    );
+    const moves: Move[] = [
+      { from: 13, to: 12, die: 1, capture: 'none' },
+      { from: 13, to: 7, die: 6, capture: 'hit' },
+    ];
+    const flights = turnFlights(geo, WHITE, 'white', moves, board, {
+      id: 'r',
+      direction: 'contrary',
+    });
+    expect(flights.map((f) => [f.id, f.owner, f.delay])).toEqual([
+      ['r:0:0', 'white', 0],
+      ['r:1:0', 'white', FLIGHT_MS + TURN_MOVE_GAP_MS],
+      ['r:1:1', 'black', FLIGHT_MS + TURN_MOVE_GAP_MS + HIT_DELAY_MS],
+    ]);
+    // Two checkers and a blot: each waits in sight where it stands.
+    expect(flights.map((f) => f.hiddenMs)).toEqual([undefined, undefined, undefined]);
+  });
+});
+
 describe('moveFlights', () => {
   it('flies a moved checker from its stack to its landing place', () => {
     const before = portes.initialState({ startingPlayer: 'white' }).board;
@@ -372,4 +458,332 @@ describe('Plakoto: pins on the board', () => {
     // The pinned Black checker under it is never a source.
     expect(sources.every((s) => s.checker.key !== 'p5:pinned')).toBe(true);
   });
+});
+
+// Settings → Home board: bottom left (#175). Same moves, mirrored places.
+describe('home board on the bottom left (mirrored layout)', () => {
+  const mirrored = fitBoard(portraitLayout(getTheme('walnut-kafeneio'), 'left'), {
+    width: 377,
+    height: 630,
+  });
+  const flipX = (x: number) => 2 * geo.x + geo.width - x;
+  const flow = whiteToMove([6, 1]);
+  const normal = sourcesFor(flow);
+  const flipped = buildSources(mirrored, currentBoard(flow), WHITE, 'white', legalNextMoves(flow));
+
+  it('gives the same sources and targets, at mirrored places', () => {
+    expect(flipped.map((s) => s.key)).toEqual(normal.map((s) => s.key));
+    flipped.forEach((s, i) => {
+      const n = normal[i]!;
+      expect(s.checker.x).toBeCloseTo(flipX(n.checker.x), 6);
+      expect(s.checker.y).toBeCloseTo(n.checker.y, 6);
+      expect(s.rect.x).toBeCloseTo(flipX(n.rect.x + n.rect.width), 6);
+      expect(s.targets.map((t) => t.move)).toEqual(n.targets.map((t) => t.move));
+      s.targets.forEach((t, j) => {
+        expect(t.landing.x).toBeCloseTo(flipX(n.targets[j]!.landing.x), 6);
+      });
+    });
+  });
+
+  it('tap-tap: selects 13 and moves it to 7 at their mirrored places', () => {
+    const s13 = flipped.findIndex((s) => s.key === 'p13');
+    const target7 = flipped[s13]!.targets.findIndex((t) => t.key === 'p7');
+    const from = center(slotRect(mirrored, { kind: 'point', index: 13 }));
+    // Point 13 now sits at the top left.
+    expect(from.x).toBeLessThan(mirrored.x + mirrored.width / 2);
+    expect(resolveTap(flipped, null, from.x, from.y)).toEqual({ kind: 'select', source: s13 });
+    const to = center(slotRect(mirrored, { kind: 'point', index: 7 }));
+    expect(resolveTap(flipped, s13, to.x, to.y)).toEqual({
+      kind: 'move',
+      source: s13,
+      target: target7,
+    });
+    // A drop where 7 sits on the normal board is point 18: not a target.
+    const old7 = center(slotRect(geo, { kind: 'point', index: 7 }));
+    expect(resolveDrop(flipped, s13, old7.x, old7.y)).toEqual({ kind: 'illegal' });
+  });
+
+  it('works with the pass-and-play flip (Black at the bottom)', () => {
+    const black = buildSources(mirrored, currentBoard(flow), BLACK, 'white', legalNextMoves(flow));
+    // White's 13 is Black's 12 from the bottom player's side.
+    const s = source(black, 'p12');
+    expect(s.rect).toEqual(slotRect(mirrored, { kind: 'point', index: 12 }));
+    expect(s.rect.x).toBeGreaterThan(mirrored.x + mirrored.width / 2 - 1);
+  });
+
+  it('flies moves and hits between the mirrored places', () => {
+    const board = createBoard(
+      { white: { points: { 13: 15 } }, black: { points: { 18: 1, 1: 14 } } },
+      'contrary',
+    );
+    const move: Move = { from: 13, to: 7, die: 6, capture: 'hit' };
+    const after = applyMoveToBoard(board, 'white', move, 'contrary');
+    const plain = moveFlights(geo, WHITE, 'white', move, board, after, { id: 'h' });
+    const mirror = moveFlights(mirrored, WHITE, 'white', move, board, after, { id: 'h' });
+    expect(mirror).toHaveLength(2);
+    mirror.forEach((f, i) => {
+      const p = plain[i]!;
+      expect(f.hide).toBe(p.hide);
+      expect(f.from.x).toBeCloseTo(flipX(p.from.x), 6);
+      expect(f.to.x).toBeCloseTo(flipX(p.to.x), 6);
+      expect(f.to.y).toBeCloseTo(p.to.y, 6);
+    });
+  });
+
+  it('bears off into your tray at the bottom right', () => {
+    const board = createBoard(
+      { white: { points: { 2: 1, 1: 1 }, off: 13 }, black: { points: { 1: 15 } } },
+      'contrary',
+    );
+    const bear = whiteToMove([5, 2], board);
+    const sources = buildSources(
+      mirrored,
+      currentBoard(bear),
+      WHITE,
+      'white',
+      legalNextMoves(bear),
+    );
+    const off = source(sources, 'p2').targets.find((t) => t.key === 'tray:player')!;
+    expect(off.rect).toEqual(slotRect(mirrored, { kind: 'tray', side: 'player' }));
+    expect(off.rect.x).toBeGreaterThan(mirrored.x + mirrored.width / 2 - 1);
+  });
+});
+
+// #180: one checker with several dice. The "2+3" targets come after the
+// single targets of their source and carry every step.
+describe('combined targets (#180)', () => {
+  // White's door on 13 and 13 on 6. Black has a blot on White's 8 (Black's 17).
+  const door = createBoard(
+    { white: { points: { 13: 2, 6: 13 } }, black: { points: { 17: 1, 24: 14 } } },
+    'contrary',
+  );
+  const flow = whiteToMove([5, 3], door);
+  const withPaths = (g = geo, view = WHITE) =>
+    buildSources(g, currentBoard(flow), view, 'white', legalNextMoves(flow), flowPaths(flow));
+
+  it('adds 13/10/5 after the single targets of 13, with both steps', () => {
+    const s13 = source(withPaths(), 'p13');
+    expect(s13.targets.map((t) => t.key)).toEqual(['p8', 'p10', 'p5']);
+    const to5 = s13.targets[2]!;
+    expect(to5.moves).toEqual([
+      { from: 13, to: 10, die: 3, capture: 'none' },
+      { from: 10, to: 5, die: 5, capture: 'none' },
+    ]);
+    expect(to5.move).toBe(to5.moves[0]);
+    expect(to5.rect).toEqual(slotRect(geo, { kind: 'point', index: 5 }));
+    // Point 5 is empty: the ghost lands as its first checker.
+    expect(to5.landing).toEqual(stackPosition(geo, { kind: 'point', index: 5 }, 1, 0));
+    // Single targets keep one move.
+    expect(s13.targets[0]!.moves).toEqual([s13.targets[0]!.move]);
+    // Without paths nothing changes.
+    expect(source(sourcesFor(flow), 'p13').targets.map((t) => t.key)).toEqual(['p8', 'p10']);
+  });
+
+  it('plays the combined target by tap and by drop', () => {
+    const sources = withPaths();
+    const s13 = sources.findIndex((s) => s.key === 'p13');
+    const at5 = center(slotRect(geo, { kind: 'point', index: 5 }));
+    expect(resolveTap(sources, s13, at5.x, at5.y)).toEqual({
+      kind: 'move',
+      source: s13,
+      target: 2,
+    });
+    expect(resolveDrop(sources, s13, at5.x, at5.y)).toEqual({ kind: 'move', target: 2 });
+  });
+
+  it.each([
+    ['White', WHITE],
+    ['Black (flip)', BLACK],
+  ])('works on the mirrored board (%s view)', (_, view) => {
+    const mirrored = fitBoard(portraitLayout(getTheme('walnut-kafeneio'), 'left'), {
+      width: 377,
+      height: 630,
+    });
+    const flipX = (x: number) => 2 * geo.x + geo.width - x;
+    const plain = withPaths(geo, view);
+    const flipped = withPaths(mirrored, view);
+    const key = view === WHITE ? 'p13' : 'p12';
+    const a = source(plain, key);
+    const b = source(flipped, key);
+    expect(b.targets.map((t) => t.moves)).toEqual(a.targets.map((t) => t.moves));
+    const to5 = b.targets[2]!;
+    expect(to5.landing.x).toBeCloseTo(flipX(a.targets[2]!.landing.x), 6);
+    const i = flipped.indexOf(b);
+    const at = center(to5.rect);
+    expect(resolveTap(flipped, i, at.x, at.y)).toEqual({ kind: 'move', source: i, target: 2 });
+  });
+
+  it('flies one checker through the middle point, and the hit checker when it gets there', () => {
+    const steps: Move[] = [
+      { from: 13, to: 8, die: 5, capture: 'hit' },
+      { from: 8, to: 5, die: 3, capture: 'none' },
+    ];
+    const mid = applyMoveToBoard(door, 'white', steps[0]!, 'contrary');
+    const end = applyMoveToBoard(mid, 'white', steps[1]!, 'contrary');
+    const flights = pathFlights(geo, WHITE, 'white', steps, door, {
+      id: 'p',
+      direction: 'contrary',
+    });
+    expect(flights).toHaveLength(2);
+    const [mover, victim] = flights;
+    const [leg1] = moveFlights(geo, WHITE, 'white', steps[0]!, door, mid, { id: 'a' });
+    const [leg2] = moveFlights(geo, WHITE, 'white', steps[1]!, mid, end, { id: 'b' });
+    // The mover: from 13, through 8, to 5. Hidden on 5 until it lands.
+    expect(mover).toMatchObject({ owner: 'white', from: leg1!.from, to: leg2!.to, delay: 0 });
+    expect(mover!.hide).toBe(leg2!.hide);
+    expect(mover!.via).toEqual([{ x: leg1!.to.x, y: leg1!.to.y, r: leg1!.toR }]);
+    expect(flightMs(mover!)).toBe(2 * FLIGHT_MS);
+    // The hit Black checker leaves 8 as the mover gets there (first leg).
+    expect(victim).toMatchObject({ owner: 'black', delay: HIT_DELAY_MS, hide: 'bar:opponent:0' });
+
+    // Undo: the same path backwards; the hit checker comes back as the mover passes 8.
+    const [home, comeBack] = pathFlights(geo, WHITE, 'white', steps, door, {
+      id: 'u',
+      direction: 'contrary',
+      undo: true,
+    });
+    expect(home).toMatchObject({ from: leg2!.to, to: leg1!.from, delay: 0 });
+    expect(home!.via).toEqual([{ x: leg1!.to.x, y: leg1!.to.y, r: leg1!.toR }]);
+    expect(home!.hide).toBe(source(sourcesFor(flow), 'p13').checker.key);
+    expect(comeBack).toMatchObject({ owner: 'black', delay: FLIGHT_MS });
+    expect(comeBack!.to).toMatchObject(stackPosition(geo, { kind: 'point', index: 8 }, 1, 0));
+  });
+
+  it('starts a dropped path at the drop point', () => {
+    const steps: Move[] = [
+      { from: 13, to: 10, die: 3, capture: 'none' },
+      { from: 10, to: 5, die: 5, capture: 'none' },
+    ];
+    const [mover] = pathFlights(geo, WHITE, 'white', steps, door, {
+      id: 'd',
+      direction: 'contrary',
+      from: { x: 3, y: 4 },
+    });
+    expect(mover!.from).toEqual({ x: 3, y: 4 });
+    expect(mover!.via).toHaveLength(1);
+  });
+
+  it('stops on each middle point: one leg per die', () => {
+    const flight = {
+      id: 'f',
+      owner: 'white' as const,
+      from: { x: 0, y: 0 },
+      to: { x: 200, y: 0 },
+      fromR: 10,
+      toR: 10,
+      hide: null,
+      delay: 0,
+      via: [{ x: 100, y: 50, r: 10 }],
+    };
+    expect(flightPose(flight, 0)).toMatchObject({ x: 0, y: 0, r: 10 });
+    // Half way in time: on the middle point, at rest (no lift).
+    expect(flightPose(flight, 0.5)).toMatchObject({ x: 100, y: 50, r: 10 });
+    expect(flightPose(flight, 1)).toMatchObject({ x: 200, y: 0, r: 10 });
+    // Each leg slows down at its end: past its middle in half its time.
+    expect(flightPose(flight, 0.25).x).toBeGreaterThan(50);
+    expect(flightPose(flight, 0.25).r).toBeGreaterThan(10);
+  });
+});
+
+// Settings → Board layout → Classic (#184): the theme's landscape layout,
+// with your home on the bottom right (or mirrored, bottom left). Touches,
+// targets, combined targets and flights all read the layout.
+describe('classic board (#184)', () => {
+  const theme = getTheme('walnut-kafeneio');
+  const SIZE = { width: 375, height: 225 };
+  const classicFor = (side: 'right' | 'left') =>
+    fitBoardWithShadow(boardLayout(theme, 'classic', side), SIZE);
+  const door = createBoard(
+    { white: { points: { 13: 2, 6: 13 } }, black: { points: { 17: 1, 24: 14 } } },
+    'contrary',
+  );
+  const flow = whiteToMove([5, 3], door);
+  const sourcesOn = (g: BoardGeometry, view: BoardView) =>
+    buildSources(g, currentBoard(flow), view, 'white', legalNextMoves(flow), flowPaths(flow));
+  const cases = [
+    ['right', 'White', WHITE],
+    ['right', 'Black (flip)', BLACK],
+    ['left', 'White', WHITE],
+    ['left', 'Black (flip)', BLACK],
+  ] as const;
+
+  it('uses the landscape layout, and its mirror for the bottom left', () => {
+    expect(boardLayout(theme, 'classic', 'right')).toBe(getLayout(theme, 'landscape'));
+    expect(boardLayout(theme, 'classic', 'left')).toBe(boardLayout(theme, 'classic', 'left'));
+    expect(boardLayout(theme, 'classic', 'left').artMirrored).toBe(true);
+    expect(boardLayout(theme, 'tall', 'left')).toBe(portraitLayout(theme, 'left'));
+  });
+
+  it('puts your home at the bottom right, or the bottom left when mirrored', () => {
+    for (const side of ['right', 'left'] as const) {
+      const g = classicFor(side);
+      const middle = g.x + g.width / 2;
+      for (const index of [1, 2, 3, 4, 5, 6]) {
+        const p = center(slotRect(g, { kind: 'point', index }));
+        expect(p.y).toBeGreaterThan(g.y + g.height / 2);
+        if (side === 'right') expect(p.x).toBeGreaterThan(middle);
+        else expect(p.x).toBeLessThan(middle);
+      }
+    }
+  });
+
+  it.each(cases)(
+    'gives the same moves as the tall board, on the drawn places (%s, %s view)',
+    (side, _, view) => {
+      const g = classicFor(side);
+      const tall = sourcesOn(geo, view);
+      const sources = sourcesOn(g, view);
+      expect(sources.map((s) => s.key)).toEqual(tall.map((s) => s.key));
+      const picture = layoutBoard(g, currentBoard(flow), view);
+      sources.forEach((s, i) => {
+        // Single and combined targets: the same moves as on the tall board.
+        expect(s.targets.map((t) => t.moves)).toEqual(tall[i]!.targets.map((t) => t.moves));
+        // The touched checker is the drawn one.
+        const drawn = picture.checkers.find((c) => c.key === s.checker.key)!;
+        expect([s.checker.x, s.checker.y]).toEqual([drawn.x, drawn.y]);
+        // A tap on the checker selects it; a tap or a drop on each target plays it.
+        expect(resolveTap(sources, null, s.checker.x, s.checker.y)).toEqual({
+          kind: 'select',
+          source: i,
+        });
+        s.targets.forEach((t, j) => {
+          expect(resolveTap(sources, i, t.landing.x, t.landing.y)).toEqual({
+            kind: 'move',
+            source: i,
+            target: j,
+          });
+          expect(resolveDrop(sources, i, t.landing.x, t.landing.y)).toEqual({
+            kind: 'move',
+            target: j,
+          });
+        });
+      });
+    },
+  );
+
+  it.each(cases)(
+    'flies a combined move with a hit on the drawn places (%s, %s view)',
+    (side, _, view) => {
+      const g = classicFor(side);
+      const steps: Move[] = [
+        { from: 13, to: 8, die: 5, capture: 'hit' },
+        { from: 8, to: 5, die: 3, capture: 'none' },
+      ];
+      const mid = applyMoveToBoard(door, 'white', steps[0]!, 'contrary');
+      const end = applyMoveToBoard(mid, 'white', steps[1]!, 'contrary');
+      const [mover, victim] = pathFlights(g, view, 'white', steps, door, {
+        id: 'p',
+        direction: 'contrary',
+      });
+      const [leg1] = moveFlights(g, view, 'white', steps[0]!, door, mid, { id: 'a' });
+      const [leg2] = moveFlights(g, view, 'white', steps[1]!, mid, end, { id: 'b' });
+      expect(mover).toMatchObject({ owner: 'white', from: leg1!.from, to: leg2!.to });
+      // It lands where the board draws the checker.
+      const drawn = layoutBoard(g, end, view).checkers.find((c) => c.key === mover!.hide)!;
+      expect([mover!.to.x, mover!.to.y]).toEqual([drawn.x, drawn.y]);
+      // The hit checker goes to the bar.
+      expect(victim).toMatchObject({ owner: 'black', delay: HIT_DELAY_MS });
+      expect(victim!.hide?.startsWith('bar:')).toBe(true);
+    },
+  );
 });

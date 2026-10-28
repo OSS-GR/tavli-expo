@@ -12,7 +12,8 @@
  * - a pinned mother: the game is nearly decided (the pinned side loses a
  *   double almost every time; README, "The mother question"). The
  *   heuristic's number for it is close to the true one, so the net does
- *   not have to learn it, and a training game stops there.
+ *   not have to learn it, and a training game stops there. This holds for
+ *   every `motherRule`: `usesNet` reads only the board.
  *
  * The net: `PLAKOTO_NET_INPUTS` inputs → one hidden layer (sigmoid) → 3
  * outputs (sigmoid): P(win), P(win a double), P(lose a double).
@@ -35,7 +36,7 @@ import type { MotherRules } from '@tavli/engine';
 import { plakoto } from '@tavli/engine';
 
 import type { Evaluator } from '../types';
-import { createNetEvaluator, loadNet, pushInput, pushPointUnits } from './net';
+import { at, createNetEvaluator, loadNet, pushInput, pushPointUnits } from './net';
 import type { Net, NetFile, NetGame, SparseInput } from './net';
 import {
   OFF,
@@ -59,10 +60,6 @@ import { pips } from './portes-board';
 
 /** Number of inputs. */
 export const PLAKOTO_NET_INPUTS = 251;
-
-function at(values: readonly number[], i: number): number {
-  return values[i] ?? 0;
-}
 
 /** Writes the inputs of a position the net scores into `input` (it is reused). */
 export function encodePlakoto(roller: PlakotoSide, waiter: PlakotoSide, input: SparseInput): void {

@@ -4,7 +4,9 @@
  *
  * The text lives in the `rules.*` group of `en.json` and `el.json`. It
  * follows `docs/rules/` and the app's default presets (owner rules), so a
- * page never describes a flag the default preset leaves off. Pure: no React.
+ * page never describes a flag the default preset leaves off. A game in
+ * another rules version (#241) opens the page with `version`: a section on
+ * top says what that version changes (`versionSection`). Pure: no React.
  */
 import {
   ASODIO_START,
@@ -19,6 +21,14 @@ import {
   type SideLayout,
 } from '@tavli/engine';
 import type { ParseKeys } from 'i18next';
+
+import {
+  VERSION_KEYS,
+  isRulesVersion,
+  isVersionedGame,
+  otherVersion,
+  type OtherVersion,
+} from '@/features/match/setup';
 
 /** A translation key (checked against `en.json`). */
 export type RulesKey = ParseKeys;
@@ -168,6 +178,50 @@ const START_LAYOUTS: { readonly [G in RulesGame]: SideLayout } = {
   fevga: FEVGA_START,
   asodio: ASODIO_START,
 };
+
+/**
+ * The `version` route param (#241): a rules version of `variant` that is
+ * not its default, else `null` (the page then shows the default rules).
+ */
+export function parseRulesVersion(
+  variant: RulesVariant | null,
+  value: string | string[] | undefined,
+): OtherVersion | null {
+  const id = Array.isArray(value) ? value[0] : value;
+  if (!isVersionedGame(variant) || !isRulesVersion(variant, id)) return null;
+  return otherVersion(id);
+}
+
+/** The Points section of a game that scores 1 per checker left (Acey-Deucey American, #245). */
+const perCheckerScoring: RulesSection = {
+  ...scoring,
+  body: ['rules.common.scoring.bodyPerChecker'],
+};
+
+/**
+ * The sections of a game's page in `version` (null: the default rules).
+ * The Points section follows the version's `scoring.method` (#245): with
+ * `perChecker` it says 1 point per checker left, not mono and diplo. The
+ * other sections stay; the version section on top says what else changes.
+ */
+export function rulesPage(
+  game: RulesGame,
+  version: OtherVersion | null = null,
+): readonly RulesSection[] {
+  const sections = RULES_PAGES[game];
+  if (version === null || getPreset(version).scoring.method !== 'perChecker') return sections;
+  return sections.map((section) => (section.id === 'scoring' ? perCheckerScoring : section));
+}
+
+/** The section on top of a page in another rules version: what it changes. */
+export function versionSection(version: OtherVersion): RulesSection {
+  const key = VERSION_KEYS[version];
+  return {
+    id: 'version',
+    title: `rules.versions.${key}.title`,
+    body: [`rules.versions.${key}.body`],
+  };
+}
 
 /** How the game's default preset moves (Fevga: parallel). */
 export function rulesDirection(game: RulesGame): Direction {

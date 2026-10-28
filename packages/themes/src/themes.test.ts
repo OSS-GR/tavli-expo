@@ -11,6 +11,8 @@ import { contrastRatio } from './color';
 import {
   diceCenters,
   getPoint,
+  isMirrorSymmetric,
+  mirrorLayout,
   rectInsideUnit,
   rectsOverlap,
   stackCenters,
@@ -425,6 +427,25 @@ for (const id of listThemeIds()) {
       expect(getPoint(l, 13).rect.y).toBe(getPoint(l, 12).rect.y);
     });
 
+    // Settings → Home board: bottom left (#175) mirrors the slots but not the
+    // art. The frame, fields, bar and trays must fit both ways.
+    it('portrait-rotated: the art fits the mirrored layout', () => {
+      expect(isMirrorSymmetric(theme.layouts['portrait-rotated'])).toBe(true);
+    });
+
+    it('portrait-rotated, mirrored: your home and tray are at the bottom-right', () => {
+      const l = mirrorLayout(theme.layouts['portrait-rotated']);
+      for (const n of [1, 2, 3, 4, 5, 6]) {
+        const r = getPoint(l, n).rect;
+        expect(r.x).toBeGreaterThanOrEqual(0.5 - EPS);
+        expect(r.y).toBeGreaterThan(l.bar.rect.y);
+      }
+      expect(l.trays.player.rect.x).toBeGreaterThan(l.trays.opponent.rect.x);
+      // Your hit checkers wait next to where they enter (points 19 to 24).
+      expect(l.bar.player.rect.x).toBeLessThan(0.5);
+      expect(getPoint(l, 24).rect.x).toBeLessThan(0.5);
+    });
+
     it('landscape: your home is bottom-right, trays on the right edge', () => {
       const l = theme.layouts.landscape;
       expect(l.orientation).toBe('landscape');
@@ -436,6 +457,21 @@ for (const id of listThemeIds()) {
       }
       expect(l.trays.player.rect.y).toBeGreaterThan(l.trays.opponent.rect.y);
       expect(getPoint(l, 1).rect.x).toBeGreaterThan(getPoint(l, 6).rect.x);
+    });
+
+    // The classic board (#184) with Settings → Your home on the bottom left.
+    // Its trays sit on one side, so the art is mirrored with the slots.
+    it('landscape, mirrored: your home is bottom-left, trays on the left edge, art mirrored', () => {
+      const l = mirrorLayout(theme.layouts.landscape);
+      expect(isMirrorSymmetric(theme.layouts.landscape)).toBe(false);
+      expect(l.artMirrored).toBe(true);
+      for (const n of [1, 2, 3, 4, 5, 6]) {
+        const r = getPoint(l, n).rect;
+        expect(r.x + r.w).toBeLessThan(l.bar.rect.x + EPS);
+        expect(r.y).toBeGreaterThanOrEqual(0.5 - EPS);
+        expect(l.trays.player.rect.x + l.trays.player.rect.w).toBeLessThanOrEqual(r.x + EPS);
+      }
+      expect(getPoint(l, 1).rect.x).toBeLessThan(getPoint(l, 6).rect.x);
     });
   });
 }

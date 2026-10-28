@@ -19,7 +19,7 @@ The first two or three matter most: the stores show them first, in search result
 
 Spare shots, if you want more (the App Store allows 10, Google Play 8): **Fevga** vs bot in mid-game (caption "Play the bot, even offline" / "Παίξε με τον υπολογιστή, και χωρίς internet"); the **How to play** page of Plakoto with its start picture; **Home** with the Continue card.
 
-Do not show: "coming soon" items (Hard level, Play a friend, Face-to-face), the welcome consent screen, dev screens.
+Do not show: "coming soon" items (Play a friend, Face-to-face), the welcome consent screen, dev screens. Hard works in every game (#164), so New game with Hard picked is fine.
 
 ## Sizes
 

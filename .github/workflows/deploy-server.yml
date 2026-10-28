@@ -1,0 +1,142 @@
+name: Deploy server
+
+# Deploys the Convex functions in apps/server (#257).
+# - dev: on each push to main that changes the server or what it imports,
+#   and by hand ("Run workflow", target dev).
+# - prod: only by hand, with target prod, from main. The job uses the GitHub
+#   environment `production`, so the owner can add a required reviewer there.
+#
+# Never add a `pull_request` or `pull_request_target` trigger: PR code must
+# never see the deploy keys.
+#
+# Needs the secrets CONVEX_DEPLOY_KEY_DEV (a repo secret) and
+# CONVEX_DEPLOY_KEY_PROD (a secret of the environment `production`, which
+# only main may use).
+# See docs/architecture/online-game-service.md ("Deploy").
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/server/**
+      - packages/engine/**
+      - packages/contracts/**
+      - packages/online/**
+      - pnpm-lock.yaml
+      - package.json
+      - pnpm-workspace.yaml
+      - tsconfig.base.json
+      - .nvmrc
+      - .github/actions/setup/**
+      - .github/workflows/deploy-server.yml
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Convex deployment
+        type: choice
+        default: dev
+        options:
+          - dev
+          - prod
+
+permissions:
+  contents: read
+
+# One group per target, so two deploys to the same deployment never overlap.
+# A running deploy is never cancelled: it would stop halfway.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.target || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy (${{ github.event_name == 'workflow_dispatch' && inputs.target || 'dev' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Both environments are made by GitHub on the first run if they do not
+    # exist. The prod key lives in `production`, so only a prod run from
+    # main can read it.
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'prod' && 'production' || 'development' }}
+    env:
+      TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'dev' }}
+    steps:
+      # Runs before any repo code. The key stays in an env var: it is never
+      # echoed, and GitHub masks secrets in the log anyway.
+      - name: Check the target and the deploy key
+        env:
+          REF: ${{ github.ref }}
+          # Pick the secret by name. An `a && b || c` choice between two
+          # secrets would fall back to the dev key when the prod key is empty.
+          CONVEX_DEPLOY_KEY: ${{ secrets[github.event_name == 'workflow_dispatch' && inputs.target == 'prod' && 'CONVEX_DEPLOY_KEY_PROD' || 'CONVEX_DEPLOY_KEY_DEV'] }}
+        run: |
+          case "$TARGET" in
+            dev)  secret=CONVEX_DEPLOY_KEY_DEV;  deployment="dev:exciting-reindeer-792" ;;
+            prod) secret=CONVEX_DEPLOY_KEY_PROD; deployment="prod:superb-dog-503" ;;
+            *) echo "::error::Unknown target '$TARGET'. Use dev or prod."; exit 1 ;;
+          esac
+
+          if [ "$TARGET" = "prod" ] && [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Prod deploys run only from main. Pick main in \"Run workflow\"."
+            exit 1
+          fi
+
+          if [ -z "$CONVEX_DEPLOY_KEY" ]; then
+            echo "::error::The secret $secret is empty or missing. Add the dev key in Settings > Secrets and variables > Actions, and the prod key in Settings > Environments > production (see docs/architecture/online-game-service.md)."
+            exit 1
+          fi
+
+          # A space or a line break around a pasted key breaks the deploy.
+          case "$CONVEX_DEPLOY_KEY" in
+            [[:space:]]*|*[[:space:]])
+              echo "::error::The secret $secret has a space or a line break at the start or end. Paste the key again without them."
+              exit 1
+              ;;
+          esac
+
+          # A deploy key starts with "<type>:<deployment name>|". Check it
+          # names the deployment the app uses for this target
+          # (apps/mobile/app.config.ts), so a swapped key fails here.
+          case "$CONVEX_DEPLOY_KEY" in
+            "$deployment|"*) echo "The $secret key is for $deployment." ;;
+            *)
+              # The part before "|" of a Convex key is its type and public
+              # names, not secret. Show it only for the 4 Convex key types,
+              # with lower-case names (letters, digits, dots, dashes; a
+              # region can follow a dot), so the start of some other token
+              # never reaches the log.
+              prefix="${CONVEX_DEPLOY_KEY%%|*}"
+              if [ "$prefix" != "$CONVEX_DEPLOY_KEY" ] && [[ "$prefix" =~ ^(dev|prod|project|preview)(:[a-z0-9.-]+)+$ ]]; then
+                found="a Convex ${prefix%%:*} key that starts with \"$prefix|\""
+              else
+                found="text that is not a Convex deploy key"
+              fi
+              case "$prefix" in
+                project:*|preview:*) hint=" A ${prefix%%:*} key does not name one deployment." ;;
+                *) hint="" ;;
+              esac
+              echo "::error::The secret $secret must be a deploy key for $deployment (it starts with \"$deployment|\"). It holds $found.$hint Make one in the Convex dashboard: the ${deployment%%:*} deployment ${deployment#*:} > Settings > URL and Deploy Key > Generate."
+              exit 1
+              ;;
+          esac
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - name: Server typecheck
+        run: pnpm --filter @tavli/server typecheck
+
+      - name: Server tests
+        run: pnpm --filter @tavli/server test
+
+      # `convex deploy` typechecks the functions (convex/tsconfig.json),
+      # bundles them and pushes them. `--typecheck enable` fails the deploy
+      # when the typecheck fails or cannot run. It looks for
+      # apps/server/node_modules/typescript, so apps/server lists
+      # typescript in its own devDependencies.
+      - name: Deploy to Convex (${{ env.TARGET }})
+        working-directory: apps/server
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets[github.event_name == 'workflow_dispatch' && inputs.target == 'prod' && 'CONVEX_DEPLOY_KEY_PROD' || 'CONVEX_DEPLOY_KEY_DEV'] }}
+        run: pnpm exec convex deploy --typecheck enable

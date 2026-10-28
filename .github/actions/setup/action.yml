@@ -1,0 +1,16 @@
+name: Set up pnpm and install
+description: pnpm, Node with the pnpm store cache, and a frozen install. Run actions/checkout first.
+runs:
+  using: composite
+  steps:
+    # No `version` input: the action reads `packageManager` from package.json.
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Install
+      shell: bash
+      run: pnpm install --frozen-lockfile

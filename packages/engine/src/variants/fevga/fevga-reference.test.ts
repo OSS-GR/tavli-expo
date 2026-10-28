@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BoardState } from '../../board';
-import { DIE_VALUES, diceMoves } from '../../dice';
+import { DIE_VALUES, DISTINCT_ROLLS, diceMoves } from '../../dice';
 import type { Dice, DieValue } from '../../dice';
 import { formatTurn } from '../../move';
 import { opponent } from '../../player';
@@ -152,7 +152,7 @@ function compare(state: GameState, dice: Dice): void {
 }
 
 function everyRoll(state: GameState): void {
-  for (const a of DIE_VALUES) for (const b of DIE_VALUES) if (b <= a) compare(state, [a, b]);
+  for (const { dice } of DISTINCT_ROLLS) compare(state, dice);
 }
 
 describe('Fevga generator vs. the slow reference', () => {
@@ -211,13 +211,10 @@ describe('Fevga generator vs. the slow reference', () => {
       const side = [...white].map(([p, c]) => `${p}x${c}`).join(' ');
       const state = { ...start, board: parseFevgaPosition(`w: ${side} ; ${shape.black}`) };
       everyRoll(state);
-      for (const a of DIE_VALUES) {
-        for (const b of DIE_VALUES) {
-          if (b > a) continue;
-          const on = reference(state, [a, b]).finals;
-          const off = reference({ ...state, rules: noP3 }, [a, b]).finals;
-          if (on.size !== off.size) decided += 1;
-        }
+      for (const { dice } of DISTINCT_ROLLS) {
+        const on = reference(state, dice).finals;
+        const off = reference({ ...state, rules: noP3 }, dice).finals;
+        if (on.size !== off.size) decided += 1;
       }
     }
     expect(decided).toBeGreaterThan(10);

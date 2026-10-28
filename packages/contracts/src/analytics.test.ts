@@ -37,6 +37,8 @@ describe('no-op analytics (port contract)', () => {
         game: 'portes',
         variant: 'portes',
         matchLength: 3,
+        openingRoll: 'useOpeningDice',
+        rulesVersion: 'portes',
       });
       analytics.identify('x');
       analytics.screen('/');
@@ -79,7 +81,7 @@ describe('isAnonymousInstallId', () => {
 });
 
 describe('event names', () => {
-  it('lists the event plan (issues #61, #128, #163)', () => {
+  it('lists the event plan (issues #61, #128, #163, #209, #215)', () => {
     expect(ANALYTICS_EVENTS).toEqual([
       'app_opened',
       'game_started',
@@ -93,6 +95,8 @@ describe('event names', () => {
       'tutorial_step',
       'tutorial_finished',
       'tutorial_skipped',
+      'hint_shown',
+      'review_opened',
     ]);
   });
 

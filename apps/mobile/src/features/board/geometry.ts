@@ -94,6 +94,16 @@ export function fitBoardWithShadow(
   return fitBoard(layout, available, margin);
 }
 
+/**
+ * The width / height of a box that `fitBoardWithShadow` fills edge to edge:
+ * the board plus its shadow room on every side (a fraction of the width).
+ * The classic board (#184) gets a box of this shape, as wide as the screen.
+ */
+export function boxRatioWithShadow(layout: BoardLayout): number {
+  const margin = layout.shadow.dy + layout.shadow.blur;
+  return 1 / ((1 - 2 * margin) / layout.aspectRatio + 2 * margin);
+}
+
 /** A normalized rect on the canvas. */
 export function toScreenRect(geo: BoardGeometry, r: Rect): ScreenRect {
   return {

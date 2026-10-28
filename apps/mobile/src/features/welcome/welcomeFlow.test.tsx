@@ -36,7 +36,9 @@ const routes = {
   tutorial: stub('tutorial'),
   'game/[id]/index': stub('board'),
   'game/[id]/match-end': stub('match end'),
+  'game/[id]/review': stub('review'),
   'dev/board': stub('dev board'),
+  'dev/online': stub('dev online'),
 };
 
 /** A URL for each app route (not the layout, not the welcome flow). */

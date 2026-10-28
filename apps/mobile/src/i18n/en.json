@@ -15,8 +15,8 @@
     "newGame": "New game",
     "vsBot": {
       "title": "Play vs bot",
-      "subtitle": "Easy or Medium",
-      "subtitleEasy": "Easy for now. Medium is coming soon."
+      "levels": "{{first}} or {{last}}",
+      "levelsSeparator": ", "
     },
     "local": {
       "title": "Pass-and-play",
@@ -60,9 +60,9 @@
       "label": "Auto-confirm moves",
       "hint": "End the turn when all dice are used"
     },
-    "pipCounts": {
-      "label": "Show pip counts",
-      "hint": "How many pips each player needs to bear off"
+    "hints": {
+      "label": "Show hints",
+      "hint": "A Hint button shows the best move for your roll"
     },
     "boardView": {
       "label": "Board view (pass-and-play)",
@@ -72,6 +72,15 @@
       "flipHint": "The board turns to the player whose turn it is.",
       "fixedHint": "The board stays the same for both players.",
       "faceToFaceSoon": "Face-to-face view comes in a later update."
+    },
+    "botSpeed": {
+      "label": "Bot speed",
+      "slow": "Slow",
+      "normal": "Normal",
+      "fast": "Fast",
+      "slowHint": "The bot takes its time, so you can follow each move.",
+      "normalHint": "The bot plays at a pace that is easy to follow.",
+      "fastHint": "The bot plays quickly."
     },
     "sound": {
       "label": "Sound",
@@ -92,6 +101,22 @@
     "boardTheme": {
       "label": "Board",
       "hint": "The game, the tutorial and the rules use this board."
+    },
+    "boardLayout": {
+      "label": "Board layout",
+      "tall": "Tall",
+      "classic": "Classic",
+      "tallHint": "The board on its side, as big as the screen allows. Bigger checkers.",
+      "classicHint": "The board as on a table, as wide as the screen. Smaller checkers.",
+      "hint": "Only for the game. The tutorial and the rules always show the tall board."
+    },
+    "homeBoard": {
+      "label": "Your home",
+      "right": "Bottom right",
+      "left": "Bottom left",
+      "rightHint": "Your checkers go round counterclockwise.",
+      "leftHint": "Your checkers go round clockwise.",
+      "hint": "Pick it as on a real board, seen from your seat. Your home is always at the bottom of the screen. The tall board lies on its side, so there your home is on the other side."
     },
     "moveList": {
       "label": "Move list",
@@ -130,6 +155,9 @@
     "stats": "Stats",
     "matches": "Matches",
     "onPhone": "Saved only on this phone: your last {{max}} matches.",
+    "openingRoll": "Opening roll: {{rule}}",
+    "rulesVersion": "Rules version: {{version}}",
+    "rulesVersionPlakoto": "Rules version (Plakoto): {{version}}",
     "result": {
       "won": "Won",
       "lost": "Lost",
@@ -177,7 +205,56 @@
       },
       "viewer": "Board view",
       "viewWhite": "White at the bottom",
-      "viewBlack": "Black at the bottom"
+      "viewBlack": "Black at the bottom",
+      "dice": "Dice",
+      "diceOff": "No dice",
+      "diceThrow": "Throw on the board",
+      "throw": {
+        "roll": "Roll",
+        "hint": "Swipe the board to throw the dice.",
+        "result": "Rolled {{first}} and {{second}}.",
+        "boardLabel": "Board. Swipe to throw the dice, or use the Roll button."
+      }
+    },
+    "online": {
+      "title": "Online game (dev)",
+      "intro": "A game vs the bot on the in-memory server. The bot plays the remote player.",
+      "game": "Game",
+      "pace": "Pace",
+      "live": "Live (1 min a turn)",
+      "async": "Async (24 h a turn)",
+      "length": "Match length",
+      "start": "Start game"
+    }
+  },
+  "online": {
+    "opponent": "Opponent",
+    "waiting": "Waiting for Opponent",
+    "status": {
+      "waiting": "Waiting for Opponent…",
+      "sending": "Sending your turn…"
+    },
+    "clock": {
+      "seconds_one": "{{count}} s",
+      "seconds_other": "{{count}} s",
+      "minutes_one": "{{count}} min",
+      "minutes_other": "{{count}} min",
+      "hours_one": "{{count}} h",
+      "hours_other": "{{count}} h"
+    },
+    "loading": "Loading the game…",
+    "label": "{{game}} · online",
+    "summary": "{{game}} · online · {{score}}",
+    "exitHint": "The game goes on, and the clock keeps running",
+    "notice": {
+      "timedOutTitle": "Your time ran out",
+      "timedOut": "You lost this game on time. Your moves were not sent.",
+      "staleTitle": "The game changed",
+      "stale": "The board shows the newest position now.",
+      "sendFailedTitle": "Not sent",
+      "sendFailed": "Your turn did not reach the server. Check the connection, then press Confirm again.",
+      "refusedTitle": "Not accepted",
+      "refused": "The server did not accept your turn. Your moves were taken back."
     }
   },
   "game": {
@@ -188,11 +265,24 @@
     "opening": {
       "title": "Who starts?",
       "body": "Each player rolls one die. The higher die starts and plays both.",
-      "tie": "Tie! Both rolled {{value}}. Roll again.",
+      "tie": "Tie: both rolled {{value}}. Roll again.",
+      "rolledBy": "{{name}} rolled {{value}}.",
+      "rolledBy_you": "You rolled {{value}}.",
       "result": "{{name}} starts with {{high}}-{{low}}.",
       "notRolled": "Not rolled yet",
       "rolled": "Rolled {{value}}",
-      "result_you": "You start with {{high}}-{{low}}."
+      "result_you": "You start with {{high}}-{{low}}.",
+      "ok": "OK",
+      "autoClose": "Closes by itself after 3 s.",
+      "bodyReroll": "Each player rolls one die. The higher die starts and rolls both dice again.",
+      "resultReroll": "{{name}} starts ({{high}}-{{low}}) and rolls again.",
+      "resultReroll_you": "You start ({{high}}-{{low}}). Roll again."
+    },
+    "chooser": {
+      "title": "Who starts?",
+      "body": "Choose who starts. That player rolls both dice.",
+      "pick": "{{name}} starts",
+      "pick_you": "I start"
     },
     "roll": {
       "opening": "Roll to start",
@@ -203,15 +293,37 @@
     "dice": {
       "label": "Dice {{values}}, {{left}} left to play"
     },
+    "doubles": {
+      "name": {
+        "1": "double 1",
+        "2": "double 2",
+        "3": "double 3",
+        "4": "double 4",
+        "5": "double 5",
+        "6": "double 6"
+      },
+      "label": {
+        "1": "Doubles!",
+        "2": "Doubles!",
+        "3": "Doubles!",
+        "4": "Doubles!",
+        "5": "Doubles!",
+        "6": "Doubles!"
+      }
+    },
     "strip": {
-      "pips": "Pips {{count}}",
-      "pipsLabel": "{{count}} pips to go",
       "scoreLabel": "{{score}} of {{target}} points",
       "turn": "Your turn",
       "playing": "Playing",
       "turnOf": "{{name}}’s turn",
       "toEnter": "{{count}} to enter",
       "frozen": "Army frozen"
+    },
+    "hint": {
+      "button": "Hint",
+      "busy": "Thinking…",
+      "hide": "Hide the hint",
+      "text": "Hint: {{moves}}"
     },
     "controls": {
       "undo": "↶ Undo",
@@ -227,29 +339,39 @@
       "bearOff": "Bear off from point {{from}}",
       "hits": "{{move}}, hits",
       "pins": "{{move}}, pins",
+      "then": "{{move}}, {{next}}",
+      "thenTo": "then to point {{to}}",
+      "thenOff": "then bear off",
       "short": {
         "move": "{{from}} → {{to}}",
         "fromBar": "Bar → {{to}}",
         "enter": "Enter → {{to}}",
         "bearOff": "{{from}} → Off",
         "hit": "{{move}} · hit",
-        "pin": "{{move}} · pin"
+        "pin": "{{move}} · pin",
+        "then": "{{move}} → {{to}}",
+        "thenOff": "{{move}} → Off"
       }
     },
     "announce": {
       "rolled": "{{name}} rolled {{dice}}.",
       "rolled_you": "You rolled {{dice}}.",
-      "played": "{{name}} played: {{moves}}."
+      "rolledDouble": "{{name}} rolled {{double}}: four moves of {{value}}.",
+      "rolledDouble_you": "You rolled {{double}}: four moves of {{value}}.",
+      "choseDouble": "{{name}} chose {{double}}: four moves of {{value}}.",
+      "choseDouble_you": "You chose {{double}}: four moves of {{value}}.",
+      "played": "{{name}} played: {{moves}}.",
+      "chosenStarter": "{{name}} starts.",
+      "chosenStarter_you": "You start."
     },
     "pass": {
       "title": "No legal moves",
       "body": "{{name}} rolled {{dice}}. No checker can move.",
       "next": "The turn passes to {{name}}.",
       "ok": "OK",
-      "autoClose": "Closes by itself after 3 s.",
+      "autoClose": "Closes by itself after 3.5 s.",
       "body_you": "You rolled {{dice}}. No checker can move.",
       "next_you": "Your turn.",
-      "autoCloseShort": "Closes by itself after 2 s.",
       "lockedTitle": "Board locked",
       "locked": "{{name}} rolled {{dice}}. The board opens only with a 1-2 or a double.",
       "locked_you": "You rolled {{dice}}. The board opens only with a 1-2 or a double.",
@@ -257,14 +379,19 @@
       "lockedDouble_you": "You rolled {{dice}}. The board opens only with a double.",
       "frozenTitle": "Army frozen",
       "frozen": "{{name}} rolled {{dice}}. Their last checker is pinned, so no checker can move.",
-      "frozen_you": "You rolled {{dice}}. Your last checker is pinned, so no checker can move."
+      "frozen_you": "You rolled {{dice}}. Your last checker is pinned, so no checker can move.",
+      "bodyChosen": "{{name}} chose {{dice}}. No checker can move.",
+      "bodyChosen_you": "You chose {{dice}}. No checker can move.",
+      "frozenChosen": "{{name}} chose {{dice}}. Their last checker is pinned, so no checker can move.",
+      "frozenChosen_you": "You chose {{dice}}. Your last checker is pinned, so no checker can move."
     },
     "end": {
       "gameWinner": "{{name}} wins the game!",
       "draw": "The game is a draw",
       "mono": "Mono · +1 point",
       "diplo": "Diplo · +2 points",
-      "points": "+{{count}} points",
+      "points_one": "+{{count}} point",
+      "points_other": "+{{count}} points",
       "score": "{{white}} {{whiteScore}} – {{blackScore}} {{black}}",
       "target": "First to {{target}} points",
       "next": "Next game",
@@ -280,6 +407,10 @@
       "resignedMono_you": "Mono: you resigned the game.",
       "resignedDiplo": "Diplo: {{name}} resigned before bearing off a checker.",
       "resignedDiplo_you": "Diplo: you resigned before you bore off a checker.",
+      "resignedPerChecker_one": "{{name}} resigned and did not bear off {{count}} checker: 1 point.",
+      "resignedPerChecker_other": "{{name}} resigned and did not bear off {{count}} checkers: 1 point each.",
+      "resignedPerCheckerYou_one": "You resigned and did not bear off {{count}} checker: 1 point.",
+      "resignedPerCheckerYou_other": "You resigned and did not bear off {{count}} checkers: 1 point each.",
       "resignedMatch": "{{name}} resigned the match.",
       "resignedMatch_you": "You resigned the match.",
       "home": "Home",
@@ -287,19 +418,25 @@
       "matchLabel": "Match",
       "noBearOff": "{{name}} did not bear off any checker.",
       "noBearOff_you": "You did not bear off any checker.",
+      "checkersLeft_one": "{{name}} did not bear off {{count}} checker: 1 point.",
+      "checkersLeft_other": "{{name}} did not bear off {{count}} checkers: 1 point each.",
+      "checkersLeftYou_one": "You did not bear off {{count}} checker: 1 point.",
+      "checkersLeftYou_other": "You did not bear off {{count}} checkers: 1 point each.",
       "nextGame": "Next: game {{number}} · {{game}}",
       "drawChip": "Draw · 0 points",
       "deadlock": "No checker can ever move again.",
       "bothMothersPinned": "Both mothers are pinned.",
       "timeout": "{{name}} ran out of time.",
-      "timeout_you": "You ran out of time."
+      "timeout_you": "You ran out of time.",
+      "review": "Review"
     },
     "you": "You",
     "bot": {
       "name": "Bot",
       "strip": "Bot · {{level}}",
       "waiting": "Bot's turn…",
-      "moving": "Bot rolled {{dice}} and is moving…"
+      "moving": "Bot rolled {{dice}} and is moving…",
+      "choseMoving": "Bot chose {{dice}} and is moving…"
     },
     "menu": {
       "open": "Game menu",
@@ -323,6 +460,10 @@
       "mono": "{{winner}} wins 1 point (mono), because {{loser}} has borne off a checker.",
       "mono_you": "{{winner}} wins 1 point (mono), because you have borne off a checker.",
       "points": "{{winner}} wins {{count}} points.",
+      "perChecker_one": "{{winner}} wins {{count}} point, because {{loser}} has {{count}} checker left to bear off.",
+      "perChecker_other": "{{winner}} wins {{count}} points, because {{loser}} has {{count}} checkers left to bear off: 1 point each.",
+      "perCheckerYou_one": "{{winner}} wins {{count}} point, because you have {{count}} checker left to bear off.",
+      "perCheckerYou_other": "{{winner}} wins {{count}} points, because you have {{count}} checkers left to bear off: 1 point each.",
       "after": "Match after resign: {{score}} (to {{target}})",
       "matchTitle": "Resign the match?",
       "matchBody": "{{winner}} wins the match. The match ends now.",
@@ -341,6 +482,12 @@
       "resign": "Resign (lose 2)",
       "playOn": "Play on",
       "botPlaysOn": "{{name}} plays on."
+    },
+    "chooseDouble": {
+      "title": "{{name}}, you rolled 1-2",
+      "title_you": "You rolled 1-2",
+      "body": "Choose a double:",
+      "choice": "{{double}}: four moves of {{value}}"
     },
     "board": {
       "label": "Board",
@@ -432,7 +579,9 @@
     "length": {
       "label": "Match length",
       "hint_one": "First to {{count}} point. Mono = 1, diplo = 2.",
-      "hint_other": "First to {{count}} points. Mono = 1, diplo = 2."
+      "hint_other": "First to {{count}} points. Mono = 1, diplo = 2.",
+      "hintPerChecker_one": "First to {{count}} point. 1 point per checker left.",
+      "hintPerChecker_other": "First to {{count}} points. 1 point per checker left."
     },
     "botLevel": {
       "label": "Bot level",
@@ -442,16 +591,38 @@
       "soon": "Medium and Hard are coming soon.",
       "hardSoon": "Hard is coming soon."
     },
-    "whoStarts": {
-      "title": "Who starts?",
-      "body": "Each player rolls one die. High die starts."
-    },
     "players": {
       "label": "Players (optional)",
       "white": "Player 1 (white)",
       "black": "Player 2 (black)",
       "whiteLabel": "Name of player 1, white checkers",
       "blackLabel": "Name of player 2, black checkers"
+    },
+    "houseRules": {
+      "label": "House rules",
+      "openingRoll": "Opening roll",
+      "useOpeningDice": "Standard",
+      "rerollBoth": "Roll again",
+      "chosenStarterRolls": "Choose",
+      "useOpeningDiceHint": "Each player rolls one die. The higher die starts and plays both dice. The federation rule.",
+      "rerollBothHint": "Each player rolls one die. The higher die starts and rolls both dice again, so a double is possible.",
+      "chosenStarterRollsHint": "You choose who starts. That player rolls both dice.",
+      "chosenStarterRollsHintBot": "You choose who starts: you or the bot. That player rolls both dice.",
+      "rulesVersion": "Rules version",
+      "rulesVersionPlakoto": "Rules version (Plakoto)",
+      "optionLabel": "{{group}}: {{option}}"
+    },
+    "rulesVersion": {
+      "plakoto": "Standard",
+      "plakotoHint": "If your mother is pinned, you choose: resign (2 points) or play on.",
+      "plakotoFederation": "Federation",
+      "plakotoFederationHint": "Federation rules: pin the mother and win 2 points once your own point 24 is empty. Both mothers pinned: a draw.",
+      "asodioKafeneio": "Standard",
+      "asodioKafeneioHint": "Kafeneio rules: all 15 enter first, the army moves quarter by quarter, and you pin, not hit.",
+      "asodioGreek": "Greek",
+      "asodioGreekHint": "Acey-Deucey, Greek rules: you hit, not pin. After a 1-2, choose a double, then roll again. A double rolls again too.",
+      "asodioAmerican": "American",
+      "asodioAmericanHint": "Acey-Deucey, American rules: you hit, not pin, and the board is open from the start. After a 1-2, choose a double, then roll again. 1 point per checker left."
     },
     "start": "Start game",
     "boardView": "Board view",
@@ -473,7 +644,8 @@
     "unknown": "There are no rules for this game.",
     "picture": {
       "label": "The board at the start of {{game}}",
-      "caption": "In the picture you play the light checkers. You start at the bottom right, go up the right side, cross the top and come down the left side. Your home is the bottom-left quarter."
+      "caption": "In the picture you play the light checkers. You start at the bottom right, go up the right side, cross the top and come down the left side. Your home is the bottom-left quarter.",
+      "captionMirrored": "In the picture you play the light checkers. You start at the bottom left, go up the left side, cross the top and come down the right side. Your home is the bottom-right quarter."
     },
     "common": {
       "goal": {
@@ -492,7 +664,8 @@
       },
       "scoring": {
         "title": "Points",
-        "body": "Mono (μονό): you win 1 point if the other player has borne off at least one checker.\nDiplo (διπλό): you win 2 points if the other player has not borne off any checker.\nThe match ends when a player reaches the points you picked on New game: 1, 3, 5 or 7."
+        "body": "Mono (μονό): you win 1 point if the other player has borne off at least one checker.\nDiplo (διπλό): you win 2 points if the other player has not borne off any checker.\nThe match ends when a player reaches the points you picked on New game: 1, 3, 5 or 7.",
+        "bodyPerChecker": "You win 1 point for each checker the other player has not borne off. If they have borne off none, you win 15.\nA resign counts the same way: the other player wins 1 point for each checker you have not borne off.\nThe match ends when a player reaches the points you picked on New game: 1, 3, 5 or 7."
       }
     },
     "portes": {
@@ -572,6 +745,20 @@
     "tavli": {
       "title": "A Tavli match",
       "body": "A Tavli match plays three games in turn: Portes, then Plakoto, then Fevga, and then Portes again.\nEach game gives 1 or 2 points, as its own rules say. A Plakoto game can also end in a draw (both mothers pinned): nobody gets points, and the match goes on with the next game.\nThe first player to reach the match points wins."
+    },
+    "versions": {
+      "plakotoFederation": {
+        "title": "This game: federation rules",
+        "body": "This game plays the federation rules (ΕΟΠΤ). Only the mother rule is different from the page below.\nIf you pin the other player's mother, you win 2 points (diplo) as soon as none of your checkers is left on your own point 24. Until then the game goes on, and your own mother can still be pinned.\nIf both mothers are pinned at the same time, the game is a draw.\nNobody is asked to resign or play on."
+      },
+      "asodioGreek": {
+        "title": "This game: Greek rules",
+        "body": "This game plays Acey-Deucey with the Greek rules. They change the page below:\nYou hit, you do not pin. A lone checker that is hit goes out, to the middle of the board. It enters again in your starting quarter, but only with a 1-2 or a double.\nThe board still opens only with a 1-2 or a double. After that, checkers on the board may move before all 15 are in, and no quarter freezes.\nAfter a 1-2 you play the 1 and the 2, then choose any double and play it, then roll again.\nAfter a double that you play in full, you roll again too.\nYou cannot bear off while a checker is still outside the board."
+      },
+      "asodioAmerican": {
+        "title": "This game: American rules",
+        "body": "This game plays Acey-Deucey with the American rules. They change the page below:\nYou hit, you do not pin. A lone checker that is hit goes out, to the middle of the board, and enters again in your starting quarter.\nThe board is open from the start: any roll can enter checkers. Checkers on the board may move before all 15 are in, and no quarter freezes.\nAfter a 1-2 you play the 1 and the 2, then choose any double and play it, then roll again.\nThe winner gets 1 point for each checker the loser has not borne off.\nYou cannot bear off while a checker is still outside the board."
+      }
     }
   },
   "time": {
@@ -760,5 +947,29 @@
       "resigned": "Resign: you win 2 points and the game ends.",
       "playedOn": "Play on: the game goes on. Their mother stays pinned until you leave it, and they cannot bear off."
     }
+  },
+  "review": {
+    "title": "Game review",
+    "busy": "Looking at the moves…",
+    "wellPlayed": "Well played! No mistakes found.",
+    "nothing": "No moves to review in this game.",
+    "intro_you": "Your biggest mistakes, the biggest first.",
+    "intro": "The biggest mistakes, the biggest first.",
+    "failed": "This game cannot be reviewed.",
+    "turn": "Turn {{number}} · roll {{dice}}",
+    "played_you": "You played: {{moves}}",
+    "played": "{{name}} played: {{moves}}",
+    "best": "Best: {{moves}}",
+    "show": {
+      "played_you": "Your move",
+      "played": "{{name}}'s move",
+      "best": "Best move"
+    },
+    "band": {
+      "small": "Small mistake",
+      "medium": "Medium mistake",
+      "big": "Big mistake"
+    },
+    "note": "Best is the move the strongest bot would play."
   }
 }

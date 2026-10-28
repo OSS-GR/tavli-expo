@@ -606,6 +606,17 @@ Stores:
 
 Version numbers for npm packages were read from https://registry.npmjs.org on 2026-10-26.
 
+## Notes from landscape (#185, 2026-10-27)
+
+- **Per-screen orientation.** The app config allows every orientation (`"orientation": "default"` in `app.json`), and the root `Stack` locks each screen with the `orientation` screen option (react-native-screens): `portrait_up` for every screen, `default` (portrait and landscape, no upside down on an iPhone) for the game and tutorial routes. The [Expo ScreenOrientation docs](https://docs.expo.dev/versions/latest/sdk/screen-orientation/) recommend this with Expo Router, so we do not need `expo-screen-orientation`.
+- **The app config change needs a new native build.** `orientation` goes into `Info.plist` (`UISupportedInterfaceOrientations`) and `AndroidManifest.xml` (`screenOrientation`). The runtime version comes from the fingerprint, so an EAS Update cannot bring it to an old build.
+- **A `Modal` has its own orientations on iOS.** `supportedOrientations` defaults to `['portrait']`: a Modal opened in landscape turns the screen upright. Only a sheet over a screen that turns lists landscape (`Sheet` prop `turns`). Android ignores the prop.
+- **iOS 27 and later can refuse a lock** when an iPhone app runs resizable (iPhone Mirroring, on an iPad). Our screens pick their layout from the window size (`useWindowDimensions`), not from the lock, so they still fit.
+- **Turning must not remount the board.** A layout per orientation is easy to write as two trees, but then React remounts the board, and a picked-up checker, a running dice roll or an open card is lost (and the Skia canvas may lose its drawing, #173). Keep the board at the same place in the tree and change only the views around it.
+- **A turn of the phone renders before the new layout is measured.** `useWindowDimensions` changes first; a view's `onLayout` comes after. Anything placed from a measured size (the dice on the board) must wait for the new measure, or it sits in the wrong place for a frame. We key the measure on the window (`spaceKey`) and hide what depends on it until it is fresh. When the size does not change, no `onLayout` comes, so the board also calls `measure` after a key change.
+- **Do not let a child draw outside its parent.** iOS draws it, but Android may clip it, and a later sibling paints over it. Make the parent span the area instead (the board layer spans the right column).
+- **Tests:** `Dimensions` is real in Jest, and `useWindowDimensions` follows `Dimensions.set`. `apps/mobile/test/window.ts` sets a landscape window and puts Jest's window back.
+
 ## Notes from the monorepo setup (#10, 2026-10-26)
 
 - **ESLint stays on 9.x.** `eslint-config-expo` 58 crashes on ESLint 10. Move to 10 when Expo supports it.

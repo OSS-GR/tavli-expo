@@ -22,6 +22,7 @@ import {
   tapWrongPlace,
   tutorialSources,
 } from '../../../test/tutorialTaps';
+import { LANDSCAPE_SE, PORTRAIT_SE, resetWindow, setWindow } from '../../../test/window';
 
 const haptics = feedback as ReturnType<typeof createRecordingFeedback>;
 
@@ -148,6 +149,16 @@ describe('<TutorialScreen />', () => {
     ).toBeOnTheScreen();
   });
 
+  it('has no Hint button, on the board or in the move list (#209)', async () => {
+    await act(async () => {
+      settingsStore.setState({ ...DEFAULT_SETTINGS, moveList: 'on', showHints: true });
+    });
+    await open();
+    expect(screen.getByTestId('tutorial-move-list')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Hint' })).toBeNull();
+    expect(screen.queryByTestId('hint-button')).toBeNull();
+  });
+
   it('hides the move list by default (no screen reader)', async () => {
     await open();
     expect(screen.queryByTestId('tutorial-move-list')).not.toBeOnTheScreen();
@@ -226,5 +237,42 @@ describe('<TutorialScreen />', () => {
     expect(screen.getByTestId('tutorial-progress')).toHaveTextContent('Μάθημα 1 από 7');
     expect(screen.getByRole('button', { name: 'Παράλειψη' })).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Κίνησε ένα πούλι' })).toBeOnTheScreen();
+  });
+});
+
+describe('<TutorialScreen /> in landscape (#185)', () => {
+  afterEach(async () => {
+    await resetWindow();
+  });
+
+  it('puts the lesson in a left column and plays on the classic board', async () => {
+    await setWindow(LANDSCAPE_SE);
+    const props = await open();
+    const side = screen.getByTestId('tutorial-side');
+    expect(within(side).getByTestId('tutorial-card')).toBeOnTheScreen();
+    expect(within(side).getByTestId('tutorial-dice')).toBeOnTheScreen();
+    // `playLessonByTaps` taps the classic board's drawn places in a landscape window.
+    await playLessonByTaps(0);
+    expect(props.onLessonDone).toHaveBeenCalledWith(1, LESSONS[0]!.id);
+    expect(within(side).getByTestId('tutorial-next')).toBeOnTheScreen();
+  });
+
+  it('keeps the lesson and a picked-up checker when the phone turns', async () => {
+    await setWindow(PORTRAIT_SE);
+    const props = await open();
+    const board = screen.getByTestId('tutorial-board');
+    const [source] = tutorialSources(0);
+    await touch('tutorial-board-pan', [center(source!.rect)]);
+    expect(countNodes(screen.toJSON() as JsonNode, 'DashPathEffect')).toBe(1);
+
+    await setWindow(LANDSCAPE_SE);
+    await layoutTutorialBoard();
+    expect(screen.getByTestId('tutorial-board')).toBe(board);
+    expect(screen.getByTestId('tutorial-side')).toBeOnTheScreen();
+    // Still picked up: its target ring shows, and one tap on it in the new place moves it.
+    expect(countNodes(screen.toJSON() as JsonNode, 'DashPathEffect')).toBe(1);
+    const [turned] = tutorialSources(0);
+    await touch('tutorial-board-pan', [center(turned!.targets[0]!.rect)]);
+    expect(props.onLessonDone).toHaveBeenCalledWith(1, LESSONS[0]!.id);
   });
 });

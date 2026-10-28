@@ -12,7 +12,12 @@ import tseslint from 'typescript-eslint';
 const PACKAGE_FILES = ['packages/**/*.{js,ts,tsx,cjs,mjs}', 'apps/server/**/*.{js,ts,cjs,mjs}'];
 
 // Pure packages: no React, React Native, Expo or vendor code.
-const PURE_PACKAGES = ['packages/engine/**', 'packages/bot/**', 'packages/contracts/**'];
+const PURE_PACKAGES = [
+  'packages/engine/**',
+  'packages/bot/**',
+  'packages/contracts/**',
+  'packages/online/**',
+];
 
 // Only these folders may import vendor SDKs (ADR-0002).
 const VENDOR_ALLOWED = ['packages/adapters/**', 'apps/server/**'];
@@ -39,6 +44,8 @@ const vendorImports = {
     'expo-haptics',
     // Sound: use the `SoundPlayer` port and `@tavli/audio-expo`.
     'expo-audio',
+    // The sign-in cookie: use the `AuthProvider` port and `@tavli/auth-better-auth`.
+    'expo-secure-store',
   ],
   message:
     'Vendor SDKs belong in packages/adapters/* (or apps/server). Use a port from @tavli/contracts instead. See ADR-0002.',
@@ -99,6 +106,12 @@ export default defineConfig([
     languageOptions: { globals: globals.node },
   },
 
+  // Server tools (`pnpm --filter @tavli/server codegen`) run in Node.
+  {
+    files: ['apps/server/tools/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
+
   // Block vendor SDKs everywhere.
   {
     rules: {
@@ -123,18 +136,29 @@ export default defineConfig([
   },
 
   // Convex server: vendor SDKs yes, React no. Dice come from the secure
-  // RNG (`createCryptoRng`), never from Math.random.
+  // RNG (`createCryptoRng`), never from Math.random. `@better-auth/expo`
+  // (root entry only) is Better Auth's server plugin for Expo apps, not Expo
+  // itself, so the server may import it (#131).
   {
     files: ['apps/server/**'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [reactImports] }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              ...reactImports,
+              group: [...reactImports.group, '!@better-auth/expo', '@better-auth/expo/*'],
+            },
+          ],
+        },
+      ],
       'no-restricted-properties': [
         'error',
         {
           object: 'Math',
           property: 'random',
-          message:
-            'Server dice come from createCryptoRng (apps/server/convex/model/crypto-rng.ts).',
+          message: 'Server dice come from createCryptoRng (apps/server/convex/model/cryptoRng.ts).',
         },
       ],
     },
@@ -150,6 +174,22 @@ export default defineConfig([
           object: 'Math',
           property: 'random',
           message: 'The engine must be deterministic. Use the injected RNG instead.',
+        },
+      ],
+    },
+  },
+
+  // Online game model and in-memory server: dice come from the injected
+  // RNG too, so tests and the server control them.
+  {
+    files: ['packages/online/**'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'Online games roll with the injected RNG (createMemoryGameServer({ rng })).',
         },
       ],
     },

@@ -7,15 +7,21 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "codegen": "convex codegen --system-udfs --typecheck disable"
+    "codegen": "node tools/codegen.mjs"
   },
   "dependencies": {
+    "@better-auth/expo": "1.6.33",
+    "@convex-dev/better-auth": "0.12.6",
     "@tavli/contracts": "workspace:*",
     "@tavli/engine": "workspace:*",
+    "@tavli/online": "workspace:*",
+    "better-auth": "1.6.33",
     "convex": "1.46.0"
   },
   "devDependencies": {
     "@edge-runtime/vm": "5.0.0",
-    "convex-test": "0.0.61"
+    "@tavli/backend-convex": "workspace:*",
+    "convex-test": "0.0.61",
+    "typescript": "~6.0.3"
   }
 }

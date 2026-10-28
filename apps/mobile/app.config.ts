@@ -17,10 +17,17 @@
  */
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
+/**
+ * The Convex deployments (#257). These URLs are public client config, not
+ * secrets. `.github/workflows/deploy-server.yml` deploys the functions there.
+ */
+const CONVEX_DEV_URL = 'https://exciting-reindeer-792.eu-west-1.convex.cloud';
+const CONVEX_PROD_URL = 'https://superb-dog-503.eu-west-1.convex.cloud';
+
 const VARIANTS = {
-  development: { idSuffix: '.dev', nameSuffix: ' Dev' },
-  preview: { idSuffix: '.preview', nameSuffix: ' Preview' },
-  production: { idSuffix: '', nameSuffix: '' },
+  development: { idSuffix: '.dev', nameSuffix: ' Dev', convexUrl: CONVEX_DEV_URL },
+  preview: { idSuffix: '.preview', nameSuffix: ' Preview', convexUrl: CONVEX_PROD_URL },
+  production: { idSuffix: '', nameSuffix: '', convexUrl: CONVEX_PROD_URL },
 } as const;
 
 type Variant = keyof typeof VARIANTS;
@@ -60,8 +67,38 @@ function readVariant(): Variant {
   return value;
 }
 
+/**
+ * The Convex URL for the variant. `EXPO_PUBLIC_CONVEX_URL`, when set, wins,
+ * so you can point any build at your own deployment. The app reads the
+ * result from `extra.convexUrl` (`src/convexUrl.ts`).
+ */
+function convexUrl(variant: Variant): string {
+  return process.env.EXPO_PUBLIC_CONVEX_URL?.trim() || VARIANTS[variant].convexUrl;
+}
+
+/** A Convex cloud URL: `https://<name>.convex.cloud`. */
+const CONVEX_CLOUD_URL = /^(https:\/\/[^\s/?#]+)\.convex\.cloud\/?$/;
+
+/**
+ * The Convex site URL (#266), where Better Auth signs the user in.
+ * `EXPO_PUBLIC_CONVEX_SITE_URL`, when set, wins. Else it is the Convex URL
+ * with `.convex.site` in place of `.convex.cloud`: a cloud deployment
+ * serves its HTTP routes there. Any other URL (a local backend) has no
+ * site URL unless you set the variable. The app reads the result from
+ * `extra.convexSiteUrl` (`src/convexUrl.ts`).
+ */
+function convexSiteUrl(url: string): string | undefined {
+  const own = process.env.EXPO_PUBLIC_CONVEX_SITE_URL?.trim();
+  if (own) return own;
+  const cloud = CONVEX_CLOUD_URL.exec(url);
+  return cloud ? `${cloud[1]}.convex.site` : undefined;
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
-  const { idSuffix, nameSuffix } = VARIANTS[readVariant()];
+  const variant = readVariant();
+  const { idSuffix, nameSuffix } = VARIANTS[variant];
+  const url = convexUrl(variant);
+  const siteUrl = convexSiteUrl(url);
   const name = config.name ?? 'Tavlaki';
   const slug = config.slug ?? 'tavlaki';
   const bundleIdentifier = config.ios?.bundleIdentifier ?? 'com.tavlaki';
@@ -74,5 +111,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: { ...config.ios, bundleIdentifier: `${bundleIdentifier}${idSuffix}` },
     android: { ...config.android, package: `${androidPackage}${idSuffix}` },
     plugins: [...(config.plugins ?? []), sentryPlugin()],
+    extra: { ...config.extra, convexUrl: url, ...(siteUrl ? { convexSiteUrl: siteUrl } : {}) },
   };
 };

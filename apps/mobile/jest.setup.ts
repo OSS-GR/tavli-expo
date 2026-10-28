@@ -9,7 +9,10 @@ import './src/i18n';
 // Sentry and PostHog. `feedback` records every haptic, `sound` every sound,
 // `crashReporter` every report and `analytics` every event it would send
 // (it follows the opt-in rules); dice come from a fixed seed, so tests are
-// repeatable. The bot is the real inline runner (it is pure TypeScript).
+// repeatable. The bot is the real inline runner and the real Analyzer (both
+// are pure TypeScript). Online play (`auth`, `games`) and the dev games
+// (`onlineServer`, `gameTransportFor`) share one in-memory sign-in and game
+// server, new for each test (test/onlineFake.ts).
 jest.mock('@/services', () => {
   const {
     createMemoryStorage,
@@ -19,8 +22,9 @@ jest.mock('@/services', () => {
     createRecordingSoundPlayer,
   } = jest.requireActual('@tavli/contracts');
   const { createSeededRng } = jest.requireActual('@tavli/engine');
-  const { InlineBotRunner, createBot } = jest.requireActual('@tavli/bot');
+  const { InlineBotRunner, createAnalyzer, createBot } = jest.requireActual('@tavli/bot');
   const { botLevelsByGame } = jest.requireActual('@/features/bot/levels');
+  const { onlineFake } = jest.requireActual('./test/onlineFake');
   const bot = createBot();
   return {
     storage: createMemoryStorage(),
@@ -31,6 +35,12 @@ jest.mock('@/services', () => {
     createLocalRng: () => createSeededRng(7),
     botRunner: new InlineBotRunner(bot),
     botLevels: botLevelsByGame(bot),
+    analyzer: createAnalyzer(),
+    auth: onlineFake.auth,
+    games: onlineFake.games,
+    onlineServer: onlineFake.server,
+    onlinePlayerId: 'me',
+    gameTransportFor: onlineFake.transportFor,
   };
 });
 

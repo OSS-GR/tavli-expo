@@ -1,7 +1,14 @@
 /** Links and route params of the app shell (wireframes, "Route map"). Pure. */
 import type { TutorialGame, TutorialSource } from '@tavli/contracts';
+import type { PresetId } from '@tavli/engine';
 
-import { isMatchMode, type MatchMode } from './setup';
+import {
+  isMatchMode,
+  isRulesVersion,
+  isVersionedGame,
+  otherVersion,
+  type MatchMode,
+} from './setup';
 
 type Param = string | string[] | undefined;
 
@@ -36,19 +43,40 @@ export function tutorialHref(from: TutorialSource, game: TutorialGame = 'portes'
     : ({ pathname: '/tutorial', params: { from, game } } as const);
 }
 
-/** The board of a local match. */
+/** A local match id (`local-…`). Any other id names an online game (#255). */
+export function isLocalGameId(id: string): boolean {
+  return id.startsWith('local-');
+}
+
+/** The board of a local match, or of an online game (#255). */
 export function gameHref(id: string) {
   return { pathname: '/game/[id]', params: { id } } as const;
 }
 
-/** The match-end screen of a finished local match (wireframe 9). */
+/** The match-end screen of a finished match, local or online (wireframe 9). */
 export function matchEndHref(id: string) {
   return { pathname: '/game/[id]/match-end', params: { id } } as const;
 }
 
-/** The rules page of a game (`/rules/portes`, …). */
-export function rulesHref(variant: string) {
-  return { pathname: '/rules/[variant]', params: { variant } } as const;
+/** The review of the game that just ended in a local match (#215). */
+export function reviewHref(id: string) {
+  return { pathname: '/game/[id]/review', params: { id } } as const;
+}
+
+/**
+ * The rules page of a game (`/rules/portes`, …). `preset` is the engine
+ * preset in play or chosen: a rules version of `variant` that is not the
+ * default (#241) adds `version` (`/rules/plakoto?version=plakoto.federation`).
+ * Another game's version adds nothing: the Tavli page of a match whose
+ * Plakoto game plays Federation (#247) is the plain Tavli page.
+ */
+export function rulesHref(variant: string, preset?: PresetId) {
+  const other = preset === undefined ? null : otherVersion(preset);
+  const version =
+    other !== null && isVersionedGame(variant) && isRulesVersion(variant, other) ? other : null;
+  return version === null
+    ? ({ pathname: '/rules/[variant]', params: { variant } } as const)
+    : ({ pathname: '/rules/[variant]', params: { variant, version } } as const);
 }
 
 /** The `mode` param of the new-game screen. Anything else means vs bot. */
