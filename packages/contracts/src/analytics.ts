@@ -139,6 +139,14 @@ export interface AnalyticsEvents {
     matchLength: number;
     pace: OnlineGamePace;
   };
+  /**
+   * The phone's answer to the system prompt for turn notifications (#285),
+   * after the player asked to turn them on. Only `granted` or `denied`:
+   * never the push token or a user id.
+   */
+  push_permission_answered: {
+    answer: 'granted' | 'denied';
+  };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
@@ -175,6 +183,7 @@ export const ANALYTICS_EVENTS = [
   'hint_shown',
   'review_opened',
   'invite_created',
+  'push_permission_answered',
 ] as const satisfies readonly AnalyticsEventName[];
 
 type MissingEvent = Exclude<AnalyticsEventName, (typeof ANALYTICS_EVENTS)[number]>;

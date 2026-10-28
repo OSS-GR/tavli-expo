@@ -7,12 +7,15 @@ import { useAppAnalytics } from '@/features/analytics/useAppAnalytics';
 import { CrashBoundary } from '@/features/crash/CrashBoundary';
 import { usePendingInvite } from '@/features/invites/pendingInvite';
 import { matchSessions } from '@/features/match/appSessions';
-import { inviteHref } from '@/features/match/routes';
+import { gameHref, inviteHref } from '@/features/match/routes';
 import { useSaveOnBackground } from '@/features/match/useSaveOnBackground';
+import { turnPushes } from '@/features/notifications/appTurnPushes';
+import { usePushTaps } from '@/features/notifications/pushTaps';
+import { TurnPushPrompt } from '@/features/notifications/TurnPushPrompt';
 import { needsWelcome } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
 import { useLanguageSync } from '@/i18n/useLanguageSync';
-import { crashReporter } from '@/services';
+import { crashReporter, notifications } from '@/services';
 
 /**
  * The game board and the tutorial board follow the phone (#185): portrait
@@ -35,6 +38,16 @@ function RootStack() {
   // An invite link that opened the app before the answer (#256): after the
   // welcome flow, the invite opens instead of Home.
   const pendingInvite = usePendingInvite(welcome);
+  // A tap on a turn push (#285) opens its game; before the answer, after
+  // the welcome flow (an invite link first).
+  const pendingGame = usePushTaps(welcome, notifications);
+  const pushes = turnPushes();
+  const afterWelcome =
+    pendingInvite !== null
+      ? inviteHref(pendingInvite)
+      : pendingGame !== null
+        ? gameHref(pendingGame)
+        : '/';
 
   return (
     // Gesture Handler needs a root view (the board's drag gesture).
@@ -76,14 +89,14 @@ function RootStack() {
           <Stack.Screen name="friend/index" />
           <Stack.Screen name="friend/[code]" />
         </Stack.Protected>
-        <Stack.Protected
-          guard={welcome}
-          redirectTo={pendingInvite === null ? '/' : inviteHref(pendingInvite)}>
+        <Stack.Protected guard={welcome} redirectTo={afterWelcome}>
           {/* No swipe back out of the first step before the user answers. */}
           <Stack.Screen name="welcome/language" options={{ gestureEnabled: false }} />
           <Stack.Screen name="welcome/privacy" />
         </Stack.Protected>
       </Stack>
+      {/* Turn notifications (#285): offered after an async invite, over any screen. */}
+      {pushes === undefined ? null : <TurnPushPrompt pushes={pushes} />}
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
     </GestureHandlerRootView>
   );

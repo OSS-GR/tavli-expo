@@ -16,6 +16,10 @@
  *   `NOT_SIGNED_IN`.
  * - `invitesFor(playerId)` is the `Invites` port of a player on the same
  *   server (#256): the dev invites, and a friend in a test.
+ * - `notifications` is the phone's notifications in memory (#285): it
+ *   starts `undetermined`, and the system prompt answers `granted`.
+ *   `pushTokens` is the server's token list, called as the user signed
+ *   in to `auth` (`saved` and `calls` show what reached it).
  *
  * A test makes games with `onlineFake.server().createGame(...)`. Each test
  * starts with a new server, no cached transports and nobody signed in
@@ -25,6 +29,8 @@
 import {
   createMemoryAuthProvider,
   createMemoryAuthStore,
+  createMemoryPushNotifications,
+  createMemoryPushTokens,
   type GameTransport,
   type GameTransportErrorData,
   type Invites,
@@ -47,6 +53,8 @@ const auth = createMemoryAuthProvider(authStore);
 let server = newServer();
 const transports = new Map<string, GameTransport>();
 const invitePorts = new Map<string, Invites>();
+const notifications = createMemoryPushNotifications('ios');
+const pushTokens = createMemoryPushTokens(() => auth.currentUser()?.id ?? null);
 
 /** One transport per player on the current server, like `gameTransportFor` in the app. */
 function transportFor(playerId: string): GameTransport {
@@ -134,6 +142,8 @@ export const onlineFake = {
   auth,
   games,
   invites,
+  notifications,
+  pushTokens,
   /** Where the fake keeps the session. Set `session` to sign a user in at once. */
   authStore,
   /** The in-memory server of the current test. */
@@ -144,11 +154,16 @@ export const onlineFake = {
   invitesFor,
 };
 
-/** A new server, no cached transports or invite ports, and nobody signed in. */
+/**
+ * A new server, no cached transports or invite ports, nobody signed in,
+ * notifications not asked yet and no saved push token.
+ */
 export function resetOnlineFake(): void {
   authStore.session = null;
   authStore.guests = 0;
   server = newServer();
   transports.clear();
   invitePorts.clear();
+  notifications.reset();
+  pushTokens.reset();
 }

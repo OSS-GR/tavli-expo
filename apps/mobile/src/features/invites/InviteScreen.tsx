@@ -35,8 +35,11 @@ export interface InviteScreenProps {
   invites: Invites;
   /** The player id of this phone, to tell your own invite. */
   me: string;
-  /** The server started the game: open it. */
-  onAccepted: (gameId: string) => void;
+  /**
+   * The server started the game: open it. `invite` is the invite as the
+   * screen showed it (its game and pace).
+   */
+  onAccepted: (gameId: string, invite: InviteView | null) => void;
   /** The invite is declined. */
   onDeclined: () => void;
   onHome: () => void;
@@ -113,8 +116,9 @@ export function InviteScreen({
       else setState(next);
     };
     if (kind === 'accept') {
+      const invite = state.kind === 'open' ? state.view : null;
       invites.acceptInvite(code).then((gameId) => {
-        if (mounted.current) onAccepted(gameId);
+        if (mounted.current) onAccepted(gameId, invite);
       }, failed);
     } else {
       invites.declineInvite(code).then(() => {

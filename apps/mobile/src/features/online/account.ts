@@ -20,6 +20,21 @@ export async function signInForOnline(auth: AuthProvider): Promise<AuthUser> {
   return (await auth.ready()) ?? (await auth.signInAsGuest());
 }
 
+/**
+ * Signs the user out. Never call `auth.signOut()` by itself: first this
+ * takes the phone's push token off the server (#285), while the session
+ * still lets it call the server. Else the signed-out user would still get
+ * turn pushes on this phone. `pushes` is `undefined` when the build has
+ * no turn notifications. A failed removal does not stop the sign-out.
+ */
+export async function signOutOfOnline(
+  auth: AuthProvider,
+  pushes: { readonly unregister: () => Promise<void> } | undefined,
+): Promise<void> {
+  await pushes?.unregister().catch(() => undefined);
+  await auth.signOut();
+}
+
 export type OnlineAccount =
   /** Loading the saved session. */
   | { readonly status: 'loading' }

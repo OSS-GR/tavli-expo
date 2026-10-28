@@ -331,7 +331,7 @@ A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }
 
 ## Push
 
-ADR-0004 point 7: the server tells a player "your turn" in an **async** game, through the Expo Push Service, from a Convex action, behind the `PushProvider` port (#280). This is the server part. The app part (ask for permission, get the token, register it, open the game on a tap) is a later issue.
+ADR-0004 point 7: the server tells a player "your turn" in an **async** game, through the Expo Push Service, from a Convex action, behind the `PushProvider` port (#280). This is the server part. The app part (ask for permission, get the token, register it, open the game on a tap) is #285: see [App shell → Turn notifications](app-shell.md#turn-notifications-285). The app calls `registerPushToken` and `removePushToken` through `createConvexPushTokens` (`@tavli/backend-convex`, `PUSH_FUNCTIONS`).
 
 ### `pushTokens`
 

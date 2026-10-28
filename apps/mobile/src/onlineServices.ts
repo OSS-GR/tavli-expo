@@ -1,26 +1,40 @@
 /**
- * Online play (#266, #281): sign-in (`AuthProvider`), online games
- * (`GameTransport`) and invites (`Invites`), built on first use.
+ * Online play (#266, #281, #285): sign-in (`AuthProvider`), online games
+ * (`GameTransport`), invites (`Invites`), the server's push tokens
+ * (`PushTokens`) and the phone's turn notifications (`PushNotifications`),
+ * built on first use.
  *
  * `services.ts` passes the adapters. This file imports none, so Jest can
  * test it with fakes. Nothing here runs at app start:
  * - the sign-in client is made on the first call to `auth`;
- * - the Convex client (one socket) opens on the first call to `games` or
- *   `invites`; both share it.
+ * - the Convex client (one socket) opens on the first call to `games`,
+ *   `invites` or `pushTokens`; they share it;
+ * - the notifications adapter is made on its first call. The root layout
+ *   listens for taps on a push at start (`usePushTaps`): that only reads
+ *   the phone, with no network call and no prompt. Turn notifications are
+ *   for online games only, so a build with no server has none.
  *
  * No call here makes an account. A guest account is made only when a
  * screen calls `auth.signInAsGuest()`: when the user makes or opens an
  * invite (`features/online/account.ts`). Never send the user id to analytics.
  */
-import type { AuthProvider, GameTransport, Invites } from '@tavli/contracts';
+import type {
+  AuthProvider,
+  GameTransport,
+  Invites,
+  PushNotifications,
+  PushTokens,
+} from '@tavli/contracts';
 
 import type { ConvexServer } from './convexUrl';
 
-/** Sign-in, online games and invites. Games and invites share one signed-in client. */
+/** Sign-in, online games, invites and pushes. The server calls share one signed-in client. */
 export interface OnlineServices {
   readonly auth: AuthProvider;
   readonly games: GameTransport;
   readonly invites: Invites;
+  readonly pushTokens: PushTokens;
+  readonly notifications: PushNotifications;
 }
 
 /** How to make the real parts. `services.ts` passes the adapters. */
@@ -33,6 +47,10 @@ export interface OnlineAdapters<Client> {
   createGames(client: Client): GameTransport;
   /** The invites on the shared client. */
   createInvites(client: Client): Invites;
+  /** The push token calls on the shared client. */
+  createPushTokens(client: Client): PushTokens;
+  /** The phone's notifications: permission, token and taps. */
+  createNotifications(): PushNotifications;
 }
 
 /** Calls `make` once, on the first call, and keeps the result. */
@@ -80,6 +98,29 @@ export function lazyInvites(get: () => Invites): Invites {
   };
 }
 
+/** A `PushTokens` port that makes the real one on its first call. */
+export function lazyPushTokens(get: () => PushTokens): PushTokens {
+  return {
+    register: (token, platform) => get().register(token, platform),
+    remove: (token) => get().remove(token),
+  };
+}
+
+/** A `PushNotifications` port that makes the real one on its first use. */
+export function lazyPushNotifications(get: () => PushNotifications): PushNotifications {
+  return {
+    get platform() {
+      return get().platform;
+    },
+    permission: () => get().permission(),
+    requestPermission: () => get().requestPermission(),
+    getToken: () => get().getToken(),
+    onTokenChange: (listener) => get().onTokenChange(listener),
+    lastTap: () => get().lastTap(),
+    onTap: (listener) => get().onTap(listener),
+  };
+}
+
 /**
  * The online services for `server`, or `undefined` when this build has
  * no server (`convexServer()` is `undefined`): then online play is off.
@@ -90,13 +131,17 @@ export function createOnlineServices<Client>(
 ): OnlineServices | undefined {
   if (server === undefined) return undefined;
   const auth = once(() => adapters.createAuth(server.siteUrl));
-  // Games and invites share this client (one socket).
+  // Games, invites and push tokens share this client (one socket).
   const client = once(() => adapters.createClient(server.url, auth()));
   const games = once(() => adapters.createGames(client()));
   const invites = once(() => adapters.createInvites(client()));
+  const pushTokens = once(() => adapters.createPushTokens(client()));
+  const notifications = once(() => adapters.createNotifications());
   return {
     auth: lazyAuthProvider(auth),
     games: lazyGameTransport(games),
     invites: lazyInvites(invites),
+    pushTokens: lazyPushTokens(pushTokens),
+    notifications: lazyPushNotifications(notifications),
   };
 }

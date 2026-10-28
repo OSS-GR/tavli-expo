@@ -41,6 +41,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>You do not need an account to play on your phone.</li>
 <li>Your settings and the games on your phone stay on your phone.</li>
 <li><strong>Online games with a friend</strong> need a free guest account on our server. The app makes it only when you make or open an invite. It has a random user id, and no name and no email. The server keeps your invites and online games under that id.</li>
+<li><strong>Turn notifications</strong> are off until you turn them on. The app offers them only after you make or accept an invite for an async game. If you turn them on, our server keeps your phone's push token, to tell you when it is your turn.</li>
 <li>On the first launch, the app asks if it may send <strong>anonymous usage data</strong>. You choose <strong>Allow usage data</strong> or <strong>Don't allow</strong>. You can change your answer any time in <strong>Settings → Privacy</strong>.</li>
 <li>Until you answer, the app sends only anonymous <strong>crash reports</strong>. <strong>Don't allow</strong> turns off usage data <strong>and</strong> crash reports.</li>
 <li>We never collect your name, email, phone number, contacts or location.</li>
@@ -55,11 +56,12 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li><strong>Your settings:</strong> sound, haptics, language, board theme, board turn, auto-confirm.</li>
 <li><strong>Your games:</strong> the match you are playing, so you can go back to it, and your last choices on the New game screen. In pass-and-play, this includes the player names you type. Names are never sent anywhere.</li>
 <li><strong>Your privacy answer</strong> (allow or don't allow).</li>
+<li><strong>Your "Not now"</strong> to turn notifications, so the app does not ask again by itself.</li>
 <li><strong>An install id:</strong> a random code, made on your phone. It is not your name, email, phone number or a device id. It does not come from your phone's hardware. The app makes it only after you tap <strong>Allow usage data</strong>.</li>
 </ul>
 <p>Deleting the app deletes all of this from your phone. If you install the app again, you get a new install id. (On Android, your phone's own backup may keep a copy of app data and bring it back when you reinstall.)</p>
 <h2 id="what-leaves-your-phone">What leaves your phone</h2>
-<p>Crash reports and usage data. Both follow <strong>one switch</strong>. If you play a friend online, the app also talks to our game server (see "Online games with a friend" below). That does not depend on the switch, because an online game cannot work without it.</p>
+<p>Crash reports and usage data. Both follow <strong>one switch</strong>. If you play a friend online, the app also talks to our game server (see "Online games with a friend" below). If you turn on turn notifications, the server keeps your phone's push token (see "Turn notifications" below). These do not depend on the switch, because an online game and its notifications cannot work without them.</p>
 <div class="table"><table>
 <thead>
 <tr class="header">
@@ -177,6 +179,10 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <td>You made an invite to play a friend online. Includes the game, the points to win and the pace (live or async) only, never the invite code or any id</td>
 </tr>
 <tr class="even">
+<td>Turn notifications answered</td>
+<td>You answered your phone's question about turn notifications. Includes the answer only (allowed or not allowed), never the push token or any id</td>
+</tr>
+<tr class="odd">
 <td>Screen viewed</td>
 <td>You opened a screen. Includes the screen's name (for example "settings"), never personal data</td>
 </tr>
@@ -191,7 +197,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>PostHog's ids on your phone are deleted.</li>
 </ul>
 <p>A few events made just before you turned it off may still upload. Nothing new is collected.</p>
-<p>The switch does not cover online games with a friend: they need the game server (see the next section).</p>
+<p>The switch does not cover online games with a friend and their turn notifications: they need the game server (see the next sections).</p>
 <h3 id="online-games-with-a-friend-convex">Online games with a friend (Convex)</h3>
 <p>Only if you play a friend online. When you tap <strong>Make an invite</strong>, or <strong>Show the invite</strong> on an invite link, the app makes a <strong>guest account</strong> on our game server, once. The server runs on Convex, in the EU region <code>eu-west-1</code> (Ireland). Sign-in goes through Better Auth, on the same server.</p>
 <ul>
@@ -203,15 +209,25 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>The user id <strong>never goes to analytics</strong> (PostHog) and never goes into crash reports (Sentry).</li>
 </ul>
 <p>Before you make or open an invite, the app does not talk to the game server. When you open an invite link or a link to an online game, the app first asks the game server if this phone has a saved sign-in (it sends the sign-in cookie, if there is one). That check makes no account, and without a saved sign-in nothing is saved for you. With a saved sign-in, the app then loads the invite or the game.</p>
+<h3 id="turn-notifications-expo">Turn notifications (Expo)</h3>
+<p>Only if you turn them on. After you make or accept an invite for an <strong>async</strong> game (a day per turn), the app asks once if it may tell you when it is your turn. It never asks on the first launch, and never for a live game. <strong>Not now</strong> is kept: the app does not ask again by itself. You can turn them on later in <strong>Settings → Notifications</strong>, and off in your phone's settings.</p>
+<p>If you allow them:</p>
+<ul>
+<li>Your phone gets a <strong>push token</strong> from Expo's push service (Expo, through Apple's or Google's push service). It is a random address for this app on this phone. It is not your name, email or phone number.</li>
+<li>The app sends the push token and the phone system (iOS or Android) to our game server, under your guest account's user id. The server keeps, for each of your phones: the push token, the phone system and when the phone last sent it. At most 5 phones per account.</li>
+<li>When it is your turn in an async game, the server gives Expo the push token, a fixed text ("Your turn: an online game is waiting for your move") and the game's id, so a tap opens that game. No names, no emails and no moves. Expo passes the push to Apple or Google, which show it on your phone.</li>
+<li>The server deletes a push token when Expo says the phone no longer takes pushes (for example after you turn notifications off or delete the app), when you add a sixth phone (the oldest goes), when another account signs in on that phone (the token moves to that account), and when you sign out or your account is deleted.</li>
+<li>The push token <strong>never goes to analytics</strong> (PostHog) and never goes into crash reports (Sentry). Usage data gets only your answer (allowed or not allowed), and only if you allowed usage data.</li>
+</ul>
 <h2 id="what-we-never-do">What we never do</h2>
 <ul>
 <li>No ads, and no ad networks or ad ids.</li>
 <li>No tracking across other apps or websites.</li>
-<li>No selling or renting of your data. We do not share it with anyone except the three services below, and only to run the app.</li>
+<li>No selling or renting of your data. We do not share it with anyone except the four services below, and only to run the app.</li>
 <li>No contacts, no location, no microphone, no camera. No sign-in with your name, email, Apple or Google account: online games use a guest account with a random id only.</li>
 </ul>
 <h2 id="services-that-process-the-data">Services that process the data</h2>
-<p>We use three services. They process the data for us, under their data processing terms, and may not use it for their own purposes.</p>
+<p>We use four services. They process the data for us, under their data processing terms, and may not use it for their own purposes.</p>
 <div class="table"><table>
 <thead>
 <tr class="header">
@@ -236,19 +252,26 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 </tr>
 <tr class="odd">
 <td><strong>Convex</strong> (Convex, Inc., USA)</td>
-<td>The game server for online games with a friend: the guest account, the sign-in session, invites and online games</td>
+<td>The game server for online games with a friend: the guest account, the sign-in session, invites, online games and push tokens</td>
 <td>The EU (<code>eu-west-1</code>, Ireland)</td>
-<td>Until you ask us to delete them. The app does not delete old invites and games by itself yet. A sign-in session runs out 7 days after it was last renewed (Better Auth's default).</td>
+<td>Until you ask us to delete them. The app does not delete old invites and games by itself yet. A sign-in session runs out 7 days after it was last renewed (Better Auth's default). A push token: see "Turn notifications" above.</td>
+</tr>
+<tr class="even">
+<td><strong>Expo</strong> (650 Industries, Inc., USA)</td>
+<td>Carries turn notifications to Apple's and Google's push services</td>
+<td>The USA</td>
+<td>Expo's push service keeps a push only until it is delivered or runs out (at most the turn's time limit). Expo's docs say delivery receipts are kept for a day.</td>
 </tr>
 </tbody>
 </table></div>
-<p>All three companies are based in the USA. Their staff or sub-processors may reach the data from outside the EU. Their data processing terms set safeguards for such transfers, such as the EU Standard Contractual Clauses.</p>
+<p>All four companies are based in the USA. Their staff or sub-processors may reach the data from outside the EU. Their data processing terms set safeguards for such transfers, such as the EU Standard Contractual Clauses.</p>
 <h2 id="why-we-may-use-the-data-legal-basis">Why we may use the data (legal basis)</h2>
 <ul>
 <li><strong>Usage data:</strong> your consent (GDPR Article 6(1)(a)). You can withdraw it at any time in Settings. Withdrawing does not undo what was lawful before.</li>
 <li><strong>Crash reports before you answer:</strong> these hold no id at all, and we do not think they identify you. If they still count as personal data, we rely on our legitimate interest in finding and fixing crashes (GDPR Article 6(1)(f)). You can object at any time: tap <strong>Don't allow</strong>, or turn off the switch in Settings.</li>
 <li><strong>Crash reports after Allow:</strong> your consent, as for usage data.</li>
 <li><strong>Online games with a friend:</strong> the guest account, the sign-in session, your invites and your online games are needed to give you the online game you asked for (GDPR Article 6(1)(b)). If you do not want them, do not make or open an invite: the rest of the app works without them.</li>
+<li><strong>Turn notifications:</strong> you asked for them when you allowed them on your phone, so the push token is needed to give you that service (GDPR Article 6(1)(b)). Turn them off in your phone's settings at any time.</li>
 </ul>
 <h2 id="your-rights">Your rights</h2>
 <p>Under the GDPR you have the right to:</p>
@@ -261,7 +284,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li><strong>complain</strong> to a data protection authority. In Greece this is the Hellenic Data Protection Authority (<a href="https://www.dpa.gr"><span>www.dpa.gr</span></a>).</li>
 </ul>
 <p>To ask, write to <strong><a href="mailto:privacy@tavlaki.com">privacy@tavlaki.com</a></strong>. We answer within one month.</p>
-<p>Please note: we do not know who you are. The app does not show the install id or the user id yet, so we may not be able to find your data. Tell us your phone model and roughly when you used the app, and we will do our best. For online games, also send an invite code you made or accepted: it leads us to your user id, and then to your invites and games. Usage data and crash reports age out under the times in the table above. Deleting the app deletes the install id, the sign-in cookie and everything on your phone, but not your invites and games on the server: write to us to delete those.</p>
+<p>Please note: we do not know who you are. The app does not show the install id or the user id yet, so we may not be able to find your data. Tell us your phone model and roughly when you used the app, and we will do our best. For online games, also send an invite code you made or accepted: it leads us to your user id, and then to your invites and games. Usage data and crash reports age out under the times in the table above. Deleting the app deletes the install id, the sign-in cookie and everything on your phone, but not your invites and games on the server: write to us to delete those. A push token of a deleted app stops working, and the server deletes it when Expo says so.</p>
 <h2 id="children">Children</h2>
 <p>Tavlaki is not aimed at children under 13.</p>
 <p>In Greece, a child under 15 can give consent for an app like this only with a parent's or guardian's permission (Greek Law 4624/2019, Article 21). Other EU countries use an age between 13 and 16. If you are under that age, please ask a parent before you tap <strong>Allow usage data</strong>. The app works fully if you tap <strong>Don't allow</strong>.</p>
@@ -270,7 +293,6 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <p>These features are planned. They are <strong>not</strong> in the app today. We will update this policy before they go live and tell you in the app.</p>
 <ul>
 <li><strong>Sign-in with Apple, Google or an email link</strong>, and <strong>friends</strong>. These will store your account and friends list on our server (Convex), with sign-in through Better Auth. (Guest accounts and online games with a friend are live now: see above.)</li>
-<li><strong>Push notifications</strong> (for example "your turn"), through the Expo push service.</li>
 <li><strong>App updates over the air</strong> (EAS Update by Expo). The app will ask Expo's servers at launch if a newer version exists. This request carries technical facts only.</li>
 </ul>
 <h2 id="this-website">This website</h2>

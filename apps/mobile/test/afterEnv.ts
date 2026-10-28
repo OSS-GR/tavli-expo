@@ -2,6 +2,8 @@
 // (`setupFilesAfterEnv` in jest.config.js).
 
 import { resetAnnouncements } from '../src/features/game/useAnnouncement';
+import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPushes';
+import { forgetPushTapsForTest } from '../src/features/notifications/pushTaps';
 import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
 
 import { resetOnlineFake } from './onlineFake';
@@ -17,4 +19,7 @@ beforeEach(() => {
 beforeEach(() => {
   resetOnlineFake();
   forgetDevGamesForTest();
+  // Turn notifications (#285): a new instance on the reset fakes, and no tap opened yet.
+  resetTurnPushesForTest();
+  forgetPushTapsForTest();
 });
