@@ -161,6 +161,7 @@ describe('InviteScreen', () => {
       declineInvite: jest.fn(),
       cancelInvite: jest.fn(),
       listMyInvites: jest.fn(),
+      watchMyInvites: jest.fn(),
     };
     await openInvite('ABCD234O', invites);
     expect(screen.getByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();

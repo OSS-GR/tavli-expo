@@ -186,4 +186,21 @@ export interface Invites {
   cancelInvite(code: string): Promise<void>;
   /** The open invites the caller made, newest first. Invites whose time is up are left out. */
   listMyInvites(): Promise<InviteView[]>;
+  /**
+   * The live form of `listMyInvites` (#314): `onList` gets the list now
+   * and after every change to it (a new invite, an accept, a decline, a
+   * cancel, the expiry), until the returned function is called. Like
+   * `watchInvite`, it never calls back inside `watchMyInvites` or after
+   * the stop function, and each list is a copy. A failure goes to
+   * `onError`: `InviteErrorData` from the server (`NOT_SIGNED_IN`), or a
+   * network error as it is.
+   *
+   * The list changes when the server marks an invite `expired`, not when
+   * the time passes: a client that shows the list hides an invite at its
+   * `expiresAt` itself.
+   */
+  watchMyInvites(
+    onList: (invites: readonly InviteView[]) => void,
+    onError?: (error: unknown) => void,
+  ): () => void;
 }

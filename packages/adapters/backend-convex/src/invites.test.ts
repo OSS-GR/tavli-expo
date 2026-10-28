@@ -238,6 +238,61 @@ describe('watchInvite', () => {
   });
 });
 
+describe('watchMyInvites', () => {
+  it('watches listMyInvites and sends each list, a copy, on a later microtask', async () => {
+    const fake = fakeClient();
+    const invites = createConvexInvites({ client: fake.client });
+    const lists: (readonly InviteView[])[] = [];
+    const stop = invites.watchMyInvites((list) => lists.push(list));
+    const watch = fake.watches[0] as Watch;
+    expect(watch).toMatchObject({ name: 'invites:listMyInvites', args: {} });
+    const list = [VIEW];
+    watch.onResult(list);
+    expect(lists).toEqual([]);
+    await flush();
+    expect(lists).toEqual([[VIEW]]);
+    expect(lists[0]).not.toBe(list);
+    expect(lists[0]?.[0]).not.toBe(VIEW);
+    watch.onResult([]);
+    await flush();
+    expect(lists).toEqual([[VIEW], []]);
+    stop();
+  });
+
+  it('maps errors, and stop ends the client watch once and drops what is on its way', async () => {
+    const fake = fakeClient();
+    const invites = createConvexInvites({ client: fake.client });
+    const lists: unknown[] = [];
+    const errors: unknown[] = [];
+    const stop = invites.watchMyInvites(
+      (list) => lists.push(list),
+      (error) => errors.push(error),
+    );
+    const watch = fake.watches[0] as Watch;
+    watch.onError(new ConvexError({ code: 'NOT_SIGNED_IN', message: 'sign in' }));
+    await flush();
+    expect(errors).toEqual([{ code: 'NOT_SIGNED_IN', message: 'sign in' }]);
+
+    watch.onResult([VIEW]);
+    stop();
+    stop();
+    expect(watch.stops).toBe(1);
+    await flush();
+    expect(lists).toEqual([]);
+  });
+
+  it('works without onError', async () => {
+    const fake = fakeClient();
+    const lists: unknown[] = [];
+    createConvexInvites({ client: fake.client }).watchMyInvites((list) => lists.push(list));
+    const watch = fake.watches[0] as Watch;
+    watch.onError(new Error('x'));
+    watch.onResult([VIEW]);
+    await flush();
+    expect(lists).toEqual([[VIEW]]);
+  });
+});
+
 describe('toInviteError', () => {
   it('keeps only code and message of invite data, and leaves other values alone', () => {
     expect(toInviteError(new ConvexError({ code: 'OWN_INVITE', message: 'no', more: 1 }))).toEqual({

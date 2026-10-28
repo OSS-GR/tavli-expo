@@ -88,6 +88,9 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
   `acceptInvite` starts the game with `createGame` (the inviter plays
   white). No timer: an open invite counts as expired once `now()` reaches
   `expiresAt`. A rejected call rejects with plain `InviteErrorData`.
+  `watchMyInvites` (#314) sends the player's open invites on a later
+  microtask, then again after each change that changes the list; an
+  expiry reaches it only in `runDueTimeouts()`.
 - `setFlowForTest(gameId, flow)`, tests only: replaces the stored flow,
   like a Convex test that patches `games.flow`. Call it before anyone
   subscribes.
@@ -109,7 +112,7 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
   from `apps/server`).
 - `memory-invites.test.ts`: the `Invites` contract checks
   (`invitesContract`), the game an accept starts, codes and clashes,
-  and the cap on open invites.
+  `watchMyInvites` and the expiry, and the cap on open invites.
 
 An adapter of `GameTransport` (for example the Convex adapter) runs the
 same contract checks. They are plain async functions, so Vitest and Jest
