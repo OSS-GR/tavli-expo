@@ -5,7 +5,9 @@
  * - A local match comes from memory, or after an app restart from the
  *   save slot (`MatchScreen`).
  * - Any other id is an online game on the server (`OnlineMatchScreen`).
- *   Online games stay out of the save slot and History.
+ *   `OnlineConnect` picks the server: the in-memory one for a dev game,
+ *   else Convex, signed in as a guest (#266). Online games stay out of the
+ *   save slot and History.
  *
  * An unknown id or a broken save shows "This game could not be opened."
  * Both screens sit at the same place in the tree, so the board keeps its
@@ -30,8 +32,8 @@ import {
   rulesHref,
 } from '@/features/match/routes';
 import { stopDevGame } from '@/features/online/devGame';
+import { OnlineConnect } from '@/features/online/OnlineConnect';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
-import { gameTransportFor, onlinePlayerId } from '@/services';
 
 /** Back to Home: pops to it, or opens it when the board was the first screen. */
 function goHome() {
@@ -54,16 +56,20 @@ export default function GameRoute() {
   if (id !== null && !isLocalGameId(id)) {
     return (
       <View style={styles.screen}>
-        <OnlineMatchScreen
-          gameId={id}
-          transport={gameTransportFor(onlinePlayerId)}
-          me={onlinePlayerId}
-          paused={!focused}
-          onExit={goHome}
-          onSettings={() => router.push('/settings')}
-          onRules={(variant, preset) => router.push(rulesHref(variant, preset))}
-          onMatchOver={() => router.replace(matchEndHref(id))}
-        />
+        <OnlineConnect gameId={id} onHome={goHome}>
+          {({ transport, me }) => (
+            <OnlineMatchScreen
+              gameId={id}
+              transport={transport}
+              me={me}
+              paused={!focused}
+              onExit={goHome}
+              onSettings={() => router.push('/settings')}
+              onRules={(variant, preset) => router.push(rulesHref(variant, preset))}
+              onMatchOver={() => router.replace(matchEndHref(id))}
+            />
+          )}
+        </OnlineConnect>
       </View>
     );
   }

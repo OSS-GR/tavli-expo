@@ -18,6 +18,7 @@ import type { MemoryGameServer } from '@tavli/online';
 
 import type { BotTiming } from '@/features/bot/botTurn';
 
+import { rememberDevGame } from './devGameIds';
 import { startOnlineBot } from './onlineBot';
 
 /** The bot's player id in a dev game. */
@@ -62,6 +63,7 @@ export function startDevGame(options: DevGameOptions): DevGame {
     options.targetPoints,
     options.pace,
   );
+  rememberDevGame(gameId);
   const bot = startOnlineBot({
     transport: server.transportFor(DEV_BOT_ID),
     gameId,

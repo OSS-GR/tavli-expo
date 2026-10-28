@@ -44,6 +44,8 @@ const vendorImports = {
     'expo-haptics',
     // Sound: use the `SoundPlayer` port and `@tavli/audio-expo`.
     'expo-audio',
+    // The sign-in cookie: use the `AuthProvider` port and `@tavli/auth-better-auth`.
+    'expo-secure-store',
   ],
   message:
     'Vendor SDKs belong in packages/adapters/* (or apps/server). Use a port from @tavli/contracts instead. See ADR-0002.',
