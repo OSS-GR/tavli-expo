@@ -22,6 +22,7 @@ import type { Rng } from '@tavli/engine';
 import type { MemoryGameServer } from '@tavli/online';
 
 import type { BotTiming } from '@/features/bot/botTurn';
+import { onInviteAccepted } from '@/features/invites/acceptedInvite';
 
 import { rememberDevGame } from './devGameIds';
 import { startOnlineBot } from './onlineBot';
@@ -123,15 +124,15 @@ export interface DevInvite {
   stop: () => void;
 }
 
-/** The dev invite that runs now, if any. */
-let currentInvite: DevInvite | null = null;
-
 /**
  * The bot makes an invite (#256). Every `DEV_TICK_MS` the dev invite
  * looks at it: once it is accepted, the bot plays the new game; once it
  * is declined or expired, it stops. The game or invite before it stops.
  * A dev invite that stops while open is cancelled, so nobody can accept
  * it later and wait for a bot that never comes.
+ *
+ * It also looks at once after each Accept on this phone
+ * (`onInviteAccepted`), so the bot starts without waiting for a tick.
  */
 export function startDevInvite(options: DevMatchOptions): DevInvite {
   current?.stop();
@@ -146,27 +147,19 @@ export function startDevInvite(options: DevMatchOptions): DevInvite {
     if (view?.status === 'accepted' && view.gameId !== null) playDevGame(view.gameId, options);
   };
   const timer = setInterval(check, DEV_TICK_MS);
+  const stopListening = onInviteAccepted(check);
   const invite: DevInvite = {
     code,
     check,
     stop: () => {
       clearInterval(timer);
+      stopListening();
       if (server.getInvite(code)?.status === 'open') server.cancelInvite(DEV_BOT_ID, code);
       if (current === invite) current = null;
-      if (currentInvite === invite) currentInvite = null;
     },
   };
   current = invite;
-  currentInvite = invite;
   return invite;
-}
-
-/**
- * Looks at the running dev invite now, not on its next tick. The invite
- * route calls it after Accept, so the bot starts at once.
- */
-export function checkDevInvite(): void {
-  currentInvite?.check();
 }
 
 /**
