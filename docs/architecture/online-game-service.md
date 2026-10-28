@@ -297,7 +297,7 @@ Decline and cancel check the invite like accept: open (`INVITE_CLOSED`) and in t
 
 ### Expiry
 
-An invite lasts **24 hours** (`INVITE_TIME_MS`, open question Q31). `createInvite` schedules `internal.invites.expireInvite` at `expiresAt`, as `checkTimeout` does for turns. If it runs too early, it schedules itself again. The calls check the time as well: at or after `expiresAt` (`now >= expiresAt`) an open invite counts as expired, also before the scheduler has marked it. `getInvite` then shows `expired` and `listMyInvites` leaves it out. An expired accept throws `INVITE_EXPIRED` and saves nothing; the scheduled `expireInvite` marks the row.
+An invite lasts **24 hours** (`INVITE_TIME_MS`; the owner kept it, Q31 in `docs/open-questions.md`). `createInvite` schedules `internal.invites.expireInvite` at `expiresAt`, as `checkTimeout` does for turns. If it runs too early, it schedules itself again. The calls check the time as well: at or after `expiresAt` (`now >= expiresAt`) an open invite counts as expired, also before the scheduler has marked it. `getInvite` then shows `expired` and `listMyInvites` leaves it out. An expired accept throws `INVITE_EXPIRED` and saves nothing; the scheduled `expireInvite` marks the row.
 
 ### Cap on open invites
 
@@ -334,8 +334,8 @@ The Convex project has two deployments (#129), both in the EU (`eu-west-1`):
 
 | Target | Deployment | URL | Deploy key (GitHub secret) | App variants |
 |---|---|---|---|---|
-| dev | `exciting-reindeer-792` | `https://exciting-reindeer-792.eu-west-1.convex.cloud` | `CONVEX_DEPLOY_KEY_DEV` | `development` |
-| prod | `superb-dog-503` | `https://superb-dog-503.eu-west-1.convex.cloud` | `CONVEX_DEPLOY_KEY_PROD` | `preview`, `production` |
+| dev | `exciting-reindeer-792` | `https://exciting-reindeer-792.eu-west-1.convex.cloud` | `CONVEX_DEPLOY_KEY_DEV` | `development`, `preview` |
+| prod | `superb-dog-503` | `https://superb-dog-503.eu-west-1.convex.cloud` | `CONVEX_DEPLOY_KEY_PROD` | `production` |
 
 The URLs are public client config. They live in `apps/mobile/app.config.ts` (see [Running the app](../process/running-the-app.md#which-server-the-app-uses)). The deploy keys are secrets. They live only in GitHub, never in the repo. `CONVEX_DEPLOY_KEY_DEV` is a repo secret. `CONVEX_DEPLOY_KEY_PROD` is a secret of the GitHub environment `production`, which only `main` may use, so no other branch or workflow can read it. Do not keep a repo secret of the same name as well.
 
