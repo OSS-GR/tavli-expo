@@ -13,9 +13,10 @@ import type {
   OnlineGamePace,
   OnlineGameView,
 } from '@tavli/contracts';
-import { createBoard, createSeededRng, plakoto, replay } from '@tavli/engine';
-import type { FlowEvent, GameFlow, GameState, PlayerId } from '@tavli/engine';
+import { createSeededRng, replay } from '@tavli/engine';
+import type { FlowEvent, PlayerId } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
+import { motherPin } from '@tavli/online/testing';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -463,50 +464,21 @@ describe('resign', () => {
 });
 
 describe('the Plakoto mother question', () => {
-  /**
-   * Black to move with 5-2. Black's 3/1* pins White's mother (White's lone
-   * checker on its start point). Same position as the engine test
-   * `plakoto-mother.test.ts`: `w: 24 6x14 ; b: 10x14 3`.
-   */
+  /** Black pins White's mother (`motherPin`: every White roll after it has a move). */
   async function pinTheMother(t: Tester): Promise<Id<'games'>> {
     const gameId = await createGame(t, 'plakoto');
-    await t.run(async (ctx) => {
+    const pin = await t.run(async (ctx) => {
       const doc = await ctx.db.get(gameId);
       if (doc === null) throw new Error('no game');
-      const flow = loadFlow(doc.flow);
-      const board = createBoard(
-        { white: { points: { 24: 1, 6: 14 } }, black: { points: { 10: 14, 3: 1 } } },
-        'contrary',
-      );
-      const state: GameState = {
-        ...flow.game.state,
-        board,
-        toMove: 'black',
-        dice: [5, 2],
-        turnNumber: 9,
-        variantData: null,
-      };
-      const game: GameFlow = {
-        ...flow.game,
-        phase: 'moving',
-        state,
-        starter: 'black',
-        played: [],
-        lastTurn: null,
-        result: null,
-      };
-      await ctx.db.patch(gameId, { flow: storeFlow({ ...flow, game }, null) });
+      const pinned = motherPin(loadFlow(doc.flow));
+      await ctx.db.patch(gameId, { flow: storeFlow(pinned.flow, null) });
+      return pinned.pin;
     });
     const v = await view(t, gameId);
-    const state = v.game.state;
-    const pin = plakoto
-      .legalTurns(state, [5, 2])
-      .find((turn) => turn.moves.some((m) => m.capture === 'pin'));
-    if (pin === undefined) throw new Error('no pinning turn');
     await as(t, BOB).mutation(api.games.makeMove, {
       gameId,
       expectedVersion: v.version,
-      moves: [...pin.moves],
+      moves: [...pin],
     });
     return gameId;
   }
@@ -544,13 +516,10 @@ describe('the Plakoto mother question', () => {
     expect(after.version).toBe(v.version + 1);
     expect(after.status).toBe('active');
     expect(after.prompt).toBeNull();
-    // The server rolled for White right after the answer (with 6-6 White
-    // has no move and passes, so then it is Black's roll).
-    const rolledForWhite =
-      after.game.state.toMove === 'white'
-        ? after.game.state.dice !== null
-        : after.game.lastTurn?.player === 'white';
-    expect(rolledForWhite).toBe(true);
+    // The server rolled for White right after the answer.
+    expect(after.waitingFor).toBe('white');
+    expect(after.game.state.toMove).toBe('white');
+    expect(after.game.state.dice).not.toBeNull();
     await rejectsWith(
       as(t, ALICE).mutation(api.games.answer, { ...call, choice: 'playOn' }),
       'STALE_VERSION',
