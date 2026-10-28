@@ -15,9 +15,17 @@
 import type { AuthProvider, AuthUser } from '@tavli/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/** The user of the saved session, or a new guest when there is none. */
+import { forgetOnlineAccount, rememberOnlineAccount } from './accountHint';
+
+/**
+ * The user of the saved session, or a new guest when there is none. Notes
+ * on the phone that it has an account (`accountHint.ts`), so Home lists
+ * its online games.
+ */
 export async function signInForOnline(auth: AuthProvider): Promise<AuthUser> {
-  return (await auth.ready()) ?? (await auth.signInAsGuest());
+  const user = (await auth.ready()) ?? (await auth.signInAsGuest());
+  rememberOnlineAccount();
+  return user;
 }
 
 /**
@@ -26,6 +34,8 @@ export async function signInForOnline(auth: AuthProvider): Promise<AuthUser> {
  * still lets it call the server. Else the signed-out user would still get
  * turn pushes on this phone. `pushes` is `undefined` when the build has
  * no turn notifications. A failed removal does not stop the sign-out.
+ * After it, the phone forgets its account note (`accountHint.ts`, #297),
+ * so Home loads no session at the next start.
  */
 export async function signOutOfOnline(
   auth: AuthProvider,
@@ -33,6 +43,7 @@ export async function signOutOfOnline(
 ): Promise<void> {
   await pushes?.unregister().catch(() => undefined);
   await auth.signOut();
+  forgetOnlineAccount();
 }
 
 export type OnlineAccount =
@@ -70,6 +81,7 @@ export function useOnlineAccount(auth: AuthProvider): {
     let live = true;
     auth.ready().then(
       (user) => {
+        if (user !== null) rememberOnlineAccount();
         if (live) setAccount(user === null ? { status: 'signedOut' } : signedIn(user));
       },
       () => {

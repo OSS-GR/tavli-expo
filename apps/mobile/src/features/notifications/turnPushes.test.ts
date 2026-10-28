@@ -10,6 +10,7 @@ import {
 } from '@tavli/contracts';
 
 import { signOutOfOnline } from '@/features/online/account';
+import { hasOnlineAccount, rememberOnlineAccount } from '@/features/online/accountHint';
 
 import { TURN_PUSHES_STORAGE_KEY, createTurnPushes } from './turnPushes';
 
@@ -230,5 +231,13 @@ describe('the token on the server', () => {
     await auth.signInAsGuest();
     await signOutOfOnline(auth, undefined);
     expect(auth.currentUser()).toBeNull();
+  });
+
+  it('sign-out forgets the account note, so Home loads no session (#297)', async () => {
+    const { auth } = setup();
+    await auth.signInAsGuest();
+    rememberOnlineAccount();
+    await signOutOfOnline(auth, undefined);
+    expect(hasOnlineAccount()).toBe(false);
   });
 });

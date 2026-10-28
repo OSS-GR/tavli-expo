@@ -88,6 +88,8 @@ function RootStack() {
           {/* Play a friend online (#281): the setup, then the waiting screen. */}
           <Stack.Screen name="friend/index" />
           <Stack.Screen name="friend/[code]" />
+          {/* Your online games (#297): "See all" on Home. */}
+          <Stack.Screen name="online-games" options={{ headerShown: true }} />
         </Stack.Protected>
         <Stack.Protected guard={welcome} redirectTo={afterWelcome}>
           {/* No swipe back out of the first step before the user answers. */}

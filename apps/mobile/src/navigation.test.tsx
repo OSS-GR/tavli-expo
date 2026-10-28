@@ -15,6 +15,7 @@ import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { JOINED_OPEN_MS } from '@/features/invites/InviteWaitScreen';
 import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
+import { rememberOnlineAccount } from '@/features/online/accountHint';
 import { DEV_BOT_ID, DEV_TICK_MS, devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
 import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
@@ -1089,6 +1090,75 @@ describe('play a friend online (#281)', () => {
     await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await user.press(screen.getByRole('button', { name: 'Back' }));
     expect(router.getPathname()).toBe('/');
+    expect(onlineFake.authStore.guests).toBe(0);
+  });
+});
+
+describe('your online games on Home (#297)', () => {
+  const ME = 'guest-1';
+
+  /** A game of mine vs Bob, one second after the last change. */
+  function newGame(): string {
+    jest.advanceTimersByTime(1000);
+    return onlineFake.server().createGame(ME, { white: ME, black: 'bob' }, 'portes', 3, 'async');
+  }
+
+  it('a phone with no online account loads no session at start', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    newGame();
+    const ready = jest.spyOn(onlineFake.auth, 'ready');
+    await renderRouter('./src/app', { initialUrl: '/' });
+    expect(await screen.findByText('Greek tavli with friends')).toBeOnTheScreen();
+    expect(ready).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('home-online-games')).toBeNull();
+    ready.mockRestore();
+  });
+
+  it('after an invite, Home lists the game; a tap opens it', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
+    const code = router.getPathname().split('/').at(-1)!;
+    let gameId = '';
+    await act(async () => {
+      gameId = await onlineFake.invitesFor('bob').acceptInvite(code);
+    });
+    await user.press(await screen.findByRole('button', { name: 'Open the game' }));
+    expect(router.getPathname()).toBe(`/game/${gameId}`);
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe('/');
+    const row = await screen.findByTestId(`online-game-${gameId}`);
+    expect(row).toHaveAccessibleName(/^Portes vs friend, /);
+    await user.press(row);
+    expect(router.getPathname()).toBe(`/game/${gameId}`);
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+  });
+
+  it('"See all" lists every game, and a tap opens one', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    rememberOnlineAccount();
+    const ids = [newGame(), newGame(), newGame(), newGame()];
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('link', { name: 'See all (4)' }));
+    expect(router.getPathname()).toBe('/online-games');
+    expect(await screen.findByTestId(`online-game-${ids[0]}`)).toBeOnTheScreen();
+    expect(screen.getAllByTestId(/^online-game-/)).toHaveLength(4);
+    await user.press(screen.getByTestId(`online-game-${ids[0]}`));
+    expect(router.getPathname()).toBe(`/game/${ids[0]}`);
+  });
+
+  it('"See all" with no session says it did not load, and makes no account', async () => {
+    // ready() gives null: maybe no network, so the list offers Try again.
+    await renderRouter('./src/app', { initialUrl: '/online-games' });
+    expect(
+      await screen.findByText('Your online games did not load. Check the connection.'),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(0);
   });
 });
