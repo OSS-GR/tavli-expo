@@ -202,7 +202,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>The invite code and the link go where <strong>you</strong> share them (for example a chat app). Anyone with the code can see the invite and accept it until it expires.</li>
 <li>The user id <strong>never goes to analytics</strong> (PostHog) and never goes into crash reports (Sentry).</li>
 </ul>
-<p>Before your first invite, the app does not talk to the game server.</p>
+<p>Before you make or open an invite, the app does not talk to the game server. When you open an invite link or a link to an online game, the app first asks the game server if this phone has a saved sign-in (it sends the sign-in cookie, if there is one). That check makes no account, and without a saved sign-in nothing is saved for you. With a saved sign-in, the app then loads the invite or the game.</p>
 <h2 id="what-we-never-do">What we never do</h2>
 <ul>
 <li>No ads, and no ad networks or ad ids.</li>

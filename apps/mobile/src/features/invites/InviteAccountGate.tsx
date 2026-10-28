@@ -103,6 +103,8 @@ function AccountCard({ busy, failed, onShow, onHome }: AccountCardProps) {
   const title = t('invite.account.title');
   const body = t('invite.account.body');
   useAnnouncement(`${title} ${body}`);
+  // iOS VoiceOver does not read `accessibilityRole="alert"`: read the problem.
+  useAnnouncement(failed ? t('invite.account.failed') : null);
   return (
     <View testID="invite-account" style={styles.card}>
       <Text ref={titleRef} style={styles.title} accessibilityRole="header">
@@ -125,7 +127,7 @@ function AccountCard({ busy, failed, onShow, onHome }: AccountCardProps) {
       </View>
       {busy ? <Text style={styles.line}>{t('invite.account.busy')}</Text> : null}
       {failed ? (
-        <Text testID="invite-account-failed" style={styles.line} accessibilityRole="alert">
+        <Text testID="invite-account-failed" style={styles.line}>
           {t('invite.account.failed')}
         </Text>
       ) : null}

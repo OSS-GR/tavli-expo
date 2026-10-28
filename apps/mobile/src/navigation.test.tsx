@@ -1060,6 +1060,29 @@ describe('play a friend online (#281)', () => {
     createInvite.mockRestore();
   });
 
+  it('a waiting-screen link with nobody signed in shows "not found", with no call and no account', async () => {
+    const theirs = await onlineFake
+      .invitesFor('bob')
+      .createInvite({ choice: 'portes', targetPoints: 3, pace: 'live' });
+    const watchInvite = jest.spyOn(onlineFake.invites, 'watchInvite');
+    await renderRouter('./src/app', { initialUrl: `/friend/${theirs}` });
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
+    expect(watchInvite).not.toHaveBeenCalled();
+    expect(onlineFake.authStore.guests).toBe(0);
+    watchInvite.mockRestore();
+  });
+
+  it("a waiting-screen link to a friend's invite shows \"not found\"", async () => {
+    await onlineFake.auth.signInAsGuest();
+    const theirs = await onlineFake
+      .invitesFor('bob')
+      .createInvite({ choice: 'portes', targetPoints: 3, pace: 'live' });
+    await renderRouter('./src/app', { initialUrl: `/friend/${theirs}` });
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Cancel the invite' })).toBeNull();
+    expect(onlineServer().getInvite(theirs)?.status).toBe('open');
+  });
+
   it('Back from the setup goes Home, and makes no account', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });

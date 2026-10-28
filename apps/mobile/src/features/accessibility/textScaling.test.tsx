@@ -576,7 +576,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     const props = { onGame: jest.fn(), onNewInvite: jest.fn(), onHome: jest.fn() };
     const joined = server.createInvite('me', 'tavli', 5, 'async');
     const wait = await renderWithRoot(
-      <InviteWaitScreen code={joined} invites={server.invitesFor('me')} {...props} />,
+      <InviteWaitScreen code={joined} me="me" invites={server.invitesFor('me')} {...props} />,
     );
     expect(await screen.findByTestId('invite-wait-share')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
@@ -590,7 +590,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     const expired = server.createInvite('me', 'portes', 1, 'live');
     clock += INVITE_TIME_MS;
     await renderWithRoot(
-      <InviteWaitScreen code={expired} invites={server.invitesFor('me')} {...props} />,
+      <InviteWaitScreen code={expired} me="me" invites={server.invitesFor('me')} {...props} />,
     );
     expect(await screen.findByTestId('invite-wait-again')).toBeOnTheScreen();
     expect(problems()).toEqual([]);

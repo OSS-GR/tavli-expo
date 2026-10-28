@@ -12,7 +12,8 @@ import { isInviteErrorData, type InviteView } from '@tavli/contracts';
  * - `declined`: the friend said no.
  * - `expired`: nobody answered within 24 hours.
  * - `cancelled`: the inviter took it back (on another screen or phone).
- * - `notFound`: no invite has this code, or this phone is not signed in.
+ * - `notFound`: no invite has this code, it is someone else's, or this
+ *   phone is not signed in.
  * - `failed`: the watch failed (for example no network).
  */
 export type WaitState =
@@ -32,9 +33,13 @@ export function isFinalWait(state: WaitState): boolean {
   return state.kind !== 'loading' && state.kind !== 'open' && state.kind !== 'failed';
 }
 
-/** The state for a view of the watched invite. */
-export function waitStateOfView(view: InviteView | null): WaitState {
-  if (view === null) return { kind: 'notFound' };
+/**
+ * The state for a view of the watched invite. `me` is the signed-in user:
+ * an invite from someone else is not this phone's to wait for, so it is
+ * "not found" (a friend opens it on the invite screen instead).
+ */
+export function waitStateOfView(view: InviteView | null, me: string): WaitState {
+  if (view === null || view.from !== me) return { kind: 'notFound' };
   switch (view.status) {
     case 'open':
       return { kind: 'open', view };

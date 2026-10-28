@@ -45,13 +45,15 @@ function setup() {
   };
 }
 
-async function openWait(code: string, invites: Invites) {
+async function openWait(code: string, invites: Invites, me: string | null | undefined = ME) {
   const props = {
     onGame: jest.fn<void, [string]>(),
     onNewInvite: jest.fn(),
     onHome: jest.fn(),
   };
-  const view = await renderWithRoot(<InviteWaitScreen code={code} invites={invites} {...props} />);
+  const view = await renderWithRoot(
+    <InviteWaitScreen code={code} me={me} invites={invites} {...props} />,
+  );
   return { ...props, ...view };
 }
 
@@ -229,12 +231,15 @@ describe('InviteWaitScreen', () => {
       ...mine,
       cancelInvite: () => Promise.reject(new Error('offline')),
     };
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const { onHome } = await openWait(code, invites);
     await user.press(await screen.findByRole('button', { name: 'Cancel the invite' }));
     await flush();
-    expect(
-      screen.getByText('The invite was not cancelled. Check the connection and try again.'),
-    ).toBeOnTheScreen();
+    const text = 'The invite was not cancelled. Check the connection and try again.';
+    expect(screen.getByText(text)).toBeOnTheScreen();
+    // Read out: iOS VoiceOver does not read alert roles.
+    expect(announce).toHaveBeenLastCalledWith(text);
+    announce.mockRestore();
     expect(screen.getByRole('button', { name: 'Cancel the invite' })).toBeEnabled();
     expect(server.getInvite(code)?.status).toBe('open');
     expect(onHome).not.toHaveBeenCalled();
@@ -316,6 +321,38 @@ describe('InviteWaitScreen', () => {
     expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
   });
 
+  it("shows \"not found\" for someone else's invite, with no Share or Cancel", async () => {
+    const { server } = setup();
+    const theirs = server.createInvite(FRIEND, 'portes', 3, 'live');
+    await openWait(theirs, server.invitesFor(ME));
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Cancel the invite' })).toBeNull();
+    expect(server.getInvite(theirs)?.status).toBe('open');
+  });
+
+  it('with nobody signed in shows "not found" and never calls the server', async () => {
+    const { code, mine } = setup();
+    const watchInvite = jest.fn(mine.watchInvite);
+    await openWait(code, { ...mine, watchInvite }, null);
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
+    expect(watchInvite).not.toHaveBeenCalled();
+  });
+
+  it('waits for the saved session before it watches', async () => {
+    const { code, mine } = setup();
+    const watchInvite = jest.fn(mine.watchInvite);
+    const invites = { ...mine, watchInvite };
+    const props = { onGame: jest.fn(), onNewInvite: jest.fn(), onHome: jest.fn() };
+    const view = await renderWithRoot(
+      <InviteWaitScreen code={code} me={undefined} invites={invites} {...props} />,
+    );
+    expect(screen.getByText('Loading the invite…')).toBeOnTheScreen();
+    expect(watchInvite).not.toHaveBeenCalled();
+    await view.rerender(<InviteWaitScreen code={code} me={ME} invites={invites} {...props} />);
+    expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
+    expect(watchInvite).toHaveBeenCalledTimes(1);
+  });
+
   it('a watch that fails shows "did not load"; Try again watches again', async () => {
     const user = setupUser();
     const { code, mine } = setup();
@@ -392,16 +429,21 @@ describe('waitState', () => {
   } as const;
 
   it('turns each view into a state', () => {
-    expect(waitStateOfView(null)).toEqual({ kind: 'notFound' });
-    expect(waitStateOfView(view)).toEqual({ kind: 'open', view });
-    expect(waitStateOfView({ ...view, status: 'accepted', gameId: 'game-1' })).toEqual({
+    expect(waitStateOfView(null, ME)).toEqual({ kind: 'notFound' });
+    expect(waitStateOfView(view, ME)).toEqual({ kind: 'open', view });
+    expect(waitStateOfView({ ...view, status: 'accepted', gameId: 'game-1' }, ME)).toEqual({
       kind: 'joined',
       gameId: 'game-1',
     });
-    expect(waitStateOfView({ ...view, status: 'accepted' })).toEqual({ kind: 'failed' });
-    expect(waitStateOfView({ ...view, status: 'declined' })).toEqual({ kind: 'declined' });
-    expect(waitStateOfView({ ...view, status: 'cancelled' })).toEqual({ kind: 'cancelled' });
-    expect(waitStateOfView({ ...view, status: 'expired' })).toEqual({ kind: 'expired' });
+    expect(waitStateOfView({ ...view, status: 'accepted' }, ME)).toEqual({ kind: 'failed' });
+    expect(waitStateOfView({ ...view, status: 'declined' }, ME)).toEqual({ kind: 'declined' });
+    expect(waitStateOfView({ ...view, status: 'cancelled' }, ME)).toEqual({ kind: 'cancelled' });
+    expect(waitStateOfView({ ...view, status: 'expired' }, ME)).toEqual({ kind: 'expired' });
+    // Someone else's invite is not this phone's to wait for.
+    expect(waitStateOfView(view, FRIEND)).toEqual({ kind: 'notFound' });
+    expect(waitStateOfView({ ...view, status: 'accepted', gameId: 'game-1' }, FRIEND)).toEqual({
+      kind: 'notFound',
+    });
   });
 
   it('turns errors into states', () => {

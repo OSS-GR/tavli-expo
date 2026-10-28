@@ -124,7 +124,7 @@ Only if you play a friend online. When you tap **Make an invite**, or **Show the
 - The invite code and the link go where **you** share them (for example a chat app). Anyone with the code can see the invite and accept it until it expires.
 - The user id **never goes to analytics** (PostHog) and never goes into crash reports (Sentry).
 
-Before your first invite, the app does not talk to the game server.
+Before you make or open an invite, the app does not talk to the game server. When you open an invite link or a link to an online game, the app first asks the game server if this phone has a saved sign-in (it sends the sign-in cookie, if there is one). That check makes no account, and without a saved sign-in nothing is saved for you. With a saved sign-in, the app then loads the invite or the game.
 
 ## What we never do
 

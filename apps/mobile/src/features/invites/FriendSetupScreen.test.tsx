@@ -12,7 +12,7 @@ import {
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, MAX_OPEN_INVITES } from '@tavli/online';
-import { act, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
 import i18n from '@/i18n';
@@ -200,6 +200,95 @@ describe('FriendSetupScreen', () => {
     await act(async () => {
       await i18n.changeLanguage('en');
     });
+  });
+
+  it('a second tap while the invite is made makes no second invite', async () => {
+    const parts = setup();
+    const createInvite = jest.spyOn(parts.invites, 'createInvite');
+    const { onCreated } = await open(parts);
+    const button = screen.getByRole('button', { name: 'Make an invite' });
+    // Two taps in the same frame: the second comes before a render.
+    await act(async () => {
+      fireEvent.press(button);
+      fireEvent.press(button);
+    });
+    expect(createInvite).toHaveBeenCalledTimes(1);
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    expect(parts.authStore.guests).toBe(1);
+  });
+
+  it('Back while the invite is made: the new invite is cancelled, not left open', async () => {
+    const user = setupUser();
+    const parts = setup();
+    await parts.auth.signInAsGuest();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const real = parts.invites.createInvite;
+    const invites: Invites = {
+      ...parts.invites,
+      createInvite: async (game) => {
+        const code = await real(game);
+        await held;
+        return code;
+      },
+    };
+    const view = await open({ ...parts, invites });
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await view.unmount();
+    await act(async () => release());
+    await act(async () => {
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    });
+    const mine = await parts.server.invitesFor('guest-1').listMyInvites();
+    expect(mine).toEqual([]);
+    expect(view.onCreated).not.toHaveBeenCalled();
+    expect(parts.analytics.sent).toEqual([]);
+  });
+
+  it('Back before the account is ready makes no invite', async () => {
+    const user = setupUser();
+    const parts = setup();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const auth: AuthProvider = {
+      ...parts.auth,
+      signInAsGuest: async () => {
+        await held;
+        return parts.auth.signInAsGuest();
+      },
+    };
+    const createInvite = jest.spyOn(parts.invites, 'createInvite');
+    const view = await open({ ...parts, auth });
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await view.unmount();
+    await act(async () => release());
+    await act(async () => {
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    });
+    expect(createInvite).not.toHaveBeenCalled();
+  });
+
+  it('screen readers: a problem is read out (iOS does not read alert roles)', async () => {
+    const user = setupUser();
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    const parts = setup();
+    const createInvite = jest
+      .fn<Promise<string>, Parameters<Invites['createInvite']>>()
+      .mockRejectedValue(new Error('offline'));
+    await open({ ...parts, invites: { ...parts.invites, createInvite } });
+    const text = 'The invite was not made. Check the connection and try again.';
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(announce).toHaveBeenLastCalledWith(text);
+    // The same problem again is read again.
+    announce.mockClear();
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(announce).toHaveBeenCalledWith(text);
+    expect(announce).toHaveBeenCalledTimes(1);
+    announce.mockRestore();
   });
 
   it('screen readers: focus moves to the title', async () => {

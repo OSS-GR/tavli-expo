@@ -40,6 +40,12 @@ export const JOINED_OPEN_MS = 1500;
 export interface InviteWaitScreenProps {
   /** The invite code, in capital letters. */
   code: string;
+  /**
+   * The signed-in user. `undefined` while the saved session loads, `null`
+   * when nobody is signed in: then the invite cannot be this phone's, so
+   * the screen shows "not found" and never calls the server.
+   */
+  me: string | null | undefined;
   invites: Invites;
   /** The friend accepted: open the game. Called once. */
   onGame: (gameId: string) => void;
@@ -50,6 +56,7 @@ export interface InviteWaitScreenProps {
 
 export function InviteWaitScreen({
   code,
+  me,
   invites,
   onGame,
   onNewInvite,
@@ -74,6 +81,8 @@ export function InviteWaitScreen({
   }, []);
 
   useEffect(() => {
+    // No session yet, or none at all: no watch (see `shown` below).
+    if (typeof me !== 'string') return undefined;
     let watching = true;
     let stopWatch = () => {};
     const finish = () => {
@@ -84,7 +93,7 @@ export function InviteWaitScreen({
     stopWatch = invites.watchInvite(
       code,
       (view) => {
-        const next = waitStateOfView(view);
+        const next = waitStateOfView(view, me);
         if (next.kind === 'cancelled' && cancelPending.current) {
           // Most likely our own Cancel: it goes Home when it answers.
           heldCancel.current = next;
@@ -97,7 +106,9 @@ export function InviteWaitScreen({
       (error) => setState(waitStateOfError(error)),
     );
     return finish;
-  }, [code, invites, attempt]);
+  }, [code, invites, attempt, me]);
+  const shown: WaitState =
+    me === undefined ? { kind: 'loading' } : me === null ? { kind: 'notFound' } : state;
 
   const retry = () => {
     setState({ kind: 'loading' });
@@ -141,22 +152,22 @@ export function InviteWaitScreen({
       testID="invite-wait-screen"
       style={styles.screen}
       contentContainerStyle={styles.content}>
-      {state.kind === 'loading' ? (
+      {shown.kind === 'loading' ? (
         <Loading />
-      ) : state.kind === 'open' ? (
+      ) : shown.kind === 'open' ? (
         <Waiting
           code={code}
           cancelling={cancelling}
           cancelFailed={cancelFailed}
           onCancel={cancel}
         />
-      ) : state.kind === 'joined' ? (
-        <Joined code={code} gameId={state.gameId} onGame={onGame} />
+      ) : shown.kind === 'joined' ? (
+        <Joined code={code} gameId={shown.gameId} onGame={onGame} />
       ) : (
         // A new state is a new card, so focus moves to its title again.
         <Closed
-          key={state.kind}
-          kind={state.kind}
+          key={shown.kind}
+          kind={shown.kind}
           onRetry={retry}
           onNewInvite={onNewInvite}
           onHome={onHome}
@@ -194,6 +205,8 @@ function Waiting({ code, cancelling, cancelFailed, onCancel }: WaitingProps) {
   const link = inviteAppUrl(code);
   // Read once per invite in this app run (#216).
   useAnnouncement(`${title} ${body}`, `invite-wait:${code}`);
+  // iOS VoiceOver does not read `accessibilityRole="alert"`: read the problem.
+  useAnnouncement(cancelFailed ? t('friend.wait.cancelFailed') : null);
   const share = () => {
     Share.share({ message: t('friend.wait.shareMessage', { link, code }) }).catch(
       (error: unknown) => console.warn('share failed', error),
@@ -238,7 +251,7 @@ function Waiting({ code, cancelling, cancelFailed, onCancel }: WaitingProps) {
       </View>
       {cancelling ? <Text style={styles.line}>{t('friend.wait.cancelling')}</Text> : null}
       {cancelFailed ? (
-        <Text testID="invite-wait-cancel-failed" style={styles.line} accessibilityRole="alert">
+        <Text testID="invite-wait-cancel-failed" style={styles.line}>
           {t('friend.wait.cancelFailed')}
         </Text>
       ) : null}

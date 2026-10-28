@@ -7,6 +7,7 @@ Version: `convex` 1.46.0, a peer dependency (the app installs it). Keep it on th
 ## What it does
 
 - **No player id in the calls.** The Convex client sends the sign-in token (`setAuth`), and the server reads the caller from it (`identity.subject`, #131). Online play needs a signed-in user (a guest is enough).
+- **Sign-in changes.** Convex asks for a token on `setAuth`, and again only when the server refuses one; a first `null` (nobody signed in yet) leaves the client signed out for good. So `createConvexClient` calls `setAuth` again on each `auth.onChange` (#281): a guest made after the client opened is signed in at once.
 - **`subscribe`** watches the `getGame` query. Each result goes to `onView`. A `null` result (no such game) goes to `onError` as `NOT_FOUND`. Neither is ever called inside `subscribe`, or after its stop function: each result waits one microtask.
 - **`listMyGames({ status })`** (#296) runs the `listMyGames` query once (`client.query`) and resolves with a copy of the list: the caller's games with that status, newest change first, at most 50. It is a call, not a live list: call it again to see changes.
 - **`sendTurn` / `sendAnswer`** call `makeMove` / `answer` and resolve once the mutation resolves (the Convex client has the new view by then). When the turn time ran out first, the server saves the time out and returns `{ ok: false, error: { code: 'TIMED_OUT' } }`; the adapter rejects with that data. **`resign`** calls `resign`.

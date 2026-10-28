@@ -9,6 +9,11 @@
  *   guest, once.
  * - It talks to the server only through the `Invites` port.
  * - A new invite sends `invite_created` (no code, no ids).
+ * - Back while the invite is being made: the screen makes no invite, or
+ *   cancels the one the server just made, so no invite is left open that
+ *   nobody waits for (it would count toward `MAX_OPEN_INVITES`).
+ * - A problem line is read to screen readers (`useAnnouncement`; iOS
+ *   VoiceOver does not read `accessibilityRole="alert"`).
  * - Screen readers: focus moves to the title when the screen opens.
  * - Large fonts scroll: no text has a line limit.
  *
@@ -34,6 +39,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { useFocusOnShow } from '@/features/accessibility/focus';
+import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
 import { signInForOnline } from '@/features/online/account';
 
@@ -66,6 +72,8 @@ export function FriendSetupScreen({
   const [targetPoints, setTargetPoints] = useState<MatchLength>(3);
   const [pace, setPace] = useState<OnlineGamePace>('live');
   const [busy, setBusy] = useState(false);
+  // One invite per tap: a second tap before the render sees `busy` does nothing.
+  const making = useRef(false);
   const [problem, setProblem] = useState<Problem | null>(null);
   const titleRef = useFocusOnShow();
   // False once the screen is gone (the server answers later).
@@ -78,11 +86,13 @@ export function FriendSetupScreen({
   }, []);
 
   const make = async () => {
-    if (busy) return;
+    if (making.current) return;
+    making.current = true;
     setBusy(true);
     setProblem(null);
     const game: NewInvite = { choice, targetPoints, pace };
     const failed = (next: Problem) => {
+      making.current = false;
       if (!mounted.current) return;
       setBusy(false);
       setProblem(next);
@@ -93,6 +103,8 @@ export function FriendSetupScreen({
       failed('account');
       return;
     }
+    // Gone (Back) before the account was ready: make no invite.
+    if (!mounted.current) return;
     let code: string;
     try {
       code = await invites.createInvite(game);
@@ -100,9 +112,15 @@ export function FriendSetupScreen({
       failed(isInviteErrorData(error) && error.code === 'TOO_MANY_INVITES' ? 'tooMany' : 'make');
       return;
     }
+    if (!mounted.current) {
+      // Nobody will wait for it: take it back. A failed cancel only leaves
+      // it to expire.
+      invites.cancelInvite(code).catch(() => {});
+      return;
+    }
     sendInviteCreated(game, analytics);
     // The buttons stay off while the route opens the waiting screen.
-    if (mounted.current) onCreated(code);
+    onCreated(code);
   };
 
   const lengthOptions: SegmentOption<`${MatchLength}`>[] = MATCH_LENGTHS.map((n) => ({
@@ -121,6 +139,7 @@ export function FriendSetupScreen({
         : problem === 'make'
           ? t('friend.makeFailed')
           : null;
+  useAnnouncement(problemText);
 
   return (
     <View testID="friend-setup" style={styles.screen}>
@@ -197,7 +216,7 @@ export function FriendSetupScreen({
       </ScrollView>
       <View style={styles.footer}>
         {problemText !== null ? (
-          <Text testID="friend-problem" style={styles.problem} accessibilityRole="alert">
+          <Text testID="friend-problem" style={styles.problem}>
             {problemText}
           </Text>
         ) : null}

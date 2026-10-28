@@ -9,7 +9,7 @@ import {
   type AuthProvider,
 } from '@tavli/contracts';
 import { act, screen } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { AccessibilityInfo, Text } from 'react-native';
 
 import i18n from '@/i18n';
 
@@ -65,13 +65,14 @@ describe('InviteAccountGate', () => {
       signInAsGuest: () =>
         fail ? Promise.reject({ code: 'NETWORK', message: 'offline' }) : real.signInAsGuest(),
     };
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     await openGate(auth);
     await user.press(await screen.findByRole('button', { name: 'Show the invite' }));
-    expect(
-      await screen.findByText(
-        'Your free account was not made. Check the connection and try again.',
-      ),
-    ).toBeOnTheScreen();
+    const text = 'Your free account was not made. Check the connection and try again.';
+    expect(await screen.findByText(text)).toBeOnTheScreen();
+    // Read out: iOS VoiceOver does not read alert roles.
+    expect(announce).toHaveBeenLastCalledWith(text);
+    announce.mockRestore();
     fail = false;
     await user.press(screen.getByRole('button', { name: 'Show the invite' }));
     expect(await screen.findByText('invite for guest-1')).toBeOnTheScreen();

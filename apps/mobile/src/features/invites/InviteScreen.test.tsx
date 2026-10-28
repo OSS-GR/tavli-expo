@@ -219,11 +219,17 @@ describe('InviteScreen', () => {
       ...real,
       acceptInvite: () => Promise.reject(new Error('offline')),
     };
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const props = await openInvite(code, invites);
     await user.press(await screen.findByRole('button', { name: 'Accept' }));
     expect(
       await screen.findByText('That did not work. Check the connection and try again.'),
     ).toBeOnTheScreen();
+    // Read out: iOS VoiceOver does not read alert roles.
+    expect(announce).toHaveBeenLastCalledWith(
+      'That did not work. Check the connection and try again.',
+    );
+    announce.mockRestore();
     expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
     expect(props.onAccepted).not.toHaveBeenCalled();
     expect(server.getInvite(code)?.status).toBe('open');
