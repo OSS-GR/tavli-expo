@@ -17,7 +17,7 @@ Tavlaki is a Greek backgammon (tavli) app for iPhone and Android. This policy sa
 - You do not need an account to play on your phone.
 - Your settings and the games on your phone stay on your phone.
 - **Online games with a friend** need a free guest account on our server. The app makes it only when you make or open an invite. It has a random user id, and no name and no email. The server keeps your invites and online games under that id.
-- **Turn notifications** are off until you turn them on. The app offers them only after you make or accept an invite for an async game. If you turn them on, our server keeps your phone's push token, to tell you when it is your turn.
+- **Turn notifications** are off until you turn them on. The app offers them only after you make or accept an invite for an async game. If you turn them on, our server keeps your phone's push token, to tell you when it is your turn or your game is over.
 - On the first launch, the app asks if it may send **anonymous usage data**. You choose **Allow usage data** or **Don't allow**. You can change your answer any time in **Settings → Privacy**.
 - Until you answer, the app sends only anonymous **crash reports**. **Don't allow** turns off usage data **and** crash reports.
 - We never collect your name, email, phone number, contacts or location.
@@ -131,13 +131,13 @@ Before you make or open an invite, the app does not talk to the game server. Whe
 
 ### Turn notifications (Expo)
 
-Only if you turn them on. After you make or accept an invite for an **async** game (a day per turn), the app asks once if it may tell you when it is your turn. It never asks on the first launch, and never for a live game. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Notifications**, and off in your phone's settings.
+Only if you turn them on. After you make or accept an invite for an **async** game (a day per turn), the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch, and never for a live game. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Notifications**, and off in your phone's settings.
 
 If you allow them:
 
 - Your phone gets a **push token** from Expo's push service (Expo, through Apple's or Google's push service). It is a random address for this app on this phone. It is not your name, email or phone number.
 - The app sends the push token and the phone system (iOS or Android) to our game server, under your guest account's user id. The server keeps, for each of your phones: the push token, the phone system and when the phone last sent it. At most 5 phones per account.
-- When it is your turn in an async game, the server gives Expo the push token, a fixed text ("Your turn: an online game is waiting for your move") and the game's id, so a tap opens that game. No names, no emails and no moves. Expo passes the push to Apple or Google, which show it on your phone.
+- When it is your turn in an async game, or an async game is over, the server gives Expo the push token, a fixed text ("Your turn: an online game is waiting for your move", or "Your game is over. See the result.") and the game's id, so a tap opens that game. No names, no emails and no moves. Expo passes the push to Apple or Google, which show it on your phone.
 - The server deletes a push token when Expo says the phone no longer takes pushes (for example after you turn notifications off or delete the app), when you add a sixth phone (the oldest goes), when another account signs in on that phone (the token moves to that account), and when you sign out or your account is deleted.
 - The push token **never goes to analytics** (PostHog) and never goes into crash reports (Sentry). Usage data gets only your answer (allowed or not allowed), and only if you allowed usage data.
 
