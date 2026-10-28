@@ -374,11 +374,25 @@ export const resign = mutation({
   returns: v.number(),
   handler: async (ctx, { gameId }) => {
     const callerId = await signedInPlayer(ctx);
-    const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, null);
-    const next = guarded(() => resignMatch(flow, side, createCryptoRng()));
-    return await save(ctx, game, callerId, flow, next, Date.now());
+    return await resignAs(ctx, gameId, callerId);
   },
 });
+
+/**
+ * `callerId` resigns the match in the caller's transaction: the same
+ * checks and the same save as `resign`, so the opponent gets the result
+ * and the push rules hold. `resign` and `deleteMyAccount` (`account.ts`,
+ * #302) both use it. Returns the new version.
+ */
+export async function resignAs(
+  ctx: MutationCtx,
+  gameId: Id<'games'>,
+  callerId: string,
+): Promise<number> {
+  const { game, side, flow } = await loadForCaller(ctx, gameId, callerId, null);
+  const next = guarded(() => resignMatch(flow, side, createCryptoRng()));
+  return await save(ctx, game, callerId, flow, next, Date.now());
+}
 
 /**
  * Runs at each turn deadline (scheduled by `startClock`). If the game is

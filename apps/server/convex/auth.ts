@@ -26,10 +26,23 @@ export const authComponent = createClient<DataModel>(components.betterAuth);
 /** The app's URL scheme (`app.json`), so a sign-in can return to the app. */
 const APP_ORIGINS = ['tavlaki://'];
 
-/** Builds Better Auth for one request. The HTTP routes in `http.ts` use it. */
+/**
+ * Routes no client may call. A user is deleted only by `deleteMyAccount`
+ * (`account.ts`, #302): it resigns the user's games and deletes the
+ * user's invites and push tokens first. The anonymous plugin's
+ * `/delete-anonymous-user` would skip that. (`/delete-user` is off too,
+ * as `user.deleteUser` is not enabled.)
+ */
+const DISABLED_PATHS = ['/delete-anonymous-user'];
+
+/**
+ * Builds Better Auth for one request (the HTTP routes in `http.ts`), or
+ * for one mutation (`account.ts` uses its `internalAdapter`).
+ */
 export function createAuth(ctx: GenericCtx<DataModel>) {
   return betterAuth({
     trustedOrigins: APP_ORIGINS,
+    disabledPaths: DISABLED_PATHS,
     database: authComponent.adapter(ctx),
     plugins: [expo(), anonymous(), convex({ authConfig })],
   });
