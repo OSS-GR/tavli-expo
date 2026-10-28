@@ -304,6 +304,7 @@ describe('online feedback (#271)', () => {
       sendTurn: () => Promise.reject(new Error('network request failed')),
       sendAnswer: () => Promise.reject(new Error('network request failed')),
       resign: () => Promise.reject(new Error('network request failed')),
+      listMyGames: () => Promise.reject(new Error('network request failed')),
     };
     const alice = await game.storeFor(offline);
     const board = onlineBoardStore(alice, game.gameId)!;

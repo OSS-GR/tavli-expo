@@ -1,6 +1,7 @@
 {
   "name": "tavli",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Tavlaki: a Greek backgammon app for iOS and Android.",
   "packageManager": "pnpm@12.15.0",
   "engines": {
@@ -12,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "test:changed": "pnpm -r --filter '...[origin/main]' --filter '!tavli' --filter '!@tavli/mobile' test && pnpm --filter @tavli/mobile exec jest --changedSince=origin/main --passWithNoTests",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

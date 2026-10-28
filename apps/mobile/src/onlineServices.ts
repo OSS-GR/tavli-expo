@@ -59,6 +59,7 @@ export function lazyGameTransport(get: () => GameTransport): GameTransport {
     sendTurn: (request) => get().sendTurn(request),
     sendAnswer: (request) => get().sendAnswer(request),
     resign: (gameId) => get().resign(gameId),
+    listMyGames: (request) => get().listMyGames(request),
   };
 }
 

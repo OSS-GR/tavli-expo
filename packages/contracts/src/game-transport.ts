@@ -12,7 +12,16 @@
  * See `docs/architecture/online-game-service.md`.
  */
 
-import type { GameFlow, Match, MoveInput, PerPlayer, PlayerId, VariantPrompt } from '@tavli/engine';
+import type {
+  GameFlow,
+  Match,
+  MoveInput,
+  PerPlayer,
+  PlayerId,
+  PresetId,
+  VariantId,
+  VariantPrompt,
+} from '@tavli/engine';
 
 /**
  * The games a player can start online: one game (Portes, Plakoto, Fevga or
@@ -84,6 +93,50 @@ export interface OnlineGameView {
   readonly waitingFor: PlayerId | null;
   /** The question `waitingFor` must answer, else `null`. */
   readonly prompt: VariantPrompt | null;
+}
+
+/**
+ * The most games one `listMyGames` call returns (#296). Older games are
+ * left out.
+ */
+export const MAX_LISTED_GAMES = 50;
+
+/**
+ * One online game in the caller's list (#296): enough to show it on Home
+ * and open it. It says nothing about the other player but their side.
+ * Open the game (`subscribe`) for the full view.
+ */
+export interface GameSummary {
+  readonly gameId: string;
+  readonly status: OnlineGameStatus;
+  readonly choice: OnlineGameChoice;
+  /** The preset of the match rules (`match.rules.presetId`). */
+  readonly presetId: PresetId;
+  /** The game being played now (the last one once the match is over). */
+  readonly variant: VariantId;
+  /** The match length in points. */
+  readonly targetPoints: number;
+  readonly pace: OnlineGamePace;
+  /** The caller's side. The other player has the other side. */
+  readonly mySide: PlayerId;
+  /** The side the server waits for, as in the view. `null` when finished. */
+  readonly waitingFor: PlayerId | null;
+  /** True when the server waits for the caller. */
+  readonly myTurn: boolean;
+  /** Points so far. */
+  readonly score: PerPlayer<number>;
+  /** The match winner once `status` is `finished`, else `null`. */
+  readonly winner: PlayerId | null;
+  /** The last saved change, in epoch milliseconds (server clock). */
+  readonly updatedAt: number;
+  /** As in the view: when the turn of `waitingFor` runs out. `null` when finished. */
+  readonly turnDeadline: number | null;
+}
+
+/** What `listMyGames` lists. */
+export interface ListMyGamesRequest {
+  /** `active` games, or `finished` ones. */
+  readonly status: OnlineGameStatus;
 }
 
 /** Why the server rejected a call. */
@@ -176,4 +229,11 @@ export interface GameTransport {
   sendAnswer(request: SendAnswerRequest): Promise<void>;
   /** Resigns the whole match: the opponent wins. Allowed at any time. */
   resign(gameId: string): Promise<void>;
+  /**
+   * The caller's games with this `status` (#296), newest change first, at
+   * most `MAX_LISTED_GAMES`. Never another player's game. A call, not a
+   * live list: call it again to see changes. Rejects with
+   * `GameTransportErrorData` (`NOT_SIGNED_IN`).
+   */
+  listMyGames(request: ListMyGamesRequest): Promise<readonly GameSummary[]>;
 }
