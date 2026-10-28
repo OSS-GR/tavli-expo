@@ -71,6 +71,8 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
 - `listMyGames({ status })` (#296) on a transport lists that player's
   games with `summarizeGame` and `latestGames`, as the Convex query
   does. Each save sets the game's `updatedAt` to `now()`.
+  `watchMyGames` (#297) sends that list on a later microtask, then again
+  after each save or new game that changes it, until it stops.
 - `getGame(gameId)` gives the view, and `events(gameId)` the event log
   (`{ seq, version, actor, event }`, like the Convex `moves` rows).
   `replay(events.map((row) => row.event))` rebuilds the game.

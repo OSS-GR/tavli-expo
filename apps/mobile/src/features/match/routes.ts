@@ -61,6 +61,9 @@ export function inviteHref(code: string) {
 /** Play a friend online (#281): pick the game, then make an invite. */
 export const FRIEND_HREF = '/friend';
 
+/** Every active online game of this phone's account (#297): "See all" on Home. */
+export const ONLINE_GAMES_HREF = '/online-games';
+
 /** The waiting screen of an invite this phone made (#281): code, link, Share and Cancel. */
 export function inviteWaitHref(code: string) {
   return { pathname: '/friend/[code]', params: { code } } as const;

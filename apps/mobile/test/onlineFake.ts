@@ -8,6 +8,8 @@
  * - `games` is a `GameTransport` on the server. Each call comes from the
  *   user signed in to `auth` at that moment, like the Convex adapter with
  *   the sign-in token. With nobody signed in it fails `NOT_SIGNED_IN`.
+ *   Its watches (`subscribe`, `watchMyGames`, #297) act as the user
+ *   signed in when the watch starts.
  * - `onlineServer()` and `gameTransportFor(playerId)` are the dev game
  *   parts (`/dev/online`): the server itself, and one cached transport
  *   per player.

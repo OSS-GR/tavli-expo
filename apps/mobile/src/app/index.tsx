@@ -1,14 +1,16 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { anyGameLevels } from '@/features/bot/levels';
 import { ContinueCard } from '@/features/home/ContinueCard';
+import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
 import { matchSessions } from '@/features/match/appSessions';
 import {
   FRIEND_HREF,
+  ONLINE_GAMES_HREF,
   gameHref,
   newGameHref,
   rulesHref,
@@ -16,9 +18,10 @@ import {
 } from '@/features/match/routes';
 import type { SavedMatch } from '@/features/match/savedMatch';
 import { continueSummary } from '@/features/match/summary';
+import { hasOnlineAccount } from '@/features/online/accountHint';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
-import { botLevels, invites } from '@/services';
+import { auth, botLevels, games, invites } from '@/services';
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -39,13 +42,18 @@ function readSlot(): SlotState {
 export default function HomeRoute() {
   const { t } = useTranslation();
   const [slot, setSlot] = useState<SlotState>(readSlot);
-  // Read it again each time Home shows (back from a game).
+  // Online games (#297) only on a phone that has an online account: with
+  // none, Home does not even load the session (no network call at start).
+  const [onlineAccount, setOnlineAccount] = useState(hasOnlineAccount);
+  const focused = useIsFocused();
+  // Read them again each time Home shows (back from a game or an invite).
   useFocusEffect(
     useCallback(() => {
       // `broken` goes back to false here (the save is gone now). The toast
       // was shown already and keeps its own timer. A sticky `broken` would
       // show it again whenever the text changes (a language switch).
       setSlot(readSlot());
+      setOnlineAccount(hasOnlineAccount());
     }, []),
   );
   const { saved } = slot;
@@ -61,6 +69,17 @@ export default function HomeRoute() {
           <ContinueCard
             summary={continueSummary(saved, t, slot.now)}
             onPress={() => router.push(gameHref(saved.id))}
+          />
+        ) : null
+      }
+      onlineGames={
+        onlineAccount && auth !== undefined && games !== undefined ? (
+          <HomeOnlineGames
+            auth={auth}
+            games={games}
+            focused={focused}
+            onOpen={(gameId) => router.push(gameHref(gameId))}
+            onSeeAll={() => router.push(ONLINE_GAMES_HREF)}
           />
         ) : null
       }

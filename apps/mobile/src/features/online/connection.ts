@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 
 import { auth, gameTransportFor, games, onlinePlayerId } from '@/services';
 
+import { rememberOnlineAccount } from './accountHint';
 import { isDevGame } from './devGameIds';
 
 export type OnlineConnection =
@@ -43,6 +44,7 @@ export function useOnlineConnection(gameId: string): OnlineConnection {
     let live = true;
     auth.ready().then(
       (user) => {
+        if (user !== null) rememberOnlineAccount();
         if (live) setSession(user === null ? 'signedOut' : { me: user.id });
       },
       () => {
