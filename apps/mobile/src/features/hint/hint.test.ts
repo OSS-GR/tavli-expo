@@ -3,7 +3,7 @@
  * Analyzer, and after part of the turn the hint is the best way to finish
  * it. Every game: Portes, Plakoto, Fevga and Asodio.
  */
-import { createAnalyzer } from '@tavli/bot';
+import { TWO_PLY_HINT_BUDGETS, createAnalyzer } from '@tavli/bot';
 import { createRecordingAnalytics, type Analytics } from '@tavli/contracts';
 import {
   PRESET_IDS,
@@ -32,7 +32,15 @@ import {
 
 import i18n from '@/i18n';
 
-import { bestRest, boardKey, hintGroups, hintHasChoice, hintPlies, turnFinishes } from './hint';
+import {
+  bestRest,
+  boardKey,
+  hintGroups,
+  hintHasChoice,
+  hintPlies,
+  hintRankOptions,
+  turnFinishes,
+} from './hint';
 import { sendHintShown } from './hintAnalytics';
 import { hintShortText, hintSpokenText } from './hintText';
 
@@ -61,8 +69,8 @@ const after = (game: GameFlow, moves: readonly Move[]) =>
     game.state.board,
   );
 
-/** The Analyzer's options for a hint in `game` (#219): the hint's depth, best turn only. */
-const hintOptions = (game: GameFlow) => ({ plies: hintPlies(game.state.rules), top: 1 });
+/** The Analyzer's options for a hint in `game` (#219, #237): the hint's depth and budget, best turn only. */
+const hintOptions = (game: GameFlow) => ({ ...hintRankOptions(game.state.rules), top: 1 });
 
 /** A first move after which the best turn's end position is out of reach, if there is one. */
 function offBestMove(game: GameFlow): Move | undefined {
@@ -90,19 +98,31 @@ const ROLLS: readonly [DieValue, DieValue][] = [
   [3, 3],
 ];
 
-describe('hintPlies (#219)', () => {
+describe('hintPlies (#219, #237)', () => {
   it.each([
     ['portes', 2],
     ['tavli', 2],
     ['plakoto', 2],
     ['plakoto.federation', 2],
     ['fevga', 2],
-    // Asodio stays at 1 ply: its worst 2-ply hint is much slower than Plakoto's (#233).
-    ['asodio.kafeneio', 1],
-    ['asodio.aceyDeuceyGreek', 1],
-    ['asodio.aceyDeuceyAmerican', 1],
+    // Asodio hints at 2 ply since its work budget (#237) keeps the worst hint as fast as Plakoto's.
+    ['asodio.kafeneio', 2],
+    ['asodio.aceyDeuceyGreek', 2],
+    ['asodio.aceyDeuceyAmerican', 2],
   ] as const)('%s: %i ply', (preset, plies) => {
     expect(hintPlies(resolveRules(preset))).toBe(plies);
+  });
+
+  it('a 2-ply hint has the work budget of its preset (#237)', () => {
+    for (const preset of PRESET_IDS) {
+      const rules = resolveRules(preset);
+      expect(hintRankOptions(rules)).toEqual({
+        plies: 2,
+        budget: TWO_PLY_HINT_BUDGETS[preset],
+      });
+    }
+    // An Asodio position costs more time, so its budget is smaller.
+    expect(TWO_PLY_HINT_BUDGETS['asodio.kafeneio']).toBeLessThan(TWO_PLY_HINT_BUDGETS.plakoto);
   });
 
   it('covers every preset', () => {
@@ -117,7 +137,7 @@ describe('hintPlies (#219)', () => {
       expect(hintPlies(gameRules(match, 'portes'))).toBe(2);
       expect(hintPlies(gameRules(match, 'plakoto'))).toBe(2);
       expect(hintPlies(gameRules(match, 'fevga'))).toBe(2);
-      expect(hintPlies(gameRules(match, 'asodio'))).toBe(1);
+      expect(hintPlies(gameRules(match, 'asodio'))).toBe(2);
     }
   });
 });
@@ -142,23 +162,24 @@ describe('bestRest', () => {
     const game = rolled(portes, [6, 5]);
     const spy = jest.spyOn(analyzer, 'rankTurns');
     const asked = () => spy.mock.calls.map((call) => call[2]);
+    const budget = TWO_PLY_HINT_BUDGETS.portes;
     try {
       bestRest(game, analyzer);
-      expect(asked()).toEqual([{ plies: 2, top: 1 }]);
+      expect(asked()).toEqual([{ plies: 2, budget, top: 1 }]);
       const [best] = analyzer.rankTurns(game.state, [6, 5], hintOptions(game));
       // After a move one ranking does it, whether the best turn is in reach or not.
       const moves = [best!.turn.moves[0]!, offBestMove(game)!];
       for (const move of moves) {
         spy.mockClear();
         expect(bestRest(play(game, move), analyzer)).not.toBeNull();
-        expect(asked()).toEqual([{ plies: 2 }]);
+        expect(asked()).toEqual([{ plies: 2, budget }]);
       }
     } finally {
       spy.mockRestore();
     }
   });
 
-  it('asks for 1 ply in Asodio, and for every turn only when the best is out of reach', () => {
+  describe('in Asodio', () => {
     // Every checker entered, so a 6-4 has several plays.
     const board = createBoard(
       {
@@ -168,23 +189,49 @@ describe('bestRest', () => {
       asodio.direction,
     );
     const game = rolled(asodio, [6, 4], board, resolveRules('asodio.kafeneio'));
-    expect(hintHasChoice(game)).toBe(true);
-    const spy = jest.spyOn(analyzer, 'rankTurns');
-    const asked = () => spy.mock.calls.map((call) => call[2]);
-    try {
-      bestRest(game, analyzer);
-      expect(asked()).toEqual([{ plies: 1, top: 1 }]);
-      const [best] = analyzer.rankTurns(game.state, [6, 4], hintOptions(game));
-      spy.mockClear();
-      bestRest(play(game, best!.turn.moves[0]!), analyzer);
-      expect(asked()).toEqual([{ plies: 1, top: 1 }]);
-      const off = offBestMove(game)!;
-      spy.mockClear();
-      expect(bestRest(play(game, off), analyzer)).not.toBeNull();
-      expect(asked()).toEqual([{ plies: 1, top: 1 }, { plies: 1 }]);
-    } finally {
-      spy.mockRestore();
-    }
+
+    it('asks for 2 ply with the Asodio budget (#237), then every turn at once after a move', () => {
+      expect(hintHasChoice(game)).toBe(true);
+      const spy = jest.spyOn(analyzer, 'rankTurns');
+      const asked = () => spy.mock.calls.map((call) => call[2]);
+      const budget = TWO_PLY_HINT_BUDGETS['asodio.kafeneio'];
+      try {
+        const [best] = analyzer.rankTurns(game.state, [6, 4], hintOptions(game));
+        spy.mockClear();
+        expect(bestRest(game, analyzer)).toEqual(best!.turn.moves);
+        expect(asked()).toEqual([{ plies: 2, budget, top: 1 }]);
+        const off = offBestMove(game)!;
+        spy.mockClear();
+        expect(bestRest(play(game, off), analyzer)).not.toBeNull();
+        expect(asked()).toEqual([{ plies: 2, budget }]);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('at 1 ply, asks for every turn only when the best is out of reach', () => {
+      const one = { plies: 1 } as const;
+      const spy = jest.spyOn(analyzer, 'rankTurns');
+      const asked = () => spy.mock.calls.map((call) => call[2]);
+      try {
+        bestRest(game, analyzer, asodio, one);
+        expect(asked()).toEqual([{ plies: 1, top: 1 }]);
+        const [best] = analyzer.rankTurns(game.state, [6, 4], { plies: 1, top: 1 });
+        spy.mockClear();
+        bestRest(play(game, best!.turn.moves[0]!), analyzer, asodio, one);
+        expect(asked()).toEqual([{ plies: 1, top: 1 }]);
+        // A first move that cannot reach the 1-ply best end.
+        const bestEnd = boardKey(after(game, best!.turn.moves));
+        const off = legalNextMoves(game)
+          .flatMap((g) => g.moves)
+          .find((move) => !turnFinishes(play(game, move)).has(bestEnd))!;
+        spy.mockClear();
+        expect(bestRest(play(game, off), analyzer, asodio, one)).not.toBeNull();
+        expect(asked()).toEqual([{ plies: 1, top: 1 }, { plies: 1 }]);
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   it.each(GAMES.map((v) => [v.id, v] as const))(
@@ -214,7 +261,7 @@ describe('bestRest', () => {
       for (const dice of ROLLS) {
         const game = rolled(variant, dice, state.board);
         if (game.phase !== 'moving') continue;
-        const ranked = analyzer.rankTurns(game.state, dice, { plies: hintPlies(game.state.rules) });
+        const ranked = analyzer.rankTurns(game.state, dice, hintRankOptions(game.state.rules));
         const bestEnd = boardKey(after(game, ranked[0]!.turn.moves));
         // A first move that cannot reach the best end.
         const first = legalNextMoves(game)

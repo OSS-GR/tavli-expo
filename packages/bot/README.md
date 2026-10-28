@@ -89,6 +89,7 @@ const ranked = analyzer.rankTurns(state, dice, { top: 3 }); // best first
 ranked[0].turn; // the hint
 ranked[1].equityLoss; // points lost against the best turn
 analyzer.rankTurns(state, dice, { plies: 2, top: 3 }); // one roll deeper (#212)
+analyzer.rankTurns(state, dice, { plies: 2, top: 1, budget: 25_000 }); // with a work budget (#237)
 analyzer.evaluate(state); // the chances of state.toMove, before the roll
 ```
 
@@ -111,12 +112,15 @@ analyzer.evaluate(state); // the chances of state.toMove, before the roll
   keep the engine's order of `legalTurns`.
 - A forced turn (or a pass) is a list of one with `equityLoss` 0.
 - `top` keeps the best `top` turns (an integer >= 1). Default: all.
+- `budget` (2 plies only) caps the positions one call scores: an
+  integer of at least 0, or `Infinity` (the default). See "2-ply budget"
+  below.
 - `evaluate` of a finished game gives the true result (a draw is half a
   win, like in the nets).
 - Errors: `NOT_IMPLEMENTED` (no hard or medium evaluator),
-  `INVALID_REQUEST` (`dice` differs from `state.dice`, a bad `top` or
-  `plies`, or at 2 plies a question the variant cannot take an answer
-  for: `prompt` with no `answerPrompt`, or a variant that still asks after
+  `INVALID_REQUEST` (`dice` differs from `state.dice`, a bad `top`,
+  `plies` or `budget`, or at 2 plies a question the variant cannot take
+  an answer for: `prompt` with no `answerPrompt`, or a variant that still asks after
   8 answers in a row), `INVALID_REGISTRY` like
   `createBot`, and the engine's errors
   (a finished game in `rankTurns`, an unknown variant).
@@ -175,25 +179,23 @@ are not the net's, so it uses the Asodio heuristic, which cost about
 0.2–0.4 ms per position against 0.03 ms for the Portes net. Since #225
 it costs 4–4.9× less in Acey-Deucey and 2.4× less in the owner version
 (see the table below). Hermes on a phone is several times slower than
-Node, so a 2-ply hint fits the 1 s phone budget for Portes, Plakoto and
-Fevga. For Asodio it does not yet: even after #225 its worst 2-ply hint
-takes 1.2–2.5 s in Node, about 3.5–8 times Plakoto's worst (see "Asodio and 2
-ply" below), which is several seconds on a phone. The bot's own play
-(`chooseTurn`) stays 1-ply.
+Node. Without a budget, a 2-ply hint fit the 1 s phone budget for
+Portes, Plakoto and Fevga, but not for Asodio (see "Asodio and 2 ply"
+below). With the work budget of #237 (see "2-ply budget" below), it fits
+for every preset. The bot's own play (`chooseTurn`) stays 1-ply.
 
-**In the app (#219).** The Hint asks for 2 ply in Portes, Plakoto and
-Fevga, and for 1 ply in Asodio (every preset): `hintPlies` in
-`apps/mobile/src/features/hint/hint.ts`. The game review stays at 1 ply
-(see "Two scales"). Asodio needs a deterministic cap on the work before it
-can use 2 ply.
+**In the app (#219, #237).** The Hint asks for 2 ply in every game, with
+the work budget of its preset: `hintPlies` and `hintRankOptions` in
+`apps/mobile/src/features/hint/hint.ts`, `TWO_PLY_HINT_BUDGETS` here. The
+game review stays at 1 ply (see "Two scales").
 
 **Asodio and 2 ply (#233).** `pnpm --filter @tavli/bot bench:hint` times
 one 2-ply hint (`rankTurns` with `plies: 2, top: 1`) on 500 seeded
 positions per game (250 from best play, 250 from random play,
 `src/testing/hint-work.ts`). The rule: a game hints at 2 ply only when
 its worst hint is no slower than Plakoto's, the slowest game that already
-does. After #225, Node 22, dev container, three seeds (219, 233, 7), so
-1,500 positions per game:
+did. Without a budget (`--budget=none`), after #225, Node 22, dev
+container, three seeds (219, 233, 7), so 1,500 positions per game:
 
 | Game or preset       | Median (ms) | Worst per seed (ms) | Worst positions scored |
 | -------------------- | ----------- | ------------------- | ---------------------- |
@@ -202,33 +204,83 @@ does. After #225, Node 22, dev container, three seeds (219, 233, 7), so
 | Acey-Deucey Greek    | 22–23       | 1,468, 1,209, 2,517 | 74,010                 |
 | Acey-Deucey American | 67–82       | 876, 1,686, 1,002   | 44,879                 |
 
-So every Asodio preset stays at 1 ply. Most Asodio hints are fast (the
-owner version's median is a tenth of Plakoto's), but the worst ones are
-not. The owner version uses the net, and in its slowest hints a
-position costs about 0.03–0.07 ms (mostly the shot count), 3–5 times a
-Plakoto position, so even its worst count, below Plakoto's, takes 1.2 s.
-In Acey-Deucey a few rolls also score far more positions (Greek up to
-74,010). Most of the worst are doubles, some of them the chosen double
-after a 1-2. The earlier
-"0.2–0.7 s worst" came from 30 positions per preset, too few to find the
-tail. Asodio can use 2 ply once a deterministic cap bounds the work of
-these rare positions; then add its presets to `analyzer-work.test.ts`.
+So without a budget every Asodio preset stayed at 1 ply. Most Asodio
+hints are fast (the owner version's median is a tenth of Plakoto's), but
+the worst ones are not. The owner version uses the net, and in its
+slowest hints a position costs about 0.03–0.08 ms (mostly the shot
+count), 3–6 times a Plakoto position, so even its worst count, below
+Plakoto's, takes 1.2 s. In Acey-Deucey a few rolls also score far more
+positions (Greek up to 74,010). Most of the worst are doubles, some of
+them the chosen double after a 1-2.
 
-**Work bound.** `src/analyzer-work.test.ts` counts the positions the
-evaluator scores in one 2-ply hint (`rankTurns` with `plies: 2, top: 1`):
-each `evaluate` call, and each turn given to a `scoreTurns` fast path.
-That count is deterministic, unlike the time. It plays 120 positions per
-game (60 from games where both players play the 1-ply best turn, 60 from
-random play) and checks the worst against a fixed bound:
+**2-ply budget (#237).** `rankTurns(state, dice, { plies: 2, budget })`
+caps the work of one call.
+The unit is a scored position: each `evaluate` call, and each turn given
+to a `scoreTurns` fast path (the same count as `analyzer-work.test.ts`).
+It never reads a clock, so the same input with the same budget always
+gives the same output, on any phone.
 
-| Game    | Median            | Worst seen (500 positions) | Bound  |
-| ------- | ----------------- | -------------------------- | ------ |
-| Portes  | about 2,000       | 14,501                     | 19,000 |
-| Plakoto | about 2,500–3,600 | 19,065                     | 25,000 |
-| Fevga   | about 1,300–1,700 | 13,649                     | 18,000 |
+1. The 1-ply scores of every turn always run in full, and they count.
+2. The candidates get their deeper look one by one, in 1-ply order. Each
+   look runs on a metered evaluator. When the next scoring would pass the
+   budget, the look stops there (its work so far is thrown away), and that
+   candidate and every later one keep their 1-ply values.
+3. The list is built as without a budget: the looked-at candidates first,
+   by 2-ply equity, then the rest in 1-ply order with `equityLoss` raised
+   to at least the last candidate's (the two scales above). A turn that
+   ends the game needs no look and costs nothing, so a turn that wins at
+   once still ranks first. With no look at all (budget 0), the result is
+   the 1-ply ranking.
 
-A scored position costs about 0.01–0.015 ms in Node (the nets), so the
-bounds are about 0.2–0.4 s in Node. Raise a bound only with a reason here.
+So one call scores at most `max(budget, 1-ply scores)` positions, plus one
+evaluation per returned turn with a 1-ply value (one for a hint with
+`top: 1`, and only when no look fit). The default is no budget. The app's
+Hint uses `TWO_PLY_HINT_BUDGETS`, one per rules preset:
+
+- Portes, Plakoto, Fevga: 25,000 (`TWO_PLY_HINT_BUDGET`), Plakoto's old
+  work bound, about 1.3 times its worst hint over 500 positions. It almost
+  never cuts a hint there.
+- Every Asodio preset: 3,500. An Asodio position costs 3–6 times a
+  Plakoto position in time, so a smaller budget keeps its worst hint below
+  Plakoto's. At 4,000 the worst Asodio hints were 333 ms (owner version)
+  and 321 ms (American) against Plakoto's 337 ms: too close to the bar
+  for a noisy clock.
+
+`pnpm --filter @tavli/bot bench:hint` uses these budgets (`--budget=N`
+sets one for every game, `none` none). With `--compare` it also ranks each
+position without a budget and counts the hints the budget cut, and how
+many of those got another best turn. Node 22, dev container, seeds 219,
+233 and 7 (500 positions each, 1,500 per game):
+
+| Game or preset       | Budget | Median (ms) | Worst per seed (ms) | Hints cut | Other best turn |
+| -------------------- | ------ | ----------- | ------------------- | --------- | --------------- |
+| Portes               | 25,000 | 12–23       | 236, 135, 161       | 0         | 0               |
+| Plakoto              | 25,000 | 30–35       | 337, 260, 315       | 0         | 0               |
+| Fevga                | 25,000 | 11–16       | 137, 177, 122       | 2         | 0               |
+| `asodio.kafeneio`    | 3,500  | 4–5         | 236, 283, 293       | 145       | 14              |
+| Acey-Deucey Greek    | 3,500  | 21–24       | 200, 223, 214       | 405       | 64              |
+| Acey-Deucey American | 3,500  | 64–73       | 263, 280, 246       | 657       | 45              |
+
+So every preset hints at 2 ply: the worst Asodio hint (293 ms) is below
+Plakoto's worst (337 ms). The two Fevga hints cut on seed 233 kept their
+best turn. The budget
+cuts many Asodio hints (most in Acey-Deucey American, whose median hint
+scores about 2,700–3,300 positions), but a cut hint still looks deeper at
+its best candidates, and only 123 of the 4,500 Asodio hints (2.7 %) end
+on another best turn than a 2-ply hint without a budget. Before #237
+every Asodio hint was a 1-ply hint. If a heuristic or net gets faster,
+measure again with the bench and raise its budget.
+
+**Work check.** `src/analyzer-work.test.ts` plays 60 positions per game
+and preset (seeds 219, 233 and 237; at each, 10 from games where both
+players play the 1-ply best turn and 10 from random play) and checks that
+one hint never scores more than its budget plus one position (or the 1-ply
+count, if that alone is larger). `src/analyzer-budget.test.ts` checks the
+rule: budget 0 is 1 ply, a win now ranks first, the cut falls exactly at
+the budget in 1-ply order, a large budget equals no budget, and the
+ranking stays complete, sorted and the same for every game and preset. A
+scored position costs about 0.01–0.015 ms in Node with the Portes,
+Plakoto and Fevga nets, and 0.03–0.08 ms in Asodio.
 
 **The Asodio heuristic, before and after #225** (same scores; Node 22,
 dev container, `pnpm --filter @tavli/bot bench:asodio`, on the 2,100
@@ -1307,8 +1359,12 @@ the Plakoto one about 15 s with hard vs medium; the files run in parallel).
   at 1 ply but stays safe at 2 ply; the Plakoto mother question; Asodio
   extra rolls and chosen doubles; the errors (also a stub variant that
   asks a question with no `answerPrompt`).
-- `analyzer-work.test.ts` (#219): the work of one 2-ply hint in Portes,
-  Plakoto and Fevga stays under its bound (positions scored, see "2-ply").
+- `analyzer-work.test.ts` (#219, #237): one 2-ply hint never scores more
+  than its preset's budget (+1), for every game and preset, on seeded
+  positions (see "2-ply budget").
+- `analyzer-budget.test.ts` (#237): the budget rule (budget 0 is 1 ply, a
+  win now first, the exact cut in 1-ply order, a large budget equals none,
+  complete, sorted and deterministic rankings, the errors).
 - `analyzer-perf.test.ts`: a 2-ply hint for a middle-game Portes position
   takes < 2 s.
 - `create-bot.test.ts`: every level plays legal turns and repeats itself for

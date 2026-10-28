@@ -10,7 +10,7 @@
  * is no randomness: the same state gives the same ranking.
  */
 
-import type { Dice, GameState, GameResult, PlayerId, Turn, Variant } from '@tavli/engine';
+import type { Dice, GameState, GameResult, PlayerId, PresetId, Turn, Variant } from '@tavli/engine';
 import { DISTINCT_ROLLS, VARIANT_REGISTRY, getVariant } from '@tavli/engine';
 
 import { questionOf, scoreAnswers } from './answer';
@@ -49,6 +49,73 @@ export const TWO_PLY_MARGIN = 0.02;
  * hint fast.
  */
 export const TWO_PLY_MAX_CANDIDATES = 16;
+
+/**
+ * 2-ply: the default work budget of one hint (#237), in scored positions:
+ * Plakoto's old work bound. The README ("2-ply budget") has the numbers.
+ */
+export const TWO_PLY_HINT_BUDGET = 25_000;
+
+/**
+ * 2-ply: the work budget of one hint per rules preset (#237), for
+ * `rankTurns(state, dice, { plies: 2, budget })`. An Asodio position costs
+ * several times a Plakoto position, so Asodio gets a smaller budget: then
+ * its worst hint takes no longer than Plakoto's (README "2-ply budget",
+ * `pnpm --filter @tavli/bot bench:hint`). A new preset must get one (the
+ * type checks it).
+ */
+export const TWO_PLY_HINT_BUDGETS: { readonly [P in PresetId]: number } = {
+  portes: TWO_PLY_HINT_BUDGET,
+  tavli: TWO_PLY_HINT_BUDGET,
+  plakoto: TWO_PLY_HINT_BUDGET,
+  'plakoto.federation': TWO_PLY_HINT_BUDGET,
+  fevga: TWO_PLY_HINT_BUDGET,
+  'asodio.kafeneio': 3_500,
+  'asodio.aceyDeuceyGreek': 3_500,
+  'asodio.aceyDeuceyAmerican': 3_500,
+};
+
+/** Thrown inside a deeper look when the next scoring would pass the budget. Never leaves `rankTurns`. */
+class OverBudget extends Error {}
+
+/**
+ * The positions an evaluator scores: each `evaluate` call, and each turn
+ * given to its `scoreTurns` fast path (the unit of `analyzer-work.test.ts`).
+ * Before it scores, it throws `OverBudget` when the count would pass `limit`.
+ */
+interface Meter {
+  used: number;
+  limit: number;
+}
+
+function metered(evaluator: Evaluator, meter: Meter): Evaluator {
+  const spend = (positions: number): void => {
+    if (meter.used + positions > meter.limit) throw new OverBudget();
+    meter.used += positions;
+  };
+  const fast = evaluator.scoreTurns;
+  return {
+    id: evaluator.id,
+    variant: evaluator.variant,
+    evaluate: (state) => {
+      spend(1);
+      return evaluator.evaluate(state);
+    },
+    ...(fast === undefined
+      ? {}
+      : {
+          scoreTurns: (state: GameState, turns: readonly Turn[]) => {
+            spend(turns.length);
+            return fast.call(evaluator, state, turns);
+          },
+        }),
+  };
+}
+
+/** A valid `RankOptions.budget`: an integer >= 0, or `Infinity` (no budget). */
+function isBudget(budget: number): boolean {
+  return budget === Number.POSITIVE_INFINITY || (Number.isInteger(budget) && budget >= 0);
+}
 
 /**
  * The same chances, seen from the other player. `win` becomes `1 − win`:
@@ -115,7 +182,7 @@ interface Valued {
  * variants and `DEFAULT_EVALUATORS`. `policies` are ignored: the Analyzer
  * has no noise. Throws `BotError('INVALID_REGISTRY')` like `createBot`.
  *
- * - `rankTurns(state, dice, { plies, top })` returns every legal turn for
+ * - `rankTurns(state, dice, { plies, top, budget })` returns every legal turn for
  *   `dice`, best first, for `state.toMove`. Each turn has its evaluation
  *   after the turn (from the mover's view) and `equityLoss` against the
  *   best turn (0 for the best, never below 0). A forced turn or a pass is
@@ -134,6 +201,19 @@ interface Valued {
  *   still ranks first). The other turns follow in their 1-ply order, with
  *   their 1-ply evaluation. Their `equityLoss` is their 1-ply loss, but
  *   never less than the last candidate's. See `twoPly` for the details.
+ * - `budget` (2 plies only, default: none) caps the work, in scored
+ *   positions (each `evaluate` call, and each turn given to a
+ *   `scoreTurns` fast path). The 1-ply scores of every turn always come
+ *   first and count. Then the candidates get their deeper look one by one,
+ *   in 1-ply order. When a look would score a position past the budget,
+ *   it stops there: that candidate and every later one keep their 1-ply
+ *   values, like the turns that are no candidates. A turn that ends the
+ *   game costs nothing, so a turn that wins at once still ranks first. The
+ *   one evaluation per returned turn with 1-ply values comes on top. So one
+ *   call scores at most `max(budget, 1-ply scores) + returned turns`
+ *   positions, and the same input with the same budget gives the same
+ *   output. A budget of 0 gives the 1-ply ranking. Throws
+ *   `INVALID_REQUEST` unless it is an integer >= 0 or `Infinity`.
  * - `evaluate(state)` returns the evaluation for `state.toMove`, before
  *   the roll. For a finished game it returns the true result.
  */
@@ -263,6 +343,13 @@ export function createAnalyzer(registry: BotRegistry = {}): Analyzer {
       if (top !== undefined && !(Number.isInteger(top) && top >= 1)) {
         throw new BotError('INVALID_REQUEST', `top must be an integer >= 1, got ${top}`);
       }
+      const budget = opts.budget ?? Number.POSITIVE_INFINITY;
+      if (!isBudget(budget)) {
+        throw new BotError(
+          'INVALID_REQUEST',
+          `budget must be an integer >= 0 or Infinity, got ${String(budget)}`,
+        );
+      }
       checkDice(state, dice);
       const variant = getVariant(variants, state.variant);
       // Check the evaluator first, so a missing one fails on a forced turn too.
@@ -271,7 +358,9 @@ export function createAnalyzer(registry: BotRegistry = {}): Analyzer {
       const turns = variant.legalTurns(state, dice);
       const rolled: GameState = { ...state, dice };
       const me = state.toMove;
-      const scores = scoreTurns(variant, evaluator, rolled, turns);
+      // The 1-ply scores always run in full; at 2 plies they count toward the budget.
+      const rootMeter: Meter = { used: 0, limit: Number.POSITIVE_INFINITY };
+      const scores = scoreTurns(variant, metered(evaluator, rootMeter), rolled, turns);
 
       const order = turns.map((_, i) => i);
       // `sort` is stable, so equal scores keep the engine's order.
@@ -295,14 +384,26 @@ export function createAnalyzer(registry: BotRegistry = {}): Analyzer {
       const candidates = order
         .filter((i, rank) => rank < TWO_PLY_CANDIDATES || oneVsBest(i) <= TWO_PLY_MARGIN)
         .slice(0, TWO_PLY_MAX_CANDIDATES);
-      const deep = candidates.map((i) => {
+      // The deeper looks count the 1-ply scores above too, and stop at the budget.
+      const meter: Meter = { used: rootMeter.used, limit: budget };
+      const deepEvaluator = metered(evaluator, meter);
+      const deep: { i: number; score: TurnScore; value: Valued }[] = [];
+      for (const i of candidates) {
         const score = scores[i] as TurnScore;
         const after = variant.applyTurn(rolled, turns[i] as Turn);
-        // A turn that ends the game needs no deeper look: its value is exact.
-        const value =
-          variant.result(after) !== null ? oneVal(i) : twoPly(variant, evaluator, after, me);
-        return { i, score, value };
-      });
+        // A turn that ends the game needs no deeper look: its value is exact, and free.
+        if (variant.result(after) !== null) {
+          deep.push({ i, score, value: oneVal(i) });
+          continue;
+        }
+        try {
+          deep.push({ i, score, value: twoPly(variant, deepEvaluator, after, me) });
+        } catch (error) {
+          // Out of budget: this candidate and the later ones keep their 1-ply values.
+          if (error instanceof OverBudget) break;
+          throw error;
+        }
+      }
       // Wins at once first, as at 1 ply, then by 2-ply equity. `sort` is
       // stable, so ties keep the 1-ply order.
       deep.sort((a, b) => {
@@ -310,16 +411,17 @@ export function createAnalyzer(registry: BotRegistry = {}): Analyzer {
         if (wins !== 0) return wins;
         return b.value.equity - a.value.equity;
       });
-      const bestDeep = (deep[0] as (typeof deep)[number]).value.equity;
+      const bestDeep = deep[0]?.value.equity ?? 0;
       const ranked: RankedTurn[] = deep.map(({ i, value }) => ({
         turn: turns[i] as Turn,
         evaluation: value.evaluation,
         equityLoss: Math.max(0, bestDeep - value.equity),
       }));
       // The other turns: 1-ply order and evaluation. Their loss is the 1-ply
-      // loss, but never less than the last candidate's, so the list stays sorted.
+      // loss, but never less than the last candidate's, so the list stays
+      // sorted. With no deeper look at all, this is the 1-ply ranking.
       const floor = ranked[ranked.length - 1]?.equityLoss ?? 0;
-      const inDeep = new Set(candidates);
+      const inDeep = new Set(deep.map(({ i }) => i));
       for (const i of order) {
         if (top !== undefined && ranked.length >= top) break;
         if (inDeep.has(i)) continue;
