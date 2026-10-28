@@ -1,18 +1,26 @@
 /**
  * "Your online games" (#297): the active online games of the saved
- * session, live from the server (`GameTransport.watchMyGames`).
+ * session, live from the server (`GameTransport.watchMyGames`). History
+ * (#313) watches the finished ones with the same hook.
  *
  * The hook makes no account: with no saved session it shows nothing. The
  * rest is pure: the order (your turn first), the row text and the time
  * left. Never send the user id to analytics.
  */
-import type { AuthProvider, AuthUser, GameSummary, GameTransport } from '@tavli/contracts';
+import type {
+  AuthProvider,
+  AuthUser,
+  GameSummary,
+  GameTransport,
+  OnlineGameStatus,
+} from '@tavli/contracts';
 import type { TFunction } from 'i18next';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { forgetOnlineAccount } from './accountHint';
 import { clockText, clockTickMs } from './clock';
+import { gameScore, gameTitle } from './gameText';
 import { timeLeft } from './timeLeft';
 
 /** The most rows Home shows. "See all" opens the whole list. */
@@ -92,20 +100,19 @@ export function gameRowText(
   localNow: number,
   offset: number,
 ): GameRowText {
-  const title = t('home.online.vsFriend', { game: t(`games.${game.choice}`) });
+  const title = gameTitle(game, t);
   const turn = game.myTurn ? t('home.online.yourTurn') : t('home.online.waiting');
-  const me = game.score[game.mySide];
-  const friend = game.score[game.mySide === 'white' ? 'black' : 'white'];
-  const score = t('home.online.score', { me, friend });
+  const { text: score, spoken: scoreSpoken } = gameScore(game, t);
   const left = timeLeft(game, localNow, offset);
   const time =
     left === null ? null : t('home.online.timeLeft', { time: clockText(left, game.pace, t) });
-  const spoken = [title, turn, t('home.online.scoreSpoken', { me, friend }), time];
+  const spoken = [title, turn, scoreSpoken, time];
   return { title, turn, score, time, label: spoken.filter((part) => part !== null).join(', ') };
 }
 
 /**
- * The active online games of the saved session, live. It reads the
+ * The online games of the saved session with this `status` (default
+ * `active`; History asks for `finished`), live. It reads the
  * session (`auth.ready()`) and follows sign-in and sign-out
  * (`auth.onChange`); it never makes an account. A failure after a list
  * came keeps that list (`failed: true`); `retry` starts the watch again.
@@ -118,6 +125,7 @@ export function gameRowText(
 export function useMyOnlineGames(
   auth: AuthProvider,
   games: GameTransport,
+  status: OnlineGameStatus = 'active',
   now: () => number = Date.now,
 ): { readonly state: MyGamesState; readonly retry: () => void } {
   const [state, setState] = useState<MyGamesState>({ status: 'loading' });
@@ -155,7 +163,7 @@ export function useMyOnlineGames(
       // retry keeps the old list of the same user until the new one comes.
       setState((last) => (switched || last.status !== 'loaded' ? { status: 'loading' } : last));
       stop = games.watchMyGames(
-        { status: 'active' },
+        { status },
         (list) => {
           if (!live) return;
           setState({
@@ -182,7 +190,7 @@ export function useMyOnlineGames(
       unsubscribe();
       stop?.();
     };
-  }, [auth, games, now, attempt]);
+  }, [auth, games, status, now, attempt]);
 
   const retry = useCallback(() => {
     setState((last) => (last.status === 'failed' ? { status: 'loading' } : last));
