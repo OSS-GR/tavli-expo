@@ -2,8 +2,9 @@
  * #180: move one checker with both dice in one step. A selected checker
  * lights its single targets and its combined ones ("2+3"); a tap or a drop
  * on a combined target plays each step in order, and one Undo takes the
- * whole move back. Portes (a hit on the way), Plakoto (a pin on the way),
- * Fevga, the mirrored board (#175) and the flip view.
+ * whole move back. Portes (the order that hits on the way wins, #336),
+ * Plakoto (the order with no pin on the way wins: hits and pins rank the
+ * opposite way), Fevga, the mirrored board (#175) and the flip view.
  */
 import {
   checkersAt,
@@ -220,9 +221,11 @@ describe('<GameScreen /> one checker with both dice (#180)', () => {
     expect(game.state.toMove).toBe('black');
   });
 
-  it('Plakoto: prefers 13/10/5 over pinning on 8', async () => {
+  it('Plakoto: prefers 13/10/5 over pinning on 8 (unlike a Portes hit)', async () => {
     const store = await toPlay('plakoto', [5, 3], { board: createBoard(DOOR, 'contrary') });
     await tapTap(top(13, 2), point(5));
+    // The same board in Portes plays 13/8*/5: a pin on the way is let go
+    // again at once, so it gains nothing and the quiet order wins.
     expect(played(store)).toEqual(['13/10', '10/5']);
   });
 
