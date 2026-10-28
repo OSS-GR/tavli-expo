@@ -471,7 +471,7 @@ describe('the Plakoto mother question', () => {
       const doc = await ctx.db.get(gameId);
       if (doc === null) throw new Error('no game');
       const pinned = motherPin(loadFlow(doc.flow));
-      await ctx.db.patch(gameId, { flow: storeFlow(pinned.flow) });
+      await ctx.db.patch(gameId, { flow: storeFlow(pinned.flow, null) });
       return pinned.pin;
     });
     const v = await view(t, gameId);

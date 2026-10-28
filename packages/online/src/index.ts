@@ -18,16 +18,24 @@ export {
   deadlineAfter,
   isTimedOut,
   loadFlow,
+  loadStored,
   onlineGameRules,
   playTurn,
   resign,
   sideOf,
   storeFlow,
+  storeStep,
   timeOut,
   toView,
   waitingFor,
 } from './online-game';
-export type { CreateOnlineMatchOptions, StoredFlow, ViewInput } from './online-game';
+export type {
+  CreateOnlineMatchOptions,
+  LoadedFlow,
+  SteppedFlow,
+  StoredFlow,
+  ViewInput,
+} from './online-game';
 export {
   SERVER_ACTOR,
   TIMED_OUT_ERROR,

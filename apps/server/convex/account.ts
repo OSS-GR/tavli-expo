@@ -2,40 +2,43 @@
  * Delete my account (#302). App stores ask for this in the app.
  *
  * `deleteMyAccount` is one transaction: if any step throws, nothing is
- * deleted. For the signed-in caller (`signedInPlayer`) it:
+ * deleted. For the signed-in caller (`existingPlayer`) it:
  *
  * 1. resigns each active game, through the same save as `resign`
  *    (`resignAs`): the other player wins, and the push rules hold;
  * 2. keeps each finished game for the other player, with the caller's id
  *    in it (`gameOnDelete` in `model/account.ts`);
- * 3. deletes every invite the caller sent, and every push token;
+ * 3. deletes every open invite the caller sent, and every push token;
  * 4. deletes the Better Auth user, its sessions and its accounts, with
  *    Better Auth's own delete (`internalAdapter.deleteUser`) on the
- *    component's tables.
+ *    component's tables;
+ * 5. schedules `deleteSentInvites`, which deletes the caller's other
+ *    invites (accepted, declined, cancelled, expired) in pages (#306).
  *
  * The caller's token stays valid until it expires, so the call first
- * checks that the Better Auth user still exists: a second call gets
- * `NOT_SIGNED_IN`. See "Delete an account" in
+ * checks that the Better Auth user still exists (`existingPlayer`): a
+ * second call gets `NOT_SIGNED_IN`, and so do the calls that make rows
+ * under the caller's id. See "Delete an account" in
  * `docs/architecture/online-game-service.md`.
  */
 
-import { ConvexError, v } from 'convex/values';
+import { v } from 'convex/values';
 
-import type { GameTransportErrorCode } from '@tavli/contracts';
-
+import { internal } from './_generated/api';
 import type { Doc } from './_generated/dataModel';
-import { mutation } from './_generated/server';
+import { internalMutation, mutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
-import { authComponent, createAuth } from './auth';
-import { signedInPlayer } from './caller';
+import { createAuth } from './auth';
+import { existingPlayer } from './caller';
 import { resignAs } from './games';
+import { openInvitesOf } from './invites';
 import { gameOnDelete } from './model/account';
 
-function fail(code: GameTransportErrorCode, message: string): never {
-  // A plain object literal, so it fits Convex's `Value` type.
-  const data: { code: GameTransportErrorCode; message: string } = { code, message };
-  throw new ConvexError(data);
-}
+/**
+ * How many invites one run of `deleteSentInvites` deletes: one write
+ * each, far below Convex's limit of 16,000 writes per transaction.
+ */
+export const INVITE_DELETE_PAGE = 200;
 
 /** Every active game of `playerId`, on both sides' indexes. */
 async function activeGamesOf(ctx: MutationCtx, playerId: string): Promise<Doc<'games'>[]> {
@@ -61,24 +64,23 @@ export const deleteMyAccount = mutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    const callerId = await signedInPlayer(ctx);
     // A token outlives its user (it is valid until it expires), so a
     // valid token is not enough: the user must still exist.
-    const user = await authComponent.getAnyUserById(ctx, callerId);
-    if (user === null) fail('NOT_SIGNED_IN', 'this account does not exist');
+    const callerId = await existingPlayer(ctx);
 
     // Finished games stay as they are (`keep`); only active ones change.
     for (const game of await activeGamesOf(ctx, callerId)) {
       if (gameOnDelete(game, callerId) === 'resign') await resignAs(ctx, game._id, callerId);
     }
 
-    // Every invite the caller sent, open or not. An open invite's
-    // scheduled `expireInvite` then finds no row and does nothing.
-    const invites = await ctx.db
-      .query('invites')
-      .withIndex('by_from', (q) => q.eq('from', callerId))
-      .collect();
-    for (const invite of invites) await ctx.db.delete(invite._id);
+    // The open invites, now, so nobody can accept one once the user is
+    // gone. The cap keeps them few (`MAX_OPEN_INVITES`). An open invite's
+    // scheduled `expireInvite` then finds no row and does nothing. The
+    // closed ones are never pruned, so they can be many:
+    // `deleteSentInvites` deletes them below, in pages.
+    for (const invite of await openInvitesOf(ctx, callerId, Date.now())) {
+      await ctx.db.delete(invite._id);
+    }
 
     const tokens = await ctx.db
       .query('pushTokens')
@@ -93,6 +95,31 @@ export const deleteMyAccount = mutation({
     // delete a user without the steps above.
     const { internalAdapter } = await createAuth(ctx).$context;
     await internalAdapter.deleteUser(callerId);
+
+    // It runs after this transaction, when the user is gone, so no new
+    // invite can come in (`createInvite` checks `existingPlayer`).
+    await ctx.scheduler.runAfter(0, internal.account.deleteSentInvites, { from: callerId });
+    return null;
+  },
+});
+
+/**
+ * Deletes up to `INVITE_DELETE_PAGE` invites that `from` sent, and runs
+ * again while there may be more. Scheduled by `deleteMyAccount`. Nobody
+ * can accept these invites: they are closed, or their time is up.
+ */
+export const deleteSentInvites = internalMutation({
+  args: { from: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { from }) => {
+    const page = await ctx.db
+      .query('invites')
+      .withIndex('by_from', (q) => q.eq('from', from))
+      .take(INVITE_DELETE_PAGE);
+    for (const invite of page) await ctx.db.delete(invite._id);
+    if (page.length === INVITE_DELETE_PAGE) {
+      await ctx.scheduler.runAfter(0, internal.account.deleteSentInvites, { from });
+    }
     return null;
   },
 });
