@@ -8,19 +8,20 @@ Version: `convex` 1.46.0, a peer dependency (the app installs it). Keep it on th
 
 - **No player id in the calls.** The Convex client sends the sign-in token (`setAuth`), and the server reads the caller from it (`identity.subject`, #131). Online play needs a signed-in user (a guest is enough).
 - **`subscribe`** watches the `getGame` query. Each result goes to `onView`. A `null` result (no such game) goes to `onError` as `NOT_FOUND`. Neither is ever called inside `subscribe`, or after its stop function: each result waits one microtask.
+- **`listMyGames({ status })`** (#296) runs the `listMyGames` query once (`client.query`) and resolves with a copy of the list: the caller's games with that status, newest change first, at most 50. It is a call, not a live list: call it again to see changes.
 - **`sendTurn` / `sendAnswer`** call `makeMove` / `answer` and resolve once the mutation resolves (the Convex client has the new view by then). When the turn time ran out first, the server saves the time out and returns `{ ok: false, error: { code: 'TIMED_OUT' } }`; the adapter rejects with that data. **`resign`** calls `resign`.
 - **Errors.** A server error is a `ConvexError` whose `data` is `GameTransportErrorData`: the adapter rejects (or calls `onError`) with that data, as a plain object. Every server code maps the same way, `NOT_SIGNED_IN` too. Any other error (the network, a bad argument) stays as it is.
 - **Moves are copied** with only the fields the server takes (`from`, `to`, `die`, `capture`). The server checks its arguments strictly, so an extra field would fail the call.
 
 ## Files
 
-| File                    | Job                                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `src/transport.ts`      | `createConvexGameTransport({ client })`: the port on any object with `onUpdate` and `mutation` (`ConvexGameClient`) |
-| `src/functions.ts`      | `GAME_FUNCTIONS`: typed references to the server functions, by name (`GAME_FUNCTION_NAMES`)                         |
-| `src/client.ts`         | `createConvexGameTransportFromUrl(url, auth)`, `createConvexClient(url, auth)` and `authTokenFetcher(auth)`         |
-| `src/transport.test.ts` | The mapping on a fake client: views, `NOT_FOUND`, errors, `TIMED_OUT`, unsubscribe                                  |
-| `src/client.test.ts`    | The token fetcher and the URL factory (`convex/browser` mocked, no socket)                                          |
+| File                    | Job                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `src/transport.ts`      | `createConvexGameTransport({ client })`: the port on any object with `onUpdate`, `query` and `mutation` (`ConvexGameClient`) |
+| `src/functions.ts`      | `GAME_FUNCTIONS`: typed references to the server functions, by name (`GAME_FUNCTION_NAMES`)                                  |
+| `src/client.ts`         | `createConvexGameTransportFromUrl(url, auth)`, `createConvexClient(url, auth)` and `authTokenFetcher(auth)`                  |
+| `src/transport.test.ts` | The mapping on a fake client: views, `NOT_FOUND`, errors, `TIMED_OUT`, unsubscribe, `listMyGames`                            |
+| `src/client.test.ts`    | The token fetcher and the URL factory (`convex/browser` mocked, no socket)                                                   |
 
 The contract checks (`gameTransportContract`) run in `apps/server`, against the real Convex functions with convex-test: `apps/server/convex/convexTransport.test.ts`. That file also checks `GAME_FUNCTIONS` against the server's generated `api`, in name and type.
 

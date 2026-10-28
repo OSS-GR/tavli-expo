@@ -6,7 +6,7 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
-import { TURN_TIME_MS } from '@tavli/contracts';
+import { MAX_LISTED_GAMES, TURN_TIME_MS } from '@tavli/contracts';
 import type {
   GameTransportErrorCode,
   OnlineGameChoice,
@@ -174,6 +174,7 @@ describe('createGame', () => {
       'status',
       'targetPoints',
       'turnDeadline',
+      'updatedAt',
       'variant',
       'version',
       'winner',
@@ -338,6 +339,7 @@ describe('sign-in (#131)', () => {
     );
     await rejectsWith(t.mutation(api.games.resign, { gameId }), 'NOT_SIGNED_IN');
     await rejectsWith(t.query(api.games.getGame, { gameId }), 'NOT_SIGNED_IN');
+    await rejectsWith(t.query(api.games.listMyGames, { status: 'active' }), 'NOT_SIGNED_IN');
     // Also for a game that does not exist.
     await t.run(async (ctx) => ctx.db.delete(gameId));
     await rejectsWith(t.query(api.games.getGame, { gameId }), 'NOT_SIGNED_IN');
@@ -361,8 +363,76 @@ describe('sign-in (#131)', () => {
     for (const id of ['server', '', '  ']) {
       await rejectsWith(as(t, id).mutation(api.games.resign, { gameId }), 'BAD_REQUEST');
       await rejectsWith(as(t, id).query(api.games.getGame, { gameId }), 'BAD_REQUEST');
+      await rejectsWith(
+        as(t, id).query(api.games.listMyGames, { status: 'active' }),
+        'BAD_REQUEST',
+      );
     }
     expect((await view(t, gameId)).status).toBe('active');
+  });
+});
+
+describe('listMyGames (#296)', () => {
+  /** The ids of the games `id` lists with `status`, in order. */
+  async function listed(t: Tester, id: string, status: 'active' | 'finished' = 'active') {
+    const games = await as(t, id).query(api.games.listMyGames, { status });
+    return games.map((game) => game.gameId);
+  }
+
+  it('returns at most MAX_LISTED_GAMES games, the newest of both sides', async () => {
+    const t = setup();
+    const ids: Id<'games'>[] = [];
+    // Alice plays White in the even games and Black in the odd ones.
+    for (let i = 0; i < MAX_LISTED_GAMES + 3; i++) {
+      const players = i % 2 === 0 ? PLAYERS : { white: BOB, black: ALICE };
+      ids.push(
+        await t.mutation(internal.games.createGame, {
+          callerId: ALICE,
+          players,
+          choice: 'portes',
+          targetPoints: 1,
+          pace: 'async',
+        }),
+      );
+      vi.advanceTimersByTime(1000);
+    }
+    expect(await listed(t, ALICE)).toEqual(ids.slice(3).reverse());
+    expect(await listed(t, BOB)).toEqual(ids.slice(3).reverse());
+    expect(await listed(t, 'eve')).toEqual([]);
+  });
+
+  it('a save sets updatedAt: the changed game comes first', async () => {
+    const t = setup();
+    const first = await createGame(t);
+    vi.advanceTimersByTime(1000);
+    const second = await createGame(t);
+    vi.advanceTimersByTime(1000);
+    expect(await listed(t, ALICE)).toEqual([second, first]);
+    await as(t, BOB).mutation(api.games.resign, { gameId: second });
+    expect(await listed(t, ALICE)).toEqual([first]);
+    expect(await listed(t, ALICE, 'finished')).toEqual([second]);
+    const [summary] = await as(t, ALICE).query(api.games.listMyGames, { status: 'finished' });
+    expect(summary).toMatchObject({ updatedAt: START + 2000, winner: 'white', mySide: 'white' });
+  });
+
+  it('a game saved before #296 (no updatedAt) counts its creation time and comes last', async () => {
+    const t = setup();
+    const old = await createGame(t);
+    await t.run(async (ctx) => ctx.db.patch(old, { updatedAt: undefined }));
+    vi.advanceTimersByTime(1000);
+    const next = await createGame(t);
+    const games = await as(t, ALICE).query(api.games.listMyGames, { status: 'active' });
+    expect(games.map((game) => game.gameId)).toEqual([next, old]);
+    const created = await t.run(async (ctx) => (await ctx.db.get(old))?._creationTime);
+    expect(games[1]?.updatedAt).toBe(created);
+  });
+
+  it('tells nothing about the other player but their side', async () => {
+    const t = setup();
+    await createGame(t);
+    const games = await as(t, ALICE).query(api.games.listMyGames, { status: 'active' });
+    expect(games).toHaveLength(1);
+    expect(JSON.stringify(games)).not.toContain(BOB);
   });
 });
 

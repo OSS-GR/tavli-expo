@@ -44,6 +44,7 @@ function memoryAdapters() {
         sendTurn: (request) => caller().sendTurn(request),
         sendAnswer: (request) => caller().sendAnswer(request),
         resign: (gameId) => caller().resign(gameId),
+        listMyGames: (request) => caller().listMyGames(request),
       };
     },
   };
@@ -111,6 +112,8 @@ describe('createOnlineServices', () => {
     online.games.subscribe(gameId, (view) => views.push(view));
     await settle();
     expect(views.map((view) => view.gameId)).toEqual([gameId]);
+    const listed = await online.games.listMyGames({ status: 'active' });
+    expect(listed.map((game) => game.gameId)).toEqual([gameId]);
     await online.games.resign(gameId);
     // Still the same client: nothing new was made.
     expect(made).toHaveLength(3);
@@ -161,6 +164,9 @@ describe('the Jest fake of @/services', () => {
     await settle();
     expect(errors).toEqual([expect.objectContaining({ code: 'NOT_SIGNED_IN' })]);
     await expect(onlineFake.games.resign(gameId)).rejects.toMatchObject({ code: 'NOT_SIGNED_IN' });
+    await expect(onlineFake.games.listMyGames({ status: 'active' })).rejects.toMatchObject({
+      code: 'NOT_SIGNED_IN',
+    });
   });
 
   it('plays as the signed-in guest', async () => {
@@ -174,5 +180,7 @@ describe('the Jest fake of @/services', () => {
     await onlineFake.games.resign(gameId);
     await settle();
     expect(views.at(-1)?.version).toBeGreaterThan(views[0]?.version ?? 0);
+    const finished = await onlineFake.games.listMyGames({ status: 'finished' });
+    expect(finished).toEqual([expect.objectContaining({ gameId, mySide: 'white' })]);
   });
 });
