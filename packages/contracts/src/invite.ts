@@ -90,6 +90,8 @@ export const INVITE_ERROR_CODES = [
   'NOT_YOUR_INVITE',
   /** Bad arguments (for example a code with a wrong length or character). */
   'BAD_REQUEST',
+  /** The call has no signed-in user (the same code as in `GAME_TRANSPORT_ERROR_CODES`). */
+  'NOT_SIGNED_IN',
 ] as const;
 
 export type InviteErrorCode = (typeof INVITE_ERROR_CODES)[number];

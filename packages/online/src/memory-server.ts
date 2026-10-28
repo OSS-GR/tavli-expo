@@ -32,6 +32,7 @@ import {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkViewer,
   eventActor,
   matchStatus,
   nextDeadline,
@@ -82,7 +83,11 @@ export interface MemoryGameServer {
     targetPoints: number,
     pace: OnlineGamePace,
   ): string;
-  /** The transport of `playerId`: every call it makes comes from that player. */
+  /**
+   * The transport of `playerId`: every call it makes comes from that
+   * player, as if they were signed in (the Convex adapter gets the id from
+   * the sign-in token). Only the two players may subscribe to a game.
+   */
   transportFor(playerId: string): GameTransport;
   /** The game as a client sees it (a copy), or `null` when there is no such game. */
   getGame(gameId: string): OnlineGameView | null;
@@ -238,12 +243,22 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     return {
       subscribe(gameId, onView, onError) {
         const listener: Listener = { gameId, onView, active: true };
-        const game = games.get(gameId);
-        if (game === undefined) {
-          const error: GameTransportErrorData = { code: 'NOT_FOUND', message: 'no such game' };
+        const fail = (error: GameTransportErrorData) =>
           later(() => {
             if (listener.active) onError?.(error);
           });
+        let game: MemoryGame | null;
+        try {
+          // Only the two players may watch (#131), like the Convex `getGame`.
+          game = checkViewer(games.get(gameId) ?? null, playerId);
+        } catch (error) {
+          fail(toErrorData(error) as GameTransportErrorData);
+          return () => {
+            listener.active = false;
+          };
+        }
+        if (game === null) {
+          fail({ code: 'NOT_FOUND', message: 'no such game' });
         } else {
           listeners.add(listener);
           send(listener, JSON.stringify(viewOf(game)));

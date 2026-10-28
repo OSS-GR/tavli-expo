@@ -104,6 +104,12 @@ export default defineConfig([
     languageOptions: { globals: globals.node },
   },
 
+  // Server tools (`pnpm --filter @tavli/server codegen`) run in Node.
+  {
+    files: ['apps/server/tools/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
+
   // Block vendor SDKs everywhere.
   {
     rules: {
@@ -128,18 +134,29 @@ export default defineConfig([
   },
 
   // Convex server: vendor SDKs yes, React no. Dice come from the secure
-  // RNG (`createCryptoRng`), never from Math.random.
+  // RNG (`createCryptoRng`), never from Math.random. `@better-auth/expo`
+  // (root entry only) is Better Auth's server plugin for Expo apps, not Expo
+  // itself, so the server may import it (#131).
   {
     files: ['apps/server/**'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [reactImports] }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              ...reactImports,
+              group: [...reactImports.group, '!@better-auth/expo', '@better-auth/expo/*'],
+            },
+          ],
+        },
+      ],
       'no-restricted-properties': [
         'error',
         {
           object: 'Math',
           property: 'random',
-          message:
-            'Server dice come from createCryptoRng (apps/server/convex/model/crypto-rng.ts).',
+          message: 'Server dice come from createCryptoRng (apps/server/convex/model/cryptoRng.ts).',
         },
       ],
     },

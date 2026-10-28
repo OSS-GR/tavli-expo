@@ -73,6 +73,14 @@ export {
   normalizeInviteCode,
 } from './invite';
 export type { InviteErrorCode, InviteErrorData, InviteStatus, InviteView } from './invite';
+export {
+  AUTH_ERROR_CODES,
+  MEMORY_AUTH_TOKEN_PREFIX,
+  createMemoryAuthProvider,
+  createMemoryAuthStore,
+  isAuthErrorData,
+} from './auth';
+export type { AuthErrorCode, AuthErrorData, AuthProvider, AuthUser, MemoryAuthStore } from './auth';
 export { createMemoryStorage, type Storage } from './storage';
 export { isAnonymousInstallId } from './install-id';
 export {

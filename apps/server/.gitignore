@@ -1,0 +1,3 @@
+.env.local
+# The local backend that `pnpm codegen` runs (no Convex account).
+.convex/

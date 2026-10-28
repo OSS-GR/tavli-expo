@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  GAME_TRANSPORT_ERROR_CODES,
   INVITE_CODE_ALPHABET,
   INVITE_CODE_LENGTH,
   INVITE_ERROR_CODES,
@@ -58,6 +59,11 @@ describe('isInviteErrorData', () => {
     for (const code of INVITE_ERROR_CODES) {
       expect(isInviteErrorData({ code, message: 'x' })).toBe(true);
     }
+  });
+
+  it('NOT_SIGNED_IN (#131) is a game and an invite code, so one error fits both', () => {
+    expect(INVITE_ERROR_CODES).toContain('NOT_SIGNED_IN');
+    expect(GAME_TRANSPORT_ERROR_CODES).toContain('NOT_SIGNED_IN');
   });
 
   it('rejects other values', () => {
