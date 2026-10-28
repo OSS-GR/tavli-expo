@@ -8,7 +8,8 @@
  * - The time left shows on the strip of the player the server waits for
  *   (live: seconds; async: hours).
  * - A game that ends while the screen is open shows its game-end sheet
- *   over the next game; its button closes it.
+ *   over the end of that game (the board store holds it, #286); its
+ *   button closes it, and then the next game shows.
  * - There is no game resign online: Resign match goes to the server.
  * - No Hint and no Review (there is no analyzer online), and nothing goes
  *   to the save slot or History: the server keeps the game.
@@ -35,7 +36,7 @@ import { GameMenu } from '@/features/match/GameMenu';
 import { MissingGame } from '@/features/match/MissingGame';
 import { currentGameLabel, variantName } from '@/features/match/summary';
 
-import { onlineBoardStore } from './boardStore';
+import { onlineBoardStore, type OnlineBoardStore } from './boardStore';
 import { clockText, clockTickMs } from './clock';
 import { useOnlineStore, type OnlineNotice, type OnlineStore } from './onlineStore';
 import { onlineSeats } from './seats';
@@ -119,7 +120,7 @@ function OnlineBoard({
   now = Date.now,
 }: OnlineMatchScreenProps & {
   store: OnlineStore;
-  board: NonNullable<ReturnType<typeof onlineBoardStore>>;
+  board: OnlineBoardStore;
   side: PlayerId;
 }) {
   const { t } = useTranslation();
@@ -161,24 +162,27 @@ function OnlineBoard({
     return () => clearInterval(timer);
   }, [pace, now, ticking]);
 
-  // Games that end while the screen is open show their game-end sheet.
-  // Games that ended before it opened do not.
-  const games = flow.match.games;
-  const [closedGames, setClosedGames] = useState(games.length);
+  // The newest flow: the next game, while the board still holds the last one.
+  const latest = useOnlineStore(store, (s) => s.flow) ?? flow;
 
   const seats = onlineSeats(side, t);
   const name = (player: PlayerId) => seats[player].name;
   if (view === null) return null;
 
   const finished = view.status === 'finished';
+  // A game that ended while the screen was open: the board holds its end
+  // (`boardStore.ts`, #286) under its game-end sheet. Games that ended
+  // before the screen opened are not held.
+  const games = flow.match.games;
   const last = games.at(-1);
   const ended: OnlineEndedGame | null =
-    !finished && games.length > closedGames && last !== undefined
+    !finished && flow.game.phase === 'game-over' && last !== undefined
       ? {
           record: last,
           key: `${matchKey}:end:${games.length}`,
           onClose: () => {
-            setClosedGames(games.length);
+            // The next game shows: its dice tumble, and its turn is read.
+            board.release();
             // The sheet already says that your time ran out.
             if (last.reason === 'timeout' && store.getState().notice === 'timedOut') {
               store.getState().clearNotice();
@@ -219,10 +223,13 @@ function OnlineBoard({
   const game = t(`games.${view.choice}`);
   const playing = variantName(flow.game.state.variant, t);
   const gameLabel = currentGameLabel(flow, t);
-  // The next game is on the board already: the sheet names it.
+  // The server has started the next game already: the sheet names it.
   const nextLabel =
     ended !== null
-      ? t('game.end.nextGame', { number: games.length + 1, game: playing })
+      ? t('game.end.nextGame', {
+          number: games.length + 1,
+          game: variantName(latest.game.state.variant, t),
+        })
       : undefined;
   const score = t('game.end.score', {
     white: name('white'),

@@ -2,12 +2,19 @@
 // text, the board store, the online bot and the dev invite (#256), over
 // the in-memory server.
 import { ONLINE_GAME_CHOICES, TURN_TIME_MS, type OnlineGameChoice } from '@tavli/contracts';
-import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine';
+import {
+  applyMatchAction,
+  createSeededRng,
+  currentBoard,
+  opponent,
+  type MatchFlow,
+} from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
 import { pickTurn } from '@tavli/online/testing';
 
 import { storeEvents } from '@/features/game/gameFeedback';
 import { inviteAccepted } from '@/features/invites/acceptedInvite';
+import { currentGameLabel } from '@/features/match/summary';
 import i18n from '@/i18n';
 import { botLevels, botRunner } from '@/services';
 
@@ -220,6 +227,181 @@ describe('onlineBoardStore refusals', () => {
     expect(board.getState().dispatch({ type: 'roll', player: 'white' })).toBe(false);
     expect(storeEvents(before, board.getState())).toEqual(['invalidMove']);
     stop();
+  });
+});
+
+describe('onlineBoardStore between games (#286)', () => {
+  /** A board over a store that has its first view. */
+  async function openBoard(targetPoints = 3, choice: OnlineGameChoice = 'portes') {
+    const { server, gameId } = serverWithGame(choice, targetPoints);
+    const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
+    open.push(store);
+    await flush();
+    return { server, gameId, store, board: onlineBoardStore(store, gameId)! };
+  }
+
+  /** The turn time of the player the server waits for runs out. */
+  async function timeOut(server: ReturnType<typeof serverWithGame>['server']) {
+    jest.advanceTimersByTime(TURN_TIME_MS.live + 1);
+    expect(server.runDueTimeouts()).toBe(1);
+    await flush();
+  }
+
+  it('holds the end of a game until release, while the store takes every view', async () => {
+    const { server, gameId, store, board } = await openBoard();
+    const seen: MatchFlow[] = [];
+    const stop = board.subscribe((state) => seen.push(state.flow));
+    const before = board.getState().flow;
+    const loser = server.getGame(gameId)!.waitingFor!;
+
+    await timeOut(server);
+    // The store has the next game, with its first roll.
+    const next = store.getState().flow!;
+    const [record] = next.match.games;
+    expect(record).toEqual(expect.objectContaining({ winner: opponent(loser), reason: 'timeout' }));
+    expect(next.game.phase).toBe('moving');
+    expect(next.game.state.dice).not.toBeNull();
+    // The board shows the end of game 1, as a local game does.
+    const held = board.getState().flow;
+    expect(held).not.toBe(next);
+    expect(held.match).toBe(next.match);
+    expect(held.game.phase).toBe('game-over');
+    expect(held.game.result).toEqual({
+      winner: record!.winner,
+      points: record!.points,
+      reason: 'timeout',
+    });
+    expect(held.game.state.board).toEqual(currentBoard(before.game));
+    expect(held.log).toEqual([]);
+    expect(seen).toEqual([held]);
+
+    // Game 2 goes on in the store under the sheet; the board waits.
+    await playServerTurn(server, gameId);
+    await flush();
+    expect(store.getState().view?.version).toBe(server.getGame(gameId)!.version);
+    expect(board.getState().flow).toBe(held);
+    expect(seen).toHaveLength(1);
+
+    // The sheet closes: the newest view, once.
+    board.release();
+    expect(board.getState().flow).toBe(store.getState().flow);
+    board.release();
+    expect(seen).toEqual([held, store.getState().flow]);
+    stop();
+  });
+
+  it('drops the moves of a turn that timed out', async () => {
+    const { server, gameId, store, board } = await openBoard();
+    while (server.getGame(gameId)!.waitingFor !== 'white') {
+      await playServerTurn(server, gameId);
+      await flush();
+    }
+    const start = store.getState().flow!;
+    const [move] = pickTurn(start.game, createSeededRng(2));
+    expect(store.getState().dispatch({ type: 'move', player: 'white', move: move! })).toBe(true);
+    expect(board.getState().flow.game.played).toHaveLength(1);
+
+    await timeOut(server);
+    const held = board.getState().flow;
+    expect(held.game.phase).toBe('game-over');
+    expect(held.game.played).toEqual([]);
+    expect(held.game.state.board).toEqual(start.game.state.board);
+  });
+
+  it('keeps the moves that ended a game, then shows the next game that times out under the sheet', async () => {
+    const { server, gameId, store, board } = await openBoard(5);
+    while (server.getGame(gameId)!.waitingFor !== 'white') {
+      await playServerTurn(server, gameId);
+      await flush();
+    }
+    const start = store.getState().flow!;
+    const [move] = pickTurn(start.game, createSeededRng(2));
+    expect(store.getState().dispatch({ type: 'move', player: 'white', move: move! })).toBe(true);
+    const local = board.getState().flow;
+    const end = currentBoard(local.game);
+    expect(end).not.toEqual(start.game.state.board);
+
+    // Views the board only draws: your turn ended game 1 (not by time),
+    // then game 2 ends by a time out while the sheet is open.
+    const ended = (flow: MatchFlow, player: 'white' | 'black') =>
+      applyMatchAction(applyMatchAction(flow, { type: 'timeout', player }), { type: 'nextGame' });
+    const afterOne = ended(start, 'white');
+    const [one] = afterOne.match.games;
+    const won = { ...one!, winner: 'white' as const, reason: 'borneOff' as const };
+    const gameTwo: MatchFlow = {
+      ...afterOne,
+      match: { ...afterOne.match, games: [won] },
+      log: [],
+    };
+    store.setState({ flow: gameTwo });
+    expect(board.getState().flow.game.state.board).toEqual(end);
+
+    const afterTwo = ended(gameTwo, gameTwo.game.state.toMove);
+    expect(afterTwo.match.status).toBe('in-progress');
+    store.setState({ flow: { ...afterTwo, log: [] } });
+    const held = board.getState().flow;
+    expect(held.match.games).toHaveLength(2);
+    expect(held.game.result?.reason).toBe('timeout');
+    // The board shows how game 2 ended, not game 1.
+    expect(held.game.state.board).toEqual(gameTwo.game.state.board);
+  });
+
+  it('names the game that ended under the sheet: its variant and its board (Tavli)', async () => {
+    const t = i18n.t.bind(i18n);
+    const { server, store, board } = await openBoard(15, 'tavli');
+    await timeOut(server);
+    const first = board.getState().flow;
+    expect(first.game.state.variant).toBe('portes');
+    expect(currentGameLabel(first, t)).toBe('Game 1 · Portes');
+    // Game 2 is Plakoto: the store has it, the board waits.
+    const two = store.getState().flow!;
+    expect(two.game.state.variant).toBe('plakoto');
+
+    // Nobody plays game 2 while the sheet is open: the server ends it.
+    await timeOut(server);
+    expect(store.getState().view?.status).toBe('active');
+    expect(store.getState().flow!.game.state.variant).toBe('fevga');
+    const held = board.getState().flow;
+    expect(held.match.games.map((g) => g.variant)).toEqual(['portes', 'plakoto']);
+    expect(held.game.phase).toBe('game-over');
+    // The label and the menu's Rules read the variant of the board's game.
+    expect(held.game.state.variant).toBe('plakoto');
+    expect(currentGameLabel(held, t)).toBe('Game 2 · Plakoto');
+    expect(held.game.state.board).toEqual(two.game.state.board);
+  });
+
+  it('shows a next game that ends under the sheet, and lets go when the match ends', async () => {
+    const { server, store, board } = await openBoard(5);
+    await timeOut(server);
+    const first = board.getState().flow;
+    expect(first.match.games).toHaveLength(1);
+    expect(store.getState().view?.status).toBe('active');
+    const second = store.getState().flow!;
+    // Nobody plays game 2 either: the sheet shows its end, in place of game 1.
+    await timeOut(server);
+    if (store.getState().view?.status === 'active') {
+      const held = board.getState().flow;
+      expect(held.match.games).toHaveLength(2);
+      expect(held.game.phase).toBe('game-over');
+      expect(held.game.result?.reason).toBe('timeout');
+      expect(held.game.state.board).toEqual(second.game.state.board);
+    }
+    while (store.getState().view?.status === 'active') await timeOut(server);
+    // Match end: the board shows the last view, nothing waits.
+    expect(board.getState().flow).toBe(store.getState().flow);
+  });
+
+  it('does not hold a game that ended before the board was made', async () => {
+    const { server, gameId } = serverWithGame('portes', 3);
+    const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
+    open.push(store);
+    await flush();
+    jest.advanceTimersByTime(TURN_TIME_MS.live + 1);
+    expect(server.runDueTimeouts()).toBe(1);
+    await flush();
+    const board = onlineBoardStore(store, gameId)!;
+    expect(board.getState().flow).toBe(store.getState().flow);
+    expect(board.getState().flow.game.phase).toBe('moving');
   });
 });
 

@@ -17,8 +17,10 @@
  *   as soon as the view is on the board. A double chosen after a 1-2 is no
  *   roll: nothing plays (Asodio, Acey-Deucey).
  * - A game you won: `gameWin`; the match: `matchWin`. A lost game plays
- *   nothing, as in a local game vs the bot. The next game is already on
- *   the board under the game-end sheet: its roll plays nothing.
+ *   nothing, as in a local game vs the bot. The board holds the end of the
+ *   game under its game-end sheet (`boardStore.ts`, #286). When the sheet
+ *   closes, the board goes from that end (`game-over`) to the next game:
+ *   its first roll is a new turn and plays then, once.
  *
  * Your own turn comes back in the view after Confirm. Its moves played
  * already, on the phone, so that view plays only what the server did after
@@ -75,7 +77,7 @@ export function viewEvents(before: MatchFlow, after: MatchFlow, me: PlayerId): T
   const games = after.match.games.length;
   const gamesBefore = before.match.games.length;
   if (games !== gamesBefore) {
-    // The board shows the next game: the turn that ended the last one is gone.
+    // A game ended. The view has no turn that ended it: only the win plays.
     const won = games > gamesBefore && isHumanWin(after.match.games.at(-1)?.winner, humans);
     return won ? [now('gameWin')] : [];
   }

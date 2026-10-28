@@ -47,7 +47,8 @@
  * the server's rolls and the game end play from the views
  * (`features/online/onlineFeedback.ts`, #271). A game the
  * server has already ended shows its game-end sheet (`online.ended`) over
- * the next game. The online screen (`features/online/OnlineMatchScreen`)
+ * its end: the board store holds the next game until the sheet closes
+ * (#286). The online screen (`features/online/OnlineMatchScreen`)
  * gives the texts: the time left, the waiting line and its notices.
  *
  * Game logic stays in the engine. This screen sends actions to the game
@@ -156,12 +157,15 @@ export interface BotSeat {
   readonly timing?: Partial<BotTiming>;
 }
 
-/** A game the server has already ended: it shows the next game (online, #255). */
+/**
+ * A game the server has already ended (online, #255). The board shows its
+ * end until the sheet closes; the server has started the next game (#286).
+ */
 export interface OnlineEndedGame {
   readonly record: GameRecord;
   /** Names this game end for the whole app run, so it is read once (#216). */
   readonly key: string;
-  /** The sheet's button: it closes the sheet. */
+  /** The sheet's button: it closes the sheet, and the next game shows. */
   readonly onClose: () => void;
 }
 
@@ -360,7 +364,7 @@ export function GameScreen({
   // House rule `chosenStarterRolls` (#207): a card asks who starts. In
   // pass-and-play either player picks; vs the bot, the human does.
   const choosing = view.matchPhase === 'playing' && isChoosingStarter(game);
-  // Online: a game-end sheet or a notice covers the next game.
+  // Online: a game-end sheet or a notice covers the board.
   const onlineCovered = online !== undefined && (online.ended !== null || online.notice !== null);
   const blocked =
     matchOver || gameOver || showPass || showOpening || askHuman || choosing || onlineCovered;
@@ -1013,7 +1017,8 @@ export function GameScreen({
         // Like the win jingle: only a win by a person is celebrated.
         celebrate={isHumanWin(winner, humans)}>
         {ended !== null ? (
-          // The next game is on the board already: the button closes the sheet.
+          // The server has started the next game: the button closes the
+          // sheet, and the board shows that game (#286).
           <ActionButton
             testID="next-game-button"
             label={t('game.end.next')}
@@ -1054,7 +1059,7 @@ export function GameScreen({
   }
 
   // Cards over the board, at most one at a time, and none once the game is over.
-  // Online, the sheet of the game that just ended covers the next game.
+  // Online, the sheet of the game that just ended covers the board.
   const over = gameOver || matchOver || ended !== null;
   const notice = online?.notice ?? null;
   let card = null;

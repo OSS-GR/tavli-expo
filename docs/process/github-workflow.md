@@ -118,7 +118,7 @@ Without a secret, the job fails with a clear error. The Claude GitHub App must a
 
 The workflow `.github/workflows/deploy-server.yml` deploys the Convex functions in `apps/server` (#257). It is **not** a required check: it never runs on a pull request.
 
-- **Dev:** on each push to `main` that changes `apps/server/**`, `packages/engine/**`, `packages/contracts/**`, `packages/online/**`, the lockfile, the root config or the workflow itself. You can also start it by hand (Actions → **Deploy server** → **Run workflow**, target `dev`).
+- **Dev:** on each push to `main` that changes `apps/server/**`, `packages/engine/**`, `packages/contracts/**`, `packages/online/**`, `packages/adapters/push-expo/**`, the lockfile, the root config or the workflow itself. You can also start it by hand (Actions → **Deploy server** → **Run workflow**, target `dev`).
 - **Prod:** only by hand, with target `prod`, from `main`. The job uses the GitHub environment `production`.
 - **Steps:** check the deploy key, install, server typecheck and tests, then `convex deploy --typecheck enable` in `apps/server`.
 - **Never on PRs:** it has no `pull_request` or `pull_request_target` trigger, so PR code never sees the deploy keys. Keep it that way.
