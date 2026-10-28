@@ -1,12 +1,16 @@
 import type { createRecordingAnalytics } from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
+  asodio,
+  createBoard,
   createGameFlow,
   createSeededRng,
   getVariant,
   portes,
   type Dice,
+  type PerPlayer,
   type PlayerId,
+  type SideLayout,
 } from '@tavli/engine';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 
@@ -19,6 +23,7 @@ import {
   type BoardLayoutMode,
 } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import i18n from '@/i18n';
 import { analytics } from '@/services';
 
 import { MatchScreen } from './MatchScreen';
@@ -38,6 +43,13 @@ const FAST = {
   thinkMs: () => 5,
 };
 const WAIT = { timeout: 4000 };
+
+/** The game-end chip is filled (diplo) or outlined (mono, per checker, #245). */
+const expectChip = (filled: boolean) => {
+  const chip = screen.getByTestId('game-end-chip');
+  if (filled) expect(chip).not.toHaveStyle({ backgroundColor: 'transparent' });
+  else expect(chip).toHaveStyle({ backgroundColor: 'transparent' });
+};
 
 function session(setup: MatchSetup, seed = 11): MatchSession {
   return createSessionRegistry({ createRng: () => createSeededRng(seed) }).start(setup);
@@ -164,6 +176,7 @@ describe('<MatchScreen /> vs bot', () => {
       within(card).getByText('Diplo: you resigned before you bore off a checker.'),
     ).toBeOnTheScreen();
     expect(within(card).getByText('You 0 – 2 Bot')).toBeOnTheScreen();
+    expectChip(true);
     // Vs the bot, a bot win is not celebrated.
     expect(screen.queryByTestId('game-celebration', { includeHiddenElements: true })).toBeNull();
 
@@ -331,6 +344,7 @@ describe('<MatchScreen /> pass-and-play', () => {
     const card = screen.getByTestId('game-end-card');
     expect(within(card).getByText('Mono · +1 point')).toBeOnTheScreen();
     expect(within(card).getByText('Mono: Maria resigned the game.')).toBeOnTheScreen();
+    expectChip(false);
     expect(within(card).getByText('Maria 0 – 1 Nikos')).toBeOnTheScreen();
   });
 
@@ -578,4 +592,158 @@ describe('<MatchScreen /> Hint (#209)', () => {
       ]);
     },
   );
+});
+
+describe('<MatchScreen /> Acey-Deucey American scoring (#245)', () => {
+  // 1 point per checker the loser has not borne off (`perChecker`). The
+  // points come from the engine; the texts say how they were counted.
+  const american = (mode: MatchSetup['mode']): MatchSetup => ({
+    ...defaultSetup(mode),
+    game: 'asodio',
+    targetPoints: 7,
+    names: mode === 'local' ? { white: 'Maria', black: 'Nikos' } : { white: '', black: '' },
+    rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+  });
+
+  /** `toMove` is to roll on `layout` (each side in its own numbering). */
+  function startAt(s: MatchSession, layout: PerPlayer<SideLayout>, toMove: PlayerId = 'white') {
+    const { rules } = game(s).state;
+    expect(rules.scoring.method).toBe('perChecker');
+    const state = {
+      ...asodio.initialState({ startingPlayer: toMove, rules }),
+      board: createBoard(layout, rules.movement.direction),
+    };
+    s.store.setState({
+      flow: { ...s.store.getState().flow, game: createGameFlow({ state, starter: toMove }) },
+    });
+  }
+
+  /** `player` rolls 3-2, bears off from point 1 with the 3 and confirms. */
+  async function bearOffLast(s: MatchSession, player: PlayerId) {
+    await act(async () => {
+      const { dispatch } = s.store.getState();
+      expect(dispatch({ type: 'roll', player, dice: [3, 2] })).toBe(true);
+      expect(dispatch({ type: 'move', player, move: { from: 1, to: 'off', die: 3 } })).toBe(true);
+      expect(dispatch({ type: 'confirm', player })).toBe(true);
+    });
+  }
+
+  // White bears off her last checker; Black has 3 on the board and 2 outside.
+  const lastChecker: PerPlayer<SideLayout> = {
+    white: { points: { 1: 1 }, off: 14 },
+    black: { points: { 6: 3 }, outside: 2, off: 10 },
+  };
+
+  it('a finished game says 1 point for each checker the loser did not bear off', async () => {
+    const s = session(american('local'));
+    startAt(s, lastChecker);
+    await show(s).view;
+    await bearOffLast(s, 'white');
+
+    expect(game(s).result).toEqual({ winner: 'white', points: 5, reason: 'borneOff' });
+    const card = within(screen.getByTestId('game-end-card'));
+    expect(card.getByText('Maria wins the game!')).toBeOnTheScreen();
+    expect(card.getByText('+5 points')).toBeOnTheScreen();
+    expect(card.getByText('Nikos did not bear off 5 checkers: 1 point each.')).toBeOnTheScreen();
+    expect(card.getByText('Maria 5 – 0 Nikos')).toBeOnTheScreen();
+    // 5 points, but not a diplo: the chip stays outlined.
+    expectChip(false);
+    expect(card.queryByText(/Mono|Diplo|any checker/)).toBeNull();
+  });
+
+  it('a resign with one checker left: 1 point, not a mono', async () => {
+    const user = setupUser();
+    const s = session(american('local'));
+    startAt(s, lastChecker);
+    await show(s).view;
+
+    await user.press(button('Game menu'));
+    await user.press(button('Resign game, Nikos wins this game'));
+    const dialog = within(screen.getByTestId('resign-game-dialog'));
+    expect(
+      dialog.getByText('Nikos wins 1 point, because Maria has 1 checker left to bear off.'),
+    ).toBeOnTheScreen();
+    expect(dialog.getByText('Match after resign: Maria 0 – 1 Nikos (to 7)')).toBeOnTheScreen();
+    await user.press(button('Resign'));
+
+    expect(game(s).result).toEqual({ winner: 'black', points: 1, reason: 'resigned' });
+    const card = within(screen.getByTestId('game-end-card'));
+    expect(card.getByText('+1 point')).toBeOnTheScreen();
+    expect(
+      card.getByText('Maria resigned and did not bear off 1 checker: 1 point.'),
+    ).toBeOnTheScreen();
+    expect(card.queryByText(/Mono|Diplo/)).toBeNull();
+  });
+
+  it('vs the bot: your resign counts your checkers left', async () => {
+    const user = setupUser();
+    const s = session(american('bot'));
+    startAt(s, { white: { points: { 6: 2, 13: 3 }, off: 10 }, black: { points: { 6: 15 } } });
+    await show(s).view;
+
+    await user.press(button('Game menu'));
+    await user.press(button('Resign game, Bot wins this game'));
+    expect(
+      within(screen.getByTestId('resign-game-dialog')).getByText(
+        'Bot wins 5 points, because you have 5 checkers left to bear off: 1 point each.',
+      ),
+    ).toBeOnTheScreen();
+    await user.press(button('Resign'));
+
+    expect(game(s).result).toEqual({ winner: 'black', points: 5, reason: 'resigned' });
+    const card = within(screen.getByTestId('game-end-card'));
+    expect(card.getByText('+5 points')).toBeOnTheScreen();
+    expect(
+      card.getByText('You resigned and did not bear off 5 checkers: 1 point each.'),
+    ).toBeOnTheScreen();
+    expect(card.getByText('You 0 – 5 Bot')).toBeOnTheScreen();
+    expectChip(false);
+  });
+
+  it('vs the bot: a bear-off loss says how many of your checkers count', async () => {
+    const s = session(american('bot'));
+    // The bot (Black) bears off its last checker; you have 6 left.
+    startAt(
+      s,
+      { white: { points: { 13: 6 }, off: 9 }, black: { points: { 1: 1 }, off: 14 } },
+      'black',
+    );
+    await bearOffLast(s, 'black');
+    expect(game(s).result).toEqual({ winner: 'black', points: 6, reason: 'borneOff' });
+    await show(s).view;
+
+    const card = within(screen.getByTestId('game-end-card'));
+    expect(card.getByText('Bot wins the game!')).toBeOnTheScreen();
+    expect(card.getByText('+6 points')).toBeOnTheScreen();
+    expect(card.getByText('You did not bear off 6 checkers: 1 point each.')).toBeOnTheScreen();
+  });
+
+  it('Greek: the resign dialog and the game-end line', async () => {
+    const user = setupUser();
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    try {
+      const s = session(american('local'));
+      startAt(s, lastChecker);
+      await show(s).view;
+      await user.press(button('Μενού παιχνιδιού'));
+      await user.press(button(/^Παραίτηση από την παρτίδα/));
+      expect(
+        within(screen.getByTestId('resign-game-dialog')).getByText(
+          'Nikos: κερδίζει 1 βαθμό, γιατί Maria: έχει ακόμα 1 πούλι να μαζέψει.',
+        ),
+      ).toBeOnTheScreen();
+      await user.press(button('Παραίτηση'));
+      const card = within(screen.getByTestId('game-end-card'));
+      expect(card.getByText('+1 βαθμός')).toBeOnTheScreen();
+      expect(
+        card.getByText('Maria: παραιτήθηκε χωρίς να μαζέψει 1 πούλι, 1 βαθμός.'),
+      ).toBeOnTheScreen();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
 });

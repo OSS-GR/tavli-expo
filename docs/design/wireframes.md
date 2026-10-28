@@ -197,7 +197,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 - **Elements:**
   - Back button, title "Play vs bot".
   - **Game:** one card per open game: Portes (selected by default), Plakoto, Fevga, Tavli (all three in rotation) (#109). A game the bot cannot play yet, and Asodio (not built), show as locked chips. A tap on a locked chip shows "Coming soon".
-  - **Match length:** segmented control **1 / 3 / 5 / 7**, default **3**. Helper text: "First to 3 points. Mono = 1, diplo = 2."
+  - **Match length:** segmented control **1 / 3 / 5 / 7**, default **3**. Helper text: "First to 3 points. Mono = 1, diplo = 2." With Asodio's **American** version: "First to 3 points. 1 point per checker left." (#245).
   - **Bot level:** **Easy / Medium / Hard**. A level the bot cannot play in the chosen game shows locked, with "coming soon" under it. Helper text explains the selected level.
   - Info box "Who starts? Each player rolls one die. High die starts." Since #207 the **House rules** part (below) replaces it: its hint says who starts under the chosen rule.
   - **House rules** (#207, both modes): **Opening roll**: **Standard** (default, the federation rule: the starter plays the two opening dice) / **Roll again** (the starter rolls both dice again) / **Choose** (the players pick who starts). Helper text explains the selected rule.
@@ -346,6 +346,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - Title: "You win the game!" / "Bot wins the game" / "Maria wins the game!".
   - Win type chip: **Mono · +1 point** or **Diplo · +2 points**. The English UI keeps the Greek names (`tavli-match.md`). The rules page explains them ("single" and "double").
   - Reason line, for example "Bot did not bear off any checker." or, after a resign, why it gives these points: "Diplo: Maria resigned before bearing off a checker." / "Mono: you resigned the game." (#181)
+  - Acey-Deucey American (1 point per checker left, #245): the chip is "+5 points" (no Mono or Diplo), and the reason line counts the checkers: "Bot did not bear off 5 checkers: 1 point each." / "You resigned and did not bear off 5 checkers: 1 point each."
   - Match box: "You 2 – 0 Bot", "first to 3".
   - **Next game** (main button, "You start (winner starts)").
   - **Home** (text button). The match is saved, so Home shows "Continue game".

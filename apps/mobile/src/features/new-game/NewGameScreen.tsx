@@ -47,6 +47,7 @@ import {
   VERSION_KEYS,
   cleanName,
   gamePreset,
+  gameScoring,
   isGameOpen,
   isVersionedGame,
   type GameChoice,
@@ -271,7 +272,11 @@ export function NewGameScreen({
             value={`${targetPoints}`}
             onChange={(value) => setTargetPoints(Number(value) as MatchLength)}
           />
-          <Text style={styles.hint}>{t('newGame.length.hint', { count: targetPoints })}</Text>
+          <Text testID="new-game-length-hint" style={styles.hint}>
+            {gameScoring(game, rulesVersions) === 'perChecker'
+              ? t('newGame.length.hintPerChecker', { count: targetPoints })
+              : t('newGame.length.hint', { count: targetPoints })}
+          </Text>
         </SettingsSection>
 
         {mode === 'bot' ? (

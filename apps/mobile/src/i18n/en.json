@@ -349,7 +349,8 @@
       "draw": "The game is a draw",
       "mono": "Mono · +1 point",
       "diplo": "Diplo · +2 points",
-      "points": "+{{count}} points",
+      "points_one": "+{{count}} point",
+      "points_other": "+{{count}} points",
       "score": "{{white}} {{whiteScore}} – {{blackScore}} {{black}}",
       "target": "First to {{target}} points",
       "next": "Next game",
@@ -365,6 +366,10 @@
       "resignedMono_you": "Mono: you resigned the game.",
       "resignedDiplo": "Diplo: {{name}} resigned before bearing off a checker.",
       "resignedDiplo_you": "Diplo: you resigned before you bore off a checker.",
+      "resignedPerChecker_one": "{{name}} resigned and did not bear off {{count}} checker: 1 point.",
+      "resignedPerChecker_other": "{{name}} resigned and did not bear off {{count}} checkers: 1 point each.",
+      "resignedPerCheckerYou_one": "You resigned and did not bear off {{count}} checker: 1 point.",
+      "resignedPerCheckerYou_other": "You resigned and did not bear off {{count}} checkers: 1 point each.",
       "resignedMatch": "{{name}} resigned the match.",
       "resignedMatch_you": "You resigned the match.",
       "home": "Home",
@@ -372,6 +377,10 @@
       "matchLabel": "Match",
       "noBearOff": "{{name}} did not bear off any checker.",
       "noBearOff_you": "You did not bear off any checker.",
+      "checkersLeft_one": "{{name}} did not bear off {{count}} checker: 1 point.",
+      "checkersLeft_other": "{{name}} did not bear off {{count}} checkers: 1 point each.",
+      "checkersLeftYou_one": "You did not bear off {{count}} checker: 1 point.",
+      "checkersLeftYou_other": "You did not bear off {{count}} checkers: 1 point each.",
       "nextGame": "Next: game {{number}} · {{game}}",
       "drawChip": "Draw · 0 points",
       "deadlock": "No checker can ever move again.",
@@ -410,6 +419,10 @@
       "mono": "{{winner}} wins 1 point (mono), because {{loser}} has borne off a checker.",
       "mono_you": "{{winner}} wins 1 point (mono), because you have borne off a checker.",
       "points": "{{winner}} wins {{count}} points.",
+      "perChecker_one": "{{winner}} wins {{count}} point, because {{loser}} has {{count}} checker left to bear off.",
+      "perChecker_other": "{{winner}} wins {{count}} points, because {{loser}} has {{count}} checkers left to bear off: 1 point each.",
+      "perCheckerYou_one": "{{winner}} wins {{count}} point, because you have {{count}} checker left to bear off.",
+      "perCheckerYou_other": "{{winner}} wins {{count}} points, because you have {{count}} checkers left to bear off: 1 point each.",
       "after": "Match after resign: {{score}} (to {{target}})",
       "matchTitle": "Resign the match?",
       "matchBody": "{{winner}} wins the match. The match ends now.",
@@ -525,7 +538,9 @@
     "length": {
       "label": "Match length",
       "hint_one": "First to {{count}} point. Mono = 1, diplo = 2.",
-      "hint_other": "First to {{count}} points. Mono = 1, diplo = 2."
+      "hint_other": "First to {{count}} points. Mono = 1, diplo = 2.",
+      "hintPerChecker_one": "First to {{count}} point. 1 point per checker left.",
+      "hintPerChecker_other": "First to {{count}} points. 1 point per checker left."
     },
     "botLevel": {
       "label": "Bot level",
@@ -607,7 +622,8 @@
       },
       "scoring": {
         "title": "Points",
-        "body": "Mono (μονό): you win 1 point if the other player has borne off at least one checker.\nDiplo (διπλό): you win 2 points if the other player has not borne off any checker.\nThe match ends when a player reaches the points you picked on New game: 1, 3, 5 or 7."
+        "body": "Mono (μονό): you win 1 point if the other player has borne off at least one checker.\nDiplo (διπλό): you win 2 points if the other player has not borne off any checker.\nThe match ends when a player reaches the points you picked on New game: 1, 3, 5 or 7.",
+        "bodyPerChecker": "You win 1 point for each checker the other player has not borne off. If they have borne off none, you win 15.\nA resign counts the same way: the other player wins 1 point for each checker you have not borne off.\nThe match ends when a player reaches the points you picked on New game: 1, 3, 5 or 7."
       }
     },
     "portes": {
