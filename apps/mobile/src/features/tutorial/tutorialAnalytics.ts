@@ -11,6 +11,7 @@
  */
 import type { Analytics, TutorialGame, TutorialSource } from '@tavli/contracts';
 
+import { quietly } from '@/features/analytics/quietly';
 import { analytics as appAnalytics } from '@/services';
 
 import type { LessonId } from './lessons';
@@ -22,14 +23,6 @@ export interface TutorialAnalytics {
   finished: () => void;
   /** Skip was tapped on lesson `step`. */
   skipped: (step: number, lesson: LessonId) => void;
-}
-
-function quietly(send: () => void): void {
-  try {
-    send();
-  } catch (error) {
-    console.warn('analytics failed', error);
-  }
 }
 
 /** The events of one lesson set (`game`, default Portes). */
