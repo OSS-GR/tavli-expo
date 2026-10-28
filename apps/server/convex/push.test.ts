@@ -1,4 +1,5 @@
-// Push tokens and "your turn" pushes (#280), run offline with convex-test.
+// Push tokens, "your turn" pushes (#280) and "game over" pushes (#316),
+// run offline with convex-test.
 // The sender is a recording provider (`setPushProvider`), so no test
 // reaches the network. Each push runs as a scheduled action after the
 // save: `flush` moves the fake clock by 0 ms and waits for it. Alice and
@@ -19,11 +20,17 @@ import type {
 import { createSeededRng } from '@tavli/engine';
 import type { PerPlayer, PlayerId } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
-import { motherPin } from '@tavli/online/testing';
+import { lastBearOff, motherPin } from '@tavli/online/testing';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { MAX_PUSH_TOKENS_PER_PLAYER, PUSH_RETRY_MS, TURN_PUSH_TEXT } from './model/push';
+import {
+  MATCH_END_PUSH_TEXT,
+  MATCH_END_PUSH_TTL_SECONDS,
+  MAX_PUSH_TOKENS_PER_PLAYER,
+  PUSH_RETRY_MS,
+  TURN_PUSH_TEXT,
+} from './model/push';
 import { setPushProvider } from './push';
 import schema from './schema';
 import { authUsers, modules, pickTurn } from './test.setup';
@@ -100,12 +107,13 @@ async function createGame(
   pace: OnlineGamePace,
   choice: 'portes' | 'plakoto' = 'portes',
   callerId = ALICE,
+  targetPoints = 5,
 ) {
   return await t.mutation(internal.games.createGame, {
     callerId,
     players: PLAYERS,
     choice,
-    targetPoints: 5,
+    targetPoints,
     pace,
   });
 }
@@ -410,7 +418,7 @@ describe('"your turn" pushes', () => {
     expect(push.sent).toEqual([]);
   });
 
-  it('a resign ends the match: no push', async () => {
+  it('a resign ends the match: no "your turn"', async () => {
     const t = await setup();
     const gameId = await createGame(t, 'async');
     await flush(t);
@@ -418,7 +426,8 @@ describe('"your turn" pushes', () => {
     push.clear();
     await as(t, BOB).mutation(api.games.resign, { gameId });
     await flush(t);
-    expect(push.sent).toEqual([]);
+    // Only "game over", to Alice (see below).
+    expect(push.sent.map((message) => message.title)).toEqual([MATCH_END_PUSH_TEXT.title]);
   });
 
   it('a late push does nothing: the game changed since', async () => {
@@ -582,6 +591,193 @@ describe('"your turn" pushes', () => {
     await flush(t);
     push.clear();
     await wait(t, PUSH_RETRY_MS);
+    expect(push.sent).toEqual([]);
+  });
+});
+
+describe('"game over" pushes (#316)', () => {
+  /**
+   * Puts the current game in a position where `player`, to move with 6-5,
+   * bears off its last checkers: every legal turn wins the game
+   * (`lastBearOff`), so the dice cannot change the result.
+   */
+  async function lastTurnFor(
+    t: Tester,
+    gameId: Id<'games'>,
+    player: PlayerId,
+    nextGameStarter?: 'alternate',
+  ) {
+    await t.run(async (ctx) => {
+      const doc = await ctx.db.get(gameId);
+      if (doc === null) throw new Error('no game');
+      const flow = lastBearOff(loadFlow(doc.flow), player);
+      const rules =
+        nextGameStarter === undefined
+          ? flow.match.rules
+          : { ...flow.match.rules, match: { ...flow.match.rules.match, nextGameStarter } };
+      const game = { ...flow.game, starter: player };
+      await ctx.db.patch(gameId, {
+        flow: storeFlow({ ...flow, game, match: { ...flow.match, rules } }, null),
+      });
+    });
+  }
+
+  function gameOver(to: string, gameId: Id<'games'>) {
+    return {
+      to,
+      title: MATCH_END_PUSH_TEXT.title,
+      body: MATCH_END_PUSH_TEXT.body,
+      data: { gameId },
+      priority: 'normal',
+      ttlSeconds: MATCH_END_PUSH_TTL_SECONDS,
+    };
+  }
+
+  it('a winning move tells the other player, never the caller', async () => {
+    const t = await setup();
+    const gameId = await createGame(t, 'async', 'portes', ALICE, 1);
+    await flush(t);
+    await registerBoth(t);
+    for (const winner of ['white', 'black'] as const) {
+      // A second match, so each side wins once.
+      const id = winner === 'white' ? gameId : await createGame(t, 'async', 'portes', BOB, 1);
+      await flush(t);
+      push.clear();
+      await lastTurnFor(t, id, winner);
+      expect(await playOneTurn(t, id)).toBe(winner);
+      const v = await view(t, id);
+      expect(v.status).toBe('finished');
+      expect(v.match.winner).toBe(winner);
+      expect(push.sent).toEqual([]);
+      await flush(t);
+      expect(push.sent).toEqual([gameOver(TOKEN_OF[otherSide(winner)], id)]);
+    }
+    // The text holds no player ids.
+    for (const message of push.sent) {
+      for (const id of [ALICE, BOB]) {
+        expect(`${message.title} ${message.body} ${message.data.gameId}`).not.toContain(id);
+      }
+    }
+  });
+
+  it('a resign tells the other player, never the one who resigned', async () => {
+    const t = await setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    await registerBoth(t);
+    push.clear();
+    await as(t, BOB).mutation(api.games.resign, { gameId });
+    await flush(t);
+    expect(push.sent).toEqual([gameOver(ALICE_TOKEN, gameId)]);
+  });
+
+  it('a time out that ends the match tells both players', async () => {
+    const t = await setup();
+    const gameId = await createGame(t, 'async', 'portes', ALICE, 1);
+    await flush(t);
+    await registerBoth(t);
+    push.clear();
+    const late = waiting(await view(t, gameId));
+    await wait(t, TURN_TIME_MS.async);
+    const v = await view(t, gameId);
+    expect(v.status).toBe('finished');
+    expect(v.match.winner).toBe(otherSide(late));
+    await flush(t);
+    expect(push.sent).toEqual(
+      expect.arrayContaining([gameOver(ALICE_TOKEN, gameId), gameOver(BOB_TOKEN, gameId)]),
+    );
+    expect(push.sent).toHaveLength(2);
+  });
+
+  it('a live game sends none: a win, a resign or a time out', async () => {
+    const t = await setup();
+    await registerBoth(t);
+    const won = await createGame(t, 'live', 'portes', ALICE, 1);
+    await lastTurnFor(t, won, 'white');
+    await playOneTurn(t, won);
+    const resigned = await createGame(t, 'live', 'portes', ALICE, 1);
+    await as(t, ALICE).mutation(api.games.resign, { gameId: resigned });
+    const late = await createGame(t, 'live', 'portes', ALICE, 1);
+    await wait(t, TURN_TIME_MS.live);
+    expect((await view(t, won)).status).toBe('finished');
+    expect((await view(t, resigned)).status).toBe('finished');
+    expect((await view(t, late)).status).toBe('finished');
+    await flush(t);
+    expect(push.sent).toEqual([]);
+  });
+
+  it('a game that ends while the match goes on sends only "your turn"', async () => {
+    const t = await setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    await registerBoth(t);
+    push.clear();
+    // White started game 1 and wins it; with "alternate", Black starts
+    // game 2. A 5-point match goes on after a 1-point win.
+    await lastTurnFor(t, gameId, 'white', 'alternate');
+    await playOneTurn(t, gameId);
+    const v = await view(t, gameId);
+    expect(v.status).toBe('active');
+    expect(v.match.games).toHaveLength(1);
+    expect(waiting(v)).toBe('black');
+    await flush(t);
+    expect(push.sent.map((message) => [message.to, message.title])).toEqual([
+      [BOB_TOKEN, TURN_PUSH_TEXT.title],
+    ]);
+  });
+
+  it('a player with no token costs no action', async () => {
+    const t = await setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    await register(t, BOB, BOB_TOKEN);
+    await as(t, BOB).mutation(api.games.resign, { gameId });
+    const scheduled = await t.run(async (ctx) =>
+      ctx.db.system.query('_scheduled_functions').collect(),
+    );
+    expect(scheduled.filter((job) => job.name.includes('push'))).toEqual([]);
+  });
+
+  it(`a failed "game over" is tried once more after ${PUSH_RETRY_MS / 1000} s`, async () => {
+    // The match is over, so its version does not change again: the
+    // retry's version check lets it go out.
+    const t = await setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    await registerBoth(t);
+    push.fail(ALICE_TOKEN);
+    push.clear();
+    await as(t, BOB).mutation(api.games.resign, { gameId });
+    await flush(t);
+    expect(push.sent).toEqual([gameOver(ALICE_TOKEN, gameId)]);
+
+    push.clear();
+    push.revive(ALICE_TOKEN);
+    await wait(t, PUSH_RETRY_MS - 1);
+    expect(push.sent).toEqual([]);
+    await wait(t, 1);
+    // The same text and the full day to live: no turn deadline applies.
+    expect(push.sent).toEqual([gameOver(ALICE_TOKEN, gameId)]);
+
+    // It went out: no third try.
+    push.clear();
+    await wait(t, PUSH_RETRY_MS * 4);
+    expect(push.sent).toEqual([]);
+  });
+
+  it('a "game over" for a match that still runs sends nothing', async () => {
+    const t = await setup();
+    const gameId = await createGame(t, 'async');
+    await flush(t);
+    await registerBoth(t);
+    push.clear();
+    const v = await view(t, gameId);
+    await t.action(internal.push.sendTurnPush, {
+      gameId,
+      version: v.version,
+      playerId: BOB,
+      kind: 'matchEnd',
+    });
     expect(push.sent).toEqual([]);
   });
 });
