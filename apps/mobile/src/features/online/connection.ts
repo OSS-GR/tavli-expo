@@ -45,13 +45,11 @@ export function useOnlineConnection(gameId: string): OnlineConnection {
     let live = true;
     auth.ready().then(
       (user) => {
-        if (user !== null) {
-          rememberOnlineAccount();
-          // Signed in on a phone that allows pushes: the token reaches the
-          // server once per app run, also when it changed while the app
-          // was closed (#285).
-          void turnPushes()?.sync();
-        }
+        if (user !== null) rememberOnlineAccount();
+        // Signed in on a phone that allows pushes: the token reaches the
+        // server once per app run, also when it changed while the app was
+        // closed (#285). Not after the route is gone.
+        if (user !== null && live) void turnPushes()?.sync();
         if (live) setSession(user === null ? 'signedOut' : { me: user.id });
       },
       () => {

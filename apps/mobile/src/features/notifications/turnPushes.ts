@@ -21,8 +21,9 @@
  *   `then` (the sign-out) before any later sync, so a sync cannot put the
  *   token back while the user signs out (`signOutOfOnline` in
  *   `features/online/account.ts`). The server call needs a live session.
- *   It also clears the saved choice (`turnedOn`, `declined`): it belongs
- *   to the user who made it, so the next user gets the offer again.
+ *   After a sign-out that worked it clears the saved choice (`turnedOn`,
+ *   `declined`): it belongs to the user who made it, so the next user
+ *   gets the offer again. A sign-out that fails keeps it.
  * - A prompt that fails (`requestPermission` gives `undetermined`) is no
  *   answer: `turnOn()` saves nothing and tells no analytics.
  *
@@ -181,9 +182,10 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
     // Registered in this run for this user, and no new token since: asking
     // Expo for the token again would only give the same one.
     if (registered?.userId === user.id && !tokenChanged) return;
-    tokenChanged = false;
     const token = await notifications.getToken();
+    // No token now (offline): keep `tokenChanged`, so the next sync asks again.
     if (token === null) return;
+    tokenChanged = false;
     const before = registered;
     if (before !== null && before.userId === user.id && before.token === token) return;
     await pushTokens.register(token, notifications.platform);
@@ -256,10 +258,7 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
 
     unregister(then) {
       const step = chain.then(async () => {
-        // The choice belongs to the user who made it: the next person who
-        // signs in on this phone gets the offer and their own Turn on.
         const { turnedOn } = store.getState();
-        save({ declined: false, turnedOn: false });
         try {
           // Not registered in this run and never turned on in the app: the
           // server has no token of this phone, so do not ask Expo for one.
@@ -269,8 +268,13 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
         } catch {
           // The token stays until Expo says it is gone: never stop a sign-out.
         }
-        // Inside the chain: a sync asked for meanwhile runs after it.
+        // Inside the chain: a sync asked for meanwhile runs after it. A
+        // sign-out that fails keeps the choice: the user is still signed
+        // in, and the next sync registers the token again.
         if (then) await then();
+        // The choice belongs to the user who made it: the next person who
+        // signs in on this phone gets the offer and their own Turn on.
+        save({ declined: false, turnedOn: false });
       });
       chain = step.catch(() => undefined);
       return step;

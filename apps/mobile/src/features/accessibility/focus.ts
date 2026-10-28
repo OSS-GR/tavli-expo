@@ -19,10 +19,11 @@ import { AccessibilityInfo, type HostInstance } from 'react-native';
 export function useFocusOnShow(active = true) {
   const ref = useRef<HostInstance>(null);
   const done = useRef(false);
+  // No deps: a title that is not there yet gets focus on a later render.
   useEffect(() => {
-    if (!active || done.current) return;
+    if (!active || done.current || ref.current === null) return;
     done.current = true;
-    if (ref.current) AccessibilityInfo.sendAccessibilityEvent(ref.current, 'focus');
-  }, [active]);
+    AccessibilityInfo.sendAccessibilityEvent(ref.current, 'focus');
+  });
   return ref;
 }

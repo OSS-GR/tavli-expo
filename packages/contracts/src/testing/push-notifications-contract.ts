@@ -307,6 +307,9 @@ export function pushTokensContract(): PushTokensContractCheck[] {
         const me = tokensFor('me');
         await failsWith(me.register('not-a-token', 'ios'), 'BAD_REQUEST', 'register');
         await failsWith(me.remove('not-a-token'), 'BAD_REQUEST', 'remove');
+        // The right shape, but longer than the 200 characters the server keeps.
+        const long = `ExponentPushToken[${'x'.repeat(200)}]`;
+        await failsWith(me.register(long, 'ios'), 'BAD_REQUEST', 'register a long token');
         same(await savedFor('me'), [], 'saved');
       },
     },

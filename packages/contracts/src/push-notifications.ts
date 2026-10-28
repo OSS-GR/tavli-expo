@@ -106,6 +106,8 @@ export interface PushTokens {
 
 /** The shape of an Expo push token (the same check as `isExpoPushToken` in `@tavli/push-expo`). */
 const EXPO_TOKEN_SHAPE = /^Expo(?:nent)?PushToken\[[^\s[\]]+\]$/;
+/** The longest token the server keeps (`MAX_EXPO_PUSH_TOKEN_LENGTH` in `@tavli/push-expo`). */
+const MAX_PUSH_TOKEN_LENGTH = 200;
 
 /** The data of a push: `gameId` when it is a string that is not empty. */
 export function gameIdOfPush(data: unknown): string | null {
@@ -298,7 +300,9 @@ export function createMemoryPushTokens(currentUser: () => string | null): Memory
     await Promise.resolve();
     const playerId = currentUser();
     if (playerId === null) throw tokenError('NOT_SIGNED_IN', 'nobody is signed in');
-    if (!EXPO_TOKEN_SHAPE.test(token)) throw tokenError('BAD_REQUEST', 'not an Expo push token');
+    if (token.length > MAX_PUSH_TOKEN_LENGTH || !EXPO_TOKEN_SHAPE.test(token)) {
+      throw tokenError('BAD_REQUEST', 'not an Expo push token');
+    }
     return playerId;
   }
 

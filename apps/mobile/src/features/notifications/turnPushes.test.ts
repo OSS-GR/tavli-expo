@@ -225,6 +225,24 @@ describe('the token on the server', () => {
     expect(pushTokens.saved).toEqual([{ playerId: 'guest-1', token: second, platform: 'android' }]);
   });
 
+  it('a new token that cannot be had now is asked for again on the next sync', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup(optedIn());
+    await auth.signInAsGuest();
+    notifications.setPermission('granted');
+    await pushes.sync();
+    const first = notifications.token;
+    // The token changes while the phone is offline: no token on that sync.
+    jest.spyOn(notifications, 'getToken').mockResolvedValueOnce(null);
+    const second = notifications.rollToken();
+    await settle();
+    expect(pushTokens.calls).toHaveLength(1);
+    await pushes.sync();
+    expect(pushTokens.calls.slice(1)).toEqual([
+      { kind: 'register', playerId: 'guest-1', token: second, platform: 'android' },
+      { kind: 'remove', playerId: 'guest-1', token: first },
+    ]);
+  });
+
   it('is not registered while nobody is signed in, or the phone does not allow pushes', async () => {
     const { pushes, notifications, pushTokens, auth } = setup(optedIn());
     notifications.setPermission('granted');
@@ -351,6 +369,24 @@ describe('the token on the server', () => {
     // The offer shows again for the new user.
     await pushes.offer();
     expect(pushes.store.getState().offering).toBe(true);
+  });
+
+  it('a sign-out that fails keeps the choice, and the next sync registers the token again', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup();
+    await auth.signInAsGuest();
+    notifications.setPermission('granted');
+    rememberOnlineAccount();
+    await pushes.turnOn();
+    await settle();
+    jest.spyOn(auth, 'signOut').mockRejectedValueOnce(new Error('offline'));
+    await expect(signOutOfOnline(auth, pushes)).rejects.toThrow('offline');
+    expect(auth.currentUser()).not.toBeNull();
+    expect(pushes.store.getState()).toMatchObject({ turnedOn: true });
+    expect(hasOnlineAccount()).toBe(true);
+    await pushes.sync();
+    expect(pushTokens.saved).toEqual([
+      { playerId: 'guest-1', token: notifications.token, platform: 'android' },
+    ]);
   });
 
   it('sign-out with no turn notifications only signs out', async () => {
