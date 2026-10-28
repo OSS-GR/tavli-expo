@@ -7,11 +7,14 @@
  */
 import { createPostHogAnalytics } from '@tavli/analytics-posthog';
 import { createExpoSoundPlayer } from '@tavli/audio-expo';
+import { createBetterAuthProvider, createSecureSessionStorage } from '@tavli/auth-better-auth';
+import { createConvexClient, createConvexGameTransport } from '@tavli/backend-convex';
 import { InlineBotRunner, createAnalyzer, createBot, type Analyzer } from '@tavli/bot';
 import {
   createNoopAnalytics,
   createNoopCrashReporter,
   type Analytics,
+  type AuthProvider,
   type BotRunner,
   type CrashReporter,
   type Feedback,
@@ -27,8 +30,10 @@ import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
 import Constants from 'expo-constants';
 
+import { APP_SCHEME, convexServer } from '@/convexUrl';
 import { botLevelsByGame } from '@/features/bot/levels';
 import type { GameLevels } from '@/features/match/setup';
+import { createOnlineServices } from '@/onlineServices';
 
 export const storage: Storage = createMmkvStorage({ id: 'tavlaki' });
 
@@ -108,18 +113,41 @@ export const botLevels: GameLevels = botLevelsByGame(bot);
 export const analyzer: Analyzer = createAnalyzer();
 
 /**
- * Online games (#255). Online play waits for sign-in (#131), so for now
- * every online game runs on one in-memory server for this app run
- * (`@tavli/online`, no network), and this phone plays as `onlinePlayerId`.
- * The dev route `app/dev/online.tsx` starts games on it vs the bot. When
- * the build has a Convex URL (`convexUrl()` in `convexUrl.ts`, set by
- * `EXPO_PUBLIC_CONVEX_URL` or the app variant), the Convex adapter (#253)
- * replaces this server here, and the player id comes from sign-in.
+ * Online play (#266): the Convex deployment of this build (`convexUrl.ts`),
+ * with Better Auth sign-in on its site URL. Both are made on first use
+ * (`onlineServices.ts`): the app makes no network call and no guest
+ * account at start. `undefined` when the build has no Convex URL: then
+ * online play is off. Both are set, or both are `undefined`. The game
+ * route connects through `useOnlineConnection` (`features/online/connection.ts`).
+ */
+const online = createOnlineServices(convexServer(), {
+  createAuth: (baseURL) =>
+    createBetterAuthProvider({
+      baseURL,
+      scheme: APP_SCHEME,
+      // The session cookie signs the user in: it lives in the secure store.
+      storage: createSecureSessionStorage(),
+    }),
+  createClient: createConvexClient,
+  createGames: (client) => createConvexGameTransport({ client }),
+});
+
+/** Sign-in for online play (guest only, for now). Call `signInAsGuest()` when the user opens online play. */
+export const auth: AuthProvider | undefined = online?.auth;
+
+/** Online games on the Convex deployment. A screen checks `games === undefined` to show that online play is off. */
+export const games: GameTransport | undefined = online?.games;
+
+/**
+ * Dev games (#255): one in-memory server for this app run (`@tavli/online`,
+ * no network), where this phone plays as `onlinePlayerId`. The dev route
+ * `app/dev/online.tsx` starts games on it vs the bot. Every other online
+ * game uses `games` and `auth` above.
  *
  * The in-memory server runs no timers: whoever starts a game on it runs
  * `runDueTimeouts()` (the dev game does, `features/online/devGame.ts`). Its
  * dice come from `createLocalRng`, which is fine for a dev server only.
- * It is built on first use, so a build that never opens an online game
+ * It is built on first use, so a build that never opens a dev game
  * never makes it.
  */
 let memoryServer: MemoryGameServer | null = null;
@@ -128,12 +156,12 @@ export function onlineServer(): MemoryGameServer {
   return memoryServer;
 }
 
-/** The player id of this phone in online games, until sign-in (#131). */
+/** The player id of this phone in dev games. */
 export const onlinePlayerId = 'me';
 
 const transports = new Map<string, GameTransport>();
 
-/** The online game port for `playerId`. One transport per player for the app run. */
+/** The dev game port for `playerId`. One transport per player for the app run. */
 export function gameTransportFor(playerId: string): GameTransport {
   let transport = transports.get(playerId);
   if (transport === undefined) {

@@ -1,5 +1,7 @@
 import {
   TURN_TIME_MS,
+  type createRecordingFeedback,
+  type createRecordingSoundPlayer,
   type GameTransport,
   type OnlineGameChoice,
   type OnlineGamePace,
@@ -15,7 +17,7 @@ import { fitBoardWithShadow, slotRect } from '@/features/board/geometry';
 import { turnView } from '@/features/game/gameStore';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
-import { botRunner } from '@/services';
+import { botRunner, feedback, sound } from '@/services';
 
 import { startOnlineBot, type OnlineBot } from './onlineBot';
 import { OnlineMatchScreen } from './OnlineMatchScreen';
@@ -32,6 +34,10 @@ const geo = fitBoardWithShadow(getLayout(getTheme('walnut-kafeneio'), 'portrait-
 const PAN = 'game-board-pan';
 /** The bot thinks this long before its whole turn arrives. */
 const BOT_THINK_MS = 2000;
+const haptics = feedback as ReturnType<typeof createRecordingFeedback>;
+const sounds = sound as ReturnType<typeof createRecordingSoundPlayer>;
+const MOVE_SOUNDS: readonly string[] = ['checkerPlace', 'checkerHit', 'bearOff'];
+const moveSounds = () => sounds.played.filter((s) => MOVE_SOUNDS.includes(s));
 
 runOnFakeTimers();
 
@@ -104,8 +110,19 @@ async function untilYourTurn(game: Game) {
   throw new Error('your turn never came');
 }
 
-/** Plays your whole turn by tap-tap on the board (the first legal target each time). */
-async function playTurnByTaps(game: Game) {
+/** Moves the fake clock by `ms`. */
+async function wait(ms: number) {
+  await act(async () => {
+    jest.advanceTimersByTime(ms);
+  });
+}
+
+/**
+ * Plays your whole turn by tap-tap on the board (the first legal target
+ * each time). `gapMs` moves the clock after each move, as a person takes
+ * time between taps (the feedback skips a sound that comes too soon).
+ */
+async function playTurnByTaps(game: Game, gapMs = 0) {
   let flow: MatchFlow = viewFlow(view(game));
   while (flow.game.phase === 'moving') {
     const now = turnView(flow);
@@ -118,6 +135,7 @@ async function playTurnByTaps(game: Game) {
     await touch(PAN, [{ x: source!.checker.x, y: source!.checker.y }]);
     await touch(PAN, [center(target.rect)]);
     flow = applyMatchAction(flow, { type: 'move', player: 'white', move: target.move });
+    if (gapMs > 0) await wait(gapMs);
   }
 }
 
@@ -141,6 +159,82 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     expect(last?.player).toBe('black');
     expect(screen.getByTestId('confirm-button')).toBeOnTheScreen();
     expect(screen.getByTestId('strip-bottom')).toHaveTextContent(/your turn/i);
+  });
+
+  it('plays the bot’s moves and the server’s roll, and your own turn once (#271)', async () => {
+    const user = setupUser();
+    const game = await openGame();
+    await untilYourTurn(game);
+    // The flights and the dice of the bot's turn are done.
+    await wait(2000);
+    sounds.played.length = 0;
+    await playTurnByTaps(game, 500);
+    await user.press(screen.getByTestId('confirm-button'));
+    const mine = view(game).game.lastTurn;
+    expect(mine?.player).toBe('white');
+    // Your moves sounded on the phone; the view of your turn adds none,
+    // only the server's roll for the bot.
+    expect(moveSounds()).toHaveLength(mine?.moves.length ?? -1);
+    expect(sounds.played.filter((s) => s === 'diceRoll')).toHaveLength(1);
+
+    await wait(1000);
+    sounds.played.length = 0;
+    haptics.calls.length = 0;
+    await untilYourTurn(game);
+    await wait(2000);
+    const last = view(game).game.lastTurn;
+    expect(last?.player).toBe('black');
+    // One sound per move of the bot, as they fly, then your roll.
+    expect(moveSounds()).toHaveLength(last?.moves.length ?? -1);
+    expect(sounds.played).toContain('diceRoll');
+    expect(sounds.played).not.toContain('invalidMove');
+    expect(haptics.calls.length).toBeGreaterThan(0);
+  });
+
+  it('plays nothing for the bot’s turn with Sound and Haptics off (#271)', async () => {
+    await act(async () => {
+      settingsStore.getState().setSetting('sound', false);
+      settingsStore.getState().setSetting('haptics', false);
+    });
+    const user = setupUser();
+    const game = await openGame();
+    await untilYourTurn(game);
+    await playTurnByTaps(game);
+    await user.press(screen.getByTestId('confirm-button'));
+    sounds.played.length = 0;
+    haptics.calls.length = 0;
+    await untilYourTurn(game);
+    await wait(2000);
+    expect(view(game).game.lastTurn?.player).toBe('black');
+    expect(sounds.played).toEqual([]);
+    expect(haptics.calls).toEqual([]);
+  });
+
+  it('plays the win jingle when the bot’s time runs out (#271)', async () => {
+    const user = setupUser();
+    // The bot thinks longer than its turn time.
+    const game = await openGame('portes', 'live', 5, TURN_TIME_MS.live * 2);
+    if (view(game).waitingFor === 'white') {
+      await untilYourTurn(game);
+      await playTurnByTaps(game);
+      await user.press(screen.getByTestId('confirm-button'));
+    }
+    expect(view(game).waitingFor).toBe('black');
+    await wait(2000);
+    sounds.played.length = 0;
+    haptics.calls.length = 0;
+    await act(async () => {
+      jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+      game.server.runDueTimeouts();
+    });
+    expect(view(game).match.games).toEqual([
+      expect.objectContaining({ winner: 'white', reason: 'timeout' }),
+    ]);
+    expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/You win the game/);
+    // The win jingle, as in a local game. The next game is under the
+    // sheet: its roll plays no roll sound (its dice still land).
+    expect(sounds.played.filter((s) => s !== 'diceLand')).toEqual(['gameWin']);
+    expect(haptics.calls.filter((h) => h !== 'light')).toEqual(['success']);
   });
 
   it('locks the board while the server waits for the bot', async () => {

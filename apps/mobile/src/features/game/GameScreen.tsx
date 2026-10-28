@@ -43,7 +43,9 @@
  * move, and starts the next game by itself. So there is no Roll button and
  * no opening card: a short line says who starts. The other player is
  * remote: while the server waits for them the board is locked, and their
- * whole turn arrives at once and flies from `game.lastTurn`. A game the
+ * whole turn arrives at once and flies from `game.lastTurn`. Its sounds,
+ * the server's rolls and the game end play from the views
+ * (`features/online/onlineFeedback.ts`, #271). A game the
  * server has already ended shows its game-end sheet (`online.ended`) over
  * the next game. The online screen (`features/online/OnlineMatchScreen`)
  * gives the texts: the time left, the waiting line and its notices.
@@ -101,6 +103,7 @@ import { useDoubleReveal } from '@/features/board/useDoubleReveal';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { bestRest, hintHasChoice } from '@/features/hint/hint';
 import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
+import { onlineStoreEvents } from '@/features/online/onlineFeedback';
 import { remoteTurn } from '@/features/online/remoteTurn';
 import { useSettings } from '@/features/settings/store';
 
@@ -114,7 +117,7 @@ import {
 import { DoubleChoices } from './DoubleChoices';
 import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
-import { isHumanWin, useGameFeedback } from './gameFeedback';
+import { isHumanWin, storeEvents, useGameFeedback } from './gameFeedback';
 import { diceView, turnView, useGameStore, type BoardStore, type DieView } from './gameStore';
 import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { isChoosingStarter, nextOpeningRoller, openingStatus } from './opening';
@@ -284,12 +287,14 @@ export function GameScreen({
   const me = online?.me ?? null;
   // Sound and haptics: moves, rolls and wins play by themselves (from the engine
   // log). Vs the bot only the person's side counts, so a bot win plays no jingle.
-  // Online only your side counts.
+  // Online only your side counts, and the server's views play the other
+  // player's moves, the rolls and the game end (#271).
   const humans = useMemo(
     () => (me !== null ? [me] : botPlayer === null ? BOTH_SIDES : [other(botPlayer)]),
     [botPlayer, me],
   );
-  const feedback = useGameFeedback(store, theme, humans);
+  const eventsOf = useMemo(() => (me === null ? storeEvents : onlineStoreEvents(me)), [me]);
+  const feedback = useGameFeedback(store, theme, humans, eventsOf);
 
   // "No legal moves": the flow has passed the turn already; the card says why.
   const pass = passNotice(flow);

@@ -11,6 +11,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { InviteScreen } from '@/features/invites/InviteScreen';
 import { gameHref, parseIdParam } from '@/features/match/routes';
 import { checkDevInvite } from '@/features/online/devGame';
+import { rememberDevGame } from '@/features/online/devGameIds';
 import { invitesFor, onlinePlayerId } from '@/services';
 
 /** Pops to Home, or opens it when the invite was the first screen. */
@@ -29,6 +30,9 @@ export default function InviteRoute() {
       invites={invitesFor(onlinePlayerId)}
       me={onlinePlayerId}
       onAccepted={(gameId) => {
+        // The invites run on the in-memory server (`invitesFor`) until the
+        // app has a Convex invites adapter, so the game is a game there.
+        rememberDevGame(gameId);
         // A dev invite from the bot (dev builds only) starts its bot now.
         if (__DEV__) checkDevInvite();
         router.replace(gameHref(gameId));

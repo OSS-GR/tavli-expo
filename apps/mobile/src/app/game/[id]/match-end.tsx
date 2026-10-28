@@ -20,8 +20,8 @@ import {
   parseIdParam,
   reviewHref,
 } from '@/features/match/routes';
+import { OnlineConnect } from '@/features/online/OnlineConnect';
 import { OnlineMatchEnd } from '@/features/online/OnlineMatchEnd';
-import { gameTransportFor, onlinePlayerId } from '@/services';
 
 /** Back to Home: pops to it, or opens it when this was the first screen. */
 function goHome() {
@@ -33,12 +33,11 @@ export default function MatchEndRoute() {
   const id = parseIdParam(params.id);
   if (id !== null && !isLocalGameId(id)) {
     return (
-      <OnlineMatchEnd
-        gameId={id}
-        transport={gameTransportFor(onlinePlayerId)}
-        me={onlinePlayerId}
-        onHome={goHome}
-      />
+      <OnlineConnect gameId={id} onHome={goHome}>
+        {({ transport, me }) => (
+          <OnlineMatchEnd gameId={id} transport={transport} me={me} onHome={goHome} />
+        )}
+      </OnlineConnect>
     );
   }
   return <LocalMatchEnd id={id} />;

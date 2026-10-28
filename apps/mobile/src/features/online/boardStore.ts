@@ -3,8 +3,9 @@
  *
  * `GameScreen` reads a `BoardStore`: a flow that is never `null`, a match
  * key, the last error and `dispatch`. This wraps an `OnlineStore` that has
- * its first view. Its `lastError` is only a move this phone refused. The snapshot is cached, so a change of another field
- * (`sending`, `notice`, …) does not render the board again.
+ * its first view. Its `lastError` is only a move this phone refused. The
+ * snapshot is cached, so a change of another field (`sending`, `notice`,
+ * …) does not render the board again.
  *
  * The match key names the game (`online:<gameId>`), not the store: a new
  * store for the same game (the screen opened again) does not read the
