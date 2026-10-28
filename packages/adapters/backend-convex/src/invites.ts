@@ -110,5 +110,33 @@ export function createConvexInvites(options: ConvexInvitesOptions): Invites {
     async listMyInvites() {
       return copy(await run(() => client.query(INVITE_FUNCTIONS.listMyInvites, {})));
     },
+
+    watchMyInvites(onList, onError) {
+      let active = true;
+      // Like `watchInvite`: never inside the call, never after the stop function.
+      const later = (deliver: () => void) => {
+        void Promise.resolve().then(() => {
+          if (active) deliver();
+        });
+      };
+      // `listMyInvites` is a Convex query, so the client watches it: the
+      // server sends a new result whenever one of the caller's invites
+      // changes (#314), also when `expireInvite` marks one expired.
+      const stop = client.onUpdate(
+        INVITE_FUNCTIONS.listMyInvites,
+        {},
+        (list) => {
+          later(() => onList(copy(list)));
+        },
+        (error) => {
+          later(() => onError?.(toInviteError(error)));
+        },
+      );
+      return () => {
+        if (!active) return;
+        active = false;
+        stop();
+      };
+    },
   };
 }

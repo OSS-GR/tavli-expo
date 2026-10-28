@@ -296,7 +296,7 @@ Our real file is [`apps/mobile/eas.json`](../../apps/mobile/eas.json) (#39). It 
 | `preview` | Release **APK** for direct install | Release build for the **simulator** | `preview` |
 | `production` | Store AAB, `autoIncrement` | App Store build, `autoIncrement` | `production` |
 
-`cli.version` is pinned to `>= 25.0.0` and `cli.appVersionSource` is `remote`. A `base` profile pins pnpm 12. The app is linked to the EAS project `@oss_gr-org/tavlaki`: `app.json` holds its `owner` and `extra.eas.projectId` (#292, see [Running the app](../process/running-the-app.md), part 4).
+`cli.version` is pinned to `>= 25.0.0` and `cli.appVersionSource` is `remote`. A `base` profile pins pnpm 12. The app is linked to the EAS project `@oss_gr-org/tavlaki`: `app.json` holds its `owner` and `extra.eas.projectId` (#323, see [Running the app](../process/running-the-app.md), part 4).
 
 Rules:
 
@@ -310,7 +310,7 @@ Rules:
 
 ### EAS Update (OTA)
 
-`expo-updates` is installed, but **no update is published yet**. `updates.url` in `app.json` points at the linked project (#292).
+`expo-updates` is installed, but **no update is published yet**. `updates.url` in `app.json` points at the linked project (#323).
 
 - **Do** use the simple flow from Expo docs: one **channel** per build profile: `development`, `preview`, `production`. Ignore branches.
 - **Do** use `runtimeVersion: { policy: "fingerprint" }` (set in `app.json`). The hash covers all native code, so an update never reaches a build that lacks a native module. Expo's SDK 58 docs no longer call it experimental (checked 2026-10-26). The cost: any native change needs a new build before updates reach it.

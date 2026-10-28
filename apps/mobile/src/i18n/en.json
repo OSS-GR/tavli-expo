@@ -51,6 +51,19 @@
       "seeAll": "See all ({{count}})",
       "empty": "No online games right now. Play a friend to start one."
     },
+    "invites": {
+      "title": "Your invites",
+      "invite": "Invite",
+      "game_one": "{{game}} · first to {{count}} point",
+      "game_other": "{{game}} · first to {{count}} points",
+      "gameSpoken_one": "{{game}}, first to {{count}} point",
+      "gameSpoken_other": "{{game}}, first to {{count}} points",
+      "left": "{{time}} left",
+      "expiring": "Expiring now",
+      "code": "Code {{code}}",
+      "hint": "Opens the invite. Share it again, or cancel it.",
+      "failed": "Your invites did not load. Check the connection."
+    },
     "learn": {
       "title": "Learn to play",
       "subtitle": "A one-minute lesson on the board: move, hit and bear off.",
@@ -194,6 +207,11 @@
       "diplo": "Diplo wins {{value}}",
       "draws": "Draws {{value}}",
       "unfinished": "Not finished {{value}}"
+    },
+    "online": {
+      "title": "Online",
+      "youWon": "You won",
+      "friendWon": "Your friend won"
     }
   },
   "languages": {
@@ -352,7 +370,7 @@
       "share": "Share the invite",
       "shareMessage": "Play tavli with me on Tavlaki. Open this link to join: {{link}} (code {{code}})",
       "status": "Waiting for your friend…",
-      "stay": "Keep this screen open until your friend joins. The invite stays open for 24 hours.",
+      "stay": "You can close this screen: your open invites are on Home. The invite stays open for 24 hours.",
       "cancel": "Cancel the invite",
       "cancelling": "Cancelling…",
       "cancelFailed": "The invite was not cancelled. Check the connection and try again.",

@@ -64,6 +64,7 @@ function memoryAdapters() {
         declineInvite: (code) => caller().declineInvite(code),
         cancelInvite: (code) => caller().cancelInvite(code),
         listMyInvites: () => caller().listMyInvites(),
+        watchMyInvites: (onList, onError) => caller().watchMyInvites(onList, onError),
       };
     },
   };
@@ -160,6 +161,11 @@ describe('createOnlineServices', () => {
     await settle();
     expect(views).toHaveLength(1);
     stop();
+    const lists: unknown[] = [];
+    const stopList = online.invites.watchMyInvites((list) => lists.push(list));
+    await settle();
+    expect(lists).toEqual([[expect.objectContaining({ code })]]);
+    stopList();
     await online.invites.cancelInvite(code);
     // The games reuse the client.
     online.games.subscribe('game-1', () => {})();

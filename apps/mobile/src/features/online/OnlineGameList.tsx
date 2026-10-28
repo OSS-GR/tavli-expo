@@ -2,8 +2,10 @@
  * The rows of "Your online games" (#297), with the loading and failed
  * states. Home shows the first few (`limit`) and "See all"; the "See all"
  * screen shows every row. Each row is one target and reads as one item.
+ * History (#313) draws its own rows (`renderRows`) with these states.
  */
 import type { GameSummary } from '@tavli/contracts';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -12,24 +14,34 @@ import { ActionButton } from '@/components/ActionButton';
 
 import { gameRowText, type MyGamesState } from './myGames';
 
-export interface OnlineGameListProps {
+interface OnlineGameListBase {
   state: MyGamesState;
   /** The phone time the clocks show. */
   now: number;
   /** At most this many rows. More rows show "See all" (with `onSeeAll`). Default: every row. */
   limit?: number;
-  onOpen: (gameId: string) => void;
   onSeeAll?: () => void;
   onRetry: () => void;
   /** The text of an empty list. Without it an empty list shows nothing. */
   emptyText?: string;
 }
 
+/**
+ * Tappable rows that open the game (`onOpen`), or the rows a screen draws
+ * itself (`renderRows`, given the games to show).
+ */
+export type OnlineGameListProps = OnlineGameListBase &
+  (
+    | { onOpen: (gameId: string) => void; renderRows?: undefined }
+    | { renderRows: (games: readonly GameSummary[]) => ReactNode; onOpen?: undefined }
+  );
+
 export function OnlineGameList({
   state,
   now,
   limit,
   onOpen,
+  renderRows,
   onSeeAll,
   onRetry,
   emptyText,
@@ -72,15 +84,17 @@ export function OnlineGameList({
   return (
     <View style={styles.list}>
       {empty}
-      {shown.map((game) => (
-        <OnlineGameRow
-          key={game.gameId}
-          game={game}
-          now={now}
-          offset={offset}
-          onPress={() => onOpen(game.gameId)}
-        />
-      ))}
+      {renderRows !== undefined
+        ? renderRows(shown)
+        : shown.map((game) => (
+            <OnlineGameRow
+              key={game.gameId}
+              game={game}
+              now={now}
+              offset={offset}
+              onPress={() => onOpen(game.gameId)}
+            />
+          ))}
       {onSeeAll !== undefined && shown.length < games.length ? (
         <Pressable
           testID="online-games-see-all"

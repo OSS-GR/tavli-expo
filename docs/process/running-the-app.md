@@ -168,7 +168,9 @@ EAS builds the app on Expo's servers. Use it when you do not want to wait for a 
 
 ### The EAS project
 
-The app is linked to the EAS project [`@oss_gr-org/tavlaki`](https://expo.dev/accounts/oss_gr-org/projects/tavlaki) (#292). `apps/mobile/app.json` holds its `owner`, `extra.eas.projectId` and `updates.url`. To use EAS, install the CLI and log in with an Expo account in the `oss_gr-org` organization. Run `eas` commands from `apps/mobile`.
+**Done (2026-10-28, #323).** The project is [`@oss_gr-org/tavlaki`](https://expo.dev/accounts/oss_gr-org/projects/tavlaki) (id `ab412a0d-e0c2-4f38-878d-57249f4db757`). `apps/mobile/app.json` holds `owner`, `extra.eas.projectId` and `updates.url`. The id is public config, not a secret.
+
+To use EAS on a new computer, install the CLI and log in with an Expo account in the `oss_gr-org` organization. Run `eas` commands from `apps/mobile`.
 
 ```bash
 npm install --global eas-cli   # eas.json needs version 25 or newer
@@ -177,11 +179,16 @@ eas login
 
 Do **not** run `eas update` yet.
 
-How the project was linked (you only need this for a new project):
+How it was done, for a new project:
 
-- `eas init --account oss_gr-org` in `apps/mobile`. It writes `owner` and `extra.eas.projectId` to `app.json`. It also copies `extra.router` there; delete that copy, because the `expo-router` plugin adds it.
-- `eas update:configure` cannot write to `app.config.ts`. It prints the `updates.url`; add it to `app.json` by hand.
-- `pnpm format` in the repo root: EAS CLI writes `app.json` in its own style.
+```bash
+cd apps/mobile
+eas init --account oss_gr-org   # links the project, writes owner and extra.eas.projectId to app.json
+eas update:configure            # see the note below
+cd ../.. && pnpm format         # EAS CLI writes app.json in its own style
+```
+
+`eas update:configure` cannot write to a dynamic config (`app.config.ts`) and fails. It prints the `updates.url` to add: put it in `app.json` by hand.
 
 ### Build profiles (`apps/mobile/eas.json`)
 

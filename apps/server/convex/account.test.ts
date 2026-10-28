@@ -17,6 +17,7 @@ import type {
 import { api, components, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { GAME_RESIGN_PAGE, INVITE_DELETE_PAGE } from './account';
+import { MATCH_END_PUSH_TEXT } from './model/push';
 import { setPushProvider } from './push';
 import schema from './schema';
 import { modules } from './test.setup';
@@ -210,11 +211,14 @@ describe('deleteMyAccount', () => {
     expect(await authRows(t, 'user', bob)).toHaveLength(1);
     expect(await authRows(t, 'session', bob)).toHaveLength(1);
 
-    // The resign ended the match: nobody gets "your turn", and the turn
-    // timer and the invite expiry find nothing to do.
+    // The resign ended the match: Bob gets "game over" (#316), Alice gets
+    // nothing (she resigned, and her tokens are gone). Nobody gets "your
+    // turn", and the turn timer and the invite expiry find nothing to do.
     vi.advanceTimersByTime(TURN_TIME_MS.async + 1);
     await t.finishInProgressScheduledFunctions();
-    expect(push.sent).toEqual([]);
+    expect(push.sent.map((message) => [message.to, message.title, message.data.gameId])).toEqual([
+      ['ExponentPushToken[bob-phone]', MATCH_END_PUSH_TEXT.title, active],
+    ]);
     expect((await as(t, bob).query(api.games.getGame, { gameId: active }))?.version).toBe(
       resigned?.version,
     );
@@ -435,6 +439,30 @@ describe('resignActiveGames (#309)', () => {
     }
     // The game of Bob and Carol is not touched.
     expect((await rawGame(t, theirs))?.status).toBe('active');
+  });
+
+  it('the other player gets one "game over" per resigned async match, also from the later pages (#316)', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    const count = GAME_RESIGN_PAGE + 1;
+    const all: Id<'games'>[] = [];
+    for (let i = 0; i < count; i++) all.push(await createGame(t, alice, bob));
+    await register(t, alice, 'ExponentPushToken[alice-phone]');
+    await register(t, bob, 'ExponentPushToken[bob-phone]');
+    await flush(t);
+    push.clear();
+
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    // The call's page, then the scheduled page, then the pushes of that page.
+    await flush(t);
+    await flush(t);
+    await flush(t);
+    expect(await activeGames(t, alice)).toEqual([]);
+    // Alice's tokens are gone, and she resigned: nothing goes to her.
+    expect(push.sent.every((message) => message.to === 'ExponentPushToken[bob-phone]')).toBe(true);
+    expect(push.sent.every((message) => message.title === MATCH_END_PUSH_TEXT.title)).toBe(true);
+    expect(push.sent.map((message) => message.data.gameId).sort()).toEqual([...all].sort());
   });
 
   it('schedules no page when the first page holds every game', async () => {
