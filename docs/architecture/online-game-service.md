@@ -173,12 +173,12 @@ inviter                 server                                   friend
   │                     acceptInvite (one transaction) ◄───────── │
   │                     1. code well formed?       → BAD_REQUEST
   │                     2. invite with this code?  → INVITE_NOT_FOUND
-  │                     3. open?                   → INVITE_CLOSED
-  │                     4. now < expiresAt?        → INVITE_EXPIRED
-  │                     5. not your own?           → OWN_INVITE
-  │                     6. insertGame (white = inviter): opening roll,
+  │                     3. status at now: open?    → INVITE_EXPIRED when the
+  │                        time is up (marked or not), else INVITE_CLOSED
+  │                     4. not your own?           → OWN_INVITE
+  │                     5. insertGame (white = inviter): opening roll,
   │                        first roll, turn clock
-  │                     7. invite → accepted, gameId
+  │                     6. invite → accepted, gameId
   │ ◄── getInvite / listMyInvites / getGame (reactive) ─────────► │ gameId
 ```
 
@@ -236,7 +236,7 @@ pnpm --filter @tavli/server codegen   # convex codegen --system-udfs --typecheck
 
 - **Deploy** (owner): create the Convex project (EU region if offered), run `npx convex dev` once in `apps/server`, add `CONVEX_DEPLOY_KEY` as a secret for deploys. Not needed for CI.
 - **Auth** (#46, #131): replace the `callerId` argument with the Better Auth user (`ctx.auth`). Then `getGame` should answer only the two players.
-- **Invite limits:** nothing limits how many open invites one player makes. Add a limit with auth (#131), if spam shows up.
+- **Invite limits:** nothing limits how many open invites one player makes, and nothing limits code guesses. With about 850 billion codes, a guess rarely hits. Add a cap and a rate limit with auth (#131).
 - **Verify the dice** on a real deployment: `crypto.getRandomValues` in a mutation gives different, unpredictable dice per call.
 - **Client adapter**: `packages/adapters/backend-convex` implements `GameTransport` with the Convex React client.
 - **Clock skew:** `turnDeadline` is on the server clock. A phone should show the time left from the server time (for example the offset seen when the view arrives), not trust its own clock.

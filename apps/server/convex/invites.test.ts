@@ -244,13 +244,15 @@ describe('acceptInvite', () => {
     );
   });
 
-  it('rejects the player id "server"', async () => {
+  it('rejects the player id "server" and an empty id in every call', async () => {
     const t = setup();
     const code = await createInvite(t);
-    await rejectsWith(
-      t.mutation(api.invites.acceptInvite, { callerId: 'server', code }),
-      'BAD_REQUEST',
-    );
+    for (const callerId of ['server', '', '  ']) {
+      await rejectsWith(t.mutation(api.invites.acceptInvite, { callerId, code }), 'BAD_REQUEST');
+      await rejectsWith(t.mutation(api.invites.declineInvite, { callerId, code }), 'BAD_REQUEST');
+      await rejectsWith(t.mutation(api.invites.cancelInvite, { callerId, code }), 'BAD_REQUEST');
+    }
+    await rejectsWith(createInvite(t, '  '), 'BAD_REQUEST');
     expect((await invite(t, code)).status).toBe('open');
   });
 

@@ -113,7 +113,7 @@ export function inviteExpiresAt(now: number): number {
 
 /**
  * A new open invite with `code`, made at `now`. Rejects a bad match
- * length here, so an invite never fails later only when a friend accepts.
+ * length here, as the engine would, so a friend's accept does not fail on it.
  */
 export function newInvite(options: NewInviteOptions, code: string, now: number): InviteRecord {
   const { from, choice, targetPoints, pace } = options;

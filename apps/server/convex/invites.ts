@@ -58,6 +58,7 @@ function guarded<T>(step: () => T): T {
 }
 
 function checkPlayerId(playerId: string): void {
+  if (playerId.trim() === '') fail('BAD_REQUEST', 'the player id is empty');
   // The move log marks server events with SERVER_ACTOR, so no player may use that id.
   if (playerId === SERVER_ACTOR) fail('BAD_REQUEST', `"${SERVER_ACTOR}" is not a valid player id`);
 }
@@ -146,6 +147,7 @@ export const declineInvite = mutation({
   args: { callerId: v.string(), code: v.string() },
   returns: v.null(),
   handler: async (ctx, { callerId, code }) => {
+    checkPlayerId(callerId);
     const invite = await load(ctx, code);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
     await ctx.db.patch(invite._id, { status: 'declined', answeredBy: callerId });
@@ -158,6 +160,7 @@ export const cancelInvite = mutation({
   args: { callerId: v.string(), code: v.string() },
   returns: v.null(),
   handler: async (ctx, { callerId, code }) => {
+    checkPlayerId(callerId);
     const invite = await load(ctx, code);
     guarded(() => checkCancel(invite, callerId, Date.now()));
     await ctx.db.patch(invite._id, { status: 'cancelled' });
