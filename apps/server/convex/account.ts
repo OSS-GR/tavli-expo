@@ -44,9 +44,10 @@ export const INVITE_DELETE_PAGE = 200;
 /**
  * How many active games one run resigns (#309). Nothing caps a player's
  * active games: each accepted invite starts one. One resign reads the
- * game, writes it and a few `moves` rows, and runs the engine once. 25
- * of them stay far below Convex's limits (16,000 writes and 1 second of
- * run time per transaction), also when a stored flow is long.
+ * game, writes it and one `moves` row, and runs the engine once. So 25
+ * of them make about 50 writes, far below Convex's limit of 16,000 per
+ * transaction. The run time (Convex allows 1 second) is an estimate, not
+ * measured: 25 engine resigns and JSON reads should take far less.
  */
 export const GAME_RESIGN_PAGE = 25;
 

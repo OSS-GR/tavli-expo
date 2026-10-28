@@ -384,7 +384,9 @@ describe('resignActiveGames (#309)', () => {
     const bob = await guest(t);
     const carol = await guest(t);
     // Alice plays on both sides, against two players, in live games.
-    const count = 2 * GAME_RESIGN_PAGE + 1;
+    // The call resigns one page and a timer ends one game, so the first
+    // run gets a full page and the second run a part of one.
+    const count = 2 * GAME_RESIGN_PAGE + 2;
     const all: Id<'games'>[] = [];
     for (let i = 0; i < count; i++) {
       const other = i % 3 === 0 ? carol : bob;
@@ -412,9 +414,12 @@ describe('resignActiveGames (#309)', () => {
     expect(timedOut?.status).toBe('finished');
     expect(timedOut?.version).toBe(before.version + 1);
 
-    // Each run resigns one page; the last one is not full and stops.
+    // The first run resigns a full page and schedules the next one.
     await flush(t);
-    expect(await activeGames(t, alice)).toHaveLength(count - 2 * GAME_RESIGN_PAGE - 1);
+    expect(await activeGames(t, alice)).toHaveLength(1);
+    expect(await pendingResigns(t)).toBe(1);
+    // The second run resigns the last game: a page that is not full, so
+    // it stops.
     await flush(t);
     expect(await activeGames(t, alice)).toEqual([]);
     expect(await pendingResigns(t)).toBe(0);
@@ -439,6 +444,23 @@ describe('resignActiveGames (#309)', () => {
     for (let i = 0; i < GAME_RESIGN_PAGE - 1; i++) await createGame(t, alice, bob);
     await as(t, alice).mutation(api.account.deleteMyAccount, {});
     expect(await activeGames(t, alice)).toEqual([]);
+    expect(await pendingResigns(t)).toBe(0);
+  });
+
+  it('with exactly one page of games, the call resigns all and one empty run stops', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    for (let i = 0; i < GAME_RESIGN_PAGE; i++) await createGame(t, alice, bob);
+    await as(t, alice).mutation(api.account.deleteMyAccount, {});
+    expect(await activeGames(t, alice)).toEqual([]);
+    // The page was full, so the call could not know it was the last one.
+    expect(await pendingResigns(t)).toBe(1);
+    const before = await t.run(async (ctx) => await ctx.db.query('games').collect());
+
+    await flush(t);
+    // The run found nothing to resign and scheduled nothing more.
+    expect(await t.run(async (ctx) => await ctx.db.query('games').collect())).toEqual(before);
     expect(await pendingResigns(t)).toBe(0);
   });
 });
