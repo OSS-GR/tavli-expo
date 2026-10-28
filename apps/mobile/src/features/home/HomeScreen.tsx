@@ -31,6 +31,8 @@ export interface HomeScreenProps {
   continueCard?: ReactNode;
   /** "Your online games" (#297), when this phone has an online account. */
   onlineGames?: ReactNode;
+  /** "Your invites" (#314), when this phone has an online account. */
+  invites?: ReactNode;
   /** The "Learn to play" card, until the tutorial is done or dismissed (#128). */
   learnCard?: ReactNode;
   /** A one-time message, for example "Your saved game could not be opened." */
@@ -46,6 +48,7 @@ export function HomeScreen({
   botLevels,
   continueCard,
   onlineGames,
+  invites,
   learnCard,
   notice = null,
 }: HomeScreenProps) {
@@ -82,6 +85,7 @@ export function HomeScreen({
         </View>
         {continueCard}
         {onlineGames}
+        {invites}
         {learnCard}
         <Text
           style={styles.section}

@@ -6,7 +6,8 @@
  * card (#149), the Settings game picker (#159) and the online game
  * screen with its game-end sheet and match end (#255) and the invite
  * screen (#256), Play a friend online with its waiting screen (#281), and
- * your online games on Home and "See all" (#297) and in History (#313) follow the font size with no cut text. The game screen, its cards and
+ * your online games on Home and "See all" (#297) and in History (#313),
+ * and your invites on Home (#314) follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
  * cannot measure text, so `textScalingProblems` checks the layout rules
@@ -40,6 +41,7 @@ import { HistoryScreen } from '@/features/history/HistoryScreen';
 import { OnlineHistory } from '@/features/history/OnlineHistory';
 import type { HistoryRecord } from '@/features/history/records';
 import { ContinueCard } from '@/features/home/ContinueCard';
+import { HomeInvites } from '@/features/home/HomeInvites';
 import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
@@ -647,6 +649,39 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     };
     await renderWithRoot(<MyGamesScreen auth={auth} games={offline} focused onOpen={jest.fn()} />);
     expect(await screen.findByTestId('online-games-retry')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
+
+  it('your invites on Home (#314)', async () => {
+    const server = createMemoryGameServer({ rng: createSeededRng(4), now: () => Date.now() });
+    const store = createMemoryAuthStore();
+    store.session = { id: 'me', isGuest: true };
+    const auth = createMemoryAuthProvider(store);
+    server.createInvite('me', 'asodio', 1, 'live');
+    server.createInvite('me', 'tavli', 15, 'async');
+    await renderWithRoot(
+      <HomeScreen
+        onNewGame={jest.fn()}
+        onSettings={jest.fn()}
+        onHowToPlay={jest.fn()}
+        botLevels={['easy']}
+        invites={
+          <HomeInvites auth={auth} invites={server.invitesFor('me')} focused onOpen={jest.fn()} />
+        }
+      />,
+    );
+    expect(await screen.findAllByTestId(/^home-invite-/)).toHaveLength(2);
+    expect(problems()).toEqual([]);
+    // A list that did not load: the note and Try again.
+    const failing = {
+      ...server.invitesFor('me'),
+      watchMyInvites: (_onList: unknown, onError?: (error: unknown) => void) => {
+        void Promise.resolve().then(() => onError?.(new Error('offline')));
+        return () => undefined;
+      },
+    };
+    await renderWithRoot(<HomeInvites auth={auth} invites={failing} focused onOpen={jest.fn()} />);
+    expect(await screen.findByTestId('home-invites-failed')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   });
 
