@@ -233,7 +233,7 @@ Owner answer Q10: friends find each other by invite link (and later by username)
 | `gameId` | id · `null` | The game, once `accepted` |
 | `answeredBy` | string · `null` | The player who accepted or declined |
 
-Indexes: `by_code` (on `code`) and `by_from` (on `[from, status]`, for "my open invites").
+Indexes: `by_code` (on `code`) and `by_from` (on `[from, status, expiresAt]`, for "my open invites" and the [cap](#cap-on-open-invites)). The open invites of one player whose time is not up are one range: `status = open` and `expiresAt > now`.
 
 ### Codes
 
@@ -269,7 +269,7 @@ As with games, no call takes a player id. The caller is the signed-in user, and 
 
 | Call | Who may call | What it does |
 |---|---|---|
-| `createInvite(choice, targetPoints, pace)` | anyone signed in | A new open invite from the caller. Rejects a bad match length (an integer of 1 or more) with `BAD_REQUEST`. Returns the code. |
+| `createInvite(choice, targetPoints, pace)` | anyone signed in | A new open invite from the caller. Rejects a caller at the [cap](#cap-on-open-invites) with `TOO_MANY_INVITES`, then a bad match length (an integer of 1 or more) with `BAD_REQUEST`. Returns the code. |
 | `getInvite(code)` | anyone signed in with the code | `InviteView` or `null` |
 | `acceptInvite(code)` | anyone signed in but the inviter | The flow above. Returns the `gameId`. |
 | `declineInvite(code)` | anyone signed in but the inviter | Marks the invite `declined`. |
@@ -283,9 +283,13 @@ Decline and cancel check the invite like accept: open (`INVITE_CLOSED`) and in t
 
 An invite lasts **24 hours** (`INVITE_TIME_MS`, open question Q31). `createInvite` schedules `internal.invites.expireInvite` at `expiresAt`, as `checkTimeout` does for turns. If it runs too early, it schedules itself again. The calls check the time as well: at or after `expiresAt` (`now >= expiresAt`) an open invite counts as expired, also before the scheduler has marked it. `getInvite` then shows `expired` and `listMyInvites` leaves it out. An expired accept throws `INVITE_EXPIRED` and saves nothing; the scheduled `expireInvite` marks the row.
 
+### Cap on open invites
+
+One player may have at most **10** open invites at a time (`MAX_OPEN_INVITES`, #275). Each invite is a row and a scheduled `expireInvite`, and a guest account is free, so without a cap one user could fill the table. `createInvite` reads the caller's open invites whose time is not up on the `by_from` index (at most 10 rows), counts them with `countOpenInvites` and checks them with `checkInviteCap` (both in `@tavli/online`). At the cap it throws `TOO_MANY_INVITES` and saves nothing: no row, no scheduled expiry. An invite frees its place once it is accepted, declined or cancelled, and at `expiresAt`, also before the scheduled `expireInvite` marks it. The cap is per player: other players are not affected. The in-memory server runs the same check. Convex runs each mutation as one serializable transaction, so two calls at the same time cannot both take the last place.
+
 ### Errors
 
-A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }` (`InviteErrorData`, `isInviteErrorData` in contracts). The codes are `INVITE_ERROR_CODES`: `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`, `NOT_YOUR_INVITE`, `BAD_REQUEST` and `NOT_SIGNED_IN`. If `insertGame` fails inside `acceptInvite`, the error is a game error (`GameTransportErrorData`).
+A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }` (`InviteErrorData`, `isInviteErrorData` in contracts). The codes are `INVITE_ERROR_CODES`: `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`, `NOT_YOUR_INVITE`, `TOO_MANY_INVITES` (only `createInvite`), `BAD_REQUEST` and `NOT_SIGNED_IN`. If `insertGame` fails inside `acceptInvite`, the error is a game error (`GameTransportErrorData`).
 
 ## Tests (offline)
 
@@ -293,7 +297,7 @@ A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }
 
 - `convex/games.test.ts` (convex-test): a full Portes game between two players with server dice (and the log replays to the saved game), an illegal move, a wrong player and a stranger, an old version (two phones at once), resign ends the match, the Plakoto mother question (only the pinned player answers; `playOn` and `resign`; a late answer times out), a missing game. Turn timers with `vi.useFakeTimers()` and `t.finishInProgressScheduledFunctions()`: a live time out loses the game and the next game starts; the match ends on the last point; a move just in time is fine and the old check does nothing; a late move gets `TIMED_OUT` and the time out is saved; async is 24 hours; resign stops the clock. Sign-in (#131): each call runs as a convex-test identity (`t.withIdentity({ subject })`); every function refuses a call with no identity (`NOT_SIGNED_IN`, nothing saved); a stranger cannot read a game (`NOT_A_PLAYER`); a new session of the same user plays on; bad subjects get `BAD_REQUEST`. Every test in the file uses fake timers, so no turn check fires on its own.
 - `convex/model/cryptoRng.test.ts`: the secure RNG.
-- `convex/invites.test.ts` (convex-test, fake timers): create and accept starts a game that `getGame` shows (the inviter is white); accept twice; your own invite; decline and cancel (and who may call them); an unknown and a malformed code; codes in any case; a code clash (a spy on `crypto.getRandomValues`); a game error rolls the accept back; the invite expires at 24 hours and accept, decline and cancel then fail; an accept just in time; `listMyInvites`; every call refuses a call with no identity; the inviter is the identity; a stranger cannot read the new game. It also runs the `invitesContract()` checks on the real functions (#256).
+- `convex/invites.test.ts` (convex-test, fake timers): create and accept starts a game that `getGame` shows (the inviter is white); accept twice; your own invite; decline and cancel (and who may call them); an unknown and a malformed code; codes in any case; a code clash (a spy on `crypto.getRandomValues`); the cap on open invites (`TOO_MANY_INVITES` and nothing saved; accept, decline, cancel and expiry free a place, also before the scheduler runs; another player is not affected); a game error rolls the accept back; the invite expires at 24 hours and accept, decline and cancel then fail; an accept just in time; `listMyInvites`; every call refuses a call with no identity; the inviter is the identity; a stranger cannot read the new game. It also runs the `invitesContract()` checks on the real functions (#256).
 - `convex/auth.test.ts` (convex-test with the Better Auth component, `register` from `@convex-dev/better-auth/test`): the `/api/auth` routes answer; a guest signs in over HTTP and gets a Convex token whose `sub` is the user id; that identity makes an invite.
 - `convex/convexTransport.test.ts` (convex-test, fake timers): the `GameTransport` contract checks on the [Convex adapter](#the-convex-adapter) with the real functions; a late turn, no sign-in and a bad id through the adapter; the adapter's function names and types against `api`.
 
@@ -302,8 +306,8 @@ A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }
 - `online-game.test.ts`: whole matches of every game choice with random legal turns and answers, replay equals the saved flow, no dice drawn ahead, error codes, the timer helpers and `timeOut`.
 - `calls.test.ts`: the shared call checks, and `checkViewer` (who may read a game).
 - `memory-server.test.ts`: the `GameTransport` contract checks, a whole match of each game choice through two transports, and the turn timers on a fake clock.
-- `invites.test.ts` (seeded RNG): codes, the fair draw, clashes, the checks and the view.
-- `memory-invites.test.ts`: the `Invites` contract checks on the in-memory server, the game an accept starts, codes and clashes, and an accept whose game cannot start (the invite stays open).
+- `invites.test.ts` (seeded RNG): codes, the fair draw, clashes, the checks, the cap count and the view.
+- `memory-invites.test.ts`: the `Invites` contract checks on the in-memory server, the game an accept starts, codes and clashes, an accept whose game cannot start (the invite stays open), and the cap on open invites (the same cases as on Convex).
 
 The test files and `test.setup.ts` have two dots in their names, so Convex does not deploy them. The module glob in `test.setup.ts` uses a negative pattern (`['./**/*.*s', '!./**/*.*.*s']`): the extglob from the convex-test docs does not work with the Vite glob of Vitest 5.
 
@@ -357,7 +361,7 @@ A deploy does not change the stored data. Convex refuses a schema that the store
 - It has no sign-in: `transportFor(playerId)` stands for that user, signed in. Errors reject with plain `GameTransportErrorData`, with the server codes. A missing game calls `onError` with `NOT_FOUND`, and a stranger's `subscribe` calls it with `NOT_A_PLAYER`.
 - Time comes from `now()`. `runDueTimeouts()` is the in-memory `checkTimeout`: it applies every time out whose deadline has passed, each at its own deadline, like the scheduler. A late `sendTurn` gets `TIMED_OUT`, and the time out is saved.
 - `events(gameId)` is the event log (like the `moves` rows), so a test can `replay` it.
-- Invites (#256): `createInvite(callerId, choice, targetPoints, pace)` makes an open invite, like the Convex mutation (the code comes from the server's `rng`, through `pickInviteCodeNow`, which shares its loop with `pickInviteCode`). `cancelInvite(callerId, code)` takes an open invite back, like the Convex `cancelInvite`. `invitesFor(playerId)` gives that player's `Invites` port, and `getInvite(code)` reads one invite. They use the same checks (`invites.ts`). `acceptInvite` starts the game through `createGame` (the inviter plays white); if the game cannot start, the invite stays open. No timer: an open invite counts as expired once `now()` reaches `expiresAt`. Errors reject with plain `InviteErrorData` (a game error with `GameTransportErrorData`).
+- Invites (#256): `createInvite(callerId, choice, targetPoints, pace)` makes an open invite, like the Convex mutation (the code comes from the server's `rng`, through `pickInviteCodeNow`, which shares its loop with `pickInviteCode`). It has the same [cap](#cap-on-open-invites): `TOO_MANY_INVITES` at 10 open invites (#275). `cancelInvite(callerId, code)` takes an open invite back, like the Convex `cancelInvite`. `invitesFor(playerId)` gives that player's `Invites` port, and `getInvite(code)` reads one invite. They use the same checks (`invites.ts`). `acceptInvite` starts the game through `createGame` (the inviter plays white); if the game cannot start, the invite stays open. No timer: an open invite counts as expired once `now()` reaches `expiresAt`. Errors reject with plain `InviteErrorData` (a game error with `GameTransportErrorData`).
 
 ### Contract checks
 
@@ -384,7 +388,7 @@ Run it after you add or rename a file in `convex/`. The push also checks what a 
 ## Open points
 
 - **Sign-in follow-ups:** Apple, Google and email magic link; moving a guest's games after an upgrade ([Not done yet](#not-done-yet)).
-- **Invite limits:** nothing limits how many open invites one player makes, and nothing limits code guesses. With about 850 billion codes, a guess rarely hits. Add a cap and a rate limit per signed-in user.
+- **Invite limits:** one player may have 10 open invites ([cap](#cap-on-open-invites), #275), but nothing limits code guesses or how fast a player makes and cancels invites. With about 850 billion codes, a guess rarely hits. Add a rate limit per signed-in user.
 - **Verify the dice** on a real deployment: `crypto.getRandomValues` in a mutation gives different, unpredictable dice per call.
 - **The invite calls in the app** take the same `ConvexClient` as the games (the `client` in `onlineServices.ts`). There is no invite adapter yet.
 - **Privacy before online play ships.** The first screen that calls `auth.signInAsGuest()` (the invite screen, #256) makes a guest account on our server. That PR updates the privacy policy, the store answers and the iOS privacy manifest (a user id; see `docs/legal/README.md`).

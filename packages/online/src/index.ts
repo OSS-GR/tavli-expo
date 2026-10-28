@@ -43,8 +43,11 @@ export type { SavedGame } from './calls';
 export {
   InviteError,
   MAX_CODE_TRIES,
+  MAX_OPEN_INVITES,
   checkAnswer,
   checkCancel,
+  checkInviteCap,
+  countOpenInvites,
   inviteExpiresAt,
   inviteStatus,
   isInviteExpired,

@@ -11,8 +11,11 @@ import type { Rng } from '@tavli/engine';
 import {
   InviteError,
   MAX_CODE_TRIES,
+  MAX_OPEN_INVITES,
   checkAnswer,
   checkCancel,
+  checkInviteCap,
+  countOpenInvites,
   inviteExpiresAt,
   inviteStatus,
   isInviteExpired,
@@ -235,5 +238,37 @@ describe('toInviteView', () => {
       status: 'accepted',
       gameId: 'g1',
     });
+  });
+});
+
+describe('the cap on open invites (#275)', () => {
+  it('is 10', () => {
+    expect(MAX_OPEN_INVITES).toBe(10);
+  });
+
+  it('counts only open invites of the player whose time is not up', () => {
+    const open = invite();
+    const invites: InviteRecord[] = [
+      open,
+      open,
+      invite('accepted'),
+      invite('declined'),
+      invite('cancelled'),
+      invite('expired'),
+      { ...open, from: 'bob' },
+    ];
+    expect(countOpenInvites(invites, 'alice', NOW)).toBe(2);
+    expect(countOpenInvites(invites, 'bob', NOW)).toBe(1);
+    expect(countOpenInvites(invites, 'carol', NOW)).toBe(0);
+    // At expiresAt the time is up, also before the server marks the row.
+    expect(countOpenInvites(invites, 'alice', open.expiresAt - 1)).toBe(2);
+    expect(countOpenInvites(invites, 'alice', open.expiresAt)).toBe(0);
+  });
+
+  it('lets a player make an invite below the cap, and rejects one at the cap', () => {
+    expect(() => checkInviteCap(0)).not.toThrow();
+    expect(() => checkInviteCap(MAX_OPEN_INVITES - 1)).not.toThrow();
+    rejects(() => checkInviteCap(MAX_OPEN_INVITES), 'TOO_MANY_INVITES');
+    rejects(() => checkInviteCap(MAX_OPEN_INVITES + 1), 'TOO_MANY_INVITES');
   });
 });
