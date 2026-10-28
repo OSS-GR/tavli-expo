@@ -296,12 +296,12 @@ Our real file is [`apps/mobile/eas.json`](../../apps/mobile/eas.json) (#39). It 
 | `preview` | Release **APK** for direct install | Release build for the **simulator** | `preview` |
 | `production` | Store AAB, `autoIncrement` | App Store build, `autoIncrement` | `production` |
 
-`cli.version` is pinned to `>= 25.0.0` and `cli.appVersionSource` is `remote`. A `base` profile pins pnpm 12. There is no `projectId` in the repo yet: the owner links it once with `eas init` (see [Running the app](../process/running-the-app.md), part 4).
+`cli.version` is pinned to `>= 25.0.0` and `cli.appVersionSource` is `remote`. A `base` profile pins pnpm 12. The app is linked to the EAS project `@oss_gr-org/tavlaki`: `app.json` holds its `owner` and `extra.eas.projectId` (#323, see [Running the app](../process/running-the-app.md), part 4).
 
 Rules:
 
 - **Do** use **app variants** so dev, preview and production can be installed side by side ([app variants](https://docs.expo.dev/build-reference/variants/)). Done in `apps/mobile/app.config.ts`: `APP_VARIANT` picks `com.tavlaki.dev`, `com.tavlaki.preview` or `com.tavlaki`. The default is `development`, so a local build signed with a free Apple ID never reserves `com.tavlaki` (a bundle id used by a free Personal Team can block the paid team later).
-- **Do** keep `app.json` as the base config and make `app.config.ts` a function of `config`. Then `eas init` and `eas update:configure` can still write to `app.json`.
+- **Do** keep `app.json` as the base config and make `app.config.ts` a function of `config`. Then `eas init` can still write to `app.json`. `eas update:configure` cannot write to a dynamic config, so `updates.url` was added to `app.json` by hand.
 - **Do** use the `remote` version source with `autoIncrement` on production. EAS then manages `buildNumber` and `versionCode`. Duplicate build numbers are a common store rejection. Do not put build numbers in `app.json`.
 - **Do** set the user-facing `version` (for example `1.2.0`) by hand for each store release.
 - **Do** let EAS manage signing credentials (`eas credentials`).
@@ -310,7 +310,7 @@ Rules:
 
 ### EAS Update (OTA)
 
-`expo-updates` is installed, but **no update is published yet**. `updates.url` is added by `eas update:configure` when the owner links the project.
+`expo-updates` is installed, but **no update is published yet**. `updates.url` in `app.json` points at the linked project (#323).
 
 - **Do** use the simple flow from Expo docs: one **channel** per build profile: `development`, `preview`, `production`. Ignore branches.
 - **Do** use `runtimeVersion: { policy: "fingerprint" }` (set in `app.json`). The hash covers all native code, so an update never reaches a build that lacks a native module. Expo's SDK 58 docs no longer call it experimental (checked 2026-10-26). The cost: any native change needs a new build before updates reach it.

@@ -166,22 +166,29 @@ EAS builds the app on Expo's servers. Use it when you do not want to wait for a 
 
 **EAS Free plan:** 15 Android and 15 iOS builds per month, a slow queue, and a 45-minute limit per build. The limit resets each month. There is no surprise bill.
 
-### Link the project once
+### The EAS project
 
-**Done (2026-10-28, #323).** The project is `@oss_gr-org/tavlaki` (id `ab412a0d-e0c2-4f38-878d-57249f4db757`). `apps/mobile/app.json` holds `owner`, `extra.eas.projectId` and `updates.url`. The id is public config, not a secret. You only need `eas login` on a new computer.
+**Done (2026-10-28, #323).** The project is [`@oss_gr-org/tavlaki`](https://expo.dev/accounts/oss_gr-org/projects/tavlaki) (id `ab412a0d-e0c2-4f38-878d-57249f4db757`). `apps/mobile/app.json` holds `owner`, `extra.eas.projectId` and `updates.url`. The id is public config, not a secret.
+
+To use EAS on a new computer, install the CLI and log in with an Expo account in the `oss_gr-org` organization. Run `eas` commands from `apps/mobile`.
+
+```bash
+npm install --global eas-cli   # eas.json needs version 25 or newer
+eas login
+```
+
+Do **not** run `eas update` yet.
 
 How it was done, for a new project:
 
 ```bash
-npm install --global eas-cli
-eas login              # your Expo account
 cd apps/mobile
-eas init               # links the project, writes extra.eas.projectId to app.json
-eas update:configure   # see the note below
-cd ../.. && pnpm format   # EAS CLI writes app.json in its own style
+eas init --account oss_gr-org   # links the project, writes owner and extra.eas.projectId to app.json
+eas update:configure            # see the note below
+cd ../.. && pnpm format         # EAS CLI writes app.json in its own style
 ```
 
-`eas update:configure` cannot write to a dynamic config (`app.config.ts`) and fails. It prints the `updates.url` to add: put it in `app.json` by hand. Do **not** run `eas update` yet.
+`eas update:configure` cannot write to a dynamic config (`app.config.ts`) and fails. It prints the `updates.url` to add: put it in `app.json` by hand.
 
 ### Build profiles (`apps/mobile/eas.json`)
 
@@ -277,7 +284,8 @@ The invite lives on the in-memory server, so it works only while the app runs. A
 | "Port 8081 is in use" | Another Metro is running. Close it, or say yes to use another port. |
 | Android: "SDK location not found" or `JAVA_HOME is not set` | Set `ANDROID_HOME` and `JAVA_HOME` (part 3) and open a new terminal. |
 | Android: "No Android connected device found" | Start the emulator in Android Studio's **Device Manager** first. |
-| EAS: "EAS project not configured" | Run `eas init` once (part 4). |
+| EAS: "EAS project not configured" | Run `eas` from `apps/mobile`, where `app.json` is (part 4). |
+| EAS: "does not satisfy the CLI version constraint" | Your `eas-cli` is too old. Run `npm install --global eas-cli`. |
 | EAS: iOS `development` build asks for an Apple Developer account | Expected. Use `development-simulator`, or build locally with Xcode (part 2). |
 | EAS: build limit reached | Wait for the monthly reset, or build locally (parts 1–3). |
-| CI `format:check` fails after `eas init` | Run `pnpm format` in the repo root and commit. |
+| CI `format:check` fails after an EAS command changed `app.json` | Run `pnpm format` in the repo root and commit. |
