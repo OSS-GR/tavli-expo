@@ -169,11 +169,13 @@ test checks < 2 s. Over 30 random positions per game: Portes median 34 ms
 (worst 200 ms), Plakoto 87 ms (313 ms), Fevga 35 ms (140 ms), Asodio
 3 ms (1.1 s). Acey-Deucey was slow: median 0.45 s, worst 7 s. Its rules
 are not the net's, so it uses the Asodio heuristic, which cost about
-0.2–0.4 ms per position against 0.03 ms for the Portes net (about 4–5×
-less since #225, see below). Hermes on a phone is several times slower
-than Node, so a 2-ply hint fits the 1 s phone budget for Portes, Plakoto
-and Fevga, but not yet for Asodio. The bot's own play (`chooseTurn`)
-stays 1-ply.
+0.2–0.4 ms per position against 0.03 ms for the Portes net. Since #225
+it costs 4–4.9× less in Acey-Deucey and 2.4× less in the owner version
+(see the table below). Hermes on a phone is several times slower than
+Node, so a 2-ply hint fits the 1 s phone budget for Portes, Plakoto and
+Fevga. For Asodio it does not yet: after #225 the worst 2-ply hint we saw
+still takes 0.5–0.7 s in Node in Acey-Deucey, which is several seconds on
+a phone. The bot's own play (`chooseTurn`) stays 1-ply.
 
 **In the app (#219).** The Hint asks for 2 ply in Portes, Plakoto and
 Fevga, and for 1 ply in Asodio (every preset): `hintPlies` in
@@ -214,8 +216,10 @@ Almost all of the time is the shot count (`asodio-shots.ts`). It now plays
 moves in place and takes them back, shares the work of the 15 rolls with
 two different dice, and skips branches that cannot land on a target. The
 golden test (`asodio-heuristic.golden.test.ts`) checks that every score
-stays exactly the same. The Acey-Deucey presets gain 4–5×. The owner
-version gains about 2.5×: there, most of the time is the search of the
+stays exactly the same, and `asodio-shots.test.ts` compares the new shot
+count with the first one (`src/testing/asodio-shots-reference.ts`) on
+about 30,000 positions. The Acey-Deucey presets gain 4–4.9× per position.
+The owner version gains 2.4×: there, most of the time is the search of the
 doubles under the quarter lock, and a stronger cut there would need new
 rules about the army in the search, which could change a score. The
 Asodio net (hard, owner version) uses the same shot count, so it is faster

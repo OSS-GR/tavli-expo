@@ -45,8 +45,6 @@ export interface AsodioShots {
   readonly lock: number;
 }
 
-const NO_SHOTS: AsodioShots = { any: 0, perBlot: new Array<number>(25).fill(0), lock: 0 };
-
 /** True when the waiter's checker on its own point `q` can be pinned (or hit). */
 export function isTarget(roller: AsodioSide, waiter: AsodioSide, q: number, pin: boolean): boolean {
   if ((waiter[q] ?? 0) !== 1) return false;
@@ -70,9 +68,10 @@ function emptyContext(): MutableMoveContext {
 
 /**
  * The work space of one shot count. One instance serves every call: the
- * count never calls itself and JavaScript runs one call at a time, so it
- * allocates no arrays on the hot path. Every call sets all of it up again,
- * so the result depends only on the call's input.
+ * count never calls itself and JavaScript runs one call at a time, so the
+ * search allocates no arrays. Each call allocates only its result. Every
+ * call sets all of the work space up again, so the result depends only on
+ * the call's input.
  */
 class ShotSearch {
   /** Working copies of the roller and the waiter: moves are played and taken back. */
@@ -109,6 +108,9 @@ class ShotSearch {
   readonly pairFound: boolean[] = new Array<boolean>(49).fill(false);
   /** The roll cannot move at all (`rollGated`). */
   readonly gated: boolean[] = new Array<boolean>(49).fill(false);
+
+  /** Rolls that ran the first version, over all calls (for tests). */
+  fallbacks = 0;
 
   /** True when nothing more can change the result of this roll. */
   done(): boolean {
@@ -345,7 +347,8 @@ class ShotSearch {
         watch.push(t);
       }
     }
-    if (this.targets === 0) return NO_SHOTS;
+    // A new result each time: a caller may keep or change it.
+    if (this.targets === 0) return { any: 0, perBlot: new Array<number>(25).fill(0), lock: 0 };
     this.options = options;
     for (let i = 0; i < 51; i += 1) {
       me[i] = roller[i] ?? 0;
@@ -399,6 +402,7 @@ class ShotSearch {
       }
       if (this.found || fallback) {
         // A new target: the order of the search matters, so run the first version.
+        this.fallbacks += 1;
         if (!belowReady) {
           const below = this.below;
           for (let t = 1; t <= 25; t += 1) below[t] = (below[t - 1] ?? 0) + (start[t] ? 1 : 0);
@@ -424,6 +428,14 @@ class ShotSearch {
 }
 
 const SEARCH = new ShotSearch();
+
+/**
+ * How many rolls ran the first version (a new target was possible), over
+ * all calls so far. For tests: they check that the fallback really runs.
+ */
+export function asodioShotFallbacks(): number {
+  return SEARCH.fallbacks;
+}
 
 /**
  * Counts the shots of `roller` at the lone checkers of `waiter`. Both in
