@@ -17,7 +17,7 @@
  */
 import { TURN_TIME_MS, type GameTransport } from '@tavli/contracts';
 import { opponent, type PlayerId, type PresetId } from '@tavli/engine';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -132,14 +132,31 @@ function OnlineBoard({
   const [overlay, setOverlay] = useState<Overlay>('none');
   const close = () => setOverlay('none');
 
+  // Resign match while your turn is on its way: the store takes no action
+  // then, so the resign waits and goes as soon as the call is done.
+  const resignWaits = useRef(false);
+  useEffect(() => {
+    if (sending || !resignWaits.current) return;
+    resignWaits.current = false;
+    store.getState().dispatch({ type: 'resignMatch', player: side });
+  }, [sending, store, side]);
+
   // The clock: a new time each second live, each half minute async. It
   // ticks only while a clock shows: not after the match.
   const pace = view?.pace ?? 'live';
   const ticking = view !== null && view.status !== 'finished' && view.waitingFor !== null;
-  const [clockNow, setClockNow] = useState(now);
+  // The clock reads the phone time again for each new view (and so when
+  // it starts ticking), not only on the next tick: an async tick is 30 s.
+  const version = view?.version ?? -1;
+  const [clock, setClock] = useState(() => ({ version, at: now() }));
+  if (clock.version !== version) setClock({ version, at: now() });
+  const clockNow = clock.at;
   useEffect(() => {
     if (!ticking) return;
-    const timer = setInterval(() => setClockNow(now()), clockTickMs(pace));
+    const timer = setInterval(
+      () => setClock((c) => ({ version: c.version, at: now() })),
+      clockTickMs(pace),
+    );
     return () => clearInterval(timer);
   }, [pace, now, ticking]);
 
@@ -252,7 +269,8 @@ function OnlineBoard({
         cancelLabel={t('game.resign.keep')}
         onConfirm={() => {
           // The server ends the match; its view opens match end.
-          store.getState().dispatch({ type: 'resignMatch', player: side });
+          const sent = store.getState().dispatch({ type: 'resignMatch', player: side });
+          if (!sent && store.getState().sending) resignWaits.current = true;
           close();
         }}
         onCancel={close}

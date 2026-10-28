@@ -45,6 +45,16 @@ export type WinType = 'mono' | 'diplo' | 'points' | 'perChecker';
  * With `perChecker` scoring every win is `perChecker`, whatever the points:
  * there is no mono or diplo, and the screens count the checkers instead.
  */
+export function winType(
+  result: { readonly points: number },
+  scoring: RuleSet['scoring']['method'] = 'tavli',
+): WinType {
+  if (scoring === 'perChecker') return 'perChecker';
+  if (result.points === 1) return 'mono';
+  if (result.points === 2) return 'diplo';
+  return 'points';
+}
+
 /**
  * How the match scored a finished game: the scoring of that game's own
  * rules in the match (`gameRules`), not of the game on the board now. The
@@ -56,16 +66,6 @@ export function recordScoring(match: Match, record: GameRecord): RuleSet['scorin
   return variant === undefined
     ? match.rules.scoring.method
     : gameRules(match, variant).scoring.method;
-}
-
-export function winType(
-  result: { readonly points: number },
-  scoring: RuleSet['scoring']['method'] = 'tavli',
-): WinType {
-  if (scoring === 'perChecker') return 'perChecker';
-  if (result.points === 1) return 'mono';
-  if (result.points === 2) return 'diplo';
-  return 'points';
 }
 
 /**

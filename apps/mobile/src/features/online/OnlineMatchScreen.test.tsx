@@ -233,6 +233,48 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     announce.mockRestore();
   });
 
+  it('resigns the match while your turn is on its way: the resign goes after it', async () => {
+    const user = setupUser();
+    // Your turn waits on the way until `deliver()`.
+    let deliver: (() => void) | null = null;
+    const game = await openGame('portes', 'live', 5, 30_000, (server) => {
+      const real = server.transportFor('me');
+      return {
+        subscribe: (id, onView, onError) => real.subscribe(id, onView, onError),
+        sendTurn: (request) =>
+          new Promise<void>((resolve, reject) => {
+            deliver = () => {
+              real.sendTurn(request).then(resolve, reject);
+            };
+          }),
+        sendAnswer: (request) => real.sendAnswer(request),
+        resign: (id) => real.resign(id),
+      };
+    });
+    await untilYourTurn(game);
+    await playTurnByTaps(game);
+    await user.press(screen.getByTestId('confirm-button'));
+    expect(screen.getByTestId('online-wait')).toHaveTextContent('Sending your turn…');
+
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByTestId('menu-resign-match'));
+    await user.press(screen.getByRole('button', { name: 'Resign' }));
+    // Not yet: the turn is still on its way.
+    expect(view(game).status).toBe('active');
+
+    // The turn arrives, then the resign.
+    await act(async () => {
+      deliver!();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(view(game).game.lastTurn?.player).toBe('white');
+    expect(view(game).status).toBe('finished');
+    expect(view(game).match.resignedBy).toBe('white');
+    expect(game.onMatchOver).toHaveBeenCalledTimes(1);
+  });
+
   it('resigns the match from the menu, then opens match end', async () => {
     const user = setupUser();
     const game = await openGame();

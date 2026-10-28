@@ -15,6 +15,7 @@
  * (`router.replace`), so "back" does not return to a finished board.
  */
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -28,6 +29,7 @@ import {
   reviewHref,
   rulesHref,
 } from '@/features/match/routes';
+import { stopDevGame } from '@/features/online/devGame';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
 import { gameTransportFor, onlinePlayerId } from '@/services';
 
@@ -40,6 +42,9 @@ export default function GameRoute() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = parseIdParam(params.id);
   const focused = useIsFocused();
+  // A dev game vs the bot (#255) stops when its board closes: nobody can
+  // open it again. Other games go on.
+  useEffect(() => () => stopDevGame(id ?? undefined), [id]);
 
   if (id !== null && !isLocalGameId(id)) {
     return (

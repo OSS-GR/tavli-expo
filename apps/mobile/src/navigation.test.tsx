@@ -13,7 +13,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
-import { stopDevGame } from '@/features/online/devGame';
+import { DEV_TICK_MS, devGameRunning, stopDevGame } from '@/features/online/devGame';
 import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
@@ -754,6 +754,23 @@ describe('online games (#255)', () => {
     expect(await screen.findByText('This game could not be opened.')).toBeOnTheScreen();
   });
 
+  it('stops the dev game (bot and turn timers) when its board closes', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const gameId = router.getPathname().split('/').at(-1)!;
+    expect(devGameRunning()).toBe(true);
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByTestId('menu-exit'));
+    expect(router.getPathname()).toBe('/');
+    // The game is not over, but nobody plays it now.
+    expect(onlineServer().getGame(gameId)?.status).toBe('active');
+    expect(devGameRunning()).toBe(false);
+  });
+
   it('starts a dev game vs the bot, resigns it and opens match end', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
@@ -762,7 +779,7 @@ describe('online games (#255)', () => {
     const board = router.getPathname();
     expect(board).toMatch(/^\/game\/game-\d+$/);
     const gameId = board.split('/').at(-1)!;
-    expect(onlineServer.getGame(gameId)).toMatchObject({ choice: 'portes', pace: 'live' });
+    expect(onlineServer().getGame(gameId)).toMatchObject({ choice: 'portes', pace: 'live' });
     expect(
       await screen.findByTestId('game-board', { includeHiddenElements: true }),
     ).toBeOnTheScreen();
@@ -820,11 +837,11 @@ describe('invites (#256)', () => {
     expect(board).toMatch(/^\/game\/game-\d+$/);
     const gameId = board.split('/').at(-1)!;
     // The bot made the invite, so it plays White.
-    expect(onlineServer.getGame(gameId)).toMatchObject({
+    expect(onlineServer().getGame(gameId)).toMatchObject({
       choice: 'portes',
       players: { white: 'bot', black: 'me' },
     });
-    expect(onlineServer.getInvite(code)).toMatchObject({ status: 'accepted', gameId });
+    expect(onlineServer().getInvite(code)).toMatchObject({ status: 'accepted', gameId });
     expect(
       await screen.findByTestId('game-board', { includeHiddenElements: true }),
     ).toBeOnTheScreen();
@@ -837,13 +854,19 @@ describe('invites (#256)', () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
     const code = await openDevInvite(user);
+    expect(devGameRunning()).toBe(true);
     await user.press(await screen.findByRole('button', { name: 'Decline' }));
     expect(router.getPathname()).toBe('/');
-    expect(onlineServer.getInvite(code)?.status).toBe('declined');
+    expect(onlineServer().getInvite(code)?.status).toBe('declined');
+    // The dev invite sees the answer on its next tick, and stops.
+    await act(async () => {
+      jest.advanceTimersByTime(DEV_TICK_MS);
+    });
+    expect(devGameRunning()).toBe(false);
   });
 
   it('opens an invite link straight away, in any case', async () => {
-    const code = onlineServer.createInvite('friend', 'plakoto', 3, 'async');
+    const code = onlineServer().createInvite('friend', 'plakoto', 3, 'async');
     const router = await renderRouter('./src/app', {
       initialUrl: `/invite/${code.toLowerCase()}`,
     });

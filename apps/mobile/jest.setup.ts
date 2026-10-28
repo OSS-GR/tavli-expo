@@ -26,10 +26,11 @@ jest.mock('@/services', () => {
   const bot = createBot();
   // Online games (#255): one in-memory server with seeded dice. Its clock is
   // `Date.now`, which the fake timers move.
-  const onlineServer = createMemoryGameServer({
-    rng: createSeededRng(11),
-    now: () => Date.now(),
-  });
+  let memoryServer: ReturnType<typeof createMemoryGameServer> | null = null;
+  const onlineServer = () => {
+    memoryServer ??= createMemoryGameServer({ rng: createSeededRng(11), now: () => Date.now() });
+    return memoryServer;
+  };
   const transports = new Map();
   // Invites (#256) on the same server, so an accept starts a game there.
   const invitePorts = new Map();
@@ -46,11 +47,13 @@ jest.mock('@/services', () => {
     onlineServer,
     onlinePlayerId: 'me',
     gameTransportFor: (playerId: string) => {
-      if (!transports.has(playerId)) transports.set(playerId, onlineServer.transportFor(playerId));
+      if (!transports.has(playerId))
+        transports.set(playerId, onlineServer().transportFor(playerId));
       return transports.get(playerId);
     },
     invitesFor: (playerId: string) => {
-      if (!invitePorts.has(playerId)) invitePorts.set(playerId, onlineServer.invitesFor(playerId));
+      if (!invitePorts.has(playerId))
+        invitePorts.set(playerId, onlineServer().invitesFor(playerId));
       return invitePorts.get(playerId);
     },
   };

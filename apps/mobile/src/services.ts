@@ -119,11 +119,14 @@ export const analyzer: Analyzer = createAnalyzer();
  * The in-memory server runs no timers: whoever starts a game on it runs
  * `runDueTimeouts()` (the dev game does, `features/online/devGame.ts`). Its
  * dice come from `createLocalRng`, which is fine for a dev server only.
+ * It is built on first use, so a build that never opens an online game
+ * never makes it.
  */
-export const onlineServer: MemoryGameServer = createMemoryGameServer({
-  rng: createLocalRng(),
-  now: () => Date.now(),
-});
+let memoryServer: MemoryGameServer | null = null;
+export function onlineServer(): MemoryGameServer {
+  memoryServer ??= createMemoryGameServer({ rng: createLocalRng(), now: () => Date.now() });
+  return memoryServer;
+}
 
 /** The player id of this phone in online games, until sign-in (#131). */
 export const onlinePlayerId = 'me';
@@ -134,7 +137,7 @@ const transports = new Map<string, GameTransport>();
 export function gameTransportFor(playerId: string): GameTransport {
   let transport = transports.get(playerId);
   if (transport === undefined) {
-    transport = onlineServer.transportFor(playerId);
+    transport = onlineServer().transportFor(playerId);
     transports.set(playerId, transport);
   }
   return transport;
@@ -150,7 +153,7 @@ const invitePorts = new Map<string, Invites>();
 export function invitesFor(playerId: string): Invites {
   let invites = invitePorts.get(playerId);
   if (invites === undefined) {
-    invites = onlineServer.invitesFor(playerId);
+    invites = onlineServer().invitesFor(playerId);
     invitePorts.set(playerId, invites);
   }
   return invites;

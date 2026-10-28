@@ -18,7 +18,7 @@ import {
   type OnlineGamePace,
 } from '@tavli/contracts';
 import { Redirect, Stack, router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -27,7 +27,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { SegmentedControl } from '@/components/settings/SegmentedControl';
 import { inviteAppUrl, inviteUrl } from '@/features/invites/link';
 import { gameHref, inviteHref } from '@/features/match/routes';
-import { startDevGame, startDevInvite } from '@/features/online/devGame';
+import { startDevGame, startDevInvite, stopDevGame } from '@/features/online/devGame';
 import { botLevels, botRunner, createLocalRng, onlinePlayerId, onlineServer } from '@/services';
 
 const LENGTHS = ['1', '3', '5'] as const;
@@ -50,11 +50,15 @@ export default function DevOnlineRoute() {
   const [length, setLength] = useState<Length>('3');
   const [rng] = useState(createLocalRng);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  // The game or invite lives while this screen is in the stack (under its
+  // board or invite). When it closes (Home, or back), the bot and the
+  // timers stop.
+  useEffect(() => () => stopDevGame(), []);
 
   if (!__DEV__) return <Redirect href="/" />;
 
   const match = () => ({
-    server: onlineServer,
+    server: onlineServer(),
     choice,
     pace,
     targetPoints: Number(length),

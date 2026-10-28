@@ -7,11 +7,14 @@
  * in-memory server runs no timers, so the dev game calls
  * `runDueTimeouts()` every second: a turn timer that ran out ends that
  * game, as on the real server. One dev game runs at a time: a new one
- * stops the last one. A finished match stops by itself.
+ * stops the last one. A finished match stops by itself. The game also
+ * stops when its board closes (nobody can open it again) or when the dev
+ * screen closes.
  *
  * A dev invite (#256) works the same way: the bot makes an invite, and
  * when this phone accepts it, the bot plays the new game (the bot is the
- * inviter, so it plays White).
+ * inviter, so it plays White). The invite stops when the dev screen
+ * closes.
  */
 import { thinkingDelayMs } from '@tavli/bot';
 import type { BotRunner, Difficulty, OnlineGameChoice, OnlineGamePace } from '@tavli/contracts';
@@ -59,8 +62,8 @@ export interface DevGame {
   stop: () => void;
 }
 
-/** The dev game or dev invite that runs now. */
-let current: { stop: () => void } | null = null;
+/** The dev game or dev invite that runs now. A dev invite has no `gameId`. */
+let current: { readonly gameId?: string; stop: () => void } | null = null;
 
 /** Starts a dev game and returns its id. The game before it stops. */
 export function startDevGame(options: DevGameOptions): DevGame {
@@ -142,7 +145,16 @@ export function startDevInvite(options: DevMatchOptions): DevInvite {
   return invite;
 }
 
-/** Stops the running dev game or dev invite, if any (tests call it after each test). */
-export function stopDevGame(): void {
-  current?.stop();
+/**
+ * Stops the running dev game or dev invite, if any: its timers and its
+ * bot. With `gameId`, only when the running game is that one (a dev invite
+ * then keeps running).
+ */
+export function stopDevGame(gameId?: string): void {
+  if (gameId === undefined || current?.gameId === gameId) current?.stop();
+}
+
+/** Is a dev game or dev invite running (its timers, and a game's bot)? */
+export function devGameRunning(): boolean {
+  return current !== null;
 }
