@@ -64,6 +64,7 @@ function RootStack() {
           <Stack.Screen name="game/[id]/match-end" />
           <Stack.Screen name="game/[id]/review" options={{ headerShown: true }} />
           <Stack.Screen name="dev/board" />
+          <Stack.Screen name="dev/online" />
         </Stack.Protected>
         <Stack.Protected guard={welcome} redirectTo="/">
           {/* No swipe back out of the first step before the user answers. */}

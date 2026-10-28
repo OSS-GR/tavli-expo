@@ -75,7 +75,11 @@ export function FlightChecker({
   onDone: (id: string) => void;
 }) {
   const progress = useSharedValue(0);
+  const shown = useSharedValue(flight.hiddenMs === undefined ? 1 : 0);
   useEffect(() => {
+    if (flight.hiddenMs !== undefined) {
+      shown.set(withDelay(flight.hiddenMs, withTiming(1, { duration: 0 })));
+    }
     progress.set(
       withDelay(
         flight.delay,
@@ -99,7 +103,7 @@ export function FlightChecker({
     return [{ translateX: pose.x }, { translateY: pose.y }, { scale: pose.r }];
   });
   return (
-    <Group transform={transform}>
+    <Group transform={transform} opacity={shown}>
       <UnitChecker theme={theme} owner={flight.owner} />
     </Group>
   );

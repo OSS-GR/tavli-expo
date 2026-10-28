@@ -13,6 +13,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
 import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
+import { devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
 import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
@@ -22,7 +23,7 @@ import { settingsStore } from '@/features/settings/store';
 import { LESSON_SETS, LESSONS } from '@/features/tutorial/lessons';
 import { TUTORIAL_STORAGE_KEY, tutorialStorageKey } from '@/features/tutorial/progress';
 import { tutorialStore } from '@/features/tutorial/store';
-import { analytics, storage } from '@/services';
+import { analytics, onlineServer, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../test/clock';
 import { nativePath } from '../test/nativeParent';
@@ -742,5 +743,66 @@ describe('tutorial from Settings (#159)', () => {
     expect(router.getPathname()).toBe('/tutorial');
     expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'asodio' });
     expect(screen.getByRole('header', { name: 'Learn Asodio' })).toBeOnTheScreen();
+  });
+});
+
+describe('online games (#255)', () => {
+  afterEach(() => stopAnyDevGame());
+
+  it('shows "could not be opened" for an unknown online game', async () => {
+    await renderRouter('./src/app', { initialUrl: '/game/game-nope' });
+    expect(await screen.findByText('This game could not be opened.')).toBeOnTheScreen();
+  });
+
+  it('stops the dev game (bot and turn timers) when its board closes', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const gameId = router.getPathname().split('/').at(-1)!;
+    expect(devGameRunning()).toBe(true);
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByTestId('menu-exit'));
+    expect(router.getPathname()).toBe('/');
+    // The game is not over, but nobody plays it now.
+    expect(onlineServer().getGame(gameId)?.status).toBe('active');
+    expect(devGameRunning()).toBe(false);
+  });
+
+  it('starts a dev game vs the bot, resigns it and opens match end', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
+    await user.press(screen.getByRole('radio', { name: '1' }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const board = router.getPathname();
+    expect(board).toMatch(/^\/game\/game-\d+$/);
+    const gameId = board.split('/').at(-1)!;
+    expect(onlineServer().getGame(gameId)).toMatchObject({ choice: 'portes', pace: 'live' });
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    // Online games stay out of the save slot.
+    expect(storage.getString(SAVED_MATCH_KEY)).toBeUndefined();
+    expect(matchSessions.current()).toBeNull();
+
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: /^Resign match/ }));
+    await user.press(screen.getByRole('button', { name: 'Resign' }));
+    await act(async () => {
+      jest.advanceTimersByTime(MATCH_END_DELAY_MS);
+    });
+    expect(router.getPathname()).toBe(`${board}/match-end`);
+    expect(
+      await screen.findByRole('header', { name: 'Opponent wins the match!' }),
+    ).toBeOnTheScreen();
+    expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
+    // No rematch online, and no History record.
+    expect(screen.queryByRole('button', { name: /^Rematch/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Change settings' })).toBeNull();
+    expect(historyStore.getState().records).toEqual([]);
+    await user.press(screen.getByRole('button', { name: 'Home' }));
+    expect(router.getPathname()).toBe('/');
   });
 });

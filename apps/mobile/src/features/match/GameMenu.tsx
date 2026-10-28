@@ -58,7 +58,8 @@ export interface GameMenuProps {
   resignGameHint: string | null;
   resignMatchHint: string | null;
   rulesLabel: string;
-  onResignGame: () => void;
+  /** Without it there is no Resign game row: online you resign the whole match (#255). */
+  onResignGame?: () => void;
   onResignMatch: () => void;
   onRules: () => void;
   onSettings: () => void;
@@ -80,14 +81,16 @@ export function GameMenu(props: GameMenuProps) {
         </Text>
       ) : null}
       <Text style={styles.summary}>{props.summary}</Text>
-      <MenuRow
-        testID="menu-resign-game"
-        icon="!"
-        title={t('game.menu.resignGame')}
-        {...(props.resignGameHint ? { hint: props.resignGameHint } : {})}
-        disabled={props.resignGameHint === null}
-        onPress={props.onResignGame}
-      />
+      {props.onResignGame ? (
+        <MenuRow
+          testID="menu-resign-game"
+          icon="!"
+          title={t('game.menu.resignGame')}
+          {...(props.resignGameHint ? { hint: props.resignGameHint } : {})}
+          disabled={props.resignGameHint === null}
+          onPress={props.onResignGame}
+        />
+      ) : null}
       <MenuRow
         testID="menu-resign-match"
         icon="!!"

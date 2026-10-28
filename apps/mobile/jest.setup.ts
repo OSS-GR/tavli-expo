@@ -22,7 +22,16 @@ jest.mock('@/services', () => {
   const { createSeededRng } = jest.requireActual('@tavli/engine');
   const { InlineBotRunner, createAnalyzer, createBot } = jest.requireActual('@tavli/bot');
   const { botLevelsByGame } = jest.requireActual('@/features/bot/levels');
+  const { createMemoryGameServer } = jest.requireActual('@tavli/online');
   const bot = createBot();
+  // Online games (#255): one in-memory server with seeded dice. Its clock is
+  // `Date.now`, which the fake timers move.
+  let memoryServer: ReturnType<typeof createMemoryGameServer> | null = null;
+  const onlineServer = () => {
+    memoryServer ??= createMemoryGameServer({ rng: createSeededRng(11), now: () => Date.now() });
+    return memoryServer;
+  };
+  const transports = new Map();
   return {
     storage: createMemoryStorage(),
     feedback: createRecordingFeedback(),
@@ -33,6 +42,13 @@ jest.mock('@/services', () => {
     botRunner: new InlineBotRunner(bot),
     botLevels: botLevelsByGame(bot),
     analyzer: createAnalyzer(),
+    onlineServer,
+    onlinePlayerId: 'me',
+    gameTransportFor: (playerId: string) => {
+      if (!transports.has(playerId))
+        transports.set(playerId, onlineServer().transportFor(playerId));
+      return transports.get(playerId);
+    },
   };
 });
 
