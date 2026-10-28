@@ -2,7 +2,7 @@ import { INVITE_TIME_MS, type InviteView } from '@tavli/contracts';
 
 import i18n from '@/i18n';
 
-import { inviteClockOffset, inviteRowText, openInvites } from './myInvites';
+import { inviteClockOffset, inviteRowText } from './myInvites';
 
 const NOW = Date.UTC(2026, 9, 28, 12, 0, 0);
 const HOUR = 60 * 60 * 1000;
@@ -34,26 +34,6 @@ describe('inviteClockOffset', () => {
   });
 });
 
-describe('openInvites', () => {
-  it('keeps the open invites before their expiresAt, in order', () => {
-    const soon = invite('A', { expiresAt: NOW + 1 });
-    const later = invite('B');
-    expect(openInvites([later, soon], NOW, 0)).toEqual([later, soon]);
-  });
-
-  it('hides an invite at its expiresAt, on the server clock', () => {
-    const due = invite('A', { expiresAt: NOW });
-    const ahead = invite('B', { expiresAt: NOW + 1000 });
-    expect(openInvites([due, ahead], NOW, 0)).toEqual([ahead]);
-    // The server clock is a second ahead of the phone.
-    expect(openInvites([due, ahead], NOW, 1000)).toEqual([]);
-  });
-
-  it('hides an invite that is no longer open', () => {
-    expect(openInvites([invite('A', { status: 'accepted', gameId: 'g' })], NOW, 0)).toEqual([]);
-  });
-});
-
 describe('inviteRowText', () => {
   it('shows the game, the length, the pace, the time left and the code', () => {
     const text = inviteRowText(invite('ABCD2345'), i18n.t, NOW, 0);
@@ -76,6 +56,17 @@ describe('inviteRowText', () => {
     expect(inviteRowText(invite('A'), i18n.t, NOW, 2 * HOUR).line).toBe('Live · 21 h left');
   });
 
+  it('says "Expiring now" once the time is up, never a zero or negative time', () => {
+    const due = invite('A', { expiresAt: NOW });
+    expect(inviteRowText(due, i18n.t, NOW, 0)).toMatchObject({
+      line: 'Live · Expiring now',
+      label: 'Invite, Portes, first to 3 points, Live, Expiring now',
+    });
+    expect(inviteRowText(due, i18n.t, NOW + HOUR, 0).line).toBe('Live · Expiring now');
+    // A second left still counts as a minute.
+    expect(inviteRowText(due, i18n.t, NOW - 1000, 0).line).toBe('Live · 1 min left');
+  });
+
   it('shows Greek', async () => {
     await i18n.changeLanguage('el');
     try {
@@ -86,6 +77,8 @@ describe('inviteRowText', () => {
         code: 'Κωδικός ABCD2345',
         label: 'Πρόσκληση, Πλακωτό, έως 3 βαθμούς, Ζωντανά, Λήγει σε 23 ώρες',
       });
+      const due = invite('A', { expiresAt: NOW });
+      expect(inviteRowText(due, i18n.t, NOW, 0).line).toBe('Ζωντανά · Λήγει τώρα');
     } finally {
       await i18n.changeLanguage('en');
     }

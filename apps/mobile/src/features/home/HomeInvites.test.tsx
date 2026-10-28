@@ -19,6 +19,7 @@ runOnFakeTimers();
 const ME = 'guest-1';
 const FRIEND = 'bob';
 const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
 
 function signIn(): void {
   onlineFake.authStore.session = { id: ME, isGuest: true };
@@ -41,6 +42,22 @@ async function show(port: Invites = invites!, onOpen = jest.fn()) {
   await render(<HomeInvites auth={auth!} invites={port} focused onOpen={onOpen} />);
   await flush();
   return { onOpen };
+}
+
+/**
+ * The phone clock runs `ms` ahead of the server: the port gives the
+ * server's times that much earlier than the phone reads them.
+ */
+function serverBehind(ms: number): Invites {
+  return {
+    ...invites!,
+    watchMyInvites(onList, onError) {
+      return invites!.watchMyInvites(
+        (list) => onList(list.map((view) => ({ ...view, expiresAt: view.expiresAt - ms }))),
+        onError,
+      );
+    },
+  };
 }
 
 /** The codes of the rows, top to bottom. */
@@ -106,7 +123,7 @@ describe('<HomeInvites />', () => {
     expect(screen.queryByTestId('home-invites')).toBeNull();
   });
 
-  it('hides an invite at its expiresAt on the phone clock, before the server says so', async () => {
+  it('keeps an invite until the server drops it, and says "Expiring now" when the phone says the time is up', async () => {
     signIn();
     const code = newInvite();
     await show();
@@ -116,37 +133,116 @@ describe('<HomeInvites />', () => {
       jest.setSystemTime(Date.now() + INVITE_TIME_MS - 2 * MINUTE);
       jest.advanceTimersByTime(30_000);
     });
-    const row = screen.getByTestId(`home-invite-${code}`);
-    expect(within(row).getByText('Live · 2 min left')).toBeOnTheScreen();
+    expect(
+      within(screen.getByTestId(`home-invite-${code}`)).getByText('Live · 2 min left'),
+    ).toBeOnTheScreen();
     await act(async () => {
       jest.advanceTimersByTime(2 * MINUTE);
     });
-    expect(onlineFake.server().getInvite(code)?.status).toBe('expired');
+    const row = screen.getByTestId(`home-invite-${code}`);
+    expect(row).toHaveAccessibleName('Invite, Portes, first to 3 points, Live, Expiring now');
+    expect(within(row).getByText('Live · Expiring now')).toBeOnTheScreen();
+    // The server marks it expired: the list drops it.
+    await act(async () => {
+      onlineFake.server().runDueTimeouts();
+    });
+    await flush();
     expect(screen.queryByTestId('home-invites')).toBeNull();
   });
 
-  it('shows nothing when the session does not load, and makes no guest', async () => {
+  it('a phone clock 2 h fast keeps an invite the server still lists, and it opens', async () => {
+    signIn();
+    const code = newInvite();
+    const user = setupUser();
+    const { onOpen } = await show(serverBehind(2 * HOUR));
+    expect(
+      within(screen.getByTestId(`home-invite-${code}`)).getByText('Live · 22 h left'),
+    ).toBeOnTheScreen();
+    // The server has an hour left; on the phone the time was up an hour ago.
+    await act(async () => {
+      jest.setSystemTime(Date.now() + INVITE_TIME_MS - HOUR);
+      jest.advanceTimersByTime(30_000);
+    });
+    await flush();
+    expect(onlineFake.server().getInvite(code)?.status).toBe('open');
+    const row = screen.getByTestId(`home-invite-${code}`);
+    expect(within(row).getByText('Live · Expiring now')).toBeOnTheScreen();
+    await user.press(row);
+    expect(onOpen).toHaveBeenCalledWith(code);
+  });
+
+  it('reads the phone clock again when Home comes back into view', async () => {
+    signIn();
+    const code = newInvite();
+    const props = { auth: auth!, invites: invites!, onOpen: jest.fn() };
+    const view = await render(<HomeInvites {...props} focused />);
+    await flush();
+    await view.rerender(<HomeInvites {...props} focused={false} />);
+    // Two hours away from Home: no clock ticks then.
+    await act(async () => {
+      jest.setSystemTime(Date.now() + 2 * HOUR);
+    });
+    await view.rerender(<HomeInvites {...props} focused />);
+    // At once, before any timer runs.
+    expect(
+      within(screen.getByTestId(`home-invite-${code}`)).getByText('Live · 22 h left'),
+    ).toBeOnTheScreen();
+  });
+
+  it('a new list reads the phone clock, also when the clock has not ticked', async () => {
+    signIn();
+    const old = newInvite();
+    const props = { auth: auth!, invites: invites!, onOpen: jest.fn() };
+    const view = await render(<HomeInvites {...props} focused />);
+    await flush();
+    await view.rerender(<HomeInvites {...props} focused={false} />);
+    await act(async () => {
+      jest.setSystemTime(Date.now() + 2 * HOUR);
+    });
+    onlineFake.server().createInvite(ME, 'portes', 3, 'live');
+    await flush();
+    expect(rowCodes()).toHaveLength(2);
+    expect(
+      within(screen.getByTestId(`home-invite-${old}`)).getByText('Live · 22 h left'),
+    ).toBeOnTheScreen();
+  });
+
+  it('a session that does not load shows the note, keeps the flag and makes no guest', async () => {
     // Better Auth's ready() gives null with no network too: no sign-out.
     rememberOnlineAccount();
     newInvite();
     await show();
-    expect(screen.queryByTestId('home-invites')).toBeNull();
+    expect(screen.getByTestId('home-invites-failed')).toBeOnTheScreen();
+    expect(screen.queryAllByTestId(/^home-invite-/)).toEqual([]);
     expect(onlineFake.authStore.guests).toBe(0);
     expect(hasOnlineAccount()).toBe(true);
   });
 
-  it('shows nothing when the list does not load', async () => {
+  it('a list that does not load shows a note, and Try again loads it', async () => {
     signIn();
-    newInvite();
-    const offline: Invites = {
+    const code = newInvite();
+    let calls = 0;
+    const flaky: Invites = {
       ...invites!,
-      watchMyInvites(_onList, onError) {
-        void Promise.resolve().then(() => onError?.(new Error('network request failed')));
-        return () => undefined;
+      watchMyInvites(onList, onError) {
+        calls += 1;
+        if (calls === 1) {
+          void Promise.resolve().then(() => onError?.(new Error('network request failed')));
+          return () => undefined;
+        }
+        return invites!.watchMyInvites(onList, onError);
       },
     };
-    await show(offline);
-    expect(screen.queryByTestId('home-invites')).toBeNull();
+    const user = setupUser();
+    await show(flaky);
+    expect(screen.getByRole('header', { name: 'Your invites' })).toBeOnTheScreen();
+    expect(screen.getByText('Your invites did not load. Check the connection.')).toBeOnTheScreen();
+    expect(rowCodes()).toEqual([]);
+    await user.press(screen.getByRole('button', { name: 'Try again, Your invites' }));
+    await flush();
+    expect(calls).toBe(2);
+    expect(rowCodes()).toEqual([code]);
+    expect(screen.queryByTestId('home-invites-failed')).toBeNull();
   });
 
   it('keeps the last list when the connection fails later', async () => {
@@ -192,6 +288,11 @@ describe('<HomeInvites />', () => {
     });
     expect(within(row).getByText('Πόρτες · έως 1 βαθμό')).toBeOnTheScreen();
     expect(within(row).getByText(`Κωδικός ${code}`)).toBeOnTheScreen();
+    await act(async () => {
+      jest.setSystemTime(Date.now() + INVITE_TIME_MS);
+      jest.advanceTimersByTime(30_000);
+    });
+    expect(within(row).getByText('Χαλαρά · Λήγει τώρα')).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');
     });

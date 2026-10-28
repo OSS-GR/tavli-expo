@@ -195,9 +195,10 @@ export interface Invites {
    * `onError`: `InviteErrorData` from the server (`NOT_SIGNED_IN`), or a
    * network error as it is.
    *
-   * The list changes when the server marks an invite `expired`, not when
-   * the time passes: a client that shows the list hides an invite at its
-   * `expiresAt` itself.
+   * The list changes when the server marks an invite `expired` (at
+   * `expiresAt`), not when the time passes. A client keeps each invite
+   * until the list drops it: the phone clock may be wrong, and the server
+   * still counts an invite it lists as open.
    */
   watchMyInvites(
     onList: (invites: readonly InviteView[]) => void,

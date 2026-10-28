@@ -59,8 +59,10 @@
       "gameSpoken_one": "{{game}}, first to {{count}} point",
       "gameSpoken_other": "{{game}}, first to {{count}} points",
       "left": "{{time}} left",
+      "expiring": "Expiring now",
       "code": "Code {{code}}",
-      "hint": "Opens the invite. Share it again, or cancel it."
+      "hint": "Opens the invite. Share it again, or cancel it.",
+      "failed": "Your invites did not load. Check the connection."
     },
     "learn": {
       "title": "Learn to play",

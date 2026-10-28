@@ -4,9 +4,14 @@
  * waiting screen can open it again or cancel the invite.
  *
  * The hook makes no account: with no saved session it shows nothing
- * (`useSessionWatch`). The rest is pure: which invites are still open on
- * the phone clock, and the row text. Never send the user id or a code to
- * analytics.
+ * (`useSessionWatch`). The rest is pure: the clock offset and the row
+ * text. Never send the user id or a code to analytics.
+ *
+ * The list is the server's: a row stays until the server list drops it
+ * (a friend answers, Cancel, or the scheduled `expireInvite` marks it
+ * expired; each one changes the row, so the Convex query runs again). The
+ * phone clock only gives the time left, so a wrong phone clock can never
+ * hide an invite the server still counts as open.
  */
 import { INVITE_TIME_MS, type AuthProvider, type InviteView, type Invites } from '@tavli/contracts';
 import type { TFunction } from 'i18next';
@@ -22,10 +27,13 @@ import {
 /**
  * The newest list, newest invite first. `offset` is the server clock minus
  * the phone clock, as far as the list tells (`inviteClockOffset`).
+ * `receivedAt` is the phone time the list came: a clock that has not
+ * ticked since is older than that.
  */
 export interface MyInvitesList {
   readonly invites: readonly InviteView[];
   readonly offset: number;
+  readonly receivedAt: number;
 }
 
 /** The states of `useSessionWatch`: signed out, loading, loaded (`MyInvitesList`) or failed. */
@@ -49,26 +57,10 @@ export function inviteClockOffset(invites: readonly InviteView[], localNow: numb
   return newest - localNow;
 }
 
-/**
- * The invites still open at phone time `localNow`. A Convex query does
- * not run again when time passes, and the phone may be offline when the
- * server marks an invite expired, so the phone hides one at its
- * `expiresAt` itself (the server counts it expired from then on too).
- */
-export function openInvites(
-  invites: readonly InviteView[],
-  localNow: number,
-  offset: number,
-): InviteView[] {
-  return invites.filter(
-    (invite) => invite.status === 'open' && invite.expiresAt > localNow + offset,
-  );
-}
-
 export interface InviteRowText {
   /** "Portes · first to 3 points". */
   readonly title: string;
-  /** "Live · 23 h left". */
+  /** "Live · 23 h left", or "Live · Expiring now" once the phone clock says the time is up. */
   readonly line: string;
   /** "Code ABCD2345". */
   readonly code: string;
@@ -76,7 +68,10 @@ export interface InviteRowText {
   readonly label: string;
 }
 
-/** The text of one row at phone time `localNow`. */
+/**
+ * The text of one row at phone time `localNow`. When the time is up on
+ * the phone, the row says "Expiring now" until the server list drops it.
+ */
 export function inviteRowText(
   invite: InviteView,
   t: TFunction,
@@ -87,7 +82,10 @@ export function inviteRowText(
   const count = invite.targetPoints;
   const pace = t(invite.pace === 'live' ? 'friend.live' : 'friend.async');
   const left = invite.expiresAt - (localNow + offset);
-  const time = t('home.invites.left', { time: clockText(left, 'async', t) });
+  const time =
+    left > 0
+      ? t('home.invites.left', { time: clockText(left, 'async', t) })
+      : t('home.invites.expiring');
   return {
     title: t('home.invites.game', { game, count }),
     line: `${pace} · ${time}`,
@@ -116,10 +114,10 @@ export function useMyInvites(
     [invites],
   );
   const toLoaded = useCallback(
-    (list: readonly InviteView[]): MyInvitesList => ({
-      invites: list,
-      offset: inviteClockOffset(list, now()),
-    }),
+    (list: readonly InviteView[]): MyInvitesList => {
+      const receivedAt = now();
+      return { invites: list, offset: inviteClockOffset(list, receivedAt), receivedAt };
+    },
     [now],
   );
   return useSessionWatch(auth, start, toLoaded);

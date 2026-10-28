@@ -672,6 +672,17 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     );
     expect(await screen.findAllByTestId(/^home-invite-/)).toHaveLength(2);
     expect(problems()).toEqual([]);
+    // A list that did not load: the note and Try again.
+    const failing = {
+      ...server.invitesFor('me'),
+      watchMyInvites: (_onList: unknown, onError?: (error: unknown) => void) => {
+        void Promise.resolve().then(() => onError?.(new Error('offline')));
+        return () => undefined;
+      },
+    };
+    await renderWithRoot(<HomeInvites auth={auth} invites={failing} focused onOpen={jest.fn()} />);
+    expect(await screen.findByTestId('home-invites-failed')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
   });
 
   it('the game review: busy, three mistakes with their switch, and "Well played" (#215, #230)', async () => {
