@@ -4,8 +4,11 @@
  *
  * It shows a finished match and never changes it. The route
  * (`app/game/[id]/match-end.tsx`) starts the rematch and navigates.
+ *
+ * An online match (#255) passes `online` instead of `setup`: its seats
+ * and label. It has no Rematch and no Change settings.
  */
-import { createRematch, type Match, type PlayerId } from '@tavli/engine';
+import { createRematch, type Match, type PerPlayer, type PlayerId } from '@tavli/engine';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -14,20 +17,41 @@ import { ActionButton } from '@/components/ActionButton';
 import { Celebration } from '@/features/game/Celebration';
 import { isHumanWin } from '@/features/game/gameFeedback';
 import { winType, type WinType } from '@/features/game/turnNotices';
+import type { Seat } from '@/features/game/seats';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 
 import { seatsFor } from './seats';
 import { HUMAN_SIDE, type MatchSetup } from './setup';
 import { matchLabel, timedOutBy, variantName } from './summary';
 
-export interface MatchEndScreenProps {
+/** An online match (#255): who sits where, and what the match was. */
+export interface OnlineMatchEnd {
+  readonly seats: PerPlayer<Seat>;
+  /** Your side. Only your win is celebrated. */
+  readonly me: PlayerId;
+  /** "Portes · online". */
+  readonly label: string;
+}
+
+interface LocalMatchEnd {
   setup: MatchSetup;
+  onRematch: () => void;
+  onChangeSettings: () => void;
+  online?: undefined;
+}
+
+interface OnlineEnd {
+  online: OnlineMatchEnd;
+  setup?: undefined;
+  onRematch?: undefined;
+  onChangeSettings?: undefined;
+}
+
+export type MatchEndScreenProps = (LocalMatchEnd | OnlineEnd) & {
   /** A finished match. */
   match: Match;
-  onRematch: () => void;
   /** "Review": the biggest mistakes of the last game (#215). */
   onReview?: () => void;
-  onChangeSettings: () => void;
   onHome: () => void;
   /**
    * Names this match for this app run (`matchKey` of its game store, #216):
@@ -35,7 +59,7 @@ export interface MatchEndScreenProps {
    * it, every time the screen mounts.
    */
   announceKey?: string;
-}
+};
 
 /**
  * The chip of a game row: Mono or Diplo. A Tavli backgammon (3 points) and
@@ -55,6 +79,7 @@ function winChipKey(type: WinType): 'matchEnd.mono' | 'matchEnd.diplo' | null {
 
 export function MatchEndScreen({
   setup,
+  online,
   match,
   onRematch,
   onReview,
@@ -63,11 +88,13 @@ export function MatchEndScreen({
   announceKey,
 }: MatchEndScreenProps) {
   const { t } = useTranslation();
-  const seats = seatsFor(setup, t);
+  const seats = online !== undefined ? online.seats : seatsFor(setup, t);
   const name = (player: PlayerId) => seats[player].name;
   const winner = match.winner ?? 'white';
   // Like the win jingle (`matchWin`): only a win by a person is celebrated.
-  const celebrate = isHumanWin(winner, setup.mode === 'bot' ? [HUMAN_SIDE] : undefined);
+  const humans =
+    online !== undefined ? [online.me] : setup.mode === 'bot' ? [HUMAN_SIDE] : undefined;
+  const celebrate = isHumanWin(winner, humans);
 
   const title = seats[winner].you
     ? t('game.end.matchWinner_you')
@@ -94,18 +121,20 @@ export function MatchEndScreen({
     blackScore: match.score.black,
   });
   const about = [
-    matchLabel(setup, t),
+    online !== undefined ? online.label : matchLabel(setup, t),
     t('home.continue.target', { target: match.targetPoints }),
   ].join(' · ');
 
   // The rematch starter comes from the engine (owner rule: the last winner).
   const starter = createRematch(match).nextStarter;
   const rematchHint =
-    starter === null
-      ? t('matchEnd.rematchHintOpening')
-      : seats[starter].you
-        ? t('matchEnd.rematchHint_you')
-        : t('matchEnd.rematchHint', { name: name(starter) });
+    online !== undefined
+      ? null
+      : starter === null
+        ? t('matchEnd.rematchHintOpening')
+        : seats[starter].you
+          ? t('matchEnd.rematchHint_you')
+          : t('matchEnd.rematchHint', { name: name(starter) });
 
   useAnnouncement(
     [title, reason, scoreLine].filter(Boolean).join(' '),
@@ -183,12 +212,14 @@ export function MatchEndScreen({
         ) : null}
       </ScrollView>
       <View style={styles.actions}>
-        <ActionButton
-          testID="rematch-button"
-          label={t('game.end.rematch')}
-          subtitle={rematchHint}
-          onPress={onRematch}
-        />
+        {onRematch && rematchHint !== null ? (
+          <ActionButton
+            testID="rematch-button"
+            label={t('game.end.rematch')}
+            subtitle={rematchHint}
+            onPress={onRematch}
+          />
+        ) : null}
         {onReview ? (
           <ActionButton
             testID="review-button"
@@ -197,12 +228,14 @@ export function MatchEndScreen({
             onPress={onReview}
           />
         ) : null}
-        <ActionButton
-          testID="change-settings-button"
-          label={t('game.end.changeSettings')}
-          kind="secondary"
-          onPress={onChangeSettings}
-        />
+        {onChangeSettings ? (
+          <ActionButton
+            testID="change-settings-button"
+            label={t('game.end.changeSettings')}
+            kind="secondary"
+            onPress={onChangeSettings}
+          />
+        ) : null}
         <ActionButton
           testID="end-home-button"
           label={t('game.end.home')}

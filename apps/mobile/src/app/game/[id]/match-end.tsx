@@ -1,8 +1,11 @@
 /**
  * Match end (wireframe 9). The board route opens it with `router.replace`
- * when the match is over. The finished match is no longer in the save slot
- * (`sessions.ts`), so it comes from memory. After an app restart it is gone
- * and the screen shows "This game could not be opened." with Home.
+ * when the match is over.
+ *
+ * - A local match is no longer in the save slot (`sessions.ts`), so it
+ *   comes from memory. After an app restart it is gone and the screen shows
+ *   "This game could not be opened." with Home.
+ * - An online game (#255) comes from the server, with no Rematch.
  */
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -10,7 +13,15 @@ import { useState } from 'react';
 import { matchSessions } from '@/features/match/appSessions';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
 import { MissingGame } from '@/features/match/MissingGame';
-import { gameHref, newGameHref, parseIdParam, reviewHref } from '@/features/match/routes';
+import {
+  gameHref,
+  isLocalGameId,
+  newGameHref,
+  parseIdParam,
+  reviewHref,
+} from '@/features/match/routes';
+import { OnlineMatchEnd } from '@/features/online/OnlineMatchEnd';
+import { gameTransportFor, onlinePlayerId } from '@/services';
 
 /** Back to Home: pops to it, or opens it when this was the first screen. */
 function goHome() {
@@ -20,6 +31,20 @@ function goHome() {
 export default function MatchEndRoute() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = parseIdParam(params.id);
+  if (id !== null && !isLocalGameId(id)) {
+    return (
+      <OnlineMatchEnd
+        gameId={id}
+        transport={gameTransportFor(onlinePlayerId)}
+        me={onlinePlayerId}
+        onHome={goHome}
+      />
+    );
+  }
+  return <LocalMatchEnd id={id} />;
+}
+
+function LocalMatchEnd({ id }: { id: string | null }) {
   // Read once: Rematch starts a new match in the same session before this
   // screen goes away, and the screen must not change under the user.
   const [opened] = useState(() => {

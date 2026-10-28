@@ -15,12 +15,14 @@ import {
   type BotRunner,
   type CrashReporter,
   type Feedback,
+  type GameTransport,
   type SoundPlayer,
   type Storage,
 } from '@tavli/contracts';
 import { createSentryCrashReporter } from '@tavli/crash-sentry';
 import { createSeededRng, type Rng } from '@tavli/engine';
 import { createExpoFeedback } from '@tavli/haptics-expo';
+import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
 import Constants from 'expo-constants';
 
@@ -103,3 +105,35 @@ export const botLevels: GameLevels = botLevelsByGame(bot);
  * uses the same evaluators as the bot (the variant's best one).
  */
 export const analyzer: Analyzer = createAnalyzer();
+
+/**
+ * Online games (#255). Online play waits for sign-in (#131), so for now
+ * every online game runs on one in-memory server for this app run
+ * (`@tavli/online`, no network), and this phone plays as `onlinePlayerId`.
+ * The dev route `app/dev/online.tsx` starts games on it vs the bot. When
+ * `EXPO_PUBLIC_CONVEX_URL` is set, the Convex adapter (#253) replaces this
+ * server here, and the player id comes from sign-in.
+ *
+ * The in-memory server runs no timers: whoever starts a game on it runs
+ * `runDueTimeouts()` (the dev game does, `features/online/devGame.ts`). Its
+ * dice come from `createLocalRng`, which is fine for a dev server only.
+ */
+export const onlineServer: MemoryGameServer = createMemoryGameServer({
+  rng: createLocalRng(),
+  now: () => Date.now(),
+});
+
+/** The player id of this phone in online games, until sign-in (#131). */
+export const onlinePlayerId = 'me';
+
+const transports = new Map<string, GameTransport>();
+
+/** The online game port for `playerId`. One transport per player for the app run. */
+export function gameTransportFor(playerId: string): GameTransport {
+  let transport = transports.get(playerId);
+  if (transport === undefined) {
+    transport = onlineServer.transportFor(playerId);
+    transports.set(playerId, transport);
+  }
+  return transport;
+}

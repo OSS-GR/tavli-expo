@@ -46,10 +46,13 @@ The game itself lives in `apps/mobile/src/features/game/`:
 | `seats.ts` | How each player is named on screen (name, strip label, turn pill, "you"). |
 | `GameScreen.tsx` | The board screen in the tall or the classic layout (#184): strips, board with the dice, cards and the button row. Vs bot it also runs the bot turn (`features/bot/botTurn.ts`). |
 
+The online game screen (#255) lives in `apps/mobile/src/features/online/`; see [Online mode](#online-mode-255).
+
 The Hint (#209) lives in `apps/mobile/src/features/hint/`: `hint.ts` (the best rest of the turn from the bot's Analyzer, and whether there is a choice; pure), `hintText.ts` (the words) and `hintAnalytics.ts` (the `hint_shown` event). See "Hint" below.
 
 The real route is `app/game/[id]/index.tsx`; match end is `app/game/[id]/match-end.tsx` (see [App shell](app-shell.md)). Dev route (release builds redirect it to Home):
 
+- `app/dev/online.tsx` (#255): a game vs the bot on the in-memory server. See [Online mode](#online-mode-255).
 - `app/dev/board.tsx`: the fixed positions (`positions.ts`: Portes start, mid-game, bear-off, Plakoto start, Plakoto pins, Fevga start, Asodio start, Asodio loading, Asodio frozen army), from White's and from Black's side. Each position has its direction (`SAMPLE_DIRECTIONS`). The Asodio positions show the frozen marks. The dice switch turns on the dice throw spike (`features/dice-throw`, #183, see [Dice throw spike](../design/dice-throw-spike.md)).
 
 **Game flow and ADR-0003.** The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. ADR-0003 records this (updated in #29).
@@ -302,6 +305,36 @@ The owner's play test: "Say I rolled a 2 and a 3. I should see what a 2 move and
 - No dashed "last move" arrow and no double-tap shortcut yet.
 - The dice lie on the board (#184), at least 32 pt (wireframe: about 44 pt in the controls row); in landscape in the right column (#185). The tutorial still shows its dice under the board, at 40 pt (in landscape in its left column).
 
+## Online mode (#255)
+
+The board route shows `MatchScreen` for a `local-…` id (`isLocalGameId` in `features/match/routes.ts`) and `OnlineMatchScreen` for any other id. Both put `GameScreen` at the same place in the tree, so the board keeps its native views (#185). The online store (`createOnlineStore`, see [App shell → Online games](app-shell.md#online-games-254)) holds the game. The server is the truth.
+
+| File (`features/online/`) | What it does |
+|---|---|
+| `OnlineMatchScreen.tsx` | The route's screen. It opens the store (`useOnlineGame`, keyed by the game id), shows "Loading the game…" until the first view, and "This game could not be opened." for a load error. Then `GameScreen` with its `online` prop, the menu, the resign dialog and the game-end sheet. |
+| `boardStore.ts` | `onlineBoardStore(store, gameId)`: the online store as a `BoardStore` (`flow`, `matchKey` `online:<gameId>`, `lastError`, `dispatch`), the part `GameScreen` reads. A new snapshot only when one of those changes. |
+| `remoteTurn.ts` | The other player's whole turn from `game.lastTurn`, replayed on the view before. `null` when the moves do not lead from it to the new board (a missed view, a new game): then the board just shows the new position. Pure. |
+| `clock.ts` | The time-left text: live in seconds ("42 s"), async in hours ("5 h"), and minutes in the last hour. Pure. |
+| `seats.ts` | "You" and "Opponent". The opponent's pill says "Waiting for Opponent". |
+| `OnlineMatchEnd.tsx` | Match end of an online match (`app/game/[id]/match-end.tsx`): `MatchEndScreen` with `online` (seats, side, label) and no Rematch or Change settings. A match that is not over goes back to the board. |
+| `onlineBot.ts`, `devGame.ts` | The bot as an online player, and the dev game (dev builds only). |
+
+What `GameScreen` does with `online`:
+
+- **Lock.** While the server waits for the other player, or a call is on its way (`sending`), the board, the move list and the buttons take no input. The other player's strip says "Waiting for Opponent", and the button row says "Waiting for Opponent…" (`online-wait`) or "Sending your turn…".
+- **Their turn flies.** A new view whose `lastTurn` is theirs (`remoteTurn`) flies each move from the board before, one after the other (`turnFlights` in `flights.ts`, `TURN_MOVE_GAP_MS` apart).
+- **No Roll button and no opening card.** The server rolls. A line in the hint row (`online-line`) says the opening roll ("You start with 5-3.") or a pass ("Opponent rolled 6-3. No checker can move."). It closes after `OPENING_RESULT_MS`.
+- **Time left** sits in the strip note of the player to move. It ticks each second live and every 30 s async (`clockTickMs`). It uses `timeLeft` with the store's clock offset, and never shows more than the pace's turn time.
+- **Notices.** A call the server refused, a stale version, a network error and your own time out show a card (`online-notice-card`) with OK. A time out also ends the game on the server: closing its game-end sheet clears the notice too.
+- **Between games.** When a game ends while the screen is open, the game-end sheet shows the newest record of `match.games` (winner, reason, points). Its button ("Next game", `next-game-button`) only closes the sheet: the server has already started the next game.
+- **Match end.** When the match is over, the screen waits `MATCH_END_DELAY_MS` and calls `onMatchOver`; the route opens match end with `router.replace`. The final score, no Rematch.
+- **Menu.** Rules, Settings, Resign match (`transport.resign` through the store's `resignMatch`). There is no game resign online. **Exit** leaves the game running: "The game goes on, and the clock keeps running."
+- **No Hint, no Review.** Online games stay out of the save slot and out of History.
+- **Screen readers.** The move list works on your turn, with Confirm. The other player's turn is read once (`onlineTurnAnnouncement`, keyed on the game and the view's `version`): "Opponent played: …. You rolled 5-3." The opening line is read the same way.
+- No analytics events yet.
+
+**Dev game** (`app/dev/online.tsx`, dev builds only; release builds go Home). Pick a game (the games with bot levels), a pace (live or async) and a match length, then **Start game**. `startDevGame` creates the game on the app's in-memory server (`onlineServer` in `services.ts`): this phone is `me` and plays White, the bot is `bot` and plays through its own transport (`startOnlineBot`, Medium when the game has it). The bot follows `waitingFor` and the questions, never "the players alternate", and thinks at least 1.5 s. The in-memory server runs no timers, so the dev game calls `runDueTimeouts()` every second. One dev game runs at a time. `gameTransportFor(playerId)` in `services.ts` gives one transport per player for the app run; the Convex adapter (#253) replaces the in-memory server when `EXPO_PUBLIC_CONVEX_URL` is set.
+
 ## Accessibility
 
 The Skia board takes no screen reader actions, so a screen reader user plays with buttons (#134). Code: `apps/mobile/src/features/accessibility/`.
@@ -354,6 +387,7 @@ How the mirror works:
 - The same checker after a hit (#179): `interaction.test.ts` checks that the hitter stays a source on its new point, drawn and touched at the same place, and that the flights hide only the hitter and the bar top. `GameScreen.hit.test.tsx` plays a hit and then the same checker on, by tap-tap, by drag and both mixed, in Portes (either die first), after a pin in Plakoto and in Fevga. The Reanimated mock ends each flight at once, so a screen test never sees a checker in the air. To touch the board during a flight, the test renders `InteractiveBoard` with the hit flights and an `onFlightDone` that does nothing. The engine side is in `portes-next-moves.test.ts`, `plakoto.test.ts` and `fevga-next-moves.test.ts`.
 - One checker with both dice (#180): `combined.test.ts` (the paths come only from the engine; the order rule with a hit and a pin on the way; doubles; a blocked step; bearing off; Fevga; random Portes, Plakoto, Fevga and Asodio games where every path replays legally and every two-step move of one checker is offered), `interaction.test.ts` (combined targets after the single ones, tap and drop, the mirrored board and the flip, `pathFlights` and its undo, the stops of `flightPose`), `BoardScene.test.tsx` (the dotted ring and the dots), `moveGroups.test.ts` (which moves one Undo takes back), `moveList.test.ts` (the buttons and their labels in en and el) and `GameScreen.combined.test.tsx` (by tap and by drag in Portes with and without a hit on the way, Plakoto with a pin on the way, Fevga, a double with one tap, auto-confirm, undo, the mirrored board, the flip and the fixed view for Black, the move list).
 - Hint (#209): `features/hint/hint.test.ts` (`hintPlies` and `hintRankOptions` per game and preset, also in a match (#219, #237); the best turn of the Analyzer before a move, the best reachable rest after one, the options it asks for at 1 and 2 ply, every game, the Acey-Deucey question, one-turn rolls, the words, the event), `hintMarks.test.ts` (rings, combined target, stacked ghosts) and `GameScreen.hint.test.tsx` (the hint matches `rankTurns` with `hintRankOptions`, and a Portes and an Asodio roll where 1 ply picks another turn show the 2-ply turn; when the button shows, the busy state, the marks and the line, cleared by a move, an undo and a second tap, Settings → Show hints, the move list button and the announcement, Greek). `MatchScreen.test.tsx` sends `hint_shown`.
+- Online (#255): `features/online/OnlineMatchScreen.test.tsx` (a Portes turn by taps and the bot's answer, the board locked on the bot's turn, a time out that ends the game and the next game, resign and `onMatchOver`), `onlineParts.test.ts` (`remoteTurn`, the clock text in en and el, `onlineBoardStore`, two bots playing whole matches of every game with bot levels), `announcements.test.ts` (the opening line and the other player's turn), `navigation.test.tsx` (an unknown online id; the dev game from `/dev/online` to match end, with no save and no History record) and `textScaling.test.tsx` (your turn with the clock, the game-end sheet, match end).
 - `GameScreen.timeout.test.tsx` (#170): the game-end sheet after a time-out (the name, "You", Greek, diplo and mono points) and the announcement read once.
 - `GameScreen.turn.test.tsx`: undo, confirm, auto-confirm, the turn indicator (flip and fixed), the strips without a pip count (portrait and landscape, English and Greek, #238), the pass card (yours waits for OK; the bot's closes after 3.5 s, or on OK, and waits while paused; the bot plays after your OK), the game-end sheet (diplo with reason, mono, celebration, announcement, Home), next game, and `onMatchOver` after the delay. `GameScreen.match.test.tsx` plays a whole match with taps only (to 1 by default; `FULL_MATCH=1` plays to 3) and ends on `onMatchOver`.
 - Plakoto and Fevga: `boardModel.test.ts` (pins under their pinners, the Plakoto start, the Fevga start and its same-way movement, drawing and hit-testing in portrait and landscape), `interaction.test.ts` (a pin's ghost, landing and flights), `BoardScene.test.tsx` (pin rings, the Fevga start) and `botTurn.test.ts` (the bot plays on). `GameScreen.variants.test.tsx` plays a whole Plakoto game and a whole Fevga game with taps only, and tests the mother card (play on, resign, board label, vs bot both ways).

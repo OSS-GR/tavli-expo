@@ -39,6 +39,15 @@
  * rings the moves on the board and shows them in a line. A move, an undo or
  * a second tap takes the hint away. The move list has the same button.
  *
+ * Online (#255, `online`): the server rolls the dice, passes a roll with no
+ * move, and starts the next game by itself. So there is no Roll button and
+ * no opening card: a short line says who starts. The other player is
+ * remote: while the server waits for them the board is locked, and their
+ * whole turn arrives at once and flies from `game.lastTurn`. A game the
+ * server has already ended shows its game-end sheet (`online.ended`) over
+ * the next game. The online screen (`features/online/OnlineMatchScreen`)
+ * gives the texts: the time left, the waiting line and its notices.
+ *
  * Game logic stays in the engine. This screen sends actions to the game
  * store and shows the result. Vs bot, the bot's turn runs here too
  * (`startBotTurn`), so its moves fly like a human's.
@@ -48,6 +57,7 @@ import type { BotRunner, Difficulty } from '@tavli/contracts';
 import {
   applyMoveToBoard,
   currentPrompt,
+  type GameRecord,
   type MatchFlow,
   type Move,
   type PerPlayer,
@@ -75,7 +85,7 @@ import { boardDiceBox, columnDiceBox } from '@/features/board/boardDice';
 import { pinnedCheckers, toneOf, type BoardView } from '@/features/board/boardModel';
 import { flowPaths } from '@/features/board/combined';
 import { DiceRow } from '@/features/board/DiceRow';
-import { moveFlights, pathFlights, type Flight } from '@/features/board/flights';
+import { moveFlights, pathFlights, turnFlights, type Flight } from '@/features/board/flights';
 import { boxRatioWithShadow, type BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { boardModeOf, useScreenLayout } from '@/features/board/screenLayout';
@@ -83,14 +93,21 @@ import { useDoubleReveal } from '@/features/board/useDoubleReveal';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { bestRest, hintHasChoice } from '@/features/hint/hint';
 import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
+import { remoteTurn } from '@/features/online/remoteTurn';
 import { useSettings } from '@/features/settings/store';
 
-import { turnAnnouncement } from './announcements';
+import {
+  onlineOpeningLine,
+  onlinePassLine,
+  onlineTurnAnnouncement,
+  stateHasChosenDouble,
+  turnAnnouncement,
+} from './announcements';
 import { DoubleChoices } from './DoubleChoices';
 import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, useGameFeedback } from './gameFeedback';
-import { diceView, turnView, useGameStore, type DieView, type GameStore } from './gameStore';
+import { diceView, turnView, useGameStore, type BoardStore, type DieView } from './gameStore';
 import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { isChoosingStarter, nextOpeningRoller, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
@@ -128,8 +145,44 @@ export interface BotSeat {
   readonly timing?: Partial<BotTiming>;
 }
 
+/** A game the server has already ended: it shows the next game (online, #255). */
+export interface OnlineEndedGame {
+  readonly record: GameRecord;
+  /** Names this game end for the whole app run, so it is read once (#216). */
+  readonly key: string;
+  /** The sheet's button: it closes the sheet. */
+  readonly onClose: () => void;
+}
+
+/** A card over the board, such as "Your time ran out" (online, #255). */
+export interface OnlineNoticeCard {
+  /** Names this notice for the whole app run, so it is read once (#216). */
+  readonly key: string;
+  readonly title: string;
+  readonly text: string;
+  readonly onClose: () => void;
+}
+
+/** An online game (#255). See the top of this file. */
+export interface OnlineSide {
+  /** Your side: it sits at the bottom, and only it moves on this phone. */
+  readonly me: PlayerId;
+  /** The version of the view on the board. Screen reader keys use it. */
+  readonly version: number;
+  /** The board is locked: the server waits for the other player, or your call is on its way. */
+  readonly locked: boolean;
+  /** The text in place of the buttons while the board is locked: "Waiting for Opponent…". */
+  readonly status: string;
+  /** The time left on the strip of the player the server waits for: "42 s". */
+  readonly clock: { readonly player: PlayerId; readonly text: string } | null;
+  /** The game-end sheet of the game that just ended. */
+  readonly ended: OnlineEndedGame | null;
+  readonly notice: OnlineNoticeCard | null;
+}
+
 export interface GameScreenProps {
-  store: GameStore;
+  /** A local match (`GameStore`), or an online game (`features/online/boardStore.ts`). */
+  store: BoardStore;
   /**
    * `perPlayer`: each player taps for their own opening die (pass-and-play).
    * `one`: one tap rolls both (vs bot).
@@ -171,6 +224,8 @@ export interface GameScreenProps {
   analyzer?: Analyzer;
   /** A hint was shown (for the `hint_shown` event). */
   onHintShown?: () => void;
+  /** An online game (#255): the server rolls, and the other player is remote. */
+  online?: OnlineSide;
 }
 
 const other = (player: PlayerId): PlayerId => (player === 'white' ? 'black' : 'white');
@@ -191,6 +246,7 @@ export function GameScreen({
   nextGameLabel,
   analyzer,
   onHintShown,
+  online,
 }: GameScreenProps) {
   const { t } = useTranslation();
   const theme = useBoardTheme();
@@ -216,9 +272,15 @@ export function GameScreen({
   const rules = game.state.rules;
   const direction = rules.movement.direction;
   const botPlayer = bot?.player ?? null;
+  // Online (#255): your side. The other side plays on another phone.
+  const me = online?.me ?? null;
   // Sound and haptics: moves, rolls and wins play by themselves (from the engine
   // log). Vs the bot only the person's side counts, so a bot win plays no jingle.
-  const humans = useMemo(() => (botPlayer === null ? BOTH_SIDES : [other(botPlayer)]), [botPlayer]);
+  // Online only your side counts.
+  const humans = useMemo(
+    () => (me !== null ? [me] : botPlayer === null ? BOTH_SIDES : [other(botPlayer)]),
+    [botPlayer, me],
+  );
   const feedback = useGameFeedback(store, theme, humans);
 
   // "No legal moves": the flow has passed the turn already; the card says why.
@@ -241,11 +303,13 @@ export function GameScreen({
   // pass card shows, the board stays with the player who passed.
   const active: PlayerId = showPass && pass ? pass.player : view.toMove;
   const viewer: PlayerId =
-    botPlayer !== null
-      ? other(botPlayer)
-      : flipMode === 'flip' && phase !== 'opening-roll'
-        ? active
-        : 'white';
+    me !== null
+      ? me
+      : botPlayer !== null
+        ? other(botPlayer)
+        : flipMode === 'flip' && phase !== 'opening-roll'
+          ? active
+          : 'white';
   const boardView: BoardView = { viewer, direction };
 
   // The opening card: while rolling (a tie stays until the next roll), then
@@ -258,7 +322,9 @@ export function GameScreen({
     const timer = setTimeout(() => setOpeningDismissed(gameKey), OPENING_RESULT_MS);
     return () => clearTimeout(timer);
   }, [decided, gameKey]);
-  const showOpening = opening !== null && !(decided && openingDismissed === gameKey);
+  // Online the server rolls the opening: no card, a short line instead (below).
+  const showOpening =
+    online === undefined && opening !== null && !(decided && openingDismissed === gameKey);
   // Just after a tie, Roll waits a moment (the dice land first).
   const tieKey = opening?.kind === 'tie' ? `${gameKey}:${opening.round}` : null;
   const [tieSeen, setTieSeen] = useState<string | null>(null);
@@ -274,12 +340,17 @@ export function GameScreen({
   // A question for one player: Plakoto "resign or play on?" (mother pinned),
   // or the Acey-Deucey "choose a double" after a 1-2 (#205). The player it
   // asks answers; vs the bot, the bot answers its own question in its turn.
+  // Online, only your own questions show here.
   const prompt = view.matchPhase === 'playing' ? currentPrompt(game) : null;
-  const askHuman = prompt !== null && prompt.player !== botPlayer;
+  const askHuman =
+    prompt !== null && prompt.player !== botPlayer && (me === null || prompt.player === me);
   // House rule `chosenStarterRolls` (#207): a card asks who starts. In
   // pass-and-play either player picks; vs the bot, the human does.
   const choosing = view.matchPhase === 'playing' && isChoosingStarter(game);
-  const blocked = matchOver || gameOver || showPass || showOpening || askHuman || choosing;
+  // Online: a game-end sheet or a notice covers the next game.
+  const onlineCovered = online !== undefined && (online.ended !== null || online.notice !== null);
+  const blocked =
+    matchOver || gameOver || showPass || showOpening || askHuman || choosing || onlineCovered;
 
   // Match over: the final position stays a moment, then the match-end
   // screen opens. Not while paused: the menu or another screen is on top.
@@ -295,9 +366,14 @@ export function GameScreen({
     phase !== 'opening-roll' &&
     view.matchPhase === 'playing' &&
     view.toMove === botPlayer;
+  // Online: the server waits for the other player, or your call is on its way.
+  const remoteStatus =
+    online !== undefined && online.locked && view.matchPhase === 'playing' ? online.status : null;
+  // The bot or the remote player has the board: your touches do nothing.
+  const othersTurn = botsTurn || remoteStatus !== null;
 
   // One checker with several dice (#180): the "2+3" targets, from the engine.
-  const paths = useMemo(() => (botsTurn ? [] : flowPaths(game)), [game, botsTurn]);
+  const paths = useMemo(() => (othersTurn ? [] : flowPaths(game)), [game, othersTurn]);
   // The combined moves of this turn, so one Undo takes back each one whole.
   const groups = useRef<readonly MoveGroup[]>([]);
 
@@ -309,7 +385,7 @@ export function GameScreen({
     analyzer !== undefined &&
     showHints &&
     !blocked &&
-    !botsTurn &&
+    !othersTurn &&
     prompt === null &&
     view.matchPhase === 'playing' &&
     phase === 'moving';
@@ -378,7 +454,9 @@ export function GameScreen({
 
   const roller = nextOpeningRoller(game);
   // With `rerollBoth` (#207) the starter rolls after the opening result closes.
+  // Online the server rolls.
   const canRoll =
+    online === undefined &&
     !showPass &&
     !botsTurn &&
     !(decided && showOpening) &&
@@ -499,7 +577,7 @@ export function GameScreen({
 
   /** Returns whether the move was played; if not, the board flies the checker back. */
   const onMove = (move: Move, geo: BoardGeometry, from: { x: number; y: number } | null) => {
-    if (botsTurn) return false;
+    if (othersTurn) return false;
     return playMove(move, geo, from, autoConfirm);
   };
   const onSteps = (
@@ -507,16 +585,16 @@ export function GameScreen({
     geo: BoardGeometry,
     from: { x: number; y: number } | null,
   ) => {
-    if (botsTurn) return false;
+    if (othersTurn) return false;
     return playSteps(steps, geo, from, autoConfirm);
   };
   /** A button of the move list: the same move as a tap-tap on the board. */
   const onListMove = (move: Move) => {
-    if (botsTurn || blocked) return;
+    if (othersTurn || blocked) return;
     playMove(move, geoRef.current, null, autoConfirm);
   };
   const onListSteps = (steps: readonly Move[]) => {
-    if (botsTurn || blocked) return;
+    if (othersTurn || blocked) return;
     playSteps(steps, geoRef.current, null, autoConfirm);
   };
 
@@ -553,6 +631,28 @@ export function GameScreen({
     setFlights([]);
     return true;
   };
+
+  // Online (#255): the other player's whole turn arrives in one view. Its
+  // moves fly one after the other from the board of the view before.
+  const seenFlow = useRef(flow);
+  const flyRemoteTurn = useEffectEvent((before: MatchFlow, after: MatchFlow) => {
+    const geo = geoRef.current;
+    if (me === null || geo === null) return;
+    const turn = remoteTurn(before, after, me);
+    if (turn === null) return;
+    setFlights(
+      turnFlights(geo, boardView, turn.player, turn.moves, turn.before, {
+        id: `r${online?.version ?? 0}`,
+        direction,
+      }),
+    );
+  });
+  const isOnline = online !== undefined;
+  useEffect(() => {
+    const before = seenFlow.current;
+    seenFlow.current = flow;
+    if (isOnline && before !== flow) flyRemoteTurn(before, flow);
+  }, [flow, isOnline]);
 
   // The bot's turn. It starts when nothing covers the board, and stops when
   // the screen pauses (menu) or goes away. Same key = same turn.
@@ -670,11 +770,39 @@ export function GameScreen({
 
   // Screen readers hear each roll and the other player's moves (#134),
   // once each: a remount does not read the last one again (#216).
-  const announcement = turnAnnouncement(flow, t, { nameOf, isYou });
+  // Online the log is empty: each new view is read once, keyed on its version.
+  const announcement =
+    online === undefined
+      ? turnAnnouncement(flow, t, { nameOf, isYou })
+      : online.ended === null
+        ? (() => {
+            const text = onlineTurnAnnouncement(flow, t, { nameOf, isYou });
+            return text === null ? null : { key: `v${online.version}`, text };
+          })()
+        : null;
   useAnnouncement(
     announcement?.text ?? null,
     announcement ? `${matchKey}:turn:${announcement.key}` : undefined,
   );
+  // Online: who starts (the server rolled the opening) or why nothing moved
+  // (the server passed), in a line over the board for a moment.
+  const onlineLineText =
+    online === undefined
+      ? null
+      : (onlinePassLine(game, t, { nameOf, isYou }) ??
+        onlineOpeningLine(game, t, { nameOf, isYou }));
+  const onlineLineKey =
+    onlineLineText === null ? null : `${gameKey}:${game.state.turnNumber}:${onlineLineText}`;
+  const [onlineLineSeen, setOnlineLineSeen] = useState<string | null>(null);
+  useEffect(() => {
+    if (onlineLineKey === null) return;
+    const timer = setTimeout(() => setOnlineLineSeen(onlineLineKey), OPENING_RESULT_MS);
+    return () => clearTimeout(timer);
+  }, [onlineLineKey]);
+  const onlineLine =
+    onlineLineText !== null && onlineLineSeen !== onlineLineKey && online?.ended === null
+      ? onlineLineText
+      : null;
   // The hint is read out once it shows (#209). It is not a game event: the
   // user asked for it, and a remount closes it (it is screen state).
   useAnnouncement(shownHint === null ? null : hintSpokenText(t, shownHint));
@@ -689,7 +817,12 @@ export function GameScreen({
   // Before a roll the key names the coming turn, as in every turn: no dice
   // row is drawn and the reveal waits for a double, so nothing plays until
   // the dice come (the opening roll too).
-  const atRest = showPass || (game.state.dice !== null && !diceWereRolled(flow));
+  // Online the log is empty: every roll comes from the server and tumbles,
+  // but a chosen double does not.
+  const atRest =
+    showPass ||
+    (game.state.dice !== null &&
+      (online === undefined ? !diceWereRolled(flow) : stateHasChosenDouble(game)));
   const rollKey = atRest ? null : `${gameKey}:${game.state.turnNumber}`;
   // A rolled double shows its two dice first, then splits into four (#177).
   const reveal = useDoubleReveal(rollKey, dice);
@@ -710,6 +843,14 @@ export function GameScreen({
   let mainButton = null;
   if (phase === 'opening-roll') {
     mainButton = null;
+  } else if (remoteStatus !== null) {
+    // Online: the server waits for the other player (or has your turn on its way).
+    showDice = dice.length > 0;
+    mainButton = (
+      <View testID="online-wait" style={[styles.botBox, landscape && styles.botBoxSide]}>
+        <Text style={styles.botText}>{remoteStatus}</Text>
+      </View>
+    );
   } else if (botsTurn && !showPass && view.matchPhase === 'playing') {
     const rolled = game.state.dice;
     showDice = dice.length > 0;
@@ -725,7 +866,7 @@ export function GameScreen({
         </Text>
       </View>
     );
-  } else if (phase === 'awaiting-roll' && !showPass && !showOpening) {
+  } else if (phase === 'awaiting-roll' && !showPass && !showOpening && online === undefined) {
     // While the `rerollBoth` result shows (#207), Roll waits for it to close.
     mainButton = (
       <ActionButton
@@ -792,16 +933,37 @@ export function GameScreen({
 
   // Game end (wireframe 8): a sheet over the final board. Match end is
   // another screen (`onMatchOver`), so nothing covers the board then.
+  // Online (#255) the server has already started the next game: the sheet
+  // shows the game that ended (`online.ended`), from its record.
+  const ended = online?.ended ?? null;
+  const ending =
+    ended !== null
+      ? {
+          result: ended.record,
+          // The record has no board: a resign reads as a plain resign.
+          off: { white: 1, black: 1 },
+          method:
+            ended.record.variant === game.state.variant ? rules.scoring.method : ('tavli' as const),
+          key: ended.key,
+        }
+      : gameOver && game.result !== null
+        ? {
+            result: game.result,
+            off: game.state.board.off,
+            method: rules.scoring.method,
+            key: `${matchKey}:end:${gameKey}`,
+          }
+        : null;
   let endSheet = null;
-  if (gameOver && game.result !== null) {
-    const { result } = game;
+  if (ending !== null) {
+    const { result } = ending;
     const winner = result.winner;
     const loser = winner === null ? null : other(winner);
     // The points are the engine's; the win type only names them (#245).
-    const type = winType(result, game.state.rules.scoring.method);
+    const type = winType(result, ending.method);
     let reason: string | null = null;
     if (result.reason === 'resigned' && loser !== null) {
-      reason = resignedLine(loser, type, game.state.board.off[loser], result.points);
+      reason = resignedLine(loser, type, ending.off[loser], result.points);
     } else if (result.reason === 'timeout' && loser !== null) {
       // An online turn timer ran out (#170). The sheet reads this line too.
       reason = timeoutLine(loser);
@@ -816,7 +978,7 @@ export function GameScreen({
     endSheet = (
       <GameEndSheet
         testID="game-end-card"
-        announceKey={`${matchKey}:end:${gameKey}`}
+        announceKey={ending.key}
         title={
           winner === null
             ? t('game.end.draw')
@@ -835,15 +997,27 @@ export function GameScreen({
         target={t('game.end.target', { target: match.targetPoints })}
         // Like the win jingle: only a win by a person is celebrated.
         celebrate={isHumanWin(winner, humans)}>
-        <ActionButton
-          testID="next-game-button"
-          label={t('game.end.next')}
-          {...(match.nextStarter ? { subtitle: startsLine(match.nextStarter) } : {})}
-          onPress={() => {
-            setFlights([]);
-            dispatch({ type: 'nextGame' });
-          }}
-        />
+        {ended !== null ? (
+          // The next game is on the board already: the button closes the sheet.
+          <ActionButton
+            testID="next-game-button"
+            label={t('game.end.next')}
+            onPress={() => {
+              setFlights([]);
+              ended.onClose();
+            }}
+          />
+        ) : (
+          <ActionButton
+            testID="next-game-button"
+            label={t('game.end.next')}
+            {...(match.nextStarter ? { subtitle: startsLine(match.nextStarter) } : {})}
+            onPress={() => {
+              setFlights([]);
+              dispatch({ type: 'nextGame' });
+            }}
+          />
+        )}
         {onReview ? (
           <ActionButton
             testID="end-review-button"
@@ -865,9 +1039,28 @@ export function GameScreen({
   }
 
   // Cards over the board, at most one at a time, and none once the game is over.
-  const over = gameOver || matchOver;
+  // Online, the sheet of the game that just ended covers the next game.
+  const over = gameOver || matchOver || ended !== null;
+  const notice = online?.notice ?? null;
   let card = null;
-  if (!over && askHuman && prompt && prompt.kind === 'chooseDouble') {
+  if (!over && notice !== null) {
+    // Online (#255): "Your time ran out", "The game changed", ….
+    card = (
+      <GameCard
+        key={notice.key}
+        testID="online-notice-card"
+        announceKey={`${matchKey}:notice:${notice.key}`}
+        title={notice.title}
+        lines={[notice.text]}>
+        <ActionButton
+          testID="online-notice-ok-button"
+          label={t('game.pass.ok')}
+          kind="secondary"
+          onPress={notice.onClose}
+        />
+      </GameCard>
+    );
+  } else if (!over && askHuman && prompt && prompt.kind === 'chooseDouble') {
     // Acey-Deucey after a 1-2 (#205): six dice buttons, no way to close it
     // without a choice. The answer sets the dice; the turn starts at once.
     const chooser = prompt.player;
@@ -1045,13 +1238,21 @@ export function GameScreen({
   const marks = asodioMarks(view.board, rules, boardView);
   // The loading lock: until a 1-2 or a double, the board stays shut.
   const gateToMove =
-    phase === 'awaiting-roll' && !blocked && !botsTurn
+    phase === 'awaiting-roll' && !blocked && !othersTurn
       ? loadingGate(view.board, view.toMove, rules)
       : null;
-  const stripNote = (player: PlayerId): string | null => {
+  const asodioNote = (player: PlayerId): string | null => {
     if (armyStuck[player]) return t('game.strip.frozen');
     if (toEnter[player] > 0) return t('game.strip.toEnter', { count: toEnter[player] });
     return null;
+  };
+  // Online: the time left sits on the strip of the player the server waits for.
+  const stripNote = (player: PlayerId): string | null => {
+    const notes = [asodioNote(player)];
+    const clock = online?.clock ?? null;
+    if (clock !== null && clock.player === player) notes.push(clock.text);
+    const text = notes.filter((note) => note !== null).join(' · ');
+    return text === '' ? null : text;
   };
 
   // The screen reader hears the board's pinned checkers (Plakoto, Asodio),
@@ -1120,7 +1321,7 @@ export function GameScreen({
   const hideScreen = covered || endSheet !== null;
   const hideBoard = card !== null;
   // "Doubles!" for a moment after the split. Another note over the board wins.
-  const confirmHint = view.canConfirm && !blocked && !botsTurn;
+  const confirmHint = view.canConfirm && !blocked && !othersTurn;
   // The value of the double names it: Greek says «Εξάρες!» for 6-6.
   const doubleValue = dice.length === 4 ? dice[0]?.value : undefined;
   const showDoublesHint =
@@ -1130,7 +1331,8 @@ export function GameScreen({
     !confirmHint &&
     botNote === null &&
     gateToMove === null &&
-    shownHint === null;
+    shownHint === null &&
+    onlineLine === null;
 
   const menuButton = onOpenMenu ? (
     <Pressable
@@ -1164,19 +1366,22 @@ export function GameScreen({
         board={view.board}
         view={boardView}
         mover={view.toMove}
-        legal={blocked || botsTurn ? [] : view.legal}
-        positionKey={String(flow.log.length)}
+        legal={blocked || othersTurn ? [] : view.legal}
+        // Online the log holds only your moves: the view's version names the rest.
+        positionKey={
+          online === undefined ? String(flow.log.length) : `${online.version}:${flow.log.length}`
+        }
         flights={flights}
         onFlightDone={onFlightDone}
         onMove={onMove}
-        paths={blocked || botsTurn ? [] : paths}
+        paths={blocked || othersTurn ? [] : paths}
         onSteps={onSteps}
         onGeometry={onGeometry}
         onBoardTap={roll}
         onPickUp={() => feedback.event('checkerPickUp')}
         onIllegalDrop={() => feedback.event('invalidMove')}
         marks={marks}
-        hint={blocked || botsTurn ? null : shownHint}
+        hint={blocked || othersTurn ? null : shownHint}
       />
       {diceBox ? (
         // The dice lie on the board, in the theme's dice area (#184); in
@@ -1254,6 +1459,16 @@ export function GameScreen({
           </Text>
         </View>
       ) : null}
+      {onlineLine !== null && !confirmHint ? (
+        // Online: who starts, or why nothing moved. The turn announcement reads it.
+        <View
+          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
+          pointerEvents="none">
+          <Text testID="online-line" style={styles.hint}>
+            {onlineLine}
+          </Text>
+        </View>
+      ) : null}
       {botNote !== null ? (
         <View
           style={[styles.hintRow, landscape && styles.besideColumn(column)]}
@@ -1282,7 +1497,7 @@ export function GameScreen({
     </Text>
   ) : null;
   const moveList =
-    showMoveList && !blocked && !botsTurn ? (
+    showMoveList && !blocked && !othersTurn ? (
       <MoveList
         legal={view.legal}
         onMove={onListMove}

@@ -215,6 +215,46 @@
         "result": "Rolled {{first}} and {{second}}.",
         "boardLabel": "Board. Swipe to throw the dice, or use the Roll button."
       }
+    },
+    "online": {
+      "title": "Online game (dev)",
+      "intro": "A game vs the bot on the in-memory server. The bot plays the remote player.",
+      "game": "Game",
+      "pace": "Pace",
+      "live": "Live (1 min a turn)",
+      "async": "Async (24 h a turn)",
+      "length": "Match length",
+      "start": "Start game"
+    }
+  },
+  "online": {
+    "opponent": "Opponent",
+    "waiting": "Waiting for Opponent",
+    "status": {
+      "waiting": "Waiting for Opponent…",
+      "sending": "Sending your turn…"
+    },
+    "clock": {
+      "seconds_one": "{{count}} s",
+      "seconds_other": "{{count}} s",
+      "minutes_one": "{{count}} min",
+      "minutes_other": "{{count}} min",
+      "hours_one": "{{count}} h",
+      "hours_other": "{{count}} h"
+    },
+    "loading": "Loading the game…",
+    "label": "{{game}} · online",
+    "summary": "{{game}} · online · {{score}}",
+    "exitHint": "The game goes on, and the clock keeps running",
+    "notice": {
+      "timedOutTitle": "Your time ran out",
+      "timedOut": "You lost this game on time. Your moves were not sent.",
+      "staleTitle": "The game changed",
+      "stale": "The board shows the newest position now.",
+      "sendFailedTitle": "Not sent",
+      "sendFailed": "Your turn did not reach the server. Check the connection, then press Confirm again.",
+      "refusedTitle": "Not accepted",
+      "refused": "The server did not accept your turn. Your moves were taken back."
     }
   },
   "game": {

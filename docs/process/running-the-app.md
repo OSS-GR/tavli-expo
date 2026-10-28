@@ -192,6 +192,7 @@ The first Android build asks to make a **keystore** (the signing key). Say **yes
 | `/rules/<variant>` | How to play (a stub for now) |
 | `/settings` | Settings (language, sound, haptics, board options) |
 | `/dev/board` | **Dev only.** The board with sample positions. You can flip the board. **Dice → Throw on the board** turns on the dice throw spike (#183, [findings](../design/dice-throw-spike.md)). |
+| `/dev/online` | **Dev only.** An online game vs the bot on the in-memory server (#255). Pick a game, a pace (live: 60 s a turn; async: 24 h) and a match length, then tap **Start game**. The game lives only while the app runs. |
 | `/_sitemap` | Expo Router's list of all routes. Tap one to open it. |
 
 Dev routes only work in development builds. Release builds (the `preview` profile) send them back home.
@@ -201,6 +202,8 @@ Dev routes only work in development builds. Release builds (the `preview` profil
 - iOS simulator: `xcrun simctl openurl booted "tavlaki://dev/board"`
 - iPhone: type `tavlaki://dev/board` in Safari's address bar.
 - Android emulator: `adb shell am start -a android.intent.action.VIEW -d "tavlaki://dev/board"`
+
+To try the online screen: open `tavlaki://dev/online` (or pick `dev/online` in `/_sitemap`). The bot plays its turns on its own, and a turn timer that runs out ends that game, as on the real server.
 
 **Dev menu:** press `m` in the Metro terminal, shake the phone, or press `Cmd+D` (iOS simulator) / `Cmd+M` or `Ctrl+M` (Android emulator). It has reload and the performance monitor.
 

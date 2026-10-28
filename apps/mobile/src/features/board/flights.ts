@@ -224,3 +224,37 @@ export function pathFlights(
   };
   return [checker, ...others.map((f, n) => ({ ...f, id: `${options.id}:hit${n}` }))];
 }
+
+/** The pause between two moves of a turn that arrives whole (online, #255). */
+export const TURN_MOVE_GAP_MS = 100;
+
+/**
+ * The flights of a whole turn that arrives at once: the other player's
+ * turn in an online game (#255). The moves fly one after the other, each
+ * `FLIGHT_MS + TURN_MOVE_GAP_MS` after the one before. Until its turn
+ * comes, a checker waits at its start. `before` is the board before the
+ * first move; the moves are replayed on it with the engine's
+ * `applyMoveToBoard`.
+ */
+export function turnFlights(
+  geo: BoardGeometry,
+  view: BoardView,
+  mover: PlayerId,
+  moves: readonly Move[],
+  before: BoardState,
+  options: PathFlightOptions,
+): Flight[] {
+  const flights: Flight[] = [];
+  let board = before;
+  moves.forEach((move, i) => {
+    const after = applyMoveToBoard(board, mover, move, options.direction);
+    const delay = i * (FLIGHT_MS + TURN_MOVE_GAP_MS);
+    for (const f of moveFlights(geo, view, mover, move, board, after, {
+      id: `${options.id}:${i}`,
+    })) {
+      flights.push({ ...f, delay: f.delay + delay });
+    }
+    board = after;
+  });
+  return flights;
+}
