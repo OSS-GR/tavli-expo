@@ -96,6 +96,7 @@ export function lazyInvites(get: () => Invites): Invites {
     declineInvite: (code) => get().declineInvite(code),
     cancelInvite: (code) => get().cancelInvite(code),
     listMyInvites: () => get().listMyInvites(),
+    watchMyInvites: (onList, onError) => get().watchMyInvites(onList, onError),
   };
 }
 

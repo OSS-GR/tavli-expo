@@ -22,7 +22,7 @@ In Jest the app uses `createMemoryPushNotifications` from `@tavli/contracts` (`a
 
 ## Setup (owner)
 
-1. Run `eas init` in `apps/mobile`, so `app.json` has `extra.eas.projectId`. Then run `pnpm format` (EAS CLI rewrites `app.json`).
+1. Done (#324): `app.json` has `extra.eas.projectId` (see "Link the project once" in `docs/process/running-the-app.md`).
 2. iOS: let EAS make an APNs key (`eas credentials`, or on the first `eas build`). The `expo-notifications` config plugin in `app.json` adds the `aps-environment` entitlement; Xcode sets it to `production` for store builds.
 3. Android: make a Firebase project, add the Android app (`com.tavlaki`, and `com.tavlaki.dev` for dev builds), and upload the FCM v1 service account key to EAS (`eas credentials`). Never commit `google-services.json` keys or the service account file.
 4. Android: add a white, see-through notification icon (96×96 px) and set it as `icon` in the plugin options in `app.json`. Until then Android shows a plain square.
