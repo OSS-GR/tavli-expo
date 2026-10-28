@@ -20,6 +20,11 @@ export interface HomeScreenProps {
   onHowToPlay: () => void;
   /** Opens the match history (#142). The link shows only with it. */
   onHistory?: () => void;
+  /**
+   * Opens "Play a friend online" (#281). Without it (a build with no
+   * online server) the button shows "Coming soon".
+   */
+  onPlayFriend?: () => void;
   /** The bot levels this build can play, easiest first (the "Play vs bot" subtitle). */
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). */
@@ -35,6 +40,7 @@ export function HomeScreen({
   onSettings,
   onHowToPlay,
   onHistory,
+  onPlayFriend,
   botLevels,
   continueCard,
   learnCard,
@@ -95,15 +101,25 @@ export function HomeScreen({
             subtitle={t('home.local.subtitle')}
             onPress={() => onNewGame('local')}
           />
-          <MenuButton
-            testID="home-friend"
-            kind="locked"
-            badge="@"
-            title={t('home.friend.title')}
-            subtitle={t('home.friend.subtitle')}
-            chip={t('common.comingSoon')}
-            onPress={() => showToast(t('home.friend.soon'))}
-          />
+          {onPlayFriend ? (
+            <MenuButton
+              testID="home-friend"
+              badge="@"
+              title={t('home.friend.title')}
+              subtitle={t('home.friend.subtitle')}
+              onPress={onPlayFriend}
+            />
+          ) : (
+            <MenuButton
+              testID="home-friend"
+              kind="locked"
+              badge="@"
+              title={t('home.friend.title')}
+              subtitle={t('home.friend.subtitle')}
+              chip={t('common.comingSoon')}
+              onPress={() => showToast(t('home.friend.soon'))}
+            />
+          )}
         </View>
         <Pressable
           testID="home-how-to-play"

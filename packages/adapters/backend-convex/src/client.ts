@@ -26,20 +26,30 @@ export function authTokenFetcher(auth: Pick<AuthProvider, 'getToken'>): ConvexTo
 /**
  * A `ConvexClient` on `url` (`EXPO_PUBLIC_CONVEX_URL`, the `.convex.cloud`
  * URL) that sends the token of `auth`. Make one per app and share it.
+ *
+ * The client asks for a token when `setAuth` is called, and again only
+ * when the server refuses one. When the first answer is `null` (nobody
+ * signed in yet), it stays signed out for good. So each sign-in and
+ * sign-out (`auth.onChange`) calls `setAuth` again (#281).
  */
 export function createConvexClient(
   url: string,
-  auth: Pick<AuthProvider, 'getToken'>,
+  auth: Pick<AuthProvider, 'getToken' | 'onChange'>,
 ): ConvexClient {
   const client = new ConvexClient(url);
-  client.setAuth(authTokenFetcher(auth));
+  const fetchToken = authTokenFetcher(auth);
+  client.setAuth(fetchToken);
+  // One client per app: it follows the sign-in for the whole app run.
+  auth.onChange(() => {
+    client.setAuth(fetchToken);
+  });
   return client;
 }
 
 /** The `GameTransport` for the app: a new signed-in `ConvexClient` on `url`. */
 export function createConvexGameTransportFromUrl(
   url: string,
-  auth: Pick<AuthProvider, 'getToken'>,
+  auth: Pick<AuthProvider, 'getToken' | 'onChange'>,
 ): GameTransport {
   return createConvexGameTransport({ client: createConvexClient(url, auth) });
 }

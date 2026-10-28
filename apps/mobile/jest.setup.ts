@@ -10,8 +10,8 @@ import './src/i18n';
 // `crashReporter` every report and `analytics` every event it would send
 // (it follows the opt-in rules); dice come from a fixed seed, so tests are
 // repeatable. The bot is the real inline runner and the real Analyzer (both
-// are pure TypeScript). Online play (`auth`, `games`) and the dev games
-// (`onlineServer`, `gameTransportFor`) share one in-memory sign-in and game
+// are pure TypeScript). Online play (`auth`, `games`, `invites`) and the dev games
+// (`onlineServer`, `gameTransportFor`, `invitesFor`) share one in-memory sign-in and game
 // server, new for each test (test/onlineFake.ts).
 jest.mock('@/services', () => {
   const {
@@ -38,6 +38,7 @@ jest.mock('@/services', () => {
     analyzer: createAnalyzer(),
     auth: onlineFake.auth,
     games: onlineFake.games,
+    invites: onlineFake.invites,
     onlineServer: onlineFake.server,
     onlinePlayerId: 'me',
     gameTransportFor: onlineFake.transportFor,
