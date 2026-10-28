@@ -15,7 +15,8 @@
  *   simulator, no network) gives `denied` and no token.
  * - `requestPermission` shows the system prompt only while the answer is
  *   `undetermined`. The phone shows it once; after that only the phone's
- *   own settings can change the answer.
+ *   own settings can change the answer. A prompt that fails (the native
+ *   call throws) resolves `undetermined`: the player gave no answer.
  * - `getToken` asks for no token while the permission is not `granted`.
  * - A listener is never called inside the call that adds it, and never
  *   after its stop function.

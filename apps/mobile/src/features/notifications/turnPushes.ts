@@ -21,6 +21,10 @@
  *   `then` (the sign-out) before any later sync, so a sync cannot put the
  *   token back while the user signs out (`signOutOfOnline` in
  *   `features/online/account.ts`). The server call needs a live session.
+ *   It also clears the saved choice (`turnedOn`, `declined`): it belongs
+ *   to the user who made it, so the next user gets the offer again.
+ * - A prompt that fails (`requestPermission` gives `undetermined`) is no
+ *   answer: `turnOn()` saves nothing and tells no analytics.
  *
  * Pure: the ports come in as arguments, so tests pass in-memory ones.
  * The app's instance is `features/notifications/appTurnPushes.ts`.
@@ -226,11 +230,14 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
     async turnOn() {
       if (store.getState().asking) return store.getState().permission ?? 'undetermined';
       store.setState({ asking: true });
-      let answer: PushPermission = 'denied';
+      let answer: PushPermission = store.getState().permission ?? 'undetermined';
       try {
         const before = await notifications.permission();
         // The system prompt shows only while the phone was not asked.
         answer = await notifications.requestPermission();
+        // The prompt failed: no answer, so nothing is saved or told, and
+        // the app may offer again later.
+        if (answer === 'undetermined') return answer;
         // Only a real answer to the system prompt: granted or denied.
         if (before === 'undetermined') onAnswer?.(answer === 'granted' ? 'granted' : 'denied');
         const on = answer === 'granted';
@@ -249,12 +256,14 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
 
     unregister(then) {
       const step = chain.then(async () => {
+        // The choice belongs to the user who made it: the next person who
+        // signs in on this phone gets the offer and their own Turn on.
+        const { turnedOn } = store.getState();
+        save({ declined: false, turnedOn: false });
         try {
           // Not registered in this run and never turned on in the app: the
           // server has no token of this phone, so do not ask Expo for one.
-          const token =
-            registered?.token ??
-            (store.getState().turnedOn ? await notifications.getToken() : null);
+          const token = registered?.token ?? (turnedOn ? await notifications.getToken() : null);
           registered = null;
           if (token !== null) await pushTokens.remove(token);
         } catch {

@@ -2,13 +2,15 @@
  * The `PushNotifications` port on expo-notifications (#285).
  *
  * - No call rejects or throws: a failed native call (a simulator, no
- *   network, Expo Go) gives `denied`, no token or no tap.
+ *   network, Expo Go) gives `denied` (a failed prompt: `undetermined`),
+ *   no token or no tap.
  * - `permission` maps the phone's answer: iOS "provisional" and
  *   "ephemeral" count as `granted`. An Android "no" that the system lets
  *   the app ask once more (`canAskAgain`) counts as `undetermined`.
  * - `requestPermission` shows the system prompt only while the answer is
  *   `undetermined`. On Android it first makes the channel the pushes
- *   use: Android 13 shows no prompt before an app has a channel.
+ *   use: Android 13 shows no prompt before an app has a channel. A prompt
+ *   call that throws gives `undetermined`: the player did not answer.
  * - `getToken` asks Expo for a token only when the permission is
  *   `granted` and the build has an EAS project id (`extra.eas.projectId`).
  * - Taps: only a tap on the push itself (`DEFAULT_ACTION_IDENTIFIER`).
@@ -158,7 +160,8 @@ export function createExpoPushNotifications(
         const answer = toPermission(await requestPermissionsAsync());
         // A "no" is a no, even when Android would let the app ask once more.
         return answer === 'granted' ? 'granted' : 'denied';
-      }, 'denied');
+        // A failed call is no answer: the player may be asked later.
+      }, 'undetermined');
     },
 
     getToken() {

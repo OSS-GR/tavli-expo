@@ -168,6 +168,25 @@ describe('turnOn', () => {
     expect(pushes.store.getState()).toMatchObject({ asking: false, turnedOn: false });
   });
 
+  it('a prompt that fails on the phone is no answer: nothing saved or told, the offer may show again', async () => {
+    const { pushes, notifications, pushTokens, storage, answers } = setup();
+    // The adapter gives `undetermined` when the native prompt call throws.
+    jest.spyOn(notifications, 'requestPermission').mockResolvedValueOnce('undetermined');
+    await expect(pushes.turnOn()).resolves.toBe('undetermined');
+    await settle();
+    expect(answers).toEqual([]);
+    expect(storage.getString(TURN_PUSHES_STORAGE_KEY)).toBeUndefined();
+    expect(pushes.store.getState()).toMatchObject({
+      asking: false,
+      offering: false,
+      declined: false,
+      turnedOn: false,
+    });
+    expect(pushTokens.calls).toEqual([]);
+    await pushes.offer();
+    expect(pushes.store.getState().offering).toBe(true);
+  });
+
   it('a second tap while the prompt is open does nothing', async () => {
     const { pushes, notifications } = setup();
     const first = pushes.turnOn();
@@ -312,6 +331,26 @@ describe('the token on the server', () => {
     expect(pushTokens.calls).toEqual([
       { kind: 'remove', playerId: 'guest-1', token: notifications.token },
     ]);
+  });
+
+  it('sign-out clears the choice: the next user on the phone gets no token without their own Turn on', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup();
+    await auth.signInAsGuest();
+    notifications.setPermission('granted');
+    await pushes.turnOn();
+    await settle();
+    expect(pushTokens.saved).toHaveLength(1);
+    await signOutOfOnline(auth, pushes);
+    expect(pushes.store.getState()).toMatchObject({ turnedOn: false, declined: false });
+
+    await auth.signInAsGuest();
+    const calls = pushTokens.calls.length;
+    await pushes.sync();
+    expect(pushTokens.calls).toHaveLength(calls);
+    expect(pushTokens.saved).toEqual([]);
+    // The offer shows again for the new user.
+    await pushes.offer();
+    expect(pushes.store.getState().offering).toBe(true);
   });
 
   it('sign-out with no turn notifications only signs out', async () => {

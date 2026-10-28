@@ -18,6 +18,7 @@ const phone = vi.hoisted(() => ({
   responseListeners: new Set<(response: unknown) => void>(),
   last: null as unknown,
   broken: false,
+  promptFails: false,
   reset() {
     this.status = 'undetermined';
     this.canAskAgain = true;
@@ -31,6 +32,7 @@ const phone = vi.hoisted(() => ({
     this.responseListeners.clear();
     this.last = null;
     this.broken = false;
+    this.promptFails = false;
   },
 }));
 
@@ -66,6 +68,7 @@ vi.mock('expo-notifications', () => ({
   },
   requestPermissionsAsync: () => {
     check();
+    if (phone.promptFails) throw new Error('the prompt failed');
     if (phone.status === 'undetermined') {
       phone.prompts += 1;
       phone.status = phone.answer;
@@ -232,6 +235,13 @@ describe('createExpoPushNotifications', () => {
     await notifications.requestPermission();
     await notifications.getToken();
     expect(phone.channels).toEqual([]);
+  });
+
+  it('a prompt call that throws is no answer: undetermined', async () => {
+    const notifications = createExpoPushNotifications(OPTIONS);
+    phone.promptFails = true;
+    await expect(notifications.requestPermission()).resolves.toBe('undetermined');
+    expect(phone.prompts).toBe(0);
   });
 
   it('an Android "no" that may be asked once more is undetermined, but the answer is denied', async () => {
