@@ -21,6 +21,7 @@
 import type { PresetId } from '@tavli/engine';
 
 import type { Difficulty } from './bot-runner';
+import type { OnlineGamePace } from './game-transport';
 import { isAnonymousInstallId } from './install-id';
 
 /** How a game is played. `online` is for online play (MVP2): no screen sends it yet. */
@@ -127,6 +128,17 @@ export interface AnalyticsEvents {
    * for the match: never the position, the dice, the moves or the mistakes.
    */
   review_opened: { game: MatchGame };
+  /**
+   * The player made an invite to play a friend online (#281). Only the
+   * game, the match length and the pace: never the code, a game id or a
+   * user id.
+   */
+  invite_created: {
+    game: MatchGame;
+    /** Points to win. */
+    matchLength: number;
+    pace: OnlineGamePace;
+  };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
@@ -162,6 +174,7 @@ export const ANALYTICS_EVENTS = [
   'tutorial_skipped',
   'hint_shown',
   'review_opened',
+  'invite_created',
 ] as const satisfies readonly AnalyticsEventName[];
 
 type MissingEvent = Exclude<AnalyticsEventName, (typeof ANALYTICS_EVENTS)[number]>;

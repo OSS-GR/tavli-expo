@@ -15,12 +15,9 @@ import {
 import type {
   InviteErrorCode,
   InviteView,
-  Invites,
   OnlineGameChoice,
   OnlineGamePace,
 } from '@tavli/contracts';
-import { invitesContract } from '@tavli/contracts/testing';
-import type { InvitesContractPlayer, InvitesContractSubject } from '@tavli/contracts/testing';
 import { MAX_OPEN_INVITES } from '@tavli/online';
 
 import { api } from './_generated/api';
@@ -526,38 +523,5 @@ describe('sign-in (#131)', () => {
   });
 });
 
-/**
- * The `Invites` port contract (#256) on the real functions. A Convex
- * client rejects with a `ConvexError`; the port rejects with its `data`,
- * so this subject unwraps it, as a client adapter will.
- */
-function contractSubject(): InvitesContractSubject {
-  const t = setup();
-  const ids = { inviter: ALICE, friend: BOB, other: CAROL } as const;
-  const unwrap = (error: unknown) => {
-    throw (error as { data?: unknown }).data ?? error;
-  };
-  const invitesFor = (who: InvitesContractPlayer): Invites => {
-    const caller = as(t, ids[who]);
-    return {
-      getInvite: (code) => caller.query(api.invites.getInvite, { code }).catch(unwrap),
-      acceptInvite: (code) => caller.mutation(api.invites.acceptInvite, { code }).catch(unwrap),
-      declineInvite: async (code) => {
-        await caller.mutation(api.invites.declineInvite, { code }).catch(unwrap);
-      },
-    };
-  };
-  return {
-    inviterId: ALICE,
-    createInvite: ({ choice, targetPoints, pace }) =>
-      createInvite(t, ALICE, choice, targetPoints, pace),
-    invitesFor,
-    passTime: (ms) => wait(t, ms),
-  };
-}
-
-describe('Invites contract (Convex functions)', () => {
-  for (const check of invitesContract()) {
-    it(check.name, () => check.run(contractSubject()));
-  }
-});
+// The `Invites` port contract runs on the real functions through the
+// Convex client adapter: `convexInvites.test.ts`.

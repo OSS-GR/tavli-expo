@@ -55,7 +55,19 @@ describe('<HomeScreen />', () => {
     expect(levelList(['easy', 'medium', 'hard'], el)).toBe('Εύκολο, Μέτριο ή Δύσκολο');
   });
 
-  it('shows "Coming soon" for Play a friend and does not navigate', async () => {
+  it('opens Play a friend when online play is on (#281)', async () => {
+    const user = userEvent.setup();
+    const onPlayFriend = jest.fn();
+    await render(<HomeScreen {...setup()} onPlayFriend={onPlayFriend} />);
+
+    const friend = screen.getByRole('button', { name: 'Play a friend, Online' });
+    expect(friend).toBeEnabled();
+    await user.press(friend);
+    expect(onPlayFriend).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('toast')).toBeNull();
+  });
+
+  it('shows "Coming soon" for Play a friend without online play, and does not navigate', async () => {
     const user = userEvent.setup();
     const props = setup();
     await render(<HomeScreen {...props} />);

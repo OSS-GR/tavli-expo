@@ -40,6 +40,8 @@ const routes = {
   'dev/board': stub('dev board'),
   'dev/online': stub('dev online'),
   'invite/[code]': stub('invite'),
+  'friend/index': stub('play a friend'),
+  'friend/[code]': stub('invite wait'),
 };
 
 /** A URL for each app route (not the layout, not the welcome flow). */

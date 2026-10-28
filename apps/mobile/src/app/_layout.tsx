@@ -72,6 +72,9 @@ function RootStack() {
           <Stack.Screen name="dev/online" />
           {/* An invite link (#256): `tavlaki://invite/<code>`. */}
           <Stack.Screen name="invite/[code]" />
+          {/* Play a friend online (#281): the setup, then the waiting screen. */}
+          <Stack.Screen name="friend/index" />
+          <Stack.Screen name="friend/[code]" />
         </Stack.Protected>
         <Stack.Protected
           guard={welcome}

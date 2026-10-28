@@ -154,9 +154,13 @@ describe('InviteScreen', () => {
 
   it('shows "not found" at once for a link with no code, with no server call', async () => {
     const invites: Invites = {
+      createInvite: jest.fn(),
       getInvite: jest.fn(),
+      watchInvite: jest.fn(),
       acceptInvite: jest.fn(),
       declineInvite: jest.fn(),
+      cancelInvite: jest.fn(),
+      listMyInvites: jest.fn(),
     };
     await openInvite('ABCD234O', invites);
     expect(screen.getByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
@@ -215,11 +219,17 @@ describe('InviteScreen', () => {
       ...real,
       acceptInvite: () => Promise.reject(new Error('offline')),
     };
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const props = await openInvite(code, invites);
     await user.press(await screen.findByRole('button', { name: 'Accept' }));
     expect(
       await screen.findByText('That did not work. Check the connection and try again.'),
     ).toBeOnTheScreen();
+    // Read out: iOS VoiceOver does not read alert roles.
+    expect(announce).toHaveBeenLastCalledWith(
+      'That did not work. Check the connection and try again.',
+    );
+    announce.mockRestore();
     expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
     expect(props.onAccepted).not.toHaveBeenCalled();
     expect(server.getInvite(code)?.status).toBe('open');
@@ -264,7 +274,7 @@ describe('InviteScreen', () => {
       const code = server.createInvite(FRIEND, 'portes', 3, 'live');
       const real = server.invitesFor(ME);
       const invites: Invites = {
-        getInvite: real.getInvite,
+        ...real,
         acceptInvite: jest.fn(real.acceptInvite),
         declineInvite: jest.fn(real.declineInvite),
       };

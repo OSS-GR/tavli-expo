@@ -7,12 +7,18 @@ import { ContinueCard } from '@/features/home/ContinueCard';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
 import { matchSessions } from '@/features/match/appSessions';
-import { gameHref, newGameHref, rulesHref, tutorialHref } from '@/features/match/routes';
+import {
+  FRIEND_HREF,
+  gameHref,
+  newGameHref,
+  rulesHref,
+  tutorialHref,
+} from '@/features/match/routes';
 import type { SavedMatch } from '@/features/match/savedMatch';
 import { continueSummary } from '@/features/match/summary';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
-import { botLevels } from '@/services';
+import { botLevels, invites } from '@/services';
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -70,6 +76,8 @@ export default function HomeRoute() {
       onSettings={() => router.push('/settings')}
       onHowToPlay={() => router.push(rulesHref('portes'))}
       onHistory={() => router.push('/history')}
+      // Online play needs the server: a build without one shows "Coming soon".
+      onPlayFriend={invites === undefined ? undefined : () => router.push(FRIEND_HREF)}
     />
   );
 }
