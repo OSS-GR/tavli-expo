@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { DIE_VALUES } from '../../dice';
+import { DISTINCT_ROLLS } from '../../dice';
 import type { Dice } from '../../dice';
 import { formatMove, formatTurn } from '../../move';
 import type { Turn } from '../../move';
@@ -32,9 +32,7 @@ const GREEK: PresetId = 'asodio.aceyDeuceyGreek';
 const AMERICAN: PresetId = 'asodio.aceyDeuceyAmerican';
 
 /** Every roll, as `[high, low]`. */
-const ALL_ROLLS: Dice[] = DIE_VALUES.flatMap((a) =>
-  DIE_VALUES.filter((b) => b <= a).map((b): Dice => [a, b]),
-);
+const ALL_ROLLS: readonly Dice[] = DISTINCT_ROLLS.map(({ dice }) => dice);
 
 function turns(state: GameState, dice: Dice): string[] {
   return asodio.legalTurns(state, dice).map(formatTurn);

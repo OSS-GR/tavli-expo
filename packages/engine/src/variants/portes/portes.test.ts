@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DIE_VALUES } from '../../dice';
+import { DISTINCT_ROLLS } from '../../dice';
 import type { Dice } from '../../dice';
 import { formatTurn } from '../../move';
 import type { Turn } from '../../move';
@@ -28,10 +28,8 @@ function after(text: string, dice: Dice, turn: string, overrides: RuleOverrides 
   return formatPosition(next.board);
 }
 
-function allRolls(): Dice[] {
-  const rolls: Dice[] = [];
-  for (const a of DIE_VALUES) for (const b of DIE_VALUES) if (b <= a) rolls.push([a, b]);
-  return rolls;
+function allRolls(): readonly Dice[] {
+  return DISTINCT_ROLLS.map(({ dice }) => dice);
 }
 
 const illegal = expect.objectContaining({ code: 'ILLEGAL_TURN' });
