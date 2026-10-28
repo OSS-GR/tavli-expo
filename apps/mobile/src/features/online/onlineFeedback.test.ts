@@ -237,6 +237,37 @@ describe('online feedback (#271)', () => {
     expect(localUpdates(next, [{ type: 'timeout', player: loser }]).flat()).toEqual(expected);
   });
 
+  it('plays the win when the sheet opens, and the next roll once when it closes (#286)', async () => {
+    const { game } = await blackToMove();
+    const alice = await game.storeFor();
+    const board = onlineBoardStore(alice, game.gameId)!;
+    const before = alice.getState().flow!;
+    const { updates, stop } = record(board, 'white');
+
+    // Black's time runs out. The view holds game 2 and its first roll, but
+    // the board holds the end of game 1: only the win plays.
+    game.wait(TURN_TIME_MS.live);
+    expect(game.server.runDueTimeouts()).toBe(1);
+    await flush();
+    const next = game.view();
+    expect(next.match.games).toHaveLength(1);
+    expect(next.game.phase).toBe('moving');
+    expect(updates.map((u) => u.map(eventOf))).toEqual([['gameWin']]);
+
+    // The sheet closes: the roll of game 2 plays, once.
+    board.release();
+    board.release();
+    stop();
+    expect(updates.map((u) => u.map(eventOf))).toEqual([['gameWin'], ['turnStart', 'diceRoll']]);
+    // Local: the game ends, Next game, then the roll of the same dice.
+    const local = localUpdates(before, [
+      { type: 'timeout', player: 'black' },
+      { type: 'nextGame' },
+      { type: 'roll', player: next.game.state.toMove, dice: next.game.state.dice! },
+    ]);
+    expect(updates.flat().map(eventOf)).toEqual(local.flat());
+  });
+
   it('plays the match win like a local game', async () => {
     let found: Awaited<ReturnType<typeof setup>> | null = null;
     for (let seed = 1; seed < 60 && found === null; seed++) {
