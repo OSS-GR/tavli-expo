@@ -111,8 +111,9 @@ export const analyzer: Analyzer = createAnalyzer();
  * every online game runs on one in-memory server for this app run
  * (`@tavli/online`, no network), and this phone plays as `onlinePlayerId`.
  * The dev route `app/dev/online.tsx` starts games on it vs the bot. When
- * `EXPO_PUBLIC_CONVEX_URL` is set, the Convex adapter (#253) replaces this
- * server here, and the player id comes from sign-in.
+ * the build has a Convex URL (`convexUrl()` in `convexUrl.ts`, set by
+ * `EXPO_PUBLIC_CONVEX_URL` or the app variant), the Convex adapter (#253)
+ * replaces this server here, and the player id comes from sign-in.
  *
  * The in-memory server runs no timers: whoever starts a game on it runs
  * `runDueTimeouts()` (the dev game does, `features/online/devGame.ts`). Its
