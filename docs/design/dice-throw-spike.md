@@ -13,9 +13,9 @@ The spike answers three questions: how it looks, what it costs to build for real
 1. Run a development build (see [Running the app](../process/running-the-app.md)).
 2. Open the dev board screen: `/dev/board` (not linked from the app; release builds go home).
 3. Pick **Dice → Throw on the board**.
-4. Swipe the board. A tap on the board, or the **Roll** button, throws too.
+4. Swipe anywhere under the header: on the board, or up from the controls under it. A tap on the board, or the **Roll** button, throws too.
 
-The board follows Settings: the board theme, the home board side and the layout (Tall or Classic). The dice roll in the field that holds the theme's dice area: the bottom half of the tall board, the right half of the classic board.
+The board follows Settings: the board theme, the home board side and the layout (Tall or Classic). The dice roll on the whole playing surface, both halves, so a swipe in any direction can land them on any side of the board. They may stop on top of checkers: the spike does not clear a space (see the cost table).
 
 ## Preview
 
@@ -23,7 +23,7 @@ One throw, drawn headless with the same code the dev screen plays (`pnpm --filte
 
 ![Five frames of one throw: the throw, in flight, the first bounce, the second bounce, the rest pose](dice-throw/throw-strip.png)
 
-The whole throw as a GIF (30 fps): [throw.gif](dice-throw/throw.gif).
+The whole throw as a GIF (30 fps): [throw.gif](dice-throw/throw.gif). The tool writes it only when `ffmpeg` is installed.
 
 ## How it works
 
@@ -31,18 +31,32 @@ All the code is in `apps/mobile/src/features/dice-throw/`, plus a switch on the 
 
 1. **The result comes first.** The RNG rolls the dice (`rollDice(rng)`, the same injected RNG the games use). The animation never picks a value.
 2. **A plan lands on that result.** `planThrow` (`throwPath.ts`, pure TypeScript, no React) simulates the two dice at 60 samples a second, with 4 physics steps per sample:
-   - They start where the finger let go, side by side across the throw, and fly in the swipe direction. The speed is the finger speed from Gesture Handler, clamped to 450–1800 pt/s (`swipeToThrow`). Without a usable velocity it comes from the swipe length.
+   - The swipe sets only the direction and the speed, never the start (`swipeToThrow`). The direction runs from where the finger went down to where it lifted. The speed is the finger speed from Gesture Handler, clamped to 450–1200 pt/s; without a usable velocity it comes from the swipe length.
+   - The dice come in from the wall behind the throw (`entryPoint`): on the line through the middle of the field, side by side across the throw, with room for both. So every throw crosses the whole field. A swipe up starts at the middle of the near wall; a swipe up and to the right starts on the near wall, left of the middle.
    - Drag and rolling friction slow them down (`dampSpeed`, an exact formula, so the result does not depend on the frame rate).
    - They bounce off the four walls of the field (`reflect`: half the speed into the wall stays, most of the speed along it stays) and off each other.
-   - The walls come from the theme layout: the field rect from `layout.fields`, less half a die (`throwField.ts`).
+   - The walls come from the theme layout: the smallest rect around all of `layout.fields` (the whole playing surface), less half a die (`throwField.ts`).
    - The spin and the faces count **back from the end**. So the die always stops at the theme's resting tilt (`layout.dice.tilt`) and on the rolled value. On the way, a die shows a new face after each 0.9 die sizes of travel, and never the same or the opposite face twice in a row (like a real die rolling over an edge, `faceSequence`).
-   - A die is drawn up to 22% bigger at full speed, so it looks "in the air".
+   - A die is drawn up to 16% bigger at full speed, so it looks "in the air".
+   - **The bar is a raised divider** (`throwBar`, `ThrowBar`): the gap between the two fields. A die over any part of it is in the bar zone. A die that meets the bar at 250 pt/s or more (`hopSpeed`) hops over it: it flies with no friction, is drawn up to 30% bigger at the top of the hop, and a knock plays when it lands. A slower die bounces off the edge of the zone. No die rests on the bar, and a throw never starts on it: a swipe along the bar starts on the player's side of it (`offBar`, `bar.shelter`).
    - Same input, same plan: there is no randomness in the planner.
 3. **Reanimated plays the plan.** One shared value runs from 0 to the end of the throw (`withTiming`, linear). Each die (`ThrownDie.tsx`) reads its pose with `sampleAt`, a worklet, on the UI thread. It draws with the board's own `DieBody` and `DiePips`.
 4. **Knocks.** The plan lists every hit with its time and strength. `hitCues` joins hits closer than 70 ms, and each cue plays `diceLand` (sound and haptic) through `features/feedback`. The throw starts with `diceRoll`.
 5. **When the dice stop**, the text under the board says "Rolled 2 and 4." and `useAnnouncement` reads it to screen readers.
 
-Gestures follow the board rules (#174, #186): a pan and a tap race (`useCompetingGestures`), so one touch is never both a swipe and a tap. There is no `...spread` inside the gesture hook configs. A touch that the system takes away (a notification shade, a call) throws nothing.
+Gestures follow the board rules (#174, #186): one touch is never both a swipe and a tap. The pan covers the whole throw view (the board, the Roll row and the dev screen's controls); the tap covers only the board. They sit on nested views, and Gesture Handler lets only one run: the first to activate cancels the other. The tap stays on the board because an active gesture cancels the press of a button under it (`cancelsJSResponder`); the pan may cancel one, so a swipe that starts on a button only throws. There is no `...spread` inside the gesture hook configs. A touch that the system takes away (a notification shade, a call) throws nothing.
+
+### Owner feedback (2026-10-29, the bar)
+
+The dice crossed the bar and slid along it as if it were flat felt. Now the bar is a raised divider: a fast die hops over it, a slow one bounces off, and none rests on it or starts on it (see "How it works"). The speed was "good now".
+
+### Owner feedback (2026-10-29)
+
+The throw was "too fast, almost aggressive", and the dice could only roll in one half of the board. So the launch speed came down (it was 450–1800 pt/s), the drag and the bounce got softer (a bounce keeps 40% of the speed, it was 50%), and the dice may roll on the whole board. The first try (300–800 pt/s, 1.4 to 2.2 s) was then "too slow". The current tuning plays it 1.5 times faster over the same distance: 450–1200 pt/s and about 0.9 to 1.5 s a throw (it was about 1 s at the start, but with twice the launch speed).
+
+### Owner feedback (2026-10-28)
+
+The first version threw the dice from where the finger let go, and only a swipe that started on the board counted. A short swipe near the far wall made a short, awkward throw. Now a swipe may start anywhere in the throw view, and it sets only the direction and the speed. The game board needs the same in the real build: a swipe area bigger than the board.
 
 Reduce Motion: the dice show at rest at once (`restPlan`), with no flight and no knocks.
 
@@ -52,8 +66,8 @@ Tests: `throwPath.test.ts` (the math and the planner: the dice stay inside the f
 
 | What                                        | Value                                    |
 | ------------------------------------------- | ---------------------------------------- |
-| One throw, slowest to fastest               | about 0.9 s to 1.1 s                     |
-| Wall hits on a hard throw                   | 2 to 5, the first after about 0.1–0.2 s |
+| One throw, slowest to fastest               | about 0.9 s to 1.5 s                     |
+| Wall hits on a hard throw                   | 0 to 4, the first after about 0.5–0.7 s |
 | Plan size                                   | about 70 samples, about 11 KB as JSON    |
 | Planning time (Node on a laptop)            | about 0.5 ms                             |
 | Work per frame on the UI thread             | 2 transforms, 12 face opacities          |
@@ -101,8 +115,8 @@ The pure parts (`throwPath.ts`, `throwField.ts`) and their tests can stay as the
 **Other risks.**
 
 - Doubles: the throw shows two dice; the game shows four. The hand-over step above solves it (`DiceRow` shows the 2 × 2 grid).
-- A long throw slows play down. A throw takes about 1 s; a tap during the throw could skip to the rest pose.
-- On the classic board the field is small, so the dice hit the walls more often. Tune the speeds per layout if it looks busy.
+- A long throw slows play down. A throw takes about 1.5 s; a tap during the throw could skip to the rest pose.
+- On the classic board the surface is wide and short, so the dice hit the walls more often. Tune the speeds per layout if it looks busy.
 
 ## Recommendation
 

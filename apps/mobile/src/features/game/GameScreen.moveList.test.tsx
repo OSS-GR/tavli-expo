@@ -84,13 +84,13 @@ async function playWithButtons(store: GameStore) {
       questions++;
       await pressButton('Play on');
     } else if (passNotice(flow) && shows('pass-card')) await pressButton('OK');
-    else if (view.phase === 'opening-roll') await pressButton(/: roll, or tap the board$/);
+    else if (view.phase === 'opening-roll') await pressButton(/: roll, or swipe the board$/);
     else if (openingStatus(view.game) && shows('opening-card')) {
       // The result closes by itself (3 s); a screen reader user waits.
       await waitFor(() => expect(screen.queryByTestId('opening-card')).toBeNull(), {
         timeout: OPENING_RESULT_MS + 1000,
       });
-    } else if (view.phase === 'awaiting-roll') await pressButton('Roll dice, or tap the board');
+    } else if (view.phase === 'awaiting-roll') await pressButton('Roll dice, or swipe the board');
     else if (view.phase === 'awaiting-confirm') await pressButton('Confirm');
     else {
       expect(screen.getByTestId('move-list')).toBeOnTheScreen();
@@ -258,7 +258,7 @@ describe('<GameScreen /> Plakoto mother question with the move list', () => {
     expect(announce).toHaveBeenLastCalledWith(
       'Ann played: Checker from point 2 to point 1, pins; Checker from point 24 to point 18. The turn passes to Bob.',
     );
-    await pressButton('Roll dice, or tap the board');
+    await pressButton('Roll dice, or swipe the board');
     expect(announce).toHaveBeenLastCalledWith(expect.stringMatching(/^Bob rolled \d-\d\.$/));
     await pressButton(firstMoveName(store));
     expect(store.getState().flow.game.played).toHaveLength(1);
@@ -319,7 +319,7 @@ describe('<GameScreen /> announcements vs the bot', () => {
     expect(said).toContainEqual(expect.stringMatching(/^Bot played: .+\. Your turn\.$/));
     // Your own moves are never read back to you.
     expect(said.some((text) => text.startsWith('You played'))).toBe(false);
-    await pressButton('Roll dice, or tap the board');
+    await pressButton('Roll dice, or swipe the board');
     expect(announce).toHaveBeenLastCalledWith(expect.stringMatching(/^You rolled \d-\d\.$/));
     expect(screen.getByTestId('move-list')).toBeOnTheScreen();
   });
@@ -353,7 +353,7 @@ describe('<GameScreen /> announcements after a remount (#216)', () => {
       jest.advanceTimersByTime(OPENING_RESULT_MS);
     });
     await playTurn(store);
-    await pressButton('Roll dice, or tap the board');
+    await pressButton('Roll dice, or swipe the board');
     const said: unknown = announce.mock.calls.at(-1)?.[0];
     expect(said).toMatch(/^Bob rolled \d-\d\.$/);
     return String(said);

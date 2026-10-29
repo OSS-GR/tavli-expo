@@ -230,7 +230,7 @@ export function OpeningCard({
           <ActionButton
             testID="roll-button"
             label={rollLabel}
-            subtitle={t('game.roll.orTapBoard')}
+            subtitle={t('game.roll.orSwipeBoard')}
             disabled={rollDisabled}
             onPress={onRoll}
           />

@@ -8,7 +8,7 @@ import type { FeedbackEvent } from '@/features/feedback/feedback';
 import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
-import { countNodes, type JsonNode } from '../../../test/tree';
+import { countNodes, findAllNodes, type JsonNode } from '../../../test/tree';
 
 import type { BoardLayoutMode } from '@/features/settings/settings';
 
@@ -44,21 +44,37 @@ function expectedRolls(n: number) {
 
 const resultText = () => screen.getByTestId('dice-throw-result').props.children as string;
 
+type Pose = readonly [{ translateX: number }, { translateY: number }, ...unknown[]];
+
+/** Where each thrown die is now, read from its transform (`ThrownDie`). */
+function dicePlaces(): number[][] {
+  const dice = findAllNodes(screen.toJSON() as JsonNode | null, (n) => {
+    const transform = n.props.transform as { get?: unknown } | undefined;
+    return n.type === 'Group' && typeof transform?.get === 'function';
+  });
+  return dice.map((n) => {
+    const [x, y] = (n.props.transform as { get: () => Pose }).get();
+    return [Math.round(x.translateX), Math.round(y.translateY)];
+  });
+}
+
 describe('DiceThrowBoard (dice throw spike, #183)', () => {
   // The throw plays on timers (the knocks); keep them on a fake clock.
   runOnFakeTimers();
 
   it('asks for a swipe before the first throw', async () => {
     await setup();
-    expect(resultText()).toBe('Swipe the board to throw the dice.');
+    expect(resultText()).toBe('Swipe anywhere to throw the dice.');
   });
 
-  it('throws on a swipe and shows the values the RNG rolled', async () => {
+  it('throws on a swipe on the board and shows the values the RNG rolled', async () => {
     const { events } = await setup();
-    await touch('dice-throw-pan', [
-      { x: 180, y: 560 },
-      { x: 185, y: 450 },
-      { x: 190, y: 300 },
+    // A finger on the board reaches its tap and the pan around it: the pan wins.
+    // Sideways: the dice cross the board's width and hit the far wall.
+    await touch('dice-throw-tap', [
+      { x: 60, y: 450 },
+      { x: 180, y: 445 },
+      { x: 300, y: 440 },
     ]);
     const [first] = expectedRolls(1);
     expect(resultText()).toBe(`Rolled ${first![0]} and ${first![1]}.`);
@@ -68,6 +84,35 @@ describe('DiceThrowBoard (dice throw spike, #183)', () => {
       jest.advanceTimersByTime(3000);
     });
     expect(events.filter((e) => e === 'diceLand').length).toBeGreaterThan(0);
+  });
+
+  it('throws on a swipe that starts under the board', async () => {
+    const { events } = await setup();
+    // Off the board (the Roll row, the controls): only the pan gets the finger.
+    await touch('dice-throw-pan', [
+      { x: 180, y: 680 },
+      { x: 185, y: 560 },
+      { x: 190, y: 420 },
+    ]);
+    const [first] = expectedRolls(1);
+    expect(resultText()).toBe(`Rolled ${first![0]} and ${first![1]}.`);
+    expect(events).toEqual(['diceRoll']);
+  });
+
+  it('lands the dice in the same place wherever the same swipe starts', async () => {
+    await setup();
+    // The same swipe (100 up, 10 right) on the board, then from under it.
+    await touch('dice-throw-tap', [
+      { x: 180, y: 300 },
+      { x: 190, y: 200 },
+    ]);
+    const onBoard = dicePlaces();
+    expect(onBoard).toHaveLength(2);
+    await touch('dice-throw-pan', [
+      { x: 40, y: 700 },
+      { x: 50, y: 600 },
+    ]);
+    expect(dicePlaces()).toEqual(onBoard);
   });
 
   it('throws with the Roll button (screen readers, no swipe)', async () => {
@@ -101,7 +146,7 @@ describe('DiceThrowBoard (dice throw spike, #183)', () => {
       { canceled: true },
     );
     expect(events).toEqual([]);
-    expect(resultText()).toBe('Swipe the board to throw the dice.');
+    expect(resultText()).toBe('Swipe anywhere to throw the dice.');
   });
 
   it('draws two dice on the board after a throw', async () => {

@@ -129,7 +129,7 @@ describe('app navigation', () => {
     expect(session?.setup).toMatchObject({ mode: 'bot', targetPoints: 5, botLevel: 'easy' });
     expect(router.getPathname()).toBe(`/game/${session?.id}`);
     expect(
-      screen.getByRole('button', { name: 'Roll to start, or tap the board' }),
+      screen.getByRole('button', { name: 'Roll to start, or swipe the board' }),
     ).toBeOnTheScreen();
 
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
@@ -176,7 +176,7 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: 'Rematch, Same settings · you start' }));
     expect(router.getPathname()).toBe(board);
     expect(session.store.getState().flow.match.status).toBe('in-progress');
-    expect(screen.getByRole('button', { name: 'Roll dice, or tap the board' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Roll dice, or swipe the board' })).toBeOnTheScreen();
     expect(JSON.parse(storage.getString(SAVED_MATCH_KEY) ?? '{}').id).toBe(session.id);
 
     // Change settings: the new-game form of the same mode; the match is gone.
@@ -458,7 +458,7 @@ describe('app navigation', () => {
         flow: { ...flow, game: createGameFlow({ state, starter: 'white' }) },
       });
     });
-    await user.press(screen.getByRole('button', { name: 'Roll dice, or tap the board' }));
+    await user.press(screen.getByRole('button', { name: 'Roll dice, or swipe the board' }));
     // The board draws once it knows its size.
     await act(async () => {
       fireEvent(screen.getByTestId('game-board'), 'layout', {

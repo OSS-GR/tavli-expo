@@ -24,6 +24,20 @@ export interface Box {
   readonly bottom: number;
 }
 
+/**
+ * The bar between the two fields: a raised divider, not flat felt. `axis` is
+ * the direction a die crosses it (`y` on the tall board, `x` on the classic
+ * one); `from` and `to` are the edges of the gap, in canvas points.
+ * `shelter` is the middle of the field on the player's side, on the same
+ * axis: a throw that would start on the bar starts there instead.
+ */
+export interface ThrowBar {
+  readonly axis: 'x' | 'y';
+  readonly from: number;
+  readonly to: number;
+  readonly shelter: number;
+}
+
 /** A rect in canvas points (like `ScreenRect` in `features/board/geometry`). */
 export interface PlainRect {
   readonly x: number;
@@ -60,22 +74,33 @@ export interface ThrowTuning {
   readonly faceEvery: number;
   /** Extra scale of a die at full speed (it is "in the air"). */
   readonly lift: number;
+  /** A die hops over the bar only when it meets it this fast (pt/s). Slower, it bounces off. */
+  readonly hopSpeed: number;
+  /** Extra scale at the top of a hop over the bar. */
+  readonly hopLift: number;
 }
 
+// Calm, like dice rolled across a felt table (owner feedback: the first
+// tuning, 450-1800 pt/s, was "almost aggressive"). A throw takes about 1 to
+// 1.5 s and the dice cross the whole board. (The second tuning, 300-800 pt/s and
+// 1.4-2.2 s, was too slow: this one plays it 1.5 times faster over the same
+// distance, so the speeds scale by 1.5, the drag by 1.5 and the friction by 2.25.)
 export const THROW_TUNING: ThrowTuning = {
   minSpeed: 450,
-  maxSpeed: 1800,
-  drag: 1,
-  friction: 350,
-  restitution: 0.5,
-  wallGrip: 0.85,
-  quietHit: 90,
+  maxSpeed: 1200,
+  drag: 1.8,
+  friction: 158,
+  restitution: 0.4,
+  wallGrip: 0.9,
+  quietHit: 105,
   sampleMs: 1000 / 60,
   substeps: 4,
-  maxMs: 2200,
-  spin: 0.9,
-  faceEvery: 0.9,
-  lift: 0.22,
+  maxMs: 3600,
+  spin: 0.7,
+  faceEvery: 1.3,
+  lift: 0.16,
+  hopSpeed: 250,
+  hopLift: 0.3,
 };
 
 // ---------------------------------------------------------------------------
@@ -149,6 +174,37 @@ export function clampToBox(p: Vec2, box: Box): Vec2 {
   };
 }
 
+/** `box` made smaller by `byX` on the left and right and `byY` on the top and bottom, never past its middle. */
+export function shrinkBox(box: Box, byX: number, byY: number): Box {
+  const cx = (box.left + box.right) / 2;
+  const cy = (box.top + box.bottom) / 2;
+  return {
+    left: Math.min(cx, box.left + byX),
+    right: Math.max(cx, box.right - byX),
+    top: Math.min(cy, box.top + byY),
+    bottom: Math.max(cy, box.bottom - byY),
+  };
+}
+
+/**
+ * Where a throw in `direction` starts: on the wall behind the throw, on the
+ * line through the middle of `box`. So every throw crosses the whole field.
+ * A zero direction starts at the middle of the near (bottom) wall.
+ */
+export function entryPoint(box: Box, direction: Vec2): Vec2 {
+  const cx = (box.left + box.right) / 2;
+  const cy = (box.top + box.bottom) / 2;
+  const length = Math.hypot(direction.x, direction.y);
+  if (length === 0) return { x: cx, y: box.bottom };
+  const dx = direction.x / length;
+  const dy = direction.y / length;
+  // How far back from the middle the line meets a wall.
+  const toSide = dx === 0 ? Infinity : (box.right - box.left) / 2 / Math.abs(dx);
+  const toEnd = dy === 0 ? Infinity : (box.bottom - box.top) / 2 / Math.abs(dy);
+  const back = Math.min(toSide, toEnd);
+  return clampToBox({ x: cx - dx * back, y: cy - dy * back }, box);
+}
+
 // ---------------------------------------------------------------------------
 // From a swipe to a throw.
 
@@ -162,15 +218,30 @@ export interface ThrowStart {
 const SWIPE_SECONDS = 0.15;
 
 /**
- * The throw for a swipe that ended at `end`. `velocity` is the finger speed
- * from Gesture Handler (pt/s). Without a usable one (0 or not a number),
- * the speed comes from `translation` over a typical swipe time.
+ * The gap from the middle of the pair to each die at the start, across the
+ * throw, in die sizes (`planThrow`).
+ */
+export const PAIR_GAP = 0.62;
+
+/**
+ * The throw for a swipe. The swipe sets only the direction and the speed;
+ * where the finger was does not matter, so a swipe may start off the board.
+ *
+ * - Direction: `translation`, from where the finger went down to where it
+ *   lifted. Without one, the finger velocity; without both, straight up.
+ * - Speed: the finger speed from Gesture Handler (`velocity`, pt/s). Without
+ *   a usable one (0 or not a number), `translation` over a typical swipe time.
+ * - Start: the dice come in from the wall behind the throw (`entryPoint`),
+ *   with room for both side by side, so they always cross the field. A
+ *   start on the bar moves to the player's side of it (`bar.shelter`), so
+ *   the dice never slide along the bar.
  */
 export function swipeToThrow(
-  end: Vec2,
-  velocity: Vec2 | undefined,
   translation: Vec2,
+  velocity: Vec2 | undefined,
   box: Box,
+  dieSize: number,
+  bar?: ThrowBar,
   tuning: ThrowTuning = THROW_TUNING,
 ): ThrowStart {
   const usable =
@@ -178,13 +249,37 @@ export function swipeToThrow(
     Number.isFinite(velocity.x) &&
     Number.isFinite(velocity.y) &&
     Math.hypot(velocity.x, velocity.y) > 0;
-  const raw = usable
-    ? velocity
-    : { x: translation.x / SWIPE_SECONDS, y: translation.y / SWIPE_SECONDS };
+  const swiped = Math.hypot(translation.x, translation.y);
+  const direction = swiped > 0 ? translation : usable ? velocity : { x: 0, y: -1 };
+  const length = Math.hypot(direction.x, direction.y);
+  const speed = usable ? Math.hypot(velocity.x, velocity.y) : swiped / SWIPE_SECONDS;
+  const raw = { x: (direction.x / length) * speed, y: (direction.y / length) * speed };
+  // The two dice sit PAIR_GAP apart across the throw: keep both inside the box.
+  const gap = dieSize * PAIR_GAP;
+  const room = shrinkBox(
+    box,
+    (Math.abs(direction.y) / length) * gap,
+    (Math.abs(direction.x) / length) * gap,
+  );
   return {
-    at: clampToBox(end, box),
+    at: offBar(entryPoint(room, direction), room, bar, dieSize),
     velocity: clampSpeed(raw, tuning.minSpeed, tuning.maxSpeed),
   };
+}
+
+/**
+ * `at`, unless the dice would start on the bar (a die and the pair's gap
+ * away from it): then the same point on the player's side of the bar.
+ */
+export function offBar(at: Vec2, room: Box, bar: ThrowBar | undefined, dieSize: number): Vec2 {
+  if (bar === undefined) return at;
+  const along = bar.axis === 'x' ? at.x : at.y;
+  const margin = dieSize * (0.5 + PAIR_GAP);
+  if (along <= bar.from - margin || along >= bar.to + margin) return at;
+  return clampToBox(
+    bar.axis === 'x' ? { x: bar.shelter, y: at.y } : { x: at.x, y: bar.shelter },
+    room,
+  );
 }
 
 /**
@@ -244,7 +339,7 @@ export interface ThrowHit {
   /** Time from the throw, in ms. */
   readonly atMs: number;
   readonly die: number;
-  readonly kind: 'wall' | 'dice';
+  readonly kind: 'wall' | 'dice' | 'bar';
   /** 0..1: how hard the hit was (for the volume and the haptic). */
   readonly strength: number;
 }
@@ -267,6 +362,8 @@ export interface PlanThrowInput {
   readonly values: readonly [number, number];
   /** Resting angle of each die, in degrees (the theme's `layout.dice.tilt`). */
   readonly tilts: readonly [number, number];
+  /** The bar between the fields. Without one, the box is flat all over. */
+  readonly bar?: ThrowBar;
   readonly tuning?: ThrowTuning;
 }
 
@@ -362,7 +459,7 @@ export function planThrow(input: PlanThrowInput): ThrowPlan {
   const speed0 = Math.hypot(v0.x, v0.y) || 1;
   // Across the throw, half a die and a bit to each side.
   const across = { x: -v0.y / speed0, y: v0.x / speed0 };
-  const gap = dieSize * 0.62;
+  const gap = dieSize * PAIR_GAP;
   const starts = [-1, 1].map((side) =>
     clampToBox(
       { x: input.start.at.x + across.x * gap * side, y: input.start.at.y + across.y * gap * side },
@@ -384,8 +481,56 @@ export function planThrow(input: PlanThrowInput): ThrowPlan {
   const ys: number[][] = [[], []];
   const travel: number[][] = [[], []];
   const speedAt: number[][] = [[], []];
+  const hopAt: number[][] = [[], []];
   const hits: ThrowHit[] = [];
   const distance = [0, 0];
+
+  // The bar is a raised divider. A die over it (any part of it) is in the
+  // zone [lo, hi]. A fast die hops over: it flies, with no friction, and
+  // lands on the other side. A slow die bounces off the edge of the zone.
+  // No die ever rests on the bar.
+  const bar = input.bar;
+  const lo = bar ? bar.from - dieSize / 2 : 0;
+  const hi = bar ? bar.to + dieSize / 2 : 0;
+  const air = [false, false];
+  const along = (b: Body) => (bar?.axis === 'x' ? b.x : b.y);
+  const alongSpeed = (b: Body) => (bar?.axis === 'x' ? b.vx : b.vy);
+  const crossBar = (b: Body, i: number, was: number, atMs: number) => {
+    if (!bar) return;
+    const now = along(b);
+    const inside = now > lo && now < hi;
+    if (air[i]) {
+      if (!inside) {
+        air[i] = false;
+        const landing = Math.abs(alongSpeed(b));
+        if (landing > t.quietHit) {
+          hits.push({ atMs, die: i, kind: 'bar', strength: Math.min(1, landing / t.maxSpeed) });
+        }
+      }
+      return;
+    }
+    if (!inside) return;
+    const fromLow = was <= lo;
+    const fromHigh = was >= hi;
+    const side = fromLow ? -1 : fromHigh ? 1 : now < (lo + hi) / 2 ? -1 : 1;
+    const intoBar = side < 0 ? alongSpeed(b) : -alongSpeed(b);
+    if ((fromLow || fromHigh) && intoBar >= t.hopSpeed) {
+      air[i] = true;
+      return;
+    }
+    // Bounce off the edge, and keep the die off the bar.
+    const away = Math.abs(alongSpeed(b)) * t.restitution;
+    if (bar.axis === 'x') {
+      b.x = side < 0 ? lo : hi;
+      b.vx = side < 0 ? -away : away;
+    } else {
+      b.y = side < 0 ? lo : hi;
+      b.vy = side < 0 ? -away : away;
+    }
+    if (intoBar > t.quietHit) {
+      hits.push({ atMs, die: i, kind: 'wall', strength: Math.min(1, intoBar / t.maxSpeed) });
+    }
+  };
 
   const record = () => {
     bodies.forEach((b, i) => {
@@ -393,6 +538,9 @@ export function planThrow(input: PlanThrowInput): ThrowPlan {
       ys[i]?.push(b.y);
       travel[i]?.push(distance[i] ?? 0);
       speedAt[i]?.push(Math.hypot(b.vx, b.vy));
+      // Up and down once over the bar: 0 on the ground, 1 at the middle of the hop.
+      const progress = bar && hi > lo ? Math.min(1, Math.max(0, (along(b) - lo) / (hi - lo))) : 0;
+      hopAt[i]?.push(air[i] ? Math.sin(Math.PI * progress) : 0);
     });
   };
   record();
@@ -404,12 +552,15 @@ export function planThrow(input: PlanThrowInput): ThrowPlan {
     const atMs = sample * t.sampleMs;
     for (let step = 0; step < t.substeps; step++) {
       bodies.forEach((b, i) => {
-        slowDown(b, dt, t);
+        // In the air over the bar there is no felt to slow the die.
+        if (!air[i]) slowDown(b, dt, t);
         const ox = b.x;
         const oy = b.y;
+        const was = bar?.axis === 'x' ? ox : oy;
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         const into = hitWalls(b, box, t);
+        crossBar(b, i, was, atMs);
         distance[i] = (distance[i] ?? 0) + Math.hypot(b.x - ox, b.y - oy);
         if (into > t.quietHit) {
           hits.push({ atMs, die: i, kind: 'wall', strength: Math.min(1, into / t.maxSpeed) });
@@ -448,7 +599,9 @@ export function planThrow(input: PlanThrowInput): ThrowPlan {
       y: ys[i] ?? [],
       // Spin counts down to the resting tilt, so the die always stops at `tilt`.
       angle: dist.map((d) => tilt + (turn * (total - d) * t.spin) / dieSize),
-      scale: (speedAt[i] ?? []).map((s) => 1 + t.lift * (s / fastest)),
+      scale: (speedAt[i] ?? []).map(
+        (s, k) => 1 + t.lift * (s / fastest) + t.hopLift * (hopAt[i]?.[k] ?? 0),
+      ),
       // Faces count back from the end too: the last flip lands on the value.
       face: dist.map((d) => faces[flips - Math.floor((total - d) / step)] ?? faces[0] ?? 1),
     };

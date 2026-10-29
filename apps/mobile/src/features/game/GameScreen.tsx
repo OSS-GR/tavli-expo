@@ -80,6 +80,8 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import { scheduleOnRN } from 'react-native-worklets';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -97,6 +99,7 @@ import {
 import { boardDiceBox, columnDiceBox } from '@/features/board/boardDice';
 import { pinnedCheckers, toneOf, type BoardView } from '@/features/board/boardModel';
 import { flowPaths } from '@/features/board/combined';
+import { BOARD_GESTURES } from '@/features/board/interaction';
 import { DiceRow } from '@/features/board/DiceRow';
 import {
   flightsEndMs,
@@ -514,6 +517,15 @@ export function GameScreen({
     }
   };
   const onDiceLanded = () => feedback.event('diceLand');
+  // A swipe over the opening card rolls too, like on the board (the card covers it).
+  const openingSwipe = usePanGesture({
+    minDistance: BOARD_GESTURES.pan.minDistance,
+    testID: 'opening-swipe',
+    onActivate: () => {
+      'worklet';
+      scheduleOnRN(roll);
+    },
+  });
 
   // Checkers in the air. A flight belongs to the view it was made in.
   const [flights, setFlights] = useState<readonly Flight[]>([]);
@@ -917,7 +929,7 @@ export function GameScreen({
       <ActionButton
         testID="roll-button"
         label={t('game.roll.dice')}
-        subtitle={t('game.roll.orTapBoard')}
+        subtitle={t('game.roll.orSwipeBoard')}
         onPress={roll}
         grow={!landscape}
         compact={landscape}
@@ -1244,28 +1256,30 @@ export function GameScreen({
     );
   } else if (!over && showOpening && opening) {
     card = (
-      <Pressable
-        testID="opening-overlay"
-        // The whole board area: a tap anywhere closes the result early;
-        // while rolling, a tap rolls ("or tap the board").
-        style={styles.tapArea}
-        onPress={decided ? () => setOpeningDismissed(gameKey) : roll}
-        accessible={false}>
-        <OpeningCard
-          theme={theme}
-          status={opening}
-          names={{ white: nameOf('white'), black: nameOf('black') }}
-          you={isYou('white') ? 'white' : isYou('black') ? 'black' : null}
-          rollsAgain={rules.match.openingRoll === 'rerollBoth'}
-          // The match too: each step is read once per app run (#216).
-          gameKey={`${matchKey}:${gameKey}`}
-          rollLabel={openingRollLabel}
-          rollDisabled={tieWait}
-          onRoll={roll}
-          onClose={() => setOpeningDismissed(gameKey)}
-          onDieLanded={onDiceLanded}
-        />
-      </Pressable>
+      <GestureDetector gesture={openingSwipe}>
+        <Pressable
+          testID="opening-overlay"
+          // The whole board area: a tap anywhere closes the result early;
+          // while rolling, a tap rolls ("or swipe the board").
+          style={styles.tapArea}
+          onPress={decided ? () => setOpeningDismissed(gameKey) : roll}
+          accessible={false}>
+          <OpeningCard
+            theme={theme}
+            status={opening}
+            names={{ white: nameOf('white'), black: nameOf('black') }}
+            you={isYou('white') ? 'white' : isYou('black') ? 'black' : null}
+            rollsAgain={rules.match.openingRoll === 'rerollBoth'}
+            // The match too: each step is read once per app run (#216).
+            gameKey={`${matchKey}:${gameKey}`}
+            rollLabel={openingRollLabel}
+            rollDisabled={tieWait}
+            onRoll={roll}
+            onClose={() => setOpeningDismissed(gameKey)}
+            onDieLanded={onDiceLanded}
+          />
+        </Pressable>
+      </GestureDetector>
     );
   }
 
@@ -1426,6 +1440,7 @@ export function GameScreen({
         onSteps={onSteps}
         onGeometry={onGeometry}
         onBoardTap={roll}
+        onBoardSwipe={roll}
         onPickUp={() => feedback.event('checkerPickUp')}
         onIllegalDrop={() => feedback.event('invalidMove')}
         marks={marks}

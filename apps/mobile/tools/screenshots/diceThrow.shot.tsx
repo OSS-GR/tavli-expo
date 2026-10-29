@@ -32,7 +32,12 @@ import { checkerRadius, fitBoardWithShadow, type BoardGeometry } from '@/feature
 import { SAMPLE_DIRECTIONS, SAMPLE_POSITIONS } from '@/features/board/positions';
 import { BoardScene, type BoardImages } from '@/features/board/skia/BoardScene';
 import { DieBody, DiePips } from '@/features/board/skia/DieShape';
-import { boardThrowBox, throwDieSize, throwField } from '@/features/dice-throw/throwField';
+import {
+  boardThrowBox,
+  throwBar,
+  throwDieSize,
+  throwField,
+} from '@/features/dice-throw/throwField';
 import { planThrow, sampleAt, swipeToThrow, type ThrowPlan } from '@/features/dice-throw/throwPath';
 
 import { loadFont, loadSkia, loadThemeImages } from './render';
@@ -137,17 +142,23 @@ it('renders the dice throw preview', async () => {
 
   // 1. The RNG rolls first. 2. The path is planned to land on that roll.
   const values = rollDice(createSeededRng(184));
+  // A quick swipe up and to the right. Only its direction and speed count:
+  // the dice come in from the wall behind the throw.
+  const dieSize = throwDieSize(geo);
+  const bar = throwBar(geo);
   const start = swipeToThrow(
-    { x: box.left + 30, y: box.bottom - 10 },
-    { x: 1100, y: -1400 }, // a quick flick up and to the right, in pt/s
-    { x: 0, y: 0 },
+    { x: 110, y: -140 }, // the swipe, in pt
+    { x: 1100, y: -1400 }, // the finger speed at the end, in pt/s
     box,
+    dieSize,
+    bar,
   );
   const tilt = layout.dice.tilt;
   const plan = planThrow({
     box,
+    bar,
     start,
-    dieSize: throwDieSize(geo),
+    dieSize,
     values,
     tilts: [tilt[0], tilt[1]],
   });

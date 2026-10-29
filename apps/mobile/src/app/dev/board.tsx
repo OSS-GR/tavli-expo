@@ -3,7 +3,8 @@
  * the drawing on a phone. Not linked from the app. Release builds go home.
  *
  * Dice → "Throw on the board" turns on the dice throw spike (#183): swipe
- * the board to throw two dice onto it (`features/dice-throw`).
+ * to throw two dice onto the board (`features/dice-throw`). The swipe may
+ * start anywhere under the header, on the controls too.
  */
 import { getPreset, type PlayerId } from '@tavli/engine';
 import { Redirect, Stack } from 'expo-router';
@@ -42,46 +43,55 @@ export default function DevBoardRoute() {
     ? asodioMarks(board, getPreset('asodio.kafeneio'), view)
     : {};
 
+  const controls = (
+    <View style={styles.controls}>
+      <SegmentedControl
+        testID="dev-board-position"
+        label={t('dev.board.position')}
+        value={position}
+        onChange={setPosition}
+        options={SAMPLE_POSITION_IDS.map((id) => ({
+          value: id,
+          label: t(`dev.board.positions.${id}`),
+        }))}
+      />
+      <SegmentedControl
+        testID="dev-board-viewer"
+        label={t('dev.board.viewer')}
+        value={viewer}
+        onChange={setViewer}
+        options={[
+          { value: 'white', label: t('dev.board.viewWhite') },
+          { value: 'black', label: t('dev.board.viewBlack') },
+        ]}
+      />
+      <SegmentedControl
+        testID="dev-board-dice"
+        label={t('dev.board.dice')}
+        value={dice}
+        onChange={setDice}
+        options={[
+          { value: 'off', label: t('dev.board.diceOff') },
+          { value: 'throw', label: t('dev.board.diceThrow') },
+        ]}
+      />
+    </View>
+  );
+
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: true, title: t('dev.board.title') }} />
       {dice === 'throw' ? (
-        <DiceThrowBoard testID="dev-throw" board={board} view={view} marks={marks} rng={rng} />
+        // The controls go inside the throw view: a swipe that starts on them throws too.
+        <DiceThrowBoard testID="dev-throw" board={board} view={view} marks={marks} rng={rng}>
+          {controls}
+        </DiceThrowBoard>
       ) : (
-        <StaticBoard testID="dev-board" board={board} view={view} marks={marks} />
+        <>
+          <StaticBoard testID="dev-board" board={board} view={view} marks={marks} />
+          {controls}
+        </>
       )}
-      <View style={styles.controls}>
-        <SegmentedControl
-          testID="dev-board-position"
-          label={t('dev.board.position')}
-          value={position}
-          onChange={setPosition}
-          options={SAMPLE_POSITION_IDS.map((id) => ({
-            value: id,
-            label: t(`dev.board.positions.${id}`),
-          }))}
-        />
-        <SegmentedControl
-          testID="dev-board-viewer"
-          label={t('dev.board.viewer')}
-          value={viewer}
-          onChange={setViewer}
-          options={[
-            { value: 'white', label: t('dev.board.viewWhite') },
-            { value: 'black', label: t('dev.board.viewBlack') },
-          ]}
-        />
-        <SegmentedControl
-          testID="dev-board-dice"
-          label={t('dev.board.dice')}
-          value={dice}
-          onChange={setDice}
-          options={[
-            { value: 'off', label: t('dev.board.diceOff') },
-            { value: 'throw', label: t('dev.board.diceThrow') },
-          ]}
-        />
-      </View>
     </View>
   );
 }

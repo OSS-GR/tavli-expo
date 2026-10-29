@@ -117,6 +117,8 @@ export interface InteractiveBoardProps {
   ) => boolean;
   /** A tap that did not touch a movable checker (e.g. tap the board to roll). */
   onBoardTap?: () => void;
+  /** A swipe that did not start on a movable checker, while none can move (e.g. swipe the board to roll). */
+  onBoardSwipe?: () => void;
   /** A checker was selected, and the next tap hit no target (the selection is dropped). */
   onMissTap?: () => void;
   /**
@@ -178,6 +180,7 @@ export function InteractiveBoard({
   paths,
   onSteps,
   onBoardTap,
+  onBoardSwipe,
   onMissTap,
   cue = false,
   onPickUp,
@@ -318,6 +321,9 @@ export function InteractiveBoard({
       else if (pickSource(sources, x, y, 0) !== selected) onMissTap?.();
     }
   };
+  const onSwipe = () => {
+    if (sources.length === 0) onBoardSwipe?.();
+  };
   const onDragStart = (source: number) => {
     setSelected(source);
     setDragKey(sources[source]?.checker.key ?? null);
@@ -364,8 +370,11 @@ export function InteractiveBoard({
       'worklet';
       const i = dragIndex.get();
       const s = sources[i];
-      // A swipe that does not start on a movable checker does nothing.
-      if (s === undefined) return;
+      // A swipe that does not start on a movable checker moves nothing.
+      if (s === undefined) {
+        scheduleOnRN(onSwipe);
+        return;
+      }
       const p = dragPoint(s.checker, { x: startX.get(), y: startY.get() }, e);
       dragX.set(p.x);
       dragY.set(p.y);

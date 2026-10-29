@@ -254,7 +254,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 <img src="wireframes/07-board-roll.png" width="300" alt="Board: your turn, roll">
 
-- One big **Roll dice** button ("or tap the board"). Undo and Confirm are hidden.
+- One big **Roll dice** button ("or swipe the board"). Undo and Confirm are hidden.
 - The stack on point 6 shows the count badge "6".
 
 ### 6c. Your turn: moving
