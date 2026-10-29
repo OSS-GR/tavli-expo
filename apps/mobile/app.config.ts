@@ -14,6 +14,12 @@
  * project id from `eas init`). This file reads it through `config`. Only
  * settings that depend on build env vars belong here.
  *
+ * Only the development build registers the dev client's link scheme
+ * (`exp+tavlaki`, from the slug). The QR code of `expo start` opens that
+ * scheme. If a preview or production app on the phone registered it too, iOS
+ * could open that app instead of the dev app. Those variants have no dev
+ * launcher to open anyway (see `withDevClientScheme`).
+ *
  * The result goes into the fingerprint (the runtime version). EAS Build
  * makes the fingerprint on your computer and again on the build server, and
  * the build fails when the two differ. So read only env vars that both
@@ -83,6 +89,19 @@ function convexSiteUrl(url: string): string | undefined {
   return cloud ? `${cloud[1]}.convex.site` : undefined;
 }
 
+/**
+ * The plugins for `variant`. Preview and production builds turn off the
+ * dev client's generated `exp+<slug>` scheme (see the top of this file).
+ * Never list `expo-dev-client` twice: the dev build keeps the default.
+ */
+export function withDevClientScheme(
+  plugins: ExpoConfig['plugins'],
+  variant: Variant,
+): ExpoConfig['plugins'] {
+  if (variant === 'development') return plugins;
+  return [...(plugins ?? []), ['expo-dev-client', { addGeneratedScheme: false }]];
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   const variant = readVariant();
   const { idSuffix, nameSuffix } = VARIANTS[variant];
@@ -99,6 +118,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     slug,
     ios: { ...config.ios, bundleIdentifier: `${bundleIdentifier}${idSuffix}` },
     android: { ...config.android, package: `${androidPackage}${idSuffix}` },
+    plugins: withDevClientScheme(config.plugins, variant),
     extra: { ...config.extra, convexUrl: url, ...(siteUrl ? { convexSiteUrl: siteUrl } : {}) },
   };
 };
