@@ -95,7 +95,7 @@ describe('<MatchScreen /> vs bot', () => {
 
     expect(within(screen.getByTestId('strip-bottom')).getByText('You')).toBeOnTheScreen();
     expect(within(screen.getByTestId('strip-top')).getByText('Bot · Easy')).toBeOnTheScreen();
-    await user.press(button('Roll to start, or tap the board'));
+    await user.press(button('Roll to start, or swipe the board'));
     const opening = game(s).opening;
     expect(opening?.ties.length || (opening?.white !== null && opening?.black !== null)).toBe(true);
   });
@@ -301,7 +301,7 @@ describe('<MatchScreen /> pass-and-play', () => {
   it('uses the typed names, and Player 2 for an empty one', async () => {
     const s = session({ ...defaultSetup('local'), names: { white: 'Maria', black: '' } });
     await show(s).view;
-    expect(button('Maria: roll, or tap the board')).toBeOnTheScreen();
+    expect(button('Maria: roll, or swipe the board')).toBeOnTheScreen();
     expect(within(screen.getByTestId('strip-top')).getByText('Player 2')).toBeOnTheScreen();
   });
 
@@ -424,7 +424,7 @@ describe('<MatchScreen /> pass-and-play turns', () => {
     expect(bottom().getByText('NIKOS’S TURN')).toBeOnTheScreen();
     expect(top().getByText('Maria')).toBeOnTheScreen();
     // No "pass the phone" screen: Nikos can roll at once (wireframe 6e).
-    expect(screen.getByRole('button', { name: 'Roll dice, or tap the board' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Roll dice, or swipe the board' })).toBeOnTheScreen();
   });
 
   it('keeps the board fixed when Settings say Fixed, and switches at once', async () => {

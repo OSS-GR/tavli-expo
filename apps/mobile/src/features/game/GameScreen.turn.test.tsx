@@ -115,7 +115,7 @@ describe('<GameScreen /> undo and confirm', () => {
     await user.press(button('Confirm'));
     expect(phase(store)).toBe('awaiting-roll');
     expect(store.getState().flow.game.state.toMove).toBe('black');
-    expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
+    expect(button('Roll dice, or swipe the board')).toBeOnTheScreen();
   });
 
   it('ends the turn by itself with auto-confirm on', async () => {
@@ -238,12 +238,12 @@ describe('<GameScreen /> no legal moves', () => {
     ).toBeOnTheScreen();
     // The board stays with Ann until the card closes.
     expect(within(screen.getByTestId('strip-bottom')).getByText('Ann')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: 'Roll dice, or tap the board' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Roll dice, or swipe the board' })).toBeNull();
 
     await user.press(button('OK'));
     expect(screen.queryByText('No legal moves')).toBeNull();
     expect(within(screen.getByTestId('strip-bottom')).getByText('Bob')).toBeOnTheScreen();
-    expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
+    expect(button('Roll dice, or swipe the board')).toBeOnTheScreen();
   });
 
   it('your own pass waits for OK: it does not close by itself (#178)', async () => {
@@ -341,12 +341,12 @@ describe('<GameScreen /> no legal moves vs the bot (#178)', () => {
     expect(card.getByText(/^Bot rolled \d-\d\. No checker can move\.$/)).toBeOnTheScreen();
     expect(card.getByText('Your turn.')).toBeOnTheScreen();
     expect(card.getByText('Closes by itself after 3.5 s.')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: 'Roll dice, or tap the board' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Roll dice, or swipe the board' })).toBeNull();
     await tick(BOT_PASS_NOTICE_MS - 100);
     expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
     await tick(110);
     expect(screen.queryByTestId('pass-card')).toBeNull();
-    expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
+    expect(button('Roll dice, or swipe the board')).toBeOnTheScreen();
   });
 
   it('OK closes the bot’s pass sooner', async () => {
@@ -354,7 +354,7 @@ describe('<GameScreen /> no legal moves vs the bot (#178)', () => {
     await botPasses();
     await user.press(button('OK'));
     expect(screen.queryByTestId('pass-card')).toBeNull();
-    expect(button('Roll dice, or tap the board')).toBeOnTheScreen();
+    expect(button('Roll dice, or swipe the board')).toBeOnTheScreen();
   });
 
   it('the bot’s pass does not close while the screen is paused (menu open)', async () => {

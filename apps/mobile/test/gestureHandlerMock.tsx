@@ -17,9 +17,16 @@
  *   (default 500 ms). Otherwise it activates and ends when the finger lifts.
  * - `useCompetingGestures` (Race): the first gesture to activate cancels the
  *   others.
+ * - Nested detectors: a finger on the inner view reaches the gestures of the
+ *   detectors around it too. With no relation set, Gesture Handler lets only
+ *   one of them run: the first to activate cancels the others, like a race
+ *   (`shouldHandlerBeCancelledBy` in `GestureHandlerOrchestrator.kt`). A
+ *   finger outside the inner view reaches only the outer gestures.
+ *
+ * Give every gesture a `testID`: the mock finds gestures by it.
  */
 import { act } from '@testing-library/react-native';
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { View, type ViewProps } from 'react-native';
 
 interface GestureEvent {
@@ -55,32 +62,60 @@ type Gesture = { kind: 'pan'; config: PanConfig } | { kind: 'tap'; config: TapCo
 const PAN_MIN_DISTANCE = 10;
 const TAP_MAX_DURATION = 500;
 
-/** The gestures a finger on `testID` drives: the gesture and the gestures it races. */
-const groups = new Map<string, Gesture[]>();
+/**
+ * The latest gesture with each testID. The hooks run on every render, so a
+ * touch always calls the latest callbacks. The two maps below hold testIDs,
+ * not gestures, so a detector that skips a render never leaves an old one.
+ */
+const latest = new Map<string, Gesture>();
+/** The testIDs each gesture races (`useCompetingGestures`), itself included. */
+const races = new Map<string, readonly string[]>();
+/** The testIDs of the gestures on the detectors around each gesture's detector. */
+const around = new Map<string, readonly string[]>();
 
-function register(gestures: Gesture[]) {
-  for (const g of gestures) if (g.config.testID) groups.set(g.config.testID, gestures);
+const idOf = (g: Gesture) => g.config.testID;
+const idsOf = (gestures: readonly Gesture[]) =>
+  gestures.map(idOf).filter((id): id is string => id !== undefined);
+
+function remember(gesture: Gesture) {
+  const id = idOf(gesture);
+  if (id === undefined) return;
+  latest.set(id, gesture);
+  races.set(id, [id]);
 }
 
 export function usePanGesture(config: PanConfig): Gesture {
   const gesture: Gesture = { kind: 'pan', config };
-  register([gesture]);
+  remember(gesture);
   return gesture;
 }
 
 export function useTapGesture(config: TapConfig): Gesture {
   const gesture: Gesture = { kind: 'tap', config };
-  register([gesture]);
+  remember(gesture);
   return gesture;
 }
 
 export function useCompetingGestures(...gestures: Gesture[]): Gesture[] {
-  register(gestures);
+  const ids = idsOf(gestures);
+  for (const id of ids) races.set(id, ids);
   return gestures;
 }
 
-export function GestureDetector({ children }: { children: ReactNode }) {
-  return <>{children}</>;
+/** The testIDs of the gestures on the detectors around this one. */
+const Around = createContext<readonly string[]>([]);
+
+export function GestureDetector({
+  gesture,
+  children,
+}: {
+  gesture: Gesture | Gesture[];
+  children: ReactNode;
+}) {
+  const outer = useContext(Around);
+  const own = idsOf(Array.isArray(gesture) ? gesture : [gesture]);
+  for (const id of own) around.set(id, outer);
+  return <Around.Provider value={[...own, ...outer]}>{children}</Around.Provider>;
 }
 
 export function GestureHandlerRootView(props: ViewProps) {
@@ -95,7 +130,8 @@ export interface Point {
 type State = 'began' | 'active' | 'done';
 
 /**
- * A finger on the gesture `testID` (and the gestures it races): down at
+ * A finger on the view of the gesture `testID`: it drives that gesture, the
+ * gestures it races and those of the detectors around it. Down at
  * `path[0]`, through the other points, up at the last one. One point is a
  * tap. `holdMs`: how long the finger stays down (default 100 ms, a quick
  * tap). `canceled`: the system takes the touch away at the last point.
@@ -105,8 +141,9 @@ export async function touch(
   path: Point[],
   { canceled = false, holdMs = 100 }: { canceled?: boolean; holdMs?: number } = {},
 ): Promise<void> {
-  const gestures = groups.get(testID);
-  if (gestures === undefined) throw new Error(`No gesture with testID ${testID}`);
+  if (!latest.has(testID)) throw new Error(`No gesture with testID ${testID}`);
+  const ids = new Set([...(races.get(testID) ?? [testID]), ...(around.get(testID) ?? [])]);
+  const gestures = [...ids].flatMap((id) => latest.get(id) ?? []);
   const [first, ...rest] = path;
   if (first === undefined) throw new Error('A touch needs a point');
   const last = rest[rest.length - 1] ?? first;
@@ -119,7 +156,7 @@ export async function touch(
   const activate = (g: Gesture, at: Point) => {
     states.set(g, 'active');
     g.config.onActivate?.(at);
-    // Race: the others stop at once.
+    // Race (or nested detectors): the others stop at once.
     for (const other of gestures) if (other !== g && states.get(other) === 'began') fail(other, at);
   };
   const end = (g: Gesture, at: Point, wasCanceled: boolean) => {

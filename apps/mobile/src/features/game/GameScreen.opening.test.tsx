@@ -81,7 +81,7 @@ describe('<GameScreen /> opening roll (#176)', () => {
     expect(card().getByText('Ann')).toBeOnTheScreen();
     expect(card().getByText('Bob')).toBeOnTheScreen();
     // The Roll button is on the card, next to the dice.
-    expect(card().getByRole('button', { name: 'Ann: roll, or tap the board' })).toBeOnTheScreen();
+    expect(card().getByRole('button', { name: 'Ann: roll, or swipe the board' })).toBeOnTheScreen();
     expect(screen.getAllByTestId('roll-button')).toHaveLength(1);
     expect(announced()).toEqual([
       'Each player rolls one die. The higher die starts and plays both. Ann: roll.',
@@ -98,7 +98,7 @@ describe('<GameScreen /> opening roll (#176)', () => {
     ];
     const canvasBefore = dice();
     const pathsBefore = canvasBefore.map(nativePath);
-    await user.press(screen.getByRole('button', { name: 'Ann: roll, or tap the board' }));
+    await user.press(screen.getByRole('button', { name: 'Ann: roll, or swipe the board' }));
     const white = store.getState().flow.game.opening!.white!;
     expect(message()).toHaveTextContent(`Ann rolled ${white}.`);
     expect(card().getByLabelText(`Rolled ${white}`)).toBeOnTheScreen();
@@ -131,7 +131,7 @@ describe('<GameScreen /> opening roll (#176)', () => {
     expect(announced()).toContain('Tie: both rolled 4. Roll again. Ann: roll.');
 
     // Right after the tie a tap does nothing: the button waits while the dice land.
-    const button = card().getByRole('button', { name: 'Ann: roll, or tap the board' });
+    const button = card().getByRole('button', { name: 'Ann: roll, or swipe the board' });
     expect(button).toBeDisabled();
     await act(async () => {
       fireEvent.press(screen.getByTestId('opening-overlay'));
@@ -147,7 +147,7 @@ describe('<GameScreen /> opening roll (#176)', () => {
 
     // The next roll starts a new round: Bob's die is blank again.
     const user = setupUser();
-    await user.press(card().getByRole('button', { name: 'Ann: roll, or tap the board' }));
+    await user.press(card().getByRole('button', { name: 'Ann: roll, or swipe the board' }));
     const white = store.getState().flow.game.opening!.white!;
     expect(white).not.toBeNull();
     expect(message()).toHaveTextContent(`Ann rolled ${white}.`);
@@ -165,7 +165,7 @@ describe('<GameScreen /> opening roll (#176)', () => {
     const tie = 'Tie: both rolled 4. Roll again. Ann: roll.';
     expect(announced().filter((text) => text === tie)).toHaveLength(2);
     // The second tie waits again.
-    expect(card().getByRole('button', { name: 'Ann: roll, or tap the board' })).toBeDisabled();
+    expect(card().getByRole('button', { name: 'Ann: roll, or swipe the board' })).toBeDisabled();
   });
 
   it('vs bot: one tap rolls both dice, and a tie shows both', async () => {
@@ -173,7 +173,7 @@ describe('<GameScreen /> opening roll (#176)', () => {
     const store = newStore({ white: 'You', black: 'Asodio' }, seedWithTie());
     await render(<GameScreen store={store} openingTaps="one" />);
     expect(
-      card().getByRole('button', { name: 'Roll to start, or tap the board' }),
+      card().getByRole('button', { name: 'Roll to start, or swipe the board' }),
     ).toBeOnTheScreen();
     await user.press(screen.getByTestId('opening-overlay'));
     // The bot's die rolled with the same tap: both dice show the tie.
@@ -184,7 +184,7 @@ describe('<GameScreen /> opening roll (#176)', () => {
     expect(card().getAllByLabelText(`Rolled ${tie}`)).toHaveLength(2);
     // After the wait, one tap rolls both again.
     await wait(OPENING_TIE_WAIT_MS);
-    await user.press(card().getByRole('button', { name: 'Roll to start, or tap the board' }));
+    await user.press(card().getByRole('button', { name: 'Roll to start, or swipe the board' }));
     const next = store.getState().flow.game;
     expect(next.opening!.ties.length > 1 || next.phase !== 'opening-roll').toBe(true);
   });
@@ -243,7 +243,9 @@ describe('<GameScreen /> opening roll (#176)', () => {
     });
     const store = newStore({ white: 'Μαρία', black: 'Νίκος' });
     await render(<GameScreen store={store} />);
-    expect(card().getByRole('button', { name: 'Μαρία: ρίξε, ή πάτα το ταμπλό' })).toBeOnTheScreen();
+    expect(
+      card().getByRole('button', { name: 'Μαρία: ρίξε, ή σύρε στο ταμπλό' }),
+    ).toBeOnTheScreen();
     await rollDie(store, 'white', 4);
     expect(message()).toHaveTextContent('Μαρία: έφερε 4.');
     await rollDie(store, 'black', 4);

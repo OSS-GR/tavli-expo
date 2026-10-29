@@ -245,7 +245,7 @@
       "diceThrow": "Throw on the board",
       "throw": {
         "roll": "Roll",
-        "hint": "Swipe the board to throw the dice.",
+        "hint": "Swipe anywhere to throw the dice.",
         "result": "Rolled {{first}} and {{second}}.",
         "boardLabel": "Board. Swipe to throw the dice, or use the Roll button."
       }
@@ -454,7 +454,7 @@
       "opening": "Roll to start",
       "openingFor": "{{name}}: roll",
       "dice": "Roll dice",
-      "orTapBoard": "or tap the board"
+      "orSwipeBoard": "or swipe the board"
     },
     "dice": {
       "label": "Dice {{values}}, {{left}} left to play"
@@ -946,7 +946,7 @@
     "lessons": {
       "move": {
         "title": "Move a checker",
-        "body": "You play the light checkers. Tap the lit checker, then tap the ring. Or drag it there.",
+        "body": "You play the light checkers. Tap the lit checker, then tap the ring. Or drag it there. In a real game you roll the dice with a swipe on the board.",
         "hint": "Move the lit checker 4 points, with the 4.",
         "done": "Well done! A checker moves as many points as the die shows.",
         "board": "Board. Your checker on point 13 is lit. Dice 4 and 2. Move it 4 points, to point 9."

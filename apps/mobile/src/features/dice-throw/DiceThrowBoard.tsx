@@ -1,11 +1,13 @@
 /**
- * Dice throw spike (#183), dev board screen only: swipe on the board to
- * throw two dice onto it.
+ * Dice throw spike (#183), dev board screen only: swipe to throw two dice
+ * onto the board.
  *
  * 1. The RNG rolls the dice first (`rollDice`).
- * 2. `planThrow` works out a path that ends on those values: the dice fly
- *    the way the finger went, as fast as it went (clamped), bounce off the
- *    walls of the field and stop.
+ * 2. `planThrow` works out a path that ends on those values: the dice come
+ *    in from the wall behind the throw, fly the way the finger went, as fast
+ *    as it went (clamped), bounce off the walls of the field and stop.
+ *    Where the finger was does not matter (`swipeToThrow`), so a swipe may
+ *    start anywhere in this view, also under the board.
  * 3. Reanimated plays the plan back on the UI thread; a knock (sound and
  *    haptic, `features/feedback`) plays on each hit.
  *
@@ -13,21 +15,18 @@
  * path for screen readers and for players who do not want to swipe. With
  * Reduce Motion on, the dice show at rest at once.
  *
- * Gestures follow the board rules (#174, #186): a pan and a tap race, so
- * one touch is never both. The dice roll in the field that holds the
- * theme's dice area, on the tall or the classic board (`throwField`).
+ * Gestures follow the board rules (#174, #186): one touch is never both a
+ * swipe and a tap. The pan covers the whole view and the tap only the
+ * board; on nested views the first to activate cancels the other. The dice
+ * roll in the field that holds the theme's dice area, on the tall or the
+ * classic board (`throwField`).
  */
 import { rollDice, type BoardState, type Dice, type Rng } from '@tavli/engine';
 import type { ThemeManifest } from '@tavli/themes';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
-import {
-  GestureDetector,
-  useCompetingGestures,
-  usePanGesture,
-  useTapGesture,
-} from 'react-native-gesture-handler';
+import { GestureDetector, usePanGesture, useTapGesture } from 'react-native-gesture-handler';
 import { Easing, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -52,13 +51,15 @@ import {
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import type { BoardLayoutMode } from '@/features/settings/settings';
 
-import { boardThrowBox, throwDieSize } from './throwField';
+import { boardThrowBox, throwBar, throwDieSize } from './throwField';
 import {
   buttonThrow,
   hitCues,
   planThrow,
   restPlan,
   swipeToThrow,
+  type Box,
+  type ThrowBar,
   type ThrowPlan,
   type ThrowStart,
 } from './throwPath';
@@ -76,6 +77,8 @@ export interface DiceThrowBoardProps {
   layout?: BoardLayoutMode;
   /** Sound and haptics. Default: the theme's, through `createGameFeedback`. */
   feedback?: GameFeedback;
+  /** More controls under the Roll row. A swipe that starts on them throws too. */
+  children?: ReactNode;
   testID?: string;
 }
 
@@ -103,6 +106,7 @@ export function DiceThrowBoard({
   theme: themeProp,
   layout: layoutProp,
   feedback: feedbackProp,
+  children,
   testID = 'dice-throw',
 }: DiceThrowBoardProps) {
   const { t } = useTranslation();
@@ -131,16 +135,19 @@ export function DiceThrowBoard({
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
 
-  const throwFrom = (start: (box: ReturnType<typeof boardThrowBox>) => ThrowStart) => {
+  const throwFrom = (start: (box: Box, dieSize: number, bar?: ThrowBar) => ThrowStart) => {
     if (!geo) return;
     // The result first. The path is planned to land on it.
     const values = rollDice(rng);
     const box = boardThrowBox(geo);
+    const dieSize = throwDieSize(geo);
+    const bar = throwBar(geo);
     const tilt = geo.layout.dice.tilt;
     const input = {
       box,
-      start: start(box),
-      dieSize: throwDieSize(geo),
+      bar,
+      start: start(box, dieSize, bar),
+      dieSize,
       values,
       tilts: [tilt[0], tilt[1]] as const,
     };
@@ -153,13 +160,15 @@ export function DiceThrowBoard({
     });
   };
 
-  const onSwipe = (x: number, y: number, x0: number, y0: number, vx?: number, vy?: number) => {
-    throwFrom((box) =>
+  // Only the swipe's direction and speed count, not where it was.
+  const onSwipe = (dx: number, dy: number, vx?: number, vy?: number) => {
+    throwFrom((box, dieSize, bar) =>
       swipeToThrow(
-        { x, y },
+        { x: dx, y: dy },
         vx === undefined || vy === undefined ? undefined : { x: vx, y: vy },
-        { x: x - x0, y: y - y0 },
         box,
+        dieSize,
+        bar,
       ),
     );
   };
@@ -192,7 +201,10 @@ export function DiceThrowBoard({
       : null;
   useAnnouncement(result, thrown ? `${boardKey}:${thrown.key}` : undefined);
 
-  // A swipe throws. No spread inside the config: the Worklets plugin does not allow it (#174).
+  // A swipe throws. It covers the whole view, so it may start under the
+  // board (on the Roll row or the controls). An active pan cancels a button
+  // press under the finger, so a swipe that starts on a button only throws.
+  // No spread inside the config: the Worklets plugin does not allow it (#174).
   const pan = usePanGesture({
     minDistance: BOARD_GESTURES.pan.minDistance,
     testID: `${testID}-pan`,
@@ -204,11 +216,12 @@ export function DiceThrowBoard({
     onDeactivate: (e) => {
       'worklet';
       if (!e.canceled) {
-        scheduleOnRN(onSwipe, e.x, e.y, startX.get(), startY.get(), e.velocityX, e.velocityY);
+        scheduleOnRN(onSwipe, e.x - startX.get(), e.y - startY.get(), e.velocityX, e.velocityY);
       }
     },
   });
-  // A tap throws too, like tap-to-roll on the game board.
+  // A tap on the board throws too, like tap-to-roll on the game board. Only
+  // on the board: an active tap would cancel the press of a button under it.
   const tap = useTapGesture({
     maxDistance: BOARD_GESTURES.tap.maxDistance,
     maxDuration: BOARD_GESTURES.tap.maxDuration,
@@ -218,56 +231,58 @@ export function DiceThrowBoard({
       if (!e.canceled) scheduleOnRN(onButton);
     },
   });
-  const gesture = useCompetingGestures(pan, tap);
 
   const dieSize = geo ? throwDieSize(geo) : 0;
 
   return (
-    <View style={styles.wrap}>
-      <GestureDetector gesture={gesture}>
-        <View
-          testID={testID}
-          style={styles.space}
-          onLayout={onLayout}
-          accessible
-          accessibilityRole="image"
-          accessibilityLabel={t('dev.board.throw.boardLabel')}>
-          {size && geo ? (
-            <BoardCanvas
-              theme={theme}
-              geo={geo}
-              size={size}
-              picture={layoutBoard(geo, board, view, marks)}
-              testID={`${testID}-canvas`}>
-              {thrown
-                ? thrown.plan.dice.map((track, i) => (
-                    <ThrownDie
-                      key={`${thrown.key}-${i}`}
-                      style={theme.dice}
-                      track={track}
-                      sampleMs={thrown.plan.sampleMs}
-                      size={dieSize}
-                      clock={clock}
-                    />
-                  ))
-                : null}
-            </BoardCanvas>
-          ) : null}
+    <GestureDetector gesture={pan}>
+      <View testID={`${testID}-area`} style={styles.wrap}>
+        <GestureDetector gesture={tap}>
+          <View
+            testID={testID}
+            style={styles.space}
+            onLayout={onLayout}
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={t('dev.board.throw.boardLabel')}>
+            {size && geo ? (
+              <BoardCanvas
+                theme={theme}
+                geo={geo}
+                size={size}
+                picture={layoutBoard(geo, board, view, marks)}
+                testID={`${testID}-canvas`}>
+                {thrown
+                  ? thrown.plan.dice.map((track, i) => (
+                      <ThrownDie
+                        key={`${thrown.key}-${i}`}
+                        style={theme.dice}
+                        track={track}
+                        sampleMs={thrown.plan.sampleMs}
+                        size={dieSize}
+                        clock={clock}
+                      />
+                    ))
+                  : null}
+              </BoardCanvas>
+            ) : null}
+          </View>
+        </GestureDetector>
+        <View style={styles.row}>
+          {/* Read out by `useAnnouncement` (both platforms), not by a live region. */}
+          <Text testID={`${testID}-result`} style={styles.result}>
+            {result ?? t('dev.board.throw.hint')}
+          </Text>
+          <ActionButton
+            testID={`${testID}-roll`}
+            label={t('dev.board.throw.roll')}
+            disabled={!geo}
+            onPress={onButton}
+          />
         </View>
-      </GestureDetector>
-      <View style={styles.row}>
-        {/* Read out by `useAnnouncement` (both platforms), not by a live region. */}
-        <Text testID={`${testID}-result`} style={styles.result}>
-          {result ?? t('dev.board.throw.hint')}
-        </Text>
-        <ActionButton
-          testID={`${testID}-roll`}
-          label={t('dev.board.throw.roll')}
-          disabled={!geo}
-          onPress={onButton}
-        />
+        {children}
       </View>
-    </View>
+    </GestureDetector>
   );
 }
 

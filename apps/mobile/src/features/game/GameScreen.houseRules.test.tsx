@@ -133,7 +133,7 @@ describe('<GameScreen /> opening roll house rule (#207)', () => {
       expect(game(store).state.dice).toBeNull();
 
       // Now Nikos rolls both dice; the roll is read like any roll.
-      await user.press(screen.getByRole('button', { name: 'Roll dice, or tap the board' }));
+      await user.press(screen.getByRole('button', { name: 'Roll dice, or swipe the board' }));
       const dice = game(store).state.dice;
       expect(dice).not.toBeNull();
       expect(store.getState().flow.log.filter((e) => e.type === 'roll')).toHaveLength(1);
@@ -300,7 +300,7 @@ describe('<GameScreen /> opening roll house rule (#207)', () => {
         'auto',
       );
 
-      await user.press(screen.getByRole('button', { name: 'Roll dice, or tap the board' }));
+      await user.press(screen.getByRole('button', { name: 'Roll dice, or swipe the board' }));
       expect(game(store).state.dice).not.toBeNull();
       expect(announced().some((text) => text.startsWith('Nikos rolled'))).toBe(true);
     });
@@ -327,7 +327,9 @@ describe('<GameScreen /> opening roll house rule (#207)', () => {
       await user.press(card().getByRole('button', { name: 'I start' }));
       expect(game(store).state.toMove).toBe('white');
       expect(announced()).toContain('You start.');
-      expect(screen.getByRole('button', { name: 'Roll dice, or tap the board' })).toBeOnTheScreen();
+      expect(
+        screen.getByRole('button', { name: 'Roll dice, or swipe the board' }),
+      ).toBeOnTheScreen();
     });
 
     it('vs bot: "Bot starts" and the bot rolls its first turn', async () => {

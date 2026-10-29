@@ -6,7 +6,7 @@ export type ActionButtonKind = 'primary' | 'secondary' | 'text';
 
 export interface ActionButtonProps {
   label: string;
-  /** A second, smaller line, e.g. "or tap the board". */
+  /** A second, smaller line, e.g. "or swipe the board". */
   subtitle?: string;
   kind?: ActionButtonKind;
   disabled?: boolean;

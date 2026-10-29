@@ -9,6 +9,7 @@ import { feedback, sound } from '@/services';
 import { createGameStore } from './gameStore';
 import { GameScreen, OPENING_RESULT_MS } from './GameScreen';
 
+import { touch } from '../../../test/gestureHandlerMock';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot as render } from '../../../test/render';
 
@@ -51,12 +52,12 @@ describe('<GameScreen /> dice', () => {
     expect(screen.getByText('Who starts?')).toBeOnTheScreen();
     expect(screen.getAllByLabelText('Not rolled yet')).toHaveLength(2);
 
-    await user.press(screen.getByRole('button', { name: 'Ann: roll, or tap the board' }));
+    await user.press(screen.getByRole('button', { name: 'Ann: roll, or swipe the board' }));
     const white = store.getState().flow.game.opening?.white;
     expect(screen.getByLabelText(`Rolled ${white}`)).toBeOnTheScreen();
     expect(screen.getAllByLabelText('Not rolled yet')).toHaveLength(1);
 
-    await user.press(screen.getByRole('button', { name: 'Bob: roll, or tap the board' }));
+    await user.press(screen.getByRole('button', { name: 'Bob: roll, or swipe the board' }));
     const { game } = store.getState().flow;
     expect(game.phase).toBe('moving');
     const high = Math.max(game.opening!.white!, game.opening!.black!);
@@ -87,7 +88,7 @@ describe('<GameScreen /> dice', () => {
     const user = setupUser();
     const store = newStore();
     await render(<GameScreen store={store} openingTaps="one" />);
-    await user.press(screen.getByRole('button', { name: 'Roll to start, or tap the board' }));
+    await user.press(screen.getByRole('button', { name: 'Roll to start, or swipe the board' }));
     const { opening, phase } = store.getState().flow.game;
     expect(opening!.white !== null || opening!.ties.length > 0).toBe(true);
     expect(phase === 'moving' || opening!.ties.length > 0).toBe(true);
@@ -101,7 +102,7 @@ describe('<GameScreen /> dice', () => {
       store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 4 });
     });
     expect(screen.getByText('Tie: both rolled 4. Roll again.')).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Ann: roll, or tap the board' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Ann: roll, or swipe the board' })).toBeOnTheScreen();
   });
 
   it('closes the opening card after a moment', async () => {
@@ -160,11 +161,40 @@ describe('<GameScreen /> dice', () => {
       dispatch({ type: 'confirm', player: 'white' });
     });
     expect(store.getState().flow.game.phase).toBe('awaiting-roll');
-    await user.press(screen.getByRole('button', { name: 'Roll dice, or tap the board' }));
+    await user.press(screen.getByRole('button', { name: 'Roll dice, or swipe the board' }));
     const { game } = store.getState().flow;
     expect(game.state.toMove).toBe('black');
     expect(game.state.dice).not.toBeNull();
     expect(haptics.calls).toEqual([]);
     expect(sounds.played).toEqual([]);
+  });
+
+  it('rolls the opening die with a swipe over the card', async () => {
+    const store = newStore();
+    await render(<GameScreen store={store} />);
+    await touch('opening-swipe', [
+      { x: 20, y: 200 },
+      { x: 120, y: 120 },
+    ]);
+    expect(store.getState().flow.game.opening?.white).not.toBeNull();
+  });
+
+  it('rolls the dice with a swipe on the board', async () => {
+    const store = newStore();
+    await render(<GameScreen store={store} />);
+    await act(async () => {
+      const { dispatch } = store.getState();
+      dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+      dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+      dispatch({ type: 'move', player: 'white', move: { from: 13, to: 7, die: 6 } });
+      dispatch({ type: 'move', player: 'white', move: { from: 8, to: 7, die: 1 } });
+      dispatch({ type: 'confirm', player: 'white' });
+    });
+    expect(store.getState().flow.game.state.dice).toBeNull();
+    await touch('game-board-pan', [
+      { x: 20, y: 200 },
+      { x: 120, y: 120 },
+    ]);
+    expect(store.getState().flow.game.state.dice).not.toBeNull();
   });
 });

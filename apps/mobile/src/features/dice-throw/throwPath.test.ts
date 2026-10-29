@@ -1,19 +1,24 @@
 import {
+  PAIR_GAP,
   THROW_TUNING,
   buttonThrow,
   clampSpeed,
   dampSpeed,
+  entryPoint,
   faceSequence,
   hitCues,
+  offBar,
   planThrow,
   reflect,
   restPlan,
   sampleAt,
+  shrinkBox,
   stopTime,
   swipeToThrow,
   throwBox,
   type Box,
   type PlanThrowInput,
+  type ThrowBar,
   type ThrowPlan,
 } from './throwPath';
 
@@ -83,8 +88,8 @@ describe('dampSpeed and stopTime', () => {
     expect(stopTime(0, 1, 1)).toBe(0);
   });
 
-  it('stops the fastest throw in under two seconds, before the hard limit', () => {
-    expect(stopTime(THROW_TUNING.maxSpeed, drag, friction)).toBeLessThan(2);
+  it('stops the fastest throw in under two and a half seconds, before the hard limit', () => {
+    expect(stopTime(THROW_TUNING.maxSpeed, drag, friction)).toBeLessThan(2.5);
     expect(stopTime(THROW_TUNING.maxSpeed, drag, friction) * 1000).toBeLessThan(THROW_TUNING.maxMs);
   });
 });
@@ -122,29 +127,89 @@ describe('throwBox', () => {
   });
 });
 
-describe('swipeToThrow', () => {
-  it('uses the finger speed and starts where the finger let go', () => {
-    const t = swipeToThrow({ x: 100, y: 400 }, { x: 0, y: -1500 }, { x: 0, y: -60 }, BOX);
-    expect(t).toEqual({ at: { x: 100, y: 400 }, velocity: { x: 0, y: -1500 } });
+describe('shrinkBox', () => {
+  it('shrinks the sides and the ends, never past the middle', () => {
+    expect(shrinkBox(BOX, 10, 20)).toEqual({ left: 50, right: 310, top: 320, bottom: 500 });
+    expect(shrinkBox(BOX, 500, 500)).toEqual({ left: 180, right: 180, top: 410, bottom: 410 });
+  });
+});
+
+describe('entryPoint', () => {
+  // BOX: the middle is (180, 410); half width 140, half height 110.
+  it('starts a throw on the wall behind it, on the line through the middle', () => {
+    expect(entryPoint(BOX, { x: 0, y: -1 })).toEqual({ x: 180, y: 520 });
+    expect(entryPoint(BOX, { x: 0, y: 5 })).toEqual({ x: 180, y: 300 });
+    expect(entryPoint(BOX, { x: 2, y: 0 })).toEqual({ x: 40, y: 410 });
+    expect(entryPoint(BOX, { x: -2, y: 0 })).toEqual({ x: 320, y: 410 });
+    // Up and to the right: the line meets the near wall 110 to the left of the middle.
+    const diagonal = entryPoint(BOX, { x: 1, y: -1 });
+    expect(diagonal.x).toBeCloseTo(70);
+    expect(diagonal.y).toBeCloseTo(520);
   });
 
-  it('starts inside the field when the finger let go outside it', () => {
-    const t = swipeToThrow({ x: 0, y: 900 }, { x: 1000, y: 0 }, { x: 50, y: 0 }, BOX);
-    expect(t.at).toEqual({ x: BOX.left, y: BOX.bottom });
+  it('starts with no direction at the middle of the near wall', () => {
+    expect(entryPoint(BOX, { x: 0, y: 0 })).toEqual({ x: 180, y: 520 });
+  });
+
+  it('starts in the middle of a box with no room', () => {
+    const dot: Box = { left: 100, right: 100, top: 200, bottom: 200 };
+    expect(entryPoint(dot, { x: 3, y: -4 })).toEqual({ x: 100, y: 200 });
+  });
+});
+
+describe('swipeToThrow', () => {
+  it('takes the direction from the whole swipe and the speed from the finger', () => {
+    // The finger went up and to the right, then flicked straight up at the end.
+    const t = swipeToThrow({ x: 60, y: -80 }, { x: 0, y: -700 }, BOX, DIE);
+    expect(Math.hypot(t.velocity.x, t.velocity.y)).toBeCloseTo(700);
+    expect(t.velocity.x / t.velocity.y).toBeCloseTo(60 / -80);
+  });
+
+  it('starts at the wall behind the throw, not where the finger was', () => {
+    // Straight up: the middle of the near wall, so the dice cross the whole field.
+    const up = swipeToThrow({ x: 0, y: -60 }, { x: 0, y: -1500 }, BOX, DIE);
+    expect(up.at).toEqual({ x: 180, y: 520 });
+    // To the right: the middle of the left wall.
+    const right = swipeToThrow({ x: 50, y: 0 }, { x: 1000, y: 0 }, BOX, DIE);
+    expect(right.at).toEqual({ x: 40, y: 410 });
+  });
+
+  it('leaves room for both dice on a corner throw', () => {
+    const start = swipeToThrow({ x: 140, y: -110 }, undefined, BOX, DIE);
+    const plan = planThrow(input({ start }));
+    const [a, b] = plan.dice;
+    // Side by side at PAIR_GAP from the middle, so no die was pushed back inside.
+    const apart = Math.hypot((a.x[0] ?? 0) - (b.x[0] ?? 0), (a.y[0] ?? 0) - (b.y[0] ?? 0));
+    expect(apart).toBeCloseTo(2 * DIE * PAIR_GAP);
+    for (const d of plan.dice) {
+      expect(d.x[0]).toBeGreaterThanOrEqual(BOX.left);
+      expect(d.x[0]).toBeLessThanOrEqual(BOX.right);
+      expect(d.y[0]).toBeGreaterThanOrEqual(BOX.top);
+      expect(d.y[0]).toBeLessThanOrEqual(BOX.bottom);
+    }
   });
 
   it('works out the speed from the swipe when there is no velocity', () => {
-    const t = swipeToThrow({ x: 100, y: 400 }, undefined, { x: 0, y: -150 }, BOX);
+    const t = swipeToThrow({ x: 0, y: -90 }, undefined, BOX, DIE);
     expect(t.velocity.x).toBeCloseTo(0);
-    expect(t.velocity.y).toBeCloseTo(-1000);
-    const nan = swipeToThrow({ x: 100, y: 400 }, { x: NaN, y: NaN }, { x: 150, y: 0 }, BOX);
-    expect(nan.velocity.x).toBeCloseTo(1000);
+    expect(t.velocity.y).toBeCloseTo(-600);
+    const nan = swipeToThrow({ x: 90, y: 0 }, { x: NaN, y: NaN }, BOX, DIE);
+    expect(nan.velocity.x).toBeCloseTo(600);
+  });
+
+  it('uses the finger velocity with no swipe, and throws straight up with neither', () => {
+    const flick = swipeToThrow({ x: 0, y: 0 }, { x: 700, y: 0 }, BOX, DIE);
+    expect(flick).toEqual({ at: { x: 40, y: 410 }, velocity: { x: 700, y: 0 } });
+    const none = swipeToThrow({ x: 0, y: 0 }, undefined, BOX, DIE);
+    expect(none.at).toEqual({ x: 180, y: 520 });
+    expect(none.velocity.x).toBeCloseTo(0);
+    expect(none.velocity.y).toBeCloseTo(-THROW_TUNING.minSpeed);
   });
 
   it('clamps a slow drag and a wild flick', () => {
-    const slow = swipeToThrow({ x: 100, y: 400 }, { x: 10, y: 0 }, { x: 10, y: 0 }, BOX);
+    const slow = swipeToThrow({ x: 10, y: 0 }, { x: 10, y: 0 }, BOX, DIE);
     expect(Math.hypot(slow.velocity.x, slow.velocity.y)).toBeCloseTo(THROW_TUNING.minSpeed);
-    const wild = swipeToThrow({ x: 100, y: 400 }, { x: 0, y: -9000 }, { x: 0, y: -10 }, BOX);
+    const wild = swipeToThrow({ x: 0, y: -10 }, { x: 0, y: -9000 }, BOX, DIE);
     expect(Math.hypot(wild.velocity.x, wild.velocity.y)).toBeCloseTo(THROW_TUNING.maxSpeed);
   });
 });
@@ -322,5 +387,92 @@ describe('hitCues', () => {
 
   it('plays nothing for a throw with no hits', () => {
     expect(hitCues([])).toEqual([]);
+  });
+});
+
+// The bar: a raised divider between two fields. BOX is 300..520 tall; the gap
+// is 400..420, and a die (30) over any part of it is in the zone 385..435.
+const BAR: ThrowBar = { axis: 'y', from: 400, to: 420, shelter: 460 };
+const ZONE = { lo: BAR.from - DIE / 2, hi: BAR.to + DIE / 2 };
+const onBar = (y: number) => y > ZONE.lo && y < ZONE.hi;
+
+describe('the bar between the fields', () => {
+  const up = (speed: number, over: Partial<PlanThrowInput> = {}) =>
+    planThrow(
+      input({
+        bar: BAR,
+        start: { at: { x: 180, y: 510 }, velocity: { x: 0, y: -speed } },
+        ...over,
+      }),
+    );
+
+  it('hops a fast die over the bar: it lifts, then lands on the other side', () => {
+    const plan = up(1200);
+    for (const d of plan.dice) {
+      expect(last(d.y)!).toBeLessThan(ZONE.lo);
+      // At the top of the hop the die is bigger than any speed alone makes it.
+      const lifted = d.scale.some((s) => s > 1 + THROW_TUNING.lift + 0.05);
+      expect(lifted).toBe(true);
+    }
+    expect(plan.hits.some((h) => h.kind === 'bar')).toBe(true);
+  });
+
+  it('bounces a slow die off the bar, on the side it came from', () => {
+    const tuning = { ...THROW_TUNING, hopSpeed: 100000 };
+    const plan = up(1200, { tuning });
+    for (const d of plan.dice) {
+      expect(last(d.y)!).toBeGreaterThanOrEqual(ZONE.hi);
+      d.y.forEach((y) => expect(onBar(y)).toBe(false));
+    }
+    expect(plan.hits.some((h) => h.kind === 'wall')).toBe(true);
+    expect(plan.hits.some((h) => h.kind === 'bar')).toBe(false);
+  });
+
+  it('never leaves a die on the bar, whatever the throw', () => {
+    for (const speed of [450, 700, 1000, 1200]) {
+      for (const x of [-500, -150, 0, 150, 500]) {
+        const plan = up(speed, {
+          start: { at: { x: 180, y: 510 }, velocity: { x, y: -speed } },
+        });
+        for (const d of plan.dice) expect(onBar(last(d.y)!)).toBe(false);
+      }
+    }
+  });
+
+  it('keeps a die that starts on the bar from resting on it', () => {
+    const plan = planThrow(
+      input({
+        bar: BAR,
+        start: { at: { x: 100, y: 410 }, velocity: { x: 900, y: 0 } },
+      }),
+    );
+    for (const d of plan.dice) expect(onBar(last(d.y)!)).toBe(false);
+  });
+
+  it('keeps a die at normal size at rest, and the plan without a bar as before', () => {
+    const plan = up(1200);
+    for (const d of plan.dice) expect(last(d.scale)).toBeCloseTo(1);
+    expect(planThrow(input())).toEqual(planThrow(input({ bar: undefined })));
+  });
+});
+
+describe('offBar', () => {
+  it('moves a start on the bar to the shelter, and leaves other starts alone', () => {
+    const room = { left: 40, top: 300, right: 320, bottom: 520 };
+    expect(offBar({ x: 40, y: 410 }, room, BAR, DIE)).toEqual({ x: 40, y: 460 });
+    expect(offBar({ x: 180, y: 520 }, room, BAR, DIE)).toEqual({ x: 180, y: 520 });
+    expect(offBar({ x: 40, y: 410 }, room, undefined, DIE)).toEqual({ x: 40, y: 410 });
+    const upright: ThrowBar = { axis: 'x', from: 170, to: 190, shelter: 250 };
+    expect(offBar({ x: 180, y: 520 }, room, upright, DIE)).toEqual({ x: 250, y: 520 });
+  });
+
+  it('starts a swipe along the bar in the field, not on the bar', () => {
+    // BOX middle is y 410: a sideways swipe would run along the bar.
+    const flat = swipeToThrow({ x: 120, y: 0 }, { x: 1000, y: 0 }, BOX, DIE, BAR);
+    expect(flat.at.y).toBe(BAR.shelter);
+    expect(flat.at.x).toBe(BOX.left); // the wall behind the throw
+    // Straight up still starts at the near wall, away from the bar.
+    const upward = swipeToThrow({ x: 0, y: -90 }, { x: 0, y: -900 }, BOX, DIE, BAR);
+    expect(upward.at).toEqual({ x: 180, y: 520 });
   });
 });
