@@ -33,6 +33,12 @@ export interface DiceRowProps {
   split?: boolean;
   /** Called once when the last rolled die lands. */
   onLanded?: () => void;
+  /**
+   * Show the roll without playing it: the dice have just been thrown on the
+   * board (issue #183), so the row must not tumble again. It keeps until
+   * the next roll changes `rollKey`.
+   */
+  rest?: boolean;
   size?: number;
   /** A double: the size of its two rolled dice before the split. Default `size`. */
   pairSize?: number;
@@ -53,14 +59,16 @@ export function DiceRow({
   rollKey,
   split: givenSplit = true,
   onLanded,
+  rest = false,
   size = DIE_SIZE,
   pairSize = size,
   testID,
 }: DiceRowProps) {
   const { t } = useTranslation();
   const double = dice.length === 4;
-  // Dice at rest (no roll) always show all four dice of a double.
-  const split = givenSplit || rollKey === null;
+  // Dice at rest (no roll) always show all four of a double. A thrown roll
+  // (`rest`) keeps the reveal of a double: only its tumble is off.
+  const split = givenSplit || (!rest && rollKey === null);
   // Did this row show the pair of this roll? Then the split slides the new
   // dice out of the pair. Otherwise (a double at rest) the grid shows at once.
   const [pairShown, setPairShown] = useState<string | null>(null);
@@ -116,7 +124,7 @@ export function DiceRow({
               index={i}
               tilt={tilt[i % 2] ?? 0}
               used={d.used}
-              rollKey={slot.rolls ? rollKey : null}
+              rollKey={rest ? null : slot.rolls ? rollKey : null}
               {...(slot.pairAt ? { pairAt: slot.pairAt, split } : {})}
               {...(!slot.rolls && slideIn ? { slideIn: true } : {})}
               {...(i === lastRoller && onLanded ? { onLand: onLanded } : {})}

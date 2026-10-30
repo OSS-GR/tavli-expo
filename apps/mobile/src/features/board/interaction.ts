@@ -60,6 +60,15 @@ export const BOARD_GESTURES = {
   tap: { maxDistance: TAP_SLOP, maxDuration: TAP_MAX_MS },
 } as const;
 
+/**
+ * The swipe-to-roll area around the board (#183): a second pan over the
+ * whole board region (the board and the strips around it). It needs this
+ * much more movement than the board's own pan, so on the board that one
+ * always activates first and wins the race: checkers still drag, and this
+ * pan only catches touches that start outside the board.
+ */
+export const SWIPE_AREA = { minDistance: 3 * TAP_SLOP } as const;
+
 /** Where a picked-up checker may go. */
 export interface MoveTarget {
   readonly key: string;

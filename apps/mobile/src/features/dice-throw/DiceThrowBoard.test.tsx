@@ -99,20 +99,26 @@ describe('DiceThrowBoard (dice throw spike, #183)', () => {
     expect(events).toEqual(['diceRoll']);
   });
 
-  it('lands the dice in the same place wherever the same swipe starts', async () => {
+  it('throws from the side the finger went down on, and the same swipe lands the same', async () => {
     await setup();
-    // The same swipe (100 up, 10 right) on the board, then from under it.
-    await touch('dice-throw-tap', [
-      { x: 180, y: 300 },
-      { x: 190, y: 200 },
-    ]);
-    const onBoard = dicePlaces();
-    expect(onBoard).toHaveLength(2);
+    // The same swipe from the same place lands in the same place.
     await touch('dice-throw-pan', [
-      { x: 40, y: 700 },
-      { x: 50, y: 600 },
+      { x: 60, y: 420 },
+      { x: 70, y: 320 },
     ]);
-    expect(dicePlaces()).toEqual(onBoard);
+    const first = dicePlaces();
+    expect(first).toHaveLength(2);
+    await touch('dice-throw-pan', [
+      { x: 60, y: 420 },
+      { x: 70, y: 320 },
+    ]);
+    expect(dicePlaces()).toEqual(first);
+    // The same swipe from the other side throws from the other side.
+    await touch('dice-throw-pan', [
+      { x: 300, y: 420 },
+      { x: 310, y: 320 },
+    ]);
+    expect(dicePlaces()).not.toEqual(first);
   });
 
   it('throws with the Roll button (screen readers, no swipe)', async () => {

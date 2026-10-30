@@ -35,6 +35,7 @@ import {
   useRef,
   useState,
   type ComponentRef,
+  type ReactNode,
 } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import {
@@ -115,12 +116,34 @@ export interface InteractiveBoardProps {
     geo: BoardGeometry,
     from: { x: number; y: number } | null,
   ) => boolean;
-  /** A tap that did not touch a movable checker (e.g. tap the board to roll). */
-  onBoardTap?: () => void;
-  /** A swipe that did not start on a movable checker, while none can move (e.g. swipe the board to roll). */
-  onBoardSwipe?: () => void;
+  /**
+   * A tap that did not touch a movable checker (e.g. tap the board to
+   * roll). `x`, `y` are where the tap was (they pick where along the
+   * player's wall the dice come in).
+   */
+  onBoardTap?: (at: { x: number; y: number }) => void;
+  /**
+   * A swipe that did not start on a movable checker, while none can move
+   * (e.g. swipe the board to roll). `x`, `y` are where the finger went down
+   * (they pick the side the dice come in from), `dx`, `dy` the swipe, and
+   * `vx`, `vy` the finger speed at the end (pt/s, when Gesture Handler gave
+   * one).
+   */
+  onBoardSwipe?: (swipe: {
+    x: number;
+    y: number;
+    dx: number;
+    dy: number;
+    vx?: number;
+    vy?: number;
+  }) => void;
   /** A checker was selected, and the next tap hit no target (the selection is dropped). */
   onMissTap?: () => void;
+  /**
+   * Drawn inside the board canvas, over the picture and under the lamp
+   * (the thrown dice of a roll). Touches stay with the board gestures.
+   */
+  overlay?: ReactNode;
   /**
    * Ring every movable checker while none is selected: "touch this one"
    * (the tutorial). Off in a game, where most checkers can move.
@@ -182,6 +205,7 @@ export function InteractiveBoard({
   onBoardTap,
   onBoardSwipe,
   onMissTap,
+  overlay,
   cue = false,
   onPickUp,
   onIllegalDrop,
@@ -316,13 +340,23 @@ export function InteractiveBoard({
       onPickUp?.();
     } else {
       setSelected(null);
-      if (sources.length === 0 || selected === null) onBoardTap?.();
+      if (sources.length === 0 || selected === null) onBoardTap?.({ x, y });
       // A second tap on the selected checker only drops it; a tap elsewhere missed.
       else if (pickSource(sources, x, y, 0) !== selected) onMissTap?.();
     }
   };
-  const onSwipe = () => {
-    if (sources.length === 0) onBoardSwipe?.();
+  const onSwipe = (e: { x: number; y: number; velocityX?: number; velocityY?: number }) => {
+    if (sources.length === 0) {
+      onBoardSwipe?.({
+        x: startX.get(),
+        y: startY.get(),
+        dx: e.x - startX.get(),
+        dy: e.y - startY.get(),
+        ...(e.velocityX === undefined || e.velocityY === undefined
+          ? {}
+          : { vx: e.velocityX, vy: e.velocityY }),
+      });
+    }
   };
   const onDragStart = (source: number) => {
     setSelected(source);
@@ -372,7 +406,7 @@ export function InteractiveBoard({
       const s = sources[i];
       // A swipe that does not start on a movable checker moves nothing.
       if (s === undefined) {
-        scheduleOnRN(onSwipe);
+        scheduleOnRN(onSwipe, e);
         return;
       }
       const p = dragPoint(s.checker, { x: startX.get(), y: startY.get() }, e);
@@ -454,6 +488,7 @@ export function InteractiveBoard({
             {flights.map((f) => (
               <FlightChecker key={f.id} theme={theme} flight={f} onDone={onFlightDone} />
             ))}
+            {overlay}
             <DragChecker
               theme={theme}
               owner={mover}

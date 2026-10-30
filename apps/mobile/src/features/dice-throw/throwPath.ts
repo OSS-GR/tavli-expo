@@ -224,19 +224,27 @@ const SWIPE_SECONDS = 0.15;
 export const PAIR_GAP = 0.62;
 
 /**
- * The throw for a swipe. The swipe sets only the direction and the speed;
- * where the finger was does not matter, so a swipe may start off the board.
+ * The throw for a swipe. The touch decides where the dice come in: from the
+ * wall of the field closest to where the finger went down, straight into
+ * the field, at the point along that wall under the touch. The swipe sets
+ * only the speed. The touch may lie outside the field (a swipe that starts
+ * around the board): it clamps onto the field first. A touch as close to
+ * two walls as each other prefers the player's wall, then the far one,
+ * then the sides.
  *
- * - Direction: `translation`, from where the finger went down to where it
- *   lifted. Without one, the finger velocity; without both, straight up.
+ * - `at`: where the finger went down, in the field's points. `undefined`:
+ *   no position (the opening card rolls without a throw): then the swipe
+ *   itself aims, and the dice come in from the wall behind the throw
+ *   (`entryPoint`).
  * - Speed: the finger speed from Gesture Handler (`velocity`, pt/s). Without
  *   a usable one (0 or not a number), `translation` over a typical swipe time.
- * - Start: the dice come in from the wall behind the throw (`entryPoint`),
- *   with room for both side by side, so they always cross the field. A
- *   start on the bar moves to the player's side of it (`bar.shelter`), so
- *   the dice never slide along the bar.
+ * - The two dice start side by side across the throw (`PAIR_GAP`), kept
+ *   inside the field (`shrinkBox`). A start on the bar moves to the
+ *   player's side of it (`bar.shelter`), so the dice never slide along
+ *   the bar.
  */
 export function swipeToThrow(
+  at: Vec2 | undefined,
   translation: Vec2,
   velocity: Vec2 | undefined,
   box: Box,
@@ -250,20 +258,67 @@ export function swipeToThrow(
     Number.isFinite(velocity.y) &&
     Math.hypot(velocity.x, velocity.y) > 0;
   const swiped = Math.hypot(translation.x, translation.y);
-  const direction = swiped > 0 ? translation : usable ? velocity : { x: 0, y: -1 };
-  const length = Math.hypot(direction.x, direction.y);
   const speed = usable ? Math.hypot(velocity.x, velocity.y) : swiped / SWIPE_SECONDS;
-  const raw = { x: (direction.x / length) * speed, y: (direction.y / length) * speed };
   // The two dice sit PAIR_GAP apart across the throw: keep both inside the box.
   const gap = dieSize * PAIR_GAP;
-  const room = shrinkBox(
-    box,
-    (Math.abs(direction.y) / length) * gap,
-    (Math.abs(direction.x) / length) * gap,
-  );
+  const roomOf = (direction: Vec2): Box => {
+    const length = Math.hypot(direction.x, direction.y);
+    return shrinkBox(
+      box,
+      (Math.abs(direction.y) / length) * gap,
+      (Math.abs(direction.x) / length) * gap,
+    );
+  };
+  if (at === undefined) {
+    const direction = swiped > 0 ? translation : usable ? velocity : { x: 0, y: -1 };
+    const length = Math.hypot(direction.x, direction.y);
+    const room = roomOf(direction);
+    return {
+      at: offBar(entryPoint(room, direction), room, bar, dieSize),
+      velocity: clampSpeed(
+        { x: (direction.x / length) * speed, y: (direction.y / length) * speed },
+        tuning.minSpeed,
+        tuning.maxSpeed,
+      ),
+    };
+  }
+  // The wall closest to the touch (ties prefer the player's wall), and the
+  // throw goes straight into the field from it.
+  const p = clampToBox(at, box);
+  const walls: readonly (readonly [Vec2, number])[] = [
+    [{ x: 0, y: -1 }, box.bottom - p.y],
+    [{ x: 0, y: 1 }, p.y - box.top],
+    [{ x: 1, y: 0 }, p.x - box.left],
+    [{ x: -1, y: 0 }, box.right - p.x],
+  ];
+  let direction = walls[0]![0];
+  let closest = walls[0]![1];
+  for (const [inward, distance] of walls.slice(1)) {
+    if (distance < closest) {
+      direction = inward;
+      closest = distance;
+    }
+  }
+  const room = roomOf(direction);
+  // The dice start on that wall, at the point along it under the touch.
+  const start =
+    direction.y !== 0
+      ? {
+          x: Math.min(room.right, Math.max(room.left, p.x)),
+          y: direction.y < 0 ? room.bottom : room.top,
+        }
+      : {
+          x: direction.x < 0 ? room.right : room.left,
+          y: Math.min(room.bottom, Math.max(room.top, p.y)),
+        };
+  const pace = speed > 0 ? speed : tuning.minSpeed;
   return {
-    at: offBar(entryPoint(room, direction), room, bar, dieSize),
-    velocity: clampSpeed(raw, tuning.minSpeed, tuning.maxSpeed),
+    at: offBar(start, room, bar, dieSize),
+    velocity: clampSpeed(
+      { x: direction.x * pace, y: direction.y * pace },
+      tuning.minSpeed,
+      tuning.maxSpeed,
+    ),
   };
 }
 
@@ -299,6 +354,36 @@ export function buttonThrow(
     at: { x: (box.left + box.right) / 2 - side * (box.right - box.left) * 0.2, y: box.bottom },
     velocity: { x: Math.sin(angle) * speed, y: -Math.cos(angle) * speed },
   };
+}
+
+/**
+ * The throw for a tap on the board (tap-to-roll): from the roller's wall,
+ * straight into the field, at the point along that wall under the tap — a tap
+ * on the left half throws from the bottom left, on the right half from the
+ * bottom right. The tap always lands on the field, but clamp it anyway.
+ * Without a position (the Roll button) it is `buttonThrow`.
+ *
+ * `nearEnd` is the end of the box the roller sits at: `'bottom'` when the
+ * roller is the viewer (the common case — the board keeps the player at the
+ * bottom), `'top'` when the board does not turn to the roller and the roller
+ * is on the opposite wall. The dice enter from that wall, into the field.
+ */
+export function tapThrow(
+  at: Vec2 | undefined,
+  box: Box,
+  dieSize: number,
+  tuning: ThrowTuning = THROW_TUNING,
+  nearEnd: 'top' | 'bottom' = 'bottom',
+): ThrowStart {
+  if (at === undefined) return buttonThrow(box, 0, tuning);
+  const room = shrinkBox(box, dieSize * PAIR_GAP, 0);
+  const p = clampToBox(at, box);
+  const speed = (tuning.minSpeed + tuning.maxSpeed) / 2;
+  const alongX = Math.min(room.right, Math.max(room.left, p.x));
+  if (nearEnd === 'top') {
+    return { at: { x: alongX, y: room.top }, velocity: { x: 0, y: speed } };
+  }
+  return { at: { x: alongX, y: room.bottom }, velocity: { x: 0, y: -speed } };
 }
 
 // ---------------------------------------------------------------------------
@@ -633,6 +718,71 @@ export function restPlan(input: PlanThrowInput): ThrowPlan {
     samples: 1,
     dice: [still(plan.dice[0]), still(plan.dice[1])],
     hits: [],
+  };
+}
+
+/** Where a thrown die hands over to the dice row (#183): its pose there. */
+export interface SettleTarget {
+  /** Center, in canvas points. */
+  readonly x: number;
+  readonly y: number;
+  /** Side of the die there, in points. */
+  readonly size: number;
+  /** In-plane angle there, in radians. */
+  readonly angle: number;
+}
+
+/** The dice take this long to glide from their rest pose into the dice row. */
+export const SETTLE_MS = 280;
+
+/**
+ * The hand-over at rest (#183): after the throw, each die glides from where
+ * it stopped into its place in the dice row, and takes the row's size and
+ * tilt on the way. The row then shows the dice exactly where the glide left
+ * them, so the swap from throw to row is invisible. The faces never change.
+ */
+export function settlePlan(
+  plan: ThrowPlan,
+  targets: readonly [SettleTarget, SettleTarget],
+  dieSize: number,
+): ThrowPlan {
+  const steps = Math.max(1, Math.round(SETTLE_MS / plan.sampleMs));
+  const glide = (track: DieTrack, target: SettleTarget): DieTrack => {
+    const n = track.x.length;
+    const x0 = track.x[n - 1] ?? 0;
+    const y0 = track.y[n - 1] ?? 0;
+    const a0 = track.angle[n - 1] ?? 0;
+    const s0 = track.scale[n - 1] ?? 1;
+    const face = track.face[n - 1] ?? 1;
+    // The shortest way round: the glide turns by at most half a turn.
+    let turn = (target.angle - a0) % (Math.PI * 2);
+    if (turn > Math.PI) turn -= Math.PI * 2;
+    if (turn < -Math.PI) turn += Math.PI * 2;
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const angles: number[] = [];
+    const scales: number[] = [];
+    for (let k = 1; k <= steps; k++) {
+      // Ease out: fast at the start of the glide, slow at the end.
+      const e = 1 - (1 - k / steps) ** 3;
+      xs.push(x0 + (target.x - x0) * e);
+      ys.push(y0 + (target.y - y0) * e);
+      angles.push(a0 + turn * e);
+      scales.push(s0 + (target.size / dieSize - s0) * e);
+    }
+    return {
+      x: [...track.x, ...xs],
+      y: [...track.y, ...ys],
+      angle: [...track.angle, ...angles],
+      scale: [...track.scale, ...scales],
+      face: [...track.face, ...Array.from({ length: steps }, () => face)],
+    };
+  };
+  return {
+    ...plan,
+    durationMs: plan.durationMs + steps * plan.sampleMs,
+    samples: plan.samples + steps,
+    dice: [glide(plan.dice[0], targets[0]), glide(plan.dice[1], targets[1])],
   };
 }
 

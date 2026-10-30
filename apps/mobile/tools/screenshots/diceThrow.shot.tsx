@@ -142,11 +142,12 @@ it('renders the dice throw preview', async () => {
 
   // 1. The RNG rolls first. 2. The path is planned to land on that roll.
   const values = rollDice(createSeededRng(184));
-  // A quick swipe up and to the right. Only its direction and speed count:
-  // the dice come in from the wall behind the throw.
+  // A touch on the left of the field, swiped up and to the right: the dice
+  // come in from the left wall, as fast as the finger went.
   const dieSize = throwDieSize(geo);
   const bar = throwBar(geo);
   const start = swipeToThrow(
+    { x: box.left + 40, y: (box.top + box.bottom) / 2 }, // the touch, in pt
     { x: 110, y: -140 }, // the swipe, in pt
     { x: 1100, y: -1400 }, // the finger speed at the end, in pt/s
     box,
