@@ -73,7 +73,7 @@ describe('FriendSetupScreen', () => {
     ).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
     expect(screen.getByText('First to 3 points')).toBeOnTheScreen();
-    expect(screen.getByText('Live · 1 minute per turn')).toBeOnTheScreen();
+    expect(screen.getByText('No time limit: 24 hours per turn')).toBeOnTheScreen();
     expect(parts.authStore.guests).toBe(0);
   });
 
@@ -83,9 +83,8 @@ describe('FriendSetupScreen', () => {
     const { onCreated } = await open(parts);
     await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
     await user.press(screen.getByRole('radio', { name: '5' }));
-    await user.press(screen.getByRole('radio', { name: 'Async' }));
     expect(screen.getByText('First to 5 points')).toBeOnTheScreen();
-    expect(screen.getByText('Async · 24 hours per turn')).toBeOnTheScreen();
+    expect(screen.getByText('No time limit: 24 hours per turn')).toBeOnTheScreen();
 
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     expect(onCreated).toHaveBeenCalledTimes(1);
@@ -95,14 +94,14 @@ describe('FriendSetupScreen', () => {
       from: 'guest-1',
       choice: 'plakoto',
       targetPoints: 5,
-      pace: 'async',
+      turnTimeMinutes: null,
       status: 'open',
     });
     expect(parts.analytics.sent).toEqual([
       {
         type: 'track',
         event: 'invite_created',
-        props: { game: 'plakoto', matchLength: 5, pace: 'async' },
+        props: { game: 'plakoto', matchLength: 5, turnTimeMinutes: undefined },
       },
     ]);
     // No code, no user id.
@@ -178,7 +177,7 @@ describe('FriendSetupScreen', () => {
     const parts = setup();
     await parts.auth.signInAsGuest();
     for (let i = 0; i < MAX_OPEN_INVITES; i += 1) {
-      parts.server.createInvite('guest-1', 'portes', 1, 'live');
+      parts.server.createInvite('guest-1', 'portes', 1, 1);
     }
     const { onCreated } = await open(parts);
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
@@ -314,7 +313,7 @@ describe('FriendSetupScreen', () => {
     await open(setup());
     expect(screen.getByRole('header', { name: 'Παίξε με φίλο online' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Φτιάξε πρόσκληση' })).toBeOnTheScreen();
-    expect(screen.getByRole('radio', { name: 'Χαλαρά' })).toBeOnTheScreen();
+    expect(screen.getByRole('radio', { name: '24 ώρες' })).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');
     });

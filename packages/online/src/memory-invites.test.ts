@@ -59,14 +59,14 @@ describe('Invites contract (in-memory server)', () => {
 describe('in-memory invites', () => {
   it('accept starts a game that both players can watch; the inviter plays white', async () => {
     const { server } = setup();
-    const code = server.createInvite(ALICE, 'plakoto', 3, 'async');
+    const code = server.createInvite(ALICE, 'plakoto', 3, null);
     const gameId = await server.invitesFor(BOB).acceptInvite(code);
     expect(server.getGame(gameId)).toMatchObject({
       gameId,
       version: 1,
       status: 'active',
       choice: 'plakoto',
-      pace: 'async',
+      turnTimeMinutes: null,
       players: { white: ALICE, black: BOB },
     });
     expect(server.getGame(gameId)?.match.rules.match.targetPoints).toBe(3);
@@ -77,7 +77,7 @@ describe('in-memory invites', () => {
     const { server } = setup();
     // One player per invite: one player may have only MAX_OPEN_INVITES open.
     const codes = Array.from({ length: 20 }, (_, i) =>
-      server.createInvite(`player-${i}`, 'portes', 1, 'live'),
+      server.createInvite(`player-${i}`, 'portes', 1, 1),
     );
     expect(new Set(codes).size).toBe(20);
     for (const code of codes) {
@@ -90,21 +90,21 @@ describe('in-memory invites', () => {
     // The same value every time: every draw gives the same code.
     const stuck: Rng = { nextUint32: () => 7 };
     const { server } = setup(stuck);
-    expect(server.createInvite(ALICE, 'portes', 1, 'live')).toBe('99999999');
-    expect(() => server.createInvite(ALICE, 'portes', 1, 'live')).toThrow(
+    expect(server.createInvite(ALICE, 'portes', 1, 1)).toBe('99999999');
+    expect(() => server.createInvite(ALICE, 'portes', 1, 1)).toThrow(
       `no free invite code after ${MAX_CODE_TRIES} tries`,
     );
   });
 
   it('rejects a bad match length, as the Convex createInvite does', () => {
     const { server } = setup();
-    expect(() => server.createInvite(ALICE, 'portes', 0, 'live')).toThrow(InviteError);
-    expect(() => server.createInvite(ALICE, 'portes', 1.5, 'live')).toThrow(InviteError);
+    expect(() => server.createInvite(ALICE, 'portes', 0, 1)).toThrow(InviteError);
+    expect(() => server.createInvite(ALICE, 'portes', 1.5, 1)).toThrow(InviteError);
   });
 
   it('rejects with plain data, as over a network, not an Error', async () => {
     const { server } = setup();
-    const code = server.createInvite(ALICE, 'portes', 1, 'live');
+    const code = server.createInvite(ALICE, 'portes', 1, 1);
     const reason: unknown = await server
       .invitesFor(ALICE)
       .acceptInvite(code)
@@ -116,7 +116,7 @@ describe('in-memory invites', () => {
 
   it('keeps the invite open when the game cannot start', async () => {
     const { server } = setup();
-    const code = server.createInvite(ALICE, 'portes', 1, 'live');
+    const code = server.createInvite(ALICE, 'portes', 1, 1);
     // The server actor cannot be a player, so the game check fails.
     const reason: unknown = await server
       .invitesFor(SERVER_ACTOR)
@@ -129,7 +129,7 @@ describe('in-memory invites', () => {
 
   it('a call changes nothing before the caller code runs on', async () => {
     const { server } = setup();
-    const code = server.createInvite(ALICE, 'portes', 1, 'live');
+    const code = server.createInvite(ALICE, 'portes', 1, 1);
     const sent = server.invitesFor(BOB).declineInvite(code);
     expect(server.getInvite(code)?.status).toBe('open');
     await sent;
@@ -138,7 +138,7 @@ describe('in-memory invites', () => {
 
   it('the inviter cancels an open invite; nobody can accept it then', async () => {
     const { server } = setup();
-    const code = server.createInvite(ALICE, 'portes', 1, 'live');
+    const code = server.createInvite(ALICE, 'portes', 1, 1);
     expect(() => server.cancelInvite(BOB, code)).toThrow(
       expect.objectContaining({ code: 'NOT_YOUR_INVITE' }),
     );
@@ -157,7 +157,7 @@ describe('in-memory invites', () => {
 
   it('an invite whose time is up shows expired, but watchers hear of it only in runDueTimeouts', async () => {
     const { server, wait } = setup();
-    const code = server.createInvite(ALICE, 'portes', 1, 'live');
+    const code = server.createInvite(ALICE, 'portes', 1, 1);
     const views: (string | undefined)[] = [];
     const stop = server.invitesFor(ALICE).watchInvite(code, (view) => views.push(view?.status));
     await flush();
@@ -183,7 +183,7 @@ describe('in-memory invites', () => {
       .invitesFor(ALICE)
       .watchMyInvites((list) => lists.push(list.map((view) => view.code)));
     await flush();
-    const code = server.createInvite(ALICE, 'portes', 1, 'live');
+    const code = server.createInvite(ALICE, 'portes', 1, 1);
     await flush();
     expect(lists).toEqual([[], [code]]);
     wait(INVITE_TIME_MS);
@@ -194,7 +194,7 @@ describe('in-memory invites', () => {
     await flush();
     expect(lists).toEqual([[], [code], []]);
     // Another player's invite does not send the same list again.
-    server.createInvite(BOB, 'portes', 1, 'live');
+    server.createInvite(BOB, 'portes', 1, 1);
     await flush();
     expect(lists).toHaveLength(3);
     stop();
@@ -221,12 +221,12 @@ describe('in-memory invites', () => {
     };
     const { server } = setup(counting);
     await expect(
-      server.invitesFor(BOB).createInvite({ choice: 'fevga', targetPoints: 0, pace: 'live' }),
+      server.invitesFor(BOB).createInvite({ choice: 'fevga', targetPoints: 0, turnTimeMinutes: 1 }),
     ).rejects.toEqual({ code: 'BAD_REQUEST', message: expect.any(String) });
     expect(draws).toEqual([]);
     const code = await server
       .invitesFor(BOB)
-      .createInvite({ choice: 'fevga', targetPoints: 3, pace: 'async' });
+      .createInvite({ choice: 'fevga', targetPoints: 3, turnTimeMinutes: null });
     expect(server.getInvite(code)).toMatchObject({ from: BOB, choice: 'fevga', status: 'open' });
     expect(await server.invitesFor(BOB).listMyInvites()).toHaveLength(1);
     expect(await server.invitesFor(ALICE).listMyInvites()).toEqual([]);
@@ -237,7 +237,7 @@ describe('the cap on open invites (#275)', () => {
   /** ALICE makes `MAX_OPEN_INVITES` invites. Returns their codes. */
   function fill(server: ReturnType<typeof setup>['server']): string[] {
     return Array.from({ length: MAX_OPEN_INVITES }, () =>
-      server.createInvite(ALICE, 'portes', 1, 'live'),
+      server.createInvite(ALICE, 'portes', 1, 1),
     );
   }
 
@@ -246,41 +246,41 @@ describe('the cap on open invites (#275)', () => {
   it('rejects one more open invite with TOO_MANY_INVITES, and saves nothing', () => {
     const { server } = setup();
     const codes = fill(server);
-    expect(() => server.createInvite(ALICE, 'portes', 1, 'live')).toThrow(InviteError);
-    expect(() => server.createInvite(ALICE, 'portes', 1, 'live')).toThrow(tooMany);
+    expect(() => server.createInvite(ALICE, 'portes', 1, 1)).toThrow(InviteError);
+    expect(() => server.createInvite(ALICE, 'portes', 1, 1)).toThrow(tooMany);
     // The cap comes first, also for a call with a bad match length.
-    expect(() => server.createInvite(ALICE, 'portes', 0, 'live')).toThrow(tooMany);
+    expect(() => server.createInvite(ALICE, 'portes', 0, 1)).toThrow(tooMany);
     for (const code of codes) expect(server.getInvite(code)?.status).toBe('open');
   });
 
   it('another player is not affected', () => {
     const { server } = setup();
     fill(server);
-    expect(server.createInvite(BOB, 'portes', 1, 'live')).toHaveLength(8);
+    expect(server.createInvite(BOB, 'portes', 1, 1)).toHaveLength(8);
   });
 
   it('an accepted, declined or cancelled invite frees a place', async () => {
     const { server } = setup();
     const [accepted, declined, cancelled] = fill(server);
     await server.invitesFor(BOB).acceptInvite(accepted!);
-    expect(server.createInvite(ALICE, 'portes', 1, 'live')).toHaveLength(8);
-    expect(() => server.createInvite(ALICE, 'portes', 1, 'live')).toThrow(tooMany);
+    expect(server.createInvite(ALICE, 'portes', 1, 1)).toHaveLength(8);
+    expect(() => server.createInvite(ALICE, 'portes', 1, 1)).toThrow(tooMany);
     await server.invitesFor(BOB).declineInvite(declined!);
-    expect(server.createInvite(ALICE, 'portes', 1, 'live')).toHaveLength(8);
-    expect(() => server.createInvite(ALICE, 'portes', 1, 'live')).toThrow(tooMany);
+    expect(server.createInvite(ALICE, 'portes', 1, 1)).toHaveLength(8);
+    expect(() => server.createInvite(ALICE, 'portes', 1, 1)).toThrow(tooMany);
     server.cancelInvite(ALICE, cancelled!);
-    expect(server.createInvite(ALICE, 'portes', 1, 'live')).toHaveLength(8);
-    expect(() => server.createInvite(ALICE, 'portes', 1, 'live')).toThrow(tooMany);
+    expect(server.createInvite(ALICE, 'portes', 1, 1)).toHaveLength(8);
+    expect(() => server.createInvite(ALICE, 'portes', 1, 1)).toThrow(tooMany);
   });
 
   it('frees every place at expiresAt, with no timer', () => {
     const { server, wait } = setup();
     fill(server);
     wait(INVITE_TIME_MS - 1);
-    expect(() => server.createInvite(ALICE, 'portes', 1, 'live')).toThrow(tooMany);
+    expect(() => server.createInvite(ALICE, 'portes', 1, 1)).toThrow(tooMany);
     wait(1);
     const again = fill(server);
     expect(new Set(again).size).toBe(MAX_OPEN_INVITES);
-    expect(() => server.createInvite(ALICE, 'portes', 1, 'live')).toThrow(tooMany);
+    expect(() => server.createInvite(ALICE, 'portes', 1, 1)).toThrow(tooMany);
   });
 });

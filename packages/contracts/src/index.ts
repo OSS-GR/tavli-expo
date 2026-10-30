@@ -44,14 +44,13 @@ export {
 export { BOT_DIFFICULTIES, BotCancelledError, isBotCancelled, isDifficulty } from './bot-runner';
 export type { BotAnswerRequest, BotMoveRequest, BotRunner, Difficulty } from './bot-runner';
 export {
+  ASYNC_TURN_TIME_MS,
   GAME_TRANSPORT_ERROR_CODES,
   MAX_LISTED_GAMES,
   ONLINE_GAME_CHOICES,
-  ONLINE_GAME_PACES,
-  TURN_TIME_MS,
   isGameTransportErrorData,
   isOnlineGameChoice,
-  isOnlineGamePace,
+  turnDeadlineMs,
 } from './game-transport';
 export type {
   GameTransport,
@@ -60,7 +59,6 @@ export type {
   GameSummary,
   ListMyGamesRequest,
   OnlineGameChoice,
-  OnlineGamePace,
   OnlineGameStatus,
   OnlineGameView,
   SendAnswerRequest,

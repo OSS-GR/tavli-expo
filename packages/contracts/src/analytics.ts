@@ -21,7 +21,6 @@
 import type { PresetId } from '@tavli/engine';
 
 import type { Difficulty } from './bot-runner';
-import type { OnlineGamePace } from './game-transport';
 import { isAnonymousInstallId } from './install-id';
 
 /** How a game is played. `online` is for online play (MVP2): no screen sends it yet. */
@@ -130,14 +129,18 @@ export interface AnalyticsEvents {
   review_opened: { game: MatchGame };
   /**
    * The player made an invite to play a friend online (#281). Only the
-   * game, the match length and the pace: never the code, a game id or a
+   * game, the match length and the turn time: never the code, a game id or a
    * user id.
    */
   invite_created: {
     game: MatchGame;
     /** Points to win. */
     matchLength: number;
-    pace: OnlineGamePace;
+    /**
+     * A per-turn time limit in minutes, or `undefined` for the 24-hour
+     * default (the async behaviour, #183). Omitted when `undefined`.
+     */
+    turnTimeMinutes?: number;
   };
   /**
    * The phone's answer to the system prompt for turn notifications (#285),

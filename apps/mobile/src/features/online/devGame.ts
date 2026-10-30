@@ -17,7 +17,7 @@
  * closes.
  */
 import { thinkingDelayMs } from '@tavli/bot';
-import type { BotRunner, Difficulty, OnlineGameChoice, OnlineGamePace } from '@tavli/contracts';
+import type { BotRunner, Difficulty, OnlineGameChoice } from '@tavli/contracts';
 import type { Rng } from '@tavli/engine';
 import type { MemoryGameServer } from '@tavli/online';
 
@@ -50,7 +50,8 @@ export interface DevBotOptions {
 /** The game the bot offers: in a dev game, or in a dev invite. */
 export interface DevMatchOptions extends DevBotOptions {
   readonly choice: OnlineGameChoice;
-  readonly pace: OnlineGamePace;
+  /** `null` for the 24-hour default; a number for that many minutes per turn. */
+  readonly turnTimeMinutes: number | null;
   readonly targetPoints: number;
 }
 
@@ -76,7 +77,7 @@ export function startDevGame(options: DevGameOptions): DevGame {
     { white: me, black: DEV_BOT_ID },
     options.choice,
     options.targetPoints,
-    options.pace,
+    options.turnTimeMinutes,
   );
   return playDevGame(gameId, options);
 }
@@ -140,7 +141,12 @@ export interface DevInvite {
 export function startDevInvite(options: DevMatchOptions): DevInvite {
   current?.stop();
   const { server } = options;
-  const code = server.createInvite(DEV_BOT_ID, options.choice, options.targetPoints, options.pace);
+  const code = server.createInvite(
+    DEV_BOT_ID,
+    options.choice,
+    options.targetPoints,
+    options.turnTimeMinutes,
+  );
   // The invite route opens this code on the in-memory server, not on Convex.
   rememberDevInvite(code);
   const check = () => {

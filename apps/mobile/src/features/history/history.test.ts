@@ -1247,7 +1247,7 @@ describe('online history texts (#313)', () => {
     presetId: 'plakoto',
     variant: 'plakoto',
     targetPoints: 5,
-    pace: 'async',
+    turnTimeMinutes: null,
     mySide: 'black',
     waitingFor: null,
     myTurn: false,

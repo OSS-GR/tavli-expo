@@ -6,11 +6,10 @@ import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { INVITE_TIME_MS, TURN_TIME_MS, createRecordingPushProvider } from '@tavli/contracts';
+import { ASYNC_TURN_TIME_MS, INVITE_TIME_MS, createRecordingPushProvider } from '@tavli/contracts';
 import type {
   GameTransportErrorCode,
   InviteErrorCode,
-  OnlineGamePace,
   RecordingPushProvider,
 } from '@tavli/contracts';
 
@@ -107,14 +106,14 @@ async function createGame(
   t: Tester,
   white: string,
   black: string,
-  pace: OnlineGamePace = 'async',
+  turnTimeMinutes: number | null = null,
 ): Promise<Id<'games'>> {
   return await t.mutation(internal.games.createGame, {
     callerId: white,
     players: { white, black },
     choice: 'portes',
     targetPoints: 1,
-    pace,
+    turnTimeMinutes,
   });
 }
 
@@ -126,7 +125,7 @@ async function createInvite(t: Tester, id: string): Promise<string> {
   return await as(t, id).mutation(api.invites.createInvite, {
     choice: 'portes',
     targetPoints: 3,
-    pace: 'async',
+    turnTimeMinutes: null,
   });
 }
 
@@ -214,7 +213,7 @@ describe('deleteMyAccount', () => {
     // The resign ended the match: Bob gets "game over" (#316), Alice gets
     // nothing (she resigned, and her tokens are gone). Nobody gets "your
     // turn", and the turn timer and the invite expiry find nothing to do.
-    vi.advanceTimersByTime(TURN_TIME_MS.async + 1);
+    vi.advanceTimersByTime(ASYNC_TURN_TIME_MS + 1);
     await t.finishInProgressScheduledFunctions();
     expect(push.sent.map((message) => [message.to, message.title, message.data.gameId])).toEqual([
       ['ExponentPushToken[bob-phone]', MATCH_END_PUSH_TEXT.title, active],
@@ -245,7 +244,7 @@ describe('deleteMyAccount', () => {
     const alice = await guest(t);
     const bob = await guest(t);
     const carol = await guest(t);
-    const live = await createGame(t, bob, alice, 'live');
+    const live = await createGame(t, bob, alice, 1);
     const other = await createGame(t, alice, carol);
     await as(t, alice).mutation(api.account.deleteMyAccount, {});
     const liveView = await as(t, bob).query(api.games.getGame, { gameId: live });
@@ -396,9 +395,9 @@ describe('resignActiveGames (#309)', () => {
       const other = i % 3 === 0 ? carol : bob;
       const white = i % 2 === 0 ? alice : other;
       const black = i % 2 === 0 ? other : alice;
-      all.push(await createGame(t, white, black, 'live'));
+      all.push(await createGame(t, white, black, 1));
     }
-    const theirs = await createGame(t, bob, carol, 'live');
+    const theirs = await createGame(t, bob, carol, 1);
 
     await as(t, alice).mutation(api.account.deleteMyAccount, {});
     // The call resigned one page; the rest wait for the scheduled pages.
@@ -503,7 +502,7 @@ describe('deleteSentInvites (#306)', () => {
           from,
           choice: 'portes',
           targetPoints: 3,
-          pace: 'async',
+          turnTimeMinutes: null,
           status: 'cancelled',
           expiresAt: START - 1,
           gameId: null,

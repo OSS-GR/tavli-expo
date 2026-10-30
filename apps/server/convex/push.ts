@@ -27,7 +27,7 @@
 
 import { ConvexError, v } from 'convex/values';
 
-import type { GameTransportErrorCode, OnlineGamePace, PushProvider } from '@tavli/contracts';
+import type { GameTransportErrorCode, PushProvider } from '@tavli/contracts';
 import type { PerPlayer, PlayerId } from '@tavli/engine';
 import { sideOf } from '@tavli/online';
 import { createExpoPushProvider, isExpoPushToken } from '@tavli/push-expo';
@@ -165,7 +165,7 @@ const pushKind = v.union(v.literal('turn'), v.literal('matchEnd'));
 /** The game fields `scheduleTurnPush` reads. */
 export interface PushGame {
   readonly _id: Id<'games'>;
-  readonly pace: OnlineGamePace;
+  readonly turnTimeMinutes: number | null;
   readonly players: PerPlayer<string>;
 }
 
@@ -188,9 +188,9 @@ export async function scheduleTurnPush(
   callerId: string,
 ): Promise<void> {
   const caller = sideOf(game.players, callerId);
-  const turnSide = turnPushSide(game.pace, before, after, caller);
+  const turnSide = turnPushSide(before, after, caller);
   if (turnSide !== null) await schedulePush(ctx, game, version, 'turn', turnSide);
-  for (const side of matchEndPushSides(game.pace, before, after, caller)) {
+  for (const side of matchEndPushSides(before, after, caller)) {
     await schedulePush(ctx, game, version, 'matchEnd', side);
   }
 }

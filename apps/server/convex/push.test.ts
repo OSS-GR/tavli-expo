@@ -10,10 +10,9 @@ import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TURN_TIME_MS, createRecordingPushProvider } from '@tavli/contracts';
+import { ASYNC_TURN_TIME_MS, createRecordingPushProvider } from '@tavli/contracts';
 import type {
   GameTransportErrorCode,
-  OnlineGamePace,
   OnlineGameView,
   RecordingPushProvider,
 } from '@tavli/contracts';
@@ -104,7 +103,7 @@ async function tokens(t: Tester): Promise<string[]> {
 
 async function createGame(
   t: Tester,
-  pace: OnlineGamePace,
+  turnTimeMinutes: number | null,
   choice: 'portes' | 'plakoto' = 'portes',
   callerId = ALICE,
   targetPoints = 5,
@@ -114,7 +113,7 @@ async function createGame(
     players: PLAYERS,
     choice,
     targetPoints,
-    pace,
+    turnTimeMinutes,
   });
 }
 
@@ -268,9 +267,9 @@ describe('registerPushToken and removePushToken', () => {
 });
 
 describe('"your turn" pushes', () => {
-  it('a turn in an async game sends one push to the other player', async () => {
+  it('a turn in a game sends one push to the other player', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     const played = await playOneTurn(t, gameId);
@@ -284,7 +283,7 @@ describe('"your turn" pushes', () => {
         data: { gameId },
         priority: 'high',
         // Kept for the whole turn time, and no longer.
-        ttlSeconds: TURN_TIME_MS.async / 1000,
+        ttlSeconds: ASYNC_TURN_TIME_MS / 1000,
       },
     ]);
     // The push text holds no player ids.
@@ -313,24 +312,14 @@ describe('"your turn" pushes', () => {
     );
   });
 
-  it('a live game sends none', async () => {
-    const t = await setup();
-    await registerBoth(t);
-    const gameId = await createGame(t, 'live');
-    await playOneTurn(t, gameId);
-    await playOneTurn(t, gameId);
-    await flush(t);
-    expect(push.sent).toEqual([]);
-  });
-
-  it('a new async game tells the first player only when they did not start it', async () => {
+  it('a new game tells the first player only when they did not start it', async () => {
     const t = await setup();
     await registerBoth(t);
     // The server rolls the opening, so either side may move first.
     for (let i = 0; i < 12; i++) {
       push.clear();
       const callerId = i % 2 === 0 ? ALICE : BOB;
-      const gameId = await createGame(t, 'async', 'portes', callerId);
+      const gameId = await createGame(t, null, 'portes', callerId);
       await flush(t);
       const first = waiting(await view(t, gameId));
       const expected = PLAYERS[first] === callerId ? [] : [TOKEN_OF[first]];
@@ -340,7 +329,7 @@ describe('"your turn" pushes', () => {
 
   it('sends to every phone of the player, and none to a player with no token', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     const side = waiting(await view(t, gameId));
     const other = PLAYERS[otherSide(side)];
@@ -367,7 +356,7 @@ describe('"your turn" pushes', () => {
 
   it('a dead token is removed; the other tokens stay', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     const side = waiting(await view(t, gameId));
     const other = PLAYERS[otherSide(side)];
@@ -384,7 +373,7 @@ describe('"your turn" pushes', () => {
 
   it('when the same player waits again (after the mother question), there is no push', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async', 'plakoto');
+    const gameId = await createGame(t, null, 'plakoto');
     await flush(t);
     const pin = await t.run(async (ctx) => {
       const doc = await ctx.db.get(gameId);
@@ -420,7 +409,7 @@ describe('"your turn" pushes', () => {
 
   it('a resign ends the match: no "your turn"', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     push.clear();
@@ -432,7 +421,7 @@ describe('"your turn" pushes', () => {
 
   it('a late push does nothing: the game changed since', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     const v = await view(t, gameId);
@@ -452,13 +441,13 @@ describe('"your turn" pushes', () => {
 
   it('a push after the turn deadline does nothing: the turn is lost anyway', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     await playOneTurn(t, gameId);
     const v = await view(t, gameId);
     // The clock moves, but the scheduled push and time out have not run.
-    vi.setSystemTime(START + TURN_TIME_MS.async);
+    vi.setSystemTime(START + ASYNC_TURN_TIME_MS);
     await t.action(internal.push.sendTurnPush, {
       gameId,
       version: v.version,
@@ -469,7 +458,7 @@ describe('"your turn" pushes', () => {
 
   it('a failed push does not touch the game or the tokens', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     setPushProvider({
@@ -486,7 +475,7 @@ describe('"your turn" pushes', () => {
   });
   it('a time out that starts the next game tells the side it waits for, the same side too', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     // "alternate": the player who did not start game 1 starts game 2. So
     // when that player runs out of time, game 2 waits for them again.
@@ -509,7 +498,7 @@ describe('"your turn" pushes', () => {
     expect(push.sent.map((message) => message.to)).toEqual([TOKEN_OF[late]]);
 
     push.clear();
-    await wait(t, TURN_TIME_MS.async);
+    await wait(t, ASYNC_TURN_TIME_MS);
     const next = await view(t, gameId);
     expect(next.match.games[0]).toMatchObject({ winner: starter, reason: 'timeout' });
     expect(waiting(next)).toBe(late);
@@ -519,11 +508,11 @@ describe('"your turn" pushes', () => {
 
   it('a time out tells the winner, who starts the next game', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     const late = waiting(await view(t, gameId));
-    await wait(t, TURN_TIME_MS.async);
+    await wait(t, ASYNC_TURN_TIME_MS);
     const next = await view(t, gameId);
     expect(next.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
     expect(waiting(next)).toBe(otherSide(late));
@@ -533,7 +522,7 @@ describe('"your turn" pushes', () => {
 
   it(`a failed push is tried once more after ${PUSH_RETRY_MS / 1000} s, for the failed tokens only`, async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     const other = PLAYERS[otherSide(waiting(await view(t, gameId)))];
     const good = 'ExponentPushToken[good-phone]';
@@ -552,7 +541,7 @@ describe('"your turn" pushes', () => {
     await wait(t, 1);
     expect(push.sent.map((message) => message.to)).toEqual([flaky]);
     // The retry keeps the push only for the time left in the turn.
-    expect(push.sent[0]?.ttlSeconds).toBe((TURN_TIME_MS.async - PUSH_RETRY_MS) / 1000);
+    expect(push.sent[0]?.ttlSeconds).toBe((ASYNC_TURN_TIME_MS - PUSH_RETRY_MS) / 1000);
 
     // It failed again: no third try. A failed token is not removed.
     push.clear();
@@ -563,7 +552,7 @@ describe('"your turn" pushes', () => {
 
   it('a rate limited push is tried again, and the retry goes out when the service is back', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     const side = otherSide(waiting(await view(t, gameId)));
@@ -578,7 +567,7 @@ describe('"your turn" pushes', () => {
 
   it('a retry is dropped when the player has played since', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     const side = otherSide(waiting(await view(t, gameId)));
     await register(t, PLAYERS[side], TOKEN_OF[side]);
@@ -635,12 +624,12 @@ describe('"game over" pushes (#316)', () => {
 
   it('a winning move tells the other player, never the caller', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async', 'portes', ALICE, 1);
+    const gameId = await createGame(t, null, 'portes', ALICE, 1);
     await flush(t);
     await registerBoth(t);
     for (const winner of ['white', 'black'] as const) {
       // A second match, so each side wins once.
-      const id = winner === 'white' ? gameId : await createGame(t, 'async', 'portes', BOB, 1);
+      const id = winner === 'white' ? gameId : await createGame(t, null, 'portes', BOB, 1);
       await flush(t);
       push.clear();
       await lastTurnFor(t, id, winner);
@@ -662,7 +651,7 @@ describe('"game over" pushes (#316)', () => {
 
   it('a resign tells the other player, never the one who resigned', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     push.clear();
@@ -673,12 +662,12 @@ describe('"game over" pushes (#316)', () => {
 
   it('a time out that ends the match tells both players', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async', 'portes', ALICE, 1);
+    const gameId = await createGame(t, null, 'portes', ALICE, 1);
     await flush(t);
     await registerBoth(t);
     push.clear();
     const late = waiting(await view(t, gameId));
-    await wait(t, TURN_TIME_MS.async);
+    await wait(t, ASYNC_TURN_TIME_MS);
     const v = await view(t, gameId);
     expect(v.status).toBe('finished');
     expect(v.match.winner).toBe(otherSide(late));
@@ -689,26 +678,9 @@ describe('"game over" pushes (#316)', () => {
     expect(push.sent).toHaveLength(2);
   });
 
-  it('a live game sends none: a win, a resign or a time out', async () => {
-    const t = await setup();
-    await registerBoth(t);
-    const won = await createGame(t, 'live', 'portes', ALICE, 1);
-    await lastTurnFor(t, won, 'white');
-    await playOneTurn(t, won);
-    const resigned = await createGame(t, 'live', 'portes', ALICE, 1);
-    await as(t, ALICE).mutation(api.games.resign, { gameId: resigned });
-    const late = await createGame(t, 'live', 'portes', ALICE, 1);
-    await wait(t, TURN_TIME_MS.live);
-    expect((await view(t, won)).status).toBe('finished');
-    expect((await view(t, resigned)).status).toBe('finished');
-    expect((await view(t, late)).status).toBe('finished');
-    await flush(t);
-    expect(push.sent).toEqual([]);
-  });
-
   it('a game that ends while the match goes on sends only "your turn"', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     push.clear();
@@ -728,7 +700,7 @@ describe('"game over" pushes (#316)', () => {
 
   it('a player with no token costs no action', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await register(t, BOB, BOB_TOKEN);
     await as(t, BOB).mutation(api.games.resign, { gameId });
@@ -742,7 +714,7 @@ describe('"game over" pushes (#316)', () => {
     // The match is over, so its version does not change again: the
     // retry's version check lets it go out.
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     push.fail(ALICE_TOKEN);
@@ -767,7 +739,7 @@ describe('"game over" pushes (#316)', () => {
 
   it('a "game over" for a match that still runs sends nothing', async () => {
     const t = await setup();
-    const gameId = await createGame(t, 'async');
+    const gameId = await createGame(t, null);
     await flush(t);
     await registerBoth(t);
     push.clear();

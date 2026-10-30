@@ -1,7 +1,7 @@
 // The small parts of the online screen (#255): the remote turn, the clock
 // text, the board store, the online bot and the dev invite (#256), over
 // the in-memory server.
-import { ONLINE_GAME_CHOICES, TURN_TIME_MS, type OnlineGameChoice } from '@tavli/contracts';
+import { ONLINE_GAME_CHOICES, ASYNC_TURN_TIME_MS, type OnlineGameChoice } from '@tavli/contracts';
 import {
   applyMatchAction,
   createSeededRng,
@@ -56,13 +56,7 @@ async function flush(): Promise<void> {
 
 function serverWithGame(choice: OnlineGameChoice = 'portes', targetPoints = 3, seed = 5) {
   const server = createMemoryGameServer({ rng: createSeededRng(seed), now: () => Date.now() });
-  const gameId = server.createGame(
-    'me',
-    { white: 'me', black: 'bot' },
-    choice,
-    targetPoints,
-    'live',
-  );
+  const gameId = server.createGame('me', { white: 'me', black: 'bot' }, choice, targetPoints, 1);
   return { server, gameId };
 }
 
@@ -119,24 +113,24 @@ describe('remoteTurn', () => {
 describe('clockText', () => {
   const t = i18n.t;
   it('counts seconds live, rounded up', () => {
-    expect(clockText(TURN_TIME_MS.live, 'live', t)).toBe('60 s');
-    expect(clockText(41_200, 'live', t)).toBe('42 s');
-    expect(clockText(0, 'live', t)).toBe('0 s');
-    expect(clockText(-5, 'live', t)).toBe('0 s');
+    expect(clockText(60_000, 1, t)).toBe('60 s');
+    expect(clockText(41_200, 1, t)).toBe('42 s');
+    expect(clockText(0, 1, t)).toBe('0 s');
+    expect(clockText(-5, 1, t)).toBe('0 s');
   });
 
   it('counts hours async, and minutes in the last hour', () => {
-    expect(clockText(TURN_TIME_MS.async, 'async', t)).toBe('24 h');
-    expect(clockText(90 * 60_000, 'async', t)).toBe('1 h');
-    expect(clockText(40 * 60_000 - 1, 'async', t)).toBe('40 min');
-    expect(clockTickMs('live')).toBe(1000);
-    expect(clockTickMs('async')).toBeGreaterThan(1000);
+    expect(clockText(ASYNC_TURN_TIME_MS, null, t)).toBe('24 h');
+    expect(clockText(90 * 60_000, null, t)).toBe('1 h');
+    expect(clockText(40 * 60_000 - 1, null, t)).toBe('40 min');
+    expect(clockTickMs(1)).toBe(1000);
+    expect(clockTickMs(null)).toBeGreaterThan(1000);
   });
 
   it('has Greek words', async () => {
     await i18n.changeLanguage('el');
-    expect(clockText(5 * 60 * 60_000, 'async', i18n.t)).toBe('5 ώρες');
-    expect(clockText(1000, 'live', i18n.t)).toBe('1 δευτ.');
+    expect(clockText(5 * 60 * 60_000, null, i18n.t)).toBe('5 ώρες');
+    expect(clockText(1000, 1, i18n.t)).toBe('1 δευτ.');
   });
 });
 
@@ -244,7 +238,7 @@ describe('onlineBoardStore between games (#286)', () => {
 
   /** The turn time of the player the server waits for runs out. */
   async function timeOut(server: ReturnType<typeof serverWithGame>['server']) {
-    jest.advanceTimersByTime(TURN_TIME_MS.live + 1);
+    jest.advanceTimersByTime(60_000 + 1);
     expect(server.runDueTimeouts()).toBe(1);
     await flush();
   }
@@ -294,7 +288,7 @@ describe('onlineBoardStore between games (#286)', () => {
 
   it('replays the other player’s winning turn: the board ends on the final position (#299)', async () => {
     const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => Date.now() });
-    const gameId = server.createGame('them', { white: 'them', black: 'me' }, 'portes', 3, 'live');
+    const gameId = server.createGame('them', { white: 'them', black: 'me' }, 'portes', 3, 1);
     server.setFlowForTest(gameId, lastBearOff(viewFlow(server.getGame(gameId)!)));
     const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
     open.push(store);
@@ -437,7 +431,7 @@ describe('onlineBoardStore between games (#286)', () => {
     // Nobody reads the board while two games time out (the phone was away).
     const before = board.getState().flow;
     for (let i = 0; i < 2; i++) {
-      jest.advanceTimersByTime(TURN_TIME_MS.live + 1);
+      jest.advanceTimersByTime(60_000 + 1);
       expect(server.runDueTimeouts()).toBe(1);
     }
     await flush();
@@ -489,7 +483,7 @@ describe('onlineBoardStore between games (#286)', () => {
     const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
     open.push(store);
     await flush();
-    jest.advanceTimersByTime(TURN_TIME_MS.live + 1);
+    jest.advanceTimersByTime(60_000 + 1);
     expect(server.runDueTimeouts()).toBe(1);
     await flush();
     const board = onlineBoardStore(store, gameId)!;
@@ -505,7 +499,7 @@ describe('devGame', () => {
       server,
       me: 'me',
       choice: 'portes',
-      pace: 'live',
+      turnTimeMinutes: 1,
       targetPoints: 1,
       difficulty: botLevels.portes[0]!,
       runner: botRunner,
@@ -642,7 +636,7 @@ describe('startDevInvite (#256)', () => {
     const invite = startDevInvite({
       server,
       choice: 'portes',
-      pace: 'live',
+      turnTimeMinutes: 1,
       targetPoints: 1,
       difficulty: botLevels.portes[0]!,
       runner: botRunner,
@@ -659,7 +653,7 @@ describe('startDevInvite (#256)', () => {
       status: 'open',
       choice: 'portes',
       targetPoints: 1,
-      pace: 'live',
+      turnTimeMinutes: 1,
     });
     const gameId = await server.invitesFor('me').acceptInvite(code);
     // The bot made the invite, so it plays White. Let it be White's turn.
@@ -725,7 +719,7 @@ describe('startDevInvite (#256)', () => {
       server: second.server,
       me: 'me',
       choice: 'portes',
-      pace: 'live',
+      turnTimeMinutes: 1,
       targetPoints: 1,
       difficulty: botLevels.portes[0]!,
       runner: botRunner,

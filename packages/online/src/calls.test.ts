@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { TURN_TIME_MS } from '@tavli/contracts';
+import { ASYNC_TURN_TIME_MS } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 
 import {
@@ -95,11 +95,11 @@ describe('turn deadline checks', () => {
     const rng = createSeededRng(1);
     const flow = createOnlineMatch({ choice: 'portes', targetPoints: 1, players: PLAYERS }, rng);
     expect(matchStatus(flow)).toBe('active');
-    expect(nextDeadline('live', flow, 10)).toBe(10 + TURN_TIME_MS.live);
-    expect(nextDeadline('async', flow, 10)).toBe(10 + TURN_TIME_MS.async);
+    expect(nextDeadline(1, flow, 10)).toBe(10 + 60_000);
+    expect(nextDeadline(null, flow, 10)).toBe(10 + ASYNC_TURN_TIME_MS);
     const done = resign(flow, 'white', rng);
     expect(matchStatus(done)).toBe('finished');
-    expect(nextDeadline('live', done, 10)).toBeNull();
+    expect(nextDeadline(1, done, 10)).toBeNull();
   });
 });
 

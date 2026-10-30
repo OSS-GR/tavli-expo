@@ -28,7 +28,7 @@ import {
 import type { InviteRecord } from './invites';
 
 const NOW = Date.UTC(2026, 9, 28, 12, 0, 0);
-const OPTIONS = { from: 'alice', choice: 'portes', targetPoints: 3, pace: 'live' } as const;
+const OPTIONS = { from: 'alice', choice: 'portes', targetPoints: 3, turnTimeMinutes: 1 } as const;
 
 function invite(status: InviteStatus = 'open'): InviteRecord {
   return { ...newInvite(OPTIONS, 'ABCD2345', NOW), status };
@@ -228,7 +228,7 @@ describe('toInviteView', () => {
       from: 'alice',
       choice: 'portes',
       targetPoints: 3,
-      pace: 'live',
+      turnTimeMinutes: 1,
       status: 'open',
       expiresAt: NOW + INVITE_TIME_MS,
       gameId: null,

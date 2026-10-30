@@ -27,9 +27,11 @@ function signIn(): void {
 }
 
 /** A new game of mine (I am White), one second after the last change. */
-function newGame(pace: 'live' | 'async' = 'async'): string {
+function newGame(turnTimeMinutes: number | null = null): string {
   jest.advanceTimersByTime(1000);
-  return onlineFake.server().createGame(ME, { white: ME, black: FRIEND }, 'portes', 5, pace);
+  return onlineFake
+    .server()
+    .createGame(ME, { white: ME, black: FRIEND }, 'portes', 5, turnTimeMinutes);
 }
 
 function view(gameId: string): OnlineGameView {
@@ -207,7 +209,7 @@ describe('<HomeOnlineGames />', () => {
 
   it('counts the time down while it shows', async () => {
     signIn();
-    const gameId = newGame('live');
+    const gameId = newGame(1);
     await show();
     const row = screen.getByTestId(`online-game-${gameId}`);
     expect(within(row).getByText('0–0 · 60 s left')).toBeOnTheScreen();

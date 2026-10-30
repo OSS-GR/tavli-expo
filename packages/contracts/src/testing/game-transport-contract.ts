@@ -19,7 +19,6 @@ import type {
   GameTransport,
   GameTransportErrorCode,
   OnlineGameChoice,
-  OnlineGamePace,
   OnlineGameStatus,
   OnlineGameView,
 } from '../game-transport';
@@ -27,7 +26,8 @@ import type {
 export interface GameTransportContractGame {
   readonly choice: OnlineGameChoice;
   readonly targetPoints: number;
-  readonly pace: OnlineGamePace;
+  /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
+  readonly turnTimeMinutes: number | null;
 }
 
 export interface GameTransportContractSubject {
@@ -85,7 +85,7 @@ const MAX_SETTLES = 200;
 /** `settle()` calls that must pass with no view, to show that none comes. */
 const QUIET_SETTLES = 20;
 
-const PORTES: GameTransportContractGame = { choice: 'portes', targetPoints: 3, pace: 'live' };
+const PORTES: GameTransportContractGame = { choice: 'portes', targetPoints: 3, turnTimeMinutes: 1 };
 
 function same(actual: unknown, expected: unknown, what: string): void {
   const a = JSON.stringify(actual);
@@ -235,7 +235,7 @@ function sameAsView(summary: GameSummary, view: OnlineGameView, side: PlayerId):
   same(summary.presetId, view.match.rules.presetId, 'summary.presetId');
   same(summary.variant, view.game.state.variant, 'summary.variant');
   same(summary.targetPoints, view.match.targetPoints, 'summary.targetPoints');
-  same(summary.pace, view.pace, 'summary.pace');
+  same(summary.turnTimeMinutes, view.turnTimeMinutes, 'summary.turnTimeMinutes');
   same(summary.mySide, side, 'summary.mySide');
   same(summary.waitingFor, view.waitingFor, 'summary.waitingFor');
   same(summary.myTurn, view.waitingFor === side, 'summary.myTurn');
@@ -319,7 +319,7 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         same(view.gameId, gameId, 'view.gameId');
         same(view.status, 'active', 'view.status');
         same(view.choice, 'portes', 'view.choice');
-        same(view.pace, 'live', 'view.pace');
+        same(view.turnTimeMinutes, 1, 'view.turnTimeMinutes');
         same(view.game.phase, 'moving', 'view.game.phase');
         same(view.waitingFor, view.game.state.toMove, 'view.waitingFor');
         same(view.prompt, null, 'view.prompt');
@@ -670,7 +670,7 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         const second = await subject.createGame({
           choice: 'fevga',
           targetPoints: 5,
-          pace: 'async',
+          turnTimeMinutes: null,
         });
         await subject.passTime(TICK_MS);
         const other = await subject.createOtherGame();

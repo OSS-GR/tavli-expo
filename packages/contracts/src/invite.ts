@@ -8,7 +8,7 @@
  * `docs/architecture/online-game-service.md`.
  */
 
-import type { OnlineGameChoice, OnlineGamePace } from './game-transport';
+import type { OnlineGameChoice } from './game-transport';
 
 /**
  * How long an invite stays open, in milliseconds: 24 hours. Then it
@@ -63,8 +63,11 @@ export interface InviteView {
   readonly choice: OnlineGameChoice;
   /** The match length in points. */
   readonly targetPoints: number;
-  /** `live` (1 minute per turn) or `async` (24 hours per turn). */
-  readonly pace: OnlineGamePace;
+  /**
+   * A per-turn time limit in minutes, or `null` for the 24-hour default
+   * (the async behaviour, #183).
+   */
+  readonly turnTimeMinutes: number | null;
   /**
    * `expired` also when the time is up but the server has not marked
    * the invite yet.
@@ -123,7 +126,7 @@ export interface NewInvite {
   readonly choice: OnlineGameChoice;
   /** The match length in points (an integer of 1 or more). */
   readonly targetPoints: number;
-  readonly pace: OnlineGamePace;
+  readonly turnTimeMinutes: number | null;
 }
 
 /**

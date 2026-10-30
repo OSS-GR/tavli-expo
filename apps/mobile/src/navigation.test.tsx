@@ -82,6 +82,9 @@ beforeEach(async () => {
   if (current) matchSessions.end(current.id);
   storage.remove(SAVED_MATCH_KEY);
   await act(async () => historyStore.getState().clear());
+  // All online games now offer turn notifications (#285): set the phone to
+  // "denied" so `offer()` does not show the offer sheet and hide the screen.
+  onlineFake.notifications.setPermission('denied');
 });
 
 /** The orientation lock of the native screen that holds `element` (react-native-screens). */
@@ -762,7 +765,7 @@ describe('online games (#255)', () => {
     onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
     const gameId = onlineFake
       .server()
-      .createGame('guest-1', { white: 'guest-1', black: 'bob' }, 'portes', 3, 'live');
+      .createGame('guest-1', { white: 'guest-1', black: 'bob' }, 'portes', 3, 1);
     await renderRouter('./src/app', { initialUrl: `/game/${gameId}` });
     expect(
       await screen.findByTestId('game-board', { includeHiddenElements: true }),
@@ -773,7 +776,7 @@ describe('online games (#255)', () => {
   it('makes no guest for a game link when nobody is signed in (#266)', async () => {
     const gameId = onlineFake
       .server()
-      .createGame('guest-1', { white: 'guest-1', black: 'bob' }, 'portes', 3, 'live');
+      .createGame('guest-1', { white: 'guest-1', black: 'bob' }, 'portes', 3, 1);
     await renderRouter('./src/app', { initialUrl: `/game/${gameId}` });
     expect(await screen.findByText('This game could not be opened.')).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(0);
@@ -804,7 +807,10 @@ describe('online games (#255)', () => {
     const board = router.getPathname();
     expect(board).toMatch(/^\/game\/game-\d+$/);
     const gameId = board.split('/').at(-1)!;
-    expect(onlineServer().getGame(gameId)).toMatchObject({ choice: 'portes', pace: 'live' });
+    expect(onlineServer().getGame(gameId)).toMatchObject({
+      choice: 'portes',
+      turnTimeMinutes: null,
+    });
     expect(
       await screen.findByTestId('game-board', { includeHiddenElements: true }),
     ).toBeOnTheScreen();
@@ -894,7 +900,7 @@ describe('invites (#256)', () => {
     const user = setupUser();
     // The test server is shared by the whole file: take these back at the end.
     const open = Array.from({ length: MAX_OPEN_INVITES }, () =>
-      onlineServer().createInvite(DEV_BOT_ID, 'portes', 1, 'live'),
+      onlineServer().createInvite(DEV_BOT_ID, 'portes', 1, 1),
     );
     try {
       await renderRouter('./src/app', { initialUrl: '/dev/online' });
@@ -915,7 +921,7 @@ describe('invites (#256)', () => {
 
   it('opens an invite link on the server after the free account step, in any case (#281)', async () => {
     const user = setupUser();
-    const code = onlineServer().createInvite('friend', 'plakoto', 3, 'async');
+    const code = onlineServer().createInvite('friend', 'plakoto', 3, null);
     const router = await renderRouter('./src/app', {
       initialUrl: `/invite/${code.toLowerCase()}`,
     });
@@ -925,7 +931,7 @@ describe('invites (#256)', () => {
     expect(onlineFake.authStore.guests).toBe(0);
     await user.press(screen.getByRole('button', { name: 'Show the invite' }));
     expect(await screen.findByText('Plakoto')).toBeOnTheScreen();
-    expect(screen.getByText('Async · 24 hours per turn')).toBeOnTheScreen();
+    expect(screen.getByText('24 h')).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(1);
     expect(router.getPathname()).toBe(`/invite/${code.toLowerCase()}`);
   });
@@ -933,7 +939,7 @@ describe('invites (#256)', () => {
   it('a saved session shows the invite at once; Accept opens the game on the server', async () => {
     const user = setupUser();
     onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
-    const code = onlineServer().createInvite('friend', 'fevga', 1, 'live');
+    const code = onlineServer().createInvite('friend', 'fevga', 1, 1);
     const router = await renderRouter('./src/app', { initialUrl: `/invite/${code}` });
     await user.press(await screen.findByRole('button', { name: 'Accept' }));
     const board = router.getPathname();
@@ -1064,7 +1070,7 @@ describe('play a friend online (#281)', () => {
   it('a waiting-screen link with nobody signed in shows "not found", with no call and no account', async () => {
     const theirs = await onlineFake
       .invitesFor('bob')
-      .createInvite({ choice: 'portes', targetPoints: 3, pace: 'live' });
+      .createInvite({ choice: 'portes', targetPoints: 3, turnTimeMinutes: 1 });
     const watchInvite = jest.spyOn(onlineFake.invites, 'watchInvite');
     await renderRouter('./src/app', { initialUrl: `/friend/${theirs}` });
     expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
@@ -1077,7 +1083,7 @@ describe('play a friend online (#281)', () => {
     await onlineFake.auth.signInAsGuest();
     const theirs = await onlineFake
       .invitesFor('bob')
-      .createInvite({ choice: 'portes', targetPoints: 3, pace: 'live' });
+      .createInvite({ choice: 'portes', targetPoints: 3, turnTimeMinutes: 1 });
     await renderRouter('./src/app', { initialUrl: `/friend/${theirs}` });
     expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Cancel the invite' })).toBeNull();
@@ -1100,7 +1106,7 @@ describe('your online games on Home (#297)', () => {
   /** A game of mine vs Bob, one second after the last change. */
   function newGame(): string {
     jest.advanceTimersByTime(1000);
-    return onlineFake.server().createGame(ME, { white: ME, black: 'bob' }, 'portes', 3, 'async');
+    return onlineFake.server().createGame(ME, { white: ME, black: 'bob' }, 'portes', 3, null);
   }
 
   it('a phone with no online account loads no session at start', async () => {
@@ -1181,7 +1187,7 @@ describe('your invites on Home (#314)', () => {
     onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
     await onlineFake
       .invitesFor('guest-1')
-      .createInvite({ choice: 'portes', targetPoints: 3, pace: 'live' });
+      .createInvite({ choice: 'portes', targetPoints: 3, turnTimeMinutes: 1 });
     const watch = jest.spyOn(onlineFake.invites, 'watchMyInvites');
     await renderRouter('./src/app', { initialUrl: '/' });
     expect(await screen.findByText('Greek tavli with friends')).toBeOnTheScreen();
@@ -1195,7 +1201,7 @@ describe('your invites on Home (#314)', () => {
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     const code = await inviteThenHome(user, router);
     const row = await screen.findByTestId(`home-invite-${code}`);
-    expect(row).toHaveAccessibleName(/^Invite, Portes, first to 3 points, Live, /);
+    expect(row).toHaveAccessibleName(/^Invite, Portes, first to 3 points, 24 h, /);
     await user.press(row);
     expect(router.getPathname()).toBe(`/friend/${code}`);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
@@ -1232,7 +1238,7 @@ describe('online matches in History (#313)', () => {
     jest.advanceTimersByTime(1000);
     const gameId = onlineFake
       .server()
-      .createGame(ME, { white: ME, black: 'bob' }, 'portes', 3, 'async');
+      .createGame(ME, { white: ME, black: 'bob' }, 'portes', 3, null);
     await onlineFake.transportFor('bob').resign(gameId);
     return gameId;
   }

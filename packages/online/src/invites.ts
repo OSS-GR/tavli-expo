@@ -11,13 +11,7 @@
  */
 
 import { INVITE_CODE_ALPHABET, INVITE_CODE_LENGTH, INVITE_TIME_MS } from '@tavli/contracts';
-import type {
-  InviteErrorCode,
-  InviteStatus,
-  InviteView,
-  OnlineGameChoice,
-  OnlineGamePace,
-} from '@tavli/contracts';
+import type { InviteErrorCode, InviteStatus, InviteView, OnlineGameChoice } from '@tavli/contracts';
 import type { Rng } from '@tavli/engine';
 
 /**
@@ -111,7 +105,8 @@ export interface InviteRecord {
   readonly from: string;
   readonly choice: OnlineGameChoice;
   readonly targetPoints: number;
-  readonly pace: OnlineGamePace;
+  /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
+  readonly turnTimeMinutes: number | null;
   readonly status: InviteStatus;
   readonly expiresAt: number;
   readonly gameId: string | null;
@@ -121,7 +116,8 @@ export interface NewInviteOptions {
   readonly from: string;
   readonly choice: OnlineGameChoice;
   readonly targetPoints: number;
-  readonly pace: OnlineGamePace;
+  /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
+  readonly turnTimeMinutes: number | null;
 }
 
 /** When an invite made at `now` expires. */
@@ -134,7 +130,7 @@ export function inviteExpiresAt(now: number): number {
  * length here, as the engine would, so a friend's accept does not fail on it.
  */
 export function newInvite(options: NewInviteOptions, code: string, now: number): InviteRecord {
-  const { from, choice, targetPoints, pace } = options;
+  const { from, choice, targetPoints, turnTimeMinutes } = options;
   if (from === '') fail('BAD_REQUEST', 'the player id is empty');
   if (!Number.isSafeInteger(targetPoints) || targetPoints < 1) {
     fail('BAD_REQUEST', 'target points must be an integer of 1 or more');
@@ -144,7 +140,7 @@ export function newInvite(options: NewInviteOptions, code: string, now: number):
     from,
     choice,
     targetPoints,
-    pace,
+    turnTimeMinutes,
     status: 'open',
     expiresAt: inviteExpiresAt(now),
     gameId: null,
@@ -235,7 +231,7 @@ export function toInviteView(invite: InviteRecord, now: number): InviteView {
     from: invite.from,
     choice: invite.choice,
     targetPoints: invite.targetPoints,
-    pace: invite.pace,
+    turnTimeMinutes: invite.turnTimeMinutes,
     status: inviteStatus(invite, now),
     expiresAt: invite.expiresAt,
     gameId: invite.gameId,

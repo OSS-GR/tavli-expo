@@ -126,7 +126,7 @@ describe('createOnlineServices', () => {
   it('opens one client on the deployment URL on the first game call', async () => {
     const { adapters, made, server, authStore } = memoryAdapters();
     const online = createOnlineServices(SERVER, adapters)!;
-    const gameId = server.createGame('guest-1', PLAYERS, 'portes', 3, 'live');
+    const gameId = server.createGame('guest-1', PLAYERS, 'portes', 3, 1);
     const errors: unknown[] = [];
     const stop = online.games.subscribe(
       gameId,
@@ -160,7 +160,7 @@ describe('createOnlineServices', () => {
     const code = await online.invites.createInvite({
       choice: 'portes',
       targetPoints: 3,
-      pace: 'live',
+      turnTimeMinutes: 1,
     });
     expect(made).toEqual([`auth ${SERVER.siteUrl}`, `client ${SERVER.url}`, 'invites']);
     await expect(online.invites.getInvite(code)).resolves.toMatchObject({
@@ -269,7 +269,7 @@ describe('the Jest fake of @/services', () => {
   });
 
   it('makes invites as the signed-in guest, and refuses them while nobody is signed in', async () => {
-    const game = { choice: 'plakoto', targetPoints: 1, pace: 'async' } as const;
+    const game = { choice: 'plakoto', targetPoints: 1, turnTimeMinutes: null } as const;
     await expect(onlineFake.invites.createInvite(game)).rejects.toMatchObject({
       code: 'NOT_SIGNED_IN',
     });
@@ -293,11 +293,11 @@ describe('the Jest fake of @/services', () => {
     // The first guest of each test is `guest-1`.
     expect(onlineFake.auth.currentUser()).toEqual({ id: 'guest-1', isGuest: true });
     expect(onlineFake.server().getGame('game-1')).toBeNull();
-    onlineFake.server().createGame('guest-1', PLAYERS, 'portes', 3, 'live');
+    onlineFake.server().createGame('guest-1', PLAYERS, 'portes', 3, 1);
   });
 
   it('refuses game calls while nobody is signed in', async () => {
-    const gameId = onlineFake.server().createGame('guest-1', PLAYERS, 'portes', 3, 'live');
+    const gameId = onlineFake.server().createGame('guest-1', PLAYERS, 'portes', 3, 1);
     const errors: unknown[] = [];
     onlineFake.games.subscribe(
       gameId,
@@ -315,7 +315,7 @@ describe('the Jest fake of @/services', () => {
   });
 
   it('plays as the signed-in guest', async () => {
-    const gameId = onlineFake.server().createGame('guest-1', PLAYERS, 'portes', 3, 'live');
+    const gameId = onlineFake.server().createGame('guest-1', PLAYERS, 'portes', 3, 1);
     await onlineFake.auth.signInAsGuest();
     const views: OnlineGameView[] = [];
     onlineFake.games.subscribe(gameId, (view) => views.push(view));

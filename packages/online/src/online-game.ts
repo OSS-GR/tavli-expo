@@ -23,13 +23,8 @@
  * `storeStep` saves it.
  */
 
-import { TURN_TIME_MS } from '@tavli/contracts';
-import type {
-  GameTransportErrorCode,
-  OnlineGameChoice,
-  OnlineGamePace,
-  OnlineGameView,
-} from '@tavli/contracts';
+import { turnDeadlineMs } from '@tavli/contracts';
+import type { GameTransportErrorCode, OnlineGameChoice, OnlineGameView } from '@tavli/contracts';
 import {
   DEFAULT_PRESET_BY_GAME,
   EngineError,
@@ -325,8 +320,8 @@ export function resign(flow: MatchFlow, player: PlayerId, rng: Rng): SteppedFlow
 // pure. The Convex functions pass `Date.now()`.
 
 /** When a turn that starts at `now` runs out. */
-export function deadlineAfter(pace: OnlineGamePace, now: number): number {
-  return now + TURN_TIME_MS[pace];
+export function deadlineAfter(turnTimeMinutes: number | null, now: number): number {
+  return now + turnDeadlineMs(turnTimeMinutes);
 }
 
 /** True when `deadline` has passed at `now`. At the deadline itself the time is up. */
@@ -353,7 +348,8 @@ export interface ViewInput {
   readonly gameId: string;
   readonly version: number;
   readonly choice: OnlineGameChoice;
-  readonly pace: OnlineGamePace;
+  /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
+  readonly turnTimeMinutes: number | null;
   readonly turnDeadline: number | null;
   readonly players: PerPlayer<string>;
   readonly flow: MatchFlow;
@@ -366,14 +362,15 @@ export interface ViewInput {
  * rolls each roll when its turn starts), and nothing about the RNG.
  */
 export function toView(input: ViewInput): OnlineGameView {
-  const { gameId, version, choice, pace, turnDeadline, players, flow, previousGame } = input;
+  const { gameId, version, choice, turnTimeMinutes, turnDeadline, players, flow, previousGame } =
+    input;
   const finished = matchPhase(flow) === 'match-over';
   return {
     gameId,
     version,
     status: finished ? 'finished' : 'active',
     choice,
-    pace,
+    turnTimeMinutes,
     turnDeadline: finished ? null : turnDeadline,
     players,
     match: flow.match,

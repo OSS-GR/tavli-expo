@@ -1,24 +1,19 @@
 /**
  * Dev only (#255): an online game vs the bot on the in-memory server.
- * Pick a game, a pace and a length, then start: the board opens on the
+ * Pick a game, a time limit and a length, then start: the board opens on the
  * online screen, and the bot plays the remote player through its own
  * transport (`features/online/devGame.ts`). Not linked from the app.
  * Release builds go home.
  *
  * "Make an invite" (#256): the bot makes an invite with the same game,
- * pace and length, and the screen shows its code and links. Open it with
+ * time limit and length, and the screen shows its code and links. Open it with
  * the button, or on a simulator:
  * `xcrun simctl openurl booted tavlaki://invite/<code>`. When this phone
  * accepts it, the bot plays the game (as White, the inviter). When the
  * bot has too many open invites (`TOO_MANY_INVITES`, #275), the screen
  * says so instead of a code.
  */
-import {
-  ONLINE_GAME_CHOICES,
-  type Difficulty,
-  type OnlineGameChoice,
-  type OnlineGamePace,
-} from '@tavli/contracts';
+import { ONLINE_GAME_CHOICES, type Difficulty, type OnlineGameChoice } from '@tavli/contracts';
 import { InviteError } from '@tavli/online';
 import { Redirect, Stack, router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -30,6 +25,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { SegmentedControl } from '@/components/settings/SegmentedControl';
 import { inviteAppUrl, inviteUrl } from '@/features/invites/link';
 import { gameHref, inviteHref } from '@/features/match/routes';
+import { formatTimeLimit } from '@/features/online/clock';
 import { startDevGame, startDevInvite, stopAnyDevGame } from '@/features/online/devGame';
 import { botLevels, botRunner, createLocalRng, onlinePlayerId, onlineServer } from '@/services';
 
@@ -49,7 +45,7 @@ export default function DevOnlineRoute() {
   const { t } = useTranslation();
   const [games] = useState(botGames);
   const [choice, setChoice] = useState<OnlineGameChoice>(games[0]?.choice ?? 'portes');
-  const [pace, setPace] = useState<OnlineGamePace>('live');
+  const [turnTimeMinutes, setTurnTimeMinutes] = useState<number | null>(null);
   const [length, setLength] = useState<Length>('3');
   const [rng] = useState(createLocalRng);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -64,7 +60,7 @@ export default function DevOnlineRoute() {
   const match = () => ({
     server: onlineServer(),
     choice,
-    pace,
+    turnTimeMinutes,
     targetPoints: Number(length),
     difficulty: games.find((g) => g.choice === choice)?.level ?? 'easy',
     runner: botRunner,
@@ -101,13 +97,14 @@ export default function DevOnlineRoute() {
         options={games.map((g) => ({ value: g.choice, label: t(`games.${g.choice}`) }))}
       />
       <SegmentedControl
-        testID="dev-online-pace"
-        label={t('dev.online.pace')}
-        value={pace}
-        onChange={setPace}
+        testID="dev-online-time-limit"
+        label={t('dev.online.timeLimit')}
+        value={`${turnTimeMinutes}`}
+        onChange={(value) => setTurnTimeMinutes(value === 'null' ? null : Number(value))}
         options={[
-          { value: 'live', label: t('dev.online.live') },
-          { value: 'async', label: t('dev.online.async') },
+          { value: 'null', label: formatTimeLimit(null, t) },
+          { value: '5', label: formatTimeLimit(5, t) },
+          { value: '1', label: formatTimeLimit(1, t) },
         ]}
       />
       <SegmentedControl

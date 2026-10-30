@@ -96,7 +96,11 @@ function contractSubject(): GameTransportContractSubject {
   return {
     createGame: (game) => refreshed(createGame(t, game)),
     createMotherQuestion: async () => {
-      const gameId = await createGame(t, { choice: 'plakoto', targetPoints: 1, pace: 'live' });
+      const gameId = await createGame(t, {
+        choice: 'plakoto',
+        targetPoints: 1,
+        turnTimeMinutes: 1,
+      });
       const pin = await t.run(async (ctx) => {
         const doc = await ctx.db.get(gameId);
         if (doc === null) throw new Error('no game');
@@ -113,7 +117,7 @@ function contractSubject(): GameTransportContractSubject {
       return gameId;
     },
     createWinningTurn: async () => {
-      const gameId = await createGame(t, { choice: 'portes', targetPoints: 3, pace: 'live' });
+      const gameId = await createGame(t, { choice: 'portes', targetPoints: 3, turnTimeMinutes: 1 });
       await t.run(async (ctx) => {
         const doc = await ctx.db.get(gameId);
         if (doc === null) throw new Error('no game');
@@ -129,11 +133,11 @@ function contractSubject(): GameTransportContractSubject {
           players: { white: BOB, black: EVE },
           choice: 'portes',
           targetPoints: 1,
-          pace: 'live',
+          turnTimeMinutes: 1,
         }),
       ),
     missingGameId: async () => {
-      const gameId = await createGame(t, { choice: 'portes', targetPoints: 1, pace: 'live' });
+      const gameId = await createGame(t, { choice: 'portes', targetPoints: 1, turnTimeMinutes: 1 });
       await t.run(async (ctx) => ctx.db.delete(gameId));
       return gameId;
     },
@@ -168,7 +172,7 @@ describe('the adapter on the real functions', () => {
   it('a late turn rejects with TIMED_OUT, and both players see the time out', async () => {
     const t = setup();
     const network = gameNetwork(t);
-    const gameId = await createGame(t, { choice: 'portes', targetPoints: 5, pace: 'live' });
+    const gameId = await createGame(t, { choice: 'portes', targetPoints: 5, turnTimeMinutes: 1 });
     const views: OnlineGameView[] = [];
     const stop = network.transportFor(BOB).subscribe(gameId, (view) => views.push(view));
     await network.settle();
@@ -198,7 +202,7 @@ describe('the adapter on the real functions', () => {
 
   it('a caller with no sign-in gets NOT_SIGNED_IN', async () => {
     const t = setup();
-    const gameId = await createGame(t, { choice: 'portes', targetPoints: 1, pace: 'live' });
+    const gameId = await createGame(t, { choice: 'portes', targetPoints: 1, turnTimeMinutes: 1 });
     // A client with no token: convex-test with no identity.
     let loaded: Promise<unknown> = Promise.resolve();
     const anonymous: ConvexGameClient = {

@@ -43,10 +43,10 @@
 | Accounts | **All paid accounts move to the end (v1.0 launch).** Apple Developer and Google Play are opened just before store release. Until then: simulators on the Mac, the owner's iPhone via a free Apple ID in Xcode, and Android test builds (APK) installed directly. Note: friends on iPhones can only test once the Apple account exists. Google Play needs a 14-day closed test with 12 testers before release; the owner accepts that it adds time at the end. | #3, #41, #54 |
 | Q1 | **Budget:** use free plans only until launch. The PM asks the owner before adding anything paid. | ADR-0004 |
 | Q12 | **No time estimates.** Agents work as fast as they can; the roadmap has milestones, not dates. | `docs/roadmap.md` |
-| Q3 | Online: **both live and slow (async) games**. | #46 |
+| Q3 | Online: **both live and slow (async) games**. | #46, ADR-0007 (turnTimeMinutes replaces pace) |
 | Q10 | Friends find each other by **invite link and username**. | #45 |
 | Q11 | **Guest play** for bot and pass-and-play; an **account is needed for online**. | #44 |
-| Q15 | Timers: **live 1 minute per turn, async 24 hours; time runs out = you lose that game.** | #46 |
+| Q15 | Timers: **live 1 minute per turn, async 24 hours; time runs out = you lose that game.** | #46, ADR-0007 (per-turn minutes, 24 h default) |
 | Q17 | **Verifiable dice: later.** | Later |
 | Q7 | **Free at launch. No ads, ever.** If we earn money later: one-time purchase or cosmetic extras (e.g. themes) that never change gameplay. To discuss before v1.0. | `docs/vision.md`, #54 |
 | Q31 | (2026-10-28) **Online invites last 24 hours.** Kept as built (`INVITE_TIME_MS`). | `docs/architecture/online-game-service.md`, #252 |

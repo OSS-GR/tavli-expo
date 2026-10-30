@@ -5,13 +5,7 @@
  * functions. See "Push" in `docs/architecture/online-game-service.md`.
  */
 
-import type {
-  OnlineGamePace,
-  OnlineGameStatus,
-  PushErrorCode,
-  PushMessage,
-  PushResult,
-} from '@tavli/contracts';
+import type { OnlineGameStatus, PushErrorCode, PushMessage, PushResult } from '@tavli/contracts';
 import { PLAYERS } from '@tavli/engine';
 import type { MatchFlow, PlayerId } from '@tavli/engine';
 import { waitingFor } from '@tavli/online';
@@ -71,20 +65,19 @@ export function turnWait(flow: MatchFlow): TurnWait {
  * or the side that must answer a question). `caller` is the side of the
  * player who caused the save, or `null` for the server (a time out).
  *
- * A push goes out only in an async game, never to the caller (they are in
- * the app), and only when the wait moved to the other side, or a new game
- * of the match started: a time out ends a game, and the next one may wait
- * for the same side again. When the same side plays again in the same
- * game (an Asodio extra roll), or the match is over, there is no push. A
- * live game never pushes: both players are in the app.
+ * A push goes out for every online game (there is no longer a live/async
+ * split, #183), never to the caller (they are in the app), and only when the
+ * wait moved to the other side, or a new game of the match started: a time
+ * out ends a game, and the next one may wait for the same side again. When
+ * the same side plays again in the same game (an Asodio extra roll), or the
+ * match is over, there is no push.
  */
 export function turnPushSide(
-  pace: OnlineGamePace,
   before: TurnWait,
   after: TurnWait,
   caller: PlayerId | null,
 ): PlayerId | null {
-  if (pace !== 'async' || after.over || after.side === null || after.side === caller) return null;
+  if (after.over || after.side === null || after.side === caller) return null;
   if (after.side === before.side && after.game === before.game) return null;
   return after.side;
 }
@@ -93,10 +86,9 @@ export function turnPushSide(
  * The sides to tell "game over" after a save (#316), or none.
  *
  * Only the save that ends the match pushes (`after.over`, and not
- * `before.over`), and only in an async game: in a live game both players
- * are in the app. The caller never gets one: they made the winning move
- * or resigned, so they see the result. After a time out (`caller` is
- * `null`: the server) both players get one.
+ * `before.over`), for every online game (#183). The caller never gets one:
+ * they made the winning move or resigned, so they see the result. After a
+ * time out (`caller` is `null`: the server) both players get one.
  *
  * It never overlaps `turnPushSide`: that one never pushes when the match
  * is over, and this one only then. A game that ends while the match goes
@@ -104,12 +96,11 @@ export function turnPushSide(
  * one save sends one kind of push.
  */
 export function matchEndPushSides(
-  pace: OnlineGamePace,
   before: TurnWait,
   after: TurnWait,
   caller: PlayerId | null,
 ): PlayerId[] {
-  if (pace !== 'async' || before.over || !after.over) return [];
+  if (before.over || !after.over) return [];
   return PLAYERS.filter((side) => side !== caller);
 }
 

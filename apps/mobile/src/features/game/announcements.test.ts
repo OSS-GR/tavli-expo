@@ -259,7 +259,7 @@ describe('online announcements (#255)', () => {
   };
   const game = () => {
     const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => 0 });
-    const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 'live');
+    const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 1);
     const view = () => server.getGame(gameId)!;
     const play = async () => {
       const player = view().waitingFor === 'white' ? 'me' : 'bot';

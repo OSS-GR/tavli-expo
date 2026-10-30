@@ -37,7 +37,7 @@ export function summarizeGame(input: SummaryInput, playerId: string): GameSummar
     presetId: view.match.rules.presetId,
     variant: view.game.state.variant,
     targetPoints: view.match.targetPoints,
-    pace: view.pace,
+    turnTimeMinutes: view.turnTimeMinutes,
     mySide,
     waitingFor: view.waitingFor,
     myTurn: view.waitingFor === mySide,

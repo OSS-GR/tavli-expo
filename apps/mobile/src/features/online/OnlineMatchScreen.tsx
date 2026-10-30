@@ -16,7 +16,7 @@
  *
  * Navigation stays in the route (`app/game/[id]/index.tsx`).
  */
-import { TURN_TIME_MS, type GameTransport } from '@tavli/contracts';
+import { turnDeadlineMs, type GameTransport } from '@tavli/contracts';
 import { opponent, type PlayerId, type PresetId } from '@tavli/engine';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -149,9 +149,9 @@ function OnlineBoard({
     store.getState().dispatch({ type: 'resignMatch', player: side });
   }, [sending, store, side]);
 
-  // The clock: a new time each second live, each half minute async. It
-  // ticks only while a clock shows: not after the match.
-  const pace = view?.pace ?? 'live';
+  // The clock: a new time each second for a time limit, each half minute
+  // otherwise. It ticks only while a clock shows: not after the match.
+  const turnTimeMinutes = view?.turnTimeMinutes ?? null;
   const ticking = view !== null && view.status !== 'finished' && view.waitingFor !== null;
   // The clock reads the phone time again for each new view (and so when
   // it starts ticking), not only on the next tick: an async tick is 30 s.
@@ -163,10 +163,10 @@ function OnlineBoard({
     if (!ticking) return;
     const timer = setInterval(
       () => setClock((c) => ({ version: c.version, at: now() })),
-      clockTickMs(pace),
+      clockTickMs(turnTimeMinutes),
     );
     return () => clearInterval(timer);
-  }, [pace, now, ticking]);
+  }, [turnTimeMinutes, now, ticking]);
 
   // The newest flow: the next game, while the board still holds the last one.
   const latest = useOnlineStore(store, (s) => s.flow) ?? flow;
@@ -212,7 +212,7 @@ function OnlineBoard({
   // The clock ticks once a second (or half minute): a view newer than the
   // last tick would show more than a whole turn.
   const left = timeLeft(view, clockNow, clockOffset);
-  const shown = left === null ? null : Math.min(left, TURN_TIME_MS[view.pace]);
+  const shown = left === null ? null : Math.min(left, turnDeadlineMs(view.turnTimeMinutes));
   const online: OnlineSide = {
     me: side,
     version: view.version,
@@ -221,7 +221,7 @@ function OnlineBoard({
     clock:
       waitingFor === null || shown === null || finished
         ? null
-        : { player: waitingFor, text: clockText(shown, view.pace, t) },
+        : { player: waitingFor, text: clockText(shown, view.turnTimeMinutes, t) },
     ended,
     notice: noticeCard,
   };

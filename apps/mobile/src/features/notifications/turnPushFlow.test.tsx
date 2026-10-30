@@ -99,11 +99,13 @@ async function tapPush(data: unknown): Promise<void> {
   });
 }
 
-/** Play a friend → pick the pace → Make an invite. */
-async function makeInvite(pace: 'Live' | 'Async') {
+/** Play a friend → pick the time limit → Make an invite. */
+async function makeInvite(turnTimeMinutes: number | null = null) {
   const user = setupUser();
   await renderRouter(routes, { initialUrl: '/friend' });
-  await user.press(screen.getByRole('radio', { name: pace }));
+  if (turnTimeMinutes !== null) {
+    await user.press(screen.getByRole('radio', { name: `${turnTimeMinutes} min` }));
+  }
   await user.press(screen.getByRole('button', { name: 'Make an invite' }));
   expect(await screen.findByText('invite wait')).toBeOnTheScreen();
   await flush();
@@ -111,8 +113,8 @@ async function makeInvite(pace: 'Live' | 'Async') {
 }
 
 describe('the offer', () => {
-  it('shows after the player makes an async invite; "Not now" is kept', async () => {
-    const user = await makeInvite('Async');
+  it('shows after the player makes an invite; "Not now" is kept', async () => {
+    const user = await makeInvite();
     expect(screen.getByRole('header', OFFER)).toBeOnTheScreen();
     expect(screen.getByText(/We tell you when it is your turn/)).toBeOnTheScreen();
     // Only the offer: the phone was not asked yet.
@@ -124,11 +126,10 @@ describe('the offer', () => {
       turnedOn: false,
     });
 
-    // The next async invite does not offer again.
+    // The next invite does not offer again.
     await act(async () => {
       router.push('/friend');
     });
-    await user.press(screen.getByRole('radio', { name: 'Async' }));
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     await flush();
     expect(screen.queryByRole('header', OFFER)).toBeNull();
@@ -138,15 +139,16 @@ describe('the offer', () => {
     ).toBe(false);
   });
 
-  it('does not show after a live invite', async () => {
-    await makeInvite('Live');
-    expect(screen.queryByRole('header', OFFER)).toBeNull();
+  it('shows after a timed invite too', async () => {
+    const user = await makeInvite(1);
+    expect(screen.getByRole('header', OFFER)).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Not now' }));
   });
 
-  it('accepting an async invite offers it; "Turn on" asks the phone and registers the token', async () => {
+  it('accepting an invite offers it; "Turn on" asks the phone and registers the token', async () => {
     const user = setupUser();
     onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
-    const code = onlineServer().createInvite('friend', 'plakoto', 3, 'async');
+    const code = onlineServer().createInvite('friend', 'plakoto', 3, null);
     await renderRouter(routes, { initialUrl: `/invite/${code}` });
     await user.press(await screen.findByRole('button', { name: 'Accept' }));
     expect(await screen.findByText('board')).toBeOnTheScreen();
@@ -166,20 +168,21 @@ describe('the offer', () => {
     });
   });
 
-  it('accepting a live invite does not offer it', async () => {
+  it('accepting a timed invite offers it', async () => {
     const user = setupUser();
     onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
-    const code = onlineServer().createInvite('friend', 'fevga', 1, 'live');
+    const code = onlineServer().createInvite('friend', 'fevga', 1, 1);
     await renderRouter(routes, { initialUrl: `/invite/${code}` });
     await user.press(await screen.findByRole('button', { name: 'Accept' }));
     expect(await screen.findByText('board')).toBeOnTheScreen();
     await flush();
-    expect(screen.queryByRole('header', OFFER)).toBeNull();
+    expect(screen.getByRole('header', OFFER)).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Not now' }));
   });
 
   it('a phone that allows pushes by default (Android 12) still gets the offer; only "Turn on" sends the token', async () => {
     onlineFake.notifications.setPermission('granted');
-    const user = await makeInvite('Async');
+    const user = await makeInvite();
     expect(screen.getByRole('header', OFFER)).toBeOnTheScreen();
     expect(onlineFake.pushTokens.calls).toEqual([]);
     expect(onlineFake.notifications.tokenRequests).toBe(0);
@@ -197,7 +200,7 @@ describe('the offer', () => {
 
   it('a phone that allows pushes by default and says "Not now" sends no token', async () => {
     onlineFake.notifications.setPermission('granted');
-    const user = await makeInvite('Async');
+    const user = await makeInvite();
     await user.press(screen.getByRole('button', { name: 'Not now' }));
     await flush();
     expect(onlineFake.pushTokens.calls).toEqual([]);
@@ -207,7 +210,6 @@ describe('the offer', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const user = setupUser();
     await renderRouter(realRoutes, { initialUrl: '/friend' });
-    await user.press(screen.getByRole('radio', { name: 'Async' }));
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     await flush();
     expect(screen.getByRole('header', OFFER)).toBeOnTheScreen();
@@ -365,7 +367,7 @@ describe('a phone without online play', () => {
   });
 
   it('never offers, shows no Settings row, and opens nothing on a tap', async () => {
-    await makeInvite('Async');
+    await makeInvite();
     expect(screen.queryByRole('header', OFFER)).toBeNull();
     await act(async () => {
       router.push('/settings');

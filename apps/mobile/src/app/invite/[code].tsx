@@ -14,8 +14,8 @@
  *
  * Accept replaces this screen with the online game (`game/<gameId>`), so
  * Back does not return to an answered invite. Decline and Home go Home.
- * Accepting an async invite on the server offers turn notifications
- * (#285); a dev invite never does.
+ * Accepting an invite on the server offers turn notifications
+ * (#285, #183); a dev invite never does.
  */
 import { normalizeInviteCode, type InviteView } from '@tavli/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -39,10 +39,10 @@ function accepted(gameId: string) {
   router.replace(gameHref(gameId));
 }
 
-/** An invite on the server: an async game also offers turn notifications (#285). */
+/** An invite on the server always offers turn notifications (#285, #183). */
 function acceptedOnServer(gameId: string, invite: InviteView | null) {
   accepted(gameId);
-  if (invite?.pace === 'async') void turnPushes()?.offer();
+  void turnPushes()?.offer();
 }
 
 export default function InviteRoute() {

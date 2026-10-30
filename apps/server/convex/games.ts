@@ -32,12 +32,7 @@ import { ConvexError, v } from 'convex/values';
 import type { Infer } from 'convex/values';
 
 import { MAX_LISTED_GAMES } from '@tavli/contracts';
-import type {
-  GameSummary,
-  GameTransportErrorData,
-  OnlineGamePace,
-  OnlineGameView,
-} from '@tavli/contracts';
+import type { GameSummary, GameTransportErrorData, OnlineGameView } from '@tavli/contracts';
 import { serializeRules } from '@tavli/engine';
 import type { MatchFlow, MoveInput, PlayerId } from '@tavli/engine';
 import {
@@ -75,7 +70,7 @@ import { signedInPlayer } from './caller';
 import { createCryptoRng } from './model/cryptoRng';
 import { NEW_MATCH_WAIT, turnWait } from './model/push';
 import { scheduleTurnPush } from './push';
-import { gameChoice, gamePace, gameStatus } from './schema';
+import { gameChoice, gameStatus, gameTurnTimeMinutes } from './schema';
 
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
 function reject(error: OnlineGameError): never {
@@ -154,11 +149,11 @@ async function startClock(
   ctx: MutationCtx,
   gameId: Id<'games'>,
   version: number,
-  pace: OnlineGamePace,
+  turnTimeMinutes: number | null,
   flow: MatchFlow,
   now: number,
 ): Promise<number | null> {
-  const deadline = nextDeadline(pace, flow, now);
+  const deadline = nextDeadline(turnTimeMinutes, flow, now);
   if (deadline === null) return null;
   await ctx.scheduler.runAt(deadline, internal.games.checkTimeout, { gameId, version });
   return deadline;
@@ -181,7 +176,7 @@ async function save(
 ): Promise<number> {
   const version = game.version + 1;
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
-  const turnDeadline = await startClock(ctx, game._id, version, game.pace, flow, now);
+  const turnDeadline = await startClock(ctx, game._id, version, game.turnTimeMinutes, flow, now);
   await ctx.db.patch(game._id, {
     ...gameFields(flow, storeStep(before, flow)),
     version,
@@ -259,7 +254,7 @@ export interface NewGame {
   readonly players: { readonly white: string; readonly black: string };
   readonly choice: Infer<typeof gameChoice>;
   readonly targetPoints: number;
-  readonly pace: OnlineGamePace;
+  readonly turnTimeMinutes: number | null;
 }
 
 /**
@@ -270,7 +265,7 @@ export interface NewGame {
  * "your turn" push when it is not the caller (#280). Returns the id.
  */
 export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'games'>> {
-  const { callerId, choice, targetPoints, pace } = game;
+  const { callerId, choice, targetPoints, turnTimeMinutes } = game;
   const players = { white: game.players.white, black: game.players.black };
   guarded(() => checkNewGame(callerId, players));
   const flow = guarded(() =>
@@ -281,7 +276,7 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
   const gameId = await ctx.db.insert('games', {
     players,
     choice,
-    pace,
+    turnTimeMinutes,
     targetPoints,
     rules: serializeRules(flow.match.rules),
     // A new match: no game ended before it.
@@ -292,13 +287,13 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
     updatedAt: now,
   });
   const eventCount = await writeEvents(ctx, gameId, 0, version, callerId, flow);
-  const turnDeadline = await startClock(ctx, gameId, version, pace, flow, now);
+  const turnDeadline = await startClock(ctx, gameId, version, turnTimeMinutes, flow, now);
   await ctx.db.patch(gameId, { eventCount, turnDeadline });
   // Nobody was waited for before. The caller started the game and is in
   // the app, so only the other player can get a push.
   await scheduleTurnPush(
     ctx,
-    { _id: gameId, pace, players },
+    { _id: gameId, turnTimeMinutes, players },
     version,
     NEW_MATCH_WAIT,
     turnWait(flow),
@@ -321,8 +316,8 @@ export const createGame = internalMutation({
     players: v.object({ white: v.string(), black: v.string() }),
     choice: gameChoice,
     targetPoints: v.number(),
-    /** `live` (1 minute per turn) or `async` (24 hours per turn). */
-    pace: gamePace,
+    /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
+    turnTimeMinutes: gameTurnTimeMinutes,
   },
   returns: v.id('games'),
   handler: async (ctx, args) => await insertGame(ctx, args),
@@ -438,7 +433,7 @@ function gameInput(game: Doc<'games'>) {
     gameId: game._id,
     version: game.version,
     choice: game.choice,
-    pace: game.pace,
+    turnTimeMinutes: game.turnTimeMinutes,
     turnDeadline: game.turnDeadline,
     players: game.players,
   };

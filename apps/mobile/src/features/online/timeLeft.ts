@@ -4,11 +4,12 @@
  * The server sets `turnDeadline` on its own clock. The phone clock can be
  * off, so the phone keeps an estimate of the difference:
  * `offset = server time - phone time`. Every save sets
- * `turnDeadline = save time + TURN_TIME_MS[pace]`, so a new version tells
- * us the server time of its save. See "Turn timers" in
+ * `turnDeadline = save time + turnDeadlineMs(turnTimeMinutes)`, so a new
+ * version tells us the server time of its save. See "Turn timers" in
  * `docs/architecture/online-game-service.md`.
  */
-import { TURN_TIME_MS, type OnlineGameView } from '@tavli/contracts';
+import { turnDeadlineMs } from '@tavli/contracts';
+import type { OnlineGameView } from '@tavli/contracts';
 
 /**
  * The offset (server time - phone time) that a view gives when it arrives
@@ -17,11 +18,11 @@ import { TURN_TIME_MS, type OnlineGameView } from '@tavli/contracts';
  * low, so the phone shows a little more time than the server has.
  */
 export function estimateOffset(
-  view: Pick<OnlineGameView, 'turnDeadline' | 'pace'>,
+  view: Pick<OnlineGameView, 'turnDeadline' | 'turnTimeMinutes'>,
   localNow: number,
 ): number | null {
   if (view.turnDeadline === null) return null;
-  const savedAt = view.turnDeadline - TURN_TIME_MS[view.pace];
+  const savedAt = view.turnDeadline - turnDeadlineMs(view.turnTimeMinutes);
   return savedAt - localNow;
 }
 

@@ -27,12 +27,7 @@ import {
   type BoardState,
   type Match,
 } from '@tavli/engine';
-import {
-  createMemoryAuthProvider,
-  createMemoryAuthStore,
-  INVITE_TIME_MS,
-  TURN_TIME_MS,
-} from '@tavli/contracts';
+import { createMemoryAuthProvider, createMemoryAuthStore, INVITE_TIME_MS } from '@tavli/contracts';
 import { createMemoryGameServer } from '@tavli/online';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
@@ -481,7 +476,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
   it('the online game: your turn with its clock, the game-end sheet, match end (#255)', async () => {
     const user = setupUser();
     const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
-    const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 'live');
+    const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 1);
     const bot = startOnlineBot({
       transport: server.transportFor('bot'),
       gameId,
@@ -514,7 +509,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
 
       // You run out of time: the game-end sheet.
       await act(async () => {
-        jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+        jest.advanceTimersByTime(60_000 + 1000);
         server.runDueTimeouts();
       });
       expect(await screen.findByTestId('game-end-card')).toBeOnTheScreen();
@@ -545,7 +540,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
   it('the invite: open, and expired (#256)', async () => {
     let clock = Date.now();
     const server = createMemoryGameServer({ rng: createSeededRng(4), now: () => clock });
-    const code = server.createInvite('friend', 'tavli', 5, 'async');
+    const code = server.createInvite('friend', 'tavli', 5, null);
     const props = {
       invites: server.invitesFor('me'),
       me: 'me',
@@ -581,7 +576,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     await setup.unmount();
 
     const props = { onGame: jest.fn(), onNewInvite: jest.fn(), onHome: jest.fn() };
-    const joined = server.createInvite('me', 'tavli', 5, 'async');
+    const joined = server.createInvite('me', 'tavli', 5, null);
     const wait = await renderWithRoot(
       <InviteWaitScreen code={joined} me="me" invites={server.invitesFor('me')} {...props} />,
     );
@@ -594,7 +589,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(problems()).toEqual([]);
     await wait.unmount();
 
-    const expired = server.createInvite('me', 'portes', 1, 'live');
+    const expired = server.createInvite('me', 'portes', 1, 1);
     clock += INVITE_TIME_MS;
     await renderWithRoot(
       <InviteWaitScreen code={expired} me="me" invites={server.invitesFor('me')} {...props} />,
@@ -610,7 +605,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     const auth = createMemoryAuthProvider(store);
     const games = server.transportFor('me');
     for (const choice of ['tavli', 'asodio', 'plakoto', 'fevga'] as const) {
-      server.createGame('me', { white: 'me', black: 'friend' }, choice, 5, 'async');
+      server.createGame('me', { white: 'me', black: 'friend' }, choice, 5, null);
     }
     const home = await renderWithRoot(
       <HomeScreen
@@ -657,8 +652,8 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     const store = createMemoryAuthStore();
     store.session = { id: 'me', isGuest: true };
     const auth = createMemoryAuthProvider(store);
-    server.createInvite('me', 'asodio', 1, 'live');
-    server.createInvite('me', 'tavli', 15, 'async');
+    server.createInvite('me', 'asodio', 1, 1);
+    server.createInvite('me', 'tavli', 15, null);
     await renderWithRoot(
       <HomeScreen
         onNewGame={jest.fn()}
@@ -748,7 +743,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     const auth = createMemoryAuthProvider(store);
     const games = server.transportFor('me');
     for (const choice of ['tavli', 'asodio'] as const) {
-      const gameId = server.createGame('me', { white: 'me', black: 'friend' }, choice, 5, 'async');
+      const gameId = server.createGame('me', { white: 'me', black: 'friend' }, choice, 5, null);
       await server.transportFor(choice === 'tavli' ? 'friend' : 'me').resign(gameId);
     }
     rememberOnlineAccount();

@@ -35,7 +35,6 @@ import type {
   InviteView,
   Invites,
   OnlineGameChoice,
-  OnlineGamePace,
   OnlineGameStatus,
   OnlineGameView,
 } from '@tavli/contracts';
@@ -113,7 +112,7 @@ export interface MemoryGameServer {
     players: PerPlayer<string>,
     choice: OnlineGameChoice,
     targetPoints: number,
-    pace: OnlineGamePace,
+    turnTimeMinutes: number | null,
   ): string;
   /**
    * The transport of `playerId`: every call it makes comes from that
@@ -132,7 +131,7 @@ export interface MemoryGameServer {
     callerId: string,
     choice: OnlineGameChoice,
     targetPoints: number,
-    pace: OnlineGamePace,
+    turnTimeMinutes: number | null,
   ): string;
   /**
    * The inviter takes back an open invite, like the Convex `cancelInvite`.
@@ -175,7 +174,7 @@ export interface MemoryGameServer {
 interface MemoryGame extends SavedGame {
   readonly gameId: string;
   readonly choice: OnlineGameChoice;
-  readonly pace: OnlineGamePace;
+  readonly turnTimeMinutes: number | null;
   readonly targetPoints: number;
   /** `storeFlow` text. */
   readonly flow: string;
@@ -262,7 +261,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       gameId: game.gameId,
       version: game.version,
       choice: game.choice,
-      pace: game.pace,
+      turnTimeMinutes: game.turnTimeMinutes,
       turnDeadline: game.turnDeadline,
       players: game.players,
     };
@@ -353,7 +352,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       flow: storeStep(before, flow),
       status: matchStatus(flow),
       version,
-      turnDeadline: nextDeadline(game.pace, flow, at),
+      turnDeadline: nextDeadline(game.turnTimeMinutes, flow, at),
       events: [...game.events, ...logRows(game.events.length, version, callerId, flow)],
       updatedAt: at,
     };
@@ -461,7 +460,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     players: PerPlayer<string>,
     choice: OnlineGameChoice,
     targetPoints: number,
-    pace: OnlineGamePace,
+    turnTimeMinutes: number | null,
   ): string {
     checkNewGame(callerId, players);
     const flow = createOnlineMatch({ choice, targetPoints, players: copy(players) }, rng);
@@ -473,12 +472,12 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       gameId,
       players: copy(players),
       choice,
-      pace,
+      turnTimeMinutes,
       targetPoints,
       flow: storeFlow(flow, null),
       status: matchStatus(flow),
       version,
-      turnDeadline: nextDeadline(pace, flow, at),
+      turnDeadline: nextDeadline(turnTimeMinutes, flow, at),
       events: logRows(0, version, callerId, flow),
       updatedAt: at,
     };
@@ -544,11 +543,11 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     callerId: string,
     choice: OnlineGameChoice,
     targetPoints: number,
-    pace: OnlineGamePace,
+    turnTimeMinutes: number | null,
   ): string {
     // The cap first, like the Convex function (#275).
     checkInviteCap(countOpenInvites(invites.values(), callerId, now()));
-    const options = { from: callerId, choice, targetPoints, pace };
+    const options = { from: callerId, choice, targetPoints, turnTimeMinutes };
     // Check the arguments before a code is drawn, as the Convex function
     // throws before it saves anything.
     const invite = newInvite(options, '', now());
@@ -599,7 +598,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             { white: invite.from, black: playerId },
             invite.choice,
             invite.targetPoints,
-            invite.pace,
+            invite.turnTimeMinutes,
           );
           saveInvite({ ...invite, status: 'accepted', gameId });
           return gameId;
@@ -613,8 +612,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         });
       },
       createInvite(game) {
-        const { choice, targetPoints, pace } = copy(game);
-        return inviteCall(() => makeInvite(playerId, choice, targetPoints, pace));
+        const { choice, targetPoints, turnTimeMinutes } = copy(game);
+        return inviteCall(() => makeInvite(playerId, choice, targetPoints, turnTimeMinutes));
       },
       cancelInvite(text) {
         return inviteCall(() => cancel(playerId, text));

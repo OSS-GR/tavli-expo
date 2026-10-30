@@ -65,7 +65,7 @@ describe('Better Auth routes', () => {
     const code = await guest.mutation(api.invites.createInvite, {
       choice: 'portes',
       targetPoints: 3,
-      pace: 'live',
+      turnTimeMinutes: 1,
     });
     expect((await guest.query(api.invites.getInvite, { code }))?.from).toBe(body.user.id);
   });

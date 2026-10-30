@@ -1,6 +1,6 @@
 /**
  * The `invite_created` event (#281): the game, the match length and the
- * pace of a new invite. Never the code, a game id or a user id. It goes
+ * turn time limit of a new invite. Never the code, a game id or a user id. It goes
  * through the `Analytics` port, which drops every call until the user
  * allows usage data, and through `quietly()`: an analytics error never
  * breaks the screen.
@@ -17,7 +17,7 @@ export function sendInviteCreated(game: NewInvite, analytics: Analytics = appAna
     analytics.track('invite_created', {
       game: game.choice,
       matchLength: game.targetPoints,
-      pace: game.pace,
+      turnTimeMinutes: game.turnTimeMinutes ?? undefined,
     }),
   );
 }

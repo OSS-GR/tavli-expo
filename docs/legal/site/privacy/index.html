@@ -176,7 +176,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 </tr>
 <tr class="odd">
 <td>Invite made</td>
-<td>You made an invite to play a friend online. Includes the game, the points to win and the pace (live or async) only, never the invite code or any id</td>
+<td>You made an invite to play a friend online. Includes the game, the points to win and the time limit only, never the invite code or any id</td>
 </tr>
 <tr class="even">
 <td>Turn notifications answered</td>
@@ -202,7 +202,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <p>Only if you play a friend online. When you tap <strong>Make an invite</strong>, or <strong>Show the invite</strong> on an invite link, the app makes a <strong>guest account</strong> on our game server, once. The server runs on Convex, in the EU region <code>eu-west-1</code> (Ireland). Sign-in goes through Better Auth, on the same server.</p>
 <ul>
 <li>The guest account has a <strong>random user id</strong>, made by the server. It has no name and no email. (The sign-in software fills in a made-up placeholder for both.)</li>
-<li>The server keeps your <strong>invites</strong> (the invite code, the game, the points to win, the pace, if a friend accepted or declined, and when it expires) and your <strong>online games</strong> (the two players' user ids, the rules, every move and roll, the score, and the turn times) under that user id. Your friend's app sees the invite and the game you play together.</li>
+<li>The server keeps your <strong>invites</strong> (the invite code, the game, the points to win, the time limit, if a friend accepted or declined, and when it expires) and your <strong>online games</strong> (the two players' user ids, the rules, every move and roll, the score, and the turn times) under that user id. Your friend's app sees the invite and the game you play together.</li>
 <li>The server keeps your <strong>sign-in session</strong>: a random session token, when it expires, and, as the sign-in software records it, the IP address and the app's user agent (the app name and the phone system) when the session was made.</li>
 <li>The app keeps the <strong>sign-in cookie</strong> in your phone's secure store (the iOS Keychain or the Android Keystore). The next invite uses it, so the app makes the guest account only once.</li>
 <li>The invite code and the link go where <strong>you</strong> share them (for example a chat app). Anyone with the code can see the invite and accept it until it expires.</li>
@@ -210,7 +210,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 </ul>
 <p>Before you make or open an invite, the app does not talk to the game server. When you open an invite link or a link to an online game, the app first asks the game server if this phone has a saved sign-in (it sends the sign-in cookie, if there is one). That check makes no account, and without a saved sign-in nothing is saved for you. With a saved sign-in, the app then loads the invite or the game.</p>
 <h3 id="turn-notifications-expo">Turn notifications (Expo)</h3>
-<p>Only if you turn them on. After you make or accept an invite for an <strong>async</strong> game (a day per turn), the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch, and never for a live game. <strong>Not now</strong> is kept: the app does not ask again by itself. You can turn them on later in <strong>Settings → Notifications</strong>, and off in your phone's settings.</p>
+<p>Only if you turn them on. After you make or accept an invite for an online game, the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch. <strong>Not now</strong> is kept: the app does not ask again by itself. You can turn them on later in <strong>Settings → Notifications</strong>, and off in your phone's settings.</p>
 <p>If you allow them:</p>
 <ul>
 <li>Your phone gets a <strong>push token</strong> from Expo's push service (Expo, through Apple's or Google's push service). It is a random address for this app on this phone. It is not your name, email or phone number.</li>

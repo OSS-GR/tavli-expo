@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ASYNC_TURN_TIME_MS,
   GAME_IDS,
   GAME_TRANSPORT_ERROR_CODES,
   ONLINE_GAME_CHOICES,
-  ONLINE_GAME_PACES,
-  TURN_TIME_MS,
   isGameTransportErrorData,
   isOnlineGameChoice,
-  isOnlineGamePace,
+  turnDeadlineMs,
 } from './index';
 
 describe('online game choices', () => {
@@ -24,16 +23,16 @@ describe('online game choices', () => {
   });
 });
 
-describe('online game paces (owner Q3, Q15)', () => {
-  it('are live and async, with 1 minute and 24 hours per turn', () => {
-    expect(ONLINE_GAME_PACES).toEqual(['live', 'async']);
-    expect(TURN_TIME_MS).toEqual({ live: 60_000, async: 86_400_000 });
+describe('turn time (owner Q15, #183)', () => {
+  it('is 24 hours by default, an hour for 60 minutes', () => {
+    expect(ASYNC_TURN_TIME_MS).toBe(24 * 60 * 60 * 1000);
+    expect(turnDeadlineMs(null)).toBe(ASYNC_TURN_TIME_MS);
+    expect(turnDeadlineMs(60)).toBe(60 * 60 * 1000);
   });
 
-  it('isOnlineGamePace accepts only known paces', () => {
-    for (const pace of ONLINE_GAME_PACES) expect(isOnlineGamePace(pace)).toBe(true);
-    expect(isOnlineGamePace('blitz')).toBe(false);
-    expect(isOnlineGamePace(null)).toBe(false);
+  it('turnDeadlineMs gives minutes in ms', () => {
+    expect(turnDeadlineMs(1)).toBe(60 * 1000);
+    expect(turnDeadlineMs(5)).toBe(5 * 60 * 1000);
   });
 });
 

@@ -1,4 +1,4 @@
-import { TURN_TIME_MS, type GameSummary } from '@tavli/contracts';
+import { ASYNC_TURN_TIME_MS, type GameSummary } from '@tavli/contracts';
 
 import i18n from '@/i18n';
 
@@ -15,14 +15,14 @@ function summary(gameId: string, fields: Partial<GameSummary> = {}): GameSummary
     presetId: 'portes',
     variant: 'portes',
     targetPoints: 5,
-    pace: 'async',
+    turnTimeMinutes: null,
     mySide: 'white',
     waitingFor: 'white',
     myTurn: true,
     score: { white: 3, black: 1 },
     winner: null,
     updatedAt: NOW - HOUR,
-    turnDeadline: NOW - HOUR + TURN_TIME_MS.async,
+    turnDeadline: NOW - HOUR + ASYNC_TURN_TIME_MS,
     ...fields,
   };
 }
@@ -51,8 +51,8 @@ describe('clockOffset', () => {
 describe('listTickMs', () => {
   it('ticks as often as the fastest game with a turn timer needs', () => {
     expect(listTickMs([summary('a')])).toBe(30_000);
-    expect(listTickMs([summary('a'), summary('b', { pace: 'live' })])).toBe(1000);
-    expect(listTickMs([summary('a', { pace: 'live', turnDeadline: null })])).toBeNull();
+    expect(listTickMs([summary('a'), summary('b', { turnTimeMinutes: 1 })])).toBe(1000);
+    expect(listTickMs([summary('a', { turnTimeMinutes: 1, turnDeadline: null })])).toBeNull();
     expect(listTickMs([])).toBeNull();
   });
 });
@@ -82,7 +82,7 @@ describe('gameRowText', () => {
   });
 
   it('counts seconds in a live game, with the clock offset', () => {
-    const live = summary('a', { pace: 'live', turnDeadline: NOW + 42_000 });
+    const live = summary('a', { turnTimeMinutes: 1, turnDeadline: NOW + 42_000 });
     expect(gameRowText(live, en, NOW, 0).time).toBe('42 s left');
     expect(gameRowText(live, en, NOW, 2000).time).toBe('40 s left');
   });
