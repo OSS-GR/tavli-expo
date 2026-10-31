@@ -13,7 +13,7 @@ function invite(code: string, fields: Partial<InviteView> = {}): InviteView {
     from: 'guest-1',
     choice: 'portes',
     targetPoints: 3,
-    pace: 'live',
+    turnTimeMinutes: 1,
     status: 'open',
     // Made an hour ago.
     expiresAt: NOW - HOUR + INVITE_TIME_MS,
@@ -35,36 +35,40 @@ describe('inviteClockOffset', () => {
 });
 
 describe('inviteRowText', () => {
-  it('shows the game, the length, the pace, the time left and the code', () => {
+  it('shows the game, the length, the time limit, the time left and the code', () => {
     const text = inviteRowText(invite('ABCD2345'), i18n.t, NOW, 0);
     expect(text).toEqual({
       title: 'Portes · first to 3 points',
-      line: 'Live · 23 h left',
+      line: '1 min · 23 h left',
       code: 'Code ABCD2345',
-      label: 'Invite, Portes, first to 3 points, Live, 23 h left',
+      label: 'Invite, Portes, first to 3 points, 1 min, 23 h left',
     });
   });
 
   it('counts minutes in the last hour, and one point', () => {
-    const last = invite('A', { expiresAt: NOW + 40 * 60 * 1000, targetPoints: 1, pace: 'async' });
+    const last = invite('A', {
+      expiresAt: NOW + 40 * 60 * 1000,
+      targetPoints: 1,
+      turnTimeMinutes: null,
+    });
     const text = inviteRowText(last, i18n.t, NOW, 0);
     expect(text.title).toBe('Portes · first to 1 point');
-    expect(text.line).toBe('Async · 40 min left');
+    expect(text.line).toBe('24 h · 40 min left');
   });
 
   it('uses the clock offset', () => {
-    expect(inviteRowText(invite('A'), i18n.t, NOW, 2 * HOUR).line).toBe('Live · 21 h left');
+    expect(inviteRowText(invite('A'), i18n.t, NOW, 2 * HOUR).line).toBe('1 min · 21 h left');
   });
 
   it('says "Expiring now" once the time is up, never a zero or negative time', () => {
     const due = invite('A', { expiresAt: NOW });
     expect(inviteRowText(due, i18n.t, NOW, 0)).toMatchObject({
-      line: 'Live · Expiring now',
-      label: 'Invite, Portes, first to 3 points, Live, Expiring now',
+      line: '1 min · Expiring now',
+      label: 'Invite, Portes, first to 3 points, 1 min, Expiring now',
     });
-    expect(inviteRowText(due, i18n.t, NOW + HOUR, 0).line).toBe('Live · Expiring now');
+    expect(inviteRowText(due, i18n.t, NOW + HOUR, 0).line).toBe('1 min · Expiring now');
     // A second left still counts as a minute.
-    expect(inviteRowText(due, i18n.t, NOW - 1000, 0).line).toBe('Live · 1 min left');
+    expect(inviteRowText(due, i18n.t, NOW - 1000, 0).line).toBe('1 min · 1 min left');
   });
 
   it('shows Greek', async () => {
@@ -73,12 +77,12 @@ describe('inviteRowText', () => {
       const text = inviteRowText(invite('ABCD2345', { choice: 'plakoto' }), i18n.t, NOW, 0);
       expect(text).toEqual({
         title: 'Πλακωτό · έως 3 βαθμούς',
-        line: 'Ζωντανά · Λήγει σε 23 ώρες',
+        line: '1 λεπτό · Λήγει σε 23 ώρες',
         code: 'Κωδικός ABCD2345',
-        label: 'Πρόσκληση, Πλακωτό, έως 3 βαθμούς, Ζωντανά, Λήγει σε 23 ώρες',
+        label: 'Πρόσκληση, Πλακωτό, έως 3 βαθμούς, 1 λεπτό, Λήγει σε 23 ώρες',
       });
       const due = invite('A', { expiresAt: NOW });
-      expect(inviteRowText(due, i18n.t, NOW, 0).line).toBe('Ζωντανά · Λήγει τώρα');
+      expect(inviteRowText(due, i18n.t, NOW, 0).line).toBe('1 λεπτό · Λήγει τώρα');
     } finally {
       await i18n.changeLanguage('en');
     }

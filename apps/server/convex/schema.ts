@@ -11,11 +11,12 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
-import { INVITE_STATUSES, ONLINE_GAME_CHOICES, ONLINE_GAME_PACES } from '@tavli/contracts';
+import { INVITE_STATUSES, ONLINE_GAME_CHOICES } from '@tavli/contracts';
 
 export const gameChoice = v.union(...ONLINE_GAME_CHOICES.map((choice) => v.literal(choice)));
 
-export const gamePace = v.union(...ONLINE_GAME_PACES.map((pace) => v.literal(pace)));
+/** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
+export const gameTurnTimeMinutes = v.union(v.number(), v.null());
 
 export const side = v.union(v.literal('white'), v.literal('black'));
 
@@ -32,8 +33,8 @@ export default defineSchema({
     players: v.object({ white: v.string(), black: v.string() }),
     /** The game the players picked (one game, or `tavli` for the rotation). */
     choice: gameChoice,
-    /** `live` (1 minute per turn) or `async` (24 hours per turn). */
-    pace: gamePace,
+    /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
+    turnTimeMinutes: gameTurnTimeMinutes,
     /** Match length in points. */
     targetPoints: v.number(),
     /** The match `RuleSet`, JSON text (`serializeRules`). */
@@ -90,7 +91,7 @@ export default defineSchema({
     from: v.string(),
     choice: gameChoice,
     targetPoints: v.number(),
-    pace: gamePace,
+    turnTimeMinutes: gameTurnTimeMinutes,
     status: inviteStatus,
     /** When the invite expires, epoch ms (server clock). `expireInvite` runs at this time. */
     expiresAt: v.number(),

@@ -9,7 +9,7 @@
  * milliseconds). A failed check throws an `OnlineGameError`.
  */
 
-import type { GameTransportErrorData, OnlineGamePace, OnlineGameStatus } from '@tavli/contracts';
+import type { GameTransportErrorData, OnlineGameStatus } from '@tavli/contracts';
 import type { FlowEvent, MatchFlow, PerPlayer, PlayerId } from '@tavli/engine';
 
 import { OnlineGameError, deadlineAfter, isTimedOut, sideOf } from './online-game';
@@ -133,6 +133,10 @@ export function matchStatus(flow: MatchFlow): OnlineGameStatus {
  * The turn deadline to save with `flow` at `now`: a full turn time from
  * now, or `null` when the match is over (no clock runs then).
  */
-export function nextDeadline(pace: OnlineGamePace, flow: MatchFlow, now: number): number | null {
-  return matchStatus(flow) === 'finished' ? null : deadlineAfter(pace, now);
+export function nextDeadline(
+  turnTimeMinutes: number | null,
+  flow: MatchFlow,
+  now: number,
+): number | null {
+  return matchStatus(flow) === 'finished' ? null : deadlineAfter(turnTimeMinutes, now);
 }

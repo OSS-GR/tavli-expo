@@ -1,7 +1,7 @@
 /**
  * The invite screen (#256): a friend opened an invite link
  * (`tavlaki://invite/<code>`). It shows the game, the match length and
- * the pace, with Accept and Decline.
+ * the turn time limit, with Accept and Decline.
  *
  * - It talks to the server only through the `Invites` port, so the same
  *   screen works on the in-memory server now and on Convex later.
@@ -37,7 +37,7 @@ export interface InviteScreenProps {
   me: string;
   /**
    * The server started the game: open it. `invite` is the invite as the
-   * screen showed it (its game and pace).
+   * screen showed it (its game and turn time limit).
    */
   onAccepted: (gameId: string, invite: InviteView | null) => void;
   /** The invite is declined. */
@@ -179,7 +179,13 @@ function OpenInvite({ view, busy, failed, onAccept, onDecline }: OpenInviteProps
       label: t('invite.open.length'),
       value: t('invite.open.lengthValue', { count: view.targetPoints }),
     },
-    { label: t('invite.open.pace'), value: t(`invite.open.${view.pace}`) },
+    {
+      label: t('invite.open.timeLimit'),
+      value:
+        view.turnTimeMinutes === null
+          ? t('invite.open.timeLimitNone')
+          : t('invite.open.timeLimit', { count: view.turnTimeMinutes }),
+    },
   ];
   // Read once per invite in this app run (#216): the title, then each detail.
   useAnnouncement(

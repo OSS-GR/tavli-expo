@@ -80,8 +80,8 @@ export interface TurnPushesDeps {
 export interface TurnPushes {
   readonly store: StoreApi<TurnPushesState>;
   /**
-   * After an async invite: shows the offer when it may, or registers the
-   * token when the player turned them on before.
+   * After making or accepting an invite: shows the offer when it may, or
+   * registers the token when the player turned them on before.
    */
   offer(): Promise<void>;
   /** "Not now" on the offer: hide it, and do not offer again by itself. */

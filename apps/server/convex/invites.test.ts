@@ -9,18 +9,13 @@ import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ASYNC_TURN_TIME_MS,
   INVITE_CODE_ALPHABET,
   INVITE_TIME_MS,
-  TURN_TIME_MS,
   isGameTransportErrorData,
   isInviteErrorData,
 } from '@tavli/contracts';
-import type {
-  InviteErrorCode,
-  InviteView,
-  OnlineGameChoice,
-  OnlineGamePace,
-} from '@tavli/contracts';
+import type { InviteErrorCode, InviteView, OnlineGameChoice } from '@tavli/contracts';
 import { MAX_OPEN_INVITES } from '@tavli/online';
 
 import { api } from './_generated/api';
@@ -72,9 +67,13 @@ async function createInvite(
   from = ALICE,
   choice: OnlineGameChoice = 'portes',
   targetPoints = 3,
-  pace: OnlineGamePace = 'live',
+  turnTimeMinutes: number | null = 1,
 ) {
-  return await as(t, from).mutation(api.invites.createInvite, { choice, targetPoints, pace });
+  return await as(t, from).mutation(api.invites.createInvite, {
+    choice,
+    targetPoints,
+    turnTimeMinutes,
+  });
 }
 
 /** The invite as Carol (neither inviter nor answerer) sees it. */
@@ -116,13 +115,13 @@ describe('createInvite', () => {
 
   it('makes an open invite that expires in 24 hours', async () => {
     const t = await setup();
-    const code = await createInvite(t, ALICE, 'plakoto', 5, 'async');
+    const code = await createInvite(t, ALICE, 'plakoto', 5, null);
     expect(await invite(t, code)).toEqual({
       code,
       from: ALICE,
       choice: 'plakoto',
       targetPoints: 5,
-      pace: 'async',
+      turnTimeMinutes: null,
       status: 'open',
       expiresAt: START + INVITE_TIME_MS,
       gameId: null,
@@ -253,20 +252,20 @@ describe('getInvite', () => {
 describe('acceptInvite', () => {
   it('starts the game: the inviter plays white, and getGame shows it', async () => {
     const t = await setup();
-    const code = await createInvite(t, ALICE, 'fevga', 3, 'async');
+    const code = await createInvite(t, ALICE, 'fevga', 3, null);
     const gameId = await as(t, BOB).mutation(api.invites.acceptInvite, { code });
     const game = await as(t, BOB).query(api.games.getGame, { gameId });
     expect(game).not.toBeNull();
     expect(game?.players).toEqual({ white: ALICE, black: BOB });
     expect(await as(t, ALICE).query(api.games.getGame, { gameId })).toEqual(game);
     expect(game?.choice).toBe('fevga');
-    expect(game?.pace).toBe('async');
+    expect(game?.turnTimeMinutes).toBeNull();
     expect(game?.match.targetPoints).toBe(3);
     expect(game?.status).toBe('active');
     expect(game?.version).toBe(1);
     // The opening roll is done and the first player's clock runs.
     expect(game?.game.phase).toBe('moving');
-    expect(game?.turnDeadline).toBe(START + TURN_TIME_MS.async);
+    expect(game?.turnDeadline).toBe(START + ASYNC_TURN_TIME_MS);
 
     expect(await invite(t, code)).toMatchObject({ status: 'accepted', gameId });
     const row = await t.run(async (ctx) =>
@@ -439,7 +438,7 @@ describe('expiry (24 hours)', () => {
 
   it('an accept just in time works, and the expiry later does nothing', async () => {
     const t = await setup();
-    const code = await createInvite(t, ALICE, 'portes', 3, 'async');
+    const code = await createInvite(t, ALICE, 'portes', 3, null);
     vi.setSystemTime(START + INVITE_TIME_MS - 1);
     const gameId = await as(t, BOB).mutation(api.invites.acceptInvite, { code });
     await wait(t, 1);
@@ -499,7 +498,11 @@ describe('sign-in (#131)', () => {
     const t = await setup();
     const code = await createInvite(t);
     await rejectsWith(
-      t.mutation(api.invites.createInvite, { choice: 'portes', targetPoints: 3, pace: 'live' }),
+      t.mutation(api.invites.createInvite, {
+        choice: 'portes',
+        targetPoints: 3,
+        turnTimeMinutes: 1,
+      }),
       'NOT_SIGNED_IN',
     );
     await rejectsWith(t.query(api.invites.getInvite, { code }), 'NOT_SIGNED_IN');

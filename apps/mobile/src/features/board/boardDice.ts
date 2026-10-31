@@ -6,8 +6,9 @@
  * their own canvas (`DiceRow`); this only says where its box goes and how
  * big a die is. Pure TypeScript.
  */
-import { DIE_SIZE, dicePlaces } from './diceMotion';
+import { DIE_SIZE, dicePlaces, doublePlaces, type DicePlace } from './diceMotion';
 import { toScreenRect, type BoardGeometry } from './geometry';
+import type { SettleTarget } from '../dice-throw/throwPath';
 
 /**
  * The smallest die on the board, in points. The theme's die size is about
@@ -50,6 +51,33 @@ export function boardDiceBox(geo: BoardGeometry, count: number): BoardDiceBox {
     size,
     pairSize: die,
   };
+}
+
+/**
+ * Where the thrown dice hand over to the dice row (#183): each die's pose in
+ * its slot, in the dice box's points (in portrait these are board canvas
+ * points, so a thrown die can glide there). A double hands over to its pair
+ * of rolled dice (#177); the split into four comes later. `tilt` is the row's
+ * own resting tilt per die (`theme.layouts['portrait-rotated'].dice.tilt`).
+ */
+export function settleTargets(
+  box: BoardDiceBox,
+  count: number,
+  tilt: readonly [number, number],
+): [SettleTarget, SettleTarget] {
+  const at = (place: DicePlace, i: number): SettleTarget => ({
+    x: box.left + place.x,
+    y: box.top + place.y,
+    size: place.size,
+    angle: ((tilt[i % 2] ?? 0) * Math.PI) / 180,
+  });
+  if (count === 4) {
+    const [a, b] = doublePlaces(box.size, box.pairSize).pair;
+    return [at(a, 0), at(b, 1)];
+  }
+  // Two dice: `dicePlaces` always makes exactly two places.
+  const [a, b] = dicePlaces(2, box.size).places as [DicePlace, DicePlace];
+  return [at(a, 0), at(b, 1)];
 }
 
 /** Room kept free on each side of the dice in the right column, in points. */

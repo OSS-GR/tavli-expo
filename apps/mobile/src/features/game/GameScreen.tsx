@@ -56,6 +56,11 @@
  * Game logic stays in the engine. This screen sends actions to the game
  * store and shows the result. Vs bot, the bot's turn runs here too
  * (`startBotTurn`), so its moves fly like a human's.
+ *
+ * The dice throw (#183): every roll — swipe, tap on the board, Roll button,
+ * the bot — plays the throw over the board (`BoardThrow`), and the dice row
+ * waits hidden until it ends, then shows the roll without a second tumble.
+ * With Reduce Motion the dice appear as before.
  */
 import type { Analyzer } from '@tavli/bot';
 import type { BotRunner, Difficulty } from '@tavli/contracts';
@@ -82,6 +87,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
+import { useReducedMotion, useSharedValue } from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -96,10 +102,10 @@ import {
   opensGate,
   toEnterCount,
 } from '@/features/board/asodio';
-import { boardDiceBox, columnDiceBox } from '@/features/board/boardDice';
-import { pinnedCheckers, toneOf, type BoardView } from '@/features/board/boardModel';
+import { boardDiceBox, columnDiceBox, settleTargets } from '@/features/board/boardDice';
+import { pinnedCheckers, sideOf, toneOf, type BoardView } from '@/features/board/boardModel';
 import { flowPaths } from '@/features/board/combined';
-import { BOARD_GESTURES } from '@/features/board/interaction';
+import { BOARD_GESTURES, SWIPE_AREA } from '@/features/board/interaction';
 import { DiceRow } from '@/features/board/DiceRow';
 import {
   flightsEndMs,
@@ -113,6 +119,7 @@ import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { boardModeOf, useScreenLayout } from '@/features/board/screenLayout';
 import { useDoubleReveal } from '@/features/board/useDoubleReveal';
 import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
+import { BoardThrow, type ThrowSwipe } from '@/features/dice-throw/BoardThrow';
 import { bestRest, hintHasChoice } from '@/features/hint/hint';
 import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
 import { onlineStoreEvents } from '@/features/online/onlineFeedback';
@@ -276,6 +283,7 @@ export function GameScreen({
 }: GameScreenProps) {
   const { t } = useTranslation();
   const theme = useBoardTheme();
+  const reduceMotion = useReducedMotion();
   const flow = useGameStore(store, (s) => s.flow);
   const dispatch = useGameStore(store, (s) => s.dispatch);
   // Names the match for this app run: every screen reader event keys on it,
@@ -339,6 +347,11 @@ export function GameScreen({
           ? active
           : 'white';
   const boardView: BoardView = { viewer, direction };
+  // A tap-to-roll comes from the roller's wall: the angle the roller looks at
+  // the board from. In a game that does not flip to the roller (pass-and-play
+  // on the fixed board, the bot on top), the roller may sit on the opposite
+  // wall from the viewer (#183).
+  const nearEnd: 'top' | 'bottom' = sideOf(view.toMove, boardView) === 'player' ? 'bottom' : 'top';
 
   // The opening card: while rolling (a tie stays until the next roll), then
   // the result until a tap or for a moment (#176).
@@ -505,13 +518,41 @@ export function GameScreen({
     !(decided && showOpening) &&
     (phase === 'awaiting-roll' || (roller !== null && !tieWait));
 
-  const roll = () => {
+  // The dice throw of the last roll (issue #183). `throwReq` arms a throw
+  // on the roll; while it plays the dice row waits (it would tumble again
+  // what the throw has already landed). After the throw, `thrownTurn` marks
+  // the roll as thrown, so the row shows it without a roll of its own,
+  // until the next roll arms a new throw.
+  const [throwReq, setThrowReq] = useState<{
+    key: string;
+    values: readonly [number, number];
+    swipe: ThrowSwipe | null;
+  } | null>(null);
+  const [thrownTurn, setThrownTurn] = useState<string | null>(null);
+  const endThrow = () => setThrowReq(null);
+  const throwPlaying = throwReq !== null;
+  // Arms the throw of the roll just dispatched: the swipe that caused it
+  // plays it back (`null`: the throw comes from the near wall — the button,
+  // a tap, the bot). With Reduce Motion the dice appear as before.
+  const armThrow = (swipe: ThrowSwipe | null) => {
+    if (reduceMotion) return;
+    const flowNow = store.getState().flow;
+    const event = flowNow.log[flowNow.log.length - 1];
+    if (event === undefined || event.type !== 'roll' || event.dice === undefined) return;
+    const key = `${String(flowNow.match.games.length)}:${flowNow.game.state.turnNumber}`;
+    setThrownTurn(key);
+    setThrowReq({ key, values: event.dice, swipe });
+  };
+  const roll = (swipe?: ThrowSwipe) => {
     if (!canRoll) return;
     if (phase === 'awaiting-roll') {
-      dispatch({ type: 'roll', player: view.toMove });
+      if (dispatch({ type: 'roll', player: view.toMove })) armThrow(swipe ?? null);
     } else if (roller !== null) {
-      dispatch({ type: 'rollOpening', player: roller });
-      if (openingTaps === 'one' && roller === 'white') {
+      // The opening dice show on the card, at rest: the card covers the
+      // board, so a throw under it would be invisible. The first throw of
+      // the game is the first turn's roll.
+      const ok = dispatch({ type: 'rollOpening', player: roller });
+      if (ok && openingTaps === 'one' && roller === 'white') {
         dispatch({ type: 'rollOpening', player: 'black' });
       }
     }
@@ -521,9 +562,52 @@ export function GameScreen({
   const openingSwipe = usePanGesture({
     minDistance: BOARD_GESTURES.pan.minDistance,
     testID: 'opening-swipe',
-    onActivate: () => {
+    onActivate: (e) => {
       'worklet';
-      scheduleOnRN(roll);
+      const t = e as { translationX?: number; translationY?: number };
+      scheduleOnRN(roll, {
+        dx: t.translationX ?? e.x,
+        dy: t.translationY ?? e.y,
+      });
+    },
+  });
+
+  // The swipe-to-roll area around the board (#183): a swipe may start on the
+  // strips and the space around the board, like on the dev board screen. It
+  // needs more movement than the board's own pan, so on the board that one
+  // always activates first and wins: checkers still drag there. In landscape
+  // the move list scrolls in this region, and a card may cover the board:
+  // there the pan stays off (it can never activate), so it never takes
+  // their touches.
+  //
+  // Where the finger went down picks the side the dice come in from, and
+  // that needs the board's points: the frame sits between the strips in the
+  // classic layout, so its origin shifts the touch into the board's space.
+  const areaStartX = useSharedValue(0);
+  const areaStartY = useSharedValue(0);
+  const boardFrameX = useSharedValue(0);
+  const boardFrameY = useSharedValue(0);
+  const swipeArea = usePanGesture({
+    minDistance: landscape || blocked ? Number.MAX_SAFE_INTEGER : SWIPE_AREA.minDistance,
+    testID: 'game-swipe-area',
+    onBegin: (e) => {
+      'worklet';
+      areaStartX.set(e.x);
+      areaStartY.set(e.y);
+    },
+    onDeactivate: (e) => {
+      'worklet';
+      if (!e.canceled) {
+        scheduleOnRN(roll, {
+          dx: e.x - areaStartX.get(),
+          dy: e.y - areaStartY.get(),
+          x: e.x - boardFrameX.get(),
+          y: e.y - boardFrameY.get(),
+          ...(e.velocityX === undefined || e.velocityY === undefined
+            ? {}
+            : { vx: e.velocityX, vy: e.velocityY }),
+        });
+      }
     },
   });
 
@@ -715,9 +799,11 @@ export function GameScreen({
   // the screen pauses (menu) or goes away. Same key = same turn.
   const botActive = botsTurn && !blocked && !paused;
   const botKey = `${gameKey}:${game.state.turnNumber}`;
-  const botRoll = useEffectEvent(() =>
-    botPlayer === null ? false : dispatch({ type: 'roll', player: botPlayer }),
-  );
+  const botRoll = useEffectEvent(() => {
+    if (botPlayer === null || !dispatch({ type: 'roll', player: botPlayer })) return false;
+    armThrow(null);
+    return true;
+  });
   const botMove = useEffectEvent((move: Move) => playMove(move, geoRef.current, null, false));
   const botUndo = useEffectEvent(() => undo());
   const botConfirm = useEffectEvent(() => confirm());
@@ -880,7 +966,12 @@ export function GameScreen({
     showPass ||
     (game.state.dice !== null &&
       (online === undefined ? !diceWereRolled(flow) : stateHasChosenDouble(game)));
-  const rollKey = atRest ? null : `${gameKey}:${game.state.turnNumber}`;
+  // While the throw plays, the dice row waits: it would tumble again what
+  // the throw has already landed. After it, the row shows the roll without
+  // a tumble of its own (`rest`, until the next roll re-keys it).
+  const turnKey = `${gameKey}:${game.state.turnNumber}`;
+  const rollKey = atRest || throwPlaying ? null : turnKey;
+  const thrownRest = !throwPlaying && thrownTurn === turnKey;
   // A rolled double shows its two dice first, then splits into four (#177).
   const reveal = useDoubleReveal(rollKey, dice);
 
@@ -930,7 +1021,7 @@ export function GameScreen({
         testID="roll-button"
         label={t('game.roll.dice')}
         subtitle={t('game.roll.orSwipeBoard')}
-        onPress={roll}
+        onPress={() => roll()}
         grow={!landscape}
         compact={landscape}
       />
@@ -980,7 +1071,15 @@ export function GameScreen({
         ? columnDiceBox(placeGeo, column, dice.length)
         : boardDiceBox(placeGeo, dice.length)
       : null;
-  const diceHidden = freshGeo === null;
+  const diceHidden = freshGeo === null || throwPlaying;
+  // The hand-over of the throw (#183): in portrait the dice row lies on the
+  // board, inside the canvas, so the thrown dice can glide into it. In
+  // landscape the row sits in the right column, outside the canvas, and the
+  // row takes over where the dice stopped.
+  const settle =
+    diceBox !== null && placeGeo !== null && !landscape
+      ? settleTargets(diceBox, dice.length, theme.layouts['portrait-rotated'].dice.tilt)
+      : null;
   // Landscape: the right column keeps this slot free for the dice (two, or
   // four for a double), also before a roll, so its buttons never move.
   const diceSlot =
@@ -1262,7 +1361,7 @@ export function GameScreen({
           // The whole board area: a tap anywhere closes the result early;
           // while rolling, a tap rolls ("or swipe the board").
           style={styles.tapArea}
-          onPress={decided ? () => setOpeningDismissed(gameKey) : roll}
+          onPress={decided ? () => setOpeningDismissed(gameKey) : () => roll()}
           accessible={false}>
           <OpeningCard
             theme={theme}
@@ -1439,12 +1538,27 @@ export function GameScreen({
         paths={blocked || othersTurn ? [] : paths}
         onSteps={onSteps}
         onGeometry={onGeometry}
-        onBoardTap={roll}
+        onBoardTap={(at) => roll({ x: at.x, y: at.y })}
         onBoardSwipe={roll}
         onPickUp={() => feedback.event('checkerPickUp')}
         onIllegalDrop={() => feedback.event('invalidMove')}
         marks={marks}
         hint={blocked || othersTurn ? null : shownHint}
+        overlay={
+          throwReq !== null && placeGeo !== null ? (
+            <BoardThrow
+              key={throwReq.key}
+              theme={theme}
+              values={throwReq.values}
+              swipe={throwReq.swipe}
+              nearEnd={nearEnd}
+              settle={settle}
+              geo={placeGeo}
+              feedback={feedback}
+              onDone={endThrow}
+            />
+          ) : null
+        }
       />
       {diceBox ? (
         // The dice lie on the board, in the theme's dice area (#184); in
@@ -1467,6 +1581,7 @@ export function GameScreen({
             theme={theme}
             dice={dice}
             rollKey={rollKey}
+            rest={thrownRest}
             split={reveal.split}
             onLanded={onDiceLanded}
             size={diceBox.size}
@@ -1659,28 +1774,39 @@ export function GameScreen({
         {/* Classic: the board with its strips, centred in the space that is
             left; a card covers that whole space, so it has room. Tall: the
             board as large as it gets. Landscape: the board between the
-            columns; the layer reaches under the right column for the dice. */}
-        <View
-          testID="game-middle"
-          style={tall ? styles.boardArea : styles.middle}
-          collapsable={false}>
-          {classic ? strip(top, 'strip-top') : null}
+            columns; the layer reaches under the right column for the dice.
+            The swipe area around the board (#183) covers this region (not in
+            landscape, and not while a card is up): on the board the board's
+            own pan (it needs less movement) always wins the race, so
+            checkers still drag. */}
+        <GestureDetector gesture={swipeArea}>
           <View
-            style={
-              classic
-                ? styles.classicBoard(boxRatioWithShadow(theme.layouts.landscape))
-                : styles.boardArea
-            }
+            testID="game-middle"
+            style={tall ? styles.boardArea : styles.middle}
             collapsable={false}>
-            {boardLayer}
+            {classic ? strip(top, 'strip-top') : null}
+            <View
+              testID="game-board-frame"
+              style={
+                classic
+                  ? styles.classicBoard(boxRatioWithShadow(theme.layouts.landscape))
+                  : styles.boardArea
+              }
+              collapsable={false}
+              onLayout={(e) => {
+                boardFrameX.set(e.nativeEvent.layout.x);
+                boardFrameY.set(e.nativeEvent.layout.y);
+              }}>
+              {boardLayer}
+            </View>
+            {classic ? strip(viewer, 'strip-bottom') : null}
+            {landscape && moveList ? (
+              <View style={styles.besideColumnFlow(column)}>{moveList}</View>
+            ) : null}
+            {hints}
+            {cardOverlay}
           </View>
-          {classic ? strip(viewer, 'strip-bottom') : null}
-          {landscape && moveList ? (
-            <View style={styles.besideColumnFlow(column)}>{moveList}</View>
-          ) : null}
-          {hints}
-          {cardOverlay}
-        </View>
+        </GestureDetector>
         {tall ? strip(viewer, 'strip-bottom') : null}
         {landscape ? null : moveList}
         {trail}

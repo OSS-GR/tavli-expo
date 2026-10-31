@@ -1,10 +1,8 @@
 import {
-  TURN_TIME_MS,
   type createRecordingFeedback,
   type createRecordingSoundPlayer,
   type GameTransport,
   type OnlineGameChoice,
-  type OnlineGamePace,
 } from '@tavli/contracts';
 import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
@@ -64,7 +62,7 @@ interface Game {
 /** A game of `me` (White) vs the bot (Black) on its own in-memory server, on the screen. */
 async function openGame(
   choice: OnlineGameChoice = 'portes',
-  pace: OnlineGamePace = 'live',
+  turnTimeMinutes: number | null = 1,
   targetPoints = 5,
   botThinkMs = BOT_THINK_MS,
   meTransport: (server: MemoryGameServer) => GameTransport = (server) => server.transportFor('me'),
@@ -72,7 +70,13 @@ async function openGame(
   prepare?: (server: MemoryGameServer, gameId: string) => void,
 ): Promise<Game> {
   const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
-  const gameId = server.createGame('me', { white: 'me', black: 'bot' }, choice, targetPoints, pace);
+  const gameId = server.createGame(
+    'me',
+    { white: 'me', black: 'bot' },
+    choice,
+    targetPoints,
+    turnTimeMinutes,
+  );
   prepare?.(server, gameId);
   bot = startOnlineBot({
     transport: server.transportFor('bot'),
@@ -218,7 +222,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
   it('plays the win jingle when the bot’s time runs out (#271)', async () => {
     const user = setupUser();
     // The bot thinks longer than its turn time.
-    const game = await openGame('portes', 'live', 5, TURN_TIME_MS.live * 2);
+    const game = await openGame('portes', 1, 5, 60_000 * 2);
     if (view(game).waitingFor === 'white') {
       await untilYourTurn(game);
       await playTurnByTaps(game);
@@ -229,7 +233,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     sounds.played.length = 0;
     haptics.calls.length = 0;
     await act(async () => {
-      jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+      jest.advanceTimersByTime(60_000 + 1000);
       game.server.runDueTimeouts();
     });
     expect(view(game).match.games).toEqual([
@@ -253,7 +257,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       await act(async () => {
         settingsStore.getState().setSetting('boardLayout', 'classic');
       });
-      const game = await openGame(choice, 'live', targetPoints, TURN_TIME_MS.live * 2);
+      const game = await openGame(choice, 1, targetPoints, 60_000 * 2);
       if (view(game).waitingFor === 'white') {
         await untilYourTurn(game);
         await playTurnByTaps(game);
@@ -262,7 +266,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(view(game).waitingFor).toBe('black');
       await wait(2000);
       await act(async () => {
-        jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+        jest.advanceTimersByTime(60_000 + 1000);
         game.server.runDueTimeouts();
       });
       expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/You win the game/);
@@ -316,7 +320,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     });
 
     it('flies the bot’s winning turn to the end position before the sheet opens (#299)', async () => {
-      const game = await openGame('portes', 'live', 5, BOT_THINK_MS, undefined, (server, id) => {
+      const game = await openGame('portes', 1, 5, BOT_THINK_MS, undefined, (server, id) => {
         // The bot (Black) bears off its last two checkers with its next turn.
         server.setFlowForTest(id, lastBearOff(viewFlow(server.getGame(id)!), 'black'));
       });
@@ -357,7 +361,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       // Nobody plays game 2 while the sheet is open: the server ends it.
       sounds.played.length = 0;
       await act(async () => {
-        jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+        jest.advanceTimersByTime(60_000 + 1000);
         game.server.runDueTimeouts();
       });
       expect(view(game).match.games).toHaveLength(2);
@@ -381,7 +385,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(screen.getByTestId('game-end-card')).toHaveTextContent(/Next: game 2 · Plakoto/);
       // Nobody plays game 2 (Plakoto) while the sheet is open.
       await act(async () => {
-        jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+        jest.advanceTimersByTime(60_000 + 1000);
         game.server.runDueTimeouts();
       });
       expect(view(game).match.games).toHaveLength(2);
@@ -393,7 +397,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
   it('locks the board while the server waits for the bot', async () => {
     const user = setupUser();
     // The bot thinks long: the taps below take a while.
-    const game = await openGame('portes', 'live', 5, 30_000);
+    const game = await openGame('portes', 1, 5, 30_000);
     await untilYourTurn(game);
     await playTurnByTaps(game);
     await user.press(screen.getByTestId('confirm-button'));
@@ -414,14 +418,14 @@ describe('<OnlineMatchScreen /> (#255)', () => {
 
   it('ends the game when your time runs out, and the next game starts', async () => {
     const user = setupUser();
-    const game = await openGame('portes', 'live', 5);
+    const game = await openGame('portes', 1, 5);
     await untilYourTurn(game);
     expect(screen.getByTestId('strip-bottom')).toHaveTextContent(/\d+ s/);
 
     // You wait too long. The server ends the game (the in-memory server
     // runs its timers when asked).
     await act(async () => {
-      jest.advanceTimersByTime(TURN_TIME_MS.live + 1000);
+      jest.advanceTimersByTime(60_000 + 1000);
       game.server.runDueTimeouts();
     });
     expect(view(game).match.games).toEqual([
@@ -447,7 +451,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     const user = setupUser();
     // Your turns do not reach the server (no network) until `offline` is false.
     let offline = true;
-    const game = await openGame('portes', 'live', 5, BOT_THINK_MS, (server) => {
+    const game = await openGame('portes', 1, 5, BOT_THINK_MS, (server) => {
       const real = server.transportFor('me');
       return {
         subscribe: (id, onView, onError) => real.subscribe(id, onView, onError),
@@ -486,7 +490,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     const user = setupUser();
     // Your turn waits on the way until `deliver()`.
     let deliver: (() => void) | null = null;
-    const game = await openGame('portes', 'live', 5, 30_000, (server) => {
+    const game = await openGame('portes', 1, 5, 30_000, (server) => {
       const real = server.transportFor('me');
       return {
         subscribe: (id, onView, onError) => real.subscribe(id, onView, onError),

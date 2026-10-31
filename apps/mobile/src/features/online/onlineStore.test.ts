@@ -3,7 +3,6 @@
 // on later microtasks and runs no timers; time moves only with `wait`.
 import {
   ONLINE_GAME_CHOICES,
-  TURN_TIME_MS,
   type GameTransport,
   type OnlineGameChoice,
   type OnlineGameView,
@@ -19,7 +18,7 @@ const ALICE = 'alice';
 const BOB = 'bob';
 const PLAYERS = { white: ALICE, black: BOB };
 const START = Date.UTC(2026, 9, 28, 12, 0, 0);
-const LIVE = TURN_TIME_MS.live;
+const LIVE = 60_000;
 
 const open: OnlineStore[] = [];
 afterEach(() => {
@@ -30,7 +29,7 @@ afterEach(() => {
 function setup(choice: OnlineGameChoice = 'portes', seed = 1, targetPoints = 3) {
   let clock = START;
   const server = createMemoryGameServer({ rng: createSeededRng(seed), now: () => clock });
-  const gameId = server.createGame(ALICE, PLAYERS, choice, targetPoints, 'live');
+  const gameId = server.createGame(ALICE, PLAYERS, choice, targetPoints, 1);
   return {
     server,
     gameId,
@@ -507,7 +506,7 @@ describe('createOnlineStore', () => {
     let phone = START + 5_000; // The phone clock is 5 s ahead of the server.
     let server = START;
     const memory = createMemoryGameServer({ rng: createSeededRng(1), now: () => server });
-    const gameId = memory.createGame(ALICE, PLAYERS, 'portes', 3, 'live');
+    const gameId = memory.createGame(ALICE, PLAYERS, 'portes', 3, 1);
     const stores = [ALICE, BOB].map((me) =>
       createOnlineStore({ transport: memory.transportFor(me), gameId, me, now: () => phone }),
     );

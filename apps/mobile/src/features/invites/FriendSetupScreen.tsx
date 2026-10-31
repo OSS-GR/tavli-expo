@@ -1,6 +1,6 @@
 /**
- * Play a friend online (#281): pick the game, the match length and the
- * pace, then "Make an invite". The route then opens the waiting screen
+ * Play a friend online (#281): pick the game, the match length and a turn
+ * time limit, then "Make an invite". The route then opens the waiting screen
  * (`InviteWaitScreen`) with the code and the link.
  *
  * - An online game needs an account on our server. The screen says so,
@@ -27,7 +27,6 @@ import {
   type Invites,
   type NewInvite,
   type OnlineGameChoice,
-  type OnlineGamePace,
 } from '@tavli/contracts';
 import { MAX_OPEN_INVITES } from '@tavli/online';
 import { useEffect, useRef, useState } from 'react';
@@ -42,6 +41,7 @@ import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
 import { signInForOnline } from '@/features/online/account';
+import { formatTimeLimit } from '@/features/online/clock';
 
 import { sendInviteCreated } from './inviteAnalytics';
 
@@ -58,7 +58,8 @@ export interface FriendSetupScreenProps {
 /** Why "Make an invite" did not work. */
 type Problem = 'account' | 'make' | 'tooMany';
 
-const PACES: readonly OnlineGamePace[] = ['live', 'async'];
+/** The turn time limit options: null is the 24-hour default, others are minutes. */
+const TIME_LIMITS: readonly (number | null)[] = [null, 5, 1];
 
 export function FriendSetupScreen({
   auth,
@@ -70,7 +71,7 @@ export function FriendSetupScreen({
   const { t } = useTranslation();
   const [choice, setChoice] = useState<OnlineGameChoice>('portes');
   const [targetPoints, setTargetPoints] = useState<MatchLength>(3);
-  const [pace, setPace] = useState<OnlineGamePace>('live');
+  const [turnTimeMinutes, setTurnTimeMinutes] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   // One invite per tap: a second tap before the render sees `busy` does nothing.
   const making = useRef(false);
@@ -90,7 +91,7 @@ export function FriendSetupScreen({
     making.current = true;
     setBusy(true);
     setProblem(null);
-    const game: NewInvite = { choice, targetPoints, pace };
+    const game: NewInvite = { choice, targetPoints, turnTimeMinutes };
     const failed = (next: Problem) => {
       making.current = false;
       if (!mounted.current) return;
@@ -127,10 +128,14 @@ export function FriendSetupScreen({
     value: `${n}`,
     label: String(n),
   }));
-  const paceOptions: SegmentOption<OnlineGamePace>[] = PACES.map((value) => ({
-    value,
-    label: t(`friend.${value}`),
+  const timeLimitOptions: SegmentOption<string>[] = TIME_LIMITS.map((value) => ({
+    value: `${value}`,
+    label: formatTimeLimit(value, t),
   }));
+  const timeLimitHint =
+    turnTimeMinutes === null
+      ? t('friend.timeLimitHint_none')
+      : t('friend.timeLimitHint', { count: turnTimeMinutes });
   const problemText =
     problem === 'account'
       ? t('friend.accountFailed')
@@ -200,15 +205,15 @@ export function FriendSetupScreen({
           />
           <Text style={styles.hint}>{t('invite.open.lengthValue', { count: targetPoints })}</Text>
         </SettingsSection>
-        <SettingsSection title={t('friend.pace')}>
+        <SettingsSection title={t('friend.timeLimit')}>
           <SegmentedControl
-            testID="friend-pace"
-            label={t('friend.pace')}
-            options={paceOptions}
-            value={pace}
-            onChange={setPace}
+            testID="friend-time-limit"
+            label={t('friend.timeLimit')}
+            options={timeLimitOptions}
+            value={`${turnTimeMinutes}`}
+            onChange={(value) => setTurnTimeMinutes(value === 'null' ? null : Number(value))}
           />
-          <Text style={styles.hint}>{t(`invite.open.${pace}`)}</Text>
+          <Text style={styles.hint}>{timeLimitHint}</Text>
         </SettingsSection>
         <Text testID="friend-account" style={styles.intro}>
           {t('friend.account')}

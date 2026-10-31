@@ -32,70 +32,59 @@ const at = (side: PlayerId | null, game = 0): TurnWait => ({ side, game, over: f
 const over = (game = 1): TurnWait => ({ side: null, game, over: true });
 
 describe('turnPushSide', () => {
-  it('tells the other side in an async game', () => {
-    expect(turnPushSide('async', at('white'), at('black'), 'white')).toBe('black');
-    expect(turnPushSide('async', at('black'), at('white'), 'black')).toBe('white');
+  it('tells the other side', () => {
+    expect(turnPushSide(at('white'), at('black'), 'white')).toBe('black');
+    expect(turnPushSide(at('black'), at('white'), 'black')).toBe('white');
     // A new game: nobody was waited for, and the other player starts.
-    expect(turnPushSide('async', at(null), at('white'), 'black')).toBe('white');
+    expect(turnPushSide(at(null), at('white'), 'black')).toBe('white');
   });
 
   it('tells nobody when the same side waits again in the same game (an Asodio extra roll)', () => {
-    expect(turnPushSide('async', at('white'), at('white'), 'white')).toBeNull();
-    expect(turnPushSide('async', at('black', 2), at('black', 2), null)).toBeNull();
+    expect(turnPushSide(at('white'), at('white'), 'white')).toBeNull();
+    expect(turnPushSide(at('black', 2), at('black', 2), null)).toBeNull();
   });
 
   it('tells the same side when a new game of the match waits for it', () => {
     // White ran out of time (the server saved it) and starts the next game.
-    expect(turnPushSide('async', at('white', 0), at('white', 1), null)).toBe('white');
-    expect(turnPushSide('async', at('black', 1), at('black', 2), 'white')).toBe('black');
+    expect(turnPushSide(at('white', 0), at('white', 1), null)).toBe('white');
+    expect(turnPushSide(at('black', 1), at('black', 2), 'white')).toBe('black');
   });
 
   it('never tells the caller: they are in the app', () => {
     // A new game the caller started, with the caller to move.
-    expect(turnPushSide('async', at(null), at('white'), 'white')).toBeNull();
+    expect(turnPushSide(at(null), at('white'), 'white')).toBeNull();
     // The caller ended a game and starts the next one.
-    expect(turnPushSide('async', at('black', 0), at('black', 1), 'black')).toBeNull();
-    expect(turnPushSide('async', at('white', 0), at('black', 1), 'black')).toBeNull();
+    expect(turnPushSide(at('black', 0), at('black', 1), 'black')).toBeNull();
+    expect(turnPushSide(at('white', 0), at('black', 1), 'black')).toBeNull();
   });
 
   it('tells nobody when the match is over', () => {
-    expect(turnPushSide('async', at('white'), over(), 'white')).toBeNull();
-    expect(turnPushSide('async', at('white', 2), over(3), null)).toBeNull();
+    expect(turnPushSide(at('white'), over(), 'white')).toBeNull();
+    expect(turnPushSide(at('white', 2), over(3), null)).toBeNull();
     // Even with a side (it cannot happen: `waitingFor` is null then).
-    expect(turnPushSide('async', at('white'), { ...over(), side: 'black' }, 'white')).toBeNull();
-  });
-
-  it('never pushes in a live game', () => {
-    expect(turnPushSide('live', at('white'), at('black'), 'white')).toBeNull();
-    expect(turnPushSide('live', at(null), at('white'), 'black')).toBeNull();
-    expect(turnPushSide('live', at('white', 0), at('white', 1), null)).toBeNull();
+    expect(turnPushSide(at('white'), { ...over(), side: 'black' }, 'white')).toBeNull();
   });
 });
 
 describe('matchEndPushSides', () => {
-  it('tells the other player when the caller ends an async match', () => {
+  it('tells the other player when the caller ends a match', () => {
     // A winning move or a resign by the caller.
-    expect(matchEndPushSides('async', at('white'), over(), 'white')).toEqual(['black']);
-    expect(matchEndPushSides('async', at('white', 2), over(3), 'black')).toEqual(['white']);
+    expect(matchEndPushSides(at('white'), over(), 'white')).toEqual(['black']);
+    expect(matchEndPushSides(at('white', 2), over(3), 'black')).toEqual(['white']);
   });
 
   it('tells both players after a time out (the server ended it)', () => {
-    expect(matchEndPushSides('async', at('white'), over(), null)).toEqual(['white', 'black']);
+    expect(matchEndPushSides(at('white'), over(), null)).toEqual(['white', 'black']);
   });
 
   it('tells nobody while the match goes on: the turn push covers a new game', () => {
-    expect(matchEndPushSides('async', at('white'), at('black'), 'white')).toEqual([]);
-    expect(matchEndPushSides('async', at('white', 0), at('white', 1), null)).toEqual([]);
-    expect(matchEndPushSides('async', NEW_MATCH_WAIT, at('white'), 'black')).toEqual([]);
+    expect(matchEndPushSides(at('white'), at('black'), 'white')).toEqual([]);
+    expect(matchEndPushSides(at('white', 0), at('white', 1), null)).toEqual([]);
+    expect(matchEndPushSides(NEW_MATCH_WAIT, at('white'), 'black')).toEqual([]);
   });
 
   it('tells nobody when the match was over before the save', () => {
-    expect(matchEndPushSides('async', over(), over(), null)).toEqual([]);
-  });
-
-  it('never pushes in a live game', () => {
-    expect(matchEndPushSides('live', at('white'), over(), 'white')).toEqual([]);
-    expect(matchEndPushSides('live', at('white'), over(), null)).toEqual([]);
+    expect(matchEndPushSides(over(), over(), null)).toEqual([]);
   });
 
   it('never overlaps the turn push: one save, one kind of push', () => {
@@ -108,15 +97,13 @@ describe('matchEndPushSides', () => {
       over(),
       over(2),
     ];
-    for (const pace of ['async', 'live'] as const) {
-      for (const before of waits) {
-        for (const after of waits) {
-          for (const caller of ['white', 'black', null] as const) {
-            const turn = turnPushSide(pace, before, after, caller);
-            const end = matchEndPushSides(pace, before, after, caller);
-            expect(turn !== null && end.length > 0).toBe(false);
-            if (caller !== null) expect(end).not.toContain(caller);
-          }
+    for (const before of waits) {
+      for (const after of waits) {
+        for (const caller of ['white', 'black', null] as const) {
+          const turn = turnPushSide(before, after, caller);
+          const end = matchEndPushSides(before, after, caller);
+          expect(turn !== null && end.length > 0).toBe(false);
+          if (caller !== null) expect(end).not.toContain(caller);
         }
       }
     }

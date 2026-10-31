@@ -246,8 +246,8 @@ eas submit --platform ios --latest
 | `/rules/<variant>` | How to play (a stub for now) |
 | `/settings` | Settings (language, sound, haptics, board options) |
 | `/dev/board` | **Dev only.** The board with sample positions. You can flip the board. **Dice → Throw on the board** turns on the dice throw spike (#183, [findings](../design/dice-throw-spike.md)). |
-| `/dev/online` | **Dev only.** An online game vs the bot on the in-memory server (#255). Pick a game, a pace (live: 60 s a turn; async: 24 h) and a match length, then tap **Start game**. **Make an invite** makes an invite from the bot instead and shows its code and links (#256). The game lives only while the app runs. |
-| `/invite/<code>` | An invite to an online game (#256). It shows the game, the length and the pace, with Accept and Decline. Opened by the link `tavlaki://invite/<code>`. |
+| `/dev/online` | **Dev only.** An online game vs the bot on the in-memory server (#255). Pick a game, a time limit (1 minute, 5 minutes, or 24 hours by default) and a match length, then tap **Start game**. **Make an invite** makes an invite from the bot instead and shows its code and links (#256). The game lives only while the app runs. |
+| `/invite/<code>` | An invite to an online game (#256). It shows the game, the length and the time limit, with Accept and Decline. Opened by the link `tavlaki://invite/<code>`. |
 | `/_sitemap` | Expo Router's list of all routes. Tap one to open it. |
 
 Dev routes only work in development builds. Release builds (the `preview` profile) send them back home.

@@ -36,7 +36,7 @@ function startDev() {
     server: onlineFake.server(),
     me: 'me',
     choice: 'portes',
-    pace: 'live',
+    turnTimeMinutes: 1,
     targetPoints: 1,
     difficulty: botLevels.portes[0]!,
     runner: botRunner,
@@ -60,7 +60,7 @@ describe('useOnlineConnection', () => {
 
   it('plays any other game on `games` as the signed-in user', async () => {
     onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
-    const gameId = onlineFake.server().createGame('guest-1', PLAYERS, 'portes', 3, 'live');
+    const gameId = onlineFake.server().createGame('guest-1', PLAYERS, 'portes', 3, 1);
     expect(isDevGame(gameId)).toBe(false);
     const { result } = await renderHook(() => useOnlineConnection(gameId));
     await flush();

@@ -1,5 +1,6 @@
 import type { createRecordingFeedback, createRecordingSoundPlayer } from '@tavli/contracts';
-import { createSeededRng, rollDie } from '@tavli/engine';
+import { InlineBotRunner, createBot } from '@tavli/bot';
+import { createSeededRng, rollDie, type PerPlayer } from '@tavli/engine';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
@@ -7,11 +8,22 @@ import { settingsStore } from '@/features/settings/store';
 import { feedback, sound } from '@/services';
 
 import { createGameStore } from './gameStore';
-import { GameScreen, OPENING_RESULT_MS } from './GameScreen';
+import { GameScreen, OPENING_RESULT_MS, type BotSeat } from './GameScreen';
+import type { Seat } from './seats';
 
 import { touch } from '../../../test/gestureHandlerMock';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot as render } from '../../../test/render';
+
+// Records that the thrown dice rendered: the mock plays the throw at once
+// (it ends inside the touch), so the rendered dice are the only trace of it.
+const mockThrownDice: number[] = [];
+jest.mock('../dice-throw/ThrownDie', () => ({
+  ThrownDie: () => {
+    mockThrownDice.push(1);
+    return null;
+  },
+}));
 
 const haptics = feedback as ReturnType<typeof createRecordingFeedback>;
 const sounds = sound as ReturnType<typeof createRecordingSoundPlayer>;
@@ -36,6 +48,7 @@ function newStore(seed = seedWithoutTie()) {
 runOnFakeTimers();
 
 beforeEach(async () => {
+  mockThrownDice.length = 0;
   haptics.calls.length = 0;
   sounds.played.length = 0;
   await act(async () => {
@@ -161,12 +174,20 @@ describe('<GameScreen /> dice', () => {
       dispatch({ type: 'confirm', player: 'white' });
     });
     expect(store.getState().flow.game.phase).toBe('awaiting-roll');
+    await act(async () => {
+      fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 500 } },
+      });
+    });
     await user.press(screen.getByRole('button', { name: 'Roll dice, or swipe the board' }));
     const { game } = store.getState().flow;
     expect(game.state.toMove).toBe('black');
     expect(game.state.dice).not.toBeNull();
     expect(haptics.calls).toEqual([]);
     expect(sounds.played).toEqual([]);
+    // The button throws the dice over the board too (#183), with the same
+    // cues as a swipe (the throw's knocks are sounds, so none here).
+    expect(mockThrownDice.length).toBeGreaterThan(0);
   });
 
   it('rolls the opening die with a swipe over the card', async () => {
@@ -179,7 +200,7 @@ describe('<GameScreen /> dice', () => {
     expect(store.getState().flow.game.opening?.white).not.toBeNull();
   });
 
-  it('rolls the dice with a swipe on the board', async () => {
+  it('rolls the dice with a swipe on the board, and the throw plays', async () => {
     const store = newStore();
     await render(<GameScreen store={store} />);
     await act(async () => {
@@ -191,10 +212,119 @@ describe('<GameScreen /> dice', () => {
       dispatch({ type: 'confirm', player: 'white' });
     });
     expect(store.getState().flow.game.state.dice).toBeNull();
+    await act(async () => {
+      fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 500 } },
+      });
+    });
     await touch('game-board-pan', [
       { x: 20, y: 200 },
       { x: 120, y: 120 },
     ]);
+    const { game } = store.getState().flow;
+    expect(game.state.dice).not.toBeNull();
+    // The throw played over the board (the mock plays it at once, so it has
+    // already ended): the dice row shows the rolled dice, without a second
+    // roll of its own (`rest`, see DiceRow).
+    const row = screen.getByTestId('dice-row', { includeHiddenElements: true });
+    expect(row.props.accessibilityLabel).toBe(`Dice ${game.state.dice!.join('-')}, 2 left to play`);
+    // The throw played over the board: the thrown dice rendered.
+    expect(mockThrownDice.length).toBeGreaterThan(0);
+  });
+
+  it('rolls with a swipe that starts outside the board (classic layout)', async () => {
+    const store = newStore();
+    await act(async () => {
+      settingsStore.getState().setSetting('boardLayout', 'classic');
+    });
+    await render(<GameScreen store={store} />);
+    await act(async () => {
+      const { dispatch } = store.getState();
+      dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+      dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+      dispatch({ type: 'move', player: 'white', move: { from: 13, to: 7, die: 6 } });
+      dispatch({ type: 'move', player: 'white', move: { from: 8, to: 7, die: 1 } });
+      dispatch({ type: 'confirm', player: 'white' });
+    });
+    await act(async () => {
+      fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 500 } },
+      });
+      // The board frame sits between the strips in the classic layout: the
+      // swipe area shifts its touch into the board's points by its origin.
+      fireEvent(screen.getByTestId('game-board-frame', { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 70, width: 375, height: 500 } },
+      });
+    });
+    expect(store.getState().flow.game.state.dice).toBeNull();
+    // The swipe starts on the strip above the board, not on the board: the
+    // dice come in from the side of the board closest to the touch (above
+    // it here), and land in the dice row.
+    await touch('game-swipe-area', [
+      { x: 187, y: 6 },
+      { x: 187, y: 60 },
+    ]);
+    const { game } = store.getState().flow;
+    expect(game.state.dice).not.toBeNull();
+    // The throw played, and the dice row shows the rolled dice.
+    expect(mockThrownDice.length).toBeGreaterThan(0);
+    const row = screen.getByTestId('dice-row', { includeHiddenElements: true });
+    expect(row.props.accessibilityLabel).toBe(`Dice ${game.state.dice!.join('-')}, 2 left to play`);
+  });
+});
+
+describe('<GameScreen /> swiping while the bot waits', () => {
+  const seats: PerPlayer<Seat> = {
+    white: { name: 'You', label: 'You', turnLabel: 'Your turn', you: true },
+    black: { name: 'Bot', label: 'Bot · Easy', turnLabel: 'Playing', you: false },
+  };
+  const bot: BotSeat = {
+    player: 'black',
+    difficulty: 'easy',
+    runner: new InlineBotRunner(createBot()),
+    rng: createSeededRng(1),
+    timing: { beforeRollMs: 3000, moveMs: 0, thinkMs: () => 0 },
+  };
+
+  it('rolls nothing while the bot waits, and the bot still rolls itself', async () => {
+    const store = newStore();
+    await render(<GameScreen store={store} openingTaps="one" seats={seats} bot={bot} />);
+    await act(async () => {
+      const { dispatch } = store.getState();
+      dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+      dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+      dispatch({ type: 'move', player: 'white', move: { from: 13, to: 7, die: 6 } });
+      dispatch({ type: 'move', player: 'white', move: { from: 8, to: 7, die: 1 } });
+      dispatch({ type: 'confirm', player: 'white' });
+    });
+    // The opening card closed with the first turn's moves: the bot's wait runs.
+    expect(store.getState().flow.game.state.toMove).toBe('black');
+    await act(async () => {
+      fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 500 } },
+      });
+    });
+    // Excessive swiping during the bot's turn, on the board and around it:
+    // none of it rolls for the bot.
+    for (let i = 0; i < 3; i++) {
+      await touch('game-swipe-area', [
+        { x: 187, y: 6 },
+        { x: 187, y: 60 },
+      ]);
+      await touch('game-board-pan', [
+        { x: 20, y: 200 },
+        { x: 120, y: 120 },
+      ]);
+    }
+    expect(store.getState().flow.game.state.dice).toBeNull();
+    expect(mockThrownDice.length).toBe(0);
+    // The bot rolls itself when its wait is over, and its throw plays.
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+    const rolls = store.getState().flow.log.filter((e) => e.type === 'roll');
+    expect(rolls.at(-1)?.player).toBe('black');
     expect(store.getState().flow.game.state.dice).not.toBeNull();
+    expect(mockThrownDice.length).toBeGreaterThan(0);
   });
 });

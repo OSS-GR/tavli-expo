@@ -17,7 +17,7 @@ import { INVITE_TIME_MS, type AuthProvider, type InviteView, type Invites } from
 import type { TFunction } from 'i18next';
 import { useCallback } from 'react';
 
-import { clockText, clockTickMs } from '@/features/online/clock';
+import { clockText, clockTickMs, formatTimeLimit } from '@/features/online/clock';
 import {
   useSessionWatch,
   type SessionWatchState,
@@ -41,9 +41,9 @@ export type MyInvitesState = SessionWatchState<MyInvitesList>;
 
 /**
  * How often the list checks the clock: the time left counts hours, then
- * minutes, like an async turn (`clockTickMs`).
+ * minutes, like a 24-hour turn (`clockTickMs`).
  */
-export const INVITE_TICK_MS = clockTickMs('async');
+export const INVITE_TICK_MS = clockTickMs(null);
 
 /**
  * The server clock minus the phone clock, as far as a list that arrives
@@ -60,11 +60,11 @@ export function inviteClockOffset(invites: readonly InviteView[], localNow: numb
 export interface InviteRowText {
   /** "Portes · first to 3 points". */
   readonly title: string;
-  /** "Live · 23 h left", or "Live · Expiring now" once the phone clock says the time is up. */
+  /** "1 min · 23 h left", or "1 min · Expiring now" once the phone clock says the time is up. */
   readonly line: string;
   /** "Code ABCD2345". */
   readonly code: string;
-  /** What a screen reader reads for the whole row: "Invite, Portes, first to 3 points, Live, 23 h left". */
+  /** What a screen reader reads for the whole row: "Invite, Portes, first to 3 points, 1 min, 23 h left". */
   readonly label: string;
 }
 
@@ -80,20 +80,20 @@ export function inviteRowText(
 ): InviteRowText {
   const game = t(`games.${invite.choice}`);
   const count = invite.targetPoints;
-  const pace = t(invite.pace === 'live' ? 'friend.live' : 'friend.async');
+  const limit = formatTimeLimit(invite.turnTimeMinutes, t);
   const left = invite.expiresAt - (localNow + offset);
   const time =
     left > 0
-      ? t('home.invites.left', { time: clockText(left, 'async', t) })
+      ? t('home.invites.left', { time: clockText(left, null, t) })
       : t('home.invites.expiring');
   return {
     title: t('home.invites.game', { game, count }),
-    line: `${pace} · ${time}`,
+    line: `${limit} · ${time}`,
     code: t('home.invites.code', { code: invite.code }),
     label: [
       t('home.invites.invite'),
       t('home.invites.gameSpoken', { game, count }),
-      pace,
+      limit,
       time,
     ].join(', '),
   };

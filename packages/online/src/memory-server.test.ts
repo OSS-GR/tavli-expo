@@ -4,9 +4,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ASYNC_TURN_TIME_MS,
   MAX_LISTED_GAMES,
   ONLINE_GAME_CHOICES,
-  TURN_TIME_MS,
   isGameTransportErrorData,
 } from '@tavli/contracts';
 import type {
@@ -30,7 +30,7 @@ const ALICE = 'alice';
 const BOB = 'bob';
 const PLAYERS = { white: ALICE, black: BOB };
 const START = Date.UTC(2026, 9, 28, 12, 0, 0);
-const LIVE = TURN_TIME_MS.live;
+const LIVE = 60_000;
 
 /** A server on a clock that the test moves by hand. */
 function setup(seed = 1) {
@@ -86,10 +86,10 @@ function contractSubject(): GameTransportContractSubject {
   const { server, wait } = setup(7);
   const picker = createSeededRng(8);
   return {
-    createGame: async ({ choice, targetPoints, pace }) =>
-      server.createGame(ALICE, PLAYERS, choice, targetPoints, pace),
+    createGame: async ({ choice, targetPoints, turnTimeMinutes }) =>
+      server.createGame(ALICE, PLAYERS, choice, targetPoints, turnTimeMinutes),
     createMotherQuestion: async () => {
-      const gameId = server.createGame(ALICE, PLAYERS, 'plakoto', 1, 'live');
+      const gameId = server.createGame(ALICE, PLAYERS, 'plakoto', 1, 1);
       const plakoto = createOnlineMatch(
         { choice: 'plakoto', targetPoints: 1, players: PLAYERS },
         createSeededRng(1),
@@ -100,7 +100,7 @@ function contractSubject(): GameTransportContractSubject {
       return gameId;
     },
     createWinningTurn: async () => {
-      const gameId = server.createGame(ALICE, PLAYERS, 'portes', 3, 'live');
+      const gameId = server.createGame(ALICE, PLAYERS, 'portes', 3, 1);
       const portes = createOnlineMatch(
         { choice: 'portes', targetPoints: 3, players: PLAYERS },
         createSeededRng(1),
@@ -109,7 +109,7 @@ function contractSubject(): GameTransportContractSubject {
       return gameId;
     },
     createOtherGame: async () =>
-      server.createGame(BOB, { white: BOB, black: 'eve' }, 'portes', 1, 'live'),
+      server.createGame(BOB, { white: BOB, black: 'eve' }, 'portes', 1, 1),
     missingGameId: async () => 'game-404',
     transportFor: (who) => server.transportFor(who === 'stranger' ? 'eve' : PLAYERS[who]),
     legalTurn: (view) => pickTurn(view.game, picker),
@@ -126,7 +126,7 @@ describe('GameTransport contract (in-memory server)', () => {
 describe('createGame', () => {
   it('starts at version 1 with the first roll and a running clock', () => {
     const { server } = setup();
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 'live');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 1);
     const view = server.getGame(gameId);
     expect(view).toMatchObject({
       gameId,
@@ -142,7 +142,7 @@ describe('createGame', () => {
     const { server } = setup();
     const codeOf = (players: { white: string; black: string }, caller = ALICE) => {
       try {
-        server.createGame(caller, players, 'portes', 1, 'live');
+        server.createGame(caller, players, 'portes', 1, 1);
       } catch (error) {
         if (error instanceof OnlineGameError) return error.code;
         throw error;
@@ -157,8 +157,8 @@ describe('createGame', () => {
 
   it('gives each game its own id', () => {
     const { server } = setup();
-    const a = server.createGame(ALICE, PLAYERS, 'portes', 1, 'live');
-    const b = server.createGame(BOB, PLAYERS, 'fevga', 1, 'async');
+    const a = server.createGame(ALICE, PLAYERS, 'portes', 1, 1);
+    const b = server.createGame(BOB, PLAYERS, 'fevga', 1, null);
     expect(a).not.toBe(b);
     expect(server.getGame(b)?.choice).toBe('fevga');
   });
@@ -167,7 +167,7 @@ describe('createGame', () => {
 describe('copies', () => {
   it('getGame and events return copies', () => {
     const { server } = setup();
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 'live');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 1);
     const view = server.getGame(gameId) as { version: number; players: { white: string } };
     view.version = 99;
     view.players.white = 'eve';
@@ -180,7 +180,7 @@ describe('copies', () => {
 
   it('two players get equal views, but not the same objects', async () => {
     const { server } = setup();
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 'live');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 1);
     const white = watch(server.transportFor(ALICE), gameId);
     const black = watch(server.transportFor(BOB), gameId);
     await flush();
@@ -235,7 +235,7 @@ describe('whole matches through two transports', () => {
     it(`${choice}: plays to the end; the event log replays to the last view`, async () => {
       const { server } = setup(21);
       const targetPoints = choice === 'tavli' ? 3 : 1;
-      const gameId = server.createGame(ALICE, PLAYERS, choice, targetPoints, 'live');
+      const gameId = server.createGame(ALICE, PLAYERS, choice, targetPoints, 1);
       const view = await playMatch(server, gameId, 31);
       expect(view.match.status).toBe('finished');
       expect(view.waitingFor).toBeNull();
@@ -262,7 +262,7 @@ describe('whole matches through two transports', () => {
 describe('turn timers on a fake clock', () => {
   it('runDueTimeouts: nothing before the deadline; at it the late player loses the game', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 'live');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
     const white = watch(server.transportFor(ALICE), gameId);
     await flush();
     const before = white.last();
@@ -288,7 +288,7 @@ describe('turn timers on a fake clock', () => {
 
   it('runs each check at its deadline, like the Convex scheduler', () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 'live');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
     wait(3 * LIVE);
     expect(server.runDueTimeouts()).toBe(3);
     const view = server.getGame(gameId);
@@ -300,19 +300,19 @@ describe('turn timers on a fake clock', () => {
 
   it('the match ends when a time out gives the last point; then no clock runs', () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 'live');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 1);
     wait(10 * LIVE);
     expect(server.runDueTimeouts()).toBe(1);
     const view = server.getGame(gameId);
     expect(view?.status).toBe('finished');
     expect(view?.turnDeadline).toBeNull();
-    wait(10 * TURN_TIME_MS.async);
+    wait(10 * ASYNC_TURN_TIME_MS);
     expect(server.runDueTimeouts()).toBe(0);
   });
 
   it('a late sendTurn gets TIMED_OUT, and the time out is saved', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 'live');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
     const before = server.getGame(gameId) as OnlineGameView;
     const late = before.waitingFor as PlayerId;
     const watcher = watch(server.transportFor(PLAYERS[late]), gameId);
@@ -337,9 +337,9 @@ describe('turn timers on a fake clock', () => {
 
   it('a move just in time is fine, and gives the next player a full turn', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 'async');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, null);
     const before = server.getGame(gameId) as OnlineGameView;
-    wait(TURN_TIME_MS.async - 1);
+    wait(ASYNC_TURN_TIME_MS - 1);
     await server.transportFor(PLAYERS[before.waitingFor as PlayerId]).sendTurn({
       gameId,
       expectedVersion: before.version,
@@ -348,13 +348,13 @@ describe('turn timers on a fake clock', () => {
     const after = server.getGame(gameId);
     expect(after?.version).toBe(before.version + 1);
     expect(after?.match.games).toHaveLength(0);
-    expect(after?.turnDeadline).toBe(START + 2 * TURN_TIME_MS.async - 1);
+    expect(after?.turnDeadline).toBe(START + 2 * ASYNC_TURN_TIME_MS - 1);
     expect(server.runDueTimeouts()).toBe(0);
   });
 
   it('resign ignores the clock and stops it', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 'live');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
     wait(5 * LIVE);
     await server.transportFor(BOB).resign(gameId);
     const view = server.getGame(gameId);
@@ -368,7 +368,7 @@ describe('turn timers on a fake clock', () => {
 describe('calls act like a network', () => {
   it('a call changes nothing before the caller code runs on', async () => {
     const { server } = setup();
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 5, 'live');
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 5, 1);
     const sent = server.transportFor(ALICE).resign(gameId);
     expect(server.getGame(gameId)?.status).toBe('active');
     await sent;
@@ -381,7 +381,7 @@ describe('listMyGames', () => {
     const { server, wait } = setup();
     const ids: string[] = [];
     for (let i = 0; i < MAX_LISTED_GAMES + 2; i++) {
-      ids.push(server.createGame(ALICE, PLAYERS, 'portes', 1, 'live'));
+      ids.push(server.createGame(ALICE, PLAYERS, 'portes', 1, 1));
       wait(1);
     }
     const listed = await server.transportFor(ALICE).listMyGames({ status: 'active' });
@@ -390,7 +390,7 @@ describe('listMyGames', () => {
 
   it('gives a copy: changing it changes nothing on the server', async () => {
     const { server } = setup();
-    const gameId = server.createGame(ALICE, PLAYERS, 'plakoto', 3, 'async');
+    const gameId = server.createGame(ALICE, PLAYERS, 'plakoto', 3, null);
     const transport = server.transportFor(BOB);
     const listed = await transport.listMyGames({ status: 'active' });
     expect(listed).toEqual([
@@ -403,9 +403,9 @@ describe('listMyGames', () => {
 
   it('a time out is a change: the game moves to the top', async () => {
     const { server, wait } = setup();
-    const first = server.createGame(ALICE, PLAYERS, 'portes', 3, 'live');
+    const first = server.createGame(ALICE, PLAYERS, 'portes', 3, 1);
     wait(1000);
-    const second = server.createGame(ALICE, PLAYERS, 'portes', 3, 'live');
+    const second = server.createGame(ALICE, PLAYERS, 'portes', 3, 1);
     wait(LIVE - 500);
     // Only the first game's deadline has passed.
     expect(server.runDueTimeouts()).toBe(1);

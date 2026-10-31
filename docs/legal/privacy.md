@@ -97,7 +97,7 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Tutorial skipped | You tapped Skip in the tutorial. Includes the game, and the lesson's number and name on screen |
 | Hint shown | You tapped Hint in a game. Includes the game only, never the position, the dice or the moves |
 | Review opened | You opened the review of a game. Includes the game only, never the position, the dice, the moves or the mistakes |
-| Invite made | You made an invite to play a friend online. Includes the game, the points to win and the pace (live or async) only, never the invite code or any id |
+| Invite made | You made an invite to play a friend online. Includes the game, the points to win and the time limit only, never the invite code or any id |
 | Turn notifications answered | You answered your phone's question about turn notifications. Includes the answer only (allowed or not allowed), never the push token or any id |
 | Screen viewed | You opened a screen. Includes the screen's name (for example "settings"), never personal data |
 
@@ -121,7 +121,7 @@ The switch does not cover online games with a friend and their turn notification
 Only if you play a friend online. When you tap **Make an invite**, or **Show the invite** on an invite link, the app makes a **guest account** on our game server, once. The server runs on Convex, in the EU region `eu-west-1` (Ireland). Sign-in goes through Better Auth, on the same server.
 
 - The guest account has a **random user id**, made by the server. It has no name and no email. (The sign-in software fills in a made-up placeholder for both.)
-- The server keeps your **invites** (the invite code, the game, the points to win, the pace, if a friend accepted or declined, and when it expires) and your **online games** (the two players' user ids, the rules, every move and roll, the score, and the turn times) under that user id. Your friend's app sees the invite and the game you play together.
+- The server keeps your **invites** (the invite code, the game, the points to win, the time limit, if a friend accepted or declined, and when it expires) and your **online games** (the two players' user ids, the rules, every move and roll, the score, and the turn times) under that user id. Your friend's app sees the invite and the game you play together.
 - The server keeps your **sign-in session**: a random session token, when it expires, and, as the sign-in software records it, the IP address and the app's user agent (the app name and the phone system) when the session was made.
 - The app keeps the **sign-in cookie** in your phone's secure store (the iOS Keychain or the Android Keystore). The next invite uses it, so the app makes the guest account only once.
 - The invite code and the link go where **you** share them (for example a chat app). Anyone with the code can see the invite and accept it until it expires.
@@ -131,7 +131,7 @@ Before you make or open an invite, the app does not talk to the game server. Whe
 
 ### Turn notifications (Expo)
 
-Only if you turn them on. After you make or accept an invite for an **async** game (a day per turn), the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch, and never for a live game. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Notifications**, and off in your phone's settings.
+Only if you turn them on. After you make or accept an invite for an online game, the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Notifications**, and off in your phone's settings.
 
 If you allow them:
 

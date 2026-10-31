@@ -58,9 +58,9 @@ export function createConvexInvites(options: ConvexInvitesOptions): Invites {
   const { client } = options;
 
   return {
-    async createInvite({ choice, targetPoints, pace }) {
+    async createInvite({ choice, targetPoints, turnTimeMinutes }) {
       // Only the fields the server takes: it checks its arguments strictly.
-      const args = { choice, targetPoints, pace };
+      const args = { choice, targetPoints, turnTimeMinutes };
       return await run(() => client.mutation(INVITE_FUNCTIONS.createInvite, args));
     },
 

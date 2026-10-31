@@ -23,7 +23,7 @@ async function flush(): Promise<void> {
 
 function setup() {
   const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => Date.now() });
-  const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 'live');
+  const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 1);
   return { server, gameId, transport: server.transportFor('me') };
 }
 

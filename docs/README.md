@@ -77,5 +77,6 @@
 | [0004](decisions/0004-backend-auth.md) | Convex backend, Better Auth, Expo Push | Accepted |
 | [0005](decisions/0005-rendering.md) | 2D Skia board, themes as data, Blender art later | Accepted |
 | [0006](decisions/0006-bot.md) | Own TypeScript bot, TD self-play for hard level | Accepted |
+| [0007](decisions/0007-online-game-turn-timer.md) | `turnTimeMinutes` replaces the live/async pace | Accepted |
 
 New ADRs: copy [0000-template.md](decisions/0000-template.md).

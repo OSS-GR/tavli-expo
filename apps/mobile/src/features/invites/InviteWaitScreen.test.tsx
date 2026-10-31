@@ -31,7 +31,7 @@ afterAll(async () => {
 function setup() {
   let clock = START;
   const server = createMemoryGameServer({ rng: createSeededRng(3), now: () => clock });
-  const code = server.createInvite(ME, 'portes', 3, 'live');
+  const code = server.createInvite(ME, 'portes', 3, 1);
   return {
     server,
     code,
@@ -323,7 +323,7 @@ describe('InviteWaitScreen', () => {
 
   it('shows "not found" for someone else\'s invite, with no Share or Cancel', async () => {
     const { server } = setup();
-    const theirs = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const theirs = server.createInvite(FRIEND, 'portes', 3, 1);
     await openWait(theirs, server.invitesFor(ME));
     expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Cancel the invite' })).toBeNull();
@@ -422,7 +422,7 @@ describe('waitState', () => {
     from: ME,
     choice: 'portes',
     targetPoints: 3,
-    pace: 'live',
+    turnTimeMinutes: 1,
     status: 'open',
     expiresAt: START + INVITE_TIME_MS,
     gameId: null,

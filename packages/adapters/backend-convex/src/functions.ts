@@ -84,7 +84,7 @@ export const GAME_FUNCTIONS: GameFunctions = {
 export type NewInviteArgs = {
   choice: NewInvite['choice'];
   targetPoints: number;
-  pace: NewInvite['pace'];
+  turnTimeMinutes: NewInvite['turnTimeMinutes'];
 };
 
 /** The functions in `apps/server/convex/invites.ts` (#281). */

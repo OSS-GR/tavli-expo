@@ -2,7 +2,6 @@
 // events of the same steps in a local game. The in-memory server runs the
 // real model; it runs no timers, and its clock moves only by hand.
 import {
-  TURN_TIME_MS,
   createRecordingFeedback,
   createRecordingSoundPlayer,
   type GameTransport,
@@ -48,7 +47,7 @@ async function flush(): Promise<void> {
 async function setup(seed: number, targetPoints = 7) {
   let clock = START;
   const server = createMemoryGameServer({ rng: createSeededRng(seed), now: () => clock });
-  const gameId = server.createGame(ALICE, PLAYERS, 'portes', targetPoints, 'live');
+  const gameId = server.createGame(ALICE, PLAYERS, 'portes', targetPoints, 1);
   const view = (): OnlineGameView => server.getGame(gameId)!;
   /** Plays a full turn of the side the server waits for, with no phone. */
   const playTurn = async (moves?: readonly MoveInput[]) => {
@@ -212,7 +211,7 @@ describe('online feedback (#271)', () => {
     const { updates, stop } = record(board, 'white');
 
     // Black's time runs out: White wins the game, and the next one starts.
-    game.wait(TURN_TIME_MS.live);
+    game.wait(60_000);
     expect(game.server.runDueTimeouts()).toBe(1);
     await flush();
     const won = game.view();
@@ -228,7 +227,7 @@ describe('online feedback (#271)', () => {
     updates.length = 0;
     const next = alice.getState().flow!;
     const loser = won.waitingFor!;
-    game.wait(TURN_TIME_MS.live);
+    game.wait(60_000);
     expect(game.server.runDueTimeouts()).toBe(1);
     await flush();
     stop();
@@ -246,7 +245,7 @@ describe('online feedback (#271)', () => {
 
     // Black's time runs out. The view holds game 2 and its first roll, but
     // the board holds the end of game 1: only the win plays.
-    game.wait(TURN_TIME_MS.live);
+    game.wait(60_000);
     expect(game.server.runDueTimeouts()).toBe(1);
     await flush();
     const next = game.view();
@@ -280,7 +279,7 @@ describe('online feedback (#271)', () => {
     const before = alice.getState().flow!;
     const { updates, stop } = record(board, 'white');
 
-    game.wait(TURN_TIME_MS.live);
+    game.wait(60_000);
     expect(game.server.runDueTimeouts()).toBe(1);
     await flush();
     stop();

@@ -102,10 +102,10 @@ describe('the adapter on the real functions', () => {
     const network = inviteNetwork(await setup());
     const code = await network
       .invitesFor(ALICE)
-      .createInvite({ choice: 'portes', targetPoints: 1, pace: 'live' });
+      .createInvite({ choice: 'portes', targetPoints: 1, turnTimeMinutes: 1 });
     const anonymous = network.invitesFor(null);
     const calls: Promise<unknown>[] = [
-      anonymous.createInvite({ choice: 'portes', targetPoints: 1, pace: 'live' }),
+      anonymous.createInvite({ choice: 'portes', targetPoints: 1, turnTimeMinutes: 1 }),
       anonymous.getInvite(code),
       anonymous.acceptInvite(code),
       anonymous.declineInvite(code),
@@ -131,7 +131,7 @@ describe('the adapter on the real functions', () => {
 
   it('a game that is not a game fails argument validation: a plain error, not port data', async () => {
     const network = inviteNetwork(await setup());
-    const bad = { choice: 'backgammon', targetPoints: 1, pace: 'live' } as never;
+    const bad = { choice: 'backgammon', targetPoints: 1, turnTimeMinutes: 1 } as never;
     const reason = await reasonOf(network.invitesFor(ALICE).createInvite(bad));
     expect(reason).toBeInstanceOf(Error);
     expect(isInviteErrorData(reason)).toBe(false);
@@ -140,7 +140,11 @@ describe('the adapter on the real functions', () => {
   it('the inviter watches the invite: the accept brings the game id, then the game opens', async () => {
     const network = inviteNetwork(await setup());
     const alice = network.invitesFor(ALICE);
-    const code = await alice.createInvite({ choice: 'plakoto', targetPoints: 3, pace: 'async' });
+    const code = await alice.createInvite({
+      choice: 'plakoto',
+      targetPoints: 3,
+      turnTimeMinutes: null,
+    });
     const views: (InviteView | null)[] = [];
     const stop = alice.watchInvite(code, (view) => views.push(view));
     await network.settle();
@@ -156,7 +160,7 @@ describe('the adapter on the real functions', () => {
   it('one invite over the cap gives TOO_MANY_INVITES, as plain data (#275)', async () => {
     const network = inviteNetwork(await setup());
     const alice = network.invitesFor(ALICE);
-    const game = { choice: 'portes', targetPoints: 1, pace: 'live' } as const;
+    const game = { choice: 'portes', targetPoints: 1, turnTimeMinutes: 1 } as const;
     for (let i = 0; i < MAX_OPEN_INVITES; i += 1) await alice.createInvite(game);
     const reason = await reasonOf(alice.createInvite(game));
     expect(reason).toEqual({ code: 'TOO_MANY_INVITES', message: expect.any(String) });
@@ -167,7 +171,7 @@ describe('the adapter on the real functions', () => {
   it('the scheduled expiry reaches a watcher', async () => {
     const network = inviteNetwork(await setup());
     const alice = network.invitesFor(ALICE);
-    const code = await alice.createInvite({ choice: 'fevga', targetPoints: 1, pace: 'live' });
+    const code = await alice.createInvite({ choice: 'fevga', targetPoints: 1, turnTimeMinutes: 1 });
     const views: (string | undefined)[] = [];
     const stop = alice.watchInvite(code, (view) => views.push(view?.status));
     await network.settle();

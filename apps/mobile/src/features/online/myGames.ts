@@ -59,7 +59,7 @@ export function clockOffset(games: readonly GameSummary[], localNow: number): nu
 export function listTickMs(games: readonly GameSummary[]): number | null {
   const ticks = games
     .filter((game) => game.turnDeadline !== null)
-    .map((game) => clockTickMs(game.pace));
+    .map((game) => clockTickMs(game.turnTimeMinutes));
   return ticks.length === 0 ? null : Math.min(...ticks);
 }
 
@@ -88,7 +88,9 @@ export function gameRowText(
   const { text: score, spoken: scoreSpoken } = gameScore(game, t);
   const left = timeLeft(game, localNow, offset);
   const time =
-    left === null ? null : t('home.online.timeLeft', { time: clockText(left, game.pace, t) });
+    left === null
+      ? null
+      : t('home.online.timeLeft', { time: clockText(left, game.turnTimeMinutes, t) });
   const spoken = [title, turn, scoreSpoken, time];
   return { title, turn, score, time, label: spoken.filter((part) => part !== null).join(', ') };
 }

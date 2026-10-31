@@ -1,6 +1,6 @@
 # Dice throw spike: throw the dice onto the board with a swipe
 
-> Issue #183. A design spike: a prototype on the dev board screen, not in real games. Last review: 2026-10-27.
+> Issue #183. A design spike: a prototype on the dev board screen, then the first steps in real games. Last review: 2026-10-30.
 
 ## The idea
 
@@ -56,11 +56,25 @@ The throw was "too fast, almost aggressive", and the dice could only roll in one
 
 ### Owner feedback (2026-10-28)
 
-The first version threw the dice from where the finger let go, and only a swipe that started on the board counted. A short swipe near the far wall made a short, awkward throw. Now a swipe may start anywhere in the throw view, and it sets only the direction and the speed. The game board needs the same in the real build: a swipe area bigger than the board.
+The first version threw the dice from where the finger let go, and only a swipe that started on the board counted. A short swipe near the far wall made a short, awkward throw. Now a swipe may start anywhere in the throw view, and where the finger went down decides where the dice come in: from the wall of the field closest to the touch, straight into the field, at the point along that wall under the touch (a touch at the bottom throws from the bottom, even far off to the side). The swipe sets only the speed. A tap on the board throws from the player's wall, at the point along it under the tap. The game board needs the same in the real build: a swipe area bigger than the board.
 
 Reduce Motion: the dice show at rest at once (`restPlan`), with no flight and no knocks.
 
-Tests: `throwPath.test.ts` (the math and the planner: the dice stay inside the field, land on the value at the resting tilt, bounce on a hard throw, stay apart at rest), `throwField.test.ts` (the field on the tall, mirrored and classic layouts) and `DiceThrowBoard.test.tsx` (swipe, tap, Roll button, a cancelled touch, the classic board, the RNG values in order).
+Tests: `throwPath.test.ts` (the math and the planner: the dice stay inside the field, land on the value at the resting tilt, bounce on a hard throw, stay apart at rest, glide into the row slots), `throwField.test.ts` (the field on the tall, mirrored and classic layouts) and `DiceThrowBoard.test.tsx` (swipe, tap, Roll button, a cancelled touch, the classic board, the RNG values in order). In the app, `GameScreen.test.tsx` checks that the throw plays from the Roll button and from a swipe outside the board, and that a swipe during the bot's turn rolls nothing.
+
+## In the game (built 2026-10-29/30)
+
+The dev screen's throw now plays in real games (`BoardThrow.tsx`, `features/dice-throw/`), exactly like on the dev board:
+
+- A roll in a game — by swipe, a tap on the board, or the Roll button — plays the throw over the board. The values come from the engine (the log's `roll` event); the animation never picks a value.
+- The swipe on the board works while it is your roll and nothing can move (`onBoardSwipe` in `InteractiveBoard`). Where the finger went down picks where the dice come in: from the wall of the field closest to the touch, straight into the field, at the point along that wall under the touch (`swipeToThrow`); the swipe sets only the speed. A tap on the board throws from the roller's wall, at the point along it under the tap (`tapThrow`). In a game that flips to the roller the roller is the viewer (the bottom wall); in pass-and-play and the bot the board stays put, so the roller may be the opponent on the top wall — the dice come from there, the angle the roller looks at the board from.
+- The swipe may also start outside the board, on the strips and the space around it (`game-swipe-area` in `GameScreen`, `SWIPE_AREA` in `board/interaction.ts`): a second pan over the whole board region that needs three times the movement of the board's own pan. On the board that one always activates first and wins the race, so checkers still drag. The area stays off in landscape (the move list scrolls there) and while a card covers the board. It shifts its touch into the board's points by the board frame's origin (the frame sits between the strips in the classic layout), so the touch picks the same side it would on the board.
+- At rest the thrown dice glide into their dice-row slots and take the row's size and tilt (`settlePlan` in `throwPath.ts`, `settleTargets` in `board/boardDice.ts`), so the row takes over without a jump. In landscape the dice row sits outside the board canvas, so there the row still appears without the glide.
+- The bot's roll throws from the near wall (`buttonThrow`).
+- While the throw plays, the dice row waits hidden (`diceHidden`); when it ends, the row shows the rolled dice without a second tumble (`rest` on `DiceRow`, until the next roll re-keys it). A thrown double keeps its two-then-split reveal.
+- The opening roll shows its dice on the card, at rest: the card covers the board, so nothing throws under it. Vs the bot one swipe or tap rolls both opening dice (`openingTaps="one"`): the swipe that starts your roll also rolls the bot's — by design. In the later turns of a bot game a swipe rolls nothing (`canRoll` refuses; a test in `GameScreen.test.tsx` keeps it that way).
+- Online rolls do not throw yet (the server's dice; see the cost table below). Reduce Motion never arms a throw: the dice appear as before.
+- The roll sound comes from the store event (`gameFeedback`); the throw plays only the knocks.
 
 ## Numbers
 
@@ -79,9 +93,9 @@ About **6 to 9 days** (size L), in this order:
 | Step                                                                                                                                                                                    | Days  |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | Draw the thrown dice on their own canvas over the board, like `DiceRow` does now. Then the board picture does not redraw on every frame of the throw.                                  | 1     |
-| Hand over at rest: the dice glide into the dice area (`boardDiceBox`), then `DiceRow` takes over (used dice, the 2 × 2 grid for a double). Today the dice can stop on top of checkers. | 1–1.5 |
-| The swipe on the game board when it is your roll. The board pan moves checkers; before the roll there is nothing to move, so a swipe can throw. Keep tap-to-roll and the Roll button. | 1     |
-| The other player's throw (bot, pass-and-play, online): a fixed throw from the far wall (`buttonThrow`).                                                                                | 0.5   |
+| ~~Hand over at rest: the dice glide into the dice area (`boardDiceBox`), then `DiceRow` takes over (used dice, the 2 × 2 grid for a double).~~ Done in portrait (2026-10-30, `settlePlan` glides each die into its row slot). In landscape the dice row sits outside the board canvas, so the dice still appear there without the glide. | — |
+| ~~The swipe on the game board when it is your roll. The board pan moves checkers; before the roll there is nothing to move, so a swipe can throw. Keep tap-to-roll and the Roll button.~~ Done (2026-10-30, with the throw itself, see "In the game"). | — |
+| The other player's throw (bot, pass-and-play, online): a fixed throw from the far wall (`buttonThrow`). The bot throws from the near wall since 2026-10-30; the far wall and online remain. | 0.5 |
 | Online games: the dice come from the server state (see below).                                                                                                                          | 0.5–1 |
 | A wooden rattle sound per theme, louder for a harder hit (the feedback port has no volume yet).                                                                                         | 0.5–1 |
 | Look: a squash at each face change so the roll reads as 3D, not as a flicker. Tune on phones.                                                                                           | 1     |

@@ -4,10 +4,10 @@
  *
  * 1. The RNG rolls the dice first (`rollDice`).
  * 2. `planThrow` works out a path that ends on those values: the dice come
- *    in from the wall behind the throw, fly the way the finger went, as fast
- *    as it went (clamped), bounce off the walls of the field and stop.
- *    Where the finger was does not matter (`swipeToThrow`), so a swipe may
- *    start anywhere in this view, also under the board.
+ *    in from the side of the board the finger went down on, flying toward
+ *    the middle of the field, as fast as the finger went (clamped), bounce
+ *    off the walls of the field and stop. The touch may lie anywhere in
+ *    this view, also under the board (`swipeToThrow`).
  * 3. Reanimated plays the plan back on the UI thread; a knock (sound and
  *    haptic, `features/feedback`) plays on each hit.
  *
@@ -58,6 +58,7 @@ import {
   planThrow,
   restPlan,
   swipeToThrow,
+  tapThrow,
   type Box,
   type ThrowBar,
   type ThrowPlan,
@@ -160,10 +161,13 @@ export function DiceThrowBoard({
     });
   };
 
-  // Only the swipe's direction and speed count, not where it was.
-  const onSwipe = (dx: number, dy: number, vx?: number, vy?: number) => {
+  // The touch picks the side the dice come in from: the pan covers the
+  // whole view and the board fills it from the top left, so the view's
+  // points are the board field's points.
+  const onSwipe = (x: number, y: number, dx: number, dy: number, vx?: number, vy?: number) => {
     throwFrom((box, dieSize, bar) =>
       swipeToThrow(
+        { x, y },
         { x: dx, y: dy },
         vx === undefined || vy === undefined ? undefined : { x: vx, y: vy },
         box,
@@ -172,6 +176,10 @@ export function DiceThrowBoard({
       ),
     );
   };
+  // A tap on the board throws too, like tap-to-roll on the game board: from
+  // the player's wall, at the point along it under the tap.
+  const onTap = (x: number, y: number) =>
+    throwFrom((box, dieSize) => tapThrow({ x, y }, box, dieSize));
   const onButton = () => throwFrom((box) => buttonThrow(box, turns.current));
 
   // Play the plan: the clock runs from 0 to the end of the throw.
@@ -216,7 +224,15 @@ export function DiceThrowBoard({
     onDeactivate: (e) => {
       'worklet';
       if (!e.canceled) {
-        scheduleOnRN(onSwipe, e.x - startX.get(), e.y - startY.get(), e.velocityX, e.velocityY);
+        scheduleOnRN(
+          onSwipe,
+          e.x,
+          e.y,
+          e.x - startX.get(),
+          e.y - startY.get(),
+          e.velocityX,
+          e.velocityY,
+        );
       }
     },
   });
@@ -228,7 +244,7 @@ export function DiceThrowBoard({
     testID: `${testID}-tap`,
     onDeactivate: (e) => {
       'worklet';
-      if (!e.canceled) scheduleOnRN(onButton);
+      if (!e.canceled) scheduleOnRN(onTap, e.x, e.y);
     },
   });
 

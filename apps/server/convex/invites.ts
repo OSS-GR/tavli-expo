@@ -50,7 +50,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import { existingPlayer, signedInPlayer } from './caller';
 import { insertGame } from './games';
 import { createCryptoRng } from './model/cryptoRng';
-import { gameChoice, gamePace } from './schema';
+import { gameChoice, gameTurnTimeMinutes } from './schema';
 
 /** Throws a `ConvexError` with `InviteErrorData`, so clients get the code. */
 function fail(code: InviteErrorCode, message: string): never {
@@ -113,11 +113,11 @@ export const createInvite = mutation({
   args: {
     choice: gameChoice,
     targetPoints: v.number(),
-    /** `live` (1 minute per turn) or `async` (24 hours per turn). */
-    pace: gamePace,
+    /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
+    turnTimeMinutes: gameTurnTimeMinutes,
   },
   returns: v.string(),
-  handler: async (ctx, { choice, targetPoints, pace }) => {
+  handler: async (ctx, { choice, targetPoints, turnTimeMinutes }) => {
     const callerId = await existingPlayer(ctx);
     const now = Date.now();
     // Reading at most the cap is enough to know if the caller is at it.
@@ -127,7 +127,7 @@ export const createInvite = mutation({
       createCryptoRng(),
       async (candidate) => (await findByCode(ctx, candidate)) !== null,
     );
-    const options = { from: callerId, choice, targetPoints, pace };
+    const options = { from: callerId, choice, targetPoints, turnTimeMinutes };
     const invite = guarded(() => newInvite(options, code, now));
     const inviteId = await ctx.db.insert('invites', { ...invite, gameId: null, answeredBy: null });
     await ctx.scheduler.runAt(invite.expiresAt, internal.invites.expireInvite, { inviteId });
@@ -168,7 +168,7 @@ export const acceptInvite = mutation({
       players: { white: invite.from, black: callerId },
       choice: invite.choice,
       targetPoints: invite.targetPoints,
-      pace: invite.pace,
+      turnTimeMinutes: invite.turnTimeMinutes,
     });
     await ctx.db.patch(invite._id, { status: 'accepted', gameId, answeredBy: callerId });
     return gameId;

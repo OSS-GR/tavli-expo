@@ -83,7 +83,7 @@ const VIEW: InviteView = {
   from: 'alice',
   choice: 'portes',
   targetPoints: 3,
-  pace: 'live',
+  turnTimeMinutes: 1,
   status: 'open',
   expiresAt: 1,
   gameId: null,
@@ -101,12 +101,12 @@ describe('calls', () => {
   it('createInvite sends only the game fields and resolves with the code', async () => {
     const fake = fakeClient();
     const invites = createConvexInvites({ client: fake.client });
-    const game = { choice: 'plakoto', targetPoints: 5, pace: 'async', extra: 1 } as const;
+    const game = { choice: 'plakoto', targetPoints: 5, turnTimeMinutes: null, extra: 1 } as const;
     const made = invites.createInvite(game);
     expect(fake.last()).toMatchObject({
       kind: 'mutation',
       name: 'invites:createInvite',
-      args: { choice: 'plakoto', targetPoints: 5, pace: 'async' },
+      args: { choice: 'plakoto', targetPoints: 5, turnTimeMinutes: null },
     });
     expect(fake.last().args).not.toHaveProperty('extra');
     fake.last().resolve('ABCD2345');
@@ -172,7 +172,7 @@ describe('calls', () => {
     expect(await reasonOf(signedOut)).toEqual({ code: 'NOT_SIGNED_IN', message: 'sign in' });
 
     const network = new Error('offline');
-    const offline = invites.createInvite({ choice: 'portes', targetPoints: 1, pace: 'live' });
+    const offline = invites.createInvite({ choice: 'portes', targetPoints: 1, turnTimeMinutes: 1 });
     fake.last().reject(network);
     expect(await reasonOf(offline)).toBe(network);
 

@@ -56,9 +56,9 @@ async function openInvite(code: string, invites: Invites, me = ME) {
 }
 
 describe('InviteScreen', () => {
-  it('loads, then shows the game, the match length and the pace', async () => {
+  it('loads, then shows the game, the match length and the time limit', async () => {
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'plakoto', 5, 'async');
+    const code = server.createInvite(FRIEND, 'plakoto', 5, null);
     const real = server.invitesFor(ME);
     // The answer waits until the test lets it through.
     let release = () => {};
@@ -77,24 +77,24 @@ describe('InviteScreen', () => {
     expect(screen.getByText('A friend invites you to an online match.')).toBeOnTheScreen();
     expect(screen.getByText('Plakoto')).toBeOnTheScreen();
     expect(screen.getByText('First to 5 points')).toBeOnTheScreen();
-    expect(screen.getByText('Async · 24 hours per turn')).toBeOnTheScreen();
+    expect(screen.getByText('24 h')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Accept' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeOnTheScreen();
   });
 
-  it('shows a live invite of one point', async () => {
+  it('shows a timed invite of one point', async () => {
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'tavli', 1, 'live');
+    const code = server.createInvite(FRIEND, 'tavli', 1, 1);
     await openInvite(code, server.invitesFor(ME));
     expect(await screen.findByText('Tavli')).toBeOnTheScreen();
     expect(screen.getByText('First to 1 point')).toBeOnTheScreen();
-    expect(screen.getByText('Live · 1 minute per turn')).toBeOnTheScreen();
+    expect(screen.getByText('1 min')).toBeOnTheScreen();
   });
 
   it('Accept starts the game, and the inviter plays White', async () => {
     const user = setupUser();
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     const props = await openInvite(code, server.invitesFor(ME));
     await user.press(await screen.findByRole('button', { name: 'Accept' }));
 
@@ -102,7 +102,7 @@ describe('InviteScreen', () => {
     const gameId = props.onAccepted.mock.calls[0]?.[0] as string;
     expect(server.getGame(gameId)).toMatchObject({
       choice: 'portes',
-      pace: 'live',
+      turnTimeMinutes: 1,
       players: { white: FRIEND, black: ME },
     });
     expect(server.getInvite(code)).toMatchObject({ status: 'accepted', gameId });
@@ -112,7 +112,7 @@ describe('InviteScreen', () => {
   it('Decline closes the invite', async () => {
     const user = setupUser();
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'fevga', 3, 'live');
+    const code = server.createInvite(FRIEND, 'fevga', 3, 1);
     const props = await openInvite(code, server.invitesFor(ME));
     await user.press(await screen.findByRole('button', { name: 'Decline' }));
 
@@ -124,7 +124,7 @@ describe('InviteScreen', () => {
   it('shows an expired invite, with a Home button', async () => {
     const user = setupUser();
     const { server, wait } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     wait(INVITE_TIME_MS);
     const props = await openInvite(code, server.invitesFor(ME));
     expect(
@@ -137,7 +137,7 @@ describe('InviteScreen', () => {
 
   it('shows an invite that was already used', async () => {
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     await server.invitesFor('carol').acceptInvite(code);
     await openInvite(code, server.invitesFor(ME));
     expect(
@@ -147,7 +147,7 @@ describe('InviteScreen', () => {
 
   it('shows "not found" for an unknown code', async () => {
     const { server } = setup();
-    server.createInvite(FRIEND, 'portes', 3, 'live');
+    server.createInvite(FRIEND, 'portes', 3, 1);
     await openInvite('ABCD2345', server.invitesFor(ME));
     expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
   });
@@ -170,7 +170,7 @@ describe('InviteScreen', () => {
 
   it('shows your own invite, with no Accept', async () => {
     const { server } = setup();
-    const code = server.createInvite(ME, 'portes', 3, 'live');
+    const code = server.createInvite(ME, 'portes', 3, 1);
     await openInvite(code, server.invitesFor(ME));
     expect(
       await screen.findByRole('header', { name: 'This is your own invite' }),
@@ -181,7 +181,7 @@ describe('InviteScreen', () => {
   it('shows the new state when the invite expires before Accept', async () => {
     const user = setupUser();
     const { server, wait } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     const props = await openInvite(code, server.invitesFor(ME));
     const accept = await screen.findByRole('button', { name: 'Accept' });
     wait(INVITE_TIME_MS);
@@ -195,7 +195,7 @@ describe('InviteScreen', () => {
   it('shows "did not load" with Try again when the call fails', async () => {
     const user = setupUser();
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     const real = server.invitesFor(ME);
     let fail = true;
     const invites: Invites = {
@@ -214,7 +214,7 @@ describe('InviteScreen', () => {
   it('keeps the invite open and says so when Accept fails for another reason', async () => {
     const user = setupUser();
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     const real = server.invitesFor(ME);
     const invites: Invites = {
       ...real,
@@ -239,7 +239,7 @@ describe('InviteScreen', () => {
   it('keeps the invite open with a retry when the game does not start (BAD_REQUEST)', async () => {
     const user = setupUser();
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     // The server actor cannot be a player: the game check rejects with
     // BAD_REQUEST, as when the server cannot start the game.
     const props = await openInvite(code, server.invitesFor(SERVER_ACTOR), SERVER_ACTOR);
@@ -255,7 +255,7 @@ describe('InviteScreen', () => {
 
   it('shows "did not load" with Try again for a BAD_REQUEST on load', async () => {
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     const invites: Invites = {
       ...server.invitesFor(ME),
       getInvite: () => Promise.reject({ code: 'BAD_REQUEST', message: 'refused' }),
@@ -272,7 +272,7 @@ describe('InviteScreen', () => {
     async (button) => {
       const user = setupUser();
       const { server } = setup();
-      const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+      const code = server.createInvite(FRIEND, 'portes', 3, 1);
       const real = server.invitesFor(ME);
       const invites: Invites = {
         ...real,
@@ -300,7 +300,7 @@ describe('InviteScreen', () => {
   it('does nothing when the answer comes after the screen closed', async () => {
     const user = setupUser();
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     const real = server.invitesFor(ME);
     let release = () => {};
     const gate = new Promise<void>((resolve) => {
@@ -323,13 +323,13 @@ describe('InviteScreen', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent');
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'live');
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
     await openInvite(code, server.invitesFor(ME));
     await screen.findByRole('header', { name: 'Game invite' });
     expect(focus).toHaveBeenLastCalledWith(expect.anything(), 'focus');
     expect(announce).toHaveBeenLastCalledWith(
       'Game invite A friend invites you to an online match. Game: Portes. ' +
-        'Match length: First to 3 points. Pace: Live · 1 minute per turn.',
+        'Match length: First to 3 points. Time limit: 1 min.',
     );
     focus.mockRestore();
     announce.mockRestore();
@@ -340,12 +340,12 @@ describe('InviteScreen', () => {
       await i18n.changeLanguage('el');
     });
     const { server } = setup();
-    const code = server.createInvite(FRIEND, 'portes', 3, 'async');
+    const code = server.createInvite(FRIEND, 'portes', 3, null);
     await openInvite(code, server.invitesFor(ME));
     expect(await screen.findByRole('header', { name: 'Πρόσκληση για παιχνίδι' })).toBeOnTheScreen();
     expect(screen.getByText('Πόρτες')).toBeOnTheScreen();
     expect(screen.getByText('Νικά όποιος φτάσει τους 3 βαθμούς')).toBeOnTheScreen();
-    expect(screen.getByText('Χαλαρά · 24 ώρες τη σειρά')).toBeOnTheScreen();
+    expect(screen.getByText('24 ώρες')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Αποδοχή' })).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');
@@ -359,7 +359,7 @@ describe('inviteState', () => {
     from: FRIEND,
     choice: 'portes',
     targetPoints: 3,
-    pace: 'live',
+    turnTimeMinutes: 1,
     status: 'open',
     expiresAt: START + INVITE_TIME_MS,
     gameId: null,

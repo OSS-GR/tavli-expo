@@ -6,13 +6,8 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
-import { MAX_LISTED_GAMES, TURN_TIME_MS } from '@tavli/contracts';
-import type {
-  GameTransportErrorCode,
-  OnlineGameChoice,
-  OnlineGamePace,
-  OnlineGameView,
-} from '@tavli/contracts';
+import { ASYNC_TURN_TIME_MS, MAX_LISTED_GAMES } from '@tavli/contracts';
+import type { GameTransportErrorCode, OnlineGameChoice, OnlineGameView } from '@tavli/contracts';
 import { createSeededRng, replay } from '@tavli/engine';
 import type { FlowEvent, PlayerId } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
@@ -56,14 +51,14 @@ async function createGame(
   t: Tester,
   choice: OnlineGameChoice = 'portes',
   targetPoints = 1,
-  pace: OnlineGamePace = 'live',
+  turnTimeMinutes: number | null = 1,
 ) {
   return await t.mutation(internal.games.createGame, {
     callerId: ALICE,
     players: PLAYERS,
     choice,
     targetPoints,
-    pace,
+    turnTimeMinutes,
   });
 }
 
@@ -129,7 +124,7 @@ describe('createGame', () => {
         players: PLAYERS,
         choice: 'portes',
         targetPoints: 1,
-        pace: 'live',
+        turnTimeMinutes: 1,
       }),
       'BAD_REQUEST',
     );
@@ -139,7 +134,7 @@ describe('createGame', () => {
         players: { white: ALICE, black: ALICE },
         choice: 'portes',
         targetPoints: 1,
-        pace: 'live',
+        turnTimeMinutes: 1,
       }),
       'BAD_REQUEST',
     );
@@ -153,7 +148,7 @@ describe('createGame', () => {
         players: { white: ALICE, black: 'server' },
         choice: 'portes',
         targetPoints: 1,
-        pace: 'live',
+        turnTimeMinutes: 1,
       }),
       'BAD_REQUEST',
     );
@@ -169,12 +164,12 @@ describe('createGame', () => {
       'choice',
       'eventCount',
       'flow',
-      'pace',
       'players',
       'rules',
       'status',
       'targetPoints',
       'turnDeadline',
+      'turnTimeMinutes',
       'updatedAt',
       'variant',
       'version',
@@ -392,7 +387,7 @@ describe('listMyGames (#296)', () => {
           players,
           choice: 'portes',
           targetPoints: 1,
-          pace: 'async',
+          turnTimeMinutes: null,
         }),
       );
       vi.advanceTimersByTime(1000);
@@ -545,8 +540,8 @@ describe('the Plakoto mother question', () => {
     const t = setup();
     const gameId = await pinTheMother(t);
     const v = await view(t, gameId);
-    expect(v.turnDeadline).toBe(START + TURN_TIME_MS.live);
-    vi.setSystemTime(START + TURN_TIME_MS.live);
+    expect(v.turnDeadline).toBe(START + 60_000);
+    vi.setSystemTime(START + 60_000);
     const result = await as(t, ALICE).mutation(api.games.answer, {
       gameId,
       expectedVersion: v.version,
@@ -561,8 +556,8 @@ describe('the Plakoto mother question', () => {
 });
 
 describe('turn timers (#133)', () => {
-  const LIVE = TURN_TIME_MS.live;
-  const ASYNC = TURN_TIME_MS.async;
+  const LIVE = 60_000;
+  const ASYNC = ASYNC_TURN_TIME_MS;
 
   /** Moves the clock and runs the checks that are due. */
   async function wait(t: Tester, ms: number) {
@@ -585,14 +580,14 @@ describe('turn timers (#133)', () => {
     });
   }
 
-  it('createGame sets the pace and the first deadline (live: 1 minute)', async () => {
+  it('createGame sets the turn time and the first deadline (1 minute)', async () => {
     const t = setup();
     const v = await view(t, await createGame(t));
-    expect(v.pace).toBe('live');
+    expect(v.turnTimeMinutes).toBe(1);
     expect(v.turnDeadline).toBe(START + LIVE);
   });
 
-  it('a live time out loses the game, and the next game starts with a new deadline', async () => {
+  it('a timed-out turn loses the game, and the next game starts with a new deadline', async () => {
     const t = setup();
     const gameId = await createGame(t, 'portes', 5);
     const before = await view(t, gameId);
@@ -686,11 +681,11 @@ describe('turn timers (#133)', () => {
     expect((await view(t, gameId)).version).toBe(v.version);
   });
 
-  it('async games have 24 hours per turn', async () => {
+  it('default games have 24 hours per turn', async () => {
     const t = setup();
-    const gameId = await createGame(t, 'portes', 5, 'async');
+    const gameId = await createGame(t, 'portes', 5, null);
     const before = await view(t, gameId);
-    expect(before.pace).toBe('async');
+    expect(before.turnTimeMinutes).toBeNull();
     expect(before.turnDeadline).toBe(START + ASYNC);
     await wait(t, ASYNC - 1);
     expect((await view(t, gameId)).version).toBe(before.version);

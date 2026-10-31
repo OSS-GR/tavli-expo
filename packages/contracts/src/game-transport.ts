@@ -35,26 +35,17 @@ export function isOnlineGameChoice(value: unknown): value is OnlineGameChoice {
   return typeof value === 'string' && (ONLINE_GAME_CHOICES as readonly string[]).includes(value);
 }
 
+/** The default turn time: 24 hours per turn, the async behaviour (#183). */
+export const ASYNC_TURN_TIME_MS = 24 * 60 * 60 * 1000;
+
 /**
- * How fast an online game is played (owner answers Q3 and Q15): `live`
- * (both players at the board) or `async` (slow, a turn now and then).
+ * The deadline for one turn, in milliseconds (owner answer Q15). `null`
+ * is the default and gives the 24-hour async behaviour; a number gives
+ * that many minutes. When it runs out, the player loses that game.
  */
-export const ONLINE_GAME_PACES = ['live', 'async'] as const;
-
-export type OnlineGamePace = (typeof ONLINE_GAME_PACES)[number];
-
-export function isOnlineGamePace(value: unknown): value is OnlineGamePace {
-  return typeof value === 'string' && (ONLINE_GAME_PACES as readonly string[]).includes(value);
+export function turnDeadlineMs(turnTimeMinutes: number | null): number {
+  return turnTimeMinutes === null ? ASYNC_TURN_TIME_MS : turnTimeMinutes * 60 * 1000;
 }
-
-/**
- * The time for one turn, in milliseconds (owner answer Q15): 1 minute
- * live, 24 hours async. When it runs out, the player loses that game.
- */
-export const TURN_TIME_MS: { readonly [P in OnlineGamePace]: number } = {
-  live: 60 * 1000,
-  async: 24 * 60 * 60 * 1000,
-};
 
 /** `active` while the match runs, `finished` once it has a winner. */
 export type OnlineGameStatus = 'active' | 'finished';
@@ -72,8 +63,11 @@ export interface OnlineGameView {
   readonly version: number;
   readonly status: OnlineGameStatus;
   readonly choice: OnlineGameChoice;
-  /** Live (1 minute per turn) or async (24 hours per turn). */
-  readonly pace: OnlineGamePace;
+  /**
+   * A per-turn time limit in minutes, or `null` for the 24-hour default
+   * (the async behaviour, #183).
+   */
+  readonly turnTimeMinutes: number | null;
   /**
    * When the turn of `waitingFor` runs out, in epoch milliseconds (server
    * clock). Then `waitingFor` loses the current game. `null` when finished.
@@ -125,7 +119,8 @@ export interface GameSummary {
   readonly variant: VariantId;
   /** The match length in points. */
   readonly targetPoints: number;
-  readonly pace: OnlineGamePace;
+  /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
+  readonly turnTimeMinutes: number | null;
   /** The caller's side. The other player has the other side. */
   readonly mySide: PlayerId;
   /** The side the server waits for, as in the view. `null` when finished. */

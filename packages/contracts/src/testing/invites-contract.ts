@@ -49,7 +49,7 @@ export interface InvitesContractCheck {
   readonly run: (subject: InvitesContractSubject) => Promise<void>;
 }
 
-const FEVGA: InvitesContractGame = { choice: 'fevga', targetPoints: 5, pace: 'async' };
+const FEVGA: InvitesContractGame = { choice: 'fevga', targetPoints: 5, turnTimeMinutes: null };
 
 function same(actual: unknown, expected: unknown, what: string): void {
   const a = JSON.stringify(actual);
@@ -157,7 +157,7 @@ export function invitesContract(): InvitesContractCheck[] {
         same(view.from, subject.inviterId, 'view.from');
         same(view.choice, FEVGA.choice, 'view.choice');
         same(view.targetPoints, FEVGA.targetPoints, 'view.targetPoints');
-        same(view.pace, FEVGA.pace, 'view.pace');
+        same(view.turnTimeMinutes, FEVGA.turnTimeMinutes, 'view.turnTimeMinutes');
         same(view.status, 'open', 'view.status');
         same(view.gameId, null, 'view.gameId');
         if (typeof view.expiresAt !== 'number') throw new Error('view.expiresAt is not a number');
@@ -272,7 +272,7 @@ export function invitesContract(): InvitesContractCheck[] {
         const first = await invites.createInvite({
           choice: 'tavli',
           targetPoints: 3,
-          pace: 'live',
+          turnTimeMinutes: 1,
         });
         const second = await invites.createInvite(FEVGA);
         checkCode(first);
@@ -281,8 +281,8 @@ export function invitesContract(): InvitesContractCheck[] {
         const view = await viewOf(subject.invitesFor('friend'), first);
         same(view.from, subject.inviterId, 'view.from');
         same(
-          [view.choice, view.targetPoints, view.pace, view.status],
-          ['tavli', 3, 'live', 'open'],
+          [view.choice, view.targetPoints, view.turnTimeMinutes, view.status],
+          ['tavli', 3, 1, 'open'],
           'the new invite',
         );
       },
@@ -344,7 +344,7 @@ export function invitesContract(): InvitesContractCheck[] {
         const second = await invites.createInvite({
           choice: 'portes',
           targetPoints: 1,
-          pace: 'live',
+          turnTimeMinutes: 1,
         });
         await subject.passTime(1000);
         const accepted = await invites.createInvite(FEVGA);
@@ -459,7 +459,7 @@ export function invitesContract(): InvitesContractCheck[] {
         const second = await createFrom(subject, {
           choice: 'portes',
           targetPoints: 1,
-          pace: 'live',
+          turnTimeMinutes: 1,
         });
         const third = await createFrom(subject);
         await subject.settle();

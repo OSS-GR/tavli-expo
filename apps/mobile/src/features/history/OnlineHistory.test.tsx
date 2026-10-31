@@ -52,7 +52,7 @@ function signIn(): void {
 /** A new game of mine (I am White), one second after the last change. */
 function newGame(choice: 'portes' | 'plakoto' = 'portes', points = 5): string {
   jest.advanceTimersByTime(1000);
-  return onlineFake.server().createGame(ME, { white: ME, black: FRIEND }, choice, points, 'async');
+  return onlineFake.server().createGame(ME, { white: ME, black: FRIEND }, choice, points, null);
 }
 
 /** A finished match: `loser` resigns it. */

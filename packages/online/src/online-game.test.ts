@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ONLINE_GAME_CHOICES } from '@tavli/contracts';
+import { ASYNC_TURN_TIME_MS, ONLINE_GAME_CHOICES } from '@tavli/contracts';
 import type { OnlineGameChoice } from '@tavli/contracts';
 import { createSeededRng, getPreset, matchPhase, replay } from '@tavli/engine';
 import type { FlowEvent, MatchFlow, Rng } from '@tavli/engine';
@@ -34,7 +34,7 @@ const PLAYERS = { white: 'alice', black: 'bob' };
 const VIEW = {
   gameId: 'g',
   version: 1,
-  pace: 'live',
+  turnTimeMinutes: 1,
   turnDeadline: 1000,
   players: PLAYERS,
   previousGame: null,
@@ -197,9 +197,9 @@ describe('resign', () => {
 });
 
 describe('turn timers (#133)', () => {
-  it('a turn lasts 1 minute live and 24 hours async; at the deadline the time is up', () => {
-    expect(deadlineAfter('live', 5000)).toBe(5000 + 60_000);
-    expect(deadlineAfter('async', 5000)).toBe(5000 + 24 * 60 * 60 * 1000);
+  it('a turn lasts 1 minute or 24 hours; at the deadline the time is up', () => {
+    expect(deadlineAfter(1, 5000)).toBe(5000 + 60_000);
+    expect(deadlineAfter(null, 5000)).toBe(5000 + ASYNC_TURN_TIME_MS);
     expect(isTimedOut(10_000, 9_999)).toBe(false);
     expect(isTimedOut(10_000, 10_000)).toBe(true);
     expect(isTimedOut(null, 10_000)).toBe(false);
