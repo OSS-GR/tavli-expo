@@ -60,7 +60,7 @@ function toInviteRecord(doc: Doc<'invites'>): InviteRecord {
     from: doc.from,
     choice: doc.choice,
     targetPoints: doc.targetPoints,
-    turnTimeMinutes: doc.turnTimeMinutes ?? null,
+    turnTimeMinutes: doc.turnTimeMinutes,
     status: doc.status,
     expiresAt: doc.expiresAt,
     gameId: doc.gameId,

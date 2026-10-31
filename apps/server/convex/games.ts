@@ -177,14 +177,7 @@ async function save(
 ): Promise<number> {
   const version = game.version + 1;
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
-  const turnDeadline = await startClock(
-    ctx,
-    game._id,
-    version,
-    game.turnTimeMinutes ?? null,
-    flow,
-    now,
-  );
+  const turnDeadline = await startClock(ctx, game._id, version, game.turnTimeMinutes, flow, now);
   await ctx.db.patch(game._id, {
     ...gameFields(flow, storeStep(before, flow)),
     version,
@@ -192,14 +185,7 @@ async function save(
     turnDeadline,
     updatedAt: now,
   });
-  await scheduleTurnPush(
-    ctx,
-    { ...game, turnTimeMinutes: game.turnTimeMinutes ?? null },
-    version,
-    turnWait(before.flow),
-    turnWait(flow),
-    callerId,
-  );
+  await scheduleTurnPush(ctx, game, version, turnWait(before.flow), turnWait(flow), callerId);
   return version;
 }
 
@@ -451,7 +437,7 @@ function gameInput(game: Doc<'games'>) {
     gameId: game._id,
     version: game.version,
     choice: game.choice,
-    turnTimeMinutes: game.turnTimeMinutes ?? null,
+    turnTimeMinutes: game.turnTimeMinutes,
     turnDeadline: game.turnDeadline,
     players: game.players,
   };
