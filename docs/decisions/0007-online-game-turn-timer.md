@@ -54,14 +54,18 @@ Consequences:
 
 ### Migration
 
-Convex validates a document against the schema on the next write; old rows still
-holding `pace` (a literal string) break `v.union(v.number(), v.null())` when read
-typed as `Doc<'games'>`. Since this is the dev deployment (online play is built
-for real but not yet shipped to prod), we rename the field **in place** to
-`turnTimeMinutes` and backfill from the literal: `live → 1`, `async` (and any
-missing/`null`) → `null`. A one-off migration script runs on deploy (or, for the
-in-memory server, `memory-server.ts` is constructed with the new field). If the
-deployment is treated as throwaway, the backfill can be skipped.
+Convex validates every existing row against the schema on a push, so old rows
+that still hold `pace` (a literal string) fail a required `turnTimeMinutes`
+field. Online play runs on the dev deployment only (not shipped to prod), and
+the owner agreed the data is throwaway, so `convex/migrations/
+0001_backfill_turn_time_minutes.ts` **wipes** the `games` and `invites` tables
+instead of backfilling. Run it with `npx convex run
+migrations/0001_backfill_turn_time_minutes` on the dev deployment.
+
+The schema keeps `turnTimeMinutes` `v.optional` until the wipe has run (a push
+with the field required would fail while old rows exist). Once the tables are
+empty, make the field required again in a follow-up and delete the five
+`?? null` read sites.
 
 ### UI (decisions taken)
 

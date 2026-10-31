@@ -11,6 +11,7 @@ import {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkTurnTimeMinutes,
   checkViewer,
   eventActor,
   matchStatus,
@@ -43,6 +44,20 @@ describe('checkNewGame', () => {
     expect(code(() => checkNewGame('alice', { white: 'alice', black: SERVER_ACTOR }))).toBe(
       'BAD_REQUEST',
     );
+  });
+});
+
+describe('checkTurnTimeMinutes', () => {
+  it('accepts null (the 24-hour default) and whole minutes of 1 or more', () => {
+    expect(() => checkTurnTimeMinutes(null)).not.toThrow();
+    expect(() => checkTurnTimeMinutes(1)).not.toThrow();
+    expect(() => checkTurnTimeMinutes(60)).not.toThrow();
+  });
+
+  it('rejects 0, negative and fractional minutes', () => {
+    expect(code(() => checkTurnTimeMinutes(0))).toBe('BAD_REQUEST');
+    expect(code(() => checkTurnTimeMinutes(-5))).toBe('BAD_REQUEST');
+    expect(code(() => checkTurnTimeMinutes(1.5))).toBe('BAD_REQUEST');
   });
 });
 

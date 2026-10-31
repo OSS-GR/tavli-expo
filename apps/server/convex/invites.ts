@@ -42,6 +42,7 @@ import {
   pickInviteCode,
   toInviteView,
 } from '@tavli/online';
+import type { InviteRecord } from '@tavli/online';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
@@ -51,6 +52,20 @@ import { existingPlayer, signedInPlayer } from './caller';
 import { insertGame } from './games';
 import { createCryptoRng } from './model/cryptoRng';
 import { gameChoice, gameTurnTimeMinutes } from './schema';
+
+/** Maps a Convex invite row to `InviteRecord`, defaulting `turnTimeMinutes` (#183). */
+function toInviteRecord(doc: Doc<'invites'>): InviteRecord {
+  return {
+    code: doc.code,
+    from: doc.from,
+    choice: doc.choice,
+    targetPoints: doc.targetPoints,
+    turnTimeMinutes: doc.turnTimeMinutes ?? null,
+    status: doc.status,
+    expiresAt: doc.expiresAt,
+    gameId: doc.gameId,
+  };
+}
 
 /** Throws a `ConvexError` with `InviteErrorData`, so clients get the code. */
 function fail(code: InviteErrorCode, message: string): never {
@@ -146,7 +161,7 @@ export const getInvite = query({
     const code = normalizeInviteCode(text);
     if (code === null) return null;
     const invite = await findByCode(ctx, code);
-    return invite === null ? null : toInviteView(invite, Date.now());
+    return invite === null ? null : toInviteView(toInviteRecord(invite), Date.now());
   },
 });
 
@@ -161,7 +176,8 @@ export const acceptInvite = mutation({
   returns: v.id('games'),
   handler: async (ctx, { code }) => {
     const callerId = await existingPlayer(ctx);
-    const invite = await load(ctx, code);
+    const doc = await load(ctx, code);
+    const invite = toInviteRecord(doc);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
     const gameId: Id<'games'> = await insertGame(ctx, {
       callerId,
@@ -170,7 +186,7 @@ export const acceptInvite = mutation({
       targetPoints: invite.targetPoints,
       turnTimeMinutes: invite.turnTimeMinutes,
     });
-    await ctx.db.patch(invite._id, { status: 'accepted', gameId, answeredBy: callerId });
+    await ctx.db.patch(doc._id, { status: 'accepted', gameId, answeredBy: callerId });
     return gameId;
   },
 });
@@ -181,9 +197,10 @@ export const declineInvite = mutation({
   returns: v.null(),
   handler: async (ctx, { code }) => {
     const callerId = await existingPlayer(ctx);
-    const invite = await load(ctx, code);
+    const doc = await load(ctx, code);
+    const invite = toInviteRecord(doc);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
-    await ctx.db.patch(invite._id, { status: 'declined', answeredBy: callerId });
+    await ctx.db.patch(doc._id, { status: 'declined', answeredBy: callerId });
     return null;
   },
 });
@@ -194,9 +211,10 @@ export const cancelInvite = mutation({
   returns: v.null(),
   handler: async (ctx, { code }) => {
     const callerId = await signedInPlayer(ctx);
-    const invite = await load(ctx, code);
+    const doc = await load(ctx, code);
+    const invite = toInviteRecord(doc);
     guarded(() => checkCancel(invite, callerId, Date.now()));
-    await ctx.db.patch(invite._id, { status: 'cancelled' });
+    await ctx.db.patch(doc._id, { status: 'cancelled' });
     return null;
   },
 });
@@ -207,7 +225,7 @@ export const listMyInvites = query({
   handler: async (ctx): Promise<InviteView[]> => {
     const callerId = await signedInPlayer(ctx);
     const now = Date.now();
-    const open = await openInvitesOf(ctx, callerId, now);
+    const open = (await openInvitesOf(ctx, callerId, now)).map(toInviteRecord);
     return open
       .filter((invite) => !isInviteExpired(invite, now))
       .map((invite) => toInviteView(invite, now));
@@ -223,8 +241,9 @@ export const expireInvite = internalMutation({
   args: { inviteId: v.id('invites') },
   returns: v.null(),
   handler: async (ctx, { inviteId }) => {
-    const invite = await ctx.db.get(inviteId);
-    if (invite === null || invite.status !== 'open') return null;
+    const doc = await ctx.db.get(inviteId);
+    if (doc === null || doc.status !== 'open') return null;
+    const invite = toInviteRecord(doc);
     if (!isInviteExpired(invite, Date.now())) {
       // Too early (the scheduler ran before the time): check again then.
       await ctx.scheduler.runAt(invite.expiresAt, internal.invites.expireInvite, { inviteId });

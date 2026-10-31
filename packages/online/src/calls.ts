@@ -10,6 +10,7 @@
  */
 
 import type { GameTransportErrorData, OnlineGameStatus } from '@tavli/contracts';
+import { isTurnTimeMinutes } from '@tavli/contracts';
 import type { FlowEvent, MatchFlow, PerPlayer, PlayerId } from '@tavli/engine';
 
 import { OnlineGameError, deadlineAfter, isTimedOut, sideOf } from './online-game';
@@ -42,6 +43,17 @@ export function checkNewGame(callerId: string, players: PerPlayer<string>): void
   // The move log marks server events with SERVER_ACTOR, so no player may use that id.
   if (players.white === SERVER_ACTOR || players.black === SERVER_ACTOR) {
     throw new OnlineGameError('BAD_REQUEST', `"${SERVER_ACTOR}" is not a valid player id`);
+  }
+}
+
+/**
+ * Checks the per-turn time limit of a new game (#183): `isTurnTimeMinutes`
+ * (contracts). Without this a `0` or negative limit would time out every
+ * turn at once.
+ */
+export function checkTurnTimeMinutes(turnTimeMinutes: number | null): void {
+  if (!isTurnTimeMinutes(turnTimeMinutes)) {
+    throw new OnlineGameError('BAD_REQUEST', 'turn time minutes must be an integer of 1 or more');
   }
 }
 

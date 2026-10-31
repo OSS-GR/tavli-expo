@@ -43,6 +43,7 @@ import {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkTurnTimeMinutes,
   checkViewer,
   createOnlineMatch,
   eventActor,
@@ -176,7 +177,14 @@ async function save(
 ): Promise<number> {
   const version = game.version + 1;
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
-  const turnDeadline = await startClock(ctx, game._id, version, game.turnTimeMinutes, flow, now);
+  const turnDeadline = await startClock(
+    ctx,
+    game._id,
+    version,
+    game.turnTimeMinutes ?? null,
+    flow,
+    now,
+  );
   await ctx.db.patch(game._id, {
     ...gameFields(flow, storeStep(before, flow)),
     version,
@@ -184,7 +192,14 @@ async function save(
     turnDeadline,
     updatedAt: now,
   });
-  await scheduleTurnPush(ctx, game, version, turnWait(before.flow), turnWait(flow), callerId);
+  await scheduleTurnPush(
+    ctx,
+    { ...game, turnTimeMinutes: game.turnTimeMinutes ?? null },
+    version,
+    turnWait(before.flow),
+    turnWait(flow),
+    callerId,
+  );
   return version;
 }
 
@@ -267,7 +282,10 @@ export interface NewGame {
 export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'games'>> {
   const { callerId, choice, targetPoints, turnTimeMinutes } = game;
   const players = { white: game.players.white, black: game.players.black };
-  guarded(() => checkNewGame(callerId, players));
+  guarded(() => {
+    checkNewGame(callerId, players);
+    checkTurnTimeMinutes(turnTimeMinutes);
+  });
   const flow = guarded(() =>
     createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
   );
@@ -433,7 +451,7 @@ function gameInput(game: Doc<'games'>) {
     gameId: game._id,
     version: game.version,
     choice: game.choice,
-    turnTimeMinutes: game.turnTimeMinutes,
+    turnTimeMinutes: game.turnTimeMinutes ?? null,
     turnDeadline: game.turnDeadline,
     players: game.players,
   };

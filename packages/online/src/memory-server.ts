@@ -46,6 +46,7 @@ import {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkTurnTimeMinutes,
   checkViewer,
   eventActor,
   matchStatus,
@@ -463,6 +464,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     turnTimeMinutes: number | null,
   ): string {
     checkNewGame(callerId, players);
+    checkTurnTimeMinutes(turnTimeMinutes);
     const flow = createOnlineMatch({ choice, targetPoints, players: copy(players) }, rng);
     const gameId = `game-${nextId}`;
     nextId += 1;

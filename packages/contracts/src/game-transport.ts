@@ -47,6 +47,18 @@ export function turnDeadlineMs(turnTimeMinutes: number | null): number {
   return turnTimeMinutes === null ? ASYNC_TURN_TIME_MS : turnTimeMinutes * 60 * 1000;
 }
 
+/**
+ * True when `turnTimeMinutes` is a valid per-turn limit: `null` (the
+ * 24-hour default) or a whole number of minutes, 1 or more (#183). The
+ * servers check this on create; a `0` or negative limit would time out
+ * every turn at once.
+ */
+export function isTurnTimeMinutes(turnTimeMinutes: number | null): boolean {
+  return (
+    turnTimeMinutes === null || (Number.isSafeInteger(turnTimeMinutes) && turnTimeMinutes >= 1)
+  );
+}
+
 /** `active` while the match runs, `finished` once it has a winner. */
 export type OnlineGameStatus = 'active' | 'finished';
 

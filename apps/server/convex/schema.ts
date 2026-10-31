@@ -33,8 +33,11 @@ export default defineSchema({
     players: v.object({ white: v.string(), black: v.string() }),
     /** The game the players picked (one game, or `tavli` for the rotation). */
     choice: gameChoice,
-    /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
-    turnTimeMinutes: gameTurnTimeMinutes,
+    /**
+     * A per-turn time limit in minutes, or `null` for the 24-hour default
+     * (#183). Optional while migrating old rows that still carry `pace` (#183).
+     */
+    turnTimeMinutes: v.optional(gameTurnTimeMinutes),
     /** Match length in points. */
     targetPoints: v.number(),
     /** The match `RuleSet`, JSON text (`serializeRules`). */
@@ -91,7 +94,7 @@ export default defineSchema({
     from: v.string(),
     choice: gameChoice,
     targetPoints: v.number(),
-    turnTimeMinutes: gameTurnTimeMinutes,
+    turnTimeMinutes: v.optional(gameTurnTimeMinutes),
     status: inviteStatus,
     /** When the invite expires, epoch ms (server clock). `expireInvite` runs at this time. */
     expiresAt: v.number(),

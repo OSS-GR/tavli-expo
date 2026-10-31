@@ -12,6 +12,7 @@
 
 import { INVITE_CODE_ALPHABET, INVITE_CODE_LENGTH, INVITE_TIME_MS } from '@tavli/contracts';
 import type { InviteErrorCode, InviteStatus, InviteView, OnlineGameChoice } from '@tavli/contracts';
+import { isTurnTimeMinutes } from '@tavli/contracts';
 import type { Rng } from '@tavli/engine';
 
 /**
@@ -135,6 +136,9 @@ export function newInvite(options: NewInviteOptions, code: string, now: number):
   if (!Number.isSafeInteger(targetPoints) || targetPoints < 1) {
     fail('BAD_REQUEST', 'target points must be an integer of 1 or more');
   }
+  if (!isTurnTimeMinutes(turnTimeMinutes)) {
+    fail('BAD_REQUEST', 'turn time minutes must be an integer of 1 or more');
+  }
   return {
     code,
     from,
@@ -148,15 +152,23 @@ export function newInvite(options: NewInviteOptions, code: string, now: number):
 }
 
 /** True when the invite is open but its time is up at `now`. At `expiresAt` itself it is up. */
-export function isInviteExpired(invite: InviteRecord, now: number): boolean {
+export function isInviteExpired(
+  invite: Pick<InviteRecord, 'status' | 'expiresAt'>,
+  now: number,
+): boolean {
   return invite.status === 'open' && now >= invite.expiresAt;
 }
 
 /**
  * The status a client sees: `expired` as soon as the time is up, also
- * before the scheduled `expireInvite` has marked the row.
+ * before the scheduled `expireInvite` has marked the row. Takes the
+ * fields it reads only, so a server may pass a Convex row without
+ * copying it.
  */
-export function inviteStatus(invite: InviteRecord, now: number): InviteStatus {
+export function inviteStatus(
+  invite: Pick<InviteRecord, 'status' | 'expiresAt'>,
+  now: number,
+): InviteStatus {
   return isInviteExpired(invite, now) ? 'expired' : invite.status;
 }
 
@@ -176,9 +188,12 @@ export const MAX_OPEN_INVITES = 10;
  * `open` and time not up. An invite counts as expired at `expiresAt`, also
  * before the server has marked it. The other invites in the list are
  * skipped, so a server may pass more than the player's open ones.
+ *
+ * Takes the fields the count reads only: a Convex row is one of these
+ * with `turnTimeMinutes` optional, so a server need not copy its rows.
  */
 export function countOpenInvites(
-  invites: Iterable<InviteRecord>,
+  invites: Iterable<Pick<InviteRecord, 'from' | 'status' | 'expiresAt'>>,
   from: string,
   now: number,
 ): number {

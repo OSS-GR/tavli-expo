@@ -42,6 +42,7 @@ export {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkTurnTimeMinutes,
   checkViewer,
   eventActor,
   matchStatus,

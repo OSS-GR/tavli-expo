@@ -50,7 +50,7 @@ Engine data is stored as **JSON text**. So Convex field rules never limit the en
 |---|---|---|
 | `players` | `{ white, black }` strings | Player ids: the Better Auth user id of each player ([Sign-in](#sign-in)) |
 | `choice` | `portes` · `plakoto` · `fevga` · `asodio` · `tavli` | What the players picked. `tavli` = the Portes → Plakoto → Fevga rotation. |
-| `turnTimeMinutes` | number · null | Turn time in minutes, or `null` for the 24-hour default ([Turn timers](#turn-timers)) |
+| `turnTimeMinutes` | number · null | Turn time in minutes, or `null` for the 24-hour default ([Turn timers](#turn-timers)). Optional in the schema until the one-off wipe migration (`convex/migrations/0001_backfill_turn_time_minutes.ts`) has emptied the table (#183); every read site defaults the missing field to `null`. |
 | `targetPoints` | number | Match length |
 | `rules` | JSON text | The match `RuleSet` (`serializeRules`) |
 | `variant` | string | The variant of the current game |
@@ -254,7 +254,7 @@ Owner answer Q10: friends find each other by invite link (and later by username)
 |---|---|---|
 | `code` | string | 8 characters from `INVITE_CODE_ALPHABET`, stored in capital letters. Unique. |
 | `from` | string | The player id of the inviter. The inviter plays white. |
-| `choice`, `targetPoints`, `turnTimeMinutes` | as in `games` | The game the inviter picked |
+| `choice`, `targetPoints`, `turnTimeMinutes` | as in `games` | The game the inviter picked (`turnTimeMinutes` optional there, see above) |
 | `status` | `open` · `accepted` · `declined` · `cancelled` · `expired` | |
 | `expiresAt` | number | Epoch ms (server clock): the time of `createInvite` + `INVITE_TIME_MS` (24 hours) |
 | `gameId` | id · `null` | The game, once `accepted` |

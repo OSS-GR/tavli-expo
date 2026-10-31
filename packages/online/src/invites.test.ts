@@ -165,6 +165,15 @@ describe('newInvite', () => {
     }
     rejects(() => newInvite({ ...OPTIONS, from: '' }, 'ABCD2345', NOW), 'BAD_REQUEST');
   });
+
+  it('rejects a turn time that is not null or a whole number of minutes from 1', () => {
+    expect(
+      newInvite({ ...OPTIONS, turnTimeMinutes: null }, 'ABCD2345', NOW).turnTimeMinutes,
+    ).toBeNull();
+    for (const turnTimeMinutes of [0, -1, 1.5, Number.NaN]) {
+      rejects(() => newInvite({ ...OPTIONS, turnTimeMinutes }, 'ABCD2345', NOW), 'BAD_REQUEST');
+    }
+  });
 });
 
 describe('expiry', () => {

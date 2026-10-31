@@ -50,6 +50,7 @@ export {
   ONLINE_GAME_CHOICES,
   isGameTransportErrorData,
   isOnlineGameChoice,
+  isTurnTimeMinutes,
   turnDeadlineMs,
 } from './game-transport';
 export type {
