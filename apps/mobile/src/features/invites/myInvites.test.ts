@@ -53,7 +53,7 @@ describe('inviteRowText', () => {
     });
     const text = inviteRowText(last, i18n.t, NOW, 0);
     expect(text.title).toBe('Portes · first to 1 point');
-    expect(text.line).toBe('24 h · 40 min left');
+    expect(text.line).toBe('None · 40 min left');
   });
 
   it('uses the clock offset', () => {

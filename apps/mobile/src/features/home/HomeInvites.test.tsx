@@ -91,7 +91,7 @@ describe('<HomeInvites />', () => {
     expect(within(row).getByText('1 min · 23 h left')).toBeOnTheScreen();
     expect(within(row).getByText(`Code ${first}`)).toBeOnTheScreen();
     expect(
-      screen.getByRole('button', { name: 'Invite, Portes, first to 1 point, 24 h, 24 h left' }),
+      screen.getByRole('button', { name: 'Invite, Portes, first to 1 point, None, 24 h left' }),
     ).toBeOnTheScreen();
     await user.press(row);
     expect(onOpen).toHaveBeenCalledWith(first);
@@ -284,7 +284,7 @@ describe('<HomeInvites />', () => {
     await show();
     expect(screen.getByRole('header', { name: 'Οι προσκλήσεις σου' })).toBeOnTheScreen();
     const row = screen.getByRole('button', {
-      name: 'Πρόσκληση, Πόρτες, έως 1 βαθμό, 24 ώρες, Λήγει σε 24 ώρες',
+      name: 'Πρόσκληση, Πόρτες, έως 1 βαθμό, Χωρίς, Λήγει σε 24 ώρες',
     });
     expect(within(row).getByText('Πόρτες · έως 1 βαθμό')).toBeOnTheScreen();
     expect(within(row).getByText(`Κωδικός ${code}`)).toBeOnTheScreen();
@@ -292,7 +292,7 @@ describe('<HomeInvites />', () => {
       jest.setSystemTime(Date.now() + INVITE_TIME_MS);
       jest.advanceTimersByTime(30_000);
     });
-    expect(within(row).getByText('24 ώρες · Λήγει τώρα')).toBeOnTheScreen();
+    expect(within(row).getByText('Χωρίς · Λήγει τώρα')).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');
     });

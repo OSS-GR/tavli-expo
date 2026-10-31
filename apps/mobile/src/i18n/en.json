@@ -280,7 +280,7 @@
       "hours_one": "{{count}} h",
       "hours_other": "{{count}} h"
     },
-    "timeLimitNone": "24 h",
+    "timeLimitNone": "None",
     "timeLimit_one": "1 min",
     "timeLimit_other": "{{count}} min",
     "loading": "Loading the game…",
@@ -308,7 +308,7 @@
       "lengthValue_one": "First to {{count}} point",
       "lengthValue_other": "First to {{count}} points",
       "timeLimit": "Time limit",
-      "timeLimitNone": "24 h",
+      "timeLimitNone": "None",
       "timeLimit_one": "1 min",
       "timeLimit_other": "{{count}} min",
       "accept": "Accept",

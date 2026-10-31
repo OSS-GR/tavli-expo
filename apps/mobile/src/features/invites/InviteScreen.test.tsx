@@ -77,7 +77,7 @@ describe('InviteScreen', () => {
     expect(screen.getByText('A friend invites you to an online match.')).toBeOnTheScreen();
     expect(screen.getByText('Plakoto')).toBeOnTheScreen();
     expect(screen.getByText('First to 5 points')).toBeOnTheScreen();
-    expect(screen.getByText('24 h')).toBeOnTheScreen();
+    expect(screen.getByText('None')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Accept' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeOnTheScreen();
   });
@@ -345,7 +345,7 @@ describe('InviteScreen', () => {
     expect(await screen.findByRole('header', { name: 'Πρόσκληση για παιχνίδι' })).toBeOnTheScreen();
     expect(screen.getByText('Πόρτες')).toBeOnTheScreen();
     expect(screen.getByText('Νικά όποιος φτάσει τους 3 βαθμούς')).toBeOnTheScreen();
-    expect(screen.getByText('24 ώρες')).toBeOnTheScreen();
+    expect(screen.getByText('Χωρίς')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Αποδοχή' })).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');

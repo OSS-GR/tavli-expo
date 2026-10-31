@@ -64,10 +64,11 @@ the field as required from the start.
 ### UI (decisions taken)
 
 - `FriendSetupScreen`: replace the Live/Async segmented control with a
-  **Turn time** picker: a "None (24 h a turn)" option (the default) and a few
-  minute values a player can pick to speed a game up. No "async" wording.
-- `InviteScreen.open` and the Home invite row: show the minutes value (or "24 h")
-  instead of `view.pace`.
+  **Turn time** picker: a "None" option (the default) and a few minute values a
+  player can pick to speed a game up. No "async" wording. The hint under the
+  picker tells what None means ("No time limit: 24 hours per turn").
+- `InviteScreen.open` and the Home invite row: show the minutes value (or
+  "None") instead of `view.pace`.
 
 ## Consequences
 

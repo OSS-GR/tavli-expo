@@ -931,7 +931,7 @@ describe('invites (#256)', () => {
     expect(onlineFake.authStore.guests).toBe(0);
     await user.press(screen.getByRole('button', { name: 'Show the invite' }));
     expect(await screen.findByText('Plakoto')).toBeOnTheScreen();
-    expect(screen.getByText('24 h')).toBeOnTheScreen();
+    expect(screen.getByText('None')).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(1);
     expect(router.getPathname()).toBe(`/invite/${code.toLowerCase()}`);
   });
@@ -1201,7 +1201,7 @@ describe('your invites on Home (#314)', () => {
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     const code = await inviteThenHome(user, router);
     const row = await screen.findByTestId(`home-invite-${code}`);
-    expect(row).toHaveAccessibleName(/^Invite, Portes, first to 3 points, 24 h, /);
+    expect(row).toHaveAccessibleName(/^Invite, Portes, first to 3 points, None, /);
     await user.press(row);
     expect(router.getPathname()).toBe(`/friend/${code}`);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();

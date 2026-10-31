@@ -280,7 +280,7 @@
       "hours_one": "{{count}} ώρα",
       "hours_other": "{{count}} ώρες"
     },
-    "timeLimitNone": "24 ώρες",
+    "timeLimitNone": "Χωρίς",
     "timeLimit_one": "1 λεπτό",
     "timeLimit_other": "{{count}} λεπτά",
     "loading": "Φόρτωση παιχνιδιού…",
@@ -308,7 +308,7 @@
       "lengthValue_one": "Νικά όποιος φτάσει τον {{count}} βαθμό",
       "lengthValue_other": "Νικά όποιος φτάσει τους {{count}} βαθμούς",
       "timeLimit": "Χρόνος",
-      "timeLimitNone": "24 ώρες",
+      "timeLimitNone": "Χωρίς",
       "timeLimit_one": "1 λεπτό",
       "timeLimit_other": "{{count}} λεπτά",
       "accept": "Αποδοχή",

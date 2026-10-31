@@ -313,7 +313,7 @@ describe('FriendSetupScreen', () => {
     await open(setup());
     expect(screen.getByRole('header', { name: 'Παίξε με φίλο online' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Φτιάξε πρόσκληση' })).toBeOnTheScreen();
-    expect(screen.getByRole('radio', { name: '24 ώρες' })).toBeOnTheScreen();
+    expect(screen.getByRole('radio', { name: 'Χωρίς' })).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');
     });
