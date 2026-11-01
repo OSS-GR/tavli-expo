@@ -17,9 +17,9 @@
     "@tavli/contracts": "workspace:*"
   },
   "peerDependencies": {
-    "expo-notifications": "~58.1.6"
+    "expo-notifications": "~58.1.7"
   },
   "devDependencies": {
-    "expo-notifications": "~58.1.6"
+    "expo-notifications": "~58.1.7"
   }
 }
