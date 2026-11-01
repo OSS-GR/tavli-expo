@@ -1,10 +1,13 @@
 /**
- * The rows of History (#142): one card, one row per match, each read as
- * one item. The local matches and the online ones (#313) share it.
+ * The rows of History (#142): one `SectionCard`, one row per match, each
+ * read as one item. The local matches and the online ones (#313) share it.
+ * In the Home style (#359): the result chip first (Won brass, Lost dark,
+ * Not finished outlined), then the match line, the score and the date.
  */
-import { displayCaps } from '@tavli/ui';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+
+import { SectionCard } from '@/components/SectionCard';
 
 import type { ResultBadge } from './format';
 
@@ -22,97 +25,109 @@ export interface MatchListRow {
   readonly label: string;
 }
 
-export function MatchList({ rows }: { rows: readonly MatchListRow[] }) {
+export interface MatchListProps {
+  rows: readonly MatchListRow[];
+  /** The small caps title above the card. */
+  title?: string;
+}
+
+export function MatchList({ rows, title }: MatchListProps) {
   return (
-    <View style={styles.list}>
-      {rows.map((row, i) => (
+    <SectionCard title={title}>
+      {rows.map((row) => (
         <View
           key={row.key}
           testID={row.testID}
-          style={[styles.row, i > 0 && styles.rowLine]}
+          style={styles.row}
           accessible
           accessibilityLabel={row.label}>
-          <View style={styles.rowTop}>
-            <Text style={styles.rowTitle}>{row.title}</Text>
-            {row.badge !== null && row.result !== null ? (
-              <View style={styles.badge(row.badge)}>
-                <Text style={styles.badgeText(row.badge)}>{row.result}</Text>
-              </View>
-            ) : null}
+          {row.badge !== null && row.result !== null ? (
+            <View style={styles.chip(row.badge)}>
+              <Text style={styles.chipText(row.badge)}>{row.result}</Text>
+            </View>
+          ) : null}
+          <View style={styles.texts}>
+            <Text style={styles.title}>{row.title}</Text>
+            <Text style={styles.score(row.badge)}>{row.score}</Text>
+            {row.date ? <Text style={styles.date}>{row.date}</Text> : null}
           </View>
-          <Text style={styles.rowScore}>{row.score}</Text>
-          {row.date ? <Text style={styles.rowDate}>{row.date}</Text> : null}
         </View>
       ))}
-    </View>
+    </SectionCard>
   );
 }
 
-/** A section title in caps, read as a header in normal case. */
-export function SectionTitle({ title }: { title: string }) {
-  return (
-    <Text style={styles.section} accessibilityRole="header" accessibilityLabel={title}>
-      {displayCaps(title)}
-    </Text>
-  );
+/** A pass-and-play winner shows as a win: someone won the match. */
+function chipLook(badge: ResultBadge): 'won' | 'lost' | 'unfinished' {
+  return badge === 'winner' ? 'won' : badge;
 }
 
 const styles = StyleSheet.create((theme) => ({
-  section: {
-    ...theme.type.section,
-    color: theme.colors.textDim,
-    paddingTop: theme.space.lg,
-  },
-  list: {
-    paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radii.lg,
-    backgroundColor: theme.colors.surface,
-  },
+  // The chip and the texts share a line; with a large font or a long
+  // result the texts wrap under the chip.
   row: {
-    gap: theme.space.xxs,
-    minHeight: theme.touch.row,
-    paddingVertical: theme.space.md,
-  },
-  rowLine: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.separator,
-  },
-  rowTop: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: theme.space.sm,
+    gap: theme.space.md,
+    minHeight: theme.touch.row,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.md,
   },
-  rowTitle: {
-    ...theme.type.bodyStrong,
-    flexShrink: 1,
+  chip: (badge: ResultBadge) => {
+    const look = chipLook(badge);
+    return {
+      flexShrink: 1,
+      minWidth: 52,
+      paddingHorizontal: theme.space.sm,
+      paddingVertical: theme.space.xxs,
+      borderRadius: theme.radii.pill,
+      borderWidth: 1,
+      alignItems: 'center' as const,
+      borderColor:
+        look === 'won'
+          ? theme.colors.accent
+          : look === 'lost'
+            ? theme.colors.separator
+            : theme.colors.border,
+      backgroundColor:
+        look === 'won'
+          ? theme.colors.accent
+          : look === 'lost'
+            ? theme.colors.separator
+            : theme.colors.backgroundDeep,
+    };
+  },
+  chipText: (badge: ResultBadge) => {
+    const look = chipLook(badge);
+    return {
+      ...theme.type.caption,
+      fontWeight: '700' as const,
+      textAlign: 'center' as const,
+      color:
+        look === 'won'
+          ? theme.colors.onAccent
+          : look === 'lost'
+            ? theme.colors.text
+            : theme.colors.textDim,
+    };
+  },
+  texts: {
     flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 180,
+    gap: theme.space.xxs,
+  },
+  title: {
+    ...theme.type.bodyStrong,
     color: theme.colors.text,
   },
-  badge: (badge: ResultBadge) => ({
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xxs,
-    borderRadius: theme.radii.pill,
-    borderWidth: 2,
-    borderStyle: badge === 'unfinished' ? ('dashed' as const) : ('solid' as const),
-    borderColor: badge === 'unfinished' ? theme.colors.border : theme.colors.accent,
-    backgroundColor: badge === 'won' ? theme.colors.accent : 'transparent',
-  }),
-  badgeText: (badge: ResultBadge) => ({
-    ...theme.type.caption,
-    fontWeight: '600' as const,
-    color:
-      badge === 'won'
-        ? theme.colors.onAccent
-        : badge === 'unfinished'
-          ? theme.colors.textDim
-          : theme.colors.text,
-  }),
-  rowScore: {
+  score: (badge: ResultBadge | null) => ({
     ...theme.type.body,
-    color: theme.colors.text,
-  },
-  rowDate: {
+    fontVariant: ['tabular-nums' as const],
+    color: badge === 'unfinished' ? theme.colors.textDim : theme.colors.text,
+  }),
+  date: {
     ...theme.type.caption,
     color: theme.colors.textDim,
   },

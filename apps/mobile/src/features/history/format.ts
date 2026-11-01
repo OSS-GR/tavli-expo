@@ -219,16 +219,72 @@ function rateText(rate: number | null): string {
  * "Played 4 · Draws 1" in pass-and-play. "Not finished" shows only when some were.
  */
 export function statParts(line: StatLine, mode: 'bot' | 'local', t: TFunction): string[] {
-  const parts = [t('history.line.played', { value: line.played })];
+  return statValues(line, mode).map(({ key, value }) => t(`history.line.${key}`, { value }));
+}
+
+type StatKey = 'played' | 'won' | 'lost' | 'winRate' | 'diplo' | 'draws' | 'unfinished';
+
+/** The numbers of `statParts`, in its order, with the key of each text. */
+function statValues(
+  line: StatLine,
+  mode: 'bot' | 'local',
+): { key: StatKey; value: string | number }[] {
+  const values: { key: StatKey; value: string | number }[] = [
+    { key: 'played', value: line.played },
+  ];
   if (mode === 'bot') {
-    parts.push(
-      t('history.line.won', { value: line.won }),
-      t('history.line.lost', { value: line.lost }),
-      t('history.line.winRate', { value: rateText(winRate(line)) }),
-      t('history.line.diplo', { value: line.diploWins }),
+    values.push(
+      { key: 'won', value: line.won },
+      { key: 'lost', value: line.lost },
+      { key: 'winRate', value: rateText(winRate(line)) },
+      { key: 'diplo', value: line.diploWins },
     );
   }
-  parts.push(t('history.line.draws', { value: line.draws }));
-  if (line.unfinished > 0) parts.push(t('history.line.unfinished', { value: line.unfinished }));
-  return parts;
+  values.push({ key: 'draws', value: line.draws });
+  if (line.unfinished > 0) values.push({ key: 'unfinished', value: line.unfinished });
+  return values;
+}
+
+/** The stats that show as tiles (#359); the others go in one line under them. */
+const TILE_KEYS: ReadonlySet<StatKey> = new Set(['played', 'won', 'winRate']);
+
+/** One big number of the stats (#359): "24" over "Played". */
+export interface StatTile {
+  readonly key: StatKey;
+  /** "24", "75%" or "—". */
+  readonly value: string;
+  /** The stat's own text without the number: "Played", "Win rate". */
+  readonly label: string;
+}
+
+/** Stands in for the number, so the label keeps the language's own words. */
+const VALUE_SLOT = '\u0000';
+
+/**
+ * The stats of one line as tiles and one line of the rest (#359). Vs the
+ * bot: Played, Won and Win rate as tiles, then "Lost 1 · Diplo wins 1 ·
+ * Draws 0". Pass-and-play has no "you": a Played tile, then "Draws 1".
+ * The texts are the ones of `statParts`: a tile's label is its text
+ * without the number ("Played {{value}}" gives "Played"), wherever the
+ * number sits in the language.
+ */
+export function statTiles(
+  line: StatLine,
+  mode: 'bot' | 'local',
+  t: TFunction,
+): { tiles: StatTile[]; rest: string[] } {
+  const tiles: StatTile[] = [];
+  const rest: string[] = [];
+  for (const { key, value } of statValues(line, mode)) {
+    if (TILE_KEYS.has(key)) {
+      const label = t(`history.line.${key}`, { value: VALUE_SLOT })
+        .replace(VALUE_SLOT, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      tiles.push({ key, value: String(value), label });
+    } else {
+      rest.push(t(`history.line.${key}`, { value }));
+    }
+  }
+  return { tiles, rest };
 }
