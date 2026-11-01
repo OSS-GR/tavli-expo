@@ -31,7 +31,7 @@ export function WelcomeTop({ onBack, backTestID, step }: WelcomeTopProps) {
           <RoundButton
             testID={backTestID}
             icon="chevronLeft"
-            accessibilityLabel={t('welcome.privacy.back')}
+            accessibilityLabel={t('common.back')}
             onPress={onBack}
           />
         ) : null}

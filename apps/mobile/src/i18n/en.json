@@ -1,7 +1,8 @@
 {
   "common": {
     "comingSoon": "Coming soon",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "back": "Back"
   },
   "crash": {
     "title": "Something went wrong",
@@ -81,7 +82,6 @@
   },
   "settings": {
     "title": "Settings",
-    "back": "Back",
     "sections": {
       "game": "Game",
       "soundAndFeel": "Sound and feel",
@@ -187,7 +187,6 @@
   },
   "history": {
     "title": "History",
-    "back": "Back",
     "emptyTitle": "No matches yet",
     "empty": "Finish a match vs the bot or in pass-and-play, and it shows here.",
     "play": "Play",
@@ -364,7 +363,6 @@
   },
   "friend": {
     "title": "Play a friend online",
-    "back": "Back",
     "intro": "Pick the game. You get a link to send to a friend, and the game starts when they accept.",
     "game": "Game",
     "length": "Match length",
@@ -699,7 +697,6 @@
       "continue": "Continue"
     },
     "privacy": {
-      "back": "Back",
       "step": "Step {{step}} of {{total}}",
       "title": "Help us make Tavlaki better",
       "intro": "We would like to collect anonymous usage data, for example:",
@@ -757,7 +754,6 @@
   "newGame": {
     "titleBot": "Play vs bot",
     "titleLocal": "Pass-and-play",
-    "back": "Back",
     "game": "Game",
     "lockedGames": "More games are coming soon.",
     "gameSoon": "Coming soon: {{game}}",

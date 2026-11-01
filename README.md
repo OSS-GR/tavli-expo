@@ -63,6 +63,8 @@ See [ADR-0002](docs/decisions/0002-modular-architecture.md) for the full plan.
 2. Use it with `const { t } = useTranslation()` and `t('section.key')`. Keys are typed, so a typo fails `pnpm typecheck`.
 3. `pnpm test` checks that both files have the same keys and `{{placeholders}}`.
 
+Every back button reads `common.back` ("Back" / «Πίσω») to screen readers. Do not add a Back key per screen.
+
 Never hard-code text in a screen. Section titles in caps go through `displayCaps()` from `@tavli/ui` (Greek caps drop the tonos).
 
 ### Add a setting

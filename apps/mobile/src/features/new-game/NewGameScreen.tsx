@@ -239,7 +239,7 @@ export function NewGameScreen({
         <ScreenHeader
           title={mode === 'bot' ? t('newGame.titleBot') : t('newGame.titleLocal')}
           onBack={onBack}
-          backLabel={t('newGame.back')}
+          backLabel={t('common.back')}
           testID="new-game-back"
         />
         <ScrollView

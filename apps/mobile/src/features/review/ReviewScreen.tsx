@@ -91,7 +91,7 @@ export function ReviewScreen({ setup, flow, analyzer = appAnalyzer, onBack }: Re
       <ScreenHeader
         title={t('review.title')}
         {...(onBack ? { onBack } : {})}
-        backLabel={t('newGame.back')}
+        backLabel={t('common.back')}
         testID="review-back"
       />
       <ScrollView
