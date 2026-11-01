@@ -176,6 +176,9 @@ export function onlinePassLine(
  * text says both: "Opponent played: …. You rolled 5-3." A pass and the
  * opening roll (the server does both) are read too. The game screen keys
  * the text on the game and the view's version, so each view is read once.
+ * When the phone holds back your roll (#347), the turn waits for it:
+ * "Opponent played: …. Your turn." A pass before it has its card, which
+ * reads itself.
  * Your own moves on the phone are not read again: the text goes once you
  * move, and comes back with the same key after an undo.
  */
@@ -190,6 +193,15 @@ export function onlineTurnAnnouncement(
   const lines: string[] = [];
   const last = game.lastTurn;
   const pass = onlinePassLine(game, t, names);
+  if (game.phase === 'awaiting-roll') {
+    if (pass !== null) return null;
+    if (last !== null && !isYou(last.player)) {
+      const moves = last.moves.map((move) => moveLabel(t, move)).join('; ');
+      lines.push(t('game.announce.played', { name: nameOf(last.player), moves }));
+    }
+    if (isYou(game.state.toMove)) lines.push(t('game.pass.next_you'));
+    return lines.length > 0 ? lines.join(' ') : null;
+  }
   if (pass !== null) {
     lines.push(pass);
   } else if (last !== null && !isYou(last.player)) {

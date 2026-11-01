@@ -3,7 +3,9 @@
  * store (`onlineStore.ts`), with the menu and the Resign match dialog.
  *
  * - The server rolls, passes and starts the next game, so there is no
- *   Roll button and no opening card (see "Online" in `GameScreen.tsx`).
+ *   opening card (see "Online" in `GameScreen.tsx`). The phone holds back
+ *   your new roll until you tap Roll or swipe, as offline (#347,
+ *   `hiddenRoll.ts`).
  * - While the server waits for the other player, the board is locked.
  * - The time left shows on the strip of the player the server waits for
  *   (live: seconds; async: hours).
@@ -72,7 +74,13 @@ export function OnlineMatchScreen(props: OnlineMatchScreenProps) {
 
 function OnlineGame(props: OnlineMatchScreenProps) {
   const { gameId, transport, me, now } = props;
-  const store = useOnlineGame({ transport, gameId, me, ...(now ? { now } : {}) });
+  const store = useOnlineGame({
+    transport,
+    gameId,
+    me,
+    hideRolls: true,
+    ...(now ? { now } : {}),
+  });
   if (store === null) return <Loading />;
   return <OnlineLoader store={store} {...props} />;
 }
@@ -134,6 +142,7 @@ function OnlineBoard({
   const matchKey = useGameStore(board, (s) => s.matchKey);
   const view = useOnlineStore(store, (s) => s.view);
   const sending = useOnlineStore(store, (s) => s.sending);
+  const rollWaits = useOnlineStore(store, (s) => s.rollWaits);
   const notice = useOnlineStore(store, (s) => s.notice);
   const noticeCount = useOnlineStore(store, (s) => s.noticeCount);
   const clockOffset = useOnlineStore(store, (s) => s.clockOffset);
@@ -216,7 +225,9 @@ function OnlineBoard({
   const online: OnlineSide = {
     me: side,
     version: view.version,
-    locked: sending || waitingFor !== side,
+    // Your passed roll waits for you to roll it, while the server waits
+    // for the other player (#347).
+    locked: sending || (waitingFor !== side && !rollWaits),
     status: sending ? t('online.status.sending') : t('online.status.waiting'),
     clock:
       waitingFor === null || shown === null || finished
