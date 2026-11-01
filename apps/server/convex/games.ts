@@ -6,15 +6,18 @@
  * the server waits for loses the game.
  *
  * Each mutation is one Convex transaction: load the game, check the call,
- * run the engine (`@tavli/online`), roll the next dice on the server, and
- * save with a version bump. If anything throws, nothing is saved. The
+ * run the engine (`@tavli/online`), and save with a version bump. The
+ * server rolls the dice only when the player asks (`rollDice`, #355); it
+ * rolls the opening dice and starts the next game by itself. If anything throws, nothing is saved. The
  * call checks are pure helpers in `@tavli/online` too (#251), shared with
  * the in-memory server; this file keeps the database and scheduler parts.
  *
  * Timers: every save that leaves the match running sets a new
  * `turnDeadline` and schedules `checkTimeout` for that version. A later
  * change bumps the version, so an old check does nothing: no cancel is
- * needed. `makeMove` and `answer` check the deadline too.
+ * needed. `makeMove`, `answer` and `rollDice` check the deadline too. A
+ * roll keeps the deadline of the turn it starts (`rollDeadline`): the
+ * turn time covers the wait before the roll.
  *
  * Push (#280): a save that moves the wait to the other player of an async
  * game, or starts the next game of the match, schedules a "your turn"
@@ -54,6 +57,8 @@ import {
   nextDeadline,
   playTurn,
   resign as resignMatch,
+  rollDeadline,
+  rollDice as rollMatchDice,
   scheduledCheck,
   storeFlow,
   storeStep,
@@ -144,7 +149,8 @@ async function loadForCaller(
 /**
  * Starts the clock for the turn that begins `now`: returns the deadline
  * and schedules `checkTimeout` for `version` at that time. `null` (and no
- * check) when the match is over.
+ * check) when the match is over. `deadline` keeps a deadline the step
+ * worked out itself (a roll keeps the turn's deadline, `rollDeadline`).
  */
 async function startClock(
   ctx: MutationCtx,
@@ -153,8 +159,8 @@ async function startClock(
   turnTimeMinutes: number | null,
   flow: MatchFlow,
   now: number,
+  deadline: number | null = nextDeadline(turnTimeMinutes, flow, now),
 ): Promise<number | null> {
-  const deadline = nextDeadline(turnTimeMinutes, flow, now);
   if (deadline === null) return null;
   await ctx.scheduler.runAt(deadline, internal.games.checkTimeout, { gameId, version });
   return deadline;
@@ -165,7 +171,7 @@ async function startClock(
  * bump, its log rows, a new turn deadline, and a "your turn" push when
  * the wait moved to the other player of an async game, or a new game
  * started (#280), or a "game over" push when the step ended an async
- * match (#316).
+ * match (#316). `deadline` is passed to `startClock`.
  */
 async function save(
   ctx: MutationCtx,
@@ -174,10 +180,19 @@ async function save(
   before: LoadedFlow,
   flow: SteppedFlow,
   now: number,
+  deadline?: number | null,
 ): Promise<number> {
   const version = game.version + 1;
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
-  const turnDeadline = await startClock(ctx, game._id, version, game.turnTimeMinutes, flow, now);
+  const turnDeadline = await startClock(
+    ctx,
+    game._id,
+    version,
+    game.turnTimeMinutes,
+    flow,
+    now,
+    deadline,
+  );
   await ctx.db.patch(game._id, {
     ...gameFields(flow, storeStep(before, flow)),
     version,
@@ -201,7 +216,7 @@ async function applyTimeout(
 }
 
 /**
- * What `makeMove` and `answer` return. `ok: false` means the turn time ran
+ * What `makeMove`, `answer` and `rollDice` return. `ok: false` means the turn time ran
  * out first: the server saved the time out (the late player lost the
  * game) instead of the call. It is a return value, not a thrown error,
  * because a thrown error would roll the time out back too. A client
@@ -330,7 +345,7 @@ export const createGame = internalMutation({
 /**
  * Plays one full turn for the caller: every move for the current roll.
  * Rejects a stale `expectedVersion`, a caller who is not to move, and an
- * illegal or incomplete turn. Then the server rolls the next dice.
+ * illegal or incomplete turn. Then the server waits for the next roll.
  * Returns the new version, or `TIMED_OUT` when the turn time ran out
  * first (see `writeResult`).
  */
@@ -349,6 +364,31 @@ export const makeMove = mutation({
         playTurn(before.flow, side, moves.map(toMoveInput), createCryptoRng()),
       );
       return await save(ctx, game, callerId, before, next, now);
+    });
+  },
+});
+
+/**
+ * Rolls the dice for the caller, who must be the player the server waits
+ * for in `awaiting-roll` (#355). The server rolls with its own dice. A
+ * roll with no legal move passes at once, and the server then waits for
+ * the other player's roll: both views show the pass in `game.lastTurn`.
+ * The roll keeps the turn's deadline; a pass starts the other player's
+ * turn time. Returns like `makeMove`.
+ */
+export const rollDice = mutation({
+  args: {
+    gameId: v.id('games'),
+    expectedVersion: v.number(),
+  },
+  returns: writeResult,
+  handler: async (ctx, { gameId, expectedVersion }) => {
+    const callerId = await signedInPlayer(ctx);
+    const { game, side, before } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
+    return await onTime(ctx, game, before, async (now) => {
+      const next = guarded(() => rollMatchDice(before.flow, side, createCryptoRng()));
+      const deadline = rollDeadline(game, game.turnTimeMinutes, side, next, now);
+      return await save(ctx, game, callerId, before, next, now, deadline);
     });
   },
 });

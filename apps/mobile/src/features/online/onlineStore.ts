@@ -5,13 +5,12 @@
  * view replaces the local flow. On your turn you play the roll here: each
  * move and undo goes through the engine (`applyMatchAction`) on the local
  * flow, as in `features/game/gameStore.ts`, and only the engine judges a
- * move. Confirm sends the whole turn (`sendTurn`). The server rolls the
- * dice, passes, and starts the next game by itself, so the store refuses
- * those actions.
- *
- * With `hideRolls` (the game screen, #347) the store holds back the dice
- * of your new roll (`hiddenRoll.ts`): the flow waits for a roll, and a
- * `roll` action shows the server's dice. It never sends anything.
+ * move. Confirm sends the whole turn (`sendTurn`). A `roll` asks the
+ * server to roll (`rollDice`, #355): the server picks the dice, the phone
+ * never does. Its view comes with the roll in the log (`rollResult.ts`),
+ * so the screen plays it as a local roll. The server rolls the opening,
+ * passes a roll with no legal move and starts the next game by itself, so
+ * the store refuses those actions.
  *
  * The store follows the view: `view.waitingFor`, `view.prompt` and
  * `game.state.toMove`. It never assumes the players alternate (an Asodio
@@ -30,6 +29,7 @@ import {
   EngineError,
   MATCH_FLOW_SCHEMA_VERSION,
   applyMatchAction,
+  type Dice,
   type MatchAction,
   type MatchFlow,
   type MoveInput,
@@ -39,14 +39,7 @@ import { sideOf } from '@tavli/online';
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-import {
-  hiddenFlow,
-  newRoll,
-  revealedFlow,
-  revealRoll,
-  wasRevealed,
-  type NewRoll,
-} from './hiddenRoll';
+import { rollResult } from './rollResult';
 import { estimateOffset } from './timeLeft';
 
 export interface OnlineStoreOptions {
@@ -56,12 +49,6 @@ export interface OnlineStoreOptions {
   readonly me: string;
   /** The phone clock, in epoch milliseconds. Default: `Date.now`. Tests pass a fake one. */
   readonly now?: () => number;
-  /**
-   * Hold back the dice of your new roll until you roll (#347, see
-   * `hiddenRoll.ts`). The game screen sets it; the online bot does not.
-   * Default: `false`.
-   */
-  readonly hideRolls?: boolean;
 }
 
 /**
@@ -72,10 +59,12 @@ export interface OnlineStoreOptions {
  *   phone played). Your moves are gone; the store shows the newest view.
  * - `sendFailed`: the call did not reach the server (a network error).
  *   Your moves stay, so you can send again.
+ * - `rollFailed`: your roll did not reach the server (a network error).
+ *   Roll again.
  * - `refused`: the server refused the call for another reason
  *   (`lastError` says why). Your moves are gone.
  */
-export type OnlineNotice = 'timedOut' | 'stale' | 'sendFailed' | 'refused';
+export type OnlineNotice = 'timedOut' | 'stale' | 'sendFailed' | 'rollFailed' | 'refused';
 
 /** Why the game did not load: a server code (for example `NOT_FOUND`), or `network`. */
 export type OnlineLoadError = GameTransportErrorCode | 'network';
@@ -83,7 +72,8 @@ export type OnlineLoadError = GameTransportErrorCode | 'network';
 export interface OnlineStoreState {
   /**
    * The newest view with the moves you played on it this turn. `null`
-   * until the first view arrives. Its `log` holds only your local moves.
+   * until the first view arrives. Its `log` holds only your roll (when
+   * this store asked for it) and your local moves.
    */
   readonly flow: MatchFlow | null;
   /** The newest view from the server. `null` until it arrives. */
@@ -103,17 +93,13 @@ export interface OnlineStoreState {
   /** Set when the game could not load. */
   readonly loadError: OnlineLoadError | null;
   /**
-   * True while the flow holds back your new roll (`hideRolls`, #347): it
-   * waits for a `roll` action, which shows the server's dice. Move, undo
-   * and confirm do nothing meanwhile (no refusal: `refusals` stays).
-   */
-  readonly rollWaits: boolean;
-  /**
-   * True from a call (turn, answer, resign) until the server has it and
-   * its new view is here, or until it fails. Every action is refused
+   * True from a call (roll, turn, answer, resign) until the server has it
+   * and its new view is here, or until it fails. Every action is refused
    * meanwhile.
    */
   readonly sending: boolean;
+  /** True while `sending` is a roll (#355): the screen says the dice are on their way. */
+  readonly rolling: boolean;
   readonly notice: OnlineNotice | null;
   /**
    * How many notices this store has set, the newest included. It names
@@ -131,11 +117,12 @@ export interface OnlineStoreState {
   readonly clockOffset: number;
   /**
    * Plays one action of your side. Returns `false` (and keeps the flow)
-   * when it is refused. `move` and `undo` stay on the phone, and so does
-   * `roll` while `rollWaits` (it only shows the dice). `confirm`,
-   * `answer` and `resignMatch` start a call and return `true`; the result
-   * arrives later (`sending`, `notice`, the next view). A `move` with
-   * `autoConfirm` sends the turn as soon as it is complete.
+   * when it is refused. `move` and `undo` stay on the phone. `roll`,
+   * `confirm`, `answer` and `resignMatch` start a call and return `true`;
+   * the result arrives later (`sending`, `notice`, the next view). A
+   * `move` with `autoConfirm` sends the turn as soon as it is complete.
+   * Before your roll, move, undo and confirm do nothing (no refusal:
+   * `refusals` stays), as a local game ignores a tap before the roll.
    */
   dispatch: (action: MatchAction) => boolean;
   clearNotice: () => void;
@@ -156,9 +143,8 @@ export function viewFlow(view: OnlineGameView): MatchFlow {
   return { schemaVersion: MATCH_FLOW_SCHEMA_VERSION, match: view.match, game: view.game, log: [] };
 }
 
-/** The server does these steps by itself (but see `rollWaits`). */
+/** The server does these steps by itself. */
 const SERVER_ACTIONS: ReadonlySet<MatchAction['type']> = new Set([
-  'roll',
   'rollOpening',
   'nextGame',
   'chooseStarter',
@@ -176,16 +162,21 @@ export function createOnlineStore({
   gameId,
   me,
   now = Date.now,
-  hideRolls = false,
 }: OnlineStoreOptions): OnlineStore {
   let disposed = false;
-  /** Your new roll in `view` to hold back (`hideRolls`), shown or not. */
-  const rollOf = (view: OnlineGameView, side: PlayerId | null): NewRoll | null =>
-    hideRolls && side !== null ? newRoll(view, side) : null;
-  /** The flow of `view`: your new roll hidden until you roll. */
-  const flowOf = (view: OnlineGameView, roll: NewRoll | null): MatchFlow => {
-    if (roll === null) return viewFlow(view);
-    return wasRevealed(gameId, roll) ? revealedFlow(view, roll) : hiddenFlow(view);
+  /** The version this store asked for a roll on, until a newer view or a failure. */
+  let rolledOn: number | null = null;
+  /** The view of the last roll this store asked for, with its dice. */
+  let myRoll: { readonly version: number; readonly player: PlayerId; readonly dice: Dice } | null =
+    null;
+  /**
+   * The flow of `view`. The view of your roll starts its log with the
+   * roll, so the screen throws the dice and reads them as a local roll.
+   */
+  const flowOf = (view: OnlineGameView): MatchFlow => {
+    const flow = viewFlow(view);
+    if (myRoll === null || myRoll.version !== view.version) return flow;
+    return { ...flow, log: [{ type: 'roll', player: myRoll.player, dice: myRoll.dice }] };
   };
   /** True while a call waits for the server. */
   let inFlight = false;
@@ -203,7 +194,6 @@ export function createOnlineStore({
       return false;
     };
 
-    /** Runs `action` through the engine. `null` (and `lastError`) when it refuses. */
     /**
      * A move, undo or confirm before you rolled: nothing happens, with no
      * "invalid move" feedback (a local game ignores a tap before the roll).
@@ -213,6 +203,7 @@ export function createOnlineStore({
       return false;
     };
 
+    /** Runs `action` through the engine. `null` (and `lastError`) when it refuses. */
     const engine = (flow: MatchFlow, action: MatchAction): MatchFlow | null => {
       try {
         return applyMatchAction(flow, action);
@@ -225,11 +216,11 @@ export function createOnlineStore({
 
     /** The flow of the newest view: your local moves are dropped. */
     const fresh = (): MatchFlow | null => {
-      const { view, side } = get();
-      return view === null ? null : flowOf(view, rollOf(view, side));
+      const { view } = get();
+      return view === null ? null : flowOf(view);
     };
 
-    const failed = (error: unknown) => {
+    const failed = (error: unknown, roll: boolean) => {
       if (isGameTransportErrorData(error)) {
         const notice: OnlineNotice =
           error.code === 'TIMED_OUT'
@@ -240,6 +231,7 @@ export function createOnlineStore({
         set((s) => ({
           flow: fresh(),
           sending: false,
+          rolling: false,
           notice,
           noticeCount: s.noticeCount + 1,
           lastError: errorText(error),
@@ -248,17 +240,19 @@ export function createOnlineStore({
         // A network error: keep the moves, so the player can send again.
         set((s) => ({
           sending: false,
-          notice: 'sendFailed',
+          rolling: false,
+          notice: roll ? 'rollFailed' : 'sendFailed',
           noticeCount: s.noticeCount + 1,
           lastError: errorText(error),
         }));
       }
     };
 
-    const call = (version: number, send: () => Promise<void>) => {
+    const call = (version: number, send: () => Promise<void>, roll = false) => {
       inFlight = true;
       sentOn = version;
-      set({ sending: true, notice: null, lastError: null });
+      rolledOn = roll ? version : null;
+      set({ sending: true, rolling: roll, notice: null, lastError: null });
       let started: Promise<void>;
       try {
         started = send();
@@ -272,14 +266,15 @@ export function createOnlineStore({
           const { view } = get();
           if (view !== null && view.version > version) {
             sentOn = null;
-            set({ sending: false });
+            set({ sending: false, rolling: false });
           }
           // Else `sending` stays on until the next view (`onView`).
         },
         (error: unknown) => {
           inFlight = false;
           sentOn = null;
-          if (!disposed) failed(error);
+          rolledOn = null;
+          if (!disposed) failed(error, roll);
         },
       );
     };
@@ -304,15 +299,14 @@ export function createOnlineStore({
       lastError: null,
       refusals: 0,
       loadError: null,
-      rollWaits: false,
       sending: false,
+      rolling: false,
       notice: null,
       noticeCount: 0,
       clockOffset: 0,
 
       dispatch: (action) => {
-        const showRoll = action.type === 'roll' && get().rollWaits;
-        if (SERVER_ACTIONS.has(action.type) && !showRoll) {
+        if (SERVER_ACTIONS.has(action.type)) {
           return refuse(`the server does "${action.type}" by itself`);
         }
         if (disposed) return refuse('the game is closed');
@@ -324,17 +318,24 @@ export function createOnlineStore({
           return refuse(`you play ${side}`);
         }
         if (view.status === 'finished') return refuse('the match is over');
+        // Your turn waits for your roll (#355).
+        const rollWaits =
+          view.waitingFor === side &&
+          view.prompt === null &&
+          view.game.phase === 'awaiting-roll' &&
+          view.game.state.toMove === side;
 
         switch (action.type) {
-          case 'roll': {
-            // Shows the server's dice of this view: the phone never picks one.
-            const roll = rollOf(view, side);
-            if (roll === null || !get().rollWaits) return refuse('there is no roll to show');
-            if (action.dice !== undefined) return refuse('the server rolled the dice');
-            revealRoll(gameId, roll);
-            set({ flow: revealedFlow(view, roll), rollWaits: false, lastError: null });
+          case 'roll':
+            // The server rolls: the phone never picks a die.
+            if (action.dice !== undefined) return refuse('the server rolls the dice');
+            if (!rollWaits) return refuse('there is no roll to make');
+            call(
+              view.version,
+              () => transport.rollDice({ gameId, expectedVersion: view.version }),
+              true,
+            );
             return true;
-          }
           case 'resignMatch':
             call(view.version, () => transport.resign(gameId));
             return true;
@@ -342,7 +343,7 @@ export function createOnlineStore({
             return refuse('online, you resign the whole match');
           case 'move':
           case 'undo': {
-            if (get().rollWaits) return rollFirst();
+            if (rollWaits) return rollFirst();
             if (view.waitingFor !== side) return refuse('it is not your turn');
             // Auto confirm is done here, by sending the turn, not by the engine.
             const local: MatchAction =
@@ -360,7 +361,7 @@ export function createOnlineStore({
             return true;
           }
           case 'confirm':
-            if (get().rollWaits) return rollFirst();
+            if (rollWaits) return rollFirst();
             if (view.waitingFor !== side) return refuse('it is not your turn');
             // The engine checks that the turn is complete; its result is not kept.
             if (engine(flow, action) === null) return false;
@@ -403,15 +404,19 @@ export function createOnlineStore({
     const done = !inFlight && sentOn !== null && view.version > sentOn;
     if (done) sentOn = null;
     const side = sideOf(view.players, me);
-    const roll = rollOf(view, side);
+    // The view of the roll this store asked for: its dice go in the log.
+    if (rolledOn !== null && current !== null && side !== null && current.version === rolledOn) {
+      const dice = rollResult(current, view, side);
+      if (dice !== null) myRoll = { version: view.version, player: side, dice };
+    }
+    if (rolledOn !== null && view.version > rolledOn) rolledOn = null;
     store.setState({
       view,
-      flow: flowOf(view, roll),
+      flow: flowOf(view),
       side,
-      rollWaits: roll !== null && !wasRevealed(gameId, roll),
       loadError: null,
       ...(measured === null ? {} : { clockOffset: measured }),
-      ...(done ? { sending: false } : {}),
+      ...(done ? { sending: false, rolling: false } : {}),
     });
   };
 

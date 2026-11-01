@@ -4,7 +4,8 @@
  * Their whole turn arrives in one view: `game.lastTurn` holds its moves,
  * and the board already shows the end. The screen flies the moves from
  * the board of the view before. That works only when the view before is
- * the start of that turn, so `remoteTurn` replays the moves on it with
+ * the start of that turn: their roll, or the turn before it when the view
+ * of the roll was missed (#355). So `remoteTurn` replays the moves on it with
  * the engine's `applyMoveToBoard` and checks that they end on the new
  * board. Anything else (a new game, a missed view, a turn of yours) gives
  * `null`: the board just shows the new position.
@@ -49,7 +50,8 @@ function sameBoard(a: BoardState, b: BoardState): boolean {
 export function remoteTurn(before: MatchFlow, after: MatchFlow, me: PlayerId): RemoteTurn | null {
   const last = after.game.lastTurn;
   if (last === null || last.player === me || last.moves.length === 0) return null;
-  if (before.game.phase !== 'moving' || before.game.state.toMove !== last.player) return null;
+  const begun = before.game.phase === 'moving' || before.game.phase === 'awaiting-roll';
+  if (!begun || before.game.state.toMove !== last.player) return null;
   const start = currentBoard(before.game);
   const direction = after.game.state.rules.movement.direction;
   let board = start;

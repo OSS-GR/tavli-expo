@@ -39,17 +39,18 @@
  * rings the moves on the board and shows them in a line. A move, an undo or
  * a second tap takes the hint away. The move list has the same button.
  *
- * Online (#255, `online`): the server rolls the dice, passes a roll with no
- * move, and starts the next game by itself. So there is no opening card:
- * a short line says who starts. The online store holds back your own new
- * roll when it has a legal move (#347, `features/online/hiddenRoll.ts`):
- * the flow waits for a roll, and the Roll button, a tap or a swipe throws
- * the server's dice as offline. A roll with no legal move is not held
- * back: the server passed it, and a line shows it. The other player is
- * remote: while the server waits for them the board is locked, and their
- * whole turn arrives at once and flies from `game.lastTurn`. Its sounds,
- * the server's rolls and the game end play from the views
- * (`features/online/onlineFeedback.ts`, #271). A game the
+ * Online (#255, `online`): the server rolls the opening, passes a roll
+ * with no move, and starts the next game by itself. So there is no opening
+ * card: a short line says who starts. Each turn waits for its roll (#355):
+ * on your turn the Roll button, a tap or a swipe asks the server to roll
+ * (`rollDice` through the online store), and the throw waits for the
+ * server's dice (`rollSent`), then plays as offline. The other player's
+ * dice tumble in the dice row when their roll's view arrives. A roll with
+ * no legal move shows its dice first, then the pass card (`passWaits`).
+ * The other player is remote: while the server waits for them the board is
+ * locked, and their whole turn arrives at once and flies from
+ * `game.lastTurn`. Its sounds, the other player's rolls and the game end
+ * play from the views (`features/online/onlineFeedback.ts`, #271). A game the
  * server has already ended shows its game-end sheet (`online.ended`) over
  * its end: the board store holds the next game until the sheet closes
  * (#286). When the other player's turn ended the game, its checkers fly
@@ -111,6 +112,7 @@ import { pinnedCheckers, sideOf, toneOf, type BoardView } from '@/features/board
 import { flowPaths } from '@/features/board/combined';
 import { BOARD_GESTURES, SWIPE_AREA } from '@/features/board/interaction';
 import { DiceRow } from '@/features/board/DiceRow';
+import { DICE_LAND_MS } from '@/features/board/diceMotion';
 import {
   flightsEndMs,
   moveFlights,
@@ -168,6 +170,13 @@ export const BOT_PASS_NOTICE_MS = 3500;
 export const BOT_ANSWER_NOTE_MS = 2000;
 /** The final position stays on screen this long before the match-end screen opens. */
 export const MATCH_END_DELAY_MS = 1000;
+/**
+ * Online (#355): a roll with no legal move shows its dice before the pass
+ * card. Dice that tumble in the dice row (the other player's) show this
+ * long; your own thrown dice show `PASS_AFTER_THROW_MS` after the throw.
+ */
+export const ONLINE_PASS_DICE_MS = DICE_LAND_MS + 400;
+export const PASS_AFTER_THROW_MS = 400;
 
 /** The bot's side in a game vs the bot. */
 export interface BotSeat {
@@ -327,7 +336,10 @@ export function GameScreen({
   const pass = passNotice(flow);
   const [passDismissed, setPassDismissed] = useState<string | null>(null);
   const passKey = pass?.key ?? null;
-  const showPass = pass !== null && passDismissed !== pass.key;
+  // Online (#355): the dice of the pass show first, then the card (`passReady`).
+  const [passReady, setPassReady] = useState<string | null>(null);
+  const passWaits = online !== undefined && pass !== null && passReady !== pass.key;
+  const showPass = pass !== null && !passWaits && passDismissed !== pass.key;
   // Your own pass (in pass-and-play: the player who passed) waits for OK, so
   // there is time to read why. The bot's pass closes by itself, so the game
   // goes on (#178), and so does the other player's pass online (#347).
@@ -412,7 +424,14 @@ export function GameScreen({
   // Online: a game-end sheet or a notice covers the board.
   const onlineCovered = online !== undefined && (online.ended !== null || online.notice !== null);
   const blocked =
-    matchOver || gameOver || showPass || showOpening || askHuman || choosing || onlineCovered;
+    matchOver ||
+    gameOver ||
+    showPass ||
+    passWaits ||
+    showOpening ||
+    askHuman ||
+    choosing ||
+    onlineCovered;
 
   // Match over: the final position stays a moment, then the match-end
   // screen opens. Not while paused: the menu or another screen is on top.
@@ -516,8 +535,7 @@ export function GameScreen({
 
   const roller = nextOpeningRoller(game);
   // With `rerollBoth` (#207) the starter rolls after the opening result closes.
-  // Online the server rolls; the phone only shows your roll when you roll
-  // (#347): the flow waits for it (`awaiting-roll`) on your turn.
+  // Online your turn waits for your roll (#355): the server rolls when you ask.
   const onlineRoll =
     online !== undefined &&
     !online.locked &&
@@ -527,6 +545,7 @@ export function GameScreen({
   const canRoll =
     (online === undefined || onlineRoll) &&
     !showPass &&
+    !passWaits &&
     !botsTurn &&
     !(decided && showOpening) &&
     (phase === 'awaiting-roll' || (roller !== null && !tieWait));
@@ -543,7 +562,16 @@ export function GameScreen({
   } | null>(null);
   const [thrownTurn, setThrownTurn] = useState<string | null>(null);
   const endThrow = () => setThrowReq(null);
-  const throwPlaying = throwReq !== null;
+  // Online (#355): your roll is a call. `from` is the flow it was asked on;
+  // the throw is armed when a newer flow brings the roll (`armSentRoll`).
+  // In the render that brings it, the dice row already waits for the throw.
+  const [rollSent, setRollSent] = useState<{
+    from: MatchFlow;
+    swipe: ThrowSwipe | null;
+  } | null>(null);
+  const rollArrived =
+    rollSent !== null && rollSent.from !== flow && flow.log.at(-1)?.type === 'roll';
+  const throwPlaying = throwReq !== null || rollArrived;
   // Arms the throw of the roll just dispatched: the swipe that caused it
   // plays it back (`null`: the throw comes from the near wall — the button,
   // a tap, the bot). With Reduce Motion the dice appear as before.
@@ -559,7 +587,11 @@ export function GameScreen({
   const roll = (swipe?: ThrowSwipe) => {
     if (!canRoll) return;
     if (phase === 'awaiting-roll') {
-      if (dispatch({ type: 'roll', player: view.toMove })) armThrow(swipe ?? null);
+      const from = store.getState().flow;
+      if (!dispatch({ type: 'roll', player: view.toMove })) return;
+      // Online the dice come later, with the server's view.
+      if (online === undefined) armThrow(swipe ?? null);
+      else setRollSent({ from, swipe: swipe ?? null });
     } else if (roller !== null) {
       // The opening dice show on the card, at rest: the card covers the
       // board, so a throw under it would be invisible. The first throw of
@@ -799,13 +831,24 @@ export function GameScreen({
       setLanding({ key: `${matchKey}:${after.match.games.length}`, ms: flightsEndMs(flying) });
     }
   });
+  // Online (#355): the first flow after your roll call. It brings the
+  // roll (the throw plays), or something else (the call failed, the game
+  // changed): then nothing is thrown.
+  const armSentRoll = useEffectEvent(() => {
+    if (rollSent === null || rollSent.from === flow) return;
+    setRollSent(null);
+    if (rollArrived) armThrow(rollSent.swipe);
+  });
   const isOnline = online !== undefined;
-  // A layout effect: the flights start in the same frame as the new
-  // board, so the turn's end never shows first for a frame.
+  // A layout effect: the flights and the throw start in the same frame as
+  // the new board, so the turn's end never shows first for a frame.
   useLayoutEffect(() => {
     const before = seenFlow.current;
     seenFlow.current = flow;
-    if (isOnline && before !== flow) flyRemoteTurn(before, flow);
+    if (isOnline && before !== flow) {
+      flyRemoteTurn(before, flow);
+      armSentRoll();
+    }
   }, [flow, isOnline]);
 
   // The bot's turn. It starts when nothing covers the board, and stops when
@@ -927,7 +970,7 @@ export function GameScreen({
   // Screen readers hear each roll and the other player's moves (#134),
   // once each: a remount does not read the last one again (#216).
   // Online the log is empty: each new view is read once, keyed on its version.
-  // A roll you showed on the phone (#347) starts the log: it is read as a
+  // Your roll from this phone (#355) starts the log: it is read as a
   // local roll ("You rolled 5-3."), and your moves after it are not read.
   // Its key names the view too: one server roll, read once.
   const announcement =
@@ -963,12 +1006,13 @@ export function GameScreen({
     const timer = setTimeout(() => setOnlineLineSeen(onlineLineKey), OPENING_RESULT_MS);
     return () => clearTimeout(timer);
   }, [onlineLineKey]);
-  // The pass card says it already (a roll you showed, #347).
+  // The pass card says it already, and its dice show first (#355).
   const onlineLine =
     onlineLineText !== null &&
     onlineLineSeen !== onlineLineKey &&
     online?.ended === null &&
-    !showPass
+    !showPass &&
+    !passWaits
       ? onlineLineText
       : null;
   // The hint is read out once it shows (#209). It is not a game event: the
@@ -977,7 +1021,19 @@ export function GameScreen({
 
   // Dice in the controls row: this turn's, or the faded dice of a pass.
   const passDice: DieView[] = pass ? diceView(pass.dice, []) : [];
-  const dice = showPass ? passDice : view.dice;
+  const dice = showPass || passWaits ? passDice : view.dice;
+
+  // Online (#355): the pass card waits until the dice of the pass have
+  // shown: after your throw, or after the other player's dice tumbled.
+  const passWaitMs =
+    thrownTurn === `${gameKey}:${game.state.turnNumber}`
+      ? PASS_AFTER_THROW_MS
+      : ONLINE_PASS_DICE_MS;
+  useEffect(() => {
+    if (!passWaits || passKey === null || throwPlaying) return;
+    const timer = setTimeout(() => setPassReady(passKey), passWaitMs);
+    return () => clearTimeout(timer);
+  }, [passWaits, passKey, throwPlaying, passWaitMs]);
   // The opening dice already rolled in the card: show them at rest. So do
   // dice that no roll gave: a double chosen after a 1-2 (Acey-Deucey, #177).
   // Both have no roll in the log. With `rerollBoth` (#207) the starter's
@@ -1042,6 +1098,7 @@ export function GameScreen({
   } else if (
     phase === 'awaiting-roll' &&
     !showPass &&
+    !passWaits &&
     !showOpening &&
     (online === undefined || onlineRoll)
   ) {
@@ -1056,7 +1113,7 @@ export function GameScreen({
         compact={landscape}
       />
     );
-  } else if (phase === 'moving' || phase === 'awaiting-confirm' || showPass) {
+  } else if (phase === 'moving' || phase === 'awaiting-confirm' || showPass || passWaits) {
     showDice = true;
     hintButton = hintProps ? (
       <ActionButton
@@ -1075,7 +1132,7 @@ export function GameScreen({
         label={t('game.controls.undo')}
         accessibilityLabel={t('game.controls.undoLabel')}
         kind="secondary"
-        disabled={!view.canUndo || showPass}
+        disabled={!view.canUndo || showPass || passWaits}
         onPress={undo}
         grow={!landscape}
         compact={landscape}
@@ -1085,7 +1142,7 @@ export function GameScreen({
       <ActionButton
         testID="confirm-button"
         label={t('game.controls.confirm')}
-        disabled={!view.canConfirm || showPass}
+        disabled={!view.canConfirm || showPass || passWaits}
         onPress={confirm}
         grow={!landscape}
         compact={landscape}

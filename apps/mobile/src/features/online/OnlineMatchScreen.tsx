@@ -2,10 +2,10 @@
  * An online game on the board screen (#255): `GameScreen` over an online
  * store (`onlineStore.ts`), with the menu and the Resign match dialog.
  *
- * - The server rolls, passes and starts the next game, so there is no
- *   opening card (see "Online" in `GameScreen.tsx`). The phone holds back
- *   your new roll until you tap Roll or swipe, as offline, when it has a
- *   legal move (#347, `hiddenRoll.ts`).
+ * - The server rolls the opening, passes and starts the next game, so
+ *   there is no opening card (see "Online" in `GameScreen.tsx`). Your
+ *   roll waits for you: Roll, a tap or a swipe asks the server to roll
+ *   (#355), and the line says so until the dice come.
  * - While the server waits for the other player, the board is locked.
  * - The time left shows on the strip of the player the server waits for
  *   (live: seconds; async: hours).
@@ -74,13 +74,7 @@ export function OnlineMatchScreen(props: OnlineMatchScreenProps) {
 
 function OnlineGame(props: OnlineMatchScreenProps) {
   const { gameId, transport, me, now } = props;
-  const store = useOnlineGame({
-    transport,
-    gameId,
-    me,
-    hideRolls: true,
-    ...(now ? { now } : {}),
-  });
+  const store = useOnlineGame({ transport, gameId, me, ...(now ? { now } : {}) });
   if (store === null) return <Loading />;
   return <OnlineLoader store={store} {...props} />;
 }
@@ -117,6 +111,7 @@ const NOTICE_KEYS = {
   timedOut: { title: 'online.notice.timedOutTitle', text: 'online.notice.timedOut' },
   stale: { title: 'online.notice.staleTitle', text: 'online.notice.stale' },
   sendFailed: { title: 'online.notice.sendFailedTitle', text: 'online.notice.sendFailed' },
+  rollFailed: { title: 'online.notice.sendFailedTitle', text: 'online.notice.rollFailed' },
   refused: { title: 'online.notice.refusedTitle', text: 'online.notice.refused' },
 } as const satisfies Record<OnlineNotice, { title: string; text: string }>;
 
@@ -142,6 +137,7 @@ function OnlineBoard({
   const matchKey = useGameStore(board, (s) => s.matchKey);
   const view = useOnlineStore(store, (s) => s.view);
   const sending = useOnlineStore(store, (s) => s.sending);
+  const rolling = useOnlineStore(store, (s) => s.rolling);
   const notice = useOnlineStore(store, (s) => s.notice);
   const noticeCount = useOnlineStore(store, (s) => s.noticeCount);
   const clockOffset = useOnlineStore(store, (s) => s.clockOffset);
@@ -225,7 +221,11 @@ function OnlineBoard({
     me: side,
     version: view.version,
     locked: sending || waitingFor !== side,
-    status: sending ? t('online.status.sending') : t('online.status.waiting'),
+    status: rolling
+      ? t('online.status.rolling')
+      : sending
+        ? t('online.status.sending')
+        : t('online.status.waiting'),
     clock:
       waitingFor === null || shown === null || finished
         ? null

@@ -77,6 +77,31 @@ function confirm(store: OnlineStore): boolean {
   return store.getState().dispatch({ type: 'confirm', player: side });
 }
 
+/** Asks the server for the roll of `store`'s side (#355). */
+function roll(store: OnlineStore): boolean {
+  const { side } = store.getState();
+  if (side === null) throw new Error('not a player');
+  return store.getState().dispatch({ type: 'roll', player: side });
+}
+
+/** Two stores; the first player's turn is sent, so the other one waits to roll. */
+async function waitingToRoll(seed = 7) {
+  const game = setup();
+  const spies = {
+    [ALICE]: spy(game.server.transportFor(ALICE)),
+    [BOB]: spy(game.server.transportFor(BOB)),
+  };
+  const a = game.storeFor(ALICE, spies[ALICE].transport);
+  const b = game.storeFor(BOB, spies[BOB].transport);
+  await flush();
+  const [mover, roller] = turnOrder(a, b);
+  play(mover, pickTurn(viewOf(mover).game, createSeededRng(seed)));
+  expect(confirm(mover)).toBe(true);
+  await flush();
+  expect(roller.getState().flow?.game.phase).toBe('awaiting-roll');
+  return { ...game, mover, roller, rollerSpy: spies[roller === a ? ALICE : BOB] };
+}
+
 /** A transport that records its calls and can fail the next call like a network. */
 function spy(inner: GameTransport) {
   const calls: string[] = [];
@@ -94,6 +119,7 @@ function spy(inner: GameTransport) {
         stop();
       };
     },
+    rollDice: (request) => send('rollDice', () => inner.rollDice(request)),
     sendTurn: (request) => send('sendTurn', () => inner.sendTurn(request)),
     sendAnswer: (request) => send('sendAnswer', () => inner.sendAnswer(request)),
     resign: (gameId) => send('resign', () => inner.resign(gameId)),
@@ -147,9 +173,84 @@ describe('createOnlineStore', () => {
       expect(viewOf(store).version).toBe(2);
       expect(store.getState().flow?.game.lastTurn?.moves).toEqual(moves);
     }
-    // The server rolled for the next player.
+    // The next player's turn waits for their roll (#355).
     expect(viewOf(other).waitingFor).toBe(other.getState().side);
-    expect(other.getState().flow?.game.phase).toBe('moving');
+    expect(other.getState().flow?.game.phase).toBe('awaiting-roll');
+  });
+
+  it('asks the server for your roll; the view of it starts its log with the roll (#355)', async () => {
+    const { server, gameId, mover, roller, rollerSpy } = await waitingToRoll();
+    const side = roller.getState().side!;
+    const version = viewOf(roller).version;
+
+    expect(roll(roller)).toBe(true);
+    expect(roller.getState().sending).toBe(true);
+    expect(roller.getState().rolling).toBe(true);
+    // One roll at a time.
+    expect(roll(roller)).toBe(false);
+    await flush();
+
+    expect(roller.getState().sending).toBe(false);
+    expect(roller.getState().rolling).toBe(false);
+    expect(rollerSpy.calls).toEqual(['subscribe', 'rollDice']);
+    const view = server.getGame(gameId)!;
+    expect(view.version).toBe(version + 1);
+    expect(view.game.phase).toBe('moving');
+    const dice = view.game.state.dice!;
+    // Your phone throws the dice and reads them as a local roll.
+    expect(roller.getState().flow?.game).toEqual(view.game);
+    expect(roller.getState().flow?.log).toEqual([{ type: 'roll', player: side, dice }]);
+    // The other phone gets the same view, with an empty log.
+    expect(mover.getState().flow?.game.state.dice).toEqual(dice);
+    expect(mover.getState().flow?.log).toEqual([]);
+    // The roll stays in the log while you move.
+    play(roller, pickTurn(view.game, createSeededRng(8)).slice(0, 1));
+    expect(roller.getState().flow?.log[0]).toEqual({ type: 'roll', player: side, dice });
+  });
+
+  it('refuses a roll that is not yours, and ignores a move before your roll (#355)', async () => {
+    const { mover, roller, rollerSpy } = await waitingToRoll();
+    const moverSide = mover.getState().side!;
+    const side = roller.getState().side!;
+    // Not the mover's roll.
+    expect(roll(mover)).toBe(false);
+    expect(mover.getState().lastError).toMatch(/no roll to make/);
+    // The phone never picks a die.
+    expect(roller.getState().dispatch({ type: 'roll', player: side, dice: [6, 6] })).toBe(false);
+    expect(roller.getState().lastError).toMatch(/server rolls the dice/);
+    expect(roller.getState().dispatch({ type: 'roll', player: moverSide })).toBe(false);
+
+    // A move, undo or confirm before the roll does nothing, with no refusal.
+    const refusals = roller.getState().refusals;
+    const move = { from: 1, to: 2, die: 1 } as MoveInput;
+    expect(roller.getState().dispatch({ type: 'move', player: side, move })).toBe(false);
+    expect(roller.getState().dispatch({ type: 'undo', player: side })).toBe(false);
+    expect(confirm(roller)).toBe(false);
+    expect(roller.getState().refusals).toBe(refusals);
+    expect(roller.getState().lastError).toBe('roll first');
+    expect(rollerSpy.calls).toEqual(['subscribe']);
+  });
+
+  it('says when a roll does not reach the server, and lets you roll again (#355)', async () => {
+    const { server, gameId, roller, rollerSpy } = await waitingToRoll();
+    const version = viewOf(roller).version;
+    rollerSpy.setOffline(true);
+    expect(roll(roller)).toBe(true);
+    await flush();
+    expect(roller.getState().notice).toBe('rollFailed');
+    expect(roller.getState().lastError).toMatch(/network/);
+    expect(roller.getState().sending).toBe(false);
+    expect(roller.getState().rolling).toBe(false);
+    expect(roller.getState().flow?.game.phase).toBe('awaiting-roll');
+    expect(server.getGame(gameId)?.version).toBe(version);
+
+    rollerSpy.setOffline(false);
+    roller.getState().clearNotice();
+    expect(roll(roller)).toBe(true);
+    await flush();
+    expect(roller.getState().notice).toBeNull();
+    expect(server.getGame(gameId)?.version).toBe(version + 1);
+    expect(roller.getState().flow?.log).toHaveLength(1);
   });
 
   it('undoes on the phone before Confirm', async () => {
@@ -225,7 +326,6 @@ describe('createOnlineStore', () => {
     const alice = storeFor(ALICE, spied.transport);
     await flush();
     const actions: MatchAction[] = [
-      { type: 'roll', player: 'white' },
       { type: 'rollOpening', player: 'white' },
       { type: 'nextGame' },
       { type: 'chooseStarter', player: 'white' },
@@ -235,6 +335,9 @@ describe('createOnlineStore', () => {
       expect(alice.getState().dispatch(action)).toBe(false);
       expect(alice.getState().lastError).toMatch(/by itself/);
     }
+    // The server rolls the dice when you ask (#355): the phone never picks them.
+    expect(alice.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 5] })).toBe(false);
+    expect(alice.getState().lastError).toMatch(/server rolls the dice/);
     expect(spied.calls).toEqual(['subscribe']);
   });
 
@@ -528,6 +631,8 @@ describe('createOnlineStore', () => {
     expect(timeLeft(view, phone, other.getState().clockOffset)).toBe(LIVE - 20_000);
 
     // A view that arrives late (an hour after its save) keeps the best estimate.
+    expect(roll(other)).toBe(true);
+    await flush();
     play(other, pickTurn(viewOf(other).game, createSeededRng(16)));
     expect(confirm(other)).toBe(true);
     phone += 60 * 60 * 1000;
@@ -575,6 +680,9 @@ describe('createOnlineStore', () => {
           expect(
             mover.getState().dispatch({ type: 'answer', player: side, choice: choiceOf }),
           ).toBe(true);
+        } else if (view.game.phase === 'awaiting-roll') {
+          // Each turn waits for its roll (#355).
+          expect(roll(mover)).toBe(true);
         } else {
           play(mover, pickTurn(view.game, picker));
           expect(confirm(mover)).toBe(true);

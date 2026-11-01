@@ -29,7 +29,7 @@ import type {
 type MoveArg = SendTurnRequest['moves'][number];
 
 /**
- * What `makeMove` and `answer` return. `ok: false` means the turn time ran
+ * What `makeMove`, `answer` and `rollDice` return. `ok: false` means the turn time ran
  * out first: the server saved the time out instead of the call.
  */
 export type WriteResult =
@@ -42,6 +42,12 @@ export type WriteResult =
 
 export interface GameFunctions {
   readonly getGame: FunctionReference<'query', 'public', { gameId: string }, OnlineGameView | null>;
+  readonly rollDice: FunctionReference<
+    'mutation',
+    'public',
+    { gameId: string; expectedVersion: number },
+    WriteResult
+  >;
   readonly makeMove: FunctionReference<
     'mutation',
     'public',
@@ -66,6 +72,7 @@ export interface GameFunctions {
 /** The Convex function names (`module:function`) the adapter calls. */
 export const GAME_FUNCTION_NAMES = {
   getGame: 'games:getGame',
+  rollDice: 'games:rollDice',
   makeMove: 'games:makeMove',
   answer: 'games:answer',
   resign: 'games:resign',
@@ -74,6 +81,7 @@ export const GAME_FUNCTION_NAMES = {
 
 export const GAME_FUNCTIONS: GameFunctions = {
   getGame: makeFunctionReference(GAME_FUNCTION_NAMES.getGame),
+  rollDice: makeFunctionReference(GAME_FUNCTION_NAMES.rollDice),
   makeMove: makeFunctionReference(GAME_FUNCTION_NAMES.makeMove),
   answer: makeFunctionReference(GAME_FUNCTION_NAMES.answer),
   resign: makeFunctionReference(GAME_FUNCTION_NAMES.resign),
