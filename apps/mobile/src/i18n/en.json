@@ -186,6 +186,7 @@
   },
   "history": {
     "title": "History",
+    "back": "Back",
     "emptyTitle": "No matches yet",
     "empty": "Finish a match vs the bot or in pass-and-play, and it shows here.",
     "play": "Play",
