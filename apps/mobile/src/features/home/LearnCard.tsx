@@ -4,7 +4,9 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+
+import { Icon } from '@/components/Icon';
 
 export interface LearnCardProps {
   onStart: () => void;
@@ -13,12 +15,20 @@ export interface LearnCardProps {
 
 export function LearnCard({ onStart, onDismiss }: LearnCardProps) {
   const { t } = useTranslation();
+  const { theme } = useUnistyles();
   return (
     <View testID="home-learn" style={styles.card}>
-      <Text style={styles.title} accessibilityRole="header">
-        {t('home.learn.title')}
-      </Text>
-      <Text style={styles.line}>{t('home.learn.subtitle')}</Text>
+      <View style={styles.head}>
+        <View style={styles.badge}>
+          <Icon name="graduation" size={22} color={theme.colors.turnText} />
+        </View>
+        <View style={styles.texts}>
+          <Text style={styles.title} accessibilityRole="header">
+            {t('home.learn.title')}
+          </Text>
+          <Text style={styles.line}>{t('home.learn.subtitle')}</Text>
+        </View>
+      </View>
       <View style={styles.buttons}>
         <Pressable
           testID="home-learn-start"
@@ -43,20 +53,39 @@ export function LearnCard({ onStart, onDismiss }: LearnCardProps) {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  // A brass-tinted banner (#342): it stands out from the walnut tiles.
   card: {
     gap: theme.space.sm,
     padding: theme.space.lg,
-    borderRadius: theme.radii.lg,
+    borderRadius: theme.radii.xl,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: `${theme.colors.accent}88`,
     backgroundColor: theme.colors.surface,
+    backgroundImage: `linear-gradient(135deg, ${theme.colors.accent}38 0%, ${theme.colors.surface} 80%)`,
+  },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.space.md,
+  },
+  badge: {
+    width: theme.touch.minTarget,
+    height: theme.touch.minTarget,
+    borderRadius: theme.radii.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.backgroundDeep,
+  },
+  texts: {
+    flex: 1,
+    gap: theme.space.xxs,
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.bodyStrong,
     color: theme.colors.text,
   },
   line: {
-    ...theme.type.body,
+    ...theme.type.caption,
     color: theme.colors.textDim,
   },
   // Greek labels are longer: the buttons wrap instead of shrinking.
@@ -70,8 +99,8 @@ const styles = StyleSheet.create((theme) => ({
   start: {
     minHeight: theme.touch.minTarget,
     justifyContent: 'center',
-    paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radii.md,
+    paddingHorizontal: theme.space.xl,
+    borderRadius: theme.radii.pill,
     backgroundColor: theme.colors.accent,
   },
   startText: {

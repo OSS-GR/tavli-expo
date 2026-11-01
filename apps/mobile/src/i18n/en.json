@@ -11,8 +11,15 @@
   "home": {
     "title": "Tavlaki",
     "tagline": "Greek tavli with friends",
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening"
+    },
     "openSettings": "Settings",
     "newGame": "New game",
+    "moreModes": "More ways to play",
+    "playNow": "Play now",
     "vsBot": {
       "title": "Play vs bot",
       "levels": "{{first}} or {{last}}",
@@ -34,7 +41,8 @@
       "vsBot": "{{game}} · vs Bot ({{level}})",
       "local": "{{game}} · pass-and-play",
       "target": "first to {{target}}",
-      "broken": "Your saved game could not be opened."
+      "broken": "Your saved game could not be opened.",
+      "resume": "Continue"
     },
     "online": {
       "title": "Your online games",
