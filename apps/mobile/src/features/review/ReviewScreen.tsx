@@ -11,6 +11,8 @@
  * and the match-end screen. It reads the game from the match log in
  * memory (`review.ts`); nothing is saved.
  *
+ * The Home style (#362): `Screen`, `ScreenHeader` and walnut cards.
+ *
  * Screen readers: each mistake is one element with the full text; the
  * board and the dice in it are hidden from them. The switch is hidden
  * too: it only changes the marks on that hidden board, and the card's
@@ -24,6 +26,8 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { Screen } from '@/components/Screen';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { asodioMarks } from '@/features/board/asodio';
 import { boardLayout, useBoardTheme, useHomeBoardSide } from '@/features/board/BoardCanvas';
 import type { BoardView } from '@/features/board/boardModel';
@@ -46,6 +50,8 @@ export interface ReviewScreenProps {
   flow: MatchFlow;
   /** For tests: another Analyzer. */
   analyzer?: Analyzer;
+  /** Goes back. Without it the header has no back button. */
+  onBack?: () => void;
 }
 
 const BOTH_SIDES: readonly PlayerId[] = ['white', 'black'];
@@ -54,7 +60,7 @@ type ShownTurn = 'played' | 'best';
 /** The dice under each small board. */
 const REVIEW_DIE_SIZE = 32;
 
-export function ReviewScreen({ setup, flow, analyzer = appAnalyzer }: ReviewScreenProps) {
+export function ReviewScreen({ setup, flow, analyzer = appAnalyzer, onBack }: ReviewScreenProps) {
   const { t } = useTranslation();
   const vsBot = setup.mode === 'bot';
   // Vs the bot only the person's turns count; in pass-and-play both players'.
@@ -81,34 +87,45 @@ export function ReviewScreen({ setup, flow, analyzer = appAnalyzer }: ReviewScre
   useAnnouncement(status);
 
   return (
-    <ScrollView testID="review-screen" style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title} accessibilityRole="header">
-        {game}
-      </Text>
-      {review.kind === 'busy' ? (
-        <View testID="review-busy" style={styles.busy}>
-          <ActivityIndicator />
-          <Text style={styles.status}>{t('review.busy')}</Text>
-        </View>
-      ) : (
-        <Text testID="review-status" style={styles.status}>
-          {status}
+    <Screen>
+      <ScreenHeader
+        title={t('review.title')}
+        {...(onBack ? { onBack } : {})}
+        backLabel={t('newGame.back')}
+        testID="review-back"
+      />
+      <ScrollView
+        testID="review-screen"
+        style={styles.scroll}
+        contentContainerStyle={styles.content}>
+        <Text style={styles.title} accessibilityRole="header">
+          {game}
         </Text>
-      )}
-      {review.kind === 'done'
-        ? review.mistakes.map((mistake, i) => (
-            <MistakeCard
-              key={i}
-              testID={`review-mistake-${i + 1}`}
-              mistake={mistake}
-              name={vsBot ? null : seats[mistake.turn.player].name}
-            />
-          ))
-        : null}
-      {review.kind === 'done' && review.mistakes.length > 0 ? (
-        <Text style={styles.note}>{t('review.note')}</Text>
-      ) : null}
-    </ScrollView>
+        {review.kind === 'busy' ? (
+          <View testID="review-busy" style={styles.busy}>
+            <ActivityIndicator />
+            <Text style={styles.status}>{t('review.busy')}</Text>
+          </View>
+        ) : (
+          <Text testID="review-status" style={styles.status}>
+            {status}
+          </Text>
+        )}
+        {review.kind === 'done'
+          ? review.mistakes.map((mistake, i) => (
+              <MistakeCard
+                key={i}
+                testID={`review-mistake-${i + 1}`}
+                mistake={mistake}
+                name={vsBot ? null : seats[mistake.turn.player].name}
+              />
+            ))
+          : null}
+        {review.kind === 'done' && review.mistakes.length > 0 ? (
+          <Text style={styles.note}>{t('review.note')}</Text>
+        ) : null}
+      </ScrollView>
+    </Screen>
   );
 }
 
@@ -218,15 +235,14 @@ function MistakeCard({ mistake, name, testID }: MistakeCardProps) {
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
-  screen: {
+  scroll: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   content: {
     gap: theme.space.md,
     paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.lg,
-    paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
+    paddingTop: theme.space.sm,
+    paddingBottom: rt.insets.bottom + theme.space.xl,
   },
   title: {
     ...theme.type.title,
@@ -242,13 +258,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     flexShrink: 1,
     color: theme.colors.text,
   },
+  // The walnut card of `SectionCard` (#356), with room for the board.
   card: {
     gap: theme.space.md,
-    padding: theme.space.md,
-    borderRadius: theme.radii.lg,
+    padding: theme.space.lg,
+    borderRadius: theme.radii.xl,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
   },
   cardBody: {
     gap: theme.space.sm,
@@ -294,7 +312,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
   }),
   // The buttons share a row; at a large font the second one wraps to a row
-  // of its own, and a long label wraps inside its button.
+  // of its own, and a long label wraps inside its button. The look of
+  // `SegmentedControl` (#356): a dark track, the picked one in brass.
   switch: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -302,7 +321,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     padding: theme.space.xs,
     borderRadius: theme.radii.lg,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.separator,
+    backgroundColor: theme.colors.backgroundDeep,
   },
   segment: (selected: boolean) => ({
     flexGrow: 1,
@@ -313,18 +333,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.space.md,
     paddingVertical: theme.space.xs,
     borderRadius: theme.radii.md,
-    borderWidth: 2,
-    borderColor: selected ? theme.colors.accent : 'transparent',
-    backgroundColor: selected ? theme.colors.surfaceSelected : 'transparent',
+    backgroundColor: selected ? theme.colors.accent : 'transparent',
   }),
   pressed: {
     opacity: 0.7,
   },
-  // `textDim` on `surface` keeps 4.5:1 (checked in `packages/ui` for every app theme).
   segmentLabel: (selected: boolean) => ({
     ...(selected ? theme.type.bodyStrong : theme.type.body),
     textAlign: 'center',
-    color: selected ? theme.colors.text : theme.colors.textDim,
+    color: selected ? theme.colors.onAccent : theme.colors.textDim,
   }),
   note: {
     ...theme.type.caption,

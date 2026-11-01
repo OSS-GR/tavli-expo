@@ -161,9 +161,11 @@ describe('<RulesScreen />', () => {
   it.each(RULES_GAMES)('shows every section of %s in order, with headers', async (game) => {
     await show(game).view;
     const sections = RULES_PAGES[game];
-    expect(screen.getAllByRole('header').map((h) => h.props.children)).toEqual(
-      sections.map((section) => tr(section.title)),
-    );
+    // The page title first (the screen header, #362), then each section.
+    expect(screen.getAllByRole('header').map((h) => h.props.children)).toEqual([
+      tr(rulesTitleKey(game)),
+      ...sections.map((section) => tr(section.title)),
+    ]);
     for (const section of sections) {
       const box = screen.getByTestId(`rules-section-${section.id}`);
       for (const line of paragraphs(section.body.map(tr))) {
@@ -195,8 +197,9 @@ describe('<RulesScreen />', () => {
     async (game, version, title) => {
       await render(<RulesScreen variant={game} version={version} onOpenRules={jest.fn()} />);
       const headers = screen.getAllByRole('header').map((h) => h.props.children);
-      expect(headers[0]).toBe(title);
-      expect(headers.slice(1)).toEqual(RULES_PAGES[game].map((section) => tr(section.title)));
+      expect(headers[0]).toBe(tr(rulesTitleKey(game)));
+      expect(headers[1]).toBe(title);
+      expect(headers.slice(2)).toEqual(RULES_PAGES[game].map((section) => tr(section.title)));
       const box = screen.getByTestId('rules-section-version');
       for (const line of paragraphs(versionSection(version).body.map(tr))) {
         expect(within(box).getByText(line)).toBeOnTheScreen();
@@ -350,6 +353,19 @@ describe('<RulesScreen />', () => {
     await show('tavli').view;
     expect(screen.queryByRole('button', { name: 'How to play Asodio' })).toBeNull();
     expect(screen.getAllByRole('button')).toHaveLength(3);
+  });
+
+  it('has a back button in its header only with onBack (#362)', async () => {
+    const onBack = jest.fn();
+    await render(<RulesScreen variant="portes" onOpenRules={jest.fn()} onBack={onBack} />);
+    expect(screen.getByRole('header', { name: 'How to play Portes' })).toBeOnTheScreen();
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no back button without onBack', async () => {
+    await show('portes').view;
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
   });
 
   it('handles an unknown game', async () => {
