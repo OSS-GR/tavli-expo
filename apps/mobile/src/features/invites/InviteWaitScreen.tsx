@@ -15,16 +15,32 @@
  *   covers the screen (`covered`: the turn notifications offer, #285), the
  *   screen is hidden from screen readers, and a card takes focus and is
  *   read only once the sheet is gone.
+ * - Look (#358): the Home style. The code is large on a brass-edged card
+ *   with the link under it, Share is the main button, a dot pulses by
+ *   "Waiting for your friend…" (still with reduce motion), and Cancel
+ *   sits at the bottom.
  *
  * Navigation stays in the route (`app/friend/[code].tsx`).
  */
 import { isInviteErrorData, type Invites } from '@tavli/contracts';
+import { displayCaps } from '@tavli/ui';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, Share, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { Icon } from '@/components/Icon';
+import { screenBackground } from '@/components/Screen';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 
@@ -36,6 +52,10 @@ import {
   waitStateOfView,
   type WaitState,
 } from './waitState';
+
+/** The waiting dot and the ring around it, in points. */
+const DOT = 10;
+const DOT_RING = 6;
 
 /** How long "Your friend joined" shows before the game opens. */
 export const JOINED_OPEN_MS = 1500;
@@ -166,7 +186,7 @@ export function InviteWaitScreen({
       <Covered value={covered}>
         <ScrollView
           testID="invite-wait-screen"
-          style={styles.screen}
+          style={styles.scroll}
           contentContainerStyle={styles.content}>
           {shown.kind === 'loading' ? (
             <Loading />
@@ -218,6 +238,7 @@ interface WaitingProps {
 
 function Waiting({ code, cancelling, cancelFailed, onCancel }: WaitingProps) {
   const { t } = useTranslation();
+  const { theme } = useUnistyles();
   const covered = useContext(Covered);
   const titleRef = useFocusOnShow(!covered);
   const title = t('friend.wait.title');
@@ -233,48 +254,86 @@ function Waiting({ code, cancelling, cancelFailed, onCancel }: WaitingProps) {
     );
   };
   return (
-    <View testID="invite-wait-open" style={styles.card}>
-      <Text ref={titleRef} style={styles.title} accessibilityRole="header">
+    <View testID="invite-wait-open" style={styles.waiting}>
+      <Text ref={titleRef} style={styles.pageTitle} accessibilityRole="header">
         {title}
       </Text>
-      <Text style={styles.line}>{body}</Text>
-      {/* A screen reader spells the code out, one character at a time. */}
-      <View
-        style={styles.row}
-        accessible
-        accessibilityLabel={`${t('friend.wait.code')}: ${[...code].join(' ')}`}>
-        <Text style={styles.label}>{t('friend.wait.code')}</Text>
-        <Text testID="invite-wait-code" style={styles.code} selectable>
-          {code}
-        </Text>
+      <Text style={styles.lead}>{body}</Text>
+      <View style={styles.hero}>
+        {/* A screen reader spells the code out, one character at a time. */}
+        <View
+          style={styles.codeBlock}
+          accessible
+          accessibilityLabel={`${t('friend.wait.code')}: ${[...code].join(' ')}`}>
+          <Text style={styles.eyebrow}>{displayCaps(t('friend.wait.code'))}</Text>
+          <Text testID="invite-wait-code" style={styles.code} selectable>
+            {code}
+          </Text>
+        </View>
+        <View
+          style={styles.linkRow}
+          accessible
+          accessibilityLabel={`${t('friend.wait.link')}: ${link}`}>
+          <Icon name="link" size={20} color={theme.colors.textDim} />
+          <Text testID="invite-wait-link" style={styles.link} selectable>
+            {link}
+          </Text>
+        </View>
       </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>{t('friend.wait.link')}</Text>
-        <Text testID="invite-wait-link" style={styles.value} selectable>
-          {link}
-        </Text>
+      <ActionButton testID="invite-wait-share" label={t('friend.wait.share')} onPress={share} />
+      <View style={styles.waitCard}>
+        <View style={styles.status}>
+          <PulsingDot />
+          <Text style={styles.statusText}>{t('friend.wait.status')}</Text>
+        </View>
+        <Text style={styles.small}>{t('friend.wait.stay')}</Text>
       </View>
-      <View style={styles.status}>
-        <ActivityIndicator />
-        <Text style={styles.value}>{t('friend.wait.status')}</Text>
-      </View>
-      <Text style={styles.line}>{t('friend.wait.stay')}</Text>
-      <View style={styles.actions}>
-        <ActionButton testID="invite-wait-share" label={t('friend.wait.share')} onPress={share} />
-        <ActionButton
-          testID="invite-wait-cancel"
-          kind="secondary"
-          label={t('friend.wait.cancel')}
-          disabled={cancelling}
-          onPress={onCancel}
-        />
-      </View>
+      <View style={styles.spacer} />
+      <ActionButton
+        testID="invite-wait-cancel"
+        kind="secondary"
+        label={t('friend.wait.cancel')}
+        disabled={cancelling}
+        onPress={onCancel}
+      />
       {cancelling ? <Text style={styles.line}>{t('friend.wait.cancelling')}</Text> : null}
       {cancelFailed ? (
         <Text testID="invite-wait-cancel-failed" style={styles.line}>
           {t('friend.wait.cancelFailed')}
         </Text>
       ) : null}
+    </View>
+  );
+}
+
+/** One beat of the waiting dot, in ms: it fades out and back in. */
+const PULSE_MS = 900;
+
+/**
+ * The dot by "Waiting for your friend…": it pulses while the invite is
+ * open. With reduce motion on it stays still. Screen readers skip it.
+ */
+function PulsingDot() {
+  const reduceMotion = useReducedMotion();
+  const pulse = useSharedValue(1);
+  useEffect(() => {
+    if (reduceMotion) return undefined;
+    pulse.set(
+      withRepeat(
+        withTiming(0.35, { duration: PULSE_MS, easing: Easing.inOut(Easing.quad) }),
+        -1,
+        true,
+      ),
+    );
+    return () => cancelAnimation(pulse);
+  }, [reduceMotion, pulse]);
+  const animated = useAnimatedStyle(() => ({ opacity: pulse.get() }));
+  return (
+    <View
+      style={styles.dotRing}
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden>
+      <Animated.View testID="invite-wait-dot" style={[styles.dot, animated]} />
     </View>
   );
 }
@@ -372,12 +431,15 @@ function Closed({ kind, onRetry, onNewInvite, onHome }: ClosedProps) {
 const styles = StyleSheet.create((theme, rt) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    ...screenBackground(theme.colors),
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingTop: Math.max(rt.insets.top, theme.space.lg),
+    paddingTop: rt.insets.top + theme.space.lg,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
     paddingHorizontal: theme.space.lg,
   },
@@ -392,6 +454,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
   },
   title: {
     ...theme.type.title,
@@ -401,26 +464,106 @@ const styles = StyleSheet.create((theme, rt) => ({
     ...theme.type.body,
     color: theme.colors.textDim,
   },
-  row: {
-    gap: theme.space.xxs,
+  waiting: {
+    flexGrow: 1,
+    gap: theme.space.lg,
   },
-  label: {
-    ...theme.type.caption,
+  pageTitle: {
+    ...theme.type.title,
+    textAlign: 'center',
+    color: theme.colors.text,
+  },
+  lead: {
+    ...theme.type.body,
+    textAlign: 'center',
     color: theme.colors.textDim,
   },
-  value: {
-    ...theme.type.bodyStrong,
-    color: theme.colors.text,
+  hero: {
+    alignItems: 'center',
+    gap: theme.space.md,
+    paddingVertical: theme.space.xl,
+    paddingHorizontal: theme.space.lg,
+    borderRadius: theme.radii.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.surface,
+    backgroundImage: `linear-gradient(160deg, ${theme.colors.surfaceSelected} 0%, ${theme.colors.surface} 70%)`,
+    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
+  },
+  codeBlock: {
+    alignItems: 'center',
+    gap: theme.space.xs,
+  },
+  eyebrow: {
+    ...theme.type.section,
+    color: theme.colors.accent,
   },
   code: {
-    ...theme.type.title,
+    ...theme.type.display,
+    fontWeight: '800',
+    letterSpacing: 6,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
     color: theme.colors.text,
-    letterSpacing: 2,
+  },
+  linkRow: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.sm,
+    minHeight: 48,
+    paddingHorizontal: theme.space.md,
+    paddingVertical: theme.space.sm,
+    borderRadius: theme.radii.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.separator,
+    backgroundColor: theme.colors.backgroundDeep,
+  },
+  link: {
+    ...theme.type.caption,
+    flex: 1,
+    color: theme.colors.textDim,
+  },
+  waitCard: {
+    gap: theme.space.sm,
+    padding: theme.space.lg,
+    borderRadius: theme.radii.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
   },
   status: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.sm,
+    gap: theme.space.md,
+  },
+  statusText: {
+    ...theme.type.bodyStrong,
+    flex: 1,
+    color: theme.colors.text,
+  },
+  small: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
+  },
+  // The ring stays; only the dot inside it pulses.
+  dotRing: {
+    width: DOT + 2 * DOT_RING,
+    height: DOT + 2 * DOT_RING,
+    borderRadius: (DOT + 2 * DOT_RING) / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.accentWash,
+  },
+  dot: {
+    width: DOT,
+    height: DOT,
+    borderRadius: DOT / 2,
+    backgroundColor: theme.colors.turn,
+  },
+  spacer: {
+    flexGrow: 1,
   },
   actions: {
     gap: theme.space.sm,
