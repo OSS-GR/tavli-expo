@@ -1,6 +1,9 @@
 import { Pressable, Switch, Text, View } from 'react-native';
 import { StyleSheet, withUnistyles } from 'react-native-unistyles';
 
+import type { IconName } from '../icons';
+import { RowIcon, useInSectionCard } from '../SectionCard';
+
 const ThemedSwitch = withUnistyles(Switch, (theme) => ({
   trackColor: { false: theme.colors.switchTrackOff, true: theme.colors.accent },
   thumbColor: theme.colors.switchThumb,
@@ -11,6 +14,8 @@ interface ToggleRowProps {
   label: string;
   /** One short line under the label. It may wrap. */
   hint?: string;
+  /** A Lucide icon in a small dark badge on the left. */
+  icon?: IconName;
   value: boolean;
   onValueChange: (value: boolean) => void;
   testID?: string;
@@ -19,8 +24,11 @@ interface ToggleRowProps {
 /**
  * A settings row with a switch. The whole row is one tap target and one
  * accessible "switch", so screen readers read the label and the state together.
+ * In a `SectionCard` it is a card row (side padding, the card draws the
+ * lines); elsewhere it has a line under it.
  */
-export function ToggleRow({ label, hint, value, onValueChange, testID }: ToggleRowProps) {
+export function ToggleRow({ label, hint, icon, value, onValueChange, testID }: ToggleRowProps) {
+  const inCard = useInSectionCard();
   return (
     <Pressable
       testID={testID}
@@ -29,9 +37,10 @@ export function ToggleRow({ label, hint, value, onValueChange, testID }: ToggleR
       accessibilityHint={hint}
       accessibilityState={{ checked: value }}
       onPress={() => onValueChange(!value)}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.row(inCard), pressed && styles.pressed]}>
+      {icon ? <RowIcon name={icon} /> : null}
       <View style={styles.text}>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.label(inCard)}>{label}</Text>
         {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       </View>
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -42,15 +51,16 @@ export function ToggleRow({ label, hint, value, onValueChange, testID }: ToggleR
 }
 
 const styles = StyleSheet.create((theme) => ({
-  row: {
+  row: (inCard: boolean) => ({
     minHeight: theme.touch.row,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.lg,
+    gap: inCard ? theme.space.md : theme.space.lg,
     paddingVertical: theme.space.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.separator,
-  },
+    ...(inCard
+      ? { paddingHorizontal: theme.space.lg }
+      : { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.separator }),
+  }),
   pressed: {
     opacity: 0.7,
   },
@@ -58,10 +68,10 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     gap: theme.space.xxs,
   },
-  label: {
-    ...theme.type.body,
+  label: (inCard: boolean) => ({
+    ...(inCard ? theme.type.bodyStrong : theme.type.body),
     color: theme.colors.text,
-  },
+  }),
   hint: {
     ...theme.type.caption,
     color: theme.colors.textDim,

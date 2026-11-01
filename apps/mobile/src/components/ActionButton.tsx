@@ -1,7 +1,10 @@
 import { Pressable, Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
-/** `primary`: filled. `secondary`: outlined. `text`: no frame, for a quiet last choice ("Home"). */
+/**
+ * `primary`: brass gradient. `secondary`: surface with a thin border.
+ * `text`: no frame, for a quiet last choice ("Home").
+ */
 export type ActionButtonKind = 'primary' | 'secondary' | 'text';
 
 export interface ActionButtonProps {
@@ -24,9 +27,10 @@ export interface ActionButtonProps {
 }
 
 /**
- * A big game button (wireframe rules: main = filled brass, second =
- * outlined, quiet = text only, disabled = dashed). At least 52 pt tall,
- * and text may wrap for longer Greek labels and large system fonts.
+ * A big button in the Home style (#356; wireframe rules: main = brass
+ * gradient, second = surface with a border, quiet = text only, disabled =
+ * dashed). It shrinks a little when pressed. At least 52 pt tall, and text
+ * may wrap for longer Greek labels and large system fonts.
  */
 export function ActionButton({
   label,
@@ -69,22 +73,29 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.radii.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderStyle: disabled ? 'dashed' : 'solid',
-    borderColor: disabled
-      ? theme.colors.border
+    ...(disabled
+      ? {
+          borderWidth: 2,
+          borderStyle: 'dashed' as const,
+          borderColor: theme.colors.border,
+          backgroundColor: 'transparent',
+        }
       : kind === 'primary'
-        ? theme.colors.accent
-        : kind === 'text'
-          ? 'transparent'
-          : theme.colors.border,
-    backgroundColor: disabled
-      ? 'transparent'
-      : kind === 'primary'
-        ? theme.colors.accent
-        : kind === 'text'
-          ? 'transparent'
-          : theme.colors.surface,
+        ? {
+            borderWidth: 1,
+            borderColor: theme.colors.accent,
+            backgroundColor: theme.colors.accent,
+            // Lit from the top left, like the Home tiles.
+            backgroundImage: `linear-gradient(160deg, ${theme.colors.accentLight} 0%, ${theme.colors.accent} 70%)`,
+            boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.35)',
+          }
+        : kind === 'secondary'
+          ? {
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.surface,
+            }
+          : { borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' }),
   }),
   grow: {
     flex: 1,
@@ -94,7 +105,8 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.space.xs,
   },
   pressed: {
-    opacity: 0.75,
+    opacity: 0.9,
+    transform: [{ scale: 0.97 }],
   },
   label: (kind: ActionButtonKind, disabled: boolean) => ({
     ...theme.type.bodyStrong,
