@@ -213,13 +213,12 @@ The first Android build asks to make a **keystore** (the signing key). Say **yes
 
 ```bash
 cd apps/mobile
-eas build --profile production --platform ios
-eas submit --platform ios --latest
+eas build --profile production --platform ios --auto-submit
 ```
 
-`--latest` takes the newest iOS build of any profile, so run it right after the production build, or pass `--id <build id>` instead.
+`--auto-submit` sends the build to App Store Connect when it finishes, with the `production` submit profile. To submit a build made earlier, run `eas submit --platform ios --id <build id>` (or `--latest`, which takes the newest iOS build of any profile).
 
-`eas submit` reads `app.config.ts` without the build profile's env, so it sees the development variant (`com.tavlaki.dev`). So `submit.production.ios` in `eas.json` names the store app itself: `bundleIdentifier` `com.tavlaki` and `appName` "Tavlaki". `apps/mobile/src/easSubmit.test.ts` checks that they match the production variant. A submit for another variant needs its own submit profile, and Android needs `submit.production.android.applicationId` once the Play account exists.
+`eas submit` reads `app.config.ts` without the build profile's env, so it sees the development variant (`com.tavlaki.dev`). So `submit.production.ios` in `eas.json` names the store app itself: `bundleIdentifier` `com.tavlaki`, `appName` "Tavlaki" and `ascAppId` `6828172932` (the app's Apple ID in App Store Connect → App Information; not a secret, #344). Without `ascAppId` a submit with no questions (auto-submit, the Expo MCP) stops with "Set ascAppId in the submit profile". `apps/mobile/src/easSubmit.test.ts` checks them against the production variant. A submit for another variant needs its own submit profile, and Android needs `submit.production.android.applicationId` once the Play account exists.
 
 **Manual GitHub workflow.** The **EAS build** workflow (`.github/workflows/eas-build.yml`) starts a cloud build from the Actions tab. It only runs when you click **Run workflow**. It needs a repo secret `EXPO_TOKEN`: make a token on expo.dev > **Account settings** > **Access tokens**, then add it in GitHub > **Settings** > **Secrets and variables** > **Actions**. The run does not wait for the build, so it uses about 2 GitHub minutes.
 
