@@ -2,6 +2,8 @@ import { act, render, screen, userEvent } from '@testing-library/react-native';
 
 import i18n from '@/i18n';
 
+import { startBoard } from '@/features/rules/content';
+
 import { ContinueCard } from './ContinueCard';
 import { HomeScreen, levelList } from './HomeScreen';
 
@@ -135,6 +137,70 @@ describe('<HomeScreen />', () => {
     await render(<HomeScreen {...setup()} onHistory={onHistory} />);
     await user.press(screen.getByRole('link', { name: 'History' }));
     expect(onHistory).toHaveBeenCalled();
+  });
+
+  it('greets for the part of the day (#342)', async () => {
+    const { rerender } = await render(<HomeScreen {...setup()} hour={8} />);
+    expect(screen.getByText('Good morning')).toBeOnTheScreen();
+    await rerender(<HomeScreen {...setup()} hour={14} />);
+    expect(screen.getByText('Good afternoon')).toBeOnTheScreen();
+    await rerender(<HomeScreen {...setup()} hour={22} />);
+    expect(screen.getByText('Good evening')).toBeOnTheScreen();
+    expect(screen.getByText('Greek tavli with friends')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Tavlaki' })).toBeOnTheScreen();
+  });
+
+  it('makes Play vs bot the hero with the start board when there is no save (#342)', async () => {
+    const user = userEvent.setup();
+    const props = setup();
+    await render(<HomeScreen {...props} />);
+
+    expect(screen.getAllByTestId('home-vs-bot')).toHaveLength(1);
+    expect(screen.getByTestId('home-vs-bot-board', { includeHiddenElements: true })).toBeTruthy();
+    // The board is a picture only: screen readers hear the card's label.
+    expect(screen.queryByTestId('home-vs-bot-board')).toBeNull();
+    expect(screen.getByText('Play now')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'More ways to play' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Play vs bot, Easy' }));
+    expect(props.onNewGame).toHaveBeenLastCalledWith('bot');
+  });
+
+  it('moves Play vs bot to a tile when the hero is the saved game (#342)', async () => {
+    const user = userEvent.setup();
+    const props = setup();
+    const onContinue = jest.fn();
+    await render(
+      <HomeScreen
+        {...props}
+        continueCard={
+          <ContinueCard
+            summary={{ game: 'Portes · vs Bot (Easy)', status: 'You 0 – 0 Bot' }}
+            board={{ board: startBoard('portes'), direction: 'contrary' }}
+            onPress={onContinue}
+          />
+        }
+      />,
+    );
+
+    expect(screen.getByTestId('home-continue-board', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId('home-vs-bot-board', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getAllByTestId('home-vs-bot')).toHaveLength(1);
+    expect(screen.getByRole('header', { name: 'New game' })).toBeOnTheScreen();
+    expect(screen.getByText('Continue')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Play vs bot, Easy' }));
+    expect(props.onNewGame).toHaveBeenLastCalledWith('bot');
+    await user.press(screen.getByRole('button', { name: /^Continue game, Portes/ }));
+    expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws no board on the Continue card without a position', async () => {
+    await render(
+      <ContinueCard
+        summary={{ game: 'Portes · pass-and-play', status: '1 – 0' }}
+        onPress={jest.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('home-continue-board', { includeHiddenElements: true })).toBeNull();
   });
 
   it('shows a notice once, for example a broken save', async () => {

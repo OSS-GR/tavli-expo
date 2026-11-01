@@ -161,22 +161,26 @@ Notes:
 
 - **Route:** `app/index.tsx`
 - **Purpose:** Start or continue a game in one or two taps (#34, #36).
+- **Redesign (#342).** The drawing above is the first layout. The app now differs: the empty art box is gone, the play modes are tiles with icons, and a hero card with a board picture leads the screen. The list below is the current layout.
 - **Elements:**
-  - Top bar: small logo, "Tavlaki", **gear** button (Settings).
-  - Board art or mascot area (filled by the art task).
-  - **Continue game** card (only when a saved game exists): game, opponent, match score, target and time since last move. The whole card is one target.
-  - **Learn to play** card (#128, not drawn): title, one line, **Start the lesson** (filled) and **Not now** (text). Shows until the tutorial is finished or dismissed.
-  - "New game" section:
-    - **Play vs bot** (main button). The subtitle lists the bot levels, for example "Easy, Medium or Hard". The app builds it from the levels the bot plays in at least one game (#182).
-    - **Pass-and-play** (subtitle "2 players, 1 phone").
-    - **Play a friend** (disabled look, "Coming soon" chip).
-  - **How to play** link (opens `/rules/portes`).
+  - Top row: the app logo (the app icon, `assets/home/logo.webp`), "Tavlaki" (a header for screen readers) and a round **gear** icon button (Settings).
+  - A large greeting for the part of the day ("Good morning", "Good afternoon", "Good evening"; `features/home/greeting.ts`, the phone's hour) and the tagline under it.
+  - **Hero card** (`HomeHero.tsx`): a board picture (the classic wide board, `StaticBoard`, hidden from screen readers), a small caps line, a title, dim lines and a brass pill. The whole card is one button.
+    - *Saved game:* **Continue game**: the saved board as it was left, game and opponent, then score, target and time since the save. The pill says **Continue**.
+    - *No saved game:* **Play vs bot** over the Portes start position. The line under it lists the bot levels, for example "Easy, Medium or Hard" (built from the levels the bot plays in at least one game, #182). The pill says **Play now**.
+  - **Your online games** and **Your invites** (#297, #314) when this phone has an online account.
+  - **Learn to play** banner (#128): a brass-tinted card with an icon, title, one line, **Start the lesson** (filled pill) and **Not now** (text). Shows until the tutorial is finished or dismissed.
+  - Mode tiles (`ModeTile.tsx`) under a section title: "New game" with a saved game (then **Play vs bot** is a wide brass tile first), else "More ways to play".
+    - **Pass-and-play** (subtitle "2 players, 1 phone") and **Play a friend** ("Online"), two in a row. With a font scale above 1.3 each takes a row.
+    - **Play a friend** without an online server: dashed tile with a "Coming soon" chip.
+  - **How to play** (opens `/rules/portes`) and **History** as two pills with icons. Screen readers hear links.
+  - Icons are Lucide line icons (ISC) drawn with Skia (`components/Icon.tsx`, `components/icons.ts`).
 - **States:**
-  - *No saved game:* the Continue card is hidden and the art area grows.
-  - *Saved game:* Continue card shows. MVP1 keeps **one** saved game.
+  - *No saved game:* the hero is Play vs bot.
+  - *Saved game:* the hero is Continue game, and Play vs bot moves to the tiles. MVP1 keeps **one** saved game.
   - *Loading:* the native splash stays until settings and the save are read. This is local and fast, so there is no spinner.
   - *Saved game broken or too old:* it is dropped safely (#36). A one-time toast says "Your saved game could not be opened."
-  - *Play a friend tapped:* toast "Coming soon: play friends online." No navigation. The button keeps a full-size target so the tap gives feedback.
+  - *Play a friend tapped (no online server):* toast "Coming soon: play friends online." No navigation. The tile keeps a full-size target so the tap gives feedback.
 - **Goes to:** Board (continue), New game (`mode=bot` or `mode=local`), Settings, Rules, Tutorial.
 
 ### Note: first-run tutorial (#128, not drawn)
