@@ -71,7 +71,7 @@ export function RulesScreen({
       <ScreenHeader
         title={t(rulesTitleKey(variant))}
         {...(onBack ? { onBack } : {})}
-        backLabel={t('newGame.back')}
+        backLabel={t('common.back')}
         testID="rules-back"
       />
       <ScrollView

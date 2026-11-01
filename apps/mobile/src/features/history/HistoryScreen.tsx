@@ -59,7 +59,7 @@ export function HistoryScreen({ records, onPlay, onBack, online }: HistoryScreen
       <ScreenHeader
         title={t('history.title')}
         onBack={onBack}
-        backLabel={t('history.back')}
+        backLabel={t('common.back')}
         testID="history-back"
       />
       <ScrollView contentContainerStyle={[styles.content, empty && styles.emptyContent]}>

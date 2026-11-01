@@ -167,7 +167,7 @@ export function FriendSetupScreen({
         title={t('friend.title')}
         titleRef={titleRef}
         onBack={onBack}
-        backLabel={t('friend.back')}
+        backLabel={t('common.back')}
         testID="friend-back"
       />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>

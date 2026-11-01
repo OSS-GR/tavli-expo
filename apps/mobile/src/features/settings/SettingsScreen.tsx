@@ -125,7 +125,7 @@ export function SettingsScreen({
       <ScreenHeader
         title={t('settings.title')}
         onBack={onBack}
-        backLabel={t('settings.back')}
+        backLabel={t('common.back')}
         testID="settings-back"
       />
       <ScrollView

@@ -35,7 +35,7 @@ export function MyGamesScreen({ auth, games, focused, onOpen, onBack }: MyGamesS
       <ScreenHeader
         title={t('home.online.title')}
         {...(onBack ? { onBack } : {})}
-        backLabel={t('newGame.back')}
+        backLabel={t('common.back')}
         testID="online-games-back"
       />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
