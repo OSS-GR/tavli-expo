@@ -1,7 +1,12 @@
 /**
  * New game (wireframes 4 and 5): game, match length, and the bot level
  * (vs bot) or the player names (pass-and-play). Start sits at the bottom,
- * near the thumb.
+ * near the thumb, on a fade over the end of the list.
+ *
+ * Look (#357): the shared `Screen`, `ScreenHeader` and `SectionCard`
+ * parts. The games are cards, two per row, Tavli on a whole row; the
+ * chosen card has a brass border, a lighter fill and a small brass check.
+ * The book button on each card opens its rules without choosing it.
  *
  * Game (#109): Portes, Plakoto, Fevga or Tavli (all three in rotation).
  * A game shows locked ("Coming soon") when the engine does not have it, or
@@ -19,6 +24,7 @@
 import type { Difficulty } from '@tavli/contracts';
 import { BOT_DIFFICULTIES } from '@tavli/contracts';
 import type { PlayerId, PresetId } from '@tavli/engine';
+import { withAlpha } from '@tavli/ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -34,8 +40,11 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Icon } from '@/components/Icon';
+import { Screen } from '@/components/Screen';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { SectionCard, SectionTitle } from '@/components/SectionCard';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
-import { SettingsSection } from '@/components/settings/SettingsSection';
 import { Sheet } from '@/components/Sheet';
 import { Toast, useToast } from '@/components/Toast';
 import { BoardViewPicker } from '@/features/settings/BoardViewPicker';
@@ -164,7 +173,7 @@ export function NewGameScreen({
   const start = () => (hasSavedGame ? setAsking(true) : startNow());
 
   const nameField = (player: PlayerId) => (
-    <View style={styles.nameRow}>
+    <View key={player} style={styles.nameRow}>
       <View style={styles.swatch(player)} />
       <TextInput
         testID={`new-game-name-${player}`}
@@ -182,305 +191,297 @@ export function NewGameScreen({
     </View>
   );
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.header}>
+  const gameCard = (choice: GameChoice) => {
+    const selected = choice === game;
+    return (
+      <View key={choice} style={[styles.gameCard, selected && styles.gameCardSelected]}>
         <Pressable
-          testID="new-game-back"
-          accessibilityRole="button"
-          accessibilityLabel={t('newGame.back')}
-          onPress={onBack}
-          hitSlop={8}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-          <Text style={styles.backIcon} importantForAccessibility="no" allowFontScaling={false}>
-            {'‹'}
-          </Text>
+          testID={`new-game-${choice}`}
+          style={({ pressed }) => [styles.gameChoice, pressed && !selected && styles.pressed]}
+          onPress={() => setGame(choice)}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: selected }}
+          accessibilityLabel={`${t(`games.${choice}`)}, ${t(`games.${choice}Subtitle`)}`}>
+          <View style={styles.gameNameLine}>
+            <Text style={styles.gameName}>{t(`games.${choice}`)}</Text>
+            {selected ? (
+              <View style={styles.check}>
+                <Icon name="check" size={14} color={theme.colors.onAccent} />
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.gameSubtitle}>{t(`games.${choice}Subtitle`)}</Text>
         </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
-          {mode === 'bot' ? t('newGame.titleBot') : t('newGame.titleLocal')}
-        </Text>
-        <View style={styles.headerSpace} />
+        {onRules ? (
+          <Pressable
+            testID={`new-game-rules-${choice}`}
+            accessibilityRole="button"
+            accessibilityLabel={t(`rules.title.${choice}`)}
+            onPress={() => onRules(choice, gamePreset(choice, rulesVersions))}
+            style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
+            <Icon name="book" size={20} color={theme.colors.accent} />
+          </Pressable>
+        ) : null}
       </View>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled">
-        <SettingsSection title={t('newGame.game')}>
-          <View style={styles.gameList} accessibilityRole="radiogroup">
-            {openGames.map((choice) => {
-              const selected = choice === game;
-              return (
-                <View key={choice} style={styles.gameCard(selected)}>
-                  <Pressable
-                    testID={`new-game-${choice}`}
-                    style={({ pressed }) => [
-                      styles.gameChoice,
-                      pressed && !selected && styles.pressed,
-                    ]}
-                    onPress={() => setGame(choice)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected }}
-                    accessibilityLabel={`${t(`games.${choice}`)}, ${t(`games.${choice}Subtitle`)}`}>
-                    <View style={styles.radio}>
-                      {selected ? <View style={styles.radioDot} /> : null}
-                    </View>
-                    <View style={styles.gameTexts}>
-                      <Text style={styles.gameName}>{t(`games.${choice}`)}</Text>
-                      <Text style={styles.hint}>{t(`games.${choice}Subtitle`)}</Text>
-                    </View>
-                  </Pressable>
-                  {onRules ? (
-                    <Pressable
-                      testID={`new-game-rules-${choice}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={t(`rules.title.${choice}`)}
-                      onPress={() => onRules(choice, gamePreset(choice, rulesVersions))}
-                      hitSlop={4}
-                      style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
-                      <Text style={styles.rulesIcon} importantForAccessibility="no">
-                        {'i'}
-                      </Text>
-                    </Pressable>
+    );
+  };
+  // Two cards per row; Tavli (all three games) takes a whole row.
+  const pairGames = openGames.filter((choice) => choice !== 'tavli');
+  const gameRows: GameChoice[][] = [];
+  for (let i = 0; i < pairGames.length; i += 2) gameRows.push(pairGames.slice(i, i + 2));
+  if (openGames.includes('tavli')) gameRows.push(['tavli']);
+
+  return (
+    <Screen>
+      <KeyboardAvoidingView
+        style={styles.body}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScreenHeader
+          title={mode === 'bot' ? t('newGame.titleBot') : t('newGame.titleLocal')}
+          onBack={onBack}
+          backLabel={t('newGame.back')}
+          testID="new-game-back"
+        />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled">
+          <View style={styles.section}>
+            <SectionTitle title={t('newGame.game')} />
+            <View style={styles.gameGrid} accessibilityRole="radiogroup">
+              {gameRows.map((row) => (
+                <View key={row.join('-')} style={styles.gameRow}>
+                  {row.map(gameCard)}
+                  {row.length === 1 && row[0] !== 'tavli' ? (
+                    <View style={styles.gameSpace} />
                   ) : null}
                 </View>
-              );
-            })}
-          </View>
-          {lockedGames.length > 0 ? (
-            <View style={styles.chips}>
-              {lockedGames.map((choice) => (
-                <Pressable
-                  key={choice}
-                  testID={`new-game-locked-${choice}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={t(`games.${choice}`)}
-                  accessibilityHint={t('common.comingSoon')}
-                  accessibilityState={{ disabled: true }}
-                  onPress={() => showToast(t('newGame.gameSoon', { game: t(`games.${choice}`) }))}
-                  style={({ pressed }) => [styles.chip, pressed && styles.pressed]}>
-                  <Text style={styles.chipText}>{t(`games.${choice}`)}</Text>
-                </Pressable>
               ))}
             </View>
-          ) : null}
-          {lockedGames.length > 0 ? (
-            <Text style={styles.hint}>{t('newGame.lockedGames')}</Text>
-          ) : null}
-        </SettingsSection>
-
-        <SettingsSection title={t('newGame.length.label')}>
-          <SegmentedControl
-            testID="new-game-length"
-            label={t('newGame.length.label')}
-            options={lengthOptions}
-            value={`${targetPoints}`}
-            onChange={(value) => setTargetPoints(Number(value) as MatchLength)}
-          />
-          <Text testID="new-game-length-hint" style={styles.hint}>
-            {gameScoring(game, rulesVersions) === 'perChecker'
-              ? t('newGame.length.hintPerChecker', { count: targetPoints })
-              : t('newGame.length.hint', { count: targetPoints })}
-          </Text>
-        </SettingsSection>
-
-        {mode === 'bot' ? (
-          <SettingsSection title={t('newGame.botLevel.label')}>
-            <SegmentedControl
-              testID="new-game-level"
-              label={t('newGame.botLevel.label')}
-              options={levelOptions}
-              value={botLevel}
-              onChange={setBotLevel}
-            />
-            <Text style={styles.hint}>{t(`newGame.botLevel.${botLevel}Hint`)}</Text>
-            {lockedLevels ? (
-              <Text style={styles.hint}>
-                {botLevels.includes('medium')
-                  ? t('newGame.botLevel.hardSoon')
-                  : t('newGame.botLevel.soon')}
-              </Text>
+            {lockedGames.length > 0 ? (
+              <View style={styles.chips}>
+                {lockedGames.map((choice) => (
+                  <Pressable
+                    key={choice}
+                    testID={`new-game-locked-${choice}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={t(`games.${choice}`)}
+                    accessibilityHint={t('common.comingSoon')}
+                    accessibilityState={{ disabled: true }}
+                    onPress={() => showToast(t('newGame.gameSoon', { game: t(`games.${choice}`) }))}
+                    style={({ pressed }) => [styles.chip, pressed && styles.pressed]}>
+                    <Text style={styles.chipText}>{t(`games.${choice}`)}</Text>
+                  </Pressable>
+                ))}
+              </View>
             ) : null}
-          </SettingsSection>
-        ) : (
-          <>
-            <SettingsSection title={t('newGame.players.label')}>
-              {nameField('white')}
-              {nameField('black')}
-            </SettingsSection>
-            <SettingsSection title={t('newGame.boardView')}>
-              <BoardViewPicker testID="new-game-board-view" />
-            </SettingsSection>
-          </>
-        )}
+            {lockedGames.length > 0 ? (
+              <Text style={styles.hint}>{t('newGame.lockedGames')}</Text>
+            ) : null}
+          </View>
 
-        {/* House rules (#207): who starts the first game. It replaces the
-            "Who starts?" info box: the hint says what the chosen rule does. */}
-        <SettingsSection title={t('newGame.houseRules.label')}>
-          <Text style={styles.subLabel}>{t('newGame.houseRules.openingRoll')}</Text>
-          <SegmentedControl
-            testID="new-game-opening-roll"
-            label={t('newGame.houseRules.openingRoll')}
-            options={openingOptions}
-            accessibilityLabelFor={houseRuleLabel(t('newGame.houseRules.openingRoll'))}
-            value={openingRoll}
-            onChange={setOpeningRoll}
-          />
-          <Text style={styles.hint}>{openingHint}</Text>
-          {/* The rules version (#241): Plakoto and Asodio, and Tavli's Plakoto game (#247). */}
-          {version !== null ? (
-            <View style={styles.subPart}>
-              <Text style={styles.subLabel}>{versionLabel}</Text>
+          <SectionCard title={t('newGame.length.label')} padded>
+            <SegmentedControl
+              testID="new-game-length"
+              label={t('newGame.length.label')}
+              options={lengthOptions}
+              value={`${targetPoints}`}
+              onChange={(value) => setTargetPoints(Number(value) as MatchLength)}
+            />
+            <Text testID="new-game-length-hint" style={styles.hint}>
+              {gameScoring(game, rulesVersions) === 'perChecker'
+                ? t('newGame.length.hintPerChecker', { count: targetPoints })
+                : t('newGame.length.hint', { count: targetPoints })}
+            </Text>
+          </SectionCard>
+
+          {mode === 'bot' ? (
+            <SectionCard title={t('newGame.botLevel.label')} padded>
               <SegmentedControl
-                testID="new-game-rules-version"
-                label={versionLabel}
-                options={versionOptions}
-                accessibilityLabelFor={houseRuleLabel(versionLabel)}
-                value={version}
-                onChange={chooseVersion}
+                testID="new-game-level"
+                label={t('newGame.botLevel.label')}
+                options={levelOptions}
+                value={botLevel}
+                onChange={setBotLevel}
               />
-              <Text testID="new-game-rules-version-hint" style={styles.hint}>
-                {t(`newGame.rulesVersion.${VERSION_KEYS[version]}Hint`)}
-              </Text>
+              <View style={styles.hints}>
+                <Text style={styles.hint}>{t(`newGame.botLevel.${botLevel}Hint`)}</Text>
+                {lockedLevels ? (
+                  <Text style={styles.hint}>
+                    {botLevels.includes('medium')
+                      ? t('newGame.botLevel.hardSoon')
+                      : t('newGame.botLevel.soon')}
+                  </Text>
+                ) : null}
+              </View>
+            </SectionCard>
+          ) : (
+            <>
+              <SectionCard title={t('newGame.players.label')}>
+                {nameField('white')}
+                {nameField('black')}
+              </SectionCard>
+              <SectionCard title={t('newGame.boardView')} padded>
+                <BoardViewPicker testID="new-game-board-view" />
+              </SectionCard>
+            </>
+          )}
+
+          {/* House rules (#207): who starts the first game. It replaces the
+              "Who starts?" info box: the hint says what the chosen rule does. */}
+          <SectionCard title={t('newGame.houseRules.label')}>
+            <View style={styles.rulePart}>
+              <Text style={styles.subLabel}>{t('newGame.houseRules.openingRoll')}</Text>
+              <SegmentedControl
+                testID="new-game-opening-roll"
+                label={t('newGame.houseRules.openingRoll')}
+                options={openingOptions}
+                accessibilityLabelFor={houseRuleLabel(t('newGame.houseRules.openingRoll'))}
+                value={openingRoll}
+                onChange={setOpeningRoll}
+              />
+              <Text style={styles.hint}>{openingHint}</Text>
             </View>
-          ) : null}
-        </SettingsSection>
-      </ScrollView>
-      <View style={styles.footer}>
-        <ActionButton testID="new-game-start" label={t('newGame.start')} onPress={start} />
-      </View>
-      <Toast text={toast} />
-      <Sheet
-        visible={asking}
-        onClose={() => setAsking(false)}
-        closeLabel={t('common.cancel')}
-        look="dialog">
-        <ConfirmDialog
-          testID="replace-dialog"
-          title={t('newGame.replace.title')}
-          lines={[t('newGame.replace.body')]}
-          confirmLabel={t('newGame.replace.confirm')}
-          cancelLabel={t('common.cancel')}
-          onConfirm={() => {
-            setAsking(false);
-            startNow();
-          }}
-          onCancel={() => setAsking(false)}
-        />
-      </Sheet>
-    </KeyboardAvoidingView>
+            {/* The rules version (#241): Plakoto and Asodio, and Tavli's Plakoto game (#247). */}
+            {version !== null ? (
+              <View style={styles.rulePart}>
+                <Text style={styles.subLabel}>{versionLabel}</Text>
+                <SegmentedControl
+                  testID="new-game-rules-version"
+                  label={versionLabel}
+                  options={versionOptions}
+                  accessibilityLabelFor={houseRuleLabel(versionLabel)}
+                  value={version}
+                  onChange={chooseVersion}
+                />
+                <Text testID="new-game-rules-version-hint" style={styles.hint}>
+                  {t(`newGame.rulesVersion.${VERSION_KEYS[version]}Hint`)}
+                </Text>
+              </View>
+            ) : null}
+          </SectionCard>
+        </ScrollView>
+        {/* Start sits over the end of the list on a fade. Touches on the
+            fade go through to the list (`box-none`). */}
+        <View style={styles.dock} pointerEvents="box-none">
+          <ActionButton testID="new-game-start" label={t('newGame.start')} onPress={start} />
+        </View>
+        <Toast text={toast} />
+        <Sheet
+          visible={asking}
+          onClose={() => setAsking(false)}
+          closeLabel={t('common.cancel')}
+          look="dialog">
+          <ConfirmDialog
+            testID="replace-dialog"
+            title={t('newGame.replace.title')}
+            lines={[t('newGame.replace.body')]}
+            confirmLabel={t('newGame.replace.confirm')}
+            cancelLabel={t('common.cancel')}
+            onConfirm={() => {
+              setAsking(false);
+              startNow();
+            }}
+            onCancel={() => setAsking(false)}
+          />
+        </Sheet>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
+/** How far the fade above Start reaches over the end of the list. */
+const FADE = 32;
+
 const styles = StyleSheet.create((theme, rt) => ({
-  screen: {
+  body: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-    paddingTop: rt.insets.top,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.sm,
-    paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.sm,
-  },
-  back: {
-    width: theme.touch.minTarget,
-    height: theme.touch.minTarget,
-    borderRadius: theme.touch.minTarget / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  backIcon: {
-    fontSize: 30,
-    lineHeight: 32,
-    color: theme.colors.text,
-  },
-  headerSpace: {
-    width: theme.touch.minTarget,
   },
   pressed: {
     opacity: 0.7,
-  },
-  title: {
-    ...theme.type.title,
-    flex: 1,
-    textAlign: 'center',
-    color: theme.colors.text,
   },
   scroll: {
     flex: 1,
   },
   content: {
+    gap: theme.space.xl,
     paddingHorizontal: theme.space.lg,
-    paddingBottom: theme.space.xl,
+    paddingTop: theme.space.sm,
+    // The fade above Start covers the end of the list: room to scroll past it.
+    paddingBottom: FADE + theme.space.lg,
   },
-  gameList: {
+  section: {
     gap: theme.space.sm,
   },
-  gameChoice: {
+  gameGrid: {
+    gap: theme.space.sm,
+  },
+  gameRow: {
+    flexDirection: 'row',
+    gap: theme.space.sm,
+  },
+  gameSpace: {
+    flex: 1,
+  },
+  gameCard: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.md,
+    borderRadius: theme.radii.lg,
+    // The same border width either way, so the text does not move.
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  gameCardSelected: {
+    borderColor: theme.colors.accent,
+    backgroundImage: `linear-gradient(160deg, ${theme.colors.surfaceSelected} 0%, ${theme.colors.surface} 80%)`,
+  },
+  gameChoice: {
+    flex: 1,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    gap: theme.space.xxs,
+    minHeight: 64,
+    paddingVertical: theme.space.sm,
+    paddingLeft: theme.space.md,
+    paddingRight: theme.space.xs,
+  },
+  gameNameLine: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: theme.space.xs,
+  },
+  gameName: {
+    ...theme.type.bodyStrong,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  gameSubtitle: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
+  },
+  check: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.accent,
   },
   rulesButton: {
     minWidth: theme.touch.minTarget,
     minHeight: theme.touch.minTarget,
+    marginRight: theme.space.xxs,
     borderRadius: theme.touch.minTarget / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.text,
-  },
-  rulesIcon: {
-    ...theme.type.bodyStrong,
-    fontStyle: 'italic',
-    color: theme.colors.text,
-  },
-  gameCard: (selected: boolean) => ({
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: theme.space.sm,
-    padding: theme.space.lg,
-    borderRadius: theme.radii.lg,
-    // The same border width either way, so the text does not move.
-    borderWidth: 3,
-    borderColor: selected ? theme.colors.accent : theme.colors.border,
-    backgroundColor: selected ? theme.colors.surfaceSelected : theme.colors.surface,
-  }),
-  radio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.colors.text,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: theme.colors.text,
-  },
-  gameTexts: {
-    flex: 1,
-  },
-  gameName: {
-    ...theme.type.title,
-    color: theme.colors.text,
   },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.space.sm,
-    paddingTop: theme.space.sm,
   },
   chip: {
     minWidth: 104,
@@ -489,7 +490,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: theme.space.md,
-    borderRadius: theme.radii.md,
+    borderRadius: theme.radii.lg,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: theme.colors.border,
@@ -498,18 +499,20 @@ const styles = StyleSheet.create((theme, rt) => ({
     ...theme.type.body,
     color: theme.colors.textDisabled,
   },
+  hints: {
+    gap: theme.space.xs,
+  },
   hint: {
     ...theme.type.caption,
     color: theme.colors.textDim,
-    paddingTop: theme.space.xs,
   },
   subLabel: {
     ...theme.type.bodyStrong,
     color: theme.colors.text,
   },
-  subPart: {
-    gap: theme.space.xs,
-    paddingTop: theme.space.md,
+  rulePart: {
+    gap: theme.space.sm,
+    padding: theme.space.md,
   },
   nameRow: {
     flexDirection: 'row',
@@ -517,10 +520,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.space.md,
     minHeight: theme.touch.row,
     paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radii.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
   },
   swatch: (player: PlayerId) => ({
     width: 24,
@@ -536,9 +535,13 @@ const styles = StyleSheet.create((theme, rt) => ({
     minHeight: theme.touch.minTarget,
     color: theme.colors.text,
   },
-  footer: {
+  // Pulled up over the end of the list. The fade runs from a clear page
+  // color to the page color behind Start.
+  dock: {
+    marginTop: -FADE,
+    paddingTop: FADE,
     paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.sm,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
+    backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0)} 0%, ${theme.colors.background} 38%)`,
   },
 }));

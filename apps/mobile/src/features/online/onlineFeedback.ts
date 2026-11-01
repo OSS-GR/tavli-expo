@@ -3,22 +3,25 @@
  *
  * A local game plays its feedback from the engine log (`flowEvents` in
  * `features/game/gameFeedback.ts`). Online, the log holds only your own
- * moves of this turn: they play as in a local game. Everything else comes
- * in a new view from the server, with an empty log. `viewEvents` reads
- * what changed between two views and gives the events a local game plays
- * for the same steps:
+ * roll (#355) and moves of this turn: they play as in a local game. Everything
+ * else comes in a new view from the server, with an empty log.
+ * `viewEvents` reads what changed between two views and gives the events a
+ * local game plays for the same steps:
  *
  * - The other player's moves, one event each, from `remoteTurn` (the same
  *   turn the board flies). Each one plays when its checker starts to fly
  *   (`turnMoveDelay`), as a local move plays when it starts. A view that
  *   does not follow the view before (a missed view) plays no moves.
- * - A new turn with a server roll: `turnStart`, then `diceRoll`, as after a
- *   confirm and a roll in a local game. They play at once: the dice tumble
- *   as soon as the view is on the board. A double chosen after a 1-2 is no
- *   roll: nothing plays (Asodio, Acey-Deucey).
- * - Your new turn, with the roll held back (#347, `hiddenRoll.ts`): only
- *   `turnStart`. Your roll is in the log when you roll, so it plays then,
- *   as a local roll.
+ * - A new turn that waits for its roll: `turnStart`, as after a confirm in
+ *   a local game.
+ * - The other player's roll (#355): `diceRoll`, at once: their dice tumble
+ *   as soon as the view is on the board. Their roll with no legal move
+ *   (the view is the next turn, with their pass in `lastTurn`):
+ *   `diceRoll`, then `turnStart`. Your own roll is in the log (the store
+ *   asked for it), so it plays as a local roll. A double chosen after a
+ *   1-2 is no roll: nothing plays (Asodio, Acey-Deucey).
+ * - A view that skipped the roll (a missed view, the opening dice):
+ *   `turnStart`, then `diceRoll`.
  * - A game you won: `gameWin`; the match: `matchWin`. A lost game plays
  *   no win, as in a local game vs the bot. The board holds the end of the
  *   game under its game-end sheet (`boardStore.ts`, #286), with the turn
@@ -53,20 +56,24 @@ const IN_TURN: ReadonlySet<GamePhase> = new Set(['moving', 'awaiting-confirm']);
 
 const now = (event: FeedbackEvent): TimedEvent => ({ event, at: 0 });
 
-/** The server rolled for a new turn between `before` and `after` (same game). */
+/** A new turn or a roll between `before` and `after` (same game). */
 function rolledTurn(before: GameFlow, after: GameFlow): TimedEvent[] {
+  const roller = before.phase === 'awaiting-roll' ? before.state.toMove : null;
   if (after.phase === 'awaiting-roll') {
-    // Your roll waits for you (#347): the turn starts, the roll comes later.
-    const waited =
-      before.phase === 'awaiting-roll' &&
-      before.state.toMove === after.state.toMove &&
-      before.state.turnNumber === after.state.turnNumber;
-    return waited ? [] : [now('turnStart')];
+    const newTurn = roller === null || roller !== after.state.toMove;
+    // The roller had no legal move: their dice, then the next turn.
+    const last = after.lastTurn;
+    const passed =
+      roller !== null && last !== null && last.player === roller && last.moves.length === 0;
+    return [...(passed ? [now('diceRoll')] : []), ...(newTurn ? [now('turnStart')] : [])];
   }
-  if (after.phase !== 'moving' || after.state.dice === null) return [];
+  if (after.phase !== 'moving' || after.state.dice === null || stateHasChosenDouble(after)) {
+    return [];
+  }
+  // The roll of the turn that waited for it (#355).
+  if (roller === after.state.toMove) return [now('diceRoll')];
   const newTurn = after.state.turnNumber !== before.state.turnNumber || !IN_TURN.has(before.phase);
-  if (!newTurn || stateHasChosenDouble(after)) return [];
-  return [now('turnStart'), now('diceRoll')];
+  return newTurn ? [now('turnStart'), now('diceRoll')] : [];
 }
 
 /**

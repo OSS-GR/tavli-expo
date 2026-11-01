@@ -24,7 +24,7 @@ import { SERVER_ACTOR } from './calls';
 import { createMemoryGameServer } from './memory-server';
 import type { MemoryGameServer } from './memory-server';
 import { OnlineGameError, createOnlineMatch } from './online-game';
-import { lastBearOff, motherPin, pickChoice, pickTurn } from './testing';
+import { closedOut, lastBearOff, motherPin, pickChoice, pickTurn } from './testing';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -213,17 +213,16 @@ async function playMatch(server: MemoryGameServer, gameId: string, seed: number)
     const side = view.waitingFor;
     if (side === null) throw new Error('nobody to wait for');
     const mine = watchers[side].last();
-    await (mine.prompt === null
-      ? transports[side].sendTurn({
-          gameId,
-          expectedVersion: mine.version,
-          moves: pickTurn(mine.game, picker),
-        })
-      : transports[side].sendAnswer({
-          gameId,
-          expectedVersion: mine.version,
-          choice: pickChoice(mine.prompt.choices, picker),
-        }));
+    const expectedVersion = mine.version;
+    if (mine.prompt !== null) {
+      const choice = pickChoice(mine.prompt.choices, picker);
+      await transports[side].sendAnswer({ gameId, expectedVersion, choice });
+    } else if (mine.game.phase === 'awaiting-roll') {
+      await transports[side].rollDice({ gameId, expectedVersion });
+    } else {
+      const moves = pickTurn(mine.game, picker);
+      await transports[side].sendTurn({ gameId, expectedVersion, moves });
+    }
     await flush();
     expect(watchers.white.last().version).toBe(view.version + 1);
   }
@@ -248,10 +247,15 @@ describe('whole matches through two transports', () => {
       const again = replay(log.map((row) => row.event));
       expect(again.match).toEqual(view.match);
       expect(again.game).toEqual(view.game);
-      // Moves and confirms carry the id of the player who sent them.
+      // Rolls, moves and confirms carry the id of the player who sent them (#355).
       for (const row of log) {
         const event = row.event;
-        if (event.type === 'move' || event.type === 'confirm' || event.type === 'answer') {
+        if (
+          event.type === 'roll' ||
+          event.type === 'move' ||
+          event.type === 'confirm' ||
+          event.type === 'answer'
+        ) {
           expect(row.actor).toBe(PLAYERS[event.player]);
         }
       }
@@ -276,7 +280,8 @@ describe('turn timers on a fake clock', () => {
     const after = white.last();
     expect(after.version).toBe(before.version + 1);
     expect(after.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
-    expect(after.game.phase).toBe('moving');
+    // The next game waits for its first roll (#355).
+    expect(after.game.phase).toBe('awaiting-roll');
     expect(after.turnDeadline).toBe(START + 2 * LIVE);
     expect(server.events(gameId).find((row) => row.event.type === 'timeout')).toMatchObject({
       actor: SERVER_ACTOR,
@@ -349,6 +354,85 @@ describe('turn timers on a fake clock', () => {
     expect(after?.version).toBe(before.version + 1);
     expect(after?.match.games).toHaveLength(0);
     expect(after?.turnDeadline).toBe(START + 2 * ASYNC_TURN_TIME_MS - 1);
+    expect(server.runDueTimeouts()).toBe(0);
+  });
+
+  it('a roll keeps the turn deadline; the turn time covers the wait before it (#355)', async () => {
+    const { server, wait } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const first = server.getGame(gameId) as OnlineGameView;
+    const mover = first.waitingFor as PlayerId;
+    await server.transportFor(PLAYERS[mover]).sendTurn({
+      gameId,
+      expectedVersion: first.version,
+      moves: pickTurn(first.game, createSeededRng(1)),
+    });
+    const before = server.getGame(gameId) as OnlineGameView;
+    const roller = before.waitingFor as PlayerId;
+    expect(before.game.phase).toBe('awaiting-roll');
+    expect(before.turnDeadline).toBe(START + LIVE);
+    wait(LIVE / 2);
+    await server.transportFor(PLAYERS[roller]).rollDice({
+      gameId,
+      expectedVersion: before.version,
+    });
+    const after = server.getGame(gameId) as OnlineGameView;
+    expect(after.version).toBe(before.version + 1);
+    expect(after.game.state.dice).not.toBeNull();
+    if (after.waitingFor === roller) {
+      expect(after.turnDeadline).toBe(START + LIVE);
+    } else {
+      // The roll had no legal move: the other player gets a full turn.
+      expect(after.turnDeadline).toBe(START + LIVE / 2 + LIVE);
+    }
+    // The old check is for an old version: it does nothing.
+    wait(LIVE / 2 - 1);
+    expect(server.runDueTimeouts()).toBe(0);
+  });
+
+  it('a roll with no legal move passes; the other player gets a full turn', async () => {
+    const { server, wait } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const portes = createOnlineMatch(
+      { choice: 'portes', targetPoints: 15, players: PLAYERS },
+      createSeededRng(1),
+    );
+    server.setFlowForTest(gameId, closedOut(portes));
+    const black = watch(server.transportFor(BOB), gameId);
+    await flush();
+    const before = black.last();
+    expect(before.waitingFor).toBe('white');
+    wait(1000);
+    await server.transportFor(ALICE).rollDice({ gameId, expectedVersion: before.version });
+    await flush();
+    const after = black.last();
+    expect(after.version).toBe(before.version + 1);
+    expect(after.game.phase).toBe('awaiting-roll');
+    expect(after.waitingFor).toBe('black');
+    expect(after.game.lastTurn).toMatchObject({ player: 'white', moves: [] });
+    expect(after.game.lastTurn?.dice).toHaveLength(2);
+    expect(after.turnDeadline).toBe(START + 1000 + LIVE);
+    const roll = server.events(gameId).find((row) => row.event.type === 'roll');
+    expect(roll).toMatchObject({ actor: ALICE, version: after.version });
+  });
+
+  it('a late rollDice gets TIMED_OUT, and the time out is saved', async () => {
+    const { server, wait } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const portes = createOnlineMatch(
+      { choice: 'portes', targetPoints: 15, players: PLAYERS },
+      createSeededRng(1),
+    );
+    server.setFlowForTest(gameId, closedOut(portes));
+    const before = server.getGame(gameId) as OnlineGameView;
+    wait(LIVE);
+    await rejectsWith(
+      server.transportFor(ALICE).rollDice({ gameId, expectedVersion: before.version }),
+      'TIMED_OUT',
+    );
+    const after = server.getGame(gameId) as OnlineGameView;
+    expect(after.version).toBe(before.version + 1);
+    expect(after.match.games[0]).toMatchObject({ winner: 'black', reason: 'timeout' });
     expect(server.runDueTimeouts()).toBe(0);
   });
 

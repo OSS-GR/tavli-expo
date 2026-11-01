@@ -19,7 +19,7 @@ import type {
 import { createSeededRng } from '@tavli/engine';
 import type { PerPlayer, PlayerId } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
-import { lastBearOff, motherPin } from '@tavli/online/testing';
+import { closedOut, lastBearOff, motherPin } from '@tavli/online/testing';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -128,10 +128,23 @@ function waiting(v: OnlineGameView): PlayerId {
   return v.waitingFor;
 }
 
-/** The side the server waits for plays one turn. Returns that side. */
+/**
+ * The side the server waits for plays one turn: it rolls first when the
+ * server waits for its roll (#355). A roll with no legal move ends the
+ * turn (a pass). Either way the server then waits for the other side,
+ * unless the turn ended the match. Returns the side that played.
+ */
 async function playOneTurn(t: Tester, gameId: Id<'games'>): Promise<PlayerId> {
-  const v = await view(t, gameId);
+  let v = await view(t, gameId);
   const side = waiting(v);
+  if (v.game.phase === 'awaiting-roll') {
+    await as(t, PLAYERS[side]).mutation(api.games.rollDice, {
+      gameId,
+      expectedVersion: v.version,
+    });
+    v = await view(t, gameId);
+    if (v.game.phase !== 'moving') return side;
+  }
   await as(t, PLAYERS[side]).mutation(api.games.makeMove, {
     gameId,
     expectedVersion: v.version,
@@ -293,23 +306,47 @@ describe('"your turn" pushes', () => {
       }
     }
 
-    // The next turn tells the first player. The dice are real: when the
-    // first player's roll has no legal move (a hit checker facing a closed
-    // point), the turn passes at once and the server waits for the same
-    // player again. Then nobody gets a push (#308).
+    // The next turn tells the first player. The second player rolls
+    // first (#355): a roll they can play keeps the wait with them (no
+    // push), and a roll with no legal move passes the turn. Either way
+    // the first player gets one push.
     push.clear();
     const second = await playOneTurn(t, gameId);
-    const after = await view(t, gameId);
-    const next = waiting(after);
-    if (next === second) {
-      // Only a real pass keeps the wait here: the first player's turn
-      // played no move.
-      expect(after.game.lastTurn).toMatchObject({ player: played, moves: [] });
-    }
+    expect(second).toBe(otherSide(played));
+    expect(waiting(await view(t, gameId))).toBe(played);
     await flush(t);
-    expect(push.sent.map((message) => message.to)).toEqual(
-      next === second ? [] : [TOKEN_OF[played]],
-    );
+    expect(push.sent.map((message) => message.to)).toEqual([TOKEN_OF[played]]);
+  });
+
+  it('a roll that can be played sends no push; a roll that passes tells the other player (#355)', async () => {
+    const t = await setup();
+    const gameId = await createGame(t, null);
+    await flush(t);
+    await playOneTurn(t, gameId);
+    await flush(t);
+    await registerBoth(t);
+    push.clear();
+    // Every roll of White's here has no legal move: the turn passes.
+    await t.run(async (ctx) => {
+      const doc = await ctx.db.get(gameId);
+      if (doc === null) throw new Error('no game');
+      await ctx.db.patch(gameId, { flow: storeFlow(closedOut(loadFlow(doc.flow)), null) });
+    });
+    const stuck = await view(t, gameId);
+    await as(t, ALICE).mutation(api.games.rollDice, { gameId, expectedVersion: stuck.version });
+    const passed = await view(t, gameId);
+    expect(passed.waitingFor).toBe('black');
+    await flush(t);
+    expect(push.sent.map((message) => message.to)).toEqual([BOB_TOKEN]);
+
+    // Black has a move with every roll here: the wait stays with Black.
+    push.clear();
+    await as(t, BOB).mutation(api.games.rollDice, { gameId, expectedVersion: passed.version });
+    const rolled = await view(t, gameId);
+    expect(rolled.game.phase).toBe('moving');
+    expect(rolled.waitingFor).toBe('black');
+    await flush(t);
+    expect(push.sent).toEqual([]);
   });
 
   it('a new game tells the first player only when they did not start it', async () => {
@@ -393,7 +430,7 @@ describe('"your turn" pushes', () => {
     await flush(t);
     expect(push.sent.map((message) => message.to)).toEqual([ALICE_TOKEN]);
 
-    // White plays on and moves next: the wait stays with White, no push.
+    // White plays on, rolls and moves next: the wait stays with White, no push.
     push.clear();
     const asked = await view(t, gameId);
     expect(asked.waitingFor).toBe('white');
@@ -402,6 +439,9 @@ describe('"your turn" pushes', () => {
       expectedVersion: asked.version,
       choice: 'playOn',
     });
+    const playOn = await view(t, gameId);
+    expect(playOn.waitingFor).toBe('white');
+    await as(t, ALICE).mutation(api.games.rollDice, { gameId, expectedVersion: playOn.version });
     expect((await view(t, gameId)).waitingFor).toBe('white');
     await flush(t);
     expect(push.sent).toEqual([]);

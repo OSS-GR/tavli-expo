@@ -51,6 +51,7 @@ import {
   eventActor,
   matchStatus,
   nextDeadline,
+  rollDeadline,
   scheduledCheck,
 } from './calls';
 import type { SavedGame } from './calls';
@@ -74,6 +75,7 @@ import {
   loadStored,
   playTurn,
   resign,
+  rollDice,
   storeFlow,
   storeStep,
   timeOut,
@@ -96,7 +98,7 @@ export interface LoggedEvent {
   readonly seq: number;
   /** The game version the event led to. */
   readonly version: number;
-  /** The player id who acted, or `SERVER_ACTOR` (rolls, time outs, the next game). */
+  /** The player id who acted (a roll too, #355), or `SERVER_ACTOR` (the opening roll, time outs, the next game). */
   readonly actor: string;
   readonly event: FlowEvent;
 }
@@ -337,8 +339,9 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   }
 
   /**
-   * Saves the flow after a step: a version bump, its log rows and a new
-   * turn deadline. `before` is what the step loaded its flow from.
+   * Saves the flow after a step: a version bump, its log rows and the turn
+   * deadline (by default a new one). `before` is what the step loaded its
+   * flow from.
    */
   function save(
     game: MemoryGame,
@@ -346,6 +349,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     before: LoadedFlow,
     flow: SteppedFlow,
     at: number,
+    turnDeadline: number | null = nextDeadline(game.turnTimeMinutes, flow, at),
   ): void {
     const version = game.version + 1;
     const saved: MemoryGame = {
@@ -353,7 +357,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       flow: storeStep(before, flow),
       status: matchStatus(flow),
       version,
-      turnDeadline: nextDeadline(game.turnTimeMinutes, flow, at),
+      turnDeadline,
       events: [...game.events, ...logRows(game.events.length, version, callerId, flow)],
       updatedAt: at,
     };
@@ -368,9 +372,10 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   }
 
   /**
-   * A player's call: the checks of `checkCall`, then (for a move or an
-   * answer) the turn deadline, then `step`. Like the Convex `onTime`, a
-   * late call saves the time out and gets `TIMED_OUT`.
+   * A player's call: the checks of `checkCall`, then (for a roll, a move
+   * or an answer) the turn deadline, then `step`. Like the Convex `onTime`,
+   * a late call saves the time out and gets `TIMED_OUT`. `deadline` gives
+   * the turn deadline to save (default: a new one, `nextDeadline`).
    */
   async function playerCall(
     callerId: string,
@@ -378,6 +383,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     expectedVersion: number | null,
     timed: boolean,
     step: (flow: MatchFlow, side: PlayerId) => SteppedFlow,
+    deadline?: (game: MemoryGame, side: PlayerId, flow: SteppedFlow, at: number) => number | null,
   ): Promise<void> {
     await nextTick();
     try {
@@ -388,7 +394,9 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         throw new OnlineGameError(TIMED_OUT_ERROR.code, TIMED_OUT_ERROR.message);
       }
       const before = loadStored(game.flow);
-      save(game, callerId, before, step(before.flow, side), at);
+      const next = step(before.flow, side);
+      const turnDeadline = deadline?.(game, side, next, at);
+      save(game, callerId, before, next, at, turnDeadline);
     } catch (error) {
       throw toErrorData(error);
     }
@@ -422,6 +430,18 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           listener.active = false;
           listeners.delete(listener);
         };
+      },
+      rollDice(request) {
+        const { gameId, expectedVersion } = copy(request);
+        return playerCall(
+          playerId,
+          gameId,
+          expectedVersion,
+          true,
+          (flow, side) => rollDice(flow, side, rng),
+          // The roll is part of the turn: no new time, unless it passed.
+          (game, side, flow, at) => rollDeadline(game, game.turnTimeMinutes, side, flow, at),
+        );
       },
       sendTurn(request) {
         const { gameId, expectedVersion, moves } = copy(request);

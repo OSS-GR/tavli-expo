@@ -365,7 +365,9 @@ describe('app navigation', () => {
     expect(router.getPathname()).toBe('/rules/portes');
     expect(screen.getByTestId('rules-section-hitting')).toBeOnTheScreen();
 
-    await act(async () => appRouter.back());
+    // The page's own back button (#362) returns to New game.
+    await user.press(screen.getByTestId('rules-back'));
+    expect(router.getPathname()).toBe('/new-game');
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
     await user.press(screen.getByRole('button', { name: 'How to play Portes' }));
@@ -397,8 +399,12 @@ describe('app navigation', () => {
   });
 
   it('opens the Plakoto rules page', async () => {
-    await renderRouter('./src/app', { initialUrl: '/rules/plakoto' });
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/rules/plakoto' });
     expect(screen.getByTestId('rules-section-mother')).toBeOnTheScreen();
+    // Opened first, its back button goes Home (#362).
+    await user.press(screen.getByTestId('rules-back'));
+    expect(router.getPathname()).toBe('/');
   });
 
   it('opens the Fevga rules from the Tavli page', async () => {

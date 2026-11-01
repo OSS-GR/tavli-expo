@@ -159,6 +159,11 @@ export function createConvexGameTransport(options: ConvexGameTransportOptions): 
       };
     },
 
+    async rollDice({ gameId, expectedVersion }) {
+      const args = { gameId, expectedVersion };
+      checkWrite(await run(() => client.mutation(GAME_FUNCTIONS.rollDice, args)));
+    },
+
     async sendTurn({ gameId, expectedVersion, moves }) {
       const args = { gameId, expectedVersion, moves: moves.map(moveArg) };
       checkWrite(await run(() => client.mutation(GAME_FUNCTIONS.makeMove, args)));
