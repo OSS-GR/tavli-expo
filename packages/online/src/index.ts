@@ -22,6 +22,7 @@ export {
   onlineGameRules,
   playTurn,
   resign,
+  rollDice,
   sideOf,
   storeFlow,
   storeStep,
@@ -47,6 +48,7 @@ export {
   eventActor,
   matchStatus,
   nextDeadline,
+  rollDeadline,
   scheduledCheck,
 } from './calls';
 export type { SavedGame } from './calls';

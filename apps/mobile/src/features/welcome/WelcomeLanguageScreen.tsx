@@ -1,12 +1,15 @@
 import { useLocales } from 'expo-localization';
 import { useTranslation } from 'react-i18next';
-import { Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { Screen } from '@/components/Screen';
 import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { useSettings } from '@/features/settings/store';
 import { LANGUAGES, pickDeviceLanguage, resolveLanguage, type AppLanguage } from '@/i18n/languages';
+
+import { WelcomeTop } from './WelcomeTop';
 
 export interface WelcomeLanguageScreenProps {
   onContinue: () => void;
@@ -14,7 +17,9 @@ export interface WelcomeLanguageScreenProps {
 
 /**
  * First launch, step 1 (wireframe 01): pick Greek or English. The phone's
- * language is picked at first. The app switches language at once.
+ * language is picked at first. The app switches language at once. The
+ * logo and the app name sit on top as on the other steps (#362); the
+ * choice sits in the middle and scrolls with a large font.
  */
 export function WelcomeLanguageScreen({ onContinue }: WelcomeLanguageScreenProps) {
   const { t } = useTranslation();
@@ -34,78 +39,56 @@ export function WelcomeLanguageScreen({ onContinue }: WelcomeLanguageScreenProps
   }));
 
   return (
-    <View testID="welcome-language" style={styles.screen}>
-      <View style={styles.brand}>
-        <View style={styles.logo} importantForAccessibility="no" />
-        <Text style={styles.appName} accessibilityRole="header">
-          {t('home.title', { lng: 'en' })}
-        </Text>
-        <Text style={styles.appNameAlt}>{t('home.title', { lng: 'el' })}</Text>
-      </View>
+    <Screen testID="welcome-language">
+      <WelcomeTop />
+      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        <View style={styles.choice}>
+          <Text style={styles.title} accessibilityRole="header">
+            {t('welcome.language.title', { lng: current })}
+          </Text>
+          <Text style={styles.titleAlt}>{t('welcome.language.title', { lng: other })}</Text>
+          <OptionList
+            testID="welcome-language-options"
+            label={t('welcome.language.title')}
+            options={options}
+            value={current}
+            // Picking the phone's language keeps "Phone language" in Settings.
+            onChange={(code) => setSetting('language', code === phone ? 'system' : code)}
+          />
+          <Text style={styles.note}>{t('welcome.language.note')}</Text>
+        </View>
+      </ScrollView>
 
-      <View style={styles.choice}>
-        <Text style={styles.title} accessibilityRole="header">
-          {t('welcome.language.title', { lng: current })}
-        </Text>
-        <Text style={styles.titleAlt}>{t('welcome.language.title', { lng: other })}</Text>
-        <OptionList
-          testID="welcome-language-options"
-          label={t('welcome.language.title')}
-          options={options}
-          value={current}
-          // Picking the phone's language keeps "Phone language" in Settings.
-          onChange={(code) => setSetting('language', code === phone ? 'system' : code)}
+      <View style={styles.buttons}>
+        <ActionButton
+          testID="welcome-language-continue"
+          kind="primary"
+          label={t('welcome.language.continue')}
+          onPress={onContinue}
         />
-        <Text style={styles.note}>{t('welcome.language.note')}</Text>
       </View>
-
-      <ActionButton
-        testID="welcome-language-continue"
-        label={t('welcome.language.continue')}
-        onPress={onContinue}
-      />
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
-  screen: {
+  body: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-    paddingTop: rt.insets.top + theme.space.xl,
-    paddingBottom: rt.insets.bottom + theme.space.lg,
-    paddingHorizontal: theme.space.xl,
-    justifyContent: 'space-between',
-    gap: theme.space.xl,
   },
-  brand: {
-    flex: 1,
-    alignItems: 'center',
+  // The choice in the middle of the space; it scrolls when it does not fit.
+  bodyContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    gap: theme.space.xs,
-  },
-  logo: {
-    width: 96,
-    height: 96,
-    borderRadius: theme.radii.lg,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    marginBottom: theme.space.md,
-  },
-  appName: {
-    ...theme.type.display,
-    color: theme.colors.text,
-  },
-  appNameAlt: {
-    ...theme.type.body,
-    color: theme.colors.textDim,
+    paddingHorizontal: theme.space.xl,
+    paddingVertical: theme.space.lg,
   },
   choice: {
     gap: theme.space.sm,
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.display,
+    fontSize: 30,
+    lineHeight: 36,
     color: theme.colors.text,
     textAlign: 'center',
   },
@@ -120,5 +103,10 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.textDim,
     textAlign: 'center',
     paddingTop: theme.space.sm,
+  },
+  buttons: {
+    paddingHorizontal: theme.space.xl,
+    paddingTop: theme.space.sm,
+    paddingBottom: rt.insets.bottom + theme.space.lg,
   },
 }));

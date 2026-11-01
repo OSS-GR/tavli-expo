@@ -68,11 +68,12 @@ describe('<MatchEndScreen />', () => {
     expect(rows.getByLabelText('Game 3 · Portes, You won, Diplo, 2 points')).toBeOnTheScreen();
     expect(within(screen.getByTestId('match-game-3')).getByText('+2')).toBeOnTheScreen();
 
-    // The human won: cup and confetti, hidden from screen readers.
+    // The human won: the trophy badge and confetti, hidden from screen readers.
     const area = screen.getByTestId('match-celebration', hidden);
-    // 14 confetti pieces and the cup.
+    // 14 confetti pieces and the trophy.
     expect(area.children).toHaveLength(15);
-    expect(screen.getByTestId('match-celebration-icon', hidden)).toHaveTextContent('🏆');
+    const icon = within(screen.getByTestId('match-celebration-icon', hidden));
+    expect(icon.getByTestId('match-trophy', hidden)).toBeOnTheScreen();
     expect(announce).toHaveBeenCalledWith('You won the match! You 3 – 1 Bot');
   });
 
@@ -90,6 +91,9 @@ describe('<MatchEndScreen />', () => {
     // Rematch is the main button; the engine's rule says who starts.
     await user.press(screen.getByRole('button', { name: 'Rematch, Same settings · you start' }));
     expect(props.onRematch).toHaveBeenCalledTimes(1);
+    // The hint is a line under the button; screen readers hear it in the button's name only.
+    expect(screen.queryByText('Same settings · you start')).toBeNull();
+    expect(screen.getByText('Same settings · you start', hidden)).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Change settings' }));
     expect(props.onChangeSettings).toHaveBeenCalledTimes(1);
     await user.press(screen.getByRole('button', { name: 'Home' }));
@@ -133,6 +137,7 @@ describe('<MatchEndScreen />', () => {
     expect(screen.getByRole('header', { name: 'Bot wins the match!' })).toBeOnTheScreen();
     expect(screen.getByText('0 – 3')).toBeOnTheScreen();
     expect(screen.queryByTestId('match-celebration', hidden)).toBeNull();
+    expect(screen.queryByTestId('match-trophy', hidden)).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Rematch, Same settings · Bot starts' }),
     ).toBeOnTheScreen();

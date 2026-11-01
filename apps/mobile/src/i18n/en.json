@@ -186,6 +186,7 @@
   },
   "history": {
     "title": "History",
+    "back": "Back",
     "emptyTitle": "No matches yet",
     "empty": "Finish a match vs the bot or in pass-and-play, and it shows here.",
     "play": "Play",
@@ -278,7 +279,8 @@
     "waiting": "Waiting for Opponent",
     "status": {
       "waiting": "Waiting for Opponent…",
-      "sending": "Sending your turn…"
+      "sending": "Sending your turn…",
+      "rolling": "Rolling the dice…"
     },
     "clock": {
       "seconds_one": "{{count}} s",
@@ -302,6 +304,7 @@
       "stale": "The board shows the newest position now.",
       "sendFailedTitle": "Not sent",
       "sendFailed": "Your turn did not reach the server. Check the connection, then press Confirm again.",
+      "rollFailed": "Your roll did not reach the server. Check the connection, then roll again.",
       "refusedTitle": "Not accepted",
       "refused": "The server did not accept your turn. Your moves were taken back."
     }

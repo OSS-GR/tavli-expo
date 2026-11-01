@@ -4,6 +4,8 @@
  * follows the screen and its height follows the board's shape, so it never
  * needs a fixed height. The board and the caption follow Settings → Home
  * board (#175): with the home on the bottom left the picture is mirrored.
+ * The board sits on a dark panel in a brass-edged frame, with the caption
+ * under it in the same frame (#362).
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,18 +23,20 @@ export function StartPicture({ game }: { game: RulesGame }) {
   const homeSide = useHomeBoardSide();
   const board = useMemo(() => startBoard(game), [game]);
   return (
-    <View style={styles.wrap}>
-      <View
-        testID={`rules-picture-${game}`}
-        style={styles.picture(aspectRatio)}
-        accessible
-        accessibilityRole="image"
-        accessibilityLabel={t('rules.picture.label', { game: t(`games.${game}`) })}>
-        <StaticBoard
-          board={board}
-          view={{ viewer: 'white', direction: rulesDirection(game) }}
-          testID={`rules-board-${game}`}
-        />
+    <View style={styles.frame}>
+      <View style={styles.panel}>
+        <View
+          testID={`rules-picture-${game}`}
+          style={styles.picture(aspectRatio)}
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={t('rules.picture.label', { game: t(`games.${game}`) })}>
+          <StaticBoard
+            board={board}
+            view={{ viewer: 'white', direction: rulesDirection(game) }}
+            testID={`rules-board-${game}`}
+          />
+        </View>
       </View>
       <Text style={styles.caption}>
         {homeSide === 'left' ? t('rules.picture.captionMirrored') : t('rules.picture.caption')}
@@ -42,9 +46,16 @@ export function StartPicture({ game }: { game: RulesGame }) {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  wrap: {
-    gap: theme.space.sm,
-    paddingVertical: theme.space.xs,
+  frame: {
+    marginVertical: theme.space.xs,
+    borderRadius: theme.radii.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    overflow: 'hidden',
+  },
+  panel: {
+    padding: theme.space.md,
+    backgroundColor: theme.colors.backgroundDeep,
   },
   picture: (aspectRatio: number) => ({
     alignSelf: 'center',
@@ -55,5 +66,8 @@ const styles = StyleSheet.create((theme) => ({
   caption: {
     ...theme.type.caption,
     color: theme.colors.textDim,
+    paddingHorizontal: theme.space.md,
+    paddingTop: theme.space.sm,
+    paddingBottom: theme.space.md,
   },
 }));

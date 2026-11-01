@@ -6,11 +6,11 @@ import {
   resolveRules,
   type PlayerId,
 } from '@tavli/engine';
+import { type OnlineGameView as GameView } from '@tavli/contracts';
 import { createMemoryGameServer } from '@tavli/online';
 import { pickTurn } from '@tavli/online/testing';
 
 import { gameRuleSet, type OpeningRollRule } from '@/features/match/setup';
-import { hiddenFlow, newRoll } from '@/features/online/hiddenRoll';
 import { viewFlow } from '@/features/online/onlineStore';
 import i18n from '@/i18n';
 
@@ -262,16 +262,33 @@ describe('online announcements (#255)', () => {
     const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => 0 });
     const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 1);
     const view = () => server.getGame(gameId)!;
-    const play = async () => {
-      const player = view().waitingFor === 'white' ? 'me' : 'bot';
-      await server.transportFor(player).sendTurn({
-        gameId,
-        expectedVersion: view().version,
-        moves: pickTurn(view().game, createSeededRng(view().version)),
-      });
+    // One call: a roll when the turn waits for it (#355), else the turn.
+    const step = async () => {
+      const now = view();
+      const transport = server.transportFor(now.waitingFor === 'white' ? 'me' : 'bot');
+      const expectedVersion = now.version;
+      if (now.game.phase === 'awaiting-roll') {
+        await transport.rollDice({ gameId, expectedVersion });
+      } else {
+        const moves = pickTurn(now.game, createSeededRng(now.version));
+        await transport.sendTurn({ gameId, expectedVersion, moves });
+      }
     };
-    return { view, play };
+    const until = async (done: (view: GameView) => boolean) => {
+      for (let calls = 0; !done(view()); calls++) {
+        if (calls > 100) throw new Error('the game never got there');
+        await step();
+      }
+    };
+    return { view, step, until };
   };
+  /** The server waits for `side` to roll, after the other side's turn with moves. */
+  const waitsToRoll = (side: PlayerId) => (view: GameView) =>
+    view.game.phase === 'awaiting-roll' &&
+    view.waitingFor === side &&
+    view.game.lastTurn !== null &&
+    view.game.lastTurn.player !== side &&
+    view.game.lastTurn.moves.length > 0;
 
   it('says who starts, with the server’s opening roll', () => {
     const { view } = game();
@@ -282,36 +299,40 @@ describe('online announcements (#255)', () => {
     expect(onlineTurnAnnouncement(flow, i18n.t, online)).toBe(line);
   });
 
-  it('reads the opponent’s whole turn and your roll in one text', async () => {
-    const { view, play } = game();
-    while (view().waitingFor !== 'black') await play();
-    await play();
+  it('reads the opponent’s whole turn and “Your turn.” while your roll waits (#355)', async () => {
+    const { view, until } = game();
+    await until(waitsToRoll('white'));
     const flow = viewFlow(view());
     expect(onlineOpeningLine(flow.game, i18n.t, online)).toBeNull();
-    const [a, b] = flow.game.state.dice!;
-    const roll = a === b ? /You rolled double/ : new RegExp(`You rolled ${a}-${b}\\.$`);
     const text = onlineTurnAnnouncement(flow, i18n.t, online);
-    expect(text).toMatch(/^Opponent played: Checker from point \d+ to point \d+/);
-    expect(text).toMatch(roll);
-  });
-
-  it('reads the opponent’s turn and “Your turn.” while your roll waits (#347)', async () => {
-    const { view, play } = game();
-    while (view().waitingFor !== 'black') await play();
-    await play();
-    expect(newRoll(view(), 'white')).not.toBeNull();
-    const text = onlineTurnAnnouncement(hiddenFlow(view()), i18n.t, online);
     expect(text).toMatch(/^Opponent played: Checker from point \d+ to point \d+/);
     expect(text).toMatch(/Your turn\.$/);
     expect(text).not.toMatch(/rolled/);
   });
 
-  it('does not read your own turn back to you', async () => {
-    const { view, play } = game();
-    while (view().waitingFor !== 'white') await play();
-    await play();
+  it('reads your roll that came from another phone', async () => {
+    const { view, step, until } = game();
+    await until(waitsToRoll('white'));
+    await step();
     const flow = viewFlow(view());
-    expect(flow.game.lastTurn?.player).toBe('white');
-    expect(onlineTurnAnnouncement(flow, i18n.t, online)).toMatch(/^Opponent rolled /);
+    expect(flow.game.phase).toBe('moving');
+    const [a, b] = flow.game.state.dice!;
+    const roll = a === b ? /^You rolled double/ : new RegExp(`^You rolled ${a}-${b}\\.$`);
+    const text = onlineTurnAnnouncement(flow, i18n.t, online);
+    expect(text).toMatch(roll);
+    // The opponent’s turn had its own view: it is not read again.
+    expect(text).not.toMatch(/played/);
+  });
+
+  it('does not read your own turn back to you, and reads the opponent’s roll', async () => {
+    const { view, step, until } = game();
+    await until(waitsToRoll('black'));
+    const waiting = viewFlow(view());
+    expect(waiting.game.lastTurn?.player).toBe('white');
+    expect(onlineTurnAnnouncement(waiting, i18n.t, online)).toBeNull();
+    await step();
+    const rolled = viewFlow(view());
+    expect(rolled.game.phase).toBe('moving');
+    expect(onlineTurnAnnouncement(rolled, i18n.t, online)).toMatch(/^Opponent rolled /);
   });
 });

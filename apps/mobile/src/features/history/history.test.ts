@@ -29,6 +29,7 @@ import {
   onlineHistoryRow,
   recordSetup,
   statParts,
+  statTiles,
 } from './format';
 import { createHistoryStore } from './historyStore';
 import {
@@ -1236,6 +1237,37 @@ describe('history texts', () => {
       'Not finished 1',
     ]);
     expect(statParts({ ...line, unfinished: 0 }, 'local', t)).toEqual(['Played 5', 'Draws 1']);
+  });
+
+  it('splits a line into tiles and one line of the rest (#359)', async () => {
+    const line = { played: 5, won: 3, lost: 1, unfinished: 1, diploWins: 2, draws: 1 };
+    expect(statTiles(line, 'bot', t)).toEqual({
+      tiles: [
+        { key: 'played', value: '5', label: 'Played' },
+        { key: 'won', value: '3', label: 'Won' },
+        { key: 'winRate', value: '75%', label: 'Win rate' },
+      ],
+      rest: ['Lost 1', 'Diplo wins 2', 'Draws 1', 'Not finished 1'],
+    });
+    expect(statTiles({ ...EMPTY_LINE, played: 2 }, 'bot', t).tiles[2]).toEqual({
+      key: 'winRate',
+      value: '—',
+      label: 'Win rate',
+    });
+    expect(statTiles({ ...line, unfinished: 0 }, 'local', t)).toEqual({
+      tiles: [{ key: 'played', value: '5', label: 'Played' }],
+      rest: ['Draws 1'],
+    });
+    await i18n.changeLanguage('el');
+    try {
+      expect(statTiles(line, 'bot', t).tiles.map(({ label }) => label)).toEqual([
+        'Ματς',
+        'Νίκες',
+        'Ποσοστό νικών',
+      ]);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });
 

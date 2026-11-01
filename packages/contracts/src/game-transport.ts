@@ -2,8 +2,9 @@
  * The online game port (ADR-0004, #126).
  *
  * The app plays an online game only through `GameTransport`. The server
- * (`apps/server`, Convex) is the truth: it rolls the dice, checks every
- * turn with `@tavli/engine` and saves the game. The client adapter
+ * (`apps/server`, Convex) is the truth: it rolls the dice when a player
+ * asks (`rollDice`, #355), checks every turn with `@tavli/engine` and
+ * saves the game. The client adapter
  * `@tavli/backend-convex` (`packages/adapters/backend-convex`) implements
  * this port. The in-memory
  * server in `@tavli/online` implements it too, with no network.
@@ -64,7 +65,8 @@ export type OnlineGameStatus = 'active' | 'finished';
 
 /**
  * What a client may see of one online game. It never holds dice that are
- * not rolled yet: the server rolls each roll when that turn starts.
+ * not rolled yet: the server rolls each roll when its player asks
+ * (`rollDice`, #355).
  */
 export interface OnlineGameView {
   readonly gameId: string;
@@ -90,9 +92,13 @@ export interface OnlineGameView {
   /** The match: rules, score, finished games and the winner. */
   readonly match: Match;
   /**
-   * The current game (the last one once the match is over). While a
-   * player moves, `game.state.dice` is their roll. `game.played` is always
-   * empty: a turn is sent and saved as a whole.
+   * The current game (the last one once the match is over). In
+   * `awaiting-roll` the server waits for `waitingFor` to roll (#355): no
+   * dice yet. While a player moves, `game.state.dice` is their roll. A
+   * roll with no legal move passes at once: the next view waits for the
+   * other player's roll, and `game.lastTurn` is the pass (no moves, with
+   * its dice). `game.played` is always empty: a turn is sent and saved as
+   * a whole.
    */
   readonly game: GameFlow;
   /**
@@ -104,7 +110,7 @@ export interface OnlineGameView {
    * starts).
    */
   readonly previousGame: GameFlow | null;
-  /** The side the server waits for (to move, or to answer). `null` when finished. */
+  /** The side the server waits for (to roll, to move, or to answer). `null` when finished. */
   readonly waitingFor: PlayerId | null;
   /** The question `waitingFor` must answer, else `null`. */
   readonly prompt: VariantPrompt | null;
@@ -167,7 +173,7 @@ export const GAME_TRANSPORT_ERROR_CODES = [
   'STALE_VERSION',
   /** A move of the turn is not legal, or the turn is not complete. */
   'ILLEGAL_MOVE',
-  /** The action is not allowed now (for example an answer with no question). */
+  /** The action is not allowed now (for example an answer with no question, or a roll in the middle of a turn). */
   'ILLEGAL_ACTION',
   /** The match is over. */
   'GAME_OVER',
@@ -198,6 +204,13 @@ export function isGameTransportErrorData(value: unknown): value is GameTransport
     typeof code === 'string' &&
     (GAME_TRANSPORT_ERROR_CODES as readonly string[]).includes(code)
   );
+}
+
+/** A roll of the dice for the caller's turn (#355). */
+export interface RollDiceRequest {
+  readonly gameId: string;
+  /** `OnlineGameView.version` of the view that waits for the roll. */
+  readonly expectedVersion: number;
 }
 
 /** One full turn: every move for the current roll, in order. */
@@ -236,9 +249,22 @@ export interface GameTransport {
     onError?: (error: unknown) => void,
   ): () => void;
   /**
-   * Sends one full turn. Resolves once the server saved it (the next roll
-   * comes through `subscribe`). Rejects with `GameTransportErrorData`;
-   * `TIMED_OUT` when the turn time ran out first.
+   * Rolls the dice of the caller's turn (#355): the server rolls them with
+   * its RNG, only now, and saves the roll. Only when the view waits for
+   * the caller's roll (`game.phase` is `awaiting-roll`). The dice come
+   * through `subscribe`: a roll to play (`moving`), or a pass when no
+   * checker can move (`game.lastTurn` holds its dice, and the server waits
+   * for the other side). The roll does not reset the turn deadline; a
+   * pass gives the other side a new one. Rejects like `sendTurn`:
+   * `NOT_YOUR_TURN`, `ILLEGAL_ACTION` when there is nothing to roll,
+   * `STALE_VERSION`, `GAME_OVER`, or `TIMED_OUT` when the turn time ran
+   * out first.
+   */
+  rollDice(request: RollDiceRequest): Promise<void>;
+  /**
+   * Sends one full turn. Resolves once the server saved it (the next view
+   * waits for a roll and comes through `subscribe`). Rejects with
+   * `GameTransportErrorData`; `TIMED_OUT` when the turn time ran out first.
    */
   sendTurn(request: SendTurnRequest): Promise<void>;
   /** Answers the current question. Rejects like `sendTurn`. */

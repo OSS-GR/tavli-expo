@@ -6,7 +6,7 @@
  * With "Reduce motion" on (system setting), it shows the still icon and
  * no confetti. Screen readers skip it: the title says who won.
  */
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -39,13 +39,18 @@ const confetti = Array.from({ length: PIECES }, (_, i) => {
 export interface CelebrationProps {
   /** `match`: a cup (wireframe 9). `game`: a party popper (wireframe 8). */
   kind: 'game' | 'match';
+  /**
+   * Pops this in place of the emoji: the match end's trophy badge (#361).
+   * It must fit in the area (`CELEBRATION_HEIGHT`).
+   */
+  icon?: ReactNode;
   testID?: string;
 }
 
 /** The height of the celebration area, by kind. */
 export const CELEBRATION_HEIGHT = { game: 64, match: 120 } as const;
 
-export function Celebration({ kind, testID }: CelebrationProps) {
+export function Celebration({ kind, icon, testID }: CelebrationProps) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(reduceMotion ? 1 : 0);
   const pop = useSharedValue(reduceMotion ? 1 : 0.6);
@@ -69,8 +74,10 @@ export function Celebration({ kind, testID }: CelebrationProps) {
         ? null
         : confetti.map((piece, i) => <Piece key={i} piece={piece} progress={progress} />)}
       <Animated.View testID={testID ? `${testID}-icon` : undefined} style={iconStyle}>
-        {/* U+1F3C6 trophy, U+1F389 party popper. */}
-        <Text style={styles.icon(kind)}>{kind === 'match' ? '🏆' : '🎉'}</Text>
+        {icon ?? (
+          // U+1F3C6 trophy, U+1F389 party popper.
+          <Text style={styles.icon(kind)}>{kind === 'match' ? '🏆' : '🎉'}</Text>
+        )}
       </Animated.View>
     </View>
   );

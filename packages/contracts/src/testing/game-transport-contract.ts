@@ -10,6 +10,10 @@
  * the transport breaks the contract. The checks never wait on a real
  * clock: they call `subject.settle()` in a loop while they wait for a
  * view, and `subject.passTime()` to move the server clock.
+ *
+ * The server waits for each player's roll (`rollDice`, #355). The dice are
+ * random, so a check that needs a roll to play rolls until one comes
+ * (`untilMoving`): a roll with no legal move passes to the other side.
  */
 import type { MoveInput, PlayerId } from '@tavli/engine';
 
@@ -60,7 +64,10 @@ export interface GameTransportContractSubject {
   readonly missingGameId: () => Promise<string>;
   /** The transport of one side, or of a caller who is neither player. */
   readonly transportFor: (who: PlayerId | 'stranger') => GameTransport;
-  /** A legal full turn for `view.waitingFor` (the contract has no engine at run time). */
+  /**
+   * A legal full turn for `view.waitingFor` (the contract has no engine at
+   * run time). Only for a view where that player moves (`moving`).
+   */
   readonly legalTurn: (view: OnlineGameView) => readonly MoveInput[];
   /**
    * Moves the server clock forward by `ms` (a few seconds at most, far
@@ -304,6 +311,31 @@ async function sameAsListed(
   await waitUntil(subject, () => lastSummary() === want, `${what}: the listed summary`);
 }
 
+/** More rolls than this in a row with no legal move means a broken server. */
+const MAX_ROLLS = 20;
+
+/**
+ * Rolls in turn until the server waits for a move (`moving`): each view in
+ * `awaiting-roll` gets a roll from the side it waits for (a pass gives the
+ * other side the roll). `watcher` may be either player's. Returns the
+ * view that waits for a move.
+ */
+async function untilMoving(
+  subject: GameTransportContractSubject,
+  watcher: Watcher,
+  view: OnlineGameView,
+): Promise<OnlineGameView> {
+  let current = view;
+  for (let i = 0; i < MAX_ROLLS && current.game.phase === 'awaiting-roll'; i++) {
+    await subject
+      .transportFor(waiting(current))
+      .rollDice({ gameId: current.gameId, expectedVersion: current.version });
+    current = await viewAt(subject, watcher, current.version + 1);
+  }
+  same(current.game.phase, 'moving', 'phase after the rolls');
+  return current;
+}
+
 /** One second: the checks move the clock between changes, so each change has its own time. */
 const TICK_MS = 1000;
 
@@ -347,6 +379,80 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         same(black, white, 'Black view');
         same(white.game.lastTurn?.player, mover, 'game.lastTurn.player');
         same(white.game.played, [], 'game.played');
+        // The next player's dice are not rolled yet (#355).
+        same(white.game.phase, 'awaiting-roll', 'game.phase after the turn');
+        same(white.game.state.dice, null, 'game.state.dice after the turn');
+        same(white.waitingFor, white.game.state.toMove, 'waitingFor after the turn');
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
+      name: 'rollDice rolls for the player the server waits for, and both players see it',
+      run: async (subject) => {
+        const { gameId, watchers, view } = await startGame(
+          subject,
+          await subject.createGame(PORTES),
+        );
+        await subject.transportFor(waiting(view)).sendTurn({
+          gameId,
+          expectedVersion: view.version,
+          moves: subject.legalTurn(view),
+        });
+        const next = await viewAt(subject, watchers.white, view.version + 1);
+        same(next.game.phase, 'awaiting-roll', 'phase before the roll');
+        const roller = waiting(next);
+        const roll = { gameId, expectedVersion: next.version };
+        await rejectsWith(
+          subject.transportFor(other(roller)).rollDice(roll),
+          'NOT_YOUR_TURN',
+          'a roll by the other player',
+        );
+        await rejectsWith(
+          subject.transportFor('stranger').rollDice(roll),
+          'NOT_A_PLAYER',
+          'a roll by a stranger',
+        );
+        await rejectsWith(
+          subject.transportFor(roller).sendTurn({ ...roll, moves: [] }),
+          'ILLEGAL_ACTION',
+          'a turn before the roll',
+        );
+        await rejectsWith(
+          subject.transportFor(roller).rollDice({ gameId, expectedVersion: view.version }),
+          'STALE_VERSION',
+          'a roll on an old version',
+        );
+        await stayQuiet(subject);
+        same(watchers.white.last().version, next.version, 'version after the rejected calls');
+        await subject.passTime(TICK_MS);
+        await subject.transportFor(roller).rollDice(roll);
+        const white = await viewAt(subject, watchers.white, next.version + 1);
+        const black = await viewAt(subject, watchers.black, next.version + 1);
+        same(white.version, next.version + 1, 'version after the roll');
+        same(black, white, 'Black view');
+        if (white.game.phase === 'moving') {
+          same(white.waitingFor, roller, 'waitingFor after the roll');
+          same(white.game.state.toMove, roller, 'game.state.toMove after the roll');
+          if (white.game.state.dice === null) throw new Error('no dice after the roll');
+          // The roll is part of the turn: the clock does not start again.
+          same(white.turnDeadline, next.turnDeadline, 'turnDeadline after the roll');
+          await rejectsWith(
+            subject.transportFor(roller).rollDice({ gameId, expectedVersion: white.version }),
+            'ILLEGAL_ACTION',
+            'a second roll in the same turn',
+          );
+        } else {
+          // No legal move: the roll passed, and the other side rolls next.
+          same(white.game.phase, 'awaiting-roll', 'phase after a pass');
+          same(white.waitingFor, other(roller), 'waitingFor after a pass');
+          same(white.game.lastTurn?.player, roller, 'game.lastTurn.player after a pass');
+          same(white.game.lastTurn?.moves, [], 'game.lastTurn.moves after a pass');
+          if (white.game.lastTurn?.dice === undefined) throw new Error('no dice in the pass');
+          if (!(Number(white.turnDeadline) > Number(next.turnDeadline))) {
+            throw new Error('a pass did not give the other side a new turn time');
+          }
+        }
         watchers.white.stop();
         watchers.black.stop();
       },
@@ -369,7 +475,7 @@ export function gameTransportContract(): GameTransportContractCheck[] {
           subject.transportFor(waiting(next)).sendTurn({
             gameId,
             expectedVersion: view.version,
-            moves: subject.legalTurn(next),
+            moves: subject.legalTurn(view),
           }),
           'STALE_VERSION',
           'a turn on the old version',
@@ -533,13 +639,15 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         same(plainMoves(ended.lastTurn?.moves), plainMoves(moves), 'previousGame.lastTurn.moves');
         same(ended.state.board.off.white, 15, 'previousGame: White checkers off');
         same(ended.played, [], 'previousGame.played');
-        // It stays until the next game ends.
-        await subject.transportFor(waiting(white)).sendTurn({
+        // It stays until the next game ends: through rolls and turns.
+        const moving = await untilMoving(subject, watchers.white, white);
+        same(moving.previousGame, ended, 'previousGame after a roll of the next game');
+        await subject.transportFor(waiting(moving)).sendTurn({
           gameId,
-          expectedVersion: white.version,
-          moves: subject.legalTurn(white),
+          expectedVersion: moving.version,
+          moves: subject.legalTurn(moving),
         });
-        const next = await viewAt(subject, watchers.white, white.version + 1);
+        const next = await viewAt(subject, watchers.white, moving.version + 1);
         same(next.previousGame, ended, 'previousGame after a turn of the next game');
         watchers.white.stop();
         watchers.black.stop();
@@ -570,6 +678,11 @@ export function gameTransportContract(): GameTransportContractCheck[] {
           }),
           'GAME_OVER',
           'a turn after the match',
+        );
+        await rejectsWith(
+          subject.transportFor(waiting(view)).rollDice({ gameId, expectedVersion: white.version }),
+          'GAME_OVER',
+          'a roll after the match',
         );
         await rejectsWith(
           subject.transportFor(resigner).resign(gameId),
@@ -622,6 +735,11 @@ export function gameTransportContract(): GameTransportContractCheck[] {
           subject.transportFor('white').sendTurn({ gameId, expectedVersion: 1, moves: [] }),
           'NOT_FOUND',
           'a turn in a missing game',
+        );
+        await rejectsWith(
+          subject.transportFor('white').rollDice({ gameId, expectedVersion: 1 }),
+          'NOT_FOUND',
+          'a roll in a missing game',
         );
         await rejectsWith(
           subject.transportFor('white').sendAnswer({ gameId, expectedVersion: 1, choice: 'x' }),
