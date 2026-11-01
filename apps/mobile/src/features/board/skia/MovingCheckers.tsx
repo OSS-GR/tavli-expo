@@ -17,7 +17,7 @@ import {
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { toneOf } from '../boardModel';
-import { FLIGHT_MS, flightMs, type Flight } from '../flights';
+import { flightMs, type Flight } from '../flights';
 
 import { CheckerShape } from './CheckerShape';
 
@@ -88,7 +88,7 @@ export function FlightChecker({
           // A path eases each leg itself (`flightPose`), so its clock runs evenly.
           flight.via?.length
             ? { duration: flightMs(flight), easing: Easing.linear }
-            : { duration: FLIGHT_MS, easing: Easing.out(Easing.cubic) },
+            : { duration: flightMs(flight), easing: Easing.out(Easing.cubic) },
           (finished) => {
             if (finished) scheduleOnRN(onDone, flight.id);
           },

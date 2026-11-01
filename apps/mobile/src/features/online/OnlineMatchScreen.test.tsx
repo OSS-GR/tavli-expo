@@ -11,7 +11,7 @@ import { getLayout, getTheme } from '@tavli/themes';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
-import { FLIGHT_MS, turnMoveDelay } from '@/features/board/flights';
+import { REMOTE_FLIGHT_MS, turnMoveDelay } from '@/features/board/flights';
 import { buildSources } from '@/features/board/interaction';
 import { fitBoardWithShadow, slotRect } from '@/features/board/geometry';
 import { turnView } from '@/features/game/gameStore';
@@ -330,7 +330,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       for (let i = 0; i < 100 && view(game).match.games.length === 0; i++) await wait(50);
       // Its two checkers fly off one after the other. The sheet waits until
       // the last one lands, so it never covers them.
-      const landed = turnMoveDelay(1) + FLIGHT_MS;
+      const landed = turnMoveDelay(1) + REMOTE_FLIGHT_MS;
       await wait(landed - 1);
       expect(screen.queryByTestId('game-end-card')).toBeNull();
       expect(screen.queryByTestId('next-game-button')).toBeNull();
