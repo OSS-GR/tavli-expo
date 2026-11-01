@@ -19,6 +19,7 @@ const phone = vi.hoisted(() => ({
   last: null as unknown,
   broken: false,
   promptFails: false,
+  handlers: [] as { handleNotification: (n: unknown) => Promise<unknown> }[],
   reset() {
     this.status = 'undetermined';
     this.canAskAgain = true;
@@ -106,10 +107,23 @@ vi.mock('expo-notifications', () => ({
     check();
     phone.last = null;
   },
+  setNotificationHandler: (handler: { handleNotification: (n: unknown) => Promise<unknown> }) => {
+    check();
+    phone.handlers.push(handler);
+  },
 }));
 
-const { ANDROID_CHANNEL_ID, createExpoPushNotifications, tapOf, toPermission } =
-  await import('./index');
+const {
+  ANDROID_CHANNEL_ID,
+  FOREGROUND_BEHAVIOR,
+  createExpoPushNotifications,
+  hidePushesInForeground,
+  tapOf,
+  toPermission,
+} = await import('./index');
+
+// Read before any `reset()`: the module sets the handler when it loads.
+const handlersAtLoad = [...phone.handlers];
 
 let taps = 0;
 
@@ -287,6 +301,29 @@ describe('createExpoPushNotifications', () => {
     expect(got).toEqual([]);
     phone.last = response({ gameId: 'g1' }, 'reply');
     await expect(notifications.lastTap()).resolves.toBeNull();
+  });
+});
+
+describe('foreground pushes (#349)', () => {
+  it('hides a push that comes while the app is open, from the moment the module loads', async () => {
+    expect(handlersAtLoad).toHaveLength(1);
+    await expect(handlersAtLoad[0]?.handleNotification({})).resolves.toEqual({
+      shouldShowBanner: false,
+      shouldShowList: false,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    });
+    expect(FOREGROUND_BEHAVIOR).toEqual({
+      shouldShowBanner: false,
+      shouldShowList: false,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    });
+  });
+
+  it('never throws when the notification system is missing', () => {
+    phone.broken = true;
+    expect(() => hidePushesInForeground()).not.toThrow();
   });
 });
 

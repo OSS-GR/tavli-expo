@@ -17,9 +17,11 @@
  *   `lastTap` reads the tap that opened the app and clears it, so it
  *   opens the game once.
  *
- * The app does not set a foreground handler (`setNotificationHandler`),
- * so a push that comes while the app is open is not shown: the open game
- * shows the turn by itself. See README.md.
+ * - Foreground (#349): a push that comes while the app is open is not
+ *   shown. expo-notifications shows every push by default (banner, list,
+ *   sound, badge) once it is loaded, so this module sets a handler that
+ *   shows nothing when it loads: the open app shows the turn by itself.
+ *   A tap on a push in the background still opens the game. See README.md.
  */
 import { gameIdOfPush } from '@tavli/contracts';
 import type { PushNotifications, PushPermission, PushPlatform, PushTap } from '@tavli/contracts';
@@ -35,9 +37,11 @@ import {
   getPermissionsAsync,
   requestPermissionsAsync,
   setNotificationChannelAsync,
+  setNotificationHandler,
 } from 'expo-notifications';
 import type {
   DevicePushToken,
+  NotificationBehavior,
   NotificationPermissionsStatus,
   NotificationResponse,
 } from 'expo-notifications';
@@ -58,6 +62,25 @@ export interface ExpoPushNotificationsOptions {
   readonly projectId: string | undefined;
   /** The name of the Android channel, in the app language. Read when the channel is made. */
   readonly channelName: () => string;
+}
+
+/** What a push that comes while the app is open does: nothing (#349). */
+export const FOREGROUND_BEHAVIOR: NotificationBehavior = {
+  shouldShowBanner: false,
+  shouldShowList: false,
+  shouldPlaySound: false,
+  shouldSetBadge: false,
+};
+
+/**
+ * Replaces the default foreground handler of expo-notifications, which
+ * shows every push. It answers at once: on iOS a handler that does not
+ * answer in 3 s gets the default (shown) behavior.
+ */
+export function hidePushesInForeground(): void {
+  safelyNow(() => {
+    setNotificationHandler({ handleNotification: () => Promise.resolve(FOREGROUND_BEHAVIOR) });
+  }, undefined);
 }
 
 /** What the phone allows, as the port says it. */
@@ -224,3 +247,7 @@ export function createExpoPushNotifications(
     },
   };
 }
+
+// expo-notifications shows foreground pushes from the moment it loads, so
+// hide them as soon as this module loads, before any push can come.
+hidePushesInForeground();
