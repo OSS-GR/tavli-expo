@@ -48,7 +48,7 @@ export interface Flight {
   readonly delay: number;
   /**
    * Stops on the way, in order (a move with several dice). The flight has
-   * one leg of `FLIGHT_MS` per stop, plus the last one.
+   * one leg per stop, plus the last one.
    */
   readonly via?: readonly { readonly x: number; readonly y: number; readonly r: number }[];
   /**
@@ -57,12 +57,17 @@ export interface Flight {
    * the air. Without it, one checker shows twice.
    */
   readonly hiddenMs?: number;
+  /**
+   * The time of one leg, in ms. Default `FLIGHT_MS`. The other player's
+   * turn online flies slower (`REMOTE_FLIGHT_MS`, #348).
+   */
+  readonly legMs?: number;
 }
 
-/** How long a flight is in the air: one `FLIGHT_MS` per leg. */
+/** How long a flight is in the air: one leg (`legMs`, default `FLIGHT_MS`) per stop, plus one. */
 export function flightMs(flight: Flight): number {
   'worklet';
-  return FLIGHT_MS * (1 + (flight.via?.length ?? 0));
+  return (flight.legMs ?? FLIGHT_MS) * (1 + (flight.via?.length ?? 0));
 }
 
 /** When the last of `flights` lands, in ms from their start. 0 for none. */
@@ -236,18 +241,29 @@ export function pathFlights(
   return [checker, ...others.map((f, n) => ({ ...f, id: `${options.id}:hit${n}` }))];
 }
 
+/**
+ * How much slower the other player's turn plays online than a move on the
+ * phone (#348): a quarter slower, so the player can follow it. It scales
+ * the flight, the hit delay and the pause between moves.
+ */
+export const REMOTE_PACE = 1.25;
+/** Flight time of a checker in a turn that arrives whole (online), in ms. */
+export const REMOTE_FLIGHT_MS = FLIGHT_MS * REMOTE_PACE;
+/** The hit checker of such a turn leaves this long after the hitter starts. */
+export const REMOTE_HIT_DELAY_MS = HIT_DELAY_MS * REMOTE_PACE;
 /** The pause between two moves of a turn that arrives whole (online, #255). */
-export const TURN_MOVE_GAP_MS = 100;
+export const TURN_MOVE_GAP_MS = 100 * REMOTE_PACE;
 
 /** When move `i` (from 0) of a turn that arrives whole starts to fly, in ms. */
 export function turnMoveDelay(i: number): number {
-  return i * (FLIGHT_MS + TURN_MOVE_GAP_MS);
+  return i * (REMOTE_FLIGHT_MS + TURN_MOVE_GAP_MS);
 }
 
 /**
  * The flights of a whole turn that arrives at once: the other player's
- * turn in an online game (#255). The moves fly one after the other, each
- * `FLIGHT_MS + TURN_MOVE_GAP_MS` after the one before. Until its turn
+ * turn in an online game (#255). It plays at `REMOTE_PACE` (#348): each
+ * checker flies `REMOTE_FLIGHT_MS`, and the moves fly one after the
+ * other, each `REMOTE_FLIGHT_MS + TURN_MOVE_GAP_MS` after the one before. Until its turn
  * comes, a checker waits at its start. A checker that moves again (a
  * double) waits where its last flight lands: it stays hidden until that
  * flight is down (`hiddenMs`). `before` is the board before the first
@@ -270,7 +286,8 @@ export function turnFlights(
     for (const f of moveFlights(geo, view, mover, move, board, after, {
       id: `${options.id}:${i}`,
     })) {
-      const flight = { ...f, delay: f.delay + delay };
+      // `moveFlights` paces a move as on the phone: scale it (a hit's delay).
+      const flight = { ...f, delay: f.delay * REMOTE_PACE + delay, legMs: REMOTE_FLIGHT_MS };
       const lands = landsAt(flights.slice(0, earlier), flight);
       flights.push(lands === null ? flight : { ...flight, hiddenMs: lands });
     }

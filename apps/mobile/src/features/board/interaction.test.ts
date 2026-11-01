@@ -20,12 +20,16 @@ import { flowPaths } from './combined';
 import {
   FLIGHT_MS,
   HIT_DELAY_MS,
+  REMOTE_FLIGHT_MS,
+  REMOTE_HIT_DELAY_MS,
+  REMOTE_PACE,
   TURN_MOVE_GAP_MS,
   flightMs,
   flightsEndMs,
   moveFlights,
   pathFlights,
   turnFlights,
+  turnMoveDelay,
 } from './flights';
 import {
   fitBoard,
@@ -254,14 +258,34 @@ describe('turnFlights (#255)', () => {
     });
     expect(flights.map((f) => [f.id, f.delay])).toEqual([
       ['r:0:0', 0],
-      ['r:1:0', FLIGHT_MS + TURN_MOVE_GAP_MS],
+      ['r:1:0', REMOTE_FLIGHT_MS + TURN_MOVE_GAP_MS],
     ]);
     // The second move starts where the first one landed.
     expect(flights[1]!.from).toEqual(flights[0]!.to);
     expect(flights[1]!.to).toMatchObject(stackPosition(geo, { kind: 'point', index: 2 }, 1, 0));
     // It is the same checker: it shows there only once the first flight is down.
     expect(flights[0]!.hiddenMs).toBeUndefined();
-    expect(flights[1]!.hiddenMs).toBe(FLIGHT_MS);
+    expect(flights[1]!.hiddenMs).toBe(REMOTE_FLIGHT_MS);
+  });
+
+  it('plays a quarter slower than a move on the phone (#348)', () => {
+    expect(REMOTE_PACE).toBe(1.25);
+    expect(REMOTE_FLIGHT_MS).toBe(FLIGHT_MS * 1.25);
+    expect(REMOTE_HIT_DELAY_MS).toBe(HIT_DELAY_MS * 1.25);
+    expect(turnMoveDelay(1)).toBe(1.25 * 300);
+    const before = portes.initialState({ startingPlayer: 'white' }).board;
+    const [flight] = turnFlights(
+      geo,
+      WHITE,
+      'white',
+      [{ from: 13, to: 7, die: 6, capture: 'none' }],
+      before,
+      {
+        id: 'r',
+        direction: 'contrary',
+      },
+    );
+    expect(flightMs(flight!)).toBe(REMOTE_FLIGHT_MS);
   });
 
   it('hides each later move of one checker until it lands (a double)', () => {
@@ -276,11 +300,11 @@ describe('turnFlights (#255)', () => {
       id: 'r',
       direction: 'contrary',
     });
-    const step = FLIGHT_MS + TURN_MOVE_GAP_MS;
+    const step = REMOTE_FLIGHT_MS + TURN_MOVE_GAP_MS;
     expect(flights.map((f) => [f.delay, f.hiddenMs])).toEqual([
       [0, undefined],
-      [step, FLIGHT_MS],
-      [2 * step, step + FLIGHT_MS],
+      [step, REMOTE_FLIGHT_MS],
+      [2 * step, step + REMOTE_FLIGHT_MS],
       // Another checker: it waits in sight at its start.
       [3 * step, undefined],
     ]);
@@ -301,13 +325,15 @@ describe('turnFlights (#255)', () => {
     });
     expect(flights.map((f) => [f.id, f.owner, f.delay])).toEqual([
       ['r:0:0', 'white', 0],
-      ['r:1:0', 'white', FLIGHT_MS + TURN_MOVE_GAP_MS],
-      ['r:1:1', 'black', FLIGHT_MS + TURN_MOVE_GAP_MS + HIT_DELAY_MS],
+      ['r:1:0', 'white', REMOTE_FLIGHT_MS + TURN_MOVE_GAP_MS],
+      ['r:1:1', 'black', REMOTE_FLIGHT_MS + TURN_MOVE_GAP_MS + REMOTE_HIT_DELAY_MS],
     ]);
     // Two checkers and a blot: each waits in sight where it stands.
     expect(flights.map((f) => f.hiddenMs)).toEqual([undefined, undefined, undefined]);
     // The turn is down when the hit checker lands on the bar (#299).
-    expect(flightsEndMs(flights)).toBe(FLIGHT_MS + TURN_MOVE_GAP_MS + HIT_DELAY_MS + FLIGHT_MS);
+    expect(flightsEndMs(flights)).toBe(
+      REMOTE_FLIGHT_MS + TURN_MOVE_GAP_MS + REMOTE_HIT_DELAY_MS + REMOTE_FLIGHT_MS,
+    );
     expect(flightsEndMs([])).toBe(0);
   });
 });
