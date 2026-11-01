@@ -10,7 +10,7 @@ import {
   type MatchFlow,
 } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
-import { lastBearOff, pickTurn } from '@tavli/online/testing';
+import { closedOut, lastBearOff, pickTurn } from '@tavli/online/testing';
 
 import { moveEvent, storeEvents } from '@/features/game/gameFeedback';
 import { inviteAccepted } from '@/features/invites/acceptedInvite';
@@ -29,7 +29,13 @@ import {
   stopAnyDevGame,
   stopDevGame,
 } from './devGame';
-import { MAX_TRIES_PER_TURN, startOnlineBot, type OnlineBot } from './onlineBot';
+import {
+  MAX_TRIES_PER_TURN,
+  ONLINE_BOT_ROLL_AFTER_PASS_MS,
+  ONLINE_BOT_ROLL_MS,
+  startOnlineBot,
+  type OnlineBot,
+} from './onlineBot';
 import { viewEvents } from './onlineFeedback';
 import { createOnlineStore, viewFlow, type OnlineStore } from './onlineStore';
 import { remoteTurn } from './remoteTurn';
@@ -60,17 +66,48 @@ function serverWithGame(choice: OnlineGameChoice = 'portes', targetPoints = 3, s
   return { server, gameId };
 }
 
-/** Plays a random full turn for the player the server waits for, from its own transport. */
+/**
+ * Plays a random full turn for the player the server waits for, from its
+ * own transport: the roll (#355), then the moves. A roll with no legal
+ * move ends the turn.
+ */
 async function playServerTurn(
   server: ReturnType<typeof serverWithGame>['server'],
   gameId: string,
   rng = createSeededRng(9),
 ) {
-  const view = server.getGame(gameId)!;
-  const player = view.waitingFor === 'white' ? 'me' : 'bot';
-  await server
-    .transportFor(player)
-    .sendTurn({ gameId, expectedVersion: view.version, moves: pickTurn(view.game, rng) });
+  let view = server.getGame(gameId)!;
+  const side = view.waitingFor;
+  const transport = server.transportFor(side === 'white' ? 'me' : 'bot');
+  if (view.game.phase === 'awaiting-roll') {
+    await transport.rollDice({ gameId, expectedVersion: view.version });
+    view = server.getGame(gameId)!;
+    if (view.waitingFor !== side || view.game.phase !== 'moving') return;
+  }
+  await transport.sendTurn({
+    gameId,
+    expectedVersion: view.version,
+    moves: pickTurn(view.game, rng),
+  });
+}
+
+/** Plays the server's turns until you (White, `store`) have rolled and can move. */
+async function untilYouMove(
+  server: ReturnType<typeof serverWithGame>['server'],
+  gameId: string,
+  store: OnlineStore,
+) {
+  for (let i = 0; i < 100; i++) {
+    const view = server.getGame(gameId)!;
+    if (view.waitingFor === 'white' && view.game.phase === 'moving') return;
+    if (view.waitingFor === 'white' && view.game.phase === 'awaiting-roll') {
+      expect(store.getState().dispatch({ type: 'roll', player: 'white' })).toBe(true);
+    } else {
+      await playServerTurn(server, gameId);
+    }
+    await flush();
+  }
+  throw new Error('your move never came');
 }
 
 describe('remoteTurn', () => {
@@ -94,9 +131,11 @@ describe('remoteTurn', () => {
     const { server, gameId } = serverWithGame();
     while (server.getGame(gameId)!.waitingFor !== 'black') await playServerTurn(server, gameId);
     const start = viewFlow(server.getGame(gameId)!);
-    // The bot plays, you play, the bot plays again: two views were missed.
+    // The bot plays, you play, the bot plays again: views were missed.
     await playServerTurn(server, gameId);
     while (server.getGame(gameId)!.waitingFor !== 'white') await playServerTurn(server, gameId);
+    const waiting = server.getGame(gameId)!;
+    await server.transportFor('me').rollDice({ gameId, expectedVersion: waiting.version });
     const mine = viewFlow(server.getGame(gameId)!);
     await playServerTurn(server, gameId);
     while (server.getGame(gameId)!.waitingFor !== 'white') await playServerTurn(server, gameId);
@@ -174,9 +213,10 @@ describe('onlineBoardStore refusals', () => {
     const board = onlineBoardStore(store, gameId)!;
     const errors: (string | null)[] = [];
     const stop = board.subscribe((state) => errors.push(state.lastError));
-    // The server rolls: the store refuses a roll, with the same text each time.
-    expect(board.getState().dispatch({ type: 'roll', player: 'white' })).toBe(false);
-    expect(board.getState().dispatch({ type: 'roll', player: 'white' })).toBe(false);
+    // The server does the next game by itself: the store refuses it, with
+    // the same text each time.
+    expect(board.getState().dispatch({ type: 'nextGame' })).toBe(false);
+    expect(board.getState().dispatch({ type: 'nextGame' })).toBe(false);
     expect(errors).toHaveLength(2);
     expect(errors[0]).toBe(errors[1]);
     expect(errors[0]).toMatch(/by itself/);
@@ -193,6 +233,7 @@ describe('onlineBoardStore refusals', () => {
           lost = onError;
           return real.subscribe(id, onView, onError);
         },
+        rollDice: (request) => real.rollDice(request),
         sendTurn: (request) => real.sendTurn(request),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: () => Promise.reject(new Error('no network')),
@@ -220,7 +261,7 @@ describe('onlineBoardStore refusals', () => {
     expect(board.getState()).toBe(before);
     expect(storeEvents(before, board.getState())).toEqual([]);
     // A refused move still buzzes.
-    expect(board.getState().dispatch({ type: 'roll', player: 'white' })).toBe(false);
+    expect(board.getState().dispatch({ type: 'nextGame' })).toBe(false);
     expect(storeEvents(before, board.getState())).toEqual(['invalidMove']);
     stop();
   });
@@ -251,12 +292,13 @@ describe('onlineBoardStore between games (#286)', () => {
     const loser = server.getGame(gameId)!.waitingFor!;
 
     await timeOut(server);
-    // The store has the next game, with its first roll.
+    // The store has the next game. Its winner starts it with a roll (#355).
     const next = store.getState().flow!;
     const [record] = next.match.games;
     expect(record).toEqual(expect.objectContaining({ winner: opponent(loser), reason: 'timeout' }));
-    expect(next.game.phase).toBe('moving');
-    expect(next.game.state.dice).not.toBeNull();
+    expect(next.game.phase).toBe('awaiting-roll');
+    expect(next.game.state.toMove).toBe(opponent(loser));
+    expect(next.game.state.dice).toBeNull();
     // The board shows the end of game 1, as a local game does.
     const held = board.getState().flow;
     expect(held).not.toBe(next);
@@ -303,7 +345,7 @@ describe('onlineBoardStore between games (#286)', () => {
     // The store has game 2; the board holds the end of game 1.
     const view = store.getState().view!;
     expect(view.match.games).toHaveLength(1);
-    expect(view.game.phase).toBe('moving');
+    expect(view.game.phase).toBe('awaiting-roll');
     const held = board.getState().flow;
     expect(held.match).toBe(store.getState().flow!.match);
     expect(held.game).toEqual(view.previousGame);
@@ -327,10 +369,7 @@ describe('onlineBoardStore between games (#286)', () => {
 
   it('drops the moves of a turn that timed out', async () => {
     const { server, gameId, store, board } = await openBoard();
-    while (server.getGame(gameId)!.waitingFor !== 'white') {
-      await playServerTurn(server, gameId);
-      await flush();
-    }
+    await untilYouMove(server, gameId, store);
     const start = store.getState().flow!;
     const [move] = pickTurn(start.game, createSeededRng(2));
     expect(store.getState().dispatch({ type: 'move', player: 'white', move: move! })).toBe(true);
@@ -345,10 +384,7 @@ describe('onlineBoardStore between games (#286)', () => {
 
   it('keeps the moves that ended a game, then shows the next game that times out under the sheet', async () => {
     const { server, gameId, store, board } = await openBoard(5);
-    while (server.getGame(gameId)!.waitingFor !== 'white') {
-      await playServerTurn(server, gameId);
-      await flush();
-    }
+    await untilYouMove(server, gameId, store);
     const start = store.getState().flow!;
     const [move] = pickTurn(start.game, createSeededRng(2));
     expect(store.getState().dispatch({ type: 'move', player: 'white', move: move! })).toBe(true);
@@ -488,7 +524,7 @@ describe('onlineBoardStore between games (#286)', () => {
     await flush();
     const board = onlineBoardStore(store, gameId)!;
     expect(board.getState().flow).toBe(store.getState().flow);
-    expect(board.getState().flow.game.phase).toBe('moving');
+    expect(board.getState().flow.game.phase).toBe('awaiting-roll');
   });
 });
 
@@ -530,6 +566,7 @@ describe('startOnlineBot', () => {
       startOnlineBot({
         transport: {
           subscribe: (id, onView, onError) => real.subscribe(id, onView, onError),
+          rollDice: (request) => real.rollDice(request),
           sendTurn,
           sendAnswer: (request) => real.sendAnswer(request),
           resign: (id) => real.resign(id),
@@ -568,6 +605,7 @@ describe('startOnlineBot', () => {
             onView(server.getGame(id)!);
             return real.subscribe(id, onView, onError);
           },
+          rollDice: (request) => real.rollDice(request),
           sendTurn: (request) => real.sendTurn(request),
           sendAnswer: (request) => real.sendAnswer(request),
           resign: (id) => real.resign(id),
@@ -587,6 +625,59 @@ describe('startOnlineBot', () => {
       await flush();
     }
     expect(server.getGame(gameId)!.version).toBeGreaterThan(version);
+  });
+
+  it('waits a moment before it rolls, and longer after the other player’s pass (#355)', async () => {
+    const start = (server: ReturnType<typeof serverWithGame>['server'], gameId: string) =>
+      open.push(
+        startOnlineBot({
+          transport: server.transportFor('bot'),
+          gameId,
+          botId: 'bot',
+          difficulty: botLevels.portes[0]!,
+          runner: botRunner,
+          rng: createSeededRng(2),
+          timing: { thinkMs: () => 60_000 },
+        }),
+      );
+    const waits = async (
+      server: ReturnType<typeof serverWithGame>['server'],
+      gameId: string,
+      ms: number,
+    ) => {
+      const { version } = server.getGame(gameId)!;
+      jest.advanceTimersByTime(ms - 1);
+      await flush();
+      expect(server.getGame(gameId)!.version).toBe(version);
+      jest.advanceTimersByTime(1);
+      await flush();
+      expect(server.getGame(gameId)!.version).toBe(version + 1);
+      expect(server.getGame(gameId)!.game.phase).toBe('moving');
+    };
+
+    // Your turn, then the bot's roll.
+    const plain = serverWithGame();
+    const botRolls = () => {
+      const view = plain.server.getGame(plain.gameId)!;
+      return view.waitingFor === 'black' && view.game.phase === 'awaiting-roll';
+    };
+    while (!botRolls()) await playServerTurn(plain.server, plain.gameId);
+    start(plain.server, plain.gameId);
+    await flush();
+    await waits(plain.server, plain.gameId, ONLINE_BOT_ROLL_MS);
+
+    // Your roll with no legal move: your phone shows it before the bot rolls.
+    const passed = serverWithGame();
+    const flow = closedOut(viewFlow(passed.server.getGame(passed.gameId)!), 'white');
+    passed.server.setFlowForTest(passed.gameId, flow);
+    const { version } = passed.server.getGame(passed.gameId)!;
+    await passed.server
+      .transportFor('me')
+      .rollDice({ gameId: passed.gameId, expectedVersion: version });
+    expect(passed.server.getGame(passed.gameId)!.waitingFor).toBe('black');
+    start(passed.server, passed.gameId);
+    await flush();
+    await waits(passed.server, passed.gameId, ONLINE_BOT_ROLL_AFTER_PASS_MS);
   });
 
   // Two bots, each on its own transport, play whole matches. They follow
@@ -609,7 +700,7 @@ describe('startOnlineBot', () => {
             difficulty: level,
             runner: botRunner,
             rng: createSeededRng(seed),
-            timing: { thinkMs: () => 0 },
+            timing: { thinkMs: () => 0, beforeRollMs: 0 },
             onError: (error) => errors.push(error),
           }),
         );
