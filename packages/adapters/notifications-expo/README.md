@@ -2,7 +2,7 @@
 
 The `PushNotifications` port (`@tavli/contracts`) on [expo-notifications](https://docs.expo.dev/versions/latest/sdk/notifications/). The app uses it to ask for the push permission, to get the phone's Expo push token and to hear taps on a turn push. Issue: #285. The server side (who gets a push, the sender) is #280: `apps/server/convex/push.ts` and [`../push-expo/README.md`](../push-expo/README.md).
 
-Version: `expo-notifications` ~58.1.6, a peer dependency (the app installs it).
+Version: `expo-notifications` ~58.1.7, a peer dependency (the app installs it).
 
 ## What it does
 
@@ -12,7 +12,7 @@ Version: `expo-notifications` ~58.1.6, a peer dependency (the app installs it).
 - **`getToken()`** asks Expo for a token only when the permission is `granted` and the build has an EAS project id. Without one it gives `null`.
 - **`onTokenChange(listener)`** tells only a token that differs from the last one this port gave out.
 - **`lastTap()`** reads the tap that opened the app and clears it, so a game opens once. **`onTap(listener)`** hears later taps, each on a microtask. Only a tap on the push itself counts (`DEFAULT_ACTION_IDENTIFIER`). The tap's `gameId` comes from the push's `data.gameId` (`gameIdOfPush`).
-- **No foreground handler.** The app does not call `setNotificationHandler`, so a push that comes while the app is open is not shown. The open game shows the turn by itself.
+- **Hides pushes while the app is open (#349).** expo-notifications shows every push by default (banner, list, sound, badge) from the moment it loads, also when the app is open. So this module calls `hidePushesInForeground()` when it loads: it sets a handler (`setNotificationHandler`) that answers `FOREGROUND_BEHAVIOR` (show nothing) at once. The open app shows the turn by itself. A push that comes while the app is in the background still shows, and a tap on it opens the game.
 
 ## How the app uses it
 
@@ -30,7 +30,7 @@ In Jest the app uses `createMemoryPushNotifications` from `@tavli/contracts` (`a
 
 ## Files
 
-| File                | Job                                                                                          |
-| ------------------- | -------------------------------------------------------------------------------------------- |
-| `src/index.ts`      | `createExpoPushNotifications({ platform, projectId, channelName })`, `toPermission`, `tapOf` |
-| `src/index.test.ts` | The `pushNotificationsContract` checks and the mapping, on a mocked `expo-notifications`     |
+| File                | Job                                                                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`      | `createExpoPushNotifications({ platform, projectId, channelName })`, `toPermission`, `tapOf`, `hidePushesInForeground` |
+| `src/index.test.ts` | The `pushNotificationsContract` checks and the mapping, on a mocked `expo-notifications`                               |
