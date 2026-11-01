@@ -29,8 +29,9 @@ import type {
 type MoveArg = SendTurnRequest['moves'][number];
 
 /**
- * What `makeMove`, `answer` and `rollDice` return. `ok: false` means the turn time ran
- * out first: the server saved the time out instead of the call.
+ * What `makeMove`, `answer` and `rollDice` return. `ok: false` means the
+ * turn time ran out first. Then the server saved the time out instead of
+ * the call.
  */
 export type WriteResult =
   | { readonly ok: true; readonly version: number }

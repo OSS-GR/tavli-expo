@@ -231,6 +231,15 @@ describe('online feedback (#271)', () => {
     const alice = await game.storeFor();
     const board = onlineBoardStore(alice, game.gameId)!;
     const { updates, stop } = record(board, 'white');
+    // The other phone (Bob, Black) hears the same pass.
+    const bob = createOnlineStore({
+      transport: game.server.transportFor(BOB),
+      gameId: game.gameId,
+      me: BOB,
+    });
+    open.push(bob);
+    await flush();
+    const theirs = record(onlineBoardStore(bob, game.gameId)!, 'black');
 
     // Your roll has no legal move: it plays as the same roll in a local game.
     expect(alice.getState().dispatch({ type: 'roll', player: 'white' })).toBe(true);
@@ -242,6 +251,10 @@ describe('online feedback (#271)', () => {
     expect(updates.flat().map(eventOf)).toEqual(
       localUpdates(start, [{ type: 'roll', player: 'white', dice }]).flat(),
     );
+    // Your dice, then the other player's turn: on both phones.
+    expect(updates.flat().map(eventOf)).toEqual(['diceRoll', 'turnStart']);
+    expect(theirs.updates.flat().map(eventOf)).toEqual(['diceRoll', 'turnStart']);
+    theirs.stop();
 
     // Black rolls: only their dice play.
     updates.length = 0;

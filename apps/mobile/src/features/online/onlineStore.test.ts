@@ -253,6 +253,29 @@ describe('createOnlineStore', () => {
     expect(roller.getState().flow?.log).toHaveLength(1);
   });
 
+  it('plays a roll whose answer was lost when its view comes later (#355)', async () => {
+    const { server, gameId, roller, rollerSpy } = await waitingToRoll();
+    const side = roller.getState().side!;
+    const version = viewOf(roller).version;
+    // The call fails on the phone...
+    rollerSpy.setOffline(true);
+    expect(roll(roller)).toBe(true);
+    await flush();
+    expect(roller.getState().notice).toBe('rollFailed');
+    // ...but the roll reached the server, and its view comes later.
+    await server
+      .transportFor(side === 'white' ? ALICE : BOB)
+      .rollDice({ gameId, expectedVersion: version });
+    await flush();
+    const view = server.getGame(gameId)!;
+    expect(view.version).toBe(version + 1);
+    expect(viewOf(roller).version).toBe(version + 1);
+    // It plays as your roll, and the wrong notice closes.
+    const dice = view.game.phase === 'moving' ? view.game.state.dice! : view.game.lastTurn!.dice;
+    expect(roller.getState().flow?.log).toEqual([{ type: 'roll', player: side, dice }]);
+    expect(roller.getState().notice).toBeNull();
+  });
+
   it('undoes on the phone before Confirm', async () => {
     const { server, gameId, storeFor } = setup();
     const spied = spy(server.transportFor(ALICE));

@@ -565,6 +565,8 @@ export function GameScreen({
   // Online (#355): your roll is a call. `from` is the flow it was asked on;
   // the throw is armed when a newer flow brings the roll (`armSentRoll`).
   // In the render that brings it, the dice row already waits for the throw.
+  // A failed call keeps it until the next flow: only your own roll puts a
+  // roll in a new flow's log, so a lost answer's late view still throws.
   const [rollSent, setRollSent] = useState<{
     from: MatchFlow;
     swipe: ThrowSwipe | null;

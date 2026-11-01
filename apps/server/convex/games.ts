@@ -6,11 +6,16 @@
  * the server waits for loses the game.
  *
  * Each mutation is one Convex transaction: load the game, check the call,
- * run the engine (`@tavli/online`), and save with a version bump. The
- * server rolls the dice only when the player asks (`rollDice`, #355); it
- * rolls the opening dice and starts the next game by itself. If anything throws, nothing is saved. The
- * call checks are pure helpers in `@tavli/online` too (#251), shared with
- * the in-memory server; this file keeps the database and scheduler parts.
+ * run the engine (`@tavli/online`), and save with a version bump. If
+ * anything throws, nothing is saved.
+ *
+ * The server rolls a player's dice only when that player asks
+ * (`rollDice`, #355). It rolls the opening dice and starts the next game
+ * by itself.
+ *
+ * The call checks are pure helpers in `@tavli/online` (#251). The
+ * in-memory server uses them too. This file keeps the database and
+ * scheduler parts.
  *
  * Timers: every save that leaves the match running sets a new
  * `turnDeadline` and schedules `checkTimeout` for that version. A later
@@ -216,9 +221,9 @@ async function applyTimeout(
 }
 
 /**
- * What `makeMove`, `answer` and `rollDice` return. `ok: false` means the turn time ran
- * out first: the server saved the time out (the late player lost the
- * game) instead of the call. It is a return value, not a thrown error,
+ * What `makeMove`, `answer` and `rollDice` return. `ok: false` means the
+ * turn time ran out first. Then the server saved the time out (the late
+ * player lost the game) instead of the call. It is a return value, not a thrown error,
  * because a thrown error would roll the time out back too. A client
  * adapter turns it into a `TIMED_OUT` rejection.
  */

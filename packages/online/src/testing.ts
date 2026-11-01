@@ -39,10 +39,10 @@ export interface MotherPin {
  * on its start point): `w: 24 7x14 ; b: 10x14 3`.
  *
  * White's 14 other checkers sit on point 7, so every roll after a `playOn`
- * has a legal move: when White rolls (`rollDice`, #355), the wait stays
- * with White whatever the dice (#308). (On point 6, as in the engine test `plakoto-mother.test.ts`,
- * 6-6 has no move: White passes, and a test that expects White to move
- * fails once in 36 runs.)
+ * has a legal move. When White rolls (`rollDice`, #355), White still has
+ * to move, whatever the dice (#308). On point 6 (as in the engine test
+ * `plakoto-mother.test.ts`), 6-6 has no move. Then White passes, and a
+ * test that expects White to move fails once in 36 runs.
  *
  * A test saves the returned flow on the server (on Convex: patch
  * `games.flow` with `storeFlow`), then sends `pin` as Black's turn.

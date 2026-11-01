@@ -164,9 +164,11 @@ export function createOnlineStore({
   now = Date.now,
 }: OnlineStoreOptions): OnlineStore {
   let disposed = false;
-  /** The version this store asked for a roll on, until a newer view or a failure. */
-  let rolledOn: number | null = null;
-  /** The view of the last roll this store asked for, with its dice. */
+  /**
+   * The view of your last roll, with its dice. It is found in each new
+   * view (`rollResult`), not in the call's answer: a roll can reach the
+   * server while its answer is lost, and its view still plays as a roll.
+   */
   let myRoll: { readonly version: number; readonly player: PlayerId; readonly dice: Dice } | null =
     null;
   /**
@@ -251,7 +253,6 @@ export function createOnlineStore({
     const call = (version: number, send: () => Promise<void>, roll = false) => {
       inFlight = true;
       sentOn = version;
-      rolledOn = roll ? version : null;
       set({ sending: true, rolling: roll, notice: null, lastError: null });
       let started: Promise<void>;
       try {
@@ -273,7 +274,6 @@ export function createOnlineStore({
         (error: unknown) => {
           inFlight = false;
           sentOn = null;
-          rolledOn = null;
           if (!disposed) failed(error, roll);
         },
       );
@@ -404,12 +404,12 @@ export function createOnlineStore({
     const done = !inFlight && sentOn !== null && view.version > sentOn;
     if (done) sentOn = null;
     const side = sideOf(view.players, me);
-    // The view of the roll this store asked for: its dice go in the log.
-    if (rolledOn !== null && current !== null && side !== null && current.version === rolledOn) {
-      const dice = rollResult(current, view, side);
-      if (dice !== null) myRoll = { version: view.version, player: side, dice };
-    }
-    if (rolledOn !== null && view.version > rolledOn) rolledOn = null;
+    // The view of your roll: its dice go in the log. Only your own roll
+    // leads to it, also when the call's answer was lost (then the
+    // "did not reach the server" notice was wrong, and it closes).
+    const dice = current === null || side === null ? null : rollResult(current, view, side);
+    if (dice !== null && side !== null) myRoll = { version: view.version, player: side, dice };
+    const rollFailed = dice !== null && store.getState().notice === 'rollFailed';
     store.setState({
       view,
       flow: flowOf(view),
@@ -417,6 +417,7 @@ export function createOnlineStore({
       loadError: null,
       ...(measured === null ? {} : { clockOffset: measured }),
       ...(done ? { sending: false, rolling: false } : {}),
+      ...(rollFailed ? { notice: null } : {}),
     });
   };
 

@@ -13,7 +13,7 @@ import type { GameTransportErrorData, OnlineGameStatus } from '@tavli/contracts'
 import { isTurnTimeMinutes } from '@tavli/contracts';
 import type { FlowEvent, MatchFlow, PerPlayer, PlayerId } from '@tavli/engine';
 
-import { OnlineGameError, deadlineAfter, isTimedOut, sideOf, waitingFor } from './online-game';
+import { OnlineGameError, deadlineAfter, isTimedOut, sideOf } from './online-game';
 
 /** The `actor` of the log events that the server plays itself. No player may use this id. */
 export const SERVER_ACTOR = 'server';
@@ -158,10 +158,10 @@ export function nextDeadline(
 
 /**
  * The turn deadline to save after `side` rolled (#355). The roll is part
- * of the turn, so it gets no new time: while the server still waits for
- * `side` (a roll they can play), the deadline stays `turnDeadline`. A
- * roll with no legal move passes, and the other player's turn gets a full
- * turn time from `now` (`nextDeadline`).
+ * of the turn, so it gets no new time. A roll they can play keeps
+ * `turnDeadline`. A roll with no legal move is a pass: `game.lastTurn` is
+ * that roll, with no moves. The next turn then gets a full turn time from
+ * `now` (`nextDeadline`), also if a rule ever gives it to the same side.
  */
 export function rollDeadline(
   game: SavedGame,
@@ -170,6 +170,12 @@ export function rollDeadline(
   flow: MatchFlow,
   now: number,
 ): number | null {
-  if (game.turnDeadline !== null && waitingFor(flow) === side) return game.turnDeadline;
+  const last = flow.game.lastTurn;
+  const passed =
+    flow.game.phase === 'awaiting-roll' &&
+    last !== null &&
+    last.player === side &&
+    last.moves.length === 0;
+  if (game.turnDeadline !== null && !passed) return game.turnDeadline;
   return nextDeadline(turnTimeMinutes, flow, now);
 }
