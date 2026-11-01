@@ -40,8 +40,12 @@
  * a second tap takes the hint away. The move list has the same button.
  *
  * Online (#255, `online`): the server rolls the dice, passes a roll with no
- * move, and starts the next game by itself. So there is no Roll button and
- * no opening card: a short line says who starts. The other player is
+ * move, and starts the next game by itself. So there is no opening card:
+ * a short line says who starts. The online store holds back your own new
+ * roll when it has a legal move (#347, `features/online/hiddenRoll.ts`):
+ * the flow waits for a roll, and the Roll button, a tap or a swipe throws
+ * the server's dice as offline. A roll with no legal move is not held
+ * back: the server passed it, and a line shows it. The other player is
  * remote: while the server waits for them the board is locked, and their
  * whole turn arrives at once and flies from `game.lastTurn`. Its sounds,
  * the server's rolls and the game end play from the views
@@ -326,8 +330,10 @@ export function GameScreen({
   const showPass = pass !== null && passDismissed !== pass.key;
   // Your own pass (in pass-and-play: the player who passed) waits for OK, so
   // there is time to read why. The bot's pass closes by itself, so the game
-  // goes on (#178). Not while paused: the menu covers the card.
-  const botPassed = pass !== null && pass.player === botPlayer;
+  // goes on (#178), and so does the other player's pass online (#347).
+  // Not while paused: the menu covers the card.
+  const botPassed =
+    pass !== null && (pass.player === botPlayer || (me !== null && pass.player !== me));
   // Keyed on the pass, not the notice object (a new one on each render).
   useEffect(() => {
     if (!showPass || !botPassed || passKey === null || paused) return;
@@ -510,9 +516,16 @@ export function GameScreen({
 
   const roller = nextOpeningRoller(game);
   // With `rerollBoth` (#207) the starter rolls after the opening result closes.
-  // Online the server rolls.
+  // Online the server rolls; the phone only shows your roll when you roll
+  // (#347): the flow waits for it (`awaiting-roll`) on your turn.
+  const onlineRoll =
+    online !== undefined &&
+    !online.locked &&
+    !onlineCovered &&
+    phase === 'awaiting-roll' &&
+    view.toMove === online.me;
   const canRoll =
-    online === undefined &&
+    (online === undefined || onlineRoll) &&
     !showPass &&
     !botsTurn &&
     !(decided && showOpening) &&
@@ -914,15 +927,23 @@ export function GameScreen({
   // Screen readers hear each roll and the other player's moves (#134),
   // once each: a remount does not read the last one again (#216).
   // Online the log is empty: each new view is read once, keyed on its version.
+  // A roll you showed on the phone (#347) starts the log: it is read as a
+  // local roll ("You rolled 5-3."), and your moves after it are not read.
+  // Its key names the view too: one server roll, read once.
   const announcement =
     online === undefined
       ? turnAnnouncement(flow, t, { nameOf, isYou })
-      : online.ended === null
+      : flow.log[0]?.type === 'roll'
         ? (() => {
-            const text = onlineTurnAnnouncement(flow, t, { nameOf, isYou });
-            return text === null ? null : { key: `v${online.version}`, text };
+            const local = turnAnnouncement(flow, t, { nameOf, isYou });
+            return local === null ? null : { ...local, key: `v${online.version}:${local.key}` };
           })()
-        : null;
+        : online.ended === null
+          ? (() => {
+              const text = onlineTurnAnnouncement(flow, t, { nameOf, isYou });
+              return text === null ? null : { key: `v${online.version}`, text };
+            })()
+          : null;
   useAnnouncement(
     announcement?.text ?? null,
     announcement ? `${matchKey}:turn:${announcement.key}` : undefined,
@@ -942,8 +963,12 @@ export function GameScreen({
     const timer = setTimeout(() => setOnlineLineSeen(onlineLineKey), OPENING_RESULT_MS);
     return () => clearTimeout(timer);
   }, [onlineLineKey]);
+  // The pass card says it already (a roll you showed, #347).
   const onlineLine =
-    onlineLineText !== null && onlineLineSeen !== onlineLineKey && online?.ended === null
+    onlineLineText !== null &&
+    onlineLineSeen !== onlineLineKey &&
+    online?.ended === null &&
+    !showPass
       ? onlineLineText
       : null;
   // The hint is read out once it shows (#209). It is not a game event: the
@@ -1014,7 +1039,12 @@ export function GameScreen({
         </Text>
       </View>
     );
-  } else if (phase === 'awaiting-roll' && !showPass && !showOpening && online === undefined) {
+  } else if (
+    phase === 'awaiting-roll' &&
+    !showPass &&
+    !showOpening &&
+    (online === undefined || onlineRoll)
+  ) {
     // While the `rerollBoth` result shows (#207), Roll waits for it to close.
     mainButton = (
       <ActionButton

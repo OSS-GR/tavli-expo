@@ -26,6 +26,7 @@ import { viewFlow } from './onlineStore';
 import { center } from '../../../test/boardPlay';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
+import { whitePassed, whiteRolled } from '../../../test/onlineRolls';
 import { renderWithRoot } from '../../../test/render';
 import { countNodes, type JsonNode } from '../../../test/tree';
 
@@ -108,10 +109,26 @@ async function openGame(
 
 const view = (game: Game) => game.server.getGame(game.gameId)!;
 
-/** Moves the clock until the server waits for you, and the screen has that view. */
-async function untilYourTurn(game: Game) {
+/**
+ * Moves the clock until the server waits for you, and the screen has that
+ * view. The phone holds back your new roll (#347): with `roll` (the
+ * default) it taps Roll, so the turn can be played; else it stops at the
+ * Roll button. The other player's pass card closes by itself first.
+ */
+async function untilYourTurn(game: Game, { roll = true }: { roll?: boolean } = {}) {
   for (let i = 0; i < 200; i++) {
-    if (view(game).waitingFor === 'white' && screen.queryByTestId('online-wait') === null) return;
+    if (view(game).waitingFor === 'white' && screen.queryByTestId('online-wait') === null) {
+      const button = screen.queryByTestId('roll-button');
+      if (button !== null) {
+        if (roll) {
+          await act(async () => {
+            fireEvent.press(button);
+          });
+        }
+        return;
+      }
+      if (screen.queryByTestId('pass-card') === null) return;
+    }
     await act(async () => {
       jest.advanceTimersByTime(250);
     });
@@ -304,18 +321,25 @@ describe('<OnlineMatchScreen /> (#255)', () => {
         new RegExp(`You ${score.white} – 0 Opponent`),
       );
 
-      // The sheet closes: game 2 shows, its dice tumble and sound once,
-      // and its first roll is read once.
+      // The sheet closes: game 2 shows. You won game 1, so you start game
+      // 2 with a roll the phone holds back (#347): "Your turn.", no dice yet.
       await user.press(screen.getByTestId('next-game-button'));
       expect(screen.queryByTestId('game-end-card')).toBeNull();
-      expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
       expect(gameLabel()).toHaveTextContent('Game 2 · Portes');
+      expect(view(game).waitingFor).toBe('white');
+      expect(screen.queryByTestId('board-dice')).toBeNull();
+      expect(announce.mock.calls.map(([text]) => text)).toEqual(['Your turn.']);
+      // Roll: the server's dice tumble and sound once, and the roll is read once.
+      await user.press(screen.getByTestId('roll-button'));
+      expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
       await wait(3000);
       expect(sounds.played.filter((s) => s === 'diceRoll')).toEqual(['diceRoll']);
       expect(sounds.played).not.toContain('gameWin');
-      // "You rolled 3-6." (or who starts, or the opponent's roll), once.
-      expect(announce).toHaveBeenCalledTimes(1);
-      expect(String(announce.mock.calls[0]?.[0])).toMatch(/rolled|start/);
+      const dice = view(game).game.state.dice!;
+      expect(announce).toHaveBeenCalledTimes(2);
+      expect(String(announce.mock.calls[1]?.[0])).toMatch(
+        dice[0] === dice[1] ? /You rolled double/ : `You rolled ${dice.join('-')}.`,
+      );
       announce.mockRestore();
     });
 
@@ -394,6 +418,84 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     });
   });
 
+  describe('your own roll (#347)', () => {
+    /** A game where the server already rolled 5-3 for you (no opening). */
+    const rolled53 = (server: MemoryGameServer, id: string) =>
+      server.setFlowForTest(id, whiteRolled(viewFlow(server.getGame(id)!), [5, 3]));
+    const diceLabel = () =>
+      screen.getByTestId('dice-row', { includeHiddenElements: true }).props.accessibilityLabel;
+
+    it('waits for Roll on your turn, then shows the server’s dice', async () => {
+      const user = setupUser();
+      const announce = jest
+        .spyOn(AccessibilityInfo, 'announceForAccessibility')
+        .mockImplementation(() => undefined);
+      const game = await openGame('portes', 1, 5, BOT_THINK_MS, undefined, rolled53);
+      await untilYourTurn(game, { roll: false });
+      const version = view(game).version;
+      expect(view(game).game.state.dice).toEqual([5, 3]);
+      // The board waits for your roll, as offline: no dice, no Confirm.
+      const button = screen.getByTestId('roll-button');
+      expect(button).toHaveAccessibleName(/Roll dice/);
+      expect(screen.queryByTestId('board-dice')).toBeNull();
+      expect(screen.queryByTestId('confirm-button')).toBeNull();
+      expect(screen.getByTestId('strip-bottom')).toHaveTextContent(/your turn/i);
+      sounds.played.length = 0;
+      announce.mockClear();
+
+      await user.press(button);
+      // The server's dice show with the roll's sound and text. The phone
+      // sent nothing and changed no die.
+      expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
+      expect(diceLabel()).toBe('Dice 5-3, 2 left to play');
+      expect(sounds.played.filter((s) => s === 'diceRoll')).toHaveLength(1);
+      expect(announce.mock.calls.map(([text]) => String(text))).toContainEqual(
+        expect.stringMatching(/^You rolled 5-3/),
+      );
+      expect(view(game).version).toBe(version);
+      expect(view(game).game.state.dice).toEqual([5, 3]);
+      expect(screen.queryByTestId('roll-button')).toBeNull();
+
+      // The turn plays and goes to the server as before.
+      await playTurnByTaps(game);
+      await user.press(screen.getByTestId('confirm-button'));
+      expect(view(game).game.lastTurn).toEqual(
+        expect.objectContaining({ player: 'white', dice: [5, 3] }),
+      );
+      expect(screen.getByTestId('online-wait')).toBeOnTheScreen();
+      announce.mockRestore();
+    });
+
+    it('shows the server’s dice on a swipe', async () => {
+      const game = await openGame('portes', 1, 5, BOT_THINK_MS, undefined, rolled53);
+      await untilYourTurn(game, { roll: false });
+      expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+      await touch('game-swipe-area', [
+        { x: 187, y: 6 },
+        { x: 187, y: 60 },
+      ]);
+      expect(screen.queryByTestId('roll-button')).toBeNull();
+      expect(diceLabel()).toBe('Dice 5-3, 2 left to play');
+      expect(view(game).game.state.dice).toEqual([5, 3]);
+    });
+
+    it('shows a roll with no legal move at once, as before (no Roll)', async () => {
+      // The bot thinks long, so its turn does not come in between.
+      const game = await openGame('portes', 1, 5, 30_000, undefined, (server, id) =>
+        server.setFlowForTest(id, whitePassed(viewFlow(server.getGame(id)!))),
+      );
+      await wait(100);
+      // The server passed your 6-6 and waits for the bot, which rolled 2-1.
+      expect(view(game).waitingFor).toBe('black');
+      expect(screen.queryByTestId('roll-button')).toBeNull();
+      expect(screen.getByTestId('online-line')).toHaveTextContent(
+        'You rolled 6-6. No checker can move.',
+      );
+      expect(screen.getByTestId('online-wait')).toBeOnTheScreen();
+      expect(diceLabel()).toMatch(/^Dice 2-1/);
+    });
+  });
+
   it('locks the board while the server waits for the bot', async () => {
     const user = setupUser();
     // The bot thinks long: the taps below take a while.
@@ -407,6 +509,8 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     expect(screen.getByTestId('strip-top')).toHaveTextContent(/\d+ s/);
     expect(screen.queryByTestId('confirm-button')).toBeNull();
     expect(screen.queryByTestId('undo-button')).toBeNull();
+    // The bot's turn has no Roll button: the server rolls for it (#347).
+    expect(screen.queryByTestId('roll-button')).toBeNull();
 
     // A tap on any point selects nothing: no target rings.
     for (let index = 1; index <= 24; index++) {

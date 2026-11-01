@@ -3,7 +3,9 @@
  * store (`onlineStore.ts`), with the menu and the Resign match dialog.
  *
  * - The server rolls, passes and starts the next game, so there is no
- *   Roll button and no opening card (see "Online" in `GameScreen.tsx`).
+ *   opening card (see "Online" in `GameScreen.tsx`). The phone holds back
+ *   your new roll until you tap Roll or swipe, as offline, when it has a
+ *   legal move (#347, `hiddenRoll.ts`).
  * - While the server waits for the other player, the board is locked.
  * - The time left shows on the strip of the player the server waits for
  *   (live: seconds; async: hours).
@@ -72,7 +74,13 @@ export function OnlineMatchScreen(props: OnlineMatchScreenProps) {
 
 function OnlineGame(props: OnlineMatchScreenProps) {
   const { gameId, transport, me, now } = props;
-  const store = useOnlineGame({ transport, gameId, me, ...(now ? { now } : {}) });
+  const store = useOnlineGame({
+    transport,
+    gameId,
+    me,
+    hideRolls: true,
+    ...(now ? { now } : {}),
+  });
   if (store === null) return <Loading />;
   return <OnlineLoader store={store} {...props} />;
 }

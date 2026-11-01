@@ -170,6 +170,40 @@ describe('online feedback (#271)', () => {
     expect(timed.map(atOf)).toEqual(moves.map((_, i) => turnMoveDelay(i)));
   });
 
+  it('plays your held-back roll when you roll, like a local roll (#347)', async () => {
+    const { game } = await blackToMove();
+    const alice = createOnlineStore({
+      transport: game.server.transportFor(ALICE),
+      gameId: game.gameId,
+      me: ALICE,
+      now: () => START,
+      hideRolls: true,
+    });
+    open.push(alice);
+    await flush();
+    const board = onlineBoardStore(alice, game.gameId)!;
+    const before = alice.getState().flow!;
+    const { updates, stop } = record(board, 'white');
+
+    const moves = await game.playTurn();
+    // Black's turn plays and your turn starts; your roll waits.
+    expect(alice.getState().rollWaits).toBe(true);
+    expect(updates.flat().map(eventOf)).toContain('turnStart');
+    expect(updates.flat().map(eventOf)).not.toContain('diceRoll');
+    const dice = game.view().game.state.dice!;
+
+    expect(alice.getState().dispatch({ type: 'roll', player: 'white' })).toBe(true);
+    stop();
+    expect(updates.at(-1)?.map(eventOf)).toEqual(['diceRoll']);
+    // In all, the same steps as a local game.
+    const local = localUpdates(before, [
+      ...moves.map((move): MatchAction => ({ type: 'move', player: 'black', move })),
+      { type: 'confirm', player: 'black' },
+      { type: 'roll', player: 'white', dice },
+    ]);
+    expect(updates.flat().map(eventOf)).toEqual(local.flat());
+  });
+
   it('plays your own turn once: its moves on the phone, then only the next roll', async () => {
     let found: Awaited<ReturnType<typeof setup>> | null = null;
     for (let seed = 1; seed < 60 && found === null; seed++) {

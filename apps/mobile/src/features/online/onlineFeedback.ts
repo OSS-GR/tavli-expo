@@ -16,6 +16,9 @@
  *   confirm and a roll in a local game. They play at once: the dice tumble
  *   as soon as the view is on the board. A double chosen after a 1-2 is no
  *   roll: nothing plays (Asodio, Acey-Deucey).
+ * - Your new turn, with the roll held back (#347, `hiddenRoll.ts`): only
+ *   `turnStart`. Your roll is in the log when you roll, so it plays then,
+ *   as a local roll.
  * - A game you won: `gameWin`; the match: `matchWin`. A lost game plays
  *   no win, as in a local game vs the bot. The board holds the end of the
  *   game under its game-end sheet (`boardStore.ts`, #286), with the turn
@@ -52,6 +55,14 @@ const now = (event: FeedbackEvent): TimedEvent => ({ event, at: 0 });
 
 /** The server rolled for a new turn between `before` and `after` (same game). */
 function rolledTurn(before: GameFlow, after: GameFlow): TimedEvent[] {
+  if (after.phase === 'awaiting-roll') {
+    // Your roll waits for you (#347): the turn starts, the roll comes later.
+    const waited =
+      before.phase === 'awaiting-roll' &&
+      before.state.toMove === after.state.toMove &&
+      before.state.turnNumber === after.state.turnNumber;
+    return waited ? [] : [now('turnStart')];
+  }
   if (after.phase !== 'moving' || after.state.dice === null) return [];
   const newTurn = after.state.turnNumber !== before.state.turnNumber || !IN_TURN.has(before.phase);
   if (!newTurn || stateHasChosenDouble(after)) return [];

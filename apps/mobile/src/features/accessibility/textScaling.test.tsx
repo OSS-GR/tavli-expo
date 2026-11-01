@@ -512,6 +512,12 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
           jest.advanceTimersByTime(250);
         });
       }
+      // Your roll waits for Roll after the bot's turn (#347).
+      const roll = screen.queryByTestId('roll-button');
+      if (roll !== null) {
+        expect(problems()).toEqual([]);
+        await user.press(roll);
+      }
       expect(await screen.findByTestId('confirm-button')).toBeOnTheScreen();
       expect(problems()).toEqual([]);
 

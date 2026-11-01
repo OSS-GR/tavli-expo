@@ -10,6 +10,7 @@ import { createMemoryGameServer } from '@tavli/online';
 import { pickTurn } from '@tavli/online/testing';
 
 import { gameRuleSet, type OpeningRollRule } from '@/features/match/setup';
+import { hiddenFlow, newRoll } from '@/features/online/hiddenRoll';
 import { viewFlow } from '@/features/online/onlineStore';
 import i18n from '@/i18n';
 
@@ -292,6 +293,17 @@ describe('online announcements (#255)', () => {
     const text = onlineTurnAnnouncement(flow, i18n.t, online);
     expect(text).toMatch(/^Opponent played: Checker from point \d+ to point \d+/);
     expect(text).toMatch(roll);
+  });
+
+  it('reads the opponent’s turn and “Your turn.” while your roll waits (#347)', async () => {
+    const { view, play } = game();
+    while (view().waitingFor !== 'black') await play();
+    await play();
+    expect(newRoll(view(), 'white')).not.toBeNull();
+    const text = onlineTurnAnnouncement(hiddenFlow(view()), i18n.t, online);
+    expect(text).toMatch(/^Opponent played: Checker from point \d+ to point \d+/);
+    expect(text).toMatch(/Your turn\.$/);
+    expect(text).not.toMatch(/rolled/);
   });
 
   it('does not read your own turn back to you', async () => {
