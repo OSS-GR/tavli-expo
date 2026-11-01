@@ -7,8 +7,8 @@
  * It adds no safe-area inset: put it inside `Screen`, which pads the top.
  * The title may wrap with a large font; it is never cut.
  */
-import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import type { ReactNode, Ref } from 'react';
+import { Text, View, type HostInstance } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { RoundButton } from './RoundButton';
@@ -23,9 +23,18 @@ export interface ScreenHeaderProps {
   testID?: string;
   /** One small control on the right, for example a `RoundButton`. */
   right?: ReactNode;
+  /** A ref for the title, for example from `useFocusOnShow`. */
+  titleRef?: Ref<HostInstance>;
 }
 
-export function ScreenHeader({ title, onBack, backLabel, testID, right }: ScreenHeaderProps) {
+export function ScreenHeader({
+  title,
+  onBack,
+  backLabel,
+  testID,
+  right,
+  titleRef,
+}: ScreenHeaderProps) {
   return (
     <View style={styles.header}>
       <View style={styles.side}>
@@ -38,7 +47,7 @@ export function ScreenHeader({ title, onBack, backLabel, testID, right }: Screen
           />
         ) : null}
       </View>
-      <Text style={styles.title} accessibilityRole="header">
+      <Text ref={titleRef} style={styles.title} accessibilityRole="header">
         {title}
       </Text>
       <View style={[styles.side, styles.right]}>{right ?? null}</View>
