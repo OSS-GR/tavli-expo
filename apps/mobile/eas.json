@@ -49,7 +49,8 @@
     "production": {
       "ios": {
         "bundleIdentifier": "com.tavlaki",
-        "appName": "Tavlaki"
+        "appName": "Tavlaki",
+        "ascAppId": "6828172932"
       }
     }
   }

@@ -32,7 +32,7 @@ function variantConfig(variant: string): ExpoConfig {
 const productionConfig = () => variantConfig('production');
 
 interface SubmitProfile {
-  ios?: { bundleIdentifier?: string; appName?: string };
+  ios?: { bundleIdentifier?: string; appName?: string; ascAppId?: string };
 }
 
 describe('eas.json submit profile', () => {
@@ -48,6 +48,13 @@ describe('eas.json submit profile', () => {
       appName: config.name,
     });
     expect(submit.production.ios?.bundleIdentifier).toBe('com.tavlaki');
+  });
+
+  // A submit with no questions (auto-submit after `eas build`) needs the App
+  // Store Connect app id, or it stops: "Set ascAppId in the submit profile" (#344).
+  it('names the App Store Connect app', () => {
+    const { submit } = readJson('eas.json') as { submit: { production: SubmitProfile } };
+    expect(submit.production.ios?.ascAppId).toMatch(/^\d{9,12}$/);
   });
 });
 
