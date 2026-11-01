@@ -1,18 +1,35 @@
 /**
- * Home (wireframe 3): start or continue a game in one or two taps.
- * Main actions sit in the lower half; the top holds only the gear.
+ * Home (wireframe 3, redesigned in #342): start or continue a game in one
+ * or two taps.
+ *
+ * Top to bottom: the logo and Settings, a greeting, then a big hero card
+ * with a board picture. The hero is the saved game ("Continue game") or,
+ * with no save, "Play vs bot". Then your online games and invites, the
+ * "Learn to play" banner, the other play modes as tiles, and How to play
+ * and History as pills.
  */
 import type { Difficulty } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
 import type { TFunction } from 'i18next';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-import { MenuButton } from '@/components/MenuButton';
+import { Icon } from '@/components/Icon';
+import type { IconName } from '@/components/icons';
 import { Toast, useToast } from '@/components/Toast';
 import type { MatchMode } from '@/features/match/setup';
+import { rulesDirection, startBoard } from '@/features/rules/content';
+
+import { greetingFor } from './greeting';
+import { HomeHero, type HeroBoard } from './HomeHero';
+import { ModeTile } from './ModeTile';
+
+const LOGO = require('../../../assets/home/logo.webp') as number;
+
+/** Above this font scale the mode tiles and the pills take a row each. */
+const ONE_COLUMN_FONT_SCALE = 1.3;
 
 export interface HomeScreenProps {
   onNewGame: (mode: MatchMode) => void;
@@ -22,12 +39,12 @@ export interface HomeScreenProps {
   onHistory?: () => void;
   /**
    * Opens "Play a friend online" (#281). Without it (a build with no
-   * online server) the button shows "Coming soon".
+   * online server) the tile shows "Coming soon".
    */
   onPlayFriend?: () => void;
   /** The bot levels this build can play, easiest first (the "Play vs bot" subtitle). */
   botLevels: readonly Difficulty[];
-  /** The "Continue game" card, when a saved game exists (#36). */
+  /** The "Continue game" card, when a saved game exists (#36). It takes the hero's place. */
   continueCard?: ReactNode;
   /** "Your online games" (#297), when this phone has an online account. */
   onlineGames?: ReactNode;
@@ -37,6 +54,8 @@ export interface HomeScreenProps {
   learnCard?: ReactNode;
   /** A one-time message, for example "Your saved game could not be opened." */
   notice?: string | null;
+  /** The phone's hour (0–23), for the greeting. Default: now. */
+  hour?: number;
 }
 
 export function HomeScreen({
@@ -51,105 +70,159 @@ export function HomeScreen({
   invites,
   learnCard,
   notice = null,
+  hour,
 }: HomeScreenProps) {
   const { t } = useTranslation();
+  const { theme } = useUnistyles();
   const [toast, showToast] = useToast();
   useEffect(() => {
     if (notice !== null) showToast(notice);
   }, [notice, showToast]);
+  const startPosition = useMemo<HeroBoard>(
+    () => ({ board: startBoard('portes'), direction: rulesDirection('portes') }),
+    [],
+  );
+
+  const greeting = t(`home.greeting.${greetingFor(hour ?? new Date().getHours())}`);
+  const vsBotTitle = t('home.vsBot.title');
+  const levels = levelList(botLevels, t);
+  const vsBotLabel = [vsBotTitle, levels].filter(Boolean).join(', ');
+  const hasSave = continueCard != null;
+  const modesTitle = hasSave ? t('home.newGame') : t('home.moreModes');
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <View style={styles.logo} importantForAccessibility="no-hide-descendants" />
-        <Text style={styles.appName} accessibilityRole="header">
-          {t('home.title')}
-        </Text>
-        <Pressable
-          testID="home-settings"
-          accessibilityRole="button"
-          accessibilityLabel={t('home.openSettings')}
-          hitSlop={8}
-          onPress={onSettings}
-          style={({ pressed }) => [styles.gear, pressed && styles.pressed]}>
-          {/* U+FE0E asks for the text glyph, not the emoji. */}
-          <Text style={styles.gearIcon} importantForAccessibility="no" allowFontScaling={false}>
-            {'⚙︎'}
-          </Text>
-        </Pressable>
-      </View>
       <ScrollView contentContainerStyle={styles.content} bounces={false}>
-        {/* Board art comes with the art task. It grows when there is no saved game. */}
-        <View style={styles.art}>
+        <View style={styles.header}>
+          <View style={styles.topRow}>
+            <Image
+              source={LOGO}
+              style={styles.logo}
+              accessible={false}
+              importantForAccessibility="no"
+            />
+            <Text style={styles.appName} accessibilityRole="header">
+              {t('home.title')}
+            </Text>
+            <Pressable
+              testID="home-settings"
+              accessibilityRole="button"
+              accessibilityLabel={t('home.openSettings')}
+              hitSlop={8}
+              onPress={onSettings}
+              style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}>
+              <Icon name="settings" size={22} color={theme.colors.text} />
+            </Pressable>
+          </View>
+          <Text style={styles.greeting}>{greeting}</Text>
           <Text style={styles.tagline}>{t('home.tagline')}</Text>
         </View>
-        {continueCard}
+
+        {continueCard ?? (
+          <HomeHero
+            testID="home-vs-bot"
+            eyebrow={displayCaps(t('home.newGame'))}
+            title={vsBotTitle}
+            {...(levels ? { lines: [levels] } : {})}
+            action={t('home.playNow')}
+            accessibilityLabel={vsBotLabel}
+            board={startPosition}
+            onPress={() => onNewGame('bot')}
+          />
+        )}
         {onlineGames}
         {invites}
         {learnCard}
-        <Text
-          style={styles.section}
-          accessibilityRole="header"
-          accessibilityLabel={t('home.newGame')}>
-          {displayCaps(t('home.newGame'))}
+
+        <Text style={styles.section} accessibilityRole="header" accessibilityLabel={modesTitle}>
+          {displayCaps(modesTitle)}
         </Text>
-        <View style={styles.buttons}>
-          <MenuButton
-            testID="home-vs-bot"
-            kind="primary"
-            badge="AI"
-            title={t('home.vsBot.title')}
-            subtitle={levelList(botLevels, t)}
-            onPress={() => onNewGame('bot')}
-          />
-          <MenuButton
-            testID="home-local"
-            badge="2P"
-            title={t('home.local.title')}
-            subtitle={t('home.local.subtitle')}
-            onPress={() => onNewGame('local')}
-          />
-          {onPlayFriend ? (
-            <MenuButton
-              testID="home-friend"
-              badge="@"
-              title={t('home.friend.title')}
-              subtitle={t('home.friend.subtitle')}
-              onPress={onPlayFriend}
+        <View style={styles.grid}>
+          {hasSave ? (
+            <ModeTile
+              testID="home-vs-bot"
+              kind="primary"
+              wide
+              icon="bot"
+              title={vsBotTitle}
+              {...(levels ? { subtitle: levels } : {})}
+              onPress={() => onNewGame('bot')}
             />
-          ) : (
-            <MenuButton
-              testID="home-friend"
-              kind="locked"
-              badge="@"
-              title={t('home.friend.title')}
-              subtitle={t('home.friend.subtitle')}
-              chip={t('common.comingSoon')}
-              onPress={() => showToast(t('home.friend.soon'))}
+          ) : null}
+          <View style={styles.cell}>
+            <ModeTile
+              testID="home-local"
+              icon="users"
+              title={t('home.local.title')}
+              subtitle={t('home.local.subtitle')}
+              onPress={() => onNewGame('local')}
             />
-          )}
+          </View>
+          <View style={styles.cell}>
+            {onPlayFriend ? (
+              <ModeTile
+                testID="home-friend"
+                icon="globe"
+                title={t('home.friend.title')}
+                subtitle={t('home.friend.subtitle')}
+                onPress={onPlayFriend}
+              />
+            ) : (
+              <ModeTile
+                testID="home-friend"
+                kind="locked"
+                icon="globe"
+                title={t('home.friend.title')}
+                subtitle={t('home.friend.subtitle')}
+                chip={t('common.comingSoon')}
+                onPress={() => showToast(t('home.friend.soon'))}
+              />
+            )}
+          </View>
         </View>
-        <Pressable
-          testID="home-how-to-play"
-          accessibilityRole="link"
-          onPress={onHowToPlay}
-          hitSlop={8}
-          style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
-          <Text style={styles.linkText}>{t('home.howToPlay')}</Text>
-        </Pressable>
-        {onHistory ? (
-          <Pressable
-            testID="home-history"
-            accessibilityRole="link"
-            onPress={onHistory}
-            hitSlop={8}
-            style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
-            <Text style={styles.linkText}>{t('home.history')}</Text>
-          </Pressable>
-        ) : null}
+
+        <View style={styles.footer}>
+          <FooterLink
+            testID="home-how-to-play"
+            icon="book"
+            label={t('home.howToPlay')}
+            onPress={onHowToPlay}
+          />
+          {onHistory ? (
+            <FooterLink
+              testID="home-history"
+              icon="history"
+              label={t('home.history')}
+              onPress={onHistory}
+            />
+          ) : null}
+        </View>
       </ScrollView>
       <Toast text={toast} />
     </View>
+  );
+}
+
+interface FooterLinkProps {
+  testID: string;
+  icon: IconName;
+  label: string;
+  onPress: () => void;
+}
+
+/** A pill at the bottom of Home. Screen readers hear a link, as before #342. */
+function FooterLink({ testID, icon, label, onPress }: FooterLinkProps) {
+  const { theme } = useUnistyles();
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.pill, pressed && styles.pressed]}>
+      <Icon name={icon} size={18} color={theme.colors.textDim} />
+      <Text style={styles.pillText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -170,29 +243,39 @@ const styles = StyleSheet.create((theme, rt) => ({
   screen: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    paddingTop: rt.insets.top,
+    // Deep at the top, lighter below: the cards sit on a lit table.
+    backgroundImage: `linear-gradient(180deg, ${theme.colors.backgroundDeep} 0%, ${theme.colors.background} 45%)`,
   },
-  topBar: {
+  content: {
+    flexGrow: 1,
+    gap: theme.space.lg,
+    paddingHorizontal: theme.space.lg,
+    paddingTop: rt.insets.top + theme.space.sm,
+    paddingBottom: rt.insets.bottom + theme.space.xl,
+  },
+  header: {
+    gap: theme.space.xs,
+  },
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.md,
-    paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.sm,
+    gap: theme.space.sm,
+    paddingBottom: theme.space.md,
   },
   logo: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: theme.radii.md,
-    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
   appName: {
-    ...theme.type.title,
+    ...theme.type.bodyStrong,
     flex: 1,
     color: theme.colors.text,
+    letterSpacing: 0.3,
   },
-  gear: {
+  roundButton: {
     width: theme.touch.minTarget,
     height: theme.touch.minTarget,
     borderRadius: theme.touch.minTarget / 2,
@@ -203,53 +286,61 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderColor: theme.colors.border,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.85,
+    transform: [{ scale: 0.97 }],
   },
-  gearIcon: {
-    fontSize: 24,
-    lineHeight: 28,
+  greeting: {
+    ...theme.type.display,
+    fontSize: 34,
+    lineHeight: 41,
+    letterSpacing: -0.5,
     color: theme.colors.text,
-  },
-  content: {
-    flexGrow: 1,
-    gap: theme.space.md,
-    paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.lg,
-    paddingBottom: rt.insets.bottom + theme.space.xl,
-  },
-  art: {
-    flexGrow: 1,
-    minHeight: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radii.lg,
-    backgroundColor: theme.colors.backgroundDeep,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.space.lg,
   },
   tagline: {
     ...theme.type.body,
     color: theme.colors.textDim,
-    textAlign: 'center',
   },
   section: {
     ...theme.type.section,
     color: theme.colors.textDim,
-    paddingTop: theme.space.sm,
+    paddingTop: theme.space.xs,
+    marginBottom: -theme.space.xs,
   },
-  buttons: {
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.space.md,
   },
-  link: {
-    alignSelf: 'center',
-    minHeight: theme.touch.minTarget,
-    justifyContent: 'center',
-    paddingHorizontal: theme.space.lg,
+  // Two tiles a row; one a row with a large font. Equal heights in a row.
+  cell: {
+    flexGrow: 1,
+    flexBasis: rt.fontScale > ONE_COLUMN_FONT_SCALE ? '100%' : 0,
+    minWidth: 140,
   },
-  linkText: {
+  footer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space.md,
+  },
+  pill: {
+    flexGrow: 1,
+    flexBasis: rt.fontScale > ONE_COLUMN_FONT_SCALE ? '100%' : 0,
+    minWidth: 140,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.space.sm,
+    minHeight: theme.touch.button,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.sm,
+    borderRadius: theme.radii.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  pillText: {
     ...theme.type.bodyStrong,
     color: theme.colors.text,
-    textDecorationLine: 'underline',
+    flexShrink: 1,
   },
 }));

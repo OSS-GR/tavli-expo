@@ -66,11 +66,16 @@ export default function HomeRoute() {
   return (
     <HomeScreen
       botLevels={anyGameLevels(botLevels)}
+      hour={new Date(slot.now).getHours()}
       notice={slot.broken ? t('home.continue.broken') : null}
       continueCard={
         saved ? (
           <ContinueCard
             summary={continueSummary(saved, t, slot.now)}
+            board={{
+              board: saved.flow.game.state.board,
+              direction: saved.flow.game.state.rules.movement.direction,
+            }}
             onPress={() => router.push(gameHref(saved.id))}
           />
         ) : null

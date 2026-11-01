@@ -24,6 +24,10 @@ export interface UiColors {
   accent: string;
   /** Text and icons on `accent`. */
   onAccent: string;
+  /** A soft brass tint on a surface: the "Learn to play" banner (#342). Opaque. */
+  accentWash: string;
+  /** A brass outline on a surface (#342). Opaque. */
+  accentLine: string;
   /** Turn ring around the active player. */
   turn: string;
   /** Turn text, for example "Σειρά σου". */
