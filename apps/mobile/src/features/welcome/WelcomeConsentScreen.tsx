@@ -3,10 +3,12 @@ import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { Screen } from '@/components/Screen';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
 
 import { useBoardStep } from './boardStepStore';
+import { WelcomeTop } from './WelcomeTop';
 
 export interface WelcomeConsentScreenProps {
   onBack: () => void;
@@ -48,21 +50,12 @@ export function WelcomeConsentScreen({ onBack, onAnswered }: WelcomeConsentScree
   ];
 
   return (
-    <View testID="welcome-consent" style={styles.screen}>
-      <View style={styles.topBar}>
-        <Pressable
-          testID="welcome-consent-back"
-          accessibilityRole="button"
-          accessibilityLabel={t('welcome.privacy.back')}
-          hitSlop={8}
-          onPress={onBack}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-          <Text style={styles.backIcon} importantForAccessibility="no" allowFontScaling={false}>
-            {'‹'}
-          </Text>
-        </Pressable>
-        <Text style={styles.step}>{t('welcome.privacy.step', { step: 2, total })}</Text>
-      </View>
+    <Screen testID="welcome-consent">
+      <WelcomeTop
+        onBack={onBack}
+        backTestID="welcome-consent-back"
+        step={t('welcome.privacy.step', { step: 2, total })}
+      />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         <View style={styles.picture} importantForAccessibility="no-hide-descendants">
@@ -106,42 +99,13 @@ export function WelcomeConsentScreen({ onBack, onAnswered }: WelcomeConsentScree
           onPress={() => answer(false)}
         />
       </View>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
-  screen: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    paddingTop: rt.insets.top + theme.space.sm,
-    paddingBottom: rt.insets.bottom + theme.space.lg,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.space.lg,
-  },
-  back: {
-    width: theme.touch.minTarget,
-    height: theme.touch.minTarget,
-    borderRadius: theme.touch.minTarget / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.surface,
-  },
-  backIcon: {
-    fontSize: 32,
-    lineHeight: 34,
-    color: theme.colors.text,
-  },
   pressed: {
     opacity: 0.7,
-  },
-  step: {
-    ...theme.type.caption,
-    color: theme.colors.textDim,
   },
   body: {
     flex: 1,
@@ -155,10 +119,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignSelf: 'center',
     width: 96,
     height: 88,
-    borderRadius: theme.radii.lg,
-    borderWidth: 2,
+    borderRadius: theme.radii.xl,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'center',
@@ -170,7 +135,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     width: 12,
     height: 48 * height,
     borderRadius: 2,
-    backgroundColor: theme.colors.textDim,
+    backgroundColor: theme.colors.accent,
   }),
   title: {
     ...theme.type.display,
@@ -199,5 +164,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.space.sm,
     paddingHorizontal: theme.space.xl,
     paddingTop: theme.space.sm,
+    paddingBottom: rt.insets.bottom + theme.space.lg,
   },
 }));

@@ -11,7 +11,7 @@ import type { GameTransportErrorCode, OnlineGameChoice, OnlineGameView } from '@
 import { createSeededRng, replay } from '@tavli/engine';
 import type { FlowEvent, PlayerId } from '@tavli/engine';
 import { loadFlow, storeFlow } from '@tavli/online';
-import { motherPin } from '@tavli/online/testing';
+import { closedOut, motherPin } from '@tavli/online/testing';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -189,15 +189,18 @@ describe('a full Portes game between two players', () => {
     while (v.status === 'active') {
       const side = v.waitingFor;
       if (side === null) throw new Error('nobody to wait for');
-      const result = await as(t, idOf(side)).mutation(api.games.makeMove, {
-        gameId,
-        expectedVersion: v.version,
-        moves: pickTurn(v.game, picker),
-      });
+      const call = { gameId, expectedVersion: v.version };
+      // The server rolls only when the player asks (#355).
+      const result = await (v.game.phase === 'awaiting-roll'
+        ? as(t, idOf(side)).mutation(api.games.rollDice, call)
+        : as(t, idOf(side)).mutation(api.games.makeMove, {
+            ...call,
+            moves: pickTurn(v.game, picker),
+          }));
       expect(result).toEqual({ ok: true, version: v.version + 1 });
       v = await view(t, gameId);
       turns += 1;
-      if (turns > 2000) throw new Error('the game does not end');
+      if (turns > 4000) throw new Error('the game does not end');
     }
     expect(v.match.status).toBe('finished');
     expect(v.match.winner).not.toBeNull();
@@ -511,14 +514,21 @@ describe('the Plakoto mother question', () => {
     expect(after.version).toBe(v.version + 1);
     expect(after.status).toBe('active');
     expect(after.prompt).toBeNull();
-    // The server rolled for White right after the answer.
+    // The server waits for White's roll (#355).
     expect(after.waitingFor).toBe('white');
     expect(after.game.state.toMove).toBe('white');
-    expect(after.game.state.dice).not.toBeNull();
+    expect(after.game.phase).toBe('awaiting-roll');
+    expect(after.game.state.dice).toBeNull();
     await rejectsWith(
       as(t, ALICE).mutation(api.games.answer, { ...call, choice: 'playOn' }),
       'STALE_VERSION',
     );
+    // Every White roll has a move here (`motherPin`), so White moves next.
+    await as(t, ALICE).mutation(api.games.rollDice, { gameId, expectedVersion: after.version });
+    const rolled = await view(t, gameId);
+    expect(rolled.game.phase).toBe('moving');
+    expect(rolled.waitingFor).toBe('white');
+    expect(rolled.game.state.dice).not.toBeNull();
   });
 
   it('"resign" gives the game to the opponent (double, 2 points)', async () => {
@@ -599,8 +609,9 @@ describe('turn timers (#133)', () => {
     expect(v.match.games).toHaveLength(1);
     expect(v.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
     expect(v.match.score[otherSide(late)]).toBeGreaterThanOrEqual(1);
-    // The next game runs, and its first turn has its own minute.
-    expect(v.game.phase).toBe('moving');
+    // The next game runs, waits for its first roll (#355), and that turn
+    // has its own minute.
+    expect(v.game.phase).toBe('awaiting-roll');
     expect(v.game.result).toBeNull();
     expect(v.turnDeadline).toBe(START + 2 * LIVE);
 
@@ -697,6 +708,123 @@ describe('turn timers (#133)', () => {
       reason: 'timeout',
     });
     expect(v.turnDeadline).toBe(START + 2 * ASYNC);
+  });
+
+  it('a roll keeps the turn deadline; the check at it still runs (#355)', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5);
+    await playOneTurn(t, gameId);
+    const before = await view(t, gameId);
+    const roller = waiting(before);
+    expect(before.game.phase).toBe('awaiting-roll');
+    expect(before.turnDeadline).toBe(START + LIVE);
+    await wait(t, LIVE / 2);
+    const result = await as(t, idOf(roller)).mutation(api.games.rollDice, {
+      gameId,
+      expectedVersion: before.version,
+    });
+    expect(result).toEqual({ ok: true, version: before.version + 1 });
+    const v = await view(t, gameId);
+    if (v.waitingFor !== roller) {
+      // The roll had no legal move: the other player gets a full turn.
+      expect(v.turnDeadline).toBe(START + LIVE / 2 + LIVE);
+      return;
+    }
+    expect(v.game.phase).toBe('moving');
+    expect(v.turnDeadline).toBe(START + LIVE);
+    // The check scheduled by the roll's save runs at the same deadline.
+    await wait(t, LIVE / 2);
+    const after = await view(t, gameId);
+    expect(after.version).toBe(v.version + 1);
+    expect(after.match.games[0]).toMatchObject({ winner: otherSide(roller), reason: 'timeout' });
+  });
+
+  it('a roll with no legal move passes; the other player gets a full turn (#355)', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5);
+    await t.run(async (ctx) => {
+      const doc = await ctx.db.get(gameId);
+      if (doc === null) throw new Error('no game');
+      await ctx.db.patch(gameId, { flow: storeFlow(closedOut(loadFlow(doc.flow)), null) });
+    });
+    const before = await view(t, gameId);
+    expect(before.waitingFor).toBe('white');
+    await wait(t, 1000);
+    const result = await as(t, ALICE).mutation(api.games.rollDice, {
+      gameId,
+      expectedVersion: before.version,
+    });
+    expect(result).toEqual({ ok: true, version: before.version + 1 });
+    // Both players see the dice and the pass.
+    const v = await view(t, gameId);
+    const seen = await as(t, BOB).query(api.games.getGame, { gameId });
+    expect(seen).toEqual(v);
+    expect(v.game.phase).toBe('awaiting-roll');
+    expect(v.waitingFor).toBe('black');
+    expect(v.game.lastTurn).toMatchObject({ player: 'white', moves: [] });
+    expect(v.game.lastTurn?.dice).toHaveLength(2);
+    expect(v.turnDeadline).toBe(START + 1000 + LIVE);
+    const rows = await t.run(async (ctx) =>
+      ctx.db
+        .query('moves')
+        .withIndex('by_game', (q) => q.eq('gameId', gameId))
+        .collect(),
+    );
+    const roll = rows.find((row) => row.event.includes('"roll"'));
+    expect(roll?.actor).toBe(ALICE);
+  });
+
+  it('rollDice checks the caller, the version and the phase (#355)', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5);
+    const first = await view(t, gameId);
+    // The first turn plays the opening dice: no roll.
+    await rejectsWith(
+      as(t, idOf(waiting(first))).mutation(api.games.rollDice, {
+        gameId,
+        expectedVersion: first.version,
+      }),
+      'ILLEGAL_ACTION',
+    );
+    await playOneTurn(t, gameId);
+    const v = await view(t, gameId);
+    const roller = waiting(v);
+    const call = { gameId, expectedVersion: v.version };
+    await rejectsWith(
+      as(t, idOf(otherSide(roller))).mutation(api.games.rollDice, call),
+      'NOT_YOUR_TURN',
+    );
+    await rejectsWith(as(t, 'eve').mutation(api.games.rollDice, call), 'NOT_A_PLAYER');
+    await rejectsWith(t.mutation(api.games.rollDice, call), 'NOT_SIGNED_IN');
+    await rejectsWith(
+      as(t, idOf(roller)).mutation(api.games.rollDice, { ...call, expectedVersion: 1 }),
+      'STALE_VERSION',
+    );
+    await rejectsWith(
+      as(t, idOf(roller)).mutation(api.games.makeMove, { ...call, moves: [] }),
+      'ILLEGAL_ACTION',
+    );
+    expect(await view(t, gameId)).toEqual(v);
+  });
+
+  it('a late roll gets TIMED_OUT, and the time out is saved', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5);
+    await playOneTurn(t, gameId);
+    const before = await view(t, gameId);
+    const late = waiting(before);
+    vi.setSystemTime(START + LIVE);
+    const result = await as(t, idOf(late)).mutation(api.games.rollDice, {
+      gameId,
+      expectedVersion: before.version,
+    });
+    expect(result).toEqual({
+      ok: false,
+      version: before.version + 1,
+      error: { code: 'TIMED_OUT', message: expect.any(String) },
+    });
+    const v = await view(t, gameId);
+    expect(v.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
   });
 
   it('resign stops the clock: the check at the deadline does nothing', async () => {
