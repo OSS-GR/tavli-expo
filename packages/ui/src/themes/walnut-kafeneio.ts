@@ -21,6 +21,8 @@ export const walnutKafeneio = {
     // Raised from #8A7559 (3.1:1) in #134: locked labels like "Coming soon" must stay readable.
     textDisabled: '#A89274',
     accent: '#C89B45',
+    // The top of the main button's brass gradient (#356).
+    accentLight: '#E0B867',
     onAccent: '#22160C',
     // `accent` over `surface` at 22% and 55% (#342).
     accentWash: '#503A20',

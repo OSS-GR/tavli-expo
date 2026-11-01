@@ -49,6 +49,7 @@ describe('themes', () => {
         ['textDim', 'backgroundDeep'], // the tagline on Home
         ['accent', 'surface'], // the tutorial hint
         ['onAccent', 'turn'], // the turn pill
+        ['onAccent', 'accentLight'], // the main button's gradient (#356)
         ['text', 'accentWash'], // the "Learn to play" banner on Home (#342)
         ['textDim', 'accentWash'],
         // Locked or disabled labels ("Coming soon", a disabled Undo). WCAG lets

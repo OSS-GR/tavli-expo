@@ -22,7 +22,9 @@ export interface UiColors {
   textDisabled: string;
   /** Main button, selected outline and "on" switch track (brass). */
   accent: string;
-  /** Text and icons on `accent`. */
+  /** The lit edge of the brass gradient on the main button (#356). Opaque. */
+  accentLight: string;
+  /** Text and icons on `accent` (and on `accentLight`). */
   onAccent: string;
   /** A soft brass tint on a surface: the "Learn to play" banner (#342). Opaque. */
   accentWash: string;

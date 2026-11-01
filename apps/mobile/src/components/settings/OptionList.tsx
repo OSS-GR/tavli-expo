@@ -1,5 +1,9 @@
+import { Fragment } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+
+import { Icon } from '../Icon';
+import { CardFrame, RowDivider, useInSectionCard } from '../SectionCard';
 
 export interface ListOption<T extends string> {
   value: T;
@@ -18,8 +22,10 @@ interface OptionListProps<T extends string> {
 }
 
 /**
- * A list of full-width radio rows. Good for options with long labels, such as
- * languages. The radio dot and a brass outline mark the selected row.
+ * A list of full-width radio rows in one card, with thin lines between them
+ * (#356). Good for options with long labels, such as languages. The picked
+ * row has a lighter fill, bold text and a brass check, so color is not the
+ * only cue. In a `SectionCard` the rows join that card instead of their own.
  */
 export function OptionList<T extends string>({
   label,
@@ -28,44 +34,38 @@ export function OptionList<T extends string>({
   onChange,
   testID,
 }: OptionListProps<T>) {
-  return (
-    <View
-      testID={testID}
-      accessibilityRole="radiogroup"
-      accessibilityLabel={label}
-      style={styles.list}>
-      {options.map((option) => {
+  const { theme } = useUnistyles();
+  const inCard = useInSectionCard();
+  const rows = (
+    <View testID={testID} accessibilityRole="radiogroup" accessibilityLabel={label}>
+      {options.map((option, index) => {
         const selected = option.value === value;
         return (
-          <Pressable
-            key={option.value}
-            testID={testID ? `${testID}-${option.value}` : undefined}
-            accessibilityRole="radio"
-            accessibilityLabel={option.label}
-            accessibilityHint={option.hint}
-            accessibilityState={{ checked: selected }}
-            onPress={() => onChange(option.value)}
-            style={({ pressed }) => [styles.row(selected), pressed && styles.pressed]}>
-            <View style={styles.radio(selected)}>
-              {selected ? <View style={styles.dot} /> : null}
-            </View>
-            <View style={styles.text}>
-              <Text style={styles.label(selected)}>{option.label}</Text>
-              {option.hint ? <Text style={styles.hint}>{option.hint}</Text> : null}
-            </View>
-          </Pressable>
+          <Fragment key={option.value}>
+            {index > 0 ? <RowDivider /> : null}
+            <Pressable
+              testID={testID ? `${testID}-${option.value}` : undefined}
+              accessibilityRole="radio"
+              accessibilityLabel={option.label}
+              accessibilityHint={option.hint}
+              accessibilityState={{ checked: selected }}
+              onPress={() => onChange(option.value)}
+              style={({ pressed }) => [styles.row(selected), pressed && styles.pressed]}>
+              <View style={styles.text}>
+                <Text style={styles.label(selected)}>{option.label}</Text>
+                {option.hint ? <Text style={styles.hint}>{option.hint}</Text> : null}
+              </View>
+              {selected ? <Icon name="check" size={20} color={theme.colors.accent} /> : null}
+            </Pressable>
+          </Fragment>
         );
       })}
     </View>
   );
+  return inCard ? rows : <CardFrame>{rows}</CardFrame>;
 }
 
-const RADIO = 22;
-
 const styles = StyleSheet.create((theme) => ({
-  list: {
-    gap: theme.space.sm,
-  },
   row: (selected: boolean) => ({
     minHeight: theme.touch.row,
     flexDirection: 'row',
@@ -73,28 +73,10 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.space.md,
     paddingHorizontal: theme.space.lg,
     paddingVertical: theme.space.md,
-    borderRadius: theme.radii.lg,
-    borderWidth: 2,
-    borderColor: selected ? theme.colors.accent : theme.colors.border,
-    backgroundColor: selected ? theme.colors.surfaceSelected : theme.colors.surface,
+    backgroundColor: selected ? theme.colors.surfaceSelected : 'transparent',
   }),
   pressed: {
     opacity: 0.7,
-  },
-  radio: (selected: boolean) => ({
-    width: RADIO,
-    height: RADIO,
-    borderRadius: RADIO / 2,
-    borderWidth: 2,
-    borderColor: selected ? theme.colors.accent : theme.colors.textDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  }),
-  dot: {
-    width: RADIO / 2,
-    height: RADIO / 2,
-    borderRadius: RADIO / 4,
-    backgroundColor: theme.colors.accent,
   },
   text: {
     flex: 1,

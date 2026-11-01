@@ -78,6 +78,12 @@ export const ICONS = {
   chevronRight: {
     strokes: ['m9 18 6-6-6-6'],
   },
+  chevronLeft: {
+    strokes: ['m15 18-6-6 6-6'],
+  },
+  check: {
+    strokes: ['M20 6 9 17l-5-5'],
+  },
 } as const satisfies Record<string, IconShape>;
 
 export type IconName = keyof typeof ICONS;

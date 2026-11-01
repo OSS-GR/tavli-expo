@@ -26,8 +26,9 @@ interface SegmentedControlProps<T extends string> {
 }
 
 /**
- * A row of equal segments. The selected one has a thick brass outline and
- * bold text, so color is not the only cue. Labels may wrap.
+ * A row of equal segments on a dark pill track (#356). The selected one is
+ * a brass pill with bold text, so color is not the only cue. Each segment
+ * is at least 44 pt tall, and labels may wrap.
  */
 export function SegmentedControl<T extends string>({
   label,
@@ -73,23 +74,23 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: 'row',
     gap: theme.space.xs,
     padding: theme.space.xs,
-    borderRadius: theme.radii.lg,
-    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radii.pill,
+    backgroundColor: theme.colors.backgroundDeep,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.separator,
   },
   segment: (selected: boolean, disabled: boolean) => ({
     flex: 1,
-    minHeight: theme.touch.minTarget + theme.space.xs,
+    minHeight: theme.touch.minTarget,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: theme.space.sm,
     paddingVertical: theme.space.xs,
-    borderRadius: theme.radii.md,
-    borderWidth: 2,
+    borderRadius: theme.radii.pill,
+    borderWidth: disabled ? 1 : 0,
     borderStyle: disabled ? 'dashed' : 'solid',
-    borderColor: selected ? theme.colors.accent : disabled ? theme.colors.border : 'transparent',
-    backgroundColor: selected ? theme.colors.surfaceSelected : 'transparent',
+    borderColor: disabled ? theme.colors.border : 'transparent',
+    backgroundColor: selected ? theme.colors.accent : 'transparent',
   }),
   pressed: {
     opacity: 0.7,
@@ -100,7 +101,7 @@ const styles = StyleSheet.create((theme) => ({
     color: disabled
       ? theme.colors.textDisabled
       : selected
-        ? theme.colors.text
+        ? theme.colors.onAccent
         : theme.colors.textDim,
   }),
 }));
