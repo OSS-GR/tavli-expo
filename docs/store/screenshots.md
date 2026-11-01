@@ -50,7 +50,7 @@ eas build --profile preview --platform android  # .apk for the emulator
 
 Or build locally in release mode: `npx expo run:ios --configuration Release` and `npx expo run:android --variant release`. See [Running the app](../process/running-the-app.md).
 
-On the first launch, pick the language, then tap **Don't allow**. So the screenshot sessions send no usage data or crash reports.
+On the first launch, pick the language, tap **Don't allow**, then pick the board and tap **Continue**. So the screenshot sessions send no usage data or crash reports.
 
 ### 2. iOS simulator
 

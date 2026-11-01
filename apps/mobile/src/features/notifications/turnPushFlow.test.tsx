@@ -12,10 +12,13 @@ import InviteWaitRoute from '@/app/friend/[code]';
 import GameRoute from '@/app/game/[id]/index';
 import InviteRoute from '@/app/invite/[code]';
 import SettingsRoute from '@/app/settings';
+import WelcomeBoardRoute from '@/app/welcome/board';
 import WelcomeLanguageRoute from '@/app/welcome/language';
 import WelcomePrivacyRoute from '@/app/welcome/privacy';
 import { CONSENT_STORAGE_KEY } from '@/features/privacy/consent';
 import { consentStore } from '@/features/privacy/consentStore';
+import { WELCOME_BOARD_STORAGE_KEY } from '@/features/welcome/boardStep';
+import { boardStepStore } from '@/features/welcome/boardStepStore';
 import { analytics, onlineServer, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
@@ -54,6 +57,7 @@ const routes = {
   settings: SettingsRoute,
   'welcome/language': WelcomeLanguageRoute,
   'welcome/privacy': WelcomePrivacyRoute,
+  'welcome/board': WelcomeBoardRoute,
   'new-game': stub('new game'),
   history: stub('history'),
   'rules/[variant]': stub('rules'),
@@ -231,12 +235,16 @@ describe('the offer', () => {
     await act(async () => {
       storage.remove(CONSENT_STORAGE_KEY);
       consentStore.setState({ status: 'unset' });
+      storage.remove(WELCOME_BOARD_STORAGE_KEY);
+      boardStepStore.setState({ status: 'new' });
     });
     const user = setupUser();
     await renderRouter(routes, { initialUrl: '/' });
     expect(screen).toHavePathname('/welcome/language');
     await user.press(screen.getByRole('button', { name: 'Continue' }));
     await user.press(screen.getByRole('button', { name: 'Allow usage data' }));
+    // The board step (#350).
+    await user.press(screen.getByRole('button', { name: 'Continue' }));
     await flush();
     expect(screen).toHavePathname('/');
     expect(screen.queryByRole('header', OFFER)).toBeNull();
@@ -295,6 +303,8 @@ describe('a tap on a push', () => {
     await act(async () => {
       storage.remove(CONSENT_STORAGE_KEY);
       consentStore.setState({ status: 'unset' });
+      storage.remove(WELCOME_BOARD_STORAGE_KEY);
+      boardStepStore.setState({ status: 'new' });
     });
     const user = setupUser();
     onlineFake.notifications.tap({ gameId: 'k57abc' }, { opensApp: true });
@@ -303,6 +313,8 @@ describe('a tap on a push', () => {
     expect(screen).toHavePathname('/welcome/language');
     await user.press(screen.getByRole('button', { name: 'Continue' }));
     await user.press(screen.getByRole('button', { name: "Don't allow" }));
+    // The board step (#350).
+    await user.press(screen.getByRole('button', { name: 'Continue' }));
     await flush();
     expect(screen).toHavePathname('/game/k57abc');
   });

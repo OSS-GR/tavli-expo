@@ -709,6 +709,10 @@
       "policy": "Read the privacy policy",
       "allow": "Allow usage data",
       "deny": "Don't allow"
+    },
+    "board": {
+      "title": "Set up your board",
+      "intro": "Pick how the board looks. The board at the top shows your choice. You can change it later in Settings."
     }
   },
   "matchEnd": {
