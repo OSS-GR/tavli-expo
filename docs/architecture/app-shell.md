@@ -35,7 +35,7 @@ Settings sections: Game (auto-confirm, **Show hints** (the Hint button, #209), b
 ## Rules pages (#112, #124)
 
 - `/rules/portes`, `/rules/plakoto`, `/rules/fevga` and `/rules/asodio` each show a full page. `/rules/tavli` explains the match rotation and links to its three games (`TAVLI_GAMES`; Asodio is not in the rotation). Any other id says there are no rules.
-- Opened from Home (**How to play**), the in-game menu (**How to play Plakoto**: the game on the board, in Tavli the game of the rotation) and New game (the **i** button on each game card). Only the route files call `router`.
+- Opened from Home (**How to play**), the in-game menu (**How to play Plakoto**: the game on the board, in Tavli the game of the rotation) and New game (the book button on each game card). Only the route files call `router`.
 - `features/rules/content.ts` lists each page's sections in reading order: goal, start position, dice and turns, how checkers move, hitting / pinning / no hitting, the special rules (Plakoto mother, Fevga first checker and six-in-a-row bans, Asodio entering and the loading lock, quarter by quarter, the draw), bearing off and points. Shared sections (`rules.common.*`) appear on every page; a game can add its own line to a shared section (for example Plakoto: no bearing off while pinned).
 - The texts live in one i18n group, `rules.*`. Each body is a few short lines split by `\n`; each line shows as one bullet paragraph. Greek uses tavli words: πόρτα, πλάκωμα, μάνα, εξάπορτο, μάζεμα, μονό / διπλό, βαθμοί.
 - The texts describe the **default presets** only (`DEFAULT_PRESET_BY_GAME`): Plakoto `motherRule: "offerConcede"` (resign for diplo or play on; both mothers pinned is a draw), Fevga runner rule to pass the opponent's mother and the prime bans P1, P2 (points 6–11) and P3, Asodio `asodio.kafeneio` (A1–A6: a 1-2 or a double opens the board, a double enters four, entered checkers wait until all 15 are in, the quarter lock, pins, no bearing off while pinned, a deadlock is a draw). When a default flag changes, update the page.
@@ -80,6 +80,7 @@ A one-minute lesson in Portes on the real board, before the first game.
 ## Choosing the game (#109)
 
 - The game picker on New game lists the games that are open as radio cards: **Portes**, **Plakoto**, **Fevga**, **Tavli** (all three in rotation) and **Asodio**. Default: Portes, or the last game chosen in this mode. Locked games are dashed chips; a tap shows the toast "Coming soon: Asodio".
+- Look (#357): the shared `Screen`, `ScreenHeader` and `SectionCard` parts. The game cards sit two per row, Tavli on a whole row at the end (the radio order follows what you see). The chosen card has a brass border, a `surfaceSelected` gradient and a small brass check after its name. Match length, bot level (or the players and the board view) and house rules are each one `SectionCard`. **Start game** is docked at the bottom on a fade (clear page color to page color) pulled up over the end of the list; the fade lets touches through, and the list has room to scroll past it. The dock pads the bottom safe area.
 - Each game uses its engine preset (`gamePreset`, `gameRuleSet` in `setup.ts`):
   - Portes, Plakoto, Fevga, Asodio: a **one-game match**. Plakoto and Asodio use their chosen rules version (#241, default `plakoto` and the owner version `asodio.kafeneio`). The engine's Plakoto and Fevga presets keep the shared rotation Portes → Plakoto → Fevga, so the app sets `match.rotation` to the one game ("single game" in `tavli-match.md`).
   - Tavli: the `tavli` preset, Portes → Plakoto → Fevga → Portes → … Each game uses its own default preset and the match flags of `tavli`; the engine scores every game the same way (mono 1, diplo 2) per `docs/rules/tavli-match.md`. With another Plakoto version (#247) the match preset is that version with the Tavli rotation: the engine plays it in the Plakoto games only (`gameRules`).
@@ -336,7 +337,7 @@ All parts keep text free to wrap (no line limit, no fixed height around text) an
 - The "Play vs bot" subtitle lists the bot levels: "Easy, Medium or Hard" (Greek: "Εύκολο, Μέτριο ή Δύσκολο"). `levelList` in `HomeScreen.tsx` builds it from the levels the bot plays in at least one game (`anyGameLevels` in `features/bot/levels.ts`), so it changes when the bot gets a level (#182).
 - A broken save on the board route shows the "could not be opened" card (not a dialog), with a Home button.
 - The game also saves mid-turn when the app goes to the background or the user exits (the wireframe accepts losing those moves; we keep them).
-- New game has a small **i** button on each game card that opens its rules page (not in wireframe 4).
+- New game has a small book button on each game card that opens its rules page without choosing the game. The restyle mockup has one "How to play" link under the cards for the chosen game; we keep a button per card, so the rules of any game are one tap away.
 
 ## Tests
 
