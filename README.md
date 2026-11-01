@@ -70,7 +70,7 @@ Never hard-code text in a screen. Section titles in caps go through `displayCaps
 1. In `apps/mobile/src/features/settings/settings.ts`: add the field to `Settings` and `DEFAULT_SETTINGS`, and a check in `sanitizeSettings`.
 2. If an old saved value must change meaning, raise `SETTINGS_VERSION` and add a step in `migrateSettings`.
 3. Read it with `useSettings((s) => s.mySetting)`. Change it with `setSetting('mySetting', value)`. It saves at once (MMKV through the `Storage` port).
-4. Add a row to `SettingsScreen.tsx` (labels through `t()`) and a test.
+4. Add a row to the right `SectionCard` in `SettingsScreen.tsx` (labels through `t()`) and a test. Every row starts with an icon (`icon`, a Lucide name from `apps/mobile/src/components/icons.ts`): a switch is a `ToggleRow`, a picker and its hints go in a `SettingBlock`. A new icon needs its path data in `icons.ts` and its name in `docs/design/style/LICENSES.md`.
 
 ### Style a screen
 

@@ -15,11 +15,12 @@
  */
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppState, Linking, Pressable, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 import { useStore } from 'zustand';
 
 import { ActionButton } from '@/components/ActionButton';
+import { BlockHint, SettingBlock } from '@/features/settings/SettingBlock';
 
 import type { TurnPushes } from './turnPushes';
 
@@ -59,13 +60,11 @@ export function TurnPushSettings({ pushes }: { pushes: TurnPushes }) {
   const state = shown === null ? null : t(`notifications.settings.${shown}`);
 
   return (
-    <View testID="settings-turn-pushes" style={styles.row}>
-      <Text style={styles.label}>{t('notifications.settings.label')}</Text>
-      {state === null ? null : (
-        <Text testID="settings-turn-pushes-state" style={styles.hint}>
-          {state}
-        </Text>
-      )}
+    <SettingBlock
+      testID="settings-turn-pushes"
+      icon="bell"
+      label={t('notifications.settings.label')}>
+      {state === null ? null : <BlockHint testID="settings-turn-pushes-state">{state}</BlockHint>}
       {shown === 'undetermined' ? (
         <ActionButton
           testID="settings-turn-pushes-on"
@@ -84,24 +83,11 @@ export function TurnPushSettings({ pushes }: { pushes: TurnPushes }) {
           <Text style={styles.linkText}>{`${t('notifications.settings.openSettings')} ›`}</Text>
         </Pressable>
       ) : null}
-    </View>
+    </SettingBlock>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  row: {
-    gap: theme.space.xs,
-    paddingTop: theme.space.md,
-  },
-  label: {
-    ...theme.type.body,
-    color: theme.colors.text,
-  },
-  hint: {
-    ...theme.type.caption,
-    color: theme.colors.textDim,
-    paddingBottom: theme.space.xs,
-  },
   link: {
     minHeight: theme.touch.row,
     justifyContent: 'center',

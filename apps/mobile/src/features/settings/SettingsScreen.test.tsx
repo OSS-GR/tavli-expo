@@ -35,6 +35,21 @@ describe('<SettingsScreen />', () => {
     expect(screen.getByRole('radio', { name: 'Face-to-face' })).toBeDisabled();
   });
 
+  it('has the screen header with a back button (#360)', async () => {
+    const user = userEvent.setup();
+    const onBack = jest.fn();
+    await render(<SettingsScreen onBack={onBack} />);
+
+    expect(screen.getByRole('header', { name: 'Settings' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no back button without a way back', async () => {
+    await render(<SettingsScreen />);
+    expect(screen.queryByTestId('settings-back')).toBeNull();
+  });
+
   it('has no pip count row (#238), in English and in Greek', async () => {
     const user = userEvent.setup();
     await render(<SettingsScreen />);
@@ -295,7 +310,7 @@ describe('<SettingsScreen />', () => {
     expect(screen.getByRole('header', { name: 'Privacy' })).toBeOnTheScreen();
     const toggle = screen.getByRole('switch', { name: 'Share anonymous usage data' });
     expect(toggle).not.toBeChecked();
-    expect(screen.getByRole('link', { name: 'Privacy policy ›' })).toBeOnTheScreen();
+    expect(screen.getByRole('link', { name: 'Privacy policy' })).toBeOnTheScreen();
 
     await user.press(toggle);
     expect(consentStore.getState().status).toBe('granted');
@@ -337,7 +352,7 @@ describe('<SettingsScreen />', () => {
     await render(<SettingsScreen onLearnToPlay={onLearnToPlay} />);
     expect(screen.queryByTestId('tutorial-picker')).not.toBeOnTheScreen();
 
-    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
     const picker = within(screen.getByTestId('tutorial-picker'));
     expect(picker.getByRole('header', { name: 'Learn to play' })).toBeOnTheScreen();
     await user.press(picker.getByRole('button', { name: label }));
@@ -351,7 +366,7 @@ describe('<SettingsScreen />', () => {
     const user = userEvent.setup();
     const onLearnToPlay = jest.fn();
     await render(<SettingsScreen onLearnToPlay={onLearnToPlay} />);
-    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
     await user.press(
       within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Cancel' }),
     );
@@ -365,7 +380,7 @@ describe('<SettingsScreen />', () => {
       settingsStore.setState({ language: 'el' });
     });
     await render(<SettingsScreen onLearnToPlay={jest.fn()} />);
-    await user.press(screen.getByRole('button', { name: 'Μάθε να παίζεις ›' }));
+    await user.press(screen.getByRole('button', { name: 'Μάθε να παίζεις' }));
     const picker = within(screen.getByTestId('tutorial-picker'));
     for (const name of ['Πόρτες', 'Πλακωτό', 'Φεύγα', 'Ασόδιο', 'Άκυρο']) {
       expect(picker.getByRole('button', { name })).toBeOnTheScreen();

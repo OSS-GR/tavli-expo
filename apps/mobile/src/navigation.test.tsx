@@ -293,7 +293,7 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: 'Settings' }));
     await user.press(screen.getByRole('button', { name: 'Clear history' }));
     await user.press(screen.getByRole('button', { name: 'Clear' }));
-    await user.press(screen.getByRole('button', { name: 'Match history ›' }));
+    await user.press(screen.getByRole('button', { name: 'Match history' }));
     expect(router.getPathname()).toBe('/history');
     expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
   });
@@ -552,7 +552,7 @@ describe('tutorial (#128)', () => {
 
     // Reopen from Settings → Help: pick the game first.
     await user.press(screen.getByRole('button', { name: 'Settings' }));
-    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
     await user.press(
       within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Portes' }),
     );
@@ -677,7 +677,7 @@ describe('tutorial from Settings (#159)', () => {
     recorded.sent.length = 0;
     const router = await renderRouter('./src/app', { initialUrl: '/settings' });
 
-    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
     const picker = within(screen.getByTestId('tutorial-picker'));
     expect(picker.getByRole('header', { name: 'Learn to play' })).toBeOnTheScreen();
     expect(picker.getAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual([
@@ -711,7 +711,7 @@ describe('tutorial from Settings (#159)', () => {
   it('Cancel closes the picker and stays in Settings', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/settings' });
-    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
     await user.press(
       within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Cancel' }),
     );
@@ -722,7 +722,7 @@ describe('tutorial from Settings (#159)', () => {
   it('plays the Asodio lessons from Settings, saves them apart, then plays Asodio', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/settings' });
-    await user.press(screen.getByRole('button', { name: 'Learn to play ›' }));
+    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
     await user.press(
       within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Asodio' }),
     );

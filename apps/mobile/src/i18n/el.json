@@ -81,6 +81,7 @@
   },
   "settings": {
     "title": "Ρυθμίσεις",
+    "back": "Πίσω",
     "sections": {
       "game": "Παιχνίδι",
       "soundAndFeel": "Ήχος και δόνηση",

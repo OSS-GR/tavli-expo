@@ -84,6 +84,22 @@ describe('<SectionRow />', () => {
     expect(problems()).toEqual([]);
   });
 
+  it('can be a link, or a disabled button (#360)', async () => {
+    const user = userEvent.setup();
+    const onPress = jest.fn();
+    await renderWithRoot(
+      <SectionCard>
+        <SectionRow label="Privacy policy" accessibilityRole="link" onPress={jest.fn()} />
+        <SectionRow label="Clear history" disabled onPress={onPress} />
+      </SectionCard>,
+    );
+    expect(screen.getByRole('link', { name: 'Privacy policy' })).toBeEnabled();
+    const clear = screen.getByRole('button', { name: 'Clear history' });
+    expect(clear).toBeDisabled();
+    await user.press(clear);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
   it('is not a button without onPress', async () => {
     await renderWithRoot(<SectionRow label="Version" value="1.0" />);
     expect(screen.queryByRole('button')).toBeNull();

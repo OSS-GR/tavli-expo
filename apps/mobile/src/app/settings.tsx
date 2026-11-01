@@ -9,8 +9,10 @@ export default function SettingsRoute() {
   const { t } = useTranslation();
   return (
     <>
+      {/* The title names the screen for the back button of the next one. */}
       <Stack.Screen options={{ title: t('settings.title') }} />
       <SettingsScreen
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         onLearnToPlay={(game) => router.push(tutorialHref('settings', game))}
         onHistory={() => router.push('/history')}
         turnPushes={turnPushes()}

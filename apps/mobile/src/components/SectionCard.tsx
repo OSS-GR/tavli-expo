@@ -106,6 +106,10 @@ export interface SectionRowProps {
   accessibilityLabel?: string;
   /** Default for a button row: the hint. */
   accessibilityHint?: string;
+  /** A button row's role: `link` for a row that opens a web page. Default: `button`. */
+  accessibilityRole?: 'button' | 'link';
+  /** A button row that cannot be pressed now: dim label, read as disabled. */
+  disabled?: boolean;
   testID?: string;
 }
 
@@ -118,6 +122,8 @@ export function SectionRow({
   right,
   accessibilityLabel,
   accessibilityHint,
+  accessibilityRole = 'button',
+  disabled = false,
   testID,
 }: SectionRowProps) {
   const { theme } = useUnistyles();
@@ -125,7 +131,7 @@ export function SectionRow({
     <>
       {icon ? <RowIcon name={icon} /> : null}
       <View style={styles.texts}>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, disabled && styles.disabled]}>{label}</Text>
         {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       </View>
       {right ?? (value ? <Text style={styles.value}>{value}</Text> : null)}
@@ -142,9 +148,11 @@ export function SectionRow({
   return (
     <Pressable
       testID={testID}
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel ?? [label, value].filter(Boolean).join(', ')}
       accessibilityHint={accessibilityHint ?? hint}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       {content}
@@ -218,6 +226,9 @@ const styles = StyleSheet.create((theme) => ({
   label: {
     ...theme.type.bodyStrong,
     color: theme.colors.text,
+  },
+  disabled: {
+    color: theme.colors.textDisabled,
   },
   hint: {
     ...theme.type.caption,
