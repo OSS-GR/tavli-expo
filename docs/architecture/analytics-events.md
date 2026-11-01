@@ -56,7 +56,7 @@ Every property value is a number, or a short id from a fixed set (the lists belo
 | `review_opened` | The game review (#215) opens: **Review** on the game-end sheet or the match-end screen of an offline game (vs bot or pass-and-play). Once per open. | `game`: the game picked for the match (as in `game_started`). Never the position, the dice, the moves or the mistakes. | `app/game/[id]/review.tsx` through `features/review/reviewAnalytics.ts` |
 | `invite_created` | The player made an invite on **Play a friend online** (#281): the server saved it and gave its code. Once per invite. | `game`: the game picked, as in `game_started`; `matchLength`: points to win (1, 3, 5, 7); `turnTimeMinutes`: a per-turn time limit in minutes, or omitted for the 24-hour default (#183). Never the invite code, a game id or a user id. | `features/invites/FriendSetupScreen.tsx` through `features/invites/inviteAnalytics.ts` |
 | `push_permission_answered` | The phone answered the system prompt for turn notifications (#285), after the player tapped **Turn on** (on the prompt after making or accepting an invite, or in Settings). Once per answer. Not sent for **Not now** (the system prompt did not show). | `answer`: `granted` \| `denied`. Never the push token, a game id or a user id. | `features/notifications/turnPushes.ts` through `features/notifications/pushAnalytics.ts` |
-| `$screen` | A route change. | screen name = route pattern: `/`, `/new-game`, `/game/[id]`, `/game/[id]/match-end`, `/game/[id]/review`, `/history`, `/settings`, `/tutorial`, `/rules/[variant]`, `/friend`, `/friend/[code]`, `/invite/[code]`, `/welcome/language`, `/welcome/privacy` | `features/analytics/useAppAnalytics.ts` |
+| `$screen` | A route change. | screen name = route pattern: `/`, `/new-game`, `/game/[id]`, `/game/[id]/match-end`, `/game/[id]/review`, `/history`, `/settings`, `/tutorial`, `/rules/[variant]`, `/friend`, `/friend/[code]`, `/invite/[code]`, `/welcome/language`, `/welcome/privacy`, `/welcome/board` | `features/analytics/useAppAnalytics.ts` |
 
 Notes:
 
@@ -142,7 +142,7 @@ Make three dashboards in PostHog (Dashboards → New dashboard). Each line below
 | Tutorial helper | `apps/mobile/src/features/tutorial/tutorialAnalytics.ts` |
 | Tests: the doc and the list (`ANALYTICS_EVENTS`) agree | `packages/contracts/src/analytics.test.ts` |
 | Tests: the code sends only listed events, every listed event is sent, only the adapter calls PostHog | `apps/mobile/src/features/analytics/eventPlan.test.ts` |
-| First-launch screens (language, consent) | `apps/mobile/src/features/welcome/`, routes `app/welcome/*` |
+| First-launch screens (language, consent, board) | `apps/mobile/src/features/welcome/`, routes `app/welcome/*` |
 
 ## Setup (owner)
 

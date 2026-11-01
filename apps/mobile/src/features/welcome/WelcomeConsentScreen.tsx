@@ -6,8 +6,12 @@ import { ActionButton } from '@/components/ActionButton';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
 
+import { useBoardStep } from './boardStepStore';
+
 export interface WelcomeConsentScreenProps {
   onBack: () => void;
+  /** After the answer is saved: the route opens the board step when it is due (#350). */
+  onAnswered?: () => void;
 }
 
 /**
@@ -16,15 +20,24 @@ export interface WelcomeConsentScreenProps {
  * as accepting. "Don't allow" stops usage data and crash reports (the one
  * switch, `features/privacy`). Closing the app without an answer sends no
  * usage data, only anonymous crash reports, and this screen shows again on
- * the next launch. The answer itself leaves this screen: the root layout's
- * guard opens Home.
+ * the next launch. The first answer makes the board step due (#350), so
+ * the route opens it next. Without a board step, the answer itself leaves
+ * this screen: the root layout's guard opens Home.
  */
-export function WelcomeConsentScreen({ onBack }: WelcomeConsentScreenProps) {
+export function WelcomeConsentScreen({ onBack, onAnswered }: WelcomeConsentScreenProps) {
   const { t } = useTranslation();
   const setConsent = useConsent((s) => s.setConsent);
+  const beginBoardStep = useBoardStep((s) => s.begin);
+  // A player who passed the board step before (a new consent text asks
+  // again) has two steps; a new player three.
+  const total = useBoardStep((s) => s.status) === 'done' ? 2 : 3;
 
   const answer = (granted: boolean) => {
+    // Before the answer: the guard must never see the consent answered
+    // while the board step is not due yet, or it opens Home at once.
+    beginBoardStep();
     setConsent(granted);
+    onAnswered?.();
   };
 
   const collect = [
@@ -48,7 +61,7 @@ export function WelcomeConsentScreen({ onBack }: WelcomeConsentScreenProps) {
             {'‹'}
           </Text>
         </Pressable>
-        <Text style={styles.step}>{t('welcome.privacy.step', { step: 2, total: 2 })}</Text>
+        <Text style={styles.step}>{t('welcome.privacy.step', { step: 2, total })}</Text>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>

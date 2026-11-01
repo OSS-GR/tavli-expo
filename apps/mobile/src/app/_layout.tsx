@@ -14,6 +14,7 @@ import { usePushTaps } from '@/features/notifications/pushTaps';
 import { TurnPushPrompt } from '@/features/notifications/TurnPushPrompt';
 import { needsWelcome } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
+import { useBoardStep } from '@/features/welcome/boardStepStore';
 import { useLanguageSync } from '@/i18n/useLanguageSync';
 import { crashReporter, notifications } from '@/services';
 
@@ -29,12 +30,18 @@ function RootStack() {
   useLanguageSync();
   useAppAnalytics();
   useSaveOnBackground(matchSessions.saveNow);
-  // First launch (#61): language, then usage data consent, until the user
-  // answers. The gate lives here, not on Home, so a deep link or a restored
-  // route cannot skip it. The app routes are guarded until the answer; the
-  // welcome routes after it. When the guard flips, the router drops the
-  // routes that are now guarded, so Back cannot return to the welcome flow.
-  const welcome = needsWelcome(useConsent((s) => s.status));
+  // First launch (#61): language, then usage data consent, then the board
+  // (#350), until the user is through. The gate lives here, not on Home, so
+  // a deep link or a restored route cannot skip it. The app routes are
+  // guarded until then; the welcome routes after it. When the guard flips,
+  // the router drops the routes that are now guarded, so Back cannot return
+  // to the welcome flow.
+  const consentDue = needsWelcome(useConsent((s) => s.status));
+  // The board step comes after the first consent answer (`boardStep.ts`).
+  const boardDue = useBoardStep((s) => s.status) === 'due';
+  const welcome = consentDue || boardDue;
+  // Answered, but the app closed before the board step: start there.
+  const welcomeStart = consentDue ? '/welcome/language' : '/welcome/board';
   // An invite link that opened the app before the answer (#256): after the
   // welcome flow, the invite opens instead of Home.
   const pendingInvite = usePendingInvite(welcome);
@@ -66,7 +73,7 @@ function RootStack() {
           headerShadowVisible: false,
         }}>
         {/* Every app route is listed here, so the welcome gate covers it. */}
-        <Stack.Protected guard={!welcome} redirectTo="/welcome/language">
+        <Stack.Protected guard={!welcome} redirectTo={welcomeStart}>
           <Stack.Screen name="index" />
           <Stack.Screen name="new-game" />
           <Stack.Screen name="settings" options={{ headerShown: true }} />
@@ -95,6 +102,8 @@ function RootStack() {
           {/* No swipe back out of the first step before the user answers. */}
           <Stack.Screen name="welcome/language" options={{ gestureEnabled: false }} />
           <Stack.Screen name="welcome/privacy" />
+          {/* The board (#350): after the first consent answer. */}
+          <Stack.Screen name="welcome/board" />
         </Stack.Protected>
       </Stack>
       {/* Turn notifications (#285): offered after an async invite, over any screen. */}

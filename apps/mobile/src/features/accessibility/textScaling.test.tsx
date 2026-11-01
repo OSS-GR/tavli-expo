@@ -7,7 +7,8 @@
  * screen with its game-end sheet and match end (#255) and the invite
  * screen (#256), Play a friend online with its waiting screen (#281), and
  * your online games on Home and "See all" (#297) and in History (#313),
- * and your invites on Home (#314) follow the font size with no cut text. The game screen, its cards and
+ * your invites on Home (#314), and the board step of the first launch
+ * (#350) follow the font size with no cut text. The game screen, its cards and
  * menu, and the tutorial also in a landscape window (#185). Cards and sheets scroll when they
  * get taller than the screen. Jest
  * cannot measure text, so `textScalingProblems` checks the layout rules
@@ -64,6 +65,7 @@ import {
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { settingsStore } from '@/features/settings/store';
 import { TutorialScreen } from '@/features/tutorial/TutorialScreen';
+import { WelcomeBoardScreen } from '@/features/welcome/WelcomeBoardScreen';
 import i18n from '@/i18n';
 import { botRunner } from '@/services';
 
@@ -125,6 +127,12 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
   }
 
   it('Tutorial: the Plakoto mother card (#149)', tutorialMotherCard);
+
+  it('First launch: the board step (#350)', async () => {
+    await renderWithRoot(<WelcomeBoardScreen onBack={jest.fn()} onContinue={jest.fn()} />);
+    expect(screen.getByTestId('welcome-board')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
 
   it('Settings: the "Learn to play" game picker (#159)', async () => {
     await renderWithRoot(<SettingsScreen onLearnToPlay={jest.fn()} />);

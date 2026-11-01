@@ -32,6 +32,7 @@
 | Root layout | `app/_layout.tsx` | Loads settings and the saved game while the splash shows. Sends a first-time user to `/welcome/language`. |
 | First launch: language | `app/welcome/language.tsx` | Stack, no back button |
 | First launch: usage data | `app/welcome/privacy.tsx` | Stack |
+| First launch: board | `app/welcome/board.tsx` | Stack. After the first consent answer (#350). |
 | Home | `app/index.tsx` | Root of the stack |
 | New game | `app/new-game.tsx` | Push, with param `mode=bot` or `mode=local` |
 | Board | `app/game/[id]/index.tsx` | Push |
@@ -57,7 +58,8 @@ flowchart TD
   Open([App opens]) --> First{First launch?}
   First -->|yes| Lang[Welcome: pick language]
   Lang --> Consent[Welcome: usage data yes or no]
-  Consent --> Home
+  Consent --> BoardStep[Welcome: board theme, home side, layout]
+  BoardStep --> Home
   First -->|no| Home[Home]
 
   Home -->|Play vs bot| NGB[New game: vs bot<br/>game, length, bot level]
@@ -142,7 +144,7 @@ Notes:
 - **Route:** `app/welcome/privacy.tsx`
 - **Purpose:** Ask for opt-in to anonymous analytics (GDPR, #61). **No usage events are sent before the user chooses.** Only anonymous crash reports (no install id) are sent before the answer. This is the one privacy switch: **Don't allow** also stops crash reports.
 - **Elements:**
-  - Back button (to language) and "Step 2 of 2".
+  - Back button (to language) and "Step 2 of 3" ("Step 2 of 2" when a new consent text asks again after the board step was done).
   - Simple picture placeholder.
   - Title "Help us make Tavlaki better".
   - What we collect, in plain words (modes and games played, game start and end, settings changed, crash reports).
@@ -150,7 +152,22 @@ Notes:
   - Link "Read the privacy policy" (opens `tavlaki.com/privacy` in an in-app browser).
   - Two buttons with the **same look and size**: **Allow usage data** and **Don't allow**. No button is more prominent. Refusing must be as easy as accepting.
 - **States:** If the app closes before a choice, no usage data is sent (crash reports stay anonymous) and the screen shows again on next launch.
-- **Goes to:** Home. The choice is saved; Settings → "Share usage data" reflects it.
+- **Goes to:** The board step after the first answer, else Home. The choice is saved; Settings → "Share usage data" reflects it.
+
+## 2b. First launch: board
+
+Not drawn (#350).
+
+- **Route:** `app/welcome/board.tsx`
+- **Purpose:** Pick how the board looks before the first game. Shown once, after the first consent answer. Players who passed the welcome flow before this step existed never see it.
+- **Elements:**
+  - Back button (to usage data) and "Step 3 of 3".
+  - A live preview of the start position. It follows every pick (theme, home side, tall or classic).
+  - Title "Set up your board" and a short note: the preview shows the choice, and Settings can change it later.
+  - The three pickers from Settings → Board: the board theme, **Your home** (bottom right or bottom left) and **Board layout** (tall or classic). The defaults are picked.
+  - **Continue** (main button).
+- **States:** Each tap saves at once. If the app closes before **Continue**, the step shows again on the next launch.
+- **Goes to:** Home, or an invite link or push tap that opened the app.
 
 ## 3. Home
 
