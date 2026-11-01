@@ -8,6 +8,7 @@
  * This package must not import from `apps/mobile`.
  */
 
+export { withAlpha } from './color';
 export { contrastRatio, luminance } from './contrast';
 export { displayCaps } from './text';
 export * from './themes';

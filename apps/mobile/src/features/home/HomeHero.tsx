@@ -6,6 +6,7 @@
  * screen readers, so the card's label says it all.
  */
 import type { BoardState, Direction } from '@tavli/engine';
+import { withAlpha } from '@tavli/ui';
 import { Text, View, Pressable } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -153,7 +154,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.space.xl,
     borderRadius: theme.radii.pill,
     backgroundColor: theme.colors.accent,
-    boxShadow: `0px 4px 14px ${theme.colors.accent}55`,
+    boxShadow: `0px 4px 14px ${withAlpha(theme.colors.accent, 0.33)}`,
   },
   actionText: {
     ...theme.type.bodyStrong,

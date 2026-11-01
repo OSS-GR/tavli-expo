@@ -161,7 +161,7 @@ Notes:
 
 - **Route:** `app/index.tsx`
 - **Purpose:** Start or continue a game in one or two taps (#34, #36).
-- **Redesign (#342).** The drawing above is the first layout. The app now differs: the empty art box is gone, the play modes are tiles with icons, and a hero card with a board picture leads the screen. The list below is the current layout.
+- **Redesign (#342).** The drawing above is the first layout. The app now differs: the empty art box is gone, the play modes are tiles with icons, and a hero card with a board picture leads the screen. The list below is the current layout. Screenshots (a web render of the app, iPhone size): [before and after](home/before-after.webp), [English: no save, a saved game, scrolled](home/home-en.webp), [Greek](home/home-el.webp).
 - **Elements:**
   - Top row: the app logo (the app icon, `assets/home/logo.webp`), "Tavlaki" (a header for screen readers) and a round **gear** icon button (Settings).
   - A large greeting for the part of the day ("Good morning", "Good afternoon", "Good evening"; `features/home/greeting.ts`, the phone's hour) and the tagline under it.

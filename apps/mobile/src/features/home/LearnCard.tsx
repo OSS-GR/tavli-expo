@@ -59,9 +59,9 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.space.lg,
     borderRadius: theme.radii.xl,
     borderWidth: 1,
-    borderColor: `${theme.colors.accent}88`,
+    borderColor: theme.colors.accentLine,
     backgroundColor: theme.colors.surface,
-    backgroundImage: `linear-gradient(135deg, ${theme.colors.accent}38 0%, ${theme.colors.surface} 80%)`,
+    backgroundImage: `linear-gradient(135deg, ${theme.colors.accentWash} 0%, ${theme.colors.surface} 80%)`,
   },
   head: {
     flexDirection: 'row',

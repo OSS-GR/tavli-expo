@@ -49,6 +49,8 @@ describe('themes', () => {
         ['textDim', 'backgroundDeep'], // the tagline on Home
         ['accent', 'surface'], // the tutorial hint
         ['onAccent', 'turn'], // the turn pill
+        ['text', 'accentWash'], // the "Learn to play" banner on Home (#342)
+        ['textDim', 'accentWash'],
         // Locked or disabled labels ("Coming soon", a disabled Undo). WCAG lets
         // disabled controls be fainter, but locked labels still carry meaning.
         ['textDisabled', 'background'],

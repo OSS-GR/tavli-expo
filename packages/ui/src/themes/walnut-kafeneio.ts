@@ -22,6 +22,9 @@ export const walnutKafeneio = {
     textDisabled: '#A89274',
     accent: '#C89B45',
     onAccent: '#22160C',
+    // `accent` over `surface` at 22% and 55% (#342).
+    accentWash: '#503A20',
+    accentLine: '#83632F',
     turn: '#F2C14E',
     turnText: '#F6D27A',
     switchTrackOff: '#5A4330',
