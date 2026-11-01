@@ -39,10 +39,10 @@ export interface MotherPin {
  * on its start point): `w: 24 7x14 ; b: 10x14 3`.
  *
  * White's 14 other checkers sit on point 7, so every roll after a `playOn`
- * has a legal move: the wait stays with White whatever the server rolls
- * (#308). (On point 6, as in the engine test `plakoto-mother.test.ts`,
- * 6-6 has no move: White passes, and a test that expects White to move
- * fails once in 36 runs.)
+ * has a legal move. When White rolls (`rollDice`, #355), White still has
+ * to move, whatever the dice (#308). On point 6 (as in the engine test
+ * `plakoto-mother.test.ts`), 6-6 has no move. Then White passes, and a
+ * test that expects White to move fails once in 36 runs.
  *
  * A test saves the returned flow on the server (on Convex: patch
  * `games.flow` with `storeFlow`), then sends `pin` as Black's turn.
@@ -103,6 +103,42 @@ export function lastBearOff(flow: MatchFlow, player: PlayerId = 'white'): MatchF
   const game: GameFlow = {
     ...flow.game,
     phase: 'moving',
+    state,
+    starter: flow.game.starter ?? player,
+    played: [],
+    lastTurn: null,
+    result: null,
+  };
+  return { ...flow, game };
+}
+
+/**
+ * Puts the current game of the Portes match `flow` in a position where
+ * `player` (White by default) waits to roll with one checker on the bar
+ * and the other player's home board closed: every roll passes (#355).
+ * The other player has three checkers on its point 13, so every roll of
+ * theirs has a legal move.
+ *
+ * A test saves the returned flow on the server (on Convex: patch
+ * `games.flow` with `storeFlow`), then rolls as `player`.
+ */
+export function closedOut(flow: MatchFlow, player: PlayerId = 'white'): MatchFlow {
+  const stuck = { points: { 6: 14 }, bar: 1 };
+  const closer = { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } };
+  const board = createBoard(
+    player === 'white' ? { white: stuck, black: closer } : { white: closer, black: stuck },
+    'contrary',
+  );
+  const state: GameState = {
+    ...flow.game.state,
+    board,
+    toMove: player,
+    dice: null,
+    turnNumber: 12,
+  };
+  const game: GameFlow = {
+    ...flow.game,
+    phase: 'awaiting-roll',
     state,
     starter: flow.game.starter ?? player,
     played: [],

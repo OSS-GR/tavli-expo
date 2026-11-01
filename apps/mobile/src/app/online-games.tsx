@@ -15,12 +15,14 @@ export default function OnlineGamesRoute() {
   if (auth === undefined || games === undefined) return <Redirect href="/" />;
   return (
     <>
-      <Stack.Screen options={{ title: t('home.online.title') }} />
+      {/* The screen draws its own header (#362). */}
+      <Stack.Screen options={{ title: t('home.online.title'), headerShown: false }} />
       <MyGamesScreen
         auth={auth}
         games={games}
         focused={focused}
         onOpen={(gameId) => router.push(gameHref(gameId))}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       />
     </>
   );

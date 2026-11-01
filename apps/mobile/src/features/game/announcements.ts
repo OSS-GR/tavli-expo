@@ -172,13 +172,17 @@ export function onlinePassLine(
 
 /**
  * Online (#255): what screen readers hear when a new view arrives. The
- * other player's whole turn comes at once, with the roll after it, so one
- * text says both: "Opponent played: …. You rolled 5-3." A pass and the
- * opening roll (the server does both) are read too. The game screen keys
- * the text on the game and the view's version, so each view is read once.
- * When the phone holds back your roll (#347), the turn waits for it:
- * "Opponent played: …. Your turn." The other player's pass before it has
- * its card, which reads itself.
+ * game screen keys the text on the game and the view's version, so each
+ * view is read once. Each turn waits for its roll (#355):
+ * - The other player's whole turn comes at once: "Opponent played: ….
+ *   Your turn."
+ * - A roll: "Opponent rolled 5-3." The turn before it had its own view, so
+ *   it is not read again. The opening roll (the server rolls it) reads who
+ *   starts. Your own roll from this phone is in the log: the screen reads
+ *   it as a local roll (`turnAnnouncement`).
+ * - A roll with no legal move has its pass card, which reads itself.
+ * - A question (Plakoto's mother, the Acey-Deucey double) reads the turn
+ *   before it.
  * Your own moves on the phone are not read again: the text goes once you
  * move, and comes back with the same key after an undo.
  */
@@ -193,46 +197,38 @@ export function onlineTurnAnnouncement(
   const lines: string[] = [];
   const last = game.lastTurn;
   const pass = onlinePassLine(game, t, names);
+  const played = () => {
+    if (last === null || isYou(last.player)) return;
+    const moves = last.moves.map((move) => moveLabel(t, move)).join('; ');
+    lines.push(t('game.announce.played', { name: nameOf(last.player), moves }));
+  };
   if (game.phase === 'awaiting-roll') {
     if (pass !== null) return null;
-    if (last !== null && !isYou(last.player)) {
-      const moves = last.moves.map((move) => moveLabel(t, move)).join('; ');
-      lines.push(t('game.announce.played', { name: nameOf(last.player), moves }));
-    }
+    played();
     if (isYou(game.state.toMove)) lines.push(t('game.pass.next_you'));
     return lines.length > 0 ? lines.join(' ') : null;
   }
-  if (pass !== null) {
-    lines.push(pass);
-  } else if (last !== null && !isYou(last.player)) {
-    const moves = last.moves.map((move) => moveLabel(t, move)).join('; ');
-    lines.push(t('game.announce.played', { name: nameOf(last.player), moves }));
-  }
   const dice = game.state.dice;
-  if (game.phase === 'moving' && game.played.length === 0 && dice !== null) {
-    const opening = onlineOpeningLine(game, t, names);
-    const player = game.state.toMove;
-    const you = isYou(player);
-    const name = nameOf(player);
-    if (opening !== null) {
-      lines.push(opening);
-    } else if (isDouble(dice)) {
-      const value = dice[0];
-      const vars = { name, value, double: t(`game.doubles.name.${value}`) };
-      const chosen = stateHasChosenDouble(game);
-      if (chosen) {
-        lines.push(
-          you ? t('game.announce.choseDouble_you', vars) : t('game.announce.choseDouble', vars),
-        );
-      } else {
-        lines.push(
-          you ? t('game.announce.rolledDouble_you', vars) : t('game.announce.rolledDouble', vars),
-        );
-      }
-    } else {
-      const vars = { name, dice: dice.join('-') };
-      lines.push(you ? t('game.announce.rolled_you', vars) : t('game.announce.rolled', vars));
-    }
+  if (game.phase !== 'moving' || dice === null) {
+    // A question: the turn before it.
+    if (pass !== null) lines.push(pass);
+    else played();
+    return lines.length > 0 ? lines.join(' ') : null;
   }
-  return lines.length > 0 ? lines.join(' ') : null;
+  if (game.played.length > 0) return null;
+  const opening = onlineOpeningLine(game, t, names);
+  if (opening !== null) return opening;
+  const player = game.state.toMove;
+  const you = isYou(player);
+  const name = nameOf(player);
+  if (isDouble(dice)) {
+    const value = dice[0];
+    const vars = { name, value, double: t(`game.doubles.name.${value}`) };
+    if (stateHasChosenDouble(game)) {
+      return you ? t('game.announce.choseDouble_you', vars) : t('game.announce.choseDouble', vars);
+    }
+    return you ? t('game.announce.rolledDouble_you', vars) : t('game.announce.rolledDouble', vars);
+  }
+  const vars = { name, dice: dice.join('-') };
+  return you ? t('game.announce.rolled_you', vars) : t('game.announce.rolled', vars);
 }

@@ -139,6 +139,7 @@ const games: GameTransport = {
     if (transport !== null) return transport.subscribe(gameId, onView, onError);
     return signedOutWatch(onError);
   },
+  rollDice: (request) => caller()?.rollDice(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   sendTurn: (request) => caller()?.sendTurn(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   sendAnswer: (request) => caller()?.sendAnswer(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   resign: (gameId) => caller()?.resign(gameId) ?? Promise.reject({ ...NOT_SIGNED_IN }),

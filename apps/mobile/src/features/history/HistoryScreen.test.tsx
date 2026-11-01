@@ -1,4 +1,4 @@
-import { act, render, screen, userEvent } from '@testing-library/react-native';
+import { act, render, screen, userEvent, within } from '@testing-library/react-native';
 
 import { gamePreset } from '@/features/match/setup';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
@@ -151,6 +151,35 @@ describe('<HistoryScreen />', () => {
       'Bot · Medium, Played 1, Won 0, Lost 1, Win rate 0%, Diplo wins 1, Draws 0',
     );
     expect(screen.queryByTestId('history-stats-fevga')).toBeNull();
+  });
+
+  it('shows each stat line as tiles, the rest in one line under them (#359)', async () => {
+    await render(<HistoryScreen records={RECORDS} onPlay={jest.fn()} />);
+
+    const easy = screen.getByTestId('history-stats-portes-easy');
+    for (const text of ['Played', 'Won', 'Win rate', '—']) {
+      expect(within(easy).getByText(text)).toBeOnTheScreen();
+    }
+    expect(
+      within(easy).getByText('Lost 0 · Diplo wins 1 · Draws 0 · Not finished 1'),
+    ).toBeOnTheScreen();
+    const local = screen.getByTestId('history-stats-portes-local');
+    expect(within(local).getByText('Played')).toBeOnTheScreen();
+    expect(within(local).queryByText('Won')).toBeNull();
+    expect(within(local).getByText('Draws 1')).toBeOnTheScreen();
+  });
+
+  it('has the shared header, with a back button only when it can go back (#359)', async () => {
+    const user = userEvent.setup();
+    const onBack = jest.fn();
+    const { rerender } = await render(<HistoryScreen records={RECORDS} onPlay={jest.fn()} />);
+
+    expect(screen.getByRole('header', { name: 'History' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('history-back')).toBeNull();
+
+    await rerender(<HistoryScreen records={RECORDS} onPlay={jest.fn()} onBack={onBack} />);
+    await user.press(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalled();
   });
 
   it('speaks Greek, with Greek dates', async () => {

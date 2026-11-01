@@ -1,6 +1,8 @@
 /**
- * Match end (wireframe 9): who won the match, the final score, one row per
- * game, then Rematch, Change settings and Home.
+ * Match end (wireframe 9, restyled after the "Match end" wireframe in
+ * #361): a brass hero card with who won the match (a trophy badge for a win
+ * by a person), the final score and the match, one row per game in a card,
+ * then Rematch (the main button), Review, Change settings and Home.
  *
  * It shows a finished match and never changes it. The route
  * (`app/game/[id]/match-end.tsx`) starts the rematch and navigates.
@@ -11,9 +13,12 @@
 import { createRematch, type Match, type PerPlayer, type PlayerId } from '@tavli/engine';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { Icon } from '@/components/Icon';
+import { Screen } from '@/components/Screen';
+import { CardFrame, RowDivider } from '@/components/SectionCard';
 import { Celebration } from '@/features/game/Celebration';
 import { isHumanWin } from '@/features/game/gameFeedback';
 import { winType, type WinType } from '@/features/game/turnNotices';
@@ -88,6 +93,7 @@ export function MatchEndScreen({
   announceKey,
 }: MatchEndScreenProps) {
   const { t } = useTranslation();
+  const { theme } = useUnistyles();
   const seats = online !== undefined ? online.seats : seatsFor(setup, t);
   const name = (player: PlayerId) => seats[player].name;
   const winner = match.winner ?? 'white';
@@ -141,28 +147,53 @@ export function MatchEndScreen({
     announceKey === undefined ? undefined : `${announceKey}:matchEnd`,
   );
 
+  // One text, so it reads "3 – 1"; the winner's number is brass.
+  const sideScore = (player: PlayerId) => (
+    <Text style={player === winner ? styles.winnerScore : undefined}>{match.score[player]}</Text>
+  );
+  const rematchLabel = t('game.end.rematch');
+
   return (
-    <View testID="match-end-screen" style={styles.screen}>
+    <Screen testID="match-end-screen">
       <ScrollView contentContainerStyle={styles.content}>
-        {celebrate ? <Celebration testID="match-celebration" kind="match" /> : null}
-        <Text style={styles.title} accessibilityRole="header">
-          {title}
-        </Text>
-        {reason ? <Text style={styles.about}>{reason}</Text> : null}
-        <View
-          testID="final-score"
-          style={styles.scoreBox}
-          accessible
-          accessibilityLabel={t('matchEnd.finalScore', { score: scoreLine })}>
-          <Text style={styles.bigScore}>{`${match.score.white} – ${match.score.black}`}</Text>
-          <View style={styles.scoreNames}>
-            <Text style={styles.scoreName}>{name('white')}</Text>
-            <Text style={styles.scoreName}>{name('black')}</Text>
+        <View testID="match-hero" style={styles.hero}>
+          {celebrate ? (
+            <Celebration
+              testID="match-celebration"
+              kind="match"
+              // A win by a person gets the trophy badge (#361).
+              icon={
+                <View testID="match-trophy" style={styles.badge}>
+                  <Icon name="trophy" size={TROPHY_SIZE} color={theme.colors.turnText} />
+                </View>
+              }
+            />
+          ) : null}
+          <Text style={styles.title} accessibilityRole="header">
+            {title}
+          </Text>
+          {reason ? <Text style={styles.reason}>{reason}</Text> : null}
+          <View
+            testID="final-score"
+            style={styles.scoreBox}
+            accessible
+            accessibilityLabel={t('matchEnd.finalScore', { score: scoreLine })}>
+            <Text style={styles.bigScore}>
+              {sideScore('white')}
+              {' – '}
+              {sideScore('black')}
+            </Text>
+            <View style={styles.scoreNames}>
+              <Text style={styles.scoreName}>{name('white')}</Text>
+              <Text style={styles.scoreName}>{name('black')}</Text>
+            </View>
+          </View>
+          <View style={styles.aboutChip}>
+            <Text style={styles.about}>{about}</Text>
           </View>
         </View>
-        <Text style={styles.about}>{about}</Text>
         {match.games.length > 0 ? (
-          <View testID="match-games" style={styles.games}>
+          <CardFrame testID="match-games">
             {match.games.map((record, i) => {
               // Each game names its variant (#109): "Game 2 · Plakoto".
               const game = t('game.round', { number: i + 1, game: variantName(record.variant, t) });
@@ -182,89 +213,139 @@ export function MatchEndScreen({
               const chipKey = winChipKey(type);
               const chip = chipKey === null ? null : t(chipKey);
               return (
-                <View
-                  key={i}
-                  testID={`match-game-${i + 1}`}
-                  style={[styles.row, i > 0 && styles.rowLine]}
-                  accessible
-                  accessibilityLabel={[
-                    game,
-                    result,
-                    chip,
-                    t('matchEnd.pointsLabel', { count: record.points }),
-                  ]
-                    .filter(Boolean)
-                    .join(', ')}>
-                  <Text style={styles.rowGame}>{game}</Text>
-                  <Text style={styles.rowResult}>{result}</Text>
-                  {chip ? (
-                    <View style={styles.chip(type === 'diplo')}>
-                      <Text style={styles.chipText(type === 'diplo')}>{chip}</Text>
+                <View key={i}>
+                  {i > 0 ? <RowDivider /> : null}
+                  <View
+                    testID={`match-game-${i + 1}`}
+                    style={styles.row}
+                    accessible
+                    accessibilityLabel={[
+                      game,
+                      result,
+                      chip,
+                      t('matchEnd.pointsLabel', { count: record.points }),
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}>
+                    <View style={styles.rowTexts}>
+                      <Text style={styles.rowGame}>{game}</Text>
+                      <Text style={styles.rowResult}>{result}</Text>
                     </View>
-                  ) : null}
-                  <Text style={styles.rowPoints}>
-                    {t('matchEnd.points', { count: record.points })}
-                  </Text>
+                    {chip ? (
+                      <View style={styles.chip(type === 'diplo')}>
+                        <Text style={styles.chipText(type === 'diplo')}>{chip}</Text>
+                      </View>
+                    ) : null}
+                    <Text style={styles.rowPoints}>
+                      {t('matchEnd.points', { count: record.points })}
+                    </Text>
+                  </View>
                 </View>
               );
             })}
-          </View>
+          </CardFrame>
         ) : null}
+        {/* Pushes the buttons down on a tall screen; with a large font all of it scrolls. */}
+        <View style={styles.spacer} />
+        <View style={styles.actions}>
+          {onRematch && rematchHint !== null ? (
+            <View style={styles.rematch}>
+              <ActionButton
+                testID="rematch-button"
+                label={rematchLabel}
+                // The hint sits under the button; screen readers hear both.
+                accessibilityLabel={`${rematchLabel}, ${rematchHint}`}
+                onPress={onRematch}
+              />
+              <Text
+                style={styles.rematchHint}
+                accessibilityElementsHidden
+                importantForAccessibility="no">
+                {rematchHint}
+              </Text>
+            </View>
+          ) : null}
+          {onReview || onChangeSettings ? (
+            <View style={styles.pair}>
+              {onReview ? (
+                <ActionButton
+                  testID="review-button"
+                  label={t('game.end.review')}
+                  kind="secondary"
+                  grow
+                  onPress={onReview}
+                />
+              ) : null}
+              {onChangeSettings ? (
+                <ActionButton
+                  testID="change-settings-button"
+                  label={t('game.end.changeSettings')}
+                  kind="secondary"
+                  grow
+                  onPress={onChangeSettings}
+                />
+              ) : null}
+            </View>
+          ) : null}
+          <ActionButton
+            testID="end-home-button"
+            label={t('game.end.home')}
+            kind="secondary"
+            onPress={onHome}
+          />
+        </View>
       </ScrollView>
-      <View style={styles.actions}>
-        {onRematch && rematchHint !== null ? (
-          <ActionButton
-            testID="rematch-button"
-            label={t('game.end.rematch')}
-            subtitle={rematchHint}
-            onPress={onRematch}
-          />
-        ) : null}
-        {onReview ? (
-          <ActionButton
-            testID="review-button"
-            label={t('game.end.review')}
-            kind="secondary"
-            onPress={onReview}
-          />
-        ) : null}
-        {onChangeSettings ? (
-          <ActionButton
-            testID="change-settings-button"
-            label={t('game.end.changeSettings')}
-            kind="secondary"
-            onPress={onChangeSettings}
-          />
-        ) : null}
-        <ActionButton
-          testID="end-home-button"
-          label={t('game.end.home')}
-          kind="text"
-          onPress={onHome}
-        />
-      </View>
-    </View>
+    </Screen>
   );
 }
 
+/** The trophy in its round badge, with a brass ring (#361). */
+const TROPHY_SIZE = 32;
+const BADGE_RING = 8;
+const BADGE = 64 + 2 * BADGE_RING;
+
 const styles = StyleSheet.create((theme, rt) => ({
-  screen: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    paddingTop: rt.insets.top,
-    paddingBottom: Math.max(rt.insets.bottom, theme.space.sm),
-  },
   content: {
+    flexGrow: 1,
+    gap: theme.space.lg,
+    paddingHorizontal: theme.space.lg,
+    paddingTop: theme.space.xl,
+    paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
+  },
+  hero: {
     alignItems: 'center',
     gap: theme.space.sm,
     paddingHorizontal: theme.space.lg,
-    paddingVertical: theme.space.lg,
+    paddingVertical: theme.space.xl,
+    borderRadius: theme.radii.xl + 4,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.surface,
+    // Brass light from the top, fading into the card.
+    backgroundImage: `radial-gradient(120% 90% at 50% 0%, ${theme.colors.accentWash} 0%, ${theme.colors.surface} 100%)`,
+    boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.4)',
+  },
+  badge: {
+    width: BADGE,
+    height: BADGE,
+    borderRadius: BADGE / 2,
+    borderWidth: BADGE_RING,
+    borderColor: theme.colors.accentWash,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.backgroundDeep,
   },
   title: {
     ...theme.type.title,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '800',
     color: theme.colors.text,
+    textAlign: 'center',
+  },
+  reason: {
+    ...theme.type.body,
+    color: theme.colors.textDim,
     textAlign: 'center',
   },
   scoreBox: {
@@ -272,73 +353,103 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   bigScore: {
     ...theme.type.display,
-    fontSize: 56,
-    lineHeight: 64,
+    fontSize: 52,
+    lineHeight: 60,
+    fontWeight: '800',
     color: theme.colors.text,
     fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+  },
+  winnerScore: {
+    color: theme.colors.turnText,
   },
   scoreNames: {
     flexDirection: 'row',
-    gap: theme.space.xxxl,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    columnGap: theme.space.xxxl,
   },
   scoreName: {
-    ...theme.type.bodyStrong,
-    color: theme.colors.textDim,
-  },
-  about: {
-    ...theme.type.body,
+    ...theme.type.caption,
     color: theme.colors.textDim,
     textAlign: 'center',
   },
-  games: {
-    alignSelf: 'stretch',
-    marginTop: theme.space.sm,
-    paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radii.lg,
-    backgroundColor: theme.colors.surface,
+  aboutChip: {
+    marginTop: theme.space.xs,
+    minHeight: 28,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space.md,
+    paddingVertical: theme.space.xxs,
+    borderRadius: theme.radii.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.separator,
+    backgroundColor: theme.colors.backgroundDeep,
+  },
+  about: {
+    ...theme.type.caption,
+    fontWeight: '600',
+    color: theme.colors.textDim,
+    textAlign: 'center',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.sm,
-    minHeight: theme.touch.minTarget,
+    gap: theme.space.md,
+    minHeight: theme.touch.button,
+    paddingHorizontal: theme.space.lg,
     paddingVertical: theme.space.sm,
   },
-  rowLine: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.separator,
+  rowTexts: {
+    flex: 1,
+    gap: theme.space.xxs,
   },
   rowGame: {
-    ...theme.type.body,
+    ...theme.type.caption,
     color: theme.colors.textDim,
   },
   rowResult: {
     ...theme.type.bodyStrong,
-    flex: 1,
     color: theme.colors.text,
   },
   chip: (strong: boolean) => ({
+    minHeight: 28,
+    justifyContent: 'center',
     paddingHorizontal: theme.space.md,
     paddingVertical: theme.space.xxs,
     borderRadius: theme.radii.pill,
-    borderWidth: 2,
-    borderColor: theme.colors.accent,
-    backgroundColor: strong ? theme.colors.accent : 'transparent',
+    borderWidth: 1,
+    borderColor: strong ? theme.colors.accent : theme.colors.separator,
+    backgroundColor: strong ? theme.colors.accent : theme.colors.backgroundDeep,
   }),
   chipText: (strong: boolean) => ({
     ...theme.type.caption,
-    fontWeight: '600',
-    color: strong ? theme.colors.onAccent : theme.colors.text,
+    fontWeight: '700',
+    color: strong ? theme.colors.onAccent : theme.colors.textDim,
   }),
   rowPoints: {
     ...theme.type.bodyStrong,
+    fontWeight: '700',
     minWidth: 28,
     textAlign: 'right',
     color: theme.colors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  spacer: {
+    flexGrow: 1,
   },
   actions: {
-    gap: theme.space.sm,
-    paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.sm,
+    gap: theme.space.md,
+  },
+  rematch: {
+    gap: theme.space.xs,
+  },
+  rematchHint: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
+    textAlign: 'center',
+  },
+  pair: {
+    flexDirection: 'row',
+    gap: theme.space.md,
   },
 }));

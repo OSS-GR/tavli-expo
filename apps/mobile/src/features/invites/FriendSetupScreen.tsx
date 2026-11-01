@@ -16,6 +16,9 @@
  *   VoiceOver does not read `accessibilityRole="alert"`).
  * - Screen readers: focus moves to the title when the screen opens.
  * - Large fonts scroll: no text has a line limit.
+ * - Look (#358): the Home style. The intro sits on a brass-edged card,
+ *   the pickers in `SectionCard`s, and "Make an invite" stays at the
+ *   bottom while the list fades out under it.
  *
  * Navigation stays in the route (`app/friend/index.tsx`).
  */
@@ -29,14 +32,19 @@ import {
   type OnlineGameChoice,
 } from '@tavli/contracts';
 import { MAX_OPEN_INVITES } from '@tavli/online';
+import { withAlpha } from '@tavli/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { ScrollView, Text, View } from 'react-native';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { Icon } from '@/components/Icon';
+import { Screen } from '@/components/Screen';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { RowIcon, SectionCard } from '@/components/SectionCard';
+import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
-import { SettingsSection } from '@/components/settings/SettingsSection';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
@@ -69,6 +77,7 @@ export function FriendSetupScreen({
   analytics,
 }: FriendSetupScreenProps) {
   const { t } = useTranslation();
+  const { theme } = useUnistyles();
   const [choice, setChoice] = useState<OnlineGameChoice>('portes');
   const [targetPoints, setTargetPoints] = useState<MatchLength>(3);
   const [turnTimeMinutes, setTurnTimeMinutes] = useState<number | null>(null);
@@ -146,56 +155,38 @@ export function FriendSetupScreen({
           : null;
   useAnnouncement(problemText);
 
+  const gameOptions: ListOption<OnlineGameChoice>[] = ONLINE_GAME_CHOICES.map((game) => ({
+    value: game,
+    label: t(`games.${game}`),
+    hint: t(`games.${game}Subtitle`),
+  }));
+
   return (
-    <View testID="friend-setup" style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable
-          testID="friend-back"
-          accessibilityRole="button"
-          accessibilityLabel={t('friend.back')}
-          onPress={onBack}
-          hitSlop={8}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-          <Text style={styles.backIcon} importantForAccessibility="no" allowFontScaling={false}>
-            {'‹'}
-          </Text>
-        </Pressable>
-        <Text ref={titleRef} style={styles.title} accessibilityRole="header">
-          {t('friend.title')}
-        </Text>
-        <View style={styles.headerSpace} />
-      </View>
+    <Screen testID="friend-setup">
+      <ScreenHeader
+        title={t('friend.title')}
+        titleRef={titleRef}
+        onBack={onBack}
+        backLabel={t('friend.back')}
+        testID="friend-back"
+      />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text style={styles.intro}>{t('friend.intro')}</Text>
-        <SettingsSection title={t('friend.game')}>
-          <View style={styles.gameList} accessibilityRole="radiogroup">
-            {ONLINE_GAME_CHOICES.map((game) => {
-              const selected = game === choice;
-              return (
-                <Pressable
-                  key={game}
-                  testID={`friend-game-${game}`}
-                  onPress={() => setChoice(game)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
-                  accessibilityLabel={`${t(`games.${game}`)}, ${t(`games.${game}Subtitle`)}`}
-                  style={({ pressed }) => [
-                    styles.gameCard(selected),
-                    pressed && !selected && styles.pressed,
-                  ]}>
-                  <View style={styles.radio}>
-                    {selected ? <View style={styles.radioDot} /> : null}
-                  </View>
-                  <View style={styles.gameTexts}>
-                    <Text style={styles.gameName}>{t(`games.${game}`)}</Text>
-                    <Text style={styles.hint}>{t(`games.${game}Subtitle`)}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
+        <View style={styles.hero}>
+          <View style={styles.heroBadge}>
+            <Icon name="globe" size={26} color={theme.colors.accent} />
           </View>
-        </SettingsSection>
-        <SettingsSection title={t('friend.length')}>
+          <Text style={styles.intro}>{t('friend.intro')}</Text>
+        </View>
+        <SectionCard title={t('friend.game')}>
+          <OptionList
+            testID="friend-game"
+            label={t('friend.game')}
+            options={gameOptions}
+            value={choice}
+            onChange={setChoice}
+          />
+        </SectionCard>
+        <SectionCard title={t('friend.length')} padded>
           <SegmentedControl
             testID="friend-length"
             label={t('friend.length')}
@@ -204,8 +195,8 @@ export function FriendSetupScreen({
             onChange={(value) => setTargetPoints(Number(value) as MatchLength)}
           />
           <Text style={styles.hint}>{t('invite.open.lengthValue', { count: targetPoints })}</Text>
-        </SettingsSection>
-        <SettingsSection title={t('friend.timeLimit')}>
+        </SectionCard>
+        <SectionCard title={t('friend.timeLimit')} padded>
           <SegmentedControl
             testID="friend-time-limit"
             label={t('friend.timeLimit')}
@@ -214,12 +205,17 @@ export function FriendSetupScreen({
             onChange={(value) => setTurnTimeMinutes(value === 'null' ? null : Number(value))}
           />
           <Text style={styles.hint}>{timeLimitHint}</Text>
-        </SettingsSection>
-        <Text testID="friend-account" style={styles.intro}>
-          {t('friend.account')}
-        </Text>
+        </SectionCard>
+        <View style={styles.note}>
+          <RowIcon name="shield" />
+          <Text testID="friend-account" style={styles.noteText}>
+            {t('friend.account')}
+          </Text>
+        </View>
       </ScrollView>
       <View style={styles.footer}>
+        {/* The list fades out under the button. */}
+        <View style={styles.fade} pointerEvents="none" />
         {problemText !== null ? (
           <Text testID="friend-problem" style={styles.problem}>
             {problemText}
@@ -233,103 +229,64 @@ export function FriendSetupScreen({
           onPress={() => void make()}
         />
       </View>
-    </View>
+    </Screen>
   );
 }
 
+/** How far the list fades out above the button. */
+const FADE = 32;
+
 const styles = StyleSheet.create((theme, rt) => ({
-  screen: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    paddingTop: rt.insets.top,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.sm,
-    paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.sm,
-  },
-  back: {
-    width: theme.touch.minTarget,
-    height: theme.touch.minTarget,
-    borderRadius: theme.touch.minTarget / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  backIcon: {
-    fontSize: 30,
-    lineHeight: 32,
-    color: theme.colors.text,
-  },
-  headerSpace: {
-    width: theme.touch.minTarget,
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  title: {
-    ...theme.type.title,
-    flex: 1,
-    textAlign: 'center',
-    color: theme.colors.text,
-  },
   scroll: {
     flex: 1,
   },
   content: {
-    gap: theme.space.sm,
+    gap: theme.space.lg,
     paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.md,
-    paddingBottom: theme.space.xl,
+    paddingTop: theme.space.sm,
+    // Room for the fade over the last line.
+    paddingBottom: FADE,
+  },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    padding: theme.space.lg,
+    borderRadius: theme.radii.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.surface,
+    backgroundImage: `linear-gradient(160deg, ${theme.colors.surfaceSelected} 0%, ${theme.colors.surface} 70%)`,
+    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
+  },
+  heroBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.radii.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.backgroundDeep,
   },
   intro: {
     ...theme.type.body,
-    color: theme.colors.textDim,
-  },
-  gameList: {
-    gap: theme.space.sm,
-  },
-  gameCard: (selected: boolean) => ({
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: theme.space.md,
-    padding: theme.space.lg,
-    borderRadius: theme.radii.lg,
-    // The same border width either way, so the text does not move.
-    borderWidth: 3,
-    borderColor: selected ? theme.colors.accent : theme.colors.border,
-    backgroundColor: selected ? theme.colors.surfaceSelected : theme.colors.surface,
-  }),
-  radio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.colors.text,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: theme.colors.text,
-  },
-  gameTexts: {
     flex: 1,
-  },
-  gameName: {
-    ...theme.type.title,
     color: theme.colors.text,
   },
   hint: {
     ...theme.type.caption,
     color: theme.colors.textDim,
+  },
+  note: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.space.md,
+    paddingHorizontal: theme.space.xs,
     paddingTop: theme.space.xs,
+  },
+  noteText: {
+    ...theme.type.caption,
+    flex: 1,
+    color: theme.colors.textDim,
   },
   problem: {
     ...theme.type.body,
@@ -340,5 +297,14 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.space.lg,
     paddingTop: theme.space.sm,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
+    backgroundColor: theme.colors.background,
+  },
+  fade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: -FADE,
+    height: FADE,
+    backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0)} 0%, ${theme.colors.background} 100%)`,
   },
 }));

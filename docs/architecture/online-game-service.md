@@ -72,7 +72,7 @@ The event log. One row per engine `FlowEvent`, in order: `start`, `rollOpening`,
 |---|---|
 | `gameId`, `seq` | `seq` 0 is the `start` event. Index `by_game` on `[gameId, seq]`. |
 | `version` | The game version the event led to |
-| `actor` | The player id who acted, or `server` (rolls, time outs, the next game) |
+| `actor` | The player id who acted, or `server` (the opening roll, time outs, the next game). A `roll` row names the player who asked for it (#355); the server still made the dice. |
 | `event` | The `FlowEvent`, JSON text, with the dice in it |
 
 `replay(events)` from `@tavli/engine` rebuilds the exact game from these rows. The tests check this. It gives history and replays (L3) almost for free.
@@ -98,17 +98,27 @@ client                     makeMove (one transaction)
   │                          5. caller is to move?                → NOT_YOUR_TURN
   │                          6. engine: each move, then confirm   → ILLEGAL_MOVE
   │                          7. server steps (advance):
-  │                             roll the next dice (secure RNG),
-  │                             pass a roll with no move,
-  │                             start the next game + opening roll
+  │                             start the next game + opening roll,
+  │                             then stop at the next roll
   │                          8. save flow, version + 1, log rows,
   │                             new turnDeadline + checkTimeout
   ◄──── getGame (reactive) ─ both phones see the new version
+
+client                     rollDice (one transaction, #355)
+  │  gameId,                 0-5. the same checks as makeMove
+  │  expectedVersion ──────► 6. phase is awaiting-roll?            → ILLEGAL_ACTION
+  │                          7. roll the dice (secure RNG);
+  │                             a roll with no move passes
+  │                          8. save flow, version + 1, log rows;
+  │                             the turnDeadline stays (a pass
+  │                             starts the other side's time)
+  ◄──── getGame (reactive) ─ both phones see the dice
 ```
 
 - **A turn is sent whole.** `moves` is every move for the current roll, in order. The engine checks each one (`nextMoves`), and the turn must be a full legal play. An incomplete turn is `ILLEGAL_MOVE`. Undo stays on the phone.
-- **The server rests only where it waits for a player:** `moving` (play your roll) or `awaiting-answer` (a question). Everything else happens on the server, inside the same transaction (`advance`).
-- **A roll with no legal move** passes by itself, as in the engine flow. `game.lastTurn` shows the dice of the pass.
+- **The server rests only where it waits for a player:** `awaiting-roll` (tap Roll, #355), `moving` (play your roll) or `awaiting-answer` (a question). Everything else happens on the server, inside the same transaction (`advance`).
+- **The roll waits for its player** (#355). `advance` stops at `awaiting-roll`, and the dice are rolled only when that player calls `rollDice`. So the dice of a turn do not exist before the player taps Roll. The opening roll and the next game stay automatic: no one taps for them. In Portes the winner starts the next game, so that game begins in `awaiting-roll`, with no dice.
+- **A roll with no legal move** passes in the engine, inside `rollDice`. The new view waits for the other player's roll, and `game.lastTurn` is the pass: the player, the dice and no moves. Both phones learn of the pass and its dice from that view; there is no extra field.
 - **Between games** the server starts the next game at once (with the opening roll, if the rules ask for one). The result of the finished game is in `match.games`. The finished game itself, as it ended, is the view's `previousGame` (#299): its `lastTurn` is the turn that ended it, and its board the end position. `advance` keeps it when it starts the next game: each step (`playTurn`, `answerPrompt`, `timeOut`, `resign`) returns a `SteppedFlow`, whose `endedGame` is the game the step ended, or `null`. Nothing plays the step again. A server reads the stored text once (`loadStored` gives the flow and `previousGame`) and saves with `storeStep(loaded, next)`: the step's `endedGame`, else the stored `previousGame`. `storeFlow(flow, previousGame)` takes the previous game as a required argument, so a new save path cannot drop it by mistake; a new match passes `null`. `listMyGames` does not use `previousGame` (summaries drop it).
 - **Opening roll:** the server rolls it when the game starts (`insertGame`). `chosenStarterRolls` is not supported online; no preset uses it.
 
@@ -120,9 +130,10 @@ A game between two people starts only from an accepted invite ([Invites](#invite
 
 | Call | Who may call | Version | What it does |
 |---|---|---|---|
-| `createGame(callerId, players, choice, targetPoints, turnTimeMinutes)` | internal (tests, the Convex dashboard) | – | New game at version 1 through `insertGame`. The opening and first roll are done, and the first turn's clock runs. An internal call has no sign-in, so `callerId` names who starts the game; it must be one of the players. Returns the id. |
+| `createGame(callerId, players, choice, targetPoints, turnTimeMinutes)` | internal (tests, the Convex dashboard) | – | New game at version 1 through `insertGame`. The opening roll is done (the starter plays those dice), and the first turn's clock runs. An internal call has no sign-in, so `callerId` names who starts the game; it must be one of the players. Returns the id. |
+| `rollDice(gameId, expectedVersion)` | the player the server waits for, in `awaiting-roll` | yes | Rolls the caller's dice (#355, above). `ILLEGAL_ACTION` when the game does not wait for a roll. Returns like `makeMove`. |
 | `makeMove(gameId, expectedVersion, moves)` | the player to move | yes | One full turn (above). Returns `{ ok: true, version }`, or `TIMED_OUT` ([Turn timers](#turn-timers)). |
-| `answer(gameId, expectedVersion, choice)` | the player the question asks | yes | Answers `prompt` (Plakoto mother question: `resign` or `playOn`; Asodio chosen double). Then the server rolls on. Returns like `makeMove`. |
+| `answer(gameId, expectedVersion, choice)` | the player the question asks | yes | Answers `prompt` (Plakoto mother question: `resign` or `playOn`; Asodio chosen double). Then the server goes on to the next wait (a roll, or the chosen double to play). Returns like `makeMove`. |
 | `resign(gameId)` | either player, any time | no | Resigns the **match**; the opponent wins. No version, so a resign never fails only because the opponent just moved. It ignores the turn timer. Returns the new version. |
 | `getGame(gameId)` | the two players | – | `OnlineGameView`, or `null` when there is no such game. Anyone else gets `NOT_A_PLAYER`. |
 | `listMyGames(status)` | anyone signed in | – | The caller's games with `status` (`active` or `finished`) as `GameSummary`, newest change first, at most `MAX_LISTED_GAMES` (50). See [My games](#my-games). |
@@ -136,9 +147,9 @@ Every write call except `resign` takes `expectedVersion`. Convex mutations are s
 
 Owner answers Q3 and Q15: both **timed** (one minute or more) and **untimed** (slow, 24-hour) games. A timed turn lasts the chosen number of minutes; an untimed turn lasts **24 hours** (`ASYNC_TURN_TIME_MS` in contracts). When the time runs out, the player the server waits for **loses that game**. The match goes on with the next game, or ends if that game gave the last point.
 
-- **The deadline.** Every save that leaves the match running sets `turnDeadline = now + turnDeadlineMs(turnTimeMinutes)`: the new game (`insertGame`), `makeMove`, `answer`, and a time out (the server's rolls and the next game happen in the same save). So each wait for a player gets a full turn time, also when the same player acts again (an Asodio extra roll, an answer and then a roll). A finished match has `turnDeadline: null`.
+- **The deadline.** Every save that leaves the match running sets `turnDeadline = now + turnDeadlineMs(turnTimeMinutes)`: the new game (`insertGame`), `makeMove`, `answer`, and a time out (the next game happens in the same save). So each wait for a player gets a full turn time, also when the same player acts again (an Asodio extra roll, an answer and then a roll). `rollDice` is the one exception (#355): the roll is part of the turn, so the turn time covers the wait before the roll and the moves after it, and the save keeps the old `turnDeadline` (`rollDeadline` in `@tavli/online`). A roll with no legal move passes, and the other player's turn gets a full turn time. A finished match has `turnDeadline: null`.
 - **The scheduler.** The same save schedules `internal.games.checkTimeout({ gameId, version })` with `ctx.scheduler.runAt(turnDeadline)`. Any later change bumps the version, so an old check does nothing. No cancel is needed. If a check ever runs before the deadline, it schedules itself again for the deadline.
-- **On a call.** `makeMove` and `answer` check the deadline after the version check. At or after the deadline (`now >= turnDeadline`), they save the time out instead of the call and return `{ ok: false, version, error: { code: 'TIMED_OUT', message } }`. This is a return value, not a thrown error: a thrown error rolls back the whole transaction, and so the time out too. A client adapter turns it into a `TIMED_OUT` rejection (the port's `sendTurn` / `sendAnswer`). The scheduled check for the old version then does nothing.
+- **On a call.** `rollDice`, `makeMove` and `answer` check the deadline after the version check. At or after the deadline (`now >= turnDeadline`), they save the time out instead of the call and return `{ ok: false, version, error: { code: 'TIMED_OUT', message } }`. This is a return value, not a thrown error: a thrown error rolls back the whole transaction, and so the time out too. A client adapter turns it into a `TIMED_OUT` rejection (the port's `rollDice` / `sendTurn` / `sendAnswer`). The scheduled check for the old version then does nothing.
 - **The engine.** The time out is the engine game action `{ type: 'timeout', player }` (only the player the game waits for, not during the opening roll). It ends the game like a resign of that game (`resignGame`: mono 1 if the player has borne off a checker, else diplo 2), with `reason: 'timeout'` in `GameResult` and `GameRecord`. The engine has no clock: the server decides when time is up, with `Date.now()` inside the Convex function. The pure helpers `deadlineAfter`, `isTimedOut`, `timeOut`, `callTimedOut` and `scheduledCheck` in `@tavli/online` take `now` as an argument.
 - **The log.** The `timeout` event is a row in `moves` with actor `server`, so `replay` still rebuilds the game.
 - **Points.** The rules docs do not say what a timed-out game is worth. We use the single-game resign value (open question Q30).
@@ -152,7 +163,7 @@ A rejected call throws a `ConvexError` whose `data` is `{ code, message }` (`Gam
 ## Dice
 
 - Rolled **only on the server**, inside the mutation, through the engine's `Rng`. The server uses `createCryptoRng()` (Web Crypto, `crypto.getRandomValues`). It never uses the seeded engine RNG, which is predictable.
-- A roll is made at the moment its turn starts. The server stores **no seed and no RNG state**, so the next dice do not exist anywhere before they are rolled. `getGame` shows only the current roll.
+- A roll is made when its player taps Roll (`rollDice`, #355); only the opening roll is made when the game starts. The server stores **no seed and no RNG state**, so the next dice do not exist anywhere before they are rolled. `getGame` shows only the current roll, and a pass's dice in `game.lastTurn`.
 - Convex makes queries and mutations **deterministic**. Its docs say `Math.random` there is a seeded strong PRNG, and the seed is a hidden input of the function call. We expect `crypto.getRandomValues` in a mutation to work the same way. The seed stays on the server, so a client cannot predict a roll. **Check this on the first real deployment** (open point below).
 - Lint blocks `Math.random` in `apps/server`.
 - The pure tests in `packages/online` pass a seeded RNG. The Convex tests use the real server RNG and read the dice from `getGame`.
@@ -283,7 +294,7 @@ inviter                 server                                   friend
   │                        time is up (marked or not), else INVITE_CLOSED
   │                     4. not your own?           → OWN_INVITE
   │                     5. insertGame (white = inviter): opening roll,
-  │                        first roll, turn clock
+  │                        turn clock
   │                     6. invite → accepted, gameId
   │ ◄── getInvite / listMyInvites / getGame (reactive) ─────────► │ gameId
 ```
@@ -528,7 +539,7 @@ A deploy does not change the stored data. Convex refuses a schema that the store
 
 ### Contract checks
 
-`gameTransportContract()` in `@tavli/contracts/testing` checks any `GameTransport`. The checks are plain async functions, so Vitest and Jest can both run them. The subject gives a way to create a game, a Plakoto game at the mother question, a game that White is not in (Black against the stranger), a missing game id, a transport per side (and for a stranger), a legal turn, and `passTime(ms)` to move the server clock. The checks: the first view arrives on a later tick; a legal turn reaches both players with `version + 1`; an old version gets `STALE_VERSION`; the wrong player gets `NOT_YOUR_TURN` and a stranger `NOT_A_PLAYER`; a stranger cannot watch a game (`subscribe` gets `NOT_A_PLAYER`); an incomplete turn gets `ILLEGAL_MOVE`; the mother question; resign finishes the match; no view after unsubscribe; a missing game gives `NOT_FOUND`; a view is a copy; `listMyGames` lists only my own games, newest first, and each summary matches my view; a change moves a game to the top; the status filter, and a finished game moves to `finished` (#296); `watchMyGames` sends the list on a later tick, then each change (a turn, a new game, a resign), lists only my own games, and sends nothing after stop (#297). The subject's `createGame` must make a watched list see the new game. Every rejection must pass `isGameTransportErrorData`. The in-memory server and the [Convex adapter](#the-convex-adapter) run them.
+`gameTransportContract()` in `@tavli/contracts/testing` checks any `GameTransport`. The checks are plain async functions, so Vitest and Jest can both run them. The subject gives a way to create a game, a Plakoto game at the mother question, a game that White is not in (Black against the stranger), a missing game id, a transport per side (and for a stranger), a legal turn, and `passTime(ms)` to move the server clock. The checks: the first view arrives on a later tick; a legal turn reaches both players with `version + 1`, and the next view waits for a roll, with no dice; `rollDice` (#355) rolls only for the player the server waits for (the other player gets `NOT_YOUR_TURN`, a stranger `NOT_A_PLAYER`, an old version `STALE_VERSION`, a turn before the roll and a second roll `ILLEGAL_ACTION`), both players see the dice with `version + 1`, the roll keeps the turn deadline, and a pass waits for the other side's roll; a roll after the match gets `GAME_OVER` and one in a missing game `NOT_FOUND`; an old version gets `STALE_VERSION`; the wrong player gets `NOT_YOUR_TURN` and a stranger `NOT_A_PLAYER`; a stranger cannot watch a game (`subscribe` gets `NOT_A_PLAYER`); an incomplete turn gets `ILLEGAL_MOVE`; the mother question; resign finishes the match; no view after unsubscribe; a missing game gives `NOT_FOUND`; a view is a copy; `listMyGames` lists only my own games, newest first, and each summary matches my view; a change moves a game to the top; the status filter, and a finished game moves to `finished` (#296); `watchMyGames` sends the list on a later tick, then each change (a turn, a new game, a resign), lists only my own games, and sends nothing after stop (#297). The subject's `createGame` must make a watched list see the new game. Every rejection must pass `isGameTransportErrorData`. The in-memory server and the [Convex adapter](#the-convex-adapter) run them.
 
 `invitesContract()` (#256) checks any `Invites`, the same way. The subject gives the inviter's id, a way to make an invite, the `Invites` of the inviter, a friend and a second friend, and `passTime(ms)` to move the server clock. The checks: `getInvite` shows an open invite for the code in any case; it resolves `null` for an unknown code and for text that is not a code; accept resolves with the game id and the invite shows it, and a second answer gets `INVITE_CLOSED`; decline closes the invite; the inviter gets `OWN_INVITE`; an unknown code gets `INVITE_NOT_FOUND` and text that is not a code `BAD_REQUEST`; the invite expires at `INVITE_TIME_MS` (then `INVITE_EXPIRED`); a view is a copy; `createInvite` gives a new code from the caller and refuses a bad match length; only the inviter cancels, and a late cancel gets `INVITE_EXPIRED`; `listMyInvites` lists the caller's open invites, newest first; `watchInvite` sends the invite later, then each change (accept, decline, cancel, expiry), until it stops (#281); `watchMyInvites` sends the caller's open invites later, then each change (a new invite, accept, decline, cancel, expiry), lists only the caller's own invites, gives each watcher its own copy, and sends nothing after stop (#314). Every rejection must pass `isInviteErrorData`. The in-memory server, the Convex functions (`apps/server/convex/invites.test.ts`) and the [Convex invites adapter](#the-convex-invites-adapter) (`convexInvites.test.ts`) run them.
 

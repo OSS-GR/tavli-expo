@@ -291,6 +291,24 @@ describe('sendTurn', () => {
   });
 });
 
+describe('rollDice', () => {
+  it('calls rollDice and maps TIMED_OUT like sendTurn', async () => {
+    const fake = fakeClient();
+    const transport = createConvexGameTransport({ client: fake.client });
+    const ok = transport.rollDice({ gameId: 'g1', expectedVersion: 3 });
+    expect(fake.lastMutation()).toMatchObject({
+      name: 'games:rollDice',
+      args: { gameId: 'g1', expectedVersion: 3 },
+    });
+    fake.lastMutation().resolve({ ok: true, version: 4 });
+    await expect(ok).resolves.toBeUndefined();
+
+    const late = transport.rollDice({ gameId: 'g1', expectedVersion: 3 });
+    fake.lastMutation().resolve({ ok: false, version: 4, error: TIMED_OUT });
+    expect(await reasonOf(late)).toEqual(TIMED_OUT);
+  });
+});
+
 describe('sendAnswer and resign', () => {
   it('sendAnswer calls answer and maps TIMED_OUT like sendTurn', async () => {
     const fake = fakeClient();

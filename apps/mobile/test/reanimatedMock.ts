@@ -70,6 +70,11 @@ export function withSequence<T>(...animations: T[]): T | undefined {
   return animations[animations.length - 1];
 }
 
+/** The animation runs once, so the value ends where the first run ends. */
+export function withRepeat<T>(animation: T, _count?: number, _reverse?: boolean): T {
+  return animation;
+}
+
 export function cancelAnimation(): void {}
 
 const linear = (t: number) => t;

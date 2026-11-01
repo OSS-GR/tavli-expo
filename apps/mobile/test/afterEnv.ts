@@ -6,7 +6,6 @@ import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPus
 import { forgetPushTapsForTest } from '../src/features/notifications/pushTaps';
 import { forgetOnlineAccount } from '../src/features/online/accountHint';
 import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
-import { forgetRevealedRollsForTest } from '../src/features/online/hiddenRoll';
 
 import { resetOnlineFake } from './onlineFake';
 
@@ -23,8 +22,6 @@ beforeEach(() => {
   resetOnlineFake();
   forgetDevGamesForTest();
   forgetOnlineAccount();
-  // Online rolls shown so far (#347): each test rolls its own.
-  forgetRevealedRollsForTest();
   // Turn notifications (#285): a new instance on the reset fakes, and no tap opened yet.
   resetTurnPushesForTest();
   forgetPushTapsForTest();

@@ -17,12 +17,13 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { SectionTitle } from '@/components/SectionCard';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 import { OnlineGameList } from '@/features/online/OnlineGameList';
 import { useMyOnlineGames } from '@/features/online/myGames';
 
 import { dateLocale, onlineHistoryRow } from './format';
-import { MatchList, SectionTitle } from './MatchList';
+import { MatchList } from './MatchList';
 
 export interface OnlineHistoryProps {
   auth: AuthProvider | undefined;

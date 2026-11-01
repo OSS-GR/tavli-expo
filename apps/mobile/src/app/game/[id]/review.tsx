@@ -47,8 +47,13 @@ export default function ReviewRoute() {
   if (!over) return <Redirect href={gameHref(opened.id)} />;
   return (
     <>
-      <Stack.Screen options={{ title: t('review.title') }} />
-      <ReviewScreen setup={opened.setup} flow={opened.flow} />
+      {/* The screen draws its own header (#362). */}
+      <Stack.Screen options={{ title: t('review.title'), headerShown: false }} />
+      <ReviewScreen
+        setup={opened.setup}
+        flow={opened.flow}
+        onBack={() => (router.canGoBack() ? router.back() : goHome())}
+      />
     </>
   );
 }

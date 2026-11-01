@@ -8,6 +8,7 @@ import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
 import { act, screen } from '@testing-library/react-native';
 import { AccessibilityInfo, Share } from 'react-native';
+import * as Reanimated from 'react-native-reanimated';
 
 import i18n from '@/i18n';
 
@@ -399,6 +400,25 @@ describe('InviteWaitScreen', () => {
     });
     await flush();
     expect(stops).toHaveLength(2);
+  });
+
+  it('pulses the waiting dot, and keeps it still with reduce motion (#358)', async () => {
+    const repeat = jest.spyOn(Reanimated, 'withRepeat');
+    const { code, mine } = setup();
+    const first = await openWait(code, mine);
+    await screen.findByRole('header', { name: 'Send the invite' });
+    expect(screen.getByLabelText(`Link: tavlaki://invite/${code}`)).toBeOnTheScreen();
+    expect(screen.getByTestId('invite-wait-dot', { includeHiddenElements: true })).toBeTruthy();
+    expect(repeat).toHaveBeenCalledWith(expect.anything(), -1, true);
+    await first.unmount();
+
+    repeat.mockClear();
+    const still = jest.spyOn(Reanimated, 'useReducedMotion').mockReturnValue(true);
+    await openWait(code, mine);
+    await screen.findByRole('header', { name: 'Send the invite' });
+    expect(repeat).not.toHaveBeenCalled();
+    still.mockRestore();
+    repeat.mockRestore();
   });
 
   it('shows Greek', async () => {
