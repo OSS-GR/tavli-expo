@@ -16,9 +16,11 @@ import {
   eventActor,
   matchStatus,
   nextDeadline,
+  rollDeadline,
   scheduledCheck,
 } from './calls';
-import { OnlineGameError, createOnlineMatch, resign } from './online-game';
+import { OnlineGameError, createOnlineMatch, resign, rollDice } from './online-game';
+import { closedOut } from './testing';
 
 const PLAYERS = { white: 'alice', black: 'bob' };
 const GAME = { players: PLAYERS, version: 3, status: 'active', turnDeadline: 1000 } as const;
@@ -116,12 +118,28 @@ describe('turn deadline checks', () => {
     expect(matchStatus(done)).toBe('finished');
     expect(nextDeadline(1, done, 10)).toBeNull();
   });
+
+  it('rollDeadline: a roll keeps the turn deadline; a pass starts a new turn time (#355)', () => {
+    const rng = createSeededRng(1);
+    const match = createOnlineMatch({ choice: 'portes', targetPoints: 1, players: PLAYERS }, rng);
+    // The server still waits for the roller (a roll they can play).
+    const roller = match.game.state.toMove;
+    expect(rollDeadline(GAME, 1, roller, match, 10)).toBe(1000);
+    // A roll with no legal move: the wait moves to Black, who gets a full turn.
+    const passed = rollDice(closedOut(match), 'white', rng);
+    expect(rollDeadline(GAME, 1, 'white', passed, 10)).toBe(10 + 60_000);
+    expect(rollDeadline(GAME, null, 'white', passed, 10)).toBe(10 + ASYNC_TURN_TIME_MS);
+    // No deadline saved before: a full turn time.
+    expect(rollDeadline({ ...GAME, turnDeadline: null }, 1, roller, match, 10)).toBe(10 + 60_000);
+  });
 });
 
 describe('eventActor', () => {
   it('marks server steps with the server id, and player steps with the caller', () => {
-    expect(eventActor({ type: 'roll', player: 'white' }, 'alice')).toBe(SERVER_ACTOR);
+    expect(eventActor({ type: 'rollOpening', player: 'white' }, 'alice')).toBe(SERVER_ACTOR);
     expect(eventActor({ type: 'timeout', player: 'white' }, 'alice')).toBe(SERVER_ACTOR);
+    // The player asks for each roll (#355), so the roll is the player's step.
+    expect(eventActor({ type: 'roll', player: 'white' }, 'alice')).toBe('alice');
     expect(eventActor({ type: 'nextGame' }, 'alice')).toBe(SERVER_ACTOR);
     expect(eventActor({ type: 'confirm', player: 'white' }, 'alice')).toBe('alice');
     expect(eventActor({ type: 'resignMatch', player: 'black' }, 'bob')).toBe('bob');

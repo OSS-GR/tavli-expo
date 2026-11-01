@@ -284,6 +284,7 @@ describe('function references', () => {
   it('the adapter names the functions of the server api', () => {
     expect(GAME_FUNCTION_NAMES).toEqual({
       getGame: getFunctionName(api.games.getGame),
+      rollDice: getFunctionName(api.games.rollDice),
       makeMove: getFunctionName(api.games.makeMove),
       answer: getFunctionName(api.games.answer),
       resign: getFunctionName(api.games.resign),
@@ -297,6 +298,7 @@ describe('function references', () => {
   it('the server takes the adapter arguments and returns what the adapter expects', () => {
     type Api = typeof api.games;
     expectType<Extends<WithGameId<GameFunctions['getGame']>, FunctionArgs<Api['getGame']>>>();
+    expectType<Extends<WithGameId<GameFunctions['rollDice']>, FunctionArgs<Api['rollDice']>>>();
     expectType<Extends<WithGameId<GameFunctions['makeMove']>, FunctionArgs<Api['makeMove']>>>();
     expectType<Extends<WithGameId<GameFunctions['answer']>, FunctionArgs<Api['answer']>>>();
     expectType<Extends<WithGameId<GameFunctions['resign']>, FunctionArgs<Api['resign']>>>();
@@ -305,6 +307,9 @@ describe('function references', () => {
     >();
     expectType<
       Extends<FunctionReturnType<Api['getGame']>, FunctionReturnType<GameFunctions['getGame']>>
+    >();
+    expectType<
+      Extends<FunctionReturnType<Api['rollDice']>, FunctionReturnType<GameFunctions['rollDice']>>
     >();
     expectType<
       Extends<FunctionReturnType<Api['makeMove']>, FunctionReturnType<GameFunctions['makeMove']>>

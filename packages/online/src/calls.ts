@@ -18,10 +18,13 @@ import { OnlineGameError, deadlineAfter, isTimedOut, sideOf } from './online-gam
 /** The `actor` of the log events that the server plays itself. No player may use this id. */
 export const SERVER_ACTOR = 'server';
 
+/**
+ * A player's `roll` is theirs (#355): they asked for it, and the server
+ * rolled it with its RNG. The opening roll stays a server step.
+ */
 const SERVER_EVENTS: ReadonlySet<FlowEvent['type']> = new Set([
   'start',
   'rollOpening',
-  'roll',
   'nextGame',
   'timeout',
 ]);
@@ -103,7 +106,7 @@ export function checkViewer<G extends SavedGame>(game: G | null, callerId: strin
 }
 
 /**
- * True when a player's move or answer comes too late: the match runs and
+ * True when a player's roll, move or answer comes too late: the match runs and
  * its turn deadline has passed at `now`. Then the server saves the time
  * out instead of the call, and the call gets `TIMED_OUT_ERROR`.
  */
@@ -151,4 +154,28 @@ export function nextDeadline(
   now: number,
 ): number | null {
   return matchStatus(flow) === 'finished' ? null : deadlineAfter(turnTimeMinutes, now);
+}
+
+/**
+ * The turn deadline to save after `side` rolled (#355). The roll is part
+ * of the turn, so it gets no new time. A roll they can play keeps
+ * `turnDeadline`. A roll with no legal move is a pass: `game.lastTurn` is
+ * that roll, with no moves. The next turn then gets a full turn time from
+ * `now` (`nextDeadline`), also if a rule ever gives it to the same side.
+ */
+export function rollDeadline(
+  game: SavedGame,
+  turnTimeMinutes: number | null,
+  side: PlayerId,
+  flow: MatchFlow,
+  now: number,
+): number | null {
+  const last = flow.game.lastTurn;
+  const passed =
+    flow.game.phase === 'awaiting-roll' &&
+    last !== null &&
+    last.player === side &&
+    last.moves.length === 0;
+  if (game.turnDeadline !== null && !passed) return game.turnDeadline;
+  return nextDeadline(turnTimeMinutes, flow, now);
 }

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { ASYNC_TURN_TIME_MS, ONLINE_GAME_CHOICES } from '@tavli/contracts';
 import type { OnlineGameChoice } from '@tavli/contracts';
 import { createSeededRng, getPreset, matchPhase, replay } from '@tavli/engine';
-import type { FlowEvent, MatchFlow, Rng } from '@tavli/engine';
+import type { FlowEvent, MatchFlow, PlayerId, Rng } from '@tavli/engine';
 
 import {
   OnlineGameError,
@@ -19,6 +19,7 @@ import {
   onlineGameRules,
   playTurn,
   resign,
+  rollDice,
   sideOf,
   storeFlow,
   storeStep,
@@ -26,7 +27,8 @@ import {
   toView,
   waitingFor,
 } from './online-game';
-import { lastBearOff, pickChoice, pickTurn } from './testing';
+import { closedOut, lastBearOff, pickChoice, pickTurn } from './testing';
+import type { LoadedFlow } from './online-game';
 
 const PLAYERS = { white: 'alice', black: 'bob' };
 
@@ -61,6 +63,21 @@ function code(step: () => unknown): string {
   throw new Error('no error');
 }
 
+/**
+ * Rolls for the player the server waits for until a roll can be played
+ * (a roll with no legal move passes to the other player). Each roll is
+ * saved like the server saves it.
+ */
+function untilMoving(loaded: LoadedFlow, rng: Rng): LoadedFlow {
+  let next = loaded;
+  for (let i = 0; i < 20 && next.flow.game.phase === 'awaiting-roll'; i++) {
+    const side = waitingFor(next.flow) as PlayerId;
+    next = loadStored(storeStep(next, rollDice(next.flow, side, rng)));
+  }
+  if (next.flow.game.phase !== 'moving') throw new Error(`still ${next.flow.game.phase}`);
+  return next;
+}
+
 /** Plays a whole match with random legal turns and answers. Returns every event. */
 function playMatch(choice: OnlineGameChoice, seed: number, targetPoints: number) {
   const { flow: first, rng } = create(choice, seed, targetPoints);
@@ -71,10 +88,13 @@ function playMatch(choice: OnlineGameChoice, seed: number, targetPoints: number)
     const side = waitingFor(flow);
     if (side === null) throw new Error('nobody to wait for');
     const view = toView({ ...VIEW, version: i, choice, flow });
-    flow =
-      view.prompt === null
-        ? playTurn(stored(flow), side, pickTurn(flow.game, picker), rng)
-        : answerPrompt(stored(flow), side, pickChoice(view.prompt.choices, picker), rng);
+    if (view.prompt !== null) {
+      flow = answerPrompt(stored(flow), side, pickChoice(view.prompt.choices, picker), rng);
+    } else if (flow.game.phase === 'awaiting-roll') {
+      flow = rollDice(stored(flow), side, rng);
+    } else {
+      flow = playTurn(stored(flow), side, pickTurn(flow.game, picker), rng);
+    }
     events.push(...flow.log);
   }
   return { flow, events };
@@ -150,16 +170,28 @@ describe('createOnlineMatch', () => {
 });
 
 describe('playTurn', () => {
-  it('plays a full turn, then the server rolls for the other player', () => {
+  it('plays a full turn, then waits for the other player to roll (#355)', () => {
     const { flow, rng } = create();
     const side = flow.game.state.toMove;
     const moves = pickTurn(flow.game, createSeededRng(9));
     const next = playTurn(stored(flow), side, moves, rng);
     const types = next.log.map((e) => e.type);
-    expect(types.slice(0, moves.length + 1)).toEqual([...moves.map(() => 'move'), 'confirm']);
-    expect(types).toContain('roll');
+    expect(types).toEqual([...moves.map(() => 'move'), 'confirm']);
+    expect(next.game.phase).toBe('awaiting-roll');
+    expect(next.game.state.dice).toBeNull();
+    expect(next.game.state.toMove).not.toBe(side);
+    expect(waitingFor(next)).toBe(next.game.state.toMove);
     expect(next.game.lastTurn?.player).toBe(side);
     expect(next.game.played).toEqual([]);
+  });
+
+  it('rejects a turn before the roll', () => {
+    const { flow, rng } = create();
+    const side = flow.game.state.toMove;
+    const next = playTurn(stored(flow), side, pickTurn(flow.game, createSeededRng(9)), rng);
+    const roller = next.game.state.toMove;
+    expect(code(() => playTurn(next, roller, [], rng))).toBe('ILLEGAL_ACTION');
+    expect(code(() => playTurn(next, side, [], rng))).toBe('NOT_YOUR_TURN');
   });
 
   it('rejects the player who is not to move', () => {
@@ -180,6 +212,62 @@ describe('playTurn', () => {
     expect(code(() => playTurn(flow, side, moves.slice(0, 1), rng))).toBe('ILLEGAL_MOVE');
     expect(code(() => playTurn(flow, side, [], rng))).toBe('ILLEGAL_MOVE');
     expect(code(() => playTurn(flow, side, [...moves, ...moves], rng))).toBe('ILLEGAL_ACTION');
+  });
+});
+
+describe('rollDice (#355)', () => {
+  /** A flow where the server waits for a roll, after the first turn. */
+  function awaitingRoll() {
+    const { flow, rng } = create('portes', 1, 5);
+    const side = flow.game.state.toMove;
+    const next = playTurn(stored(flow), side, pickTurn(flow.game, createSeededRng(9)), rng);
+    return { flow: loadFlow(storeFlow(next, null)), rng, roller: next.game.state.toMove };
+  }
+
+  it('rolls with the server dice for the player the server waits for', () => {
+    const { flow, roller } = awaitingRoll();
+    const values = [2, 4];
+    const dice: Rng = { nextUint32: () => values.shift() ?? 0 };
+    const next = rollDice(flow, roller, dice);
+    expect(next.log[0]).toEqual({ type: 'roll', player: roller, dice: [3, 5] });
+    expect(next.game.state.dice).toEqual([3, 5]);
+    if (next.game.phase === 'moving') {
+      expect(next.game.state.toMove).toBe(roller);
+      expect(waitingFor(next)).toBe(roller);
+    }
+  });
+
+  it('rejects the other player, a second roll, and a roll in a finished match', () => {
+    const { flow, rng, roller } = awaitingRoll();
+    const other = roller === 'white' ? 'black' : 'white';
+    expect(code(() => rollDice(flow, other, rng))).toBe('NOT_YOUR_TURN');
+    const rolled = untilMoving({ flow, previousGame: null }, rng).flow;
+    const mover = rolled.game.state.toMove;
+    expect(code(() => rollDice(rolled, mover, rng))).toBe('ILLEGAL_ACTION');
+    expect(code(() => rollDice(rolled, mover === 'white' ? 'black' : 'white', rng))).toBe(
+      'NOT_YOUR_TURN',
+    );
+    const done = resign(flow, 'white', rng);
+    expect(code(() => rollDice(done, roller, rng))).toBe('GAME_OVER');
+  });
+
+  it('a roll with no legal move passes; the server waits for the other player', () => {
+    const { flow } = create('portes', 1, 5);
+    const stuck = loadFlow(storeFlow(closedOut(flow), null));
+    for (const seed of [1, 2, 3]) {
+      const next = rollDice(stuck, 'white', createSeededRng(seed));
+      expect(next.log[0]).toMatchObject({ type: 'roll', player: 'white' });
+      expect(next.game.phase).toBe('awaiting-roll');
+      expect(next.game.state.toMove).toBe('black');
+      expect(next.game.state.dice).toBeNull();
+      expect(waitingFor(next)).toBe('black');
+      const rolled = (next.log[0] as { dice: readonly number[] }).dice;
+      expect(next.game.lastTurn).toEqual({ player: 'white', dice: rolled, moves: [] });
+      // Both views show the pass in `game.lastTurn`.
+      expect(toView({ ...VIEW, choice: 'portes', flow: next }).game.lastTurn).toEqual(
+        next.game.lastTurn,
+      );
+    }
   });
 });
 
@@ -215,7 +303,9 @@ describe('turn timers (#133)', () => {
     expect(next.match.games[0]?.reason).toBe('timeout');
     expect(next.log[0]).toEqual({ type: 'timeout', player: late });
     expect(next.log.map((e) => e.type)).toContain('nextGame');
-    expect(next.game.phase).toBe('moving');
+    // The next game waits for its first roll (#355).
+    expect(next.game.phase).toBe('awaiting-roll');
+    expect(next.game.state.dice).toBeNull();
     expect(next.match.status).toBe('in-progress');
   });
 
@@ -306,7 +396,7 @@ describe('previousGame (#299)', () => {
     const { before, moves, rng } = lastTurn();
     const next = playTurn(before.flow, 'white', moves, rng);
     expect(next.match.games).toHaveLength(1);
-    expect(next.game.phase).toBe('moving');
+    expect(next.game.phase).toBe('awaiting-roll');
     const ended = next.endedGame;
     expect(ended?.phase).toBe('game-over');
     expect(ended?.result).toMatchObject({ winner: 'white', points: 1 });
@@ -325,14 +415,16 @@ describe('previousGame (#299)', () => {
     const first = loadStored(storeStep(before, playTurn(before.flow, 'white', moves, rng)));
     const ended = first.previousGame;
     expect(ended?.phase).toBe('game-over');
+    const rolled = untilMoving(first, rng);
+    expect(rolled.previousGame).toEqual(ended);
     const step = playTurn(
-      first.flow,
-      first.flow.game.state.toMove,
-      pickTurn(first.flow.game, rng),
+      rolled.flow,
+      rolled.flow.game.state.toMove,
+      pickTurn(rolled.flow.game, rng),
       rng,
     );
     expect(step.endedGame).toBeNull();
-    const late = loadStored(storeStep(first, step));
+    const late = loadStored(storeStep(rolled, step));
     expect(late.previousGame).toEqual(ended);
     // A time out ends the second game: it takes the place of the first.
     const second = loadStored(storeStep(late, timeOut(late.flow, rng))).previousGame;
