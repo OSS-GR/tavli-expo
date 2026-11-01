@@ -78,6 +78,7 @@ export function lazyAuthProvider(get: () => AuthProvider): AuthProvider {
 export function lazyGameTransport(get: () => GameTransport): GameTransport {
   return {
     subscribe: (gameId, onView, onError) => get().subscribe(gameId, onView, onError),
+    rollDice: (request) => get().rollDice(request),
     sendTurn: (request) => get().sendTurn(request),
     sendAnswer: (request) => get().sendAnswer(request),
     resign: (gameId) => get().resign(gameId),

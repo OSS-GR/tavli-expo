@@ -62,6 +62,7 @@ export type {
   OnlineGameChoice,
   OnlineGameStatus,
   OnlineGameView,
+  RollDiceRequest,
   SendAnswerRequest,
   SendTurnRequest,
 } from './game-transport';

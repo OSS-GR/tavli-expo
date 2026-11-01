@@ -9,9 +9,12 @@
  * a seeded one.
  *
  * The server keeps a game at rest in a phase where it waits for a player:
- * `moving` (a player must play their roll) or `awaiting-answer` (a variant
- * question). Rolls, passes and the start of the next game happen on the
- * server, in `advance`.
+ * `awaiting-roll` (a player must roll, #355), `moving` (a player must play
+ * their roll) or `awaiting-answer` (a variant question). The opening roll
+ * and the start of the next game happen on the server, in `advance`. A
+ * player's roll waits for that player (`rollDice`): the server rolls it
+ * with its RNG only then. A roll with no legal move passes in the engine,
+ * and the server then waits for the other player's roll.
  *
  * The stored flow is the engine `MatchFlow` without its log. The log
  * lives apart (on Convex, in the `moves` table), one row per event. A
@@ -185,10 +188,10 @@ function apply(flow: MatchFlow, action: MatchAction, rng: Rng): MatchFlow {
 }
 
 /**
- * Plays every step that needs no player: the opening roll, each roll (a
- * roll with no legal move passes by itself) and the start of the next
- * game. Stops when a player must act or the match is over. The result
- * keeps the game it replaced with the next one (`endedGame`).
+ * Plays every step that needs no player: the opening roll and the start of
+ * the next game. Stops when a player must act (roll, move or answer) or
+ * the match is over. A player's roll waits for them (`rollDice`, #355).
+ * The result keeps the game it replaced with the next one (`endedGame`).
  */
 export function advance(flow: MatchFlow, rng: Rng): SteppedFlow {
   let next = flow;
@@ -212,9 +215,6 @@ export function advance(flow: MatchFlow, rng: Rng): SteppedFlow {
         next = apply(next, { type: 'rollOpening', player }, rng);
         break;
       }
-      case 'awaiting-roll':
-        next = apply(next, { type: 'roll', player: game.state.toMove }, rng);
-        break;
       default:
         return done();
     }
@@ -230,7 +230,8 @@ export interface CreateOnlineMatchOptions {
 }
 
 /**
- * A new match, advanced to the first roll. `flow.log` holds every event so
+ * A new match, with the opening rolled. The first player then plays the
+ * opening dice (`useOpeningDice`) or rolls. `flow.log` holds every event so
  * far. Save it with `storeFlow(flow, null)`: no game ended before it.
  */
 export function createOnlineMatch(options: CreateOnlineMatchOptions, rng: Rng): MatchFlow {
@@ -263,8 +264,28 @@ export function waitingFor(flow: MatchFlow): PlayerId | null {
 }
 
 /**
+ * `player` rolls the dice of their turn (#355), with `rng` (on Convex the
+ * secure RNG). Only the player to move, in `awaiting-roll`. A roll with no
+ * legal move passes in the engine: `game.lastTurn` keeps its dice, and the
+ * server waits for the other player's roll.
+ */
+export function rollDice(flow: MatchFlow, player: PlayerId, rng: Rng): SteppedFlow {
+  checkActive(flow);
+  const { game } = flow;
+  if (game.phase !== 'awaiting-roll') {
+    fail(
+      waitingFor(flow) === player ? 'ILLEGAL_ACTION' : 'NOT_YOUR_TURN',
+      `no roll in phase ${game.phase}`,
+    );
+  }
+  if (game.state.toMove !== player) fail('NOT_YOUR_TURN', `it is ${game.state.toMove}'s roll`);
+  return advance(apply(flow, { type: 'roll', player }, rng), rng);
+}
+
+/**
  * `player` plays one full turn: every move for the current roll. The
- * turn must be complete (a full legal play). Then the server rolls on.
+ * turn must be complete (a full legal play). Then the server waits for
+ * the next roll.
  */
 export function playTurn(
   flow: MatchFlow,
@@ -279,8 +300,13 @@ export function playTurn(
       'a question waits for its answer',
     );
   }
-  if (flow.game.phase !== 'moving')
-    fail('ILLEGAL_ACTION', `no turn to play in phase ${flow.game.phase}`);
+  if (flow.game.phase !== 'moving') {
+    // `awaiting-roll`: roll first (#355).
+    fail(
+      waitingFor(flow) === player ? 'ILLEGAL_ACTION' : 'NOT_YOUR_TURN',
+      `no turn to play in phase ${flow.game.phase}`,
+    );
+  }
   if (flow.game.state.toMove !== player)
     fail('NOT_YOUR_TURN', `it is ${flow.game.state.toMove}'s turn`);
   let next = flow;
@@ -332,7 +358,7 @@ export function isTimedOut(deadline: number | null, now: number): boolean {
 /**
  * The player the server waits for ran out of time: they lose the current
  * game (engine action `timeout`, scored like a resign of that game). Then
- * the server rolls on: the next game starts, or the match ends.
+ * the server goes on: the next game starts, or the match ends.
  */
 export function timeOut(flow: MatchFlow, rng: Rng): SteppedFlow {
   checkActive(flow);
@@ -359,7 +385,7 @@ export interface ViewInput {
 
 /**
  * What a client may see. The flow never holds future dice (the server
- * rolls each roll when its turn starts), and nothing about the RNG.
+ * rolls each roll when its player asks, #355), and nothing about the RNG.
  */
 export function toView(input: ViewInput): OnlineGameView {
   const { gameId, version, choice, turnTimeMinutes, turnDeadline, players, flow, previousGame } =
