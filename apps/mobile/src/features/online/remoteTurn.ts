@@ -49,9 +49,7 @@ function sameBoard(a: BoardState, b: BoardState): boolean {
 export function remoteTurn(before: MatchFlow, after: MatchFlow, me: PlayerId): RemoteTurn | null {
   const last = after.game.lastTurn;
   if (last === null || last.player === me || last.moves.length === 0) return null;
-  // Their turn under way, or (after a pass you rolled, #347) before their roll.
-  const started = before.game.phase === 'moving' || before.game.phase === 'awaiting-roll';
-  if (!started || before.game.state.toMove !== last.player) return null;
+  if (before.game.phase !== 'moving' || before.game.state.toMove !== last.player) return null;
   const start = currentBoard(before.game);
   const direction = after.game.state.rules.movement.direction;
   let board = start;

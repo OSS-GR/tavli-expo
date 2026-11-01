@@ -177,8 +177,8 @@ export function onlinePassLine(
  * opening roll (the server does both) are read too. The game screen keys
  * the text on the game and the view's version, so each view is read once.
  * When the phone holds back your roll (#347), the turn waits for it:
- * "Opponent played: …. Your turn." A pass before it has its card, which
- * reads itself.
+ * "Opponent played: …. Your turn." The other player's pass before it has
+ * its card, which reads itself.
  * Your own moves on the phone are not read again: the text goes once you
  * move, and comes back with the same key after an undo.
  */

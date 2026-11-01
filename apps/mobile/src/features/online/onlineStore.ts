@@ -104,8 +104,8 @@ export interface OnlineStoreState {
   readonly loadError: OnlineLoadError | null;
   /**
    * True while the flow holds back your new roll (`hideRolls`, #347): it
-   * waits for a `roll` action, which shows the server's dice. For a pass
-   * the server waits for the other player meanwhile.
+   * waits for a `roll` action, which shows the server's dice. Move, undo
+   * and confirm do nothing meanwhile (no refusal: `refusals` stays).
    */
   readonly rollWaits: boolean;
   /**
@@ -179,12 +179,13 @@ export function createOnlineStore({
   hideRolls = false,
 }: OnlineStoreOptions): OnlineStore {
   let disposed = false;
-  /** Your new roll in the newest view (`hideRolls`), shown or not. */
-  let roll: NewRoll | null = null;
+  /** Your new roll in `view` to hold back (`hideRolls`), shown or not. */
+  const rollOf = (view: OnlineGameView, side: PlayerId | null): NewRoll | null =>
+    hideRolls && side !== null ? newRoll(view, side) : null;
   /** The flow of `view`: your new roll hidden until you roll. */
-  const flowOf = (view: OnlineGameView): MatchFlow => {
+  const flowOf = (view: OnlineGameView, roll: NewRoll | null): MatchFlow => {
     if (roll === null) return viewFlow(view);
-    return wasRevealed(gameId, roll) ? revealedFlow(view, roll) : hiddenFlow(view, roll);
+    return wasRevealed(gameId, roll) ? revealedFlow(view, roll) : hiddenFlow(view);
   };
   /** True while a call waits for the server. */
   let inFlight = false;
@@ -203,6 +204,15 @@ export function createOnlineStore({
     };
 
     /** Runs `action` through the engine. `null` (and `lastError`) when it refuses. */
+    /**
+     * A move, undo or confirm before you rolled: nothing happens, with no
+     * "invalid move" feedback (a local game ignores a tap before the roll).
+     */
+    const rollFirst = (): false => {
+      set({ lastError: 'roll first' });
+      return false;
+    };
+
     const engine = (flow: MatchFlow, action: MatchAction): MatchFlow | null => {
       try {
         return applyMatchAction(flow, action);
@@ -215,8 +225,8 @@ export function createOnlineStore({
 
     /** The flow of the newest view: your local moves are dropped. */
     const fresh = (): MatchFlow | null => {
-      const { view } = get();
-      return view === null ? null : flowOf(view);
+      const { view, side } = get();
+      return view === null ? null : flowOf(view, rollOf(view, side));
     };
 
     const failed = (error: unknown) => {
@@ -317,8 +327,9 @@ export function createOnlineStore({
 
         switch (action.type) {
           case 'roll': {
-            // Shows the server's dice: the phone never picks one.
-            if (roll === null) return refuse('there is no roll to show');
+            // Shows the server's dice of this view: the phone never picks one.
+            const roll = rollOf(view, side);
+            if (roll === null || !get().rollWaits) return refuse('there is no roll to show');
             if (action.dice !== undefined) return refuse('the server rolled the dice');
             revealRoll(gameId, roll);
             set({ flow: revealedFlow(view, roll), rollWaits: false, lastError: null });
@@ -331,7 +342,7 @@ export function createOnlineStore({
             return refuse('online, you resign the whole match');
           case 'move':
           case 'undo': {
-            if (get().rollWaits) return refuse('roll first');
+            if (get().rollWaits) return rollFirst();
             if (view.waitingFor !== side) return refuse('it is not your turn');
             // Auto confirm is done here, by sending the turn, not by the engine.
             const local: MatchAction =
@@ -349,7 +360,7 @@ export function createOnlineStore({
             return true;
           }
           case 'confirm':
-            if (get().rollWaits) return refuse('roll first');
+            if (get().rollWaits) return rollFirst();
             if (view.waitingFor !== side) return refuse('it is not your turn');
             // The engine checks that the turn is complete; its result is not kept.
             if (engine(flow, action) === null) return false;
@@ -392,10 +403,10 @@ export function createOnlineStore({
     const done = !inFlight && sentOn !== null && view.version > sentOn;
     if (done) sentOn = null;
     const side = sideOf(view.players, me);
-    roll = hideRolls && side !== null ? newRoll(view, side, current) : null;
+    const roll = rollOf(view, side);
     store.setState({
       view,
-      flow: flowOf(view),
+      flow: flowOf(view, roll),
       side,
       rollWaits: roll !== null && !wasRevealed(gameId, roll),
       loadError: null,

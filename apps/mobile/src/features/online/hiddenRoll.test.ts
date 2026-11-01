@@ -6,8 +6,6 @@ import { createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
 import { pickTurn } from '@tavli/online/testing';
 
-import { passNotice } from '@/features/game/turnNotices';
-
 import { newRoll, revealRoll, wasRevealed } from './hiddenRoll';
 import { createOnlineStore, viewFlow, type OnlineStore } from './onlineStore';
 
@@ -158,30 +156,58 @@ describe('the online store holds back your roll (#347)', () => {
     expect(again.getState().flow!.log).toEqual([{ type: 'roll', player: 'white', dice: [4, 2] }]);
   });
 
-  it('holds back a roll with no legal move, then shows the pass', async () => {
-    const { storeFor, calls } = setup(whitePassed);
+  it('does not hold back a roll with no legal move: the pass shows as before', async () => {
+    const { storeFor } = setup(whitePassed);
     const alice = storeFor(ALICE);
     await flush();
     const view = viewOf(alice);
     // The server passed your 6-6 and waits for the other player.
     expect(view.waitingFor).toBe('black');
     expect(view.game.lastTurn).toEqual({ player: 'white', dice: [6, 6], moves: [] });
-    expect(alice.getState().rollWaits).toBe(true);
-    const hidden = alice.getState().flow!;
-    expect(hidden.game.phase).toBe('awaiting-roll');
-    expect(hidden.game.state.toMove).toBe('white');
-    expect(hidden.game.state.dice).toBeNull();
-    expect(hidden.game.lastTurn).toBeNull();
-    expect(passNotice(hidden)).toBeNull();
+    expect(alice.getState().rollWaits).toBe(false);
+    expect(alice.getState().flow!.game).toEqual(view.game);
+    expect(alice.getState().dispatch({ type: 'roll', player: 'white' })).toBe(false);
+  });
 
-    // Roll shows the pass as a local game does: the pass card's flow.
+  it('ignores a move or confirm before the roll, with no refusal', async () => {
+    const { storeFor } = setup((flow) => whiteRolled(flow, [5, 3]));
+    const alice = storeFor(ALICE);
+    await flush();
+    const { dispatch } = alice.getState();
+    const refusals = alice.getState().refusals;
+    expect(dispatch({ type: 'move', player: 'white', move: { from: 13, to: 8, die: 5 } })).toBe(
+      false,
+    );
+    expect(dispatch({ type: 'undo', player: 'white' })).toBe(false);
+    expect(dispatch({ type: 'confirm', player: 'white' })).toBe(false);
+    // No "invalid move" feedback: the board reads `refusals`.
+    expect(alice.getState().refusals).toBe(refusals);
+    expect(alice.getState().rollWaits).toBe(true);
+  });
+
+  it('shows the roll of the newest view', async () => {
+    const { server, gameId } = setup((flow) => whiteRolled(flow, [5, 3]));
+    const first = server.getGame(gameId)!;
+    // A transport that hands the views over by hand.
+    let send: (view: OnlineGameView) => void = () => undefined;
+    const transport: GameTransport = {
+      ...server.transportFor(ALICE),
+      subscribe: (_id, onView) => {
+        send = onView;
+        return () => undefined;
+      },
+    };
+    const alice = createOnlineStore({ transport, gameId, me: ALICE, hideRolls: true });
+    open.push(alice);
+    send(first);
+    expect(alice.getState().rollWaits).toBe(true);
+    // A newer view with another roll replaces the waiting one.
+    const next = whiteRolled(viewFlow(first), [6, 1]);
+    send({ ...first, version: first.version + 1, game: next.game });
+    expect(alice.getState().rollWaits).toBe(true);
     expect(alice.getState().dispatch({ type: 'roll', player: 'white' })).toBe(true);
-    const shown = alice.getState().flow!;
-    expect(shown.game.phase).toBe('awaiting-roll');
-    expect(shown.game.state.toMove).toBe('black');
-    expect(passNotice(shown)).toEqual(expect.objectContaining({ player: 'white', dice: [6, 6] }));
-    expect(shown.log).toEqual([{ type: 'roll', player: 'white', dice: [6, 6] }]);
-    expect(calls).toEqual([]);
+    expect(alice.getState().flow!.log).toEqual([{ type: 'roll', player: 'white', dice: [6, 1] }]);
+    expect(alice.getState().flow!.game.state.dice).toEqual([6, 1]);
   });
 
   it('plays at once without `hideRolls` (the online bot)', async () => {
@@ -201,46 +227,45 @@ describe('newRoll', () => {
   const flow = whiteRolled(viewFlow(base), [5, 3]);
   const yours: OnlineGameView = { ...base, game: flow.game, waitingFor: 'white' };
 
-  it('names your roll by its game and turn', () => {
-    expect(newRoll(yours, 'white', null)).toEqual({
-      kind: 'turn',
+  it('names your roll by the view that brought it', () => {
+    expect(newRoll(yours, 'white')).toEqual({
       player: 'white',
       dice: [5, 3],
-      key: '0:1',
+      version: yours.version,
     });
-    expect(newRoll(yours, 'black', null)).toBeNull();
+    expect(newRoll(yours, 'black')).toBeNull();
   });
 
   it('is null for a question, a finished match and a chosen double', () => {
     expect(
-      newRoll({ ...yours, prompt: { player: 'white', kind: 'x', choices: [] } }, 'white', null),
+      newRoll({ ...yours, prompt: { player: 'white', kind: 'x', choices: [] } }, 'white'),
     ).toBeNull();
-    expect(newRoll({ ...yours, status: 'finished' }, 'white', null)).toBeNull();
+    expect(newRoll({ ...yours, status: 'finished' }, 'white')).toBeNull();
     const chosen = {
       ...yours.game,
       state: { ...yours.game.state, variantData: { chosenDouble: 4 } },
     };
-    expect(newRoll({ ...yours, game: chosen }, 'white', null)).toBeNull();
+    expect(newRoll({ ...yours, game: chosen }, 'white')).toBeNull();
   });
 
-  it('is null for a pass right after you chose a double', () => {
+  it('is null for a pass and for the opening dice', () => {
     const passed = whitePassed(viewFlow(base));
-    const pass: OnlineGameView = { ...base, game: passed.game, waitingFor: 'black' };
-    expect(newRoll(pass, 'white', null)).toEqual(
-      expect.objectContaining({ kind: 'pass', dice: [6, 6], key: '0:9' }),
-    );
-    const asked: OnlineGameView = {
-      ...base,
-      prompt: { player: 'white', kind: 'x', choices: [] },
-    };
-    expect(newRoll(pass, 'white', asked)).toBeNull();
+    expect(newRoll({ ...base, game: passed.game, waitingFor: 'black' }, 'white')).toBeNull();
+    // The starter plays the opening dice: nobody rolled them this turn.
+    const opening = base.game;
+    expect(opening.lastTurn).toBeNull();
+    expect(opening.opening).not.toBeNull();
+    const starter = opening.state.toMove;
+    expect(newRoll({ ...base, waitingFor: starter }, starter)).toBeNull();
   });
 
-  it('remembers the rolls shown per game', () => {
-    const roll = newRoll(yours, 'white', null)!;
+  it('remembers every roll shown per game', () => {
+    const roll = newRoll(yours, 'white')!;
     expect(wasRevealed('other-game', roll)).toBe(false);
     revealRoll('other-game', roll);
+    revealRoll('other-game', { ...roll, version: roll.version + 2 });
     expect(wasRevealed('other-game', roll)).toBe(true);
-    expect(wasRevealed('other-game', { ...roll, key: '0:3' })).toBe(false);
+    expect(wasRevealed('other-game', { ...roll, version: roll.version + 2 })).toBe(true);
+    expect(wasRevealed('other-game', { ...roll, version: roll.version + 1 })).toBe(false);
   });
 });

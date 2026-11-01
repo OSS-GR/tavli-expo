@@ -10,22 +10,22 @@
  * the roll in the log, so the throw, the sound and the screen reader text
  * are those of a local roll. The phone never picks or changes a die.
  *
- * Two kinds of new roll:
- * - `turn`: the server waits for you to move with these dice.
- * - `pass`: the dice had no legal move, so the server passed your turn
- *   and the other player is on. Rolling shows the pass card, as offline.
- *
- * Not held back: the opening dice (the server rolls the opening; the
+ * Only a roll you can play is held back: a view where the server waits
+ * for you to move (`moving`, you to move, dice set). A roll with no legal
+ * move is not: the server passed it already and the other player is on,
+ * so the screen shows the pass with your dice at once, as before. Not
+ * held back either: the opening dice (the server rolls the opening; the
  * starter plays them, `useOpeningDice`), a double chosen after a 1-2 (no
  * roll, Asodio), and the other player's rolls.
  *
- * Once a roll is shown, it stays shown for the rest of the app run, also
- * when the screen opens again (`revealRoll`): you never roll twice for one
- * turn. The memory is not saved, so after a restart the phone asks once
- * more; the dice are the same.
+ * A roll is named by the view's `version`: the server saves a new version
+ * when it rolls, and the next change of the game is your turn. Once a roll
+ * is shown, it stays shown for the rest of the app run, also when the
+ * screen opens again (`revealRoll`): you never roll twice for one turn.
+ * The memory is not saved, so after a restart the phone asks once more;
+ * the dice are the same.
  */
 import {
-  isDouble,
   MATCH_FLOW_SCHEMA_VERSION,
   type Dice,
   type GameFlow,
@@ -38,11 +38,10 @@ import { stateHasChosenDouble } from '@/features/game/announcements';
 
 /** A roll of yours that the server made. */
 export interface NewRoll {
-  readonly kind: 'turn' | 'pass';
   readonly player: PlayerId;
   readonly dice: Dice;
-  /** Names the turn in its game: `<games>:<turn number>`. */
-  readonly key: string;
+  /** The version of the view that brought the roll. */
+  readonly version: number;
 }
 
 /** The starter plays the opening dice: nobody rolled them in this turn. */
@@ -57,75 +56,32 @@ function openingDice(game: GameFlow): boolean {
   );
 }
 
-/**
- * Your new roll in `view`, or `null`. `before` is the view the phone had
- * before it: a pass right after you chose a double (Asodio) is no roll.
- */
-export function newRoll(
-  view: OnlineGameView,
-  side: PlayerId,
-  before: OnlineGameView | null,
-): NewRoll | null {
-  if (view.status !== 'active') return null;
+/** Your new roll in `view`, to hold back, or `null`. */
+export function newRoll(view: OnlineGameView, side: PlayerId): NewRoll | null {
   const { game } = view;
-  const games = view.match.games.length;
   const dice = game.state.dice;
   if (
-    view.waitingFor === side &&
-    view.prompt === null &&
-    game.phase === 'moving' &&
-    game.state.toMove === side &&
-    dice !== null
+    view.status !== 'active' ||
+    view.waitingFor !== side ||
+    view.prompt !== null ||
+    game.phase !== 'moving' ||
+    game.state.toMove !== side ||
+    dice === null ||
+    openingDice(game) ||
+    stateHasChosenDouble(game)
   ) {
-    if (openingDice(game) || stateHasChosenDouble(game)) return null;
-    return { kind: 'turn', player: side, dice, key: `${games}:${game.state.turnNumber}` };
+    return null;
   }
-  const last = game.lastTurn;
-  if (
-    last !== null &&
-    last.player === side &&
-    last.moves.length === 0 &&
-    game.phase !== 'game-over' &&
-    game.state.toMove !== side
-  ) {
-    const chose = before?.prompt?.player === side && isDouble(last.dice);
-    if (chose) return null;
-    // The pass was the turn before the one on now.
-    const turn = Math.max(1, game.state.turnNumber - 1);
-    return { kind: 'pass', player: side, dice: last.dice, key: `${games}:${turn}` };
-  }
-  return null;
+  return { player: side, dice, version: view.version };
 }
 
 function flowOf(view: OnlineGameView, game: GameFlow, log: MatchFlow['log']): MatchFlow {
   return { schemaVersion: MATCH_FLOW_SCHEMA_VERSION, match: view.match, game, log };
 }
 
-/**
- * The board before you roll: the turn waits for your roll, with no dice.
- * For a pass it is the start of the turn you passed: you to move, and no
- * last turn (it would show the pass).
- */
-export function hiddenFlow(view: OnlineGameView, roll: NewRoll): MatchFlow {
+/** The board before you roll: the turn waits for your roll, with no dice. */
+export function hiddenFlow(view: OnlineGameView): MatchFlow {
   const { game } = view;
-  if (roll.kind === 'pass') {
-    return flowOf(
-      view,
-      {
-        ...game,
-        phase: 'awaiting-roll',
-        state: {
-          ...game.state,
-          toMove: roll.player,
-          dice: null,
-          turnNumber: Math.max(1, game.state.turnNumber - 1),
-        },
-        played: [],
-        lastTurn: null,
-      },
-      [],
-    );
-  }
   return flowOf(
     view,
     { ...game, phase: 'awaiting-roll', state: { ...game.state, dice: null } },
@@ -135,34 +91,25 @@ export function hiddenFlow(view: OnlineGameView, roll: NewRoll): MatchFlow {
 
 /**
  * The board after you rolled: the view, with your roll in the log (so the
- * screen plays it as a local roll). For a pass it is the pass as a local
- * game shows it: the other player's turn before their roll, and your
- * pass as the last turn (the pass card).
+ * screen plays it as a local roll).
  */
 export function revealedFlow(view: OnlineGameView, roll: NewRoll): MatchFlow {
-  const log = [{ type: 'roll' as const, player: roll.player, dice: roll.dice }];
-  const { game } = view;
-  if (roll.kind === 'pass') {
-    return flowOf(
-      view,
-      { ...game, phase: 'awaiting-roll', state: { ...game.state, dice: null }, played: [] },
-      log,
-    );
-  }
-  return flowOf(view, game, log);
+  return flowOf(view, view.game, [{ type: 'roll', player: roll.player, dice: roll.dice }]);
 }
 
-/** The last roll shown per game in this app run (game id → `NewRoll.key`). */
-const shown = new Map<string, string>();
+/** The rolls shown per game in this app run (game id to view versions). */
+const shown = new Map<string, Set<number>>();
 
 /** Notes that this app run has shown `roll` of `gameId`. */
 export function revealRoll(gameId: string, roll: NewRoll): void {
-  shown.set(gameId, roll.key);
+  const versions = shown.get(gameId) ?? new Set<number>();
+  versions.add(roll.version);
+  shown.set(gameId, versions);
 }
 
 /** True when this app run has shown `roll` of `gameId` already. */
 export function wasRevealed(gameId: string, roll: NewRoll): boolean {
-  return shown.get(gameId) === roll.key;
+  return shown.get(gameId)?.has(roll.version) ?? false;
 }
 
 /** Forgets every roll shown. For tests (`apps/mobile/test/afterEnv.ts`). */

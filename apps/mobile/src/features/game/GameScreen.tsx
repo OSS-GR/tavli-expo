@@ -42,9 +42,10 @@
  * Online (#255, `online`): the server rolls the dice, passes a roll with no
  * move, and starts the next game by itself. So there is no opening card:
  * a short line says who starts. The online store holds back your own new
- * roll (#347, `features/online/hiddenRoll.ts`): the flow waits for a roll,
- * and the Roll button, a tap or a swipe throws the server's dice as
- * offline; a roll with no move then shows the pass card. The other player is
+ * roll when it has a legal move (#347, `features/online/hiddenRoll.ts`):
+ * the flow waits for a roll, and the Roll button, a tap or a swipe throws
+ * the server's dice as offline. A roll with no legal move is not held
+ * back: the server passed it, and a line shows it. The other player is
  * remote: while the server waits for them the board is locked, and their
  * whole turn arrives at once and flies from `game.lastTurn`. Its sounds,
  * the server's rolls and the game end play from the views
@@ -516,7 +517,7 @@ export function GameScreen({
   const roller = nextOpeningRoller(game);
   // With `rerollBoth` (#207) the starter rolls after the opening result closes.
   // Online the server rolls; the phone only shows your roll when you roll
-  // (#347): the flow waits for it (`awaiting-roll`), and the board is yours.
+  // (#347): the flow waits for it (`awaiting-roll`) on your turn.
   const onlineRoll =
     online !== undefined &&
     !online.locked &&
@@ -928,15 +929,21 @@ export function GameScreen({
   // Online the log is empty: each new view is read once, keyed on its version.
   // A roll you showed on the phone (#347) starts the log: it is read as a
   // local roll ("You rolled 5-3."), and your moves after it are not read.
+  // Its key names the view too: one server roll, read once.
   const announcement =
-    online === undefined || flow.log[0]?.type === 'roll'
+    online === undefined
       ? turnAnnouncement(flow, t, { nameOf, isYou })
-      : online.ended === null
+      : flow.log[0]?.type === 'roll'
         ? (() => {
-            const text = onlineTurnAnnouncement(flow, t, { nameOf, isYou });
-            return text === null ? null : { key: `v${online.version}`, text };
+            const local = turnAnnouncement(flow, t, { nameOf, isYou });
+            return local === null ? null : { ...local, key: `v${online.version}:${local.key}` };
           })()
-        : null;
+        : online.ended === null
+          ? (() => {
+              const text = onlineTurnAnnouncement(flow, t, { nameOf, isYou });
+              return text === null ? null : { key: `v${online.version}`, text };
+            })()
+          : null;
   useAnnouncement(
     announcement?.text ?? null,
     announcement ? `${matchKey}:turn:${announcement.key}` : undefined,

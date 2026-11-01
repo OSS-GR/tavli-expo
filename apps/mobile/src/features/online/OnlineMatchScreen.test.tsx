@@ -479,30 +479,20 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(view(game).game.state.dice).toEqual([5, 3]);
     });
 
-    it('waits for Roll on a roll with no legal move, then shows the pass', async () => {
-      const user = setupUser();
+    it('shows a roll with no legal move at once, as before (no Roll)', async () => {
       // The bot thinks long, so its turn does not come in between.
       const game = await openGame('portes', 1, 5, 30_000, undefined, (server, id) =>
         server.setFlowForTest(id, whitePassed(viewFlow(server.getGame(id)!))),
       );
-      // The server passed your 6-6 and waits for the bot; the phone still
-      // waits for your roll.
-      await wait(500);
+      await wait(100);
+      // The server passed your 6-6 and waits for the bot, which rolled 2-1.
       expect(view(game).waitingFor).toBe('black');
-      expect(screen.queryByTestId('pass-card')).toBeNull();
-      expect(screen.queryByTestId('online-wait')).toBeNull();
-      await user.press(screen.getByTestId('roll-button'));
-
-      // The roll shows the pass card, as offline. OK closes it, and the
-      // phone waits for the bot.
-      const card = screen.getByTestId('pass-card');
-      expect(card).toHaveTextContent(/You rolled 6-6\. No checker can move\./);
-      expect(sounds.played).toContain('diceRoll');
-      await user.press(screen.getByTestId('pass-ok-button'));
-      expect(screen.queryByTestId('pass-card')).toBeNull();
       expect(screen.queryByTestId('roll-button')).toBeNull();
+      expect(screen.getByTestId('online-line')).toHaveTextContent(
+        'You rolled 6-6. No checker can move.',
+      );
       expect(screen.getByTestId('online-wait')).toBeOnTheScreen();
-      expect(view(game).waitingFor).toBe('black');
+      expect(diceLabel()).toMatch(/^Dice 2-1/);
     });
   });
 

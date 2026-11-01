@@ -299,9 +299,8 @@ describe('online announcements (#255)', () => {
     const { view, play } = game();
     while (view().waitingFor !== 'black') await play();
     await play();
-    const roll = newRoll(view(), 'white', null);
-    expect(roll?.kind).toBe('turn');
-    const text = onlineTurnAnnouncement(hiddenFlow(view(), roll!), i18n.t, online);
+    expect(newRoll(view(), 'white')).not.toBeNull();
+    const text = onlineTurnAnnouncement(hiddenFlow(view()), i18n.t, online);
     expect(text).toMatch(/^Opponent played: Checker from point \d+ to point \d+/);
     expect(text).toMatch(/Your turn\.$/);
     expect(text).not.toMatch(/rolled/);
