@@ -176,7 +176,7 @@ describe('Settings → History', () => {
     await act(async () => historyStore.getState().add(RECORDS[0]!));
     await render(<SettingsScreen onHistory={onHistory} />);
 
-    await user.press(screen.getByRole('button', { name: 'Match history ›' }));
+    await user.press(screen.getByRole('button', { name: 'Match history' }));
     expect(onHistory).toHaveBeenCalled();
 
     // Cancel keeps the history.

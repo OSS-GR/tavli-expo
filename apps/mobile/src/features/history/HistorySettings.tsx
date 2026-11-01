@@ -1,13 +1,13 @@
 /**
  * The History rows of Settings (#142): open the history, and clear it
  * after a confirm step. Clearing only deletes the records on this phone.
+ * Both are rows of the History card (#360), with a line between them.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Text } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { RowDivider, SectionRow } from '@/components/SectionCard';
 import { Sheet } from '@/components/Sheet';
 
 import { historyStore, useHistory } from './store';
@@ -24,25 +24,21 @@ export function HistorySettings({ onOpen }: HistorySettingsProps) {
 
   return (
     <>
-      <Pressable
+      <SectionRow
         testID="settings-history"
-        accessibilityRole="button"
+        icon="history"
+        label={t('settings.history.open')}
         onPress={onOpen}
-        style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
-        <Text style={styles.linkText}>{`${t('settings.history.open')} ›`}</Text>
-      </Pressable>
-      <Pressable
+      />
+      <RowDivider />
+      <SectionRow
         testID="settings-clear-history"
-        accessibilityRole="button"
-        accessibilityState={{ disabled: empty }}
+        icon="trash"
+        label={t('settings.history.clear')}
+        hint={empty ? t('settings.history.empty') : undefined}
         disabled={empty}
         onPress={() => setAsking(true)}
-        style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
-        <Text style={[styles.linkText, empty && styles.disabled]}>
-          {t('settings.history.clear')}
-        </Text>
-      </Pressable>
-      {empty ? <Text style={styles.hint}>{t('settings.history.empty')}</Text> : null}
+      />
       <Sheet
         visible={asking}
         onClose={() => setAsking(false)}
@@ -64,25 +60,3 @@ export function HistorySettings({ onOpen }: HistorySettingsProps) {
     </>
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  link: {
-    minHeight: theme.touch.row,
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  linkText: {
-    ...theme.type.body,
-    color: theme.colors.text,
-    textDecorationLine: 'underline',
-  },
-  disabled: {
-    color: theme.colors.textDisabled,
-  },
-  hint: {
-    ...theme.type.caption,
-    color: theme.colors.textDim,
-  },
-}));

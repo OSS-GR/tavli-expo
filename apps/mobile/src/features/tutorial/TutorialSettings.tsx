@@ -9,10 +9,11 @@
 import type { TutorialGame } from '@tavli/contracts';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { SectionRow } from '@/components/SectionCard';
 import { Sheet } from '@/components/Sheet';
 import { TUTORIAL_GAMES } from '@/features/match/routes';
 
@@ -28,13 +29,12 @@ export function TutorialSettings({ onOpen }: TutorialSettingsProps) {
 
   return (
     <>
-      <Pressable
+      <SectionRow
         testID="settings-learn-to-play"
-        accessibilityRole="button"
+        icon="graduation"
+        label={t('settings.learnToPlay')}
         onPress={() => setPicking(true)}
-        style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
-        <Text style={styles.linkText}>{`${t('settings.learnToPlay')} ›`}</Text>
-      </Pressable>
+      />
       <Sheet visible={picking} onClose={close} closeLabel={t('common.cancel')}>
         <View testID="tutorial-picker" style={styles.picker}>
           <Text style={styles.heading} accessibilityRole="header">
@@ -66,18 +66,6 @@ export function TutorialSettings({ onOpen }: TutorialSettingsProps) {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  link: {
-    minHeight: theme.touch.row,
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  linkText: {
-    ...theme.type.body,
-    color: theme.colors.text,
-    textDecorationLine: 'underline',
-  },
   picker: {
     gap: theme.space.sm,
   },
