@@ -269,6 +269,41 @@ describe('plakoto.md edge cases', () => {
     expect(plakoto.result(s13)).toEqual({ winner: 'black', points: 2, reason: 'motherPinned' });
     expect(() => plakoto.legalTurns(s13, [5, 2])).toThrow(illegal);
   });
+
+  it('plakoto.md #21: motherRule="none" → both mothers pinned is a draw, 0 points', () => {
+    // White's mother is pinned (nothing special with "none"); White's 3/1*
+    // pins Black's mother too.
+    const text = 'w: 24! 6x13 3 ; b: 24 10x13 1';
+    const none = { mother: { motherRule: 'none' } } as const;
+    expect(plakoto.result(state(text, none))).toBeNull();
+    // afterEachMove (default): the game ends at the pin; the 2 is not played.
+    const turns = plays(text, [5, 2], none);
+    expect(turns).toContain('3/1*');
+    const draw = play(state(text, none), [5, 2], '3/1*');
+    expect(plakoto.result(draw)).toEqual({ winner: null, points: 0, reason: 'bothMothersPinned' });
+    expect(plakoto.isGameOver(draw)).toBe(true);
+    // endOfTurn: the whole roll is played first, then it is a draw.
+    const late = { mother: { motherRule: 'none', motherCheckTiming: 'endOfTurn' } } as const;
+    expect(plays(text, [5, 2], late)).not.toContain('3/1*');
+    const lateDraw = play(state(text, late), [5, 2], '3/1* 6/1');
+    expect(plakoto.result(lateDraw)).toEqual({
+      winner: null,
+      points: 0,
+      reason: 'bothMothersPinned',
+    });
+  });
+
+  it('plakoto.md #22: offerConcede, afterEachMove → a pin made and lifted in one turn asks nothing', () => {
+    const ask = { player: 'white', kind: 'motherPinned', choices: ['resign', 'playOn'] };
+    // Black pins White's mother with 3/1* and bears that checker off with the 1.
+    const lifted = play(state('w: 24 6x14 ; b: 3 2 offx13', {}, 'black'), [2, 1], '3/1* 1/0');
+    expect(formatPlakoto(lifted.board)).toBe('w: 24 6x14 ; b: 2 offx14');
+    expect(plakoto.prompt?.(lifted)).toBeNull();
+    expect(lifted.variantData).toBeNull();
+    // The mother is still pinned when Black's turn ends: White is asked.
+    const pinned = play(state('w: 24 6x14 ; b: 10x14 3', {}, 'black'), [5, 2], '3/1* 10/5');
+    expect(plakoto.prompt?.(pinned)).toEqual(ask);
+  });
 });
 
 describe('Plakoto variant', () => {
@@ -294,7 +329,7 @@ describe('Plakoto variant', () => {
     expect(() =>
       plakoto.initialState({ startingPlayer: 'white', rules: getPreset('portes') }),
     ).toThrow(expect.objectContaining({ code: 'RULES_CONFLICT' }));
-    for (const motherRule of ['offerConcede', 'federation'] as const) {
+    for (const motherRule of ['offerConcede', 'federation', 'none'] as const) {
       expect(() =>
         plakoto.initialState({
           startingPlayer: 'white',
@@ -304,7 +339,7 @@ describe('Plakoto variant', () => {
         expect.objectContaining({ code: 'NOT_SUPPORTED', path: 'rules.mother.mutualMotherPin' }),
       );
     }
-    // With "instant" or "none" both mothers are never pinned, so the flag does nothing.
+    // With "instant" both mothers are never pinned, so the flag does nothing.
     const rules = resolveRules('plakoto', {
       mother: { motherRule: 'instant', mutualMotherPin: 'replay' },
     });

@@ -505,7 +505,6 @@ describe('asodio: rules errors', () => {
     const notYet = [
       resolveRules(GREEK, { capture: { nominateBlot: true } }),
       resolveRules(GREEK, { specialRolls: { complementaryDoubles: true } }),
-      resolveRules(AMERICAN, { quarters: { quarterGathering: true } }),
       resolveRules('asodio.kafeneio', { scoring: { doublingCube: true } }),
     ];
     for (const rules of notYet) {

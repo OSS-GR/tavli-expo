@@ -153,7 +153,6 @@ describe('owner decisions (docs/open-questions.md, "Answered")', () => {
       moveWhileLoading: false, // A2
     });
     expect(r.quarters).toEqual({
-      quarterGathering: true,
       quarterLock: true,
       moveInsideFrozenQuarter: false, // A2
     });
@@ -310,12 +309,6 @@ describe('combination rules (RULE_CONSTRAINTS)', () => {
       'entry.moveWhileLoading',
     ],
     [
-      'quarterLockNeedsGathering',
-      'asodio.kafeneio',
-      { quarters: { quarterGathering: false } },
-      'quarters.quarterGathering',
-    ],
-    [
       'quarterLockNeedsEnterAllFirst',
       'asodio.kafeneio',
       { entry: { mustEnterAllFirst: false, moveWhileLoading: true } },
@@ -335,10 +328,10 @@ describe('combination rules (RULE_CONSTRAINTS)', () => {
       'movement.runnerRule',
     ],
     [
-      'runnerBlocksGathering',
+      'runnerBlocksQuarterLock',
       'fevga',
-      { quarters: { quarterGathering: true } },
-      'quarters.quarterGathering',
+      { quarters: { quarterLock: true } },
+      'quarters.quarterLock',
     ],
     [
       'p2NeedsParallel',
@@ -402,7 +395,7 @@ describe('combination rules (RULE_CONSTRAINTS)', () => {
       'asodio.kafeneio',
       {
         entry: { mustEnterAllFirst: false, moveWhileLoading: true },
-        quarters: { quarterGathering: false, quarterLock: false },
+        quarters: { quarterLock: false },
       },
     ],
     [
@@ -424,6 +417,50 @@ describe('combination rules (RULE_CONSTRAINTS)', () => {
     ['Portes with exact bear-off', 'portes', { bearOff: { exactBearOff: true } }],
   ])('allows %s', (_name, presetId, overrides) => {
     expect(() => resolveRules(presetId, overrides)).not.toThrow();
+  });
+});
+
+/** Adds the retired `quarters.quarterGathering` flag, as rules saved before Q27 hold it. */
+function withQuarterGathering(
+  rules: unknown,
+  value: unknown = true,
+): Record<string, Record<string, unknown>> {
+  const raw = JSON.parse(JSON.stringify(rules)) as Record<string, Record<string, unknown>>;
+  raw['quarters'] = { quarterGathering: value, ...raw['quarters'] };
+  return raw;
+}
+
+describe('retired fields: quarters.quarterGathering (Q27)', () => {
+  it('validateRules drops it from old rules of every preset', () => {
+    for (const id of PRESET_IDS) {
+      const preset = getPreset(id);
+      for (const value of [true, false]) {
+        const rules = validateRules(withQuarterGathering(preset, value));
+        expect(rules).toEqual(preset);
+        expect(Object.keys(rules.quarters)).not.toContain('quarterGathering');
+      }
+    }
+  });
+
+  it('is gone from the type, the schema and the presets', () => {
+    expect(Object.keys(RULE_SCHEMA.quarters)).not.toContain('quarterGathering');
+    for (const id of PRESET_IDS) {
+      expect(Object.keys(getPreset(id).quarters)).not.toContain('quarterGathering');
+    }
+  });
+
+  it('must still be true or false', () => {
+    const error = errorOf(() => validateRules(withQuarterGathering(getPreset('portes'), 'yes')));
+    expect(error.code).toBe('INVALID_RULES');
+    expect(error.path).toBe('rules.quarters.quarterGathering');
+  });
+
+  it('old saved rules and game states still load', () => {
+    const old = withQuarterGathering(getPreset('asodio.kafeneio'));
+    expect(parseRules(JSON.stringify(old))).toEqual(getPreset('asodio.kafeneio'));
+    const state = makeState();
+    const text = JSON.stringify({ ...state, rules: withQuarterGathering(state.rules) });
+    expect(parseGameState(text)).toEqual(state);
   });
 });
 

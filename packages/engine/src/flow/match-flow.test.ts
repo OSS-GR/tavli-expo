@@ -292,6 +292,26 @@ describe('match flow', () => {
     expect(replay(flow.log)).toEqual(flow);
   });
 
+  it('a log saved with the retired quarterGathering flag replays (Q27)', () => {
+    const rules = resolveRules('asodio.kafeneio', { match: { rotation: ['asodio'] } });
+    const flow = playMatch(createMatchFlow({ rules, starter: null }), 27);
+    const old = JSON.parse(
+      JSON.stringify(flow.log).replaceAll(
+        '"quarterLock":',
+        '"quarterGathering":true,"quarterLock":',
+      ),
+    ) as FlowEvent[];
+    expect(JSON.stringify(old)).toContain('quarterGathering');
+    expect(replay(old, { seed: 27 })).toEqual(flow);
+    const match = JSON.parse(
+      JSON.stringify(flow.match).replaceAll(
+        '"quarterLock":',
+        '"quarterGathering":true,"quarterLock":',
+      ),
+    ) as unknown;
+    expect(validateMatch(match)).toEqual(flow.match);
+  });
+
   it('resign match: the opponent wins the match at once', () => {
     const flow = act(createMatchFlow({ rules: portesOnly(), starter: 'white' }), [
       { type: 'roll', player: 'white', dice: [3, 1] },

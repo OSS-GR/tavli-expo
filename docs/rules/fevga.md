@@ -94,9 +94,12 @@ Checked on the position at the **end of the mover's turn** (default).
   uses 6–11; flag `p2Window` allows 7–12.
 - **P3 — must leave the opponent a move, if possible:** after the turn, the
   opponent must have at least one legal single-die move for at least one die
-  value 1–6 (using the opponent's full rules, including their runner rule and
-  bearing off). If **every** legal play of the roll would leave the opponent
-  with no move, the player may play any of them. (ΕΟΠΤ: "εφόσον είναι
+  value 1–6 (using the opponent's full rules, including their runner rule,
+  bearing off and the prime bans P1 and P2 with the active `p2Window`: a
+  single move that would leave the opponent holding a banned prime does not
+  count; owner, 2026-11-02). If **every** legal play of the roll would leave
+  the opponent with no move, the player may play any of them. `primeRulesOff`
+  turns all of this off. (ΕΟΠΤ: "εφόσον είναι
   δυνατόν" — if possible; EN Wikipedia: "if the blocked player cannot
   legally unblock, they lose their turn".)
 - bkgm.com / Condos phrase P3 as: if you hold a 6-prime and the opponent has
@@ -109,7 +112,11 @@ Checked on the position at the **end of the mover's turn** (default).
    bans. A shorter sequence may then become the longest legal one.
 3. Apply the "use as many dice as possible" rule and the higher die rule.
 4. Apply P3 among the remaining plays: if at least one leaves the opponent a
-   move, drop those that do not.
+   move, drop those that do not. The opponent's test move obeys P1 and P2.
+   In a real game this never changes the answer: the opponent's position is
+   the end of their own last turn, so it holds no banned prime, and a
+   player who holds five points of a six-point window can always move a
+   checker onto one of their own points instead.
 
 Flag `p3Priority` lets P3 run before step 3 (i.e. a player must even give up
 a die to avoid a full block). Default runs P3 after step 3, because the
@@ -167,6 +174,18 @@ No triple game, no cube.
 18. Bearing off follows shared rules; no hitting, so a checker never leaves
     home once inside.
 19. Winner bears off all 15 while loser has 0 off → 2 points.
+20. P3 and the prime bans (owner, 2026-11-02): an opponent move that would
+    end with the opponent holding all of a banned window (P1, or P2 with the
+    active `p2Window`) does not count as "a move" for P3. With
+    `primeRulesOff` it counts. (Only a made-up position shows the
+    difference; see "Order of checks", step 4.)
+21. Both players blocked forever (no roll gives either player a move): a
+    draw, 0 points (owner, 2026-11-02). It cannot happen in a real game: to
+    block every checker of one player, the other player must hold points so
+    close together that one of their checkers can always move onto another
+    of their own points. So one player always has a move, the board keeps
+    changing, and the engine needs no draw rule for it. (The proof is in the
+    `fevga.md #21` test.)
 
 ## House-rule variants (flags)
 

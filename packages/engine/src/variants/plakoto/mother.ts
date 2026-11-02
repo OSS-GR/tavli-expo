@@ -14,10 +14,12 @@
  * - `"federation"`: the pinner wins 2 points once the pinner has no checker
  *   left on own point 24. Both mothers pinned: a draw.
  * - `"instant"`: the pinner wins 2 points at once.
- * - `"none"`: nothing special.
+ * - `"none"`: nothing special for one pinned mother.
  *
- * Both mothers pinned (only possible with `"offerConcede"` or
- * `"federation"`) is a draw (`mutualMotherPin: "draw"`).
+ * Both mothers pinned (possible with `"offerConcede"`, `"federation"` or
+ * `"none"`) is a draw (`mutualMotherPin: "draw"`). Then neither pin can
+ * ever end: each pinner sits on its own point 1 and may only bear off,
+ * which its own pinned mother forbids. So no one could ever bear off.
  *
  * The result is read from the board, so it needs no stored data. Only the
  * `"offerConcede"` question and its answers live in `state.variantData`
@@ -53,12 +55,12 @@ export function isMotherPinned(board: BoardState, player: PlayerId): boolean {
  * checkers or at a resignation.
  */
 export function motherResult(board: BoardState, rules: MotherRules): GameResult | null {
-  if (rules.motherRule === 'none') return null;
   const white = isMotherPinned(board, 'white');
   const black = isMotherPinned(board, 'black');
-  // Federation rule 3 and flag mutualMotherPin. `instant` never gets here:
-  // the first pin ends the game.
+  // Federation rule 3 and flag mutualMotherPin; also with "none" (Q23).
+  // `instant` never gets here: the first pin ends the game.
   if (white && black) return { winner: null, points: 0, reason: 'bothMothersPinned' };
+  if (rules.motherRule === 'none') return null;
   for (const loser of PLAYERS) {
     if (!(loser === 'white' ? white : black)) continue;
     const winner = opponent(loser);
@@ -117,8 +119,6 @@ function ownMotherPinned(pos: Position): boolean {
 export function midTurnEnd(rules: MotherRules): MidTurnEnd | null {
   if (rules.motherCheckTiming !== 'afterEachMove') return null;
   switch (rules.motherRule) {
-    case 'none':
-      return null;
     case 'instant':
       return { possible: mayPinMother, ended: opponentMotherPinned };
     case 'federation':
@@ -131,7 +131,9 @@ export function midTurnEnd(rules: MotherRules): MidTurnEnd | null {
         ended: (pos) => opponentMotherPinned(pos) && (pos[24] === 0 || ownMotherPinned(pos)),
       };
     case 'offerConcede':
-      // Only the draw ends the game here; a single pinned mother is a question.
+    case 'none':
+      // Only the draw ends the game here. With "offerConcede" a single pinned
+      // mother is a question; with "none" it is nothing special.
       return {
         possible: (pos, dice) => ownMotherPinned(pos) && mayPinMother(pos, dice),
         ended: (pos) => opponentMotherPinned(pos) && ownMotherPinned(pos),

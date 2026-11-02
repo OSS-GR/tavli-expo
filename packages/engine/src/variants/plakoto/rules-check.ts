@@ -12,7 +12,7 @@
  *
  * `mother.mutualMotherPin: "replay"` (replay the same game after both
  * mothers are pinned) is not built yet: it throws `NOT_SUPPORTED` when the
- * mother rule can lead to it (`"offerConcede"` or `"federation"`).
+ * mother rule can lead to it (every rule but `"instant"`).
  *
  * Every other flag belongs to another game. It must keep the value of the
  * `plakoto` preset, or the variant throws `RULES_CONFLICT`, so a flag is
@@ -67,10 +67,7 @@ export function checkPlakotoRules(rules: RuleSet): RuleSet {
     }
   }
   const { motherRule, mutualMotherPin } = rules.mother;
-  if (
-    mutualMotherPin === 'replay' &&
-    (motherRule === 'offerConcede' || motherRule === 'federation')
-  ) {
+  if (mutualMotherPin === 'replay' && motherRule !== 'instant') {
     throw new EngineError(
       'NOT_SUPPORTED',
       'replaying the game after both mothers are pinned is not built yet',

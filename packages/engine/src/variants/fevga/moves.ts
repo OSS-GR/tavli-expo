@@ -20,8 +20,8 @@
  *    normal roll and some candidate uses the higher die, keep only those
  *    (`higherDieRule`).
  * 4. P3: if at least one candidate leaves the opponent a move, drop those
- *    that do not. With `p3Priority: "beforeDiceRule"` this runs before
- *    step 3 instead.
+ *    that do not. The opponent's test move obeys P1 and P2 too. With
+ *    `p3Priority: "beforeDiceRule"` this runs before step 3 instead.
  * 5. Plays that end in the same position are listed once.
  *
  * The search remembers each (position, dice left) it has seen, because the
@@ -165,12 +165,48 @@ export function breaksPrimeBan(pos: Position, options: MoveOptions): boolean {
 }
 
 /**
+ * True when the opponent ends a single move from their own point `from` to
+ * their own point `to` holding a full banned window (P1 or P2). `theirs` is
+ * the opponent's position before the move.
+ */
+function endsInBannedPrime(
+  theirs: readonly number[],
+  from: number,
+  to: number,
+  banned: MoveOptions['bannedPrimes'],
+): boolean {
+  for (const [low, high] of banned) {
+    let full = true;
+    for (let p = low; p <= high; p += 1) {
+      const count = (theirs[p] as number) - (p === from ? 1 : 0) + (p === to ? 1 : 0);
+      if (count === 0) {
+        full = false;
+        break;
+      }
+    }
+    if (full) return true;
+  }
+  return false;
+}
+
+/**
  * P3: true when the opponent has at least one legal single-die move, for
  * at least one die value 1–6, after the mover ends in `pos`. It uses the
- * opponent's movement rules: their runner rule and bearing off. `info` is
- * `infoOf(opp.own)`, which does not change during the mover's turn.
+ * opponent's movement rules: their runner rule and bearing off. The move
+ * must also obey P1 and P2: a move that ends with the opponent holding a
+ * full banned window does not count (owner, Q21; edge case 20). In a real
+ * game this never changes the answer: the opponent's position is the end
+ * of their last turn, so it breaks no ban, and a player who holds five
+ * points of a window can always move a checker onto another own point
+ * instead. `info` is `infoOf(opp.own)`, which does not change during the
+ * mover's turn. (Bearing off never ends in a full window.)
  */
-function opponentCanMove(pos: Position, opp: Opponent, info: Info): boolean {
+function opponentCanMove(
+  pos: Position,
+  opp: Opponent,
+  info: Info,
+  banned: MoveOptions['bannedPrimes'],
+): boolean {
   const theirs = opp.own;
   for (let die = 1; die <= 6; die += 1) {
     for (let from = 24; from >= 1; from -= 1) {
@@ -178,7 +214,7 @@ function opponentCanMove(pos: Position, opp: Opponent, info: Info): boolean {
       const to = from - die;
       // The opponent's own point `to` is the mover's `otherPoint(to)`.
       if (to >= 1) {
-        if (pos[otherPoint(to)] === 0) return true;
+        if (pos[otherPoint(to)] === 0 && !endsInBannedPrime(theirs, from, to, banned)) return true;
       } else if (info.home && (to === 0 || from === info.highest)) {
         return true;
       }
@@ -198,7 +234,7 @@ function opponentCanMove(pos: Position, opp: Opponent, info: Info): boolean {
 export function fullPlayIsLegal(pos: Position, opp: Opponent, options: MoveOptions): boolean {
   if (breaksPrimeBan(pos, options)) return false;
   if (options.leaveMove === 'off') return true;
-  return opponentCanMove(pos, opp, infoOf(opp.own, options.runnerTarget));
+  return opponentCanMove(pos, opp, infoOf(opp.own, options.runnerTarget), options.bannedPrimes);
 }
 
 /** A finished play: its moves and the position it ends in. */
@@ -286,7 +322,9 @@ export function generatePlays(
 
   const leavesMove = (plays: Candidate[]): Candidate[] => {
     const info = infoOf(opp.own, target);
-    const open = plays.filter((play) => opponentCanMove(play.final, opp, info));
+    const open = plays.filter((play) =>
+      opponentCanMove(play.final, opp, info, options.bannedPrimes),
+    );
     return open.length > 0 ? open : plays;
   };
 

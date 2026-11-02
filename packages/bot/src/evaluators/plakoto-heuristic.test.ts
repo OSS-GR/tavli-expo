@@ -249,6 +249,7 @@ describe('plakoto game end after a turn', () => {
     const bothPinned = side({ 1: 1, [START]: 1, 6: 13 }, [START]);
     const otherPinner = side({ [START]: 1, 1: 1, 6: 13 }, [START]);
     expect(plakotoTurnResult(bothPinned, otherPinner, rules('offerConcede'))).toBe(0);
+    expect(plakotoTurnResult(bothPinned, otherPinner, rules('none'))).toBe(0);
     expect(plakotoTurnResult(side({ 0: 15 }), side({ 0: 1, 3: 14 }), rules('none'))).toBe(1);
     expect(plakotoTurnResult(side({ 0: 15 }), side({ 3: 15 }), rules('offerConcede'))).toBe(2);
   });

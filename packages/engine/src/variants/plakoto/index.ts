@@ -14,10 +14,10 @@
  *   of a play that the normal rules allow ("use as much of the roll as
  *   possible"); the mother rule only cuts that play short.
  * - `motherRule: "offerConcede"` asks its question when the turn is over,
- *   also with `"afterEachMove"`: the turn flow asks only between turns. The answer
- *   cannot change the rest of the turn, so the outcome is the same. With
- *   `"afterEachMove"` a mother that was pinned after any move of the turn
- *   is asked about, even if the pin ended later in the same turn.
+ *   also with `"afterEachMove"`: the turn flow asks only between turns. The
+ *   answer cannot change the rest of the turn, so the outcome is the same.
+ *   The question comes only if the mother is still pinned when the turn
+ *   ends: a pin made and lifted in the same turn asks nothing (Q24).
  */
 
 import { createBoard } from '../../board';
@@ -132,8 +132,6 @@ interface Walk {
   readonly pos: Position;
   /** The game ended by the mother rule after the last move. */
   readonly ended: boolean;
-  /** The opponent's mother was pinned after one of the moves. */
-  readonly pinnedMother: boolean;
 }
 
 /**
@@ -145,8 +143,6 @@ interface Walk {
 function playEach(start: Position, left: DieValue[], moves: readonly Move[], setup: Setup): Walk {
   let pos = start;
   let ended = false;
-  // A mother that was already pinned at the start counts too (it is pinned during the turn).
-  let pinnedMother = opponentMotherPinned(start);
   moves.forEach((move, i) => {
     if (ended) illegal(`the game ended after move ${i}`);
     const at = left.indexOf(move.die);
@@ -161,10 +157,9 @@ function playEach(start: Position, left: DieValue[], moves: readonly Move[], set
       illegal(`move ${i + 1} should be to ${played.move.to} (${played.move.capture})`);
     }
     pos = played.next;
-    if (opponentMotherPinned(pos)) pinnedMother = true;
     if (setup.end?.ended(pos) === true) ended = true;
   });
-  return { pos, ended, pinnedMother };
+  return { pos, ended };
 }
 
 function generate(start: Position, dice: Dice, setup: Setup): Generated {
@@ -311,16 +306,16 @@ function applyTurn(state: GameState, turn: Turn): GameState {
   return { ...next, variantData: writeMotherData(afterTurnData(state, next, walk)) };
 }
 
-/** offerConcede: after the turn, ask the opponent if their mother was pinned. */
+/**
+ * offerConcede: after the turn, ask the opponent if their mother is still
+ * pinned. With either `motherCheckTiming` only the end of the turn counts.
+ */
 function afterTurnData(before: GameState, after: GameState, walk: Walk) {
   const data = readMotherData(before);
-  const { motherRule, motherCheckTiming } = before.rules.mother;
   const other = after.toMove;
-  if (motherRule !== 'offerConcede' || data.playOn.includes(other)) return data;
+  if (before.rules.mother.motherRule !== 'offerConcede' || data.playOn.includes(other)) return data;
   if (motherResult(after.board, after.rules.mother) !== null) return data;
-  const pinned =
-    motherCheckTiming === 'afterEachMove' ? walk.pinnedMother : opponentMotherPinned(walk.pos);
-  return pinned ? { ...data, offer: other } : data;
+  return opponentMotherPinned(walk.pos) ? { ...data, offer: other } : data;
 }
 
 function answerPrompt(state: GameState, player: PlayerId, choice: string): GameState {

@@ -144,9 +144,8 @@ export function endsMidTurn(side: Side, rules: RuleSet): boolean {
       // Rule 1 (we have nothing left on own 24) or rule 3 (both pinned: a draw).
       return side.own[24] === 0 || ourMotherPinned;
     case 'offerConcede':
-      return ourMotherPinned; // both pinned: a draw
     case 'none':
-      return false;
+      return ourMotherPinned; // both pinned: a draw
   }
 }
 

@@ -15,6 +15,7 @@ import { createMatch, startNextGame } from '../../match';
 import { otherPlayerPoint } from '../../numbering';
 import type { PlayerId } from '../../player';
 import { getPreset, resolveRules } from '../../presets';
+import { createSeededRng } from '../../rng';
 import type { RuleOverrides, RuleSet } from '../../rules';
 import type { GameState } from '../../state';
 import { getVariant } from '../../variant';
@@ -287,6 +288,102 @@ describe('fevga.md edge cases', () => {
     const single = play(fevgaState('w: 1 ; b: 1x14'), '1/0:6', [6, 5]);
     expect(fevga.result(single)).toEqual({ winner: 'white', points: 1, reason: 'borneOff' });
     expect(() => fevga.legalTurns(won, [3, 1])).toThrow(illegal);
+  });
+
+  it('fevga.md #20: P3 — an opponent move that ends in a banned prime does not count', () => {
+    // A made-up position: Black already holds all of B6–B11 (P2), with two
+    // checkers on each point but B6. So every Black move keeps that prime,
+    // except a move of the lone B6 checker. Its landing points B5–B1 are
+    // W17–W13. White holds W14–W17; W13 is open.
+    const text = 'w: 17 16x2 15 14 2x10 ; b: 6 7x2 8x2 9x2 10x2 11x2 12x4';
+    const state = fevgaState(text);
+    // 16/13 closes W13: then each Black move would end in the banned prime,
+    // so Black has no move. Another play leaves the B6 checker a move.
+    expect(() => play(state, '16/13 2/1', [3, 1])).toThrow(illegal);
+    expect(plays(state, [3, 1])).not.toContain('16/13 2/1');
+    expect(plays(state, [3, 1])).toContain('16/13 14/13');
+    // Without P2, Black's moves inside B6–B11 count, so 16/13 2/1 is legal.
+    const noP2 = fevgaState(text, { rules: rules({ primes: { p2NoPrimeFrontOfMother: false } }) });
+    expect(play(noP2, '16/13 2/1', [3, 1]).toMove).toBe('black');
+    // With primeRulesOff, P3 is off too.
+    const off = fevgaState(text, {
+      rules: rules({
+        primes: {
+          primeRulesOff: true,
+          p1NoPrimeOwnStart: false,
+          p2NoPrimeFrontOfMother: false,
+          p3MustLeaveMove: false,
+        },
+      }),
+    });
+    expect(plays(off, [3, 1])).toContain('16/13 2/1');
+  });
+
+  /**
+   * Why both players can never be blocked at once (Q22). Say White has no
+   * move for any roll. White is not all home (else White bears off). So
+   * White has a checker outside home that is not held on 24 by the runner
+   * rule (while the rule holds, the runner is outside home and free). Each
+   * of its six landing points is held by Black: an own point is a move, and
+   * a move onto an empty point can only end in a banned prime when White
+   * holds five points of a six-point window, and then White can move one of
+   * them onto another. Those six points run along White's track; on Black's
+   * track they are six points in a row, or split at W12/W13 (Black's 24 and
+   * 1). Either way Black holds two neighbouring points of its own track
+   * that are not its point 24, so Black can move a checker onto its lower
+   * neighbour. That move keeps every point Black held but one, so it ends
+   * in no banned prime. So Black has a move.
+   */
+  it('fevga.md #21: both players blocked forever cannot happen (it would be a draw)', () => {
+    const rng = createSeededRng(21);
+    const random = (n: number): number => rng.nextUint32() % n;
+    const blackPoint = (w: number): number => (w > 12 ? w - 12 : w + 12);
+    const bans = (own: Map<number, number>): boolean =>
+      [
+        [19, 24],
+        [6, 11],
+      ].some(([low = 0, high = 0]) => {
+        for (let p = low; p <= high; p += 1) if (!own.has(p)) return false;
+        return true;
+      });
+    const side = (own: Map<number, number>): string =>
+      [...own].map(([p, n]) => `${p}x${n}`).join(' ');
+    const blocked = (state: GameState): boolean =>
+      DISTINCT_ROLLS.every(({ dice }) =>
+        fevga.legalTurns(state, dice).every((t) => t.moves.length === 0),
+      );
+    let whiteBlocked = 0;
+    for (let i = 0; i < 300; i += 1) {
+      // Black holds the six points in front of White's outside stack on
+      // W(r); some White checkers may wait on W1. Black's rest go anywhere free.
+      const r = 7 + random(18);
+      const white = new Map<number, number>();
+      const black = new Map<number, number>();
+      const onOne = r > 7 && random(2) === 0 ? 1 + random(5) : 0;
+      if (onOne > 0) white.set(1, onOne);
+      white.set(r, 15 - onOne);
+      let left = 15;
+      for (let p = r - 6; p < r; p += 1) {
+        black.set(blackPoint(p), 1);
+        left -= 1;
+      }
+      while (left > 0) {
+        const w = 1 + random(24);
+        if (white.has(w)) continue;
+        const b = blackPoint(w);
+        black.set(b, (black.get(b) ?? 0) + 1);
+        left -= 1;
+      }
+      if (bans(white) || bans(black)) continue; // only a made-up position breaks a ban
+      const text = `w: ${side(white)} ; b: ${side(black)}`;
+      const whiteToMove = fevgaState(text);
+      const blackToMove = fevgaState(text, { toMove: 'black' });
+      const both = blocked(whiteToMove) && blocked(blackToMove);
+      expect({ text, both }).toEqual({ text, both: false });
+      if (blocked(whiteToMove)) whiteBlocked += 1;
+    }
+    // The positions do block White often, so the check above means something.
+    expect(whiteBlocked).toBeGreaterThan(50);
   });
 });
 

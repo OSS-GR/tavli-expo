@@ -44,7 +44,7 @@ export const ASODIO_RULE_MIX: readonly (readonly [string, PresetId, RuleOverride
     'asodio.aceyDeuceyGreek',
     {
       entry: { mustEnterAllFirst: true },
-      quarters: { quarterGathering: true, quarterLock: true },
+      quarters: { quarterLock: true },
     },
   ],
 ];

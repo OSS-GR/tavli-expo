@@ -73,8 +73,6 @@ interface Tally {
   /** Turns that the mother rule cut short (the game ended in the middle). */
   cut: number;
   offers: number;
-  /** Games with `motherRule: "none"` that stopped with both mothers pinned. */
-  stalls: number;
   reasons: Record<string, number>;
 }
 
@@ -89,7 +87,6 @@ function newTally(): Tally {
     passes: 0,
     cut: 0,
     offers: 0,
-    stalls: 0,
     reasons: {},
   };
 }
@@ -354,15 +351,6 @@ function playGame(seed: number, rules: RuleSet, tally: Tally): void {
         state = plakoto.answerPrompt?.(state, question.player, choice) ?? fail('no answer');
         continue;
       }
-      if (
-        rules.mother.motherRule === 'none' &&
-        isMotherPinned(state.board, 'white') &&
-        isMotherPinned(state.board, 'black')
-      ) {
-        // With "none", two pinned mothers never move again: the game cannot end.
-        tally.stalls += 1;
-        return;
-      }
       state = playTurn(state, rng, tally);
       if (state.turnNumber > MAX_TURNS) fail('the game did not end');
     }
@@ -455,10 +443,11 @@ describe('Plakoto fuzz', () => {
     expect(tally.cut).toBeGreaterThan(0);
   });
 
-  it(`none: ${GAMES.none} games; both mothers pinned stalls the game`, { timeout: 60_000 }, () => {
+  it(`none: ${GAMES.none} games; both mothers pinned is a draw (Q23)`, { timeout: 60_000 }, () => {
     const tally = run(GAMES.none, 500_001, { motherRule: 'none' });
-    expect(tally.games + tally.stalls).toBe(GAMES.none);
+    expect(tally.games).toBe(GAMES.none);
     expect(tally.reasons['motherPinned']).toBeUndefined();
-    expect(tally.reasons['borneOff']).toBe(tally.games);
+    expect(tally.reasons['bothMothersPinned']).toBeGreaterThan(0);
+    expect(tally.reasons['borneOff']).toBeGreaterThan(0);
   });
 });

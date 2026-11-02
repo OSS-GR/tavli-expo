@@ -1,24 +1,12 @@
 # Open Questions
 
-> Living list. When the owner answers, move the answer to **Answered** and update the doc it affects. Last review: 2026-10-28.
+> Living list. When the owner answers, move the answer to **Answered** and update the doc it affects. Last review: 2026-11-02.
 
 ## Waiting on the owner
 
 | # | Question | Why it matters | Affects |
 |---|----------|----------------|---------|
-| Q16 | Chat: **emotes / preset phrases only**, or free text? Recommended: presets only (no moderation work). | Moderation and store rules | Later |
-| Q18 | **Sentry project:** create a free Sentry React Native project and add the DSN, org and project slugs, and an auth token to EAS (steps in `packages/adapters/crash-sentry/README.md`). Until then, builds send no crash reports. | We see crashes from test builds | #43 |
-| Q20 | **PostHog project:** create a free PostHog project in the **EU** region, turn on "Discard client IP data", and add the project API key as `EXPO_PUBLIC_POSTHOG_KEY` (`.env.local` and EAS). Steps in `docs/architecture/analytics-events.md`. Until then, builds send no usage data. Also: does `tavlaki.com/privacy` exist yet? The consent screen and Settings link to it. | We see which modes testers use | #61 |
-| Q21 | **Fevga, P3 "the opponent's full rules":** the engine (#99) reads this as movement, the runner rule and bearing off. It does not apply the prime bans P1/P2 to the opponent's one test move, because those judge a whole turn's end position. OK? | Which plays count as "blocking the opponent" | `docs/rules/fevga.md`, #99 |
-| Q22 | **Fevga, both players blocked forever:** the rules doc gives no outcome. It never happened in 2,700 test games. Recommended: a draw. | A game that cannot end | `docs/rules/fevga.md` |
-| Q23 | **Plakoto, `motherRule: none` with both mothers pinned:** neither side can bear off, so the game never ends. Recommended: a draw, like the other mother rules. | A game that cannot end | `docs/rules/plakoto.md`, #98 |
-| Q24 | **Plakoto, the mother question with `afterEachMove`:** the engine (#98) checks after every move but asks "resign or play on?" when the turn ends. If a pin is made and lifted in the same turn, the question is still asked. Keep this, or ask only if the mother is still pinned at the end of the turn? Recommended: ask only if still pinned. | When the pinned player is asked | `docs/rules/plakoto.md`, #98 |
-| Q25 | **Asodio, bearing off while pinned:** `asodio.md` says "bear off as in Portes" and "pinning (Plakoto style)". Plakoto forbids bearing off while one of your checkers is pinned, even inside your home. The engine (#115) follows Plakoto (`bearOffWhilePinned: false`). OK? | When a pinned player may bear off | `docs/rules/asodio.md`, #115 |
-| Q26 | **Asodio, a lock that ends in the middle of a roll:** the engine (#115) checks the rules after every single move, like bearing off in the shared rules. So when the last checker enters with the first die, the second die may already move the army; and when the last lagging checker joins the new quarter, the rest of the roll may advance. OK, or must the rest of that roll wait? Recommended: keep it. | How the loading lock and the quarter lock end | `docs/rules/asodio.md`, #115 |
-| Q27 | **Asodio, `quarterGathering` without `quarterLock`:** the doc does not say what "gathering" means without the lock. The engine (#115) throws "not supported" for it. No preset uses it. Drop the flag, or describe it? | A flag with no meaning | `docs/rules/asodio.md`, #115 |
-| Q28 | **Asodio deadlocks are common:** in 400 random owner-version games (#115), 286 ended in a deadlock (A5: both armies frozen, because each side's last lagging checker is pinned by a checker of the other side that is frozen itself). Real players avoid lone lagging checkers, so real games end this way less often, but please check in playtests. If it happens a lot, an option is: a frozen checker may still move when its army has no other move. Bots (#125, 1,000 games each): 30.5% of medium-vs-medium games, 43.0% of easy-vs-easy and 27.2% of medium-vs-random games end in a deadlock, so the bot cannot reach the usual 85% win bar against random. Nearly all come from a "mutual lock" while the armies cross mid-board (each side's new quarter is the other side's rear quarter); see `packages/bot/README.md`, "Asodio strength and speed". | Many drawn games | `docs/rules/asodio.md`, #115 |
-| Q29 | **Asodio doc, research defaults vs owner:** "Turn & dice rules", "Movement rules" and edge cases 1–13 describe the research version (a 1-2 gives a chosen double and a new roll; `mustEnterAllFirst=false`), but the flag table gives the owner defaults (A3: no extra rolls; `mustEnterAllFirst=true`). The engine tests cases 1–13 with the Acey-Deucey presets. Recommended: mark those sections "research version" in the doc. | A clear rules doc | `docs/rules/asodio.md`, #115 |
-| Q30 | **Online, what is a timed-out game worth?** The rules docs do not say. The server (#133) scores it like a resign of that game: mono 1 if the late player has borne off a checker, else diplo 2 (Plakoto too). Recommended: keep this. Other option: always 1 point. | Points in online games | `docs/architecture/online-game-service.md`, #133 |
+| Q32 | **`tavlaki.com/privacy` is not live yet.** The consent screen and Settings link to it. Please publish the privacy policy there (the text is in `docs/legal/`). | Testers and the stores need a working privacy link | `docs/legal/README.md`, #61 |
 
 ## Answered
 
@@ -52,4 +40,17 @@
 | Q31 | (2026-10-28) **Online invites last 24 hours.** Kept as built (`INVITE_TIME_MS`). | `docs/architecture/online-game-service.md`, #252 |
 | Test builds | (2026-10-28) **`preview` builds use the dev Convex deployment.** Only `production` uses prod, so test games never touch real players' data. | `apps/mobile/app.config.ts`, `docs/process/running-the-app.md` |
 | Q19 | (2026-10-28) Greek label for the pip count: **none needed.** The owner removed the pip count: "please remove the pip counter, it doesn't add anything, who uses it". The strips and Settings no longer show it. | #238 |
+| Q16 | (2026-11-02) **Chat: free text, later.** Not in the first online release. | #320 |
+| Q18 | (2026-11-02) **Sentry project:** done by the owner (DSN, org, project and token in EAS). | #43, `packages/adapters/crash-sentry/README.md` |
+| Q20 | (2026-11-02) **PostHog project:** done by the owner (EU region, client IP discarded, key in `.env.local` and EAS). The privacy link is still open (Q32). | #61, `docs/architecture/analytics-events.md` |
+| Q21 | (2026-11-02) **Fevga P3:** the opponent's test move obeys P1 and P2 too, with the active `p2Window`. `primeRulesOff` turns it all off. This never changes a real game (proof in the code). | `docs/rules/fevga.md` (edge case 20), #377 |
+| Q22 | (2026-11-02) **Fevga, both players blocked forever:** a draw. It cannot happen in Fevga, so the engine needs no rule for it (proof and test in edge case 21). | `docs/rules/fevga.md` (edge case 21), #377 |
+| Q23 | (2026-11-02) **Plakoto, `motherRule: none` with both mothers pinned:** a draw, like the other mother rules. | `docs/rules/plakoto.md` (edge case 21), #377 |
+| Q24 | (2026-11-02) **Plakoto, the mother question with `afterEachMove`:** ask only if the mother is still pinned at the end of the turn. | `docs/rules/plakoto.md` (edge case 22), #377 |
+| Q25 | (2026-11-02) **Asodio, bearing off while pinned:** not allowed, as in Plakoto. Kept as built. | `docs/rules/asodio.md`, #377 |
+| Q26 | (2026-11-02) **Asodio, a lock that ends in the middle of a roll:** the rest of the roll may move. Kept as built. | `docs/rules/asodio.md`, #377 |
+| Q27 | (2026-11-02) **Asodio, `quarterGathering`:** drop the flag; `quarterLock` already says it. Old saved rules that hold it still load. | `docs/rules/asodio.md`, `packages/engine/README.md`, #377 |
+| Q28 | (2026-11-02) **Asodio deadlocks:** keep the rule (a draw, A5) and check in playtests. | `docs/rules/asodio.md`, #377 |
+| Q29 | (2026-11-02) **Asodio doc, research text vs owner defaults:** kept as built; the research sections are marked "research version". | `docs/rules/asodio.md`, #377 |
+| Q30 | (2026-11-02) **Online, a timed-out game is always worth 1 point.** | `docs/architecture/online-game-service.md`, #378 |
 | New | Players can make their **own house-rule variants** ("kafeneio mode"). | Backlog epic (Later) + engine rules-as-data task (MVP1) |
