@@ -65,6 +65,8 @@ export type {
   RollDiceRequest,
   SendAnswerRequest,
   SendTurnRequest,
+  SetDraftRequest,
+  TurnDraft,
 } from './game-transport';
 export {
   INVITE_CODE_ALPHABET,

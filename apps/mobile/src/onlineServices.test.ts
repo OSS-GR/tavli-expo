@@ -53,6 +53,7 @@ function memoryAdapters() {
         subscribe: (gameId, onView, onError) => caller().subscribe(gameId, onView, onError),
         rollDice: (request) => caller().rollDice(request),
         sendTurn: (request) => caller().sendTurn(request),
+        setDraft: (request) => caller().setDraft(request),
         sendAnswer: (request) => caller().sendAnswer(request),
         resign: (gameId) => caller().resign(gameId),
         listMyGames: (request) => caller().listMyGames(request),

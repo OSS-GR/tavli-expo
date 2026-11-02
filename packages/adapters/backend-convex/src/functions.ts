@@ -55,6 +55,13 @@ export interface GameFunctions {
     { gameId: string; expectedVersion: number; moves: MoveArg[] },
     WriteResult
   >;
+  /** The turn so far (#374). A server from before #374 has no such function. */
+  readonly setDraft: FunctionReference<
+    'mutation',
+    'public',
+    { gameId: string; expectedVersion: number; moves: MoveArg[] },
+    null
+  >;
   readonly answer: FunctionReference<
     'mutation',
     'public',
@@ -75,6 +82,7 @@ export const GAME_FUNCTION_NAMES = {
   getGame: 'games:getGame',
   rollDice: 'games:rollDice',
   makeMove: 'games:makeMove',
+  setDraft: 'games:setDraft',
   answer: 'games:answer',
   resign: 'games:resign',
   listMyGames: 'games:listMyGames',
@@ -84,6 +92,7 @@ export const GAME_FUNCTIONS: GameFunctions = {
   getGame: makeFunctionReference(GAME_FUNCTION_NAMES.getGame),
   rollDice: makeFunctionReference(GAME_FUNCTION_NAMES.rollDice),
   makeMove: makeFunctionReference(GAME_FUNCTION_NAMES.makeMove),
+  setDraft: makeFunctionReference(GAME_FUNCTION_NAMES.setDraft),
   answer: makeFunctionReference(GAME_FUNCTION_NAMES.answer),
   resign: makeFunctionReference(GAME_FUNCTION_NAMES.resign),
   listMyGames: makeFunctionReference(GAME_FUNCTION_NAMES.listMyGames),

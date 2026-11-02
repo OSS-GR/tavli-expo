@@ -14,6 +14,7 @@ export {
   OnlineGameError,
   advance,
   answerPrompt,
+  checkDraft,
   createOnlineMatch,
   deadlineAfter,
   isTimedOut,
@@ -33,6 +34,7 @@ export {
 export type {
   CreateOnlineMatchOptions,
   LoadedFlow,
+  SavedDraft,
   SteppedFlow,
   StoredFlow,
   ViewInput,
@@ -48,6 +50,7 @@ export {
   eventActor,
   matchStatus,
   nextDeadline,
+  nextDraft,
   rollDeadline,
   scheduledCheck,
 } from './calls';

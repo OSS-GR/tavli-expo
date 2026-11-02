@@ -27,7 +27,12 @@
  */
 
 import { turnDeadlineMs } from '@tavli/contracts';
-import type { GameTransportErrorCode, OnlineGameChoice, OnlineGameView } from '@tavli/contracts';
+import type {
+  GameTransportErrorCode,
+  OnlineGameChoice,
+  OnlineGameView,
+  TurnDraft,
+} from '@tavli/contracts';
 import {
   DEFAULT_PRESET_BY_GAME,
   EngineError,
@@ -318,6 +323,48 @@ export function playTurn(
   return advance(next, rng);
 }
 
+/** A copy of a move with only the fields of `MoveInput`. */
+function plainMove(move: MoveInput): MoveInput {
+  const { from, to, die, capture } = move;
+  return capture === undefined ? { from, to, die } : { from, to, die, capture };
+}
+
+/**
+ * Checks a draft (#374): the moves `player` has made so far in this turn,
+ * before Confirm. Only the side the server waits for, only while it
+ * moves (`moving`), and each move must be legal from the board before it
+ * (the draft may be the whole turn, or empty after the last undo). It
+ * changes nothing: it returns the moves to show, with only the
+ * `MoveInput` fields. Rejects like `playTurn`; any refused move is
+ * `ILLEGAL_MOVE`.
+ */
+export function checkDraft(
+  flow: MatchFlow,
+  player: PlayerId,
+  moves: readonly MoveInput[],
+): MoveInput[] {
+  checkActive(flow);
+  if (flow.game.phase !== 'moving') {
+    fail(
+      waitingFor(flow) === player ? 'ILLEGAL_ACTION' : 'NOT_YOUR_TURN',
+      `no turn to show in phase ${flow.game.phase}`,
+    );
+  }
+  if (flow.game.state.toMove !== player)
+    fail('NOT_YOUR_TURN', `it is ${flow.game.state.toMove}'s turn`);
+  let next = flow;
+  for (const move of moves) {
+    try {
+      // A move needs no dice roll, so no `Rng`.
+      next = applyMatchAction(next, { type: 'move', player, move });
+    } catch (error) {
+      if (error instanceof EngineError) fail('ILLEGAL_MOVE', error.message);
+      throw error;
+    }
+  }
+  return moves.map(plainMove);
+}
+
 /** `player` answers the current question (for example the Plakoto mother question). */
 export function answerPrompt(
   flow: MatchFlow,
@@ -381,6 +428,16 @@ export interface ViewInput {
   readonly flow: MatchFlow;
   /** The game before `flow.game`, as it ended (`LoadedFlow.previousGame`). */
   readonly previousGame: GameFlow | null;
+  /**
+   * The saved draft of this game (#374), or `null`. The view shows it only
+   * when it belongs to `version` and the server waits for a move.
+   */
+  readonly draft?: SavedDraft | null;
+}
+
+/** A draft as a server keeps it (#374): the game version it belongs to. */
+export interface SavedDraft extends TurnDraft {
+  readonly version: number;
 }
 
 /**
@@ -390,6 +447,11 @@ export interface ViewInput {
 export function toView(input: ViewInput): OnlineGameView {
   const { gameId, version, choice, turnTimeMinutes, turnDeadline, players, flow, previousGame } =
     input;
+  const saved = input.draft ?? null;
+  const draft: TurnDraft | null =
+    saved !== null && saved.version === version && flow.game.phase === 'moving'
+      ? { moves: saved.moves, seq: saved.seq }
+      : null;
   const finished = matchPhase(flow) === 'match-over';
   return {
     gameId,
@@ -404,5 +466,6 @@ export function toView(input: ViewInput): OnlineGameView {
     previousGame,
     waitingFor: waitingFor(flow),
     prompt: flow.match.status === 'finished' ? null : currentPrompt(flow.game),
+    draft: finished ? null : draft,
   };
 }

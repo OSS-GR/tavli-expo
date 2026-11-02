@@ -30,6 +30,11 @@
  * schedules a "game over" push instead (#316). It is sent after the save,
  * so it never fails a move.
  *
+ * Drafts (#374): `setDraft` keeps the turn so far of the player the
+ * server waits for in `drafts`, and `getGame` shows it to both players.
+ * It is never a turn: only `makeMove` ends one, and every save deletes
+ * the draft.
+ *
  * The caller is the signed-in user (#131): every public function reads
  * the player id from `ctx.auth` (`signedInPlayer`), and no public call
  * takes a player id. Each call checks that the caller may act. `getGame` answers
@@ -60,6 +65,7 @@ import {
   loadStored,
   matchStatus,
   nextDeadline,
+  nextDraft,
   playTurn,
   resign as resignMatch,
   rollDeadline,
@@ -71,7 +77,7 @@ import {
   timeOut,
   toView,
 } from '@tavli/online';
-import type { LoadedFlow, SteppedFlow } from '@tavli/online';
+import type { LoadedFlow, SavedDraft, SteppedFlow } from '@tavli/online';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
@@ -171,12 +177,27 @@ async function startClock(
   return deadline;
 }
 
+/** The `drafts` row of a game (#374), or `null`. */
+async function draftRow(ctx: QueryCtx, gameId: Id<'games'>): Promise<Doc<'drafts'> | null> {
+  return await ctx.db
+    .query('drafts')
+    .withIndex('by_game', (q) => q.eq('gameId', gameId))
+    .unique();
+}
+
+/** A `drafts` row as `@tavli/online` reads it. */
+function savedDraft(row: Doc<'drafts'> | null): SavedDraft | null {
+  if (row === null) return null;
+  return { version: row.version, seq: row.seq, moves: JSON.parse(row.moves) as MoveInput[] };
+}
+
 /**
  * Saves `flow` after a step from `before` (the saved flow): a version
  * bump, its log rows, a new turn deadline, and a "your turn" push when
  * the wait moved to the other player of an async game, or a new game
  * started (#280), or a "game over" push when the step ended an async
- * match (#316). `deadline` is passed to `startClock`.
+ * match (#316). `deadline` is passed to `startClock`. A step ends the
+ * draft of the turn (#374): its row goes.
  */
 async function save(
   ctx: MutationCtx,
@@ -205,6 +226,8 @@ async function save(
     turnDeadline,
     updatedAt: now,
   });
+  const draft = await draftRow(ctx, game._id);
+  if (draft !== null) await ctx.db.delete(draft._id);
   await scheduleTurnPush(ctx, game, version, turnWait(before.flow), turnWait(flow), callerId);
   return version;
 }
@@ -374,6 +397,37 @@ export const makeMove = mutation({
 });
 
 /**
+ * Shows the caller's turn so far to the other player (#374): every move
+ * since the roll, before Confirm (empty after the last undo). Only the
+ * player the server waits for, while they move, at `expectedVersion` and
+ * before the deadline; the engine checks each move (`nextDraft` in
+ * `@tavli/online`). A refused draft throws and saves nothing; a late one
+ * gets `TIMED_OUT`, and the scheduled `checkTimeout` ends the game. It
+ * keeps the version, starts no clock, writes no log row and sends no
+ * push. Both players watch `getGame`, so the other phone gets it at once.
+ */
+export const setDraft = mutation({
+  args: {
+    gameId: v.id('games'),
+    expectedVersion: v.number(),
+    moves: v.array(moveInput),
+  },
+  returns: v.null(),
+  handler: async (ctx, { gameId, expectedVersion, moves }) => {
+    const callerId = await signedInPlayer(ctx);
+    const { game, side, before } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
+    const row = await draftRow(ctx, gameId);
+    const draft = guarded(() =>
+      nextDraft(game, before.flow, side, moves.map(toMoveInput), savedDraft(row), Date.now()),
+    );
+    const fields = { version: draft.version, seq: draft.seq, moves: JSON.stringify(draft.moves) };
+    if (row === null) await ctx.db.insert('drafts', { gameId, ...fields });
+    else await ctx.db.patch(row._id, fields);
+    return null;
+  },
+});
+
+/**
  * Rolls the dice for the caller, who must be the player the server waits
  * for in `awaiting-roll` (#355). The server rolls with its own dice. A
  * roll with no legal move passes at once, and the server then waits for
@@ -491,8 +545,9 @@ function gameInput(game: Doc<'games'>) {
 /**
  * The game as a client may see it, or `null` when there is no such game.
  * It never holds dice that are not rolled yet. Both players watch this
- * query, so their screens update after every change. Only the two
- * players may read it: anyone else gets `NOT_A_PLAYER` (#131).
+ * query, so their screens update after every change, and after each
+ * draft (#374). Only the two players may read it: anyone else gets
+ * `NOT_A_PLAYER` (#131).
  */
 export const getGame = query({
   args: { gameId: v.id('games') },
@@ -502,7 +557,8 @@ export const getGame = query({
     const game = guarded(() => checkViewer(loaded, callerId));
     if (game === null) return null;
     const { flow, previousGame } = loadStored(game.flow);
-    return toView({ ...gameInput(game), flow, previousGame });
+    const draft = savedDraft(await draftRow(ctx, game._id));
+    return toView({ ...gameInput(game), flow, previousGame, draft });
   },
 });
 

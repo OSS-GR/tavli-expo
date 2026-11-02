@@ -8,10 +8,13 @@
  * `viewEvents` reads what changed between two views and gives the events a
  * local game plays for the same steps:
  *
- * - The other player's moves, one event each, from `remoteTurn` (the same
- *   turn the board flies). Each one plays when its checker starts to fly
- *   (`turnMoveDelay`), as a local move plays when it starts. A view that
- *   does not follow the view before (a missed view) plays no moves.
+ * - The other player's moves, one event each, from `remoteSteps` (the
+ *   same moves the board flies). Each one plays when its checker starts to
+ *   fly (`turnMoveDelay`), as a local move plays when it starts. A view
+ *   that does not follow the view before (a missed view) plays no moves.
+ *   Live moves (#374): each draft plays its new moves; moves taken back
+ *   play nothing (a local undo plays nothing either), and the end of the
+ *   turn plays only the moves the drafts did not show.
  * - A new turn that waits for its roll: `turnStart`, as after a confirm in
  *   a local game.
  * - The other player's roll (#355): `diceRoll`, at once: their dice tumble
@@ -49,7 +52,7 @@ import {
   type TimedEvent,
 } from '@/features/game/gameFeedback';
 
-import { remoteTurn } from './remoteTurn';
+import { remoteSteps } from './remoteTurn';
 
 /** Phases of a turn that is under way: a view in them has its roll already. */
 const IN_TURN: ReadonlySet<GamePhase> = new Set(['moving', 'awaiting-confirm']);
@@ -85,7 +88,8 @@ function rolledTurn(before: GameFlow, after: GameFlow): TimedEvent[] {
 export function viewEvents(before: MatchFlow, after: MatchFlow, me: PlayerId): TimedEvent[] {
   if (before === after) return [];
   const humans = [me];
-  const moves = (remoteTurn(before, after, me)?.moves ?? []).map((move, i) => ({
+  const steps = remoteSteps(before, after, me);
+  const moves = (steps === null || steps.undo ? [] : steps.moves).map((move, i) => ({
     event: moveEvent(move),
     at: turnMoveDelay(i),
   }));

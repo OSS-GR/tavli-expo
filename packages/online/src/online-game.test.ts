@@ -11,6 +11,7 @@ import type { FlowEvent, MatchFlow, PlayerId, Rng } from '@tavli/engine';
 import {
   OnlineGameError,
   answerPrompt,
+  checkDraft,
   createOnlineMatch,
   deadlineAfter,
   isTimedOut,
@@ -212,6 +213,68 @@ describe('playTurn', () => {
     expect(code(() => playTurn(flow, side, moves.slice(0, 1), rng))).toBe('ILLEGAL_MOVE');
     expect(code(() => playTurn(flow, side, [], rng))).toBe('ILLEGAL_MOVE');
     expect(code(() => playTurn(flow, side, [...moves, ...moves], rng))).toBe('ILLEGAL_ACTION');
+  });
+});
+
+describe('checkDraft (#374)', () => {
+  it('takes any legal start of the turn, the whole turn and an empty draft', () => {
+    const { flow } = create();
+    const side = flow.game.state.toMove;
+    const moves = pickTurn(flow.game, createSeededRng(9));
+    for (let count = 0; count <= moves.length; count++) {
+      expect(checkDraft(stored(flow), side, moves.slice(0, count))).toEqual(
+        moves
+          .slice(0, count)
+          .map(({ from, to, die, capture }) =>
+            capture === undefined ? { from, to, die } : { from, to, die, capture },
+          ),
+      );
+    }
+  });
+
+  it('drops fields that are not part of a move', () => {
+    const { flow } = create();
+    const side = flow.game.state.toMove;
+    const [first] = pickTurn(flow.game, createSeededRng(9));
+    if (first === undefined) throw new Error('no move');
+    const extra = { ...first, note: 'x' };
+    expect(checkDraft(stored(flow), side, [extra])[0]).not.toHaveProperty('note');
+  });
+
+  it('rejects an illegal move, and more moves than the dice, as ILLEGAL_MOVE', () => {
+    const { flow } = create();
+    const side = flow.game.state.toMove;
+    const moves = pickTurn(flow.game, createSeededRng(9));
+    expect(code(() => checkDraft(flow, side, [{ from: 1, to: 'off', die: 1 }]))).toBe(
+      'ILLEGAL_MOVE',
+    );
+    expect(code(() => checkDraft(flow, side, [...moves, ...moves]))).toBe('ILLEGAL_MOVE');
+  });
+
+  it('rejects the other player, a draft before the roll and a finished match', () => {
+    const { flow, rng } = create();
+    const side = flow.game.state.toMove;
+    const other = side === 'white' ? 'black' : 'white';
+    expect(code(() => checkDraft(flow, other, []))).toBe('NOT_YOUR_TURN');
+    const next = playTurn(stored(flow), side, pickTurn(flow.game, createSeededRng(9)), rng);
+    expect(code(() => checkDraft(next, next.game.state.toMove, []))).toBe('ILLEGAL_ACTION');
+    expect(code(() => checkDraft(next, side, []))).toBe('NOT_YOUR_TURN');
+    const done = resign(stored(flow), side, rng);
+    expect(code(() => checkDraft(done, side, []))).toBe('GAME_OVER');
+  });
+
+  it('shows a draft in the view only for its version, while the player moves', () => {
+    const { flow, rng } = create();
+    const side = flow.game.state.toMove;
+    const moves = pickTurn(flow.game, createSeededRng(9));
+    const draft = { version: 1, seq: 2, moves: moves.slice(0, 1) };
+    const view = (input: { version: number; flow: MatchFlow }) =>
+      toView({ ...VIEW, choice: 'portes', ...input, draft });
+    expect(view({ version: 1, flow }).draft).toEqual({ seq: 2, moves: moves.slice(0, 1) });
+    expect(view({ version: 2, flow }).draft).toBeNull();
+    expect(toView({ ...VIEW, choice: 'portes', flow }).draft).toBeNull();
+    const next = playTurn(stored(flow), side, moves, rng);
+    expect(view({ version: 1, flow: next }).draft).toBeNull();
   });
 });
 

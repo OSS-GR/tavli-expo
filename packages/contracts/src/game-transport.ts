@@ -114,6 +114,29 @@ export interface OnlineGameView {
   readonly waitingFor: PlayerId | null;
   /** The question `waitingFor` must answer, else `null`. */
   readonly prompt: VariantPrompt | null;
+  /**
+   * The moves `waitingFor` has made so far in this turn, before Confirm
+   * (#374): only to show them live on the other phone. It is never a
+   * saved turn: only `sendTurn` ends a turn. `null` when there is no
+   * draft. A server from before #374 leaves it out, so read it as
+   * `view.draft ?? null`.
+   */
+  readonly draft?: TurnDraft | null;
+}
+
+/**
+ * The turn so far of the player the server waits for (#374). A draft
+ * belongs to one `version`: the next saved change drops it.
+ */
+export interface TurnDraft {
+  /** The moves so far, in order, each one legal from the board before it. */
+  readonly moves: readonly MoveInput[];
+  /**
+   * Goes up by one on each new draft of the same `version`, from 1. A
+   * new draft does not change `version`, so a client tells drafts apart
+   * by `seq`.
+   */
+  readonly seq: number;
 }
 
 /**
@@ -221,6 +244,15 @@ export interface SendTurnRequest {
   readonly moves: readonly MoveInput[];
 }
 
+/** The turn so far, sent after each move and each undo (#374). */
+export interface SetDraftRequest {
+  readonly gameId: string;
+  /** `OnlineGameView.version` of the view the moves were played on. */
+  readonly expectedVersion: number;
+  /** Every move of the turn so far, in order. Empty after the last undo. */
+  readonly moves: readonly MoveInput[];
+}
+
 /** The answer to `OnlineGameView.prompt`. */
 export interface SendAnswerRequest {
   readonly gameId: string;
@@ -267,6 +299,17 @@ export interface GameTransport {
    * `GameTransportErrorData`; `TIMED_OUT` when the turn time ran out first.
    */
   sendTurn(request: SendTurnRequest): Promise<void>;
+  /**
+   * Shows the caller's turn so far to the other player (#374): the next
+   * view has it in `draft`, with a new `seq` and the same `version`. It
+   * saves no turn, starts no clock and sends no push. Only the side the
+   * server waits for may send one, only while it moves (`game.phase` is
+   * `moving`), and every move must be legal. Rejects like `sendTurn`
+   * (`NOT_YOUR_TURN`, `ILLEGAL_ACTION`, `ILLEGAL_MOVE`, `STALE_VERSION`,
+   * `GAME_OVER`, `TIMED_OUT`); a rejected draft changes nothing. Best
+   * effort: a client never waits for it before a move or `sendTurn`.
+   */
+  setDraft(request: SetDraftRequest): Promise<void>;
   /** Answers the current question. Rejects like `sendTurn`. */
   sendAnswer(request: SendAnswerRequest): Promise<void>;
   /** Resigns the whole match: the opponent wins. Allowed at any time. */

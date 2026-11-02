@@ -141,6 +141,7 @@ const games: GameTransport = {
   },
   rollDice: (request) => caller()?.rollDice(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   sendTurn: (request) => caller()?.sendTurn(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
+  setDraft: (request) => caller()?.setDraft(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   sendAnswer: (request) => caller()?.sendAnswer(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   resign: (gameId) => caller()?.resign(gameId) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   listMyGames: (request) => caller()?.listMyGames(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),

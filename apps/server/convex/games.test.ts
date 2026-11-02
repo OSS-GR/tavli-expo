@@ -304,6 +304,134 @@ describe('makeMove', () => {
   });
 });
 
+describe('setDraft (#374)', () => {
+  async function scheduled(t: Tester) {
+    return (await t.run(async (ctx) => ctx.db.system.query('_scheduled_functions').collect()))
+      .length;
+  }
+
+  async function draftRows(t: Tester) {
+    return await t.run(async (ctx) => ctx.db.query('drafts').collect());
+  }
+
+  it('shows the turn so far to both players; no version, clock, log row or push', async () => {
+    const t = setup();
+    // An async game, so a saved turn would send a push.
+    const gameId = await createGame(t, 'portes', 1, null);
+    const before = await view(t, gameId);
+    expect(before.draft).toBeNull();
+    const mover = idOf(before.game.state.toMove);
+    const moves = pickTurn(before.game, createSeededRng(1));
+    const jobs = await scheduled(t);
+    const log = (await events(t, gameId)).length;
+    vi.setSystemTime(START + 1000);
+    const draft = { gameId, expectedVersion: before.version, moves: moves.slice(0, 1) };
+    expect(await as(t, mover).mutation(api.games.setDraft, draft)).toBeNull();
+    const shown = await view(t, gameId);
+    expect(shown).toEqual({ ...before, draft: { seq: 1, moves: moves.slice(0, 1) } });
+    expect(await as(t, BOB).query(api.games.getGame, { gameId })).toEqual(shown);
+    await as(t, mover).mutation(api.games.setDraft, { ...draft, moves: [] });
+    expect((await view(t, gameId)).draft).toEqual({ seq: 2, moves: [] });
+    expect(await scheduled(t)).toBe(jobs);
+    expect(await events(t, gameId)).toHaveLength(log);
+    expect(await draftRows(t)).toHaveLength(1);
+    // The "my games" list does not change.
+    const listed = await as(t, mover).query(api.games.listMyGames, { status: 'active' });
+    expect(listed[0]?.updatedAt).toBe(START);
+  });
+
+  it('a saved turn deletes the draft', async () => {
+    const t = setup();
+    const gameId = await createGame(t);
+    const before = await view(t, gameId);
+    const mover = as(t, idOf(before.game.state.toMove));
+    const moves = pickTurn(before.game, createSeededRng(1));
+    await mover.mutation(api.games.setDraft, {
+      gameId,
+      expectedVersion: before.version,
+      moves: moves.slice(0, 1),
+    });
+    await mover.mutation(api.games.makeMove, { gameId, expectedVersion: before.version, moves });
+    expect((await view(t, gameId)).draft).toBeNull();
+    expect(await draftRows(t)).toEqual([]);
+  });
+
+  it('refuses the other player, a stranger, an old version, a bad move and the wrong phase', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 3);
+    const v = await view(t, gameId);
+    const side = v.game.state.toMove;
+    const moves = pickTurn(v.game, createSeededRng(1));
+    const draft = { gameId, expectedVersion: v.version, moves: moves.slice(0, 1) };
+    await rejectsWith(
+      as(t, idOf(otherSide(side))).mutation(api.games.setDraft, draft),
+      'NOT_YOUR_TURN',
+    );
+    await rejectsWith(as(t, 'eve').mutation(api.games.setDraft, draft), 'NOT_A_PLAYER');
+    await rejectsWith(
+      as(t, idOf(side)).mutation(api.games.setDraft, { ...draft, expectedVersion: 0 }),
+      'STALE_VERSION',
+    );
+    await rejectsWith(
+      as(t, idOf(side)).mutation(api.games.setDraft, {
+        ...draft,
+        moves: [{ from: 24, to: 17, die: 7 }],
+      }),
+      'ILLEGAL_MOVE',
+    );
+    await rejectsWith(t.mutation(api.games.setDraft, draft), 'NOT_SIGNED_IN');
+    expect(await draftRows(t)).toEqual([]);
+    await as(t, idOf(side)).mutation(api.games.makeMove, {
+      gameId,
+      expectedVersion: v.version,
+      moves,
+    });
+    const next = await view(t, gameId);
+    await rejectsWith(
+      as(t, idOf(next.game.state.toMove)).mutation(api.games.setDraft, {
+        gameId,
+        expectedVersion: next.version,
+        moves: [],
+      }),
+      'ILLEGAL_ACTION',
+    );
+    await as(t, ALICE).mutation(api.games.resign, { gameId });
+    const done = await view(t, gameId);
+    await rejectsWith(
+      as(t, ALICE).mutation(api.games.setDraft, {
+        gameId,
+        expectedVersion: done.version,
+        moves: [],
+      }),
+      'GAME_OVER',
+    );
+    expect(await draftRows(t)).toEqual([]);
+  });
+
+  it('a late draft gets TIMED_OUT and saves nothing; the scheduled check ends the game', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 5);
+    const before = await view(t, gameId);
+    const late = before.game.state.toMove;
+    vi.setSystemTime(START + 60_000);
+    await rejectsWith(
+      as(t, idOf(late)).mutation(api.games.setDraft, {
+        gameId,
+        expectedVersion: before.version,
+        moves: [],
+      }),
+      'TIMED_OUT',
+    );
+    expect(await view(t, gameId)).toEqual(before);
+    // The fake timers have not run the scheduled check yet: run it now.
+    vi.advanceTimersByTime(60_000);
+    await t.finishInProgressScheduledFunctions();
+    const after = await view(t, gameId);
+    expect(after.version).toBe(before.version + 1);
+    expect(after.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
+  });
+});
+
 describe('sign-in (#131)', () => {
   it('the player id is the token subject, so a new session of the same user plays on', async () => {
     const t = setup();

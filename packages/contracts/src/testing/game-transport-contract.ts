@@ -543,6 +543,117 @@ export function gameTransportContract(): GameTransportContractCheck[] {
       },
     },
     {
+      name: 'setDraft shows the turn so far to both players, with the same version',
+      run: async (subject) => {
+        const { gameId, watchers, view } = await startGame(
+          subject,
+          await subject.createGame(PORTES),
+        );
+        same(view.draft ?? null, null, 'draft before any move');
+        const mover = waiting(view);
+        const moves = subject.legalTurn(view);
+        const summary = await summaryOf(subject.transportFor(mover), 'active', gameId);
+        const draftWith = async (count: number, seq: number) => {
+          await subject.transportFor(mover).setDraft({
+            gameId,
+            expectedVersion: view.version,
+            moves: moves.slice(0, count),
+          });
+          for (const watcher of [watchers.white, watchers.black]) {
+            await waitUntil(
+              subject,
+              () => watcher.last().draft?.seq === seq,
+              `the draft with seq ${seq}`,
+            );
+            const shown = watcher.last();
+            same(shown.version, view.version, `version with draft ${seq}`);
+            same(plainMoves(shown.draft?.moves), plainMoves(moves.slice(0, count)), 'draft.moves');
+            // The draft shows the moves; the saved game stays as it was.
+            same(shown.game, view.game, `game with draft ${seq}`);
+            same(shown.turnDeadline, view.turnDeadline, `turnDeadline with draft ${seq}`);
+          }
+        };
+        await subject.passTime(TICK_MS);
+        await draftWith(1, 1);
+        await draftWith(moves.length, 2);
+        // The last undo: an empty draft.
+        await draftWith(0, 3);
+        same(
+          await summaryOf(subject.transportFor(mover), 'active', gameId),
+          summary,
+          'the listed summary after the drafts',
+        );
+        // The turn itself ends the draft.
+        await subject
+          .transportFor(mover)
+          .sendTurn({ gameId, expectedVersion: view.version, moves });
+        const white = await viewAt(subject, watchers.white, view.version + 1);
+        const black = await viewAt(subject, watchers.black, view.version + 1);
+        same(white.draft ?? null, null, 'White draft after the turn');
+        same(black.draft ?? null, null, 'Black draft after the turn');
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
+      name: 'setDraft is refused for the wrong player, an old version, a bad move or the wrong phase',
+      run: async (subject) => {
+        const { gameId, watchers, view } = await startGame(
+          subject,
+          await subject.createGame(PORTES),
+        );
+        const mover = waiting(view);
+        const moves = subject.legalTurn(view);
+        const draft = { gameId, expectedVersion: view.version, moves: moves.slice(0, 1) };
+        await rejectsWith(
+          subject.transportFor(other(mover)).setDraft(draft),
+          'NOT_YOUR_TURN',
+          'a draft by the other player',
+        );
+        await rejectsWith(
+          subject.transportFor('stranger').setDraft(draft),
+          'NOT_A_PLAYER',
+          'a draft by a stranger',
+        );
+        await rejectsWith(
+          subject.transportFor(mover).setDraft({ ...draft, moves: [...moves, ...moves] }),
+          'ILLEGAL_MOVE',
+          'a draft with more moves than the dice',
+        );
+        await stayQuiet(subject);
+        same(watchers.black.last().version, view.version, 'version after the refused drafts');
+        same(watchers.black.last().draft ?? null, null, 'draft after the refused drafts');
+        await subject
+          .transportFor(mover)
+          .sendTurn({ gameId, expectedVersion: view.version, moves });
+        const next = await viewAt(subject, watchers.black, view.version + 1);
+        if (next.status !== 'active') throw new Error('the match ended after one turn');
+        await rejectsWith(
+          subject.transportFor(mover).setDraft(draft),
+          'STALE_VERSION',
+          'a draft on the old version',
+        );
+        same(next.game.phase, 'awaiting-roll', 'phase after the turn');
+        const roller = waiting(next);
+        const early = { gameId, expectedVersion: next.version, moves: [] };
+        await rejectsWith(
+          subject.transportFor(roller).setDraft(early),
+          'ILLEGAL_ACTION',
+          'a draft before the roll',
+        );
+        await rejectsWith(
+          subject.transportFor(other(roller)).setDraft(early),
+          'NOT_YOUR_TURN',
+          'a draft by the player who just moved',
+        );
+        await stayQuiet(subject);
+        same(watchers.black.last().version, next.version, 'version after the refused drafts');
+        same(watchers.black.last().draft ?? null, null, 'draft after the refused drafts');
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
       name: 'an incomplete turn gets ILLEGAL_MOVE',
       run: async (subject) => {
         const { gameId, watchers, view } = await startGame(

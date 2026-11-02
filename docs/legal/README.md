@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90). Last review: 2026-10-28 (#285, turn notifications).
+> The privacy policy for the app and the stores (issue #90). Last review: 2026-11-02 (#374, live moves in online games).
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy before it goes live.
 

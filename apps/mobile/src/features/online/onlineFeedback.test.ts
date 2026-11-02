@@ -404,6 +404,7 @@ describe('online feedback (#271)', () => {
       subscribe: (id, onView, onError) => inner.subscribe(id, onView, onError),
       rollDice: (request) => inner.rollDice(request),
       sendTurn: () => Promise.reject(new Error('network request failed')),
+      setDraft: () => Promise.reject(new Error('network request failed')),
       sendAnswer: () => Promise.reject(new Error('network request failed')),
       resign: () => Promise.reject(new Error('network request failed')),
       listMyGames: () => Promise.reject(new Error('network request failed')),

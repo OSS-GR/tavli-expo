@@ -16,11 +16,12 @@ import {
   eventActor,
   matchStatus,
   nextDeadline,
+  nextDraft,
   rollDeadline,
   scheduledCheck,
 } from './calls';
 import { OnlineGameError, createOnlineMatch, resign, rollDice } from './online-game';
-import { closedOut } from './testing';
+import { closedOut, pickTurn } from './testing';
 
 const PLAYERS = { white: 'alice', black: 'bob' };
 const GAME = { players: PLAYERS, version: 3, status: 'active', turnDeadline: 1000 } as const;
@@ -143,5 +144,32 @@ describe('eventActor', () => {
     expect(eventActor({ type: 'nextGame' }, 'alice')).toBe(SERVER_ACTOR);
     expect(eventActor({ type: 'confirm', player: 'white' }, 'alice')).toBe('alice');
     expect(eventActor({ type: 'resignMatch', player: 'black' }, 'bob')).toBe('bob');
+  });
+});
+
+describe('nextDraft (#374)', () => {
+  function moving() {
+    const rng = createSeededRng(1);
+    const flow = createOnlineMatch({ choice: 'portes', targetPoints: 1, players: PLAYERS }, rng);
+    const side = flow.game.state.toMove;
+    const moves = pickTurn(flow.game, createSeededRng(9));
+    return { flow, side, moves };
+  }
+
+  it('numbers the drafts of one version from 1, and starts again at a new version', () => {
+    const { flow, side, moves } = moving();
+    const first = nextDraft(GAME, flow, side, moves.slice(0, 1), null, 0);
+    expect(first).toEqual({ version: 3, seq: 1, moves: moves.slice(0, 1) });
+    const second = nextDraft(GAME, flow, side, [], first, 0);
+    expect(second).toEqual({ version: 3, seq: 2, moves: [] });
+    expect(nextDraft({ ...GAME, version: 4 }, flow, side, [], second, 0).seq).toBe(1);
+  });
+
+  it('rejects a late draft with TIMED_OUT, and checks the moves', () => {
+    const { flow, side, moves } = moving();
+    expect(code(() => nextDraft(GAME, flow, side, [], null, 1000))).toBe('TIMED_OUT');
+    expect(code(() => nextDraft(GAME, flow, side, [...moves, ...moves], null, 0))).toBe(
+      'ILLEGAL_MOVE',
+    );
   });
 });

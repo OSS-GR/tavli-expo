@@ -169,6 +169,13 @@ export function createConvexGameTransport(options: ConvexGameTransportOptions): 
       checkWrite(await run(() => client.mutation(GAME_FUNCTIONS.makeMove, args)));
     },
 
+    async setDraft({ gameId, expectedVersion, moves }) {
+      // A server from before #374 has no `setDraft`: the call rejects, and
+      // the app treats a draft as best effort.
+      const args = { gameId, expectedVersion, moves: moves.map(moveArg) };
+      await run(() => client.mutation(GAME_FUNCTIONS.setDraft, args));
+    },
+
     async sendAnswer({ gameId, expectedVersion, choice }) {
       const args = { gameId, expectedVersion, choice };
       checkWrite(await run(() => client.mutation(GAME_FUNCTIONS.answer, args)));
