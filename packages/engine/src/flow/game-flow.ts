@@ -122,9 +122,9 @@ export type GameAction =
   | { readonly type: 'resign'; readonly player: PlayerId }
   /**
    * `player` ran out of time (online turn timers, #133). Only the player
-   * the game waits for can time out. The game ends as if they resigned it,
-   * with the reason `timeout`. The flow has no clock: the caller (the
-   * server) decides when time is up.
+   * the game waits for can time out. The other player wins the game for
+   * 1 point (never a diplo, #378), with the reason `timeout`. The flow has
+   * no clock: the caller (the server) decides when time is up.
    */
   | { readonly type: 'timeout'; readonly player: PlayerId };
 
@@ -382,9 +382,11 @@ export function stepGame(
       if (flow.phase === 'opening-roll') illegal('the game has not started yet');
       const waiting = currentPrompt(flow, ctx)?.player ?? flow.state.toMove;
       if (player !== waiting) illegal(`the game waits for ${waiting}`);
-      // Scored like a resign of this game: the moves of an unfinished turn do not count.
+      // The other player wins the game. The moves of an unfinished turn do not count.
+      // A time out is always worth 1 point, also where a resign would give a diplo
+      // (owner, Q30, #378). `resignGame` still checks the player and that the game is on.
       const resigned = resignGame(flow.state, player, ctx.registry ?? VARIANT_REGISTRY);
-      const result: GameResult = { ...resigned, reason: 'timeout' };
+      const result: GameResult = { winner: resigned.winner, points: 1, reason: 'timeout' };
       return [
         { ...flow, played: [], phase: 'game-over', result },
         { type: 'timeout', player },

@@ -279,7 +279,12 @@ describe('turn timers on a fake clock', () => {
     await flush();
     const after = white.last();
     expect(after.version).toBe(before.version + 1);
-    expect(after.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
+    // Nothing is borne off: a time out is still 1 point, never a diplo (#378).
+    expect(after.match.games[0]).toMatchObject({
+      winner: otherSide(late),
+      points: 1,
+      reason: 'timeout',
+    });
     // The next game waits for its first roll (#355).
     expect(after.game.phase).toBe('awaiting-roll');
     expect(after.turnDeadline).toBe(START + 2 * LIVE);
@@ -310,6 +315,7 @@ describe('turn timers on a fake clock', () => {
     expect(server.runDueTimeouts()).toBe(1);
     const view = server.getGame(gameId);
     expect(view?.status).toBe('finished');
+    expect(view?.match.games[0]).toMatchObject({ points: 1, reason: 'timeout' });
     expect(view?.turnDeadline).toBeNull();
     wait(10 * ASYNC_TURN_TIME_MS);
     expect(server.runDueTimeouts()).toBe(0);

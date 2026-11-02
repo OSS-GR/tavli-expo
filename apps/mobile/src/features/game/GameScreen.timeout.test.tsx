@@ -2,9 +2,9 @@
  * The game-end sheet after a time-out (#170): an online turn timer ran out,
  * so the engine ends the game with the reason `timeout`. Online play is not
  * wired to the app yet, so the tests send the `timeout` action to the store
- * directly. The points follow the engine (scored like a resign: 2 when the
- * loser has borne off no checker, else 1). Fake timers, like every game
- * screen test (#152).
+ * directly. The points follow the engine: a time out is always 1 point,
+ * also when the loser has borne off no checker (#378). Fake timers, like
+ * every game screen test (#152).
  */
 import {
   createBoard,
@@ -66,7 +66,7 @@ afterEach(() => {
 });
 
 describe('<GameScreen /> game end on time (#170)', () => {
-  it('names the player who ran out of time; a diplo when they bore off nothing', async () => {
+  it('names the player who ran out of time; a mono also when they bore off nothing (#378)', async () => {
     const store = newStore();
     startAt(store);
     await renderWithRoot(<GameScreen store={store} />);
@@ -74,17 +74,18 @@ describe('<GameScreen /> game end on time (#170)', () => {
 
     expect(store.getState().flow.game.result).toEqual({
       winner: 'black',
-      points: 2,
+      points: 1,
       reason: 'timeout',
     });
     expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Bob wins the game!' })).toBeOnTheScreen();
-    expect(screen.getByText('Diplo · +2 points')).toBeOnTheScreen();
+    expect(screen.getByText('Mono · +1 point')).toBeOnTheScreen();
+    expect(screen.queryByText(/Diplo/)).toBeNull();
     expect(screen.getByText('Ann ran out of time.')).toBeOnTheScreen();
     // The sheet reads the reason once; nothing else says it again.
     const timeouts = announce.mock.calls.filter(([text]) => String(text).includes('out of time'));
     expect(timeouts).toEqual([
-      ['Bob wins the game! Diplo · +2 points Ann ran out of time. Ann 0 – 2 Bob'],
+      ['Bob wins the game! Mono · +1 point Ann ran out of time. Ann 0 – 1 Bob'],
     ]);
     await act(async () => {
       jest.advanceTimersByTime(5000);

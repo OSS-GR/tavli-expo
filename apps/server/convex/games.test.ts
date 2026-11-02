@@ -688,7 +688,8 @@ describe('the Plakoto mother question', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'TIMED_OUT' } });
     const after = await view(t, gameId);
     expect(after.status).toBe('finished');
-    expect(after.match.games[0]).toMatchObject({ winner: 'black', points: 2, reason: 'timeout' });
+    // A resign here gives a double; a time out is always 1 point (#378).
+    expect(after.match.games[0]).toMatchObject({ winner: 'black', points: 1, reason: 'timeout' });
     expect(after.turnDeadline).toBeNull();
   });
 });
@@ -735,8 +736,13 @@ describe('turn timers (#133)', () => {
     expect(v.version).toBe(before.version + 1);
     expect(v.status).toBe('active');
     expect(v.match.games).toHaveLength(1);
-    expect(v.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
-    expect(v.match.score[otherSide(late)]).toBeGreaterThanOrEqual(1);
+    // Nothing is borne off, so a resign would give a diplo: a time out is 1 point (#378).
+    expect(v.match.games[0]).toMatchObject({
+      winner: otherSide(late),
+      points: 1,
+      reason: 'timeout',
+    });
+    expect(v.match.score[otherSide(late)]).toBe(1);
     // The next game runs, waits for its first roll (#355), and that turn
     // has its own minute.
     expect(v.game.phase).toBe('awaiting-roll');
@@ -766,6 +772,7 @@ describe('turn timers (#133)', () => {
     const v = await view(t, gameId);
     expect(v.status).toBe('finished');
     expect(v.match.winner).toBe(otherSide(late));
+    expect(v.match.games[0]).toMatchObject({ points: 1, reason: 'timeout' });
     expect(v.turnDeadline).toBeNull();
     expect(v.waitingFor).toBeNull();
     const doc = await t.run(async (ctx) => ctx.db.get(gameId));

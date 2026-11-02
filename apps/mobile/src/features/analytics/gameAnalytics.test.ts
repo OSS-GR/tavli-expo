@@ -319,7 +319,7 @@ describe('resultKind', () => {
     expect(resultKind({ winner: 'white', points: 3, reason: 'borneOff' })).toBe('diplo');
     expect(resultKind({ winner: 'white', points: 2, reason: 'resigned' })).toBe('resign');
     expect(resultKind({ winner: null, points: 0, reason: 'deadlock' })).toBe('draw');
-    // A time-out is its own result, whatever the points (1, or 2 for a diplo).
+    // A time-out is its own result, whatever the points (1 now; 2 in games before #378).
     expect(resultKind({ winner: 'black', points: 1, reason: 'timeout' })).toBe('timeout');
     expect(resultKind({ winner: 'white', points: 2, reason: 'timeout' })).toBe('timeout');
   });
