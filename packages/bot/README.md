@@ -1197,7 +1197,7 @@ above, not in the weights.
 | easy vs easy     | 293 (29.3 %) | 277          | 430 (43.0 %)     | 503 : 482           | 210           |
 | random vs random | 146 (14.6 %) | 144          | 710 (71.0 %)     | 245 : 229           | 99            |
 
-**Deadlock draws are very common** (open question Q28): 30 % of
+**Deadlock draws are very common** (Q28: the owner keeps the draw rule): 30 % of
 medium-vs-medium games, 43 % of easy-vs-easy games and 71 % of random
 games end with both armies frozen. A draw is a non-win in the table. Of the
 games that someone wins, medium wins 94.5 % against random and 73.1 %

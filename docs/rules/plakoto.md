@@ -135,11 +135,15 @@ while the mother is pinned.
 | Mother win | Mother rule condition 1 (see above) | 2 |
 | Draw | Both mothers pinned | 0 / 0 |
 
-The "Mother win" and "Draw" rows are for `motherRule: "federation"`. The
-app default is `"offerConcede"`: when a mother is pinned, the pinned player
+The "Mother win" row is for `motherRule: "federation"`. The "Draw" row holds
+for every mother rule but `"instant"` (where one pinned mother already ends
+the game): with `"offerConcede"` and `"none"` too, two pinned mothers can
+never be freed, so nobody could ever bear off (owner, 2026-11-02). The app
+default is `"offerConcede"`: when a mother is pinned, the pinned player
 chooses **Resign** (the opponent wins 2 points) or **Play on** (the game
-goes on as with `"none"`). See the flags table and open questions Q23 and
-Q24 in `docs/open-questions.md`.
+goes on as with `"none"`). The question comes when the turn of the pinner
+ends, and only if the mother is **still pinned** then: a pin made and lifted
+in the same turn asks nothing (owner, 2026-11-02). See the flags table.
 
 There is no triple game and no cube.
 
@@ -180,12 +184,19 @@ Edge cases 10–14 use `motherRule: "federation"`. The default
 19. A player with no legal move (everything pinned or blocked) passes.
 20. With flag `motherRule="instant"`: pinning the mother ends the game at
     once (+2), whatever the pinner's own position; draw is impossible.
+21. With flag `motherRule="none"`: both mothers pinned → draw, 0 points,
+    like the other mother rules (owner, 2026-11-02). With
+    `motherCheckTiming="afterEachMove"` the game ends at that move.
+22. With `motherRule="offerConcede"` and `motherCheckTiming="afterEachMove"`:
+    B pins A's mother and bears that checker off in the same turn → A is not
+    asked. A is asked only if the mother is still pinned when B's turn ends
+    (owner, 2026-11-02).
 
 ## House-rule variants (flags)
 
 | Flag | Values | Default | Notes |
 |---|---|---|---|
-| `motherRule` | `"offerConcede"`, `"federation"`, `"instant"`, `"none"` | `"offerConcede"` (owner) | `offerConcede` (owner, 2026-10-26): when a mother is pinned, the pinned player chooses **Resign** (opponent wins 2 points) or **Play on** (game continues as `none`). Vs bot and pass-and-play the human decides; online, only the pinned player decides. `federation`: rule above (ΕΟΠΤ 3.3.iii, bkgm.com, EN Wikipedia agree). `instant`: pinning the mother ends the game double at once; no draw (Greek Wikipedia variant). `none`: no special result; the game simply continues (pinned mother can only be freed when the pinner leaves; Greek Wikipedia says this "almost always" ends as a double anyway). |
+| `motherRule` | `"offerConcede"`, `"federation"`, `"instant"`, `"none"` | `"offerConcede"` (owner) | `offerConcede` (owner, 2026-10-26): when a mother is pinned, the pinned player chooses **Resign** (opponent wins 2 points) or **Play on** (game continues as `none`). Vs bot and pass-and-play the human decides; online, only the pinned player decides. `federation`: rule above (ΕΟΠΤ 3.3.iii, bkgm.com, EN Wikipedia agree). `instant`: pinning the mother ends the game double at once; no draw (Greek Wikipedia variant). `none`: no special result; the game simply continues (pinned mother can only be freed when the pinner leaves; Greek Wikipedia says this "almost always" ends as a double anyway). Both mothers pinned is still a draw (edge case 21). |
 | `motherCheckTiming` | `"afterEachMove"`, `"endOfTurn"` | `"afterEachMove"` | ΕΟΠΤ says "the moment". |
 | `mutualMotherPin` | `"draw"`, `"replay"` | `"draw"` | Draw = 0 points. `replay` = replay the same Plakoto game (not seen in sources; offered for casual play only). |
 | `intermediatePinBlocks` | bool | `false` | See edge case 9. Sources are silent; default treats the jumped-on checker as unaffected. |

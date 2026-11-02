@@ -11,8 +11,7 @@
  *   `RULES_CONFLICT`;
  * - `entry.*`: `firstEntryGate`, `firstEntryGateRolls`, `mustEnterAllFirst`,
  *   `moveWhileLoading`, `barEntryNeedsSpecial`;
- * - `quarters.*`: `quarterGathering`, `quarterLock`,
- *   `moveInsideFrozenQuarter`;
+ * - `quarters.*`: `quarterLock`, `moveInsideFrozenQuarter`;
  * - `specialRolls.aceDeuceChoosesDouble`, `extraRolls.*`;
  * - `bearOff.exactBearOff` and `bearOff.bearOffWhilePinned` (pins only);
  * - `scoring.method` and `scoring.deadlock`;
@@ -23,9 +22,6 @@
  *
  * - `capture.nominateBlot: true` (the opponent must hit a named blot);
  * - `specialRolls.complementaryDoubles: true`;
- * - `quarters.quarterGathering: true` with `quarterLock: false`. The doc
- *   does not say what gathering without the lock means (open question
- *   Q27);
  * - `scoring.doublingCube: true`.
  *
  * Every other flag belongs to another game. It must keep the value of the
@@ -50,7 +46,6 @@ const ASODIO_FLAGS = new Set([
   'entry.mustEnterAllFirst',
   'entry.moveWhileLoading',
   'entry.barEntryNeedsSpecial',
-  'quarters.quarterGathering',
   'quarters.quarterLock',
   'quarters.moveInsideFrozenQuarter',
   'specialRolls.aceDeuceChoosesDouble',
@@ -118,12 +113,6 @@ export function checkAsodioRules(rules: RuleSet): RuleSet {
   }
   if (rules.specialRolls.complementaryDoubles) {
     notSupported('specialRolls.complementaryDoubles', 'complementaryDoubles is not built yet');
-  }
-  if (rules.quarters.quarterGathering && !rules.quarters.quarterLock) {
-    notSupported(
-      'quarters.quarterGathering',
-      'quarterGathering without quarterLock is not built yet; the rules doc does not say what it means',
-    );
   }
   if (rules.scoring.doublingCube) {
     notSupported('scoring.doublingCube', 'the doubling cube is not built yet');

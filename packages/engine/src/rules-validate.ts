@@ -5,14 +5,30 @@
  *
  * 1. Shape: every group and field is there, every value is allowed by
  *    `RULE_SCHEMA`, and there are no unknown keys. Fails with
- *    `INVALID_RULES`.
+ *    `INVALID_RULES`. A retired field (`RETIRED_FIELDS`) that old saved
+ *    rules still hold is checked and dropped.
  * 2. Combinations: the flags in `RULE_CONSTRAINTS` must fit together.
  *    Fails with `RULES_CONFLICT`. The path points at the flag to change.
  */
 
 import { EngineError } from './errors';
 import { RULE_GROUPS, RULE_SCHEMA, isPresetId } from './rules';
-import type { FieldSpec, RuleSet } from './rules';
+import type { FieldSpec, RuleGroupName, RuleSet } from './rules';
+
+/**
+ * Fields that `RuleSet` no longer has. Saved games, match logs, history
+ * and online games may still hold them, so `validateRules` accepts each
+ * one with its old type and leaves it out of the result. Never reuse a
+ * retired name for a new field.
+ *
+ * - `quarters.quarterGathering` (owner, Q27, 2026-11-02): `quarterLock`
+ *   already says it; gathering without the lock had no meaning.
+ */
+const RETIRED_FIELDS: Readonly<
+  Partial<Record<RuleGroupName, Readonly<Record<string, FieldSpec>>>>
+> = {
+  quarters: { quarterGathering: { kind: 'boolean' } },
+};
 
 function fail(path: string, message: string): never {
   throw new EngineError('INVALID_RULES', message, path);
@@ -24,13 +40,21 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-function record(value: unknown, path: string, keys: readonly string[]): Record<string, unknown> {
+function record(
+  value: unknown,
+  path: string,
+  keys: readonly string[],
+  retired: Readonly<Record<string, FieldSpec>> = {},
+): Record<string, unknown> {
   if (!isPlainObject(value)) fail(path, 'expected an object');
   for (const key of keys) {
     if (!Object.hasOwn(value, key)) fail(`${path}.${key}`, 'missing field');
   }
   for (const key of Object.keys(value)) {
-    if (!keys.includes(key)) fail(`${path}.${key}`, 'unknown field');
+    if (keys.includes(key)) continue;
+    const spec = Object.hasOwn(retired, key) ? retired[key] : undefined;
+    if (spec === undefined) fail(`${path}.${key}`, 'unknown field');
+    field(spec, value[key], `${path}.${key}`);
   }
   return value;
 }
@@ -137,12 +161,6 @@ export const RULE_CONSTRAINTS: readonly RuleConstraint[] = [
     broken: (r) => !r.entry.moveWhileLoading && !r.entry.mustEnterAllFirst,
   },
   {
-    id: 'quarterLockNeedsGathering',
-    flag: 'quarters.quarterGathering',
-    message: 'quarterLock needs quarterGathering; the lock is the strict form of gathering',
-    broken: (r) => r.quarters.quarterLock && !r.quarters.quarterGathering,
-  },
-  {
     id: 'quarterLockNeedsEnterAllFirst',
     flag: 'entry.mustEnterAllFirst',
     message:
@@ -169,11 +187,11 @@ export const RULE_CONSTRAINTS: readonly RuleConstraint[] = [
     broken: (r) => r.movement.runnerRule && r.board.startPosition !== 'allOnOwn24',
   },
   {
-    id: 'runnerBlocksGathering',
-    flag: 'quarters.quarterGathering',
+    id: 'runnerBlocksQuarterLock',
+    flag: 'quarters.quarterLock',
     message:
-      'runnerRule and quarterGathering cannot work together: the runner must leave the quarter alone',
-    broken: (r) => r.movement.runnerRule && r.quarters.quarterGathering,
+      'runnerRule and quarterLock cannot work together: the runner must leave the quarter alone',
+    broken: (r) => r.movement.runnerRule && r.quarters.quarterLock,
   },
   {
     id: 'p2NeedsParallel',
@@ -232,7 +250,7 @@ export function validateRules(value: unknown, path = 'rules'): RuleSet {
   for (const group of RULE_GROUPS) {
     const specs = RULE_SCHEMA[group] as Readonly<Record<string, FieldSpec>>;
     const keys = Object.keys(specs);
-    const rawGroup = record(raw[group], `${path}.${group}`, keys);
+    const rawGroup = record(raw[group], `${path}.${group}`, keys, RETIRED_FIELDS[group]);
     const copy: Record<string, unknown> = {};
     for (const key of keys) {
       const spec = specs[key];

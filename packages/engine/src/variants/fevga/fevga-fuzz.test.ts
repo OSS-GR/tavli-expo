@@ -80,12 +80,28 @@ function runnerOn(own: readonly number[], target: number): boolean {
   return true;
 }
 
+/** True when `own` holds a full P1 or P2 window. */
+function breaksBan(own: readonly number[], rules: RuleSet): boolean {
+  const p2: [number, number] = rules.primes.p2Window === '6-11' ? [6, 11] : [7, 12];
+  return (
+    (rules.primes.p1NoPrimeOwnStart && holdsAll(own, 19, 24)) ||
+    (rules.primes.p2NoPrimeFrontOfMother && holdsAll(own, p2[0], p2[1]))
+  );
+}
+
 /**
  * P3 (`fevga.md`): true when `player` has a legal single-die move for some
- * die 1–6, with their runner rule and bearing off.
+ * die 1–6, with their runner rule and bearing off. The move must not end in
+ * a P1 or P2 prime (Q21).
  */
 function hasSingleMove(board: BoardState, player: PlayerId, rules: RuleSet): boolean {
   const own = counts(board, player);
+  const endsInBan = (from: number, to: number): boolean => {
+    const after = own.slice();
+    after[from] = (after[from] as number) - 1;
+    after[to] = (after[to] as number) + 1;
+    return breaksBan(after, rules);
+  };
   const other = opponent(player);
   const target = rules.movement.runnerTarget === 'passMother' ? 11 : 12;
   const locked = rules.movement.runnerRule && own[24] !== 15 && runnerOn(own, target);
@@ -101,7 +117,7 @@ function hasSingleMove(board: BoardState, player: PlayerId, rules: RuleSet): boo
       if (own[from] === 0 || (from === 24 && locked)) continue;
       const to = from - die;
       if (to >= 1 ? board.points[abs(to, player) - 1]?.[other] === 0 : home) {
-        if (to >= 0 || from === highest) return true;
+        if ((to >= 0 || from === highest) && !endsInBan(from, Math.max(to, 0))) return true;
       }
     }
   }
@@ -175,6 +191,14 @@ function playRandomGame(seed: number, rules: RuleSet, stats: Stats): void {
     // Runner rule: while it is on, at most one checker has left point 24.
     if (rules.movement.runnerRule && runnerOn(mine, target)) {
       check((mine[24] as number) >= 14, seed, 'a second checker left 24 too early');
+    }
+    // Q22 (fevga.md #21): both players are never blocked at the same time.
+    if (!fevga.isGameOver(next)) {
+      check(
+        hasSingleMove(next.board, other, rules) || hasSingleMove(next.board, player, rules),
+        seed,
+        'both players are blocked',
+      );
     }
     // P3: a play that leaves the opponent no move is legal only if every play does.
     if (rules.primes.p3MustLeaveMove && !fevga.isGameOver(next)) {

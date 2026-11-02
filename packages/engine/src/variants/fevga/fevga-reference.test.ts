@@ -105,16 +105,26 @@ function reference(state: GameState, dice: Dice): { finals: Set<string>; used: n
     return true;
   };
   const [low2, high2] = primes.p2Window === '6-11' ? [6, 11] : [7, 12];
-  const banned = (s: Seq): boolean =>
+  const bannedOwn = (own: readonly number[]): boolean =>
     on &&
-    ((primes.p1NoPrimeOwnStart && holds(s.own, 19, 24)) ||
-      (primes.p2NoPrimeFrontOfMother && holds(s.own, low2, high2)));
-  // P3: the opponent has a single-die move for some die. Their point q is the mover's other one.
+    ((primes.p1NoPrimeOwnStart && holds(own, 19, 24)) ||
+      (primes.p2NoPrimeFrontOfMother && holds(own, low2, high2)));
+  const banned = (s: Seq): boolean => bannedOwn(s.own);
+  // The opponent's checkers after one single move from `from` with `die`.
+  const theirsAfter = (from: number, die: number): number[] => {
+    const next = theirs.slice();
+    next[from] = (next[from] ?? 0) - 1;
+    const to = Math.max(from - die, 0);
+    next[to] = (next[to] ?? 0) + 1;
+    return next;
+  };
+  // P3: the opponent has a single-die move for some die, and the move does
+  // not end in a P1 or P2 prime (Q21). Their point q is the mover's other one.
   const leaves = (s: Seq): boolean =>
-    DIE_VALUES.some(
-      (die) =>
-        singleMoves(theirs, die, rules, (q) => (s.own[q > 12 ? q - 12 : q + 12] ?? 0) === 0)
-          .length > 0,
+    DIE_VALUES.some((die) =>
+      singleMoves(theirs, die, rules, (q) => (s.own[q > 12 ? q - 12 : q + 12] ?? 0) === 0).some(
+        (from) => !bannedOwn(theirsAfter(from, die)),
+      ),
     );
   const p3 = (seqs: Seq[]): Seq[] => {
     const open = seqs.filter(leaves);

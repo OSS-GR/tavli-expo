@@ -436,6 +436,29 @@ describe('stored flow', () => {
     expect(loadStored(old)).toEqual({ flow: loaded.flow, previousGame: null });
   });
 
+  it('plays on a flow saved with the retired quarterGathering flag (Q27)', () => {
+    for (const choice of ['asodio', 'tavli'] as const) {
+      const { flow, rng } = create(choice, 7);
+      const text = storeFlow(flow, null);
+      const old = text.replaceAll('"quarterLock":', '"quarterGathering":true,"quarterLock":');
+      expect(old).not.toBe(text);
+      const picker = createSeededRng(70);
+      let loaded = loadStored(old);
+      for (let i = 0; i < 5000 && loaded.flow.match.status !== 'finished'; i++) {
+        const side = waitingFor(loaded.flow) as PlayerId;
+        const view = toView({ ...VIEW, version: i, choice, flow: loaded.flow });
+        const step =
+          view.prompt !== null
+            ? answerPrompt(loaded.flow, side, pickChoice(view.prompt.choices, picker), rng)
+            : loaded.flow.game.phase === 'awaiting-roll'
+              ? rollDice(loaded.flow, side, rng)
+              : playTurn(loaded.flow, side, pickTurn(loaded.flow.game, picker), rng);
+        loaded = loadStored(storeStep(loaded, step));
+      }
+      expect(loaded.flow.match.status).toBe('finished');
+    }
+  });
+
   it('saves no endedGame: it is a field of the step result only', () => {
     const { flow, rng } = create('portes', 1, 5);
     const before = loadStored(storeFlow(flow, null));

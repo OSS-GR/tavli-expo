@@ -40,7 +40,7 @@ const NEUTRAL: RuleGroups = {
     moveWhileLoading: true,
     barEntryNeedsSpecial: false,
   },
-  quarters: { quarterGathering: false, quarterLock: false, moveInsideFrozenQuarter: false },
+  quarters: { quarterLock: false, moveInsideFrozenQuarter: false },
   specialRolls: { aceDeuceChoosesDouble: false, complementaryDoubles: false },
   extraRolls: { aceDeuceExtraRoll: false, doublesGiveExtraRoll: false },
   bearOff: { exactBearOff: false, bearOffWhilePinned: false },
@@ -104,7 +104,7 @@ const ASODIO_KAFENEIO_CHANGES = {
   board: { startPosition: 'offBoard' },
   capture: { captureMode: 'pin' },
   entry: { firstEntryGate: true, mustEnterAllFirst: true, moveWhileLoading: false },
-  quarters: { quarterGathering: true, quarterLock: true },
+  quarters: { quarterLock: true },
   match: { rotation: ['asodio'] },
 } as const satisfies RuleOverrides;
 

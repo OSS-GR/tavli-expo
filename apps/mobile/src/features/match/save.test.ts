@@ -459,6 +459,24 @@ describe('the rules version in the save (#241)', () => {
   });
 });
 
+describe('rules saved with a retired flag (Q27)', () => {
+  it('loads an Asodio or Tavli save whose log still holds quarterGathering', () => {
+    for (const game of ['asodio', 'tavli'] as const) {
+      const storage = createMemoryStorage();
+      const s = registry(storage).start({ ...defaultSetup('local'), game });
+      openGame(s);
+      const text = serializeSavedMatch(s.id, s.setup, flowOf(s), 42);
+      const old = text.replaceAll('"quarterLock":', '"quarterGathering":true,"quarterLock":');
+      expect(old).not.toBe(text);
+      const result = parseSavedMatch(old, LEVELS);
+      expect(result.kind).toBe('ok');
+      if (result.kind !== 'ok') return;
+      expect(result.saved.flow.match).toEqual(flowOf(s).match);
+      expect(result.saved.flow.game).toEqual(flowOf(s).game);
+    }
+  });
+});
+
 describe('the Plakoto version of a Tavli match in the save (#247)', () => {
   const federation = { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' } as const;
   const tavli: MatchSetup = { ...defaultSetup('local'), game: 'tavli', rulesVersions: federation };

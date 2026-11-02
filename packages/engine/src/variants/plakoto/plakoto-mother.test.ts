@@ -105,14 +105,16 @@ describe('motherRule "offerConcede" (app default)', () => {
     expect(() => answer(black(PIN), 'white', 'resign')).toThrow(illegalAction);
   });
 
-  it('afterEachMove asks about a pin that ended later in the turn; endOfTurn does not', () => {
-    // Black pins with 3/1* and bears that checker off with the 1.
+  it('with both timings, only a mother still pinned at the end of the turn is asked about', () => {
+    // Black pins with 3/1* and bears that checker off with the 1 (Q24).
     const text = 'w: 24 6x14 ; b: 3 2 offx13';
     const each = play(black(text), [2, 1], '3/1* 1/0');
     expect(formatPlakoto(each.board)).toBe('w: 24 6x14 ; b: 2 offx14');
-    expect(plakoto.prompt?.(each)).toEqual(ASK_WHITE);
+    expect(plakoto.prompt?.(each)).toBeNull();
     const end = play(black(text, END_OF_TURN), [2, 1], '3/1* 1/0');
     expect(plakoto.prompt?.(end)).toBeNull();
+    // afterEachMove asks when the mother is still pinned at the end of the turn.
+    expect(plakoto.prompt?.(play(black(PIN), [5, 2], '3/1* 10/5'))).toEqual(ASK_WHITE);
     // endOfTurn asks when the mother is still pinned at the end of the turn.
     expect(plakoto.prompt?.(play(black(PIN, END_OF_TURN), [5, 2], '3/1* 10/5'))).toEqual(ASK_WHITE);
   });

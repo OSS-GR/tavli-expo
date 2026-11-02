@@ -135,7 +135,7 @@ interface RuleSet {
     moveWhileLoading;
     barEntryNeedsSpecial;
   };
-  quarters: { quarterGathering; quarterLock; moveInsideFrozenQuarter };
+  quarters: { quarterLock; moveInsideFrozenQuarter };
   specialRolls: { aceDeuceChoosesDouble; complementaryDoubles };
   extraRolls: { aceDeuceExtraRoll; doublesGiveExtraRoll };
   bearOff: { exactBearOff; bearOffWhilePinned };
@@ -195,7 +195,12 @@ interface RuleSet {
   with the rotation (for #51). Portes, Plakoto and Fevga are all built, so a
   `tavli` match plays every game of the rotation.
 - The two Acey-Deucey presets turn the owner's army rules off
-  (`mustEnterAllFirst`, `quarterGathering`, `quarterLock`).
+  (`mustEnterAllFirst`, `quarterLock`).
+- Retired fields: `validateRules` still accepts a field that `RuleSet` no
+  longer has (`RETIRED_FIELDS` in `rules-validate.ts`) and drops it, so old
+  saved games, match logs, history and online games keep loading. Today
+  that is `quarters.quarterGathering` (owner, Q27). Never reuse a retired
+  name.
 - `getPreset(id)` returns the frozen preset. Bump its `version` in
   `presets.ts` when you change any value.
 
@@ -234,12 +239,11 @@ that only means something with another setting must stay neutral without it.
 | `entryGateNeedsOffBoard`        | `firstEntryGate` needs `startPosition: 'offBoard'`.                                                                      |
 | `enterAllFirstNeedsOffBoard`    | `mustEnterAllFirst` needs `startPosition: 'offBoard'`.                                                                   |
 | `loadingLockNeedsEnterAllFirst` | `moveWhileLoading: false` needs `mustEnterAllFirst: true`.                                                               |
-| `quarterLockNeedsGathering`     | `quarterLock` needs `quarterGathering` (the lock is the strict form).                                                    |
 | `quarterLockNeedsEnterAllFirst` | `quarterLock` with `offBoard` needs `mustEnterAllFirst`: the starting quarter is locked until all 15 are in (phase 2.1). |
 | `frozenMoveNeedsLock`           | `moveInsideFrozenQuarter` needs `quarterLock`.                                                                           |
 | `runnerNeedsParallel`           | `runnerRule` needs `direction: 'parallel'`.                                                                              |
 | `runnerNeedsStartStack`         | `runnerRule` needs `startPosition: 'allOnOwn24'`.                                                                        |
-| `runnerBlocksGathering`         | `runnerRule` and `quarterGathering` cannot both be on: the runner must leave the quarter alone.                          |
+| `runnerBlocksQuarterLock`       | `runnerRule` and `quarterLock` cannot both be on: the runner must leave the quarter alone.                               |
 | `p2NeedsParallel`               | `p2NoPrimeFrontOfMother` needs `direction: 'parallel'` (its window is defined for Fevga).                                |
 | `primeRulesOffMeansOff`         | `primeRulesOff` needs P1, P2, P3 and `noPrimeOwnHome` all `false`.                                                       |
 | `motherNeedsPin`                | `motherRule` other than `'none'` needs `captureMode: 'pin'`.                                                             |
@@ -472,7 +476,7 @@ own 24 has opponent checkers on top. The result is read from the board.
 | `offerConcede` (default) | The pinned player is asked "resign or play on" (`Variant.prompt`).        | Draw, 0 points      |
 | `federation`             | The pinner wins 2 (`motherPinned`) once the pinner has nothing on own 24. | Draw, 0 points      |
 | `instant`                | The pinner wins 2 at once.                                                | Cannot happen       |
-| `none`                   | Nothing special.                                                          | Nothing special     |
+| `none`                   | Nothing special.                                                          | Draw, 0 points      |
 
 - `motherCheckTiming: "afterEachMove"` (default): the board is checked
   after every single move. When the game ends (a federation or instant
@@ -485,10 +489,10 @@ own 24 has opponent checkers on top. The result is read from the board.
 - `offerConcede` asks its question when the turn is over, with both
   timings, because the flow asks only between turns. The answer cannot
   change the rest of the turn, so the outcome is the same as with a
-  question in the middle of the turn. With `"afterEachMove"`, a mother that
-  was pinned after any move of the turn is asked about, even if the pin
-  ended later in that turn (the pinner bore off). With `"endOfTurn"`, only
-  a mother that is still pinned at the end is asked about.
+  question in the middle of the turn. With both timings, only a mother
+  that is still pinned at the end of the turn is asked about: a pin made
+  and lifted in the same turn (the pinner bore off) asks nothing (owner,
+  Q24).
 - `offerConcede` keeps `{ offer, playOn, conceded }` in
   `state.variantData` (`null` when there is nothing to keep). `offer` is
   the player who must answer now: `prompt` returns `{ player, kind:
@@ -497,10 +501,11 @@ own 24 has opponent checkers on top. The result is read from the board.
   `answerPrompt(state, player, 'resign')` ends the game: the opponent wins
   2 (`reason: 'resigned'`). `'playOn'` adds the player to `playOn`; that
   player is not asked again in this game.
-- `mutualMotherPin: "replay"` throws `NOT_SUPPORTED` with `offerConcede`
-  and `federation`.
-- With `none`, two pinned mothers can never move again, so that game
-  cannot end (an open question for the rules doc).
+- `mutualMotherPin: "replay"` throws `NOT_SUPPORTED` with every rule but
+  `instant`.
+- With `none`, two pinned mothers can never move again, so the game ends
+  in a draw at that moment, like the other rules (owner, Q23; edge case
+  21).
 
 Flags Plakoto reads: `movement.higherDieRule`,
 `capture.intermediatePinBlocks`, `bearOff.bearOffWhilePinned` and the three
@@ -567,6 +572,8 @@ are from `src/`. `plakoto-edge-cases.test.ts` reads this table.
 | 18   | Last checker off, loser has 0 off → 2                   | `variants/plakoto/plakoto.test.ts` |
 | 19   | No legal move → pass                                    | `variants/plakoto/plakoto.test.ts` |
 | 20   | `motherRule="instant"` → +2 at once; no draw            | `variants/plakoto/plakoto.test.ts` |
+| 21   | `motherRule="none"`, both mothers pinned → draw         | `variants/plakoto/plakoto.test.ts` |
+| 22   | Pin made and lifted in one turn → no question           | `variants/plakoto/plakoto.test.ts` |
 
 ## Fevga
 
@@ -596,6 +603,10 @@ Code: `src/variants/fevga/`. Rules: `docs/rules/fevga.md` and
   4. P3: if some play leaves the opponent a single-die move (for any die
      1–6, with the opponent's runner rule and bearing off), drop the plays
      that do not. If none does, any play is legal and the opponent passes.
+     The opponent's test move obeys P1 and P2 too, with the active
+     `p2Window` (owner, Q21; edge case 20). This never changes a real game:
+     an opponent that can only reach a banned window holds five of its
+     points, so it can always move onto one of its own points instead.
      With `p3Priority: "beforeDiceRule"`, P3 runs before step 3.
 
   `primeRulesOff` turns P1, P2 and P3 off.
@@ -634,7 +645,9 @@ Tests:
 - `fevga-fuzz.test.ts`: 2,000 random games (and 100 per flag setting) to
   the end. After every move: 15 checkers each, never two colors on a
   point, pip count down by the die. After every turn: no P1 or P2 prime,
-  the runner rule, and P3 (a full block only when every play blocks).
+  the runner rule, P3 (a full block only when every play blocks), and
+  never both players blocked at once (edge case 21: it cannot happen, so
+  the engine has no draw for it).
 - `fevga-perf.test.ts`: median < 5 ms and worst < 50 ms.
 - Test helpers: `src/testing/fevga-notation.ts` (the position notation for
   parallel movement: `fevgaState('w: 24x14 13 ; b: 24x15')`) and
@@ -658,7 +671,7 @@ Code: `src/variants/asodio/`. Rules: `docs/rules/asodio.md` and
   `barEntryNeedsSpecial` (a hit checker waits for a 1-2 or a double). A
   gated roll is a pass.
 - The single-move rules, checked after every move (so a lock that ends in
-  the middle of a roll frees the rest of it; open question Q26):
+  the middle of a roll frees the rest of it; owner, Q26):
   1. Hit checkers enter before anything else moves. Checkers that never
      entered have no such priority.
   2. A pinned checker cannot move.
@@ -674,7 +687,7 @@ Code: `src/variants/asodio/`. Rules: `docs/rules/asodio.md` and
      one free opponent checker is pinned, and a point where the opponent
      pins our checker is closed; `"hit"`: the checker goes to the bar.
   6. Bearing off: nothing outside or on the bar, all home, and (pins) none
-     pinned unless `bearOffWhilePinned` (open question Q25). `exactBearOff`:
+     pinned unless `bearOffWhilePinned` (owner, Q25). `exactBearOff`:
      only the exact die bears off.
 - Then "use as much of the roll as possible" and the higher-die rule, as in
   Portes. `legalTurns` lists one play per end position; `applyTurn` accepts
@@ -696,9 +709,8 @@ choices: ['1', …, '6'] }` (`variantData: { chooseDouble: true }`).
   player has a single legal move with any die, every roll passes forever,
   so the game is a draw (`reason: 'deadlock'`, 0 points). Resigning uses
   the shared rule (`pointsForLoss` follows `scoring.method`).
-- Not built yet (`NOT_SUPPORTED`): `nominateBlot`, `complementaryDoubles`,
-  `quarterGathering` without `quarterLock` (open question Q27) and the
-  doubling cube. Flags of other games throw `RULES_CONFLICT`, as do
+- Not built yet (`NOT_SUPPORTED`): `nominateBlot`, `complementaryDoubles`
+  and the doubling cube. Flags of other games throw `RULES_CONFLICT`, as do
   `captureMode: "none"` and `startPosition: "portes"`.
 - A board that cannot happen under the rules (a bar checker with pins, a
   pin with hits, checkers outside without `"offBoard"`) throws
@@ -726,8 +738,8 @@ Tests:
   mix, checked after every move (15 checkers each, stacking, pins never
   move, pip counts, the army rules, every move against the oracle) and
   after every turn (`applyTurn` board, the roll chain). About 3 s. In
-  random play most owner-version games end in a deadlock (open question
-  Q28).
+  random play most owner-version games end in a deadlock (Q28: the owner
+  keeps the rule; check in playtests).
 - Test helpers: `src/testing/asodio-notation.ts` (`out`, `bar` and `!` for
   pins: `asodioState('w: 24 23 outx13 ; b: outx15')`, turns like
   `out/22 13/8*`) and `src/testing/random-asodio.ts`.

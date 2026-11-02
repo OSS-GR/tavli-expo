@@ -141,14 +141,11 @@ export interface EntryRules {
 /** Asodio's quarter-by-quarter rules. */
 export interface QuarterRules {
   /**
-   * `asodio.md` flag `quarterGathering` (default `true`, owner): all 15
-   * checkers gather in one quarter before any checker leaves it.
-   */
-  readonly quarterGathering: boolean;
-  /**
    * `asodio.md` flag `quarterLock` (default `true`, owner): a checker that
    * enters a new quarter is frozen there until all 15 are in that quarter.
-   * The strict form of `quarterGathering`.
+   * So all 15 gather in one quarter before any checker leaves it. (The old
+   * `quarterGathering` flag is gone, owner Q27; `validateRules` drops it
+   * from old saved rules.)
    */
   readonly quarterLock: boolean;
   /**
@@ -367,7 +364,6 @@ export const RULE_SCHEMA = {
     barEntryNeedsSpecial: bool,
   },
   quarters: {
-    quarterGathering: bool,
     quarterLock: bool,
     moveInsideFrozenQuarter: bool,
   },

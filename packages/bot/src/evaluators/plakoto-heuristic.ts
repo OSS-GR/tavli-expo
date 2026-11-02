@@ -303,19 +303,17 @@ export function plakotoTurnResult(
   rules: MotherRules,
 ): number | null {
   const rule = rules.motherRule;
-  if (rule !== 'none') {
-    const otherPinned = motherPinned(other);
-    const moverPinned = motherPinned(mover);
-    // Both mothers pinned: a draw (`mutualMotherPin`).
-    if (otherPinned && moverPinned) return 0;
-    if (rule === 'instant') {
-      if (otherPinned) return 2;
-      if (moverPinned) return -2;
-    }
-    if (rule === 'federation') {
-      if (otherPinned && at(mover, START) === 0) return 2;
-      if (moverPinned && at(other, START) === 0) return -2;
-    }
+  const otherPinned = motherPinned(other);
+  const moverPinned = motherPinned(mover);
+  // Both mothers pinned: a draw (`mutualMotherPin`), with every rule (Q23).
+  if (otherPinned && moverPinned) return 0;
+  if (rule === 'instant') {
+    if (otherPinned) return 2;
+    if (moverPinned) return -2;
+  }
+  if (rule === 'federation') {
+    if (otherPinned && at(mover, START) === 0) return 2;
+    if (moverPinned && at(other, START) === 0) return -2;
   }
   if (at(mover, OFF) === 15) return at(other, OFF) > 0 ? 1 : 2;
   return null;

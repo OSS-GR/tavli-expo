@@ -35,6 +35,10 @@ Core idea: all 15 checkers move as **one army, quarter by quarter**, and you
    reading of the owner's sheet, matches A2). Flag `moveInsideFrozenQuarter`,
    default `false`. Confirm in playtests.
 4. If one checker lags behind, the whole front is frozen.
+5. A lock ends at the move that completes it, also in the middle of a roll.
+   When the last checker enters with the first die, the second die may
+   already move the army. When the last lagging checker joins the new
+   quarter, the rest of the roll may advance (owner, Q26, 2026-11-02).
 
 ### Phase 3 — Pinning (Plakoto style)
 
@@ -49,6 +53,8 @@ Core idea: all 15 checkers move as **one army, quarter by quarter**, and you
 ### Bearing off and winning
 
 - Bear off as in Portes once all 15 are in the home quarter (owner, A4).
+- No bearing off while one of your checkers is pinned, even inside your
+  home, as in Plakoto (`bearOffWhilePinned=false`; owner, Q25, 2026-11-02).
 - Score 1 point, or 2 (mars) if the loser has borne off none (owner, A4).
 
 ### Owner answers (2026-10-26)
@@ -61,6 +67,16 @@ Core idea: all 15 checkers move as **one army, quarter by quarter**, and you
 | A4 | Bearing off and scoring as in Portes? | Yes |
 | A5 | Deadlock (no one can ever move)? | Draw, 0 points |
 | A6 | Pinned lagging checker freezes its owner's army? | Yes; that player passes until freed (default, not asked) |
+
+### Owner answers (2026-11-02)
+
+| # | Question | Answer |
+|---|----------|--------|
+| Q25 | Bear off while a checker is pinned? | No, as in Plakoto (kept as built) |
+| Q26 | A lock that ends in the middle of a roll? | The rest of the roll may move (kept as built) |
+| Q27 | `quarterGathering` without `quarterLock`? | Drop the flag: `quarterLock` already says it |
+| Q28 | Deadlocks are common in random and bot games. | Keep the rule (A5: a draw); check in playtests |
+| Q29 | Research text vs owner defaults? | Kept as built: the research sections below are marked "research version" |
 
 ## Summary (research on other versions)
 
@@ -114,6 +130,9 @@ toward own point 1.
 
 ## Turn & dice rules
 
+Research version (the Acey-Deucey presets; owner, Q29). The owner version
+is at the top of this page.
+
 1. Opening roll and starter: as `tavli-match.md`.
 2. Normal roll: two moves, doubles four moves. Must use as much of the roll
    as possible; higher die rule.
@@ -136,6 +155,8 @@ toward own point 1.
    a chain of "sub-rolls".
 
 ## Movement rules
+
+Research version, like "Turn & dice rules".
 
 1. **Entering:** a die `d` enters one outside checker on own point `25 - d`
    (opponent's home), if that point is not an opponent door. Entering on an
@@ -186,6 +207,9 @@ or as an optional extra in a custom rotation.
 
 ## Edge cases
 
+Cases 1–13 are for the research version (the engine tests them with the
+Acey-Deucey presets). The owner cases are 14–19, after the presets.
+
 1. Start: 30 checkers outside, board empty.
 2. `firstEntryGate`: first roll 6-4 → no move.
 3. `firstEntryGate`: first roll 3-3 → enter four checkers on own 22 (or enter
@@ -219,12 +243,11 @@ or as an optional extra in a custom rotation.
 | `complementaryDoubles` | bool | `false` | European Acey-Deucey: after a double, also play its complement (sum 7, e.g. 6-6 → 1-1), then roll again. |
 | `barEntryNeedsSpecial` | bool | `false` | Greek folk sources: `true`. |
 | `captureMode` | `"hit"`, `"pin"` | `"pin"` (owner) | Owner version pins like Plakoto. Acey-Deucey hits. |
-| `quarterLock` | bool | `true` (owner) | A checker that enters a new quarter is frozen until all 15 are in that quarter. |
+| `quarterLock` | bool | `true` (owner) | A checker that enters a new quarter is frozen until all 15 are in that quarter. So all 15 gather in one quarter before advancing (Greek Wikipedia/cna.gr and the owner). The old flag `quarterGathering` is gone (owner, Q27). |
 | `moveWhileLoading` | bool | `false` (owner, A2) | Entered checkers may not move until all 15 are in. |
 | `moveInsideFrozenQuarter` | bool | `false` | Frozen checkers may not move inside their quarter. |
 | `deadlock` | `"draw"` | `"draw"` (owner, A5) | No one can ever move: draw, 0 points. |
 | `nominateBlot` | bool | `false` | Frantzis: at end of turn you may name an own blot; opponent must hit it if possible. |
-| `quarterGathering` | bool | `true` (owner) | Greek Wikipedia/cna.gr and the owner: all 15 gather in one quarter before advancing. See `quarterLock`. |
 | `exactBearOff` | bool | `false` | |
 | `scoring` | `"tavli"`, `"perChecker"`, `"singleOnly"` | `"tavli"` | |
 
@@ -232,7 +255,7 @@ or as an optional extra in a custom rotation.
 
 | Preset | Flags |
 |---|---|
-| `kafeneio` (default, owner) | `startPosition=offBoard`, `firstEntryGate=true`, `mustEnterAllFirst=true`, `quarterGathering=true`, `quarterLock=true`, `captureMode=pin`, no extra rolls |
+| `kafeneio` (default, owner) | `startPosition=offBoard`, `firstEntryGate=true`, `mustEnterAllFirst=true`, `quarterLock=true`, `captureMode=pin`, no extra rolls |
 | `aceyDeuceyGreek` | `captureMode=hit`, `aceDeuceExtraRoll=true`, `doublesGiveExtraRoll=true`, `barEntryNeedsSpecial=true` |
 | `aceyDeuceyAmerican` | `captureMode=hit`, `firstEntryGate=false`, `scoring=perChecker` |
 
