@@ -250,6 +250,28 @@ describe('buttonThrow', () => {
     expect(a.velocity.y).toBeLessThan(0);
     expect(Math.sign(a.velocity.x)).toBe(-Math.sign(b.velocity.x));
   });
+
+  it('throws down from the far wall for the other player online (#373)', () => {
+    const a = buttonThrow(BOX, 0, THROW_TUNING, 'top');
+    const b = buttonThrow(BOX, 1, THROW_TUNING, 'top');
+    expect(a.at.y).toBe(BOX.top);
+    expect(a.velocity.y).toBeGreaterThan(0);
+    // The same speed and the same point along the wall as from the near wall.
+    const near = buttonThrow(BOX, 0);
+    expect(a.at.x).toBe(near.at.x);
+    expect(a.velocity.y).toBeCloseTo(-near.velocity.y);
+    // Two throws in a row come in from two places.
+    expect(a.at.x).not.toBe(b.at.x);
+    // The dice land on the values and stay in the box.
+    const plan = planThrow(input({ start: a }));
+    plan.dice.forEach((d, i) => expect(last(d.face)).toBe([5, 3][i]));
+    everyPose(plan, (x, y) => {
+      expect(x).toBeGreaterThanOrEqual(BOX.left - 1e-6);
+      expect(x).toBeLessThanOrEqual(BOX.right + 1e-6);
+      expect(y).toBeGreaterThanOrEqual(BOX.top - 1e-6);
+      expect(y).toBeLessThanOrEqual(BOX.bottom + 1e-6);
+    });
+  });
 });
 
 describe('tapThrow', () => {
