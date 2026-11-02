@@ -1,7 +1,7 @@
 // Turn notifications in the app (#285): the offer after an async invite,
 // "Not now", the token on the server, a tap on a push, and the Settings
 // row. The routes that matter are the real ones; the game board is a stub.
-import type { createRecordingAnalytics } from '@tavli/contracts';
+import type { createRecordingAnalytics, PushTap } from '@tavli/contracts';
 import { router } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 import { AccessibilityInfo, Linking, Text } from 'react-native';
@@ -25,6 +25,7 @@ import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { onlineFake } from '../../../test/onlineFake';
 
 import { resetTurnPushesForTest } from './appTurnPushes';
+import { PUSH_TAP_MAX_TRIES, PUSH_TAP_RETRY_MS } from './pushTaps';
 import { TURN_PUSHES_STORAGE_KEY } from './turnPushes';
 
 const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
@@ -317,6 +318,151 @@ describe('a tap on a push', () => {
     await user.press(screen.getByRole('button', { name: 'Continue' }));
     await flush();
     expect(screen).toHavePathname('/game/k57abc');
+  });
+});
+
+describe('a tap on a push, when the router does not take the navigation (#325)', () => {
+  let restore: (() => void)[] = [];
+  afterEach(() => {
+    for (const undo of restore) undo();
+    restore = [];
+  });
+
+  /**
+   * The phone's notifications, but the tap that opened the app comes only
+   * on `release()`, after the router is up: a test can then make the
+   * router miss the navigation.
+   */
+  function slowOpeningTap(): () => Promise<void> {
+    let open!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const phone = onlineFake.notifications;
+    const replaced = jest.replaceProperty(services, 'notifications', {
+      ...phone,
+      lastTap: async () => {
+        await gate;
+        return phone.lastTap();
+      },
+    });
+    restore.push(() => replaced.restore());
+    return async () => {
+      open();
+      await flush();
+    };
+  }
+
+  /** The router misses the next navigation: `how` throws, or does nothing. */
+  function missNextNavigation(how: 'throws' | 'drops') {
+    const navigate = jest.spyOn(router, 'navigate').mockImplementationOnce(() => {
+      if (how === 'throws') throw new Error('The router is not ready.');
+    });
+    restore.push(() => navigate.mockRestore());
+    return navigate;
+  }
+
+  async function waitForRetry(): Promise<void> {
+    await act(async () => {
+      jest.advanceTimersByTime(PUSH_TAP_RETRY_MS);
+    });
+    await flush();
+  }
+
+  it.each(['throws', 'drops'] as const)(
+    'the tap that opened the app still opens its game when the first navigation %s',
+    async (how) => {
+      onlineFake.notifications.tap({ gameId: 'k57abc' }, { opensApp: true });
+      const release = slowOpeningTap();
+      await renderRouter(routes, { initialUrl: '/' });
+      await flush();
+      const navigate = missNextNavigation(how);
+      await release();
+      // The phone gives the opening tap once: the layout keeps it.
+      expect(screen).toHavePathname('/');
+      await waitForRetry();
+      expect(screen).toHavePathname('/game/k57abc');
+      expect(navigate).toHaveBeenCalledTimes(2);
+      // Opened: nothing tries again.
+      await act(async () => {
+        router.back();
+      });
+      await waitForRetry();
+      expect(screen).toHavePathname('/');
+      expect(navigate).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it(`gives up after ${PUSH_TAP_MAX_TRIES} tries, and never opens the game later`, async () => {
+    onlineFake.notifications.tap({ gameId: 'k57abc' }, { opensApp: true });
+    const release = slowOpeningTap();
+    await renderRouter(routes, { initialUrl: '/' });
+    await flush();
+    const navigate = jest.spyOn(router, 'navigate').mockImplementation(() => undefined);
+    await release();
+    for (let i = 0; i < PUSH_TAP_MAX_TRIES + 1; i += 1) await waitForRetry();
+    expect(navigate).toHaveBeenCalledTimes(PUSH_TAP_MAX_TRIES);
+    navigate.mockRestore();
+    await act(async () => {
+      router.push('/settings');
+    });
+    await waitForRetry();
+    expect(screen).toHavePathname('/settings');
+  });
+
+  it('opens the tap that opened the app once, when the listener gets it too', async () => {
+    const opening: PushTap = { id: 'push-1', gameId: 'k57abc' };
+    let listener: ((tap: PushTap) => void) | null = null;
+    const replaced = jest.replaceProperty(services, 'notifications', {
+      ...onlineFake.notifications,
+      lastTap: () => Promise.resolve(opening),
+      onTap: (next: (tap: PushTap) => void) => {
+        listener = next;
+        return () => {
+          listener = null;
+        };
+      },
+    });
+    restore.push(() => replaced.restore());
+    await renderRouter(routes, { initialUrl: '/' });
+    await flush();
+    expect(screen).toHavePathname('/game/k57abc');
+    await act(async () => {
+      router.back();
+    });
+    await act(async () => listener?.({ ...opening }));
+    await waitForRetry();
+    expect(screen).toHavePathname('/');
+    // A new tap on a push of the same game opens it again.
+    await act(async () => listener?.({ id: 'push-2', gameId: 'k57abc' }));
+    await flush();
+    expect(screen).toHavePathname('/game/k57abc');
+  });
+
+  it('with an invite link before the welcome answer opens the invite, then the game', async () => {
+    await act(async () => {
+      storage.remove(CONSENT_STORAGE_KEY);
+      consentStore.setState({ status: 'unset' });
+      storage.remove(WELCOME_BOARD_STORAGE_KEY);
+      boardStepStore.setState({ status: 'new' });
+    });
+    const user = setupUser();
+    onlineFake.notifications.tap({ gameId: 'k57abc' }, { opensApp: true });
+    await renderRouter(routes, { initialUrl: '/invite/ABCD2345' });
+    await flush();
+    expect(screen).toHavePathname('/welcome/language');
+    await user.press(screen.getByRole('button', { name: 'Continue' }));
+    await user.press(screen.getByRole('button', { name: "Don't allow" }));
+    await user.press(screen.getByRole('button', { name: 'Continue' }));
+    await flush();
+    expect(screen).toHavePathname('/game/k57abc');
+    // The invite waits under the game.
+    await act(async () => {
+      router.back();
+    });
+    expect(screen).toHavePathname('/invite/ABCD2345');
+    await waitForRetry();
+    expect(screen).toHavePathname('/invite/ABCD2345');
   });
 });
 
