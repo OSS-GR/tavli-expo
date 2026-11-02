@@ -1,8 +1,8 @@
 /**
  * The dice throw in a real game (issue #183, the step after the spike).
  *
- * A roll in a real game — by swipe, tap on the board, or the Roll button —
- * plays the same throw the dev board screen plays: `planThrow` works out a
+ * A roll in a real game — by swipe, tap on the board, or the Roll button,
+ * and online the other player's roll from their wall (#373) — plays the same throw the dev board screen plays: `planThrow` works out a
  * path that ends on the rolled values (they come from the engine, the
  * animation never picks a value), and Reanimated plays it back on the UI
  * thread over the board. Then the normal dice row takes over (the screen
@@ -68,6 +68,12 @@ export interface BoardThrowProps {
    */
   nearEnd: 'top' | 'bottom';
   /**
+   * The wall a throw with no swipe comes in from. The default, `'bottom'`,
+   * is the viewer's wall (the button, a tap, the bot). Online the other
+   * player's roll comes from their wall (#373).
+   */
+  wall?: 'top' | 'bottom';
+  /**
    * Where each die glides after the throw, into its place in the dice row
    * (`settleTargets`, in the same points as `geo`). `null`: the row takes
    * over where the dice stopped (landscape: the row is outside the canvas).
@@ -92,8 +98,9 @@ function throwStart(
   dieSize: number,
   bar: ThrowBar | undefined,
   nearEnd: 'top' | 'bottom',
+  wall: 'top' | 'bottom',
 ): ThrowStart {
-  if (swipe === null) return buttonThrow(box, buttonTurns++);
+  if (swipe === null) return buttonThrow(box, buttonTurns++, THROW_TUNING, wall);
   if (swipe.dx !== undefined && swipe.dy !== undefined) {
     return swipeToThrow(
       swipe.x === undefined || swipe.y === undefined ? undefined : { x: swipe.x, y: swipe.y },
@@ -116,6 +123,7 @@ export function BoardThrow({
   geo,
   swipe,
   nearEnd,
+  wall = 'bottom',
   settle,
   feedback,
   onDone,
@@ -125,7 +133,7 @@ export function BoardThrow({
     const box = boardThrowBox(geo);
     const dieSize = throwDieSize(geo);
     const bar = throwBar(geo);
-    const start = throwStart(swipe, box, dieSize, bar, nearEnd);
+    const start = throwStart(swipe, box, dieSize, bar, nearEnd, wall);
     const plan = planThrow({ box, bar, start, dieSize, values, tilts: geo.layout.dice.tilt });
     return settle ? settlePlan(plan, settle, dieSize) : plan;
   });

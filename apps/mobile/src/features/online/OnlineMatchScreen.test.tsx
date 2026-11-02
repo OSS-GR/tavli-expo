@@ -10,8 +10,10 @@ import { closedOut, lastBearOff } from '@tavli/online/testing';
 import { getLayout, getTheme } from '@tavli/themes';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
+import * as Reanimated from 'react-native-reanimated';
 
 import { REMOTE_FLIGHT_MS, turnMoveDelay } from '@/features/board/flights';
+import type { BoardThrowProps as MockBoardThrowProps } from '@/features/dice-throw/BoardThrow';
 import { buildSources } from '@/features/board/interaction';
 import { fitBoardWithShadow, slotRect } from '@/features/board/geometry';
 import {
@@ -44,7 +46,28 @@ const sounds = sound as ReturnType<typeof createRecordingSoundPlayer>;
 const MOVE_SOUNDS: readonly string[] = ['checkerPlace', 'checkerHit', 'bearOff'];
 const moveSounds = () => sounds.played.filter((s) => MOVE_SOUNDS.includes(s));
 
+// Records each dice throw over the board (one per mount), then plays the
+// real one: its wall and its dice (#373).
+const mockThrows: { wall: string | undefined; values: readonly number[] }[] = [];
+jest.mock('@/features/dice-throw/BoardThrow', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const actual = jest.requireActual<typeof import('@/features/dice-throw/BoardThrow')>(
+    '@/features/dice-throw/BoardThrow',
+  );
+  return {
+    ...actual,
+    BoardThrow: (props: MockBoardThrowProps) => {
+      React.useState(() => mockThrows.push({ wall: props.wall, values: props.values }));
+      return React.createElement(actual.BoardThrow, props);
+    },
+  };
+});
+
 runOnFakeTimers();
+
+beforeEach(() => {
+  mockThrows.length = 0;
+});
 
 let bot: OnlineBot | null = null;
 afterEach(() => {
@@ -484,12 +507,15 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(screen.getByTestId('strip-bottom')).toHaveTextContent(/your turn/i);
       sounds.played.length = 0;
       announce.mockClear();
+      mockThrows.length = 0;
 
       await user.press(button);
       // The server rolled and saved; its dice show with the roll's sound and text.
       expect(view(game).version).toBe(version + 1);
       const dice = view(game).game.state.dice!;
       expect(dice).not.toBeNull();
+      // The throw comes from your side (#373: no far wall).
+      expect(mockThrows).toEqual([{ wall: undefined, values: dice }]);
       expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
       expect(diceLabel()).toMatch(new RegExp(`^Dice ${high(dice)}`));
       expect(sounds.played.filter((s) => s === 'diceRoll')).toHaveLength(1);
@@ -597,11 +623,13 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(passed.waitingFor).toBe('white');
       expect(passed.game.lastTurn).toMatchObject({ player: 'black', moves: [] });
       const dice = passed.game.lastTurn!.dice;
-      // Its dice tumble first: no card, no Roll yet.
+      // Its dice are thrown first, from its wall (#373): no card, no Roll yet.
+      expect(mockThrows).toEqual([{ wall: 'top', values: dice }]);
       expect(screen.queryByTestId('pass-card')).toBeNull();
       expect(screen.queryByTestId('roll-button')).toBeNull();
       expect(diceLabel()).toMatch(new RegExp(`^Dice ${high(dice)}`));
-      await wait(ONLINE_PASS_DICE_MS);
+      // The card waits until the thrown dice have shown, as after your throw.
+      await wait(PASS_AFTER_THROW_MS);
       expect(screen.getByTestId('pass-card')).toHaveTextContent(passText('Opponent', dice));
       expect(screen.queryByTestId('roll-button')).toBeNull();
       // The card closes by itself; then your turn waits for your roll.
@@ -610,25 +638,41 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
     });
 
-    it('tumbles the bot’s dice when its roll arrives', async () => {
-      const game = await openGame('portes', 1, 5, BOT_THINK_MS, undefined, (server, id) => {
-        whiteToRoll(server, id);
-        const flow = viewFlow(server.getGame(id)!);
-        server.setFlowForTest(id, {
-          ...flow,
-          game: { ...flow.game, state: { ...flow.game.state, toMove: 'black' } },
-        });
+    /** The bot's turn waits for its roll. */
+    const blackToRoll = (server: MemoryGameServer, id: string) => {
+      whiteToRoll(server, id);
+      const flow = viewFlow(server.getGame(id)!);
+      server.setFlowForTest(id, {
+        ...flow,
+        game: { ...flow.game, state: { ...flow.game.state, toMove: 'black' } },
       });
+    };
+
+    it('throws the bot’s dice from its wall when its roll arrives', async () => {
+      const game = await openGame('portes', 1, 5, BOT_THINK_MS, undefined, blackToRoll);
       expect(view(game).waitingFor).toBe('black');
       sounds.played.length = 0;
       await wait(ONLINE_BOT_ROLL_MS);
       // The bot rolled; it thinks before its moves.
       expect(view(game).game.phase).toBe('moving');
       const dice = view(game).game.state.dice!;
+      // Its dice come in over the board from its wall, the far one (#373).
+      expect(mockThrows).toEqual([{ wall: 'top', values: dice }]);
       expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
       expect(diceLabel()).toMatch(new RegExp(`^Dice ${high(dice)}`));
-      expect(sounds.played).toContain('diceRoll');
+      expect(sounds.played.filter((s) => s === 'diceRoll')).toHaveLength(1);
       expect(screen.getByTestId('online-wait')).toBeOnTheScreen();
+    });
+
+    it('only tumbles the bot’s dice with Reduce Motion on', async () => {
+      const still = jest.spyOn(Reanimated, 'useReducedMotion').mockReturnValue(true);
+      const game = await openGame('portes', 1, 5, BOT_THINK_MS, undefined, blackToRoll);
+      await wait(ONLINE_BOT_ROLL_MS);
+      expect(view(game).game.phase).toBe('moving');
+      const dice = view(game).game.state.dice!;
+      expect(mockThrows).toEqual([]);
+      expect(diceLabel()).toMatch(new RegExp(`^Dice ${high(dice)}`));
+      still.mockRestore();
     });
   });
 

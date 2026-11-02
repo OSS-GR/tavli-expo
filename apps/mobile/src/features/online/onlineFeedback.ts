@@ -14,8 +14,8 @@
  *   does not follow the view before (a missed view) plays no moves.
  * - A new turn that waits for its roll: `turnStart`, as after a confirm in
  *   a local game.
- * - The other player's roll (#355): `diceRoll`, at once: their dice tumble
- *   as soon as the view is on the board. Their roll with no legal move
+ * - The other player's roll (#355): `diceRoll`, at once: their dice are
+ *   thrown over the board as soon as the view is on it (#373). Their roll with no legal move
  *   (the view is the next turn, with their pass in `lastTurn`):
  *   `diceRoll`, then `turnStart`. Your own roll is in the log (the store
  *   asked for it), so it plays as a local roll. A double chosen after a

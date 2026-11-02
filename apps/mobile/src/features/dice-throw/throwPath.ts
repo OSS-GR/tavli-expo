@@ -341,17 +341,29 @@ export function offBar(at: Vec2, room: Box, bar: ThrowBar | undefined, dieSize: 
  * A throw without a swipe (the Roll button, a tap): from the near end of
  * the box, up into the field, a bit to the left or right. `turn` picks the
  * side, so two button throws in a row look different.
+ *
+ * `wall` is the end the dice come in from: `'bottom'` (the viewer's wall,
+ * the default) or `'top'`, the far wall. Online the other player's roll
+ * comes from their wall, so it looks like they threw it (#373).
  */
 export function buttonThrow(
   box: Box,
   turn: number,
   tuning: ThrowTuning = THROW_TUNING,
+  wall: 'top' | 'bottom' = 'bottom',
 ): ThrowStart {
   const side = turn % 2 === 0 ? 1 : -1;
   const angle = (side * 18 * Math.PI) / 180;
   const speed = (tuning.minSpeed + tuning.maxSpeed) / 2;
+  const x = (box.left + box.right) / 2 - side * (box.right - box.left) * 0.2;
+  if (wall === 'top') {
+    return {
+      at: { x, y: box.top },
+      velocity: { x: Math.sin(angle) * speed, y: Math.cos(angle) * speed },
+    };
+  }
   return {
-    at: { x: (box.left + box.right) / 2 - side * (box.right - box.left) * 0.2, y: box.bottom },
+    at: { x, y: box.bottom },
     velocity: { x: Math.sin(angle) * speed, y: -Math.cos(angle) * speed },
   };
 }
