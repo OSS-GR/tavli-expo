@@ -1,4 +1,4 @@
-// Online play wiring (#266, #281, #285): built on first use, no guest at start, and
+// Online play wiring (#266, #281, #285, #315): built on first use, no guest at start, and
 // the Jest fake of `@/services` (test/onlineFake.ts).
 import {
   createMemoryAuthProvider,
@@ -21,6 +21,7 @@ import {
   games as servicesGames,
   invites as servicesInvites,
   notifications as servicesNotifications,
+  onlineData as servicesOnlineData,
   pushTokens as servicesPushTokens,
 } from './services';
 
@@ -72,6 +73,12 @@ function memoryAdapters() {
         cancelInvite: (code) => caller().cancelInvite(code),
         listMyInvites: () => caller().listMyInvites(),
         watchMyInvites: (onList, onError) => caller().watchMyInvites(onList, onError),
+      };
+    },
+    createOnlineData: ({ auth }) => {
+      made.push('onlineData');
+      return {
+        deleteMyData: () => server.onlineDataFor(auth.currentUser()?.id ?? 'nobody').deleteMyData(),
       };
     },
     createPushTokens: ({ auth }) => {
@@ -226,6 +233,28 @@ describe('createOnlineServices', () => {
     expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
   });
 
+  it('makes the online data delete on the same client, on first use (#315)', async () => {
+    const { adapters, made } = memoryAdapters();
+    const online = createOnlineServices(SERVER, adapters)!;
+    await online.auth.signInAsGuest();
+    const code = await online.invites.createInvite({
+      choice: 'portes',
+      targetPoints: 3,
+      turnTimeMinutes: null,
+    });
+    expect(made).toEqual([`auth ${SERVER.siteUrl}`, `client ${SERVER.url}`, 'invites']);
+    await online.onlineData.deleteMyData();
+    expect(made).toEqual([
+      `auth ${SERVER.siteUrl}`,
+      `client ${SERVER.url}`,
+      'invites',
+      'onlineData',
+    ]);
+    // The open invite went with the data.
+    await expect(online.invites.getInvite(code)).resolves.toBeNull();
+    await expect(online.onlineData.deleteMyData()).rejects.toMatchObject({ code: 'NOT_SIGNED_IN' });
+  });
+
   it('passes every sign-in call through', async () => {
     const { adapters } = memoryAdapters();
     const online = createOnlineServices(SERVER, adapters)!;
@@ -244,8 +273,9 @@ describe('createOnlineServices', () => {
 });
 
 describe('the Jest fake of @/services', () => {
-  it('gives the in-memory sign-in, games, invites and pushes', () => {
+  it('gives the in-memory sign-in, games, invites, pushes and online data', () => {
     expect(servicesAuth).toBe(onlineFake.auth);
+    expect(servicesOnlineData).toBe(onlineFake.onlineData);
     expect(servicesGames).toBe(onlineFake.games);
     expect(servicesInvites).toBe(onlineFake.invites);
     expect(servicesNotifications).toBe(onlineFake.notifications);
@@ -287,6 +317,21 @@ describe('the Jest fake of @/services', () => {
     await onlineFake.auth.signInAsGuest();
     const code = await onlineFake.invites.createInvite(game);
     expect(onlineFake.server().getInvite(code)).toMatchObject({ from: 'guest-1' });
+  });
+
+  it('deletes the online data of the signed-in guest, and refuses while nobody is signed in', async () => {
+    await expect(onlineFake.onlineData.deleteMyData()).rejects.toMatchObject({
+      code: 'NOT_SIGNED_IN',
+    });
+    await onlineFake.auth.signInAsGuest();
+    const game = { choice: 'plakoto', targetPoints: 1, turnTimeMinutes: null } as const;
+    const code = await onlineFake.invites.createInvite(game);
+    await onlineFake.onlineData.deleteMyData();
+    expect(onlineFake.server().getInvite(code)).toBeNull();
+    // The data is gone; the phone still holds the sign-in until it signs out.
+    await expect(onlineFake.onlineData.deleteMyData()).rejects.toMatchObject({
+      code: 'NOT_SIGNED_IN',
+    });
   });
 
   it('starts each test with nobody signed in and a new server', async () => {

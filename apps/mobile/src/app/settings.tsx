@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { tutorialHref } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
+import { auth, onlineData } from '@/services';
 
 export default function SettingsRoute() {
   const { t } = useTranslation();
+  const pushes = turnPushes();
   return (
     <>
       {/* The title names the screen for the back button of the next one. */}
@@ -15,7 +17,8 @@ export default function SettingsRoute() {
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         onLearnToPlay={(game) => router.push(tutorialHref('settings', game))}
         onHistory={() => router.push('/history')}
-        turnPushes={turnPushes()}
+        turnPushes={pushes}
+        onlineData={auth && onlineData ? { auth, data: onlineData, pushes } : undefined}
       />
     </>
   );

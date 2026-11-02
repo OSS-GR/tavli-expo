@@ -93,6 +93,7 @@ export {
   isAuthErrorData,
 } from './auth';
 export type { AuthErrorCode, AuthErrorData, AuthProvider, AuthUser, MemoryAuthStore } from './auth';
+export type { OnlineData } from './online-data';
 export { PUSH_ERROR_CODES, createRecordingPushProvider, isPushErrorCode } from './push';
 export type {
   PushErrorCode,

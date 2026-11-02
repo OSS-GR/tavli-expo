@@ -42,6 +42,7 @@ jest.mock('@/services', () => {
     invites: onlineFake.invites,
     notifications: onlineFake.notifications,
     pushTokens: onlineFake.pushTokens,
+    onlineData: onlineFake.onlineData,
     onlineServer: onlineFake.server,
     onlinePlayerId: 'me',
     gameTransportFor: onlineFake.transportFor,

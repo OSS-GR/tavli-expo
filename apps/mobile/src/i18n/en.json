@@ -169,6 +169,20 @@
       "label": "Share anonymous usage data",
       "hint": "Which modes you play, which settings you change, and crash reports. Off also stops crash reports. No names or emails."
     },
+    "onlineData": {
+      "label": "Delete my online data",
+      "hint": "Your online games and invites on our server.",
+      "deleting": "Deleting your online data…",
+      "failed": "Could not delete your online data. Check the connection and try again.",
+      "done": "Your online data is deleted.",
+      "doneHint": "The next Play a friend starts fresh.",
+      "confirmTitle": "Delete your online data?",
+      "confirmGames": "Games in progress end now. You resign them, so you lose them.",
+      "confirmInvites": "Your open invites are cancelled.",
+      "confirmPushes": "Turn notifications stop.",
+      "confirmKept": "Finished games stay for the other players, with no name. Your games and history on this phone stay too. You cannot undo it.",
+      "confirm": "Delete"
+    },
     "privacyPolicy": "Privacy policy",
     "version": "Tavlaki {{version}}",
     "learnToPlay": "Learn to play",

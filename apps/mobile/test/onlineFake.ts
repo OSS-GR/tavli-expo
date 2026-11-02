@@ -23,6 +23,11 @@
  *   starts `undetermined`, and the system prompt answers `granted`.
  *   `pushTokens` is the server's token list, called as the user signed
  *   in to `auth` (`saved` and `calls` show what reached it).
+ * - `onlineData` is Delete my online data (#315) on the server, as the
+ *   user signed in to `auth`. With nobody signed in it fails
+ *   `NOT_SIGNED_IN`, and so does a second call. It leaves `pushTokens`
+ *   alone (the app removes its token first, `deleteOnlineData`), and it
+ *   does not sign the user out: the app does.
  *
  * A test makes games with `onlineFake.server().createGame(...)`. A new
  * match waits for both opening dice (#379): `onlineFake.openGame(gameId)`
@@ -39,6 +44,7 @@ import {
   type GameTransport,
   type GameTransportErrorData,
   type Invites,
+  type OnlineData,
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
@@ -156,12 +162,21 @@ const games: GameTransport = {
   },
 };
 
+/** Delete my online data on the server, as the user signed in to `auth` at that moment. */
+const onlineData: OnlineData = {
+  deleteMyData() {
+    const user = auth.currentUser();
+    return user === null ? notSignedIn() : server.onlineDataFor(user.id).deleteMyData();
+  },
+};
+
 export const onlineFake = {
   auth,
   games,
   invites,
   notifications,
   pushTokens,
+  onlineData,
   /** Where the fake keeps the session. Set `session` to sign a user in at once. */
   authStore,
   /** The in-memory server of the current test. */

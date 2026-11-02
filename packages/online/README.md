@@ -91,6 +91,13 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
   `watchMyInvites` (#314) sends the player's open invites on a later
   microtask, then again after each change that changes the list; an
   expiry reaches it only in `runDueTimeouts()`.
+- **Delete my online data** (#315): `onlineDataFor(playerId)` gives that
+  player's `OnlineData` port. `deleteMyData()` acts like the Convex
+  `deleteMyAccount` in one go: it resigns the player's active matches
+  (the other player wins), keeps the finished ones and deletes every
+  invite the player sent. The id then counts as deleted: making,
+  accepting or declining an invite, and a second delete, get
+  `NOT_SIGNED_IN`, as on Convex (`existingPlayer`).
 - `setFlowForTest(gameId, flow)`, tests only: replaces the stored flow,
   like a Convex test that patches `games.flow`. Call it before anyone
   subscribes.
@@ -113,6 +120,8 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
 - `memory-invites.test.ts`: the `Invites` contract checks
   (`invitesContract`), the game an accept starts, codes and clashes,
   `watchMyInvites` and the expiry, and the cap on open invites.
+- `memory-online-data.test.ts`: the `OnlineData` contract checks
+  (`onlineDataContract`), and what a delete resigns, deletes and keeps.
 
 An adapter of `GameTransport` (for example the Convex adapter) runs the
 same contract checks. They are plain async functions, so Vitest and Jest

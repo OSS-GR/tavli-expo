@@ -286,6 +286,26 @@ describe('deleteMyAccount', () => {
     expect(await authRows(t, 'user', user.id)).toHaveLength(1);
   });
 
+  it('lets the app sign out after it: the old session cookie still reaches sign-out (#315)', async () => {
+    const t = setup();
+    const signIn = await t.fetch('/api/auth/sign-in/anonymous', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'tavlaki://' },
+      body: '{}',
+    });
+    const { user } = (await signIn.json()) as { user: { id: string } };
+    const cookie = signIn.headers.get('set-cookie') ?? '';
+    await as(t, user.id).mutation(api.account.deleteMyAccount, {});
+    // Delete my online data signs out next (`deleteData.ts` in the app).
+    const signOut = await t.fetch('/api/auth/sign-out', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'tavlaki://', cookie },
+      body: '{}',
+    });
+    expect(signOut.status).toBe(200);
+    expect(await authRows(t, 'session', user.id)).toEqual([]);
+  });
+
   it('throws NOT_SIGNED_IN without a sign-in', async () => {
     const t = setup();
     await rejectsWith(t.mutation(api.account.deleteMyAccount, {}), 'NOT_SIGNED_IN');

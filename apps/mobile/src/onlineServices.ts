@@ -1,14 +1,14 @@
 /**
- * Online play (#266, #281, #285): sign-in (`AuthProvider`), online games
- * (`GameTransport`), invites (`Invites`), the server's push tokens
- * (`PushTokens`) and the phone's turn notifications (`PushNotifications`),
- * built on first use.
+ * Online play (#266, #281, #285, #315): sign-in (`AuthProvider`), online
+ * games (`GameTransport`), invites (`Invites`), the server's push tokens
+ * (`PushTokens`), the phone's turn notifications (`PushNotifications`)
+ * and Delete my online data (`OnlineData`), built on first use.
  *
  * `services.ts` passes the adapters. This file imports none, so Jest can
  * test it with fakes. Nothing here runs at app start:
  * - the sign-in client is made on the first call to `auth`;
  * - the Convex client (one socket) opens on the first call to `games`,
- *   `invites` or `pushTokens`; they share it;
+ *   `invites`, `pushTokens` or `onlineData`; they share it;
  * - the notifications adapter is made on its first call. The root layout
  *   listens for taps on a push at start (`usePushTaps`): that only reads
  *   the phone, with no network call and no prompt. Turn notifications are
@@ -22,6 +22,7 @@ import type {
   AuthProvider,
   GameTransport,
   Invites,
+  OnlineData,
   PushNotifications,
   PushTokens,
 } from '@tavli/contracts';
@@ -35,6 +36,8 @@ export interface OnlineServices {
   readonly invites: Invites;
   readonly pushTokens: PushTokens;
   readonly notifications: PushNotifications;
+  /** Delete my online data (#315), on the same client. */
+  readonly onlineData: OnlineData;
 }
 
 /** How to make the real parts. `services.ts` passes the adapters. */
@@ -51,6 +54,8 @@ export interface OnlineAdapters<Client> {
   createPushTokens(client: Client): PushTokens;
   /** The phone's notifications: permission, token and taps. */
   createNotifications(): PushNotifications;
+  /** Delete my online data on the shared client. */
+  createOnlineData(client: Client): OnlineData;
 }
 
 /** Calls `make` once, on the first call, and keeps the result. */
@@ -110,6 +115,13 @@ export function lazyPushTokens(get: () => PushTokens): PushTokens {
   };
 }
 
+/** An `OnlineData` port that makes the real one on its first call. */
+export function lazyOnlineData(get: () => OnlineData): OnlineData {
+  return {
+    deleteMyData: () => get().deleteMyData(),
+  };
+}
+
 /** A `PushNotifications` port that makes the real one on its first use. */
 export function lazyPushNotifications(get: () => PushNotifications): PushNotifications {
   return {
@@ -135,17 +147,19 @@ export function createOnlineServices<Client>(
 ): OnlineServices | undefined {
   if (server === undefined) return undefined;
   const auth = once(() => adapters.createAuth(server.siteUrl));
-  // Games, invites and push tokens share this client (one socket).
+  // Games, invites, push tokens and the delete share this client (one socket).
   const client = once(() => adapters.createClient(server.url, auth()));
   const games = once(() => adapters.createGames(client()));
   const invites = once(() => adapters.createInvites(client()));
   const pushTokens = once(() => adapters.createPushTokens(client()));
   const notifications = once(() => adapters.createNotifications());
+  const onlineData = once(() => adapters.createOnlineData(client()));
   return {
     auth: lazyAuthProvider(auth),
     games: lazyGameTransport(games),
     invites: lazyInvites(invites),
     pushTokens: lazyPushTokens(pushTokens),
     notifications: lazyPushNotifications(notifications),
+    onlineData: lazyOnlineData(onlineData),
   };
 }

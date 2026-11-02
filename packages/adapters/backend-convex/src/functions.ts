@@ -1,6 +1,6 @@
 /**
  * References to the Convex functions in `apps/server/convex/games.ts`,
- * `invites.ts` and `push.ts`, by name. The adapter does not import the generated `api`
+ * `invites.ts`, `push.ts` and `account.ts`, by name. The adapter does not import the generated `api`
  * of `apps/server`: that would pull the server code (and Better Auth) into
  * the app's type check, and `apps/server` already depends on this package
  * for its tests.
@@ -8,7 +8,8 @@
  * The names and types must match the server. `apps/server` checks them
  * against its `api` (`convex/convexTransport.test.ts` for the games,
  * `convex/convexInvites.test.ts` for the invites,
- * `convex/convexPushTokens.test.ts` for the push tokens), so a rename
+ * `convex/convexPushTokens.test.ts` for the push tokens,
+ * `convex/convexOnlineData.test.ts` for the delete), so a rename
  * there fails a test.
  */
 import { makeFunctionReference } from 'convex/server';
@@ -155,4 +156,18 @@ export const PUSH_FUNCTION_NAMES = {
 export const PUSH_FUNCTIONS: PushFunctions = {
   registerPushToken: makeFunctionReference(PUSH_FUNCTION_NAMES.registerPushToken),
   removePushToken: makeFunctionReference(PUSH_FUNCTION_NAMES.removePushToken),
+};
+
+/** The delete in `apps/server/convex/account.ts` (#302, #315). */
+export interface AccountFunctions {
+  readonly deleteMyAccount: FunctionReference<'mutation', 'public', Record<string, never>, null>;
+}
+
+/** The Convex function names (`module:function`) of the account calls. */
+export const ACCOUNT_FUNCTION_NAMES = {
+  deleteMyAccount: 'account:deleteMyAccount',
+} as const satisfies { readonly [K in keyof AccountFunctions]: string };
+
+export const ACCOUNT_FUNCTIONS: AccountFunctions = {
+  deleteMyAccount: makeFunctionReference(ACCOUNT_FUNCTION_NAMES.deleteMyAccount),
 };

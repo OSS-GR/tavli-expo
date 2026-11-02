@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90). Last review: 2026-11-02 (#374, live moves in online games).
+> The privacy policy for the app and the stores (issue #90). Last review: 2026-11-02 (#315, Delete my online data).
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy before it goes live.
 
@@ -53,12 +53,11 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 - [ ] Check the retention times on your Sentry and PostHog plans. The policy states each vendor's documented default (checked 2026-10-27).
 - [ ] Have the policy checked (see the note at the top).
 
-## Server data that is not live yet
+## Delete my online data (#315)
 
-The server can keep data that the app does not send yet. The policy changes when the app starts to send it, in that PR.
+The app shows no account, so the feature is called **Delete my online data** (Settings → Privacy), never "delete my account". The row shows on a phone that played online. The server call is `deleteMyAccount` (#302): it deletes, for the signed-in user, the sign-in user, its sessions and linked accounts (Better Auth), every invite the user sent, and every push token. It resigns the user's running games, so the other player wins. It **keeps** finished games and their move logs for the other player. They hold the user's random user id, but no name and no email, and once the sign-in user is gone the id names nobody. Invites someone else sent that the user answered stay with their sender. The app then signs out, so the next invite makes a new guest. See "Delete an account" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md#delete-an-account).
 
-- **Account deletion (#302).** The server mutation `deleteMyAccount` deletes, for the signed-in user: the sign-in user, its sessions and linked accounts (Better Auth), every invite the user sent, and every push token. It resigns the user's running games, so the other player wins. It **keeps** finished games and their move logs for the other player. They hold the user's random user id, but no name and no email, and once the sign-in user is gone the id names nobody. Invites someone else sent that the user answered stay with their sender. See "Delete an account" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md#delete-an-account).
-  - When the app screen ships: say in the policy (all four files) how to delete the account in the app, what is deleted at once, and what is kept (finished games, under an id that no longer leads to an account). Update the store answers: App Store Connect and the Play Console ask whether users can delete their account and data.
+The policy's "Delete your online data" section (all four files) and the store answers describe it. A change to what the delete removes or keeps updates them in the same PR.
 
 ## Ideas for later (app changes, not part of #90)
 

@@ -38,14 +38,29 @@ export async function signInForOnline(auth: AuthProvider): Promise<AuthUser> {
  * (`unregister(then)`), so no token sync can run between the removal and
  * the sign-out. After it, the phone forgets its account note
  * (`accountHint.ts`, #297), so Home loads no session at the next start.
+ *
+ * `before` runs after the token removal and just before the sign-out, in
+ * the same queue: Delete my online data (#315, `deleteData.ts`) deletes
+ * the data there. When it rejects, the user stays signed in, the phone
+ * keeps its note, and this rejects too.
  */
 export async function signOutOfOnline(
   auth: AuthProvider,
-  pushes: { readonly unregister: (then?: () => Promise<void>) => Promise<void> } | undefined,
+  pushes: SignOutPushes | undefined,
+  before?: () => Promise<void>,
 ): Promise<void> {
-  if (pushes === undefined) await auth.signOut();
-  else await pushes.unregister(() => auth.signOut());
+  const signOut = async () => {
+    await before?.();
+    await auth.signOut();
+  };
+  if (pushes === undefined) await signOut();
+  else await pushes.unregister(signOut);
   forgetOnlineAccount();
+}
+
+/** What `signOutOfOnline` needs of the turn notifications (`TurnPushes`). */
+export interface SignOutPushes {
+  readonly unregister: (then?: () => Promise<void>) => Promise<void>;
 }
 
 export type OnlineAccount =
