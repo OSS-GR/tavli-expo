@@ -19,6 +19,7 @@ import { fitBoardWithShadow, slotRect } from '@/features/board/geometry';
 import {
   BOT_PASS_NOTICE_MS,
   ONLINE_PASS_DICE_MS,
+  OPENING_TIE_WAIT_MS,
   PASS_AFTER_THROW_MS,
 } from '@/features/game/GameScreen';
 import { turnView } from '@/features/game/gameStore';
@@ -96,6 +97,8 @@ async function openGame(
   meTransport: (server: MemoryGameServer) => GameTransport = (server) => server.transportFor('me'),
   /** Changes the game before anyone watches it (`setFlowForTest`). */
   prepare?: (server: MemoryGameServer, gameId: string) => void,
+  /** Rolls your opening die on the screen and waits for the card to close (#379). */
+  playOpening = true,
 ): Promise<Game> {
   const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
   const gameId = server.createGame(
@@ -131,7 +134,9 @@ async function openGame(
   await act(async () => {
     fireEvent(board, 'layout', { nativeEvent: { layout: { x: 0, y: 0, ...SIZE } } });
   });
-  return { server, gameId, onMatchOver };
+  const game = { server, gameId, onMatchOver };
+  if (playOpening) await untilOpened(game);
+  return game;
 }
 
 const view = (game: Game) => game.server.getGame(game.gameId)!;
@@ -166,6 +171,28 @@ async function untilYourTurn(game: Game, { roll = true }: { roll?: boolean } = {
     });
   }
   throw new Error('your turn never came');
+}
+
+/**
+ * Plays the opening of a new match (#379): taps Roll on the opening card
+ * for your die (again after a tie), while the bot rolls its own, and moves
+ * the clock until the card closes.
+ */
+async function untilOpened(game: Game) {
+  for (let i = 0; i < 400; i++) {
+    const card = screen.queryByTestId('opening-card');
+    if (card === null && view(game).game.phase !== 'opening-roll') return;
+    const button = screen.queryByTestId('roll-button');
+    if (card !== null && button !== null && view(game).game.opening?.white === null) {
+      await act(async () => {
+        fireEvent.press(button);
+      });
+    }
+    await act(async () => {
+      jest.advanceTimersByTime(250);
+    });
+  }
+  throw new Error('the opening never ended');
 }
 
 /** Moves the fake clock by `ms`. */
@@ -454,6 +481,107 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(view(game).match.games).toHaveLength(2);
       expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/Next: game 3 · Fevga/);
       expect(gameLabel()).toHaveTextContent('Game 2 · Plakoto');
+    });
+  });
+
+  describe('the opening roll on tap (#379)', () => {
+    /** A transport for `me` whose roll fails while `offline()` says so. */
+    const flaky =
+      (offline: () => boolean) =>
+      (server: MemoryGameServer): GameTransport => {
+        const real = server.transportFor('me');
+        return {
+          subscribe: (id, onView, onError) => real.subscribe(id, onView, onError),
+          rollDice: (request) =>
+            offline() ? Promise.reject(new Error('offline')) : real.rollDice(request),
+          sendTurn: (request) => real.sendTurn(request),
+          setDraft: (request) => real.setDraft(request),
+          sendAnswer: (request) => real.sendAnswer(request),
+          resign: (id) => real.resign(id),
+          listMyGames: (request) => real.listMyGames(request),
+          watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
+        };
+      };
+
+    it('rolls your die from the opening card, and the bot rolls its own', async () => {
+      const user = setupUser();
+      const game = await openGame('portes', 1, 5, BOT_THINK_MS, undefined, undefined, false);
+      expect(view(game).game.phase).toBe('opening-roll');
+      expect(view(game).game.opening).toMatchObject({ white: null, black: null });
+      expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+      sounds.played.length = 0;
+
+      await user.press(screen.getByTestId('roll-button'));
+      const white = view(game).game.opening!.white!;
+      expect(white).not.toBeNull();
+      // Your die plays as a local opening roll; the card waits for the bot.
+      expect(sounds.played).toContain('diceRoll');
+      expect(screen.getByTestId('opening-message')).toHaveTextContent(`You rolled ${white}.`);
+      expect(screen.queryByTestId('roll-button')).toBeNull();
+      expect(screen.getByTestId('opening-waiting')).toHaveTextContent('Waiting for Opponent…');
+
+      // The bot taps its die after a moment; its die comes with the view.
+      await wait(ONLINE_BOT_ROLL_MS);
+      const after = view(game);
+      expect(after.game.phase).not.toBe('opening-roll');
+      expect(after.game.opening?.black).not.toBeNull();
+      expect(screen.getByTestId('opening-ok-button')).toBeOnTheScreen();
+      // The card closes by itself, and the starter plays.
+      await wait(3000);
+      expect(screen.queryByTestId('opening-card')).toBeNull();
+    });
+
+    it('shows a tie on the card, and Roll comes back after a moment', async () => {
+      const game = await openGame(
+        'portes',
+        1,
+        5,
+        BOT_THINK_MS,
+        undefined,
+        (server, id) => {
+          let flow = viewFlow(server.getGame(id)!);
+          flow = applyMatchAction(flow, { type: 'rollOpening', player: 'white', die: 4 });
+          flow = applyMatchAction(flow, { type: 'rollOpening', player: 'black', die: 4 });
+          server.setFlowForTest(id, flow);
+        },
+        false,
+      );
+      expect(view(game).game.opening).toMatchObject({ white: null, black: null, ties: [4] });
+      expect(screen.getByTestId('opening-message')).toHaveTextContent(/^Tie: both rolled 4\./);
+      // The dice land first: Roll waits.
+      expect(screen.getByTestId('roll-button')).toBeDisabled();
+      await wait(OPENING_TIE_WAIT_MS);
+      expect(screen.getByTestId('roll-button')).toBeEnabled();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('roll-button'));
+      });
+      expect(view(game).game.opening?.white ?? view(game).game.opening?.ties.length).toBeTruthy();
+    });
+
+    it('says when your die does not reach the server, and lets you roll again', async () => {
+      const user = setupUser();
+      let offline = true;
+      const game = await openGame(
+        'portes',
+        1,
+        5,
+        BOT_THINK_MS,
+        flaky(() => offline),
+        undefined,
+        false,
+      );
+      const version = view(game).version;
+      await user.press(screen.getByTestId('roll-button'));
+      expect(await screen.findByTestId('online-notice-card')).toHaveTextContent(
+        /did not reach the server/,
+      );
+      expect(view(game).game.opening?.white).toBeNull();
+      await user.press(screen.getByTestId('online-notice-ok-button'));
+
+      offline = false;
+      await user.press(screen.getByTestId('roll-button'));
+      expect(view(game).version).toBeGreaterThan(version);
+      expect(view(game).game.opening?.white ?? view(game).game.opening?.ties.length).toBeTruthy();
     });
   });
 

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { PushResult } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import type { PlayerId } from '@tavli/engine';
-import { createOnlineMatch, resign, timeOut, waitingFor } from '@tavli/online';
+import { createOnlineMatch, resign, rollDice, timeOut, waitingFor } from '@tavli/online';
+import { openFlow } from '@tavli/online/testing';
 
 import {
   MATCH_END_PUSH_TEXT,
@@ -111,10 +112,27 @@ describe('matchEndPushSides', () => {
 });
 
 describe('turnWait', () => {
-  it('reads the waited side and the game number of a flow', () => {
+  it('waits for the side still to roll its opening die (#379)', () => {
+    const rng = createSeededRng(1);
     const flow = createOnlineMatch(
       { choice: 'portes', targetPoints: 3, players: { white: 'a', black: 'b' } },
-      createSeededRng(1),
+      rng,
+    );
+    expect(turnWait(flow)).toEqual({ side: 'white', game: 0, over: false });
+    // Black rolls first: the wait stays on White, so Black's roll sends no push.
+    expect(turnWait(rollDice(flow, 'black', rng))).toEqual({ side: 'white', game: 0, over: false });
+    // White rolls first: now Black is waited for.
+    expect(turnWait(rollDice(flow, 'white', rng))).toEqual({ side: 'black', game: 0, over: false });
+  });
+
+  it('reads the waited side and the game number of a flow', () => {
+    const rng = createSeededRng(1);
+    const flow = openFlow(
+      createOnlineMatch(
+        { choice: 'portes', targetPoints: 3, players: { white: 'a', black: 'b' } },
+        rng,
+      ),
+      rng,
     );
     expect(turnWait(flow)).toEqual({ side: flow.game.state.toMove, game: 0, over: false });
     const next = timeOut(flow, createSeededRng(2));

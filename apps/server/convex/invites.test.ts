@@ -263,8 +263,9 @@ describe('acceptInvite', () => {
     expect(game?.match.targetPoints).toBe(3);
     expect(game?.status).toBe('active');
     expect(game?.version).toBe(1);
-    // The opening roll is done and the first player's clock runs.
-    expect(game?.game.phase).toBe('moving');
+    // Each player rolls their own opening die (#379); the opening has a turn's deadline.
+    expect(game?.game.phase).toBe('opening-roll');
+    expect(game?.game.opening).toEqual({ white: null, black: null, ties: [] });
     expect(game?.turnDeadline).toBe(START + ASYNC_TURN_TIME_MS);
 
     expect(await invite(t, code)).toMatchObject({ status: 'accepted', gameId });

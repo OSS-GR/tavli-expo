@@ -2,13 +2,18 @@
  * An online game on the board screen (#255): `GameScreen` over an online
  * store (`onlineStore.ts`), with the menu and the Resign match dialog.
  *
- * - The server rolls the opening, passes and starts the next game, so
- *   there is no opening card (see "Online" in `GameScreen.tsx`). Your
- *   roll waits for you: Roll, a tap or a swipe asks the server to roll
- *   (#355), and the line says so until the dice come.
- * - While the server waits for the other player, the board is locked.
+ * - The server passes and starts the next game (and its opening) by
+ *   itself (see "Online" in `GameScreen.tsx`). Your roll waits for you:
+ *   Roll, a tap or a swipe asks the server to roll (#355), and the line
+ *   says so until the dice come. In the first game each player rolls their
+ *   own opening die on the opening card (#379), in any order.
+ * - While the server waits for the other player, the board is locked. Your
+ *   opening die is the exception: you may roll it while it is not in,
+ *   whatever `waitingFor` says.
  * - The time left shows on the strip of the player the server waits for
- *   (live: seconds; async: hours).
+ *   (live: seconds; async: hours). In the opening it shows on yours while
+ *   your die is not in: at the deadline the side that did not roll loses
+ *   the game, when the other side rolled.
  * - A game that ends while the screen is open shows its game-end sheet
  *   over the end of that game (the board store holds it, #286); its
  *   button closes it, and then the next game shows.
@@ -20,6 +25,7 @@
  */
 import { turnDeadlineMs, type GameTransport } from '@tavli/contracts';
 import { opponent, type PlayerId, type PresetId } from '@tavli/engine';
+import { mayRollOpening } from '@tavli/online';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Text, View } from 'react-native';
@@ -213,6 +219,9 @@ function OnlineBoard({
         };
 
   const waitingFor = view.waitingFor;
+  // Your opening die (#379): either player may roll first.
+  const myOpening = mayRollOpening(view, side);
+  const clockSide = myOpening ? side : waitingFor;
   // The clock ticks once a second (or half minute): a view newer than the
   // last tick would show more than a whole turn.
   const left = timeLeft(view, clockNow, clockOffset);
@@ -220,16 +229,16 @@ function OnlineBoard({
   const online: OnlineSide = {
     me: side,
     version: view.version,
-    locked: sending || waitingFor !== side,
+    locked: sending || (waitingFor !== side && !myOpening),
     status: rolling
       ? t('online.status.rolling')
       : sending
         ? t('online.status.sending')
         : t('online.status.waiting'),
     clock:
-      waitingFor === null || shown === null || finished
+      clockSide === null || shown === null || finished
         ? null
-        : { player: waitingFor, text: clockText(shown, view.turnTimeMinutes, t) },
+        : { player: clockSide, text: clockText(shown, view.turnTimeMinutes, t) },
     ended,
     notice: noticeCard,
   };

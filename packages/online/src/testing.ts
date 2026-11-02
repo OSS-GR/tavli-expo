@@ -4,8 +4,78 @@
  * both use them.
  */
 
+import type { OnlineGameView } from '@tavli/contracts';
 import { VARIANT_REGISTRY, createBoard, getVariant, plakoto } from '@tavli/engine';
 import type { GameFlow, GameState, MatchFlow, MoveInput, PlayerId, Rng } from '@tavli/engine';
+
+import type { MemoryGameServer } from './memory-server';
+import { rollDice } from './online-game';
+
+/** More opening rounds than this means a broken RNG: a tie comes 1 time in 6. */
+const MAX_OPENING_ROLLS = 60;
+
+/** The side still to roll its opening die in `game`, or `null` when the opening is over. */
+function openingRoller(game: GameFlow): PlayerId | null {
+  if (game.phase !== 'opening-roll' || game.opening === null) return null;
+  return game.opening.white === null ? 'white' : 'black';
+}
+
+/**
+ * Rolls both opening dice of `flow` (#379), White first, again after each
+ * tie, until the opening is over. A flow past its opening comes back as it
+ * is.
+ */
+export function openFlow(flow: MatchFlow, rng: Rng): MatchFlow {
+  let next = flow;
+  for (let i = 0; i < MAX_OPENING_ROLLS; i++) {
+    const side = openingRoller(next.game);
+    if (side === null) return next;
+    // A plain `MatchFlow`: no `endedGame` (no game ends in an opening).
+    const { schemaVersion, match, game, log } = rollDice(next, side, rng);
+    next = { schemaVersion, match, game, log };
+  }
+  throw new Error(`the opening was not decided after ${MAX_OPENING_ROLLS} rolls`);
+}
+
+/** How `rollOpenings` rolls a die and reads the game. */
+export interface OpeningRolls {
+  /** Rolls the opening die of `side` (`GameTransport.rollDice`). */
+  readonly roll: (side: PlayerId, expectedVersion: number) => Promise<unknown>;
+  /** The game as the server holds it now. */
+  readonly view: () => Promise<OnlineGameView | null> | OnlineGameView | null;
+}
+
+/**
+ * Rolls both opening dice of an online game (#379), White first, again
+ * after each tie, until the opening is over. Server tests roll real dice,
+ * so a tie comes at random: this repeats until one side starts. Resolves
+ * to the view after the opening (a game past its opening as it is).
+ */
+export async function rollOpenings(rolls: OpeningRolls): Promise<OnlineGameView> {
+  for (let i = 0; i < MAX_OPENING_ROLLS; i++) {
+    const view = await rolls.view();
+    if (view === null) throw new Error('no such game');
+    const side = openingRoller(view.game);
+    if (side === null || view.status !== 'active') return view;
+    await rolls.roll(side, view.version);
+  }
+  throw new Error(`the opening was not decided after ${MAX_OPENING_ROLLS} rolls`);
+}
+
+/**
+ * `rollOpenings` on the in-memory server: each player rolls through their
+ * own transport. Resolves to the view after the opening.
+ */
+export function openMemoryGame(server: MemoryGameServer, gameId: string): Promise<OnlineGameView> {
+  return rollOpenings({
+    roll: (side, expectedVersion) => {
+      const players = server.getGame(gameId)?.players;
+      if (players === undefined) throw new Error('no such game');
+      return server.transportFor(players[side]).rollDice({ gameId, expectedVersion });
+    },
+    view: () => server.getGame(gameId),
+  });
+}
 
 /** A legal full turn for the player to move, picked with `rng`. */
 export function pickTurn(game: GameFlow, rng: Rng): MoveInput[] {

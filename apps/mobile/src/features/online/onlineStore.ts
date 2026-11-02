@@ -8,9 +8,13 @@
  * move. Confirm sends the whole turn (`sendTurn`). A `roll` asks the
  * server to roll (`rollDice`, #355): the server picks the dice, the phone
  * never does. Its view comes with the roll in the log (`rollResult.ts`),
- * so the screen plays it as a local roll. The server rolls the opening,
- * passes a roll with no legal move and starts the next game by itself, so
- * the store refuses those actions.
+ * so the screen plays it as a local roll. The opening of a new match is
+ * the same (#379): a `rollOpening` of your side asks the server to roll
+ * your opening die (`rollDice` again), while your die is not in yet. Its
+ * view starts its log with that roll. The other player's die comes only
+ * with the next view. The server passes a roll with no legal move and
+ * starts the next game (its opening too) by itself, so the store refuses
+ * those actions.
  *
  * The store follows the view: `view.waitingFor`, `view.prompt` and
  * `game.state.toMove`. It never assumes the players alternate (an Asodio
@@ -38,16 +42,17 @@ import {
   MATCH_FLOW_SCHEMA_VERSION,
   applyMatchAction,
   type Dice,
+  type DieValue,
   type MatchAction,
   type MatchFlow,
   type MoveInput,
   type PlayerId,
 } from '@tavli/engine';
-import { sideOf } from '@tavli/online';
+import { mayRollOpening, sideOf } from '@tavli/online';
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-import { rollResult } from './rollResult';
+import { openingRollResult, rollResult } from './rollResult';
 import { estimateOffset } from './timeLeft';
 
 export interface OnlineStoreOptions {
@@ -131,7 +136,8 @@ export interface OnlineStoreState {
   /**
    * Plays one action of your side. Returns `false` (and keeps the flow)
    * when it is refused. `move` and `undo` stay on the phone. `roll`,
-   * `confirm`, `answer` and `resignMatch` start a call and return `true`;
+   * `rollOpening` (your opening die, #379), `confirm`, `answer` and
+   * `resignMatch` start a call and return `true`;
    * the result arrives later (`sending`, `notice`, the next view). A
    * `move` with `autoConfirm` sends the turn as soon as it is complete.
    * Before your roll, move, undo and confirm do nothing (no refusal:
@@ -192,7 +198,6 @@ function newerDraft(current: OnlineGameView, next: OnlineGameView, side: PlayerI
 
 /** The server does these steps by itself. */
 const SERVER_ACTIONS: ReadonlySet<MatchAction['type']> = new Set([
-  'rollOpening',
   'nextGame',
   'chooseStarter',
   'timeout',
@@ -224,12 +229,26 @@ export function createOnlineStore({
    */
   let myRoll: { readonly version: number; readonly player: PlayerId; readonly dice: Dice } | null =
     null;
+  /** The view of your opening die (#379), with its value: found like `myRoll`. */
+  let myOpening: {
+    readonly version: number;
+    readonly player: PlayerId;
+    readonly die: DieValue;
+  } | null = null;
   /**
    * The flow of `view`. The view of your roll starts its log with the
    * roll, so the screen throws the dice and reads them as a local roll.
+   * The view of your opening die starts it with that die (`rollOpening`),
+   * so it sounds as a local opening roll.
    */
   const flowOf = (view: OnlineGameView): MatchFlow => {
     const flow = draftFlow(view, sideOf(view.players, me));
+    if (myOpening !== null && myOpening.version === view.version) {
+      return {
+        ...flow,
+        log: [{ type: 'rollOpening', player: myOpening.player, die: myOpening.die }],
+      };
+    }
     if (myRoll === null || myRoll.version !== view.version) return flow;
     return { ...flow, log: [{ type: 'roll', player: myRoll.player, dice: myRoll.dice }] };
   };
@@ -415,6 +434,18 @@ export function createOnlineStore({
               true,
             );
             return true;
+          case 'rollOpening':
+            // Your opening die (#379): the server rolls it, also when the
+            // other player rolled first. A server that rolls the opening
+            // itself (before #379) never waits for it.
+            if (action.die !== undefined) return refuse('the server rolls the dice');
+            if (!mayRollOpening(view, side)) return refuse('there is no opening die to roll');
+            call(
+              view.version,
+              () => transport.rollDice({ gameId, expectedVersion: view.version }),
+              true,
+            );
+            return true;
           case 'resignMatch':
             call(view.version, () => transport.resign(gameId));
             return true;
@@ -499,7 +530,10 @@ export function createOnlineStore({
     // "did not reach the server" notice was wrong, and it closes).
     const dice = current === null || side === null ? null : rollResult(current, view, side);
     if (dice !== null && side !== null) myRoll = { version: view.version, player: side, dice };
-    const rollFailed = dice !== null && store.getState().notice === 'rollFailed';
+    // Your opening die (#379), the same way.
+    const die = current === null || side === null ? null : openingRollResult(current, view, side);
+    if (die !== null && side !== null) myOpening = { version: view.version, player: side, die };
+    const rollFailed = (dice !== null || die !== null) && store.getState().notice === 'rollFailed';
     store.setState({
       view,
       flow: flowOf(view),

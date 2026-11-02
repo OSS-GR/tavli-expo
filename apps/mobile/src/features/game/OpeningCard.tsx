@@ -11,6 +11,8 @@
  * - With the house rule `rerollBoth` (#207) the starter does not play the
  *   opening dice but rolls both dice again: "Maria starts (6-3) and rolls
  *   again." The engine decides; `rollsAgain` only picks the words.
+ * - Online (#379) each phone rolls only its own die. Once it is in,
+ *   `waiting` ("Waiting for Opponent…") takes the place of Roll.
  *
  * Each step is read to screen reader users (`useAnnouncement`); focus moves
  * to the title when the card opens (#153).
@@ -49,6 +51,11 @@ export interface OpeningCardProps {
   rollLabel: string;
   /** Just after a tie the Roll button waits a moment, so a quick tap does not skip the tie. */
   rollDisabled?: boolean;
+  /**
+   * Online (#379): you cannot roll now (your die is in, or on its way).
+   * This text shows in place of the Roll button.
+   */
+  waiting?: string | null;
   onRoll: () => void;
   /** Closes the result. */
   onClose: () => void;
@@ -130,6 +137,7 @@ export function OpeningCard({
   gameKey,
   rollLabel,
   rollDisabled = false,
+  waiting = null,
   onRoll,
   onClose,
   onDieLanded,
@@ -184,7 +192,7 @@ export function OpeningCard({
   // with the same words (two ties of 4). A remount does not (#216).
   const titleRef = useFocusOnShow();
   useAnnouncement(
-    decided ? message : `${message} ${rollLabel}.`,
+    decided ? message : `${message} ${waiting ?? `${rollLabel}.`}`,
     `${gameKey}:opening:${status.kind}:${status.round}`,
   );
 
@@ -226,6 +234,10 @@ export function OpeningCard({
             kind="secondary"
             onPress={onClose}
           />
+        ) : waiting !== null ? (
+          <Text testID="opening-waiting" style={styles.waiting}>
+            {waiting}
+          </Text>
         ) : (
           <ActionButton
             testID="roll-button"
@@ -284,6 +296,11 @@ const styles = StyleSheet.create((theme) => ({
   actions: {
     alignSelf: 'stretch',
     paddingTop: theme.space.xs,
+  },
+  waiting: {
+    ...theme.type.body,
+    color: theme.colors.textDim,
+    textAlign: 'center',
   },
   footnote: {
     ...theme.type.caption,

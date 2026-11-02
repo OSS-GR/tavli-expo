@@ -10,7 +10,7 @@ import {
   type MatchFlow,
 } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
-import { closedOut, lastBearOff, pickTurn } from '@tavli/online/testing';
+import { closedOut, lastBearOff, openMemoryGame, pickTurn } from '@tavli/online/testing';
 
 import { moveEvent, storeEvents } from '@/features/game/gameFeedback';
 import { inviteAccepted } from '@/features/invites/acceptedInvite';
@@ -60,9 +60,16 @@ async function flush(): Promise<void> {
   for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 
-function serverWithGame(choice: OnlineGameChoice = 'portes', targetPoints = 3, seed = 5) {
+/** A server with one game, after both opening dice (#379) unless `opened` is false. */
+async function serverWithGame(
+  choice: OnlineGameChoice = 'portes',
+  targetPoints = 3,
+  seed = 5,
+  opened = true,
+) {
   const server = createMemoryGameServer({ rng: createSeededRng(seed), now: () => Date.now() });
   const gameId = server.createGame('me', { white: 'me', black: 'bot' }, choice, targetPoints, 1);
+  if (opened) await openMemoryGame(server, gameId);
   return { server, gameId };
 }
 
@@ -72,7 +79,7 @@ function serverWithGame(choice: OnlineGameChoice = 'portes', targetPoints = 3, s
  * move ends the turn.
  */
 async function playServerTurn(
-  server: ReturnType<typeof serverWithGame>['server'],
+  server: Awaited<ReturnType<typeof serverWithGame>>['server'],
   gameId: string,
   rng = createSeededRng(9),
 ) {
@@ -93,7 +100,7 @@ async function playServerTurn(
 
 /** Plays the server's turns until you (White, `store`) have rolled and can move. */
 async function untilYouMove(
-  server: ReturnType<typeof serverWithGame>['server'],
+  server: Awaited<ReturnType<typeof serverWithGame>>['server'],
   gameId: string,
   store: OnlineStore,
 ) {
@@ -112,7 +119,7 @@ async function untilYouMove(
 
 describe('remoteTurn', () => {
   it('replays the other player’s turn from the view before', async () => {
-    const { server, gameId } = serverWithGame();
+    const { server, gameId } = await serverWithGame();
     // Until the bot is to move.
     while (server.getGame(gameId)!.waitingFor !== 'black') await playServerTurn(server, gameId);
     const before = viewFlow(server.getGame(gameId)!);
@@ -128,7 +135,7 @@ describe('remoteTurn', () => {
   });
 
   it('does not fly a turn that does not start on the view before', async () => {
-    const { server, gameId } = serverWithGame();
+    const { server, gameId } = await serverWithGame();
     while (server.getGame(gameId)!.waitingFor !== 'black') await playServerTurn(server, gameId);
     const start = viewFlow(server.getGame(gameId)!);
     // The bot plays, you play, the bot plays again: views were missed.
@@ -152,7 +159,7 @@ describe('remoteTurn', () => {
 describe('remoteSteps (#374)', () => {
   /** Plays until the bot (Black) has rolled two different dice and can move. */
   async function botMoves() {
-    const { server, gameId } = serverWithGame();
+    const { server, gameId } = await serverWithGame();
     const bot = server.transportFor('bot');
     for (let i = 0; i < 100; i++) {
       const view = server.getGame(gameId)!;
@@ -274,7 +281,7 @@ describe('clockText', () => {
 
 describe('onlineBoardStore', () => {
   it('is null until the first view, then follows the flow only', async () => {
-    const { server, gameId } = serverWithGame();
+    const { server, gameId } = await serverWithGame();
     const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
     open.push(store);
     expect(onlineBoardStore(store, gameId)).toBeNull();
@@ -305,7 +312,7 @@ describe('onlineBoardStore', () => {
 
 describe('onlineBoardStore refusals', () => {
   it('gives a new snapshot for each refusal, also the same one twice', async () => {
-    const { server, gameId } = serverWithGame();
+    const { server, gameId } = await serverWithGame();
     const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
     open.push(store);
     await flush();
@@ -323,7 +330,7 @@ describe('onlineBoardStore refusals', () => {
   });
 
   it('does not buzz for a call that did not go through or a lost connection', async () => {
-    const { server, gameId } = serverWithGame();
+    const { server, gameId } = await serverWithGame();
     const real = server.transportFor('me');
     let lost: ((error: unknown) => void) | undefined;
     const store = createOnlineStore({
@@ -370,7 +377,7 @@ describe('onlineBoardStore refusals', () => {
 describe('onlineBoardStore between games (#286)', () => {
   /** A board over a store that has its first view. */
   async function openBoard(targetPoints = 3, choice: OnlineGameChoice = 'portes') {
-    const { server, gameId } = serverWithGame(choice, targetPoints);
+    const { server, gameId } = await serverWithGame(choice, targetPoints);
     const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
     open.push(store);
     await flush();
@@ -378,7 +385,7 @@ describe('onlineBoardStore between games (#286)', () => {
   }
 
   /** The turn time of the player the server waits for runs out. */
-  async function timeOut(server: ReturnType<typeof serverWithGame>['server']) {
+  async function timeOut(server: Awaited<ReturnType<typeof serverWithGame>>['server']) {
     jest.advanceTimersByTime(60_000 + 1);
     expect(server.runDueTimeouts()).toBe(1);
     await flush();
@@ -615,7 +622,7 @@ describe('onlineBoardStore between games (#286)', () => {
   });
 
   it('does not hold a game that ended before the board was made', async () => {
-    const { server, gameId } = serverWithGame('portes', 3);
+    const { server, gameId } = await serverWithGame('portes', 3);
     const store = createOnlineStore({ transport: server.transportFor('me'), gameId, me: 'me' });
     open.push(store);
     await flush();
@@ -655,7 +662,7 @@ describe('devGame', () => {
 
 describe('startOnlineBot', () => {
   it('gives up on a turn the server keeps refusing, then waits for a new view', async () => {
-    const { server, gameId } = serverWithGame();
+    const { server, gameId } = await serverWithGame();
     while (server.getGame(gameId)!.waitingFor !== 'black') await playServerTurn(server, gameId);
     const real = server.transportFor('bot');
     const sendTurn = jest.fn(() =>
@@ -693,8 +700,42 @@ describe('startOnlineBot', () => {
     expect(server.getGame(gameId)!.waitingFor).toBe('black');
   });
 
+  it('rolls its own opening die after a moment, also before the other player (#379)', async () => {
+    const { server, gameId } = await serverWithGame('portes', 3, 5, false);
+    open.push(
+      startOnlineBot({
+        transport: server.transportFor('bot'),
+        gameId,
+        botId: 'bot',
+        difficulty: botLevels.portes[0]!,
+        runner: botRunner,
+        rng: createSeededRng(2),
+        timing: { thinkMs: () => 0 },
+      }),
+    );
+    await flush();
+    // The view waits for White, but the bot (Black) may roll first.
+    expect(server.getGame(gameId)!.waitingFor).toBe('white');
+    jest.advanceTimersByTime(ONLINE_BOT_ROLL_MS - 1);
+    await flush();
+    expect(server.getGame(gameId)!.game.opening?.black).toBeNull();
+    jest.advanceTimersByTime(1);
+    await flush();
+    expect(server.getGame(gameId)!.game.opening?.black).not.toBeNull();
+    // You roll yours; after a tie the bot rolls again by itself.
+    for (let i = 0; i < 20 && server.getGame(gameId)!.game.phase === 'opening-roll'; i++) {
+      const view = server.getGame(gameId)!;
+      if (view.game.opening?.white === null) {
+        await server.transportFor('me').rollDice({ gameId, expectedVersion: view.version });
+      }
+      jest.advanceTimersByTime(ONLINE_BOT_ROLL_MS);
+      await flush();
+    }
+    expect(server.getGame(gameId)!.game.phase).not.toBe('opening-roll');
+  });
+
   it('plays a view that came before it listened', async () => {
-    const { server, gameId } = serverWithGame();
+    const { server, gameId } = await serverWithGame();
     while (server.getGame(gameId)!.waitingFor !== 'black') await playServerTurn(server, gameId);
     const version = server.getGame(gameId)!.version;
     const real = server.transportFor('bot');
@@ -730,7 +771,7 @@ describe('startOnlineBot', () => {
   });
 
   it('waits a moment before it rolls, and longer after the other player’s pass (#355)', async () => {
-    const start = (server: ReturnType<typeof serverWithGame>['server'], gameId: string) =>
+    const start = (server: Awaited<ReturnType<typeof serverWithGame>>['server'], gameId: string) =>
       open.push(
         startOnlineBot({
           transport: server.transportFor('bot'),
@@ -743,7 +784,7 @@ describe('startOnlineBot', () => {
         }),
       );
     const waits = async (
-      server: ReturnType<typeof serverWithGame>['server'],
+      server: Awaited<ReturnType<typeof serverWithGame>>['server'],
       gameId: string,
       ms: number,
     ) => {
@@ -758,7 +799,7 @@ describe('startOnlineBot', () => {
     };
 
     // Your turn, then the bot's roll.
-    const plain = serverWithGame();
+    const plain = await serverWithGame();
     const botRolls = () => {
       const view = plain.server.getGame(plain.gameId)!;
       return view.waitingFor === 'black' && view.game.phase === 'awaiting-roll';
@@ -769,7 +810,7 @@ describe('startOnlineBot', () => {
     await waits(plain.server, plain.gameId, ONLINE_BOT_ROLL_MS);
 
     // Your roll with no legal move: your phone shows it before the bot rolls.
-    const passed = serverWithGame();
+    const passed = await serverWithGame();
     const flow = closedOut(viewFlow(passed.server.getGame(passed.gameId)!), 'white');
     passed.server.setFlowForTest(passed.gameId, flow);
     const { version } = passed.server.getGame(passed.gameId)!;
@@ -787,7 +828,7 @@ describe('startOnlineBot', () => {
   it.each(ONLINE_GAME_CHOICES.filter((c) => botLevels[c].length > 0))(
     'plays a whole %s match against another bot',
     async (choice) => {
-      const { server, gameId } = serverWithGame(choice, 1, 7);
+      const { server, gameId } = await serverWithGame(choice, 1, 7);
       const level = botLevels[choice][0]!;
       const errors: unknown[] = [];
       for (const [player, seed] of [

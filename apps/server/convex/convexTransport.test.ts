@@ -30,7 +30,7 @@ import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import schema from './schema';
 import { convexTestNetwork } from './test.network';
-import { modules, pickTurn } from './test.setup';
+import { modules, openGame, pickTurn } from './test.setup';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -173,6 +173,7 @@ describe('the adapter on the real functions', () => {
     const t = setup();
     const network = gameNetwork(t);
     const gameId = await createGame(t, { choice: 'portes', targetPoints: 5, turnTimeMinutes: 1 });
+    await openGame(t, gameId, PLAYERS);
     const views: OnlineGameView[] = [];
     const stop = network.transportFor(BOB).subscribe(gameId, (view) => views.push(view));
     await network.settle();

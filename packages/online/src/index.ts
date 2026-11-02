@@ -20,6 +20,7 @@ export {
   isTimedOut,
   loadFlow,
   loadStored,
+  mayRollOpening,
   onlineGameRules,
   playTurn,
   resign,
@@ -51,6 +52,7 @@ export {
   matchStatus,
   nextDeadline,
   nextDraft,
+  rollCallVersion,
   rollDeadline,
   scheduledCheck,
 } from './calls';
