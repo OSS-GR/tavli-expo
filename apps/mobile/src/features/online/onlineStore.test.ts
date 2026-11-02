@@ -8,7 +8,16 @@ import {
   type OnlineGameView,
   type SetDraftRequest,
 } from '@tavli/contracts';
-import { createSeededRng, type MatchAction, type MoveInput, type Rng } from '@tavli/engine';
+import {
+  createBoard,
+  createSeededRng,
+  currentBoard,
+  legalNextMoves,
+  type GameFlow,
+  type MatchAction,
+  type MoveInput,
+  type Rng,
+} from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
 import { motherPin, openMemoryGame, pickChoice, pickTurn } from '@tavli/online/testing';
 
@@ -1036,5 +1045,67 @@ describe('live moves (#374)', () => {
     // The first draft went; the next ones waited, and the turn made them old.
     expect(spied.drafts.map((draft) => draft.moves.length)).toEqual([1]);
     expect(server.getGame(gameId)?.draft).toBeNull();
+  });
+});
+
+describe('the same checker after a hit, online (#179)', () => {
+  /**
+   * White (Alice) to play 5-3 in Portes: a door on 13 and 13 on 6. Black has
+   * a blot on White's 8 (Black's 17).
+   */
+  function doorFlow(view: OnlineGameView) {
+    const flow = viewFlow(view);
+    const board = createBoard(
+      { white: { points: { 13: 2, 6: 13 } }, black: { points: { 17: 1, 24: 14 } } },
+      'contrary',
+    );
+    const game: GameFlow = {
+      ...flow.game,
+      phase: 'moving',
+      state: { ...flow.game.state, board, toMove: 'white', dice: [5, 3], turnNumber: 5 },
+      starter: 'white',
+      played: [],
+      lastTurn: null,
+      result: null,
+    };
+    return { ...flow, game };
+  }
+
+  it('hits, then moves the hitter on with the other die, with live moves on', async () => {
+    const { server, gameId, storeFor } = await setup();
+    server.setFlowForTest(gameId, doorFlow(server.getGame(gameId)!));
+    const alice = storeFor(ALICE);
+    const bob = storeFor(BOB);
+    await flush();
+    expect(alice.getState().side).toBe('white');
+    const version = viewOf(alice).version;
+
+    play(alice, [{ from: 13, to: 8, die: 5 }]);
+    // The draft goes to the server and comes back to both phones.
+    await flush();
+    expect(server.getGame(gameId)?.draft?.moves).toHaveLength(1);
+    const after = alice.getState().flow!.game;
+    expect(after.played).toEqual([expect.objectContaining({ from: 13, to: 8, capture: 'hit' })]);
+    expect(currentBoard(after).bar.black).toBe(1);
+    // The hitter on 8 still has its move with the 3.
+    const from8 = legalNextMoves(after).find((group) => group.from === 8);
+    expect(from8?.moves).toContainEqual(expect.objectContaining({ from: 8, to: 5, die: 3 }));
+    // Bob sees the hit as it happens.
+    expect(currentBoard(bob.getState().flow!.game).bar.black).toBe(1);
+
+    play(alice, [{ from: 8, to: 5, die: 3 }]);
+    await flush();
+    expect(alice.getState().flow?.game.phase).toBe('awaiting-confirm');
+    expect(confirm(alice)).toBe(true);
+    await flush();
+    const sent = server.getGame(gameId)!;
+    expect(sent.version).toBe(version + 1);
+    expect(plain(sent.game.lastTurn!.moves)).toEqual(
+      plain([
+        { from: 13, to: 8, die: 5 },
+        { from: 8, to: 5, die: 3 },
+      ]),
+    );
+    expect(sent.game.state.board.bar.black).toBe(1);
   });
 });
