@@ -6,13 +6,21 @@
  * notifications (#285, #183).
  */
 import { Redirect, router } from 'expo-router';
+import { useState } from 'react';
 
 import { FriendSetupScreen } from '@/features/invites/FriendSetupScreen';
 import { inviteWaitHref } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
+import { hasOnlineAccount } from '@/features/online/accountHint';
+import { useAppUpdateCheck } from '@/features/update/updateCheck';
 import { auth, invites } from '@/services';
 
 export default function FriendRoute() {
+  // Update needed (#390): a phone that played online asks the server when
+  // it opens. Before the first invite the app does not talk to the server
+  // (privacy policy): Make an invite asks then (`signInForOnline`).
+  const [playedOnline] = useState(hasOnlineAccount);
+  useAppUpdateCheck(playedOnline);
   if (auth === undefined || invites === undefined) return <Redirect href="/" />;
   return (
     <FriendSetupScreen

@@ -1,6 +1,6 @@
 # Online game service
 
-Status: first version (#126, part of #46), with turn timers (#133), invites by code (#252), [my games](#my-games) (#296), ["your turn" pushes](#push) (#280) and ["game over" pushes](#game-over) (#316), [sign-in](#sign-in) (#131), [account deletion](#delete-an-account) (#302), a [Convex client adapter](#the-convex-adapter) (#253) and its [invites adapter](#the-convex-invites-adapter) (#281). The game model is in the pure package `@tavli/online`, with an [in-memory server](#the-in-memory-server) (#251). It runs and is tested **offline**, with no Convex account. CI deploys it to Convex (#257, see [Deploy](#deploy)).
+Status: first version (#126, part of #46), with turn timers (#133), invites by code (#252), [my games](#my-games) (#296), ["your turn" pushes](#push) (#280) and ["game over" pushes](#game-over) (#316), [sign-in](#sign-in) (#131), [account deletion](#delete-an-account) (#302), [Update needed](#update-needed) (#390), a [Convex client adapter](#the-convex-adapter) (#253) and its [invites adapter](#the-convex-invites-adapter) (#281). The game model is in the pure package `@tavli/online`, with an [in-memory server](#the-in-memory-server) (#251). It runs and is tested **offline**, with no Convex account. CI deploys it to Convex (#257, see [Deploy](#deploy)).
 
 Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0002](../decisions/0002-modular-architecture.md).
 
@@ -11,6 +11,9 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `invites` and `pushTokens` |
 | `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
 | `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315) |
+| `apps/server/convex/appUpdate.ts` | `updatePolicy`: the lowest app build the server works with, from the deployment's env vars ([Update needed](#update-needed), #390). The one public function with no sign-in |
+| `apps/server/convex/model/appUpdate.ts` | The pure part: `appUpdatePolicy(env, platform)` reads the env vars |
+| `packages/contracts/src/app-update.ts` | The `AppUpdates` port, `AppUpdatePolicy` and the in-memory fake |
 | `apps/server/convex/model/account.ts` | The pure part of account deletion: `gameOnDelete` (resign, keep or skip a game) |
 | `apps/server/convex/caller.ts` | `signedInPlayer(ctx)`: the caller's player id from the sign-in token, and `existingPlayer(ctx)`: the same, for an account that still exists ([Sign-in](#sign-in)) |
 | `apps/server/convex/convex.config.ts` | The Convex app: it uses the Better Auth component |
@@ -249,7 +252,7 @@ Issue #131. Owner decision: online play waits for sign-in. There is no play keye
 
 ### Who calls
 
-Every public function in `games.ts`, `invites.ts`, `push.ts` and `account.ts` gets the caller from `signedInPlayer(ctx)` in `caller.ts`:
+Every public function in `games.ts`, `invites.ts`, `push.ts` and `account.ts` gets the caller from `signedInPlayer(ctx)` in `caller.ts`. The one exception is `updatePolicy` in `appUpdate.ts` ([Update needed](#update-needed)): an old build must learn that it is too old also with no session, and the call reads no player data.
 
 - **The player id is `identity.subject`.** It is the Better Auth user id (the token's `sub`). It stays the same for a user across sessions and token refreshes. We do not use `tokenIdentifier` (issuer + subject): the issuer is the site URL, and a new site URL (a custom domain) would change every player id. There is one issuer. If a second one is ever added, move to `tokenIdentifier` and migrate the stored ids.
 - **No identity:** `NOT_SIGNED_IN`. The code is in both `GAME_TRANSPORT_ERROR_CODES` and `INVITE_ERROR_CODES`, so every call can throw it.
@@ -499,6 +502,35 @@ Both delete routes are **off**, so no client can delete a user without steps 2�
 - No sign-in, or no Better Auth user for the token: `NOT_SIGNED_IN`.
 - After the delete, the old token is valid for up to 15 more minutes. The calls that save the caller's id (`createInvite`, `acceptInvite`, `declineInvite`, `registerPushToken`) check the user (`existingPlayer`) and get `NOT_SIGNED_IN` (#306), so no row is saved under the deleted id. The other calls still pass `signedInPlayer`, but save nothing: once the game pages ran, the caller has no active game and no invite that is still open (see [Games after the call](#games-after-the-call)). See [Who calls](#who-calls).
 
+## Update needed
+
+Issue #390. A server deploy can break older app builds (#380). The owner then sets the lowest build that still works, and an older build shows the "Update needed" screen with one button, **Update** (TestFlight on iOS, Google Play on Android). The app side is in [App shell → Update needed](app-shell.md#update-needed-390).
+
+### The env vars
+
+The policy lives in the deployment's env vars, so the owner changes it with no deploy (Convex dashboard → the deployment → **Settings** → **Environment Variables**, or `pnpm exec convex env set <name> <value> --prod` in `apps/server`). None is a secret.
+
+| Name | Value | When it is not set |
+|---|---|---|
+| `MIN_APP_BUILD_IOS` | The lowest iOS build number (`CFBundleVersion`, the EAS build number) that works, a whole number above 0 | No iOS build is blocked |
+| `MIN_APP_BUILD_ANDROID` | The same for Android (`versionCode`) | No Android build is blocked |
+| `FORCE_APP_UPDATE` | `true` or `1`: an older build shows the screen at once, also in the middle of an online game (breaking changes). Both phone systems | Older builds wait until the player leaves the game screen |
+| `APP_UPDATE_URL_IOS` | Where Update goes on iOS, for example a TestFlight public link or the App Store page | The TestFlight app (`itms-beta://`), then the TestFlight page in the App Store |
+| `APP_UPDATE_URL_ANDROID` | Where Update goes on Android | `market://details?id=<app id>`, then the Google Play web page |
+
+A value that is not a whole number above 0 (a typo, `0`, `-3`) blocks nothing: a typo must never lock every player out. Any other `FORCE_APP_UPDATE` value counts as off. The parsing is `appUpdatePolicy` in `convex/model/appUpdate.ts`.
+
+### The call
+
+- `updatePolicy({ platform: 'ios' | 'android' })` is a query. It answers `{ minBuild, force, updateUrl }` (`AppUpdatePolicy` in `@tavli/contracts`) for that phone system.
+- **No sign-in.** It is the one public function that does not call `signedInPlayer`: an old build may have no session, or a session the new server cannot read, and it must still learn that it is too old. It reads no table and returns nothing about players, so there is nothing to guard.
+- **It sends the phone system only.** The app compares its own build on the phone, so the server never learns the build number, and nothing is stored. The privacy policy needs no change.
+- The app adapter is `createConvexAppUpdates` (`@tavli/backend-convex`, `APP_UPDATE_FUNCTIONS`); `convex/convexAppUpdates.test.ts` checks its name and types against `api`.
+
+### Deploy note
+
+The function must be on a deployment before the env vars do anything. Deploy to prod once ([Deploy to prod](#deploy-to-prod)) before the first build that has the screen goes out. A build from before #390 never asks, so it cannot be blocked: only builds with the screen can be told to update. The owner's steps are in [Running the app → Update needed](../process/running-the-app.md#update-needed-390).
+
 ## Tests (offline)
 
 `pnpm test` runs Vitest in `apps/server` with the **edge runtime** environment (`@edge-runtime/vm`), as the convex-test docs say. convex-test runs the real functions against an in-memory database, with schema checks.
@@ -511,6 +543,8 @@ Both delete routes are **off**, so no client can delete a user without steps 2�
 - `convex/auth.test.ts` (convex-test with the Better Auth component, `register` from `@convex-dev/better-auth/test`): the `/api/auth` routes answer; a guest signs in over HTTP and gets a Convex token whose `sub` is the user id; that identity makes an invite.
 - `convex/account.test.ts` (convex-test with the Better Auth component, fake timers, a recording sender): Alice and Bob sign in as guests over HTTP. Alice, with an active game, a finished game, two invites, two push tokens and a linked account, deletes her account: Bob sees the active game won by her resign; the finished game is unchanged; her open invite, tokens, Better Auth user, session and account are gone, her cancelled invite goes in the scheduled `deleteSentInvites`, and Bob's stay; Bob gets one "game over" push (#316), nobody gets "your turn", and the turn timer does nothing. A second call, no sign-in and a token with no user get `NOT_SIGNED_IN`. After the delete, the old token gets `NOT_SIGNED_IN` from `createInvite`, `registerPushToken`, `acceptInvite` and `declineInvite`, and nothing is saved (#306); nobody can accept her open invite. An open invite whose time is up but that `expireInvite` has not closed yet stays after the call, gets `INVITE_EXPIRED` on accept, and is gone after `deleteSentInvites` (#309). `deleteSentInvites` deletes 2 pages + 1 invites in three runs and leaves Bob's. With 2 pages + 2 active games, the call resigns one page, a turn timer that runs out in between still ends one game, and `resignActiveGames` resigns a full page, then a part of one, and stops; other players' games stay. With exactly one page, the call resigns all and one empty run schedules nothing more (#309). A guest with no data; an untimed game and several games; other players' games are not touched; the Better Auth delete routes answer 404; sign-out with the old session cookie still answers after the delete (#315).
 - `convex/model/account.test.ts` (pure): `gameOnDelete`.
+- `convex/model/appUpdate.test.ts` (pure, #390): no env vars, each value, invalid values (they block nothing), and the force flag.
+- `convex/convexAppUpdates.test.ts` (convex-test, #390): `updatePolicy` with the env vars set and not set, with nobody signed in; a bad argument; the [adapter](#update-needed) through the fake clients, signed in or not; `APP_UPDATE_FUNCTIONS` against `api`.
 - `convex/convexTransport.test.ts` (convex-test, fake timers): the `GameTransport` contract checks on the [Convex adapter](#the-convex-adapter) with the real functions; a late turn, no sign-in and a bad id through the adapter; the adapter's function names and types against `api`.
 - `convex/convexOnlineData.test.ts` (convex-test, #315): the `OnlineData` contract checks on `createConvexOnlineData` with the real `deleteMyAccount`; `ACCOUNT_FUNCTIONS` against `api`.
 - `convex/convexInvites.test.ts` (convex-test, fake timers, real Better Auth users from `authUsers`, #281): the `Invites` contract checks on the [Convex invites adapter](#the-convex-invites-adapter) with the real functions; no sign-in, a bad argument, an accept seen by the watching inviter, the cap and the scheduled expiry through the adapter; `INVITE_FUNCTIONS` against `api`.

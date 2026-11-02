@@ -16,6 +16,7 @@ import type { GameTransport } from '@tavli/contracts';
 import { useEffect, useState } from 'react';
 
 import { turnPushes } from '@/features/notifications/appTurnPushes';
+import { checkAppUpdate } from '@/features/update/updateCheck';
 import { auth, gameTransportFor, games, onlinePlayerId } from '@/services';
 
 import { rememberOnlineAccount } from './accountHint';
@@ -50,6 +51,8 @@ export function useOnlineConnection(gameId: string): OnlineConnection {
         // server once per app run, also when it changed while the app was
         // closed (#285). Not after the route is gone.
         if (user !== null && live) void turnPushes()?.sync();
+        // Update needed (#390): this build may be too old for the server.
+        if (user !== null) void checkAppUpdate();
         if (live) setSession(user === null ? 'signedOut' : { me: user.id });
       },
       () => {

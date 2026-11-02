@@ -94,6 +94,8 @@ export {
 } from './auth';
 export type { AuthErrorCode, AuthErrorData, AuthProvider, AuthUser, MemoryAuthStore } from './auth';
 export type { OnlineData } from './online-data';
+export { APP_PLATFORMS, NO_UPDATE_POLICY, createMemoryAppUpdates } from './app-update';
+export type { AppPlatform, AppUpdatePolicy, AppUpdates, MemoryAppUpdates } from './app-update';
 export { PUSH_ERROR_CODES, createRecordingPushProvider, isPushErrorCode } from './push';
 export type {
   PushErrorCode,

@@ -228,6 +228,20 @@ eas build --profile production --platform ios --auto-submit
 - **Build numbers** (iOS `buildNumber`, Android `versionCode`) live on EAS (`appVersionSource: "remote"`). The `production` profile has `autoIncrement`, so each store build gets a new number. Stores reject a repeated number. Do not set build numbers in `app.json`.
 - Local builds (`expo run:*`) use build number 1. That is fine for testing.
 
+### Update needed (#390)
+
+When a server change breaks older builds, tell those builds to update. A build that is too old shows one screen, "Update needed", with an **Update** button that opens TestFlight (iOS) or Google Play (Android). There is no way past it. The app asks only when the player uses online play, so offline players are never asked. Details: [Online game service → Update needed](../architecture/online-game-service.md#update-needed).
+
+Set these on the **prod** deployment (Convex dashboard → `superb-dog-503` → **Settings** → **Environment Variables**, or `pnpm exec convex env set <name> <value> --prod` in `apps/server`). Leave the dev deployment alone: local builds have build number 1 and use dev.
+
+1. **Once:** deploy the server to prod after #390 is merged ([Deploy to prod](../architecture/online-game-service.md#deploy-to-prod)). Builds from before #390 never ask, so they cannot be blocked.
+2. Make the new build and wait until it is in TestFlight (or on Google Play). Note its build number (EAS → the build → **Build number**, or App Store Connect → TestFlight).
+3. Set the lowest build that works. For example, when build 13 is in TestFlight: `MIN_APP_BUILD_IOS` = `13`. For Android: `MIN_APP_BUILD_ANDROID` = the `versionCode`. Builds 12 and lower show the screen. A player in the middle of an online game sees it when they leave the game.
+4. **Breaking change:** also set `FORCE_APP_UPDATE` = `true`. Then older builds show the screen at once, also in the middle of a game. Delete it (or set `false`) when the players have updated.
+5. **Optional:** `APP_UPDATE_URL_IOS` / `APP_UPDATE_URL_ANDROID` = where Update goes, for example the TestFlight public link (`https://testflight.apple.com/join/…`) or the App Store page once the app is there. Without them, iOS opens the TestFlight app and Android opens Google Play.
+
+Changes take effect with no deploy: the app asks again when it opens online play or comes back to the front. To undo, delete `MIN_APP_BUILD_*`. A value that is not a whole number above 0 blocks nothing, so a typo never locks players out.
+
 ### EAS Update (over-the-air updates), for later
 
 - Builds from each profile listen on the **channel** with the same name: `development`, `preview`, `production`.

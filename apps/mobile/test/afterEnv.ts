@@ -6,6 +6,7 @@ import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPus
 import { forgetPushTapsForTest } from '../src/features/notifications/pushTaps';
 import { forgetOnlineAccount } from '../src/features/online/accountHint';
 import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
+import { resetUpdateCheckForTest } from '../src/features/update/updateCheck';
 
 import { resetOnlineFake } from './onlineFake';
 
@@ -25,4 +26,6 @@ beforeEach(() => {
   // Turn notifications (#285): a new instance on the reset fakes, and no tap opened yet.
   resetTurnPushesForTest();
   forgetPushTapsForTest();
+  // Update needed (#390): no answer and no online game screen yet.
+  resetUpdateCheckForTest();
 });
