@@ -1106,6 +1106,75 @@ describe('play a friend online (#281)', () => {
   });
 });
 
+describe('join with a code (#333)', () => {
+  /** Home → Join with a code → type `text` → Continue. */
+  async function typeCode(user: ReturnType<typeof setupUser>, text: string) {
+    await user.press(
+      await screen.findByRole('button', { name: 'Join with a code, Got a code from a friend?' }),
+    );
+    expect(await screen.findByRole('header', { name: 'Join with a code' })).toBeOnTheScreen();
+    await user.type(screen.getByTestId('join-code-input'), text);
+    await user.press(screen.getByRole('button', { name: 'Continue' }));
+  }
+
+  it('opens the typed code as an invite: the free account first, then Accept opens the game', async () => {
+    const user = setupUser();
+    const code = onlineServer().createInvite('friend', 'plakoto', 3, null);
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await typeCode(user, code.toLowerCase());
+    expect(router.getPathname()).toBe(`/invite/${code}`);
+    // Like a link: no account until the player asks for the invite.
+    expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
+    await user.press(screen.getByRole('button', { name: 'Show the invite' }));
+    expect(await screen.findByText('Plakoto')).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(1);
+
+    await user.press(screen.getByRole('button', { name: 'Accept' }));
+    const board = router.getPathname();
+    expect(board).toMatch(/^\/game\/game-\d+$/);
+    const gameId = board.split('/').at(-1)!;
+    expect(onlineServer().getGame(gameId)).toMatchObject({
+      choice: 'plakoto',
+      players: { white: 'friend', black: 'guest-1' },
+    });
+    expect(onlineServer().getInvite(code)).toMatchObject({ status: 'accepted', gameId });
+    expect(
+      await screen.findByTestId('game-board', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+  });
+
+  it('a bad code says so, stays on the screen and calls no server', async () => {
+    const user = setupUser();
+    const getInvite = jest.spyOn(onlineFake.invites, 'getInvite');
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await typeCode(user, 'ABCD234O');
+    expect(
+      screen.getByText(
+        'This is not a code. A code has only Latin letters and digits, with no 0, O, 1, I or L.',
+      ),
+    ).toBeOnTheScreen();
+    expect(router.getPathname()).toBe('/join');
+    expect(getInvite).not.toHaveBeenCalled();
+    expect(onlineFake.authStore.guests).toBe(0);
+    getInvite.mockRestore();
+  });
+
+  it('Back from an unknown invite returns to the typed code', async () => {
+    const user = setupUser();
+    onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await typeCode(user, 'ABCD2345');
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe('/join');
+    expect(screen.getByTestId('join-code-input').props.value).toBe('ABCD2345');
+    // Back from the code screen goes Home.
+    await user.press(screen.getByRole('button', { name: 'Back' }));
+    expect(router.getPathname()).toBe('/');
+  });
+});
+
 describe('your online games on Home (#297)', () => {
   const ME = 'guest-1';
 

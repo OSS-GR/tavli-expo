@@ -13,6 +13,7 @@ import * as Reanimated from 'react-native-reanimated';
 import i18n from '@/i18n';
 
 import { InviteWaitScreen, JOINED_OPEN_MS } from './InviteWaitScreen';
+import { readTypedCode } from './typedCode';
 import { waitStateOfCancelError, waitStateOfError, waitStateOfView } from './waitState';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
@@ -82,7 +83,7 @@ describe('InviteWaitScreen', () => {
     announce.mockRestore();
   });
 
-  it('Share opens the share sheet with the link and the code', async () => {
+  it('Share opens the share sheet with the link and the code to type (#333)', async () => {
     const user = setupUser();
     const share = jest
       .spyOn(Share, 'share')
@@ -92,8 +93,11 @@ describe('InviteWaitScreen', () => {
     await user.press(await screen.findByRole('button', { name: 'Share the invite' }));
     expect(share).toHaveBeenCalledTimes(1);
     expect(share).toHaveBeenCalledWith({
-      message: `Play tavli with me on Tavlaki. Open this link to join: tavlaki://invite/${code} (code ${code})`,
+      message: `Play tavli with me on Tavlaki. Open this link to join: tavlaki://invite/${code}\nOr open Tavlaki, tap Join with a code and enter ${code}.`,
     });
+    // The friend can paste the whole message on "Join with a code" (#333).
+    const message = (share.mock.calls[0]?.[0] as { message: string }).message;
+    expect(readTypedCode(message)).toEqual({ kind: 'code', code });
     // Sharing does not change the invite.
     expect(server.getInvite(code)?.status).toBe('open');
     share.mockRestore();
