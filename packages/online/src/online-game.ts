@@ -9,12 +9,14 @@
  * a seeded one.
  *
  * The server keeps a game at rest in a phase where it waits for a player:
- * `awaiting-roll` (a player must roll, #355), `moving` (a player must play
- * their roll) or `awaiting-answer` (a variant question). The opening roll
- * and the start of the next game happen on the server, in `advance`. A
- * player's roll waits for that player (`rollDice`): the server rolls it
- * with its RNG only then. A roll with no legal move passes in the engine,
- * and the server then waits for the other player's roll.
+ * `opening-roll` (the first game of a match: each player rolls their own
+ * opening die, #379), `awaiting-roll` (a player must roll, #355), `moving`
+ * (a player must play their roll) or `awaiting-answer` (a variant
+ * question). Every roll waits for its player (`rollDice`): the server
+ * rolls it with its RNG only then. A roll with no legal move passes in the
+ * engine, and the server then waits for the other player's roll. The
+ * start of the next game, and its opening roll when one decides, happen on
+ * the server, in `advance`.
  *
  * The stored flow is the engine `MatchFlow` without its log. The log
  * lives apart (on Convex, in the `moves` table), one row per event. A
@@ -193,12 +195,19 @@ function apply(flow: MatchFlow, action: MatchAction, rng: Rng): MatchFlow {
 }
 
 /**
- * Plays every step that needs no player: the opening roll and the start of
- * the next game. Stops when a player must act (roll, move or answer) or
+ * Plays every step that needs no player: the start of the next game, and
+ * its opening roll. Stops when a player must act (roll, move or answer) or
  * the match is over. A player's roll waits for them (`rollDice`, #355).
- * The result keeps the game it replaced with the next one (`endedGame`).
+ * The opening roll of a match's first game waits for the players too
+ * (#379): each one rolls their own die. Only `rollOpenings: true` (the
+ * time out when nobody rolled) makes the server roll it. The result keeps
+ * the game it replaced with the next one (`endedGame`).
  */
-export function advance(flow: MatchFlow, rng: Rng): SteppedFlow {
+export function advance(
+  flow: MatchFlow,
+  rng: Rng,
+  options: { readonly rollOpenings?: boolean } = {},
+): SteppedFlow {
   let next = flow;
   let endedGame: GameFlow | null = null;
   const done = (): SteppedFlow => ({ ...next, endedGame });
@@ -216,6 +225,8 @@ export function advance(flow: MatchFlow, rng: Rng): SteppedFlow {
           // `chosenStarterRolls`: `createOnlineMatch` never allows it.
           throw new Error('online games need an opening roll');
         }
+        // The first game: the players roll (`rollDice`).
+        if (next.match.games.length === 0 && options.rollOpenings !== true) return done();
         const player: PlayerId = opening.white === null ? 'white' : 'black';
         next = apply(next, { type: 'rollOpening', player }, rng);
         break;
@@ -235,9 +246,9 @@ export interface CreateOnlineMatchOptions {
 }
 
 /**
- * A new match, with the opening rolled. The first player then plays the
- * opening dice (`useOpeningDice`) or rolls. `flow.log` holds every event so
- * far. Save it with `storeFlow(flow, null)`: no game ended before it.
+ * A new match, in the opening roll (#379): each player then rolls their
+ * own opening die (`rollDice`). `flow.log` holds every event so far. Save
+ * it with `storeFlow(flow, null)`: no game ended before it.
  */
 export function createOnlineMatch(options: CreateOnlineMatchOptions, rng: Rng): MatchFlow {
   const { choice, targetPoints, players } = options;
@@ -260,9 +271,29 @@ function checkActive(flow: MatchFlow): void {
   if (flow.match.status === 'finished') fail('GAME_OVER', 'the match is over');
 }
 
-/** The side the server waits for, or `null` when the match is over. */
+/** True when `side` may roll their opening die now (#379): their die is still to roll. */
+export function mayRollOpening(flow: Pick<MatchFlow, 'match' | 'game'>, side: PlayerId): boolean {
+  const { game } = flow;
+  return (
+    flow.match.status !== 'finished' &&
+    game.phase === 'opening-roll' &&
+    game.opening !== null &&
+    game.opening[side] === null
+  );
+}
+
+/**
+ * The side the server waits for, or `null` when the match is over. In the
+ * opening roll (#379) both players may roll their own die, in any order;
+ * this names the one still to roll: White while neither rolled, else the
+ * side whose die is missing. That side loses on time if the other rolled.
+ */
 export function waitingFor(flow: MatchFlow): PlayerId | null {
   if (flow.match.status === 'finished') return null;
+  const { opening } = flow.game;
+  if (flow.game.phase === 'opening-roll' && opening !== null) {
+    return opening.white === null ? 'white' : 'black';
+  }
   const prompt = currentPrompt(flow.game);
   if (prompt !== null) return prompt.player;
   return flow.game.state.toMove;
@@ -273,10 +304,18 @@ export function waitingFor(flow: MatchFlow): PlayerId | null {
  * secure RNG). Only the player to move, in `awaiting-roll`. A roll with no
  * legal move passes in the engine: `game.lastTurn` keeps its dice, and the
  * server waits for the other player's roll.
+ *
+ * In the opening roll (#379) it rolls the caller's opening die instead,
+ * while that die is still to roll (else `ILLEGAL_ACTION`). Either player
+ * may roll first. A tie clears both dice, and both roll again.
  */
 export function rollDice(flow: MatchFlow, player: PlayerId, rng: Rng): SteppedFlow {
   checkActive(flow);
   const { game } = flow;
+  if (game.phase === 'opening-roll') {
+    if (!mayRollOpening(flow, player)) fail('ILLEGAL_ACTION', `${player} already rolled`);
+    return advance(apply(flow, { type: 'rollOpening', player }, rng), rng);
+  }
   if (game.phase !== 'awaiting-roll') {
     fail(
       waitingFor(flow) === player ? 'ILLEGAL_ACTION' : 'NOT_YOUR_TURN',
@@ -406,9 +445,17 @@ export function isTimedOut(deadline: number | null, now: number): boolean {
  * The player the server waits for ran out of time: they lose the current
  * game (engine action `timeout`, always 1 point, #378). Then
  * the server goes on: the next game starts, or the match ends.
+ *
+ * In the opening roll (#379) the player who did not roll loses, when the
+ * other did. When neither rolled, nobody loses: the server rolls both
+ * dice, and the first turn starts.
  */
 export function timeOut(flow: MatchFlow, rng: Rng): SteppedFlow {
   checkActive(flow);
+  const { opening } = flow.game;
+  if (flow.game.phase === 'opening-roll' && opening?.white === null && opening.black === null) {
+    return advance(flow, rng, { rollOpenings: true });
+  }
   const player = waitingFor(flow);
   if (player === null) fail('GAME_OVER', 'the match is over');
   return advance(apply(flow, { type: 'timeout', player }, rng), rng);

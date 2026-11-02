@@ -39,9 +39,14 @@
  * rings the moves on the board and shows them in a line. A move, an undo or
  * a second tap takes the hint away. The move list has the same button.
  *
- * Online (#255, `online`): the server rolls the opening, passes a roll
- * with no move, and starts the next game by itself. So there is no opening
- * card: a short line says who starts. Each turn waits for its roll (#355):
+ * Online (#255, `online`): the server passes a roll with no move, and
+ * starts the next game (and rolls its opening) by itself. In the first
+ * game of a match each player rolls their own opening die (#379): the
+ * opening card shows as in pass-and-play, but its Roll button (a tap or a
+ * swipe over it too) is only for your die, while it is not in, and asks
+ * the server to roll it. Once your die is in, the card says what the
+ * server waits for. The other player's die comes with their view. Each
+ * turn waits for its roll (#355):
  * on your turn the Roll button, a tap or a swipe asks the server to roll
  * (`rollDice` through the online store), and the throw waits for the
  * server's dice (`rollSent`), then plays as offline. The other player's
@@ -135,7 +140,6 @@ import { remoteSteps } from '@/features/online/remoteTurn';
 import { useSettings } from '@/features/settings/store';
 
 import {
-  onlineOpeningLine,
   onlinePassLine,
   onlineTurnAnnouncement,
   stateHasChosenDouble,
@@ -147,7 +151,7 @@ import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, storeEvents, useGameFeedback } from './gameFeedback';
 import { diceView, turnView, useGameStore, type BoardStore, type DieView } from './gameStore';
 import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
-import { isChoosingStarter, nextOpeningRoller, openingStatus } from './opening';
+import { isChoosingStarter, nextOpeningRoller, openingDiceInPlay, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
 import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
 import { diceWereChosen, diceWereRolled } from './rolledDice';
@@ -384,9 +388,8 @@ export function GameScreen({
     const timer = setTimeout(() => setOpeningDismissed(gameKey), OPENING_RESULT_MS);
     return () => clearTimeout(timer);
   }, [decided, gameKey]);
-  // Online the server rolls the opening: no card, a short line instead (below).
-  const showOpening =
-    online === undefined && opening !== null && !(decided && openingDismissed === gameKey);
+  // Online too (#379): the first game's opening waits for each player's die.
+  const showOpening = opening !== null && !(decided && openingDismissed === gameKey);
   // Just after a tie, Roll waits a moment (the dice land first).
   const tieKey = opening?.kind === 'tie' ? `${gameKey}:${opening.round}` : null;
   const [tieSeen, setTieSeen] = useState<string | null>(null);
@@ -536,15 +539,21 @@ export function GameScreen({
       }
     : null;
 
-  const roller = nextOpeningRoller(game);
+  // Online (#379) you roll only your own opening die, while it is not in;
+  // the other player may roll theirs first.
+  const roller =
+    online === undefined
+      ? nextOpeningRoller(game)
+      : phase === 'opening-roll' && game.opening !== null && game.opening[online.me] === null
+        ? online.me
+        : null;
   // With `rerollBoth` (#207) the starter rolls after the opening result closes.
   // Online your turn waits for your roll (#355): the server rolls when you ask.
   const onlineRoll =
     online !== undefined &&
     !online.locked &&
     !onlineCovered &&
-    phase === 'awaiting-roll' &&
-    view.toMove === online.me;
+    ((phase === 'awaiting-roll' && view.toMove === online.me) || roller !== null);
   const canRoll =
     (online === undefined || onlineRoll) &&
     !showPass &&
@@ -1020,13 +1029,9 @@ export function GameScreen({
     announcement?.text ?? null,
     announcement ? `${matchKey}:turn:${announcement.key}` : undefined,
   );
-  // Online: who starts (the server rolled the opening) or why nothing moved
-  // (the server passed), in a line over the board for a moment.
-  const onlineLineText =
-    online === undefined
-      ? null
-      : (onlinePassLine(game, t, { nameOf, isYou }) ??
-        onlineOpeningLine(game, t, { nameOf, isYou }));
+  // Online: why nothing moved (the server passed), in a line over the
+  // board for a moment. The opening card says who starts (#379).
+  const onlineLineText = online === undefined ? null : onlinePassLine(game, t, { nameOf, isYou });
   const onlineLineKey =
     onlineLineText === null ? null : `${gameKey}:${game.state.turnNumber}:${onlineLineText}`;
   const [onlineLineSeen, setOnlineLineSeen] = useState<string | null>(null);
@@ -1072,11 +1077,14 @@ export function GameScreen({
   // row is drawn and the reveal waits for a double, so nothing plays until
   // the dice come (the opening roll too).
   // Online the log is empty: every roll comes from the server and tumbles,
-  // but a chosen double does not.
+  // but a chosen double does not, and the opening dice showed on the card.
   const atRest =
     showPass ||
     (game.state.dice !== null &&
-      (online === undefined ? !diceWereRolled(flow) : stateHasChosenDouble(game)));
+      (online === undefined
+        ? !diceWereRolled(flow)
+        : stateHasChosenDouble(game) ||
+          (openingDiceInPlay(flow) && rules.match.openingRoll === 'useOpeningDice')));
   // While the throw plays, the dice row waits: it would tumble again what
   // the throw has already landed. After it, the row shows the roll without
   // a tumble of its own (`rest`, until the next roll re-keys it).
@@ -1087,10 +1095,14 @@ export function GameScreen({
   const reveal = useDoubleReveal(rollKey, dice);
 
   // The opening Roll button sits on the opening card, next to the dice (#176).
+  // Online it is only ever your own die: no name.
   const openingRollLabel =
-    openingTaps === 'perPlayer' && roller !== null
+    online === undefined && openingTaps === 'perPlayer' && roller !== null
       ? t('game.roll.openingFor', { name: nameOf(roller) })
       : t('game.roll.opening');
+  // Online (#379): once your die is in, the card says what the server waits
+  // for in place of Roll. While your roll is on its way, Roll waits.
+  const openingWait = online !== undefined && roller === null ? online.status : null;
 
   // The dice lie on the board (#184), in the theme's dice area; in
   // landscape in the right column (#185). The main button (Roll, Confirm or
@@ -1489,7 +1501,8 @@ export function GameScreen({
             // The match too: each step is read once per app run (#216).
             gameKey={`${matchKey}:${gameKey}`}
             rollLabel={openingRollLabel}
-            rollDisabled={tieWait}
+            rollDisabled={tieWait || (online !== undefined && !onlineRoll)}
+            {...(openingWait === null ? {} : { waiting: openingWait })}
             onRoll={roll}
             onClose={() => setOpeningDismissed(gameKey)}
             onDieLanded={onDiceLanded}

@@ -23,8 +23,12 @@
  *   `diceRoll`, then `turnStart`. Your own roll is in the log (the store
  *   asked for it), so it plays as a local roll. A double chosen after a
  *   1-2 is no roll: nothing plays (Asodio, Acey-Deucey).
- * - A view that skipped the roll (a missed view, the opening dice):
- *   `turnStart`, then `diceRoll`.
+ * - The other player's opening die (#379): `diceRoll`, as a local opening
+ *   roll (a tie too). Your own die is in the log (the store asked for it).
+ *   When their die decides the opening and the starter rolls both dice
+ *   again (`rerollBoth`), `turnStart` follows.
+ * - A view that skipped the roll (a missed view, the opening dice of a
+ *   server that rolls the opening): `turnStart`, then `diceRoll`.
  * - A game you won: `gameWin`; the match: `matchWin`. A lost game plays
  *   no win, as in a local game vs the bot. The board holds the end of the
  *   game under its game-end sheet (`boardStore.ts`, #286), with the turn
@@ -58,6 +62,20 @@ import { remoteSteps } from './remoteTurn';
 const IN_TURN: ReadonlySet<GamePhase> = new Set(['moving', 'awaiting-confirm']);
 
 const now = (event: FeedbackEvent): TimedEvent => ({ event, at: 0 });
+
+/**
+ * The other player's opening die between `before` (in the opening roll)
+ * and `after` (same game), for the player `me` (#379).
+ */
+function openingEvents(before: GameFlow, after: GameFlow, me: PlayerId): TimedEvent[] {
+  const was = before.opening;
+  const next = after.opening;
+  if (was === null || next === null) return [];
+  const them = me === 'white' ? 'black' : 'white';
+  const rolled = was[them] === null && (next[them] !== null || next.ties.length > was.ties.length);
+  if (!rolled) return [];
+  return [now('diceRoll'), ...(after.phase === 'awaiting-roll' ? [now('turnStart')] : [])];
+}
 
 /** A new turn or a roll between `before` and `after` (same game). */
 function rolledTurn(before: GameFlow, after: GameFlow): TimedEvent[] {
@@ -106,6 +124,7 @@ export function viewEvents(before: MatchFlow, after: MatchFlow, me: PlayerId): T
     const won = games > gamesBefore && isHumanWin(after.match.games.at(-1)?.winner, humans);
     return won ? [...moves, now('gameWin')] : moves;
   }
+  if (before.game.phase === 'opening-roll') return openingEvents(before.game, after.game, me);
   return [...moves, ...rolledTurn(before.game, after.game)];
 }
 

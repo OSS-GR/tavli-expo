@@ -21,7 +21,9 @@ export const SERVER_ACTOR = 'server';
 
 /**
  * A player's `roll` is theirs (#355): they asked for it, and the server
- * rolled it with its RNG. The opening roll stays a server step.
+ * rolled it with its RNG. An opening die stays a server step, also when
+ * its player asked for it in the first game (#379): the server rolls the
+ * next games' openings by itself, and the event does not tell them apart.
  */
 const SERVER_EVENTS: ReadonlySet<FlowEvent['type']> = new Set([
   'start',
@@ -90,6 +92,23 @@ export function checkCall<G extends SavedGame>(
     );
   }
   return { game, side };
+}
+
+/**
+ * The version a `rollDice` call must match (#379), for `checkCall`. In
+ * the opening roll of a running match both players may roll at the same
+ * time: each rolls only their own die, and the engine refuses a second
+ * roll of it. So the version is not checked there (`null`), and the
+ * second of two calls at about the same time still rolls. Else it is
+ * `expectedVersion`.
+ */
+export function rollCallVersion(
+  flow: Pick<MatchFlow, 'match' | 'game'>,
+  expectedVersion: number,
+): number | null {
+  return flow.match.status !== 'finished' && flow.game.phase === 'opening-roll'
+    ? null
+    : expectedVersion;
 }
 
 /**
@@ -163,6 +182,10 @@ export function nextDeadline(
  * `turnDeadline`. A roll with no legal move is a pass: `game.lastTurn` is
  * that roll, with no moves. The next turn then gets a full turn time from
  * `now` (`nextDeadline`), also if a rule ever gives it to the same side.
+ *
+ * The opening roll (#379) has one deadline, like a turn: the first die
+ * keeps it. A tie starts a new full time for both, and so does the end of
+ * the opening (the first turn's clock).
  */
 export function rollDeadline(
   game: SavedGame,
@@ -171,6 +194,15 @@ export function rollDeadline(
   flow: MatchFlow,
   now: number,
 ): number | null {
+  if (flow.log.some((event) => event.type === 'rollOpening')) {
+    const opening = flow.game.opening;
+    const oneRolled =
+      flow.game.phase === 'opening-roll' &&
+      opening !== null &&
+      (opening.white === null) !== (opening.black === null);
+    if (game.turnDeadline !== null && oneRolled) return game.turnDeadline;
+    return nextDeadline(turnTimeMinutes, flow, now);
+  }
   const last = flow.game.lastTurn;
   const passed =
     flow.game.phase === 'awaiting-roll' &&

@@ -14,12 +14,7 @@ import { gameRuleSet, type OpeningRollRule } from '@/features/match/setup';
 import { viewFlow } from '@/features/online/onlineStore';
 import i18n from '@/i18n';
 
-import {
-  onlineOpeningLine,
-  onlineTurnAnnouncement,
-  turnAnnouncement,
-  type AnnouncementNames,
-} from './announcements';
+import { onlineTurnAnnouncement, turnAnnouncement, type AnnouncementNames } from './announcements';
 import { createGameStore } from './gameStore';
 import { diceWereRolled } from './rolledDice';
 
@@ -262,12 +257,13 @@ describe('online announcements (#255)', () => {
     const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => 0 });
     const gameId = server.createGame('me', { white: 'me', black: 'bot' }, 'portes', 3, 1);
     const view = () => server.getGame(gameId)!;
-    // One call: a roll when the turn waits for it (#355), else the turn.
+    // One call: a roll when the turn waits for it (#355) or an opening die
+    // (#379, `waitingFor` is the side still to roll), else the turn.
     const step = async () => {
       const now = view();
       const transport = server.transportFor(now.waitingFor === 'white' ? 'me' : 'bot');
       const expectedVersion = now.version;
-      if (now.game.phase === 'awaiting-roll') {
+      if (now.game.phase === 'awaiting-roll' || now.game.phase === 'opening-roll') {
         await transport.rollDice({ gameId, expectedVersion });
       } else {
         const moves = pickTurn(now.game, createSeededRng(now.version));
@@ -290,20 +286,22 @@ describe('online announcements (#255)', () => {
     view.game.lastTurn.player !== side &&
     view.game.lastTurn.moves.length > 0;
 
-  it('says who starts, with the server’s opening roll', () => {
-    const { view } = game();
+  it('reads nothing in the opening: the opening card reads each die and who starts (#379)', async () => {
+    const { view, step, until } = game();
+    expect(onlineTurnAnnouncement(viewFlow(view()), i18n.t, online)).toBeNull();
+    await step();
+    expect(onlineTurnAnnouncement(viewFlow(view()), i18n.t, online)).toBeNull();
+    await until((v) => v.game.phase !== 'opening-roll');
     const flow = viewFlow(view());
-    const line = onlineOpeningLine(flow.game, i18n.t, online);
-    expect(line).toMatch(/^(You start|Opponent starts) with [1-6]-[1-6]\.$/);
-    // The screen reader hears the same line.
-    expect(onlineTurnAnnouncement(flow, i18n.t, online)).toBe(line);
+    // The first turn plays the opening dice: the card said them already.
+    expect(flow.game.phase).toBe('moving');
+    expect(onlineTurnAnnouncement(flow, i18n.t, online)).toBeNull();
   });
 
   it('reads the opponent’s whole turn and “Your turn.” while your roll waits (#355)', async () => {
     const { view, until } = game();
     await until(waitsToRoll('white'));
     const flow = viewFlow(view());
-    expect(onlineOpeningLine(flow.game, i18n.t, online)).toBeNull();
     const text = onlineTurnAnnouncement(flow, i18n.t, online);
     expect(text).toMatch(/^Opponent played: Checker from point \d+ to point \d+/);
     expect(text).toMatch(/Your turn\.$/);

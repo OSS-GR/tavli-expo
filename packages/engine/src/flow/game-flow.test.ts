@@ -363,6 +363,33 @@ describe('timeout (online turn timers, #133)', () => {
   });
 });
 
+describe('timeout during the opening roll (online, #379)', () => {
+  it('the player who has not rolled loses when the other has; the roller is the starter', () => {
+    const rolled = applyGameAction(opening(), { type: 'rollOpening', player: 'black', die: 4 });
+    const over = applyGameAction(rolled, { type: 'timeout', player: 'white' });
+    expect(over).toMatchObject({
+      phase: 'game-over',
+      starter: 'black',
+      // Nothing is borne off, where a resign gives a diplo: still 1 point (#378).
+      result: { winner: 'black', points: 1, reason: 'timeout' },
+    });
+    expect(over.state.board).toEqual(rolled.state.board);
+  });
+
+  it('nobody times out before a roll, after a tie, or for the side that rolled', () => {
+    expect(() => applyGameAction(opening(), { type: 'timeout', player: 'black' })).toThrow(
+      illegalAction,
+    );
+    const rolled = applyGameAction(opening(), { type: 'rollOpening', player: 'white', die: 3 });
+    expect(() => applyGameAction(rolled, { type: 'timeout', player: 'white' })).toThrow(
+      illegalAction,
+    );
+    const tie = applyGameAction(rolled, { type: 'rollOpening', player: 'black', die: 3 });
+    expect(tie.phase).toBe('opening-roll');
+    expect(() => applyGameAction(tie, { type: 'timeout', player: 'black' })).toThrow(illegalAction);
+  });
+});
+
 describe('UI helpers', () => {
   it('legalNextMoves groups the single moves by source', () => {
     const flow = applyGameAction(at('w: 13x14 bar ; b: 3x15'), roll('white', [6, 1]));

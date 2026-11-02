@@ -10,8 +10,8 @@
  * anything throws, nothing is saved.
  *
  * The server rolls a player's dice only when that player asks
- * (`rollDice`, #355). It rolls the opening dice and starts the next game
- * by itself.
+ * (`rollDice`, #355), the opening die of a match's first game too (#379).
+ * It starts the next game, and rolls its opening, by itself.
  *
  * The call checks are pure helpers in `@tavli/online` (#251). The
  * in-memory server uses them too. This file keeps the database and
@@ -68,6 +68,7 @@ import {
   nextDraft,
   playTurn,
   resign as resignMatch,
+  rollCallVersion,
   rollDeadline,
   rollDice as rollMatchDice,
   scheduledCheck,
@@ -145,16 +146,27 @@ function gameFields(flow: MatchFlow, stored: string) {
   };
 }
 
-/** Loads a game for `callerId` and checks the version (`checkCall`). */
+/**
+ * Loads a game for `callerId` and checks the version (`checkCall`).
+ * `expectedVersion` may be a function of the saved flow (a roll,
+ * `rollCallVersion`).
+ */
 async function loadForCaller(
   ctx: MutationCtx,
   gameId: Id<'games'>,
   callerId: string,
-  expectedVersion: number | null,
+  expectedVersion: number | null | ((flow: MatchFlow) => number | null),
 ): Promise<{ game: Doc<'games'>; side: PlayerId; before: LoadedFlow }> {
   const loaded = await ctx.db.get(gameId);
-  const { game, side } = guarded(() => checkCall(loaded, callerId, expectedVersion));
-  return { game, side, before: loadStored(game.flow) };
+  const before = loaded === null ? null : loadStored(loaded.flow);
+  const version =
+    typeof expectedVersion === 'function'
+      ? before === null
+        ? null
+        : expectedVersion(before.flow)
+      : expectedVersion;
+  const { game, side } = guarded(() => checkCall(loaded, callerId, version));
+  return { game, side, before: before ?? loadStored(game.flow) };
 }
 
 /**
@@ -303,10 +315,11 @@ export interface NewGame {
 
 /**
  * Creates a game between two players, in the caller's transaction.
- * `createGame` and `acceptInvite` (`invites.ts`) both use it. The server
- * rolls the opening at once, so the game starts with the first player to
- * move, and that player's clock runs. In an async game that player gets a
- * "your turn" push when it is not the caller (#280). Returns the id.
+ * `createGame` and `acceptInvite` (`invites.ts`) both use it. The game
+ * starts in the opening roll (#379): each player rolls their own die with
+ * `rollDice`, and the opening's clock runs. In an async game the side the
+ * server waits for (White while nobody rolled) gets a "your turn" push
+ * when it is not the caller (#280). Returns the id.
  */
 export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'games'>> {
   const { callerId, choice, targetPoints, turnTimeMinutes } = game;
@@ -434,6 +447,10 @@ export const setDraft = mutation({
  * the other player's roll: both views show the pass in `game.lastTurn`.
  * The roll keeps the turn's deadline; a pass starts the other player's
  * turn time. Returns like `makeMove`.
+ *
+ * In the opening roll (#379) it rolls the caller's opening die, while it
+ * is still to roll. Both players may roll at the same time, so the
+ * version is not checked then (`rollCallVersion`).
  */
 export const rollDice = mutation({
   args: {
@@ -443,7 +460,9 @@ export const rollDice = mutation({
   returns: writeResult,
   handler: async (ctx, { gameId, expectedVersion }) => {
     const callerId = await signedInPlayer(ctx);
-    const { game, side, before } = await loadForCaller(ctx, gameId, callerId, expectedVersion);
+    const { game, side, before } = await loadForCaller(ctx, gameId, callerId, (flow) =>
+      rollCallVersion(flow, expectedVersion),
+    );
     return await onTime(ctx, game, before, async (now) => {
       const next = guarded(() => rollMatchDice(before.flow, side, createCryptoRng()));
       const deadline = rollDeadline(game, game.turnTimeMinutes, side, next, now);
