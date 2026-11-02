@@ -17,11 +17,12 @@ import {
   matchStatus,
   nextDeadline,
   nextDraft,
+  rollCallVersion,
   rollDeadline,
   scheduledCheck,
 } from './calls';
 import { OnlineGameError, createOnlineMatch, resign, rollDice } from './online-game';
-import { closedOut, pickTurn } from './testing';
+import { closedOut, openFlow, pickTurn } from './testing';
 
 const PLAYERS = { white: 'alice', black: 'bob' };
 const GAME = { players: PLAYERS, version: 3, status: 'active', turnDeadline: 1000 } as const;
@@ -34,6 +35,13 @@ function code(step: () => unknown): string {
     throw error;
   }
   throw new Error('no error');
+}
+
+/** A new Portes match, and the same with its opening rolled (as stored: no log). */
+function opened() {
+  const rng = createSeededRng(1);
+  const created = createOnlineMatch({ choice: 'portes', targetPoints: 1, players: PLAYERS }, rng);
+  return { match: { ...openFlow(created, rng), log: [] }, created, rng };
 }
 
 describe('checkNewGame', () => {
@@ -121,8 +129,7 @@ describe('turn deadline checks', () => {
   });
 
   it('rollDeadline: a roll keeps the turn deadline; a pass starts a new turn time (#355)', () => {
-    const rng = createSeededRng(1);
-    const match = createOnlineMatch({ choice: 'portes', targetPoints: 1, players: PLAYERS }, rng);
+    const { match, rng } = opened();
     // The server still waits for the roller (a roll they can play).
     const roller = match.game.state.toMove;
     expect(rollDeadline(GAME, 1, roller, match, 10)).toBe(1000);
@@ -132,6 +139,26 @@ describe('turn deadline checks', () => {
     expect(rollDeadline(GAME, null, 'white', passed, 10)).toBe(10 + ASYNC_TURN_TIME_MS);
     // No deadline saved before: a full turn time.
     expect(rollDeadline({ ...GAME, turnDeadline: null }, 1, roller, match, 10)).toBe(10 + 60_000);
+  });
+
+  it('rollDeadline in the opening (#379): the first die keeps it; a tie or the start gets a new one', () => {
+    const { created } = opened();
+    const die = (value: number) => ({ nextUint32: () => value - 1 });
+    const first = rollDice(created, 'white', die(3));
+    expect(rollDeadline(GAME, 1, 'white', first, 10)).toBe(1000);
+    const tie = rollDice({ ...first, log: [] }, 'black', die(3));
+    expect(tie.game.phase).toBe('opening-roll');
+    expect(rollDeadline(GAME, 1, 'black', tie, 10)).toBe(10 + 60_000);
+    const started = rollDice({ ...first, log: [] }, 'black', die(5));
+    expect(started.game.phase).toBe('moving');
+    expect(rollDeadline(GAME, 1, 'black', started, 10)).toBe(10 + 60_000);
+  });
+
+  it('rollCallVersion (#379): no version check in the opening of a running match', () => {
+    const { match, created } = opened();
+    expect(rollCallVersion(created, 4)).toBeNull();
+    expect(rollCallVersion(match, 4)).toBe(4);
+    expect(rollCallVersion(resign(created, 'white', createSeededRng(2)), 4)).toBe(4);
   });
 });
 
@@ -149,8 +176,7 @@ describe('eventActor', () => {
 
 describe('nextDraft (#374)', () => {
   function moving() {
-    const rng = createSeededRng(1);
-    const flow = createOnlineMatch({ choice: 'portes', targetPoints: 1, players: PLAYERS }, rng);
+    const flow = opened().match;
     const side = flow.game.state.toMove;
     const moves = pickTurn(flow.game, createSeededRng(9));
     return { flow, side, moves };

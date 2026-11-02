@@ -252,6 +252,22 @@ describe('match flow', () => {
     expect(replay(flow.log)).toEqual(flow);
   });
 
+  it('timeout in the opening roll (#379): the match records the game, the log replays', () => {
+    const flow = act(createMatchFlow({ rules: portesOnly(), starter: null }), [
+      { type: 'rollOpening', player: 'black', die: 5 },
+      { type: 'timeout', player: 'white' },
+    ]);
+    expect(flow.match.games[0]).toMatchObject({
+      starter: 'black',
+      winner: 'black',
+      points: 2,
+      reason: 'timeout',
+    });
+    expect(flow.match.nextStarter).toBe('black');
+    expect(validateMatch(JSON.parse(JSON.stringify(flow.match)))).toEqual(flow.match);
+    expect(replay(flow.log)).toEqual(flow);
+  });
+
   it('resign match: the opponent wins the match at once', () => {
     const flow = act(createMatchFlow({ rules: portesOnly(), starter: 'white' }), [
       { type: 'roll', player: 'white', dice: [3, 1] },

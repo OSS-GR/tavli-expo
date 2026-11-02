@@ -24,7 +24,7 @@ import { SERVER_ACTOR } from './calls';
 import { createMemoryGameServer } from './memory-server';
 import type { MemoryGameServer } from './memory-server';
 import { OnlineGameError, createOnlineMatch } from './online-game';
-import { closedOut, lastBearOff, motherPin, pickChoice, pickTurn } from './testing';
+import { closedOut, lastBearOff, motherPin, openMemoryGame, pickChoice, pickTurn } from './testing';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -43,6 +43,21 @@ function setup(seed = 1) {
       clock += ms;
     },
   };
+}
+
+/**
+ * A new game between Alice (White) and Bob (Black), with both opening dice
+ * rolled (#379, `openMemoryGame`): the first player waits to move.
+ */
+async function startOpened(
+  server: MemoryGameServer,
+  choice: OnlineGameChoice,
+  targetPoints: number,
+  turnTimeMinutes: number | null,
+): Promise<string> {
+  const gameId = server.createGame(ALICE, PLAYERS, choice, targetPoints, turnTimeMinutes);
+  await openMemoryGame(server, gameId);
+  return gameId;
 }
 
 /** Lets the pending microtasks run (the server answers on later microtasks). */
@@ -124,7 +139,7 @@ describe('GameTransport contract (in-memory server)', () => {
 });
 
 describe('createGame', () => {
-  it('starts at version 1 with the first roll and a running clock', () => {
+  it('starts at version 1 in the opening roll, with a running clock (#379)', () => {
     const { server } = setup();
     const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 1);
     const view = server.getGame(gameId);
@@ -133,9 +148,18 @@ describe('createGame', () => {
       version: 1,
       status: 'active',
       turnDeadline: START + LIVE,
+      waitingFor: 'white',
     });
-    expect(view?.game.state.dice).not.toBeNull();
-    expect(server.events(gameId)[0]).toMatchObject({ seq: 0, version: 1, actor: SERVER_ACTOR });
+    expect(view?.game.phase).toBe('opening-roll');
+    expect(view?.game.opening).toEqual({ white: null, black: null, ties: [] });
+    expect(server.events(gameId)).toEqual([
+      {
+        seq: 0,
+        version: 1,
+        actor: SERVER_ACTOR,
+        event: expect.objectContaining({ type: 'start' }),
+      },
+    ]);
   });
 
   it('rejects the same checks as the Convex mutation', () => {
@@ -217,7 +241,8 @@ async function playMatch(server: MemoryGameServer, gameId: string, seed: number)
     if (mine.prompt !== null) {
       const choice = pickChoice(mine.prompt.choices, picker);
       await transports[side].sendAnswer({ gameId, expectedVersion, choice });
-    } else if (mine.game.phase === 'awaiting-roll') {
+    } else if (mine.game.phase === 'awaiting-roll' || mine.game.phase === 'opening-roll') {
+      // In the opening roll (#379) `waitingFor` names the side still to roll.
       await transports[side].rollDice({ gameId, expectedVersion });
     } else {
       const moves = pickTurn(mine.game, picker);
@@ -266,7 +291,7 @@ describe('whole matches through two transports', () => {
 describe('turn timers on a fake clock', () => {
   it('runDueTimeouts: nothing before the deadline; at it the late player loses the game', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const gameId = await startOpened(server, 'portes', 15, 1);
     const white = watch(server.transportFor(ALICE), gameId);
     await flush();
     const before = white.last();
@@ -291,9 +316,9 @@ describe('turn timers on a fake clock', () => {
     expect(server.runDueTimeouts()).toBe(0);
   });
 
-  it('runs each check at its deadline, like the Convex scheduler', () => {
+  it('runs each check at its deadline, like the Convex scheduler', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const gameId = await startOpened(server, 'portes', 15, 1);
     wait(3 * LIVE);
     expect(server.runDueTimeouts()).toBe(3);
     const view = server.getGame(gameId);
@@ -303,9 +328,9 @@ describe('turn timers on a fake clock', () => {
     expect(again.match).toEqual(view?.match);
   });
 
-  it('the match ends when a time out gives the last point; then no clock runs', () => {
+  it('the match ends when a time out gives the last point; then no clock runs', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 1, 1);
+    const gameId = await startOpened(server, 'portes', 1, 1);
     wait(10 * LIVE);
     expect(server.runDueTimeouts()).toBe(1);
     const view = server.getGame(gameId);
@@ -317,7 +342,7 @@ describe('turn timers on a fake clock', () => {
 
   it('a late sendTurn gets TIMED_OUT, and the time out is saved', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const gameId = await startOpened(server, 'portes', 15, 1);
     const before = server.getGame(gameId) as OnlineGameView;
     const late = before.waitingFor as PlayerId;
     const watcher = watch(server.transportFor(PLAYERS[late]), gameId);
@@ -342,7 +367,7 @@ describe('turn timers on a fake clock', () => {
 
   it('a move just in time is fine, and gives the next player a full turn', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, null);
+    const gameId = await startOpened(server, 'portes', 15, null);
     const before = server.getGame(gameId) as OnlineGameView;
     wait(ASYNC_TURN_TIME_MS - 1);
     await server.transportFor(PLAYERS[before.waitingFor as PlayerId]).sendTurn({
@@ -359,7 +384,7 @@ describe('turn timers on a fake clock', () => {
 
   it('a roll keeps the turn deadline; the turn time covers the wait before it (#355)', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const gameId = await startOpened(server, 'portes', 15, 1);
     const first = server.getGame(gameId) as OnlineGameView;
     const mover = first.waitingFor as PlayerId;
     await server.transportFor(PLAYERS[mover]).sendTurn({
@@ -449,10 +474,89 @@ describe('turn timers on a fake clock', () => {
   });
 });
 
+describe('the opening roll (#379)', () => {
+  it('at the deadline, the player who did not roll loses the game; the next game starts', async () => {
+    const { server, wait } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    wait(1000);
+    await server.transportFor(BOB).rollDice({ gameId, expectedVersion: 1 });
+    const rolled = server.getGame(gameId) as OnlineGameView;
+    expect(rolled.waitingFor).toBe('white');
+    expect(rolled.turnDeadline).toBe(START + LIVE);
+    wait(LIVE - 1001);
+    expect(server.runDueTimeouts()).toBe(0);
+    wait(1);
+    expect(server.runDueTimeouts()).toBe(1);
+    const after = server.getGame(gameId) as OnlineGameView;
+    expect(after.match.games).toEqual([
+      expect.objectContaining({ starter: 'black', winner: 'black', reason: 'timeout' }),
+    ]);
+    expect(after.previousGame?.result?.reason).toBe('timeout');
+    // The next game opens by itself (the winner starts).
+    expect(after.game.phase).toBe('awaiting-roll');
+    expect(after.waitingFor).toBe('black');
+    expect(after.turnDeadline).toBe(START + 2 * LIVE);
+    expect(server.events(gameId).find((row) => row.event.type === 'timeout')).toMatchObject({
+      actor: SERVER_ACTOR,
+      event: { type: 'timeout', player: 'white' },
+    });
+    const again = replay(server.events(gameId).map((row) => row.event));
+    expect(again.match).toEqual(after.match);
+  });
+
+  it('at the deadline with no die rolled, the server rolls both and the first turn starts', () => {
+    const { server, wait } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    wait(LIVE);
+    expect(server.runDueTimeouts()).toBe(1);
+    const after = server.getGame(gameId) as OnlineGameView;
+    expect(after.match.games).toEqual([]);
+    expect(after.game.phase).toBe('moving');
+    expect(after.waitingFor).toBe(after.game.starter);
+    expect(after.turnDeadline).toBe(START + 2 * LIVE);
+    const rolls = server.events(gameId).filter((row) => row.event.type === 'rollOpening');
+    expect(rolls.length).toBeGreaterThanOrEqual(2);
+    for (const row of rolls) expect(row.actor).toBe(SERVER_ACTOR);
+  });
+
+  it('a late opening roll gets TIMED_OUT, and the time out is saved', async () => {
+    const { server, wait } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    await server.transportFor(ALICE).rollDice({ gameId, expectedVersion: 1 });
+    wait(LIVE);
+    await rejectsWith(
+      server.transportFor(BOB).rollDice({ gameId, expectedVersion: 2 }),
+      'TIMED_OUT',
+    );
+    const after = server.getGame(gameId) as OnlineGameView;
+    expect(after.match.games[0]).toMatchObject({ winner: 'white', reason: 'timeout' });
+    expect(server.runDueTimeouts()).toBe(0);
+  });
+
+  it('an async opening has the 24-hour deadline of an async turn', () => {
+    const { server } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, null);
+    expect(server.getGame(gameId)?.turnDeadline).toBe(START + ASYNC_TURN_TIME_MS);
+  });
+
+  it('a roll after the opening is a normal roll, with the version checked', async () => {
+    const { server } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const opened = await openMemoryGame(server, gameId);
+    await rejectsWith(
+      server.transportFor(PLAYERS[opened.waitingFor as PlayerId]).rollDice({
+        gameId,
+        expectedVersion: 1,
+      }),
+      'STALE_VERSION',
+    );
+  });
+});
+
 describe('drafts (#374)', () => {
   it('a late draft gets TIMED_OUT and saves nothing; the time out comes from the clock', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const gameId = await startOpened(server, 'portes', 15, 1);
     const before = server.getGame(gameId) as OnlineGameView;
     const late = before.waitingFor as PlayerId;
     const watcher = watch(server.transportFor(PLAYERS[otherSide(late)]), gameId);
@@ -473,7 +577,7 @@ describe('drafts (#374)', () => {
 
   it('a draft changes no list, the version or the clock, and the next step clears it', async () => {
     const { server, wait } = setup(3);
-    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const gameId = await startOpened(server, 'portes', 15, 1);
     const before = server.getGame(gameId) as OnlineGameView;
     const mover = PLAYERS[before.waitingFor as PlayerId];
     const lists: unknown[] = [];
