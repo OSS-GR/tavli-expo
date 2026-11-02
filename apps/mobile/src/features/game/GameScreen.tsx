@@ -45,7 +45,8 @@
  * on your turn the Roll button, a tap or a swipe asks the server to roll
  * (`rollDice` through the online store), and the throw waits for the
  * server's dice (`rollSent`), then plays as offline. The other player's
- * dice tumble in the dice row when their roll's view arrives. A roll with
+ * dice are thrown over the board from their wall when their roll's view
+ * arrives (`remoteRoll`, #373). A roll with
  * no legal move shows its dice first, then the pass card (`passWaits`).
  * The other player is remote: while the server waits for them the board is
  * locked, and their whole turn arrives at once and flies from
@@ -63,7 +64,7 @@
  * (`startBotTurn`), so its moves fly like a human's.
  *
  * The dice throw (#183): every roll — swipe, tap on the board, Roll button,
- * the bot — plays the throw over the board (`BoardThrow`), and the dice row
+ * the bot, the other player online — plays the throw over the board (`BoardThrow`), and the dice row
  * waits hidden until it ends, then shows the roll without a second tumble.
  * With Reduce Motion the dice appear as before.
  */
@@ -129,6 +130,7 @@ import { BoardThrow, type ThrowSwipe } from '@/features/dice-throw/BoardThrow';
 import { bestRest, hintHasChoice } from '@/features/hint/hint';
 import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
 import { onlineStoreEvents } from '@/features/online/onlineFeedback';
+import { remoteRoll } from '@/features/online/remoteRoll';
 import { remoteSteps } from '@/features/online/remoteTurn';
 import { useSettings } from '@/features/settings/store';
 
@@ -172,8 +174,9 @@ export const BOT_ANSWER_NOTE_MS = 2000;
 export const MATCH_END_DELAY_MS = 1000;
 /**
  * Online (#355): a roll with no legal move shows its dice before the pass
- * card. Dice that tumble in the dice row (the other player's) show this
- * long; your own thrown dice show `PASS_AFTER_THROW_MS` after the throw.
+ * card. Thrown dice (yours, and the other player's since #373) show
+ * `PASS_AFTER_THROW_MS` after the throw. Dice that only tumble in the dice
+ * row (Reduce Motion) show this long.
  */
 export const ONLINE_PASS_DICE_MS = DICE_LAND_MS + 400;
 export const PASS_AFTER_THROW_MS = 400;
@@ -559,6 +562,8 @@ export function GameScreen({
     key: string;
     values: readonly [number, number];
     swipe: ThrowSwipe | null;
+    /** The other player's roll online comes from their wall (#373). */
+    wall?: 'top' | 'bottom';
   } | null>(null);
   const [thrownTurn, setThrownTurn] = useState<string | null>(null);
   const endThrow = () => setThrowReq(null);
@@ -846,6 +851,22 @@ export function GameScreen({
     setRollSent(null);
     if (rollArrived) armThrow(rollSent.swipe);
   });
+  // Online (#373): the other player's roll is thrown over the board from
+  // their wall, as if they threw it. A pass is thrown too; its card waits
+  // for the throw (`passWaits`). With Reduce Motion the dice appear as before.
+  const throwRemoteRoll = useEffectEvent((before: MatchFlow, after: MatchFlow) => {
+    if (me === null || reduceMotion) return;
+    const rolled = remoteRoll(before, after, me);
+    if (rolled === null) return;
+    const key = `${String(after.match.games.length)}:${after.game.state.turnNumber}`;
+    setThrownTurn(key);
+    setThrowReq({
+      key,
+      values: rolled.dice,
+      swipe: null,
+      wall: sideOf(rolled.player, boardView) === 'player' ? 'bottom' : 'top',
+    });
+  });
   const isOnline = online !== undefined;
   // A layout effect: the flights and the throw start in the same frame as
   // the new board, so the turn's end never shows first for a frame.
@@ -855,6 +876,7 @@ export function GameScreen({
     if (isOnline && before !== flow) {
       flyRemoteTurn(before, flow);
       armSentRoll();
+      throwRemoteRoll(before, flow);
     }
   }, [flow, isOnline]);
 
@@ -1031,7 +1053,8 @@ export function GameScreen({
   const dice = showPass || passWaits ? passDice : view.dice;
 
   // Online (#355): the pass card waits until the dice of the pass have
-  // shown: after your throw, or after the other player's dice tumbled.
+  // shown: after the throw (yours or theirs, #373), or after the dice
+  // tumbled in the row (Reduce Motion).
   const passWaitMs =
     thrownTurn === `${gameKey}:${game.state.turnNumber}`
       ? PASS_AFTER_THROW_MS
@@ -1646,6 +1669,7 @@ export function GameScreen({
               values={throwReq.values}
               swipe={throwReq.swipe}
               nearEnd={nearEnd}
+              wall={throwReq.wall}
               settle={settle}
               geo={placeGeo}
               feedback={feedback}
