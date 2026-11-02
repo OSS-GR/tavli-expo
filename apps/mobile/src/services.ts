@@ -12,6 +12,7 @@ import {
   createConvexClient,
   createConvexGameTransport,
   createConvexInvites,
+  createConvexOnlineData,
   createConvexPushTokens,
 } from '@tavli/backend-convex';
 import { InlineBotRunner, createAnalyzer, createBot, type Analyzer } from '@tavli/bot';
@@ -25,6 +26,7 @@ import {
   type Feedback,
   type GameTransport,
   type Invites,
+  type OnlineData,
   type PushNotifications,
   type PushTokens,
   type SoundPlayer,
@@ -135,8 +137,8 @@ function easProjectId(): string | undefined {
  * (`convexUrl.ts`), with Better Auth sign-in on its site URL. All are made
  * on first use (`onlineServices.ts`): the app makes no network call and no
  * guest account at start. `undefined` when the build has no Convex URL:
- * then online play is off. `auth`, `games`, `invites`, `pushTokens` and
- * `notifications` are all set, or all `undefined`. The game route
+ * then online play is off. `auth`, `games`, `invites`, `pushTokens`,
+ * `notifications` and `onlineData` are all set, or all `undefined`. The game route
  * connects through `useOnlineConnection` (`features/online/connection.ts`).
  */
 const online = createOnlineServices(convexServer(), {
@@ -151,6 +153,7 @@ const online = createOnlineServices(convexServer(), {
   createGames: (client) => createConvexGameTransport({ client }),
   createInvites: (client) => createConvexInvites({ client }),
   createPushTokens: (client) => createConvexPushTokens({ client }),
+  createOnlineData: (client) => createConvexOnlineData({ client }),
   createNotifications: () =>
     createExpoPushNotifications({
       platform: Platform.OS === 'android' ? 'android' : 'ios',
@@ -187,6 +190,13 @@ export const invites: Invites | undefined = online?.invites;
  */
 export const notifications: PushNotifications | undefined = online?.notifications;
 export const pushTokens: PushTokens | undefined = online?.pushTokens;
+
+/**
+ * Delete my online data (#315), on the same client as `games`. Only
+ * Settings calls it, through `deleteOnlineData`
+ * (`features/online/deleteData.ts`).
+ */
+export const onlineData: OnlineData | undefined = online?.onlineData;
 
 /**
  * Dev games (#255): one in-memory server for this app run (`@tavli/online`,

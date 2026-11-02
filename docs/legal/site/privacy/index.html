@@ -41,6 +41,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>You do not need an account to play on your phone.</li>
 <li>Your settings and the games on your phone stay on your phone.</li>
 <li><strong>Online games with a friend</strong> need a free guest account on our server. The app makes it only when you make or open an invite. It has a random user id, and no name and no email. The server keeps your invites and online games under that id.</li>
+<li>You can <strong>delete your online data</strong> in the app at any time: <strong>Settings → Privacy → Delete my online data</strong>.</li>
 <li><strong>Turn notifications</strong> are off until you turn them on. The app offers them only after you make or accept an invite for an async game. If you turn them on, our server keeps your phone's push token, to tell you when it is your turn or your game is over.</li>
 <li>On the first launch, the app asks if it may send <strong>anonymous usage data</strong>. You choose <strong>Allow usage data</strong> or <strong>Don't allow</strong>. You can change your answer any time in <strong>Settings → Privacy</strong>.</li>
 <li>Until you answer, the app sends only anonymous <strong>crash reports</strong>. <strong>Don't allow</strong> turns off usage data <strong>and</strong> crash reports.</li>
@@ -209,6 +210,16 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>The user id <strong>never goes to analytics</strong> (PostHog) and never goes into crash reports (Sentry).</li>
 </ul>
 <p>Before you make or open an invite, the app does not talk to the game server. When you open an invite link or a link to an online game, the app first asks the game server if this phone has a saved sign-in (it sends the sign-in cookie, if there is one). That check makes no account, and without a saved sign-in nothing is saved for you. With a saved sign-in, the app then loads the invite or the game.</p>
+<h3 id="delete-your-online-data">Delete your online data</h3>
+<p>In the app, go to <strong>Settings → Privacy</strong> and tap <strong>Delete my online data</strong>. The row shows on a phone that played online. After you confirm, our server:</p>
+<ul>
+<li>resigns your online games in progress, so you lose them and your friend wins;</li>
+<li>deletes the invites you made, so nobody can accept them;</li>
+<li>deletes your push tokens, so turn notifications stop;</li>
+<li>deletes your guest account and its sign-in sessions.</li>
+</ul>
+<p>Then the app signs out and deletes the sign-in cookie on your phone. If you play online again, the app makes a new guest account with a new user id.</p>
+<p>What stays: finished online games (with their moves) stay for the other player. They hold your old random user id, but no name and no email, and once the account is gone that id leads to nobody. An invite a friend made and you answered stays with that friend. The games and the history on your phone stay too.</p>
 <h3 id="turn-notifications-expo">Turn notifications (Expo)</h3>
 <p>Only if you turn them on. After you make or accept an invite for an online game, the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch. <strong>Not now</strong> is kept: the app does not ask again by itself. You can turn them on later in <strong>Settings → Notifications</strong>, and off in your phone's settings.</p>
 <p>If you allow them:</p>
@@ -216,7 +227,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>Your phone gets a <strong>push token</strong> from Expo's push service (Expo, through Apple's or Google's push service). It is a random address for this app on this phone. It is not your name, email or phone number.</li>
 <li>The app sends the push token and the phone system (iOS or Android) to our game server, under your guest account's user id. The server keeps, for each of your phones: the push token, the phone system and when the phone last sent it. At most 5 phones per account.</li>
 <li>When it is your turn in an async game, or an async game is over, the server gives Expo the push token, a fixed text ("Your turn: an online game is waiting for your move", or "Your game is over. See the result.") and the game's id, so a tap opens that game. No names, no emails and no moves. Expo passes the push to Apple or Google, which show it on your phone.</li>
-<li>The server deletes a push token when Expo says it is no longer valid (for example after you delete the app), when you add a sixth phone (the oldest goes), when another account signs in on that phone (the token moves to that account), and when you sign out or your account is deleted. Turning notifications off in your phone's settings stops them from showing on your phone; the token stays on the server until one of these happens.</li>
+<li>The server deletes a push token when Expo says it is no longer valid (for example after you delete the app), when you add a sixth phone (the oldest goes), when another account signs in on that phone (the token moves to that account), and when you sign out or delete your online data. Turning notifications off in your phone's settings stops them from showing on your phone; the token stays on the server until one of these happens.</li>
 <li>The push token <strong>never goes to analytics</strong> (PostHog) and never goes into crash reports (Sentry). Usage data gets only your answer (allowed or not allowed), and only if you allowed usage data.</li>
 </ul>
 <h2 id="what-we-never-do">What we never do</h2>
@@ -254,7 +265,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <td><strong>Convex</strong> (Convex, Inc., USA)</td>
 <td>The game server for online games with a friend: the guest account, the sign-in session, invites, online games and push tokens</td>
 <td>The EU (<code>eu-west-1</code>, Ireland)</td>
-<td>Until you ask us to delete them. The app does not delete old invites and games by itself yet. A sign-in session runs out 7 days after it was last renewed (Better Auth's default). A push token: see "Turn notifications" above.</td>
+<td>Until you delete them in the app (<strong>Settings → Privacy → Delete my online data</strong>) or ask us to. Finished games then stay, under an id that leads to nobody (see "Delete your online data"). The app does not delete old invites and games by itself yet. A sign-in session runs out 7 days after it was last renewed (Better Auth's default). A push token: see "Turn notifications" above.</td>
 </tr>
 <tr class="even">
 <td><strong>Expo</strong> (650 Industries, Inc., USA)</td>
@@ -284,7 +295,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li><strong>complain</strong> to a data protection authority. In Greece this is the Hellenic Data Protection Authority (<a href="https://www.dpa.gr"><span>www.dpa.gr</span></a>).</li>
 </ul>
 <p>To ask, write to <strong><a href="mailto:privacy@tavlaki.com">privacy@tavlaki.com</a></strong>. We answer within one month.</p>
-<p>Please note: we do not know who you are. The app does not show the install id or the user id yet, so we may not be able to find your data. Tell us your phone model and roughly when you used the app, and we will do our best. For online games, also send an invite code you made or accepted: it leads us to your user id, and then to your invites and games. Usage data and crash reports age out under the times in the table above. Deleting the app deletes the install id, the sign-in cookie and everything on your phone, but not your invites and games on the server: write to us to delete those. A push token of a deleted app stops working, and the server deletes it when Expo says so.</p>
+<p>Please note: we do not know who you are. The app does not show the install id or the user id yet, so we may not be able to find your data. Tell us your phone model and roughly when you used the app, and we will do our best. For online games, also send an invite code you made or accepted: it leads us to your user id, and then to your invites and games. Usage data and crash reports age out under the times in the table above. Deleting the app deletes the install id, the sign-in cookie and everything on your phone, but not your invites and games on the server: to delete those, tap <strong>Delete my online data</strong> in <strong>Settings → Privacy</strong> before you delete the app, or write to us. A push token of a deleted app stops working, and the server deletes it when Expo says so.</p>
 <h2 id="children">Children</h2>
 <p>Tavlaki is not aimed at children under 13.</p>
 <p>In Greece, a child under 15 can give consent for an app like this only with a parent's or guardian's permission (Greek Law 4624/2019, Article 21). Other EU countries use an age between 13 and 16. If you are under that age, please ask a parent before you tap <strong>Allow usage data</strong>. The app works fully if you tap <strong>Don't allow</strong>.</p>

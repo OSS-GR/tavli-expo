@@ -1,6 +1,6 @@
 # @tavli/backend-convex
 
-The `GameTransport`, `Invites` and `PushTokens` ports (`@tavli/contracts`) on the [Convex](https://www.convex.dev/) client. They call the functions in `apps/server/convex/games.ts`, `invites.ts` and `push.ts`. Decision: [ADR-0004](../../../docs/decisions/0004-backend-auth.md) (point 9). Issues: #253 (games), #281 (invites), #285 (push tokens).
+The `GameTransport`, `Invites`, `PushTokens` and `OnlineData` ports (`@tavli/contracts`) on the [Convex](https://www.convex.dev/) client. They call the functions in `apps/server/convex/games.ts`, `invites.ts`, `push.ts` and `account.ts`. Decision: [ADR-0004](../../../docs/decisions/0004-backend-auth.md) (point 9). Issues: #253 (games), #281 (invites), #285 (push tokens), #315 (delete my online data).
 
 Version: `convex` 1.46.0, a peer dependency (the app installs it). Keep it on the same version as `apps/server`.
 
@@ -30,25 +30,33 @@ Version: `convex` 1.46.0, a peer dependency (the app installs it). Keep it on th
 - **`register(token, platform)`** calls `registerPushToken` with only `token` and `platform`. **`remove(token)`** calls `removePushToken`. Both resolve once the mutation resolves.
 - **Errors.** A `ConvexError` with `GameTransportErrorData` rejects with that data (`toTransportError`): `NOT_SIGNED_IN` when nobody is signed in or the account is gone. Any other error stays as it is.
 
+### Delete my online data (#315)
+
+- **`createConvexOnlineData({ client })`** needs only `mutation` (`ConvexOnlineDataClient`).
+- **`deleteMyData()`** calls `deleteMyAccount` (#302) with no arguments, and resolves once the mutation resolves.
+- **Errors.** Like the push tokens: `NOT_SIGNED_IN` (nobody signed in, or the data is already gone) rejects as plain data; any other error stays as it is. While the phone is offline, the Convex client keeps the call and sends it later, so the app puts its own time limit on it.
+
 ## Files
 
-| File                     | Job                                                                                                                               |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `src/transport.ts`       | `createConvexGameTransport({ client })`: the port on any object with `onUpdate`, `query` and `mutation` (`ConvexGameClient`)      |
-| `src/functions.ts`       | `GAME_FUNCTIONS`, `INVITE_FUNCTIONS` and `PUSH_FUNCTIONS`: typed references to the server functions, by name (`…_FUNCTION_NAMES`) |
-| `src/pushTokens.ts`      | `createConvexPushTokens({ client })`: the `PushTokens` port                                                                       |
-| `src/pushTokens.test.ts` | The push tokens mapping on a fake client: arguments and errors                                                                    |
-| `src/invites.ts`         | `createConvexInvites({ client })`: the `Invites` port, and `toInviteError`                                                        |
-| `src/client.ts`          | `createConvexGameTransportFromUrl(url, auth)`, `createConvexClient(url, auth)` and `authTokenFetcher(auth)`                       |
-| `src/transport.test.ts`  | The mapping on a fake client: views, `NOT_FOUND`, errors, `TIMED_OUT`, unsubscribe, `listMyGames`, `watchMyGames`                 |
-| `src/client.test.ts`     | The token fetcher and the URL factory (`convex/browser` mocked, no socket)                                                        |
-| `src/invites.test.ts`    | The invites mapping on a fake client: arguments, copies, errors, `watchInvite`, `watchMyInvites` and their stop                   |
+| File                     | Job                                                                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/transport.ts`       | `createConvexGameTransport({ client })`: the port on any object with `onUpdate`, `query` and `mutation` (`ConvexGameClient`)                           |
+| `src/functions.ts`       | `GAME_FUNCTIONS`, `INVITE_FUNCTIONS`, `PUSH_FUNCTIONS` and `ACCOUNT_FUNCTIONS`: typed references to the server functions, by name (`…_FUNCTION_NAMES`) |
+| `src/pushTokens.ts`      | `createConvexPushTokens({ client })`: the `PushTokens` port                                                                                            |
+| `src/pushTokens.test.ts` | The push tokens mapping on a fake client: arguments and errors                                                                                         |
+| `src/onlineData.ts`      | `createConvexOnlineData({ client })`: the `OnlineData` port (#315)                                                                                     |
+| `src/onlineData.test.ts` | The delete on a fake client: name, no arguments, errors                                                                                                |
+| `src/invites.ts`         | `createConvexInvites({ client })`: the `Invites` port, and `toInviteError`                                                                             |
+| `src/client.ts`          | `createConvexGameTransportFromUrl(url, auth)`, `createConvexClient(url, auth)` and `authTokenFetcher(auth)`                                            |
+| `src/transport.test.ts`  | The mapping on a fake client: views, `NOT_FOUND`, errors, `TIMED_OUT`, unsubscribe, `listMyGames`, `watchMyGames`                                      |
+| `src/client.test.ts`     | The token fetcher and the URL factory (`convex/browser` mocked, no socket)                                                                             |
+| `src/invites.test.ts`    | The invites mapping on a fake client: arguments, copies, errors, `watchInvite`, `watchMyInvites` and their stop                                        |
 
-The contract checks (`gameTransportContract`) run in `apps/server`, against the real Convex functions with convex-test: `apps/server/convex/convexTransport.test.ts`. That file also checks `GAME_FUNCTIONS` against the server's generated `api`, in name and type. The `Invites` contract checks (`invitesContract`) and the `INVITE_FUNCTIONS` check run the same way in `apps/server/convex/convexInvites.test.ts`. The `PushTokens` contract checks (`pushTokensContract`) and the `PUSH_FUNCTIONS` check run in `apps/server/convex/convexPushTokens.test.ts`. All three use the fake clients in `apps/server/convex/test.network.ts`.
+The contract checks (`gameTransportContract`) run in `apps/server`, against the real Convex functions with convex-test: `apps/server/convex/convexTransport.test.ts`. That file also checks `GAME_FUNCTIONS` against the server's generated `api`, in name and type. The `Invites` contract checks (`invitesContract`) and the `INVITE_FUNCTIONS` check run the same way in `apps/server/convex/convexInvites.test.ts`. The `PushTokens` contract checks (`pushTokensContract`) and the `PUSH_FUNCTIONS` check run in `apps/server/convex/convexPushTokens.test.ts`, and the `OnlineData` ones (`onlineDataContract`, `ACCOUNT_FUNCTIONS`) in `apps/server/convex/convexOnlineData.test.ts`. All of them use the fake clients in `apps/server/convex/test.network.ts`.
 
 ### Why names, not the generated `api`
 
-The adapter does not import `apps/server/convex/_generated/api`. Its types pull in every server module (and Better Auth), so the app's type check would compile the server. And `apps/server` depends on this package for its tests, so the import would make a cycle. If you rename or change a function in `games.ts`, `invites.ts` or the public functions of `push.ts`, change `src/functions.ts` too: the server tests fail until they match.
+The adapter does not import `apps/server/convex/_generated/api`. Its types pull in every server module (and Better Auth), so the app's type check would compile the server. And `apps/server` depends on this package for its tests, so the import would make a cycle. If you rename or change a function in `games.ts`, `invites.ts`, `account.ts` or the public functions of `push.ts`, change `src/functions.ts` too: the server tests fail until they match.
 
 ## How the app uses it
 
@@ -59,12 +67,14 @@ createClient: createConvexClient, // (server.url, auth): one ConvexClient per ap
 createGames: (client) => createConvexGameTransport({ client }),
 createInvites: (client) => createConvexInvites({ client }), // #281
 createPushTokens: (client) => createConvexPushTokens({ client }), // #285
+createOnlineData: (client) => createConvexOnlineData({ client }), // #315
 ```
 
 - `services.ts` exports the transport as `games`. It is `undefined` when the build has no Convex URL: then online play is off, and a screen checks `games === undefined`.
 - The `ConvexClient` opens its socket on the first call to `games`, not at app start. It sends the token of `auth` (`@tavli/auth-better-auth`). With nobody signed in, calls fail `NOT_SIGNED_IN`.
 - `services.ts` exports the invites as `invites` (#281), on the same client (one socket). Dev invites stay on the in-memory server.
 - `services.ts` exports the push tokens as `pushTokens` (#285), on the same client. Only the turn notifications flow (`apps/mobile/src/features/notifications/turnPushes.ts`) calls it.
+- `services.ts` exports the delete as `onlineData` (#315), on the same client. Only Settings → Delete my online data (`apps/mobile/src/features/online/deleteData.ts`) calls it.
 - `createConvexGameTransportFromUrl(url, auth)` does both steps in one call, for a tool or a test that needs no shared client.
 
 ## Setup

@@ -22,6 +22,13 @@
  * - A rejected call rejects with plain `GameTransportErrorData` (an
  *   invite call with plain `InviteErrorData`).
  *
+ * - `onlineDataFor(playerId).deleteMyData()` (#315) acts like the Convex
+ *   `deleteMyAccount` (#302): it resigns the player's active matches,
+ *   deletes the invites they sent, and marks the id deleted. A deleted
+ *   id then gets `NOT_SIGNED_IN` where Convex checks that the account
+ *   exists (`existingPlayer`): make, accept or decline an invite, and
+ *   delete again.
+ *
  * Time comes from the `now` option. Nothing runs on a timer: call
  * `runDueTimeouts()` to apply the time outs whose deadline has passed (the
  * in-memory version of the Convex `checkTimeout`). Like on Convex, an
@@ -38,6 +45,7 @@ import type {
   InviteErrorData,
   InviteView,
   Invites,
+  OnlineData,
   OnlineGameChoice,
   OnlineGameStatus,
   OnlineGameView,
@@ -156,6 +164,11 @@ export interface MemoryGameServer {
    * view on a later microtask after each change.
    */
   invitesFor(playerId: string): Invites;
+  /**
+   * Delete my online data (#315) for `playerId`, as if they were signed
+   * in. See the top of this file.
+   */
+  onlineDataFor(playerId: string): OnlineData;
   /** The invite as a client sees it at `now()` (a copy), or `null` when no invite has the code. */
   getInvite(code: string): InviteView | null;
   /** The game as a client sees it (a copy), or `null` when there is no such game. */
@@ -265,6 +278,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const inviteListListeners = new Set<InviteListListener>();
   /** The draft of each game (#374), as `SavedDraft` JSON, like the Convex `drafts` table. */
   const drafts = new Map<string, string>();
+  /** Player ids whose data was deleted (#315), like a Better Auth user that is gone. */
+  const deletedPlayers = new Set<string>();
   let nextId = 1;
 
   function draftOf(gameId: string): SavedDraft | null {
@@ -606,12 +621,20 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     }
   }
 
+  /** Like the Convex `existingPlayer`: a deleted player id is signed in to nothing. */
+  function checkExists(playerId: string): void {
+    if (deletedPlayers.has(playerId)) {
+      throw new InviteError('NOT_SIGNED_IN', 'this account does not exist');
+    }
+  }
+
   function makeInvite(
     callerId: string,
     choice: OnlineGameChoice,
     targetPoints: number,
     turnTimeMinutes: number | null,
   ): string {
+    checkExists(callerId);
     // The cap first, like the Convex function (#275).
     checkInviteCap(countOpenInvites(invites.values(), callerId, now()));
     const options = { from: callerId, choice, targetPoints, turnTimeMinutes };
@@ -656,6 +679,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       },
       acceptInvite(text) {
         return inviteCall(() => {
+          checkExists(playerId);
           const invite = loadInvite(text);
           checkAnswer(invite, playerId, now());
           // If the game cannot start, the invite stays open (the Convex
@@ -673,6 +697,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       },
       declineInvite(text) {
         return inviteCall(() => {
+          checkExists(playerId);
           const invite = loadInvite(text);
           checkAnswer(invite, playerId, now());
           saveInvite({ ...invite, status: 'declined' });
@@ -710,10 +735,48 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     };
   }
 
+  /**
+   * Deletes the data of `playerId`, like the Convex `deleteMyAccount`
+   * (#302) in one go: it resigns each active match (the other player
+   * wins), keeps the finished ones, and deletes every invite the player
+   * sent. Watchers of those invites get `null`.
+   */
+  async function deleteData(playerId: string): Promise<void> {
+    await nextTick();
+    if (deletedPlayers.has(playerId)) {
+      const data: GameTransportErrorData = {
+        code: 'NOT_SIGNED_IN',
+        message: 'this account does not exist',
+      };
+      throw data;
+    }
+    const at = now();
+    for (const game of [...games.values()]) {
+      if (game.status !== 'active') continue;
+      const side = sideOf(game.players, playerId);
+      if (side === null) continue;
+      const before = loadStored(game.flow);
+      save(game, playerId, before, resign(before.flow, side, rng), at);
+    }
+    for (const invite of [...invites.values()]) {
+      if (invite.from !== playerId) continue;
+      invites.delete(invite.code);
+      for (const listener of inviteListeners) {
+        if (listener.code === invite.code) sendInvite(listener);
+      }
+    }
+    for (const listener of inviteListListeners) {
+      if (listener.playerId === playerId) sendInviteList(listener);
+    }
+    deletedPlayers.add(playerId);
+  }
+
   return {
     createGame,
 
     createInvite: makeInvite,
+
+    onlineDataFor: (playerId) => ({ deleteMyData: () => deleteData(playerId) }),
 
     cancelInvite: cancel,
 

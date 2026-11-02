@@ -2,6 +2,7 @@ import type { TutorialGame } from '@tavli/contracts';
 import { THEME_IDS } from '@tavli/ui';
 import Constants from 'expo-constants';
 import { useLocales } from 'expo-localization';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, ScrollView, Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -15,6 +16,9 @@ import { ToggleRow } from '@/components/settings/ToggleRow';
 import type { BotSpeed } from '@/features/bot/botSpeed';
 import { HistorySettings } from '@/features/history/HistorySettings';
 import type { TurnPushes } from '@/features/notifications/turnPushes';
+import { hasOnlineAccount } from '@/features/online/accountHint';
+import type { OnlineDataDeps } from '@/features/online/deleteData';
+import { OnlineDataSettings } from '@/features/online/OnlineDataSettings';
 import { TurnPushSettings } from '@/features/notifications/TurnPushSettings';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
@@ -57,6 +61,13 @@ export interface SettingsScreenProps {
    * it: a build with no online play has none.
    */
   turnPushes?: TurnPushes;
+  /**
+   * Delete my online data (#315). The row shows only with it (a build
+   * with online play), and only when this phone used online play
+   * (`hasOnlineAccount()` when the screen opens). It stays until the
+   * screen closes, so it can say that the data is deleted.
+   */
+  onlineData?: OnlineDataDeps;
 }
 
 export function SettingsScreen({
@@ -64,9 +75,11 @@ export function SettingsScreen({
   onLearnToPlay,
   onHistory,
   turnPushes,
+  onlineData,
 }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
   const locales = useLocales();
+  const [usedOnline] = useState(hasOnlineAccount);
 
   const sound = useSettings((s) => s.sound);
   const haptics = useSettings((s) => s.haptics);
@@ -278,6 +291,7 @@ export function SettingsScreen({
             accessibilityRole="link"
             onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
           />
+          {onlineData && usedOnline ? <OnlineDataSettings deps={onlineData} /> : null}
         </SectionCard>
 
         <Text style={styles.footer}>{t('settings.version', { version })}</Text>
