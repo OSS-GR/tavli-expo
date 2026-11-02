@@ -291,6 +291,37 @@ describe('sendTurn', () => {
   });
 });
 
+describe('setDraft (#374)', () => {
+  const move: Move = { from: 13, to: 8, die: 5 };
+
+  it('calls setDraft with only the move fields the server takes', async () => {
+    const fake = fakeClient();
+    const transport = createConvexGameTransport({ client: fake.client });
+    const moves: Move[] = [{ ...move, extra: 'not for the server' } as Move];
+    const sent = transport.setDraft({ gameId: 'g1', expectedVersion: 4, moves });
+    moves.length = 0;
+    expect(fake.lastMutation()).toMatchObject({
+      name: 'games:setDraft',
+      args: { gameId: 'g1', expectedVersion: 4, moves: [move] },
+    });
+    fake.lastMutation().resolve(null);
+    await expect(sent).resolves.toBeUndefined();
+  });
+
+  it('a server error rejects with its plain data; an old server rejects as it is', async () => {
+    const fake = fakeClient();
+    const transport = createConvexGameTransport({ client: fake.client });
+    const stale = transport.setDraft({ gameId: 'g1', expectedVersion: 1, moves: [] });
+    fake.lastMutation().reject(new ConvexError({ code: 'STALE_VERSION', message: 'load again' }));
+    expect(await reasonOf(stale)).toEqual({ code: 'STALE_VERSION', message: 'load again' });
+    // A server from before #374 has no such function.
+    const missing = new Error("Could not find public function for 'games:setDraft'");
+    const old = transport.setDraft({ gameId: 'g1', expectedVersion: 1, moves: [] });
+    fake.lastMutation().reject(missing);
+    expect(await reasonOf(old)).toBe(missing);
+  });
+});
+
 describe('rollDice', () => {
   it('calls rollDice and maps TIMED_OUT like sendTurn', async () => {
     const fake = fakeClient();

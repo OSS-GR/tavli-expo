@@ -37,8 +37,8 @@ import {
   type OnlineBot,
 } from './onlineBot';
 import { viewEvents } from './onlineFeedback';
-import { createOnlineStore, viewFlow, type OnlineStore } from './onlineStore';
-import { remoteTurn } from './remoteTurn';
+import { createOnlineStore, draftFlow, viewFlow, type OnlineStore } from './onlineStore';
+import { remoteSteps, remoteTurn } from './remoteTurn';
 
 const START = Date.UTC(2026, 9, 28, 12, 0, 0);
 
@@ -149,6 +149,105 @@ describe('remoteTurn', () => {
   });
 });
 
+describe('remoteSteps (#374)', () => {
+  /** Plays until the bot (Black) has rolled two different dice and can move. */
+  async function botMoves() {
+    const { server, gameId } = serverWithGame();
+    const bot = server.transportFor('bot');
+    for (let i = 0; i < 100; i++) {
+      const view = server.getGame(gameId)!;
+      if (view.waitingFor === 'black' && view.game.phase === 'awaiting-roll') {
+        await bot.rollDice({ gameId, expectedVersion: view.version });
+        continue;
+      }
+      const dice = view.game.state.dice;
+      const twoMoves = dice !== null && dice[0] !== dice[1];
+      if (view.waitingFor === 'black' && view.game.phase === 'moving' && twoMoves) {
+        const moves = pickTurn(view.game, createSeededRng(4));
+        if (moves.length === 2) return { server, gameId, bot, view, moves };
+      }
+      await playServerTurn(server, gameId, createSeededRng(i));
+    }
+    throw new Error('the bot never got a turn of two moves');
+  }
+
+  it('flies each new draft move, and the moves taken back back', async () => {
+    const { view, moves } = await botMoves();
+    const start = draftFlow(view, 'white');
+    const one = draftFlow({ ...view, draft: { seq: 1, moves: moves.slice(0, 1) } }, 'white');
+    const two = draftFlow({ ...view, draft: { seq: 2, moves } }, 'white');
+    expect(remoteSteps(start, one, 'white')).toEqual({
+      player: 'black',
+      moves: [one.game.played[0]],
+      before: currentBoard(start.game),
+      undo: false,
+    });
+    expect(remoteSteps(one, two, 'white')).toMatchObject({
+      moves: [two.game.played[1]],
+      before: currentBoard(one.game),
+      undo: false,
+    });
+    // Taken back: the board after the undo, the moves in the order played.
+    expect(remoteSteps(two, one, 'white')).toMatchObject({
+      moves: [two.game.played[1]],
+      before: currentBoard(one.game),
+      undo: true,
+    });
+    expect(remoteSteps(two, start, 'white')).toMatchObject({
+      moves: two.game.played,
+      before: currentBoard(start.game),
+      undo: true,
+    });
+    // Your own moves are not theirs to fly.
+    expect(remoteSteps(start, one, 'black')).toBeNull();
+    // Sounds: a new move plays, a move taken back plays nothing.
+    expect(viewEvents(one, two, 'white').map(({ event }) => event)).toEqual([
+      moveEvent(two.game.played[1]!),
+    ]);
+    expect(viewEvents(two, one, 'white')).toEqual([]);
+  });
+
+  it('the end of the turn flies only the moves the draft did not show', async () => {
+    const { server, gameId, bot, view, moves } = await botMoves();
+    const start = draftFlow(view, 'white');
+    const one = draftFlow({ ...view, draft: { seq: 1, moves: moves.slice(0, 1) } }, 'white');
+    const two = draftFlow({ ...view, draft: { seq: 2, moves } }, 'white');
+    await bot.sendTurn({ gameId, expectedVersion: view.version, moves });
+    const after = viewFlow(server.getGame(gameId)!);
+    const last = after.game.lastTurn!.moves;
+    expect(remoteTurn(start, after, 'white')).toEqual({
+      player: 'black',
+      moves: last,
+      before: currentBoard(start.game),
+    });
+    expect(remoteSteps(one, after, 'white')).toEqual({
+      player: 'black',
+      moves: last.slice(1),
+      before: currentBoard(one.game),
+      undo: false,
+    });
+    // Every move showed already: nothing flies, and no move sounds again.
+    expect(remoteSteps(two, after, 'white')).toBeNull();
+    expect(viewEvents(two, after, 'white').map(({ event }) => event)).toEqual(['turnStart']);
+    // A draft that is not the start of the turn: the whole turn flies from its start.
+    const other = view.game.state;
+    let diverged: MatchFlow | null = null;
+    for (let seed = 1; seed < 40 && diverged === null; seed++) {
+      const [move] = pickTurn(view.game, createSeededRng(seed));
+      if (move !== undefined && (move.from !== moves[0]!.from || move.die !== moves[0]!.die)) {
+        diverged = draftFlow({ ...view, draft: { seq: 1, moves: [move] } }, 'white');
+      }
+    }
+    expect(diverged).not.toBeNull();
+    expect(remoteSteps(diverged!, after, 'white')).toEqual({
+      player: 'black',
+      moves: last,
+      before: other.board,
+      undo: false,
+    });
+  });
+});
+
 describe('clockText', () => {
   const t = i18n.t;
   it('counts seconds live, rounded up', () => {
@@ -235,6 +334,7 @@ describe('onlineBoardStore refusals', () => {
         },
         rollDice: (request) => real.rollDice(request),
         sendTurn: (request) => real.sendTurn(request),
+        setDraft: (request) => real.setDraft(request),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: () => Promise.reject(new Error('no network')),
         listMyGames: (request) => real.listMyGames(request),
@@ -568,6 +668,7 @@ describe('startOnlineBot', () => {
           subscribe: (id, onView, onError) => real.subscribe(id, onView, onError),
           rollDice: (request) => real.rollDice(request),
           sendTurn,
+          setDraft: (request) => real.setDraft(request),
           sendAnswer: (request) => real.sendAnswer(request),
           resign: (id) => real.resign(id),
           listMyGames: (request) => real.listMyGames(request),
@@ -607,6 +708,7 @@ describe('startOnlineBot', () => {
           },
           rollDice: (request) => real.rollDice(request),
           sendTurn: (request) => real.sendTurn(request),
+          setDraft: (request) => real.setDraft(request),
           sendAnswer: (request) => real.sendAnswer(request),
           resign: (id) => real.resign(id),
           listMyGames: (request) => real.listMyGames(request),

@@ -86,6 +86,23 @@ export default defineSchema({
     event: v.string(),
   }).index('by_game', ['gameId', 'seq']),
 
+  /**
+   * The turn so far of the player the server waits for (#374): shown live
+   * on the other phone, never a saved turn. At most one row per game. It
+   * belongs to one game `version`: `save` in `games.ts` deletes it, and
+   * `getGame` shows it only at that version. Its own table, so a draft
+   * does not run the "my games" lists again. It holds no player id.
+   */
+  drafts: defineTable({
+    gameId: v.id('games'),
+    /** The game version the draft was made on. */
+    version: v.number(),
+    /** 1 for the first draft of `version`, then +1 per draft. */
+    seq: v.number(),
+    /** The moves so far, `MoveInput[]` as JSON text. */
+    moves: v.string(),
+  }).index('by_game', ['gameId']),
+
   /** Game invites by code (#252). See "Invites" in the service doc. */
   invites: defineTable({
     /** The code to share: 8 capital letters and digits (`INVITE_CODE_ALPHABET`). Unique. */

@@ -286,6 +286,7 @@ describe('function references', () => {
       getGame: getFunctionName(api.games.getGame),
       rollDice: getFunctionName(api.games.rollDice),
       makeMove: getFunctionName(api.games.makeMove),
+      setDraft: getFunctionName(api.games.setDraft),
       answer: getFunctionName(api.games.answer),
       resign: getFunctionName(api.games.resign),
       listMyGames: getFunctionName(api.games.listMyGames),
@@ -300,6 +301,7 @@ describe('function references', () => {
     expectType<Extends<WithGameId<GameFunctions['getGame']>, FunctionArgs<Api['getGame']>>>();
     expectType<Extends<WithGameId<GameFunctions['rollDice']>, FunctionArgs<Api['rollDice']>>>();
     expectType<Extends<WithGameId<GameFunctions['makeMove']>, FunctionArgs<Api['makeMove']>>>();
+    expectType<Extends<WithGameId<GameFunctions['setDraft']>, FunctionArgs<Api['setDraft']>>>();
     expectType<Extends<WithGameId<GameFunctions['answer']>, FunctionArgs<Api['answer']>>>();
     expectType<Extends<WithGameId<GameFunctions['resign']>, FunctionArgs<Api['resign']>>>();
     expectType<
@@ -313,6 +315,9 @@ describe('function references', () => {
     >();
     expectType<
       Extends<FunctionReturnType<Api['makeMove']>, FunctionReturnType<GameFunctions['makeMove']>>
+    >();
+    expectType<
+      Extends<FunctionReturnType<Api['setDraft']>, FunctionReturnType<GameFunctions['setDraft']>>
     >();
     expectType<
       Extends<FunctionReturnType<Api['answer']>, FunctionReturnType<GameFunctions['answer']>>

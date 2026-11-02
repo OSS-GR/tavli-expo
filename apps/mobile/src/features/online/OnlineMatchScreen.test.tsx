@@ -562,6 +562,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
             rollDice: (request) =>
               offline ? Promise.reject(new Error('offline')) : real.rollDice(request),
             sendTurn: (request) => real.sendTurn(request),
+            setDraft: (request) => real.setDraft(request),
             sendAnswer: (request) => real.sendAnswer(request),
             resign: (id) => real.resign(id),
             listMyGames: (request) => real.listMyGames(request),
@@ -744,6 +745,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
         rollDice: (request) => real.rollDice(request),
         sendTurn: (request) =>
           offline ? Promise.reject(new Error('offline')) : real.sendTurn(request),
+        setDraft: (request) => real.setDraft(request),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
         listMyGames: (request) => real.listMyGames(request),
@@ -788,6 +790,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
               real.sendTurn(request).then(resolve, reject);
             };
           }),
+        setDraft: (request) => real.setDraft(request),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
         listMyGames: (request) => real.listMyGames(request),

@@ -12,6 +12,10 @@
  *   again after each change to one of the caller's games, only when the
  *   list changed (like a Convex query watch). `watchMyInvites` (#314)
  *   does the same for the caller's open invites.
+ * - `setDraft` (#374) keeps the mover's turn so far (`checkDraft`, like
+ *   the Convex `setDraft`) and sends both players the view again at the
+ *   same version. It never moves the version, starts a timer or sends a
+ *   push. Every save drops the draft.
  * - Every view, request and event is a copy (a JSON round trip), so a
  *   client cannot change the server state, and the server cannot change a
  *   view a client holds.
@@ -51,6 +55,7 @@ import {
   eventActor,
   matchStatus,
   nextDeadline,
+  nextDraft,
   rollDeadline,
   scheduledCheck,
 } from './calls';
@@ -82,7 +87,7 @@ import {
   sideOf,
   toView,
 } from './online-game';
-import type { LoadedFlow, SteppedFlow } from './online-game';
+import type { LoadedFlow, SavedDraft, SteppedFlow } from './online-game';
 import { latestGames, summarizeGame } from './summaries';
 
 export interface MemoryGameServerOptions {
@@ -256,7 +261,14 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const invites = new Map<string, InviteRecord>();
   const inviteListeners = new Set<InviteListener>();
   const inviteListListeners = new Set<InviteListListener>();
+  /** The draft of each game (#374), as `SavedDraft` JSON, like the Convex `drafts` table. */
+  const drafts = new Map<string, string>();
   let nextId = 1;
+
+  function draftOf(gameId: string): SavedDraft | null {
+    const text = drafts.get(gameId);
+    return text === undefined ? null : (JSON.parse(text) as SavedDraft);
+  }
 
   /** The view input of `game`, without its flow. */
   function gameInput(game: MemoryGame) {
@@ -272,7 +284,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
 
   function viewOf(game: MemoryGame): OnlineGameView {
     const { flow, previousGame } = loadStored(game.flow);
-    return toView({ ...gameInput(game), flow, previousGame });
+    return toView({ ...gameInput(game), flow, previousGame, draft: draftOf(game.gameId) });
   }
 
   /** The games of `playerId` with `status`, like the Convex `listMyGames`. */
@@ -297,12 +309,17 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     });
   }
 
-  /** Sends the view of `game` as it is now to each listener of the game. */
-  function notify(game: MemoryGame): void {
+  /** Sends the view of `game` as it is now to each listener of the game, not to the lists. */
+  function notifyViews(game: MemoryGame): void {
     const text = JSON.stringify(viewOf(game));
     for (const listener of listeners) {
       if (listener.gameId === game.gameId) send(listener, text);
     }
+  }
+
+  /** Sends the view of `game` as it is now to each listener of the game, and the new lists. */
+  function notify(game: MemoryGame): void {
+    notifyViews(game);
     notifyLists(game);
   }
 
@@ -362,6 +379,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       updatedAt: at,
     };
     games.set(game.gameId, saved);
+    // A new step ends the draft (#374).
+    drafts.delete(game.gameId);
     notify(saved);
   }
 
@@ -448,6 +467,20 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         return playerCall(playerId, gameId, expectedVersion, true, (flow, side) =>
           playTurn(flow, side, moves, rng),
         );
+      },
+      async setDraft(request) {
+        const { gameId, expectedVersion, moves } = copy(request);
+        await nextTick();
+        try {
+          const { game, side } = checkCall(games.get(gameId) ?? null, playerId, expectedVersion);
+          const flow = loadFlow(game.flow);
+          const draft = nextDraft(game, flow, side, moves, draftOf(gameId), now());
+          drafts.set(gameId, JSON.stringify(draft));
+          // Only the game's watchers: a draft changes no list (#374).
+          notifyViews(game);
+        } catch (error) {
+          throw toErrorData(error);
+        }
       },
       sendAnswer(request) {
         const { gameId, expectedVersion, choice } = copy(request);

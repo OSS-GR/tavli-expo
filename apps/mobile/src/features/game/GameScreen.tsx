@@ -131,7 +131,7 @@ import { bestRest, hintHasChoice } from '@/features/hint/hint';
 import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
 import { onlineStoreEvents } from '@/features/online/onlineFeedback';
 import { remoteRoll } from '@/features/online/remoteRoll';
-import { remoteTurn } from '@/features/online/remoteTurn';
+import { remoteSteps } from '@/features/online/remoteTurn';
 import { useSettings } from '@/features/settings/store';
 
 import {
@@ -820,17 +820,22 @@ export function GameScreen({
     return true;
   };
 
-  // Online (#255): the other player's whole turn arrives in one view. Its
-  // moves fly one after the other from the board of the view before.
+  // Online (#255): the other player's turn ends in one view. Its moves fly
+  // one after the other from the board of the view before. Live moves
+  // (#374): each draft flies its new moves, or flies the ones taken back
+  // back; the end of the turn flies only the moves not shown yet.
   const seenFlow = useRef(flow);
+  const remoteFlights = useRef(0);
   const flyRemoteTurn = useEffectEvent((before: MatchFlow, after: MatchFlow) => {
     const geo = geoRef.current;
     if (me === null || geo === null) return;
-    const turn = remoteTurn(before, after, me);
+    const turn = remoteSteps(before, after, me);
     if (turn === null) return;
+    remoteFlights.current += 1;
     const flying = turnFlights(geo, boardView, turn.player, turn.moves, turn.before, {
-      id: `r${online?.version ?? 0}`,
+      id: `r${remoteFlights.current}`,
       direction,
+      ...(turn.undo ? { undo: true } : {}),
     });
     setFlights(flying);
     // The turn ended the game: the end waits until it lands (#299).

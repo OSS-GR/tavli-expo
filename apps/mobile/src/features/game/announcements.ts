@@ -184,7 +184,9 @@ export function onlinePassLine(
  * - A question (Plakoto's mother, the Acey-Deucey double) reads the turn
  *   before it.
  * Your own moves on the phone are not read again: the text goes once you
- * move, and comes back with the same key after an undo.
+ * move, and comes back with the same key after an undo. The other
+ * player's draft (#374) is the same: their moves show on the board as
+ * they happen, and are read once, in "Opponent played: …".
  */
 export function onlineTurnAnnouncement(
   flow: MatchFlow,
@@ -208,6 +210,9 @@ export function onlineTurnAnnouncement(
     if (isYou(game.state.toMove)) lines.push(t('game.pass.next_you'));
     return lines.length > 0 ? lines.join(' ') : null;
   }
+  // The other player's draft used every die (#374): their moves are read
+  // once, when the turn ends ("Opponent played: …").
+  if (game.phase === 'awaiting-confirm') return null;
   const dice = game.state.dice;
   if (game.phase !== 'moving' || dice === null) {
     // A question: the turn before it.

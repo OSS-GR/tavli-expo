@@ -268,6 +268,10 @@ export function turnMoveDelay(i: number): number {
  * double) waits where its last flight lands: it stays hidden until that
  * flight is down (`hiddenMs`). `before` is the board before the first
  * move; the moves are replayed on it with the engine's `applyMoveToBoard`.
+ *
+ * With `undo` (the other player took moves back, #374), the moves fly
+ * back the same way, the last one first, and `before` is the board after
+ * the undo (as for `pathFlights`).
  */
 export function turnFlights(
   geo: BoardGeometry,
@@ -277,21 +281,30 @@ export function turnFlights(
   before: BoardState,
   options: PathFlightOptions,
 ): Flight[] {
+  const undo = options.undo === true;
+  const boards: BoardState[] = [before];
+  for (const move of moves) {
+    boards.push(
+      applyMoveToBoard(boards[boards.length - 1] as BoardState, mover, move, options.direction),
+    );
+  }
   const flights: Flight[] = [];
-  let board = before;
-  moves.forEach((move, i) => {
-    const after = applyMoveToBoard(board, mover, move, options.direction);
-    const delay = turnMoveDelay(i);
+  moves.forEach((_, leg) => {
+    const i = undo ? moves.length - 1 - leg : leg;
+    const move = moves[i] as Move;
+    const start = boards[undo ? i + 1 : i] as BoardState;
+    const end = boards[undo ? i : i + 1] as BoardState;
+    const delay = turnMoveDelay(leg);
     const earlier = flights.length;
-    for (const f of moveFlights(geo, view, mover, move, board, after, {
-      id: `${options.id}:${i}`,
+    for (const f of moveFlights(geo, view, mover, move, start, end, {
+      id: `${options.id}:${leg}`,
+      ...(undo ? { undo: true } : {}),
     })) {
       // `moveFlights` paces a move as on the phone: scale it (a hit's delay).
       const flight = { ...f, delay: f.delay * REMOTE_PACE + delay, legMs: REMOTE_FLIGHT_MS };
       const lands = landsAt(flights.slice(0, earlier), flight);
       flights.push(lands === null ? flight : { ...flight, hiddenMs: lands });
     }
-    board = after;
   });
   return flights;
 }

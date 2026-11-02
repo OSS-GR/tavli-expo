@@ -6,12 +6,13 @@ import {
   type GameTransport,
   type OnlineGameChoice,
   type OnlineGameView,
+  type SetDraftRequest,
 } from '@tavli/contracts';
 import { createSeededRng, type MatchAction, type MoveInput, type Rng } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
 import { motherPin, pickChoice, pickTurn } from '@tavli/online/testing';
 
-import { createOnlineStore, viewFlow, type OnlineStore } from './onlineStore';
+import { createOnlineStore, draftFlow, viewFlow, type OnlineStore } from './onlineStore';
 import { timeLeft } from './timeLeft';
 
 const ALICE = 'alice';
@@ -105,6 +106,8 @@ async function waitingToRoll(seed = 7) {
 /** A transport that records its calls and can fail the next call like a network. */
 function spy(inner: GameTransport) {
   const calls: string[] = [];
+  /** The drafts sent (#374), apart from `calls`: they go after every move and undo. */
+  const drafts: SetDraftRequest[] = [];
   let offline = false;
   const send = <T>(name: string, run: () => Promise<T>): Promise<T> => {
     calls.push(name);
@@ -121,6 +124,12 @@ function spy(inner: GameTransport) {
     },
     rollDice: (request) => send('rollDice', () => inner.rollDice(request)),
     sendTurn: (request) => send('sendTurn', () => inner.sendTurn(request)),
+    setDraft: (request) => {
+      drafts.push(request);
+      return offline
+        ? Promise.reject(new Error('network request failed'))
+        : inner.setDraft(request);
+    },
     sendAnswer: (request) => send('sendAnswer', () => inner.sendAnswer(request)),
     resign: (gameId) => send('resign', () => inner.resign(gameId)),
     listMyGames: (request) => send('listMyGames', () => inner.listMyGames(request)),
@@ -129,6 +138,7 @@ function spy(inner: GameTransport) {
   return {
     transport,
     calls,
+    drafts,
     setOffline: (value: boolean) => {
       offline = value;
     },
@@ -716,5 +726,196 @@ describe('createOnlineStore', () => {
       expect(viewOf(b).status).toBe('finished');
       expect(server.getGame(gameId)?.match.winner).not.toBeNull();
     }
+  });
+});
+
+/** Only the fields a move is named by: an engine `Move` may carry more. */
+const plain = (moves: readonly MoveInput[]) =>
+  moves.map(({ from, to, die }) => ({ from, to, die }));
+
+/** A transport whose drafts wait until the test lets them go, one by one. */
+function heldDrafts(inner: GameTransport) {
+  const sent: SetDraftRequest[] = [];
+  const waiting: (() => void)[] = [];
+  const transport: GameTransport = {
+    ...inner,
+    setDraft: (request) => {
+      sent.push(request);
+      return new Promise<void>((resolve, reject) => {
+        waiting.push(() => {
+          inner.setDraft(request).then(resolve, reject);
+        });
+      });
+    },
+  };
+  return {
+    transport,
+    sent,
+    /** Lets the oldest held draft go to the server. */
+    release: () => waiting.shift()?.(),
+  };
+}
+
+describe('live moves (#374)', () => {
+  it('sends your turn so far after each move and undo: one call at a time, then the newest', async () => {
+    const { server, gameId, storeFor } = setup();
+    const first = server.getGame(gameId)!;
+    const moverId = first.waitingFor === 'white' ? ALICE : BOB;
+    const held = heldDrafts(server.transportFor(moverId));
+    const mover = storeFor(moverId, held.transport);
+    await flush();
+    const side = mover.getState().side!;
+    const moves = pickTurn(first.game, createSeededRng(3));
+    expect(moves.length).toBeGreaterThan(1);
+
+    play(mover, moves.slice(0, 1));
+    expect(held.sent).toEqual([
+      { gameId, expectedVersion: first.version, moves: moves.slice(0, 1) },
+    ]);
+    // While that one is on its way, only the newest draft waits.
+    play(mover, moves.slice(1, 2));
+    expect(mover.getState().dispatch({ type: 'undo', player: side })).toBe(true);
+    expect(held.sent).toHaveLength(1);
+    held.release();
+    await flush();
+    expect(held.sent.map((draft) => draft.moves)).toEqual([moves.slice(0, 1), moves.slice(0, 1)]);
+    held.release();
+    await flush();
+    expect(server.getGame(gameId)?.draft).toEqual({ seq: 2, moves: moves.slice(0, 1) });
+    // Drafts never touch the local flow, the version or `sending`.
+    expect(mover.getState().flow?.game.played).toHaveLength(1);
+    expect(mover.getState().sending).toBe(false);
+    expect(server.getGame(gameId)?.version).toBe(first.version);
+  });
+
+  it('shows the other player their moves as they happen, on the same version', async () => {
+    const { storeFor } = setup();
+    const a = storeFor(ALICE);
+    const b = storeFor(BOB);
+    await flush();
+    const [mover, other] = turnOrder(a, b);
+    const side = mover.getState().side!;
+    const start = viewOf(other);
+    const moves = pickTurn(start.game, createSeededRng(3));
+
+    play(mover, moves.slice(0, 1));
+    await flush();
+    expect(viewOf(other).version).toBe(start.version);
+    expect(viewOf(other).draft?.seq).toBe(1);
+    expect(plain(other.getState().flow!.game.played)).toEqual(plain(moves.slice(0, 1)));
+    // A view: the log stays empty.
+    expect(other.getState().flow?.log).toEqual([]);
+    // Your own draft comes back to you too: your moves on the phone stay.
+    expect(mover.getState().flow?.log).toHaveLength(1);
+
+    expect(mover.getState().dispatch({ type: 'undo', player: side })).toBe(true);
+    await flush();
+    expect(other.getState().flow?.game.played).toEqual([]);
+    expect(other.getState().flow?.game).toEqual(start.game);
+
+    play(mover, moves);
+    await flush();
+    expect(plain(other.getState().flow!.game.played)).toEqual(plain(moves));
+    expect(other.getState().flow?.game.phase).toBe('awaiting-confirm');
+    // The other player still cannot act on it.
+    expect(other.getState().dispatch({ type: 'undo', player: other.getState().side! })).toBe(false);
+
+    expect(confirm(mover)).toBe(true);
+    await flush();
+    expect(viewOf(other).version).toBe(start.version + 1);
+    expect(viewOf(other).draft).toBeNull();
+    expect(other.getState().flow?.game.lastTurn?.moves).toEqual(moves);
+  });
+
+  it('takes only a newer draft of the same view, on the other player turn', () => {
+    const { server, gameId } = setup();
+    const view = server.getGame(gameId)!;
+    const mover = view.waitingFor!;
+    const [move] = pickTurn(view.game, createSeededRng(3));
+    const drafted = { ...view, draft: { seq: 1, moves: [move!] } };
+    const other = mover === 'white' ? 'black' : 'white';
+    expect(plain(draftFlow(drafted, other).game.played)).toEqual(plain([move!]));
+    // Your own draft: your moves are on the phone already.
+    expect(draftFlow(drafted, mover)).toEqual(viewFlow(view));
+    // A draft the engine refuses stops there; the view stays as it is.
+    const bad = { ...view, draft: { seq: 1, moves: [{ from: 24, to: 17, die: 6 as const }] } };
+    expect(draftFlow(bad, other)).toEqual(viewFlow(view));
+  });
+
+  it('a draft that fails never holds back a move, an undo or Confirm', async () => {
+    const { server, gameId, storeFor } = setup();
+    const first = server.getGame(gameId)!;
+    const moverId = first.waitingFor === 'white' ? ALICE : BOB;
+    const inner = server.transportFor(moverId);
+    let tries = 0;
+    // A server from before #374: no `setDraft`. Then one that throws at once.
+    const mover = storeFor(moverId, {
+      ...inner,
+      setDraft: () => {
+        tries += 1;
+        if (tries > 1) throw new Error('no setDraft');
+        return Promise.reject(new Error("Could not find public function for 'games:setDraft'"));
+      },
+    });
+    await flush();
+    const side = mover.getState().side!;
+    const moves = pickTurn(first.game, createSeededRng(3));
+    play(mover, moves.slice(0, 1));
+    await flush();
+    expect(mover.getState().dispatch({ type: 'undo', player: side })).toBe(true);
+    await flush();
+    play(mover, moves);
+    await flush();
+    expect(tries).toBeGreaterThan(1);
+    expect(mover.getState().notice).toBeNull();
+    expect(mover.getState().lastError).toBeNull();
+    expect(confirm(mover)).toBe(true);
+    await flush();
+    expect(server.getGame(gameId)?.game.lastTurn?.moves).toEqual(moves);
+  });
+
+  it('sends no draft with `sendDrafts: false` (the online bot)', async () => {
+    const { server, gameId } = setup();
+    const first = server.getGame(gameId)!;
+    const moverId = first.waitingFor === 'white' ? ALICE : BOB;
+    const spied = spy(server.transportFor(moverId));
+    const mover = createOnlineStore({
+      transport: spied.transport,
+      gameId,
+      me: moverId,
+      sendDrafts: false,
+    });
+    open.push(mover);
+    await flush();
+    const side = mover.getState().side!;
+    const moves = pickTurn(first.game, createSeededRng(3));
+    play(mover, moves.slice(0, 1));
+    expect(mover.getState().dispatch({ type: 'undo', player: side })).toBe(true);
+    play(mover, moves);
+    await flush();
+    expect(spied.drafts).toEqual([]);
+    expect(server.getGame(gameId)?.draft ?? null).toBeNull();
+    expect(confirm(mover)).toBe(true);
+    await flush();
+    expect(server.getGame(gameId)?.game.lastTurn?.moves).toEqual(moves);
+  });
+
+  it('sends no draft once the turn goes (auto confirm), and drops the one waiting', async () => {
+    const { server, gameId, storeFor } = setup();
+    const first = server.getGame(gameId)!;
+    const moverId = first.waitingFor === 'white' ? ALICE : BOB;
+    const spied = spy(server.transportFor(moverId));
+    const mover = storeFor(moverId, spied.transport);
+    await flush();
+    const side = mover.getState().side!;
+    const moves = pickTurn(first.game, createSeededRng(8));
+    for (const move of moves) {
+      mover.getState().dispatch({ type: 'move', player: side, move, autoConfirm: true });
+    }
+    await flush();
+    expect(server.getGame(gameId)?.version).toBe(first.version + 1);
+    // The first draft went; the next ones waited, and the turn made them old.
+    expect(spied.drafts.map((draft) => draft.moves.length)).toEqual([1]);
+    expect(server.getGame(gameId)?.draft).toBeNull();
   });
 });

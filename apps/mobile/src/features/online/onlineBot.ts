@@ -76,7 +76,8 @@ const HIDDEN_MOVES: Partial<BotTiming> = {
 
 export function startOnlineBot(options: OnlineBotOptions): OnlineBot {
   const { transport, gameId, botId, difficulty, runner, rng } = options;
-  const store = createOnlineStore({ transport, gameId, me: botId });
+  // The bot's turn arrives whole: it sends no drafts (#374).
+  const store = createOnlineStore({ transport, gameId, me: botId, sendDrafts: false });
   let stopped = false;
   let turn: BotTurnHandle | null = null;
   /** The view version the bot plays now. A new version is a new turn. */

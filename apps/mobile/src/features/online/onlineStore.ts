@@ -16,6 +16,14 @@
  * `game.state.toMove`. It never assumes the players alternate (an Asodio
  * turn can give the same player another roll).
  *
+ * Live moves (#374): after each move and undo of your turn the store
+ * sends your turn so far (`setDraft`), best effort: one call at a time,
+ * then only the newest draft. A draft that fails changes nothing (an old
+ * server has no `setDraft`), and it never holds back a move, an undo or
+ * Confirm. On the other player's turn a view with a newer draft (same
+ * version, higher `seq`) replaces the flow: its moves are played on the
+ * view (`draftFlow`), so the board shows them as they happen.
+ *
  * See "Online games" in `docs/architecture/app-shell.md` and "Move flow"
  * in `docs/architecture/online-game-service.md`.
  */
@@ -49,6 +57,11 @@ export interface OnlineStoreOptions {
   readonly me: string;
   /** The phone clock, in epoch milliseconds. Default: `Date.now`. Tests pass a fake one. */
   readonly now?: () => number;
+  /**
+   * Sends your turn so far after each move and undo (#374). Default:
+   * `true`. The online bot turns it off: its turn arrives whole.
+   */
+  readonly sendDrafts?: boolean;
 }
 
 /**
@@ -143,6 +156,40 @@ export function viewFlow(view: OnlineGameView): MatchFlow {
   return { schemaVersion: MATCH_FLOW_SCHEMA_VERSION, match: view.match, game: view.game, log: [] };
 }
 
+/**
+ * The flow of a view with the other player's draft (#374) played on it:
+ * their moves so far, through the engine. Only while they move, never on
+ * your turn (your moves are on the phone). A draft move the engine refuses
+ * stops it there; the server checked every move already. The log stays
+ * empty, so the screen reads it as a view.
+ */
+export function draftFlow(view: OnlineGameView, side: PlayerId | null): MatchFlow {
+  const flow = viewFlow(view);
+  const moves = view.draft?.moves ?? [];
+  const player = view.game.state.toMove;
+  if (moves.length === 0 || view.game.phase !== 'moving' || view.waitingFor === side) return flow;
+  let drafted = flow;
+  for (const move of moves) {
+    try {
+      drafted = applyMatchAction(drafted, { type: 'move', player, move });
+    } catch (error) {
+      if (!(error instanceof EngineError)) throw error;
+      break;
+    }
+  }
+  return { ...drafted, log: [] };
+}
+
+/** True when `next` brings the other player a newer draft of the same view (#374). */
+function newerDraft(current: OnlineGameView, next: OnlineGameView, side: PlayerId | null): boolean {
+  return (
+    next.version === current.version &&
+    side !== null &&
+    next.waitingFor !== side &&
+    (next.draft?.seq ?? 0) > (current.draft?.seq ?? 0)
+  );
+}
+
 /** The server does these steps by itself. */
 const SERVER_ACTIONS: ReadonlySet<MatchAction['type']> = new Set([
   'rollOpening',
@@ -150,6 +197,11 @@ const SERVER_ACTIONS: ReadonlySet<MatchAction['type']> = new Set([
   'chooseStarter',
   'timeout',
 ]);
+
+/** The moves of your turn so far, with only the fields the server takes. */
+function playedMoves(flow: MatchFlow): MoveInput[] {
+  return flow.game.played.map(({ from, to, die, capture }) => ({ from, to, die, capture }));
+}
 
 function errorText(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -162,6 +214,7 @@ export function createOnlineStore({
   gameId,
   me,
   now = Date.now,
+  sendDrafts = true,
 }: OnlineStoreOptions): OnlineStore {
   let disposed = false;
   /**
@@ -176,7 +229,7 @@ export function createOnlineStore({
    * roll, so the screen throws the dice and reads them as a local roll.
    */
   const flowOf = (view: OnlineGameView): MatchFlow => {
-    const flow = viewFlow(view);
+    const flow = draftFlow(view, sideOf(view.players, me));
     if (myRoll === null || myRoll.version !== view.version) return flow;
     return { ...flow, log: [{ type: 'roll', player: myRoll.player, dice: myRoll.dice }] };
   };
@@ -189,6 +242,35 @@ export function createOnlineStore({
   let sentOn: number | null = null;
   /** The best clock offset so far (see `clockOffset`), `null` before the first estimate. */
   let measured: number | null = null;
+  /** True while a `setDraft` call waits for the server (#374). */
+  let draftInFlight = false;
+  /** The newest draft not sent yet: it goes when the call in flight ends. */
+  let draftWaiting: { readonly version: number; readonly moves: MoveInput[] } | null = null;
+
+  /**
+   * Sends the newest waiting draft, unless one is in flight. A draft of an
+   * older view, or one made while a call is on its way (your turn), is
+   * dropped. Its result is not read: a draft is best effort.
+   */
+  const sendDraft = () => {
+    if (draftInFlight || draftWaiting === null) return;
+    const draft = draftWaiting;
+    draftWaiting = null;
+    const view = store.getState().view;
+    if (disposed || inFlight || view === null || view.version !== draft.version) return;
+    draftInFlight = true;
+    const done = () => {
+      draftInFlight = false;
+      sendDraft();
+    };
+    let sent: Promise<void>;
+    try {
+      sent = transport.setDraft({ gameId, expectedVersion: draft.version, moves: draft.moves });
+    } catch (error) {
+      sent = Promise.reject(error);
+    }
+    sent.then(done, done);
+  };
 
   const store = createStore<OnlineStoreState>()((set, get) => {
     const refuse = (message: string): false => {
@@ -253,6 +335,8 @@ export function createOnlineStore({
     const call = (version: number, send: () => Promise<void>, roll = false) => {
       inFlight = true;
       sentOn = version;
+      // The turn (or the resign) goes: a draft that waits is old.
+      draftWaiting = null;
       set({ sending: true, rolling: roll, notice: null, lastError: null });
       let started: Promise<void>;
       try {
@@ -280,12 +364,7 @@ export function createOnlineStore({
     };
 
     const sendTurn = (flow: MatchFlow, view: OnlineGameView) => {
-      const moves: MoveInput[] = flow.game.played.map(({ from, to, die, capture }) => ({
-        from,
-        to,
-        die,
-        capture,
-      }));
+      const moves = playedMoves(flow);
       call(view.version, () =>
         transport.sendTurn({ gameId, expectedVersion: view.version, moves }),
       );
@@ -357,6 +436,10 @@ export function createOnlineStore({
               next.game.phase === 'awaiting-confirm'
             ) {
               sendTurn(next, view);
+            } else if (sendDrafts) {
+              // The other phone shows the turn so far (#374).
+              draftWaiting = { version: view.version, moves: playedMoves(next) };
+              sendDraft();
             }
             return true;
           }
@@ -396,8 +479,15 @@ export function createOnlineStore({
   const onView = (view: OnlineGameView) => {
     if (disposed) return;
     const current = store.getState().view;
-    // Same or older version (a repeat, or out of order): keep the local moves.
-    if (current !== null && view.version <= current.version) return;
+    if (current !== null && view.version <= current.version) {
+      // The other player's newer draft (#374): the same view with more of
+      // their turn. Nothing else changed (no clock estimate, no call ends).
+      const side = store.getState().side;
+      if (newerDraft(current, view, side)) store.setState({ view, flow: flowOf(view) });
+      // Else the same or an older version (a repeat, or out of order):
+      // keep the local moves.
+      return;
+    }
     // The first view may be old (the game was opened later): no estimate.
     const estimate = current === null ? null : estimateOffset(view, now());
     if (estimate !== null) measured = measured === null ? estimate : Math.max(measured, estimate);

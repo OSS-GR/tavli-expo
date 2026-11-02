@@ -268,6 +268,35 @@ describe('turnFlights (#255)', () => {
     expect(flights[1]!.hiddenMs).toBe(REMOTE_FLIGHT_MS);
   });
 
+  it('flies moves taken back the other way, the last one first (#374)', () => {
+    const before = portes.initialState({ startingPlayer: 'white' }).board;
+    const moves: Move[] = [
+      { from: 13, to: 7, die: 6, capture: 'none' },
+      { from: 7, to: 2, die: 5, capture: 'none' },
+    ];
+    const forward = turnFlights(geo, WHITE, 'white', moves, before, {
+      id: 'r',
+      direction: 'contrary',
+    });
+    // `before` is the board after the undo: here, the board at the start.
+    const back = turnFlights(geo, WHITE, 'white', moves, before, {
+      id: 'u',
+      direction: 'contrary',
+      undo: true,
+    });
+    expect(back.map((f) => [f.id, f.delay])).toEqual([
+      ['u:0:0', 0],
+      ['u:1:0', REMOTE_FLIGHT_MS + TURN_MOVE_GAP_MS],
+    ]);
+    // The last move goes back first: from where it landed to point 7.
+    expect(back[0]!.from).toEqual(forward[1]!.to);
+    expect(back[0]!.to).toEqual(forward[1]!.from);
+    // Then the first move: from point 7 back to point 13.
+    expect(back[1]!.from).toEqual(back[0]!.to);
+    expect(back[1]!.to).toEqual(forward[0]!.from);
+    expect(back[1]!.hiddenMs).toBe(REMOTE_FLIGHT_MS);
+  });
+
   it('plays a quarter slower than a move on the phone (#348)', () => {
     expect(REMOTE_PACE).toBe(1.25);
     expect(REMOTE_FLIGHT_MS).toBe(FLIGHT_MS * 1.25);

@@ -449,6 +449,57 @@ describe('turn timers on a fake clock', () => {
   });
 });
 
+describe('drafts (#374)', () => {
+  it('a late draft gets TIMED_OUT and saves nothing; the time out comes from the clock', async () => {
+    const { server, wait } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const before = server.getGame(gameId) as OnlineGameView;
+    const late = before.waitingFor as PlayerId;
+    const watcher = watch(server.transportFor(PLAYERS[otherSide(late)]), gameId);
+    await flush();
+    wait(LIVE);
+    const moves = pickTurn(before.game, createSeededRng(1)).slice(0, 1);
+    await rejectsWith(
+      server
+        .transportFor(PLAYERS[late])
+        .setDraft({ gameId, expectedVersion: before.version, moves }),
+      'TIMED_OUT',
+    );
+    await flush();
+    expect(watcher.views).toHaveLength(1);
+    expect(server.getGame(gameId)).toEqual(before);
+    expect(server.runDueTimeouts()).toBe(1);
+  });
+
+  it('a draft changes no list, the version or the clock, and the next step clears it', async () => {
+    const { server, wait } = setup(3);
+    const gameId = server.createGame(ALICE, PLAYERS, 'portes', 15, 1);
+    const before = server.getGame(gameId) as OnlineGameView;
+    const mover = PLAYERS[before.waitingFor as PlayerId];
+    const lists: unknown[] = [];
+    const stop = server.transportFor(mover).watchMyGames({ status: 'active' }, (list) => {
+      lists.push(list);
+    });
+    await flush();
+    expect(lists).toHaveLength(1);
+    const events = server.events(gameId).length;
+    wait(1000);
+    const moves = pickTurn(before.game, createSeededRng(1));
+    await server
+      .transportFor(mover)
+      .setDraft({ gameId, expectedVersion: before.version, moves: moves.slice(0, 1) });
+    await flush();
+    const shown = server.getGame(gameId) as OnlineGameView;
+    expect(shown).toEqual({ ...before, draft: { seq: 1, moves: moves.slice(0, 1) } });
+    expect(lists).toHaveLength(1);
+    expect(server.events(gameId)).toHaveLength(events);
+    await server.transportFor(mover).sendTurn({ gameId, expectedVersion: before.version, moves });
+    await flush();
+    expect(server.getGame(gameId)?.draft).toBeNull();
+    stop();
+  });
+});
+
 describe('calls act like a network', () => {
   it('a call changes nothing before the caller code runs on', async () => {
     const { server } = setup();

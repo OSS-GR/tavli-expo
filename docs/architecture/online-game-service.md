@@ -79,6 +79,19 @@ The event log. One row per engine `FlowEvent`, in order: `start`, `rollOpening`,
 
 The server does not replay the log on every move: it loads `games.flow`, which only the server writes. So a move costs the same at turn 5 and at turn 500.
 
+### `drafts`
+
+The turn so far of the player the server waits for (#374): the moves since the roll, before Confirm. The other phone shows them live ([Live moves](#live-moves)). A draft is never a saved turn.
+
+| Field | Notes |
+|---|---|
+| `gameId` | Index `by_game`. At most one row per game. |
+| `version` | The game version the draft was made on. |
+| `seq` | 1 for the first draft of that version, then +1 per draft. |
+| `moves` | `MoveInput[]` as JSON text: every move so far (empty after the last undo). |
+
+Every save (`save` in `games.ts`) deletes the row, and `getGame` shows a draft only at its own version, while the game waits for a move. The row holds no player id. A draft is its own table, so a draft write does not run the [my games](#my-games) queries again.
+
 ## Rules of a game choice
 
 `onlineGameRules(choice)` in `@tavli/online`: the preset of the game, and for one game `match.rotation = [game]`. This is the same as `gameRuleSet` in `apps/mobile/src/features/match/setup.ts`. The server must not import app code, so the few lines are copied. **Keep both in sync.** If they grow, move one helper into `packages/engine`.
@@ -135,9 +148,22 @@ A game between two people starts only from an accepted invite ([Invites](#invite
 | `makeMove(gameId, expectedVersion, moves)` | the player to move | yes | One full turn (above). Returns `{ ok: true, version }`, or `TIMED_OUT` ([Turn timers](#turn-timers)). |
 | `answer(gameId, expectedVersion, choice)` | the player the question asks | yes | Answers `prompt` (Plakoto mother question: `resign` or `playOn`; Asodio chosen double). Then the server goes on to the next wait (a roll, or the chosen double to play). Returns like `makeMove`. |
 | `resign(gameId)` | either player, any time | no | Resigns the **match**; the opponent wins. No version, so a resign never fails only because the opponent just moved. It ignores the turn timer. Returns the new version. |
+| `setDraft(gameId, expectedVersion, moves)` | the player to move, in `moving` | yes | Saves the caller's turn so far ([Live moves](#live-moves)). Returns `null`. |
 | `getGame(gameId)` | the two players | – | `OnlineGameView`, or `null` when there is no such game. Anyone else gets `NOT_A_PLAYER`. |
 | `listMyGames(status)` | anyone signed in | – | The caller's games with `status` (`active` or `finished`) as `GameSummary`, newest change first, at most `MAX_LISTED_GAMES` (50). See [My games](#my-games). |
 | `checkTimeout(gameId, version)` | internal (the scheduler) | yes | Runs at a turn deadline. Applies the time out if the game is still at `version`; else it does nothing. |
+
+### Live moves
+
+The other player sees each move as it happens (#374). After each move and undo, the mover's phone sends `setDraft` with every move of the turn so far. The pure check is `nextDraft` (`calls.ts`) and `checkDraft` (`online-game.ts`) in `@tavli/online`:
+
+- Only the player the server waits for, only in `moving`, at `expectedVersion`. Each move must be legal from the board before it (the engine checks). A refused draft throws (`ILLEGAL_MOVE`, `NOT_YOUR_TURN`, `ILLEGAL_ACTION`, `STALE_VERSION`) and saves nothing.
+- At or after the deadline it throws `TIMED_OUT` and saves nothing. The scheduled `checkTimeout` ends the game.
+- A draft keeps the version and the deadline. It writes no `moves` row, schedules nothing and sends no push.
+- The view's `draft` is `{ moves, seq }` or `null`. Both players watch `getGame`, so the other phone gets each draft at once, at the same version with a higher `seq`.
+- Confirm (`makeMove`) still sends the whole turn, and the server checks it again. A draft is only for show: the turn need not match it.
+
+**Rollout.** `draft` is optional in the view. An app from before #374 ignores it and the views at the same version. A new app on a server from before #374 gets "Could not find public function" from `setDraft`; the app drops the error and plays on, with no live moves.
 
 ### Two phones at once
 
@@ -170,7 +196,7 @@ A rejected call throws a `ConvexError` whose `data` is `{ code, message }` (`Gam
 
 ## The client view
 
-`getGame` returns `OnlineGameView` (`packages/contracts`): `gameId`, `version`, `status`, `choice`, `turnTimeMinutes`, `turnDeadline` (epoch ms on the server clock, `null` when finished; a phone shows the time left from it), `players`, `match` (rules, score, finished games), `game` (the engine `MatchFlow` of the current game), `previousGame` (the game before `game`, as it ended, #299; `null` in the first game), `waitingFor` (the side to move or answer) and `prompt`. `game.played` is always empty, because turns are saved whole. `previousGame` stays the same until the next game ends; a match that ends keeps its last game in `game`. The phone replays the turn in `previousGame.lastTurn`, so the other player's winning turn flies before the game-end sheet (see "Between games" in `board-screen.md`).
+`getGame` returns `OnlineGameView` (`packages/contracts`): `gameId`, `version`, `status`, `choice`, `turnTimeMinutes`, `turnDeadline` (epoch ms on the server clock, `null` when finished; a phone shows the time left from it), `players`, `match` (rules, score, finished games), `game` (the engine `MatchFlow` of the current game), `previousGame` (the game before `game`, as it ended, #299; `null` in the first game), `waitingFor` (the side to move or answer), `prompt` and `draft` (the mover's turn so far, or `null`, #374). `game.played` is always empty, because turns are saved whole; the phone plays `draft.moves` on top for the other player. `previousGame` stays the same until the next game ends; a match that ends keeps its last game in `game`. The phone replays the turn in `previousGame.lastTurn`, so the other player's winning turn flies before the game-end sheet (see "Between games" in `board-screen.md`).
 
 ## My games
 
@@ -422,7 +448,7 @@ Issue #302. App stores ask for in-app account deletion. The app screen is a late
 One transaction. If any step throws, nothing is deleted. Two steps go on after the call, in pages: the active games past the first page (step 2) and the closed invites (step 7).
 
 1. **Checks the user still exists.** A Convex token stays valid until it expires (15 minutes, the `convex` plugin's default), also after its user is deleted. So the call reads the Better Auth user (`existingPlayer`). No user: `NOT_SIGNED_IN`. A second call after a delete gets this clean error.
-2. **Active games:** the caller resigns each one (`resignAs` in `games.ts`, the same checks and the same `save` as `resign`). The other player wins the match. The save bumps the version, so the turn timer's check does nothing, and `scheduleTurnPush` runs as on every save (a resign ends the match: the other player gets ["game over"](#game-over), nobody gets "your turn"). Nothing caps a player's active games (each accepted invite starts one), so the call resigns only the first `GAME_RESIGN_PAGE` (25) of them (#309). One resign reads the game, writes it and one `moves` row, and runs the engine once. So 25 make about 50 writes, far below Convex's limit of 16,000 per transaction. The run time (Convex allows 1 second) is an estimate, not measured. When the page was full, the call schedules the internal mutation `resignActiveGames`, which resigns the next page (`by_white`, then `by_black`) and runs again while its page was full. See [Games after the call](#games-after-the-call).
+2. **Active games:** the caller resigns each one (`resignAs` in `games.ts`, the same checks and the same `save` as `resign`). The other player wins the match. The save bumps the version, so the turn timer's check does nothing, it deletes the game's [draft](#drafts) (#374), and `scheduleTurnPush` runs as on every save (a resign ends the match: the other player gets ["game over"](#game-over), nobody gets "your turn"). Nothing caps a player's active games (each accepted invite starts one), so the call resigns only the first `GAME_RESIGN_PAGE` (25) of them (#309). One resign reads the game, writes it and one `moves` row, and runs the engine once. So 25 make about 50 writes, far below Convex's limit of 16,000 per transaction. The run time (Convex allows 1 second) is an estimate, not measured. When the page was full, the call schedules the internal mutation `resignActiveGames`, which resigns the next page (`by_white`, then `by_black`) and runs again while its page was full. See [Games after the call](#games-after-the-call).
 3. **Finished games** (and the games just resigned) stay for the other player, as they are. See [What is kept](#what-is-kept).
 4. **Open invites:** the caller's open invites whose time is not up are deleted (`openInvitesOf` in `invites.ts`), so nobody can accept one. The cap keeps them few (at most `MAX_OPEN_INVITES`). An open invite's scheduled `expireInvite` then finds no row and does nothing. Invites someone else sent stay, also when the caller answered them.
 5. **Push tokens:** every `pushTokens` row of the caller is deleted.

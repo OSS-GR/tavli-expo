@@ -80,6 +80,7 @@ export function lazyGameTransport(get: () => GameTransport): GameTransport {
     subscribe: (gameId, onView, onError) => get().subscribe(gameId, onView, onError),
     rollDice: (request) => get().rollDice(request),
     sendTurn: (request) => get().sendTurn(request),
+    setDraft: (request) => get().setDraft(request),
     sendAnswer: (request) => get().sendAnswer(request),
     resign: (gameId) => get().resign(gameId),
     listMyGames: (request) => get().listMyGames(request),

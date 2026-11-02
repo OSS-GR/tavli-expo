@@ -11,9 +11,10 @@
 
 import type { GameTransportErrorData, OnlineGameStatus } from '@tavli/contracts';
 import { isTurnTimeMinutes } from '@tavli/contracts';
-import type { FlowEvent, MatchFlow, PerPlayer, PlayerId } from '@tavli/engine';
+import type { FlowEvent, MatchFlow, MoveInput, PerPlayer, PlayerId } from '@tavli/engine';
 
-import { OnlineGameError, deadlineAfter, isTimedOut, sideOf } from './online-game';
+import { OnlineGameError, checkDraft, deadlineAfter, isTimedOut, sideOf } from './online-game';
+import type { SavedDraft } from './online-game';
 
 /** The `actor` of the log events that the server plays itself. No player may use this id. */
 export const SERVER_ACTOR = 'server';
@@ -178,4 +179,28 @@ export function rollDeadline(
     last.moves.length === 0;
   if (game.turnDeadline !== null && !passed) return game.turnDeadline;
   return nextDeadline(turnTimeMinutes, flow, now);
+}
+
+/**
+ * The draft to save for a `setDraft` call by `side` (#374), after
+ * `checkCall`. `saved` is the draft the server holds now (`null`: none).
+ * A late draft throws `TIMED_OUT` and saves nothing: the scheduled turn
+ * check ends the game. Then `checkDraft` checks the phase and each move.
+ * `seq` goes up by one per draft of the same version, from 1. A draft
+ * never changes the version, the deadline or the log.
+ */
+export function nextDraft(
+  game: SavedGame,
+  flow: MatchFlow,
+  side: PlayerId,
+  moves: readonly MoveInput[],
+  saved: SavedDraft | null,
+  now: number,
+): SavedDraft {
+  if (callTimedOut(game, now)) {
+    throw new OnlineGameError(TIMED_OUT_ERROR.code, TIMED_OUT_ERROR.message);
+  }
+  const checked = checkDraft(flow, side, moves);
+  const seq = saved !== null && saved.version === game.version ? saved.seq + 1 : 1;
+  return { version: game.version, seq, moves: checked };
 }
