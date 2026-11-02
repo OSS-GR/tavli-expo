@@ -51,7 +51,7 @@ export type GameEndReason =
   | 'deadlock'
   /** A player resigned (for example Plakoto "offerConcede"). */
   | 'resigned'
-  /** A player ran out of time on their turn (online turn timers). Scored like a resign. */
+  /** A player ran out of time on their turn (online turn timers). Always 1 point (#378). */
   | 'timeout';
 
 // Typecheck fails if the list has a reason the type does not, or misses one.

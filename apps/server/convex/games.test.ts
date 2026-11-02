@@ -701,7 +701,8 @@ describe('the Plakoto mother question', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'TIMED_OUT' } });
     const after = await view(t, gameId);
     expect(after.status).toBe('finished');
-    expect(after.match.games[0]).toMatchObject({ winner: 'black', points: 2, reason: 'timeout' });
+    // A resign here gives a double; a time out is always 1 point (#378).
+    expect(after.match.games[0]).toMatchObject({ winner: 'black', points: 1, reason: 'timeout' });
     expect(after.turnDeadline).toBeNull();
   });
 });
@@ -748,8 +749,13 @@ describe('turn timers (#133)', () => {
     expect(v.version).toBe(before.version + 1);
     expect(v.status).toBe('active');
     expect(v.match.games).toHaveLength(1);
-    expect(v.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
-    expect(v.match.score[otherSide(late)]).toBeGreaterThanOrEqual(1);
+    // Nothing is borne off, so a resign would give a diplo: a time out is 1 point (#378).
+    expect(v.match.games[0]).toMatchObject({
+      winner: otherSide(late),
+      points: 1,
+      reason: 'timeout',
+    });
+    expect(v.match.score[otherSide(late)]).toBe(1);
     // The next game runs, waits for its first roll (#355), and that turn
     // has its own minute.
     expect(v.game.phase).toBe('awaiting-roll');
@@ -779,6 +785,7 @@ describe('turn timers (#133)', () => {
     const v = await view(t, gameId);
     expect(v.status).toBe('finished');
     expect(v.match.winner).toBe(otherSide(late));
+    expect(v.match.games[0]).toMatchObject({ points: 1, reason: 'timeout' });
     expect(v.turnDeadline).toBeNull();
     expect(v.waitingFor).toBeNull();
     const doc = await t.run(async (ctx) => ctx.db.get(gameId));
@@ -786,6 +793,28 @@ describe('turn timers (#133)', () => {
     // Nothing is scheduled any more.
     await wait(t, 10 * ASYNC);
     expect((await view(t, gameId)).version).toBe(v.version);
+  });
+
+  it('a time out in the opening roll is 1 point too, and can end the match (#378, #379)', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 1, 1, { open: false });
+    const before = await view(t, gameId);
+    // Black rolls their opening die; White never rolls.
+    const rolled = await as(t, BOB).mutation(api.games.rollDice, {
+      gameId,
+      expectedVersion: before.version,
+    });
+    expect(rolled).toEqual({ ok: true, version: before.version + 1 });
+    await wait(t, LIVE);
+    const v = await view(t, gameId);
+    // Nothing is borne off, where a resign gives a diplo: still 1 point.
+    expect(v.match.games).toEqual([
+      expect.objectContaining({ starter: 'black', winner: 'black', points: 1, reason: 'timeout' }),
+    ]);
+    expect(v.match.score).toEqual({ white: 0, black: 1 });
+    expect(v.status).toBe('finished');
+    expect(v.match.winner).toBe('black');
+    expect(v.turnDeadline).toBeNull();
   });
 
   it('a move just in time is fine, and the old check after it does nothing', async () => {

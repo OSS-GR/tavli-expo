@@ -443,7 +443,7 @@ export function isTimedOut(deadline: number | null, now: number): boolean {
 
 /**
  * The player the server waits for ran out of time: they lose the current
- * game (engine action `timeout`, scored like a resign of that game). Then
+ * game (engine action `timeout`, always 1 point, #378). Then
  * the server goes on: the next game starts, or the match ends.
  *
  * In the opening roll (#379) the player who did not roll loses, when the

@@ -608,7 +608,7 @@ describe('diplo wins', () => {
       game('black', 2, 'motherPinned'), // Plakoto: a pinned mother is a double
       game('black', 2, 'resigned'), // a resign scores the position: here a double
       game('white', 1, 'resigned'), // ... and here a single
-      game('white', 2, 'timeout'), // a timeout scores like a resign
+      game('white', 2, 'timeout'), // a timeout saved before #378 could score a double
       game('white', 3, 'borneOff'), // `backgammonScores3` (off by default): still a double
       game(null, 0, 'bothMothersPinned'), // a draw
     ];

@@ -256,11 +256,14 @@ describe('the opening roll (#379)', () => {
     const { flow, rng } = createNew('portes', 1, 5);
     const rolled = rollDice(stored(flow), 'black', dice(3));
     const late = timeOut(stored(rolled), rng);
+    // Nothing is borne off, where a resign gives a diplo: still 1 point (#378).
     expect(late.match.games[0]).toMatchObject({
       starter: 'black',
       winner: 'black',
+      points: 1,
       reason: 'timeout',
     });
+    expect(late.match.score).toEqual({ white: 0, black: 1 });
     expect(late.endedGame?.result?.reason).toBe('timeout');
     expect(late.match.status).toBe('in-progress');
     expect(late.game.phase).not.toBe('opening-roll');
@@ -481,8 +484,12 @@ describe('turn timers (#133)', () => {
     if (late === null) throw new Error('nobody to wait for');
     const next = timeOut(stored(flow), rng);
     expect(next.match.games).toHaveLength(1);
-    expect(next.match.games[0]).toMatchObject({ winner: late === 'white' ? 'black' : 'white' });
-    expect(next.match.games[0]?.reason).toBe('timeout');
+    // At the start nothing is borne off: a time out is still 1 point (#378).
+    expect(next.match.games[0]).toMatchObject({
+      winner: late === 'white' ? 'black' : 'white',
+      points: 1,
+      reason: 'timeout',
+    });
     expect(next.log[0]).toEqual({ type: 'timeout', player: late });
     expect(next.log.map((e) => e.type)).toContain('nextGame');
     // The next game waits for its first roll (#355).
