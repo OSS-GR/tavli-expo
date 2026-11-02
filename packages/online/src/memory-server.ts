@@ -56,6 +56,7 @@ import {
   matchStatus,
   nextDeadline,
   nextDraft,
+  rollCallVersion,
   rollDeadline,
   scheduledCheck,
 } from './calls';
@@ -103,15 +104,16 @@ export interface LoggedEvent {
   readonly seq: number;
   /** The game version the event led to. */
   readonly version: number;
-  /** The player id who acted (a roll too, #355), or `SERVER_ACTOR` (the opening roll, time outs, the next game). */
+  /** The player id who acted (a roll too, #355), or `SERVER_ACTOR` (opening dice, time outs, the next game). */
   readonly actor: string;
   readonly event: FlowEvent;
 }
 
 export interface MemoryGameServer {
   /**
-   * Creates a game between `players`, like the Convex `createGame`: the
-   * server rolls the opening at once, and the first turn's clock runs.
+   * Creates a game between `players`, like the Convex `createGame`: it
+   * waits for each player's opening die (#379), and the opening's clock
+   * runs.
    * Returns the game id. Throws an `OnlineGameError` (`BAD_REQUEST`,
    * `ILLEGAL_ACTION`) for bad arguments.
    */
@@ -395,18 +397,27 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
    * or an answer) the turn deadline, then `step`. Like the Convex `onTime`,
    * a late call saves the time out and gets `TIMED_OUT`. `deadline` gives
    * the turn deadline to save (default: a new one, `nextDeadline`).
+   * `expectedVersion` may be a function of the saved flow (a roll,
+   * `rollCallVersion`).
    */
   async function playerCall(
     callerId: string,
     gameId: string,
-    expectedVersion: number | null,
+    expectedVersion: number | null | ((flow: MatchFlow) => number | null),
     timed: boolean,
     step: (flow: MatchFlow, side: PlayerId) => SteppedFlow,
     deadline?: (game: MemoryGame, side: PlayerId, flow: SteppedFlow, at: number) => number | null,
   ): Promise<void> {
     await nextTick();
     try {
-      const { game, side } = checkCall(games.get(gameId) ?? null, callerId, expectedVersion);
+      const saved = games.get(gameId) ?? null;
+      const version =
+        typeof expectedVersion === 'function'
+          ? saved === null
+            ? null
+            : expectedVersion(loadFlow(saved.flow))
+          : expectedVersion;
+      const { game, side } = checkCall(saved, callerId, version);
       const at = now();
       if (timed && callTimedOut(game, at)) {
         applyTimeout(game, at);
@@ -455,7 +466,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         return playerCall(
           playerId,
           gameId,
-          expectedVersion,
+          // Both may roll the opening at once (#379): no version check then.
+          (flow) => rollCallVersion(flow, expectedVersion),
           true,
           (flow, side) => rollDice(flow, side, rng),
           // The roll is part of the turn: no new time, unless it passed.

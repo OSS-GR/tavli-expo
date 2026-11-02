@@ -115,8 +115,9 @@ export interface HistoryRecord {
  * - `tavli` (every game but Acey-Deucey American; `docs/rules/tavli-match.md`,
  *   "Winning & scoring"): a single is 1 point, a double is 2. Every way to a
  *   double gives 2: no checker borne off, a pinned mother (Plakoto), or a
- *   resign or a timeout in such a position (the opponent wins what the
- *   position is worth, `resignGame`). Only the `backgammonScores3` flag
+ *   resign in such a position (the opponent wins what the position is
+ *   worth, `resignGame`). A time out is always 1 point (#378); a record
+ *   saved before that may hold 2. Only the `backgammonScores3` flag
  *   (Portes, off by default) gives 3, and that is a double too.
  * - `perChecker` (Acey-Deucey American, #241): 1 point per checker the
  *   loser has not borne off. Only a loser with none off gives a diplo: 15.

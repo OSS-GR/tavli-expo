@@ -17,7 +17,7 @@ import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { createGame as createGameFunction } from './games';
 import schema from './schema';
-import { modules, pickTurn } from './test.setup';
+import { modules, openGame, pickTurn } from './test.setup';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -47,19 +47,27 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/**
+ * A new game between Alice (White) and Bob (Black). With `open` (the
+ * default) both players roll the opening first (#379, `openGame`), so the
+ * first player waits to move.
+ */
 async function createGame(
   t: Tester,
   choice: OnlineGameChoice = 'portes',
   targetPoints = 1,
   turnTimeMinutes: number | null = 1,
+  { open = true }: { readonly open?: boolean } = {},
 ) {
-  return await t.mutation(internal.games.createGame, {
+  const gameId = await t.mutation(internal.games.createGame, {
     callerId: ALICE,
     players: PLAYERS,
     choice,
     targetPoints,
     turnTimeMinutes,
   });
+  if (open) await openGame(t, gameId, PLAYERS);
+  return gameId;
 }
 
 /** The game as White (Alice) sees it. */
@@ -102,18 +110,23 @@ describe('createGame', () => {
     expect(createGameFunction).not.toHaveProperty('isPublic');
   });
 
-  it('starts a game: the server rolls the opening and the first roll', async () => {
+  it('starts a game in the opening roll: each player rolls their own die (#379)', async () => {
     const t = setup();
-    const gameId = await createGame(t);
+    const gameId = await createGame(t, 'portes', 1, 1, { open: false });
     const v = await view(t, gameId);
     expect(v.version).toBe(1);
     expect(v.status).toBe('active');
     expect(v.players).toEqual(PLAYERS);
-    expect(v.game.phase).toBe('moving');
-    expect(v.game.state.dice).not.toBeNull();
-    expect(v.waitingFor).toBe(v.game.state.toMove);
+    expect(v.game.phase).toBe('opening-roll');
+    expect(v.game.opening).toEqual({ white: null, black: null, ties: [] });
+    expect(v.waitingFor).toBe('white');
     expect(v.prompt).toBeNull();
     expect(v.match.rules.match.rotation).toEqual(['portes']);
+    expect((await events(t, gameId)).map((e) => e.type)).toEqual(['start']);
+    const opened = await openGame(t, gameId, PLAYERS);
+    expect(opened.game.phase).toBe('moving');
+    expect(opened.game.state.dice).not.toBeNull();
+    expect(opened.waitingFor).toBe(opened.game.state.toMove);
   });
 
   it('rejects a caller who is not a player, and the same player twice', async () => {
@@ -688,7 +701,8 @@ describe('the Plakoto mother question', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'TIMED_OUT' } });
     const after = await view(t, gameId);
     expect(after.status).toBe('finished');
-    expect(after.match.games[0]).toMatchObject({ winner: 'black', points: 2, reason: 'timeout' });
+    // A resign here gives a double; a time out is always 1 point (#378).
+    expect(after.match.games[0]).toMatchObject({ winner: 'black', points: 1, reason: 'timeout' });
     expect(after.turnDeadline).toBeNull();
   });
 });
@@ -735,8 +749,13 @@ describe('turn timers (#133)', () => {
     expect(v.version).toBe(before.version + 1);
     expect(v.status).toBe('active');
     expect(v.match.games).toHaveLength(1);
-    expect(v.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
-    expect(v.match.score[otherSide(late)]).toBeGreaterThanOrEqual(1);
+    // Nothing is borne off, so a resign would give a diplo: a time out is 1 point (#378).
+    expect(v.match.games[0]).toMatchObject({
+      winner: otherSide(late),
+      points: 1,
+      reason: 'timeout',
+    });
+    expect(v.match.score[otherSide(late)]).toBe(1);
     // The next game runs, waits for its first roll (#355), and that turn
     // has its own minute.
     expect(v.game.phase).toBe('awaiting-roll');
@@ -766,6 +785,7 @@ describe('turn timers (#133)', () => {
     const v = await view(t, gameId);
     expect(v.status).toBe('finished');
     expect(v.match.winner).toBe(otherSide(late));
+    expect(v.match.games[0]).toMatchObject({ points: 1, reason: 'timeout' });
     expect(v.turnDeadline).toBeNull();
     expect(v.waitingFor).toBeNull();
     const doc = await t.run(async (ctx) => ctx.db.get(gameId));
@@ -775,23 +795,46 @@ describe('turn timers (#133)', () => {
     expect((await view(t, gameId)).version).toBe(v.version);
   });
 
+  it('a time out in the opening roll is 1 point too, and can end the match (#378, #379)', async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 1, 1, { open: false });
+    const before = await view(t, gameId);
+    // Black rolls their opening die; White never rolls.
+    const rolled = await as(t, BOB).mutation(api.games.rollDice, {
+      gameId,
+      expectedVersion: before.version,
+    });
+    expect(rolled).toEqual({ ok: true, version: before.version + 1 });
+    await wait(t, LIVE);
+    const v = await view(t, gameId);
+    // Nothing is borne off, where a resign gives a diplo: still 1 point.
+    expect(v.match.games).toEqual([
+      expect.objectContaining({ starter: 'black', winner: 'black', points: 1, reason: 'timeout' }),
+    ]);
+    expect(v.match.score).toEqual({ white: 0, black: 1 });
+    expect(v.status).toBe('finished');
+    expect(v.match.winner).toBe('black');
+    expect(v.turnDeadline).toBeNull();
+  });
+
   it('a move just in time is fine, and the old check after it does nothing', async () => {
     const t = setup();
     const gameId = await createGame(t, 'portes', 5);
+    const { version } = await view(t, gameId);
     await wait(t, LIVE - 1);
     const result = await playOneTurn(t, gameId);
-    expect(result).toEqual({ ok: true, version: 2 });
-    // The check for version 1 runs now, at the first deadline: it does nothing.
+    expect(result).toEqual({ ok: true, version: version + 1 });
+    // The check for the old version runs now, at the first deadline: it does nothing.
     await wait(t, 1);
     const v = await view(t, gameId);
-    expect(v.version).toBe(2);
+    expect(v.version).toBe(version + 1);
     expect(v.match.games).toHaveLength(0);
     expect(v.turnDeadline).toBe(START + LIVE - 1 + LIVE);
     // The new deadline holds for the next player.
     const late = waiting(v);
     await wait(t, LIVE - 1);
     const after = await view(t, gameId);
-    expect(after.version).toBe(3);
+    expect(after.version).toBe(version + 2);
     expect(after.match.games[0]).toMatchObject({ winner: otherSide(late), reason: 'timeout' });
   });
 

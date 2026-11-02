@@ -126,34 +126,6 @@ export function stateHasChosenDouble(game: GameFlow): boolean {
 }
 
 /**
- * Online, the server rolls the opening: "You start with 6-3." while the
- * starter's first turn plays the opening dice. `null` at any other time.
- */
-export function onlineOpeningLine(
-  game: GameFlow,
-  t: TFunction,
-  { nameOf, isYou }: AnnouncementNames,
-): string | null {
-  const { opening, starter } = game;
-  if (
-    opening === null ||
-    starter === null ||
-    opening.white === null ||
-    opening.black === null ||
-    game.lastTurn !== null ||
-    game.state.dice === null ||
-    game.state.rules.match.openingRoll !== 'useOpeningDice'
-  ) {
-    return null;
-  }
-  const high = Math.max(opening.white, opening.black);
-  const low = Math.min(opening.white, opening.black);
-  return isYou(starter)
-    ? t('game.opening.result_you', { high, low })
-    : t('game.opening.result', { name: nameOf(starter), high, low });
-}
-
-/**
  * Online, the server passes a roll with no legal move by itself. The last
  * turn was such a pass: "Opponent rolled 6-6. No checker can move."
  */
@@ -177,9 +149,10 @@ export function onlinePassLine(
  * - The other player's whole turn comes at once: "Opponent played: ….
  *   Your turn."
  * - A roll: "Opponent rolled 5-3." The turn before it had its own view, so
- *   it is not read again. The opening roll (the server rolls it) reads who
- *   starts. Your own roll from this phone is in the log: the screen reads
- *   it as a local roll (`turnAnnouncement`).
+ *   it is not read again. Your own roll from this phone is in the log: the
+ *   screen reads it as a local roll (`turnAnnouncement`).
+ * - The opening (#379): the opening card reads each die and who starts, so
+ *   the first turn on the opening dice reads nothing here.
  * - A roll with no legal move has its pass card, which reads itself.
  * - A question (Plakoto's mother, the Acey-Deucey double) reads the turn
  *   before it.
@@ -221,8 +194,10 @@ export function onlineTurnAnnouncement(
     return lines.length > 0 ? lines.join(' ') : null;
   }
   if (game.played.length > 0) return null;
-  const opening = onlineOpeningLine(game, t, names);
-  if (opening !== null) return opening;
+  // The opening card said who starts and with what (#379).
+  if (openingDiceInPlay(flow) && game.state.rules.match.openingRoll === 'useOpeningDice') {
+    return null;
+  }
   const player = game.state.toMove;
   const you = isYou(player);
   const name = nameOf(player);

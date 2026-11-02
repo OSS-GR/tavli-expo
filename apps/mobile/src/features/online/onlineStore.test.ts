@@ -10,7 +10,7 @@ import {
 } from '@tavli/contracts';
 import { createSeededRng, type MatchAction, type MoveInput, type Rng } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
-import { motherPin, pickChoice, pickTurn } from '@tavli/online/testing';
+import { motherPin, openMemoryGame, pickChoice, pickTurn } from '@tavli/online/testing';
 
 import { createOnlineStore, draftFlow, viewFlow, type OnlineStore } from './onlineStore';
 import { timeLeft } from './timeLeft';
@@ -26,14 +26,25 @@ afterEach(() => {
   for (const store of open.splice(0)) store.getState().dispose();
 });
 
-/** A server on a clock that the test moves by hand, with one game. */
-function setup(choice: OnlineGameChoice = 'portes', seed = 1, targetPoints = 3) {
+/**
+ * A server on a clock that the test moves by hand, with one game. Both
+ * players roll their opening dice first (#379), unless `opened` is false.
+ */
+async function setup(
+  choice: OnlineGameChoice = 'portes',
+  seed = 1,
+  targetPoints = 3,
+  opened = true,
+) {
   let clock = START;
   const server = createMemoryGameServer({ rng: createSeededRng(seed), now: () => clock });
   const gameId = server.createGame(ALICE, PLAYERS, choice, targetPoints, 1);
+  /** The version after the opening: the first player's turn waits at this version. */
+  const v0 = opened ? (await openMemoryGame(server, gameId)).version : 1;
   return {
     server,
     gameId,
+    v0,
     /** Moves the server clock. */
     wait: (ms: number) => {
       clock += ms;
@@ -87,7 +98,7 @@ function roll(store: OnlineStore): boolean {
 
 /** Two stores; the first player's turn is sent, so the other one waits to roll. */
 async function waitingToRoll(seed = 7) {
-  const game = setup();
+  const game = await setup();
   const spies = {
     [ALICE]: spy(game.server.transportFor(ALICE)),
     [BOB]: spy(game.server.transportFor(BOB)),
@@ -147,13 +158,13 @@ function spy(inner: GameTransport) {
 
 describe('createOnlineStore', () => {
   it('loads the game and finds your side', async () => {
-    const { storeFor } = setup();
+    const { v0, storeFor } = await setup();
     const alice = storeFor(ALICE);
     expect(alice.getState().flow).toBeNull();
     expect(alice.getState().dispatch({ type: 'confirm', player: 'white' })).toBe(false);
     await flush();
     const view = viewOf(alice);
-    expect(view.version).toBe(1);
+    expect(view.version).toBe(v0);
     expect(alice.getState().side).toBe('white');
     expect(alice.getState().flow).toEqual(viewFlow(view));
     expect(alice.getState().flow?.log).toEqual([]);
@@ -162,7 +173,7 @@ describe('createOnlineStore', () => {
   });
 
   it('sends a full Portes turn, and the other store gets it', async () => {
-    const { server, gameId, storeFor } = setup();
+    const { v0, server, gameId, storeFor } = await setup();
     const a = storeFor(ALICE);
     const b = storeFor(BOB);
     await flush();
@@ -172,7 +183,7 @@ describe('createOnlineStore', () => {
     play(mover, moves);
     expect(mover.getState().flow?.game.phase).toBe('awaiting-confirm');
     // Moves stay on the phone until Confirm.
-    expect(server.getGame(gameId)?.version).toBe(1);
+    expect(server.getGame(gameId)?.version).toBe(v0);
 
     expect(confirm(mover)).toBe(true);
     expect(mover.getState().sending).toBe(true);
@@ -180,7 +191,7 @@ describe('createOnlineStore', () => {
 
     expect(mover.getState().sending).toBe(false);
     for (const store of [mover, other]) {
-      expect(viewOf(store).version).toBe(2);
+      expect(viewOf(store).version).toBe(v0 + 1);
       expect(store.getState().flow?.game.lastTurn?.moves).toEqual(moves);
     }
     // The next player's turn waits for their roll (#355).
@@ -287,7 +298,7 @@ describe('createOnlineStore', () => {
   });
 
   it('undoes on the phone before Confirm', async () => {
-    const { server, gameId, storeFor } = setup();
+    const { server, gameId, storeFor } = await setup();
     const spied = spy(server.transportFor(ALICE));
     const a = storeFor(ALICE, spied.transport);
     const b = storeFor(BOB);
@@ -311,7 +322,7 @@ describe('createOnlineStore', () => {
   });
 
   it('lets only the engine judge a move', async () => {
-    const { storeFor } = setup();
+    const { storeFor } = await setup();
     const a = storeFor(ALICE);
     const b = storeFor(BOB);
     await flush();
@@ -333,7 +344,7 @@ describe('createOnlineStore', () => {
   });
 
   it('refuses moves on the other player turn, and for the other side', async () => {
-    const { storeFor } = setup();
+    const { storeFor } = await setup();
     const a = storeFor(ALICE);
     const b = storeFor(BOB);
     await flush();
@@ -354,12 +365,11 @@ describe('createOnlineStore', () => {
   });
 
   it('refuses the steps the server does by itself, with no call', async () => {
-    const { server, storeFor } = setup();
+    const { server, storeFor } = await setup();
     const spied = spy(server.transportFor(ALICE));
     const alice = storeFor(ALICE, spied.transport);
     await flush();
     const actions: MatchAction[] = [
-      { type: 'rollOpening', player: 'white' },
       { type: 'nextGame' },
       { type: 'chooseStarter', player: 'white' },
       { type: 'timeout', player: 'white' },
@@ -371,11 +381,16 @@ describe('createOnlineStore', () => {
     // The server rolls the dice when you ask (#355): the phone never picks them.
     expect(alice.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 5] })).toBe(false);
     expect(alice.getState().lastError).toMatch(/server rolls the dice/);
+    expect(alice.getState().dispatch({ type: 'rollOpening', player: 'white', die: 6 })).toBe(false);
+    expect(alice.getState().lastError).toMatch(/server rolls the dice/);
+    // The opening is over: there is no die left to roll.
+    expect(alice.getState().dispatch({ type: 'rollOpening', player: 'white' })).toBe(false);
+    expect(alice.getState().lastError).toMatch(/no opening die/);
     expect(spied.calls).toEqual(['subscribe']);
   });
 
   it('refuses every action while a call is on its way', async () => {
-    const { storeFor } = setup();
+    const { storeFor } = await setup();
     const a = storeFor(ALICE);
     const b = storeFor(BOB);
     await flush();
@@ -391,7 +406,7 @@ describe('createOnlineStore', () => {
   });
 
   it('stays sending until the new view arrives, also when the call resolves first', async () => {
-    const { server, storeFor } = setup();
+    const { server, storeFor } = await setup();
     // Holds the views back until the test lets them through.
     const held: (() => void)[] = [];
     const base = server.transportFor(ALICE);
@@ -423,7 +438,7 @@ describe('createOnlineStore', () => {
   });
 
   it('auto confirm sends the turn when it is complete', async () => {
-    const { server, gameId, storeFor } = setup();
+    const { v0, server, gameId, storeFor } = await setup();
     const a = storeFor(ALICE);
     const b = storeFor(BOB);
     await flush();
@@ -437,12 +452,12 @@ describe('createOnlineStore', () => {
     }
     expect(mover.getState().sending).toBe(true);
     await flush();
-    expect(server.getGame(gameId)?.version).toBe(2);
+    expect(server.getGame(gameId)?.version).toBe(v0 + 1);
     expect(server.getGame(gameId)?.game.lastTurn?.moves).toEqual(moves);
   });
 
   it('drops the local moves on a stale version (the other phone sent first)', async () => {
-    const { server, gameId, storeFor } = setup();
+    const { v0, server, gameId, storeFor } = await setup();
     const start = server.getGame(gameId) as OnlineGameView;
     const starter = start.game.state.toMove;
     const who = PLAYERS[starter];
@@ -456,19 +471,19 @@ describe('createOnlineStore', () => {
     expect(confirm(phone1)).toBe(true);
     await flush();
 
-    expect(server.getGame(gameId)?.version).toBe(2);
+    expect(server.getGame(gameId)?.version).toBe(v0 + 1);
     const state = phone1.getState();
     expect(state.notice).toBe('stale');
     expect(state.lastError).toMatch(/STALE_VERSION/);
     expect(state.sending).toBe(false);
-    expect(viewOf(phone1).version).toBe(2);
+    expect(viewOf(phone1).version).toBe(v0 + 1);
     expect(state.flow).toEqual(viewFlow(viewOf(phone1)));
     state.clearNotice();
     expect(phone1.getState().notice).toBeNull();
   });
 
   it('gets TIMED_OUT for a late turn and drops the moves', async () => {
-    const { server, gameId, storeFor, wait } = setup();
+    const { v0, server, gameId, storeFor, wait } = await setup();
     const a = storeFor(ALICE);
     const b = storeFor(BOB);
     await flush();
@@ -484,15 +499,15 @@ describe('createOnlineStore', () => {
     // The call saved the time out, so no check is due any more.
     expect(server.runDueTimeouts()).toBe(0);
     const view = viewOf(mover);
-    expect(view.version).toBe(2);
+    expect(view.version).toBe(v0 + 1);
     expect(view.match.games[0]?.reason).toBe('timeout');
     expect(view.match.games[0]?.winner).not.toBe(side);
     expect(mover.getState().flow).toEqual(viewFlow(view));
-    expect(server.getGame(gameId)?.version).toBe(2);
+    expect(server.getGame(gameId)?.version).toBe(v0 + 1);
   });
 
   it('replaces the local moves when the server times the turn out', async () => {
-    const { server, storeFor, wait } = setup();
+    const { v0, server, storeFor, wait } = await setup();
     const a = storeFor(ALICE);
     const b = storeFor(BOB);
     await flush();
@@ -501,13 +516,13 @@ describe('createOnlineStore', () => {
     wait(LIVE);
     expect(server.runDueTimeouts()).toBe(1);
     await flush();
-    expect(viewOf(mover).version).toBe(2);
+    expect(viewOf(mover).version).toBe(v0 + 1);
     expect(viewOf(mover).match.games[0]?.reason).toBe('timeout');
     expect(mover.getState().flow?.game.played).toEqual([]);
   });
 
   it('keeps the moves after a network error, so the player can send again', async () => {
-    const { server, gameId, storeFor } = setup();
+    const { v0, server, gameId, storeFor } = await setup();
     const view = server.getGame(gameId) as OnlineGameView;
     const who = PLAYERS[view.waitingFor ?? 'white'];
     const spied = spy(server.transportFor(who));
@@ -524,18 +539,18 @@ describe('createOnlineStore', () => {
     expect(store.getState().lastError).toBe('network request failed');
     expect(store.getState().sending).toBe(false);
     expect(store.getState().flow?.game.played).toEqual(played);
-    expect(server.getGame(gameId)?.version).toBe(1);
+    expect(server.getGame(gameId)?.version).toBe(v0);
 
     spied.setOffline(false);
     expect(confirm(store)).toBe(true);
     expect(store.getState().notice).toBeNull();
     await flush();
     expect(server.getGame(gameId)?.game.lastTurn?.moves).toEqual(moves);
-    expect(viewOf(store).version).toBe(2);
+    expect(viewOf(store).version).toBe(v0 + 1);
   });
 
   it('never stays sending when the transport throws at once', async () => {
-    const { server, gameId, storeFor } = setup();
+    const { server, gameId, storeFor } = await setup();
     const view = server.getGame(gameId) as OnlineGameView;
     const who = PLAYERS[view.waitingFor ?? 'white'];
     const base = server.transportFor(who);
@@ -556,7 +571,7 @@ describe('createOnlineStore', () => {
   });
 
   it('asks the pinned player the mother question and sends the answer', async () => {
-    const { server, gameId, storeFor } = setup('plakoto');
+    const { server, gameId, storeFor } = await setup('plakoto');
     const { flow, pin } = motherPin(viewFlow(server.getGame(gameId) as OnlineGameView));
     server.setFlowForTest(gameId, flow);
     const alice = storeFor(ALICE);
@@ -593,7 +608,7 @@ describe('createOnlineStore', () => {
   });
 
   it('resigns the whole match through the transport', async () => {
-    const { server, storeFor } = setup();
+    const { server, storeFor } = await setup();
     const spied = spy(server.transportFor(ALICE));
     const alice = storeFor(ALICE, spied.transport);
     const bob = storeFor(BOB);
@@ -616,7 +631,7 @@ describe('createOnlineStore', () => {
   });
 
   it('refuses everything when this phone is not a player', async () => {
-    const { server, storeFor } = setup();
+    const { server, storeFor } = await setup();
     const spied = spy(server.transportFor('eve'));
     const eve = storeFor('eve', spied.transport);
     await flush();
@@ -626,7 +641,7 @@ describe('createOnlineStore', () => {
   });
 
   it('sets loadError for a missing game', async () => {
-    const { server } = setup();
+    const { server } = await setup();
     const store = createOnlineStore({
       transport: server.transportFor(ALICE),
       gameId: 'game-404',
@@ -643,6 +658,7 @@ describe('createOnlineStore', () => {
     let server = START;
     const memory = createMemoryGameServer({ rng: createSeededRng(1), now: () => server });
     const gameId = memory.createGame(ALICE, PLAYERS, 'portes', 3, 1);
+    await openMemoryGame(memory, gameId);
     const stores = [ALICE, BOB].map((me) =>
       createOnlineStore({ transport: memory.transportFor(me), gameId, me, now: () => phone }),
     );
@@ -676,7 +692,7 @@ describe('createOnlineStore', () => {
   });
 
   it('unsubscribes on dispose and ignores later views', async () => {
-    const { server, storeFor } = setup();
+    const { server, storeFor } = await setup();
     const spied = spy(server.transportFor(ALICE));
     const alice = storeFor(ALICE, spied.transport);
     const bob = storeFor(BOB);
@@ -694,7 +710,7 @@ describe('createOnlineStore', () => {
 
   it('plays whole matches of each game choice through two stores', async () => {
     for (const choice of ONLINE_GAME_CHOICES) {
-      const { server, gameId, storeFor } = setup(choice, 21, 1);
+      const { server, gameId, storeFor } = await setup(choice, 21, 1);
       const a = storeFor(ALICE);
       const b = storeFor(BOB);
       const picker: Rng = createSeededRng(22);
@@ -756,9 +772,112 @@ function heldDrafts(inner: GameTransport) {
   };
 }
 
+describe('the opening roll (#379)', () => {
+  /** A new match before the opening, with a spied store per player. */
+  async function opening(seed: number) {
+    const game = await setup('portes', seed, 3, false);
+    const spies = {
+      [ALICE]: spy(game.server.transportFor(ALICE)),
+      [BOB]: spy(game.server.transportFor(BOB)),
+    };
+    const alice = game.storeFor(ALICE, spies[ALICE].transport);
+    const bob = game.storeFor(BOB, spies[BOB].transport);
+    await flush();
+    return { ...game, spies, alice, bob };
+  }
+
+  const rollOpening = (store: OnlineStore) =>
+    store.getState().dispatch({ type: 'rollOpening', player: store.getState().side! });
+
+  it('each player taps to roll their own die, in any order', async () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const { server, gameId, spies, alice, bob } = await opening(seed);
+      expect(viewOf(alice).game.phase).toBe('opening-roll');
+      expect(viewOf(alice).waitingFor).toBe('white');
+
+      // Black rolls first, while the view waits for White.
+      expect(rollOpening(bob)).toBe(true);
+      expect(bob.getState().sending).toBe(true);
+      expect(bob.getState().rolling).toBe(true);
+      // One roll at a time.
+      expect(rollOpening(bob)).toBe(false);
+      await flush();
+      expect(bob.getState().rolling).toBe(false);
+      expect(spies[BOB].calls).toEqual(['subscribe', 'rollDice']);
+      const black = server.getGame(gameId)!.game.opening!.black!;
+      // Your phone plays your die as a local opening roll; the other one
+      // gets it only from the view, with an empty log.
+      expect(bob.getState().flow?.log).toEqual([
+        { type: 'rollOpening', player: 'black', die: black },
+      ]);
+      expect(alice.getState().flow?.game.opening?.black).toBe(black);
+      expect(alice.getState().flow?.log).toEqual([]);
+      // Your die is in: there is nothing left to roll.
+      expect(rollOpening(bob)).toBe(false);
+      expect(bob.getState().lastError).toMatch(/no opening die/);
+
+      expect(rollOpening(alice)).toBe(true);
+      await flush();
+      const view = server.getGame(gameId)!;
+      if (view.game.phase === 'opening-roll') continue; // A tie: try another seed.
+      const white = view.game.opening!.white!;
+      expect(white).not.toBe(black);
+      expect(alice.getState().flow?.log).toEqual([
+        { type: 'rollOpening', player: 'white', die: white },
+      ]);
+      expect(bob.getState().flow?.log).toEqual([]);
+      expect(rollOpening(alice)).toBe(false);
+      return;
+    }
+    throw new Error('every seed tied');
+  });
+
+  it('after a tie, both players roll again', async () => {
+    for (let seed = 1; seed < 80; seed++) {
+      const { server, gameId, alice, bob } = await opening(seed);
+      expect(rollOpening(alice)).toBe(true);
+      await flush();
+      expect(rollOpening(bob)).toBe(true);
+      await flush();
+      const view = server.getGame(gameId)!;
+      if (view.game.phase !== 'opening-roll') continue; // No tie: try another seed.
+      const tie = view.game.opening!.ties[0]!;
+      // The tie is your roll too: it plays as your die.
+      expect(bob.getState().flow?.log).toEqual([
+        { type: 'rollOpening', player: 'black', die: tie },
+      ]);
+      expect(view.game.opening).toMatchObject({ white: null, black: null });
+      expect(rollOpening(bob)).toBe(true);
+      await flush();
+      expect(rollOpening(alice)).toBe(true);
+      await flush();
+      expect(server.getGame(gameId)!.version).toBeGreaterThan(view.version + 1);
+      return;
+    }
+    throw new Error('no seed tied');
+  });
+
+  it('says when your die does not reach the server, and lets you roll again', async () => {
+    const { server, gameId, spies, alice } = await opening(1);
+    spies[ALICE].setOffline(true);
+    expect(rollOpening(alice)).toBe(true);
+    await flush();
+    expect(alice.getState().notice).toBe('rollFailed');
+    expect(alice.getState().rolling).toBe(false);
+    expect(server.getGame(gameId)!.version).toBe(1);
+    expect(alice.getState().flow?.game.opening?.white).toBeNull();
+
+    spies[ALICE].setOffline(false);
+    expect(rollOpening(alice)).toBe(true);
+    await flush();
+    expect(alice.getState().notice).toBeNull();
+    expect(server.getGame(gameId)!.game.opening!.white).not.toBeNull();
+  });
+});
+
 describe('live moves (#374)', () => {
   it('sends your turn so far after each move and undo: one call at a time, then the newest', async () => {
-    const { server, gameId, storeFor } = setup();
+    const { server, gameId, storeFor } = await setup();
     const first = server.getGame(gameId)!;
     const moverId = first.waitingFor === 'white' ? ALICE : BOB;
     const held = heldDrafts(server.transportFor(moverId));
@@ -789,7 +908,7 @@ describe('live moves (#374)', () => {
   });
 
   it('shows the other player their moves as they happen, on the same version', async () => {
-    const { storeFor } = setup();
+    const { storeFor } = await setup();
     const a = storeFor(ALICE);
     const b = storeFor(BOB);
     await flush();
@@ -827,8 +946,8 @@ describe('live moves (#374)', () => {
     expect(other.getState().flow?.game.lastTurn?.moves).toEqual(moves);
   });
 
-  it('takes only a newer draft of the same view, on the other player turn', () => {
-    const { server, gameId } = setup();
+  it('takes only a newer draft of the same view, on the other player turn', async () => {
+    const { server, gameId } = await setup();
     const view = server.getGame(gameId)!;
     const mover = view.waitingFor!;
     const [move] = pickTurn(view.game, createSeededRng(3));
@@ -843,7 +962,7 @@ describe('live moves (#374)', () => {
   });
 
   it('a draft that fails never holds back a move, an undo or Confirm', async () => {
-    const { server, gameId, storeFor } = setup();
+    const { server, gameId, storeFor } = await setup();
     const first = server.getGame(gameId)!;
     const moverId = first.waitingFor === 'white' ? ALICE : BOB;
     const inner = server.transportFor(moverId);
@@ -875,7 +994,7 @@ describe('live moves (#374)', () => {
   });
 
   it('sends no draft with `sendDrafts: false` (the online bot)', async () => {
-    const { server, gameId } = setup();
+    const { server, gameId } = await setup();
     const first = server.getGame(gameId)!;
     const moverId = first.waitingFor === 'white' ? ALICE : BOB;
     const spied = spy(server.transportFor(moverId));
@@ -901,7 +1020,7 @@ describe('live moves (#374)', () => {
   });
 
   it('sends no draft once the turn goes (auto confirm), and drops the one waiting', async () => {
-    const { server, gameId, storeFor } = setup();
+    const { server, gameId, storeFor } = await setup();
     const first = server.getGame(gameId)!;
     const moverId = first.waitingFor === 'white' ? ALICE : BOB;
     const spied = spy(server.transportFor(moverId));

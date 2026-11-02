@@ -2,17 +2,19 @@
 import type { OnlineGameView } from '@tavli/contracts';
 import { createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
-import { closedOut, pickTurn } from '@tavli/online/testing';
+import { closedOut, openMemoryGame, pickTurn } from '@tavli/online/testing';
 
 import { viewFlow } from './onlineStore';
 import { remoteRoll } from './remoteRoll';
 
 const PLAYERS = { white: 'ann', black: 'bob' };
 
-/** A Portes game; `flow()` reads it, `roll()` rolls for the side the server waits for. */
-function game() {
+/** A Portes game after the opening; `flow()` reads it, `roll()` rolls for the side the server waits for. */
+async function game() {
   const server = createMemoryGameServer({ rng: createSeededRng(4), now: () => 0 });
   const gameId = server.createGame('ann', PLAYERS, 'portes', 3, 1);
+  // Both players roll their opening dice (#379).
+  await openMemoryGame(server, gameId);
   const view = (): OnlineGameView => server.getGame(gameId)!;
   const flow = (): MatchFlow => viewFlow(view());
   const transport = () => server.transportFor(PLAYERS[view().waitingFor!]);
@@ -30,7 +32,7 @@ const other = (side: 'white' | 'black') => (side === 'white' ? 'black' : 'white'
 
 describe('remoteRoll', () => {
   it('gives the other player’s roll with a legal move', async () => {
-    const { view, flow, roll, playTurn } = game();
+    const { view, flow, roll, playTurn } = await game();
     await playTurn();
     const before = flow();
     const roller = view().waitingFor!;
@@ -47,7 +49,7 @@ describe('remoteRoll', () => {
   });
 
   it('gives the other player’s roll with no legal move, from the pass', async () => {
-    const { server, gameId, flow, roll } = game();
+    const { server, gameId, flow, roll } = await game();
     server.setFlowForTest(gameId, closedOut(flow(), 'black'));
     const before = flow();
     await roll();
@@ -64,7 +66,7 @@ describe('remoteRoll', () => {
   });
 
   it('gives nothing when the view does not follow the wait for the roll', async () => {
-    const { view, flow, roll, playTurn } = game();
+    const { view, flow, roll, playTurn } = await game();
     const start = flow();
     const starter = view().waitingFor!;
     // The opening roll came from the server: nobody threw it.

@@ -24,7 +24,9 @@
  *   `pushTokens` is the server's token list, called as the user signed
  *   in to `auth` (`saved` and `calls` show what reached it).
  *
- * A test makes games with `onlineFake.server().createGame(...)`. Each test
+ * A test makes games with `onlineFake.server().createGame(...)`. A new
+ * match waits for both opening dice (#379): `onlineFake.openGame(gameId)`
+ * rolls them (again after each tie), or a test taps its own. Each test
  * starts with a new server, no cached transports and nobody signed in
  * (`resetOnlineFake`, called in `test/afterEnv.ts`). The server clock is
  * `Date.now`, which the fake timers move.
@@ -40,6 +42,7 @@ import {
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
+import { openMemoryGame } from '@tavli/online/testing';
 
 const NOT_SIGNED_IN: GameTransportErrorData = {
   code: 'NOT_SIGNED_IN',
@@ -167,6 +170,11 @@ export const onlineFake = {
   transportFor,
   /** The cached `Invites` port of `playerId` on the current server. */
   invitesFor,
+  /**
+   * Rolls both opening dice of a new match (#379), as its players, again
+   * after each tie. Resolves to the view after the opening.
+   */
+  openGame: (gameId: string) => openMemoryGame(server, gameId),
 };
 
 /**

@@ -12,7 +12,7 @@ import { formatPosition, parseTurn, portesState } from '../testing/position-nota
 import { raceVariant } from '../testing/race-variant';
 import { createVariantRegistry } from '../variant';
 import type { Variant } from '../variant';
-import { portes } from '../variants';
+import { asodio, fevga, plakoto, portes } from '../variants';
 import {
   applyGameAction,
   canConfirm,
@@ -296,13 +296,12 @@ describe('resign during a turn', () => {
 });
 
 describe('timeout (online turn timers, #133)', () => {
-  it('ends the game like a resign, with the reason timeout; unfinished moves do not count', () => {
+  it('the other player wins with the reason timeout; unfinished moves do not count', () => {
     const flow = run(at('w: 6x3 3x2 offx10 ; b: 24x14 offx1'), [
       roll('white', [6, 3]),
       move('6/0'),
     ]);
     const over = applyGameAction(flow, { type: 'timeout', player: 'white' });
-    // White has borne off ten checkers: Black wins a mono.
     expect(over).toMatchObject({
       phase: 'game-over',
       played: [],
@@ -311,11 +310,43 @@ describe('timeout (online turn timers, #133)', () => {
     expect(over.state.board).toEqual(flow.state.board);
   });
 
-  it('a player with nothing off gives a diplo', () => {
+  it('is always 1 point, also when the player bore off nothing (#378)', () => {
     const flow = applyGameAction(at('w: 24x2 13x5 8x3 6x5 ; b: 6x15'), roll('white', [3, 1]));
+    // A resign here gives a diplo; a time out does not.
+    expect(applyGameAction(flow, { type: 'resign', player: 'white' }).result?.points).toBe(2);
     const over = applyGameAction(flow, { type: 'timeout', player: 'white' });
-    expect(over.result).toEqual({ winner: 'black', points: 2, reason: 'timeout' });
+    expect(over.result).toEqual({ winner: 'black', points: 1, reason: 'timeout' });
   });
+
+  // Every game preset. A Tavli match plays Portes, Plakoto and Fevga in these presets.
+  const timeoutCases = [
+    ['portes', portes],
+    ['plakoto', plakoto],
+    ['plakoto.federation', plakoto],
+    ['fevga', fevga],
+    ['asodio.kafeneio', asodio],
+    ['asodio.aceyDeuceyGreek', asodio],
+    ['asodio.aceyDeuceyAmerican', asodio],
+  ] as const;
+
+  it.each(timeoutCases)(
+    '%s: a time out at the start is 1 point, where a resign gives more (#378)',
+    (presetId, variant) => {
+      const flow = createGameFlow({
+        state: variant.initialState({ startingPlayer: 'white', rules: resolveRules(presetId) }),
+        starter: 'white',
+      });
+      // Nothing is borne off: a resign gives a diplo (Acey-Deucey American: 15).
+      const resigned = applyGameAction(flow, { type: 'resign', player: 'white' }).result;
+      expect(resigned?.winner).toBe('black');
+      expect(resigned?.points).toBeGreaterThan(1);
+      const over = applyGameAction(flow, { type: 'timeout', player: 'white' });
+      expect(over).toMatchObject({
+        phase: 'game-over',
+        result: { winner: 'black', points: 1, reason: 'timeout' },
+      });
+    },
+  );
 
   it('only the player the game waits for can time out, and not before the game starts', () => {
     const flow = applyGameAction(at('w: 24x2 13x5 8x3 6x5 ; b: 6x15'), roll('white', [3, 1]));
@@ -329,6 +360,33 @@ describe('timeout (online turn timers, #133)', () => {
     expect(() => applyGameAction(over, { type: 'timeout', player: 'white' })).toThrow(
       illegalAction,
     );
+  });
+});
+
+describe('timeout during the opening roll (online, #379)', () => {
+  it('the player who has not rolled loses when the other has; the roller is the starter', () => {
+    const rolled = applyGameAction(opening(), { type: 'rollOpening', player: 'black', die: 4 });
+    const over = applyGameAction(rolled, { type: 'timeout', player: 'white' });
+    expect(over).toMatchObject({
+      phase: 'game-over',
+      starter: 'black',
+      // Nothing is borne off, where a resign gives a diplo: still 1 point (#378).
+      result: { winner: 'black', points: 1, reason: 'timeout' },
+    });
+    expect(over.state.board).toEqual(rolled.state.board);
+  });
+
+  it('nobody times out before a roll, after a tie, or for the side that rolled', () => {
+    expect(() => applyGameAction(opening(), { type: 'timeout', player: 'black' })).toThrow(
+      illegalAction,
+    );
+    const rolled = applyGameAction(opening(), { type: 'rollOpening', player: 'white', die: 3 });
+    expect(() => applyGameAction(rolled, { type: 'timeout', player: 'white' })).toThrow(
+      illegalAction,
+    );
+    const tie = applyGameAction(rolled, { type: 'rollOpening', player: 'black', die: 3 });
+    expect(tie.phase).toBe('opening-roll');
+    expect(() => applyGameAction(tie, { type: 'timeout', player: 'black' })).toThrow(illegalAction);
   });
 });
 
@@ -425,7 +483,7 @@ describe('variant prompts (hook for Plakoto "resign or play on")', () => {
     const over = applyGameAction(flow, { type: 'timeout', player: 'black' }, ctx);
     expect(over).toMatchObject({
       phase: 'game-over',
-      result: { winner: 'white', reason: 'timeout' },
+      result: { winner: 'white', points: 1, reason: 'timeout' },
     });
   });
 

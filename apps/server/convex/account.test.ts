@@ -405,10 +405,15 @@ describe('resignActiveGames (#309)', () => {
     expect(await authRows(t, 'user', alice)).toEqual([]);
     expect(await pendingResigns(t)).toBe(1);
 
-    // Meanwhile a turn runs out in a game Alice still plays. The turn
-    // timer ends it as usual (a 1-point match), though her user is gone.
+    // Meanwhile a turn runs out in a game Alice still plays. The other
+    // player rolls their opening die (#379) and Alice never rolls hers, so
+    // the turn timer ends it as usual (a 1-point match), though her user is gone.
     const [waiting] = await activeGames(t, alice);
     if (waiting === undefined) throw new Error('no active game left');
+    const players = (await rawGame(t, waiting))?.players;
+    if (players === undefined) throw new Error('no game');
+    const other = players.white === alice ? players.black : players.white;
+    await as(t, other).mutation(api.games.rollDice, { gameId: waiting, expectedVersion: 1 });
     const before = await rawGame(t, waiting);
     if (before?.turnDeadline == null) throw new Error('no turn deadline');
     vi.setSystemTime(before.turnDeadline + 1);

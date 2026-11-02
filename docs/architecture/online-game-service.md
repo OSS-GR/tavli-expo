@@ -72,7 +72,7 @@ The event log. One row per engine `FlowEvent`, in order: `start`, `rollOpening`,
 |---|---|
 | `gameId`, `seq` | `seq` 0 is the `start` event. Index `by_game` on `[gameId, seq]`. |
 | `version` | The game version the event led to |
-| `actor` | The player id who acted, or `server` (the opening roll, time outs, the next game). A `roll` row names the player who asked for it (#355); the server still made the dice. |
+| `actor` | The player id who acted, or `server` (time outs, the next game and its opening roll). A `roll` row names the player who asked for it (#355), and a `rollOpening` row of a new match the player who tapped for that die (#379); the server still made the dice. |
 | `event` | The `FlowEvent`, JSON text, with the dice in it |
 
 `replay(events)` from `@tavli/engine` rebuilds the exact game from these rows. The tests check this. It gives history and replays (L3) almost for free.
@@ -119,7 +119,8 @@ client                     makeMove (one transaction)
 
 client                     rollDice (one transaction, #355)
   │  gameId,                 0-5. the same checks as makeMove
-  │  expectedVersion ──────► 6. phase is awaiting-roll?            → ILLEGAL_ACTION
+  │  expectedVersion ──────► 6. phase is awaiting-roll, or (#379)
+  │                             the caller's opening die is not in? → ILLEGAL_ACTION
   │                          7. roll the dice (secure RNG);
   │                             a roll with no move passes
   │                          8. save flow, version + 1, log rows;
@@ -129,11 +130,16 @@ client                     rollDice (one transaction, #355)
 ```
 
 - **A turn is sent whole.** `moves` is every move for the current roll, in order. The engine checks each one (`nextMoves`), and the turn must be a full legal play. An incomplete turn is `ILLEGAL_MOVE`. Undo stays on the phone.
-- **The server rests only where it waits for a player:** `awaiting-roll` (tap Roll, #355), `moving` (play your roll) or `awaiting-answer` (a question). Everything else happens on the server, inside the same transaction (`advance`).
-- **The roll waits for its player** (#355). `advance` stops at `awaiting-roll`, and the dice are rolled only when that player calls `rollDice`. So the dice of a turn do not exist before the player taps Roll. The opening roll and the next game stay automatic: no one taps for them. In Portes the winner starts the next game, so that game begins in `awaiting-roll`, with no dice.
+- **The server rests only where it waits for a player:** `opening-roll` of a new match (each player taps for their die, #379), `awaiting-roll` (tap Roll, #355), `moving` (play your roll) or `awaiting-answer` (a question). Everything else happens on the server, inside the same transaction (`advance`).
+- **The roll waits for its player** (#355). `advance` stops at `awaiting-roll`, and the dice are rolled only when that player calls `rollDice`. So the dice of a turn do not exist before the player taps Roll. The next game stays automatic, its opening roll too: no one taps for it. In Portes the winner starts the next game, so that game begins in `awaiting-roll`, with no dice.
 - **A roll with no legal move** passes in the engine, inside `rollDice`. The new view waits for the other player's roll, and `game.lastTurn` is the pass: the player, the dice and no moves. Both phones learn of the pass and its dice from that view; there is no extra field.
 - **Between games** the server starts the next game at once (with the opening roll, if the rules ask for one). The result of the finished game is in `match.games`. The finished game itself, as it ended, is the view's `previousGame` (#299): its `lastTurn` is the turn that ended it, and its board the end position. `advance` keeps it when it starts the next game: each step (`playTurn`, `answerPrompt`, `timeOut`, `resign`) returns a `SteppedFlow`, whose `endedGame` is the game the step ended, or `null`. Nothing plays the step again. A server reads the stored text once (`loadStored` gives the flow and `previousGame`) and saves with `storeStep(loaded, next)`: the step's `endedGame`, else the stored `previousGame`. `storeFlow(flow, previousGame)` takes the previous game as a required argument, so a new save path cannot drop it by mistake; a new match passes `null`. `listMyGames` does not use `previousGame` (summaries drop it).
-- **Opening roll:** the server rolls it when the game starts (`insertGame`). `chosenStarterRolls` is not supported online; no preset uses it.
+- **Opening roll** (#379): a new match starts in `opening-roll` (`insertGame`; `advance` stops there only while `match.games` is empty). Each player taps for their own die: `rollDice` rolls the caller's die (the engine's `rollOpening`), and only then. Either player may roll first. A second roll of the same die is `ILLEGAL_ACTION`. A tie clears both dice, and both roll again. When the dice differ, the starter plays them (`useOpeningDice`) or rolls again (`rerollBoth`), as offline.
+  - **The version race.** Both players may tap at the same moment, both at the same version. So `rollDice` checks no version while the stored game is in `opening-roll` (`rollCallVersion` in `@tavli/online`). The engine refuses a die that is already in, and Convex runs the two mutations one after the other (optimistic concurrency: the later one runs again on the new flow). So both dice count, in either order, and no player gets `STALE_VERSION` for the other player's die. The caller check and the deadline check still run.
+  - **`waitingFor`** in `opening-roll` is White while White's die is not in, then Black. It picks the clock and the push. The app uses `mayRollOpening(view, side)` to show Roll for its own die, whatever `waitingFor` says.
+  - **The deadline** is a turn's deadline. The first die keeps it (like a roll, `rollDeadline`); a tie or the end of the opening starts a new one. At the deadline, if one die is in, the other player loses the game on time (the engine allows `timeout` in `opening-roll` only for that side). If no die is in, nobody is late: the server rolls both dice (until a side starts), and the game goes on.
+  - The next game of a match stays automatic (the server rolls its opening, if its rules ask for one). An older app cannot roll the opening of a new match; a new app on an older server sees a game past its opening and plays as before.
+  - `chosenStarterRolls` is not supported online; no preset uses it.
 
 ### Other calls
 
@@ -143,8 +149,8 @@ A game between two people starts only from an accepted invite ([Invites](#invite
 
 | Call | Who may call | Version | What it does |
 |---|---|---|---|
-| `createGame(callerId, players, choice, targetPoints, turnTimeMinutes)` | internal (tests, the Convex dashboard) | – | New game at version 1 through `insertGame`. The opening roll is done (the starter plays those dice), and the first turn's clock runs. An internal call has no sign-in, so `callerId` names who starts the game; it must be one of the players. Returns the id. |
-| `rollDice(gameId, expectedVersion)` | the player the server waits for, in `awaiting-roll` | yes | Rolls the caller's dice (#355, above). `ILLEGAL_ACTION` when the game does not wait for a roll. Returns like `makeMove`. |
+| `createGame(callerId, players, choice, targetPoints, turnTimeMinutes)` | internal (tests, the Convex dashboard) | – | New game at version 1 through `insertGame`. It waits for both opening dice (#379), and the opening's clock runs. Tests roll them with `openGame(t, gameId, players)` (`convex/test.setup.ts`). An internal call has no sign-in, so `callerId` names who starts the game; it must be one of the players. Returns the id. |
+| `rollDice(gameId, expectedVersion)` | the player the server waits for, in `awaiting-roll`; either player whose opening die is not in, in `opening-roll` | yes (not in `opening-roll`) | Rolls the caller's dice (#355), or the caller's opening die (#379, above). `ILLEGAL_ACTION` when the game does not wait for that roll. Returns like `makeMove`. |
 | `makeMove(gameId, expectedVersion, moves)` | the player to move | yes | One full turn (above). Returns `{ ok: true, version }`, or `TIMED_OUT` ([Turn timers](#turn-timers)). |
 | `answer(gameId, expectedVersion, choice)` | the player the question asks | yes | Answers `prompt` (Plakoto mother question: `resign` or `playOn`; Asodio chosen double). Then the server goes on to the next wait (a roll, or the chosen double to play). Returns like `makeMove`. |
 | `resign(gameId)` | either player, any time | no | Resigns the **match**; the opponent wins. No version, so a resign never fails only because the opponent just moved. It ignores the turn timer. Returns the new version. |
@@ -176,9 +182,9 @@ Owner answers Q3 and Q15: both **timed** (one minute or more) and **untimed** (s
 - **The deadline.** Every save that leaves the match running sets `turnDeadline = now + turnDeadlineMs(turnTimeMinutes)`: the new game (`insertGame`), `makeMove`, `answer`, and a time out (the next game happens in the same save). So each wait for a player gets a full turn time, also when the same player acts again (an Asodio extra roll, an answer and then a roll). `rollDice` is the one exception (#355): the roll is part of the turn, so the turn time covers the wait before the roll and the moves after it, and the save keeps the old `turnDeadline` (`rollDeadline` in `@tavli/online`). A roll with no legal move passes, and the other player's turn gets a full turn time. A finished match has `turnDeadline: null`.
 - **The scheduler.** The same save schedules `internal.games.checkTimeout({ gameId, version })` with `ctx.scheduler.runAt(turnDeadline)`. Any later change bumps the version, so an old check does nothing. No cancel is needed. If a check ever runs before the deadline, it schedules itself again for the deadline.
 - **On a call.** `rollDice`, `makeMove` and `answer` check the deadline after the version check. At or after the deadline (`now >= turnDeadline`), they save the time out instead of the call and return `{ ok: false, version, error: { code: 'TIMED_OUT', message } }`. This is a return value, not a thrown error: a thrown error rolls back the whole transaction, and so the time out too. A client adapter turns it into a `TIMED_OUT` rejection (the port's `rollDice` / `sendTurn` / `sendAnswer`). The scheduled check for the old version then does nothing.
-- **The engine.** The time out is the engine game action `{ type: 'timeout', player }` (only the player the game waits for, not during the opening roll). It ends the game like a resign of that game (`resignGame`: mono 1 if the player has borne off a checker, else diplo 2), with `reason: 'timeout'` in `GameResult` and `GameRecord`. The engine has no clock: the server decides when time is up, with `Date.now()` inside the Convex function. The pure helpers `deadlineAfter`, `isTimedOut`, `timeOut`, `callTimedOut` and `scheduledCheck` in `@tavli/online` take `now` as an argument.
+- **The engine.** The time out is the engine game action `{ type: 'timeout', player }` (only the player the game waits for; in the opening roll only the side whose die is not in while the other die is, #379). The other player wins that game for **1 point**, also in the opening roll, with `reason: 'timeout'` in `GameResult` and `GameRecord`. The moves of an unfinished turn do not count. The engine has no clock: the server decides when time is up, with `Date.now()` inside the Convex function. The pure helpers `deadlineAfter`, `isTimedOut`, `timeOut`, `callTimedOut` and `scheduledCheck` in `@tavli/online` take `now` as an argument.
 - **The log.** The `timeout` event is a row in `moves` with actor `server`, so `replay` still rebuilds the game.
-- **Points.** The rules docs do not say what a timed-out game is worth. We use the single-game resign value (open question Q30).
+- **Points.** A time out is always worth **1 point** (owner answer Q30, #378), in every game and preset: also when the late player has borne off no checker, where a resign would give a diplo (Acey-Deucey American: 15). A resign keeps its own score. The score is in the saved match, so the app shows the server's points, old builds too. Games timed out before #378 keep the points they were saved with (2 for a diplo); the server never replays a stored log, so they stay as they are.
 - **Resign** (the match) ignores the timer: a resign is allowed at any time.
 - **Time outs per player** are not stored: `match.games` has every game with `reason: 'timeout'` and its winner.
 
@@ -189,7 +195,7 @@ A rejected call throws a `ConvexError` whose `data` is `{ code, message }` (`Gam
 ## Dice
 
 - Rolled **only on the server**, inside the mutation, through the engine's `Rng`. The server uses `createCryptoRng()` (Web Crypto, `crypto.getRandomValues`). It never uses the seeded engine RNG, which is predictable.
-- A roll is made when its player taps Roll (`rollDice`, #355); only the opening roll is made when the game starts. The server stores **no seed and no RNG state**, so the next dice do not exist anywhere before they are rolled. `getGame` shows only the current roll, and a pass's dice in `game.lastTurn`.
+- A roll is made when its player taps Roll (`rollDice`, #355); the opening die of a new match when its player taps for it (#379). Only the opening of the next game of a match is rolled by the server itself. The server stores **no seed and no RNG state**, so the next dice do not exist anywhere before they are rolled. `getGame` shows only the current roll, and a pass's dice in `game.lastTurn`.
 - Convex makes queries and mutations **deterministic**. Its docs say `Math.random` there is a seeded strong PRNG, and the seed is a hidden input of the function call. We expect `crypto.getRandomValues` in a mutation to work the same way. The seed stays on the server, so a client cannot predict a roll. **Check this on the first real deployment** (open point below).
 - Lint blocks `Math.random` in `apps/server`.
 - The pure tests in `packages/online` pass a seeded RNG. The Convex tests use the real server RNG and read the dice from `getGame`.
@@ -319,8 +325,8 @@ inviter                 server                                   friend
   │                     3. status at now: open?    → INVITE_EXPIRED when the
   │                        time is up (marked or not), else INVITE_CLOSED
   │                     4. not your own?           → OWN_INVITE
-  │                     5. insertGame (white = inviter): opening roll,
-  │                        turn clock
+  │                     5. insertGame (white = inviter): waits for
+  │                        both opening dice, turn clock
   │                     6. invite → accepted, gameId
   │ ◄── getInvite / listMyInvites / getGame (reactive) ─────────► │ gameId
 ```
@@ -397,6 +403,7 @@ Neither public call takes a player id: both use `signedInPlayer(ctx)`. `register
 Every save in `games.ts` (`save`, and `insertGame` for a new game) calls `scheduleTurnPush(ctx, game, version, before, after, callerId)`. `before` and `after` are what the server waited for before and after the save (`turnWait`: the side from `waitingFor`, the side to move or the side that must answer a question, and the game number in the match, `match.games.length`). For a new game `before` is nobody. `callerId` is the player who caused the save, or `server` for a time out. `turnPushSide` picks the side to tell:
 
 - only when the wait **moved to the other side**, or a **new game** of the match started. A time out ends a game, and the next game may wait for the same side again (with `nextGameStarter: "alternate"` or `"openingRoll"`); that player still gets a push. When the same side waits again in the same game (an Asodio extra roll, or White plays on after the mother question), there is no push;
+- in the opening of a new match (#379) the wait follows `waitingFor`: a new match tells White to roll when Black made it (Black accepted an invite, or the internal `createGame` named Black). Black's die first leaves White waiting: no push. White's die first moves the wait to Black: Black gets one push. When the opening ends, the starter gets a push unless the starter rolled last. A tie after White's roll leaves White waiting again: no push;
 - never when the match is over (that is a ["game over"](#game-over) push).
 
 If that player has a token, the mutation schedules `sendTurnPush({ gameId, version, playerId })` with `runAfter(0)`. The action runs after the save is committed, so a push problem never fails or undoes a move. It reads the player's tokens and the turn deadline (`turnPushTokens`, newest first; no tokens when the game is no longer at `version`, so a late push is dropped), sends one message per token, and removes the tokens the push service calls dead (`DeviceNotRegistered`, `removeDeadTokens`). A player with no token costs no action.

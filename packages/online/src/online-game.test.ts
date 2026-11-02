@@ -16,6 +16,7 @@ import {
   deadlineAfter,
   isTimedOut,
   loadFlow,
+  mayRollOpening,
   loadStored,
   onlineGameRules,
   playTurn,
@@ -28,7 +29,7 @@ import {
   toView,
   waitingFor,
 } from './online-game';
-import { closedOut, lastBearOff, pickChoice, pickTurn } from './testing';
+import { closedOut, lastBearOff, openFlow, pickChoice, pickTurn } from './testing';
 import type { LoadedFlow } from './online-game';
 
 const PLAYERS = { white: 'alice', black: 'bob' };
@@ -43,10 +44,29 @@ const VIEW = {
   previousGame: null,
 } as const;
 
-function create(choice: OnlineGameChoice = 'portes', seed = 1, targetPoints = 1) {
+/** A new match in its opening roll (#379). */
+function createNew(choice: OnlineGameChoice = 'portes', seed = 1, targetPoints = 1) {
   const rng = createSeededRng(seed);
   const flow = createOnlineMatch({ choice, targetPoints, players: PLAYERS }, rng);
   return { flow, rng };
+}
+
+/** A new match with both opening dice rolled (`openFlow`): the first player to move waits. */
+function create(choice: OnlineGameChoice = 'portes', seed = 1, targetPoints = 1) {
+  const { flow, rng } = createNew(choice, seed, targetPoints);
+  return { flow: openFlow(flow, rng), rng };
+}
+
+/** An `Rng` that rolls these dice, in order. */
+function dice(...values: number[]): Rng {
+  const left = values.map((value) => value - 1);
+  return {
+    nextUint32() {
+      const value = left.shift();
+      if (value === undefined) throw new Error('no dice left');
+      return value;
+    },
+  };
 }
 
 /** Like the server: start from the stored flow with an empty log. */
@@ -121,13 +141,15 @@ describe('onlineGameRules', () => {
 });
 
 describe('createOnlineMatch', () => {
-  it('rolls the opening on the server and waits for the first player', () => {
-    const { flow } = create();
-    expect(flow.game.phase).toBe('moving');
-    expect(flow.game.starter).not.toBeNull();
-    expect(flow.log[0]?.type).toBe('start');
-    expect(flow.log.filter((e) => e.type === 'rollOpening').length).toBeGreaterThanOrEqual(2);
-    expect(waitingFor(flow)).toBe(flow.game.state.toMove);
+  it('waits in the opening roll for both players (#379); White is named first', () => {
+    const { flow } = createNew();
+    expect(flow.game.phase).toBe('opening-roll');
+    expect(flow.game.opening).toEqual({ white: null, black: null, ties: [] });
+    expect(flow.game.starter).toBeNull();
+    expect(flow.log.map((e) => e.type)).toEqual(['start']);
+    expect(waitingFor(flow)).toBe('white');
+    expect(mayRollOpening(flow, 'white')).toBe(true);
+    expect(mayRollOpening(flow, 'black')).toBe(true);
     expect(flow.match.players).toEqual(PLAYERS);
   });
 
@@ -158,15 +180,115 @@ describe('createOnlineMatch', () => {
         return seeded.nextUint32();
       },
     };
-    const flow = createOnlineMatch(
+    const created = createOnlineMatch(
       { choice: 'portes', targetPoints: 1, players: PLAYERS },
       counting,
     );
+    expect(calls).toBe(0);
+    const flow = openFlow(created, counting);
     const dice = flow.log.reduce(
       (n, e) => n + (e.type === 'rollOpening' ? 1 : e.type === 'roll' ? 2 : 0),
       0,
     );
     expect(calls).toBe(dice);
+  });
+});
+
+describe('the opening roll (#379)', () => {
+  it('each player rolls their own die, in any order; then the starter plays', () => {
+    const { flow } = createNew();
+    const black = rollDice(stored(flow), 'black', dice(2));
+    expect(black.game.phase).toBe('opening-roll');
+    expect(black.game.opening).toMatchObject({ white: null, black: 2 });
+    expect(black.log).toEqual([{ type: 'rollOpening', player: 'black', die: 2 }]);
+    expect(waitingFor(black)).toBe('white');
+    expect(mayRollOpening(black, 'black')).toBe(false);
+    expect(code(() => rollDice(black, 'black', dice(4)))).toBe('ILLEGAL_ACTION');
+    const white = rollDice(stored(black), 'white', dice(5));
+    // Portes plays the opening dice (`useOpeningDice`).
+    expect(white.game.phase).toBe('moving');
+    expect(white.game.starter).toBe('white');
+    expect(white.game.state.dice).toEqual([5, 2]);
+    expect(waitingFor(white)).toBe('white');
+    expect(mayRollOpening(white, 'white')).toBe(false);
+  });
+
+  it('White may roll first; then the server waits for Black', () => {
+    const { flow } = createNew();
+    const white = rollDice(stored(flow), 'white', dice(3));
+    expect(waitingFor(white)).toBe('black');
+    expect(code(() => rollDice(white, 'white', dice(4)))).toBe('ILLEGAL_ACTION');
+    const black = rollDice(stored(white), 'black', dice(6));
+    expect(black.game.starter).toBe('black');
+    expect(black.game.state.dice).toEqual([6, 3]);
+  });
+
+  it('a tie clears both dice, and both roll again', () => {
+    const { flow } = createNew();
+    const first = rollDice(stored(flow), 'white', dice(4));
+    const tie = rollDice(stored(first), 'black', dice(4));
+    expect(tie.game.phase).toBe('opening-roll');
+    expect(tie.game.opening).toEqual({ white: null, black: null, ties: [4] });
+    expect(mayRollOpening(tie, 'white')).toBe(true);
+    expect(mayRollOpening(tie, 'black')).toBe(true);
+    expect(waitingFor(tie)).toBe('white');
+  });
+
+  it('a rerollBoth game waits for the starter to roll after the opening', () => {
+    // Plakoto's default preset rolls again after the opening.
+    const { flow } = createNew('plakoto');
+    if (flow.match.rules.match.openingRoll !== 'rerollBoth') return;
+    const next = rollDice(rollDice(stored(flow), 'white', dice(1)), 'black', dice(6));
+    expect(next.game.phase).toBe('awaiting-roll');
+    expect(waitingFor(next)).toBe('black');
+  });
+
+  it('the next game of a match opens by itself', () => {
+    const { flow, rng } = create('portes', 1, 5);
+    const won = lastBearOff(flow);
+    const next = playTurn(stored(won), 'white', pickTurn(won.game, rng), rng);
+    expect(next.match.games).toHaveLength(1);
+    // The winner starts the next game; no opening roll waits for a player.
+    expect(next.game.phase).not.toBe('opening-roll');
+  });
+
+  it('timeOut with one die rolled: the other player loses the game', () => {
+    const { flow, rng } = createNew('portes', 1, 5);
+    const rolled = rollDice(stored(flow), 'black', dice(3));
+    const late = timeOut(stored(rolled), rng);
+    // Nothing is borne off, where a resign gives a diplo: still 1 point (#378).
+    expect(late.match.games[0]).toMatchObject({
+      starter: 'black',
+      winner: 'black',
+      points: 1,
+      reason: 'timeout',
+    });
+    expect(late.match.score).toEqual({ white: 0, black: 1 });
+    expect(late.endedGame?.result?.reason).toBe('timeout');
+    expect(late.match.status).toBe('in-progress');
+    expect(late.game.phase).not.toBe('opening-roll');
+  });
+
+  it('timeOut with no die rolled: the server rolls both, and nobody loses', () => {
+    const { flow } = createNew('portes', 1, 1);
+    const opened = timeOut(stored(flow), dice(2, 2, 5, 1));
+    expect(opened.match.games).toEqual([]);
+    expect(opened.match.status).toBe('in-progress');
+    expect(opened.game.opening?.ties).toEqual([2]);
+    expect(opened.game.starter).toBe('white');
+    expect(opened.game.phase).toBe('moving');
+    expect(opened.log.map((e) => e.type)).toEqual([
+      'rollOpening',
+      'rollOpening',
+      'rollOpening',
+      'rollOpening',
+    ]);
+  });
+
+  it('the opening log replays', () => {
+    const { flow } = createNew();
+    const opened = openFlow(flow, createSeededRng(5));
+    expect(replay(opened.log)).toEqual(opened);
   });
 });
 
@@ -362,8 +484,12 @@ describe('turn timers (#133)', () => {
     if (late === null) throw new Error('nobody to wait for');
     const next = timeOut(stored(flow), rng);
     expect(next.match.games).toHaveLength(1);
-    expect(next.match.games[0]).toMatchObject({ winner: late === 'white' ? 'black' : 'white' });
-    expect(next.match.games[0]?.reason).toBe('timeout');
+    // At the start nothing is borne off: a time out is still 1 point (#378).
+    expect(next.match.games[0]).toMatchObject({
+      winner: late === 'white' ? 'black' : 'white',
+      points: 1,
+      reason: 'timeout',
+    });
     expect(next.log[0]).toEqual({ type: 'timeout', player: late });
     expect(next.log.map((e) => e.type)).toContain('nextGame');
     // The next game waits for its first roll (#355).

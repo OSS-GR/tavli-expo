@@ -15,7 +15,7 @@ import {
   type PlayerId,
 } from '@tavli/engine';
 import { createMemoryGameServer } from '@tavli/online';
-import { closedOut, pickTurn } from '@tavli/online/testing';
+import { closedOut, openMemoryGame, pickTurn } from '@tavli/online/testing';
 import { getTheme } from '@tavli/themes';
 
 import { turnMoveDelay } from '@/features/board/flights';
@@ -43,11 +43,13 @@ async function flush(): Promise<void> {
   for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 
-/** A Portes game, Alice (White) on this phone. */
-async function setup(seed: number, targetPoints = 7) {
+/** A Portes game, Alice (White) on this phone, after the opening unless `opened` is false. */
+async function setup(seed: number, targetPoints = 7, opened = true) {
   let clock = START;
   const server = createMemoryGameServer({ rng: createSeededRng(seed), now: () => clock });
   const gameId = server.createGame(ALICE, PLAYERS, 'portes', targetPoints, 1);
+  // Both players roll their opening dice (#379).
+  if (opened) await openMemoryGame(server, gameId);
   const view = (): OnlineGameView => server.getGame(gameId)!;
   /** Rolls for the side the server waits for, with no phone (#355). */
   const roll = async () => {
@@ -147,6 +149,34 @@ async function blackToMove() {
 }
 
 describe('online feedback (#271)', () => {
+  it('plays each opening die once, like a local opening roll (#379)', async () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const game = await setup(seed, 7, false);
+      const alice = await game.storeFor();
+      const board = onlineBoardStore(alice, game.gameId)!;
+      const { updates, stop } = record(board, 'white');
+      // Bob rolls first: his die plays from the view.
+      await game.server
+        .transportFor(BOB)
+        .rollDice({ gameId: game.gameId, expectedVersion: game.view().version });
+      await flush();
+      expect(updates.map((u) => u.map(eventOf))).toEqual([['diceRoll']]);
+      // Your die: the store asked for it, so it is in the log.
+      updates.length = 0;
+      expect(alice.getState().dispatch({ type: 'rollOpening', player: 'white' })).toBe(true);
+      await flush();
+      stop();
+      expect(updates.map((u) => u.map(eventOf))).toEqual([['diceRoll']]);
+      const log = alice.getState().flow!.log;
+      expect(log).toHaveLength(1);
+      expect(log[0]).toMatchObject({ type: 'rollOpening', player: 'white' });
+      if (game.view().game.phase === 'opening-roll') continue;
+      // The opening is decided: no "your turn" on top (a local roll plays none).
+      return;
+    }
+    throw new Error('every seed tied');
+  });
+
   it('plays the other player’s turn like the same steps in a local game', async () => {
     const { game } = await blackToMove();
     const alice = await game.storeFor();

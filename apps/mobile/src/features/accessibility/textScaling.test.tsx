@@ -4,7 +4,7 @@
  * the game menu and resign dialog, the end screens, the game review
  * (#215) with its switch (#230), History (#142), the tutorial's mother
  * card (#149), the Settings game picker (#159) and the online game
- * screen with its game-end sheet and match end (#255) and the invite
+ * screen with its opening card (#379), game-end sheet and match end (#255) and the invite
  * screen (#256), Play a friend online with its waiting screen (#281), and
  * your online games on Home and "See all" (#297) and in History (#313),
  * your invites on Home (#314), and the board step of the first launch
@@ -507,6 +507,20 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
         />,
       );
       await screen.findByTestId('game-board', { includeHiddenElements: true });
+      // The opening card (#379): you roll your die, then wait for the bot's.
+      expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+      expect(problems()).toEqual([]);
+      await user.press(screen.getByTestId('roll-button'));
+      expect(problems()).toEqual([]);
+      for (let i = 0; i < 40 && screen.queryByTestId('opening-card') !== null; i++) {
+        const again = screen.queryByTestId('roll-button');
+        if (again !== null && server.getGame(gameId)!.game.opening?.white === null) {
+          await user.press(again); // A tie: roll again.
+        }
+        await act(async () => {
+          jest.advanceTimersByTime(250);
+        });
+      }
       for (let i = 0; i < 40 && server.getGame(gameId)!.waitingFor !== 'white'; i++) {
         await act(async () => {
           jest.advanceTimersByTime(250);

@@ -14,6 +14,10 @@
  * The server waits for each player's roll (`rollDice`, #355). The dice are
  * random, so a check that needs a roll to play rolls until one comes
  * (`untilMoving`): a roll with no legal move passes to the other side.
+ *
+ * A new match waits in the opening roll (#379): each player rolls their
+ * own die with `rollDice`. `startGame` rolls both, again after a tie,
+ * so most checks start at the first turn.
  */
 import type { MoveInput, PlayerId } from '@tavli/engine';
 
@@ -208,13 +212,55 @@ function plainMoves(moves: readonly MoveInput[] | undefined) {
   return (moves ?? []).map(({ from, to, die }) => ({ from, to, die }));
 }
 
-/** A new game, watched by both players, with its first view. */
-async function startGame(subject: GameTransportContractSubject, gameId: string) {
+/** The side still to roll its opening die (#379), or `null` when the opening is over. */
+function openingRoller(view: OnlineGameView): PlayerId | null {
+  const { opening, phase } = view.game;
+  if (view.status !== 'active' || phase !== 'opening-roll' || opening === null) return null;
+  return opening.white === null ? 'white' : 'black';
+}
+
+/** More opening rounds than this means a broken server: a tie comes 1 time in 6. */
+const MAX_OPENING_ROLLS = 60;
+
+/**
+ * Rolls both opening dice (#379), White first, again after each tie,
+ * until the opening is over. Both watchers see each roll. Returns Black's
+ * view after the opening (a view past its opening as it is).
+ */
+async function untilOpened(
+  subject: GameTransportContractSubject,
+  watchers: { readonly white: Watcher; readonly black: Watcher },
+  view: OnlineGameView,
+): Promise<OnlineGameView> {
+  let current = view;
+  for (let i = 0; i < MAX_OPENING_ROLLS; i++) {
+    const side = openingRoller(current);
+    if (side === null) return current;
+    await subject
+      .transportFor(side)
+      .rollDice({ gameId: current.gameId, expectedVersion: current.version });
+    await viewAt(subject, watchers.white, current.version + 1);
+    current = await viewAt(subject, watchers.black, current.version + 1);
+  }
+  throw new Error(`the opening was not decided after ${MAX_OPENING_ROLLS} rolls`);
+}
+
+/**
+ * A new game, watched by both players, with its first view. With `open`
+ * (the default) both players roll the opening first (`untilOpened`), and
+ * `view` is the view after it.
+ */
+async function startGame(
+  subject: GameTransportContractSubject,
+  gameId: string,
+  { open = true }: { readonly open?: boolean } = {},
+) {
   const white = watch(subject.transportFor('white'), gameId);
   const black = watch(subject.transportFor('black'), gameId);
   const watchers = { white, black };
   await firstView(subject, white);
-  const view = await firstView(subject, black);
+  const first = await firstView(subject, black);
+  const view = open ? await untilOpened(subject, watchers, first) : first;
   return { gameId, watchers, view };
 }
 
@@ -352,12 +398,75 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         same(view.status, 'active', 'view.status');
         same(view.choice, 'portes', 'view.choice');
         same(view.turnTimeMinutes, 1, 'view.turnTimeMinutes');
-        same(view.game.phase, 'moving', 'view.game.phase');
-        same(view.waitingFor, view.game.state.toMove, 'view.waitingFor');
+        // A new match waits for both opening dice (#379).
+        same(view.game.phase, 'opening-roll', 'view.game.phase');
+        same(view.game.opening?.white, null, 'view.game.opening.white');
+        same(view.game.opening?.black, null, 'view.game.opening.black');
+        same(view.game.opening?.ties, [], 'view.game.opening.ties');
+        same(view.waitingFor, 'white', 'view.waitingFor');
         same(view.prompt, null, 'view.prompt');
         if (typeof view.turnDeadline !== 'number') throw new Error('no turn deadline');
         same(watcher.errors, [], 'errors');
         watcher.stop();
+      },
+    },
+    {
+      name: 'each player rolls their own opening die, in any order, at any version',
+      run: async (subject) => {
+        const { gameId, watchers, view } = await startGame(
+          subject,
+          await subject.createGame(PORTES),
+          { open: false },
+        );
+        const roll = { gameId, expectedVersion: view.version };
+        await rejectsWith(
+          subject.transportFor('stranger').rollDice(roll),
+          'NOT_A_PLAYER',
+          'an opening roll by a stranger',
+        );
+        await subject.passTime(TICK_MS);
+        // Black may roll first.
+        await subject.transportFor('black').rollDice(roll);
+        const one = await viewAt(subject, watchers.white, view.version + 1);
+        same(await viewAt(subject, watchers.black, view.version + 1), one, 'Black view');
+        same(one.game.phase, 'opening-roll', 'phase after one die');
+        same(one.game.opening?.white, null, 'White die after one die');
+        if (typeof one.game.opening?.black !== 'number') throw new Error('no Black die');
+        same(one.waitingFor, 'white', 'waitingFor after one die');
+        // The opening has one clock: the first die keeps it.
+        same(one.turnDeadline, view.turnDeadline, 'turnDeadline after one die');
+        await rejectsWith(
+          subject.transportFor('black').rollDice({ gameId, expectedVersion: one.version }),
+          'ILLEGAL_ACTION',
+          'a second opening roll',
+        );
+        await subject.passTime(TICK_MS);
+        // White rolls at the version it saw before Black's die: both may roll at once.
+        await subject.transportFor('white').rollDice(roll);
+        const two = await viewAt(subject, watchers.white, one.version + 1);
+        same(await viewAt(subject, watchers.black, one.version + 1), two, 'Black view');
+        if (!(Number(two.turnDeadline) > Number(one.turnDeadline))) {
+          throw new Error('the end of an opening round did not start a new clock');
+        }
+        if (two.game.phase === 'opening-roll') {
+          // A tie: both dice again.
+          same(two.game.opening?.white, null, 'White die after a tie');
+          same(two.game.opening?.black, null, 'Black die after a tie');
+          same(two.game.opening?.ties.length, 1, 'ties after a tie');
+        } else {
+          // Portes plays the opening dice.
+          same(two.game.phase, 'moving', 'phase after the opening');
+          same(two.waitingFor, two.game.starter, 'waitingFor after the opening');
+        }
+        const opened = await untilOpened(subject, watchers, two);
+        same(opened.game.phase, 'moving', 'phase after the opening');
+        await rejectsWith(
+          subject.transportFor('white').rollDice({ gameId, expectedVersion: opened.version }),
+          opened.waitingFor === 'white' ? 'ILLEGAL_ACTION' : 'NOT_YOUR_TURN',
+          'an opening roll after the opening',
+        );
+        watchers.white.stop();
+        watchers.black.stop();
       },
     },
     {
@@ -821,11 +930,7 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         await viewAt(subject, watchers.black, view.version + 1);
         await stayQuiet(subject);
         same(early.views.length, 0, 'views after stop() inside the same tick');
-        same(
-          watchers.white.views.map((v) => v.version),
-          [view.version],
-          'White versions after stop()',
-        );
+        same(watchers.white.last().version, view.version, 'White version after stop()');
         watchers.black.stop();
       },
     },
@@ -881,7 +986,11 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         await sent;
         const after = await viewAt(subject, watchers.black, view.version + 1);
         same(after.version, view.version + 1, 'version after the turn');
-        same(watchers.black.views[0]?.version, view.version, 'Black first view');
+        same(
+          watchers.black.views.find((v) => v.version >= view.version)?.version,
+          view.version,
+          'Black view before the turn',
+        );
         watchers.white.stop();
         watchers.black.stop();
       },

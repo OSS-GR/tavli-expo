@@ -4,10 +4,35 @@
 import type { TestConvex } from 'convex-test';
 import type { GenericSchema, SchemaDefinition } from 'convex/server';
 
-import { components } from './_generated/api';
+import type { OnlineGameView } from '@tavli/contracts';
+import type { PerPlayer } from '@tavli/engine';
+import { rollOpenings } from '@tavli/online/testing';
+
+import { api, components } from './_generated/api';
+import type { Id } from './_generated/dataModel';
 
 // The turn pickers are shared with `@tavli/online` (#251).
 export { pickChoice, pickTurn } from '@tavli/online/testing';
+
+/**
+ * Rolls both opening dice of a game (#379) through the public `rollDice`,
+ * each player signed in as themselves, again after each tie. The server
+ * rolls real dice, so a tie comes at random. Resolves to White's view
+ * after the opening.
+ */
+export async function openGame(
+  t: TestConvex<SchemaDefinition<GenericSchema, boolean>>,
+  gameId: Id<'games'>,
+  players: PerPlayer<string>,
+): Promise<OnlineGameView> {
+  return await rollOpenings({
+    roll: (side, expectedVersion) =>
+      t
+        .withIdentity({ subject: players[side] })
+        .mutation(api.games.rollDice, { gameId, expectedVersion }),
+    view: () => t.withIdentity({ subject: players.white }).query(api.games.getGame, { gameId }),
+  });
+}
 
 /**
  * The Convex modules for convex-test: files with one dot, like Convex

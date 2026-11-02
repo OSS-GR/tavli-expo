@@ -26,12 +26,20 @@ function signIn(): void {
   onlineFake.authStore.session = { id: ME, isGuest: true };
 }
 
-/** A new game of mine (I am White), one second after the last change. */
-function newGame(turnTimeMinutes: number | null = null): string {
+/**
+ * A new game of mine (I am White), one second after the last change, after
+ * both opening dice (#379).
+ */
+async function newGame(turnTimeMinutes: number | null = null): Promise<string> {
   jest.advanceTimersByTime(1000);
-  return onlineFake
+  const gameId = onlineFake
     .server()
     .createGame(ME, { white: ME, black: FRIEND }, 'portes', 5, turnTimeMinutes);
+  // A shown list gets the views of the opening: let it take them in `act`.
+  await act(async () => {
+    await onlineFake.openGame(gameId);
+  });
+  return gameId;
 }
 
 function view(gameId: string): OnlineGameView {
@@ -70,7 +78,7 @@ describe('<HomeOnlineGames />', () => {
   it('keeps the account note when the session does not load, and makes no guest', async () => {
     // Better Auth's ready() gives null with no network too: no sign-out.
     rememberOnlineAccount();
-    const gameId = newGame();
+    const gameId = await newGame();
     const user = setupUser();
     await show();
     expect(
@@ -95,7 +103,7 @@ describe('<HomeOnlineGames />', () => {
 
   it('says it is loading until the first list comes', async () => {
     signIn();
-    newGame();
+    await newGame();
     let answer: (() => void) | undefined;
     const slow: GameTransport = {
       ...games!,
@@ -124,7 +132,13 @@ describe('<HomeOnlineGames />', () => {
 
   it('lists "Your turn" first, at most three rows, then "See all"', async () => {
     signIn();
-    const ids = [newGame(), newGame(), newGame(), newGame(), newGame()];
+    const ids = [
+      await newGame(),
+      await newGame(),
+      await newGame(),
+      await newGame(),
+      await newGame(),
+    ];
     const newest = [...ids].reverse();
     const expected = [...newest.filter(myTurn), ...newest.filter((id) => !myTurn(id))];
     // The seeded dice give both kinds, so the order matters.
@@ -140,7 +154,7 @@ describe('<HomeOnlineGames />', () => {
 
   it('reads each row as one item, and a tap opens the game', async () => {
     signIn();
-    const gameId = newGame();
+    const gameId = await newGame();
     const user = setupUser();
     const { onOpen } = await show();
     const turn = myTurn(gameId) ? 'Your turn' : 'Waiting for your friend';
@@ -157,8 +171,8 @@ describe('<HomeOnlineGames />', () => {
 
   it('follows the server: the friend moves, and the row turns to "Your turn"', async () => {
     signIn();
-    let gameId = newGame();
-    while (myTurn(gameId)) gameId = newGame();
+    let gameId = await newGame();
+    while (myTurn(gameId)) gameId = await newGame();
     await show();
     const row = () => screen.getByTestId(`online-game-${gameId}`);
     expect(row()).toHaveAccessibleName(/^Portes vs friend, Waiting for your friend/);
@@ -176,7 +190,7 @@ describe('<HomeOnlineGames />', () => {
     // Your turn now: the row moves to the top.
     expect(rowIds()[0]).toBe(gameId);
     // A new game shows up too, and a finished one goes.
-    const second = newGame();
+    const second = await newGame();
     await flush();
     expect(rowIds()).toContain(second);
     await act(async () => {
@@ -192,7 +206,7 @@ describe('<HomeOnlineGames />', () => {
     const addListener = jest.mocked(AppState.addEventListener);
     const firstCall = addListener.mock.calls.length;
     signIn();
-    const gameId = newGame();
+    const gameId = await newGame();
     await show();
     const row = screen.getByTestId(`online-game-${gameId}`);
     expect(within(row).getByText('0–0 · 24 h left')).toBeOnTheScreen();
@@ -209,7 +223,7 @@ describe('<HomeOnlineGames />', () => {
 
   it('counts the time down while it shows', async () => {
     signIn();
-    const gameId = newGame(1);
+    const gameId = await newGame(1);
     await show();
     const row = screen.getByTestId(`online-game-${gameId}`);
     expect(within(row).getByText('0–0 · 60 s left')).toBeOnTheScreen();
@@ -221,7 +235,7 @@ describe('<HomeOnlineGames />', () => {
 
   it('says when the list did not load; Try again loads it', async () => {
     signIn();
-    const gameId = newGame();
+    const gameId = await newGame();
     let offline = true;
     const flaky: GameTransport = {
       ...games!,
@@ -246,7 +260,7 @@ describe('<HomeOnlineGames />', () => {
 
   it('keeps the last list when the connection fails later', async () => {
     signIn();
-    const gameId = newGame();
+    const gameId = await newGame();
     let fail: ((error: unknown) => void) | undefined;
     const losing: GameTransport = {
       ...games!,
@@ -291,7 +305,7 @@ describe('<HomeOnlineGames />', () => {
   it('hides the list after a sign-out, and forgets the account', async () => {
     signIn();
     rememberOnlineAccount();
-    newGame();
+    await newGame();
     await show();
     expect(screen.getByTestId('home-online-games')).toBeOnTheScreen();
     await act(async () => {
@@ -304,8 +318,8 @@ describe('<HomeOnlineGames />', () => {
 
   it('shows Greek', async () => {
     signIn();
-    let gameId = newGame();
-    while (!myTurn(gameId)) gameId = newGame();
+    let gameId = await newGame();
+    while (!myTurn(gameId)) gameId = await newGame();
     await act(async () => {
       await i18n.changeLanguage('el');
     });

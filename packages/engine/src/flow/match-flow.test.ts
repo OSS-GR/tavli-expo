@@ -244,10 +244,50 @@ describe('match flow', () => {
       { type: 'roll', player: 'white', dice: [3, 1] },
       { type: 'timeout', player: 'white' },
     ]);
-    expect(flow.game.result).toEqual({ winner: 'black', points: 2, reason: 'timeout' });
-    expect(flow.match.games[0]).toMatchObject({ winner: 'black', points: 2, reason: 'timeout' });
-    expect(flow.match.score).toEqual({ white: 0, black: 2 });
+    // White bore off nothing, so a resign would give a diplo. A time out is 1 point (#378).
+    expect(flow.game.result).toEqual({ winner: 'black', points: 1, reason: 'timeout' });
+    expect(flow.match.games[0]).toMatchObject({ winner: 'black', points: 1, reason: 'timeout' });
+    expect(flow.match.score).toEqual({ white: 0, black: 1 });
     expect(flow.log.at(-1)).toEqual({ type: 'timeout', player: 'white' });
+    expect(validateMatch(JSON.parse(JSON.stringify(flow.match)))).toEqual(flow.match);
+    expect(replay(flow.log)).toEqual(flow);
+  });
+
+  it('timeout in a Tavli match: 1 point in each game; the time out that reaches the target ends the match (#378)', () => {
+    let flow = createMatchFlow({ rules: getPreset('tavli'), targetPoints: 3, starter: 'white' });
+    const played: string[] = [];
+    // Each game: the side to move times out before they roll, with nothing borne off.
+    // The winner starts the next game, so the late side changes each game.
+    for (const late of ['white', 'black', 'white', 'black', 'white'] as const) {
+      if (matchPhase(flow) === 'game-over') flow = applyMatchAction(flow, { type: 'nextGame' });
+      expect(flow.game.state.toMove).toBe(late);
+      played.push(flow.game.state.variant);
+      flow = applyMatchAction(flow, { type: 'timeout', player: late });
+      expect(flow.game.result).toEqual({
+        winner: late === 'white' ? 'black' : 'white',
+        points: 1,
+        reason: 'timeout',
+      });
+    }
+    expect(played).toEqual(['portes', 'plakoto', 'fevga', 'portes', 'plakoto']);
+    expect(flow.match.score).toEqual({ white: 2, black: 3 });
+    expect(flow.match.winner).toBe('black');
+    expect(matchPhase(flow)).toBe('match-over');
+    expect(replay(flow.log)).toEqual(flow);
+  });
+
+  it('timeout in the opening roll (#379): the match records the game, the log replays', () => {
+    const flow = act(createMatchFlow({ rules: portesOnly(), starter: null }), [
+      { type: 'rollOpening', player: 'black', die: 5 },
+      { type: 'timeout', player: 'white' },
+    ]);
+    expect(flow.match.games[0]).toMatchObject({
+      starter: 'black',
+      winner: 'black',
+      points: 1,
+      reason: 'timeout',
+    });
+    expect(flow.match.nextStarter).toBe('black');
     expect(validateMatch(JSON.parse(JSON.stringify(flow.match)))).toEqual(flow.match);
     expect(replay(flow.log)).toEqual(flow);
   });

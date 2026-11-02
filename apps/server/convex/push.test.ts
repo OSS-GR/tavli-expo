@@ -32,7 +32,7 @@ import {
 } from './model/push';
 import { setPushProvider } from './push';
 import schema from './schema';
-import { authUsers, modules, pickTurn } from './test.setup';
+import { authUsers, modules, openGame, pickTurn } from './test.setup';
 
 // The players: new Better Auth users for each test, made by `setup()`.
 let ALICE = '';
@@ -107,14 +107,18 @@ async function createGame(
   choice: 'portes' | 'plakoto' = 'portes',
   callerId = ALICE,
   targetPoints = 5,
+  open = true,
 ) {
-  return await t.mutation(internal.games.createGame, {
+  const gameId = await t.mutation(internal.games.createGame, {
     callerId,
     players: PLAYERS,
     choice,
     targetPoints,
     turnTimeMinutes,
   });
+  // Both players roll their opening dice (#379), unless the test does.
+  if (open) await openGame(t, gameId, PLAYERS);
+  return gameId;
 }
 
 async function view(t: Tester, gameId: Id<'games'>): Promise<OnlineGameView> {
@@ -349,18 +353,48 @@ describe('"your turn" pushes', () => {
     expect(push.sent).toEqual([]);
   });
 
-  it('a new game tells the first player only when they did not start it', async () => {
+  it('a new match tells White to roll the opening die only when Black started it (#379)', async () => {
     const t = await setup();
     await registerBoth(t);
-    // The server rolls the opening, so either side may move first.
-    for (let i = 0; i < 12; i++) {
-      push.clear();
-      const callerId = i % 2 === 0 ? ALICE : BOB;
-      const gameId = await createGame(t, null, 'portes', callerId);
+    // The opening waits for White's die first.
+    await createGame(t, null, 'portes', ALICE, 5, false);
+    await flush(t);
+    expect(push.sent).toEqual([]);
+    // Bob accepted an invite: Alice gets one push.
+    await createGame(t, null, 'portes', BOB, 5, false);
+    await flush(t);
+    expect(push.sent.map((message) => message.to)).toEqual([ALICE_TOKEN]);
+  });
+
+  it('the opening tells the side still to roll, and then the first player, once each (#379)', async () => {
+    const t = await setup();
+    await registerBoth(t);
+    // The server rolls real dice, so a tie comes at random: try a few matches.
+    for (let i = 0; i < 6; i++) {
+      const gameId = await createGame(t, null, 'portes', BOB, 5, false);
       await flush(t);
-      const first = waiting(await view(t, gameId));
-      const expected = PLAYERS[first] === callerId ? [] : [TOKEN_OF[first]];
-      expect(push.sent.map((message) => message.to)).toEqual(expected);
+      push.clear();
+      // Black rolls first: the wait stays with White, so no push.
+      const start = await view(t, gameId);
+      await as(t, BOB).mutation(api.games.rollDice, { gameId, expectedVersion: start.version });
+      await flush(t);
+      expect(push.sent).toEqual([]);
+      // White rolls: a tie waits for White again (no push, White is the
+      // caller); otherwise the first player hears it, unless it is White.
+      const half = await view(t, gameId);
+      await as(t, ALICE).mutation(api.games.rollDice, { gameId, expectedVersion: half.version });
+      await flush(t);
+      const after = await view(t, gameId);
+      if (after.game.phase === 'opening-roll') {
+        expect(push.sent).toEqual([]);
+        // After a tie White rolls first: now the wait moves to Black.
+        await as(t, ALICE).mutation(api.games.rollDice, { gameId, expectedVersion: after.version });
+        await flush(t);
+        expect(push.sent.map((message) => message.to)).toEqual([BOB_TOKEN]);
+        continue;
+      }
+      const first = waiting(after);
+      expect(push.sent.map((message) => message.to)).toEqual(first === 'white' ? [] : [BOB_TOKEN]);
     }
   });
 
@@ -507,10 +541,11 @@ describe('"your turn" pushes', () => {
           messages.map(() => ({ ok: false as const, error: 'Failed' as const, message: 'down' })),
         ),
     });
+    const before = await view(t, gameId);
     await playOneTurn(t, gameId);
     await flush(t);
     const v = await view(t, gameId);
-    expect(v.version).toBe(2);
+    expect(v.version).toBe(before.version + 1);
     expect(await tokens(t)).toEqual([`${ALICE}: ${ALICE_TOKEN}`, `${BOB}: ${BOB_TOKEN}`]);
   });
   it('a time out that starts the next game tells the side it waits for, the same side too', async () => {

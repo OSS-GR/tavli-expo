@@ -41,7 +41,7 @@ import type { Dice, DieValue } from '../dice';
 import { EngineError } from '../errors';
 import { resignGame } from '../match';
 import type { Capture, Destination, Move, Origin, Turn } from '../move';
-import { isPlayerId } from '../player';
+import { isPlayerId, opponent } from '../player';
 import type { PlayerId } from '../player';
 import type { Rng } from '../rng';
 import type { GameState } from '../state';
@@ -122,9 +122,11 @@ export type GameAction =
   | { readonly type: 'resign'; readonly player: PlayerId }
   /**
    * `player` ran out of time (online turn timers, #133). Only the player
-   * the game waits for can time out. The game ends as if they resigned it,
-   * with the reason `timeout`. The flow has no clock: the caller (the
-   * server) decides when time is up.
+   * the game waits for can time out. The other player wins the game for
+   * 1 point (never a diplo, #378), with the reason `timeout`. During the
+   * opening roll only a player who has not rolled while the other has can
+   * time out (#379). The flow has
+   * no clock: the caller (the server) decides when time is up.
    */
   | { readonly type: 'timeout'; readonly player: PlayerId };
 
@@ -268,6 +270,40 @@ function rollOpening(
   return [beginTurn(decided, dice, variant), event];
 }
 
+/**
+ * A time out during the opening roll (online play, #379). Each player
+ * rolls their own opening die. Only a player who has not rolled while the
+ * other has may time out: they lose the game, scored like a resign of
+ * it. The player who rolled counts as the starter, so the match can record
+ * the game. Before anyone rolls, or after a tie, nobody may time out.
+ */
+/**
+ * `player` ran out of time: the other player wins the game. A time out is
+ * always worth 1 point, also where a resign would give a diplo (owner, Q30,
+ * #378). `resignGame` still checks the player and that the game is on.
+ */
+function timeoutResult(flow: GameFlow, player: PlayerId, ctx: FlowContext): GameResult {
+  const resigned = resignGame(flow.state, player, ctx.registry ?? VARIANT_REGISTRY);
+  return { winner: resigned.winner, points: 1, reason: 'timeout' };
+}
+
+function openingTimeout(
+  flow: GameFlow,
+  player: PlayerId,
+  ctx: FlowContext,
+): [GameFlow, GameAction] {
+  const opening = flow.opening;
+  const other = opponent(player);
+  if (opening === null || opening[player] !== null || opening[other] === null) {
+    illegal('the game has not started yet');
+  }
+  const result = timeoutResult(flow, player, ctx);
+  return [
+    { ...flow, starter: other, played: [], phase: 'game-over', result },
+    { type: 'timeout', player },
+  ];
+}
+
 function sameInput(move: Move, input: MoveInput): boolean {
   return (
     move.from === input.from &&
@@ -379,12 +415,11 @@ export function stepGame(
     }
 
     case 'timeout': {
-      if (flow.phase === 'opening-roll') illegal('the game has not started yet');
+      if (flow.phase === 'opening-roll') return openingTimeout(flow, player, ctx);
       const waiting = currentPrompt(flow, ctx)?.player ?? flow.state.toMove;
       if (player !== waiting) illegal(`the game waits for ${waiting}`);
-      // Scored like a resign of this game: the moves of an unfinished turn do not count.
-      const resigned = resignGame(flow.state, player, ctx.registry ?? VARIANT_REGISTRY);
-      const result: GameResult = { ...resigned, reason: 'timeout' };
+      // The moves of an unfinished turn do not count.
+      const result = timeoutResult(flow, player, ctx);
       return [
         { ...flow, played: [], phase: 'game-over', result },
         { type: 'timeout', player },

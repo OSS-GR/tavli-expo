@@ -12,9 +12,14 @@
  * other player's). It waits a moment before it rolls, as a person would
  * (`ONLINE_BOT_ROLL_MS`), and longer after the other player's pass, so
  * their phone shows their dice and the pass card first.
+ *
+ * The opening of a new match (#379): the bot rolls its own opening die
+ * after the same wait, while its die is not in, whatever `waitingFor`
+ * says (either player may roll first). The die comes in a new view.
  */
 import type { BotRunner, Difficulty, GameTransport } from '@tavli/contracts';
 import type { Rng } from '@tavli/engine';
+import { mayRollOpening } from '@tavli/online';
 
 import { startBotTurn, type BotTiming, type BotTurnHandle } from '@/features/bot/botTurn';
 
@@ -84,6 +89,12 @@ export function startOnlineBot(options: OnlineBotOptions): OnlineBot {
   let playing: number | null = null;
   /** How many turns the bot started on each view version. */
   const tries = new Map<number, number>();
+  /** The wait before the bot rolls its opening die (#379). */
+  let openingTimer: ReturnType<typeof setTimeout> | null = null;
+  const stopOpening = () => {
+    if (openingTimer !== null) clearTimeout(openingTimer);
+    openingTimer = null;
+  };
 
   const check = () => {
     if (stopped) return;
@@ -101,7 +112,9 @@ export function startOnlineBot(options: OnlineBotOptions): OnlineBot {
       stop();
       return;
     }
-    if (view.waitingFor !== side || playing === view.version) return;
+    // The bot's opening die (#379): whatever `waitingFor` says.
+    const opening = mayRollOpening(view, side);
+    if ((!opening && view.waitingFor !== side) || playing === view.version) return;
     const tried = tries.get(view.version) ?? 0;
     if (tried >= MAX_TRIES_PER_TURN) {
       // Said once; then the bot waits for a newer view.
@@ -114,8 +127,17 @@ export function startOnlineBot(options: OnlineBotOptions): OnlineBot {
     for (const version of tries.keys()) if (version < view.version) tries.delete(version);
     tries.set(view.version, tried + 1);
     turn?.cancel();
+    stopOpening();
     playing = view.version;
     const dispatch = store.getState().dispatch;
+    if (opening) {
+      // After a person's wait, like a roll. The die comes in a new view.
+      openingTimer = setTimeout(() => {
+        openingTimer = null;
+        if (!stopped) dispatch({ type: 'rollOpening', player: side });
+      }, options.timing?.beforeRollMs ?? ONLINE_BOT_ROLL_MS);
+      return;
+    }
     const last = view.game.lastTurn;
     const afterPass =
       view.game.phase === 'awaiting-roll' &&
@@ -152,6 +174,7 @@ export function startOnlineBot(options: OnlineBotOptions): OnlineBot {
     if (stopped) return;
     stopped = true;
     turn?.cancel();
+    stopOpening();
     unsubscribe();
     store.getState().dispose();
   };
