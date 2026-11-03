@@ -20,6 +20,6 @@
     "convex": "^1.46.0"
   },
   "devDependencies": {
-    "convex": "1.46.0"
+    "convex": "1.48.0"
   }
 }
