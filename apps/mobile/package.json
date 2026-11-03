@@ -31,7 +31,7 @@
     "@tavli/storage-mmkv": "workspace:*",
     "@tavli/themes": "workspace:*",
     "@tavli/ui": "workspace:*",
-    "better-auth": "1.6.33",
+    "better-auth": "1.7.14",
     "convex": "1.46.0",
     "expo": "~58.0.22",
     "expo-application": "~58.1.2",
