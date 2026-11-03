@@ -11,7 +11,8 @@ import './src/i18n';
 // (it follows the opt-in rules); dice come from a fixed seed, so tests are
 // repeatable. The bot is the real inline runner and the real Analyzer (both
 // are pure TypeScript). Online play (`auth`, `games`, `invites`, and the turn
-// notifications `notifications` and `pushTokens`) and the dev games
+// notifications `notifications` and `pushTokens`, the update policy
+// `appUpdates` with this build `appBuild()`) and the dev games
 // (`onlineServer`, `gameTransportFor`, `invitesFor`) share one in-memory sign-in and game
 // server, new for each test (test/onlineFake.ts).
 jest.mock('@/services', () => {
@@ -43,6 +44,8 @@ jest.mock('@/services', () => {
     notifications: onlineFake.notifications,
     pushTokens: onlineFake.pushTokens,
     onlineData: onlineFake.onlineData,
+    appUpdates: onlineFake.appUpdates,
+    appBuild: onlineFake.appBuild,
     onlineServer: onlineFake.server,
     onlinePlayerId: 'me',
     gameTransportFor: onlineFake.transportFor,

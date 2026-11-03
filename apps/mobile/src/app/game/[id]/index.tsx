@@ -35,6 +35,7 @@ import { useTurnPushOffering } from '@/features/notifications/appTurnPushes';
 import { stopDevGame } from '@/features/online/devGame';
 import { OnlineConnect } from '@/features/online/OnlineConnect';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
+import { useOnlineGameShowing } from '@/features/update/updateCheck';
 
 /** Back to Home: pops to it, or opens it when the board was the first screen. */
 function goHome() {
@@ -47,6 +48,11 @@ export default function GameRoute() {
   const focused = useIsFocused();
   // The turn notifications offer (#285) may show over an online game.
   const offering = useTurnPushOffering();
+  const online = id !== null && !isLocalGameId(id);
+  // Update needed (#390) waits while an online game is open: from the
+  // first render, before the game loads, until the board closes (the
+  // match end replaces it).
+  useOnlineGameShowing(online);
   // A dev game vs the bot (#255) stops when its board closes: nobody can
   // open it again. Other games go on, also when this board has no id.
   useEffect(
@@ -56,7 +62,7 @@ export default function GameRoute() {
     [id],
   );
 
-  if (id !== null && !isLocalGameId(id)) {
+  if (online) {
     return (
       <View style={styles.screen}>
         <OnlineConnect gameId={id} onHome={goHome}>

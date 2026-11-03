@@ -1,6 +1,7 @@
-// Online play wiring (#266, #281, #285, #315): built on first use, no guest at start, and
+// Online play wiring (#266, #281, #285, #315, #390): built on first use, no guest at start, and
 // the Jest fake of `@/services` (test/onlineFake.ts).
 import {
+  createMemoryAppUpdates,
   createMemoryAuthProvider,
   createMemoryAuthStore,
   createMemoryPushNotifications,
@@ -17,6 +18,7 @@ import { onlineFake } from '../test/onlineFake';
 
 import { createOnlineServices, once, type OnlineAdapters } from './onlineServices';
 import {
+  appUpdates as servicesAppUpdates,
   auth as servicesAuth,
   games as servicesGames,
   invites as servicesInvites,
@@ -37,6 +39,7 @@ function memoryAdapters() {
   const server = createMemoryGameServer({ rng: createSeededRng(3), now: () => 0 });
   const made: string[] = [];
   const phone = createMemoryPushNotifications('android');
+  const updates = createMemoryAppUpdates();
   const adapters: OnlineAdapters<{ readonly auth: AuthProvider }> = {
     createAuth: (siteUrl) => {
       made.push(`auth ${siteUrl}`);
@@ -89,8 +92,12 @@ function memoryAdapters() {
       made.push('notifications');
       return phone;
     },
+    createAppUpdates: () => {
+      made.push('appUpdates');
+      return updates;
+    },
   };
-  return { adapters, authStore, server, made, phone };
+  return { adapters, authStore, server, made, phone, updates };
 }
 
 /** Waits until the in-memory server has answered (it answers on later microtasks). */
@@ -255,6 +262,19 @@ describe('createOnlineServices', () => {
     await expect(online.onlineData.deleteMyData()).rejects.toMatchObject({ code: 'NOT_SIGNED_IN' });
   });
 
+  it('asks for the update policy on the same client, with nobody signed in (#390)', async () => {
+    const { adapters, made, authStore, updates } = memoryAdapters();
+    const online = createOnlineServices(SERVER, adapters)!;
+    const policy = { minBuild: 13, force: false, updateUrl: null };
+    updates.set('ios', policy);
+    await expect(online.appUpdates.updatePolicy('ios')).resolves.toEqual(policy);
+    expect(made).toEqual([`auth ${SERVER.siteUrl}`, `client ${SERVER.url}`, 'appUpdates']);
+    expect(authStore.guests).toBe(0);
+    // The games reuse the client.
+    online.games.subscribe('game-1', () => {})();
+    expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
+  });
+
   it('passes every sign-in call through', async () => {
     const { adapters } = memoryAdapters();
     const online = createOnlineServices(SERVER, adapters)!;
@@ -280,6 +300,7 @@ describe('the Jest fake of @/services', () => {
     expect(servicesInvites).toBe(onlineFake.invites);
     expect(servicesNotifications).toBe(onlineFake.notifications);
     expect(servicesPushTokens).toBe(onlineFake.pushTokens);
+    expect(servicesAppUpdates).toBe(onlineFake.appUpdates);
   });
 
   it('saves push tokens as the signed-in guest, and refuses them while nobody is signed in', async () => {

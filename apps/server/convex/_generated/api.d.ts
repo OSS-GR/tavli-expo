@@ -9,12 +9,14 @@
  */
 
 import type * as account from "../account.js";
+import type * as appUpdate from "../appUpdate.js";
 import type * as auth from "../auth.js";
 import type * as caller from "../caller.js";
 import type * as games from "../games.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as model_account from "../model/account.js";
+import type * as model_appUpdate from "../model/appUpdate.js";
 import type * as model_cryptoRng from "../model/cryptoRng.js";
 import type * as model_push from "../model/push.js";
 import type * as push from "../push.js";
@@ -27,12 +29,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   account: typeof account;
+  appUpdate: typeof appUpdate;
   auth: typeof auth;
   caller: typeof caller;
   games: typeof games;
   http: typeof http;
   invites: typeof invites;
   "model/account": typeof model_account;
+  "model/appUpdate": typeof model_appUpdate;
   "model/cryptoRng": typeof model_cryptoRng;
   "model/push": typeof model_push;
   push: typeof push;

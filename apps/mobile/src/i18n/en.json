@@ -468,6 +468,11 @@
       "openSettings": "Open phone settings"
     }
   },
+  "update": {
+    "title": "Update needed",
+    "line": "This version no longer works with online play. Update to keep playing.",
+    "button": "Update"
+  },
   "game": {
     "players": {
       "white": "Player 1",

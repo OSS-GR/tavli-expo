@@ -28,6 +28,10 @@
  *   `NOT_SIGNED_IN`, and so does a second call. It leaves `pushTokens`
  *   alone (the app removes its token first, `deleteOnlineData`), and it
  *   does not sign the user out: the app does.
+ * - `appUpdates` is the update policy (#390): it blocks no build until a
+ *   test sets one (`onlineFake.appUpdates.set('ios', …)`). `appBuild()`
+ *   is this build: iOS build `TEST_BUILD`, until a test calls
+ *   `onlineFake.setAppBuild(…)`.
  *
  * A test makes games with `onlineFake.server().createGame(...)`. A new
  * match waits for both opening dice (#379): `onlineFake.openGame(gameId)`
@@ -37,6 +41,7 @@
  * `Date.now`, which the fake timers move.
  */
 import {
+  createMemoryAppUpdates,
   createMemoryAuthProvider,
   createMemoryAuthStore,
   createMemoryPushNotifications,
@@ -49,6 +54,13 @@ import {
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { openMemoryGame } from '@tavli/online/testing';
+
+import type { AppBuild } from '../src/features/update/decision';
+
+/** The build number of the app in Jest (iOS). */
+export const TEST_BUILD = 20;
+
+const DEFAULT_BUILD: AppBuild = { platform: 'ios', build: TEST_BUILD, appId: 'com.tavlaki.dev' };
 
 const NOT_SIGNED_IN: GameTransportErrorData = {
   code: 'NOT_SIGNED_IN',
@@ -67,6 +79,8 @@ const transports = new Map<string, GameTransport>();
 const invitePorts = new Map<string, Invites>();
 const notifications = createMemoryPushNotifications('ios');
 const pushTokens = createMemoryPushTokens(() => auth.currentUser()?.id ?? null);
+const appUpdates = createMemoryAppUpdates();
+let build: AppBuild | null = DEFAULT_BUILD;
 
 /** One transport per player on the current server, like `gameTransportFor` in the app. */
 function transportFor(playerId: string): GameTransport {
@@ -177,6 +191,13 @@ export const onlineFake = {
   notifications,
   pushTokens,
   onlineData,
+  appUpdates,
+  /** This build, like `appBuild()` of `@/services`. */
+  appBuild: (): AppBuild | null => build,
+  /** Sets this build for the rest of the test (`null`: no store build). */
+  setAppBuild: (next: AppBuild | null) => {
+    build = next;
+  },
   /** Where the fake keeps the session. Set `session` to sign a user in at once. */
   authStore,
   /** The in-memory server of the current test. */
@@ -194,7 +215,8 @@ export const onlineFake = {
 
 /**
  * A new server, no cached transports or invite ports, nobody signed in,
- * notifications not asked yet and no saved push token.
+ * notifications not asked yet, no saved push token, no update policy and
+ * the default build.
  */
 export function resetOnlineFake(): void {
   authStore.session = null;
@@ -204,4 +226,6 @@ export function resetOnlineFake(): void {
   invitePorts.clear();
   notifications.reset();
   pushTokens.reset();
+  appUpdates.reset();
+  build = DEFAULT_BUILD;
 }

@@ -15,6 +15,8 @@
 import type { AuthProvider, AuthUser } from '@tavli/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { checkAppUpdate } from '@/features/update/updateCheck';
+
 import { forgetOnlineAccount, rememberOnlineAccount } from './accountHint';
 
 /**
@@ -25,6 +27,8 @@ import { forgetOnlineAccount, rememberOnlineAccount } from './accountHint';
 export async function signInForOnline(auth: AuthProvider): Promise<AuthUser> {
   const user = (await auth.ready()) ?? (await auth.signInAsGuest());
   rememberOnlineAccount();
+  // Update needed (#390): this build may be too old for the server.
+  void checkAppUpdate();
   return user;
 }
 
@@ -98,7 +102,10 @@ export function useOnlineAccount(auth: AuthProvider): {
     let live = true;
     auth.ready().then(
       (user) => {
-        if (user !== null) rememberOnlineAccount();
+        if (user !== null) {
+          rememberOnlineAccount();
+          void checkAppUpdate();
+        }
         if (live) setAccount(user === null ? { status: 'signedOut' } : signedIn(user));
       },
       () => {

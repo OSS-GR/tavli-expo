@@ -3,7 +3,9 @@
  *
  * Every public query and mutation (`games.ts`, `invites.ts`, `push.ts`,
  * `account.ts`) gets the player id here. No call takes a player id as an
- * argument.
+ * argument. The one exception is `updatePolicy` (`appUpdate.ts`, #390):
+ * an old build must learn it is too old with no session, and that query
+ * reads only env vars, nothing about players.
  *
  * The player id is the token's `subject`. Better Auth sets it to the
  * user's id in its component tables, so it stays the same for a user,

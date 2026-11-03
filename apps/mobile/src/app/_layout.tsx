@@ -14,6 +14,7 @@ import { usePushTaps } from '@/features/notifications/pushTaps';
 import { TurnPushPrompt } from '@/features/notifications/TurnPushPrompt';
 import { needsWelcome } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
+import { UpdateGate } from '@/features/update/UpdateGate';
 import { useBoardStep } from '@/features/welcome/boardStepStore';
 import { useLanguageSync } from '@/i18n/useLanguageSync';
 import { crashReporter, notifications } from '@/services';
@@ -110,6 +111,8 @@ function RootStack() {
       </Stack>
       {/* Turn notifications (#285): offered after an async invite, over any screen. */}
       {pushes === undefined ? null : <TurnPushPrompt pushes={pushes} />}
+      {/* Update needed (#390): over everything, also the offer above. */}
+      <UpdateGate />
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
     </GestureHandlerRootView>
   );

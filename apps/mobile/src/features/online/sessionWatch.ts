@@ -9,6 +9,8 @@
 import type { AuthProvider, AuthUser } from '@tavli/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
+import { checkAppUpdate } from '@/features/update/updateCheck';
+
 import { forgetOnlineAccount } from './accountHint';
 
 export type SessionWatchState<Loaded extends object> =
@@ -87,6 +89,8 @@ export function useSessionWatch<Value, Loaded extends object>(
         setState({ status: 'signedOut' });
         return;
       }
+      // Update needed (#390): this build may be too old for the server.
+      void checkAppUpdate();
       // Another user's list is not this user's: load it from scratch. A
       // retry keeps the old list of the same user until the new one comes.
       setState((last) => (switched || last.status !== 'loaded' ? { status: 'loading' } : last));

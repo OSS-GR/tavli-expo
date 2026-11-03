@@ -1,6 +1,6 @@
 /**
  * References to the Convex functions in `apps/server/convex/games.ts`,
- * `invites.ts`, `push.ts` and `account.ts`, by name. The adapter does not import the generated `api`
+ * `invites.ts`, `push.ts`, `account.ts` and `appUpdate.ts`, by name. The adapter does not import the generated `api`
  * of `apps/server`: that would pull the server code (and Better Auth) into
  * the app's type check, and `apps/server` already depends on this package
  * for its tests.
@@ -9,13 +9,16 @@
  * against its `api` (`convex/convexTransport.test.ts` for the games,
  * `convex/convexInvites.test.ts` for the invites,
  * `convex/convexPushTokens.test.ts` for the push tokens,
- * `convex/convexOnlineData.test.ts` for the delete), so a rename
+ * `convex/convexOnlineData.test.ts` for the delete,
+ * `convex/convexAppUpdates.test.ts` for the update policy), so a rename
  * there fails a test.
  */
 import { makeFunctionReference } from 'convex/server';
 import type { FunctionReference } from 'convex/server';
 
 import type {
+  AppPlatform,
+  AppUpdatePolicy,
   GameSummary,
   GameTransportErrorData,
   InviteView,
@@ -170,4 +173,23 @@ export const ACCOUNT_FUNCTION_NAMES = {
 
 export const ACCOUNT_FUNCTIONS: AccountFunctions = {
   deleteMyAccount: makeFunctionReference(ACCOUNT_FUNCTION_NAMES.deleteMyAccount),
+};
+
+/** The update policy in `apps/server/convex/appUpdate.ts` (#390). It needs no sign-in. */
+export interface AppUpdateFunctions {
+  readonly updatePolicy: FunctionReference<
+    'query',
+    'public',
+    { platform: AppPlatform },
+    AppUpdatePolicy
+  >;
+}
+
+/** The Convex function names (`module:function`) of the update policy. */
+export const APP_UPDATE_FUNCTION_NAMES = {
+  updatePolicy: 'appUpdate:updatePolicy',
+} as const satisfies { readonly [K in keyof AppUpdateFunctions]: string };
+
+export const APP_UPDATE_FUNCTIONS: AppUpdateFunctions = {
+  updatePolicy: makeFunctionReference(APP_UPDATE_FUNCTION_NAMES.updatePolicy),
 };

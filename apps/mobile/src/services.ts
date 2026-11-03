@@ -9,6 +9,7 @@ import { createPostHogAnalytics } from '@tavli/analytics-posthog';
 import { createExpoSoundPlayer } from '@tavli/audio-expo';
 import { createBetterAuthProvider, createSecureSessionStorage } from '@tavli/auth-better-auth';
 import {
+  createConvexAppUpdates,
   createConvexClient,
   createConvexGameTransport,
   createConvexInvites,
@@ -20,6 +21,7 @@ import {
   createNoopAnalytics,
   createNoopCrashReporter,
   type Analytics,
+  type AppUpdates,
   type AuthProvider,
   type BotRunner,
   type CrashReporter,
@@ -38,6 +40,7 @@ import { createExpoFeedback } from '@tavli/haptics-expo';
 import { createExpoPushNotifications } from '@tavli/notifications-expo';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { createMmkvStorage } from '@tavli/storage-mmkv';
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { t } from 'i18next';
 import { Platform } from 'react-native';
@@ -45,6 +48,7 @@ import { Platform } from 'react-native';
 import { APP_SCHEME, convexServer } from '@/convexUrl';
 import { botLevelsByGame } from '@/features/bot/levels';
 import type { GameLevels } from '@/features/match/setup';
+import { readAppBuild, type AppBuild } from '@/features/update/decision';
 import { createOnlineServices } from '@/onlineServices';
 
 export const storage: Storage = createMmkvStorage({ id: 'tavlaki' });
@@ -154,6 +158,7 @@ const online = createOnlineServices(convexServer(), {
   createInvites: (client) => createConvexInvites({ client }),
   createPushTokens: (client) => createConvexPushTokens({ client }),
   createOnlineData: (client) => createConvexOnlineData({ client }),
+  createAppUpdates: (client) => createConvexAppUpdates({ client }),
   createNotifications: () =>
     createExpoPushNotifications({
       platform: Platform.OS === 'android' ? 'android' : 'ios',
@@ -197,6 +202,23 @@ export const pushTokens: PushTokens | undefined = online?.pushTokens;
  * (`features/online/deleteData.ts`).
  */
 export const onlineData: OnlineData | undefined = online?.onlineData;
+
+/**
+ * The update policy (#390), on the same client as `games`. It needs no
+ * sign-in. Only `checkAppUpdate` (`features/update/updateCheck.ts`) calls
+ * it, and only where the app already talks to the server.
+ */
+export const appUpdates: AppUpdates | undefined = online?.appUpdates;
+
+/**
+ * This build (#390): the phone system, the store build number and the app
+ * id, read from the native app (expo-application). `null` on the web, or
+ * when the build number is not a whole number: then the app never shows
+ * "Update needed".
+ */
+export function appBuild(): AppBuild | null {
+  return readAppBuild(Platform.OS, Application.nativeBuildVersion, Application.applicationId);
+}
 
 /**
  * Dev games (#255): one in-memory server for this app run (`@tavli/online`,
