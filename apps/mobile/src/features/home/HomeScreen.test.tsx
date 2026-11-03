@@ -79,6 +79,19 @@ describe('<HomeScreen />', () => {
     await user.press(friend);
     expect(screen.getByTestId('toast')).toHaveTextContent('Coming soon: play friends online.');
     expect(props.onNewGame).not.toHaveBeenCalled();
+    // No online play: no way to join with a code either.
+    expect(screen.queryByTestId('home-join')).toBeNull();
+  });
+
+  it('opens Join with a code when online play is on (#333)', async () => {
+    const user = userEvent.setup();
+    const onJoinWithCode = jest.fn();
+    await render(<HomeScreen {...setup()} onJoinWithCode={onJoinWithCode} />);
+
+    await user.press(
+      screen.getByRole('button', { name: 'Join with a code, Got a code from a friend?' }),
+    );
+    expect(onJoinWithCode).toHaveBeenCalledTimes(1);
   });
 
   it('hides the Continue card when there is no saved game, and shows one when given', async () => {

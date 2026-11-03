@@ -5,8 +5,9 @@
  * Top to bottom: the logo and Settings, a greeting, then a big hero card
  * with a board picture. The hero is the saved game ("Continue game") or,
  * with no save, "Play vs bot". Then your online games and invites, the
- * "Learn to play" banner, the other play modes as tiles, and How to play
- * and History as pills.
+ * "Learn to play" banner, the other play modes as tiles ("Join with a
+ * code" under "Play a friend" when online play is on, #333), and How to
+ * play and History as pills.
  */
 import type { Difficulty } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
@@ -42,6 +43,11 @@ export interface HomeScreenProps {
    * online server) the tile shows "Coming soon".
    */
   onPlayFriend?: () => void;
+  /**
+   * Opens "Join with a code" (#333). The tile shows only with it (a build
+   * with an online server).
+   */
+  onJoinWithCode?: () => void;
   /** The bot levels this build can play, easiest first (the "Play vs bot" subtitle). */
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). It takes the hero's place. */
@@ -64,6 +70,7 @@ export function HomeScreen({
   onHowToPlay,
   onHistory,
   onPlayFriend,
+  onJoinWithCode,
   botLevels,
   continueCard,
   onlineGames,
@@ -179,6 +186,16 @@ export function HomeScreen({
               />
             )}
           </View>
+          {onJoinWithCode ? (
+            <ModeTile
+              testID="home-join"
+              wide
+              icon="keyboard"
+              title={t('home.join.title')}
+              subtitle={t('home.join.subtitle')}
+              onPress={onJoinWithCode}
+            />
+          ) : null}
         </View>
 
         <View style={styles.footer}>

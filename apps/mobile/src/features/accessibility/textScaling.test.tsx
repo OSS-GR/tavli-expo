@@ -5,7 +5,8 @@
  * (#215) with its switch (#230), History (#142), the tutorial's mother
  * card (#149), the Settings game picker (#159) and the online game
  * screen with its opening card (#379), game-end sheet and match end (#255) and the invite
- * screen (#256), Play a friend online with its waiting screen (#281), and
+ * screen (#256), Play a friend online with its waiting screen (#281), Join
+ * with a code (#333), and
  * your online games on Home and "See all" (#297) and in History (#313),
  * your invites on Home (#314), and the board step of the first launch
  * (#350) follow the font size with no cut text. The game screen, its cards and
@@ -44,6 +45,7 @@ import { LearnCard } from '@/features/home/LearnCard';
 import { FriendSetupScreen } from '@/features/invites/FriendSetupScreen';
 import { InviteScreen } from '@/features/invites/InviteScreen';
 import { InviteWaitScreen } from '@/features/invites/InviteWaitScreen';
+import { JoinCodeScreen } from '@/features/invites/JoinCodeScreen';
 import { createGameStore, type GameStore } from '@/features/game/gameStore';
 import { GameScreen, OPENING_RESULT_MS } from '@/features/game/GameScreen';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
@@ -150,6 +152,8 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
         onSettings={jest.fn()}
         onHowToPlay={jest.fn()}
         onHistory={jest.fn()}
+        onPlayFriend={jest.fn()}
+        onJoinWithCode={jest.fn()}
         botLevels={['easy', 'medium']}
         continueCard={
           <ContinueCard
@@ -160,6 +164,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
         learnCard={<LearnCard onStart={jest.fn()} onDismiss={jest.fn()} />}
       />,
     );
+    expect(screen.getByTestId('home-join')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   });
 
@@ -623,6 +628,18 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       <InviteWaitScreen code={expired} me="me" invites={server.invitesFor('me')} {...props} />,
     );
     expect(await screen.findByTestId('invite-wait-again')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
+
+  it('join with a code, with a problem line (#333)', async () => {
+    await renderWithRoot(<JoinCodeScreen onCode={jest.fn()} onBack={jest.fn()} />);
+    await act(async () => {
+      fireEvent.changeText(screen.getByTestId('join-code-input'), 'ABCD234');
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('join-continue'));
+    });
+    expect(screen.getByTestId('join-problem')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   });
 

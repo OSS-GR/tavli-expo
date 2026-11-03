@@ -61,6 +61,9 @@ export function inviteHref(code: string) {
 /** Play a friend online (#281): pick the game, then make an invite. */
 export const FRIEND_HREF = '/friend';
 
+/** Join with a code (#333): type the code of a friend's invite. */
+export const JOIN_HREF = '/join';
+
 /** Every active online game of this phone's account (#297): "See all" on Home. */
 export const ONLINE_GAMES_HREF = '/online-games';
 

@@ -11,6 +11,7 @@ import { LearnCard } from '@/features/home/LearnCard';
 import { matchSessions } from '@/features/match/appSessions';
 import {
   FRIEND_HREF,
+  JOIN_HREF,
   ONLINE_GAMES_HREF,
   gameHref,
   inviteWaitHref,
@@ -115,6 +116,7 @@ export default function HomeRoute() {
       onHistory={() => router.push('/history')}
       // Online play needs the server: a build without one shows "Coming soon".
       onPlayFriend={invites === undefined ? undefined : () => router.push(FRIEND_HREF)}
+      onJoinWithCode={invites === undefined ? undefined : () => router.push(JOIN_HREF)}
     />
   );
 }

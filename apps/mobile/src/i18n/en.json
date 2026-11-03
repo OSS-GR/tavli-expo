@@ -35,6 +35,10 @@
       "subtitle": "Online",
       "soon": "Coming soon: play friends online."
     },
+    "join": {
+      "title": "Join with a code",
+      "subtitle": "Got a code from a friend?"
+    },
     "howToPlay": "How to play",
     "history": "History",
     "continue": {
@@ -396,7 +400,7 @@
       "code": "Code",
       "link": "Link",
       "share": "Share the invite",
-      "shareMessage": "Play tavli with me on Tavlaki. Open this link to join: {{link}} (code {{code}})",
+      "shareMessage": "Play tavli with me on Tavlaki. Open this link to join: {{link}}\nOr open Tavlaki, tap Join with a code and enter {{code}}.",
       "status": "Waiting for your friend…",
       "stay": "You can close this screen: your open invites are on Home. The invite stays open for 24 hours.",
       "cancel": "Cancel the invite",
@@ -432,6 +436,20 @@
     },
     "again": "Make a new invite",
     "home": "Home"
+  },
+  "join": {
+    "title": "Join with a code",
+    "intro": "Type the code from your friend's invite. It has {{length}} letters and digits. You can also paste the whole message or the link.",
+    "label": "Invite code",
+    "placeholder": "For example ABCD2345",
+    "hint": "Letters and digits. A code has no 0, O, 1, I or L.",
+    "continue": "Continue",
+    "problem": {
+      "short": "The code is too short. A code has {{length}} characters.",
+      "long": "The code is too long. A code has {{length}} characters.",
+      "characters": "This is not a code. A code has only Latin letters and digits, with no 0, O, 1, I or L.",
+      "link": "This link has no invite code. Check the link, or type the code."
+    }
   },
   "notifications": {
     "channel": "Your turn",

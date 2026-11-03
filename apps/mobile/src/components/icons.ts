@@ -191,6 +191,20 @@ export const ICONS = {
       'M18 2H6v7a6 6 0 0 0 12 0V2Z',
     ],
   },
+  // Join with a code (#333).
+  keyboard: {
+    strokes: [
+      'M10 8h.01',
+      'M12 12h.01',
+      'M14 8h.01',
+      'M16 12h.01',
+      'M18 8h.01',
+      'M6 8h.01',
+      'M7 16h10',
+      'M8 12h.01',
+      roundRect(2, 4, 20, 16, 2),
+    ],
+  },
 } as const satisfies Record<string, IconShape>;
 
 export type IconName = keyof typeof ICONS;

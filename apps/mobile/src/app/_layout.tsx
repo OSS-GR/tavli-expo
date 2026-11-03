@@ -95,6 +95,8 @@ function RootStack() {
           {/* Play a friend online (#281): the setup, then the waiting screen. */}
           <Stack.Screen name="friend/index" />
           <Stack.Screen name="friend/[code]" />
+          {/* Join with a code (#333): opens the invite route above. */}
+          <Stack.Screen name="join" />
           {/* Your online games (#297): "See all" on Home. */}
           <Stack.Screen name="online-games" options={{ headerShown: true }} />
         </Stack.Protected>
