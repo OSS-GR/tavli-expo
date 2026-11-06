@@ -10,12 +10,26 @@ from Metro, because they open dev routes (`tavlaki://dev/race`).
 | `fast-forward-stop.yaml` | **Stop** gives the board back: Roll, or Undo and Confirm.                                                                                                                                               |
 
 Each flow starts from a clean install (`clearState`), opens the dev build
-on Metro, answers the first-launch steps (`subflows/welcome.yaml`, with
-**Don't allow**) and opens `tavlaki://dev/race`. That dev route starts a
+on Metro, closes the dev menu tip, answers the first-launch steps
+(`subflows/welcome.yaml`, with **Don't allow**) and opens
+`tavlaki://dev/race`. Right after the first load a tap can be lost, so the
+first welcome step is tapped again until the next one shows. That dev route starts a
 vs-bot match and lets the bot play both sides until the game is a race
 with you to roll (`features/match/devRace.ts`).
 
 ## Run them on the iOS simulator
+
+**One step** (a Mac with Xcode, Java 17 and the repo installed): pass the
+dev build from `eas build --platform ios --profile development-simulator`
+(its `.tar.gz` or the `.app`). The script boots a simulator, installs the
+build, starts Metro, installs Maestro when it is missing, runs both flows
+and keeps the logs and screenshots in the out folder:
+
+```bash
+apps/mobile/.maestro/run-ios.sh TavlakiDev.tar.gz /tmp/maestro-out
+```
+
+**By hand:**
 
 1. Build and install the dev build once: `npx expo run:ios` in `apps/mobile`
    (or `eas build --platform ios --profile development-simulator`).

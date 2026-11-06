@@ -1,17 +1,28 @@
 # The first-launch steps: language, consent (Don't allow), board.
+# Right after the first load a tap can be lost, so the first step is tapped
+# again until the next one shows.
 appId: com.tavlaki.dev
 ---
-- tapOn:
-    id: welcome-language-continue
-- extendedWaitUntil:
-    visible:
-      id: welcome-consent-deny
-    timeout: 20000
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: welcome-consent-deny
+    commands:
+      - tapOn:
+          id: welcome-language-continue
+          optional: true
+      - waitForAnimationToEnd:
+          timeout: 2000
+- assertVisible:
+    id: welcome-consent-deny
 - tapOn:
     id: welcome-consent-deny
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: welcome-board-continue
     timeout: 20000
 - tapOn:
     id: welcome-board-continue
+    retryTapIfNoChange: true

@@ -22,3 +22,7 @@ appId: com.tavlaki.dev
       visible: .*developer menu.*
     commands:
       - tapOn: Continue
+# The first load is busy for a moment (the dev menu, DevTools): taps sent
+# right away can be lost.
+- waitForAnimationToEnd:
+    timeout: 5000
