@@ -11,7 +11,7 @@ env:
 - runFlow: subflows/open-race.yaml
 - assertVisible:
     id: roll-button
-- assertVisible: Fast forward
+- assertVisible: "Fast forward.*"
 - takeScreenshot: 01-race-fast-forward-offered
 - tapOn:
     id: fast-forward-button
