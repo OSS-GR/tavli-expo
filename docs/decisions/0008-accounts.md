@@ -1,6 +1,6 @@
 # ADR-0008: Sign-in methods and account rules
 
-- **Status:** Proposed (the owner settled each point on 2026-11-06; accepted by merging the PR that adds it)
+- **Status:** Accepted (the owner settled each point on 2026-11-06; accepted by merging #408)
 - **Date:** 2026-11-06
 - **Issue:** #395 (epic #44)
 
