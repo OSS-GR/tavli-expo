@@ -1,6 +1,7 @@
 # ADR-0004: Backend, realtime, auth, and push vendors
 
 - **Status:** Accepted (owner chose Convex on 2026-10-26; accepted by merging the PR that adds it)
+- **Note:** items 6 (sign-in methods) and 8 (email) are replaced by [ADR-0008](0008-accounts.md).
 - **Date:** 2026-10-26
 - **Issue:** #7
 
