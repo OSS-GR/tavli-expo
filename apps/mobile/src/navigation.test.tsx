@@ -788,6 +788,20 @@ describe('online games (#255)', () => {
     expect(onlineFake.authStore.guests).toBe(0);
   });
 
+  it('dev race: the board opens in a race, and Fast forward plays the game to its end', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/dev/race' });
+    expect(
+      await screen.findByTestId('fast-forward-button', {}, { timeout: 30_000 }),
+    ).toBeOnTheScreen();
+    expect(router.getPathname()).toMatch(/^\/game\/local-/);
+    // A real saved match: Home would show Continue.
+    expect(matchSessions.current()).not.toBeNull();
+    await user.press(screen.getByTestId('fast-forward-button'));
+    expect(screen.getByTestId('fast-forward-status')).toBeOnTheScreen();
+    expect(await screen.findByTestId('game-end-card', {}, { timeout: 300_000 })).toBeOnTheScreen();
+  });
+
   it('stops the dev game (bot and turn timers) when its board closes', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });

@@ -910,6 +910,18 @@ interface MatchFlow {
   resignations that replay to the same JSON, with and without dice in the
   log. `src/testing/random-flow.ts` picks the random actions.
 
+## Race
+
+`isRace(state)` (`src/race.ts`) is true when no checker can ever hit, pin
+or block an opponent checker again: the app's Fast forward
+(`docs/rules/tavli-match.md`, "Fast forward a race"). Contrary games: every
+checker has passed every opponent checker. Fevga: no opponent checker
+stands in front of either side's last checker. Never with a checker on the
+bar, still to enter (Asodio) or pinned. `isRaceBoard(board, direction)`
+does the same for a bare board. Tests: `src/race.test.ts` (edge cases
+23–28) and, in the bot, `race-contact.test.ts` (it agrees with each
+evaluator's own contact check).
+
 ## Not here yet
 
 - Asodio `nominateBlot` and `complementaryDoubles` (throw `NOT_SUPPORTED`).

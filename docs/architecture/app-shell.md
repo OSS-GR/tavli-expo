@@ -179,6 +179,18 @@ The player's past local matches and simple stats, offline. Finished online match
 - During the bot turn the board takes no touches and the controls row is a locked box: "Bot's turn…", then "Bot rolled 4-2 and is moving…". The bot's dice lie on the board (#184).
 - Opening roll vs bot: one tap rolls both dice. A bot that cannot move shows the pass card for 3.5 s, or until you tap OK ("Bot cannot move. Your turn." in the wireframe). Your own pass card waits for OK; the bot starts its turn after that (#178).
 
+## Fast forward a race
+
+Owner request (2026-11-06): skip the dull end of a game vs the bot. The rule is in [tavli-match.md, "Fast forward a race (app rule)"](../rules/tavli-match.md#fast-forward-a-race-app-rule).
+
+- **When.** Vs the bot, on your roll, when the game is a race: no checker can ever hit, pin or block an opponent checker again (`isRace` in `@tavli/engine`: every checker has passed every opponent checker; never with a checker on the bar, still to enter or pinned). Then **Fast forward** («Γρήγορη προώθηση») sits next to Roll. Not in pass-and-play, not online.
+- **What it does.** The bot plays both sides to the end of the game: your side at the strongest level of the game (`botLevels[game]`, the last one), its own side at its own level. It is the same bot turn (`startBotTurn`) for the side that acts (`autoSide` in `GameScreen`), with `FAST_FORWARD_TIMING` (`features/bot/botSpeed.ts`): about 1 s per turn. The dice show at rest (no throw over the board), every pass card closes by itself after `FAST_FORWARD_PASS_MS` (1.2 s), and the bot answers your questions too (the Acey-Deucey double). The controls row shows "Fast forward…" and **Stop**.
+- **Stop** gives you the board back at once. A turn of yours that it had begun is yours to finish; the bot ends its own turn at its own speed. You can start it again on your next roll.
+- **It ends with the game.** The state is keyed by the match and the game (`fastForwardKey`), so the game-end sheet shows as usual and the next game starts without it. The menu and Settings pause it, like the bot.
+- **Review.** The turns it played for you are not yours: `GameScreen` reports the log index of each roll or answer it made for you (`bot.fastForward.onAutoEvent`), the game store keeps them in memory (`autoEvents`, a rematch clears them), and the review leaves those turns out (`lastGameTurns(flow, players, skipped)`). A saved match forgets them.
+- **Screen readers** hear one line when it starts ("Fast forward. The bot plays both sides to the end of the game."), not every roll and move; then the game-end sheet.
+- **Tests:** `GameScreen.fastForward.test.tsx`; the Maestro flows in `apps/mobile/.maestro/` (open the dev route `tavlaki://dev/race`, see [Running the app](../process/running-the-app.md)).
+
 ## In-game menu and resign
 
 - The menu button sits left of the top strip (tall layout), or alone at the top left next to the game label (classic layout, #184). The menu is a bottom sheet (`components/Sheet.tsx`, a React Native `Modal`): Resign game, Resign match, How to play, Settings, Exit to home, Resume.
