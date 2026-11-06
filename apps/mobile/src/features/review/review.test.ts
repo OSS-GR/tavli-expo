@@ -84,6 +84,20 @@ describe('lastGameTurns', () => {
     expect(turns[0]!.state.turnNumber).toBe(1);
   });
 
+  it('leaves out the turns whose roll a fast forward made', () => {
+    const flow = oneBadTurn();
+    const rolls = flow.log.flatMap((e, i) => (e.type === 'roll' ? [i] : []));
+    // White rolls first: skip White's second roll.
+    const skipped = [rolls[2]!];
+    const white = lastGameTurns(flow, ['white'], skipped);
+    expect(white).toHaveLength(ROLLS.length / 2 - 1);
+    expect(white.map((t) => t.state.turnNumber)).not.toContain(3);
+    // An index that names no roll changes nothing.
+    expect(lastGameTurns(flow, ['white'], [0])).toHaveLength(ROLLS.length / 2);
+    // Every roll skipped: nothing left to review.
+    expect(reviewGame(flow, ['white'], testAnalyzer, rolls)).toEqual([]);
+  });
+
   it('is empty for a log with no start event', () => {
     expect(lastGameTurns({ ...oneBadTurn(), log: [] }, ['white'])).toEqual([]);
   });

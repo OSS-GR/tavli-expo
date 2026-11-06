@@ -69,6 +69,22 @@ describe('createGameStore', () => {
     expect(store.getState().lastError).toMatch(/phase/);
   });
 
+  it('keeps the fast forward marks once each, and a rematch drops them', () => {
+    const store = createGameStore({
+      players: { white: 'Ann', black: 'Bob' },
+      rng: createSeededRng(1),
+    });
+    expect(store.getState().autoEvents).toEqual([]);
+    store.getState().markAutoEvent(4);
+    store.getState().markAutoEvent(9);
+    store.getState().markAutoEvent(4);
+    expect(store.getState().autoEvents).toEqual([4, 9]);
+    // A rematch needs a finished match.
+    store.getState().dispatch({ type: 'resignMatch', player: 'black' });
+    store.getState().rematch();
+    expect(store.getState().autoEvents).toEqual([]);
+  });
+
   it('keeps a played move, a new match and a rematch when analytics throws', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const boom = () => {

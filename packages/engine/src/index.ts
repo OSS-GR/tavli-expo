@@ -117,6 +117,8 @@ export type {
   RecordGameOptions,
 } from './match';
 
+export { isRace, isRaceBoard } from './race';
+
 export { validateBoard, validateGameState } from './validate';
 export {
   parseGameState,

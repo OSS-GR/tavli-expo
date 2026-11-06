@@ -1,0 +1,11 @@
+# Opens a vs-bot match that is already a race, you to roll (dev route).
+appId: com.tavlaki.dev
+---
+- openLink: tavlaki://dev/race
+- tapOn:
+    text: Open
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: fast-forward-button
+    timeout: 60000

@@ -68,6 +68,13 @@
  * store and shows the result. Vs bot, the bot's turn runs here too
  * (`startBotTurn`), so its moves fly like a human's.
  *
+ * Fast forward a race (`bot.fastForward`, `docs/rules/tavli-match.md`):
+ * once no checker can touch an opponent checker again (`isRace`), your
+ * Roll comes with a Fast forward button. Then the bot plays both sides
+ * with `FAST_FORWARD_TIMING` until the game ends: the dice show at rest
+ * (no throw), every pass card closes by itself, and Stop gives you the
+ * board back. Your turns it plays are marked (`onAutoEvent`) for the review.
+ *
  * The dice throw (#183): every roll — swipe, tap on the board, Roll button,
  * the bot, the other player online — plays the throw over the board (`BoardThrow`), and the dice row
  * waits hidden until it ends, then shows the roll without a second tumble.
@@ -78,6 +85,7 @@ import type { BotRunner, Difficulty } from '@tavli/contracts';
 import {
   applyMoveToBoard,
   currentPrompt,
+  isRace,
   type GameRecord,
   type MatchFlow,
   type Move,
@@ -130,7 +138,7 @@ import { boxRatioWithShadow, type BoardGeometry } from '@/features/board/geometr
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
 import { boardModeOf, useScreenLayout } from '@/features/board/screenLayout';
 import { useDoubleReveal } from '@/features/board/useDoubleReveal';
-import { startBotTurn, type BotTiming } from '@/features/bot/botTurn';
+import { FAST_FORWARD_TIMING, startBotTurn, type BotTiming } from '@/features/bot/botTurn';
 import { BoardThrow, type ThrowSwipe } from '@/features/dice-throw/BoardThrow';
 import { bestRest, hintHasChoice } from '@/features/hint/hint';
 import { hintShortText, hintSpokenText } from '@/features/hint/hintText';
@@ -172,6 +180,8 @@ export const OPENING_TIE_WAIT_MS = 1000;
  * this time (OK closes it sooner). A person's own pass card waits for OK (#178).
  */
 export const BOT_PASS_NOTICE_MS = 3500;
+/** During a fast forward every pass card closes by itself after this time (OK closes it sooner). */
+export const FAST_FORWARD_PASS_MS = 1200;
 /** "Bot plays on." (the bot's answer to the mother question) shows this long. */
 export const BOT_ANSWER_NOTE_MS = 2000;
 /** The final position stays on screen this long before the match-end screen opens. */
@@ -193,6 +203,21 @@ export interface BotSeat {
   /** A UI RNG for think time and bot seeds. Never the dice RNG. */
   readonly rng: Rng;
   readonly timing?: Partial<BotTiming>;
+  /** Fast forward a race (see the top of this file). Without it there is no Fast forward button. */
+  readonly fastForward?: FastForwardSeat;
+}
+
+/** How the bot fast forwards a race for both sides. */
+export interface FastForwardSeat {
+  /** The level that plays the person's side: the strongest one in this game. */
+  readonly difficulty: Difficulty;
+  /** On top of `FAST_FORWARD_TIMING`, for both sides (tests). */
+  readonly timing?: Partial<BotTiming>;
+  /**
+   * Fast forward rolled or answered for the person: the log index of that
+   * event. The review leaves that turn out (`GameStoreState.autoEvents`).
+   */
+  readonly onAutoEvent?: (logIndex: number) => void;
 }
 
 /**
@@ -328,6 +353,13 @@ export function GameScreen({
   const botPlayer = bot?.player ?? null;
   // Online (#255): your side. The other side plays on another phone.
   const me = online?.me ?? null;
+  // Fast forward a race: the bot plays both sides to the end of this game.
+  // Keyed by the game, so it ends with it; Stop clears it.
+  const fastForwardSeat = online === undefined ? (bot?.fastForward ?? null) : null;
+  const [fastForwardKey, setFastForwardKey] = useState<string | null>(null);
+  const raceKey = `${matchKey}:${gameKey}`;
+  const fastForwarding =
+    fastForwardSeat !== null && fastForwardKey === raceKey && view.matchPhase === 'playing';
   // Sound and haptics: moves, rolls and wins play by themselves (from the engine
   // log). Vs the bot only the person's side counts, so a bot win plays no jingle.
   // Online only your side counts, and the server's views play the other
@@ -353,12 +385,15 @@ export function GameScreen({
   // Not while paused: the menu covers the card.
   const botPassed =
     pass !== null && (pass.player === botPlayer || (me !== null && pass.player !== me));
+  // During a fast forward every pass card closes by itself, and soon.
+  const passClosesItself = botPassed || fastForwarding;
+  const passMs = fastForwarding ? FAST_FORWARD_PASS_MS : BOT_PASS_NOTICE_MS;
   // Keyed on the pass, not the notice object (a new one on each render).
   useEffect(() => {
-    if (!showPass || !botPassed || passKey === null || paused) return;
-    const timer = setTimeout(() => setPassDismissed(passKey), BOT_PASS_NOTICE_MS);
+    if (!showPass || !passClosesItself || passKey === null || paused) return;
+    const timer = setTimeout(() => setPassDismissed(passKey), passMs);
     return () => clearTimeout(timer);
-  }, [showPass, botPassed, passKey, paused]);
+  }, [showPass, passClosesItself, passKey, paused, passMs]);
 
   // Pass-and-play "flip": the player to move sits at the bottom. While the
   // pass card shows, the board stays with the player who passed.
@@ -423,7 +458,11 @@ export function GameScreen({
   // Online, only your own questions show here.
   const prompt = view.matchPhase === 'playing' ? currentPrompt(game) : null;
   const askHuman =
-    prompt !== null && prompt.player !== botPlayer && (me === null || prompt.player === me);
+    prompt !== null &&
+    prompt.player !== botPlayer &&
+    (me === null || prompt.player === me) &&
+    // A fast forward answers for you too.
+    !fastForwarding;
   // House rule `chosenStarterRolls` (#207): a card asks who starts. In
   // pass-and-play either player picks; vs the bot, the human does.
   const choosing = view.matchPhase === 'playing' && isChoosingStarter(game);
@@ -456,8 +495,27 @@ export function GameScreen({
   // Online: the server waits for the other player, or your call is on its way.
   const remoteStatus =
     online !== undefined && online.locked && view.matchPhase === 'playing' ? online.status : null;
-  // The bot or the remote player has the board: your touches do nothing.
-  const othersTurn = botsTurn || remoteStatus !== null;
+  // The side the bot plays now: its own, or during a fast forward the side
+  // that acts (the player a question asks, else the player to move).
+  const autoSide: PlayerId | null =
+    fastForwarding && phase !== 'opening-roll'
+      ? (prompt?.player ?? view.toMove)
+      : botsTurn
+        ? botPlayer
+        : null;
+  // The bot (also for you, in a fast forward) or the remote player has the
+  // board: your touches do nothing.
+  const othersTurn = botsTurn || fastForwarding || remoteStatus !== null;
+  // Fast forward is offered on your roll, vs the bot, once the game is a race.
+  const human = botPlayer === null ? null : other(botPlayer);
+  const canFastForward =
+    fastForwardSeat !== null &&
+    !fastForwarding &&
+    view.matchPhase === 'playing' &&
+    phase === 'awaiting-roll' &&
+    view.toMove === human &&
+    !blocked &&
+    isRace(game.state);
 
   // One checker with several dice (#180): the "2+3" targets, from the engine.
   const paths = useMemo(() => (othersTurn ? [] : flowPaths(game)), [game, othersTurn]);
@@ -559,6 +617,7 @@ export function GameScreen({
     !showPass &&
     !passWaits &&
     !botsTurn &&
+    !fastForwarding &&
     !(decided && showOpening) &&
     (phase === 'awaiting-roll' || (roller !== null && !tieWait));
 
@@ -890,12 +949,27 @@ export function GameScreen({
   }, [flow, isOnline]);
 
   // The bot's turn. It starts when nothing covers the board, and stops when
-  // the screen pauses (menu) or goes away. Same key = same turn.
-  const botActive = botsTurn && !blocked && !paused;
+  // the screen pauses (menu) or goes away. Same key = same turn. During a
+  // fast forward it plays the turns of both sides.
+  const botActive = autoSide !== null && !blocked && !paused;
   const botKey = `${gameKey}:${game.state.turnNumber}`;
-  const botRoll = useEffectEvent(() => {
-    if (botPlayer === null || !dispatch({ type: 'roll', player: botPlayer })) return false;
-    armThrow(null);
+  // A fast forward shows its dice at rest: no throw, no tumble. Stop keeps
+  // them at rest for the rest of that turn, so they do not roll again.
+  const [restTurn, setRestTurn] = useState<string | null>(null);
+  // The review leaves out your turns that the fast forward played.
+  const markAuto = (side: PlayerId) => {
+    if (side === botPlayer) return;
+    fastForwardSeat?.onAutoEvent?.(store.getState().flow.log.length - 1);
+  };
+  const botRoll = useEffectEvent((side: PlayerId) => {
+    if (!dispatch({ type: 'roll', player: side })) return false;
+    if (fastForwarding) {
+      const now = store.getState().flow;
+      setRestTurn(`${String(now.match.games.length)}:${now.game.state.turnNumber}`);
+      markAuto(side);
+    } else {
+      armThrow(null);
+    }
     return true;
   });
   const botMove = useEffectEvent((move: Move) => playMove(move, geoRef.current, null, false));
@@ -903,10 +977,10 @@ export function GameScreen({
   const botConfirm = useEffectEvent(() => confirm());
   // The bot's answer to the mother question; a short note says what it chose.
   const [botChoice, setBotChoice] = useState<{ key: string; choice: string } | null>(null);
-  const botAnswer = useEffectEvent((choice: string) => {
-    if (botPlayer === null) return false;
-    if (!dispatch({ type: 'answer', player: botPlayer, choice })) return false;
-    setBotChoice({ key: botKey, choice });
+  const botAnswer = useEffectEvent((side: PlayerId, choice: string) => {
+    if (!dispatch({ type: 'answer', player: side, choice })) return false;
+    if (fastForwarding) markAuto(side);
+    if (side === botPlayer) setBotChoice({ key: botKey, choice });
     return true;
   });
   // The note goes after a short time (the answer does not change the turn).
@@ -918,25 +992,29 @@ export function GameScreen({
   const botOptions = useEffectEvent(() => bot);
   useEffect(() => {
     const seat = botOptions();
-    if (!botActive || seat === undefined) return;
+    if (!botActive || seat === undefined || autoSide === null) return;
+    const side = autoSide;
+    // A fast forward plays your side at its own level, and both sides fast.
+    const ff = fastForwarding ? seat.fastForward : undefined;
+    const timing = ff === undefined ? seat.timing : { ...FAST_FORWARD_TIMING, ...ff.timing };
     const handle = startBotTurn({
-      player: seat.player,
-      difficulty: seat.difficulty,
+      player: side,
+      difficulty: ff !== undefined && side !== seat.player ? ff.difficulty : seat.difficulty,
       runner: seat.runner,
       rng: seat.rng,
-      ...(seat.timing ? { timing: seat.timing } : {}),
+      ...(timing ? { timing } : {}),
       getFlow: () => store.getState().flow,
       actions: {
-        roll: botRoll,
+        roll: () => botRoll(side),
         move: botMove,
         undo: botUndo,
         confirm: botConfirm,
-        answer: botAnswer,
+        answer: (choice) => botAnswer(side, choice),
       },
       onError: (error) => console.error('bot turn failed', error),
     });
     return handle.cancel;
-  }, [botActive, botKey, store]);
+  }, [botActive, botKey, store, autoSide, fastForwarding]);
 
   // Texts that say "you" for the human vs the bot.
   const nameOf = (player: PlayerId) => seats[player].name;
@@ -1011,8 +1089,10 @@ export function GameScreen({
   // Your roll from this phone (#355) starts the log: it is read as a
   // local roll ("You rolled 5-3."), and your moves after it are not read.
   // Its key names the view too: one server roll, read once.
-  const announcement =
-    online === undefined
+  // A fast forward reads one line when it starts, not every roll and move.
+  const announcement = fastForwarding
+    ? null
+    : online === undefined
       ? turnAnnouncement(flow, t, { nameOf, isYou })
       : flow.log[0]?.type === 'roll'
         ? (() => {
@@ -1049,6 +1129,10 @@ export function GameScreen({
     !passWaits
       ? onlineLineText
       : null;
+  useAnnouncement(
+    fastForwarding ? t('game.fastForward.started') : null,
+    fastForwarding ? `${raceKey}:fastForward` : undefined,
+  );
   // The hint is read out once it shows (#209). It is not a game event: the
   // user asked for it, and a remount closes it (it is screen state).
   useAnnouncement(shownHint === null ? null : hintSpokenText(t, shownHint));
@@ -1080,6 +1164,7 @@ export function GameScreen({
   // but a chosen double does not, and the opening dice showed on the card.
   const atRest =
     showPass ||
+    restTurn === `${gameKey}:${game.state.turnNumber}` ||
     (game.state.dice !== null &&
       (online === undefined
         ? !diceWereRolled(flow)
@@ -1122,6 +1207,24 @@ export function GameScreen({
         <Text style={styles.botText}>{remoteStatus}</Text>
       </View>
     );
+  } else if (fastForwarding) {
+    // Fast forward: the bot plays both sides. Stop gives you the board back.
+    showDice = dice.length > 0;
+    undoButton = (
+      <View testID="fast-forward-status" style={[styles.botBox, landscape && styles.botBoxSide]}>
+        <Text style={styles.botText}>{t('game.fastForward.playing')}</Text>
+      </View>
+    );
+    mainButton = (
+      <ActionButton
+        testID="fast-forward-stop-button"
+        label={t('game.fastForward.stop')}
+        accessibilityLabel={t('game.fastForward.stopLabel')}
+        kind="secondary"
+        onPress={() => setFastForwardKey(null)}
+        compact={landscape}
+      />
+    );
   } else if (botsTurn && !showPass && view.matchPhase === 'playing') {
     const rolled = game.state.dice;
     showDice = dice.length > 0;
@@ -1144,6 +1247,17 @@ export function GameScreen({
     !showOpening &&
     (online === undefined || onlineRoll)
   ) {
+    // In a race vs the bot, Fast forward sits next to Roll.
+    undoButton = canFastForward ? (
+      <ActionButton
+        testID="fast-forward-button"
+        label={t('game.fastForward.button')}
+        accessibilityLabel={t('game.fastForward.label')}
+        kind="secondary"
+        onPress={() => setFastForwardKey(raceKey)}
+        compact={landscape}
+      />
+    ) : null;
     // While the `rerollBoth` result shows (#207), Roll waits for it to close.
     mainButton = (
       <ActionButton
@@ -1444,7 +1558,9 @@ export function GameScreen({
           isYou(pass.player) ? t(`game.pass.${text}_you`, vars) : t(`game.pass.${text}`, vars),
           isYou(next) ? t('game.pass.next_you') : t('game.pass.next', { name: nameOf(next) }),
         ]}
-        {...(botPassed ? { footnote: t('game.pass.autoClose') } : {})}>
+        {...(passClosesItself
+          ? { footnote: fastForwarding ? t('game.pass.autoCloseSoon') : t('game.pass.autoClose') }
+          : {})}>
         <ActionButton
           testID="pass-ok-button"
           label={t('game.pass.ok')}

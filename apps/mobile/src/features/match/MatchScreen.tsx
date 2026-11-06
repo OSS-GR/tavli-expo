@@ -21,7 +21,7 @@ import { GameScreen, type BotSeat } from '@/features/game/GameScreen';
 import { winType } from '@/features/game/turnNotices';
 import { sendHintShown } from '@/features/hint/hintAnalytics';
 import { useSettings } from '@/features/settings/store';
-import { analyzer as appAnalyzer, botRunner, createLocalRng } from '@/services';
+import { analyzer as appAnalyzer, botLevels, botRunner, createLocalRng } from '@/services';
 
 import { GameMenu } from './GameMenu';
 import { canResignGame, previewResign, resigningPlayer } from './resign';
@@ -44,6 +44,8 @@ export interface MatchScreenProps {
   /** For tests: another runner, or bot timing on top of the Bot speed setting. */
   runner?: BotRunner;
   botTiming?: Partial<BotTiming>;
+  /** For tests: timing on top of the fast forward timing. */
+  fastForwardTiming?: Partial<BotTiming>;
   /** For tests: another Analyzer for the Hint button. */
   analyzer?: Analyzer;
 }
@@ -60,6 +62,7 @@ export function MatchScreen({
   onReview,
   runner = botRunner,
   botTiming,
+  fastForwardTiming,
   analyzer = appAnalyzer,
 }: MatchScreenProps) {
   const { t } = useTranslation();
@@ -81,6 +84,12 @@ export function MatchScreen({
           runner,
           rng: uiRng,
           timing: { ...BOT_SPEED_TIMING[botSpeed], ...botTiming },
+          // Fast forward a race: your side plays at the strongest level of this game.
+          fastForward: {
+            difficulty: botLevels[setup.game].at(-1) ?? setup.botLevel,
+            ...(fastForwardTiming ? { timing: fastForwardTiming } : {}),
+            onAutoEvent: (logIndex) => store.getState().markAutoEvent(logIndex),
+          },
         }
       : undefined;
 

@@ -74,6 +74,8 @@ export function useGameReview(
   analyzer: Analyzer,
   game: MatchGame,
   reporter: CrashReporter = crashReporter,
+  /** Log indexes of events a fast forward made for a person (`lastGameTurns`). */
+  skipped?: readonly number[],
 ): GameReview {
   // The result belongs to the flow it was made for.
   const [result, setResult] = useState<{ flow: MatchFlow; review: GameReview } | null>(null);
@@ -88,7 +90,7 @@ export function useGameReview(
       // The turn being graded; `null` while the log is replayed.
       let index: number | null = null;
       try {
-        if (turns === null) turns = lastGameTurns(flow, players);
+        if (turns === null) turns = lastGameTurns(flow, players, skipped);
         else {
           index = next;
           const turn = turns[next];
@@ -113,7 +115,7 @@ export function useGameReview(
     };
     timer = setTimeout(step, 0);
     return () => clearTimeout(timer);
-  }, [flow, players, analyzer, game, reporter]);
+  }, [flow, players, analyzer, game, reporter, skipped]);
 
   return result !== null && result.flow === flow ? result.review : BUSY;
 }

@@ -50,6 +50,8 @@ export interface ReviewScreenProps {
   flow: MatchFlow;
   /** For tests: another Analyzer. */
   analyzer?: Analyzer;
+  /** Log indexes of the rolls and answers a fast forward made for you: those turns are left out. */
+  autoEvents?: readonly number[];
   /** Goes back. Without it the header has no back button. */
   onBack?: () => void;
 }
@@ -60,12 +62,18 @@ type ShownTurn = 'played' | 'best';
 /** The dice under each small board. */
 const REVIEW_DIE_SIZE = 32;
 
-export function ReviewScreen({ setup, flow, analyzer = appAnalyzer, onBack }: ReviewScreenProps) {
+export function ReviewScreen({
+  setup,
+  flow,
+  analyzer = appAnalyzer,
+  autoEvents,
+  onBack,
+}: ReviewScreenProps) {
   const { t } = useTranslation();
   const vsBot = setup.mode === 'bot';
   // Vs the bot only the person's turns count; in pass-and-play both players'.
   const players = useMemo(() => (vsBot ? [HUMAN_SIDE] : BOTH_SIDES), [vsBot]);
-  const review = useGameReview(flow, players, analyzer, setup.game);
+  const review = useGameReview(flow, players, analyzer, setup.game, undefined, autoEvents);
   const seats = seatsFor(setup, t);
 
   const game = t('game.round', {

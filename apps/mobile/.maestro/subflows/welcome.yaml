@@ -1,0 +1,17 @@
+# The first-launch steps: language, consent (Don't allow), board.
+appId: com.tavlaki.dev
+---
+- tapOn:
+    id: welcome-language-continue
+- extendedWaitUntil:
+    visible:
+      id: welcome-consent-deny
+    timeout: 20000
+- tapOn:
+    id: welcome-consent-deny
+- extendedWaitUntil:
+    visible:
+      id: welcome-board-continue
+    timeout: 20000
+- tapOn:
+    id: welcome-board-continue

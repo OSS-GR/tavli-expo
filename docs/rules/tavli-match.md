@@ -198,6 +198,27 @@ scores. These are the app rules (owner, #63 and #181).
   - The match end screen and the history show the real score and say who
     resigned the match ("You resigned the match").
 
+## Fast forward a race (app rule)
+
+A game is a **race** when no checker can ever hit, pin or block an
+opponent checker again. Then each side only rolls and moves home. Vs the
+bot, the app offers to play a race out fast (owner request, 2026-11-06).
+The engine check is `isRace` (`packages/engine/src/race.ts`).
+
+- **Contrary games** (Portes, Plakoto, Asodio): it is a race when every
+  checker of each side has passed every opponent checker. In White's
+  numbering: White's last checker is on a lower point than Black's last
+  checker.
+- **Fevga** (parallel): it is a race when no opponent checker stands in
+  front of either side's last checker, on that side's path.
+- Never a race while a checker is on the bar, a checker has not entered
+  yet (Asodio), or a checker is pinned (Plakoto, Asodio).
+- **Fast forward** plays the rest of the game for both sides: the dice
+  come from the same RNG, and every move is a legal move from the engine.
+  The bot picks your moves at its strongest level. The game scores as
+  usual (mono, diplo, or the points of the scoring method).
+- You can stop it at any time and play on yourself.
+
 ## Edge cases
 
 1. Opening roll tie (e.g. both roll 4): roll again until different.
@@ -236,6 +257,18 @@ scores. These are the app rules (owner, #63 and #181).
     match; the score stays 0–2. It is not reset to 0–0, and it is not 0–3.
 22. Match to 3, 0–2: the trailing player resigns a game with no checker off
     → diplo, 0–4: the match is won to the target, not resigned.
+23. Portes: White's last checker is on 12 and Black's last checker on its
+    own 12 (White's 13): they have passed → a race. With White's last
+    checker on 13 and Black's on its own 13 (White's 12) → no race.
+24. Portes: every checker has passed, but one checker is on the bar → no
+    race until it enters and passes too.
+25. Plakoto: every checker has passed but one, which is pinned → no race.
+26. Asodio: one checker has not entered yet → no race.
+27. Fevga: White's last checker is on 13 and a Black checker stands on
+    White's 12 → no race. When every Black checker is behind White's last
+    checker, and every White checker behind Black's last one → a race.
+28. Fast forward to the end: the game ends with a normal result (mono or
+    diplo), and the match goes on as after any other game.
 
 ## House-rule variants (flags)
 

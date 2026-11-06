@@ -31,7 +31,13 @@ export default function ReviewRoute() {
     const session = id === null ? null : matchSessions.get(id);
     return session === null
       ? null
-      : { id: session.id, setup: session.setup, flow: session.store.getState().flow };
+      : {
+          id: session.id,
+          setup: session.setup,
+          flow: session.store.getState().flow,
+          // The turns a fast forward played for you are not yours to review.
+          autoEvents: session.store.getState().autoEvents,
+        };
   });
   // The game ended, or the match did (Resign match ends it mid-game).
   const over =
@@ -52,6 +58,7 @@ export default function ReviewRoute() {
       <ReviewScreen
         setup={opened.setup}
         flow={opened.flow}
+        autoEvents={opened.autoEvents}
         onBack={() => (router.canGoBack() ? router.back() : goHome())}
       />
     </>
