@@ -140,4 +140,34 @@ export default defineSchema({
   })
     .index('by_player', ['playerId', 'updatedAt'])
     .index('by_token', ['token']),
+
+  /**
+   * Who owns each sign-in key (#397): one row per Apple id (later Google).
+   * Better Auth's `account` table has no unique index, so two users could
+   * get the same key. Every new key goes through `claimKey`
+   * (`authKeys.ts`) first, in one transaction, so a key has one owner.
+   * Better Auth still signs in with its own `account` row.
+   */
+  authKeys: defineTable({
+    /** The Better Auth provider id, for example `apple`. */
+    providerId: v.string(),
+    /** The provider's user id (Apple's `sub`). */
+    accountId: v.string(),
+    /** The Better Auth user id: the player id. */
+    userId: v.string(),
+  })
+    .index('by_key', ['providerId', 'accountId'])
+    .index('by_user', ['userId']),
+
+  /**
+   * Sign-in nonces that were used (#397), so each works once. A row stays
+   * until its nonce runs out (`expiresAt`, epoch ms); `useKeyNonce`
+   * deletes a few old rows each time.
+   */
+  usedKeyNonces: defineTable({
+    nonce: v.string(),
+    expiresAt: v.number(),
+  })
+    .index('by_nonce', ['nonce'])
+    .index('by_expires', ['expiresAt']),
 });

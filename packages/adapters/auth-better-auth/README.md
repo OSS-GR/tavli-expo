@@ -6,13 +6,14 @@ Versions: `better-auth` and `@better-auth/expo` 1.6.33, `@convex-dev/better-auth
 
 ## What it does
 
-- **Guest sign-in only, for now.** `signInAsGuest()` calls Better Auth's anonymous plugin. Apple, Google and email magic link come in follow-ups.
+- **Guest sign-in.** `signInAsGuest()` calls Better Auth's anonymous plugin.
+- **Sign-in keys** (#397, Apple now). `keyNonce()` calls our `/key/nonce`; give the nonce to the Apple sheet. `signInWithKey(credential)` is Better Auth's id token sign-in (`signIn.social`); it is `SIGNED_IN` when someone is signed in, and `NETWORK` when the saved session could not load (it would replace it). `saveKey`, `listKeys` and `removeKey` call our `/key/save`, `/key/list` and `/key/remove` with `$fetch` (see "Sign-in keys" in [`docs/architecture/online-game-service.md`](../../../docs/architecture/online-game-service.md#sign-in-keys)). The server codes `KEY_BELONGS_TO_OTHER` and `LAST_KEY` keep their name; any other server error is `REJECTED`.
+- **One sign-in at a time.** A sign-in waits for the one under way, so two taps make one guest, and a key sign-in during a guest sign-in ends `SIGNED_IN`.
 - **The player id is the Better Auth user id.** It is the `sub` of the Convex token, which the server reads as `identity.subject` (see "Sign-in" in [`docs/architecture/online-game-service.md`](../../../docs/architecture/online-game-service.md)).
 - **Tokens for Convex.** `getToken()` asks the Convex plugin (`/api/auth/convex/token`) for a JWT and keeps it until 30 seconds before it runs out. `forceRefresh` gets a new one. Pass it to the Convex client's `setAuth`.
 - **The session cookie lives on the phone.** The Expo plugin keeps it in the `storage` you pass. The app passes `createSecureSessionStorage()`: `expo-secure-store` (iOS Keychain, Android Keystore), because the cookie signs the user in. A value the phone cannot read (for example after a backup was restored on a new phone) reads as `null`, so the user is signed out and the app still starts.
 - **A session that ended on the server** (the token call answers 401) signs the user out here too. A network failure on the token gives `null` and keeps the user.
 - **Errors** reject with `AuthErrorData`: `REJECTED` when the server answered with an error, `NETWORK` when it could not be reached. A failed sign-out keeps the user signed in.
-- **Two sign-ins at once make one guest.**
 
 ## Files
 

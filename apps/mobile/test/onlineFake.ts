@@ -214,13 +214,13 @@ export const onlineFake = {
 };
 
 /**
- * A new server, no cached transports or invite ports, nobody signed in,
+ * A new server, no cached transports or invite ports, nobody signed in
+ * and no accounts or keys,
  * notifications not asked yet, no saved push token, no update policy and
  * the default build.
  */
 export function resetOnlineFake(): void {
-  authStore.session = null;
-  authStore.guests = 0;
+  Object.assign(authStore, createMemoryAuthStore());
   server = newServer();
   transports.clear();
   invitePorts.clear();

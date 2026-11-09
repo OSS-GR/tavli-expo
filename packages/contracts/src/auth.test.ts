@@ -6,6 +6,7 @@ import {
   createMemoryAuthProvider,
   createMemoryAuthStore,
   isAuthErrorData,
+  memoryAppleIdToken,
 } from './index';
 import { authProviderContract } from './testing';
 
@@ -18,6 +19,7 @@ function memorySubject() {
       if (!token.startsWith(MEMORY_AUTH_TOKEN_PREFIX)) throw new Error(`not a memory token`);
       return token.slice(MEMORY_AUTH_TOKEN_PREFIX.length);
     },
+    appleIdToken: (sub: string, nonce: string) => Promise.resolve(memoryAppleIdToken(sub, nonce)),
   };
 }
 
@@ -34,6 +36,26 @@ describe('the in-memory AuthProvider', () => {
     await auth.signOut();
     expect((await auth.signInAsGuest()).id).toBe('guest-2');
   });
+
+  it('names key accounts user-1, user-2, … and nonces nonce-1, …', async () => {
+    const { auth } = memorySubject();
+    const nonce = await auth.keyNonce();
+    expect(nonce).toBe('nonce-1');
+    const credential = {
+      provider: 'apple' as const,
+      idToken: memoryAppleIdToken('a', nonce),
+      nonce,
+    };
+    expect(await auth.signInWithKey(credential)).toEqual({ id: 'user-1', isGuest: false });
+  });
+
+  it('turns down a token for another provider format', async () => {
+    const { auth } = memorySubject();
+    const nonce = await auth.keyNonce();
+    await expect(
+      auth.signInWithKey({ provider: 'apple', idToken: 'not-a-token', nonce }),
+    ).rejects.toMatchObject({ code: 'REJECTED' });
+  });
 });
 
 describe('the contract catches a broken provider', () => {
@@ -47,6 +69,17 @@ describe('the contract catches a broken provider', () => {
     const subject = { ...memorySubject(), restart: () => createMemoryAuthProvider() };
     const check = authProviderContract().find((c) => c.name === 'a restart keeps the session');
     await expect(check?.run(subject)).rejects.toThrow(/after a restart/);
+  });
+
+  it('a provider that lets anyone save a taken key fails', async () => {
+    const base = memorySubject();
+    const auth = {
+      ...base.auth,
+      saveKey: () => Promise.resolve({ id: 'guest-1', isGuest: false }),
+    };
+    const subject = { ...base, auth };
+    const check = authProviderContract().find((c) => c.name.includes('KEY_BELONGS_TO_OTHER'));
+    await expect(check?.run(subject)).rejects.toThrow(/KEY_BELONGS_TO_OTHER/);
   });
 });
 

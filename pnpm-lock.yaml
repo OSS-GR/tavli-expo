@@ -410,6 +410,9 @@ importers:
       convex:
         specifier: 1.46.0
         version: 1.46.0(react@19.3.0)
+      jose:
+        specifier: 6.2.13
+        version: 6.2.13
     devDependencies:
       '@edge-runtime/vm':
         specifier: 5.0.0

@@ -264,6 +264,8 @@ The Convex env vars, on **both** deployments (dev `exciting-reindeer-792` and pr
 - `APPLE_SERVICES_ID` = `com.tavlaki.signin`
 - `APPLE_PRIVATE_KEY` = the whole `.p8` text, with the `BEGIN PRIVATE KEY` and `END PRIVATE KEY` lines
 
+What the server reads now (#397): only `APPLE_SERVICES_ID`. With it set, the server takes Apple id tokens for the three bundle ids and the Services ID; with it empty, Apple sign-in is off. The other three are for the web flow on Android (#401) and the revoke (#398).
+
 Apple lets you download a key only once. If it is lost or leaks: make a new key in **Keys** with Sign in with Apple on, set `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` on both deployments, then revoke the old key. Apple's server-to-server notification URL is set up with #398.
 
 ### EAS Update (over-the-air updates), for later

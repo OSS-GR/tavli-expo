@@ -17,7 +17,8 @@
     "@tavli/online": "workspace:*",
     "@tavli/push-expo": "workspace:*",
     "better-auth": "1.6.33",
-    "convex": "1.46.0"
+    "convex": "1.46.0",
+    "jose": "6.2.13"
   },
   "devDependencies": {
     "@edge-runtime/vm": "5.0.0",
