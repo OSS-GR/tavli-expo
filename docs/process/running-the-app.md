@@ -283,7 +283,9 @@ The server mails sign-in codes through [AhaSend](https://ahasend.com) (AhaSend B
    - `MAIL_FROM` = the sender, for example `no-reply@tavlaki.com`
    - optional: `MAIL_FROM_NAME` (default `Tavlaki`), `EMAIL_CODES_PER_DAY` (default 30), and `AHASEND_SANDBOX` = `true` on dev to test without delivering mail.
 
-With any of the first three missing, email codes are off: `/key/email-code` answers `503 EMAIL_OFF`. Watch the monthly count in AhaSend's dashboard; raise `EMAIL_CODES_PER_DAY` only when the plan allows it.
+With any of the first three missing, email codes are off: `/key/email-code` answers `503 EMAIL_OFF`. Watch the monthly count in AhaSend's dashboard; raise `EMAIL_CODES_PER_DAY` only when the plan allows it (at most 1,000).
+
+If new players say that email sign-in answers "try again later" all day, the day cap of new addresses may be full: a script can fill it, since the server has no client address it can trust. Players who have an email key still get codes. Check the sends in AhaSend's dashboard. A flood ends by itself after a day; to let new players in sooner, raise `EMAIL_CODES_PER_DAY` for a while (it costs mail from the plan).
 
 ### EAS Update (over-the-air updates), for later
 

@@ -300,7 +300,6 @@ export function fromBetterAuthClient(
     return { ...toUser(result.data.user) };
   }
 
-  /** A `$fetch` call; a throw (no network) becomes `AuthErrorData`. */
   /**
    * The ticket of the newest code each address got on this phone (#399).
    * The server checks a code only with its ticket, so no one else can use
@@ -310,6 +309,7 @@ export function fromBetterAuthClient(
   const codeTickets = new Map<string, string>();
   const ticketOf = (email: string): string => codeTickets.get(ticketAddress(email)) ?? '';
 
+  /** A `$fetch` call; a throw (no network) becomes `AuthErrorData`. */
   async function fetchRoute<T>(path: string, what: string, body?: object): Promise<T> {
     let result: BetterAuthResult<T>;
     try {
