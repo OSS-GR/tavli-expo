@@ -49,6 +49,7 @@ const routes = {
   'friend/[code]': stub('invite wait'),
   join: stub('join with a code'),
   'online-games': stub('online games'),
+  account: stub('account'),
   username: stub('username'),
   blocked: stub('blocked players'),
 };

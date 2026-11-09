@@ -207,6 +207,19 @@ export const ICONS = {
       'M22 8l-5 5',
     ],
   },
+  // Settings → Account (#402).
+  user: {
+    strokes: ['M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2', circle(12, 7, 4)],
+  },
+  logOut: {
+    strokes: ['M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4', 'M16 17l5-5-5-5', 'M21 12H9'],
+  },
+  keyRound: {
+    strokes: [
+      'M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z',
+      circle(16.5, 7.5, 0.5),
+    ],
+  },
   // Join with a code (#333).
   keyboard: {
     strokes: [

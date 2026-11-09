@@ -17,8 +17,6 @@ import type { BotSpeed } from '@/features/bot/botSpeed';
 import { HistorySettings } from '@/features/history/HistorySettings';
 import type { TurnPushes } from '@/features/notifications/turnPushes';
 import { hasOnlineAccount } from '@/features/online/accountHint';
-import type { OnlineDataDeps } from '@/features/online/deleteData';
-import { OnlineDataSettings } from '@/features/online/OnlineDataSettings';
 import { TurnPushSettings } from '@/features/notifications/TurnPushSettings';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
@@ -62,20 +60,14 @@ export interface SettingsScreenProps {
    */
   turnPushes?: TurnPushes;
   /**
-   * Delete my online data (#315). The row shows only with it (a build
-   * with online play), and only when this phone used online play
-   * (`hasOnlineAccount()` when the screen opens). It stays until the
-   * screen closes, so it can say that the data is deleted.
+   * Opens Settings → Account (#402): sign-in, username, sign out and
+   * delete. The Online section shows only with it (a build with online
+   * play), also on a phone that never played online.
    */
-  onlineData?: OnlineDataDeps;
+  onAccount?: () => void;
   /**
-   * Opens Settings → Username (#405). The Online section shows only with
-   * it, and only when this phone used online play (`hasOnlineAccount()`).
-   */
-  onUsername?: () => void;
-  /**
-   * Opens Settings → Blocked players (#435). Like Username, it shows only
-   * when this phone used online play (`hasOnlineAccount()`).
+   * Opens Settings → Blocked players (#435). It shows only when this
+   * phone used online play (`hasOnlineAccount()` when the screen opens).
    */
   onBlocked?: () => void;
 }
@@ -85,8 +77,7 @@ export function SettingsScreen({
   onLearnToPlay,
   onHistory,
   turnPushes,
-  onlineData,
-  onUsername,
+  onAccount,
   onBlocked,
 }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
@@ -296,18 +287,16 @@ export function SettingsScreen({
           </SectionCard>
         ) : null}
 
-        {(onUsername || onBlocked) && usedOnline ? (
+        {onAccount ? (
           <SectionCard title={t('settings.sections.online')}>
-            {onUsername ? (
-              <SectionRow
-                testID="settings-username"
-                icon="users"
-                label={t('settings.username.label')}
-                hint={t('settings.username.hint')}
-                onPress={onUsername}
-              />
-            ) : null}
-            {onBlocked ? (
+            <SectionRow
+              testID="settings-account"
+              icon="user"
+              label={t('settings.account.label')}
+              hint={t('settings.account.hint')}
+              onPress={onAccount}
+            />
+            {onBlocked && usedOnline ? (
               <SectionRow
                 testID="settings-blocked"
                 icon="userX"
@@ -335,7 +324,6 @@ export function SettingsScreen({
             accessibilityRole="link"
             onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
           />
-          {onlineData && usedOnline ? <OnlineDataSettings deps={onlineData} /> : null}
         </SectionCard>
 
         <Text style={styles.footer}>{t('settings.version', { version })}</Text>

@@ -52,6 +52,12 @@ export interface MyUsername {
   readonly ageChecked: boolean;
   /** The terms version the player accepted, or `null`. Ask when it is not `TERMS_VERSION`. */
   readonly termsVersion: string | null;
+  /**
+   * The four digits of the guest name ("Guest 4821", #400, #402), or
+   * `null` while the account has none: the server makes it at the first
+   * invite, game or username.
+   */
+  readonly guestNumber: string | null;
 }
 
 /** A new username, with the answers of the username step. */

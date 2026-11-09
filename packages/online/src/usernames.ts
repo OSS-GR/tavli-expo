@@ -26,6 +26,8 @@ import {
 } from '@tavli/contracts';
 import type { MyUsername, SetUsernameRequest, UsernameErrorCode } from '@tavli/contracts';
 
+import type { NameRecord } from './names';
+
 /** Why a name breaks the rules. The app says which. */
 export type UsernameProblem =
   /** Fewer than 3 characters. */
@@ -281,7 +283,7 @@ export function nextUsernameChange(record: UsernameRecord | null, now: number): 
 
 /** The port's view of a record. */
 export function myUsernameOf(
-  record: UsernameRecord | null,
+  record: (UsernameRecord & NameRecord) | null,
   saved: boolean,
   now: number,
 ): MyUsername {
@@ -291,6 +293,7 @@ export function myUsernameOf(
     nextChangeAt: nextUsernameChange(record, now),
     ageChecked: record?.ageCheckedAt !== undefined,
     termsVersion: record?.termsVersion ?? null,
+    guestNumber: record?.guestNumber ?? null,
   };
 }
 

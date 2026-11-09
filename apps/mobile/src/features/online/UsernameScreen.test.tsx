@@ -6,7 +6,6 @@ import { TERMS_VERSION } from '@tavli/contracts';
 import { screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
-import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { auth, usernames } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
@@ -14,7 +13,6 @@ import { onlineFake } from '../../../test/onlineFake';
 import { renderWithRoot } from '../../../test/render';
 
 import { signInForOnline } from './account';
-import { rememberOnlineAccount } from './accountHint';
 import { signInWithApple } from './signIn';
 import { UsernameScreen } from './UsernameScreen';
 
@@ -125,27 +123,5 @@ describe('Settings → Username', () => {
     const { onBack } = await openScreen();
     await user.press(screen.getByRole('button', { name: 'Back' }));
     expect(onBack).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('the Username row of Settings', () => {
-  it('is hidden on a phone that never played online', async () => {
-    await renderWithRoot(<SettingsScreen onUsername={jest.fn()} />);
-    expect(screen.queryByTestId('settings-username')).toBeNull();
-  });
-
-  it('is hidden in a build with no online play', async () => {
-    rememberOnlineAccount();
-    await renderWithRoot(<SettingsScreen />);
-    expect(screen.queryByTestId('settings-username')).toBeNull();
-  });
-
-  it('opens the screen after this phone played online', async () => {
-    const user = setupUser();
-    const onUsername = jest.fn();
-    rememberOnlineAccount();
-    await renderWithRoot(<SettingsScreen onUsername={onUsername} />);
-    await user.press(screen.getByRole('button', { name: 'Username' }));
-    expect(onUsername).toHaveBeenCalledTimes(1);
   });
 });

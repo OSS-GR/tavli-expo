@@ -12,7 +12,7 @@
  * clock: they move the server clock with `subject.passTime`.
  */
 import type { Invites, NewInvite } from '../invite';
-import { usernameName } from '../player-name';
+import { isGuestNumber, usernameName } from '../player-name';
 import { TERMS_VERSION, USERNAME_CHANGE_MS, isUsernameErrorData } from '../username';
 import type { MyUsername, UsernameErrorCode, Usernames } from '../username';
 
@@ -95,7 +95,14 @@ export function usernamesContract(): readonly UsernamesContractCheck[] {
         const usernames = subject.usernamesFor('guest');
         same(
           await usernames.mine(),
-          { saved: false, name: null, nextChangeAt: null, ageChecked: false, termsVersion: null },
+          {
+            saved: false,
+            name: null,
+            nextChangeAt: null,
+            ageChecked: false,
+            termsVersion: null,
+            guestNumber: null,
+          },
           'mine()',
         );
         await failsWith(usernames.setMine({ name: 'Alex', ...STEP }), 'NOT_SAVED', 'setMine()');
@@ -107,7 +114,14 @@ export function usernamesContract(): readonly UsernamesContractCheck[] {
         const usernames = subject.usernamesFor('saved');
         same(
           await usernames.mine(),
-          { saved: true, name: null, nextChangeAt: null, ageChecked: false, termsVersion: null },
+          {
+            saved: true,
+            name: null,
+            nextChangeAt: null,
+            ageChecked: false,
+            termsVersion: null,
+            guestNumber: null,
+          },
           'mine() before',
         );
         await failsWith(
@@ -122,8 +136,10 @@ export function usernamesContract(): readonly UsernamesContractCheck[] {
         );
         named(await usernames.mine(), null, 'mine() after the refusals');
         const picked = await usernames.setMine({ name: 'Νίκος_7', ...STEP });
+        // The first username makes the guest number too (any four digits).
+        const { guestNumber, ...rest } = picked;
         same(
-          picked,
+          rest,
           {
             saved: true,
             name: 'Νίκος_7',
@@ -133,6 +149,9 @@ export function usernamesContract(): readonly UsernamesContractCheck[] {
           },
           'setMine()',
         );
+        if (guestNumber === null || !isGuestNumber(guestNumber)) {
+          throw new Error(`setMine(): expected a guest number, got ${JSON.stringify(guestNumber)}`);
+        }
         same(await usernames.mine(), picked, 'mine() after');
       },
     },
@@ -204,6 +223,22 @@ export function usernamesContract(): readonly UsernamesContractCheck[] {
         const code = await subject.invitesFor('saved').createInvite(GAME);
         const view = await subject.invitesFor('other').getInvite(code);
         same(view?.fromName, usernameName('Μαρία'), 'fromName');
+      },
+    },
+    {
+      name: 'mine() gives the guest number the server made at the first invite',
+      run: async (subject) => {
+        const usernames = subject.usernamesFor('saved');
+        same((await usernames.mine()).guestNumber, null, 'before any invite');
+        await subject.invitesFor('saved').createInvite(GAME);
+        const { guestNumber } = await usernames.mine();
+        if (guestNumber === null || !isGuestNumber(guestNumber)) {
+          throw new Error(
+            `after an invite: expected a guest number, got ${JSON.stringify(guestNumber)}`,
+          );
+        }
+        await subject.invitesFor('saved').createInvite(GAME);
+        same((await usernames.mine()).guestNumber, guestNumber, 'the number stays');
       },
     },
   ];
