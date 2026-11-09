@@ -103,6 +103,9 @@ export type {
   AuthKeyProvider,
   AuthProvider,
   AuthUser,
+  GuestMoveCounts,
+  GuestMoveOffer,
+  MemoryAuthGuestMoves,
   MemoryAuthStore,
 } from './auth';
 export { guestName, isGuestNumber, usernameName } from './player-name';

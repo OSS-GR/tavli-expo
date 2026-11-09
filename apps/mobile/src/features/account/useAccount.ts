@@ -13,6 +13,12 @@
  * - Save my account: a guest adds a key with Apple's sheet (`saveKey`) and
  *   keeps the same id, games and guest number. The same call adds a
  *   second kind of key to a saved account.
+ * - A key that has an account already (#403): for a guest the server
+ *   sends a move offer (`offer`). The screen shows its counts and asks.
+ *   Move (`moveGuest`) moves the guest's games and invites into that
+ *   account, deletes the guest and signs in there; Keep closes the offer
+ *   and the guest stays as it is. A saved account gets no offer, only
+ *   `keyTaken`.
  * - An account keeps at least one key: Remove is off for the last one,
  *   and the server says `LAST_KEY` too.
  * - Sign out (`signOutOfOnline`, the push token first) and Delete
@@ -33,6 +39,7 @@ import {
   type AuthKey,
   type AuthKeyProvider,
   type AuthProvider,
+  type GuestMoveOffer,
   type MyUsername,
   type OnlineData,
   type Usernames,
@@ -60,13 +67,13 @@ export type AccountState =
       readonly keys: readonly AuthKey[];
     };
 
-export type AccountAction = 'signIn' | 'save' | 'removeKey' | 'signOut' | 'delete';
+export type AccountAction = 'signIn' | 'save' | 'move' | 'removeKey' | 'signOut' | 'delete';
 
 /** Why the last action failed. */
 export type AccountProblem =
   /** Apple's sheet ended unfinished: most often no Apple ID on the phone (#442). */
   | 'appleUnfinished'
-  /** This Apple ID has another account already (#403 handles the move later). */
+  /** This Apple ID has another account already, and the guest stays (#403). */
   | 'keyTaken'
   /** The last key: an account keeps at least one. */
   | 'lastKey'
@@ -75,7 +82,7 @@ export type AccountProblem =
   | 'other';
 
 /** What just happened, said once on the screen. */
-export type AccountNote = 'signedOut' | 'deleted' | 'saved';
+export type AccountNote = 'signedOut' | 'deleted' | 'saved' | 'moved';
 
 export interface AccountDeps {
   readonly auth: AuthProvider;
@@ -94,6 +101,8 @@ export interface Account {
   readonly busy: AccountAction | null;
   readonly problem: AccountProblem | null;
   readonly note: AccountNote | null;
+  /** The server's offer to move this guest into the key's account (#403), or `null`. */
+  readonly offer: GuestMoveOffer | null;
   /** Counts the problems and notes, so a screen reader hears each one (`useAnnouncement`). */
   readonly said: number;
   readonly reload: () => void;
@@ -101,6 +110,10 @@ export interface Account {
   readonly signInWithApple: () => void;
   /** A guest saves the account with Apple; a saved account adds an Apple key. */
   readonly saveWithApple: () => void;
+  /** Moves the guest into the account of the offer, and signs in there. */
+  readonly moveGuest: () => void;
+  /** Closes the offer: the guest stays as it is. */
+  readonly keepGuest: () => void;
   readonly removeKey: (provider: AuthKeyProvider) => void;
   readonly signOut: () => void;
   readonly deleteAccount: () => void;
@@ -164,6 +177,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
   const [busy, setBusy] = useState<AccountAction | null>(null);
   const [problem, setProblem] = useState<AccountProblem | null>(null);
   const [note, setNote] = useState<AccountNote | null>(null);
+  const [offer, setOffer] = useState<GuestMoveOffer | null>(null);
   const [said, setSaid] = useState(0);
   // One action at a time: a second tap before the render sees `busy` does nothing.
   const acting = useRef(false);
@@ -218,6 +232,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     setBusy(action);
     setProblem(null);
     setNote(null);
+    setOffer(null);
     call().then(
       (result) => {
         acting.current = false;
@@ -250,6 +265,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     busy,
     problem,
     note,
+    offer,
     said,
     reload,
     signInWithApple: () =>
@@ -265,16 +281,39 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     saveWithApple: () =>
       run(
         'save',
-        async () => {
+        async (): Promise<'closed' | 'saved' | GuestMoveOffer> => {
           const credential = await appleCredential(deps.auth, deps.appleSheet);
-          if (credential === null) return false;
-          await deps.auth.saveKey(credential);
-          return true;
+          if (credential === null) return 'closed';
+          try {
+            await deps.auth.saveKey(credential);
+          } catch (error) {
+            // A guest whose key has an account already: ask before a move.
+            if (isAuthErrorData(error) && error.code === 'KEY_BELONGS_TO_OTHER' && error.move) {
+              return error.move;
+            }
+            throw error;
+          }
+          return 'saved';
         },
-        (saved) => {
-          if (saved) done('saved');
+        (result) => {
+          if (result === 'saved') done('saved');
+          else if (result !== 'closed') setOffer(result);
         },
       ),
+    moveGuest: () => {
+      if (offer === null) return;
+      run(
+        'move',
+        () => deps.auth.moveGuest(offer),
+        () => done('moved'),
+      );
+    },
+    keepGuest: () => {
+      if (offer === null) return;
+      setOffer(null);
+      setProblem('keyTaken');
+      setSaid((n) => n + 1);
+    },
     removeKey: (provider) =>
       run(
         'removeKey',

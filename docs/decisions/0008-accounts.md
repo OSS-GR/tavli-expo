@@ -94,7 +94,8 @@ This replaces items 6 and 8 of ADR-0004. The rest of ADR-0004 stands.
 - Harder: we write and test our own `saveKey` step, the guest-to-account move
   (in pages), Apple token revoke, and the reminder schedule.
 - Every new table with player data (friends, requests, blocks, ratings) must
-  be handled by `deleteMyAccount` and the privacy policy.
+  be handled by `deleteMyAccount`, the guest move (`guestMove.ts`, #403) and
+  the privacy policy.
 - Switching later: the `AuthProvider` port hides Better Auth. Game Center or
   Play Games can still be added as extra keys without a change to the account
   model.

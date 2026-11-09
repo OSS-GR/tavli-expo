@@ -130,7 +130,9 @@ export default defineSchema({
     // one player whose time is not up are one range (`expiresAt > now`).
     .index('by_from', ['from', 'status', 'expiresAt'])
     // "Did these two meet?" (#320, `safety.ts`): an invite one answered from the other.
-    .index('by_answer', ['from', 'answeredBy']),
+    .index('by_answer', ['from', 'answeredBy'])
+    // Moving a guest into an account (#403, `guestMove.ts`): the invites one answered.
+    .index('by_answered', ['answeredBy']),
 
   /**
    * The Expo push tokens of each player's phones (#280), for "your turn"

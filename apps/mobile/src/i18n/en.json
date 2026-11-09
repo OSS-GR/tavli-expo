@@ -247,6 +247,7 @@
     "busy": {
       "signIn": "Signing you in…",
       "save": "Saving your account…",
+      "move": "Moving your games…",
       "removeKey": "Removing…",
       "signOut": "Signing out…",
       "delete": "Deleting your account…"
@@ -261,13 +262,26 @@
     "note": {
       "saved": "Your account is saved.",
       "signedOut": "You are signed out.",
-      "deleted": "Your account is deleted. The next Play a friend starts fresh."
+      "deleted": "Your account is deleted. The next Play a friend starts fresh.",
+      "moved": "Your games are in your account now."
     },
     "signOutDialog": {
       "title": "Sign out?",
       "comeBack": "To play online on this phone again, sign in with Apple.",
       "kept": "Your online games and your username stay with your account.",
       "confirm": "Sign out"
+    },
+    "moveDialog": {
+      "title": "This Apple ID has an account already",
+      "ask": "Move your guest’s games and invites into that account? This phone then plays as that account.",
+      "games_one": "{{count}} game in progress",
+      "games_other": "{{count}} games in progress",
+      "invites_one": "{{count}} open invite",
+      "invites_other": "{{count}} open invites",
+      "between": "A game in progress between your guest and that account ends: your guest resigns it.",
+      "deleted": "Your guest account is then deleted. You cannot undo it.",
+      "move": "Move my games",
+      "keep": "Keep the guest"
     },
     "deleteDialog": {
       "guestTitle": "Delete your guest account?",

@@ -94,6 +94,7 @@ export function lazyAuthProvider(get: () => AuthProvider): AuthProvider {
     keyNonce: () => get().keyNonce(),
     signInWithKey: (credential) => get().signInWithKey(credential),
     saveKey: (credential) => get().saveKey(credential),
+    moveGuest: (offer) => get().moveGuest(offer),
     listKeys: () => get().listKeys(),
     removeKey: (provider) => get().removeKey(provider),
     signOut: () => get().signOut(),

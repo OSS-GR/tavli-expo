@@ -9,6 +9,9 @@
  * - Guest: "You play as Guest 4821", Save my account (Apple), Delete my
  *   guest account. A guest has no Sign out: with no key it could never
  *   come back.
+ * - A guest whose Apple ID has an account already gets the move dialog
+ *   (#403): its games in progress and open invites, then Move my games
+ *   or Keep the guest.
  * - Saved: the username (to Settings → Username), the ways to sign in
  *   (never remove the last), Sign out and Delete my account.
  * - Each problem and note is read to screen readers (`useAnnouncement`).
@@ -127,6 +130,20 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
           </Text>
         ) : null}
       </ScrollView>
+      <Sheet
+        visible={account.offer !== null}
+        onClose={account.keepGuest}
+        closeLabel={t('common.cancel')}
+        look="dialog">
+        {account.offer !== null ? (
+          <MoveDialog
+            activeGames={account.offer.activeGames}
+            openInvites={account.offer.openInvites}
+            onMove={account.moveGuest}
+            onKeep={account.keepGuest}
+          />
+        ) : null}
+      </Sheet>
       <Sheet
         visible={dialog !== null}
         onClose={() => setDialog(null)}
@@ -333,6 +350,43 @@ function Saved({
         />
       </SectionCard>
     </>
+  );
+}
+
+/**
+ * The move offer (#403). Keep is the main button: it changes nothing.
+ * Its own component, so each opening focuses the title again.
+ */
+function MoveDialog({
+  activeGames,
+  openInvites,
+  onMove,
+  onKeep,
+}: {
+  activeGames: number;
+  openInvites: number;
+  onMove: () => void;
+  onKeep: () => void;
+}) {
+  const { t } = useTranslation();
+  const titleRef = useFocusOnShow();
+  return (
+    <ConfirmDialog
+      testID="account-move-dialog"
+      titleRef={titleRef}
+      title={t('account.moveDialog.title')}
+      lines={[
+        t('account.moveDialog.ask'),
+        t('account.moveDialog.games', { count: activeGames }),
+        t('account.moveDialog.invites', { count: openInvites }),
+        t('account.moveDialog.between'),
+        t('account.moveDialog.deleted'),
+      ]}
+      confirmLabel={t('account.moveDialog.move')}
+      cancelLabel={t('account.moveDialog.keep')}
+      onConfirm={onMove}
+      onCancel={onKeep}
+    />
   );
 }
 
