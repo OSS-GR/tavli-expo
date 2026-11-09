@@ -125,13 +125,7 @@ export function lastGameTurns(
       // with the roll. A roll with no legal move passes in one step, from
       // a state with no dice: it is never graded.
       const moving = current.game.phase === 'moving' || current.game.phase === 'awaiting-confirm';
-      if (
-        ended &&
-        moving &&
-        turn.moves.length > 0 &&
-        players.includes(turn.player) &&
-        !autoChose
-      ) {
+      if (ended && moving && turn.moves.length > 0 && players.includes(turn.player) && !autoChose) {
         turns.push({ state: current.game.state, turn });
       }
       if (ended) autoChose = false;

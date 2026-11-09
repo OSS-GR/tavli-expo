@@ -64,7 +64,8 @@ export async function playToRace(store: GameStore, options: PlayToRaceOptions): 
       case 'awaiting-answer': {
         const prompt = currentPrompt(game);
         if (prompt === null) return false;
-        if (!act({ type: 'answer', player: prompt.player, choice: botAnswer(prompt) })) return false;
+        if (!act({ type: 'answer', player: prompt.player, choice: botAnswer(prompt) }))
+          return false;
         break;
       }
       case 'awaiting-confirm':
