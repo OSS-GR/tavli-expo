@@ -1,6 +1,6 @@
 # App Store privacy labels (App Privacy)
 
-> The answers for App Store Connect → App Privacy. Issue #137. Google Play: [play-data-safety.md](play-data-safety.md). Last review: 2026-11-02 (#315, Delete my online data).
+> The answers for App Store Connect → App Privacy. Issue #137. Google Play: [play-data-safety.md](play-data-safety.md). Last review: 2026-11-09 (#401, Sign in with Apple).
 
 **This is not legal advice.** The answers follow the code on `main` on 2026-10-28 and Apple's App Privacy categories as we know them. The owner gives the final answers in App Store Connect.
 
@@ -13,8 +13,8 @@ Four services get data. Nothing else leaves the phone. Local games (vs the bot, 
 | Service | What | When | Code |
 |---------|------|------|------|
 | **Sentry** (crash reports) | The error and stack trace; device facts (model, system and version, app version, memory, screen, language, time zone); a short trail of events before the error (breadcrumbs). After Allow also native crashes, app hangs (iOS), ANRs (Android) and release-health sessions. No device name, no console lines, no query strings in URLs, no IP address in the event, no screenshots, no view hierarchy, no tracing, no replay. | Release builds with `EXPO_PUBLIC_SENTRY_DSN` only. Before an answer: **JS errors only, with no id at all** (#139: the native SDKs and sessions are off, because they add Sentry's own installation id). After **Allow usage data**: everything, **with** the install id (a native crash report from iOS may carry Sentry's installation id instead). After **Don't allow**: nothing. | `packages/adapters/crash-sentry/src/index.ts` (`scrubEvent`, `scrubBreadcrumb`, options), `apps/mobile/src/features/crash/consent.ts`, `setup.ts` |
-| **PostHog EU** (usage data) | The events in [Analytics events](../architecture/analytics-events.md): app opened, game started / finished / abandoned, undo, resign, setting changed (key only), theme changed (app colors or board, and the theme id), screen viewed (route pattern), tutorial started / step / finished / skipped, hint shown (the game only), review opened (the game only), invite created (game, points and pace only), push permission answered (granted or denied only). Each event carries device facts (maker, model, system and version, screen, app name and version, language, time zone), the install id and PostHog's own random ids. No session replay, no autocapture, no GeoIP. | Only after **Allow usage data**. Before that the adapter drops every call. Turning it off empties the queue and resets PostHog's ids. | `packages/adapters/analytics-posthog/src/index.ts` (`postHogOptions`, the consent gate), `apps/mobile/src/features/analytics/connect.ts` |
-| **Convex** (the game server, online play with a friend, #281) | A guest account made by Better Auth's anonymous plugin: a random **user id**, made by the server, and a placeholder name and email (no real ones). The sign-in session: a random token, its expiry, and the IP address and user agent Better Auth records when the session is made. Under the user id: the player's **invites** (code, game, points, pace, status, expiry) and **online games** (both user ids, rules, every move and roll, score, turn deadlines; while a turn is played, its moves so far, deleted when the turn is saved, #374). | Only when the player taps **Make an invite** (`/friend`) or **Show the invite** on an invite link (`/invite/<code>`): then `signInForOnline` makes the guest once (`auth.signInAsGuest()`), and the invite and game calls follow. A saved session (the cookie in the phone's secure store) is used again. Before that, opening an invite link (`/invite/<code>`) or a link to an online game (`/game/<id>`) only checks for a saved sign-in (Better Auth `getSession`, with the cookie if there is one): it makes no account and, without a saved sign-in, saves nothing and opens no game-server connection. The consent switch does not cover it: an online game cannot work without the server. The user id never goes to PostHog or Sentry. The player can delete it all in the app (**Settings → Privacy → Delete my online data**, #315; see below). | `apps/mobile/src/features/online/account.ts`, `features/online/deleteData.ts`, `features/invites/`, `packages/adapters/auth-better-auth`, `packages/adapters/backend-convex`, `apps/server/convex/auth.ts` |
+| **PostHog EU** (usage data) | The events in [Analytics events](../architecture/analytics-events.md): app opened, game started / finished / abandoned, undo, resign, setting changed (key only), theme changed (app colors or board, and the theme id), screen viewed (route pattern), tutorial started / step / finished / skipped, hint shown (the game only), review opened (the game only), invite created (game, points and pace only), push permission answered (granted or denied only), online sign-in (`apple` or `guest` only). Each event carries device facts (maker, model, system and version, screen, app name and version, language, time zone), the install id and PostHog's own random ids. No session replay, no autocapture, no GeoIP. | Only after **Allow usage data**. Before that the adapter drops every call. Turning it off empties the queue and resets PostHog's ids. | `packages/adapters/analytics-posthog/src/index.ts` (`postHogOptions`, the consent gate), `apps/mobile/src/features/analytics/connect.ts` |
+| **Convex** (the game server, online play with a friend, #281) | An account with a random **user id**, made by the server. A guest account (Better Auth's anonymous plugin) has a placeholder name and email (no real ones). **Sign in with Apple** (#401, iPhone, only if the player picks it) adds the **Apple id** (Apple's `sub` for our team), the **email** Apple gives (the person's own or a Hide My Email relay), Apple's id token (encrypted, `account` row) and Apple's refresh token (encrypted, `appleTokens`, kept only to revoke it on delete, #398). Never Apple's name or photo. The sign-in session: a random token, its expiry, and the IP address and user agent Better Auth records when the session is made. Under the user id: the player's **invites** (code, game, points, pace, status, expiry) and **online games** (both user ids, rules, every move and roll, score, turn deadlines; while a turn is played, its moves so far, deleted when the turn is saved, #374). | Only when the player taps **Make an invite** (`/friend`) or opens an invite link (`/invite/<code>`), and picks a way in the sign-in choices (#401): **Continue as a guest** (`signInForOnline` makes the guest once, `auth.signInAsGuest()`) or **Continue with Apple** (`signInWithApple`, `features/online/signIn.ts`). **Not now** signs in nothing. Then the invite and game calls follow. A saved session (the cookie in the phone's secure store) is used again. Before that, opening an invite link (`/invite/<code>`) or a link to an online game (`/game/<id>`) only checks for a saved sign-in (Better Auth `getSession`, with the cookie if there is one): it makes no account and, without a saved sign-in, saves nothing and opens no game-server connection. The consent switch does not cover it: an online game cannot work without the server. The user id, the Apple id and the email never go to PostHog or Sentry. The player can delete it all in the app (**Settings → Privacy → Delete my online data**, #315; see below). | `apps/mobile/src/features/online/account.ts`, `features/online/deleteData.ts`, `features/invites/`, `packages/adapters/auth-better-auth`, `packages/adapters/backend-convex`, `apps/server/convex/auth.ts` |
 | **Convex** and **Expo** (turn notifications, #285) | The phone's Expo **push token** and its system (`ios` or `android`), under the user id; at most 5 per player. To send a push, the server gives Expo the token, a fixed text ("Your turn", or "Your game is over. See the result." when an async match ends, #316) and the game id. Expo passes it to Apple's or Google's push service. No name, no email, no moves. | Only after the player turns on turn notifications: the app offers them after the player makes or accepts an **async** invite, or from **Settings → Notifications**. Never at first launch. The token is sent only when the phone allows notifications and a guest account exists. It is removed on sign-out and by **Delete my online data**, when Expo says the phone no longer takes pushes, and when a sixth phone is added. The token never goes to PostHog or Sentry; PostHog gets only the answer (granted or denied), after Allow. | `apps/mobile/src/features/notifications/`, `packages/adapters/notifications-expo`, `packages/adapters/backend-convex/src/pushTokens.ts`, `apps/server/convex/push.ts` |
 
 The **install id** is a random UUID made on the phone (`apps/mobile/src/features/install-id/installId.ts`). The app makes it only after **Allow usage data**. It is not an advertising id and does not come from the hardware. It is the "Device ID" below. The Convex **user id** is a different id: it is the "User ID" below, and it never goes to PostHog or Sentry. The **push token** is a third id: a random address for this app on this phone, made by Apple or Google. We count it as "Device ID" too (App Functionality), to be safe.
@@ -29,10 +29,11 @@ What never leaves the phone: the saved settings (only the events above say that 
 
 ## Step 2: Data types
 
-Tick these seven. Leave every other box empty.
+Tick these eight. Leave every other box empty.
 
 | Apple category | Data type | Why |
 |----------------|-----------|-----|
+| Contact Info | **Email Address** | The email Apple gives with Sign in with Apple (the person's own or a Hide My Email relay), kept on Convex with the account (#401). Only when the player picks Apple. |
 | Identifiers | **User ID** | The guest account's random user id on Convex (online play with a friend, #281) |
 | Identifiers | **Device ID** | The install id (PostHog `identify`, Sentry user id after Allow), PostHog's random ids, and the push token on Convex (turn notifications, #285) |
 | User Content | **Gameplay Content** | The online games and invites on Convex: the moves, rolls and score of a game with a friend (#281) |
@@ -41,14 +42,15 @@ Tick these seven. Leave every other box empty.
 | Diagnostics | **Performance Data** | App hangs (iOS) and ANRs (Android), after Allow only. These are Sentry native SDK defaults (checked in the SDK source in #139; not yet seen in a build). Declare them, as the manifest does. |
 | Diagnostics | **Other Diagnostic Data** | Device facts and breadcrumbs in crash reports; Sentry release-health sessions (after Allow only, #139); device facts on PostHog events |
 
-Leave empty (the app does not collect them): Contact Info (name, email, phone, address), Health and Fitness, Financial Info, Location (precise and coarse: PostHog GeoIP is off, Sentry is set not to store IPs, and the Better Auth session keeps the IP for sign-in only, never to find a place), Sensitive Info, Contacts, User Content → everything but Gameplay Content (pass-and-play names stay on the phone; the guest account has no real name or email), Browsing History, Search History, Purchases, Usage Data → Advertising Data, Usage Data → Other Usage Data, Other Data.
+Leave empty (the app does not collect them): Contact Info → everything but Email Address (name, phone, address; Apple's name is never kept), Health and Fitness, Financial Info, Location (precise and coarse: PostHog GeoIP is off, Sentry is set not to store IPs, and the Better Auth session keeps the IP for sign-in only, never to find a place), Sensitive Info, Contacts, User Content → everything but Gameplay Content (pass-and-play names stay on the phone; the guest account has no real name or email), Browsing History, Search History, Purchases, Usage Data → Advertising Data, Usage Data → Other Usage Data, Other Data.
 
 ## Step 3: For each data type
 
-Apple asks three questions per type. The answers match the privacy manifest in `app.json` (#139 set `NSPrivacyCollectedDataTypeLinked: true` for all five types; #281 added User ID and Gameplay Content, both linked).
+Apple asks three questions per type. The answers match the privacy manifest in `app.json` (#139 set `NSPrivacyCollectedDataTypeLinked: true` for all five types; #281 added User ID and Gameplay Content, both linked; #401 added Email Address, linked).
 
 | Data type | Purposes | Linked to the user? | Used for tracking? |
 |-----------|----------|---------------------|--------------------|
+| Email Address | **App Functionality** | **Yes** | **No** |
 | User ID | **App Functionality** | **Yes** | **No** |
 | Device ID | **Analytics**, **App Functionality** | **Yes** | **No** |
 | Gameplay Content | **App Functionality** | **Yes** | **No** |
@@ -65,20 +67,20 @@ Apple asks three questions per type. The answers match the privacy manifest in `
 
 After **Allow usage data**, the app ties its data to the install id: `analytics.identify(getInstallId(storage))` in `features/analytics/connect.ts`, and `reporter.setUser(getInstallId(storage))` in `features/crash/setup.ts`. So every usage event, and every crash report and diagnostic after Allow, carries one persistent id. Apple treats data tied to a persistent identifier as linked, even without an account or a name. Apple asks one answer per data type, so a type that is linked some of the time is answered **Yes**. This is the safe default.
 
-The online play data (User ID, Gameplay Content) is linked by design: the server keeps it under the user id.
+The online play data (Email Address, User ID, Gameplay Content) is linked by design: the server keeps it under the user id.
 
 **Tracking stays No**: the id is ours only, it is never combined with other companies' data, and nothing is used for ads.
 
-**Owner:** you may still argue "not linked": no accounts, no name, email or phone, and the id is random and lives only in this install. If you choose that, keep the label and the manifest the same: set `NSPrivacyCollectedDataTypeLinked` back to `false` in `apps/mobile/app.json` (a code PR).
+**Owner:** for the install id and the diagnostics you may still argue "not linked": no name or phone, and the id is random and lives only in this install. (The online data, and the Apple email, stay linked.) If you choose that, keep the label and the manifest the same: set `NSPrivacyCollectedDataTypeLinked` back to `false` in `apps/mobile/app.json` (a code PR).
 
-The iOS privacy manifest in `apps/mobile/app.json` says `NSPrivacyCollectedDataTypeLinked: true` for all seven types, and `NSPrivacyCollectedDataTypeTracking: false` (#139, #281).
+The iOS privacy manifest in `apps/mobile/app.json` says `NSPrivacyCollectedDataTypeLinked: true` for all eight types, and `NSPrivacyCollectedDataTypeTracking: false` (#139, #281, #401).
 
 ## The label people will see
 
 With the answers above, the App Store page shows:
 
 - **Data Used to Track You:** none.
-- **Data Linked to You:** Identifiers, User Content, Usage Data, Diagnostics.
+- **Data Linked to You:** Contact Info, Identifiers, User Content, Usage Data, Diagnostics.
 - **Data Not Linked to You:** none.
 
 ## Delete my online data (#315)
@@ -98,10 +100,10 @@ Apple asks apps that make an account to let people delete it in the app (App Rev
 - [ ] PostHog project is in the **EU** cloud, and **Discard client IP data** is on (`docs/architecture/analytics-events.md`, Setup). If IPs were stored, Apple could see it as coarse location.
 - [ ] The app has no other SDK that sends data. Today the network SDKs are Sentry, PostHog, Convex (with Better Auth) and Expo Notifications (the push token, #285). If you add one (for example EAS Update), update this page first.
 - [ ] In a release build, **before** answering the consent screen, trigger a JS error and look at the event in Sentry: no `user`, no `contexts.device.id`, no device name, and no session in Release Health. Then trigger a native crash: nothing should arrive, not even on the next launch. See "Pre-consent crash reports" below.
-- [ ] `NSPrivacyCollectedDataTypeLinked` in `apps/mobile/app.json` matches the "linked" answers above (today: `true` for all seven).
+- [ ] `NSPrivacyCollectedDataTypeLinked` in `apps/mobile/app.json` matches the "linked" answers above (today: `true` for all eight).
 - [ ] Both Convex deployments are in the EU (`eu-west-1`), and you accepted Convex's data processing terms (DPA). The deployments have `BETTER_AUTH_SECRET` set (`npx convex env set`; never in the repo).
 - [ ] Check where Expo's push service processes the data, and whether its terms need a data processing agreement (DPA).
-- [ ] When sign-in with Apple, Google or an email link ships, redo the label: maybe Name or Email.
+- [ ] Email Address is ticked since Sign in with Apple (#401). When Google or the email code ships, or usernames (#405: maybe Name or Other User Content), check the label again.
 
 ## Pre-consent crash reports (#139)
 

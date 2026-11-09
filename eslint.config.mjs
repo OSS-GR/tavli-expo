@@ -48,6 +48,8 @@ const vendorImports = {
     'expo-secure-store',
     // Push permission, token and taps: use the `PushNotifications` port and `@tavli/notifications-expo`.
     'expo-notifications',
+    // Sign in with Apple: use the `AppleSheet` port and `@tavli/apple-sign-in-expo`.
+    'expo-apple-authentication',
   ],
   message:
     'Vendor SDKs belong in packages/adapters/* (or apps/server). Use a port from @tavli/contracts instead. See ADR-0002.',

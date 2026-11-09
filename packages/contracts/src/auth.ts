@@ -45,6 +45,13 @@ export interface AuthKeyCredential {
   readonly idToken: string;
   /** The nonce from `keyNonce()`, as it was before the sheet hashed it. */
   readonly nonce: string;
+  /**
+   * Apple's one-time code from the same sheet (#398, #401). After the
+   * sign-in or the save, the provider sends it to the server once, so the
+   * server can revoke Apple's token on account delete. A failed send does
+   * not fail the sign-in. Never log it.
+   */
+  readonly authorizationCode?: string;
 }
 
 /** A sign-in key of the signed-in account. Plain JSON. */
@@ -181,10 +188,20 @@ export interface MemoryAuthStore {
   nonces: number;
   /** Nonces made and not used yet. */
   openNonces: string[];
+  /** Apple codes the provider sent to the "server", oldest first (`authorizationCode`). */
+  appleCodes: string[];
 }
 
 export function createMemoryAuthStore(): MemoryAuthStore {
-  return { session: null, guests: 0, users: 0, keys: {}, nonces: 0, openNonces: [] };
+  return {
+    session: null,
+    guests: 0,
+    users: 0,
+    keys: {},
+    nonces: 0,
+    openNonces: [],
+    appleCodes: [],
+  };
 }
 
 function authError(code: AuthErrorCode, message: string): AuthErrorData {
@@ -263,6 +280,9 @@ export function createMemoryAuthProvider(
         store.keys[key] = id;
       }
       store.session = { id, isGuest: false };
+      if (credential.authorizationCode !== undefined) {
+        store.appleCodes.push(credential.authorizationCode);
+      }
       changed(store.session);
       return { ...store.session };
     },
@@ -280,6 +300,9 @@ export function createMemoryAuthProvider(
           throw authError('REJECTED', 'this account has a key of this kind already');
         }
         store.keys[key] = user.id;
+      }
+      if (credential.authorizationCode !== undefined) {
+        store.appleCodes.push(credential.authorizationCode);
       }
       if (user.isGuest) {
         store.session = { id: user.id, isGuest: false };

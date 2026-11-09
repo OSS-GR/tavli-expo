@@ -3,16 +3,17 @@
  * time limit, then "Make an invite". The route then opens the waiting screen
  * (`InviteWaitScreen`) with the code and the link.
  *
- * - An online game needs an account on our server. The screen says so,
- *   and "Make an invite" makes the guest account first
- *   (`signInForOnline`): the saved session when there is one, else a new
- *   guest, once.
+ * - An online game needs an account on our server. The screen says so.
+ *   "Make an invite" uses the saved session when there is one; else it
+ *   opens the sign-in sheet (#401, `SignInSheet`: Apple, Continue as a
+ *   guest, Not now), and makes the invite right after the sign-in. Not
+ *   now closes the sheet and makes nothing.
  * - It talks to the server only through the `Invites` port.
  * - A new invite sends `invite_created` (no code, no ids).
  * - Back while the invite is being made: the screen makes no invite, or
  *   cancels the one the server just made, so no invite is left open that
  *   nobody waits for (it would count toward `MAX_OPEN_INVITES`).
- * - A problem line is read to screen readers (`useAnnouncement`; iOS
+ * - A problem line is read to screen readers, each time it shows (iOS
  *   VoiceOver does not read `accessibilityRole="alert"`).
  * - Screen readers: focus moves to the title when the screen opens.
  * - Large fonts scroll: no text has a line limit.
@@ -26,7 +27,9 @@ import {
   isInviteErrorData,
   ONLINE_GAME_CHOICES,
   type Analytics,
+  type AppleSheet,
   type AuthProvider,
+  type AuthUser,
   type Invites,
   type NewInvite,
   type OnlineGameChoice,
@@ -35,7 +38,7 @@ import { MAX_OPEN_INVITES } from '@tavli/online';
 import { withAlpha } from '@tavli/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Text, View } from 'react-native';
+import { AccessibilityInfo, ScrollView, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -46,9 +49,9 @@ import { RowIcon, SectionCard } from '@/components/SectionCard';
 import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { useFocusOnShow } from '@/features/accessibility/focus';
-import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
-import { signInForOnline } from '@/features/online/account';
+import { onlineAccountReady } from '@/features/online/account';
+import { SignInSheet } from '@/features/online/SignInSheet';
 import { formatTimeLimit } from '@/features/online/clock';
 
 import { sendInviteCreated } from './inviteAnalytics';
@@ -61,6 +64,8 @@ export interface FriendSetupScreenProps {
   onBack: () => void;
   /** For tests. Default: the app's analytics. */
   analytics?: Analytics;
+  /** For tests. Default: the app's. */
+  appleSheet?: AppleSheet;
 }
 
 /** Why "Make an invite" did not work. */
@@ -75,6 +80,7 @@ export function FriendSetupScreen({
   onCreated,
   onBack,
   analytics,
+  appleSheet,
 }: FriendSetupScreenProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
@@ -84,7 +90,10 @@ export function FriendSetupScreen({
   const [busy, setBusy] = useState(false);
   // One invite per tap: a second tap before the render sees `busy` does nothing.
   const making = useRef(false);
-  const [problem, setProblem] = useState<Problem | null>(null);
+  // A new object for each failure, so the same problem twice is read twice.
+  const [problem, setProblem] = useState<{ readonly kind: Problem } | null>(null);
+  // No saved session: the sign-in sheet is open.
+  const [signingIn, setSigningIn] = useState(false);
   const titleRef = useFocusOnShow();
   // False once the screen is gone (the server answers later).
   const mounted = useRef(true);
@@ -95,7 +104,8 @@ export function FriendSetupScreen({
     };
   }, []);
 
-  const make = async () => {
+  /** `signedIn`: the sheet just signed in (and noted the account already). */
+  const make = async (signedIn = false) => {
     if (making.current) return;
     making.current = true;
     setBusy(true);
@@ -105,16 +115,25 @@ export function FriendSetupScreen({
       making.current = false;
       if (!mounted.current) return;
       setBusy(false);
-      setProblem(next);
+      setProblem({ kind: next });
     };
+    let user: AuthUser | null;
     try {
-      await signInForOnline(auth);
+      user = await auth.ready();
     } catch {
       failed('account');
       return;
     }
     // Gone (Back) before the account was ready: make no invite.
     if (!mounted.current) return;
+    if (user === null) {
+      // Nobody signed in: the sheet asks how. Its sign-in calls `make` again.
+      making.current = false;
+      setBusy(false);
+      setSigningIn(true);
+      return;
+    }
+    if (!signedIn) onlineAccountReady();
     let code: string;
     try {
       code = await invites.createInvite(game);
@@ -146,14 +165,17 @@ export function FriendSetupScreen({
       ? t('friend.timeLimitHint_none')
       : t('friend.timeLimitHint', { count: turnTimeMinutes });
   const problemText =
-    problem === 'account'
+    problem?.kind === 'account'
       ? t('friend.accountFailed')
-      : problem === 'tooMany'
+      : problem?.kind === 'tooMany'
         ? t('friend.tooMany', { max: MAX_OPEN_INVITES })
-        : problem === 'make'
+        : problem?.kind === 'make'
           ? t('friend.makeFailed')
           : null;
-  useAnnouncement(problemText);
+  // iOS VoiceOver does not read `accessibilityRole="alert"`: read each problem.
+  useEffect(() => {
+    if (problemText !== null) AccessibilityInfo.announceForAccessibility(problemText);
+  }, [problem, problemText]);
 
   const gameOptions: ListOption<OnlineGameChoice>[] = ONLINE_GAME_CHOICES.map((game) => ({
     value: game,
@@ -229,6 +251,18 @@ export function FriendSetupScreen({
           onPress={() => void make()}
         />
       </View>
+      {signingIn ? (
+        <SignInSheet
+          auth={auth}
+          onSignedIn={() => {
+            setSigningIn(false);
+            void make(true);
+          }}
+          onClose={() => setSigningIn(false)}
+          {...(appleSheet === undefined ? {} : { appleSheet })}
+          {...(analytics === undefined ? {} : { analytics })}
+        />
+      ) : null}
     </Screen>
   );
 }

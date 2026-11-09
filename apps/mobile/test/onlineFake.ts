@@ -41,6 +41,7 @@
  * `Date.now`, which the fake timers move.
  */
 import {
+  createMemoryAppleSheet,
   createMemoryAppUpdates,
   createMemoryAuthProvider,
   createMemoryAuthStore,
@@ -78,6 +79,7 @@ let server = newServer();
 const transports = new Map<string, GameTransport>();
 const invitePorts = new Map<string, Invites>();
 const notifications = createMemoryPushNotifications('ios');
+const appleSheet = createMemoryAppleSheet();
 const pushTokens = createMemoryPushTokens(() => auth.currentUser()?.id ?? null);
 const appUpdates = createMemoryAppUpdates();
 let build: AppBuild | null = DEFAULT_BUILD;
@@ -186,6 +188,8 @@ const onlineData: OnlineData = {
 
 export const onlineFake = {
   auth,
+  /** Apple's sheet on the phone: set `next`, `sub` or `available` to act it out. */
+  appleSheet,
   games,
   invites,
   notifications,
@@ -227,5 +231,7 @@ export function resetOnlineFake(): void {
   notifications.reset();
   pushTokens.reset();
   appUpdates.reset();
+  Object.assign(appleSheet, { sub: 'apple-1', available: true, next: 'proof' });
+  appleSheet.shown.length = 0;
   build = DEFAULT_BUILD;
 }

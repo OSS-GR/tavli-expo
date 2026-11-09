@@ -7,6 +7,11 @@
  */
 import { createPostHogAnalytics } from '@tavli/analytics-posthog';
 import { createExpoSoundPlayer } from '@tavli/audio-expo';
+import {
+  AppleSignInButton as ExpoAppleSignInButton,
+  createExpoAppleSheet,
+  type AppleSignInButtonProps,
+} from '@tavli/apple-sign-in-expo';
 import { createBetterAuthProvider, createSecureSessionStorage } from '@tavli/auth-better-auth';
 import {
   createConvexAppUpdates,
@@ -21,6 +26,7 @@ import {
   createNoopAnalytics,
   createNoopCrashReporter,
   type Analytics,
+  type AppleSheet,
   type AppUpdates,
   type AuthProvider,
   type BotRunner,
@@ -43,6 +49,7 @@ import { createMmkvStorage } from '@tavli/storage-mmkv';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { t } from 'i18next';
+import type { ComponentType } from 'react';
 import { Platform } from 'react-native';
 
 import { APP_SCHEME, convexServer } from '@/convexUrl';
@@ -152,6 +159,8 @@ const online = createOnlineServices(convexServer(), {
       scheme: APP_SCHEME,
       // The session cookie signs the user in: it lives in the secure store.
       storage: createSecureSessionStorage(),
+      // Apple's client id for the code trade (#398): this app's bundle id.
+      appleClientId: Platform.OS === 'ios' ? Application.applicationId : null,
     }),
   createClient: createConvexClient,
   createGames: (client) => createConvexGameTransport({ client }),
@@ -169,11 +178,21 @@ const online = createOnlineServices(convexServer(), {
 });
 
 /**
- * Sign-in for online play (guest only, for now). Screens make the guest
- * through `signInForOnline` (`features/online/account.ts`) when the user
- * makes or opens an invite.
+ * Sign-in for online play. Nothing signs in at start: the sign-in choices
+ * (`features/online/SignInChoices.tsx`, #401) show at the first online
+ * tap, when the user makes or opens an invite, and make a guest or sign in
+ * with Apple there.
  */
 export const auth: AuthProvider | undefined = online?.auth;
+
+/**
+ * Sign in with Apple (#401): Apple's sheet and Apple's own button. iPhone
+ * only for now: on Android `isAvailable()` is false. Only the sign-in
+ * choices (`features/online/SignInChoices.tsx`) use them, and only with
+ * `auth`.
+ */
+export const appleSheet: AppleSheet = createExpoAppleSheet();
+export const AppleSignInButton: ComponentType<AppleSignInButtonProps> = ExpoAppleSignInButton;
 
 /** Online games on the Convex deployment. A screen checks `games === undefined` to show that online play is off. */
 export const games: GameTransport | undefined = online?.games;

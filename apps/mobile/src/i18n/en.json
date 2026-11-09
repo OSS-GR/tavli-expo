@@ -377,10 +377,7 @@
     },
     "account": {
       "title": "Game invite",
-      "body": "A friend sent you an invite to an online game. An online game needs a free account. We make a guest account for you, with no name and no email.",
-      "show": "Show the invite",
-      "busy": "Making your free account…",
-      "failed": "Your free account was not made. Check the connection and try again."
+      "body": "A friend sent you an invite to an online game. An online game needs a free account: pick how you sign in."
     },
     "off": {
       "title": "Online play is off",
@@ -397,7 +394,7 @@
     "timeLimitHint_none": "No time limit: 24 hours per turn",
     "timeLimitHint_one": "1 minute per turn",
     "timeLimitHint_other": "{{count}} minutes per turn",
-    "account": "An online game needs a free account. We make a guest account for you, with no name and no email.",
+    "account": "An online game needs a free account. When you make the invite, you pick how you sign in: you can play as a guest, with no name and no email.",
     "make": "Make an invite",
     "making": "Making the invite…",
     "makeFailed": "The invite was not made. Check the connection and try again.",
@@ -445,6 +442,16 @@
     },
     "again": "Make a new invite",
     "home": "Home"
+  },
+  "signIn": {
+    "title": "Play online",
+    "body": "An online game needs a free account. Pick how you sign in.",
+    "appleNote": "With Apple you can sign in again on a new phone. We keep your Apple ID and the email Apple gives us, and you can hide your email. Other players never see them.",
+    "guest": "Continue as a guest",
+    "guestNote": "A guest account has no name and no email. Only this phone can open it.",
+    "notNow": "Not now",
+    "busy": "Signing you in…",
+    "failed": "That did not work. Check the connection and try again."
   },
   "join": {
     "title": "Join with a code",

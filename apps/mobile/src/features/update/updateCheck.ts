@@ -9,7 +9,7 @@
  * - Play a friend, when it opens on a phone that played online before
  *   (`hasOnlineAccount()`): the privacy policy says the app does not talk
  *   to the server before the first invite;
- * - an invite link, and Make an invite (`useOnlineAccount`, `signInForOnline`);
+ * - an invite link, Make an invite and each sign-in (`onlineAccountReady`);
  * - an online game route, a push tap too (`useOnlineConnection`).
  *
  * After the first check of an app run, the root layout asks again each

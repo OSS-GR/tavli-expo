@@ -4,16 +4,17 @@
  *
  * - A saved session (this phone made or opened an invite before) shows
  *   the invite at once (`children`).
- * - Else a card says that an online game needs a free account, with "Show
- *   the invite" (it makes the guest account, once) and Home. Opening a
- *   link alone makes no account.
+ * - Else a card says that an online game needs a free account, with the
+ *   sign-in choices (#401, `SignInChoices`): Apple, Continue as a guest,
+ *   and Not now (Home). Opening a link alone makes no account. The invite
+ *   code stays in the route, so the invite shows right after the sign-in.
  * - A build with no online server shows "Online play is off".
  * - Screen readers: each card moves focus to its title and is read once.
  *   Large fonts scroll.
  *
  * Dev invites (`/dev/online`) skip this: they live on the in-memory server.
  */
-import type { AuthProvider } from '@tavli/contracts';
+import type { Analytics, AppleSheet, AuthProvider } from '@tavli/contracts';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
@@ -23,6 +24,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { useOnlineAccount } from '@/features/online/account';
+import { SignInChoices } from '@/features/online/SignInChoices';
 
 export interface InviteAccountGateProps {
   /** `undefined`: this build has no online server. */
@@ -30,9 +32,13 @@ export interface InviteAccountGateProps {
   /** The invite, for the signed-in user `me`. */
   children: (me: string) => ReactNode;
   onHome: () => void;
+  /** For tests. Default: the app's. */
+  appleSheet?: AppleSheet;
+  /** For tests. Default: the app's analytics. */
+  analytics?: Analytics;
 }
 
-export function InviteAccountGate({ auth, children, onHome }: InviteAccountGateProps) {
+export function InviteAccountGate({ auth, children, onHome, ...more }: InviteAccountGateProps) {
   if (auth === undefined) {
     return (
       <Frame>
@@ -41,26 +47,35 @@ export function InviteAccountGate({ auth, children, onHome }: InviteAccountGateP
     );
   }
   return (
-    <SignedInGate auth={auth} onHome={onHome}>
+    <SignedInGate auth={auth} onHome={onHome} {...more}>
       {children}
     </SignedInGate>
   );
 }
 
-function SignedInGate({ auth, children, onHome }: InviteAccountGateProps & { auth: AuthProvider }) {
-  const { account, signIn } = useOnlineAccount(auth);
+function SignedInGate({
+  auth,
+  children,
+  onHome,
+  appleSheet,
+  analytics,
+}: InviteAccountGateProps & { auth: AuthProvider }) {
+  const { account, signedIn } = useOnlineAccount(auth);
   if (account.status === 'signedIn') return <>{children(account.me)}</>;
   return (
     <Frame>
       {account.status === 'loading' ? (
         <Loading />
       ) : (
-        <AccountCard
-          busy={account.status === 'signingIn'}
-          failed={account.status === 'failed'}
-          onShow={signIn}
-          onHome={onHome}
-        />
+        <AccountCard>
+          <SignInChoices
+            auth={auth}
+            onSignedIn={signedIn}
+            onNotNow={onHome}
+            {...(appleSheet === undefined ? {} : { appleSheet })}
+            {...(analytics === undefined ? {} : { analytics })}
+          />
+        </AccountCard>
       )}
     </Frame>
   );
@@ -90,47 +105,20 @@ function Loading() {
   );
 }
 
-interface AccountCardProps {
-  busy: boolean;
-  failed: boolean;
-  onShow: () => void;
-  onHome: () => void;
-}
-
-function AccountCard({ busy, failed, onShow, onHome }: AccountCardProps) {
+/** The invite card over the sign-in choices (`children`). */
+function AccountCard({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
   const title = t('invite.account.title');
   const body = t('invite.account.body');
   useAnnouncement(`${title} ${body}`);
-  // iOS VoiceOver does not read `accessibilityRole="alert"`: read the problem.
-  useAnnouncement(failed ? t('invite.account.failed') : null);
   return (
     <View testID="invite-account" style={styles.card}>
       <Text ref={titleRef} style={styles.title} accessibilityRole="header">
         {title}
       </Text>
       <Text style={styles.line}>{body}</Text>
-      <View style={styles.actions}>
-        <ActionButton
-          testID="invite-account-show"
-          label={t('invite.account.show')}
-          disabled={busy}
-          onPress={onShow}
-        />
-        <ActionButton
-          testID="invite-home"
-          kind="secondary"
-          label={t('invite.home')}
-          onPress={onHome}
-        />
-      </View>
-      {busy ? <Text style={styles.line}>{t('invite.account.busy')}</Text> : null}
-      {failed ? (
-        <Text testID="invite-account-failed" style={styles.line}>
-          {t('invite.account.failed')}
-        </Text>
-      ) : null}
+      <View style={styles.actions}>{children}</View>
     </View>
   );
 }

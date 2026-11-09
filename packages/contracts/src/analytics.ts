@@ -150,6 +150,13 @@ export interface AnalyticsEvents {
   push_permission_answered: {
     answer: 'granted' | 'denied';
   };
+  /**
+   * A new sign-in for online play (#401), from the sign-in choices: the
+   * way only. Never the user id, the email, the Apple id or a username.
+   */
+  online_sign_in: {
+    method: 'apple' | 'guest';
+  };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
@@ -187,6 +194,7 @@ export const ANALYTICS_EVENTS = [
   'review_opened',
   'invite_created',
   'push_permission_answered',
+  'online_sign_in',
 ] as const satisfies readonly AnalyticsEventName[];
 
 type MissingEvent = Exclude<AnalyticsEventName, (typeof ANALYTICS_EVENTS)[number]>;

@@ -1,10 +1,12 @@
 /**
  * The online account of this phone (#281).
  *
- * Online play needs an account on our server. The app makes a guest
- * account (a random user id, no name, no email) only when the user opens
- * online play: when they make an invite, or show an invite a friend sent.
- * A link to a game makes no account by itself (`connection.ts`).
+ * Online play needs an account on our server. The app signs in only when
+ * the user opens online play and picks a way in the sign-in choices
+ * (#401, `SignInChoices`): Sign in with Apple (`signIn.ts`) or a guest
+ * account (a random user id, no name, no email). That happens when they
+ * make an invite, or show an invite a friend sent. A link to a game makes
+ * no account by itself (`connection.ts`).
  *
  * The guest is made once: a saved session (the sign-in cookie in the
  * phone's secure store) is used again, and `signInAsGuest` itself makes no
@@ -13,7 +15,7 @@
  * Never send the user id to analytics.
  */
 import type { AuthProvider, AuthUser } from '@tavli/contracts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { checkAppUpdate } from '@/features/update/updateCheck';
 
@@ -26,10 +28,18 @@ import { forgetOnlineAccount, rememberOnlineAccount } from './accountHint';
  */
 export async function signInForOnline(auth: AuthProvider): Promise<AuthUser> {
   const user = (await auth.ready()) ?? (await auth.signInAsGuest());
-  rememberOnlineAccount();
-  // Update needed (#390): this build may be too old for the server.
-  void checkAppUpdate();
+  onlineAccountReady();
   return user;
+}
+
+/**
+ * Call after any sign-in, and when a saved session is used for online
+ * play: notes on the phone that it has an account (`accountHint.ts`), and
+ * asks the server whether this build is too old (#390).
+ */
+export function onlineAccountReady(): void {
+  rememberOnlineAccount();
+  void checkAppUpdate();
 }
 
 /**
@@ -70,43 +80,30 @@ export interface SignOutPushes {
 export type OnlineAccount =
   /** Loading the saved session. */
   | { readonly status: 'loading' }
-  /** Nobody is signed in: `signIn` makes the guest. */
+  /** Nobody is signed in: the screen shows the sign-in choices. */
   | { readonly status: 'signedOut' }
-  /** Making the guest account. */
-  | { readonly status: 'signingIn' }
   /** Signed in as `me` (the user id). */
   | { readonly status: 'signedIn'; readonly me: string }
-  /** The saved session did not load, or the account was not made. `signIn` tries again. */
+  /** The saved session did not load. The sign-in choices try again. */
   | { readonly status: 'failed' };
 
 /**
  * The account of this phone, from the saved session. It makes no account
- * by itself: `signIn` makes the guest (once), when the user asks for online
- * play.
+ * by itself: the screen shows the sign-in choices (`SignInChoices`), and
+ * passes their user to `signedIn`.
  */
 export function useOnlineAccount(auth: AuthProvider): {
   readonly account: OnlineAccount;
-  readonly signIn: () => void;
+  readonly signedIn: (user: AuthUser) => void;
 } {
   const [account, setAccount] = useState<OnlineAccount>({ status: 'loading' });
-  // False once the screen is gone (sign-in answers later).
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   useEffect(() => {
     let live = true;
     auth.ready().then(
       (user) => {
-        if (user !== null) {
-          rememberOnlineAccount();
-          void checkAppUpdate();
-        }
-        if (live) setAccount(user === null ? { status: 'signedOut' } : signedIn(user));
+        if (user !== null) onlineAccountReady();
+        if (live) setAccount(user === null ? { status: 'signedOut' } : signedInAs(user));
       },
       () => {
         if (live) setAccount({ status: 'failed' });
@@ -117,23 +114,11 @@ export function useOnlineAccount(auth: AuthProvider): {
     };
   }, [auth]);
 
-  const busy = account.status === 'signingIn';
-  const signIn = useCallback(() => {
-    if (busy) return;
-    setAccount({ status: 'signingIn' });
-    signInForOnline(auth).then(
-      (user) => {
-        if (mounted.current) setAccount(signedIn(user));
-      },
-      () => {
-        if (mounted.current) setAccount({ status: 'failed' });
-      },
-    );
-  }, [auth, busy]);
+  const signedIn = useCallback((user: AuthUser) => setAccount(signedInAs(user)), []);
 
-  return { account, signIn };
+  return { account, signedIn };
 }
 
-function signedIn(user: AuthUser): OnlineAccount {
+function signedInAs(user: AuthUser): OnlineAccount {
   return { status: 'signedIn', me: user.id };
 }
