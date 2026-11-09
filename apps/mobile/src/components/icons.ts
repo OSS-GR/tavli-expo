@@ -101,6 +101,9 @@ export const ICONS = {
       'M10 22h4',
     ],
   },
+  fastForward: {
+    strokes: ['M13 19 22 12 13 5z', 'M2 19 11 12 2 5z'],
+  },
   flipVertical: {
     strokes: [
       'm17 3-5 5-5-5h10',

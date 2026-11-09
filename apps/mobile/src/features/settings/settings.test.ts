@@ -25,6 +25,8 @@ describe('settings store', () => {
     expect(state.autoConfirmMoves).toBe(false);
     // Hints (#209) start on.
     expect(state.showHints).toBe(true);
+    // The race card (fast forward a race) starts on.
+    expect(state.offerFastForward).toBe(true);
     expect(state.boardFlipMode).toBe('flip');
     expect(state.homeBoardSide).toBe('right');
     // The move list follows the screen reader until the player picks On or Off.
@@ -51,6 +53,7 @@ describe('settings store', () => {
     first.getState().setSetting('autoConfirmMoves', true);
     first.getState().setSetting('boardFlipMode', 'fixed');
     first.getState().setSetting('showHints', false);
+    first.getState().setSetting('offerFastForward', false);
     first.getState().setSetting('moveList', 'on');
 
     const second = createSettingsStore(storage);
@@ -58,6 +61,7 @@ describe('settings store', () => {
       autoConfirmMoves: true,
       boardFlipMode: 'fixed',
       showHints: false,
+      offerFastForward: false,
       moveList: 'on',
     });
   });

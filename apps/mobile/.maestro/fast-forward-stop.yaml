@@ -8,8 +8,10 @@ env:
 - runFlow: subflows/open-dev-build.yaml
 - runFlow: subflows/welcome.yaml
 - runFlow: subflows/open-race.yaml
+- assertVisible:
+    id: race-card
 - tapOn:
-    id: fast-forward-button
+    id: race-fast-forward-button
 - assertVisible:
     id: fast-forward-stop-button
 - tapOn:

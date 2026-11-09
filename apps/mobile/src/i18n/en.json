@@ -106,6 +106,10 @@
       "label": "Show hints",
       "hint": "A Hint button shows the best move for your roll"
     },
+    "offerFastForward": {
+      "label": "Offer fast forward in races",
+      "hint": "Vs the bot, a card offers fast forward when a game becomes a race"
+    },
     "boardView": {
       "label": "Board view (pass-and-play)",
       "flip": "Flip",
@@ -666,7 +670,14 @@
       "playing": "Fast forward…",
       "stop": "Stop",
       "stopLabel": "Stop fast forward and play on yourself",
-      "started": "Fast forward. The bot plays both sides to the end of the game."
+      "started": "Fast forward. The bot plays both sides to the end of the game.",
+      "offer": {
+        "title": "It's a race",
+        "body": "No more contact: the checkers only run home now. The bot can play both sides to the end of this game.",
+        "playOn": "Play on",
+        "never": "Don't ask again",
+        "settingsNote": "The Fast forward button stays next to Roll dice. You can turn this card off in Settings."
+      }
     },
     "menu": {
       "open": "Game menu",

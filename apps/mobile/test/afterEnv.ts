@@ -1,6 +1,7 @@
 // Runs in each test file after the test framework is set up
 // (`setupFilesAfterEnv` in jest.config.js).
 
+import { resetRaceOffersForTest } from '../src/features/game/raceOffer';
 import { resetAnnouncements } from '../src/features/game/useAnnouncement';
 import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPushes';
 import { forgetPushTapsForTest } from '../src/features/notifications/pushTaps';
@@ -12,8 +13,10 @@ import { resetOnlineFake } from './onlineFake';
 
 // `useAnnouncement` reads a keyed game event once per app run (#216). In
 // tests one file is one app run, so each test starts with nothing read.
+// The race card is answered once per game for the app run too.
 beforeEach(() => {
   resetAnnouncements();
+  resetRaceOffersForTest();
 });
 
 // Online play (`auth`, `games`, `onlineServer` of `@/services`): each test

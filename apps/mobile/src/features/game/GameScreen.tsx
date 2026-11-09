@@ -165,6 +165,7 @@ import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
 import { diceWereChosen, diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
 import { isStrongWin, passNotice, recordScoring, winType, type WinType } from './turnNotices';
+import { answerRaceOffer, useRaceOfferAnswered } from './raceOffer';
 import { useAnnouncement } from './useAnnouncement';
 
 /** How long the opening result ("Maria starts with 6-3.") stays, unless a tap closes it (#176). */
@@ -337,6 +338,8 @@ export function GameScreen({
   const flipMode = useSettings((s) => s.boardFlipMode);
   const autoConfirm = useSettings((s) => s.autoConfirmMoves);
   const showHints = useSettings((s) => s.showHints);
+  const offerFastForward = useSettings((s) => s.offerFastForward);
+  const setSetting = useSettings((s) => s.setSetting);
   const showMoveList = useMoveListShown();
   const { layout, column, spaceKey } = useScreenLayout();
   const landscape = layout === 'landscape';
@@ -468,7 +471,7 @@ export function GameScreen({
   const choosing = view.matchPhase === 'playing' && isChoosingStarter(game);
   // Online: a game-end sheet or a notice covers the board.
   const onlineCovered = online !== undefined && (online.ended !== null || online.notice !== null);
-  const blocked =
+  const boardCovered =
     matchOver ||
     gameOver ||
     showPass ||
@@ -477,6 +480,21 @@ export function GameScreen({
     askHuman ||
     choosing ||
     onlineCovered;
+  // Fast forward is offered on your roll, vs the bot, once the game is a race.
+  const human = botPlayer === null ? null : other(botPlayer);
+  const raceReady =
+    fastForwardSeat !== null &&
+    !fastForwarding &&
+    view.matchPhase === 'playing' &&
+    phase === 'awaiting-roll' &&
+    view.toMove === human &&
+    !boardCovered &&
+    isRace(game.state);
+  // The race card asks once per game, on your first roll of the race, until
+  // you turn it off ("Don't ask again" or the setting).
+  const raceAnswered = useRaceOfferAnswered(raceKey);
+  const showRaceCard = raceReady && offerFastForward && !raceAnswered;
+  const blocked = boardCovered || showRaceCard;
 
   // Match over: the final position stays a moment, then the match-end
   // screen opens. Not while paused: the menu or another screen is on top.
@@ -506,16 +524,8 @@ export function GameScreen({
   // The bot (also for you, in a fast forward) or the remote player has the
   // board: your touches do nothing.
   const othersTurn = botsTurn || fastForwarding || remoteStatus !== null;
-  // Fast forward is offered on your roll, vs the bot, once the game is a race.
-  const human = botPlayer === null ? null : other(botPlayer);
-  const canFastForward =
-    fastForwardSeat !== null &&
-    !fastForwarding &&
-    view.matchPhase === 'playing' &&
-    phase === 'awaiting-roll' &&
-    view.toMove === human &&
-    !blocked &&
-    isRace(game.state);
+  // After the card, Fast forward stays next to Roll for the rest of the race.
+  const canFastForward = raceReady && !showRaceCard;
 
   // One checker with several dice (#180): the "2+3" targets, from the engine.
   const paths = useMemo(() => (othersTurn ? [] : flowPaths(game)), [game, othersTurn]);
@@ -618,6 +628,7 @@ export function GameScreen({
     !passWaits &&
     !botsTurn &&
     !fastForwarding &&
+    !showRaceCard &&
     !(decided && showOpening) &&
     (phase === 'awaiting-roll' || (roller !== null && !tieWait));
 
@@ -1245,6 +1256,7 @@ export function GameScreen({
     !showPass &&
     !passWaits &&
     !showOpening &&
+    !showRaceCard &&
     (online === undefined || onlineRoll)
   ) {
     // In a race vs the bot, Fast forward sits next to Roll.
@@ -1596,6 +1608,42 @@ export function GameScreen({
             }}
           />
         ))}
+      </GameCard>
+    );
+  } else if (!over && showRaceCard) {
+    // Fast forward a race: the card the race opens with.
+    const answer = (fastForward: boolean) => {
+      answerRaceOffer(raceKey);
+      if (fastForward) setFastForwardKey(raceKey);
+    };
+    card = (
+      <GameCard
+        testID="race-card"
+        announceKey={`${raceKey}:raceOffer`}
+        title={t('game.fastForward.offer.title')}
+        lines={[t('game.fastForward.offer.body')]}
+        footnote={t('game.fastForward.offer.settingsNote')}>
+        <ActionButton
+          testID="race-fast-forward-button"
+          label={t('game.fastForward.button')}
+          accessibilityLabel={t('game.fastForward.label')}
+          onPress={() => answer(true)}
+        />
+        <ActionButton
+          testID="race-play-on-button"
+          label={t('game.fastForward.offer.playOn')}
+          kind="secondary"
+          onPress={() => answer(false)}
+        />
+        <ActionButton
+          testID="race-never-button"
+          label={t('game.fastForward.offer.never')}
+          kind="text"
+          onPress={() => {
+            setSetting('offerFastForward', false);
+            answer(false);
+          }}
+        />
       </GameCard>
     );
   } else if (!over && showOpening && opening) {

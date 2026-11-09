@@ -217,6 +217,11 @@ The engine check is `isRace` (`packages/engine/src/race.ts`).
   come from the same RNG, and every move is a legal move from the engine.
   The bot picks your moves at its strongest level. The game scores as
   usual (mono, diplo, or the points of the scoring method).
+- **The offer.** On your first roll of a race, a card asks: **Fast
+  forward**, **Play on** or **Don't ask again**. It asks once per game.
+  After the card, a Fast forward button stays next to Roll for the rest of
+  the race. **Don't ask again** turns off the setting "Offer fast forward
+  in races" (Settings, Game); the button still shows.
 - You can stop it at any time and play on yourself.
 
 ## Edge cases

@@ -274,7 +274,7 @@ Dev routes only work in development builds. Release builds (the `preview` profil
 
 To try the online screen: open `tavlaki://dev/online` (or pick `dev/online` in `/_sitemap`). The bot plays its turns on its own, and a turn timer that runs out ends that game, as on the real server.
 
-To try Fast forward: open `tavlaki://dev/race` and tap **Fast forward** next to Roll.
+To try Fast forward: open `tavlaki://dev/race` and tap **Fast forward** on the race card (or **Play on**, then **Fast forward** next to Roll).
 
 **Maestro (end-to-end).** The flows live in `apps/mobile/.maestro/` (how to run them: its `README.md`). They need the dev build on the iOS simulator and Metro running, because they open `tavlaki://dev/race`. Run them from `apps/mobile`: `maestro test .maestro/fast-forward.yaml .maestro/fast-forward-stop.yaml`.
 

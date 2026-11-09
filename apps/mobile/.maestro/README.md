@@ -4,10 +4,10 @@ End-to-end flows for the app ([Maestro](https://maestro.dev)). They drive
 the **development** build (`com.tavlaki.dev`) on a simulator, with the JS
 from Metro, because they open dev routes (`tavlaki://dev/race`).
 
-| Flow                     | What it checks                                                                                                                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fast-forward.yaml`      | In a race vs the bot, **Fast forward** shows next to Roll. A tap shows the status and **Stop**, the bot plays both sides, and the game ends with the game-end sheet. The next game has no Fast forward. |
-| `fast-forward-stop.yaml` | **Stop** gives the board back: Roll, or Undo and Confirm.                                                                                                                                               |
+| Flow                     | What it checks                                                                                                                                                                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fast-forward.yaml`      | In a race vs the bot, the race card shows; after **Play on**, **Fast forward** shows next to Roll. A tap shows the status and **Stop**, the bot plays both sides, and the game ends with the game-end sheet. The next game has no Fast forward. |
+| `fast-forward-stop.yaml` | **Fast forward** on the race card starts it; **Stop** gives the board back: Roll, or Undo and Confirm.                                                                                                                                          |
 
 Each flow starts from a clean install (`clearState`), opens the dev build
 on Metro, closes the dev menu tip, answers the first-launch steps

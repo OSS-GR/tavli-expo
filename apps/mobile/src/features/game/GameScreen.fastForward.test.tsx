@@ -1,8 +1,9 @@
 /**
  * Fast forward a race (`docs/rules/tavli-match.md`, "Fast forward a race").
- * Vs the bot, once no checker can touch an opponent checker again, your
- * Roll comes with Fast forward. Then the bot plays both sides fast to the
- * end of the game, and Stop gives you the board back.
+ * Vs the bot, once no checker can touch an opponent checker again, a card
+ * offers Fast forward on your roll (once per game, unless the setting is
+ * off), and Roll comes with a Fast forward button. Then the bot plays both
+ * sides fast to the end of the game, and Stop gives you the board back.
  *
  * The bot is a fake runner (the first legal turn) that records each
  * request, so the tests see which level played which side. Fake timers:
@@ -153,27 +154,88 @@ afterEach(() => {
 });
 
 describe('<GameScreen /> fast forward a race', () => {
-  it('shows Fast forward next to Roll only in a race, on your roll', async () => {
+  it('opens a race with a card, on your roll only', async () => {
     const store = newStore();
     setPosition(store, contact);
     const { bot } = setup();
     await show(store, bot);
     expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    expect(screen.queryByTestId('race-card')).toBeNull();
     expect(screen.queryByTestId('fast-forward-button')).toBeNull();
-
-    await act(async () => {
-      setPosition(store, race);
-    });
-    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
-    expect(
-      button('Fast forward: the bot plays both sides to the end of the game'),
-    ).toBeOnTheScreen();
 
     // Not on the bot's turn.
     await act(async () => {
       setPosition(store, race, 'black');
     });
+    expect(screen.queryByTestId('race-card')).toBeNull();
     expect(screen.queryByTestId('fast-forward-button')).toBeNull();
+
+    await act(async () => {
+      setPosition(store, race);
+    });
+    expect(screen.getByTestId('race-card')).toBeOnTheScreen();
+    expect(screen.getByText("It's a race")).toBeOnTheScreen();
+    expect(announce).toHaveBeenCalledWith(expect.stringContaining("It's a race"));
+    // The card answers first: no Roll, no swipe, and the board is hidden from screen readers.
+    expect(screen.queryByTestId('roll-button')).toBeNull();
+    expect(screen.queryByTestId('fast-forward-button')).toBeNull();
+    expect(screen.queryByTestId('game-board')).toBeNull();
+    expect(
+      button('Fast forward: the bot plays both sides to the end of the game'),
+    ).toBeOnTheScreen();
+  });
+
+  it('Play on: Fast forward stays next to Roll, and the card does not come back', async () => {
+    const user = setupUser();
+    const store = newStore();
+    setPosition(store, longRace);
+    const { bot, runner } = setup();
+    await show(store, bot);
+    await user.press(screen.getByTestId('race-play-on-button'));
+    expect(screen.queryByTestId('race-card')).toBeNull();
+    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    expect(screen.getByTestId('fast-forward-button')).toBeOnTheScreen();
+    expect(runner.requests).toHaveLength(0);
+    expect(settingsStore.getState().offerFastForward).toBe(true);
+
+    // A new screen for the same game (Home, then Continue): still answered.
+    await screen.unmount();
+    await show(store, bot);
+    expect(screen.queryByTestId('race-card')).toBeNull();
+    expect(screen.getByTestId('fast-forward-button')).toBeOnTheScreen();
+
+    // The button still starts it.
+    await user.press(screen.getByTestId('fast-forward-button'));
+    expect(screen.getByTestId('fast-forward-status')).toHaveTextContent('Fast forward…');
+  });
+
+  it("Don't ask again turns the setting off; the button stays", async () => {
+    const user = setupUser();
+    const store = newStore();
+    setPosition(store, longRace);
+    const { bot } = setup();
+    await show(store, bot);
+    await user.press(screen.getByTestId('race-never-button'));
+    expect(settingsStore.getState().offerFastForward).toBe(false);
+    expect(screen.queryByTestId('race-card')).toBeNull();
+    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    expect(screen.getByTestId('fast-forward-button')).toBeOnTheScreen();
+    expect(screen.queryByTestId('fast-forward-status')).toBeNull();
+  });
+
+  it('with the setting off: no card, only the button next to Roll', async () => {
+    await act(async () => {
+      settingsStore.setState({ offerFastForward: false });
+    });
+    const store = newStore();
+    setPosition(store, race);
+    const { bot } = setup();
+    await show(store, bot);
+    expect(screen.queryByTestId('race-card')).toBeNull();
+    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    expect(
+      button('Fast forward: the bot plays both sides to the end of the game'),
+    ).toBeOnTheScreen();
   });
 
   it('has no Fast forward without the seat for it', async () => {
@@ -191,7 +253,7 @@ describe('<GameScreen /> fast forward a race', () => {
     const { bot, runner, autoEvents } = setup();
     await show(store, bot);
 
-    await user.press(screen.getByTestId('fast-forward-button'));
+    await user.press(screen.getByTestId('race-fast-forward-button'));
     expect(screen.getByTestId('fast-forward-status')).toHaveTextContent('Fast forward…');
     expect(button('Stop fast forward and play on yourself')).toBeOnTheScreen();
     expect(screen.queryByTestId('roll-button')).toBeNull();
@@ -225,7 +287,7 @@ describe('<GameScreen /> fast forward a race', () => {
     setPosition(store, longRace);
     const { bot } = setup();
     await show(store, bot);
-    await user.press(screen.getByTestId('fast-forward-button'));
+    await user.press(screen.getByTestId('race-fast-forward-button'));
     const { beforeRollMs, afterRollMs, moveMs, landMs } = FAST_FORWARD_TIMING;
     // Your roll comes after the short wait, and it is not thrown over the board.
     await tick(beforeRollMs);
@@ -241,7 +303,7 @@ describe('<GameScreen /> fast forward a race', () => {
     setPosition(store, longRace);
     const { bot, autoEvents } = setup();
     await show(store, bot);
-    await user.press(screen.getByTestId('fast-forward-button'));
+    await user.press(screen.getByTestId('race-fast-forward-button'));
     // Your fast turn, then the bot's roll.
     await waitFor(
       () => {
@@ -277,7 +339,7 @@ describe('<GameScreen /> fast forward a race', () => {
     setPosition(store, longRace);
     const { bot, runner } = setup();
     await show(store, bot);
-    await user.press(screen.getByTestId('fast-forward-button'));
+    await user.press(screen.getByTestId('race-fast-forward-button'));
     await tick(FAST_FORWARD_TIMING.beforeRollMs);
     expect(store.getState().flow.game.phase).toBe('moving');
     await user.press(screen.getByTestId('fast-forward-stop-button'));
@@ -297,7 +359,7 @@ describe('<GameScreen /> fast forward a race', () => {
     setPosition(store, longRace);
     const { bot } = setup();
     await show(store, bot);
-    await user.press(screen.getByTestId('fast-forward-button'));
+    await user.press(screen.getByTestId('race-fast-forward-button'));
     await screen.rerender(
       <GameScreen store={store} seats={seats} bot={bot} openingTaps="one" paused />,
     );
@@ -317,7 +379,7 @@ describe('<GameScreen /> fast forward a race', () => {
     setPosition(store, race);
     const { bot } = setup();
     await show(store, bot);
-    await user.press(screen.getByTestId('fast-forward-button'));
+    await user.press(screen.getByTestId('race-fast-forward-button'));
     await waitFor(() => expect(screen.getByTestId('game-end-card')).toBeOnTheScreen(), {
       timeout: 60_000,
     });
@@ -339,7 +401,7 @@ describe('<GameScreen /> fast forward a race', () => {
       },
     };
     await show(store, failing);
-    await user.press(screen.getByTestId('fast-forward-button'));
+    await user.press(screen.getByTestId('race-fast-forward-button'));
     await tick(5000);
     // The roll is in, the runner gave no turn: Stop still gives the board back.
     expect(store.getState().flow.game.phase).toBe('moving');
