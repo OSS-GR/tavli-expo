@@ -212,6 +212,10 @@
     "username": {
       "label": "Username",
       "hint": "The name other players see"
+    },
+    "blocked": {
+      "label": "Blocked players",
+      "hint": "Players you blocked or reported"
     }
   },
   "history": {
@@ -390,6 +394,10 @@
     "account": {
       "title": "Game invite",
       "body": "A friend sent you an invite to an online game. An online game needs a free account: pick how you sign in."
+    },
+    "blocked": {
+      "title": "You block this player",
+      "body": "To play, unblock them in Settings → Blocked players, then open the invite again."
     },
     "off": {
       "title": "Online play is off",
@@ -1270,5 +1278,69 @@
     },
     "guestOnly": "A username needs a saved account. Sign in with Apple in online play to save yours. Guests play as “Guest” and a number.",
     "loading": "Loading…"
+  },
+  "safety": {
+    "action": "Report or block",
+    "actionHint": "Block {{name}}, or report them to us",
+    "actionLabel": "Report or block {{name}}",
+    "thisPlayer": "this player",
+    "cancel": "Cancel",
+    "close": "Close",
+    "done": "Done",
+    "block": "Block",
+    "report": "Report",
+    "blockLabel": "Block {{name}}",
+    "reportLabel": "Report {{name}}",
+    "choose": {
+      "title": "Report or block {{name}}",
+      "block": "Block: no new invites or games with this player, and you no longer see their name.",
+      "report": "Report: tell us about a bad name, cheating or harassment. A report blocks too."
+    },
+    "blockConfirm": {
+      "title": "Block {{name}}?",
+      "invites": "You will not get invites from this player.",
+      "more": "Their name no longer shows to you. A game you play now goes on. You can unblock them in Settings."
+    },
+    "reasons": {
+      "title": "Report {{name}}",
+      "body": "What is wrong? Tap one. We read every report.",
+      "name": "Offensive name",
+      "cheating": "Cheating or abuse of the game",
+      "harassment": "Harassment",
+      "other": "Something else"
+    },
+    "sending": "Sending…",
+    "blocked": {
+      "title": "Player blocked",
+      "body": "You will not get invites from this player. To unblock them, go to Settings → Blocked players."
+    },
+    "reported": {
+      "title": "Thank you for the report",
+      "body": "We will look at it. You also blocked {{name}}."
+    },
+    "failed": {
+      "title": "That did not work",
+      "other": "Check the connection and try again.",
+      "tooManyBlocks": "You block {{max}} players, the most you can. Unblock someone in Settings first.",
+      "tooManyReports": "You sent {{max}} reports in the last 24 hours, the most you can. Try again tomorrow.",
+      "unknownPlayer": "This player's account is gone.",
+      "signedOut": "You are not signed in to online play on this phone.",
+      "retry": "Try again"
+    },
+    "list": {
+      "title": "Blocked players",
+      "intro": "You get no invites from these players, and their names do not show to you.",
+      "loading": "Loading…",
+      "empty": "You have not blocked anyone.",
+      "failed": "The list did not load. Check the connection and try again.",
+      "retry": "Try again",
+      "signedOut": "You are not signed in to online play on this phone.",
+      "unnamed": "A player with no name",
+      "since": "Blocked on {{date}}",
+      "unblock": "Unblock",
+      "unblockLabel": "Unblock {{name}}",
+      "unblocked": "Unblocked: {{name}}",
+      "unblockFailed": "Unblock did not work. Check the connection and try again."
+    }
   }
 }

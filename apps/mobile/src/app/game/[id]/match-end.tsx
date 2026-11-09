@@ -34,8 +34,14 @@ export default function MatchEndRoute() {
   if (id !== null && !isLocalGameId(id)) {
     return (
       <OnlineConnect gameId={id} onHome={goHome}>
-        {({ transport, me }) => (
-          <OnlineMatchEnd gameId={id} transport={transport} me={me} onHome={goHome} />
+        {({ transport, safety, me }) => (
+          <OnlineMatchEnd
+            gameId={id}
+            transport={transport}
+            safety={safety}
+            me={me}
+            onHome={goHome}
+          />
         )}
       </OnlineConnect>
     );

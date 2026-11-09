@@ -20,6 +20,7 @@
 | Invite | `app/invite/[code].tsx` | `features/invites/InviteScreen.tsx` (#256, see [Invites](#invites-256)); Convex invites go through `InviteAccountGate.tsx` first (#281) |
 | Play a friend | `app/friend/index.tsx`, `app/friend/[code].tsx` | `features/invites/FriendSetupScreen.tsx`, `InviteWaitScreen.tsx` (#281, see [Play a friend](#play-a-friend-281)) |
 | Username | `app/username.tsx` | `features/online/UsernameScreen.tsx`, `UsernameForm.tsx` (#405, see [Usernames](#usernames-405)) |
+| Blocked players | `app/blocked.tsx` | `features/safety/BlockedPlayersScreen.tsx` (#435, see [Block and report](#block-and-report-435)) |
 | Join with a code | `app/join.tsx` | `features/invites/JoinCodeScreen.tsx`, `typedCode.ts` (#333, see [Play a friend](#play-a-friend-281)) |
 | Your online games | `app/online-games.tsx` | `features/online/MyGamesScreen.tsx` (#297, see [Your online games](#your-online-games-297)) |
 
@@ -348,6 +349,19 @@ A saved account (Sign in with Apple) may pick a username; other players see it i
 - **Analytics.** None. Never send a username.
 - **Privacy.** The privacy policy, the terms of use (`docs/legal/terms.md`) and the store answers describe it (see [Legal docs](../legal/README.md#usernames-405)).
 - **Tests.** `usernameStep.test.ts`, `SignInChoices.test.tsx` (the step after Apple, Not now, `TAKEN`, guests and named accounts go on, a failed server goes on), `UsernameScreen.test.tsx` (guest and no session, pick and change and the 30 days, `TAKEN`, the Settings row), `playerName.test.ts`.
+
+## Block and report (#435)
+
+App Store guideline 1.2: a player can block or report another player in the app. The server side is [Block and report](online-game-service.md#block-and-report) (#320).
+
+- **Port.** `Safety` (`packages/contracts/src/safety.ts`): `block`, `unblock`, `listBlocked`, `report({ playerId, reason })`. On Convex it is `createConvexSafety` (`backend-convex`); `services.ts` exports it as `safety`, made on first use on the shared client, `undefined` with no Convex URL. `useOnlineConnection` gives the game routes the right one: a dev game gets `server.safetyFor(onlinePlayerId)` on the in-memory server, any other game `safety`. In Jest `safety` is `onlineFake.safety`, as the user signed in to `auth`.
+- **Where.** **Report or block** sits where the other player's name shows: the online game menu (`menu-report-block`, in the screen's sheet), the end of an online match (`end-report-block`) and each row of History's Online section (a flag button, `history-report-<gameId>`; the row reads `GameSummary.opponentId`). The routes pass `safety`; without it there is no such button.
+- **The dialog** (`features/safety/ReportOrBlock.tsx`, `ReportOrBlockSheet` for screens with no sheet of their own) goes in steps: choose (Block, Report, Cancel); Block asks once more; Report offers the reasons of `REPORT_REASONS` (no free text). Then it says it is done, or what failed: Try again only for a connection error; the caps (`MAX_BLOCKS`, `MAX_REPORTS_PER_DAY`), a gone account and no session have their own text. Each step moves screen reader focus to its title (`useFocusOnShow`). The dialog keeps the name it opened with, since the server stops sending it after a block. A player with no name is "this player".
+- **Settings → Blocked players** (`app/blocked.tsx`, in the guarded app group; the row shows with the Username row's rule: a build with online play and `hasOnlineAccount()`). The screen reads `auth.ready()` and `listBlocked()` (newest first, with names: the one place a blocked player's name shows) and makes no account. **Unblock** takes the row away and is read out; a failed Unblock keeps the row and says so.
+- **Invites.** Accept of an invite from a player you blocked gets `BLOCKED`: the screen says "You block this player" with a Home button (`invite-blocked`), and the invite stays open. A player the inviter blocked sees the invite as expired (`INVITE_EXPIRED`, #439).
+- **Analytics.** None. Never send the id, the name or the reason.
+- **Terms.** "Usernames" in the terms of use (all four files) says how to report in the app.
+- **Tests.** `ReportOrBlock.test.tsx` (block, report, Cancel, no name, focus, a failure with and without Try again, Greek), `BlockedPlayersScreen.test.tsx` (the list, Unblock, a failed Unblock, empty, no session, Try again, the Settings row), `OnlineMatchScreen.test.tsx` (the menu), `OnlineHistory.test.tsx` (the row), `navigation.test.tsx` (match end of a dev game), `InviteScreen.test.tsx` (`BLOCKED`), `onlineServices.test.ts`, `connection.test.tsx`.
 
 ## Delete my online data (#315)
 

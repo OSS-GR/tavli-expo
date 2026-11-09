@@ -20,6 +20,7 @@ import {
   createConvexInvites,
   createConvexOnlineData,
   createConvexPushTokens,
+  createConvexSafety,
   createConvexUsernames,
 } from '@tavli/backend-convex';
 import { InlineBotRunner, createAnalyzer, createBot, type Analyzer } from '@tavli/bot';
@@ -38,6 +39,7 @@ import {
   type OnlineData,
   type PushNotifications,
   type PushTokens,
+  type Safety,
   type SoundPlayer,
   type Storage,
   type Usernames,
@@ -171,6 +173,7 @@ const online = createOnlineServices(convexServer(), {
   createOnlineData: (client) => createConvexOnlineData({ client }),
   createAppUpdates: (client) => createConvexAppUpdates({ client }),
   createUsernames: (client) => createConvexUsernames({ client }),
+  createSafety: (client) => createConvexSafety({ client }),
   createNotifications: () =>
     createExpoPushNotifications({
       platform: Platform.OS === 'android' ? 'android' : 'ios',
@@ -238,6 +241,14 @@ export const appUpdates: AppUpdates | undefined = online?.appUpdates;
  * sign-in with a key, and Settings → Username.
  */
 export const usernames: Usernames | undefined = online?.usernames;
+
+/**
+ * Block and report (#435, App Store guideline 1.2), on the same client as
+ * `games`. The Report or block dialog (`features/safety/`) and Settings →
+ * Blocked players use it. A dev game uses `safetyFor` of the in-memory
+ * server instead (`useOnlineConnection`).
+ */
+export const safety: Safety | undefined = online?.safety;
 
 /**
  * This build (#390): the phone system, the store build number and the app

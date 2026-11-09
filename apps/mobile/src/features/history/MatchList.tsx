@@ -3,10 +3,14 @@
  * read as one item. The local matches and the online ones (#313) share it.
  * In the Home style (#359): the result chip first (Won brass, Lost dark,
  * Not finished outlined), then the match line, the score and the date.
+ * An online row may end with a small icon button (Report or block, #435):
+ * it sits outside the row's one screen reader item, so it is its own.
  */
-import { Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { Pressable, Text, View } from 'react-native';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
+import { Icon } from '@/components/Icon';
+import type { IconName } from '@/components/icons';
 import { SectionCard } from '@/components/SectionCard';
 
 import type { ResultBadge } from './format';
@@ -23,6 +27,16 @@ export interface MatchListRow {
   readonly date: string;
   /** What a screen reader reads for the whole row. */
   readonly label: string;
+  /** An icon button at the end of the row. */
+  readonly action?: MatchListAction;
+}
+
+export interface MatchListAction {
+  readonly icon: IconName;
+  /** What screen readers say: a whole phrase, for example "Report or block Guest 4821". */
+  readonly label: string;
+  readonly onPress: () => void;
+  readonly testID: string;
 }
 
 export interface MatchListProps {
@@ -34,26 +48,53 @@ export interface MatchListProps {
 export function MatchList({ rows, title }: MatchListProps) {
   return (
     <SectionCard title={title}>
-      {rows.map((row) => (
-        <View
-          key={row.key}
-          testID={row.testID}
-          style={styles.row}
-          accessible
-          accessibilityLabel={row.label}>
-          {row.badge !== null && row.result !== null ? (
-            <View style={styles.chip(row.badge)}>
-              <Text style={styles.chipText(row.badge)}>{row.result}</Text>
-            </View>
-          ) : null}
-          <View style={styles.texts}>
-            <Text style={styles.title}>{row.title}</Text>
-            <Text style={styles.score(row.badge)}>{row.score}</Text>
-            {row.date ? <Text style={styles.date}>{row.date}</Text> : null}
+      {rows.map((row) =>
+        row.action === undefined ? (
+          <MatchRow key={row.key} row={row} />
+        ) : (
+          <View key={row.key} style={styles.withAction}>
+            <MatchRow row={row} grow />
+            <RowAction action={row.action} />
           </View>
-        </View>
-      ))}
+        ),
+      )}
     </SectionCard>
+  );
+}
+
+function RowAction({ action }: { action: MatchListAction }) {
+  const { theme } = useUnistyles();
+  return (
+    <Pressable
+      testID={action.testID}
+      accessibilityRole="button"
+      accessibilityLabel={action.label}
+      hitSlop={4}
+      onPress={action.onPress}
+      style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+      <Icon name={action.icon} size={20} color={theme.colors.textDim} />
+    </Pressable>
+  );
+}
+
+function MatchRow({ row, grow = false }: { row: MatchListRow; grow?: boolean }) {
+  return (
+    <View
+      testID={row.testID}
+      style={[styles.row, grow && styles.grow]}
+      accessible
+      accessibilityLabel={row.label}>
+      {row.badge !== null && row.result !== null ? (
+        <View style={styles.chip(row.badge)}>
+          <Text style={styles.chipText(row.badge)}>{row.result}</Text>
+        </View>
+      ) : null}
+      <View style={styles.texts}>
+        <Text style={styles.title}>{row.title}</Text>
+        <Text style={styles.score(row.badge)}>{row.score}</Text>
+        {row.date ? <Text style={styles.date}>{row.date}</Text> : null}
+      </View>
+    </View>
   );
 }
 
@@ -63,6 +104,24 @@ function chipLook(badge: ResultBadge): 'won' | 'lost' | 'unfinished' {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  withAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: theme.space.sm,
+  },
+  grow: {
+    flex: 1,
+  },
+  action: {
+    width: theme.touch.minTarget,
+    height: theme.touch.minTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radii.pill,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
   // The chip and the texts share a line; with a large font or a long
   // result the texts wrap under the chip.
   row: {

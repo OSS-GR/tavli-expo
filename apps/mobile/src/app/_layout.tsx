@@ -79,6 +79,7 @@ function RootStack() {
           <Stack.Screen name="new-game" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="username" />
+          <Stack.Screen name="blocked" />
           <Stack.Screen name="history" />
           <Stack.Screen name="rules/[variant]" options={{ headerShown: true }} />
           {/* The tutorial board: no swipe back either (Skip is on screen). */}

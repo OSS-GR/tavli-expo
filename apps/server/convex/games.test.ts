@@ -567,12 +567,15 @@ describe('listMyGames (#296)', () => {
     expect(games[1]?.updatedAt).toBe(created);
   });
 
-  it('tells nothing about the other player but their side', async () => {
+  it('tells nothing about the other player but their id, side and name', async () => {
     const t = setup();
     await createGame(t);
     const games = await as(t, ALICE).query(api.games.listMyGames, { status: 'active' });
     expect(games).toHaveLength(1);
-    expect(JSON.stringify(games)).not.toContain(BOB);
+    // The id is in the game's view too (`players`): the app reports or blocks with it (#435).
+    const { opponentId, ...rest } = games[0]!;
+    expect(opponentId).toBe(BOB);
+    expect(JSON.stringify(rest)).not.toContain(BOB);
   });
 });
 

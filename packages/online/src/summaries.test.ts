@@ -55,6 +55,7 @@ describe('summarizeGame', () => {
         winner: null,
         updatedAt: 1234,
         turnDeadline: 5000,
+        opponentId: playerId === 'alice' ? 'bob' : 'alice',
         opponentName: guestName(side === 'white' ? '2222' : '1111'),
       });
     }
@@ -74,8 +75,12 @@ describe('summarizeGame', () => {
     expect(finished.score).toEqual(flow.match.score);
   });
 
-  it('tells nothing about the other player but their side and name', () => {
-    const text = JSON.stringify(summarizeGame(input(), 'alice'));
+  it('tells nothing about the other player but their id, side and name', () => {
+    // The id is in the game view too (`players`); the app needs it to
+    // report or block the player from a list row (#435).
+    const { opponentId, ...rest } = summarizeGame(input(), 'alice');
+    expect(opponentId).toBe('bob');
+    const text = JSON.stringify(rest);
     expect(text).not.toContain('bob');
     expect(text).not.toContain('alice');
   });

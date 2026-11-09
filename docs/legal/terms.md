@@ -53,7 +53,9 @@ A username is what other players see in games, invites and lists. You pick it, s
 - The app blocks some words by itself. That list cannot catch everything, so the rules above still apply.
 - If a username breaks these rules, we may change it to a guest name or remove it. If it happens again, we may stop the account from playing online.
 
-To report a username, write to us with the name and, if you can, the invite code of a game with that player. <!-- OWNER: the server can keep reports since #320; the in-app Report and Block buttons are #435. Then say here how to report in the app. -->
+To report a player, tap **Report or block** where their name shows: in the menu of an online game, at the end of an online match, or in History. Pick a reason: an offensive name, cheating, harassment or something else. A report also blocks the player. You can also write to us with the name and, if you can, the invite code of a game with that player.
+
+A player you block cannot send you new invites, and their name no longer shows to you. A game you play with them now goes on. To unblock them, go to **Settings → Blocked players**.
 
 ## Fair play
 

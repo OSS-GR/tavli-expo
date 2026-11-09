@@ -1287,6 +1287,7 @@ describe('online history texts (#313)', () => {
     winner: 'black',
     updatedAt: Date.UTC(2026, 9, 28, 12),
     turnDeadline: null,
+    opponentId: 'friend',
     opponentName: null,
   };
 

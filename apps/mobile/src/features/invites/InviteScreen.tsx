@@ -236,7 +236,7 @@ function OpenInvite({ view, busy, failed, onAccept, onDecline }: OpenInviteProps
 }
 
 interface ClosedInviteProps {
-  kind: 'expired' | 'used' | 'notFound' | 'own' | 'failed';
+  kind: 'expired' | 'used' | 'notFound' | 'own' | 'blocked' | 'failed';
   onRetry: () => void;
   onHome: () => void;
 }
