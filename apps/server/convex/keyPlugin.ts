@@ -272,6 +272,9 @@ export function keyPlugin(options: KeyPluginOptions) {
           // Checks both users again and deletes the guest with its
           // sessions, so a second call with the same ticket fails above.
           if (!(await options.startGuestMove(move))) throw keyError('BAD_REQUEST', 'BAD_TICKET');
+          // The move is done now. If the session below fails, the guest is
+          // gone and the phone is signed out: the player signs in again with
+          // the key, and the move goes on (its pages are scheduled).
           const { internalAdapter } = ctx.context;
           const owner = await internalAdapter.findUserById(move.target);
           const session = await internalAdapter.createSession(move.target);

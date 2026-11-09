@@ -22,7 +22,7 @@
  *    it runs, and it keeps the guest's id, like a deleted player's
  *    (`guestGameMove` in `@tavli/online`).
  * 3. `moveGuestInvites`: invites the guest sent (`by_from`) and answered
- *    (`by_answered`).
+ *    (`by_answered`). An invite between the two is deleted.
  * 4. `moveGuestSafety`: blocks both ways and reports by and about the
  *    guest. A row between the two, or one the account has already, is
  *    deleted.
@@ -269,7 +269,8 @@ export const moveGuestMoves = internalMutation({
 
 /**
  * Moves up to `GUEST_ROW_PAGE` invites the guest sent, then those it
- * answered, and runs again while there may be more. Each moved row leaves
+ * answered, and runs again while there may be more. An invite between the
+ * guest and the account is deleted. Each row, moved or deleted, leaves
  * its range, so every run starts at the front.
  */
 export const moveGuestInvites = internalMutation({
@@ -285,12 +286,20 @@ export const moveGuestInvites = internalMutation({
       .query('invites')
       .withIndex('by_from', (q) => q.eq('from', source))
       .take(GUEST_ROW_PAGE);
-    for (const invite of sent) await ctx.db.patch(invite._id, { from: target });
+    for (const invite of sent) {
+      // An invite between the two would be sent by and answered by the
+      // account: delete it, as `moveGuestSafety` does for such a pair.
+      if (invite.answeredBy === target) await ctx.db.delete(invite._id);
+      else await ctx.db.patch(invite._id, { from: target });
+    }
     const answered = await ctx.db
       .query('invites')
       .withIndex('by_answered', (q) => q.eq('answeredBy', source))
       .take(GUEST_ROW_PAGE - sent.length);
-    for (const invite of answered) await ctx.db.patch(invite._id, { answeredBy: target });
+    for (const invite of answered) {
+      if (invite.from === target) await ctx.db.delete(invite._id);
+      else await ctx.db.patch(invite._id, { answeredBy: target });
+    }
     if (sent.length + answered.length === GUEST_ROW_PAGE) {
       await ctx.scheduler.runAfter(0, internal.guestMove.moveGuestInvites, { source, target });
     }

@@ -219,6 +219,19 @@ describe('startGuestMove (#403)', () => {
       turnTimeMinutes: null,
     });
     await as(t, guest).mutation(api.invites.declineInvite, { code: theirs });
+    // Two invites between the two: one each way, declined.
+    const toAccount = await as(t, guest).mutation(api.invites.createInvite, {
+      choice: 'portes',
+      targetPoints: 3,
+      turnTimeMinutes: null,
+    });
+    await as(t, account).mutation(api.invites.declineInvite, { code: toAccount });
+    const toGuest = await as(t, account).mutation(api.invites.createInvite, {
+      choice: 'portes',
+      targetPoints: 3,
+      turnTimeMinutes: null,
+    });
+    await as(t, guest).mutation(api.invites.declineInvite, { code: toGuest });
     await t.run(async (ctx) => {
       const createdAt = Date.now();
       // The guest blocks friend and other; the account blocks other already.
@@ -257,6 +270,8 @@ describe('startGuestMove (#403)', () => {
       from: friend,
       answeredBy: account,
     });
+    // No invite is sent by and answered by the account.
+    expect(rows.invites.map((row) => row.code).sort()).toEqual([open, theirs].sort());
     expect(rows.blocks.map((row) => [row.blockerId, row.blockedId]).sort()).toEqual(
       [
         [account, friend],
