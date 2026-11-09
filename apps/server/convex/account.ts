@@ -39,7 +39,7 @@ import { existingPlayer } from './caller';
 import { resignAs } from './games';
 import { openInvitesOf } from './invites';
 import { gameOnDelete } from './model/account';
-import { deleteGuestNumberOf } from './playerNames';
+import { deletePlayerNameOf } from './playerNames';
 
 /**
  * How many invites one run of `deleteSentInvites` deletes: one write
@@ -126,8 +126,9 @@ export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promi
   // The sign-in key claims (#397), so the Apple id is free again.
   await deleteKeysOf(ctx, callerId);
 
-  // The guest number (#400): the other players no longer see a name.
-  await deleteGuestNumberOf(ctx, callerId);
+  // The guest number (#400) and the username (#405): the other players no
+  // longer see a name, and the username is free for others at once.
+  await deletePlayerNameOf(ctx, callerId);
 
   // Apple asks us to revoke its token (#398). The tokens go to a queue
   // that holds no user id; the revoke runs after this transaction, so

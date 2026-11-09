@@ -1,15 +1,15 @@
 /**
- * Online play (#266, #281, #285, #315, #390): sign-in (`AuthProvider`),
+ * Online play (#266, #281, #285, #315, #390, #405): sign-in (`AuthProvider`),
  * online games (`GameTransport`), invites (`Invites`), the server's push
  * tokens (`PushTokens`), the phone's turn notifications
  * (`PushNotifications`), Delete my online data (`OnlineData`) and the
- * update policy (`AppUpdates`), built on first use.
+ * update policy (`AppUpdates`) and usernames (`Usernames`), built on first use.
  *
  * `services.ts` passes the adapters. This file imports none, so Jest can
  * test it with fakes. Nothing here runs at app start:
  * - the sign-in client is made on the first call to `auth`;
  * - the Convex client (one socket) opens on the first call to `games`,
- *   `invites`, `pushTokens`, `onlineData` or `appUpdates`; they share it;
+ *   `invites`, `pushTokens`, `onlineData`, `appUpdates` or `usernames`; they share it;
  * - the notifications adapter is made on its first call. The root layout
  *   listens for taps on a push at start (`usePushTaps`): that only reads
  *   the phone, with no network call and no prompt. Turn notifications are
@@ -27,6 +27,7 @@ import type {
   OnlineData,
   PushNotifications,
   PushTokens,
+  Usernames,
 } from '@tavli/contracts';
 
 import type { ConvexServer } from './convexUrl';
@@ -42,6 +43,8 @@ export interface OnlineServices {
   readonly onlineData: OnlineData;
   /** The update policy (#390), on the same client. It needs no sign-in. */
   readonly appUpdates: AppUpdates;
+  /** Usernames of saved accounts (#405), on the same client. */
+  readonly usernames: Usernames;
 }
 
 /** How to make the real parts. `services.ts` passes the adapters. */
@@ -62,6 +65,8 @@ export interface OnlineAdapters<Client> {
   createOnlineData(client: Client): OnlineData;
   /** The update policy on the shared client. */
   createAppUpdates(client: Client): AppUpdates;
+  /** The usernames on the shared client. */
+  createUsernames(client: Client): Usernames;
 }
 
 /** Calls `make` once, on the first call, and keeps the result. */
@@ -140,6 +145,14 @@ export function lazyAppUpdates(get: () => AppUpdates): AppUpdates {
   };
 }
 
+/** A `Usernames` port that makes the real one on its first call. */
+export function lazyUsernames(get: () => Usernames): Usernames {
+  return {
+    mine: () => get().mine(),
+    setMine: (request) => get().setMine(request),
+  };
+}
+
 /** A `PushNotifications` port that makes the real one on its first use. */
 export function lazyPushNotifications(get: () => PushNotifications): PushNotifications {
   return {
@@ -166,7 +179,7 @@ export function createOnlineServices<Client>(
   if (server === undefined) return undefined;
   const auth = once(() => adapters.createAuth(server.siteUrl));
   // Every server call (games, invites, push tokens, the delete, the update
-  // policy) shares this client: one socket.
+  // policy, usernames) shares this client: one socket.
   const client = once(() => adapters.createClient(server.url, auth()));
   const games = once(() => adapters.createGames(client()));
   const invites = once(() => adapters.createInvites(client()));
@@ -174,6 +187,7 @@ export function createOnlineServices<Client>(
   const notifications = once(() => adapters.createNotifications());
   const onlineData = once(() => adapters.createOnlineData(client()));
   const appUpdates = once(() => adapters.createAppUpdates(client()));
+  const usernames = once(() => adapters.createUsernames(client()));
   return {
     auth: lazyAuthProvider(auth),
     games: lazyGameTransport(games),
@@ -182,5 +196,6 @@ export function createOnlineServices<Client>(
     notifications: lazyPushNotifications(notifications),
     onlineData: lazyOnlineData(onlineData),
     appUpdates: lazyAppUpdates(appUpdates),
+    usernames: lazyUsernames(usernames),
   };
 }

@@ -7,11 +7,14 @@
  * - Apple's own button shows only where Apple's sheet works (iPhone).
  *   Apple on Android needs a browser flow on the server: later.
  * - Not now signs in nothing: the caller closes or goes Home.
+ * - After a sign-in with a key, a saved account with no username yet sees
+ *   the username step (`UsernameForm`, #405) in place of the choices; its
+ *   Save or Not now hands the user on.
  * - A problem line is read to screen readers (`useAnnouncement`; iOS
  *   VoiceOver does not read `accessibilityRole="alert"`). No text has a
  *   line limit, so large fonts wrap.
  */
-import type { Analytics, AppleSheet, AuthProvider, AuthUser } from '@tavli/contracts';
+import type { Analytics, AppleSheet, AuthProvider, AuthUser, Usernames } from '@tavli/contracts';
 import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -22,9 +25,11 @@ import {
   analytics as appAnalytics,
   appleSheet as appAppleSheet,
   AppleSignInButton,
+  usernames as appUsernames,
 } from '@/services';
 
 import { useSignInChoices } from './signIn';
+import { UsernameForm } from './UsernameForm';
 
 export interface SignInChoicesProps {
   auth: AuthProvider;
@@ -34,6 +39,8 @@ export interface SignInChoicesProps {
   appleSheet?: AppleSheet;
   /** For tests. Default: the app's analytics. */
   analytics?: Analytics;
+  /** For tests. Default: the app's. */
+  usernames?: Usernames | undefined;
 }
 
 export function SignInChoices({
@@ -42,16 +49,29 @@ export function SignInChoices({
   onNotNow,
   appleSheet = appAppleSheet,
   analytics = appAnalytics,
+  usernames = appUsernames,
 }: SignInChoicesProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
-  const { appleAvailable, busy, failed, choose } = useSignInChoices({
+  const { appleAvailable, busy, failed, choose, step, finishStep } = useSignInChoices({
     auth,
     appleSheet,
     analytics,
     onSignedIn,
+    usernames,
   });
   useAnnouncement(failed ? t('signIn.failed') : null);
+  if (step !== null && usernames !== undefined) {
+    return (
+      <UsernameForm
+        usernames={usernames}
+        mine={step.mine}
+        title={t('username.title')}
+        onDone={finishStep}
+        onNotNow={finishStep}
+      />
+    );
+  }
   return (
     <View testID="sign-in-choices" style={styles.choices}>
       {appleAvailable ? (

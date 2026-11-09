@@ -217,3 +217,14 @@ export function closedOut(flow: MatchFlow, player: PlayerId = 'white'): MatchFlo
   };
   return { ...flow, game };
 }
+
+/**
+ * The 4 digits of `playerId`'s guest name on `server` (#400). Throws while
+ * the player has none (before their first invite or game), or while a
+ * username shows instead (#405).
+ */
+export function guestNumberOf(server: MemoryGameServer, playerId: string): string {
+  const name = server.nameOf(playerId);
+  if (name?.kind !== 'guest') throw new Error(`${playerId} has no guest name`);
+  return name.number;
+}

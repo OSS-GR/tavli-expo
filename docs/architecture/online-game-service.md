@@ -10,8 +10,11 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 |---|---|
 | `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `drafts`, `invites`, `pushTokens`, `authKeys`, `usedKeyNonces`, `appleTokens`, `appleRevokes` and `playerNames` |
 | `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
-| `apps/server/convex/playerNames.ts` | [Guest names](#playernames) (#400): `ensureGuestNumber`, `nameOf`, `namesOfPlayers`, `deleteGuestNumberOf` |
-| `packages/online/src/names.ts` | The pure part of guest names: `pickGuestNumber(rng)` (fair, 1000–9999), `namesOf`, `NO_NAMES` |
+| `apps/server/convex/playerNames.ts` | [Guest names and usernames](#playernames) (#400, #405): `ensureGuestNumber`, `nameRowOf`, `nameOf`, `namesOfPlayers`, `deletePlayerNameOf` |
+| `packages/online/src/names.ts` | The pure part of guest names: `pickGuestNumber(rng)` (fair, 1000–9999), `nameFrom` (the username first), `namesOf`, `NO_NAMES` |
+| `apps/server/convex/usernames.ts` | [Usernames](#usernames) (#405): `getMyUsername`, `setMyUsername`, and the owner's `clearUsername` (internal) |
+| `packages/online/src/usernames.ts` | The pure part of usernames: `checkUsername`, `usernameKey`, `isAllowedUsername` (the block and reserved lists), `planUsername`, `myUsernameOf` |
+| `packages/contracts/src/username.ts` | The `Usernames` port, `MyUsername`, the error codes, `TERMS_VERSION`; contract checks `usernamesContract()` in `@tavli/contracts/testing` |
 | `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315) |
 | `apps/server/convex/appUpdate.ts` | `updatePolicy`: the lowest app build the server works with, from the deployment's env vars ([Update needed](#update-needed), #390). The one public function with no sign-in |
 | `apps/server/convex/model/appUpdate.ts` | The pure part: `appUpdatePolicy(env, platform)` reads the env vars |
@@ -146,18 +149,36 @@ The rows hold no player id.
 
 ### `playerNames`
 
-Each player's guest name (#400, ADR-0008 item 6): "Guest" and 4 random digits, such as "Guest 4821".
+Each player's guest name (#400, ADR-0008 item 6): "Guest" and 4 random digits, such as "Guest 4821". A saved account's [username](#usernames) (#405) lives in the same row and wins over the guest name.
 
 | Field | Notes |
 |---|---|
 | `playerId` | The Better Auth user id. Index `by_player`. One row per player. |
 | `guestNumber` | 4 digits, `1000`–`9999`, as text. Not unique. |
+| `username` | Optional. The username as the player typed it (NFC). |
+| `usernameKey` | Optional. `usernameKey(username)`: the folded form that must be unique. Index `by_username_key`. |
+| `usernameChangedAt` | Optional. When the name last changed. The first pick leaves it unset, so the first change is free; then 30 days (`USERNAME_CHANGE_MS`). |
+| `termsVersion`, `termsAcceptedAt` | Optional. The terms of use the player accepted (`TERMS_VERSION`), and when. |
+| `ageCheckedAt` | Optional. When the player ticked the age box. Never the age. |
 
 - **Who picks it.** The server, with `pickGuestNumber(createCryptoRng())` (`@tavli/online`): never the player, never the phone.
-- **When.** Once, the first time the player needs it: `createInvite` for the inviter, and `insertGame` for both players (`ensureGuestNumber`). Every new online player passes one of them before anyone sees them. A player whose invites and games all came before #400 has no number until their next invite or game (no query writes); until then their views say `null`. `getInvite` gives the inviter's name to anyone signed in with the code (the code is the secret, as for the rest of the invite). An Apple account gets one too, until usernames (#405).
-- **What the views carry.** Parts, not text: `PlayerName` (`packages/contracts/src/player-name.ts`, `{ kind: 'guest', number }`), so the app says "Guest" in the phone's language. `OnlineGameView.names` (both sides), `GameSummary.opponentName` and `InviteView.fromName`. A player with no row (an old account, or one deleted since) is `null`; the app then says "Opponent" or "your friend".
-- **Delete.** `deleteMyAccount` deletes the row (`deleteGuestNumberOf`). A new account gets a new number.
-- **The in-memory server** keeps the numbers in a map, from its own RNG (`nameRng`, default `createSeededRng(400)`), so the dice of seeded tests do not change. Tests read a number with `server.nameOf(playerId)`.
+- **When.** Once, the first time the player needs it: `createInvite` for the inviter, and `insertGame` for both players (`ensureGuestNumber`). Every new online player passes one of them before anyone sees them. A player whose invites and games all came before #400 has no number until their next invite or game (no query writes); until then their views say `null`. `getInvite` gives the inviter's name to anyone signed in with the code (the code is the secret, as for the rest of the invite). An Apple account gets one too, and keeps it under a username.
+- **What the views carry.** Parts, not text: `PlayerName` (`packages/contracts/src/player-name.ts`, `{ kind: 'guest', number }` or `{ kind: 'username', name }`, through `nameFrom`), so the app says "Guest" in the phone's language. `OnlineGameView.names` (both sides), `GameSummary.opponentName` and `InviteView.fromName`. A player with no row (an old account, or one deleted since) is `null`; the app then says "Opponent" or "your friend".
+- **Delete.** `deleteMyAccount` deletes the row (`deletePlayerNameOf`): the number, the username (free for others at once) and the terms and age record. A new account gets a new number.
+- **The in-memory server** keeps the numbers in a map, from its own RNG (`nameRng`, default `createSeededRng(400)`), so the dice of seeded tests do not change. Tests read a name with `server.nameOf(playerId)`, or the digits with `guestNumberOf(server, playerId)` (`@tavli/online/testing`).
+
+### Usernames
+
+One per saved account (#405, ADR-0008): a Better Auth user that is not anonymous (it has a sign-in key, today Sign in with Apple). Guests have none.
+
+- **Rules** (`checkUsername`): 3–16 characters; Latin or Greek letters, digits and `_`; a letter first; one script per name (digits and `_` go with both); at most 2 marks per letter. Stored as typed (NFC), shown as typed.
+- **Unique** on `usernameKey`: NFD, marks stripped, lower case, final ς → σ, Greek look-alikes → Latin (Α→a, Ρ→p, …), `l` and `1` → `i`, `0` → `o`, then `rn` → `m` and `vv` → `w`. So "Alexis", "ALEXÍS" and "AIexis" are one name. Two players who pick one name at once both read the `by_username_key` range, so Convex runs one again and it gets `TAKEN`.
+- **Block list** (`isAllowedUsername`): reserved names (exact, on the key: `admin`, `support`, `tavlaki`, …), reserved starts, blocked parts (substrings, on `foldLetters` without the `rn`/`vv` merges, so "porn" does not block "pomegranate") and blocked names (exact), in English, Greek and Greeklish. A "bare" form (no `_` or digits) is checked too. Keep Scunthorpe words out of the parts list: put a short word in the exact list.
+- **`setMyUsername`** (`{ name, acceptTerms?, ageChecked? }`) runs `planUsername` (both servers): `NOT_SAVED`, `BAD_NAME`, `NOT_ALLOWED`, `TERMS_NEEDED` (no accepted `TERMS_VERSION` yet), `AGE_NEEDED` (no age check yet), the same text (no change, no 30 days), `TOO_SOON`; then the server adds `TAKEN`. A missing Better Auth user is `NOT_SIGNED_IN` (a token outlives its user). The errors are `ConvexError` data (`UsernameErrorData`).
+- **`getMyUsername`** gives `MyUsername`: `saved`, `name`, `nextChangeAt`, `ageChecked`, `termsVersion`.
+- **`clearUsername`** (internal, the owner's tool from the dashboard): with no `name` it clears the username; with a `name` it renames after `checkUsername` and the uniqueness check (the block list is the owner's call). Either way the 30 days start over.
+- **The adapter** is `createConvexUsernames` (`USERNAME_FUNCTIONS` in `backend-convex`), checked against `api` and run through `usernamesContract()` in `convex/convexUsernames.test.ts`. The memory server has `usernamesFor(playerId, saved)`.
+- **Never** send a username to analytics or the logs.
 
 ## Rules of a game choice
 
@@ -434,7 +455,7 @@ As with games, no call takes a player id. The caller is the signed-in user, and 
 | Call | Who may call | What it does |
 |---|---|---|
 | `createInvite(choice, targetPoints, turnTimeMinutes)` | anyone signed in | A new open invite from the caller. Rejects a caller at the [cap](#cap-on-open-invites) with `TOO_MANY_INVITES`, then a bad match length (an integer of 1 or more) with `BAD_REQUEST`. Returns the code. |
-| `getInvite(code)` | anyone signed in with the code | `InviteView` (with the inviter's guest name, `fromName`, #400) or `null` |
+| `getInvite(code)` | anyone signed in with the code | `InviteView` (with the inviter's guest name or username, `fromName`, #400, #405) or `null` |
 | `acceptInvite(code)` | anyone signed in but the inviter | The flow above. Returns the `gameId`. |
 | `declineInvite(code)` | anyone signed in but the inviter | Marks the invite `declined`. |
 | `cancelInvite(code)` | only the inviter | Marks the invite `cancelled`. |
@@ -552,7 +573,7 @@ One transaction. If any step throws, nothing is deleted. Two steps go on after t
 2. **Active games:** the caller resigns each one (`resignAs` in `games.ts`, the same checks and the same `save` as `resign`). The other player wins the match. The save bumps the version, so the turn timer's check does nothing, it deletes the game's [draft](#drafts) (#374), and `scheduleTurnPush` runs as on every save (a resign ends the match: the other player gets ["game over"](#game-over), nobody gets "your turn"). Nothing caps a player's active games (each accepted invite starts one), so the call resigns only the first `GAME_RESIGN_PAGE` (25) of them (#309). One resign reads the game, writes it and one `moves` row, and runs the engine once. So 25 make about 50 writes, far below Convex's limit of 16,000 per transaction. The run time (Convex allows 1 second) is an estimate, not measured. When the page was full, the call schedules the internal mutation `resignActiveGames`, which resigns the next page (`by_white`, then `by_black`) and runs again while its page was full. See [Games after the call](#games-after-the-call).
 3. **Finished games** (and the games just resigned) stay for the other player, as they are. See [What is kept](#what-is-kept).
 4. **Open invites:** the caller's open invites whose time is not up are deleted (`openInvitesOf` in `invites.ts`), so nobody can accept one. The cap keeps them few (at most `MAX_OPEN_INVITES`). An open invite's scheduled `expireInvite` then finds no row and does nothing. Invites someone else sent stay, also when the caller answered them.
-5. **Push tokens:** every `pushTokens` row of the caller is deleted. So are the key claims (`authKeys`) and the [guest name](#playernames) (`playerNames`, #400), and the caller's Apple tokens move to the revoke queue (`appleRevokes`, no user id): the revoke at Apple runs after the call ([Apple tokens and the revoke](#apple-tokens-and-the-revoke), #398).
+5. **Push tokens:** every `pushTokens` row of the caller is deleted. So are the key claims (`authKeys`) and the [guest name and username](#playernames) (`playerNames`, #400, #405), and the caller's Apple tokens move to the revoke queue (`appleRevokes`, no user id): the revoke at Apple runs after the call ([Apple tokens and the revoke](#apple-tokens-and-the-revoke), #398).
 6. **Better Auth:** the user, its sessions and its accounts (Apple, Google, … once they exist) are deleted with Better Auth's own delete, `internalAdapter.deleteUser`, from `createAuth(ctx).$context`. It runs on the component's tables through the component adapter, with Better Auth's database hooks. It is the step that the `/delete-user` route and the anonymous plugin's `/delete-anonymous-user` route run too.
 7. **The other invites** (accepted, declined, cancelled, expired) are deleted after the call, in pages (#306). Nothing prunes finished invites, so a player can have many, and one Convex transaction may write at most 16,000 documents. The call schedules the internal mutation `deleteSentInvites`. Each run deletes up to `INVITE_DELETE_PAGE` (200) invites of the caller (`by_from`) and runs again when its page was full. Nobody can accept these invites (they are closed or their time is up), and no new one can come in: the user is gone, so `createInvite` refuses the old token.
 
@@ -584,7 +605,7 @@ Both delete routes are **off**, so no client can delete a user without steps 2�
 
 ### What is kept
 
-- **Finished games and their `moves`** stay, so the other player keeps their history. The caller's player id stays in them (in `players`, in the stored flow and in the log). We keep the id and do not swap in a fixed "deleted player" id: the id is a random string that names nobody once the Better Auth user is gone, our tables hold no name, email or profile once the guest name is deleted (step 5), and the id is in the stored flow and in every log row, so a swap would be a large rewrite. **A later issue that adds a name or a profile field to our tables must clear it here.**
+- **Finished games and their `moves`** stay, so the other player keeps their history. The caller's player id stays in them (in `players`, in the stored flow and in the log). We keep the id and do not swap in a fixed "deleted player" id: the id is a random string that names nobody once the Better Auth user is gone, our tables hold no name, email or profile once the guest name and username are deleted (step 5), and the id is in the stored flow and in every log row, so a swap would be a large rewrite. **A later issue that adds a name or a profile field to our tables must clear it here.**
 - **Invites someone else sent** that the caller answered (`answeredBy`) stay with their sender.
 
 ### Errors

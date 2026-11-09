@@ -17,6 +17,7 @@ Tavlaki is a Greek backgammon (tavli) app for iPhone and Android. This policy sa
 - You do not need an account to play on your phone.
 - Your settings and the games on your phone stay on your phone.
 - **Online games with a friend** need a free guest account on our server. The app makes it only when you make or open an invite. It has a random user id and a random guest name, such as "Guest 4821". It has no real name and no email. The server keeps your invites and online games under that id.
+- With **Sign in with Apple** you may pick a **username**. Other players see it instead of the guest name. You pick it; we never take it from Apple.
 - You can **delete your online data** in the app at any time: **Settings → Privacy → Delete my online data**.
 - **Turn notifications** are off until you turn them on. The app offers them only after you make or accept an invite for an async game. If you turn them on, our server keeps your phone's push token, to tell you when it is your turn or your game is over.
 - On the first launch, the app asks if it may send **anonymous usage data**. You choose **Allow usage data** or **Don't allow**. You can change your answer any time in **Settings → Privacy**.
@@ -124,13 +125,15 @@ Only if you play a friend online. When you tap **Make an invite**, or open an in
 
 - Every account has a **random user id**, made by the server.
 - Every account also gets a **guest name**: "Guest" and 4 random digits (for example "Guest 4821"). The server picks the digits once, when you make your first invite or start your first online game. You do not pick them, and they do not come from your phone. Other players may have the same number. Your friend sees it on your invite, in the game and in their lists of online games. Anyone who signs in with your invite code sees it on the invite too.
+- **Username** (only with Sign in with Apple, and only if you pick one): after the sign-in, the app asks you for a username. You can say **Not now** and pick one later in **Settings → Username**. Other players see it instead of your guest name: on your invites, in your games and in their lists of online games. You type it, so do not use your real name if you do not want others to see it. The server keeps the name as you typed it, and a simple form of it (lower case, no accents) so that no two players get names that look the same. It checks the name against a list of words that are not allowed. You can change the name once in 30 days. If a name breaks the [terms of use](https://tavlaki.com/terms), we may change it or remove it.
+- **Terms and age** (with the username): the app asks you to accept the terms of use and to confirm your age, once. The server keeps which version of the terms you accepted and when, and **when** you ticked the age box. It does not keep your age or your birthday.
 - A **guest account** has no real name and no email. (The sign-in software fills in a made-up placeholder for both.) Only this phone can open it.
 - **Sign in with Apple** (only if you pick it): Apple gives our server your **Apple id** (a random id Apple makes for Tavlaki) and an **email**: your own, or a relay address from Apple if you pick **Hide My Email**. The server keeps both with your account, and the sign-in token from Apple's sheet, encrypted (it holds the same Apple id and email). It also keeps a token from Apple, encrypted, while the Apple sign-in stays on your account. We keep that token only to cancel your Sign in with Apple for Tavlaki at Apple when you delete your online data. We never keep your name or photo from Apple, and other players never see your email. With Apple you can sign in to the same account on a new phone. If you stop using Sign in with Apple for Tavlaki in your Apple settings, Apple tells our server, and the server removes that sign-in (and your online data, if it was your only sign-in).
 - The server keeps your **invites** (the invite code, the game, the points to win, the time limit, if a friend accepted or declined, and when it expires) and your **online games** (the two players' user ids, the rules, every move and roll, the score, and the turn times) under that user id. Your friend's app sees the invite and the game you play together. While you play a turn, the server also keeps the moves you made so far, so your friend sees each move as you make it, also a move you take back. The next saved turn deletes them.
 - The server keeps your **sign-in session**: a random session token, when it expires, and, as the sign-in software records it, the IP address and the app's user agent (the app name and the phone system) when the session was made.
 - The app keeps the **sign-in cookie** in your phone's secure store (the iOS Keychain or the Android Keystore). The next invite uses it, so the app asks you to sign in only once.
 - The invite code and the link go where **you** share them (for example a chat app). Anyone with the code can see the invite and accept it until it expires.
-- The user id, the Apple id and the email **never go to analytics** (PostHog) and never go into crash reports (Sentry). Usage data gets only how you signed in (Apple or guest), and only if you allowed usage data.
+- The user id, the Apple id, the email and the username **never go to analytics** (PostHog) and never go into crash reports (Sentry). Usage data gets only how you signed in (Apple or guest), and only if you allowed usage data.
 
 Before you make or open an invite, the app does not talk to the game server. When you open an invite link or a link to an online game, the app first asks the game server if this phone has a saved sign-in (it sends the sign-in cookie, if there is one). That check makes no account, and without a saved sign-in nothing is saved for you. With a saved sign-in, the app then loads the invite or the game.
 
@@ -141,7 +144,7 @@ In the app, go to **Settings → Privacy** and tap **Delete my online data**. Th
 - resigns your online games in progress, so you lose them and your friend wins;
 - deletes the invites you made, so nobody can accept them;
 - deletes your push tokens, so turn notifications stop;
-- deletes your guest name;
+- deletes your guest name and your username (another player may then pick it), and the record of your terms and age answers;
 - deletes your account and its sign-in sessions, with Apple's sign-in: the Apple id, the email and Apple's tokens;
 - cancels your Sign in with Apple for Tavlaki at Apple, if you used it.
 
@@ -186,7 +189,9 @@ All four companies are based in the USA. Their staff or sub-processors may reach
 - **Usage data:** your consent (GDPR Article 6(1)(a)). You can withdraw it at any time in Settings. Withdrawing does not undo what was lawful before.
 - **Crash reports before you answer:** these hold no id at all, and we do not think they identify you. If they still count as personal data, we rely on our legitimate interest in finding and fixing crashes (GDPR Article 6(1)(f)). You can object at any time: tap **Don't allow**, or turn off the switch in Settings.
 - **Crash reports after Allow:** your consent, as for usage data.
-- **Online games with a friend:** the account (with Sign in with Apple: the Apple id and the email), the sign-in session, your invites and your online games are needed to give you the online game you asked for (GDPR Article 6(1)(b)). If you do not want them, do not make or open an invite: the rest of the app works without them.
+- **Online games with a friend:** the account (with Sign in with Apple: the Apple id, the email and your username), the sign-in session, your invites and your online games are needed to give you the online game you asked for (GDPR Article 6(1)(b)). If you do not want them, do not make or open an invite: the rest of the app works without them.
+- **Terms and age answers:** we keep when you accepted the terms and confirmed your age, to show that we asked (our legitimate interest, GDPR Article 6(1)(f), and our duty to check consent for children, GDPR Article 8).
+<!-- OWNER: a lawyer checks this legal basis and the age rule. -->
 - **Turn notifications:** you asked for them when you tapped **Turn on** in the app, so the push token is needed to give you that service (GDPR Article 6(1)(b)). Turn them off in your phone's settings at any time.
 
 ## Your rights
@@ -210,13 +215,15 @@ Tavlaki is not aimed at children under 13.
 
 In Greece, a child under 15 can give consent for an app like this only with a parent's or guardian's permission (Greek Law 4624/2019, Article 21). Other EU countries use an age between 13 and 16. If you are under that age, please ask a parent before you tap **Allow usage data**. The app works fully if you tap **Don't allow**.
 
-If you are a parent and think your child allowed usage data, write to us, and we will delete what we can find.
+To pick a username, you confirm that you are at least 16 (13 outside the EU and the EEA, and in the EU and EEA countries that set 13). The app picks the age from your phone's region. If the phone gives no region, it asks for 16.
+
+If you are a parent and think your child allowed usage data or picked a username, write to us, and we will delete what we can find.
 
 ## Coming later (not live yet)
 
 These features are planned. They are **not** in the app today. We will update this policy before they go live and tell you in the app.
 
-- **Sign-in with Google or an email code**, **Sign in with Apple on Android**, **usernames** and **friends**. These will store your account and friends list on our server (Convex), with sign-in through Better Auth. (Guest accounts, Sign in with Apple on iPhone and online games with a friend are live now: see above.)
+- **Sign-in with Google or an email code**, **Sign in with Apple on Android** and **friends**. These will store your account and friends list on our server (Convex), with sign-in through Better Auth. (Guest accounts, Sign in with Apple on iPhone, usernames and online games with a friend are live now: see above.)
 - **App updates over the air** (EAS Update by Expo). The app will ask Expo's servers at launch if a newer version exists. This request carries technical facts only.
 
 ## This website

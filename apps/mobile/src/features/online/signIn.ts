@@ -10,13 +10,25 @@
  *   made once).
  * - Each new sign-in sends `online_sign_in` with the way only (`apple` or
  *   `guest`): never the user id, the email or the Apple id.
+ * - The username step (#405): after a sign-in with a key, a saved account
+ *   with no username yet gets `step` (the choices show `UsernameForm`);
+ *   `finishStep` then hands the user on. When the server cannot say, the
+ *   user goes on at once: the name can wait for Settings.
  */
-import type { Analytics, AppleSheet, AuthProvider, AuthUser } from '@tavli/contracts';
+import type {
+  Analytics,
+  AppleSheet,
+  AuthProvider,
+  AuthUser,
+  MyUsername,
+  Usernames,
+} from '@tavli/contracts';
 import { useEffect, useRef, useState } from 'react';
 
 import { quietly } from '@/features/analytics/quietly';
 
 import { onlineAccountReady, signInForOnline } from './account';
+import { needsUsernameStep } from './usernameStep';
 
 export type SignInMethod = 'apple' | 'guest';
 
@@ -49,6 +61,10 @@ export interface SignInChoicesState {
   /** The last try failed (not a closed Apple sheet). */
   readonly failed: boolean;
   readonly choose: (method: SignInMethod) => void;
+  /** A saved account with no username yet: show the username step. */
+  readonly step: { readonly user: AuthUser; readonly mine: MyUsername } | null;
+  /** Ends the username step (saved or Not now) and hands the user on. */
+  readonly finishStep: () => void;
 }
 
 export interface SignInChoicesOptions {
@@ -56,6 +72,8 @@ export interface SignInChoicesOptions {
   appleSheet: AppleSheet;
   analytics: Analytics;
   onSignedIn: (user: AuthUser) => void;
+  /** The username step's server. `undefined`: no step. */
+  usernames?: Usernames | undefined;
 }
 
 /** The state of the sign-in choices. One try at a time. */
@@ -64,8 +82,10 @@ export function useSignInChoices({
   appleSheet,
   analytics,
   onSignedIn,
+  usernames,
 }: SignInChoicesOptions): SignInChoicesState {
   const [appleAvailable, setAppleAvailable] = useState(false);
+  const [step, setStep] = useState<SignInChoicesState['step']>(null);
   const [busy, setBusy] = useState<SignInMethod | null>(null);
   const [failed, setFailed] = useState(false);
   // One try at a time: a second tap before the render sees `busy` does nothing.
@@ -105,8 +125,34 @@ export function useSignInChoices({
           quietly(() => analytics.track('online_sign_in', { method }));
         }
         if (!mounted.current) return;
-        setBusy(null);
-        if (user !== null) onSignedIn(user);
+        if (user === null) {
+          setBusy(null);
+          return;
+        }
+        if (user.isGuest || usernames === undefined) {
+          setBusy(null);
+          onSignedIn(user);
+          return;
+        }
+        // Busy again while the server says whether a username is needed,
+        // so a second tap cannot start another sign-in. Each answer below
+        // clears it before the `mounted` check.
+        trying.current = true;
+        usernames.mine().then(
+          (mine) => {
+            trying.current = false;
+            if (!mounted.current) return;
+            setBusy(null);
+            if (needsUsernameStep(mine)) setStep({ user, mine });
+            else onSignedIn(user);
+          },
+          () => {
+            trying.current = false;
+            if (!mounted.current) return;
+            setBusy(null);
+            onSignedIn(user);
+          },
+        );
       },
       () => {
         trying.current = false;
@@ -117,5 +163,11 @@ export function useSignInChoices({
     );
   };
 
-  return { appleAvailable, busy, failed, choose };
+  const finishStep = () => {
+    if (step === null) return;
+    setStep(null);
+    onSignedIn(step.user);
+  };
+
+  return { appleAvailable, busy, failed, choose, step, finishStep };
 }

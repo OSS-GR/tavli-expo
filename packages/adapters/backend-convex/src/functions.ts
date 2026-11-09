@@ -1,6 +1,6 @@
 /**
  * References to the Convex functions in `apps/server/convex/games.ts`,
- * `invites.ts`, `push.ts`, `account.ts` and `appUpdate.ts`, by name. The adapter does not import the generated `api`
+ * `invites.ts`, `push.ts`, `account.ts`, `appUpdate.ts` and `usernames.ts`, by name. The adapter does not import the generated `api`
  * of `apps/server`: that would pull the server code (and Better Auth) into
  * the app's type check, and `apps/server` already depends on this package
  * for its tests.
@@ -10,7 +10,8 @@
  * `convex/convexInvites.test.ts` for the invites,
  * `convex/convexPushTokens.test.ts` for the push tokens,
  * `convex/convexOnlineData.test.ts` for the delete,
- * `convex/convexAppUpdates.test.ts` for the update policy), so a rename
+ * `convex/convexAppUpdates.test.ts` for the update policy,
+ * `convex/convexUsernames.test.ts` for the usernames), so a rename
  * there fails a test.
  */
 import { makeFunctionReference } from 'convex/server';
@@ -22,6 +23,7 @@ import type {
   GameSummary,
   GameTransportErrorData,
   InviteView,
+  MyUsername,
   NewInvite,
   OnlineGameStatus,
   OnlineGameView,
@@ -192,4 +194,28 @@ export const APP_UPDATE_FUNCTION_NAMES = {
 
 export const APP_UPDATE_FUNCTIONS: AppUpdateFunctions = {
   updatePolicy: makeFunctionReference(APP_UPDATE_FUNCTION_NAMES.updatePolicy),
+};
+
+/** What `setMyUsername` takes (`SetUsernameRequest`). */
+export type SetUsernameArgs = {
+  name: string;
+  acceptTerms?: string;
+  ageChecked?: boolean;
+};
+
+/** The username functions in `apps/server/convex/usernames.ts` (#405). */
+export interface UsernameFunctions {
+  readonly getMyUsername: FunctionReference<'query', 'public', Record<string, never>, MyUsername>;
+  readonly setMyUsername: FunctionReference<'mutation', 'public', SetUsernameArgs, MyUsername>;
+}
+
+/** The Convex function names (`module:function`) of the username calls. */
+export const USERNAME_FUNCTION_NAMES = {
+  getMyUsername: 'usernames:getMyUsername',
+  setMyUsername: 'usernames:setMyUsername',
+} as const satisfies { readonly [K in keyof UsernameFunctions]: string };
+
+export const USERNAME_FUNCTIONS: UsernameFunctions = {
+  getMyUsername: makeFunctionReference(USERNAME_FUNCTION_NAMES.getMyUsername),
+  setMyUsername: makeFunctionReference(USERNAME_FUNCTION_NAMES.setMyUsername),
 };

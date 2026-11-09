@@ -10,6 +10,7 @@ import {
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, SERVER_ACTOR } from '@tavli/online';
+import { guestNumberOf } from '@tavli/online/testing';
 import { act, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
@@ -75,7 +76,7 @@ describe('InviteScreen', () => {
     await act(async () => release());
     expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
     // The inviter has a guest name (#400).
-    const friend = `Guest ${server.nameOf(FRIEND)?.number}`;
+    const friend = `Guest ${guestNumberOf(server, FRIEND)}`;
     expect(screen.getByText(`${friend} invites you to an online match.`)).toBeOnTheScreen();
     expect(screen.getByText('Plakoto')).toBeOnTheScreen();
     expect(screen.getByText('First to 5 points')).toBeOnTheScreen();
@@ -352,7 +353,7 @@ describe('InviteScreen', () => {
     await screen.findByRole('header', { name: 'Game invite' });
     expect(focus).toHaveBeenLastCalledWith(expect.anything(), 'focus');
     expect(announce).toHaveBeenLastCalledWith(
-      `Game invite Guest ${server.nameOf(FRIEND)?.number} invites you to an online match. ` +
+      `Game invite Guest ${guestNumberOf(server, FRIEND)} invites you to an online match. ` +
         'Game: Portes. Match length: First to 3 points. Time limit: 1 min.',
     );
     focus.mockRestore();
@@ -369,7 +370,7 @@ describe('InviteScreen', () => {
     expect(await screen.findByRole('header', { name: 'Πρόσκληση για παιχνίδι' })).toBeOnTheScreen();
     expect(
       screen.getByText(
-        `Επισκέπτης ${server.nameOf(FRIEND)?.number} σε προσκαλεί σε ματς στο διαδίκτυο.`,
+        `Επισκέπτης ${guestNumberOf(server, FRIEND)} σε προσκαλεί σε ματς στο διαδίκτυο.`,
       ),
     ).toBeOnTheScreen();
     expect(screen.getByText('Πόρτες')).toBeOnTheScreen();

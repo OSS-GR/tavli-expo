@@ -45,7 +45,7 @@ export const modules = import.meta.glob(['./**/*.*s', '!./**/*.*.*s']);
 let usersMade = 0;
 
 /**
- * Makes `count` Better Auth users (guests) and returns their ids: the
+ * Makes `count` Better Auth users (guests, or saved accounts with `saved`) and returns their ids: the
  * player ids a test signs in as (`t.withIdentity({ subject: id })`). The
  * calls that save the caller's id check that the user exists
  * (`existingPlayer`, #306), so a made-up subject such as `'alice'` gets
@@ -55,6 +55,8 @@ let usersMade = 0;
 export async function authUsers(
   t: TestConvex<SchemaDefinition<GenericSchema, boolean>>,
   count: number,
+  /** `true`: saved accounts (not anonymous, as after a key, #405). Default: guests. */
+  saved = false,
 ): Promise<string[]> {
   return await t.run(async (ctx) => {
     const ids: string[] = [];
@@ -67,7 +69,7 @@ export async function authUsers(
             name: '',
             email: `guest-${usersMade++}@test.invalid`,
             emailVerified: false,
-            isAnonymous: true,
+            isAnonymous: !saved,
             createdAt: now,
             updatedAt: now,
           },

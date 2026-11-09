@@ -142,15 +142,30 @@ export default defineSchema({
     .index('by_token', ['token']),
 
   /**
-   * Each player's guest number (#400): four digits, shown to the other
-   * player as "Guest 4821". One row per player, made once
-   * (`ensureGuestNumber` in `playerNames.ts`), deleted with the account.
+   * Each player's name: the guest number (#400, four digits, shown to the
+   * other player as "Guest 4821") and the username of a saved account
+   * (#405, `usernames.ts`), with the answers of the username step. One row
+   * per player, made once (`ensureGuestNumber` in `playerNames.ts`, or the
+   * first `setMyUsername`), deleted with the account.
    */
   playerNames: defineTable({
     playerId: v.string(),
     /** `1000` to `9999` (`pickGuestNumber`). Not unique. */
     guestNumber: v.string(),
-  }).index('by_player', ['playerId']),
+    /** The username as typed (NFC). Absent: none, or the owner cleared it. */
+    username: v.optional(v.string()),
+    /** `usernameKey(username)`. Unique: `setMyUsername` checks `by_username_key`. */
+    usernameKey: v.optional(v.string()),
+    /** The last change after the first pick (ms). The next one waits 30 days. */
+    usernameChangedAt: v.optional(v.number()),
+    /** When the player said they are old enough (ms). Never an age. */
+    ageCheckedAt: v.optional(v.number()),
+    /** The terms of use version the player accepted (`TERMS_VERSION`), and when. */
+    termsVersion: v.optional(v.string()),
+    termsAcceptedAt: v.optional(v.number()),
+  })
+    .index('by_player', ['playerId'])
+    .index('by_username_key', ['usernameKey']),
 
   /**
    * Who owns each sign-in key (#397): one row per Apple id (later Google).

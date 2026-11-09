@@ -28,6 +28,10 @@
  *   `NOT_SIGNED_IN`, and so does a second call. It leaves `pushTokens`
  *   alone (the app removes its token first, `deleteOnlineData`), and it
  *   does not sign the user out: the app does.
+ * - `usernames` is the `Usernames` port (#405) on the server, as the
+ *   user signed in to `auth`: a saved account when that user is not a
+ *   guest (Sign in with Apple), like the Convex functions. With nobody
+ *   signed in it fails `NOT_SIGNED_IN`.
  * - `appUpdates` is the update policy (#390): it blocks no build until a
  *   test sets one (`onlineFake.appUpdates.set('ios', …)`). `appBuild()`
  *   is this build: iOS build `TEST_BUILD`, until a test calls
@@ -51,6 +55,7 @@ import {
   type GameTransportErrorData,
   type Invites,
   type OnlineData,
+  type Usernames,
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
@@ -186,6 +191,18 @@ const onlineData: OnlineData = {
   },
 };
 
+/** Usernames on the server, as the user signed in to `auth` at that moment. */
+const usernames: Usernames = {
+  mine() {
+    const user = auth.currentUser();
+    return server.usernamesFor(user?.id ?? null, user?.isGuest === false).mine();
+  },
+  setMine(request) {
+    const user = auth.currentUser();
+    return server.usernamesFor(user?.id ?? null, user?.isGuest === false).setMine(request);
+  },
+};
+
 export const onlineFake = {
   auth,
   /** Apple's sheet on the phone: set `next`, `sub` or `available` to act it out. */
@@ -196,6 +213,7 @@ export const onlineFake = {
   pushTokens,
   onlineData,
   appUpdates,
+  usernames,
   /** This build, like `appBuild()` of `@/services`. */
   appBuild: (): AppBuild | null => build,
   /** Sets this build for the rest of the test (`null`: no store build). */
@@ -210,11 +228,12 @@ export const onlineFake = {
   transportFor,
   /**
    * The 4 digits of `playerId`'s guest name on the current server (#400).
-   * Throws while the player has none (before their first invite or game).
+   * Throws while the player has none (before their first invite or game),
+   * or while a username shows instead (#405).
    */
   guestNumber(playerId: string): string {
     const name = server.nameOf(playerId);
-    if (name === null) throw new Error(`${playerId} has no guest name yet`);
+    if (name?.kind !== 'guest') throw new Error(`${playerId} has no guest name`);
     return name.number;
   },
   /** The cached `Invites` port of `playerId` on the current server. */
