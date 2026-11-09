@@ -13,10 +13,15 @@ import { anonymousClient } from 'better-auth/client/plugins';
 import { fromBetterAuthClient } from './provider';
 import type { BetterAuthClient, FromBetterAuthClientOptions } from './provider';
 
-/** A store with sync calls, like `expo-secure-store` (`getItem` / `setItem`). */
+/**
+ * A store like `expo-secure-store`: sync and async calls. The Expo client
+ * (1.7+) uses both.
+ */
 export interface SessionStorage {
   getItem(key: string): string | null;
-  setItem(key: string, value: string): unknown;
+  setItem(key: string, value: string): void;
+  getItemAsync(key: string): Promise<string | null>;
+  setItemAsync(key: string, value: string): Promise<void>;
 }
 
 export interface BetterAuthProviderOptions extends FromBetterAuthClientOptions {

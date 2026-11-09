@@ -24,5 +24,15 @@ export function createSecureSessionStorage(): SessionStorage {
     setItem(key, value) {
       SecureStore.setItem(key, value);
     },
+    async getItemAsync(key) {
+      try {
+        return await SecureStore.getItemAsync(key);
+      } catch {
+        return null;
+      }
+    },
+    async setItemAsync(key, value) {
+      await SecureStore.setItemAsync(key, value);
+    },
   };
 }
