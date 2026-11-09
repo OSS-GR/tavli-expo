@@ -242,6 +242,30 @@ Set these on the **prod** deployment (Convex dashboard → `superb-dog-503` → 
 
 Changes take effect with no deploy: the app asks again when it opens online play or comes back to the front. To undo, delete `MIN_APP_BUILD_*`. A value that is not a whole number above 0 blocks nothing, so a typo never locks players out.
 
+### Sign in with Apple (#396)
+
+Set up on the Apple Developer account on 2026-11-09 for the accounts work (ADR-0008). The server code that uses it is #397. Google sign-in comes later (#410).
+
+| What | Value | Where it is set |
+|------|-------|-----------------|
+| Team ID | `P36P357F6Z` | Apple Developer → Membership |
+| App IDs with Sign in with Apple | `com.tavlaki` (primary), `com.tavlaki.dev` and `com.tavlaki.preview` (grouped with `com.tavlaki`) | Certificates, Identifiers & Profiles → Identifiers |
+| Services ID (Apple on Android, the web flow) | `com.tavlaki.signin` | Identifiers → Services IDs |
+| Services ID domains | `exciting-reindeer-792.eu-west-1.convex.site`, `superb-dog-503.eu-west-1.convex.site` | the Services ID → Sign in with Apple → Configure |
+| Services ID return URLs | `https://<each domain>/api/auth/callback/apple` | the same place |
+| Key ID | `C9CDT93C8A` | Keys |
+
+These values are public. The key itself (the `.p8` file) is a secret: it lives only in the owner's password manager and in the Convex env. Never put it in the repo, an issue or a chat.
+
+The Convex env vars, on **both** deployments (dev `exciting-reindeer-792` and prod `superb-dog-503`, Convex dashboard → **Settings** → **Environment Variables**):
+
+- `APPLE_TEAM_ID` = the Team ID
+- `APPLE_KEY_ID` = the Key ID
+- `APPLE_SERVICES_ID` = `com.tavlaki.signin`
+- `APPLE_PRIVATE_KEY` = the whole `.p8` text, with the `BEGIN PRIVATE KEY` and `END PRIVATE KEY` lines
+
+Apple lets you download a key only once. If it is lost or leaks: make a new key in **Keys** with Sign in with Apple on, set `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` on both deployments, then revoke the old key. Apple's server-to-server notification URL is set up with #398.
+
 ### EAS Update (over-the-air updates), for later
 
 - Builds from each profile listen on the **channel** with the same name: `development`, `preview`, `production`.
