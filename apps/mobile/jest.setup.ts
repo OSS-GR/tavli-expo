@@ -13,7 +13,7 @@ import './src/i18n';
 // are pure TypeScript). Online play (`auth` with Apple's sheet `appleSheet`, `games`, `invites`, and the turn
 // notifications `notifications` and `pushTokens`, the update policy
 // `appUpdates` with this build `appBuild()`) and the dev games
-// (`onlineServer`, `gameTransportFor`, `invitesFor`) share one in-memory sign-in and game
+// (`onlineServer`, `gameTransportFor`, `invitesFor`, `devSafetyFor`) share one in-memory sign-in and game
 // server, new for each test (test/onlineFake.ts).
 jest.mock('@/services', () => {
   const {
@@ -63,6 +63,7 @@ jest.mock('@/services', () => {
     onlinePlayerId: 'me',
     gameTransportFor: onlineFake.transportFor,
     invitesFor: onlineFake.invitesFor,
+    devSafetyFor: onlineFake.devSafetyFor,
   };
 });
 

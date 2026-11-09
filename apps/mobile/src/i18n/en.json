@@ -1349,6 +1349,7 @@
     "action": "Report or block",
     "actionHint": "Block {{name}}, or report them to us",
     "actionLabel": "Report or block {{name}}",
+    "reportHint": "Report {{name}} to us",
     "thisPlayer": "this player",
     "cancel": "Cancel",
     "close": "Close",
@@ -1376,6 +1377,7 @@
       "other": "Something else"
     },
     "sending": "Sending…",
+    "slow": "This takes long. It goes through when the connection is back.",
     "blocked": {
       "title": "Player blocked",
       "body": "You will not get invites from this player. To unblock them, go to Settings → Blocked players."
@@ -1391,7 +1393,8 @@
       "tooManyReports": "You sent {{max}} reports in the last 24 hours, the most you can. Try again tomorrow.",
       "unknownPlayer": "This player's account is gone.",
       "signedOut": "You are not signed in to online play on this phone.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "refused": "The server did not take this. Close and try later."
     },
     "list": {
       "title": "Blocked players",

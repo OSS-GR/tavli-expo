@@ -28,6 +28,8 @@ import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { dateLocale, formatDate } from '@/features/history/format';
 import { playerNameText } from '@/features/online/playerName';
 
+import { markUnblocked, setBlockedList } from './blocked';
+
 export interface BlockedPlayersScreenProps {
   auth: AuthProvider;
   safety: Safety;
@@ -48,9 +50,9 @@ export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScr
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
   const titleRef = useFocusOnShow();
   const [state, setState] = useState<State>({ kind: 'loading' });
-  // The player whose Unblock is on its way, and the last Unblock that failed.
+  // The player whose Unblock is on its way, and whether the last Unblock failed.
   const [busy, setBusy] = useState<string | null>(null);
-  const [failedId, setFailedId] = useState<string | null>(null);
+  const [unblockFailed, setUnblockFailed] = useState(false);
   const [unblocked, setUnblocked] = useState<{ name: string; n: number } | null>(null);
   const live = useRef(true);
   useEffect(() => {
@@ -66,7 +68,10 @@ export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScr
       .ready()
       .then(async (user): Promise<State> => {
         if (user === null) return { kind: 'signedOut' };
-        return { kind: 'ready', players: await safety.listBlocked() };
+        const players = await safety.listBlocked();
+        // The other screens offer Report only for these players.
+        setBlockedList(players.map((p) => p.playerId));
+        return { kind: 'ready', players };
       })
       .then(
         (next) => {
@@ -97,9 +102,10 @@ export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScr
   const unblock = (player: BlockedPlayer) => {
     if (busy !== null) return;
     setBusy(player.playerId);
-    setFailedId(null);
+    setUnblockFailed(false);
     safety.unblock(player.playerId).then(
       () => {
+        markUnblocked(player.playerId);
         if (!live.current) return;
         setBusy(null);
         setState((s) =>
@@ -113,7 +119,7 @@ export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScr
       () => {
         if (!live.current) return;
         setBusy(null);
-        setFailedId(player.playerId);
+        setUnblockFailed(true);
       },
     );
   };
@@ -176,7 +182,7 @@ export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScr
                 })}
               </SectionCard>
             )}
-            {failedId !== null ? (
+            {unblockFailed ? (
               <Text testID="blocked-unblock-failed" style={styles.line}>
                 {t('safety.list.unblockFailed')}
               </Text>

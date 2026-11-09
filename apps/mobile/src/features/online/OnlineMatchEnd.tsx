@@ -15,6 +15,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
 import { MissingGame } from '@/features/match/MissingGame';
 import { gameHref } from '@/features/match/routes';
+import { useIsBlocked, useKnownBlocks } from '@/features/safety/blocked';
 import { ReportOrBlockSheet, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { useOnlineStore, type OnlineStore } from './onlineStore';
@@ -60,6 +61,10 @@ function OnlineMatchEndView({
   const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
   const view = useOnlineStore(store, (s) => s.view);
   const side = useOnlineStore(store, (s) => s.side);
+  useKnownBlocks(safety);
+  const blocked = useIsBlocked(
+    view !== null && side !== null ? view.players[opponent(side)] : null,
+  );
   const loadError = useOnlineStore(store, (s) => s.loadError);
   if (view === null) return loadError !== null ? <MissingGame onHome={onHome} /> : <Waiting />;
   if (side === null) return <MissingGame onHome={onHome} />;
@@ -74,7 +79,7 @@ function OnlineMatchEndView({
           seats: onlineSeats(side, t, view.names[other]),
           me: side,
           label: t('online.label', { game: t(`games.${view.choice}`) }),
-          ...(safety ? { onReportOrBlock: () => setReporting(player) } : {}),
+          ...(safety ? { onReportOrBlock: () => setReporting(player), blocked } : {}),
         }}
         match={view.match}
         // The result is read once per app run (#216).

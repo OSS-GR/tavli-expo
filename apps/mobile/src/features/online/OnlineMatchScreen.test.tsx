@@ -1006,6 +1006,13 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(screen.queryByTestId('safety-done')).toBeNull();
       // The game goes on.
       expect(view(game).status).toBe('active');
+      // The menu now offers Report only: no second Block.
+      await user.press(screen.getByRole('button', { name: 'Game menu' }));
+      expect(screen.getByTestId('menu-report-block')).toHaveTextContent(/Report .* to us/);
+      expect(screen.getByTestId('menu-report-block')).not.toHaveTextContent(/Report or block/);
+      await user.press(screen.getByTestId('menu-report-block'));
+      expect(screen.getByTestId('safety-reasons')).toBeOnTheScreen();
+      expect(screen.queryByTestId('safety-block')).toBeNull();
     });
 
     it('reports the other player from the menu', async () => {

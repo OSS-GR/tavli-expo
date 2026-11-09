@@ -876,6 +876,11 @@ describe('online games (#255)', () => {
     const blocked = await onlineServer().safetyFor(onlinePlayerId).listBlocked();
     expect(blocked.map((p) => p.playerId)).toEqual(['bot']);
     await user.press(screen.getByTestId('safety-close'));
+    // A blocked player gets Report only: no second Block.
+    expect(screen.getByTestId('end-report-block')).toHaveTextContent(/^Report$/);
+    await user.press(screen.getByTestId('end-report-block'));
+    expect(screen.getByTestId('safety-reasons')).toBeOnTheScreen();
+    await user.press(screen.getByTestId('safety-cancel'));
     await user.press(screen.getByRole('button', { name: 'Home' }));
     expect(router.getPathname()).toBe('/');
   });

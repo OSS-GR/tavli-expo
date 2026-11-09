@@ -86,6 +86,7 @@ const auth = createMemoryAuthProvider(authStore);
 let server = newServer();
 const transports = new Map<string, GameTransport>();
 const invitePorts = new Map<string, Invites>();
+const safetyPorts = new Map<string, Safety>();
 const notifications = createMemoryPushNotifications('ios');
 const appleSheet = createMemoryAppleSheet();
 const pushTokens = createMemoryPushTokens(() => auth.currentUser()?.id ?? null);
@@ -110,6 +111,16 @@ function invitesFor(playerId: string): Invites {
     invitePorts.set(playerId, invites);
   }
   return invites;
+}
+
+/** One `Safety` port per player on the current server, like `devSafetyFor` in the app. */
+function devSafetyFor(playerId: string): Safety {
+  let port = safetyPorts.get(playerId);
+  if (port === undefined) {
+    port = server.safetyFor(playerId);
+    safetyPorts.set(playerId, port);
+  }
+  return port;
 }
 
 /** The transport of the signed-in user, or `null` when nobody is signed in. */
@@ -250,6 +261,8 @@ export const onlineFake = {
   },
   /** The cached `Invites` port of `playerId` on the current server. */
   invitesFor,
+  /** The cached dev `Safety` port of `playerId` on the current server. */
+  devSafetyFor,
   /**
    * Rolls both opening dice of a new match (#379), as its players, again
    * after each tie. Resolves to the view after the opening.
@@ -268,6 +281,7 @@ export function resetOnlineFake(): void {
   server = newServer();
   transports.clear();
   invitePorts.clear();
+  safetyPorts.clear();
   notifications.reset();
   pushTokens.reset();
   appUpdates.reset();
