@@ -1,10 +1,10 @@
 /**
  * `GameTransport` (#253), `Invites` (#281), `PushTokens` (#285),
- * `OnlineData` (#315) and `AppUpdates` (#390) adapters backed by Convex
+ * `OnlineData` (#315), `AppUpdates` (#390) and `Usernames` (#405) adapters backed by Convex
  * (ADR-0004).
  *
  * They call the functions in `apps/server/convex/games.ts`, `invites.ts`,
- * `push.ts`, `account.ts` and `appUpdate.ts`. The server reads the caller from the sign-in token
+ * `push.ts`, `account.ts`, `appUpdate.ts` and `usernames.ts`. The server reads the caller from the sign-in token
  * (`AuthProvider`). See README.md.
  */
 export {
@@ -29,12 +29,16 @@ export {
   INVITE_FUNCTIONS,
   PUSH_FUNCTION_NAMES,
   PUSH_FUNCTIONS,
+  USERNAME_FUNCTION_NAMES,
+  USERNAME_FUNCTIONS,
   type AccountFunctions,
   type AppUpdateFunctions,
   type GameFunctions,
   type InviteFunctions,
   type NewInviteArgs,
   type PushFunctions,
+  type SetUsernameArgs,
+  type UsernameFunctions,
   type WriteResult,
 } from './functions';
 export {
@@ -59,3 +63,9 @@ export {
   type ConvexGameClient,
   type ConvexGameTransportOptions,
 } from './transport';
+export {
+  createConvexUsernames,
+  toUsernameError,
+  type ConvexUsernamesClient,
+  type ConvexUsernamesOptions,
+} from './usernames';

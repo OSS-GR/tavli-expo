@@ -1,5 +1,6 @@
 /**
- * Guest names (#400, ADR-0008): "Guest" and four random digits, made once
+ * Player names (#400, #405, ADR-0008). A username (a saved account,
+ * `usernames.ts`) wins; else the guest name: "Guest" and four random digits, made once
  * on the server for each account and kept for it. Both servers use this:
  * the Convex functions (`apps/server/convex/playerNames.ts`) and the
  * in-memory server. The digits come from the server's RNG (Convex:
@@ -8,7 +9,7 @@
  * Everything here is pure.
  */
 
-import { guestName } from '@tavli/contracts';
+import { guestName, usernameName } from '@tavli/contracts';
 import type { PlayerName } from '@tavli/contracts';
 import type { PerPlayer, Rng } from '@tavli/engine';
 
@@ -27,12 +28,22 @@ export function pickGuestNumber(rng: Rng): string {
   }
 }
 
-/** The name of each side from the saved guest numbers (`null` where a side has none). */
-export function namesOf(numbers: PerPlayer<string | null>): PerPlayer<PlayerName | null> {
-  return {
-    white: numbers.white === null ? null : guestName(numbers.white),
-    black: numbers.black === null ? null : guestName(numbers.black),
-  };
+/** What a server keeps for a player's name. */
+export interface NameRecord {
+  readonly guestNumber?: string;
+  readonly username?: string;
+}
+
+/** The name of a player: the username, else the guest name, else `null` (none kept). */
+export function nameFrom(record: NameRecord | null): PlayerName | null {
+  if (record?.username !== undefined) return usernameName(record.username);
+  if (record?.guestNumber !== undefined) return guestName(record.guestNumber);
+  return null;
+}
+
+/** The name of each side (`nameFrom`). */
+export function namesOf(records: PerPlayer<NameRecord | null>): PerPlayer<PlayerName | null> {
+  return { white: nameFrom(records.white), black: nameFrom(records.black) };
 }
 
 /** No names: for a view whose server keeps none. */

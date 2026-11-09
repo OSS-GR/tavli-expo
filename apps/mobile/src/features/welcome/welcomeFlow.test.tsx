@@ -49,6 +49,7 @@ const routes = {
   'friend/[code]': stub('invite wait'),
   join: stub('join with a code'),
   'online-games': stub('online games'),
+  username: stub('username'),
 };
 
 /** A URL for each app route (not the layout, not the welcome flow). */

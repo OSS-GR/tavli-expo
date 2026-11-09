@@ -20,6 +20,7 @@ import {
   createConvexInvites,
   createConvexOnlineData,
   createConvexPushTokens,
+  createConvexUsernames,
 } from '@tavli/backend-convex';
 import { InlineBotRunner, createAnalyzer, createBot, type Analyzer } from '@tavli/bot';
 import {
@@ -39,6 +40,7 @@ import {
   type PushTokens,
   type SoundPlayer,
   type Storage,
+  type Usernames,
 } from '@tavli/contracts';
 import { createSentryCrashReporter } from '@tavli/crash-sentry';
 import { createSeededRng, type Rng } from '@tavli/engine';
@@ -168,6 +170,7 @@ const online = createOnlineServices(convexServer(), {
   createPushTokens: (client) => createConvexPushTokens({ client }),
   createOnlineData: (client) => createConvexOnlineData({ client }),
   createAppUpdates: (client) => createConvexAppUpdates({ client }),
+  createUsernames: (client) => createConvexUsernames({ client }),
   createNotifications: () =>
     createExpoPushNotifications({
       platform: Platform.OS === 'android' ? 'android' : 'ios',
@@ -228,6 +231,13 @@ export const onlineData: OnlineData | undefined = online?.onlineData;
  * it, and only where the app already talks to the server.
  */
 export const appUpdates: AppUpdates | undefined = online?.appUpdates;
+
+/**
+ * Usernames of saved accounts (#405), on the same client as `games`. The
+ * username step (`features/online/UsernameForm.tsx`) uses it after a
+ * sign-in with a key, and Settings → Username.
+ */
+export const usernames: Usernames | undefined = online?.usernames;
 
 /**
  * This build (#390): the phone system, the store build number and the app

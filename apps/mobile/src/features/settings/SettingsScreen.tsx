@@ -68,6 +68,11 @@ export interface SettingsScreenProps {
    * screen closes, so it can say that the data is deleted.
    */
   onlineData?: OnlineDataDeps;
+  /**
+   * Opens Settings → Username (#405). The Online section shows only with
+   * it, and only when this phone used online play (`hasOnlineAccount()`).
+   */
+  onUsername?: () => void;
 }
 
 export function SettingsScreen({
@@ -76,6 +81,7 @@ export function SettingsScreen({
   onHistory,
   turnPushes,
   onlineData,
+  onUsername,
 }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
   const locales = useLocales();
@@ -281,6 +287,18 @@ export function SettingsScreen({
         {turnPushes ? (
           <SectionCard title={t('settings.sections.notifications')}>
             <TurnPushSettings pushes={turnPushes} />
+          </SectionCard>
+        ) : null}
+
+        {onUsername && usedOnline ? (
+          <SectionCard title={t('settings.sections.online')}>
+            <SectionRow
+              testID="settings-username"
+              icon="users"
+              label={t('settings.username.label')}
+              hint={t('settings.username.hint')}
+              onPress={onUsername}
+            />
           </SectionCard>
         ) : null}
 

@@ -10,7 +10,21 @@
  * `docs/architecture/online-game-service.md`.
  */
 
-export { NO_NAMES, namesOf, pickGuestNumber } from './names';
+export { NO_NAMES, nameFrom, namesOf, pickGuestNumber, type NameRecord } from './names';
+export {
+  checkUsername,
+  isAllowedUsername,
+  myUsernameOf,
+  nextUsernameChange,
+  planUsername,
+  usernameKey,
+  type PlanUsernameInput,
+  type UsernameCheck,
+  type UsernamePatch,
+  type UsernamePlan,
+  type UsernameProblem,
+  type UsernameRecord,
+} from './usernames';
 export {
   OnlineGameError,
   advance,

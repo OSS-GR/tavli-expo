@@ -1,6 +1,6 @@
 # @tavli/backend-convex
 
-The `GameTransport`, `Invites`, `PushTokens`, `OnlineData` and `AppUpdates` ports (`@tavli/contracts`) on the [Convex](https://www.convex.dev/) client. They call the functions in `apps/server/convex/games.ts`, `invites.ts`, `push.ts`, `account.ts` and `appUpdate.ts`. Decision: [ADR-0004](../../../docs/decisions/0004-backend-auth.md) (point 9). Issues: #253 (games), #281 (invites), #285 (push tokens), #315 (delete my online data), #390 (update needed).
+The `GameTransport`, `Invites`, `PushTokens`, `OnlineData`, `AppUpdates` and `Usernames` ports (`@tavli/contracts`) on the [Convex](https://www.convex.dev/) client. They call the functions in `apps/server/convex/games.ts`, `invites.ts`, `push.ts`, `account.ts`, `appUpdate.ts` and `usernames.ts`. Decision: [ADR-0004](../../../docs/decisions/0004-backend-auth.md) (point 9). Issues: #253 (games), #281 (invites), #285 (push tokens), #315 (delete my online data), #390 (update needed), #405 (usernames).
 
 Version: `convex` 1.49.0, a peer dependency (the app installs it). Keep it on the same version as `apps/server`.
 

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { tutorialHref } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
-import { auth, onlineData } from '@/services';
+import { auth, onlineData, usernames } from '@/services';
 
 export default function SettingsRoute() {
   const { t } = useTranslation();
@@ -19,6 +19,7 @@ export default function SettingsRoute() {
         onHistory={() => router.push('/history')}
         turnPushes={pushes}
         onlineData={auth && onlineData ? { auth, data: onlineData, pushes } : undefined}
+        onUsername={auth && usernames ? () => router.push('/username') : undefined}
       />
     </>
   );

@@ -6,7 +6,7 @@ import {
 } from '@tavli/contracts';
 import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
-import { closedOut, lastBearOff } from '@tavli/online/testing';
+import { closedOut, guestNumberOf, lastBearOff } from '@tavli/online/testing';
 import { getLayout, getTheme } from '@tavli/themes';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
@@ -141,7 +141,7 @@ async function openGame(
 
 const view = (game: Game) => game.server.getGame(game.gameId)!;
 /** The bot's guest name (#400): the screen names the other player by it. */
-const botName = (game: Game) => `Guest ${game.server.nameOf('bot')?.number}`;
+const botName = (game: Game) => `Guest ${guestNumberOf(game.server, 'bot')}`;
 
 /**
  * Moves the clock until the server waits for you, and the screen has that

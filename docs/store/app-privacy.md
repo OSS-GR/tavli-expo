@@ -34,7 +34,7 @@ Tick these eight. Leave every other box empty.
 | Apple category | Data type | Why |
 |----------------|-----------|-----|
 | Contact Info | **Email Address** | The email Apple gives with Sign in with Apple (the person's own or a Hide My Email relay), kept on Convex with the account (#401). Only when the player picks Apple. |
-| Identifiers | **User ID** | The guest account's random user id on Convex (online play with a friend, #281), and its guest name ("Guest" and 4 random digits, picked by the server, #400): Apple's User ID covers a screen name |
+| Identifiers | **User ID** | The guest account's random user id on Convex (online play with a friend, #281), its guest name ("Guest" and 4 random digits, picked by the server, #400) and the username a saved account picks (#405): Apple's User ID covers a screen name or handle |
 | Identifiers | **Device ID** | The install id (PostHog `identify`, Sentry user id after Allow), PostHog's random ids, and the push token on Convex (turn notifications, #285) |
 | User Content | **Gameplay Content** | The online games and invites on Convex: the moves, rolls and score of a game with a friend (#281) |
 | Usage Data | **Product Interaction** | The PostHog events (app opened, games, settings, screens) |
@@ -103,7 +103,7 @@ Apple asks apps that make an account to let people delete it in the app (App Rev
 - [ ] `NSPrivacyCollectedDataTypeLinked` in `apps/mobile/app.json` matches the "linked" answers above (today: `true` for all eight).
 - [ ] Both Convex deployments are in the EU (`eu-west-1`), and you accepted Convex's data processing terms (DPA). The deployments have `BETTER_AUTH_SECRET` set (`npx convex env set`; never in the repo).
 - [ ] Check where Expo's push service processes the data, and whether its terms need a data processing agreement (DPA).
-- [ ] Email Address is ticked since Sign in with Apple (#401). When Google or the email code ships, or usernames (#405: maybe Name or Other User Content), check the label again.
+- [ ] Email Address is ticked since Sign in with Apple (#401). Usernames (#405) are screen names, so they fall under User ID (Apple: "screen name, handle"), not Name or Other User Content. The server also keeps when the player accepted the terms and ticked the age box: no age or birthday. When Google or the email code ships, check the label again.
 
 ## Pre-consent crash reports (#139)
 

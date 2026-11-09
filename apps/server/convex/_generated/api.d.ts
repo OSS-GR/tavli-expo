@@ -27,6 +27,7 @@ import type * as model_keyNonce from "../model/keyNonce.js";
 import type * as model_push from "../model/push.js";
 import type * as playerNames from "../playerNames.js";
 import type * as push from "../push.js";
+import type * as usernames from "../usernames.js";
 
 import type {
   ApiFromModules,
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   "model/push": typeof model_push;
   playerNames: typeof playerNames;
   push: typeof push;
+  usernames: typeof usernames;
 }>;
 
 /**

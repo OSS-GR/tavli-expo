@@ -19,6 +19,7 @@ import { onlineFake } from '../test/onlineFake';
 import { createOnlineServices, once, type OnlineAdapters } from './onlineServices';
 import {
   appUpdates as servicesAppUpdates,
+  usernames as servicesUsernames,
   auth as servicesAuth,
   games as servicesGames,
   invites as servicesInvites,
@@ -95,6 +96,15 @@ function memoryAdapters() {
     createAppUpdates: () => {
       made.push('appUpdates');
       return updates;
+    },
+    createUsernames: ({ auth }) => {
+      made.push('usernames');
+      const user = () => auth.currentUser();
+      const caller = () => server.usernamesFor(user()?.id ?? null, user()?.isGuest === false);
+      return {
+        mine: () => caller().mine(),
+        setMine: (request) => caller().setMine(request),
+      };
     },
   };
   return { adapters, authStore, server, made, phone, updates };
@@ -301,6 +311,7 @@ describe('the Jest fake of @/services', () => {
     expect(servicesNotifications).toBe(onlineFake.notifications);
     expect(servicesPushTokens).toBe(onlineFake.pushTokens);
     expect(servicesAppUpdates).toBe(onlineFake.appUpdates);
+    expect(servicesUsernames).toBe(onlineFake.usernames);
   });
 
   it('saves push tokens as the signed-in guest, and refuses them while nobody is signed in', async () => {

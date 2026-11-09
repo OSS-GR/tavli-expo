@@ -1,8 +1,8 @@
 # Age rating
 
-> The answers for the App Store age rating and the Google Play content rating (IARC). Issue #137. Last review: 2026-10-27.
+> The answers for the App Store age rating and the Google Play content rating (IARC). Issue #137. Last review: 2026-11-09 (#405, usernames).
 
-Tavlaki is a board game. It has dice, but no betting, no real money, no prizes, no purchases, no ads, no chat and no online play. The answers below should give **4+** on the App Store and **PEGI 3 / ESRB Everyone** on Google Play.
+Tavlaki is a board game. It has dice, but no betting, no real money, no prizes, no purchases, no ads and no chat. Online play is only with a friend you invite (#281). Players with a saved account pick a **username** that other players see (#405): that is user-generated content. The answers below should give **4+** on the App Store and **PEGI 3 / ESRB Everyone** on Google Play.
 
 **Owner:** the stores change the wording of these questions now and then. The lists follow Apple's questionnaire from 2025 and the IARC questionnaire as we know them. Answer the real form with the facts here.
 
@@ -23,9 +23,9 @@ So: **Simulated gambling: None. Gambling (real money): No. Contests: None. Loot 
 | Section | Question | Answer |
 |---------|----------|--------|
 | In-app controls | Parental controls | No |
-| In-app controls | Age assurance | No |
+| In-app controls | Age assurance | No (the username step has a self-declared age box only: "I am 16 or older", or 13 by region; **Owner:** check that Apple does not count it) |
 | Capabilities | Unrestricted web access | No (the app only opens the privacy policy page in the browser) |
-| Capabilities | User-generated content | No (pass-and-play names stay on the phone and nobody else sees them) |
+| Capabilities | User-generated content | **Yes**: usernames (#405). Other players see them in games, invites and lists. Pass-and-play names stay on the phone. |
 | Capabilities | Messaging and chat | No |
 | Capabilities | Advertising | No |
 | Mature themes | Profanity or crude humor | None |
@@ -41,7 +41,7 @@ So: **Simulated gambling: None. Gambling (real money): No. Contests: None. Loot 
 | Chance-based activities | Gambling (real money) | No |
 | Chance-based activities | Loot boxes | No |
 
-Expected result: **4+**. Do not put the app in the Kids category: it is not made for children (see the privacy policy, "Children").
+Expected result: **4+**. **Owner:** the "User-generated content" answer may raise it; accept what the form gives. Do not put the app in the Kids category: it is not made for children (see the privacy policy, "Children").
 
 ## Google Play (App content → Content rating, IARC)
 
@@ -56,7 +56,7 @@ Category: **Game** (a board game).
 | Controlled substances (alcohol, tobacco, drugs) | No |
 | Gambling: does the app simulate gambling? | No (see "Dice and chance") |
 | Gambling: does the app offer real-money gambling? | No |
-| Users can interact or exchange content (chat, online play, sharing) | No. Pass-and-play is two people on one phone; nothing is sent. |
+| Users can interact or exchange content (chat, online play, sharing) | **Yes**: online games with a friend (#281) and usernames that other players see (#405). No chat. |
 | Shares the user's current location | No |
 | In-app purchases or digital goods | No |
 | Random items or loot boxes bought with money | No |
@@ -72,6 +72,16 @@ App content → Target audience and content:
 - Age groups: **13–15, 16–17, 18 and over**. Do not tick any group under 13. The privacy policy says the app is not aimed at children under 13, and ticking an under-13 group puts the app under Google's Families policy.
 - "Could your app appeal to children?" **Owner:** answer honestly. A wooden board game with no cartoon art is not made for children. If Google asks, say it is a traditional Greek board game for teens and adults.
 
+## User-generated content rules (App Review 1.2, Google UGC policy)
+
+Usernames are user content, so both stores ask for these. What we have:
+
+- **Terms of use** that forbid bad names, accepted in the app before a username is saved (`docs/legal/terms.md`, `https://tavlaki.com/terms`).
+- **A filter**: the name rules and the block and reserved lists (`packages/online/src/usernames.ts`), on the phone and on the server.
+- **Action on reports**: the owner renames or clears a name with `clearUsername` (Convex dashboard, `apps/server/convex/usernames.ts`).
+- **Report**: by email to the contact address in the terms. An in-app report button is #320. **Owner:** Apple 1.2 asks for a way to report in the app and to block a player; online games are only with a friend you invited, so say that in the review notes, and ship #320 if Apple asks.
+- **Contact**: the address in the terms and on the store page.
+
 ## When to redo the ratings
 
-Online play, friends, invites or chat (MVP2) change the answers to "Users can interact" (Google) and "Messaging and chat" or "User-generated content" (Apple). Purchases (for example themes) change the in-app purchase answers. Redo both forms before that release.
+Friends, a public lobby or chat change the answers to "Users can interact" (Google) and "Messaging and chat" (Apple). Purchases (for example themes) change the in-app purchase answers. Redo both forms before that release.

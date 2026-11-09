@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { guestName, isGuestNumber } from '@tavli/contracts';
+import { guestName, isGuestNumber, usernameName } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import type { Rng } from '@tavli/engine';
 
@@ -61,10 +61,17 @@ describe('isGuestNumber', () => {
 
 describe('namesOf', () => {
   it('names each side that has a number', () => {
-    expect(namesOf({ white: '4821', black: null })).toEqual({
+    expect(namesOf({ white: { guestNumber: '4821' }, black: null })).toEqual({
       white: guestName('4821'),
       black: null,
     });
     expect(NO_NAMES).toEqual({ white: null, black: null });
+  });
+
+  it('names a side by its username first (#405)', () => {
+    expect(namesOf({ white: { guestNumber: '4821', username: 'Νίκος' }, black: {} })).toEqual({
+      white: usernameName('Νίκος'),
+      black: null,
+    });
   });
 });

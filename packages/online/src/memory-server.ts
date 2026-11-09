@@ -31,6 +31,10 @@
  * - Guest names (#400): like the Convex server, a player gets a guest
  *   number when they first make an invite or start a game, and keeps it.
  *   Views, lists and invites carry the names; a deleted player has none.
+ * - Usernames (#405): `usernamesFor(playerId, saved)` picks and changes
+ *   them with `planUsername`, like the Convex `setMyUsername`; a username
+ *   wins over the guest name. A view sent before a change keeps the old
+ *   name until the next view.
  *   The numbers come from their own RNG (`nameRng`), so they never change
  *   the dice of a seeded `rng`.
  *
@@ -42,7 +46,7 @@
  * in-memory version of the Convex `expireInvite`).
  */
 
-import { guestName, normalizeInviteCode } from '@tavli/contracts';
+import { normalizeInviteCode } from '@tavli/contracts';
 import type {
   GameSummary,
   GameTransport,
@@ -55,6 +59,9 @@ import type {
   OnlineGameStatus,
   OnlineGameView,
   PlayerName,
+  UsernameErrorCode,
+  UsernameErrorData,
+  Usernames,
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import type { FlowEvent, MatchFlow, PerPlayer, PlayerId, Rng } from '@tavli/engine';
@@ -104,7 +111,10 @@ import {
   toView,
 } from './online-game';
 import type { LoadedFlow, SavedDraft, SteppedFlow } from './online-game';
-import { namesOf, pickGuestNumber } from './names';
+import { nameFrom, namesOf, pickGuestNumber } from './names';
+import type { NameRecord } from './names';
+import { myUsernameOf, planUsername } from './usernames';
+import type { UsernameRecord } from './usernames';
 import { latestGames, summarizeGame } from './summaries';
 
 export interface MemoryGameServerOptions {
@@ -186,7 +196,13 @@ export interface MemoryGameServer {
   getInvite(code: string): InviteView | null;
   /** The game as a client sees it (a copy), or `null` when there is no such game. */
   getGame(gameId: string): OnlineGameView | null;
-  /** The player's guest name (#400), or `null` before their first invite or game. For tests. */
+  /**
+   * Usernames (#405) for `playerId` (`null`: nobody signed in), as if
+   * they were signed in. `saved` says whether the account has a sign-in
+   * key: the in-memory server keeps no accounts, so the caller says.
+   */
+  usernamesFor(playerId: string | null, saved: boolean): Usernames;
+  /** The player's name (#400, #405): the username, else the guest name, else `null`. For tests. */
   nameOf(playerId: string): PlayerName | null;
   /** The event log of the game, oldest first (copies). `replay` rebuilds the game from it. */
   events(gameId: string): LoggedEvent[];
@@ -266,6 +282,17 @@ function nextTick(): Promise<void> {
   return Promise.resolve();
 }
 
+/** A rejected username call (#405): plain `UsernameErrorData`. */
+function usernameError(code: UsernameErrorCode, message: string): UsernameErrorData {
+  return { code, message };
+}
+
+/** Runs `step` on a later microtask; resolves with a copy of its result, or rejects with what it threw. */
+async function settled<T>(step: () => T): Promise<T> {
+  await nextTick();
+  return copy(step());
+}
+
 /**
  * An `OnlineGameError` becomes plain `GameTransportErrorData`, an
  * `InviteError` plain `InviteErrorData`; anything else is a bug.
@@ -296,8 +323,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const drafts = new Map<string, string>();
   /** Player ids whose data was deleted (#315), like a Better Auth user that is gone. */
   const deletedPlayers = new Set<string>();
-  /** The guest number of each player (#400), like the Convex `playerNames` table. */
-  const guestNumbers = new Map<string, string>();
+  /** The name of each player (#400, #405), like the Convex `playerNames` table. */
+  const nameRecords = new Map<string, NameRecord & UsernameRecord>();
   let nextId = 1;
 
   function draftOf(gameId: string): SavedDraft | null {
@@ -307,20 +334,60 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
 
   /** Gives `playerId` a guest number, once (#400), like the Convex `ensureGuestNumber`. */
   function ensureGuestNumber(playerId: string): void {
-    if (!guestNumbers.has(playerId)) guestNumbers.set(playerId, pickGuestNumber(nameRng));
+    const record = nameRecords.get(playerId);
+    if (record?.guestNumber !== undefined) return;
+    nameRecords.set(playerId, { ...record, guestNumber: pickGuestNumber(nameRng) });
   }
 
   function nameOf(playerId: string): PlayerName | null {
-    const number = guestNumbers.get(playerId);
-    return number === undefined ? null : guestName(number);
+    return nameFrom(nameRecords.get(playerId) ?? null);
+  }
+
+  /** Usernames (#405), like the Convex `usernames.ts`: the same `planUsername`. */
+  function usernamesFor(playerId: string | null, saved: boolean): Usernames {
+    const caller = (): string => {
+      if (playerId === null || deletedPlayers.has(playerId)) {
+        throw usernameError('NOT_SIGNED_IN', 'sign in first');
+      }
+      return playerId;
+    };
+    return {
+      mine: () =>
+        settled(() => {
+          const id = caller();
+          return myUsernameOf(nameRecords.get(id) ?? null, saved, now());
+        }),
+      setMine: (request) =>
+        settled(() => {
+          const id = caller();
+          const record = nameRecords.get(id) ?? null;
+          const at = now();
+          const plan = planUsername({ record, saved, request: copy(request), now: at });
+          if (!plan.ok) throw usernameError(plan.code, plan.message);
+          if (plan.key !== null) {
+            for (const [other, held] of nameRecords) {
+              if (other !== id && held.usernameKey === plan.key) {
+                throw usernameError('TAKEN', 'another player has this name');
+              }
+            }
+          }
+          // Like `setMyUsername`: a player who sets a name before any game gets a number too.
+          const next = { ...record, ...plan.patch };
+          nameRecords.set(id, {
+            ...next,
+            guestNumber: next.guestNumber ?? pickGuestNumber(nameRng),
+          });
+          return myUsernameOf(nameRecords.get(id) ?? null, saved, at);
+        }),
+    };
   }
 
   /** The view input of `game`, without its flow. */
   function gameInput(game: MemoryGame) {
     return {
       names: namesOf({
-        white: guestNumbers.get(game.players.white) ?? null,
-        black: guestNumbers.get(game.players.black) ?? null,
+        white: nameRecords.get(game.players.white) ?? null,
+        black: nameRecords.get(game.players.black) ?? null,
       }),
       gameId: game.gameId,
       version: game.version,
@@ -804,7 +871,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       if (listener.playerId === playerId) sendInviteList(listener);
     }
     deletedPlayers.add(playerId);
-    guestNumbers.delete(playerId);
+    nameRecords.delete(playerId);
   }
 
   return {
@@ -821,6 +888,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     getInvite: (text) => copy(inviteView(text)),
 
     transportFor,
+
+    usernamesFor,
 
     nameOf,
 

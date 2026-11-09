@@ -98,7 +98,8 @@
       "privacy": "Privacy",
       "help": "Help",
       "history": "History",
-      "notifications": "Notifications"
+      "notifications": "Notifications",
+      "online": "Online play"
     },
     "autoConfirm": {
       "label": "Auto-confirm moves",
@@ -207,6 +208,10 @@
       "confirmTitle": "Clear history?",
       "confirmBody": "This deletes the list and the stats of your past matches on this phone. You cannot undo it.",
       "confirm": "Clear"
+    },
+    "username": {
+      "label": "Username",
+      "hint": "The name other players see"
     }
   },
   "history": {
@@ -1228,5 +1233,42 @@
       "big": "Big mistake"
     },
     "note": "Best is the move the strongest bot would play."
+  },
+  "username": {
+    "title": "Pick a username",
+    "changeTitle": "Username",
+    "body": "Other players see it in games, invites and lists. Your account is saved, so the name stays yours.",
+    "label": "Username",
+    "rules": "3 to 16 letters, digits or _. Start with a letter. Latin or Greek letters, not both.",
+    "problem": {
+      "short": "Too short: use at least 3 characters.",
+      "long": "Too long: use at most 16 characters.",
+      "chars": "Use only letters, digits and _.",
+      "start": "Start with a letter.",
+      "mixed": "Use Latin or Greek letters, not both."
+    },
+    "terms": "I accept the terms of use",
+    "readTerms": "Read the terms of use",
+    "age": "I am {{age}} or older",
+    "ageHint": "We keep only that you ticked this, and when.",
+    "save": "Save",
+    "saving": "Saving…",
+    "notNow": "Not now",
+    "saved": "Username saved.",
+    "nextChange": "You can change it again on {{date}}.",
+    "changeRule": "After a change, the next one is possible in 30 days.",
+    "error": {
+      "TAKEN": "Another player has this name. Try another one.",
+      "NOT_ALLOWED": "This name is not allowed. Try another one.",
+      "BAD_NAME": "This name breaks the rules above.",
+      "TOO_SOON": "You changed your name less than 30 days ago.",
+      "TERMS_NEEDED": "Accept the terms of use first.",
+      "AGE_NEEDED": "Tick the age box first.",
+      "NOT_SAVED": "A username needs a saved account (Sign in with Apple).",
+      "NOT_SIGNED_IN": "You are not signed in. Open online play and sign in first.",
+      "failed": "Could not reach the server. Try again."
+    },
+    "guestOnly": "A username needs a saved account. Sign in with Apple in online play to save yours. Guests play as “Guest” and a number.",
+    "loading": "Loading…"
   }
 }

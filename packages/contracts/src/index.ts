@@ -105,8 +105,23 @@ export type {
   AuthUser,
   MemoryAuthStore,
 } from './auth';
-export { guestName, isGuestNumber } from './player-name';
-export type { GuestName, PlayerName } from './player-name';
+export { guestName, isGuestNumber, usernameName } from './player-name';
+export type { GuestName, PlayerName, UsernameName } from './player-name';
+export {
+  TERMS_VERSION,
+  USERNAME_CHANGE_MS,
+  USERNAME_ERROR_CODES,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  isUsernameErrorData,
+} from './username';
+export type {
+  MyUsername,
+  SetUsernameRequest,
+  UsernameErrorCode,
+  UsernameErrorData,
+  Usernames,
+} from './username';
 export { createMemoryAppleSheet } from './apple-sheet';
 export type { AppleSheet, AppleSheetProof, MemoryAppleSheet } from './apple-sheet';
 export type { OnlineData } from './online-data';

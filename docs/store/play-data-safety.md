@@ -29,7 +29,7 @@ Tick these six. Leave every other type empty.
 
 | Category | Data type | What it is in Tavlaki |
 |----------|-----------|-----------------------|
-| Personal info | **User IDs** | The guest account's random user id on Convex (online play with a friend, #281), and its guest name ("Guest" and 4 random digits, picked by the server, #400) |
+| Personal info | **User IDs** | The guest account's random user id on Convex (online play with a friend, #281), its guest name ("Guest" and 4 random digits, picked by the server, #400) and the username a saved account picks (#405; Google's User IDs cover a screen name) |
 | App activity | **Other actions** | The online games on Convex: the moves, rolls and score of a game with a friend (Google's "Other actions" names gameplay) |
 | App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, hint shown, review opened, invite created, push permission answered, online sign-in (`apple` or `guest` only) |
 | App info and performance | **Crash logs** | Sentry crash and error reports |
@@ -80,4 +80,4 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 - [ ] The answers here and in [app-privacy.md](app-privacy.md) say the same thing.
 - [ ] Convex: both deployments in the EU (`eu-west-1`), Convex's DPA accepted, `BETTER_AUTH_SECRET` set on both.
 - [ ] Answer the account creation and account deletion questions (Section 1) after you check Google's current rules for guest accounts.
-- [ ] Redo this form when Apple on Android, Google, the email code, usernames (#405) or EAS Update ship. Then Personal info (maybe name or email) and account creation change.
+- [ ] Usernames (#405) are in User IDs. Redo this form when Apple on Android, Google, the email code or EAS Update ship. Then Personal info (maybe email) and account creation change.
