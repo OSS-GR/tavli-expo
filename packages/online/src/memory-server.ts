@@ -56,6 +56,7 @@ import { MAX_BLOCKS, normalizeInviteCode } from '@tavli/contracts';
 import type {
   GameSummary,
   GameTransport,
+  GuestMoveCounts,
   GameTransportErrorData,
   InviteErrorData,
   InviteView,
@@ -137,6 +138,12 @@ import {
   reportWindowStart,
 } from './safety';
 import { latestGames, summarizeGame } from './summaries';
+import {
+  guestGameMove,
+  renamePlayerInEvent,
+  renamePlayerInFlow,
+  renamePlayers,
+} from './guest-move';
 
 export interface MemoryGameServerOptions {
   /** The dice. Tests pass a seeded RNG; a dev game may pass any `Rng`. */
@@ -242,6 +249,19 @@ export interface MemoryGameServer {
   reportsOf(): MemoryReport[];
   /** The owner deletes a report after the review, like a row deleted in the dashboard. For tests. */
   deleteReport(reporterId: string, reportedId: string): void;
+  /**
+   * What a guest move (#403) would take from `playerId`: active games and
+   * open invites at `now()`, like the Convex `guestMoveCounts`.
+   */
+  guestMoveCounts(playerId: string): GuestMoveCounts;
+  /**
+   * Moves guest `source` into account `target` (#403), like the Convex
+   * guest move: games, invites, answers, blocks and reports become
+   * `target`'s, a game in progress between the two ends with `source`
+   * resigning, and `source` is deleted. The caller checked that `source`
+   * is a guest and `target` a saved account.
+   */
+  moveGuest(source: string, target: string): void;
   /** The player's name (#400, #405): the username, else the guest name, else `null`. For tests. */
   nameOf(playerId: string): PlayerName | null;
   /** The event log of the game, oldest first (copies). `replay` rebuilds the game from it. */
@@ -1102,7 +1122,95 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     };
   }
 
+  function guestMoveCounts(playerId: string): GuestMoveCounts {
+    let activeGames = 0;
+    for (const game of games.values()) {
+      if (game.status === 'active' && sideOf(game.players, playerId) !== null) activeGames += 1;
+    }
+    return { activeGames, openInvites: countOpenInvites(invites.values(), playerId, now()) };
+  }
+
+  /** See `moveGuest` in `MemoryGameServer`. */
+  function moveGuest(source: string, target: string): void {
+    const at = now();
+    for (const game of [...games.values()]) {
+      const side = sideOf(game.players, source);
+      if (side === null) continue;
+      const move = guestGameMove(game.players, game.status === 'active', source, target);
+      if (move === 'resign') {
+        const before = loadStored(game.flow);
+        save(game, source, before, resign(before.flow, side, rng), at);
+      }
+      if (move !== 'rename') continue;
+      // Like a Convex patch: the version stays, so a call on its way still fits.
+      const moved: MemoryGame = {
+        ...game,
+        players: renamePlayers(game.players, source, target),
+        flow: renamePlayerInFlow(game.flow, source, target),
+        events: game.events.map((text) => {
+          const row = JSON.parse(text) as LoggedEvent;
+          const event = renamePlayerInEvent(JSON.stringify(row.event), source, target);
+          const next: LoggedEvent = {
+            ...row,
+            actor: row.actor === source ? target : row.actor,
+            event: JSON.parse(event) as FlowEvent,
+          };
+          return JSON.stringify(next);
+        }),
+      };
+      games.set(game.gameId, moved);
+      for (const listener of listeners) {
+        if (listener.gameId === game.gameId && sideOf(moved.players, listener.playerId) !== null) {
+          send(listener, JSON.stringify(viewOf(moved, listener.playerId)));
+        }
+      }
+      notifyLists(moved);
+    }
+    for (const invite of [...invites.values()]) {
+      if (answeredBy.get(invite.code) === source) answeredBy.set(invite.code, target);
+      if (invite.from === source) saveInvite({ ...invite, from: target });
+    }
+    // Blocks both ways: never one of `target` by itself, never one twice.
+    const mine = blocks.get(source) ?? new Map<string, number>();
+    blocks.delete(source);
+    const targets = blocks.get(target) ?? new Map<string, number>();
+    for (const [blocked, when] of mine) {
+      if (blocked !== target && !targets.has(blocked)) targets.set(blocked, when);
+    }
+    if (targets.size > 0) blocks.set(target, targets);
+    for (const [blocker, blocked] of blocks) {
+      const when = blocked.get(source);
+      if (when === undefined) continue;
+      blocked.delete(source);
+      if (blocker !== target && !blocked.has(target)) blocked.set(target, when);
+    }
+    // Reports both ways: never one by `target` about itself, one per pair.
+    const kept: MemoryReport[] = [];
+    for (const report of reports) {
+      const moved: MemoryReport = {
+        ...report,
+        reporterId: report.reporterId === source ? target : report.reporterId,
+        reportedId: report.reportedId === source ? target : report.reportedId,
+      };
+      if (moved.reporterId === moved.reportedId) continue;
+      if (
+        kept.some((r) => r.reporterId === moved.reporterId && r.reportedId === moved.reportedId)
+      ) {
+        continue;
+      }
+      kept.push(moved);
+    }
+    reports = kept;
+    deletedPlayers.add(source);
+    nameRecords.delete(source);
+    notifyViewer(target);
+  }
+
   return {
+    guestMoveCounts,
+
+    moveGuest,
+
     createGame,
 
     createInvite: makeInvite,

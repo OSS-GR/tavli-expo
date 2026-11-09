@@ -21,13 +21,18 @@ export const KEY_NONCE_RANDOM_BYTES = 16;
 /** Text before the signed parts, so this HMAC is never one of another use. */
 const PURPOSE = 'tavlaki-key-nonce:';
 
-function base64Url(bytes: Uint8Array): string {
+/** Bytes as base64url text with no padding. */
+export function base64Url(bytes: Uint8Array): string {
   let text = '';
   for (const byte of bytes) text += String.fromCharCode(byte);
   return btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-async function signature(secret: string, signed: string): Promise<string> {
+/**
+ * The HMAC-SHA-256 of `purpose` + `signed` with `secret`, base64url. Each
+ * use has its own `purpose`, so one use's signature never passes another's.
+ */
+export async function signText(secret: string, purpose: string, signed: string): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -36,12 +41,12 @@ async function signature(secret: string, signed: string): Promise<string> {
     false,
     ['sign'],
   );
-  const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(PURPOSE + signed));
+  const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(purpose + signed));
   return base64Url(new Uint8Array(mac));
 }
 
 /** Same text, in time that does not depend on where they differ. */
-function sameText(a: string, b: string): boolean {
+export function sameText(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -56,7 +61,7 @@ export async function makeKeyNonce(
 ): Promise<string> {
   if (random.length < KEY_NONCE_RANDOM_BYTES) throw new Error('not enough random bytes');
   const signed = `${now + KEY_NONCE_TTL_MS}.${base64Url(random)}`;
-  return `${signed}.${await signature(secret, signed)}`;
+  return `${signed}.${await signText(secret, PURPOSE, signed)}`;
 }
 
 /**
@@ -72,7 +77,7 @@ export async function checkKeyNonce(
   if (parts.length !== 3) return null;
   const [expires, random, mac] = parts as [string, string, string];
   if (!/^\d{1,15}$/.test(expires) || random === '' || mac === '') return null;
-  if (!sameText(mac, await signature(secret, `${expires}.${random}`))) return null;
+  if (!sameText(mac, await signText(secret, PURPOSE, `${expires}.${random}`))) return null;
   const expiresAt = Number(expires);
   return expiresAt > now ? expiresAt : null;
 }

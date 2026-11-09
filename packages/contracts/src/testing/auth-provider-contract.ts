@@ -12,7 +12,14 @@
  * loop while they wait for a change.
  */
 import { isAuthErrorData } from '../auth';
-import type { AuthErrorCode, AuthKeyCredential, AuthProvider, AuthUser } from '../auth';
+import type {
+  AuthErrorCode,
+  AuthErrorData,
+  AuthKeyCredential,
+  AuthProvider,
+  AuthUser,
+  GuestMoveOffer,
+} from '../auth';
 
 export interface AuthProviderContractSubject {
   /** The provider under test. Nobody is signed in yet. */
@@ -108,7 +115,7 @@ async function rejectsWith(
   call: Promise<unknown>,
   code: AuthErrorCode,
   what: string,
-): Promise<void> {
+): Promise<AuthErrorData> {
   let error: unknown;
   try {
     await call;
@@ -120,6 +127,20 @@ async function rejectsWith(
     throw new Error(`${what}: expected AuthErrorData ${code}, got ${String(error)}`);
   }
   same(error.code, code, `${what}: the error code`);
+  return error;
+}
+
+/** The move offer of a guest's `KEY_BELONGS_TO_OTHER` (#403). */
+function offerOf(error: AuthErrorData, what: string): GuestMoveOffer {
+  const move = error.move;
+  if (move === undefined) throw new Error(`${what}: no move offer`);
+  if (typeof move.ticket !== 'string' || move.ticket === '') {
+    throw new Error(`${what}: the offer has no ticket`);
+  }
+  for (const count of [move.activeGames, move.openInvites]) {
+    if (!Number.isInteger(count) || count < 0) throw new Error(`${what}: a count is ${count}`);
+  }
+  return move;
 }
 
 export function authProviderContract(): AuthProviderContractCheck[] {
@@ -318,6 +339,75 @@ export function authProviderContract(): AuthProviderContractCheck[] {
           owner,
           'the owner signs in',
         );
+      },
+    },
+    {
+      name: 'a guest with another account’s key gets a move offer, and the move signs in there',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const owner = await auth.signInWithKey(await apple(subject, 'apple-a'));
+        await auth.signOut();
+        const guest = await auth.signInAsGuest();
+        const error = await rejectsWith(
+          auth.saveKey(await apple(subject, 'apple-a')),
+          'KEY_BELONGS_TO_OTHER',
+          'saveKey()',
+        );
+        const offer = offerOf(error, 'saveKey()');
+        same(auth.currentUser(), guest, 'currentUser() before the move');
+
+        same(await auth.moveGuest(offer), owner, 'moveGuest()');
+        same(auth.currentUser(), owner, 'currentUser() after the move');
+        same(subject.tokenSubject(await tokenOf(auth, 'the move')), owner.id, 'the token subject');
+        same(await auth.listKeys(), [{ provider: 'apple' }], 'listKeys()');
+        // The offer worked once: the account is no guest.
+        await rejectsWith(auth.moveGuest(offer), 'REJECTED', 'a second move');
+        const again = subject.restart();
+        same(await again.ready(), owner, 'ready() after a restart');
+      },
+    },
+    {
+      name: 'a saved account gets no move offer; another guest’s offer is refused',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        await auth.signInWithKey(await apple(subject, 'apple-a'));
+        await auth.signOut();
+        const other = await auth.signInWithKey(await apple(subject, 'apple-b'));
+        const saved = await rejectsWith(
+          auth.saveKey(await apple(subject, 'apple-a')),
+          'KEY_BELONGS_TO_OTHER',
+          'a saved account',
+        );
+        same(saved.move, undefined, 'the offer of a saved account');
+        await rejectsWith(
+          auth.moveGuest({ ticket: 'not-a-ticket', activeGames: 0, openInvites: 0 }),
+          'REJECTED',
+          'a move of a saved account',
+        );
+        same(auth.currentUser(), other, 'currentUser() of the saved account');
+        await auth.signOut();
+
+        await auth.signInAsGuest();
+        const offer = offerOf(
+          await rejectsWith(
+            auth.saveKey(await apple(subject, 'apple-a')),
+            'KEY_BELONGS_TO_OTHER',
+            'the first guest',
+          ),
+          'the first guest',
+        );
+        await auth.signOut();
+        const second = await auth.signInAsGuest();
+        await rejectsWith(auth.moveGuest(offer), 'REJECTED', 'another guest’s offer');
+        await rejectsWith(
+          auth.moveGuest({ ...offer, ticket: `${offer.ticket}x` }),
+          'REJECTED',
+          'a changed ticket',
+        );
+        same(auth.currentUser(), second, 'currentUser() after the refusals');
+        same(await auth.listKeys(), [], 'listKeys() of the second guest');
       },
     },
     {

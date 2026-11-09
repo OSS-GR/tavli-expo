@@ -82,7 +82,11 @@ function newServer(): MemoryGameServer {
 }
 
 const authStore = createMemoryAuthStore();
-const auth = createMemoryAuthProvider(authStore);
+// A guest's move into an account (#403) moves its data on the current server.
+const auth = createMemoryAuthProvider(authStore, {
+  counts: (playerId) => server.guestMoveCounts(playerId),
+  move: (source, target) => server.moveGuest(source, target),
+});
 let server = newServer();
 const transports = new Map<string, GameTransport>();
 const invitePorts = new Map<string, Invites>();

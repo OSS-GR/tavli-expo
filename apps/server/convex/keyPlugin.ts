@@ -9,7 +9,12 @@
  *
  * - `POST /key/nonce`: a one-time nonce for the Apple sheet (no session).
  * - `POST /key/save`: adds a key to the signed-in user. A key that is
- *   another user's gives `KEY_BELONGS_TO_OTHER` and changes nothing.
+ *   another user's gives `KEY_BELONGS_TO_OTHER` and changes nothing. For
+ *   a guest the error also carries a move offer (#403): the guest's
+ *   counts and a signed ticket (`model/moveTicket.ts`).
+ * - `POST /key/move`: the ticket of that offer. Moves the guest's games
+ *   into the key's account (`guestMove.ts`), deletes the guest and signs
+ *   the phone in to the account.
  * - `GET /key/list`: the signed-in user's keys.
  * - `POST /key/remove`: removes a key, never the last one (`LAST_KEY`).
  * - `POST /key/apple-code`: the Apple sheet's `authorizationCode`, once
@@ -24,9 +29,13 @@
 
 import type { BetterAuthPlugin } from 'better-auth';
 import { APIError, createAuthEndpoint, sessionMiddleware } from 'better-auth/api';
+import { setSessionCookie } from 'better-auth/cookies';
 import { setTokenUtil } from 'better-auth/oauth2';
 
+import type { GuestMoveCounts } from '@tavli/contracts';
+
 import { makeKeyNonce, KEY_NONCE_RANDOM_BYTES } from './model/keyNonce';
+import { checkMoveTicket, makeMoveTicket } from './model/moveTicket';
 
 /** The sign-in key providers. Each needs a social provider in `auth.ts`. */
 export const KEY_PROVIDER_IDS = ['apple'] as const;
@@ -46,6 +55,7 @@ export const KEY_ERROR_CODES = {
   BAD_REQUEST: 'the request is not valid',
   NO_KEY: 'this account has no key of this kind',
   INVALID_CODE: 'the authorization code is not valid',
+  BAD_TICKET: 'the move ticket is not valid, or it ran out',
 } as const;
 
 export type KeyErrorCode = keyof typeof KEY_ERROR_CODES;
@@ -72,6 +82,15 @@ function readSaveBody(body: unknown): { provider: KeyProviderId; token: string; 
   return { provider, token, nonce };
 }
 
+/** The body of `/key/move`: `{ ticket }`. */
+function readMoveBody(body: unknown): string {
+  const { ticket } = (body ?? {}) as { ticket?: unknown };
+  if (typeof ticket !== 'string' || ticket === '' || ticket.length > 2_000) {
+    throw keyError('BAD_REQUEST', 'BAD_REQUEST');
+  }
+  return ticket;
+}
+
 function readRemoveBody(body: unknown): KeyProviderId {
   const { provider } = (body ?? {}) as { provider?: unknown };
   if (!isKeyProviderId(provider)) throw keyError('BAD_REQUEST', 'BAD_REQUEST');
@@ -93,6 +112,11 @@ function readAppleCodeBody(body: unknown): { code: string; clientId: string } {
     throw keyError('BAD_REQUEST', 'BAD_REQUEST');
   }
   return { code: authorizationCode, clientId };
+}
+
+/** A guest: the anonymous plugin's field, which Better Auth's types do not list. */
+function isAnonymousUser(user: object): boolean {
+  return (user as { isAnonymous?: unknown }).isAnonymous === true;
 }
 
 /** The user fields these routes send back: never the email or the name. */
@@ -129,6 +153,14 @@ export interface KeyPluginOptions {
     clientId: string;
     refreshToken: string;
   }) => Promise<boolean>;
+  /** A guest's games in progress and open invites (`guestMoveCounts` in `guestMove.ts`). */
+  readonly guestMoveCounts: (playerId: string) => Promise<GuestMoveCounts>;
+  /**
+   * Moves guest `source` into account `target` and deletes the guest
+   * (`startGuestMove` in `guestMove.ts`). `false` when either changed
+   * since the ticket: nothing moved.
+   */
+  readonly startGuestMove: (move: { source: string; target: string }) => Promise<boolean>;
 }
 
 export function keyPlugin(options: KeyPluginOptions) {
@@ -170,12 +202,34 @@ export function keyPlugin(options: KeyPluginOptions) {
           const user = ctx.context.session.user;
 
           const linked = await internalAdapter.findAccountByKey({ providerId, accountId });
-          if (linked !== null) {
-            if (linked.userId !== user.id) throw keyError('CONFLICT', 'KEY_BELONGS_TO_OTHER');
-            // Saved already: nothing to do.
-            return ctx.json({ user: userOutput(user) });
-          }
           const accounts = await internalAdapter.findAccounts(user.id);
+          if (linked !== null) {
+            if (linked.userId === user.id) {
+              // Saved already: nothing to do.
+              return ctx.json({ user: userOutput(user) });
+            }
+            // The key proves the person owns that account too. A guest
+            // may move its games there (#403): the ticket binds the two
+            // ids, so `/key/move` never takes an id from the app.
+            const isGuest =
+              isAnonymousUser(user) &&
+              !accounts.some((account) => isKeyProviderId(account.providerId));
+            const owner = await internalAdapter.findUserById(linked.userId);
+            if (!isGuest || owner === null || isAnonymousUser(owner)) {
+              throw keyError('CONFLICT', 'KEY_BELONGS_TO_OTHER');
+            }
+            const ticket = await makeMoveTicket(
+              ctx.context.secret,
+              { source: user.id, target: owner.id },
+              Date.now(),
+            );
+            const counts = await options.guestMoveCounts(user.id);
+            throw new APIError('CONFLICT', {
+              code: 'KEY_BELONGS_TO_OTHER',
+              message: KEY_ERROR_CODES.KEY_BELONGS_TO_OTHER,
+              move: { ticket, activeGames: counts.activeGames, openInvites: counts.openInvites },
+            });
+          }
           if (accounts.some((account) => account.providerId === providerId)) {
             throw keyError('CONFLICT', 'PROVIDER_TAKEN');
           }
@@ -199,6 +253,32 @@ export function keyPlugin(options: KeyPluginOptions) {
           }
           const updated = await internalAdapter.updateUser(user.id, patch);
           return ctx.json({ user: userOutput({ ...user, ...patch, ...(updated ?? {}) }) });
+        },
+      ),
+
+      moveGuest: createAuthEndpoint(
+        '/key/move',
+        { method: 'POST', use: [sessionMiddleware] },
+        async (ctx) => {
+          const move = await checkMoveTicket(
+            ctx.context.secret,
+            readMoveBody(ctx.body),
+            Date.now(),
+          );
+          // A ticket works only for the guest it was made for, signed in.
+          if (move === null || move.source !== ctx.context.session.user.id) {
+            throw keyError('BAD_REQUEST', 'BAD_TICKET');
+          }
+          // Checks both users again and deletes the guest with its
+          // sessions, so a second call with the same ticket fails above.
+          if (!(await options.startGuestMove(move))) throw keyError('BAD_REQUEST', 'BAD_TICKET');
+          const { internalAdapter } = ctx.context;
+          const owner = await internalAdapter.findUserById(move.target);
+          const session = await internalAdapter.createSession(move.target);
+          if (owner === null || session === null) throw keyError('BAD_REQUEST', 'BAD_TICKET');
+          // The phone is signed in to the account now, as after a sign-in.
+          await setSessionCookie(ctx, { session, user: owner });
+          return ctx.json({ token: session.token, user: userOutput(owner) });
         },
       ),
 

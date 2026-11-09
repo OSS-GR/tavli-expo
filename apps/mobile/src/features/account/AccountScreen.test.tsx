@@ -218,19 +218,63 @@ describe('<AccountScreen /> as a guest', () => {
     expect(screen.getByText('An account keeps at least one way to sign in.')).toBeOnTheScreen();
   });
 
-  it('an Apple ID with another account leaves the guest as it is', async () => {
+  it('an Apple ID with another account asks; Keep the guest leaves the guest as it is', async () => {
     const user = setupUser();
     await guest();
     onlineFake.authStore.keys['apple:apple-1'] = 'user-9';
     await open();
     await user.press(await screen.findByTestId('account-save-apple'));
+    const dialog = within(await screen.findByTestId('account-move-dialog'));
+    expect(dialog.getByText('This Apple ID has an account already')).toBeOnTheScreen();
+    expect(dialog.getByText('0 games in progress')).toBeOnTheScreen();
+    expect(dialog.getByText('1 open invite')).toBeOnTheScreen();
+    await user.press(dialog.getByText('Keep the guest'));
     expect(
       await screen.findByText(
         'This Apple ID has another Tavlaki account already. Your guest account stays as it is.',
       ),
     ).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-move-dialog')).toBeNull();
     expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: true });
     expect(screen.getByTestId('account-guest')).toBeOnTheScreen();
+  });
+
+  it('Move my games moves the guest’s games into the account and signs in there (#403)', async () => {
+    const user = setupUser();
+    await guest();
+    // A friend accepts the guest's invite: one game in progress.
+    const [code] = (await onlineFake.invites.listMyInvites()).map((invite) => invite.code);
+    const gameId = await onlineFake.server().invitesFor('friend').acceptInvite(code!);
+    onlineFake.authStore.keys['apple:apple-1'] = 'user-9';
+    await open();
+    await user.press(await screen.findByTestId('account-save-apple'));
+    const dialog = within(await screen.findByTestId('account-move-dialog'));
+    expect(dialog.getByText('1 game in progress')).toBeOnTheScreen();
+    await user.press(dialog.getByText('Move my games'));
+    expect(await screen.findByText('Your games are in your account now.')).toBeOnTheScreen();
+    expect(announce).toHaveBeenCalledWith('Your games are in your account now.');
+    expect(onlineFake.authStore.session).toEqual({ id: 'user-9', isGuest: false });
+    expect(onlineFake.server().getGame(gameId)?.players).toEqual({
+      white: 'user-9',
+      black: 'friend',
+    });
+    expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
+  });
+
+  it('a failed move keeps the guest and says so', async () => {
+    const user = setupUser();
+    await guest();
+    onlineFake.authStore.keys['apple:apple-1'] = 'user-9';
+    await open();
+    await user.press(await screen.findByTestId('account-save-apple'));
+    const dialog = within(await screen.findByTestId('account-move-dialog'));
+    // The offer runs out before the tap.
+    onlineFake.authStore.openMoveTickets.length = 0;
+    await user.press(dialog.getByText('Move my games'));
+    expect(
+      await screen.findByText('That did not work. Check the connection and try again.'),
+    ).toBeOnTheScreen();
+    expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: true });
   });
 
   it('a closed Apple sheet saves nothing and says nothing', async () => {

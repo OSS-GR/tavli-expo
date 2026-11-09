@@ -50,6 +50,8 @@ interface FakeServer {
   appleCodes: { user: string; clientId: unknown; code: unknown }[];
   /** The next calls of this name fail with this result error (or throw when `'throw'`). */
   failures: Map<string, { status?: number; message?: string } | 'throw'>;
+  /** Move tickets (#403) not used yet: ticket → guest and account. */
+  moveTickets: Map<string, { source: string; target: string }>;
   calls: string[];
 }
 
@@ -64,6 +66,7 @@ function createServer(): FakeServer {
     tokenTime: 15 * 60 * 1000,
     appleCodes: [],
     failures: new Map(),
+    moveTickets: new Map(),
     calls: [],
   };
 }
@@ -72,8 +75,8 @@ function ok<T>(data: T): BetterAuthResult<T> {
   return { data, error: null };
 }
 
-function refused<T>(status: number, code: string): BetterAuthResult<T> {
-  return { data: null, error: { status, code, message: code } };
+function refused<T>(status: number, code: string, extra: object = {}): BetterAuthResult<T> {
+  return { data: null, error: { status, code, message: code, ...extra } };
 }
 
 /** The fake Apple's id token: `fake-apple.<sub>.<nonce>`. */
@@ -128,11 +131,33 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
       const sub = provenSub(server, body?.['idToken'] as { token: string; nonce: string });
       if (sub === null) return refused(401, 'INVALID_TOKEN');
       const owner = server.appleKeys.get(sub);
-      if (owner !== undefined && owner !== id) return refused(409, 'KEY_BELONGS_TO_OTHER');
+      if (owner !== undefined && owner !== id) {
+        // A guest gets a move offer (#403).
+        if (!server.anonymous.has(id) || keysOf().length > 0) {
+          return refused(409, 'KEY_BELONGS_TO_OTHER');
+        }
+        const ticket = `ticket-${server.moveTickets.size + 1}`;
+        server.moveTickets.set(ticket, { source: id, target: owner });
+        return refused(409, 'KEY_BELONGS_TO_OTHER', {
+          move: { ticket, activeGames: 2, openInvites: 1 },
+        });
+      }
       if (owner === undefined && keysOf().length > 0) return refused(409, 'PROVIDER_TAKEN');
       server.appleKeys.set(sub, id);
       server.anonymous.delete(id);
       return ok({ user: userData(id) });
+    }
+    if (path === '/key/move') {
+      const move = server.moveTickets.get(String(body?.['ticket']));
+      if (move === undefined || move.source !== id) return refused(400, 'BAD_TICKET');
+      server.moveTickets.delete(String(body?.['ticket']));
+      // The guest goes, with its sessions.
+      for (const [session, owner] of server.sessions) {
+        if (owner === id) server.sessions.delete(session);
+      }
+      server.anonymous.delete(id);
+      newSession(move.target);
+      return ok({ token: phone.cookie, user: userData(move.target) });
     }
     if (path === '/key/apple-code') {
       server.appleCodes.push({
@@ -397,6 +422,42 @@ describe('fromBetterAuthClient', () => {
     expect(await rejection(auth.removeKey('apple'))).toMatchObject({ code: 'LAST_KEY' });
     server.failures.set('fetch /key/list', 'throw');
     expect(await rejection(auth.listKeys())).toMatchObject({ code: 'NETWORK' });
+  });
+
+  it('passes the move offer of a guest’s KEY_BELONGS_TO_OTHER, and drops a broken one (#403)', async () => {
+    const { auth, server } = subject();
+    await auth.signInWithKey(await appleCredential(auth, 'a'));
+    await auth.signOut();
+    await auth.signInAsGuest();
+    expect(await rejection(auth.saveKey(await appleCredential(auth, 'a')))).toMatchObject({
+      code: 'KEY_BELONGS_TO_OTHER',
+      move: { ticket: 'ticket-1', activeGames: 2, openInvites: 1 },
+    });
+    // A reply whose offer is not whole carries none.
+    server.failures.set('fetch /key/save', {
+      status: 409,
+      code: 'KEY_BELONGS_TO_OTHER',
+      move: { ticket: 'x', activeGames: -1, openInvites: 0 },
+    } as { status: number });
+    const broken = await rejection(auth.saveKey(await appleCredential(auth, 'a')));
+    expect(broken).toMatchObject({ code: 'KEY_BELONGS_TO_OTHER' });
+    expect(broken).not.toHaveProperty('move');
+  });
+
+  it('after a move the token is the account’s, and a failed move keeps the guest', async () => {
+    const { auth, server } = subject();
+    const owner = await auth.signInWithKey(await appleCredential(auth, 'a'));
+    await auth.signOut();
+    const guest = await auth.signInAsGuest();
+    expect(jwtPayload((await auth.getToken()) ?? '')['sub']).toBe(guest.id);
+    const error = await rejection(auth.saveKey(await appleCredential(auth, 'a')));
+    const offer = (error as { move: { ticket: string; activeGames: number; openInvites: number } })
+      .move;
+    server.failures.set('fetch /key/move', 'throw');
+    expect(await rejection(auth.moveGuest(offer))).toMatchObject({ code: 'NETWORK' });
+    expect(auth.currentUser()).toEqual(guest);
+    expect(await auth.moveGuest(offer)).toEqual(owner);
+    expect(jwtPayload((await auth.getToken()) ?? '')['sub']).toBe(owner.id);
   });
 
   it('a key sign-in never replaces a session it could not load', async () => {

@@ -18,6 +18,7 @@ import type {
   AuthKeyProvider,
   AuthProvider,
   AuthUser,
+  GuestMoveOffer,
 } from '@tavli/contracts';
 
 /** A Better Auth call result: `data`, or an `error` (HTTP status and message). */
@@ -115,7 +116,24 @@ function authError(
   const message = typeof text === 'string' && text !== '' ? `${what}: ${text}` : what;
   const serverCode = (error as { code?: unknown } | null)?.code;
   const passed = PASSED_CODES.find((code) => code === serverCode);
-  return { code: !rejected ? 'NETWORK' : (passed ?? 'REJECTED'), message };
+  const code = !rejected ? 'NETWORK' : (passed ?? 'REJECTED');
+  // A guest's save with another account's key carries a move offer (#403).
+  const move = code === 'KEY_BELONGS_TO_OTHER' ? moveOffer(error) : null;
+  return move === null ? { code, message } : { code, message, move };
+}
+
+/** The server's move offer in a `KEY_BELONGS_TO_OTHER` error, or `null`. */
+function moveOffer(error: unknown): GuestMoveOffer | null {
+  const move = (error as { move?: unknown } | null)?.move;
+  if (typeof move !== 'object' || move === null) return null;
+  const { ticket, activeGames, openInvites } = move as Record<string, unknown>;
+  if (typeof ticket !== 'string' || ticket === '') return null;
+  if (!isCount(activeGames) || !isCount(openInvites)) return null;
+  return { ticket, activeGames, openInvites };
+}
+
+function isCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }
 
 function isKeyProvider(value: unknown): value is AuthKeyProvider {
@@ -377,6 +395,23 @@ export function fromBetterAuthClient(
       set(toUser(data.user));
       await sendAppleCode(credential);
       return toUser(data.user);
+    },
+    moveGuest(offer) {
+      // Like a sign-in: the session changes to the account's.
+      return queue(async () => {
+        const guest = await signedIn('move the guest');
+        if (!guest.isGuest) {
+          throw { code: 'REJECTED', message: 'only a guest moves' } satisfies AuthErrorData;
+        }
+        const data = await fetchRoute<{ readonly user?: BetterAuthUserData }>(
+          '/key/move',
+          'moving the guest failed',
+          { ticket: offer.ticket },
+        );
+        if (data.user === undefined) throw authError(null, 'no user in the reply');
+        set(toUser(data.user));
+        return toUser(data.user);
+      });
     },
     async listKeys() {
       await ready();

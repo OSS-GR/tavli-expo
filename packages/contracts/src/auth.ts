@@ -82,6 +82,33 @@ export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 export interface AuthErrorData {
   readonly code: AuthErrorCode;
   readonly message: string;
+  /**
+   * With `KEY_BELONGS_TO_OTHER` from `saveKey` when the signed-in user is
+   * a guest (#403): what the guest would move into the account that has
+   * the key. A saved account never gets one: two saved accounts never
+   * merge.
+   */
+  readonly move?: GuestMoveOffer;
+}
+
+/** What a guest has, now that it might move into an account (#403). Plain JSON. */
+export interface GuestMoveCounts {
+  /** The guest's online games in progress. */
+  readonly activeGames: number;
+  /** The guest's open invites. */
+  readonly openInvites: number;
+}
+
+/**
+ * A guest may move into the account that has the key it tried to save
+ * (#403). Show the counts and ask; nothing moves before `moveGuest`.
+ */
+export interface GuestMoveOffer extends GuestMoveCounts {
+  /**
+   * The server's proof that this guest proved the key, for `moveGuest`.
+   * It works for a few minutes, for this guest only. Never log it.
+   */
+  readonly ticket: string;
 }
 
 export function isAuthErrorData(value: unknown): value is AuthErrorData {
@@ -129,6 +156,16 @@ export interface AuthProvider {
    * already resolves and changes nothing.
    */
   saveKey(credential: AuthKeyCredential): Promise<AuthUser>;
+  /**
+   * Moves the signed-in guest into the account of `offer` (#403, from a
+   * `KEY_BELONGS_TO_OTHER` of `saveKey`), then signs in to that account.
+   * The guest's games, invites, blocks and reports become the account's;
+   * a game in progress between the two ends with the guest resigning.
+   * Then the guest is gone. Rejects with `REJECTED` when nobody or a
+   * saved account is signed in, or the offer is not this guest's, used or
+   * too old: nothing changes then.
+   */
+  moveGuest(offer: GuestMoveOffer): Promise<AuthUser>;
   /** The signed-in account's keys; `[]` for a guest or when nobody is signed in. */
   listKeys(): Promise<readonly AuthKey[]>;
   /**
@@ -190,6 +227,18 @@ export interface MemoryAuthStore {
   openNonces: string[];
   /** Apple codes the provider sent to the "server", oldest first (`authorizationCode`). */
   appleCodes: string[];
+  /** Move tickets made (#403) and not used yet. */
+  openMoveTickets: string[];
+}
+
+/**
+ * The game server side of a guest move (#403), for the in-memory
+ * provider: the memory game server's `guestMoveCounts` and `moveGuest`.
+ * Without it a guest has nothing to count or move.
+ */
+export interface MemoryAuthGuestMoves {
+  counts(playerId: string): GuestMoveCounts;
+  move(source: string, target: string): void;
 }
 
 export function createMemoryAuthStore(): MemoryAuthStore {
@@ -201,6 +250,7 @@ export function createMemoryAuthStore(): MemoryAuthStore {
     nonces: 0,
     openNonces: [],
     appleCodes: [],
+    openMoveTickets: [],
   };
 }
 
@@ -213,9 +263,11 @@ function authError(code: AuthErrorCode, message: string): AuthErrorData {
  * accounts `user-1`, …, and the token `memory-token:<id>`. Its fake Apple
  * accepts `memoryAppleIdToken(sub, nonce)` with a nonce from `keyNonce()`.
  * Listeners get each change on a later microtask, like a real client.
+ * `guestMoves` counts and moves a guest's games (#403).
  */
 export function createMemoryAuthProvider(
   store: MemoryAuthStore = createMemoryAuthStore(),
+  guestMoves?: MemoryAuthGuestMoves,
 ): AuthProvider {
   const listeners = new Set<(user: AuthUser | null) => void>();
 
@@ -293,7 +345,13 @@ export function createMemoryAuthProvider(
       const key = provenKey(credential);
       const owner = store.keys[key];
       if (owner !== undefined && owner !== user.id) {
-        throw authError('KEY_BELONGS_TO_OTHER', 'this key belongs to another account');
+        const error = authError('KEY_BELONGS_TO_OTHER', 'this key belongs to another account');
+        if (!user.isGuest) throw error;
+        // A guest may move into the owner's account (#403).
+        const ticket = `memory-move:${user.id}:${owner}:${store.openMoveTickets.length + 1}`;
+        store.openMoveTickets.push(ticket);
+        const counts = guestMoves?.counts(user.id) ?? { activeGames: 0, openInvites: 0 };
+        throw { ...error, move: { ticket, ...counts } } satisfies AuthErrorData;
       }
       if (owner === undefined) {
         if (keysOf(user.id).some((k) => k.provider === credential.provider)) {
@@ -309,6 +367,20 @@ export function createMemoryAuthProvider(
         changed(store.session);
       }
       return { ...store.session! };
+    },
+    async moveGuest(offer) {
+      await Promise.resolve();
+      const user = store.session;
+      const at = store.openMoveTickets.indexOf(offer.ticket);
+      const [, source, target] = offer.ticket.split(':');
+      if (user === null || !user.isGuest || at < 0 || source !== user.id || target === undefined) {
+        throw authError('REJECTED', 'this move is not valid');
+      }
+      store.openMoveTickets.splice(at, 1);
+      guestMoves?.move(source, target);
+      store.session = { id: target, isGuest: false };
+      changed(store.session);
+      return { ...store.session };
     },
     listKeys: () => Promise.resolve(store.session === null ? [] : keysOf(store.session.id)),
     async removeKey(provider) {

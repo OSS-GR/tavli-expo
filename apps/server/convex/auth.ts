@@ -28,6 +28,7 @@ import { convex } from '@convex-dev/better-auth/plugins';
 import { expo } from '@better-auth/expo';
 import { betterAuth } from 'better-auth/minimal';
 import { anonymous } from 'better-auth/plugins';
+import { ConvexError } from 'convex/values';
 import { createRemoteJWKSet } from 'jose';
 import type { JWTVerifyGetKey } from 'jose';
 
@@ -214,6 +215,18 @@ export function createAuth(ctx: AuthCtx) {
         exchangeAppleCode,
         saveAppleToken: async (token) =>
           await actionCtx(ctx).runMutation(internal.appleTokens.saveAppleToken, token),
+        guestMoveCounts: async (playerId) =>
+          await actionCtx(ctx).runQuery(internal.guestMove.guestMoveCounts, { playerId }),
+        startGuestMove: async (move) => {
+          try {
+            await actionCtx(ctx).runMutation(internal.guestMove.startGuestMove, move);
+            return true;
+          } catch (error) {
+            // `startGuestMove` refuses with BAD_REQUEST when a user changed.
+            if (error instanceof ConvexError) return false;
+            throw error;
+          }
+        },
       }),
     ],
   });

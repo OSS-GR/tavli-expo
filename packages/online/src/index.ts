@@ -3,7 +3,8 @@
  * (`online-game.ts`), the checks around each call (`calls.ts`), the invite
  * checks and codes (`invites.ts`), the block and report checks
  * (`safety.ts`), the "my games" summaries
- * (`summaries.ts`), and an in-memory server that gives a
+ * (`summaries.ts`), moving a guest into an account (`guest-move.ts`),
+ * and an in-memory server that gives a
  * `GameTransport` and an `Invites` per player (`memory-server.ts`).
  *
  * It depends only on `@tavli/engine` and `@tavli/contracts`. The Convex
@@ -103,6 +104,13 @@ export {
   namesSeenBy,
   reportWindowStart,
 } from './safety';
+export {
+  guestGameMove,
+  renamePlayerInEvent,
+  renamePlayerInFlow,
+  renamePlayers,
+  type GuestGameMove,
+} from './guest-move';
 export { latestGames, newestFirst, summarizeGame } from './summaries';
 export type { SummaryInput } from './summaries';
 export { createMemoryGameServer } from './memory-server';
