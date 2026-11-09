@@ -156,6 +156,7 @@ export function createAuth(ctx: AuthCtx) {
               providerId: account.providerId,
               accountId: account.accountId,
               userId: account.userId,
+              now: Date.now(),
             });
             if (owner !== account.userId) throw keyError('CONFLICT', 'KEY_BELONGS_TO_OTHER');
           },

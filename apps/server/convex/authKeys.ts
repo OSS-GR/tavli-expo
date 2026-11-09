@@ -7,7 +7,10 @@
  *
  * - `claimKey`: the first user to claim an Apple id owns it. Better Auth
  *   calls it before it makes an `account` row (`auth.ts`,
- *   `databaseHooks.account.create.before`), on sign-in and on save.
+ *   `databaseHooks.account.create.before`), on sign-in and on save. A
+ *   claim with no `account` row behind it after `CLAIM_GRACE_MS` is stale
+ *   (that write failed, or a remove failed halfway) and goes to the next
+ *   user who claims the key.
  * - `releaseKey`: drops the claim when the key is removed (`removeKey`).
  * - `useKeyNonce`: a nonce works once (`model/keyNonce.ts`).
  *
@@ -17,6 +20,7 @@
 
 import { v } from 'convex/values';
 
+import { components } from './_generated/api';
 import { internalMutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 
@@ -24,20 +28,41 @@ import type { MutationCtx } from './_generated/server';
 export const OLD_NONCES_PER_USE = 10;
 
 /**
- * Claims `(providerId, accountId)` for `userId`. Returns the owner: the
- * same `userId` when the key was free or was already theirs, else the
- * other user's id (and writes nothing).
+ * How long a claim stays its owner's with no `account` row behind it.
+ * Better Auth writes that row right after the claim, so a younger claim
+ * may still be on its way; an older one is stale.
+ */
+export const CLAIM_GRACE_MS = 60 * 1000;
+
+/**
+ * Claims `(providerId, accountId)` for `userId` at `now` (epoch ms).
+ * Returns the owner: the same `userId` when the key was free, was
+ * already theirs or held a stale claim, else the other user's id (and
+ * writes nothing).
  */
 export const claimKey = internalMutation({
-  args: { providerId: v.string(), accountId: v.string(), userId: v.string() },
+  args: { providerId: v.string(), accountId: v.string(), userId: v.string(), now: v.number() },
   returns: v.string(),
-  handler: async (ctx, { providerId, accountId, userId }) => {
+  handler: async (ctx, { providerId, accountId, userId, now }) => {
     const owner = await ctx.db
       .query('authKeys')
       .withIndex('by_key', (q) => q.eq('providerId', providerId).eq('accountId', accountId))
       .unique();
-    if (owner !== null) return owner.userId;
-    await ctx.db.insert('authKeys', { providerId, accountId, userId });
+    if (owner === null) {
+      await ctx.db.insert('authKeys', { providerId, accountId, userId, claimedAt: now });
+      return userId;
+    }
+    if (owner.userId === userId || now - owner.claimedAt < CLAIM_GRACE_MS) return owner.userId;
+    // An old claim: it holds only when an `account` row has the key.
+    const account: unknown = await ctx.runQuery(components.betterAuth.adapter.findOne, {
+      model: 'account',
+      where: [
+        { field: 'providerId', value: providerId },
+        { field: 'accountId', value: accountId },
+      ],
+    });
+    if (account !== null) return owner.userId;
+    await ctx.db.patch(owner._id, { userId, claimedAt: now });
     return userId;
   },
 });

@@ -155,6 +155,8 @@ export default defineSchema({
     accountId: v.string(),
     /** The Better Auth user id: the player id. */
     userId: v.string(),
+    /** When this user claimed it, epoch ms (server clock): the start of `CLAIM_GRACE_MS`. */
+    claimedAt: v.number(),
   })
     .index('by_key', ['providerId', 'accountId'])
     .index('by_user', ['userId']),
