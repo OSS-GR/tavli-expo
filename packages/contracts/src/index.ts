@@ -87,12 +87,24 @@ export type {
 } from './invite';
 export {
   AUTH_ERROR_CODES,
+  AUTH_KEY_PROVIDERS,
+  MEMORY_APPLE_TOKEN_PREFIX,
   MEMORY_AUTH_TOKEN_PREFIX,
   createMemoryAuthProvider,
   createMemoryAuthStore,
   isAuthErrorData,
+  memoryAppleIdToken,
 } from './auth';
-export type { AuthErrorCode, AuthErrorData, AuthProvider, AuthUser, MemoryAuthStore } from './auth';
+export type {
+  AuthErrorCode,
+  AuthErrorData,
+  AuthKey,
+  AuthKeyCredential,
+  AuthKeyProvider,
+  AuthProvider,
+  AuthUser,
+  MemoryAuthStore,
+} from './auth';
 export type { OnlineData } from './online-data';
 export { APP_PLATFORMS, NO_UPDATE_POLICY, createMemoryAppUpdates } from './app-update';
 export type { AppPlatform, AppUpdatePolicy, AppUpdates, MemoryAppUpdates } from './app-update';

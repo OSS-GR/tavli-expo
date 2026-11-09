@@ -1,4 +1,4 @@
-import type { AuthErrorData } from '@tavli/contracts';
+import type { AuthErrorData, AuthProvider } from '@tavli/contracts';
 import { isAuthErrorData } from '@tavli/contracts';
 import { authProviderContract } from '@tavli/contracts/testing';
 import { describe, expect, it } from 'vitest';
@@ -38,6 +38,12 @@ interface FakeServer {
   guests: number;
   /** Session id → user id. */
   sessions: Map<string, string>;
+  /** User ids that are guests. */
+  anonymous: Set<string>;
+  /** Apple `sub` → user id. */
+  appleKeys: Map<string, string>;
+  /** Nonces made and not used yet. */
+  nonces: Set<string>;
   /** Token lifetime, ms. */
   tokenTime: number;
   /** The next calls of this name fail with this result error (or throw when `'throw'`). */
@@ -50,6 +56,9 @@ function createServer(): FakeServer {
     clock: Date.UTC(2026, 9, 28),
     guests: 0,
     sessions: new Map(),
+    anonymous: new Set(),
+    appleKeys: new Map(),
+    nonces: new Set(),
     tokenTime: 15 * 60 * 1000,
     failures: new Map(),
     calls: [],
@@ -58,6 +67,23 @@ function createServer(): FakeServer {
 
 function ok<T>(data: T): BetterAuthResult<T> {
   return { data, error: null };
+}
+
+function refused<T>(status: number, code: string): BetterAuthResult<T> {
+  return { data: null, error: { status, code, message: code } };
+}
+
+/** The fake Apple's id token: `fake-apple.<sub>.<nonce>`. */
+function fakeAppleToken(sub: string, nonce: string): string {
+  return `fake-apple.${sub}.${nonce}`;
+}
+
+/** The Apple `sub` a token proves, using up its nonce; `null` when it is not valid. */
+function provenSub(server: FakeServer, idToken: { token: string; nonce: string }): string | null {
+  const [kind, sub, nonce] = idToken.token.split('.');
+  if (kind !== 'fake-apple' || sub === undefined || nonce !== idToken.nonce) return null;
+  if (!server.nonces.delete(nonce)) return null;
+  return sub;
 }
 
 function createClient(server: FakeServer, phone: { cookie: string | null }): BetterAuthClient {
@@ -76,14 +102,52 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
     return run();
   }
   const userOf = () => (phone.cookie === null ? undefined : server.sessions.get(phone.cookie));
+  const userData = (id: string) => ({ id, isAnonymous: server.anonymous.has(id) });
+  function newSession(id: string): void {
+    const session = `session-${server.sessions.size + 1}-${id}`;
+    server.sessions.set(session, id);
+    phone.cookie = session;
+  }
+  function route(
+    path: string,
+    body: Record<string, unknown> | undefined,
+  ): BetterAuthResult<unknown> {
+    const id = userOf();
+    if (path === '/key/nonce') {
+      const nonce = `n${server.calls.length}`;
+      server.nonces.add(nonce);
+      return ok({ nonce });
+    }
+    if (id === undefined) return refused(401, 'UNAUTHORIZED');
+    const keysOf = () => [...server.appleKeys.values()].filter((owner) => owner === id);
+    if (path === '/key/list') return ok({ keys: keysOf().map(() => ({ provider: 'apple' })) });
+    if (path === '/key/save') {
+      const sub = provenSub(server, body?.['idToken'] as { token: string; nonce: string });
+      if (sub === null) return refused(401, 'INVALID_TOKEN');
+      const owner = server.appleKeys.get(sub);
+      if (owner !== undefined && owner !== id) return refused(409, 'KEY_BELONGS_TO_OTHER');
+      if (owner === undefined && keysOf().length > 0) return refused(409, 'PROVIDER_TAKEN');
+      server.appleKeys.set(sub, id);
+      server.anonymous.delete(id);
+      return ok({ user: userData(id) });
+    }
+    if (path === '/key/remove') {
+      const keys = keysOf();
+      if (keys.length === 0) return ok({ removed: false });
+      return refused(409, 'LAST_KEY');
+    }
+    return refused(404, 'NOT_FOUND');
+  }
   return {
     getSession: () =>
       call('getSession', () => {
         const id = userOf();
-        return id === undefined
-          ? { data: null, error: null }
-          : ok({ user: { id, isAnonymous: true } });
+        return id === undefined ? { data: null, error: null } : ok({ user: userData(id) });
       }),
+    $fetch: <T>(path: string, options: { body?: object }) =>
+      call(`fetch ${path}`, () => route(path, options.body as Record<string, unknown>)) as Promise<
+        BetterAuthResult<T>
+      >,
     signIn: {
       anonymous: () =>
         call('signIn.anonymous', () => {
@@ -92,10 +156,22 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
           }
           server.guests += 1;
           const id = `user-${server.guests}`;
-          const session = `session-${server.guests}`;
-          server.sessions.set(session, id);
-          phone.cookie = session;
-          return ok({ user: { id, isAnonymous: true } });
+          server.anonymous.add(id);
+          newSession(id);
+          return ok({ user: userData(id) });
+        }),
+      social: (input) =>
+        call('signIn.social', () => {
+          const sub = provenSub(server, input.idToken);
+          if (sub === null) return refused(401, 'INVALID_TOKEN');
+          let id = server.appleKeys.get(sub);
+          if (id === undefined) {
+            server.guests += 1;
+            id = `user-${server.guests}`;
+            server.appleKeys.set(sub, id);
+          }
+          newSession(id);
+          return ok({ user: userData(id) });
         }),
     },
     signOut: () =>
@@ -126,7 +202,13 @@ function subject(server = createServer()) {
     auth: fromBetterAuthClient(createClient(server, phone), { now }),
     restart: () => fromBetterAuthClient(createClient(server, phone), { now }),
     tokenSubject: (token: string) => String(jwtPayload(token)['sub']),
+    appleIdToken: (sub: string, nonce: string) => Promise.resolve(fakeAppleToken(sub, nonce)),
   };
+}
+
+async function appleCredential(auth: AuthProvider, sub: string) {
+  const nonce = await auth.keyNonce();
+  return { provider: 'apple' as const, idToken: fakeAppleToken(sub, nonce), nonce };
 }
 
 async function rejection(call: Promise<unknown>): Promise<AuthErrorData> {
@@ -287,5 +369,56 @@ describe('fromBetterAuthClient', () => {
     expect(await stale).toBeNull();
     const token = await auth.getToken();
     expect(jwtPayload(token ?? '')['sub']).toBe(next.id);
+  });
+
+  it('maps the server codes KEY_BELONGS_TO_OTHER and LAST_KEY; others are REJECTED', async () => {
+    const { auth, server } = subject();
+    await auth.signInWithKey(await appleCredential(auth, 'a'));
+    await auth.signOut();
+    await auth.signInAsGuest();
+    expect(await rejection(auth.saveKey(await appleCredential(auth, 'a')))).toMatchObject({
+      code: 'KEY_BELONGS_TO_OTHER',
+    });
+    expect(
+      await rejection(auth.saveKey({ provider: 'apple', idToken: 'bad', nonce: 'n' })),
+    ).toMatchObject({ code: 'REJECTED' });
+    await auth.saveKey(await appleCredential(auth, 'b'));
+    expect(await rejection(auth.removeKey('apple'))).toMatchObject({ code: 'LAST_KEY' });
+    server.failures.set('fetch /key/list', 'throw');
+    expect(await rejection(auth.listKeys())).toMatchObject({ code: 'NETWORK' });
+  });
+
+  it('a key sign-in never replaces a session it could not load', async () => {
+    const server = createServer();
+    const first = subject(server);
+    const guest = await first.auth.signInAsGuest();
+    const again = first.restart();
+    server.failures.set('getSession', 'throw');
+    expect(await again.ready()).toBeNull();
+    server.failures.set('getSession', { message: 'offline' });
+    const credential = await appleCredential(again, 'a');
+    expect(await rejection(again.signInWithKey(credential))).toMatchObject({ code: 'NETWORK' });
+    expect(server.calls).not.toContain('signIn.social');
+    expect(await again.ready()).toEqual(guest);
+  });
+
+  it('a key sign-in during a guest sign-in waits, then is SIGNED_IN', async () => {
+    const { auth, server } = subject();
+    const credential = await appleCredential(auth, 'a');
+    const guest = auth.signInAsGuest();
+    const key = auth.signInWithKey(credential);
+    expect((await guest).isGuest).toBe(true);
+    expect(await rejection(key)).toMatchObject({ code: 'SIGNED_IN' });
+    expect(server.calls).not.toContain('signIn.social');
+  });
+
+  it('a saved key moves a new token to the same user', async () => {
+    const { auth } = subject();
+    const guest = await auth.signInAsGuest();
+    const before = await auth.getToken();
+    const saved = await auth.saveKey(await appleCredential(auth, 'a'));
+    expect(saved).toEqual({ id: guest.id, isGuest: false });
+    // The id did not change, so the token stays valid.
+    expect(await auth.getToken()).toBe(before);
   });
 });

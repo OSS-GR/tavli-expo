@@ -17,10 +17,12 @@
     "@tavli/online": "workspace:*",
     "@tavli/push-expo": "workspace:*",
     "better-auth": "1.6.33",
-    "convex": "1.46.0"
+    "convex": "1.46.0",
+    "jose": "6.2.13"
   },
   "devDependencies": {
     "@edge-runtime/vm": "5.0.0",
+    "@tavli/auth-better-auth": "workspace:*",
     "@tavli/backend-convex": "workspace:*",
     "convex-test": "0.0.61",
     "typescript": "~6.0.3"

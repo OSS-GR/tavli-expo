@@ -10,7 +10,8 @@
  *    which resigns the rest in pages after the call (#309);
  * 2. keeps each finished game for the other player, with the caller's id
  *    in it (`gameOnDelete` in `model/account.ts`);
- * 3. deletes every open invite the caller sent, and every push token;
+ * 3. deletes every open invite the caller sent, every push token, and
+ *    the caller's sign-in key claims (`authKeys`, #397);
  * 4. deletes the Better Auth user, its sessions and its accounts, with
  *    Better Auth's own delete (`internalAdapter.deleteUser`) on the
  *    component's tables;
@@ -30,6 +31,7 @@ import { internal } from './_generated/api';
 import { internalMutation, mutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { createAuth } from './auth';
+import { deleteKeysOf } from './authKeys';
 import { existingPlayer } from './caller';
 import { resignAs } from './games';
 import { openInvitesOf } from './invites';
@@ -108,6 +110,9 @@ export const deleteMyAccount = mutation({
       .withIndex('by_player', (q) => q.eq('playerId', callerId))
       .collect();
     for (const token of tokens) await ctx.db.delete(token._id);
+
+    // The sign-in key claims (#397), so the Apple id is free again.
+    await deleteKeysOf(ctx, callerId);
 
     // Better Auth's own delete: the user's sessions, its accounts (Apple,
     // Google, …), then the user, with Better Auth's hooks, through the

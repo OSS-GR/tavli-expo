@@ -11,7 +11,8 @@
  * The checks never wait on a clock: they call `subject.settle()` in a
  * loop while they wait for a change.
  */
-import type { AuthProvider, AuthUser } from '../auth';
+import { isAuthErrorData } from '../auth';
+import type { AuthErrorCode, AuthKeyCredential, AuthProvider, AuthUser } from '../auth';
 
 export interface AuthProviderContractSubject {
   /** The provider under test. Nobody is signed in yet. */
@@ -23,6 +24,11 @@ export interface AuthProviderContractSubject {
   readonly restart: () => AuthProvider;
   /** The player id a token names: its `subject` (`sub`). */
   readonly tokenSubject: (token: string) => string;
+  /**
+   * An Apple id token for the Apple user `sub` that carries `nonce`, as
+   * the Apple sheet gives it. The provider (or its fake server) accepts it.
+   */
+  readonly appleIdToken: (sub: string, nonce: string) => Promise<string>;
   /**
    * Lets the provider deliver. Default: wait one microtask. Never wait on
    * a real clock here.
@@ -79,6 +85,41 @@ async function tokenOf(auth: AuthProvider, what: string): Promise<string> {
   const token = await auth.getToken();
   if (typeof token !== 'string' || token === '') throw new Error(`${what}: no token`);
   return token;
+}
+
+function checkSaved(user: AuthUser, what: string): void {
+  if (typeof user.id !== 'string' || user.id.trim() === '') {
+    throw new Error(`${what}: the user id is empty`);
+  }
+  same(user.isGuest, false, `${what}: isGuest`);
+}
+
+/** A fresh Apple credential for `sub`: a new nonce, then a token that carries it. */
+async function apple(
+  subject: AuthProviderContractSubject,
+  sub: string,
+): Promise<AuthKeyCredential> {
+  const nonce = await subject.auth.keyNonce();
+  if (typeof nonce !== 'string' || nonce === '') throw new Error('keyNonce(): no nonce');
+  return { provider: 'apple', idToken: await subject.appleIdToken(sub, nonce), nonce };
+}
+
+async function rejectsWith(
+  call: Promise<unknown>,
+  code: AuthErrorCode,
+  what: string,
+): Promise<void> {
+  let error: unknown;
+  try {
+    await call;
+  } catch (caught) {
+    error = caught;
+  }
+  if (error === undefined) throw new Error(`${what}: expected ${code}, but it resolved`);
+  if (!isAuthErrorData(error)) {
+    throw new Error(`${what}: expected AuthErrorData ${code}, got ${String(error)}`);
+  }
+  same(error.code, code, `${what}: the error code`);
 }
 
 export function authProviderContract(): AuthProviderContractCheck[] {
@@ -182,6 +223,144 @@ export function authProviderContract(): AuthProviderContractCheck[] {
         const id = user.id;
         (user as { id: string }).id = 'someone-else';
         same(auth.currentUser()?.id, id, 'currentUser().id');
+      },
+    },
+    {
+      name: 'an Apple sign-in gives a saved user; the same Apple id on a new phone gives the same user',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const user = await auth.signInWithKey(await apple(subject, 'apple-a'));
+        checkSaved(user, 'signInWithKey()');
+        same(auth.currentUser(), user, 'currentUser()');
+        const token = await tokenOf(auth, 'getToken()');
+        same(subject.tokenSubject(token), user.id, 'the token subject');
+        same(await auth.listKeys(), [{ provider: 'apple' }], 'listKeys()');
+        await auth.signOut();
+        const again = await auth.signInWithKey(await apple(subject, 'apple-a'));
+        same(again, user, 'signInWithKey() with the same Apple id');
+      },
+    },
+    {
+      name: 'a key sign-in turns down a used nonce and a token without the nonce',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const used = await apple(subject, 'apple-a');
+        await auth.signInWithKey(used);
+        await auth.signOut();
+        await rejectsWith(auth.signInWithKey(used), 'REJECTED', 'a used nonce');
+        const nonce = await auth.keyNonce();
+        const other = await auth.keyNonce();
+        const wrong = {
+          provider: 'apple' as const,
+          idToken: await subject.appleIdToken('apple-a', other),
+          nonce,
+        };
+        await rejectsWith(auth.signInWithKey(wrong), 'REJECTED', 'a token with another nonce');
+        same(auth.currentUser(), null, 'currentUser() after the refusals');
+      },
+    },
+    {
+      name: 'a key sign-in while signed in is SIGNED_IN and changes nothing',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const guest = await auth.signInAsGuest();
+        await rejectsWith(
+          auth.signInWithKey(await apple(subject, 'apple-a')),
+          'SIGNED_IN',
+          'signInWithKey()',
+        );
+        same(auth.currentUser(), guest, 'currentUser()');
+      },
+    },
+    {
+      name: 'a guest saves a key and keeps the same id; onChange reports it',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const guest = await auth.signInAsGuest();
+        same(await auth.listKeys(), [], 'listKeys() of a guest');
+        const seen: (AuthUser | null)[] = [];
+        const stop = auth.onChange((user) => seen.push(user));
+        const saved = await auth.saveKey(await apple(subject, 'apple-a'));
+        same(saved, { id: guest.id, isGuest: false }, 'saveKey()');
+        same(auth.currentUser(), saved, 'currentUser()');
+        await waitUntil(subject, () => seen.some((u) => u?.isGuest === false), 'the save change');
+        stop();
+        same(await auth.listKeys(), [{ provider: 'apple' }], 'listKeys()');
+        // Saving the same key again changes nothing.
+        same(await auth.saveKey(await apple(subject, 'apple-a')), saved, 'saveKey() again');
+        // The key now signs in to this account.
+        await auth.signOut();
+        same(await auth.signInWithKey(await apple(subject, 'apple-a')), saved, 'a later sign-in');
+      },
+    },
+    {
+      name: "saving another account's key is KEY_BELONGS_TO_OTHER and changes nothing",
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const owner = await auth.signInWithKey(await apple(subject, 'apple-a'));
+        await auth.signOut();
+        const guest = await auth.signInAsGuest();
+        await rejectsWith(
+          auth.saveKey(await apple(subject, 'apple-a')),
+          'KEY_BELONGS_TO_OTHER',
+          'saveKey()',
+        );
+        same(auth.currentUser(), guest, 'currentUser()');
+        same(await auth.listKeys(), [], 'listKeys()');
+        await auth.signOut();
+        same(
+          await auth.signInWithKey(await apple(subject, 'apple-a')),
+          owner,
+          'the owner signs in',
+        );
+      },
+    },
+    {
+      name: 'saving a key needs a sign-in; a second Apple id is refused',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        await rejectsWith(
+          auth.saveKey(await apple(subject, 'apple-a')),
+          'REJECTED',
+          'saveKey() signed out',
+        );
+        same(await auth.listKeys(), [], 'listKeys() signed out');
+        await auth.signInWithKey(await apple(subject, 'apple-a'));
+        await rejectsWith(
+          auth.saveKey(await apple(subject, 'apple-b')),
+          'REJECTED',
+          'a second Apple id',
+        );
+      },
+    },
+    {
+      name: 'the last key cannot be removed; removing a missing key does nothing',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        await rejectsWith(auth.removeKey('apple'), 'REJECTED', 'removeKey() signed out');
+        await auth.signInAsGuest();
+        await auth.removeKey('apple');
+        await auth.saveKey(await apple(subject, 'apple-a'));
+        await rejectsWith(auth.removeKey('apple'), 'LAST_KEY', 'removeKey() of the last key');
+        same(await auth.listKeys(), [{ provider: 'apple' }], 'listKeys()');
+      },
+    },
+    {
+      name: 'a restart keeps a saved account',
+      run: async (subject) => {
+        await subject.auth.ready();
+        await subject.auth.signInAsGuest();
+        const saved = await subject.auth.saveKey(await apple(subject, 'apple-a'));
+        const again = subject.restart();
+        same(await again.ready(), saved, 'ready() after a restart');
+        same(again.currentUser(), saved, 'currentUser() after a restart');
       },
     },
   ];
