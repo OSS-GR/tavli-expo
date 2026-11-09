@@ -424,8 +424,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/adapters/backend-convex
       convex-test:
-        specifier: 0.0.61
-        version: 0.0.61(convex@1.46.0(react@19.3.0))
+        specifier: 0.0.66
+        version: 0.0.66(convex@1.46.0(react@19.3.0))
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -3396,8 +3396,8 @@ packages:
       zod:
         optional: true
 
-  convex-test@0.0.61:
-    resolution: {integrity: sha512-uYKCFk9+iu8jJB7TW3BHm3EAM6yPoXERoLHGiomhgUwuTLdSUjOk9SYnnnDc1UA1MQrMPYfUFSp+0+GWyFREng==}
+  convex-test@0.0.66:
+    resolution: {integrity: sha512-d70YxtlUqL6w37EmcxAYSQPRZ6lWF7PQ4q/KrbUrn6bfbxPG4eafLl5386UNrjCb8U1kX7mRCanrB4Bv8uB5Cg==}
     peerDependencies:
       convex: ^1.43.0
 
@@ -9573,7 +9573,7 @@ snapshots:
       typescript: 6.0.3
       zod: 4.6.7
 
-  convex-test@0.0.61(convex@1.46.0(react@19.3.0)):
+  convex-test@0.0.66(convex@1.46.0(react@19.3.0)):
     dependencies:
       convex: 1.46.0(react@19.3.0)
 
