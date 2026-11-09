@@ -104,7 +104,7 @@ import {
   toView,
 } from './online-game';
 import type { LoadedFlow, SavedDraft, SteppedFlow } from './online-game';
-import { pickGuestNumber } from './names';
+import { namesOf, pickGuestNumber } from './names';
 import { latestGames, summarizeGame } from './summaries';
 
 export interface MemoryGameServerOptions {
@@ -318,7 +318,10 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   /** The view input of `game`, without its flow. */
   function gameInput(game: MemoryGame) {
     return {
-      names: { white: nameOf(game.players.white), black: nameOf(game.players.black) },
+      names: namesOf({
+        white: guestNumbers.get(game.players.white) ?? null,
+        black: guestNumbers.get(game.players.black) ?? null,
+      }),
       gameId: game.gameId,
       version: game.version,
       choice: game.choice,

@@ -45,9 +45,14 @@ import { ConvexError, v } from 'convex/values';
 import type { Infer } from 'convex/values';
 
 import { MAX_LISTED_GAMES } from '@tavli/contracts';
-import type { GameSummary, GameTransportErrorData, OnlineGameView } from '@tavli/contracts';
+import type {
+  GameSummary,
+  GameTransportErrorData,
+  OnlineGameView,
+  PlayerName,
+} from '@tavli/contracts';
 import { serializeRules } from '@tavli/engine';
-import type { MatchFlow, MoveInput, PlayerId } from '@tavli/engine';
+import type { MatchFlow, MoveInput, PerPlayer, PlayerId } from '@tavli/engine';
 import {
   OnlineGameError,
   SERVER_ACTOR,
@@ -605,11 +610,14 @@ async function gamesOnSide(
     .take(MAX_LISTED_GAMES);
 }
 
+type ViewNames = PerPlayer<PlayerName | null>;
+
 /**
  * The caller's games with `status` (#296), newest change first, at most
  * `MAX_LISTED_GAMES`. It reads the newest of each side's index
  * (`by_white`, `by_black`) and keeps the newest of both. A summary tells
- * nothing about the other player but their side (`summarizeGame`).
+ * nothing about the other player but their side and guest name
+ * (`summarizeGame`, #400).
  */
 export const listMyGames = query({
   args: { status: gameStatus },
@@ -619,34 +627,32 @@ export const listMyGames = query({
       gamesOnSide(ctx, 'by_white', callerId, status),
       gamesOnSide(ctx, 'by_black', callerId, status),
     ]);
-    const games = [...asWhite, ...asBlack];
-    // The newest games first, then the names (#400): one read per opponent.
-    const latest = latestGames(
-      games.map((game) =>
-        summarizeGame(
-          {
-            ...gameInput(game),
-            flow: loadFlow(game.flow),
-            updatedAt: game.updatedAt ?? game._creationTime,
-            names: NO_NAMES,
-          },
-          callerId,
-        ),
-      ),
-    );
-    const opponentOf = new Map(
-      games.map((game) => {
-        const other = game.players.white === callerId ? game.players.black : game.players.white;
-        return [game._id as string, other];
+    const games = [...asWhite, ...asBlack].map((game) => ({ game, flow: loadFlow(game.flow) }));
+    const summarize = ({ game, flow }: (typeof games)[number], names: ViewNames) =>
+      summarizeGame(
+        { ...gameInput(game), flow, updatedAt: game.updatedAt ?? game._creationTime, names },
+        callerId,
+      );
+    // Pick the newest games first, then read the names of those only (#400),
+    // once per player. `summarizeGame` picks the other side's name.
+    const latest = latestGames(games.map((entry) => summarize(entry, NO_NAMES)));
+    const byId = new Map(games.map((entry) => [entry.game._id as string, entry]));
+    const names = new Map<string, Promise<PlayerName | null>>();
+    const name = (playerId: string) => {
+      let found = names.get(playerId);
+      if (found === undefined) {
+        found = nameOf(ctx, playerId);
+        names.set(playerId, found);
+      }
+      return found;
+    };
+    return await Promise.all(
+      latest.map(async ({ gameId }) => {
+        const entry = byId.get(gameId)!;
+        const { white, black } = entry.game.players;
+        const [whiteName, blackName] = await Promise.all([name(white), name(black)]);
+        return summarize(entry, { white: whiteName, black: blackName });
       }),
     );
-    const opponents = [...new Set(latest.map((summary) => opponentOf.get(summary.gameId) ?? ''))];
-    const names = new Map(
-      await Promise.all(opponents.map(async (id) => [id, await nameOf(ctx, id)] as const)),
-    );
-    return latest.map((summary) => ({
-      ...summary,
-      opponentName: names.get(opponentOf.get(summary.gameId) ?? '') ?? null,
-    }));
   },
 });

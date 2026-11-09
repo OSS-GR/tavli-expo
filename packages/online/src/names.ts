@@ -1,7 +1,7 @@
 /**
  * Guest names (#400, ADR-0008): "Guest" and four random digits, made once
  * on the server for each account and kept for it. Both servers use this:
- * the Convex functions (`apps/server/convex/model/playerNames.ts`) and the
+ * the Convex functions (`apps/server/convex/playerNames.ts`) and the
  * in-memory server. The digits come from the server's RNG (Convex:
  * `createCryptoRng`), never from the phone.
  *

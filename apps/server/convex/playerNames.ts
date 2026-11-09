@@ -4,8 +4,9 @@
  *
  * A player gets a number the first time they make an invite
  * (`createInvite`) or start a game (`insertGame`, both players), and keeps
- * it. Every online player goes through one of those, so views, lists and
- * invites can name them. The digits come from `createCryptoRng`, never
+ * it. A player who made their invites and games before #400 has no number
+ * until their next one: until then their views say `null`, and the app
+ * says "Opponent" or "your friend". No query writes, so none can make one. The digits come from `createCryptoRng`, never
  * from the phone, and are not unique. `deleteAccountOf` deletes the row,
  * so a new account gets a new number. The pure parts are `pickGuestNumber`
  * and `namesOf` in `@tavli/online`.
@@ -16,7 +17,7 @@
 import { guestName } from '@tavli/contracts';
 import type { PlayerName } from '@tavli/contracts';
 import type { PerPlayer } from '@tavli/engine';
-import { pickGuestNumber } from '@tavli/online';
+import { namesOf, pickGuestNumber } from '@tavli/online';
 
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { createCryptoRng } from './model/cryptoRng';
@@ -34,22 +35,26 @@ export async function ensureGuestNumber(ctx: MutationCtx, playerId: string): Pro
   await ctx.db.insert('playerNames', { playerId, guestNumber: pickGuestNumber(createCryptoRng()) });
 }
 
-/** The name of `playerId`, or `null` when they have no number (a deleted account). */
-export async function nameOf(ctx: QueryCtx, playerId: string): Promise<PlayerName | null> {
-  const row = await rowOf(ctx, playerId);
-  return row === null ? null : guestName(row.guestNumber);
+async function numberOf(ctx: QueryCtx, playerId: string): Promise<string | null> {
+  return (await rowOf(ctx, playerId))?.guestNumber ?? null;
 }
 
-/** The name of each side. */
+/** The name of each side (`null` for a side with no number). */
 export async function namesOfPlayers(
   ctx: QueryCtx,
   players: PerPlayer<string>,
 ): Promise<PerPlayer<PlayerName | null>> {
   const [white, black] = await Promise.all([
-    nameOf(ctx, players.white),
-    nameOf(ctx, players.black),
+    numberOf(ctx, players.white),
+    numberOf(ctx, players.black),
   ]);
-  return { white, black };
+  return namesOf({ white, black });
+}
+
+/** The name of `playerId`, or `null` when they have no number (an old or deleted account). */
+export async function nameOf(ctx: QueryCtx, playerId: string): Promise<PlayerName | null> {
+  const number = await numberOf(ctx, playerId);
+  return number === null ? null : guestName(number);
 }
 
 /** Deletes the number of `playerId` (account delete). */
