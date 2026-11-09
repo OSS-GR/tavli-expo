@@ -67,9 +67,14 @@ export interface SettingsScreenProps {
   onAccount?: () => void;
   /**
    * Opens Settings → Blocked players (#435). It shows only when this
-   * phone used online play (`hasOnlineAccount()` when the screen opens).
+   * phone used online play (`hasOnlineAccount()`, read again each `visit`).
    */
   onBlocked?: () => void;
+  /**
+   * Changes each time the screen shows again (the route's focus), so a
+   * sign-in on Settings → Account shows the Blocked players row.
+   */
+  visit?: number;
 }
 
 export function SettingsScreen({
@@ -79,10 +84,14 @@ export function SettingsScreen({
   turnPushes,
   onAccount,
   onBlocked,
+  visit = 0,
 }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
   const locales = useLocales();
-  const [usedOnline] = useState(hasOnlineAccount);
+  // Read the note again when `visit` changes (React's "adjust state on a prop change").
+  const [online, setOnline] = useState(() => ({ visit, used: hasOnlineAccount() }));
+  if (online.visit !== visit) setOnline({ visit, used: hasOnlineAccount() });
+  const usedOnline = online.used;
 
   const sound = useSettings((s) => s.sound);
   const haptics = useSettings((s) => s.haptics);

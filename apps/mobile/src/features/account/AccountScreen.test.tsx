@@ -388,6 +388,37 @@ describe('<AccountScreen /> with a saved account', () => {
 });
 
 describe('<AccountScreen /> loading', () => {
+  it('a session whose user is gone on the server signs out and shows the offline state', async () => {
+    await guest();
+    // The account is deleted elsewhere (Apple's delete notice, another phone).
+    await onlineData!.deleteMyData();
+    expect(onlineFake.authStore.session).not.toBeNull();
+    await open();
+    expect(await screen.findByTestId('account-offline')).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-failed')).toBeNull();
+    expect(onlineFake.authStore.session).toBeNull();
+    expect(hasOnlineAccount()).toBe(false);
+  });
+
+  it('keeps the cards on the screen while it loads again after an action', async () => {
+    const user = setupUser();
+    await guest();
+    await open();
+    await screen.findByTestId('account-guest');
+    // Hold the reload after the save.
+    let answer: () => void = () => {};
+    const mine = usernames!.mine.bind(usernames);
+    jest
+      .spyOn(usernames!, 'mine')
+      .mockImplementation(() => new Promise((resolve) => (answer = () => resolve(mine()))));
+    await user.press(screen.getByTestId('account-save-apple'));
+    expect(await screen.findByText('Your account is saved.')).toBeOnTheScreen();
+    expect(screen.getByTestId('account-guest')).toBeOnTheScreen();
+    expect(screen.queryByText('Loading your account…')).toBeNull();
+    await act(async () => answer());
+    expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
+  });
+
   it('says so when the server does not answer; Try again loads again', async () => {
     const user = setupUser();
     await guest();

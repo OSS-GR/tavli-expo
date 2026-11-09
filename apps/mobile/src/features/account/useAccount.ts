@@ -7,7 +7,9 @@
  *   the player makes or opens an invite (`signInForOnline`).
  * - Else the screen asks who is signed in (`auth.ready()`), the name
  *   (`Usernames.mine`) and, for a saved account, its keys
- *   (`AuthProvider.listKeys`).
+ *   (`AuthProvider.listKeys`). A session whose user is gone on the server
+ *   (`NOT_SIGNED_IN`, for example after Apple's delete notice) is signed
+ *   out and shows `offline`: never a dead end with only Try again.
  * - Save my account: a guest adds a key with Apple's sheet (`saveKey`) and
  *   keeps the same id, games and guest number. The same call adds a
  *   second kind of key to a saved account.
@@ -15,7 +17,9 @@
  *   and the server says `LAST_KEY` too.
  * - Sign out (`signOutOfOnline`, the push token first) and Delete
  *   (`deleteOnlineData`) end in `offline`, with a note that says so.
- * - One action at a time. A closed Apple sheet is no problem.
+ * - One action at a time. A closed Apple sheet is no problem. After an
+ *   action the screen loads again quietly: the cards stay until the new
+ *   state is in.
  *
  * Never send the user id, the Apple id or the email to analytics.
  */
@@ -23,11 +27,13 @@ import {
   AUTH_KEY_PROVIDERS,
   isAppleSheetUnfinished,
   isAuthErrorData,
+  isUsernameErrorData,
   type Analytics,
   type AppleSheet,
   type AuthKey,
   type AuthKeyProvider,
   type AuthProvider,
+  type MyUsername,
   type OnlineData,
   type Usernames,
 } from '@tavli/contracts';
@@ -35,9 +41,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { quietly } from '@/features/analytics/quietly';
 import { onlineAccountReady, signOutOfOnline, type SignOutPushes } from '@/features/online/account';
-import { hasOnlineAccount } from '@/features/online/accountHint';
+import { forgetOnlineAccount, hasOnlineAccount } from '@/features/online/accountHint';
 import { deleteOnlineData } from '@/features/online/deleteData';
-import { signInWithApple } from '@/features/online/signIn';
+import { appleCredential, signInWithApple } from '@/features/online/signIn';
 
 export type AccountState =
   /** No account on this phone: nothing was asked of the server. */
@@ -112,12 +118,24 @@ export function addableKeys(
 }
 
 /** Loads the state (see the top of this file). */
-async function loadAccount(auth: AuthProvider, usernames: Usernames): Promise<AccountState> {
+async function loadAccount(
+  auth: AuthProvider,
+  usernames: Usernames,
+  pushes: SignOutPushes | undefined,
+): Promise<AccountState> {
   if (!hasOnlineAccount()) return { kind: 'offline' };
   const user = await auth.ready();
   if (user === null) return { kind: 'offline' };
+  let mine: MyUsername;
+  try {
+    mine = await usernames.mine();
+  } catch (error) {
+    if (!isUsernameErrorData(error) || error.code !== 'NOT_SIGNED_IN') throw error;
+    // The session outlived its user: sign it out, so the next invite starts fresh.
+    await signOutOfOnline(auth, pushes).catch(forgetOnlineAccount);
+    return { kind: 'offline' };
+  }
   onlineAccountReady();
-  const mine = await usernames.mine();
   if (user.isGuest || !mine.saved) {
     // A server from before #402 sends no `guestNumber`: show no number then.
     return { kind: 'guest', guestNumber: mine.guestNumber ?? null };
@@ -159,7 +177,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     };
   }, []);
 
-  const { auth, usernames, appleSheet } = deps;
+  const { auth, usernames, appleSheet, pushes } = deps;
   useEffect(() => {
     let on = true;
     appleSheet.isAvailable().then(
@@ -176,7 +194,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
   const load = useCallback(() => {
     loads.current += 1;
     const n = loads.current;
-    loadAccount(auth, usernames).then(
+    loadAccount(auth, usernames, pushes).then(
       (next) => {
         if (live.current && n === loads.current) setState(next);
       },
@@ -184,7 +202,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
         if (live.current && n === loads.current) setState({ kind: 'failed' });
       },
     );
-  }, [auth, usernames]);
+  }, [auth, usernames, pushes]);
 
   useEffect(load, [load, visit]);
 
@@ -217,12 +235,13 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     );
   }
 
+  // After an action: load again with the cards still on the screen.
   const done = (next: AccountNote | null) => {
     if (next !== null) {
       setNote(next);
       setSaid((n) => n + 1);
     }
-    reload();
+    load();
   };
 
   return {
@@ -247,17 +266,9 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
       run(
         'save',
         async () => {
-          const nonce = await deps.auth.keyNonce();
-          const proof = await deps.appleSheet.signIn(nonce);
-          if (proof === null) return false;
-          await deps.auth.saveKey({
-            provider: 'apple',
-            idToken: proof.idToken,
-            nonce,
-            ...(proof.authorizationCode === null
-              ? {}
-              : { authorizationCode: proof.authorizationCode }),
-          });
+          const credential = await appleCredential(deps.auth, deps.appleSheet);
+          if (credential === null) return false;
+          await deps.auth.saveKey(credential);
           return true;
         },
         (saved) => {
