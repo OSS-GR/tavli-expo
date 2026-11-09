@@ -194,6 +194,19 @@ export const ICONS = {
       'M18 2H6v7a6 6 0 0 0 12 0V2Z',
     ],
   },
+  // Report or block a player (#435).
+  flag: {
+    strokes: ['M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z', 'M4 22v-7'],
+  },
+  // Settings → Blocked players (#435).
+  userX: {
+    strokes: [
+      'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2',
+      circle(9, 7, 4),
+      'M17 8l5 5',
+      'M22 8l-5 5',
+    ],
+  },
   // Join with a code (#333).
   keyboard: {
     strokes: [

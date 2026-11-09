@@ -8,7 +8,7 @@ import { act, render, screen, within } from '@testing-library/react-native';
 import { gamePreset } from '@/features/match/setup';
 import { hasOnlineAccount, rememberOnlineAccount } from '@/features/online/accountHint';
 import i18n from '@/i18n';
-import { auth, games } from '@/services';
+import { auth, games, safety } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { onlineFake } from '../../../test/onlineFake';
@@ -302,6 +302,40 @@ describe('<OnlineHistory />', () => {
     await flush();
     expect(screen.queryByTestId('history-online')).toBeNull();
     expect(hasOnlineAccount()).toBe(false);
+  });
+
+  it('with Safety, each row has Report or block for the other player (#435)', async () => {
+    signIn();
+    rememberOnlineAccount();
+    const won = await finished(FRIEND);
+    await render(
+      <HistoryScreen
+        records={[RECORD]}
+        onPlay={jest.fn()}
+        online={(onMatches) => (
+          <OnlineHistory auth={auth} games={games} safety={safety} onMatches={onMatches} />
+        )}
+      />,
+    );
+    await flush();
+    const friend = `Guest ${onlineFake.guestNumber(FRIEND)}`;
+    const user = setupUser();
+    const action = screen.getByTestId(`history-report-${won}`);
+    expect(action).toHaveAccessibleName(`Report or block ${friend}`);
+    await user.press(action);
+    expect(screen.getByRole('header', { name: `Report or block ${friend}` })).toBeOnTheScreen();
+    await user.press(screen.getByTestId('safety-report'));
+    await user.press(screen.getByTestId('safety-reason-other'));
+    await flush();
+    expect(screen.getByTestId('safety-done')).toBeOnTheScreen();
+    expect(onlineFake.server().reportsOf()).toEqual([
+      expect.objectContaining({ reporterId: ME, reportedId: FRIEND, reason: 'other' }),
+    ]);
+    await user.press(screen.getByTestId('safety-close'));
+    expect(screen.queryByTestId('safety-done')).toBeNull();
+    // The row stays; the blocked player's name no longer shows.
+    expect(screen.getByTestId(`history-online-${won}`)).toBeOnTheScreen();
+    expect(screen.queryByText(new RegExp(friend))).toBeNull();
   });
 
   it('speaks Greek', async () => {

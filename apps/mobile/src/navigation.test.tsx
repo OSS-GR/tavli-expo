@@ -26,7 +26,7 @@ import { settingsStore } from '@/features/settings/store';
 import { LESSON_SETS, LESSONS } from '@/features/tutorial/lessons';
 import { TUTORIAL_STORAGE_KEY, tutorialStorageKey } from '@/features/tutorial/progress';
 import { tutorialStore } from '@/features/tutorial/store';
-import { analytics, onlineServer, storage } from '@/services';
+import { analytics, onlinePlayerId, onlineServer, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../test/clock';
 import { pressMakeInvite } from '../test/signIn';
@@ -858,6 +858,15 @@ describe('online games (#255)', () => {
     expect(screen.queryByRole('button', { name: /^Rematch/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Change settings' })).toBeNull();
     expect(historyStore.getState().records).toEqual([]);
+    // Report or block the other player from match end (#435).
+    const bot = `Guest ${onlineFake.guestNumber('bot')}`;
+    await user.press(screen.getByRole('button', { name: `Report or block ${bot}` }));
+    await user.press(screen.getByRole('button', { name: `Block ${bot}` }));
+    await user.press(screen.getByTestId('safety-block-yes'));
+    expect(await screen.findByRole('header', { name: 'Player blocked' })).toBeOnTheScreen();
+    const blocked = await onlineServer().safetyFor(onlinePlayerId).listBlocked();
+    expect(blocked.map((p) => p.playerId)).toEqual(['bot']);
+    await user.press(screen.getByTestId('safety-close'));
     await user.press(screen.getByRole('button', { name: 'Home' }));
     expect(router.getPathname()).toBe('/');
   });

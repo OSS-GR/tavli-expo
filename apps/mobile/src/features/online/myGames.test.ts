@@ -23,6 +23,7 @@ function summary(gameId: string, fields: Partial<GameSummary> = {}): GameSummary
     winner: null,
     updatedAt: NOW - HOUR,
     turnDeadline: NOW - HOUR + ASYNC_TURN_TIME_MS,
+    opponentId: 'friend',
     opponentName: null,
     ...fields,
   };

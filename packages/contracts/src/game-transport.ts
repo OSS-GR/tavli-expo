@@ -184,6 +184,8 @@ export interface GameSummary {
   readonly updatedAt: number;
   /** As in the view: when the turn of `waitingFor` runs out. `null` when finished. */
   readonly turnDeadline: number | null;
+  /** The other player's id, as in the view's `players`: the app reports or blocks them with it (#435). */
+  readonly opponentId: string;
   /** The other player's name, as in the view's `names` (#400): `null` when the caller blocks them (#320). */
   readonly opponentName: PlayerName | null;
 }

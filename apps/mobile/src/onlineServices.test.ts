@@ -1,4 +1,4 @@
-// Online play wiring (#266, #281, #285, #315, #390): built on first use, no guest at start, and
+// Online play wiring (#266, #281, #285, #315, #390, #435): built on first use, no guest at start, and
 // the Jest fake of `@/services` (test/onlineFake.ts).
 import {
   createMemoryAppUpdates,
@@ -26,6 +26,7 @@ import {
   notifications as servicesNotifications,
   onlineData as servicesOnlineData,
   pushTokens as servicesPushTokens,
+  safety as servicesSafety,
 } from './services';
 
 const SERVER = {
@@ -104,6 +105,16 @@ function memoryAdapters() {
       return {
         mine: () => caller().mine(),
         setMine: (request) => caller().setMine(request),
+      };
+    },
+    createSafety: ({ auth }) => {
+      made.push('safety');
+      const caller = () => server.safetyFor(auth.currentUser()?.id ?? null);
+      return {
+        block: (playerId) => caller().block(playerId),
+        unblock: (playerId) => caller().unblock(playerId),
+        listBlocked: () => caller().listBlocked(),
+        report: (request) => caller().report(request),
       };
     },
   };
@@ -285,6 +296,23 @@ describe('createOnlineServices', () => {
     expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
   });
 
+  it('blocks and reports on the same client, as the signed-in user (#435)', async () => {
+    const { adapters, made, server } = memoryAdapters();
+    const online = createOnlineServices(SERVER, adapters)!;
+    await expect(online.safety.listBlocked()).rejects.toMatchObject({ code: 'NOT_SIGNED_IN' });
+    expect(made).toEqual([`auth ${SERVER.siteUrl}`, `client ${SERVER.url}`, 'safety']);
+    const me = await online.auth.signInAsGuest();
+    // A game links the two players: now they may block each other.
+    server.createGame(me.id, { white: me.id, black: 'bob' }, 'portes', 3, 1);
+    await online.safety.report({ playerId: 'bob', reason: 'name' });
+    await expect(online.safety.listBlocked()).resolves.toEqual([
+      expect.objectContaining({ playerId: 'bob' }),
+    ]);
+    await online.safety.unblock('bob');
+    await expect(online.safety.listBlocked()).resolves.toEqual([]);
+    expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
+  });
+
   it('passes every sign-in call through', async () => {
     const { adapters } = memoryAdapters();
     const online = createOnlineServices(SERVER, adapters)!;
@@ -312,6 +340,7 @@ describe('the Jest fake of @/services', () => {
     expect(servicesPushTokens).toBe(onlineFake.pushTokens);
     expect(servicesAppUpdates).toBe(onlineFake.appUpdates);
     expect(servicesUsernames).toBe(onlineFake.usernames);
+    expect(servicesSafety).toBe(onlineFake.safety);
   });
 
   it('saves push tokens as the signed-in guest, and refuses them while nobody is signed in', async () => {

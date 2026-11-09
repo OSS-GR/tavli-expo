@@ -66,10 +66,11 @@ export default function GameRoute() {
     return (
       <View style={styles.screen}>
         <OnlineConnect gameId={id} onHome={goHome}>
-          {({ transport, me }) => (
+          {({ transport, safety, me }) => (
             <OnlineMatchScreen
               gameId={id}
               transport={transport}
+              safety={safety}
               me={me}
               paused={!focused}
               covered={offering}

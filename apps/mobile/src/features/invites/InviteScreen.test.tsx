@@ -138,6 +138,25 @@ describe('InviteScreen', () => {
     expect(props.onHome).toHaveBeenCalledTimes(1);
   });
 
+  it('Accept of an invite from a player I blocked says so, and starts no game (#435)', async () => {
+    const user = setupUser();
+    const { server } = setup();
+    // We met in a game, so I may block them.
+    server.createGame(FRIEND, { white: FRIEND, black: ME }, 'portes', 3, null);
+    await server.safetyFor(ME).block(FRIEND);
+    const code = server.createInvite(FRIEND, 'portes', 3, 1);
+    const props = await openInvite(code, server.invitesFor(ME));
+    await user.press(await screen.findByRole('button', { name: 'Accept' }));
+
+    expect(await screen.findByRole('header', { name: 'You block this player' })).toBeOnTheScreen();
+    expect(screen.getByText(/Settings → Blocked players/)).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull();
+    expect(props.onAccepted).not.toHaveBeenCalled();
+    expect(server.getInvite(code)?.status).toBe('open');
+    await user.press(screen.getByRole('button', { name: 'Home' }));
+    expect(props.onHome).toHaveBeenCalledTimes(1);
+  });
+
   it('shows an invite that was already used', async () => {
     const { server } = setup();
     const code = server.createInvite(FRIEND, 'portes', 3, 1);
@@ -414,6 +433,7 @@ describe('inviteState', () => {
     // A bad code never reaches the server, so BAD_REQUEST is some other failure.
     expect(stateOfError(error('BAD_REQUEST'))).toBeNull();
     expect(stateOfError(error('OWN_INVITE'))).toEqual({ kind: 'own' });
+    expect(stateOfError(error('BLOCKED'))).toEqual({ kind: 'blocked' });
     expect(stateOfError(error('NOT_SIGNED_IN'))).toBeNull();
     expect(stateOfError(new Error('offline'))).toBeNull();
   });

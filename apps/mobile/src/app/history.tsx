@@ -9,7 +9,7 @@ import { HistoryScreen } from '@/features/history/HistoryScreen';
 import { OnlineHistory } from '@/features/history/OnlineHistory';
 import { useHistory } from '@/features/history/store';
 import { newGameHref } from '@/features/match/routes';
-import { auth, games } from '@/services';
+import { auth, games, safety } from '@/services';
 
 export default function HistoryRoute() {
   const records = useHistory((s) => s.records);
@@ -18,7 +18,9 @@ export default function HistoryRoute() {
       records={records}
       onPlay={() => router.push(newGameHref('bot'))}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-      online={(onMatches) => <OnlineHistory auth={auth} games={games} onMatches={onMatches} />}
+      online={(onMatches) => (
+        <OnlineHistory auth={auth} games={games} safety={safety} onMatches={onMatches} />
+      )}
     />
   );
 }

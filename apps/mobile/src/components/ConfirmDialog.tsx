@@ -3,10 +3,10 @@
  * History. Show it in a `Sheet` with `look="dialog"`.
  */
 import type { Ref } from 'react';
-import { Text, View, type HostInstance } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import type { HostInstance } from 'react-native';
 
 import { ActionButton } from './ActionButton';
+import { Dialog } from './Dialog';
 
 export interface ConfirmDialogProps {
   title: string;
@@ -41,57 +41,19 @@ export function ConfirmDialog({
   testID,
 }: ConfirmDialogProps) {
   return (
-    <View testID={testID} style={styles.dialog}>
-      <Text ref={titleRef} style={styles.heading} accessibilityRole="header">
-        {title}
-      </Text>
-      {lines.map((line, i) => (
-        <Text key={i} style={styles.line}>
-          {line}
-        </Text>
-      ))}
-      {note ? (
-        <View style={styles.note}>
-          <Text style={styles.noteText}>{note}</Text>
-        </View>
-      ) : null}
-      <View style={styles.actions}>
-        <ActionButton
-          testID="dialog-confirm"
-          label={confirmLabel}
-          kind="secondary"
-          onPress={onConfirm}
-        />
-        <ActionButton testID="dialog-cancel" label={cancelLabel} onPress={onCancel} />
-      </View>
-    </View>
+    <Dialog
+      title={title}
+      lines={lines}
+      {...(note ? { note } : {})}
+      {...(titleRef ? { titleRef } : {})}
+      {...(testID ? { testID } : {})}>
+      <ActionButton
+        testID="dialog-confirm"
+        label={confirmLabel}
+        kind="secondary"
+        onPress={onConfirm}
+      />
+      <ActionButton testID="dialog-cancel" label={cancelLabel} onPress={onCancel} />
+    </Dialog>
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  dialog: {
-    gap: theme.space.sm,
-  },
-  heading: {
-    ...theme.type.title,
-    color: theme.colors.text,
-  },
-  line: {
-    ...theme.type.body,
-    color: theme.colors.textDim,
-    paddingBottom: theme.space.xs,
-  },
-  note: {
-    padding: theme.space.md,
-    borderRadius: theme.radii.md,
-    backgroundColor: theme.colors.surfaceSelected,
-  },
-  noteText: {
-    ...theme.type.bodyStrong,
-    color: theme.colors.text,
-  },
-  actions: {
-    gap: theme.space.sm,
-    paddingTop: theme.space.sm,
-  },
-}));

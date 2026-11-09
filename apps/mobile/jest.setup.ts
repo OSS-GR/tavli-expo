@@ -57,6 +57,7 @@ jest.mock('@/services', () => {
     onlineData: onlineFake.onlineData,
     appUpdates: onlineFake.appUpdates,
     usernames: onlineFake.usernames,
+    safety: onlineFake.safety,
     appBuild: onlineFake.appBuild,
     onlineServer: onlineFake.server,
     onlinePlayerId: 'me',

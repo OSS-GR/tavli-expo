@@ -10,7 +10,7 @@
  * An online match (#255) passes `online` instead of `setup`: its seats
  * and label. It has no Rematch and no Change settings.
  */
-import { createRematch, type Match, type PerPlayer, type PlayerId } from '@tavli/engine';
+import { createRematch, opponent, type Match, type PerPlayer, type PlayerId } from '@tavli/engine';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -36,6 +36,8 @@ export interface OnlineMatchEnd {
   readonly me: PlayerId;
   /** "Portes · online". */
   readonly label: string;
+  /** Report or block the other player (#435). Without it there is no button. */
+  readonly onReportOrBlock?: () => void;
 }
 
 interface LocalMatchEnd {
@@ -293,6 +295,15 @@ export function MatchEndScreen({
             kind="secondary"
             onPress={onHome}
           />
+          {online?.onReportOrBlock ? (
+            <ActionButton
+              testID="end-report-block"
+              label={t('safety.action')}
+              accessibilityLabel={t('safety.actionLabel', { name: name(opponent(online.me)) })}
+              kind="text"
+              onPress={online.onReportOrBlock}
+            />
+          ) : null}
         </View>
       </ScrollView>
     </Screen>
