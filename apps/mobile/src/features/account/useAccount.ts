@@ -126,8 +126,13 @@ export function addableKeys(
 ): readonly AuthKeyProvider[] {
   return AUTH_KEY_PROVIDERS.filter(
     (provider) =>
-      !keys.some((key) => key.provider === provider) && (provider !== 'apple' || appleAvailable),
+      !keys.some((key) => key.provider === provider) && canAdd(provider, appleAvailable),
   );
+}
+
+/** The email code has no screen yet (#433), so only Apple can be added. */
+function canAdd(provider: AuthKeyProvider, appleAvailable: boolean): boolean {
+  return provider === 'apple' && appleAvailable;
 }
 
 /** Loads the state (see the top of this file). */

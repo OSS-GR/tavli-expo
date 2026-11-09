@@ -92,6 +92,7 @@ export function lazyAuthProvider(get: () => AuthProvider): AuthProvider {
     currentUser: () => get().currentUser(),
     signInAsGuest: () => get().signInAsGuest(),
     keyNonce: () => get().keyNonce(),
+    requestEmailCode: (email, language) => get().requestEmailCode(email, language),
     signInWithKey: (credential) => get().signInWithKey(credential),
     saveKey: (credential) => get().saveKey(credential),
     moveGuest: (offer) => get().moveGuest(offer),

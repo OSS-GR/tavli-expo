@@ -5,9 +5,10 @@
  * methods below (`BetterAuthClient`). `client.ts` builds the real Expo
  * client; the tests pass a fake.
  *
- * Sign-in keys (#397): `signInWithKey` is Better Auth's id token sign-in
- * (`/sign-in/social`). The nonce, the save, the list and the remove are
- * our own routes (`/key/*`, `apps/server/convex/keyPlugin.ts`).
+ * Sign-in keys (#397): `signInWithKey` with Apple is Better Auth's id
+ * token sign-in (`/sign-in/social`). The nonce, the email code (#399:
+ * `/key/email-code`, `/key/email-sign-in`), the save, the list and the
+ * remove are our own routes (`/key/*`, `apps/server/convex/keyPlugin.ts`).
  */
 import { AUTH_KEY_PROVIDERS } from '@tavli/contracts';
 import type {
@@ -17,6 +18,7 @@ import type {
   AuthKeyCredential,
   AuthKeyProvider,
   AuthProvider,
+  AppleKeyCredential,
   AuthUser,
   GuestMoveOffer,
 } from '@tavli/contracts';
@@ -46,7 +48,7 @@ export interface BetterAuthCallOptions {
 
 /** The body of an id token sign-in (`signIn.social`) and of `/key/save`. */
 export interface BetterAuthIdTokenInput {
-  readonly provider: AuthKeyProvider;
+  readonly provider: AppleKeyCredential['provider'];
   readonly idToken: { readonly token: string; readonly nonce: string };
 }
 
@@ -100,7 +102,15 @@ function copy(user: AuthUser | null): AuthUser | null {
 }
 
 /** Server error codes that keep their name in `AuthErrorData`. */
-const PASSED_CODES: readonly AuthErrorCode[] = ['KEY_BELONGS_TO_OTHER', 'LAST_KEY'];
+const PASSED_CODES: readonly AuthErrorCode[] = [
+  'KEY_BELONGS_TO_OTHER',
+  'LAST_KEY',
+  'WRONG_CODE',
+  'RATE_LIMITED',
+];
+
+/** Server error codes that mean "not now", not "no": the mail service failed. */
+const NETWORK_CODES: readonly string[] = ['MAIL_FAILED'];
 
 /**
  * A failed call as `AuthErrorData`: an HTTP status means the server said
@@ -116,7 +126,8 @@ function authError(
   const message = typeof text === 'string' && text !== '' ? `${what}: ${text}` : what;
   const serverCode = (error as { code?: unknown } | null)?.code;
   const passed = PASSED_CODES.find((code) => code === serverCode);
-  const code = !rejected ? 'NETWORK' : (passed ?? 'REJECTED');
+  const code =
+    !rejected || NETWORK_CODES.includes(String(serverCode)) ? 'NETWORK' : (passed ?? 'REJECTED');
   // A guest's save with another account's key carries a move offer (#403).
   const move = code === 'KEY_BELONGS_TO_OTHER' ? moveOffer(error) : null;
   return move === null ? { code, message } : { code, message, move };
@@ -140,11 +151,18 @@ function isKeyProvider(value: unknown): value is AuthKeyProvider {
   return (AUTH_KEY_PROVIDERS as readonly unknown[]).includes(value);
 }
 
-function idTokenInput(credential: AuthKeyCredential): BetterAuthIdTokenInput {
+function idTokenInput(credential: AppleKeyCredential): BetterAuthIdTokenInput {
   return {
     provider: credential.provider,
     idToken: { token: credential.idToken, nonce: credential.nonce },
   };
+}
+
+/** The body of `/key/save`: an id token, or an email and its code. */
+function saveInput(credential: AuthKeyCredential): object {
+  return credential.provider === 'email'
+    ? { provider: 'email', email: credential.email, code: credential.code }
+    : idTokenInput(credential);
 }
 
 const BASE64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
@@ -304,6 +322,17 @@ export function fromBetterAuthClient(
       throw { code: 'SIGNED_IN', message: 'sign out first' } satisfies AuthErrorData;
     // A saved session may exist: a key sign-in now would replace it.
     if (loadFailed) throw authError(null, 'could not load the session');
+    if (credential.provider === 'email') {
+      // Our route: the code proves the address (#399).
+      const reply = await fetchRoute<{ readonly user?: BetterAuthUserData }>(
+        '/key/email-sign-in',
+        'email sign-in failed',
+        { email: credential.email, code: credential.code },
+      );
+      if (reply.user === undefined) throw authError(null, 'no user in the reply');
+      set(toUser(reply.user));
+      return toUser(reply.user);
+    }
     let result: BetterAuthResult<BetterAuthSocialData>;
     try {
       result = await client.signIn.social({ ...idTokenInput(credential), ...NO_THROW });
@@ -326,8 +355,9 @@ export function fromBetterAuthClient(
    * a token the server cannot revoke.
    */
   async function sendAppleCode(credential: AuthKeyCredential): Promise<void> {
+    if (credential.provider !== 'apple') return;
     const code = credential.authorizationCode;
-    if (credential.provider !== 'apple' || code === undefined || code === '') return;
+    if (code === undefined || code === '') return;
     if (appleClientId === null || appleClientId === '') return;
     try {
       await client.$fetch('/key/apple-code', {
@@ -381,6 +411,9 @@ export function fromBetterAuthClient(
       }
       return data.nonce;
     },
+    async requestEmailCode(email, language) {
+      await fetchRoute('/key/email-code', 'sending the code failed', { email, language });
+    },
     signInWithKey(credential) {
       return queue(() => keySignIn(credential));
     },
@@ -389,7 +422,7 @@ export function fromBetterAuthClient(
       const data = await fetchRoute<{ readonly user?: BetterAuthUserData }>(
         '/key/save',
         'saving the key failed',
-        idTokenInput(credential),
+        saveInput(credential),
       );
       if (data.user === undefined) throw authError(null, 'no user in the reply');
       set(toUser(data.user));

@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Last review: 2026-11-09 (#320 block and report on the server, #435 how to report in the app, #403 moving a guest into an account).
+> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Last review: 2026-11-09 (#320 block and report on the server, #435 how to report in the app, #403 moving a guest into an account, #399 the email code and AhaSend).
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy and the terms before they go live.
 
@@ -56,7 +56,7 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 - [ ] PostHog: use an **EU** project and turn on **Discard client IP data** (see `docs/architecture/analytics-events.md`).
 - [ ] Convex: check that both deployments (dev and prod) are in the EU region `eu-west-1` (Ireland), and that `BETTER_AUTH_SECRET` is set on both (`npx convex env set`, never in the repo).
 - [ ] Expo: check where Expo's push service processes the data and whether its terms need a data processing agreement. Then fix the Expo row in the policy (both languages, the `OWNER` comment).
-- [ ] Accept the four vendors' data processing terms (DPA: Sentry, PostHog, Convex, Expo) and check the line about transfers outside the EU.
+- [ ] Accept the five vendors' data processing terms (DPA: Sentry, PostHog, Convex, Expo, AhaSend) and check the line about transfers outside the EU. For AhaSend, also check that the data stays in the EU, open and click tracking are off, and logs are kept one day.
 - [ ] Check the retention times on your Sentry and PostHog plans. The policy states each vendor's documented default (checked 2026-10-27).
 - [ ] Have the policy checked (see the note at the top).
 

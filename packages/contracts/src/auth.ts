@@ -5,14 +5,18 @@
  * the sign-in token, never from an argument. A guest (anonymous) account is
  * enough to play. A guest can save their account by adding a sign-in key
  * (`saveKey`, #397) and keeps the same id; a phone with no session signs
- * in with a key (`signInWithKey`). Keys: Apple now, the email code (#399)
- * and Google (#410) later.
+ * in with a key (`signInWithKey`). Keys: Apple, the email code (#399:
+ * `requestEmailCode`, then the code as the credential), and Google (#410)
+ * later.
  *
  * The Better Auth adapter is `@tavli/auth-better-auth`. The in-memory
  * provider below is for tests and for the app before the server is live.
  * The contract checks are `authProviderContract` in `@tavli/contracts/testing`.
  * See "Sign-in" in `docs/architecture/online-game-service.md`.
  */
+
+import { EMAIL_CODE_TRIES, isEmailCodeLanguage, normalizeEmail } from './email-code';
+import type { EmailCodeLanguage } from './email-code';
 
 /** The signed-in user. Plain JSON. */
 export interface AuthUser {
@@ -29,18 +33,18 @@ export interface AuthUser {
   readonly isGuest: boolean;
 }
 
-/** The kinds of sign-in key. Google (#410) and the email code (#399) come later. */
-export const AUTH_KEY_PROVIDERS = ['apple'] as const;
+/** The kinds of sign-in key. Google (#410) comes later. */
+export const AUTH_KEY_PROVIDERS = ['apple', 'email'] as const;
 
 export type AuthKeyProvider = (typeof AUTH_KEY_PROVIDERS)[number];
 
 /**
- * Proof that the player owns a key, from the provider's sheet on the
- * phone (Sign in with Apple, #401). Get the nonce from `keyNonce()` first
- * and give it to the sheet: the id token must carry it.
+ * Proof that the player owns an Apple key, from the Sign in with Apple
+ * sheet on the phone (#401). Get the nonce from `keyNonce()` first and
+ * give it to the sheet: the id token must carry it.
  */
-export interface AuthKeyCredential {
-  readonly provider: AuthKeyProvider;
+export interface AppleKeyCredential {
+  readonly provider: 'apple';
   /** The id token (a JWT) from the provider's sheet. */
   readonly idToken: string;
   /** The nonce from `keyNonce()`, as it was before the sheet hashed it. */
@@ -53,6 +57,22 @@ export interface AuthKeyCredential {
    */
   readonly authorizationCode?: string;
 }
+
+/**
+ * Proof that the player owns an email address (#399): the code from
+ * `requestEmailCode`, sent to that address. A code works once, for
+ * `EMAIL_CODE_TTL_MS`, and takes `EMAIL_CODE_TRIES` wrong tries.
+ */
+export interface EmailKeyCredential {
+  readonly provider: 'email';
+  /** The address, as the player typed it (the provider normalizes it). */
+  readonly email: string;
+  /** The 6 digits from the email. Never log it. */
+  readonly code: string;
+}
+
+/** Proof that the player owns a key. */
+export type AuthKeyCredential = AppleKeyCredential | EmailKeyCredential;
 
 /** A sign-in key of the signed-in account. Plain JSON. */
 export interface AuthKey {
@@ -74,6 +94,14 @@ export const AUTH_ERROR_CODES = [
   'KEY_BELONGS_TO_OTHER',
   /** `removeKey` of the account's last key. An account keeps at least one. */
   'LAST_KEY',
+  /**
+   * An email code that is not the one sent (#399). The code still works:
+   * the player may type it again. After the last wrong try the code is
+   * used up, and the answer is `REJECTED`.
+   */
+  'WRONG_CODE',
+  /** `requestEmailCode` too often for this address, phone or server. Try again later. */
+  'RATE_LIMITED',
 ] as const;
 
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
@@ -141,10 +169,21 @@ export interface AuthProvider {
    */
   keyNonce(): Promise<string>;
   /**
+   * Sends a sign-in code to `email` (#399), in `language`, for
+   * `signInWithKey` or `saveKey` with an `EmailKeyCredential`. The answer
+   * is the same whether or not the address has an account. A new code
+   * replaces the last one. Rejects with `REJECTED` for an address that is
+   * not valid (`normalizeEmail`) or when email codes are off on the
+   * server, `RATE_LIMITED` when asked too often, and `NETWORK` when the
+   * server or the mail service could not be reached.
+   */
+  requestEmailCode(email: string, language: EmailCodeLanguage): Promise<void>;
+  /**
    * Signs in with a key, when nobody is signed in: to the account that
    * has the key, or to a new saved account. Rejects with `SIGNED_IN` when
-   * a user is signed in (to keep a guest's games, call `saveKey`), and
-   * with `REJECTED` for a bad or used credential.
+   * a user is signed in (to keep a guest's games, call `saveKey`), with
+   * `WRONG_CODE` for a wrong email code that may be typed again, and with
+   * `REJECTED` for a bad or used credential.
    */
   signInWithKey(credential: AuthKeyCredential): Promise<AuthUser>;
   /**
@@ -152,8 +191,10 @@ export interface AuthProvider {
    * then no longer a guest. Rejects with `KEY_BELONGS_TO_OTHER` when
    * another account has the key (nothing changes), and with `REJECTED`
    * when nobody is signed in, the credential is bad or used, or the
-   * account has a key of this kind already. Saving a key the user has
-   * already resolves and changes nothing.
+   * account has a key of this kind already. An email code may also give
+   * `WRONG_CODE`; any key credential is used up by the call, also when it
+   * gives `KEY_BELONGS_TO_OTHER`. Saving a key the user has already
+   * resolves and changes nothing.
    */
   saveKey(credential: AuthKeyCredential): Promise<AuthUser>;
   /**
@@ -229,6 +270,13 @@ export interface MemoryAuthStore {
   appleCodes: string[];
   /** Move tickets made (#403) and not used yet. */
   openMoveTickets: string[];
+  /**
+   * The email codes sent so far, oldest first (#399): the inbox a test
+   * reads. A code is `100000 + n`.
+   */
+  sentEmailCodes: { email: string; code: string; language: EmailCodeLanguage }[];
+  /** The live code of each address and its wrong tries. */
+  emailCodes: Record<string, { code: string; tries: number }>;
 }
 
 /**
@@ -251,6 +299,8 @@ export function createMemoryAuthStore(): MemoryAuthStore {
     openNonces: [],
     appleCodes: [],
     openMoveTickets: [],
+    sentEmailCodes: [],
+    emailCodes: {},
   };
 }
 
@@ -262,6 +312,7 @@ function authError(code: AuthErrorCode, message: string): AuthErrorData {
  * An `AuthProvider` in memory: guest ids `guest-1`, `guest-2`, …, saved
  * accounts `user-1`, …, and the token `memory-token:<id>`. Its fake Apple
  * accepts `memoryAppleIdToken(sub, nonce)` with a nonce from `keyNonce()`.
+ * Its email codes go to `store.sentEmailCodes` (no mail, no limits).
  * Listeners get each change on a later microtask, like a real client.
  * `guestMoves` counts and moves a guest's games (#403).
  */
@@ -280,8 +331,26 @@ export function createMemoryAuthProvider(
     }
   }
 
-  /** The key a credential proves (`<provider>:<sub>`), using up its nonce. */
+  /** The key an email credential proves (`email:<address>`), using up its code. */
+  function provenEmail(credential: EmailKeyCredential): string {
+    const email = normalizeEmail(credential.email);
+    const live = email === null ? undefined : store.emailCodes[email];
+    if (email === null || live === undefined) {
+      throw authError('REJECTED', 'no code for this address');
+    }
+    if (live.code !== credential.code) {
+      live.tries += 1;
+      if (live.tries < EMAIL_CODE_TRIES) throw authError('WRONG_CODE', 'the code is wrong');
+      delete store.emailCodes[email];
+      throw authError('REJECTED', 'the code is used up');
+    }
+    delete store.emailCodes[email];
+    return `email:${email}`;
+  }
+
+  /** The key a credential proves (`<provider>:<sub>`), using up its nonce or code. */
   function provenKey(credential: AuthKeyCredential): string {
+    if (credential.provider === 'email') return provenEmail(credential);
     const prefix = MEMORY_APPLE_TOKEN_PREFIX;
     const at = store.openNonces.indexOf(credential.nonce);
     const body = credential.idToken.startsWith(prefix)
@@ -321,6 +390,16 @@ export function createMemoryAuthProvider(
       store.openNonces.push(nonce);
       return nonce;
     },
+    async requestEmailCode(email, language) {
+      await Promise.resolve();
+      const address = normalizeEmail(email);
+      if (address === null || !isEmailCodeLanguage(language)) {
+        throw authError('REJECTED', 'not a valid address');
+      }
+      const code = String(100000 + store.sentEmailCodes.length + 1);
+      store.sentEmailCodes.push({ email: address, code, language });
+      store.emailCodes[address] = { code, tries: 0 };
+    },
     async signInWithKey(credential) {
       await Promise.resolve();
       if (store.session !== null) throw authError('SIGNED_IN', 'sign out first');
@@ -332,7 +411,7 @@ export function createMemoryAuthProvider(
         store.keys[key] = id;
       }
       store.session = { id, isGuest: false };
-      if (credential.authorizationCode !== undefined) {
+      if (credential.provider === 'apple' && credential.authorizationCode !== undefined) {
         store.appleCodes.push(credential.authorizationCode);
       }
       changed(store.session);
@@ -359,7 +438,7 @@ export function createMemoryAuthProvider(
         }
         store.keys[key] = user.id;
       }
-      if (credential.authorizationCode !== undefined) {
+      if (credential.provider === 'apple' && credential.authorizationCode !== undefined) {
         store.appleCodes.push(credential.authorizationCode);
       }
       if (user.isGuest) {

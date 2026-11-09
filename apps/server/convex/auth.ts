@@ -4,8 +4,8 @@
  * Two kinds of user:
  * - a guest (the anonymous plugin), made only when the player opens
  *   online play;
- * - a saved account: one with a sign-in key. Sign in with Apple (#397)
- *   now; the email code (#399) and Google (#410) come later.
+ * - a saved account: one with a sign-in key: Apple (#397) or an email
+ *   code (#399); Google (#410) comes later.
  *
  * A guest saves their account with our `/key/save` route (`keyPlugin.ts`)
  * and keeps the same user id. A phone with no session signs in with
@@ -19,7 +19,11 @@
  * - `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`: the key that
  *   signs our calls to Apple, to trade a code and to revoke a token
  *   (#398, `model/appleTokens.ts`). Without them no token is kept.
- * See "Sign in with Apple" in `docs/process/running-the-app.md`.
+ * - `AHASEND_API_KEY`, `AHASEND_ACCOUNT_ID`, `MAIL_FROM` (and
+ *   `MAIL_FROM_NAME`, `AHASEND_SANDBOX`): turn the email code on (`mail.ts`);
+ * - `EMAIL_CODES_PER_DAY`: the codes the whole server sends a day (default 30).
+ * See "Sign in with Apple" and "Email code" in
+ * `docs/process/running-the-app.md`.
  */
 
 import { createClient } from '@convex-dev/better-auth';
@@ -37,8 +41,10 @@ import type { DataModel } from './_generated/dataModel';
 import { appleClientIds, appleTokenClient } from './appleTokens';
 import authConfig from './auth.config';
 import { isKeyProviderId, keyError, keyPlugin } from './keyPlugin';
+import { mailSender } from './mail';
 import { APPLE_KEYS_URL, verifyAppleIdToken } from './model/appleIdToken';
 import { appleKeyConfig, makeAppleClientSecret, subjectOfAppleIdToken } from './model/appleTokens';
+import { codesPerDay } from './model/emailCode';
 import { checkKeyNonce } from './model/keyNonce';
 
 /** The Better Auth component: its tables and the helpers to read them. */
@@ -227,6 +233,14 @@ export function createAuth(ctx: AuthCtx) {
             throw error;
           }
         },
+        mailSender,
+        startEmailCode: async (start) =>
+          await actionCtx(ctx).runMutation(internal.emailCodes.startEmailCode, {
+            ...start,
+            perDay: codesPerDay(process.env),
+          }),
+        useEmailCode: async (use) =>
+          await actionCtx(ctx).runMutation(internal.emailCodes.useEmailCode, use),
       }),
     ],
   });

@@ -506,5 +506,7 @@ describe('addableKeys', () => {
     expect(addableKeys([], true)).toEqual(['apple']);
     expect(addableKeys([], false)).toEqual([]);
     expect(addableKeys([{ provider: 'apple' }], true)).toEqual([]);
+    // An email key has no screen to add it yet (#433).
+    expect(addableKeys([{ provider: 'email' }], true)).toEqual(['apple']);
   });
 });

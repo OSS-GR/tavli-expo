@@ -1,5 +1,5 @@
 import type { AuthErrorData, AuthProvider } from '@tavli/contracts';
-import { isAuthErrorData } from '@tavli/contracts';
+import { EMAIL_CODE_TRIES, isAuthErrorData, normalizeEmail } from '@tavli/contracts';
 import { authProviderContract } from '@tavli/contracts/testing';
 import { describe, expect, it } from 'vitest';
 
@@ -40,8 +40,12 @@ interface FakeServer {
   sessions: Map<string, string>;
   /** User ids that are guests. */
   anonymous: Set<string>;
-  /** Apple `sub` → user id. */
-  appleKeys: Map<string, string>;
+  /** `apple:<sub>` or `email:<address>` → user id. */
+  keys: Map<string, string>;
+  /** Live email codes (#399): address → code and wrong tries. */
+  emailCodes: Map<string, { code: string; tries: number }>;
+  /** Every code sent: the fake inbox. */
+  sentCodes: { email: string; code: string; language: unknown }[];
   /** Nonces made and not used yet. */
   nonces: Set<string>;
   /** Token lifetime, ms. */
@@ -49,7 +53,7 @@ interface FakeServer {
   /** The Apple codes sent to `/key/apple-code`: user id, client id and code. */
   appleCodes: { user: string; clientId: unknown; code: unknown }[];
   /** The next calls of this name fail with this result error (or throw when `'throw'`). */
-  failures: Map<string, { status?: number; message?: string } | 'throw'>;
+  failures: Map<string, { status?: number; message?: string; code?: string } | 'throw'>;
   /** Move tickets (#403) not used yet: ticket → guest and account. */
   moveTickets: Map<string, { source: string; target: string }>;
   calls: string[];
@@ -61,7 +65,9 @@ function createServer(): FakeServer {
     guests: 0,
     sessions: new Map(),
     anonymous: new Set(),
-    appleKeys: new Map(),
+    keys: new Map(),
+    emailCodes: new Map(),
+    sentCodes: [],
     nonces: new Set(),
     tokenTime: 15 * 60 * 1000,
     appleCodes: [],
@@ -90,6 +96,25 @@ function provenSub(server: FakeServer, idToken: { token: string; nonce: string }
   if (kind !== 'fake-apple' || sub === undefined || nonce !== idToken.nonce) return null;
   if (!server.nonces.delete(nonce)) return null;
   return sub;
+}
+
+/** The address an email code proves, using the code up; else the server's error. */
+function provenEmail(
+  server: FakeServer,
+  body: Record<string, unknown> | undefined,
+): string | BetterAuthResult<unknown> {
+  const email = normalizeEmail(String(body?.['email'] ?? ''));
+  if (email === null) return refused(400, 'INVALID_EMAIL');
+  const live = server.emailCodes.get(email);
+  if (live === undefined) return refused(401, 'CODE_EXPIRED');
+  if (live.code !== body?.['code']) {
+    live.tries += 1;
+    if (live.tries < EMAIL_CODE_TRIES) return refused(401, 'WRONG_CODE');
+    server.emailCodes.delete(email);
+    return refused(401, 'CODE_EXPIRED');
+  }
+  server.emailCodes.delete(email);
+  return email;
 }
 
 function createClient(server: FakeServer, phone: { cookie: string | null }): BetterAuthClient {
@@ -124,13 +149,44 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
       server.nonces.add(nonce);
       return ok({ nonce });
     }
+    if (path === '/key/email-code') {
+      const email = normalizeEmail(String(body?.['email'] ?? ''));
+      if (email === null) return refused(400, 'INVALID_EMAIL');
+      const code = String(200000 + server.sentCodes.length + 1);
+      server.sentCodes.push({ email, code, language: body?.['language'] });
+      server.emailCodes.set(email, { code, tries: 0 });
+      return ok({ sent: true });
+    }
+    if (path === '/key/email-sign-in') {
+      const email = provenEmail(server, body);
+      if (typeof email !== 'string') return email;
+      let owner = server.keys.get(`email:${email}`);
+      if (owner === undefined) {
+        server.guests += 1;
+        owner = `user-${server.guests}`;
+        server.keys.set(`email:${email}`, owner);
+      }
+      newSession(owner);
+      return ok({ token: phone.cookie, user: userData(owner) });
+    }
     if (id === undefined) return refused(401, 'UNAUTHORIZED');
-    const keysOf = () => [...server.appleKeys.values()].filter((owner) => owner === id);
-    if (path === '/key/list') return ok({ keys: keysOf().map(() => ({ provider: 'apple' })) });
+    const keysOf = () => [...server.keys].filter(([, owner]) => owner === id).map(([key]) => key);
+    const providerOf = (key: string) => key.split(':')[0]!;
+    if (path === '/key/list') {
+      return ok({ keys: keysOf().map((key) => ({ provider: providerOf(key) })) });
+    }
     if (path === '/key/save') {
-      const sub = provenSub(server, body?.['idToken'] as { token: string; nonce: string });
-      if (sub === null) return refused(401, 'INVALID_TOKEN');
-      const owner = server.appleKeys.get(sub);
+      let key: string;
+      if (body?.['provider'] === 'email') {
+        const email = provenEmail(server, body);
+        if (typeof email !== 'string') return email;
+        key = `email:${email}`;
+      } else {
+        const sub = provenSub(server, body?.['idToken'] as { token: string; nonce: string });
+        if (sub === null) return refused(401, 'INVALID_TOKEN');
+        key = `apple:${sub}`;
+      }
+      const owner = server.keys.get(key);
       if (owner !== undefined && owner !== id) {
         // A guest gets a move offer (#403).
         if (!server.anonymous.has(id) || keysOf().length > 0) {
@@ -142,8 +198,10 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
           move: { ticket, activeGames: 2, openInvites: 1 },
         });
       }
-      if (owner === undefined && keysOf().length > 0) return refused(409, 'PROVIDER_TAKEN');
-      server.appleKeys.set(sub, id);
+      if (owner === undefined && keysOf().some((own) => providerOf(own) === providerOf(key))) {
+        return refused(409, 'PROVIDER_TAKEN');
+      }
+      server.keys.set(key, id);
       server.anonymous.delete(id);
       return ok({ user: userData(id) });
     }
@@ -169,8 +227,11 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
     }
     if (path === '/key/remove') {
       const keys = keysOf();
-      if (keys.length === 0) return ok({ removed: false });
-      return refused(409, 'LAST_KEY');
+      const target = keys.find((key) => providerOf(key) === body?.['provider']);
+      if (target === undefined) return ok({ removed: false });
+      if (keys.length <= 1) return refused(409, 'LAST_KEY');
+      server.keys.delete(target);
+      return ok({ removed: true });
     }
     return refused(404, 'NOT_FOUND');
   }
@@ -200,11 +261,11 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
         call('signIn.social', () => {
           const sub = provenSub(server, input.idToken);
           if (sub === null) return refused(401, 'INVALID_TOKEN');
-          let id = server.appleKeys.get(sub);
+          let id = server.keys.get(`apple:${sub}`);
           if (id === undefined) {
             server.guests += 1;
             id = `user-${server.guests}`;
-            server.appleKeys.set(sub, id);
+            server.keys.set(`apple:${sub}`, id);
           }
           newSession(id);
           return ok({ user: userData(id) });
@@ -239,6 +300,11 @@ function subject(server = createServer(), appleClientId: string | null = null) {
     restart: () => fromBetterAuthClient(createClient(server, phone), { now }),
     tokenSubject: (token: string) => String(jwtPayload(token)['sub']),
     appleIdToken: (sub: string, nonce: string) => Promise.resolve(fakeAppleToken(sub, nonce)),
+    emailCode: (email: string) => {
+      const sent = server.sentCodes.filter((code) => code.email === email).at(-1);
+      if (sent === undefined) throw new Error('no code was sent to this address');
+      return Promise.resolve(sent.code);
+    },
   };
 }
 
@@ -422,6 +488,32 @@ describe('fromBetterAuthClient', () => {
     expect(await rejection(auth.removeKey('apple'))).toMatchObject({ code: 'LAST_KEY' });
     server.failures.set('fetch /key/list', 'throw');
     expect(await rejection(auth.listKeys())).toMatchObject({ code: 'NETWORK' });
+  });
+
+  it('maps the email code errors (#399): wrong and rate limits pass, a mail failure is NETWORK', async () => {
+    const { auth, server } = subject();
+    await auth.requestEmailCode('eleni@example.com', 'el');
+    expect(server.sentCodes).toEqual([
+      { email: 'eleni@example.com', code: '200001', language: 'el' },
+    ]);
+    expect(server.calls).toContain('fetch /key/email-code');
+    const wrong = { provider: 'email' as const, email: 'eleni@example.com', code: '000000' };
+    expect(await rejection(auth.signInWithKey(wrong))).toMatchObject({ code: 'WRONG_CODE' });
+    server.failures.set('fetch /key/email-code', { status: 429, code: 'RATE_LIMITED' });
+    expect(await rejection(auth.requestEmailCode('eleni@example.com', 'el'))).toMatchObject({
+      code: 'RATE_LIMITED',
+    });
+    server.failures.set('fetch /key/email-code', { status: 502, code: 'MAIL_FAILED' });
+    expect(await rejection(auth.requestEmailCode('eleni@example.com', 'el'))).toMatchObject({
+      code: 'NETWORK',
+    });
+    server.failures.set('fetch /key/email-code', { status: 503, code: 'EMAIL_OFF' });
+    expect(await rejection(auth.requestEmailCode('eleni@example.com', 'el'))).toMatchObject({
+      code: 'REJECTED',
+    });
+    // An email key sends no Apple code.
+    await auth.signInWithKey({ ...wrong, code: '200001' });
+    expect(server.calls).not.toContain('fetch /key/apple-code');
   });
 
   it('passes the move offer of a guest’s KEY_BELONGS_TO_OTHER, and drops a broken one (#403)', async () => {

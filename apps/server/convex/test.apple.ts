@@ -193,9 +193,10 @@ export async function signInWithApple(
   apple: FakeApple,
   phone: Phone,
   sub: string,
+  more: { email?: string } = {},
 ): Promise<Reply> {
   const value = await nonce(t, phone);
-  const token = await appleToken(apple, { sub, nonce: value });
+  const token = await appleToken(apple, { ...more, sub, nonce: value });
   return await call(t, phone, 'sign-in/social', {
     provider: 'apple',
     idToken: { token, nonce: value },

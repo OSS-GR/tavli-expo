@@ -21,6 +21,7 @@ on:
       - packages/engine/**
       - packages/contracts/**
       - packages/online/**
+      - packages/adapters/mail-ahasend/**
       - packages/adapters/push-expo/**
       - pnpm-lock.yaml
       - package.json

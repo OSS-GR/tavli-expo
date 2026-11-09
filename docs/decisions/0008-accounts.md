@@ -82,7 +82,9 @@ We choose **B**.
 11. **Minimum age:** 13, or 16 in EU countries that ask for it, asked once when
     a username is picked.
 12. **Email sender:** a transactional mail service in an EU region with a data
-    processing agreement, behind a `MailSender` port (picked in #399).
+    processing agreement, behind a `MailSender` port (picked in #399:
+    AhaSend, Amsterdam, data in the EU, free plan with no card; adapter
+    `@tavli/mail-ahasend`).
 
 This replaces items 6 and 8 of ADR-0004. The rest of ADR-0004 stands.
 

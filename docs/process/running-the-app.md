@@ -270,6 +270,21 @@ Apple's server-to-server notices (#398): in **Identifiers**, open `com.tavlaki` 
 
 Apple lets you download a key only once. If it is lost or leaks: make a new key in **Keys** with Sign in with Apple on, set `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` on both deployments, then revoke the old key.
 
+### Email code (#399)
+
+The server mails sign-in codes through [AhaSend](https://ahasend.com) (AhaSend B.V., Amsterdam; data stays in the EU; free plan: 1,000 mails a month, no card). The owner does these steps once; never put a key in the repo, an issue or a chat.
+
+1. Sign up at AhaSend and accept the data processing agreement (<https://ahasend.com/dpa>).
+2. Add the domain `tavlaki.com` and set the DNS records AhaSend shows: SPF (`include:spf.ahasend.com` in the domain's SPF record), the two DKIM CNAMEs (`managed._domainkey`, `managed2._domainkey`) and a DMARC record. Wait until AhaSend shows the domain as verified.
+3. Make an API key that may only send for that domain (`messages:send:tavlaki.com`).
+4. Set the Convex env vars on **both** deployments (dashboard → **Settings** → **Environment Variables**):
+   - `AHASEND_API_KEY` = the key (`aha-sk-…`)
+   - `AHASEND_ACCOUNT_ID` = the account id from AhaSend's dashboard
+   - `MAIL_FROM` = the sender, for example `no-reply@tavlaki.com`
+   - optional: `MAIL_FROM_NAME` (default `Tavlaki`), `EMAIL_CODES_PER_DAY` (default 30), and `AHASEND_SANDBOX` = `true` on dev to test without delivering mail.
+
+With any of the first three missing, email codes are off: `/key/email-code` answers `503 EMAIL_OFF`. Watch the monthly count in AhaSend's dashboard; raise `EMAIL_CODES_PER_DAY` only when the plan allows it.
+
 ### EAS Update (over-the-air updates), for later
 
 - Builds from each profile listen on the **channel** with the same name: `development`, `preview`, `production`.

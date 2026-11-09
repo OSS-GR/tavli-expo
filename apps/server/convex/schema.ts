@@ -219,7 +219,7 @@ export default defineSchema({
   authKeys: defineTable({
     /** The Better Auth provider id, for example `apple`. */
     providerId: v.string(),
-    /** The provider's user id (Apple's `sub`). */
+    /** The provider's user id: Apple's `sub`, or the address of an `email` key (#399). */
     accountId: v.string(),
     /** The Better Auth user id: the player id. */
     userId: v.string(),
@@ -274,4 +274,33 @@ export default defineSchema({
   })
     .index('by_nonce', ['nonce'])
     .index('by_expires', ['expiresAt']),
+
+  /**
+   * Live email sign-in codes (#399, `emailCodes.ts`): one per address,
+   * for `EMAIL_CODE_TTL_MS`. Holds HMACs only (`model/emailCode.ts`):
+   * never the address and never the code.
+   */
+  emailCodes: defineTable({
+    /** `addressKey` of the address. */
+    address: v.string(),
+    /** `codeKey` of the address and the code. */
+    codeHash: v.string(),
+    expiresAt: v.number(),
+    /** Wrong tries so far. */
+    tries: v.number(),
+  })
+    .index('by_address', ['address'])
+    .index('by_expires', ['expiresAt']),
+
+  /**
+   * The email code send log (#399), for the send limits: one row per
+   * bucket and send, kept `SEND_LOG_MS`. A bucket is an HMAC of the
+   * address or the caller, or `all` for the day cap.
+   */
+  emailCodeSends: defineTable({
+    bucket: v.string(),
+    at: v.number(),
+  })
+    .index('by_bucket', ['bucket', 'at'])
+    .index('by_at', ['at']),
 });

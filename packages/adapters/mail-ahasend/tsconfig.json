@@ -1,0 +1,8 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    // `fetch`, `AbortController` and timers: Web APIs of the Convex runtime.
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src"]
+}

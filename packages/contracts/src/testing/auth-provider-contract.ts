@@ -37,6 +37,12 @@ export interface AuthProviderContractSubject {
    */
   readonly appleIdToken: (sub: string, nonce: string) => Promise<string>;
   /**
+   * The code in the newest email that `requestEmailCode` sent to `email`
+   * (in lower case), read from the fake mail service (#399). Never real
+   * mail. Rejects when no code went there.
+   */
+  readonly emailCode: (email: string) => Promise<string>;
+  /**
    * Lets the provider deliver. Default: wait one microtask. Never wait on
    * a real clock here.
    */
@@ -109,6 +115,20 @@ async function apple(
   const nonce = await subject.auth.keyNonce();
   if (typeof nonce !== 'string' || nonce === '') throw new Error('keyNonce(): no nonce');
   return { provider: 'apple', idToken: await subject.appleIdToken(sub, nonce), nonce };
+}
+
+/** A fresh email credential: a code is sent to `email`, then read from the fake inbox. */
+async function emailKey(
+  subject: AuthProviderContractSubject,
+  email: string,
+): Promise<AuthKeyCredential> {
+  await subject.auth.requestEmailCode(email, 'en');
+  return { provider: 'email', email, code: await subject.emailCode(email.trim().toLowerCase()) };
+}
+
+/** A code of 6 digits that is not `code`. */
+function otherCode(code: string): string {
+  return code === '000000' ? '000001' : '000000';
 }
 
 async function rejectsWith(
@@ -440,6 +460,107 @@ export function authProviderContract(): AuthProviderContractCheck[] {
         await auth.saveKey(await apple(subject, 'apple-a'));
         await rejectsWith(auth.removeKey('apple'), 'LAST_KEY', 'removeKey() of the last key');
         same(await auth.listKeys(), [{ provider: 'apple' }], 'listKeys()');
+      },
+    },
+    {
+      name: 'an email code signs in to a new saved account; a new code later finds it again',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const first = await auth.signInWithKey(await emailKey(subject, ' Eleni@Example.com '));
+        checkSaved(first, 'the first email sign-in');
+        same(
+          subject.tokenSubject(await tokenOf(auth, 'getToken()')),
+          first.id,
+          'the token subject',
+        );
+        same(await auth.listKeys(), [{ provider: 'email' }], 'listKeys()');
+        same(await subject.restart().ready(), first, 'ready() after a restart');
+        await auth.signOut();
+        const second = await auth.signInWithKey(await emailKey(subject, 'eleni@example.com'));
+        same(second, first, 'the second email sign-in');
+      },
+    },
+    {
+      name: 'an email code works once; a wrong code is WRONG_CODE until the last try',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const used = await emailKey(subject, 'ann@example.com');
+        await auth.signInWithKey(used);
+        await auth.signOut();
+        await rejectsWith(auth.signInWithKey(used), 'REJECTED', 'a used code');
+
+        const live = await emailKey(subject, 'ann@example.com');
+        if (live.provider !== 'email') throw new Error('not an email key');
+        const wrong = { ...live, code: otherCode(live.code) };
+        await rejectsWith(auth.signInWithKey(wrong), 'WRONG_CODE', 'the first wrong code');
+        await rejectsWith(auth.signInWithKey(wrong), 'WRONG_CODE', 'the second wrong code');
+        await rejectsWith(auth.signInWithKey(wrong), 'REJECTED', 'the last wrong code');
+        await rejectsWith(auth.signInWithKey(live), 'REJECTED', 'the right code after that');
+        same(auth.currentUser(), null, 'currentUser() after the refusals');
+
+        // A new code replaces the old one. Another address: a server
+        // sends one address only a few codes in a short time.
+        const old = await emailKey(subject, 'bea@example.com');
+        const fresh = await emailKey(subject, 'bea@example.com');
+        if (old.provider === 'email' && fresh.provider === 'email' && old.code !== fresh.code) {
+          await rejectsWith(auth.signInWithKey(old), 'WRONG_CODE', 'the replaced code');
+        }
+        checkSaved(await auth.signInWithKey(fresh), 'the new code');
+      },
+    },
+    {
+      name: 'a bad address is REJECTED; a known and a new address get the same answer',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        for (const email of ['', 'eleni', 'eleni@example', 'a b@example.com']) {
+          await rejectsWith(auth.requestEmailCode(email, 'en'), 'REJECTED', `"${email}"`);
+        }
+        await auth.signInWithKey(await emailKey(subject, 'known@example.com'));
+        await auth.signOut();
+        same(await auth.requestEmailCode('known@example.com', 'el'), undefined, 'a known address');
+        same(await auth.requestEmailCode('new@example.com', 'el'), undefined, 'a new address');
+        same(auth.currentUser(), null, 'currentUser()');
+      },
+    },
+    {
+      name: 'a guest saves an email key and keeps its id; an email sign-in while signed in is SIGNED_IN',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const guest = await auth.signInAsGuest();
+        await rejectsWith(
+          auth.signInWithKey(await emailKey(subject, 'kostas@example.com')),
+          'SIGNED_IN',
+          'an email sign-in as a guest',
+        );
+        const saved = await auth.saveKey(await emailKey(subject, 'kostas@example.com'));
+        same(saved, { id: guest.id, isGuest: false }, 'saveKey() with an email code');
+        // A second key kind; then either one may go.
+        await auth.saveKey(await apple(subject, 'apple-kostas'));
+        const kinds = (await auth.listKeys()).map((key) => key.provider).sort();
+        same(kinds, ['apple', 'email'], 'listKeys()');
+        await auth.removeKey('email');
+        same(await auth.listKeys(), [{ provider: 'apple' }], 'listKeys() after removeKey()');
+      },
+    },
+    {
+      name: 'a guest with another account’s email gets a move offer',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const owner = await auth.signInWithKey(await emailKey(subject, 'maria@example.com'));
+        await auth.signOut();
+        await auth.signInAsGuest();
+        const error = await rejectsWith(
+          auth.saveKey(await emailKey(subject, 'maria@example.com')),
+          'KEY_BELONGS_TO_OTHER',
+          'saveKey() with the account’s email',
+        );
+        const moved = await auth.moveGuest(offerOf(error, 'the offer'));
+        same(moved, owner, 'moveGuest()');
       },
     },
     {
