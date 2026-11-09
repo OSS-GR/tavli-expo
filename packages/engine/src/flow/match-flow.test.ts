@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { nextVariantId, validateMatch } from '../match';
+import { nextVariantId, resignGame, validateMatch } from '../match';
 import type { PlayerId } from '../player';
 import { getPreset, resolveRules } from '../presets';
 import { createSeededRng } from '../rng';
 import type { Rng } from '../rng';
 import type { RuleOverrides, RuleSet } from '../rules';
 import type { StandardVariantId } from '../state';
+import { portesState } from '../testing/position-notation';
 import { raceVariant } from '../testing/race-variant';
 import { randomAction } from '../testing/random-flow';
 import type { RandomPlayOptions } from '../testing/random-flow';
 import { createVariantRegistry } from '../variant';
 import type { GameResult, Variant } from '../variant';
 import { portes } from '../variants';
+import { createGameFlow } from './game-flow';
 import type { FlowContext } from './game-flow';
 import {
   applyMatchAction,
@@ -313,7 +315,7 @@ describe('match flow', () => {
   });
 
   it('resign match: the opponent wins the match at once', () => {
-    const flow = act(createMatchFlow({ rules: portesOnly(), starter: 'white' }), [
+    const flow = act(createMatchFlow({ rules: portesOnly(), targetPoints: 3, starter: 'white' }), [
       { type: 'roll', player: 'white', dice: [3, 1] },
       { type: 'resignMatch', player: 'black' },
     ]);
@@ -324,29 +326,77 @@ describe('match flow', () => {
     ).toThrow(illegalAction);
   });
 
-  it('tavli-match.md #20: to 3, 0–0, resign match at the start → the opponent wins, 0–0 stays', () => {
-    const atOpening = act(createMatchFlow({ rules: portesOnly(), targetPoints: 3 }), [
-      { type: 'resignMatch', player: 'white' },
-    ]);
-    const atFirstRoll = act(
+  it('tavli-match.md #29: resign match in a game scores that game like Resign game, then ends the match', () => {
+    const playing = act(
       createMatchFlow({ rules: portesOnly(), targetPoints: 3, starter: 'white' }),
-      [{ type: 'resignMatch', player: 'white' }],
+      [{ type: 'roll', player: 'white', dice: [3, 1] }],
     );
-    for (const flow of [atOpening, atFirstRoll]) {
-      expect(matchPhase(flow)).toBe('match-over');
-      expect(flow.match).toMatchObject({
-        status: 'finished',
-        winner: 'black',
-        resignedBy: 'white',
-        score: { white: 0, black: 0 },
-        games: [],
-      });
-      expect(replay(flow.log)).toEqual(flow);
-    }
+    const worth = resignGame(playing.game.state, 'black');
+    expect(worth).toEqual({ winner: 'white', points: 2, reason: 'resigned' });
+
+    const flow = act(playing, [{ type: 'resignMatch', player: 'black' }]);
+    expect(matchPhase(flow)).toBe('match-over');
+    expect(flow.match).toMatchObject({
+      status: 'finished',
+      winner: 'white',
+      resignedBy: 'black',
+      score: { white: 2, black: 0 },
+    });
+    expect(flow.match.games).toEqual([
+      { variant: 'portes', starter: 'white', winner: 'white', points: 2, reason: 'resigned' },
+    ]);
+    expect(flow.game).toMatchObject({ phase: 'game-over', result: worth });
+    expect(flow.log.at(-1)).toEqual({ type: 'resignMatch', player: 'black' });
+    expect(validateMatch(JSON.parse(JSON.stringify(flow.match)))).toEqual(flow.match);
+    expect(replay(flow.log)).toEqual(flow);
   });
 
-  it('tavli-match.md #21: a resigned game gives 0–2, then resign match → 0–2 stays, never 0–0 or 0–3', () => {
-    const start = createMatchFlow({ rules: portesOnly(), targetPoints: 3, starter: 'white' });
+  it('tavli-match.md #29: the resigning player may be the one who is not to move, in a turn that is half played', () => {
+    const half = act(createMatchFlow({ rules: portesOnly(), targetPoints: 3, starter: 'white' }), [
+      { type: 'roll', player: 'white', dice: [3, 1] },
+      { type: 'move', player: 'white', move: { from: 8, to: 5, die: 3 } },
+    ]);
+    const flow = act(half, [{ type: 'resignMatch', player: 'white' }]);
+    expect(flow.match).toMatchObject({
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 2 },
+    });
+    expect(flow.match.games).toHaveLength(1);
+  });
+
+  it('tavli-match.md #20: to 3, 0–0, resign match during the opening roll → the opponent wins, 0–0 stays', () => {
+    const flow = act(createMatchFlow({ rules: portesOnly(), targetPoints: 3 }), [
+      { type: 'resignMatch', player: 'white' },
+    ]);
+    expect(flow.game.phase).toBe('opening-roll');
+    expect(matchPhase(flow)).toBe('match-over');
+    expect(flow.match).toMatchObject({
+      status: 'finished',
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 0 },
+      games: [],
+    });
+    expect(replay(flow.log)).toEqual(flow);
+  });
+
+  it('tavli-match.md #30: resign match before the first roll of a game that has a starter → that game scores, like Resign game', () => {
+    const flow = act(createMatchFlow({ rules: portesOnly(), targetPoints: 3, starter: 'white' }), [
+      { type: 'resignMatch', player: 'white' },
+    ]);
+    expect(flow.match).toMatchObject({
+      status: 'finished',
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 2 },
+    });
+    expect(flow.match.games).toHaveLength(1);
+    expect(replay(flow.log)).toEqual(flow);
+  });
+
+  it('tavli-match.md #21: to 5, a resigned game gives 0–2; resign match after it keeps 0–2, and in the next game it scores that game too', () => {
+    const start = createMatchFlow({ rules: portesOnly(), targetPoints: 5, starter: 'white' });
     const afterGame = act(start, [
       { type: 'roll', player: 'white', dice: [3, 1] },
       { type: 'resign', player: 'white' },
@@ -354,24 +404,77 @@ describe('match flow', () => {
     expect(afterGame.game.result).toEqual({ winner: 'black', points: 2, reason: 'resigned' });
     expect(afterGame.match.score).toEqual({ white: 0, black: 2 });
 
-    // Resigned when the game is over, or in the middle of the next game.
+    // The game is over: it is counted already, so nothing is added.
     const atGameEnd = act(afterGame, [{ type: 'resignMatch', player: 'white' }]);
+    expect(atGameEnd.match).toMatchObject({
+      status: 'finished',
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 2 },
+    });
+    expect(atGameEnd.match.games).toHaveLength(1);
+
+    // In the middle of the next game (no checker off): that game is a diplo.
     const inNextGame = act(afterGame, [
       { type: 'nextGame' },
       { type: 'roll', player: 'black', dice: [6, 5] },
       { type: 'resignMatch', player: 'white' },
     ]);
+    expect(inNextGame.match).toMatchObject({
+      status: 'finished',
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 4 },
+    });
+    expect(inNextGame.match.games).toHaveLength(2);
+
     for (const flow of [atGameEnd, inNextGame]) {
-      expect(flow.match).toMatchObject({
-        status: 'finished',
-        winner: 'black',
-        resignedBy: 'white',
-        score: { white: 0, black: 2 },
-      });
-      expect(flow.match.games).toHaveLength(1);
       expect(validateMatch(JSON.parse(JSON.stringify(flow.match)))).toEqual(flow.match);
-      expect(replay(flow.log).match.score).toEqual({ white: 0, black: 2 });
+      expect(replay(flow.log)).toEqual(flow);
     }
+  });
+
+  it('tavli-match.md #31: to 3, 0–2, resign match in a game that reaches the target → 0–4, still resigned', () => {
+    const afterGame = act(
+      createMatchFlow({ rules: portesOnly(), targetPoints: 3, starter: 'white' }),
+      [
+        { type: 'roll', player: 'white', dice: [3, 1] },
+        { type: 'resign', player: 'white' },
+      ],
+    );
+    const flow = act(afterGame, [
+      { type: 'nextGame' },
+      { type: 'roll', player: 'black', dice: [6, 5] },
+      { type: 'resignMatch', player: 'white' },
+    ]);
+    expect(matchPhase(flow)).toBe('match-over');
+    expect(flow.match).toMatchObject({
+      status: 'finished',
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 4 },
+    });
+    expect(flow.match.games).toHaveLength(2);
+    expect(flow.match.games[1]).toMatchObject({ winner: 'black', points: 2, reason: 'resigned' });
+    expect(validateMatch(JSON.parse(JSON.stringify(flow.match)))).toEqual(flow.match);
+    expect(replay(flow.log)).toEqual(flow);
+  });
+
+  it('tavli-match.md #29: the resigning player has borne off a checker → mono, 1 point', () => {
+    const start = createMatchFlow({ rules: portesOnly(), targetPoints: 3, starter: 'white' });
+    // Black has borne off one checker; White has not. White is to move.
+    const state = portesState('w: 6x5 offx10 ; b: 1x14 offx1');
+    const flow = applyMatchAction(
+      { ...start, game: createGameFlow({ state, starter: 'white' }) },
+      { type: 'resignMatch', player: 'black' },
+    );
+    expect(flow.match).toMatchObject({
+      status: 'finished',
+      winner: 'white',
+      resignedBy: 'black',
+      score: { white: 1, black: 0 },
+    });
+    expect(flow.match.games[0]).toMatchObject({ points: 1, reason: 'resigned' });
   });
 
   it('rematch: the winner of the last game starts, with no opening roll', () => {

@@ -468,6 +468,42 @@ describe('resign', () => {
     expect(code(() => resign(done, 'black', rng))).toBe('GAME_OVER');
     expect(code(() => playTurn(done, 'black', [], rng))).toBe('GAME_OVER');
   });
+
+  it('the game in play counts for the opponent, like Resign game: a diplo (owner, 2026-11-09)', () => {
+    const { flow, rng } = create('portes', 1, 5);
+    const done = resign(stored(flow), 'white', rng);
+    expect(done.match).toMatchObject({
+      status: 'finished',
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 2 },
+    });
+    expect(done.match.games).toEqual([
+      expect.objectContaining({ winner: 'black', points: 2, reason: 'resigned' }),
+    ]);
+  });
+
+  it('the player who is not to move may resign: the game in play still counts', () => {
+    const { flow, rng } = create('portes', 1, 5);
+    const waiting = flow.game.state.toMove;
+    const resigner = waiting === 'white' ? 'black' : 'white';
+    const done = resign(stored(flow), resigner, rng);
+    expect(done.match.winner).toBe(waiting);
+    expect(done.match.score[waiting]).toBe(2);
+    expect(done.match.score[resigner]).toBe(0);
+  });
+
+  it('during the opening roll no game has started: the score stays 0–0', () => {
+    const { flow, rng } = createNew('portes', 1, 5);
+    const done = resign(stored(flow), 'white', rng);
+    expect(done.match).toMatchObject({
+      status: 'finished',
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 0 },
+      games: [],
+    });
+  });
 });
 
 describe('turn timers (#133)', () => {

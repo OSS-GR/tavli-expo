@@ -588,6 +588,10 @@ describe('resign', () => {
     expect(v.status).toBe('finished');
     expect(v.match.winner).toBe(otherSide(resigner));
     expect(v.match.resignedBy).toBe(resigner);
+    // The game in play counts for the winner, like Resign game (a diplo).
+    expect(v.match.score[otherSide(resigner)]).toBe(2);
+    expect(v.match.score[resigner]).toBe(0);
+    expect(v.match.games).toHaveLength(1);
     expect(v.waitingFor).toBeNull();
     await rejectsWith(
       as(t, idOf(before.game.state.toMove)).mutation(api.games.makeMove, {

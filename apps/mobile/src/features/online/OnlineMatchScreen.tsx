@@ -42,6 +42,7 @@ import {
 } from '@/features/game/GameScreen';
 import { GameMenu } from '@/features/match/GameMenu';
 import { MissingGame } from '@/features/match/MissingGame';
+import { resignMatchText } from '@/features/match/resign';
 import { currentGameLabel, variantName } from '@/features/match/summary';
 
 import { onlineBoardStore, type OnlineBoardStore } from './boardStore';
@@ -296,11 +297,14 @@ function OnlineBoard({
       />
     );
   } else if (overlay === 'resignMatch' && !finished) {
+    // The game in play counts for the opponent, as in a local match.
+    const { lines, note } = resignMatchText(flow, side, name, t);
     content = (
       <ConfirmDialog
         testID="resign-match-dialog"
         title={t('game.resign.matchTitle')}
-        lines={[t('game.resign.matchBody', { winner: name(opponent(side)) })]}
+        lines={lines}
+        {...(note === undefined ? {} : { note })}
         confirmLabel={t('game.resign.confirm')}
         cancelLabel={t('game.resign.keep')}
         onConfirm={() => {

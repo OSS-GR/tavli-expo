@@ -299,7 +299,7 @@ describe('app navigation', () => {
     expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
   });
 
-  it('Resign match keeps the score: 0–0 at the start, 0–2 after a resigned game (#181)', async () => {
+  it('Resign match scores the game in play: 0–0 in the opening roll, 0–4 in game 2 after a resigned game (#181)', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     const resignMatchFromMenu = async () => {
@@ -308,7 +308,7 @@ describe('app navigation', () => {
       await user.press(screen.getByRole('button', { name: 'Resign' }));
     };
 
-    // 1. Resign match at the start: nobody has a point, so it stays 0–0.
+    // 1. Resign match during the opening roll: no game has started, so it stays 0–0.
     await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     const first = matchSessions.current()!;
@@ -318,7 +318,8 @@ describe('app navigation', () => {
     expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
     expect(screen.getByLabelText('Final score: You 0 – 0 Bot')).toBeOnTheScreen();
 
-    // 2. Rematch: resign a game (diplo at the start), then the match. The 0–2 stays.
+    // 2. Rematch: resign a game (diplo at the start). Then resign the match in
+    // the next game: that game is a diplo too, so the score is 0–4 (not 0–2).
     await user.press(screen.getByRole('button', { name: /^Rematch/ }));
     await act(async () => {
       // The bot starts the rematch (it won the last game) and plays its turn.
@@ -333,18 +334,26 @@ describe('app navigation', () => {
     ).toBeOnTheScreen();
     expect(within(card).getByText('You 0 – 2 Bot')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: /^Next game/ }));
-    await resignMatchFromMenu();
+    await user.press(screen.getByRole('button', { name: 'Game menu' }));
+    await user.press(screen.getByRole('button', { name: 'Resign match, Bot wins the match' }));
+    // The dialog says that the game in play counts, with the score after it.
+    expect(
+      screen.getByText('Bot wins the match. The game in play counts: Bot wins 2 points.'),
+    ).toBeOnTheScreen();
+    expect(screen.getByText(/^Match after resign: You 0 – 4 Bot \(to \d\)$/)).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Resign' }));
     await expectMatchEndAfterDelay(router, `/game/${first.id}/match-end`);
     expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Final score: You 0 – 2 Bot')).toBeOnTheScreen();
-    expect(screen.getByText('0 – 2')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Final score: You 0 – 4 Bot')).toBeOnTheScreen();
+    expect(screen.getByText('0 – 4')).toBeOnTheScreen();
     expect(screen.getByLabelText('Game 1 · Portes, Bot won, Diplo, 2 points')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Game 2 · Portes, Bot won, Diplo, 2 points')).toBeOnTheScreen();
 
     // History shows the same scores, newest first.
     await user.press(screen.getByRole('button', { name: 'Home' }));
     await user.press(screen.getByRole('link', { name: 'History' }));
     expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
-      /^Portes · vs Bot \(Easy\), You 0 – 2 Bot · first to \d · you resigned, Lost, /,
+      /^Portes · vs Bot \(Easy\), You 0 – 4 Bot · first to \d · you resigned, Lost, /,
     );
     expect(screen.getByTestId('history-row-1')).toHaveAccessibleName(
       /^Portes · vs Bot \(Easy\), You 0 – 0 Bot · first to \d · you resigned, Lost, /,

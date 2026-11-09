@@ -142,7 +142,8 @@ export function createGameAnalytics(
       if (!gameIsOver(previous) && gameIsOver(next) && next.game.result !== null) {
         finished(next, resultKind(next.game.result, next.game.state.rules.scoring.method));
       } else if (action.type === 'resignMatch' && !gameIsOver(previous)) {
-        // Resigning the match mid-game also ends the game in play.
+        // Resigning the match in the opening roll ends the game before it has
+        // a result. (Mid-game, the engine resigns the game too: the branch above.)
         finished(next, 'resign');
       }
 

@@ -9,6 +9,7 @@ import {
   recordGameResult,
   resignGame,
   resignMatch,
+  resignMatchInGame,
   startNextGame,
   validateMatch,
 } from './match';
@@ -351,6 +352,69 @@ describe('resignMatch and rematch', () => {
     });
     expect(() => resignMatch(over, 'black')).toThrow(illegalAction);
     expect(() => recordGameResult(over, win('white'))).toThrow(illegalAction);
+  });
+
+  describe('resignMatchInGame: the game in play is lost, then the match is resigned', () => {
+    const resigned = (winner: 'white' | 'black', points = 2): GameResult => ({
+      winner,
+      points,
+      reason: 'resigned',
+    });
+
+    it('adds the game to the score and ends the match, resigned by the player', () => {
+      const match = play(portesMatch(5), win('black'));
+      const over = resignMatchInGame(match, 'white', resigned('black'));
+      expect(over).toMatchObject({
+        status: 'finished',
+        winner: 'black',
+        resignedBy: 'white',
+        score: { white: 0, black: 3 },
+        nextStarter: null,
+      });
+      expect(over.games).toHaveLength(2);
+      expect(over.games[1]).toMatchObject({ winner: 'black', points: 2, reason: 'resigned' });
+      expect(validateMatch(JSON.parse(JSON.stringify(over)))).toEqual(over);
+    });
+
+    it('still counts as resigned when that game takes the opponent to the target', () => {
+      const match = play(portesMatch(3), win('black', 2));
+      const over = resignMatchInGame(match, 'white', resigned('black'));
+      expect(over).toMatchObject({
+        status: 'finished',
+        winner: 'black',
+        resignedBy: 'white',
+        score: { white: 0, black: 4 },
+      });
+      expect(validateMatch(JSON.parse(JSON.stringify(over)))).toEqual(over);
+    });
+
+    it('refuses a result that is not a game the resigning player lost by resigning', () => {
+      const match = portesMatch(5);
+      expect(() => resignMatchInGame(match, 'white', resigned('white'))).toThrow(illegalAction);
+      expect(() => resignMatchInGame(match, 'white', win('black'))).toThrow(illegalAction);
+      expect(() => resignMatchInGame(match, 'white', draw)).toThrow(illegalAction);
+      expect(() =>
+        resignMatchInGame(resignMatch(match, 'white'), 'white', resigned('black')),
+      ).toThrow(illegalAction);
+    });
+
+    it('validateMatch accepts a reached target only when the last game was resigned', () => {
+      const won = play(portesMatch(3), win('black', 3));
+      // A match won on the board cannot also be marked as resigned.
+      expect(() => validateMatch({ ...won, resignedBy: 'white' })).toThrow(
+        expect.objectContaining({ code: 'INVALID_STATE' }),
+      );
+      // A resigned game that wins the match to the target may be marked.
+      const resignedWin = play(portesMatch(3), resigned('black', 3));
+      expect(validateMatch({ ...resignedWin, resignedBy: 'white' })).toMatchObject({
+        resignedBy: 'white',
+        winner: 'black',
+      });
+      // But not by the player who won it.
+      expect(() => validateMatch({ ...resignedWin, resignedBy: 'black' })).toThrow(
+        expect.objectContaining({ code: 'INVALID_STATE' }),
+      );
+    });
   });
 
   it('tavli-match.md rematchStarter "lastGameWinner": the winner of the last game starts, no opening roll', () => {

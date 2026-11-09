@@ -17,7 +17,14 @@
  */
 
 import { EngineError } from '../errors';
-import { createMatch, createRematch, recordGameResult, resignMatch, startNextGame } from '../match';
+import {
+  createMatch,
+  createRematch,
+  recordGameResult,
+  resignMatch,
+  resignMatchInGame,
+  startNextGame,
+} from '../match';
 import type { CreateMatchOptions, Match } from '../match';
 import { isPlayerId } from '../player';
 import type { PerPlayer, PlayerId } from '../player';
@@ -145,8 +152,26 @@ export function applyMatchAction(
 
   if (action.type === 'resignMatch') {
     if (!isPlayerId(action.player)) illegal(`bad player ${JSON.stringify(action.player)}`);
-    const match = resignMatch(flow.match, action.player);
-    return { ...flow, match, log: [...flow.log, { type: 'resignMatch', player: action.player }] };
+    // A game in play is lost first, like Resign game: the opponent gets what it
+    // is worth now (docs/rules/tavli-match.md, "Resigning"). Nothing has been
+    // played during the opening roll, and a game that is over counts already.
+    let { match, game } = flow;
+    if (game.phase !== 'opening-roll' && game.phase !== 'game-over') {
+      game = stepGame(game, { type: 'resign', player: action.player }, ctx)[0];
+      // Both are set once a game has started and ended; never score nothing quietly.
+      if (game.result === null || game.starter === null) {
+        throw new EngineError('INVALID_STATE', 'a resigned game has a result and a starter');
+      }
+      match = resignMatchInGame(match, action.player, game.result, { starter: game.starter });
+    } else {
+      match = resignMatch(match, action.player);
+    }
+    return {
+      ...flow,
+      match,
+      game,
+      log: [...flow.log, { type: 'resignMatch', player: action.player }],
+    };
   }
 
   const [game, event] = stepGame(flow.game, action, ctx);

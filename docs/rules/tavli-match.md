@@ -177,7 +177,7 @@ is skipped.
 ## Resigning (app rule)
 
 The federation rules and our other sources do not say how a resign
-scores. These are the app rules (owner, #63 and #181).
+scores. These are the app rules (owner, #63, #181 and 2026-11-09).
 
 - **Resign game:** the opponent wins the game. They get what the position
   is worth now: diplo (2 points) if the resigning player has borne off no
@@ -189,14 +189,31 @@ scores. These are the app rules (owner, #63 and #181).
   #245). The points count in the match like any
   other win, so a resigned game can win the match.
 - **Resign match:** the match ends at once and the opponent wins it.
-  - The score stays as it is: the points of the finished games count. The
-    game in play gives no points. The opponent does not get the target
-    points, and the score is never reset.
+  - The game in play counts first, exactly like Resign game: the opponent
+    gets what the position is worth now (diplo, mono, or the variant's own
+    score), and the game goes into the match as a resigned game. The points
+    of the finished games count too. The opponent does not get the target
+    points, and the score is never reset. (Before 2026-11-09 the game in
+    play gave nothing, so a match resigned at 0–0 showed 0–0. Owner: the
+    opponent must get the points.)
+  - A game is in play from the moment it has started: before the first roll
+    of a game with a known starter, in the middle of a turn, or at a
+    pending question. Nothing counts during the opening roll (no game has
+    started), and nothing is added after a game has ended (it is in the
+    score already).
+  - If the points of the game in play bring the opponent to the target,
+    the opponent still wins the match and the match still counts as
+    resigned by this player: the end screen and the history say "You
+    resigned the match". (Resign game alone, edge case 22, is not a
+    resigned match.)
   - A player may resign the match at any time while it is in play: at 0–0,
     during the opening roll, in the middle of a game, or after a game ends.
-    (In pass-and-play the app offers it only to the player to move.)
-  - The match end screen and the history show the real score and say who
-    resigned the match ("You resigned the match").
+    (In pass-and-play the app offers it only to the player to move.) Online
+    it is the only resign (the server runs the same engine rule).
+  - The Resign match dialog says that the game in play counts, with its
+    points, and the score after it. The match end screen and the history
+    show the real score and say who resigned the match ("You resigned the
+    match").
 
 ## Fast forward a race (app rule)
 
@@ -255,11 +272,13 @@ The engine check is `isRace` (`packages/engine/src/race.ts`).
 18. Portes, match to 3, 0–0: the player to move resigns the game before any
     checker is off → diplo, the opponent leads 2–0.
 19. A player who has borne off a checker resigns the game → mono, 1 point.
-20. Match to 3, 0–0: a player resigns the match at the start → the opponent
-    wins the match; the score stays 0–0.
-21. Match to 3: a resigned game gives 0–2, then the loser resigns the match
-    (after that game ends, or in the next game) → the opponent wins the
-    match; the score stays 0–2. It is not reset to 0–0, and it is not 0–3.
+20. Match to 3, 0–0: a player resigns the match during the opening roll (no
+    game has started) → the opponent wins the match; the score stays 0–0.
+21. Match to 5: a resigned game gives 0–2, then the loser resigns the match
+    after that game ended → the opponent wins the match; the score stays
+    0–2 (the game is counted already). If the loser resigns in the next game,
+    with no checker off, that game scores a diplo too → 0–4. The score is
+    never reset to 0–0, and the opponent never gets the target (0–5).
 22. Match to 3, 0–2: the trailing player resigns a game with no checker off
     → diplo, 0–4: the match is won to the target, not resigned.
 23. Portes: White's last checker is on 12 and Black's last checker on its
@@ -274,6 +293,18 @@ The engine check is `isRace` (`packages/engine/src/race.ts`).
     checker, and every White checker behind Black's last one → a race.
 28. Fast forward to the end: the game ends with a normal result (mono or
     diplo), and the match goes on as after any other game.
+29. Match to 3, a game in play, nobody has borne off: a player resigns the
+    match → the opponent wins the match and gets the diplo of that game: 2–0.
+    If the resigning player has borne off a checker, it is a mono: 1–0.
+    Moves of a turn that is not confirmed do not count (the same position as
+    Resign game).
+30. Match to 3: the starter of a game is known (a rematch, or the winner of
+    the last game), and the player resigns the match before the first roll
+    → the game has started, so it scores a diplo: 2–0 (as Resign game).
+31. Match to 3, 0–2: the trailing player resigns the match in a game with no
+    checker off → diplo, 0–4: the opponent wins the match, and it still counts
+    as resigned by that player (unlike edge case 22, where only the game was
+    resigned).
 
 ## House-rule variants (flags)
 

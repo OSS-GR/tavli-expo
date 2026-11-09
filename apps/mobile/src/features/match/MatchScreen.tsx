@@ -24,7 +24,7 @@ import { useSettings } from '@/features/settings/store';
 import { analyzer as appAnalyzer, botLevels, botRunner, createLocalRng } from '@/services';
 
 import { GameMenu } from './GameMenu';
-import { canResignGame, previewResign, resigningPlayer } from './resign';
+import { canResignGame, previewResign, resignMatchText, resigningPlayer } from './resign';
 import { seatsFor } from './seats';
 import type { MatchSession } from './sessions';
 import { BOT_SIDE } from './setup';
@@ -195,11 +195,13 @@ export function MatchScreen({
       />
     );
   } else if (overlay === 'resignMatch' && resigner !== null) {
+    const { lines, note } = resignMatchText(flow, resigner, name, t);
     content = (
       <ConfirmDialog
         testID="resign-match-dialog"
         title={t('game.resign.matchTitle')}
-        lines={[t('game.resign.matchBody', { winner: name(opponent(resigner)) })]}
+        lines={lines}
+        {...(note === undefined ? {} : { note })}
         confirmLabel={t('game.resign.confirm')}
         cancelLabel={t('game.resign.keep')}
         onConfirm={() => {
