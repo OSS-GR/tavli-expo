@@ -134,6 +134,9 @@ export function useSignInChoices({
           onSignedIn(user);
           return;
         }
+        // Busy again while the server says whether a username is needed,
+        // so a second tap cannot start another sign-in. Each answer below
+        // clears it before the `mounted` check.
         trying.current = true;
         usernames.mine().then(
           (mine) => {
