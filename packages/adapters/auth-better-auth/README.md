@@ -2,27 +2,28 @@
 
 The `AuthProvider` port (`@tavli/contracts`) backed by the [Better Auth](https://www.better-auth.com/) Expo client. The server side is the Better Auth Convex component (`@convex-dev/better-auth`) in `apps/server/convex/auth.ts`. Decision: [ADR-0004](../../../docs/decisions/0004-backend-auth.md). Issue: #131.
 
-Versions: `better-auth` and `@better-auth/expo` 1.6.33, `@convex-dev/better-auth` 0.12.6, `convex` 1.46.0, `expo-secure-store` ~58.0.2. They are peer dependencies: the app installs them. Keep the first four on the same versions as `apps/server`. The app also installs `expo-network`: `@better-auth/expo` loads it to see when the phone goes online, and Metro must find it.
+Versions: `better-auth` and `@better-auth/expo` 1.7.18, `@convex-dev/better-auth` 0.13.0, `convex` (as in `apps/server`), `expo-secure-store` ~58.0.2. They are peer dependencies: the app installs them. Keep the first four on the same versions as `apps/server`. The app also installs `expo-network`: `@better-auth/expo` loads it to see when the phone goes online, and Metro must find it.
 
 ## What it does
 
-- **Guest sign-in only, for now.** `signInAsGuest()` calls Better Auth's anonymous plugin. Apple, Google and email magic link come in follow-ups.
+- **Guest sign-in.** `signInAsGuest()` calls Better Auth's anonymous plugin.
+- **Sign-in keys** (#397, Apple now). `keyNonce()` calls our `/key/nonce`; give the nonce to the Apple sheet. `signInWithKey(credential)` is Better Auth's id token sign-in (`signIn.social`); it is `SIGNED_IN` when someone is signed in, and `NETWORK` when the saved session could not load (it would replace it). `saveKey`, `listKeys` and `removeKey` call our `/key/save`, `/key/list` and `/key/remove` with `$fetch` (see "Sign-in keys" in [`docs/architecture/online-game-service.md`](../../../docs/architecture/online-game-service.md#sign-in-keys)). The server codes `KEY_BELONGS_TO_OTHER` and `LAST_KEY` keep their name; any other server error is `REJECTED`.
+- **One sign-in at a time.** A sign-in waits for the one under way, so two taps make one guest, and a key sign-in during a guest sign-in ends `SIGNED_IN`.
 - **The player id is the Better Auth user id.** It is the `sub` of the Convex token, which the server reads as `identity.subject` (see "Sign-in" in [`docs/architecture/online-game-service.md`](../../../docs/architecture/online-game-service.md)).
 - **Tokens for Convex.** `getToken()` asks the Convex plugin (`/api/auth/convex/token`) for a JWT and keeps it until 30 seconds before it runs out. `forceRefresh` gets a new one. Pass it to the Convex client's `setAuth`.
-- **The session cookie lives on the phone.** The Expo plugin keeps it in the `storage` you pass. The app passes `createSecureSessionStorage()`: `expo-secure-store` (iOS Keychain, Android Keystore), because the cookie signs the user in. A value the phone cannot read (for example after a backup was restored on a new phone) reads as `null`, so the user is signed out and the app still starts.
+- **The session cookie lives on the phone.** The Expo plugin keeps it in the `storage` you pass. The app passes `createSecureSessionStorage()`: `expo-secure-store` (iOS Keychain, Android Keystore), because the cookie signs the user in. A value the phone cannot read (for example after a backup was restored on a new phone) reads as `null`, so the user is signed out and the app still starts. The Expo plugin (1.7+) uses the sync and the async calls (`getItem`/`setItem`, `getItemAsync`/`setItemAsync`). It reads a session saved by 1.6: the key is the same (`<scheme>_cookie`), and so is the old way of splitting a long value (`<key>.0`, `<key>.1`, …). `src/legacySession.test.ts` checks this on the real Expo client with values saved the 1.6 way (React Native and Expo are stubs there, `vitest.config.ts`): a guest has no key to sign in again, so an update must keep the session. A failed write throws; the Expo plugin catches and logs it.
 - **A session that ended on the server** (the token call answers 401) signs the user out here too. A network failure on the token gives `null` and keeps the user.
 - **Errors** reject with `AuthErrorData`: `REJECTED` when the server answered with an error, `NETWORK` when it could not be reached. A failed sign-out keeps the user signed in.
-- **Two sign-ins at once make one guest.**
 
 ## Files
 
-| File                      | Job                                                                                                                       |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `src/provider.ts`         | `fromBetterAuthClient`: the port on any object with the client methods it uses (`BetterAuthClient`). No vendor imports    |
-| `src/client.ts`           | `createBetterAuthClient` and `createBetterAuthProvider`: the real Expo client with the Expo, anonymous and Convex plugins |
-| `src/secureStore.ts`      | `createSecureSessionStorage`: `expo-secure-store` as the cookie store. The only file that imports it                      |
-| `src/provider.test.ts`    | Runs `authProviderContract` (`@tavli/contracts/testing`) on a fake client, plus the adapter's own rules                   |
-| `src/secureStore.test.ts` | The cookie store on a mocked `expo-secure-store`                                                                          |
+| File                      | Job                                                                                                                                                                                                                                                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/provider.ts`         | `fromBetterAuthClient`: the port on any object with the client methods it uses (`BetterAuthClient`). No vendor imports. Also exported as `@tavli/auth-better-auth/provider` (no Expo imports), so `apps/server/convex/betterAuthClient.test.ts` can run it on the real client against the real routes |
+| `src/client.ts`           | `createBetterAuthClient` and `createBetterAuthProvider`: the real Expo client with the Expo, anonymous and Convex plugins                                                                                                                                                                             |
+| `src/secureStore.ts`      | `createSecureSessionStorage`: `expo-secure-store` as the cookie store. The only file that imports it                                                                                                                                                                                                  |
+| `src/provider.test.ts`    | Runs `authProviderContract` (`@tavli/contracts/testing`) on a fake client, plus the adapter's own rules                                                                                                                                                                                               |
+| `src/secureStore.test.ts` | The cookie store on a mocked `expo-secure-store`                                                                                                                                                                                                                                                      |
 
 ## How the app uses it
 

@@ -4,8 +4,21 @@
  * This file has no vendor import: it works on any object with the client
  * methods below (`BetterAuthClient`). `client.ts` builds the real Expo
  * client; the tests pass a fake.
+ *
+ * Sign-in keys (#397): `signInWithKey` is Better Auth's id token sign-in
+ * (`/sign-in/social`). The nonce, the save, the list and the remove are
+ * our own routes (`/key/*`, `apps/server/convex/keyPlugin.ts`).
  */
-import type { AuthErrorData, AuthProvider, AuthUser } from '@tavli/contracts';
+import { AUTH_KEY_PROVIDERS } from '@tavli/contracts';
+import type {
+  AuthErrorCode,
+  AuthErrorData,
+  AuthKey,
+  AuthKeyCredential,
+  AuthKeyProvider,
+  AuthProvider,
+  AuthUser,
+} from '@tavli/contracts';
 
 /** A Better Auth call result: `data`, or an `error` (HTTP status and message). */
 export interface BetterAuthResult<T> {
@@ -13,6 +26,8 @@ export interface BetterAuthResult<T> {
   readonly error: {
     readonly status?: number | undefined;
     readonly message?: string | undefined;
+    /** The server's error code, for example `KEY_BELONGS_TO_OTHER`. */
+    readonly code?: string | undefined;
   } | null;
 }
 
@@ -28,6 +43,25 @@ export interface BetterAuthCallOptions {
   readonly fetchOptions: { readonly throw: false };
 }
 
+/** The body of an id token sign-in (`signIn.social`) and of `/key/save`. */
+export interface BetterAuthIdTokenInput {
+  readonly provider: AuthKeyProvider;
+  readonly idToken: { readonly token: string; readonly nonce: string };
+}
+
+/** The reply of `signIn.social`. The redirect flow (no `user`) is never used here. */
+export interface BetterAuthSocialData {
+  readonly redirect?: boolean;
+  readonly user?: BetterAuthUserData;
+}
+
+/** The options of a plain `$fetch` call. Errors come back as `error`. */
+export interface BetterAuthFetchOptions {
+  readonly method: 'GET' | 'POST';
+  readonly body?: object;
+  readonly throw: false;
+}
+
 /** The Better Auth client methods this adapter uses. Tests pass a fake. */
 export interface BetterAuthClient {
   getSession(
@@ -37,7 +71,13 @@ export interface BetterAuthClient {
     anonymous(
       options: BetterAuthCallOptions,
     ): Promise<BetterAuthResult<{ readonly user: BetterAuthUserData }>>;
+    /** The id token sign-in (`/sign-in/social`). */
+    social(
+      input: BetterAuthIdTokenInput & BetterAuthCallOptions,
+    ): Promise<BetterAuthResult<BetterAuthSocialData>>;
   };
+  /** A call to any route under the base URL, with the session cookie. */
+  $fetch<T>(path: string, options: BetterAuthFetchOptions): Promise<BetterAuthResult<T>>;
   signOut(options: BetterAuthCallOptions): Promise<BetterAuthResult<unknown>>;
   /** The Convex plugin (`convexClient()`): a JWT for the Convex client. */
   readonly convex: {
@@ -58,7 +98,13 @@ function copy(user: AuthUser | null): AuthUser | null {
   return user === null ? null : { ...user };
 }
 
-/** A failed call as `AuthErrorData`: an HTTP status means the server said no. */
+/** Server error codes that keep their name in `AuthErrorData`. */
+const PASSED_CODES: readonly AuthErrorCode[] = ['KEY_BELONGS_TO_OTHER', 'LAST_KEY'];
+
+/**
+ * A failed call as `AuthErrorData`: an HTTP status means the server said
+ * no (`REJECTED`, or the server's code when the port has it).
+ */
 function authError(
   error: BetterAuthResult<unknown>['error'] | unknown,
   what: string,
@@ -67,7 +113,20 @@ function authError(
   const rejected = typeof status === 'number' && status >= 400;
   const text = (error as { message?: unknown } | null)?.message;
   const message = typeof text === 'string' && text !== '' ? `${what}: ${text}` : what;
-  return { code: rejected ? 'REJECTED' : 'NETWORK', message };
+  const serverCode = (error as { code?: unknown } | null)?.code;
+  const passed = PASSED_CODES.find((code) => code === serverCode);
+  return { code: !rejected ? 'NETWORK' : (passed ?? 'REJECTED'), message };
+}
+
+function isKeyProvider(value: unknown): value is AuthKeyProvider {
+  return (AUTH_KEY_PROVIDERS as readonly unknown[]).includes(value);
+}
+
+function idTokenInput(credential: AuthKeyCredential): BetterAuthIdTokenInput {
+  return {
+    provider: credential.provider,
+    idToken: { token: credential.idToken, nonce: credential.nonce },
+  };
 }
 
 const BASE64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
@@ -186,6 +245,62 @@ export function fromBetterAuthClient(
     return { ...toUser(result.data.user) };
   }
 
+  /** A `$fetch` call; a throw (no network) becomes `AuthErrorData`. */
+  async function fetchRoute<T>(path: string, what: string, body?: object): Promise<T> {
+    let result: BetterAuthResult<T>;
+    try {
+      result = await client.$fetch<T>(path, {
+        method: body === undefined ? 'GET' : 'POST',
+        ...(body === undefined ? {} : { body }),
+        throw: false,
+      });
+    } catch (error) {
+      throw authError(error, what);
+    }
+    if (result.error !== null || result.data === null) throw authError(result.error, what);
+    return result.data;
+  }
+
+  /**
+   * Runs a sign-in after the one under way, if any: two at once would
+   * make two sessions. The later one then sees the earlier one's user.
+   */
+  function queue(run: () => Promise<AuthUser>): Promise<AuthUser> {
+    const before = signingIn;
+    const shared = (before === null ? run() : before.then(run, run)).finally(() => {
+      if (signingIn === shared) signingIn = null;
+    });
+    signingIn = shared;
+    return shared;
+  }
+
+  async function keySignIn(credential: AuthKeyCredential): Promise<AuthUser> {
+    await ready();
+    if (user !== null)
+      throw { code: 'SIGNED_IN', message: 'sign out first' } satisfies AuthErrorData;
+    // A saved session may exist: a key sign-in now would replace it.
+    if (loadFailed) throw authError(null, 'could not load the session');
+    let result: BetterAuthResult<BetterAuthSocialData>;
+    try {
+      result = await client.signIn.social({ ...idTokenInput(credential), ...NO_THROW });
+    } catch (error) {
+      throw authError(error, 'key sign-in failed');
+    }
+    const data = result.data?.user;
+    if (result.error !== null || data === undefined) {
+      throw authError(result.error, 'key sign-in failed');
+    }
+    set(toUser(data));
+    return toUser(data);
+  }
+
+  async function signedIn(what: string): Promise<AuthUser> {
+    await ready();
+    if (user === null)
+      throw { code: 'REJECTED', message: `${what}: sign in first` } satisfies AuthErrorData;
+    return user;
+  }
+
   async function fetchToken(forEpoch: number): Promise<string | null> {
     let result: BetterAuthResult<{ readonly token: string }>;
     try {
@@ -210,11 +325,46 @@ export function fromBetterAuthClient(
     ready,
     currentUser: () => copy(user),
     signInAsGuest() {
-      // Two taps at once make one guest, not two.
-      signingIn ??= signIn().finally(() => {
-        signingIn = null;
-      });
-      return signingIn;
+      // Two taps at once make one guest, not two: the second finds the first's user.
+      return queue(signIn);
+    },
+    async keyNonce() {
+      const data = await fetchRoute<{ readonly nonce?: unknown }>('/key/nonce', 'no nonce', {});
+      if (typeof data.nonce !== 'string' || data.nonce === '') {
+        throw authError(null, 'no nonce in the reply');
+      }
+      return data.nonce;
+    },
+    signInWithKey(credential) {
+      return queue(() => keySignIn(credential));
+    },
+    async saveKey(credential) {
+      await signedIn('save the key');
+      const data = await fetchRoute<{ readonly user?: BetterAuthUserData }>(
+        '/key/save',
+        'saving the key failed',
+        idTokenInput(credential),
+      );
+      if (data.user === undefined) throw authError(null, 'no user in the reply');
+      set(toUser(data.user));
+      return toUser(data.user);
+    },
+    async listKeys() {
+      await ready();
+      if (user === null) return [];
+      const data = await fetchRoute<{ readonly keys?: readonly { readonly provider?: unknown }[] }>(
+        '/key/list',
+        'listing the keys failed',
+      );
+      const keys: AuthKey[] = [];
+      for (const key of data.keys ?? []) {
+        if (isKeyProvider(key.provider)) keys.push({ provider: key.provider });
+      }
+      return keys;
+    },
+    async removeKey(provider) {
+      await signedIn('remove the key');
+      await fetchRoute('/key/remove', 'removing the key failed', { provider });
     },
     async signOut() {
       await ready();

@@ -37,6 +37,8 @@ updates:
           - react-native-*
           - '@react-native/*'
           - '@types/react'
+          - '@sentry/react-native'
+          - '@shopify/react-native-skia'
       # Lint, format, type and test tools.
       dev-tooling:
         patterns:
@@ -80,6 +82,13 @@ updates:
         update-types: [version-update:semver-major, version-update:semver-minor]
       - dependency-name: '@react-native/*'
         update-types: [version-update:semver-major, version-update:semver-minor]
+      # Native libraries Expo pins per SDK (`bundledNativeModules.json` in
+      # the expo package) that the patterns above miss. Sentry: `~` range,
+      # so patches only (#385 broke `expo install --check`). Skia: an exact
+      # version, so never alone.
+      - dependency-name: '@sentry/react-native'
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: '@shopify/react-native-skia'
       # ESLint stays on 9.x: eslint-config-expo uses a plugin that crashes on
       # ESLint 10. See the tooling notes in CLAUDE.md.
       - dependency-name: eslint

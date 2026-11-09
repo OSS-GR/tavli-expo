@@ -10,7 +10,7 @@
 | [Roadmap](roadmap.md) | Milestones M0 → MVP1 → MVP2 → MVP3 → v1.0 → MVP4 |
 | [Open questions](open-questions.md) | Things the owner must answer or decide |
 | [How we work on GitHub](process/github-workflow.md) | Labels, issue types, board, Definition of Done |
-| [Running the app](process/running-the-app.md) | Simulator, iPhone (free Apple ID), Android emulator, which server each variant uses, EAS builds, dev routes, common errors |
+| [Running the app](process/running-the-app.md) | Simulator, iPhone (free Apple ID), Android emulator, which server each variant uses, EAS builds, Sign in with Apple ids, dev routes, common errors |
 
 ## Legal
 
@@ -78,5 +78,6 @@
 | [0005](decisions/0005-rendering.md) | 2D Skia board, themes as data, Blender art later | Accepted |
 | [0006](decisions/0006-bot.md) | Own TypeScript bot, TD self-play for hard level | Accepted |
 | [0007](decisions/0007-online-game-turn-timer.md) | `turnTimeMinutes` replaces the live/async pace | Accepted |
+| [0008](decisions/0008-accounts.md) | Sign-in methods and account rules: guests stay, Apple, Google and email code to save | Accepted |
 
 New ADRs: copy [0000-template.md](decisions/0000-template.md).

@@ -8,7 +8,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 
 | Path | What it holds |
 |---|---|
-| `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `invites` and `pushTokens` |
+| `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `drafts`, `invites`, `pushTokens`, `authKeys` and `usedKeyNonces` |
 | `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
 | `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315) |
 | `apps/server/convex/appUpdate.ts` | `updatePolicy`: the lowest app build the server works with, from the deployment's env vars ([Update needed](#update-needed), #390). The one public function with no sign-in |
@@ -17,7 +17,10 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `apps/server/convex/model/account.ts` | The pure part of account deletion: `gameOnDelete` (resign, keep or skip a game) |
 | `apps/server/convex/caller.ts` | `signedInPlayer(ctx)`: the caller's player id from the sign-in token, and `existingPlayer(ctx)`: the same, for an account that still exists ([Sign-in](#sign-in)) |
 | `apps/server/convex/convex.config.ts` | The Convex app: it uses the Better Auth component |
-| `apps/server/convex/auth.ts` | Better Auth: the component client and `createAuth` (anonymous, Expo and Convex plugins; the delete routes are off) |
+| `apps/server/convex/auth.ts` | Better Auth: the component client and `createAuth` (anonymous, Expo, Convex and key plugins, Sign in with Apple; the delete and link routes are off) |
+| `apps/server/convex/keyPlugin.ts` | Our Better Auth plugin for [sign-in keys](#sign-in-keys): `/key/nonce`, `/key/save`, `/key/list`, `/key/remove` |
+| `apps/server/convex/authKeys.ts` | The key claims and used nonces, each in one transaction: `claimKey`, `releaseKey`, `useKeyNonce`, `deleteKeysOf` |
+| `apps/server/convex/model/keyNonce.ts`, `model/appleIdToken.ts` | The pure parts: the signed nonce, and the Apple id token check (jose) |
 | `apps/server/convex/auth.config.ts` | The token issuer Convex trusts: Better Auth on the deployment's site URL |
 | `apps/server/convex/http.ts` | The HTTP routes: Better Auth under `/api/auth` |
 | `packages/online/src/online-game.ts` | The game logic, with no Convex code. Pure: dice come from an `Rng` argument |
@@ -95,6 +98,30 @@ The turn so far of the player the server waits for (#374): the moves since the r
 | `moves` | `MoveInput[]` as JSON text: every move so far (empty after the last undo). |
 
 Every save (`save` in `games.ts`) deletes the row, and `getGame` shows a draft only at its own version, while the game waits for a move. The row holds no player id. A draft is its own table, so a draft write does not run the [my games](#my-games) queries again.
+
+### `authKeys`
+
+Who owns each sign-in key (#397). Better Auth keeps its own `account` row per key; this table is the one-owner lock in front of it (see [Sign-in keys](#sign-in-keys)).
+
+| Field | Notes |
+|---|---|
+| `providerId` | The Better Auth provider id, for example `apple`. |
+| `accountId` | The provider's user id (Apple's `sub`). Index `by_key` (`providerId`, `accountId`): at most one row per key. |
+| `userId` | The Better Auth user id (the player id). Index `by_user`: a user has at most one row per provider. |
+| `claimedAt` | When this user claimed the key (server clock): the start of `CLAIM_GRACE_MS`. |
+
+`claimKey` writes it, `releaseKey` and `deleteMyAccount` (`deleteKeysOf`) delete rows.
+
+### `usedKeyNonces`
+
+The nonces already used by a key sign-in or save (#397). A nonce is signed and holds its own end time, so the server stores only the used ones, to refuse them a second time.
+
+| Field | Notes |
+|---|---|
+| `nonce` | The nonce text. Index `by_nonce`. |
+| `expiresAt` | When it runs out. Index `by_expires`: each `useKeyNonce` deletes up to 10 old rows. |
+
+The rows hold no player id.
 
 ## Rules of a game choice
 
@@ -240,15 +267,29 @@ The app plays a game through the online store (`apps/mobile/src/features/online/
 
 ## Sign-in
 
-Issue #131. Owner decision: online play waits for sign-in. There is no play keyed on an install id. Guest (anonymous) accounts come first. Apple, Google and email magic link come in later issues.
+Issue #131. Owner decision: online play waits for sign-in. There is no play keyed on an install id. Guest (anonymous) accounts come first. A guest saves the account with a sign-in key and keeps the same id ([Sign-in keys](#sign-in-keys), #397, ADR-0008): Apple now, the email code (#399) and Google (#410) later.
 
 ### The server
 
-- **Better Auth as a Convex component** (`@convex-dev/better-auth` 0.12.6, `better-auth` 1.6.33, ADR-0004). `convex.config.ts` installs the component. Its tables (users, sessions and so on) live in the component, not in our `schema.ts`.
-- `auth.ts` builds Better Auth with three plugins: `anonymous` (guest accounts), `expo` (the app's `tavlaki://` scheme is a trusted origin) and `convex` (it signs a JWT for the Convex client).
+- **Better Auth as a Convex component** (`@convex-dev/better-auth` 0.13.0, `better-auth` 1.7.18, ADR-0004). `convex.config.ts` installs the component. Its tables (users, sessions and so on) live in the component, not in our `schema.ts`.
+- `auth.ts` builds Better Auth with four plugins: `anonymous` (guest accounts), `expo` (the app's `tavlaki://` scheme is a trusted origin), `convex` (it signs a JWT for the Convex client; the JWT holds only `sub` and the session id, never an email) and our `keyPlugin` ([Sign-in keys](#sign-in-keys)).
 - `http.ts` serves Better Auth's routes under `/api/auth` on the deployment's site URL (`.convex.site`). The app signs in there and gets a Convex token from `/api/auth/convex/token`.
 - `auth.config.ts` tells Convex to trust tokens from that issuer. Convex checks each token and gives the functions `ctx.auth.getUserIdentity()`.
-- The deployment needs the secret `BETTER_AUTH_SECRET`. The owner sets it with `npx convex env set`. It is never in the repo.
+- The deployment needs the secret `BETTER_AUTH_SECRET`. The owner sets it with `npx convex env set`. It is never in the repo. `APPLE_SERVICES_ID` turns Sign in with Apple on; with no value, Apple is off (see "Sign in with Apple" in [`running-the-app.md`](../process/running-the-app.md)).
+
+### Sign-in keys
+
+Issue #397, ADR-0008. A key is a way to sign in to one account: Apple now. A guest has no key; an account with a key is saved (`isGuest` false).
+
+- **Sign in on a new phone:** Better Auth's `/sign-in/social` with `{ provider: 'apple', idToken: { token, nonce } }`. The same Apple id gives the same account; a new one makes a new saved account.
+- **Save a guest:** our `POST /key/save`, with the same body. The guest keeps the same user id, so its games, invites and push tokens stay. `isAnonymous` turns false. Apple's email is copied only when no other user has it. A key that is another user's gives `409 KEY_BELONGS_TO_OTHER` and changes nothing; a second Apple id on one account `409 PROVIDER_TAKEN`; the same key again does nothing.
+- **`GET /key/list`** gives `{ keys: [{ provider }] }`. **`POST /key/remove`** `{ provider }` never removes the last key (`409 LAST_KEY`).
+- **The nonce** (`POST /key/nonce`, no session): `<expiresAt>.<random>.<HMAC-SHA256>`, signed with `BETTER_AUTH_SECRET`, good for 10 minutes (`model/keyNonce.ts`). The server stores nothing when it makes one, so nonce spam costs no rows. The token check (`verifyKeyIdToken` in `auth.ts`) asks for a nonce, checks the HMAC and the time, checks the Apple token (`model/appleIdToken.ts`: Apple's keys, issuer, one of our bundle ids or the Services ID, at most 1 hour old, the nonce as is or as SHA-256 hex), then marks the nonce used (`useKeyNonce`, the `usedKeyNonces` table, one mutation). A used nonce fails. Each use deletes up to 10 run-out rows.
+- **One owner per key:** Better Auth writes rows one call at a time, and its `account` table has no unique index. So before Better Auth makes an `account` row for a key, `databaseHooks.account.create.before` calls `claimKey` (the `authKeys` table, one mutation): the first user to claim an Apple id owns it, and a later claim by another user fails with `KEY_BELONGS_TO_OTHER`. `/key/remove` calls `releaseKey`, and `deleteMyAccount` calls `deleteKeysOf`, so a deleted account frees its Apple id. A claim with no `account` row behind it is stale after `CLAIM_GRACE_MS` (1 minute; the account write failed, or a remove stopped halfway) and goes to the next user who claims the key, so a failed write never locks an Apple id out. `claimKey` also refuses a user who holds a live claim on another key of the same provider (`PROVIDER_TAKEN`): `/key/save` checks that first, but two saves of two Apple ids on one account at the same moment would both pass that check.
+- **How `/key/save` reads the token:** it runs the provider's `verifyIdToken` option (our `verifyKeyIdToken` in `auth.ts`; Better Auth's own sign-in runs that option before its built-in check), and takes the account id from the provider's `accountSubject` (Apple: `sub`), as Better Auth's sign-in does. Since Better Auth 1.7, `getUserInfo` gives no id. A provider with no `verifyIdToken` option is refused.
+- **Turned off on purpose:** `/link-social` (it does not check that a key is free) and `/unlink-account` (it does not know the last-key rule), next to `/delete-anonymous-user`. Implicit linking by email is off (`disableImplicitLinking`), and a later sign-in never deletes a guest (`disableDeleteAnonymousUser`): only `deleteMyAccount` deletes. Apple's name and photo are never kept (`mapProfileToUser`); the username comes in #405.
+- **Not yet:** the Apple web flow (Apple on Android) needs a client secret made from the `.p8` key (#401). Apple's server-to-server notifications and the token revoke on delete are #398.
+- **Tests:** `convex/authKeys.test.ts` signs in over HTTP with a fake Apple (`convex/test.apple.ts`): `useFakeApple(await fakeApple())` swaps Apple's keys with `setAppleKeys` and sets the env vars; `stopFakeApple()` in `afterEach`. Tests never reach Apple. `convex/betterAuthClient.test.ts` runs the `authProviderContract()` checks on the [Better Auth adapter](../../packages/adapters/auth-better-auth/README.md) with Better Auth's real client (no Expo plugin): `phoneFetch(t, phone)` sends its requests to convex-test with the app's origin and keeps the cookies, so the client's paths, bodies and error codes are checked against the real routes.
 
 ### Who calls
 
@@ -271,8 +312,9 @@ Every public function in `games.ts`, `invites.ts`, `push.ts` and `account.ts` ge
 
 ### The app side
 
-- **The port:** `AuthProvider` in `packages/contracts/src/auth.ts`: `ready()`, `currentUser()`, `signInAsGuest()`, `signOut()`, `getToken({ forceRefresh })` (for the Convex client's `setAuth`) and `onChange(listener)`. `AuthUser` is `{ id, isGuest }`, and `id` is the token subject. Errors reject with `AuthErrorData` (`NETWORK` or `REJECTED`).
-- **Contract checks:** `authProviderContract()` in `@tavli/contracts/testing`, plain async functions. The in-memory provider (`createMemoryAuthProvider`) and the Better Auth adapter (on a fake client) run them.
+- **The port:** `AuthProvider` in `packages/contracts/src/auth.ts`: `ready()`, `currentUser()`, `signInAsGuest()`, `signOut()`, `getToken({ forceRefresh })` (for the Convex client's `setAuth`) and `onChange(listener)`. `AuthUser` is `{ id, isGuest }`, and `id` is the token subject. Errors reject with `AuthErrorData` (`NETWORK`, `REJECTED`, `SIGNED_IN`, `KEY_BELONGS_TO_OTHER`, `LAST_KEY`).
+- **Keys on the port** (#397): `keyNonce()`, then the Apple sheet, then `signInWithKey(credential)` (nobody signed in; else `SIGNED_IN`) or `saveKey(credential)` (the signed-in user keeps the id). `listKeys()` and `removeKey(provider)`. A credential is `{ provider: 'apple', idToken, nonce }`. The issue named it `signInWithApple`; the port has one name for every kind of key. The in-memory provider's fake Apple takes `memoryAppleIdToken(sub, nonce)`.
+- **Contract checks:** `authProviderContract()` in `@tavli/contracts/testing`, plain async functions. The in-memory provider (`createMemoryAuthProvider`) and the Better Auth adapter (on a fake client) run them. The subject gives `appleIdToken(sub, nonce)`.
 - **The adapter:** `@tavli/auth-better-auth` (`packages/adapters/auth-better-auth/README.md`). The session cookie lives in `expo-secure-store` (`createSecureSessionStorage`).
 
 ### The app wiring
@@ -289,7 +331,8 @@ Issue #266. `apps/mobile/src/services.ts` exports `auth` (`AuthProvider`), `game
 
 ### Not done yet
 
-- **Guest upgrade:** when a guest links Apple, Google or email, Better Auth makes a new user. Moving the guest's games and invites to the new id (`onLinkAccount`) comes with those sign-in methods. After the link, the anonymous plugin deletes the guest's Better Auth user by itself (not through `deleteMyAccount`), so the move must happen in `onLinkAccount`, before that.
+- **The app screens** for Sign in with Apple and saving a guest (#401), and the privacy policy for the Apple id and email the server can now keep (#401).
+- **A known limit:** two first sign-ins at the same moment with the same new Apple id can leave one extra user with no key (the claim keeps the key with one user). That user has no data and no way in.
 
 ## Invites
 
