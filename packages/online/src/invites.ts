@@ -240,11 +240,22 @@ export function checkAnswer(invite: InviteRecord, callerId: string, now: number)
 }
 
 /**
- * Accept only between players who do not block each other (#320). `blocked`:
- * one of the two blocks the other. Check it after `checkAnswer`.
+ * No block stops this answer (#320). `byCaller`: the caller blocks the
+ * inviter, so `BLOCKED` (they know). `byInviter`: the inviter blocks the
+ * caller, so `INVITE_EXPIRED`, as `inviteSeenBy` shows it: the blocked
+ * player is never told.
  */
-export function checkNotBlocked(blocked: boolean): void {
-  if (blocked) fail('BLOCKED', 'one of you blocks the other');
+export function checkNotBlocked(blocks: { byCaller: boolean; byInviter: boolean }): void {
+  if (blocks.byCaller) fail('BLOCKED', 'you block this player');
+  if (blocks.byInviter) fail('INVITE_EXPIRED', 'the invite has expired');
+}
+
+/**
+ * The invite as a viewer sees it (#320): an open invite looks expired to
+ * a player the inviter blocks. The invite stays open for everyone else.
+ */
+export function inviteSeenBy(view: InviteView, blockedByInviter: boolean): InviteView {
+  return blockedByInviter && view.status === 'open' ? { ...view, status: 'expired' } : view;
 }
 
 /** `callerId` may cancel the invite: it is open, its time is not up, and the caller made it. */

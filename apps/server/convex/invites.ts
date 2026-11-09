@@ -37,6 +37,7 @@ import {
   checkCancel,
   checkInviteCap,
   checkNotBlocked,
+  inviteSeenBy,
   countOpenInvites,
   isInviteExpired,
   newInvite,
@@ -53,7 +54,7 @@ import { existingPlayer, signedInPlayer } from './caller';
 import { insertGame } from './games';
 import { createCryptoRng } from './model/cryptoRng';
 import { ensureGuestNumber, nameOf } from './playerNames';
-import { eitherBlocks, nameSeenBy } from './safety';
+import { blocks, nameSeenBy } from './safety';
 import { gameChoice, gameTurnTimeMinutes } from './schema';
 
 /** Maps a Convex invite row to `InviteRecord`, defaulting `turnTimeMinutes` (#183). */
@@ -158,7 +159,8 @@ export const createInvite = mutation({
 /**
  * The invite with this code (any case), or `null` when there is none.
  * Any signed-in user with the code may read it: the code is the secret.
- * A caller who blocks the inviter sees no name (#320).
+ * A caller who blocks the inviter sees no name, and a caller the inviter
+ * blocks sees an open invite as expired (#320, `inviteSeenBy`).
  */
 export const getInvite = query({
   args: { code: v.string() },
@@ -168,15 +170,19 @@ export const getInvite = query({
     if (code === null) return null;
     const invite = await findByCode(ctx, code);
     if (invite === null) return null;
-    const fromName = await nameSeenBy(ctx, callerId, invite.from);
-    return toInviteView(toInviteRecord(invite), Date.now(), fromName);
+    const [fromName, hidden] = await Promise.all([
+      nameSeenBy(ctx, callerId, invite.from),
+      blocks(ctx, invite.from, callerId),
+    ]);
+    return inviteSeenBy(toInviteView(toInviteRecord(invite), Date.now(), fromName), hidden);
   },
 });
 
 /**
  * The caller accepts the invite. In one transaction: checks the invite
- * (open, not expired, not your own, no block between the two: #320), creates the game (the inviter plays
- * white; the opening roll decides who starts), and marks the invite
+ * (open, not expired, not your own, no block between the two: #320,
+ * `checkNotBlocked`), creates the game (the inviter plays white; the
+ * opening roll decides who starts), and marks the invite
  * `accepted` with the game id. Returns the game id.
  */
 export const acceptInvite = mutation({
@@ -187,8 +193,11 @@ export const acceptInvite = mutation({
     const doc = await load(ctx, code);
     const invite = toInviteRecord(doc);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
-    const blocked = await eitherBlocks(ctx, invite.from, callerId);
-    guarded(() => checkNotBlocked(blocked));
+    const [byCaller, byInviter] = await Promise.all([
+      blocks(ctx, callerId, invite.from),
+      blocks(ctx, invite.from, callerId),
+    ]);
+    guarded(() => checkNotBlocked({ byCaller, byInviter }));
     const gameId: Id<'games'> = await insertGame(ctx, {
       callerId,
       players: { white: invite.from, black: callerId },
@@ -201,7 +210,10 @@ export const acceptInvite = mutation({
   },
 });
 
-/** The caller (not the inviter) says no to the invite. */
+/**
+ * The caller (not the inviter) says no to the invite. A caller the
+ * inviter blocks gets `INVITE_EXPIRED`, as `getInvite` shows it (#320).
+ */
 export const declineInvite = mutation({
   args: { code: v.string() },
   returns: v.null(),
@@ -210,6 +222,8 @@ export const declineInvite = mutation({
     const doc = await load(ctx, code);
     const invite = toInviteRecord(doc);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
+    const byInviter = await blocks(ctx, invite.from, callerId);
+    guarded(() => checkNotBlocked({ byCaller: false, byInviter }));
     await ctx.db.patch(doc._id, { status: 'declined', answeredBy: callerId });
     return null;
   },

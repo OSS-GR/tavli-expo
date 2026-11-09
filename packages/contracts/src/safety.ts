@@ -5,9 +5,11 @@
  *
  * - **Block.** The blocker no longer sees the other player's name (game
  *   views, the games list and invites say `null`), and no new game starts
- *   between the two from an invite (`acceptInvite` gives `BLOCKED`, both
- *   ways). Games that already run go on: the blocker may resign. The
- *   blocked player is not told.
+ *   between the two from an invite. The blocker's own accept gets
+ *   `BLOCKED`. The blocked player is never told: the blocker's open
+ *   invites look expired to them (`getInvite`, `watchInvite`), and
+ *   accepting or declining one gets `INVITE_EXPIRED`. Games that already
+ *   run go on: the blocker may resign.
  * - **Report.** A reason from `REPORT_REASONS`, no free text. The server
  *   keeps the reported player's username at that moment, so the owner
  *   sees the name even after a change. Reporting also blocks. The owner

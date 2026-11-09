@@ -8,9 +8,10 @@ import {
   guestName,
   usernameName,
 } from '@tavli/contracts';
+import type { InviteView } from '@tavli/contracts';
 
 import { SERVER_ACTOR } from './calls';
-import { checkNotBlocked } from './invites';
+import { checkNotBlocked, inviteSeenBy } from './invites';
 import {
   SafetyError,
   checkBlockCap,
@@ -75,9 +76,37 @@ describe('checkReason', () => {
 });
 
 describe('checkNotBlocked', () => {
-  it('refuses an invite between players who block each other', () => {
-    expect(codeOf(() => checkNotBlocked(true))).toBe('BLOCKED');
-    expect(codeOf(() => checkNotBlocked(false))).toBeNull();
+  it('tells the blocker, and hides the block from the blocked player', () => {
+    expect(codeOf(() => checkNotBlocked({ byCaller: true, byInviter: false }))).toBe('BLOCKED');
+    expect(codeOf(() => checkNotBlocked({ byCaller: true, byInviter: true }))).toBe('BLOCKED');
+    expect(codeOf(() => checkNotBlocked({ byCaller: false, byInviter: true }))).toBe(
+      'INVITE_EXPIRED',
+    );
+    expect(codeOf(() => checkNotBlocked({ byCaller: false, byInviter: false }))).toBeNull();
+  });
+});
+
+describe('inviteSeenBy', () => {
+  const view: InviteView = {
+    code: 'ABCDEFGH',
+    from: 'alice',
+    fromName: null,
+    choice: 'portes',
+    targetPoints: 3,
+    turnTimeMinutes: null,
+    status: 'open',
+    expiresAt: 1000,
+    gameId: null,
+  };
+
+  it('shows an open invite as expired to a player the inviter blocks', () => {
+    expect(inviteSeenBy(view, true).status).toBe('expired');
+    expect(inviteSeenBy(view, false)).toBe(view);
+  });
+
+  it('leaves a closed invite as it is', () => {
+    const accepted = { ...view, status: 'accepted', gameId: 'g1' } as const;
+    expect(inviteSeenBy(accepted, true)).toBe(accepted);
   });
 });
 

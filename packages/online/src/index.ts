@@ -81,6 +81,7 @@ export {
   checkCancel,
   checkInviteCap,
   checkNotBlocked,
+  inviteSeenBy,
   countOpenInvites,
   inviteExpiresAt,
   inviteStatus,

@@ -104,8 +104,10 @@ export const INVITE_ERROR_CODES = [
    */
   'TOO_MANY_INVITES',
   /**
-   * One of the two players blocks the other (#320, `Safety`): no game
-   * starts between them. Only `acceptInvite` gives it.
+   * The caller blocks the inviter (#320, `Safety`): no game starts
+   * between them. Only `acceptInvite` gives it. When the inviter blocks
+   * the caller, the caller gets `INVITE_EXPIRED` instead, so the block
+   * stays hidden.
    */
   'BLOCKED',
   /** Bad arguments (for example a code with a wrong length or character). */
@@ -163,7 +165,8 @@ export interface Invites {
   /**
    * The invite with this code, or `null` when no invite has it (also for
    * text that cannot be a code). An open invite whose time is up shows
-   * `expired`.
+   * `expired`, and so does an open invite whose inviter blocks the
+   * caller (#320): it stays open for everyone else.
    */
   getInvite(code: string): Promise<InviteView | null>;
   /**
@@ -187,7 +190,8 @@ export interface Invites {
    * Accepts the invite and starts the game (the inviter plays white).
    * Resolves with the `gameId`. Rejects with `InviteErrorData`:
    * `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`,
-   * `BLOCKED` (#320) or `BAD_REQUEST`.
+   * `BLOCKED` (#320: the caller blocks the inviter) or `BAD_REQUEST`.
+   * A caller the inviter blocks gets `INVITE_EXPIRED`.
    */
   acceptInvite(code: string): Promise<string>;
   /** Says no to the invite. Rejects like `acceptInvite`. */
