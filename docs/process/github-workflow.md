@@ -92,7 +92,7 @@ Node comes from `.nvmrc`. pnpm comes from `packageManager` in `package.json`. Th
 
 **Saving minutes:** the repo is private, so we get 2,000 free Actions minutes a month. To keep runs cheap, the jobs cache the pnpm store, stop after 15 minutes, and an older run is cancelled when you push again to the same PR. GitHub bills each job in whole minutes, so the parallel jobs cost about 3 more minutes per run than one long job, but the wait is about 3 minutes instead of 7.
 
-**Dependency updates:** Dependabot (`.github/dependabot.yml`) opens grouped PRs every Monday: one for Expo packages, one for dev tooling, one for GitHub Actions. It does not propose Expo SDK, React or React Native upgrades. Do those by hand in `apps/mobile`: run `npx expo install expo@^<sdk> --fix` (for example `expo@^59.0.0`). Expo then picks the React, React Native and native library versions that match the SDK.
+**Dependency updates:** Dependabot (`.github/dependabot.yml`) opens grouped PRs every Monday: one for Expo packages, one for dev tooling, one for GitHub Actions. It does not propose Expo SDK, React or React Native upgrades, or minor bumps of the native libraries Expo pins per SDK (Sentry, Skia; #415). Do those by hand in `apps/mobile`: run `npx expo install expo@^<sdk> --fix` (for example `expo@^59.0.0`). Expo then picks the React, React Native and native library versions that match the SDK.
 
 ### Claude review (`claude-review`)
 
