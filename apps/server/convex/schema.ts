@@ -11,7 +11,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
-import { INVITE_STATUSES, ONLINE_GAME_CHOICES } from '@tavli/contracts';
+import { INVITE_STATUSES, ONLINE_GAME_CHOICES, REPORT_REASONS } from '@tavli/contracts';
 
 export const gameChoice = v.union(...ONLINE_GAME_CHOICES.map((choice) => v.literal(choice)));
 
@@ -26,6 +26,9 @@ export const gameStatus = v.union(v.literal('active'), v.literal('finished'));
 export const pushPlatform = v.union(v.literal('ios'), v.literal('android'));
 
 const inviteStatus = v.union(...INVITE_STATUSES.map((status) => v.literal(status)));
+
+/** Why a player reported another (#320). */
+export const reportReason = v.union(...REPORT_REASONS.map((reason) => v.literal(reason)));
 
 export default defineSchema({
   games: defineTable({
@@ -71,7 +74,9 @@ export default defineSchema({
   })
     // "My games" (#296): one player's games with one status, newest change first.
     .index('by_white', ['players.white', 'status', 'updatedAt'])
-    .index('by_black', ['players.black', 'status', 'updatedAt']),
+    .index('by_black', ['players.black', 'status', 'updatedAt'])
+    // "Did these two meet?" (#320, `safety.ts`): a game with these sides.
+    .index('by_pair', ['players.white', 'players.black']),
 
   /** The event log of each game: one engine `FlowEvent` per row, in order. */
   moves: defineTable({
@@ -123,7 +128,9 @@ export default defineSchema({
     .index('by_code', ['code'])
     // "My open invites" and the cap on them (#275): the open invites of
     // one player whose time is not up are one range (`expiresAt > now`).
-    .index('by_from', ['from', 'status', 'expiresAt']),
+    .index('by_from', ['from', 'status', 'expiresAt'])
+    // "Did these two meet?" (#320, `safety.ts`): an invite one answered from the other.
+    .index('by_answer', ['from', 'answeredBy']),
 
   /**
    * The Expo push tokens of each player's phones (#280), for "your turn"
@@ -166,6 +173,39 @@ export default defineSchema({
   })
     .index('by_player', ['playerId'])
     .index('by_username_key', ['usernameKey']),
+
+  /**
+   * Blocks (#320, `safety.ts`): `blockerId` no longer sees the name of
+   * `blockedId`, and no game starts between the two from an invite. At
+   * most `MAX_BLOCKS` rows per blocker. Deleted with either account.
+   */
+  blocks: defineTable({
+    blockerId: v.string(),
+    blockedId: v.string(),
+    /** When the block was made, epoch ms (server clock). */
+    createdAt: v.number(),
+  })
+    .index('by_blocker', ['blockerId', 'blockedId'])
+    .index('by_blocked', ['blockedId']),
+
+  /**
+   * Reports (#320, `safety.ts`) for the owner to review in the Convex
+   * dashboard. One row per reporter and reported player while it is
+   * kept. The owner deletes a row after the review; the account delete of
+   * either player deletes it too. There is no end date.
+   */
+  reports: defineTable({
+    reporterId: v.string(),
+    reportedId: v.string(),
+    reason: reportReason,
+    /** The reported player's username at that moment. Absent: a guest. */
+    username: v.optional(v.string()),
+    /** When the report was made, epoch ms (server clock). */
+    createdAt: v.number(),
+  })
+    .index('by_reporter', ['reporterId', 'createdAt'])
+    .index('by_pair', ['reporterId', 'reportedId'])
+    .index('by_reported', ['reportedId']),
 
   /**
    * Who owns each sign-in key (#397): one row per Apple id (later Google).

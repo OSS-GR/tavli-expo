@@ -53,7 +53,7 @@ A username is what other players see in games, invites and lists. You pick it, s
 - The app blocks some words by itself. That list cannot catch everything, so the rules above still apply.
 - If a username breaks these rules, we may change it to a guest name or remove it. If it happens again, we may stop the account from playing online.
 
-To report a username, write to us with the name and, if you can, the invite code of a game with that player. <!-- OWNER: an in-app report button is issue #320. -->
+To report a username, write to us with the name and, if you can, the invite code of a game with that player. <!-- OWNER: the server can keep reports since #320; the in-app Report and Block buttons are #435. Then say here how to report in the app. -->
 
 ## Fair play
 

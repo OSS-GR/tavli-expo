@@ -37,6 +37,11 @@
  *   name until the next view.
  *   The numbers come from their own RNG (`nameRng`), so they never change
  *   the dice of a seeded `rng`.
+ * - Block and report (#320): `safetyFor(playerId)` runs the same checks
+ *   as the Convex `safety.ts` (`@tavli/online` `safety.ts`). A blocker's
+ *   views, lists and invites show `null` for the blocked player's name,
+ *   and `acceptInvite` gives `BLOCKED` between the two. `reportsOf()`
+ *   shows the reports, like the Convex dashboard.
  *
  * Time comes from the `now` option. Nothing runs on a timer: call
  * `runDueTimeouts()` to apply the time outs whose deadline has passed (the
@@ -46,7 +51,7 @@
  * in-memory version of the Convex `expireInvite`).
  */
 
-import { normalizeInviteCode } from '@tavli/contracts';
+import { MAX_BLOCKS, normalizeInviteCode } from '@tavli/contracts';
 import type {
   GameSummary,
   GameTransport,
@@ -59,6 +64,9 @@ import type {
   OnlineGameStatus,
   OnlineGameView,
   PlayerName,
+  ReportReason,
+  Safety,
+  SafetyErrorData,
   UsernameErrorCode,
   UsernameErrorData,
   Usernames,
@@ -88,6 +96,7 @@ import {
   checkAnswer,
   checkCancel,
   checkInviteCap,
+  checkNotBlocked,
   countOpenInvites,
   isInviteExpired,
   newInvite,
@@ -115,6 +124,16 @@ import { nameFrom, namesOf, pickGuestNumber } from './names';
 import type { NameRecord } from './names';
 import { myUsernameOf, planUsername } from './usernames';
 import type { UsernameRecord } from './usernames';
+import {
+  SafetyError,
+  checkBlockCap,
+  checkMet,
+  checkReason,
+  checkReportCap,
+  checkTarget,
+  namesSeenBy,
+  reportWindowStart,
+} from './safety';
 import { latestGames, summarizeGame } from './summaries';
 
 export interface MemoryGameServerOptions {
@@ -138,6 +157,16 @@ export interface LoggedEvent {
   /** The player id who acted (a roll too, #355), or `SERVER_ACTOR` (opening dice, time outs, the next game). */
   readonly actor: string;
   readonly event: FlowEvent;
+}
+
+/** One report (#320), like a row of the Convex `reports` table. */
+export interface MemoryReport {
+  readonly reporterId: string;
+  readonly reportedId: string;
+  readonly reason: ReportReason;
+  /** The reported player's username at that moment, if they had one. */
+  readonly username: string | null;
+  readonly createdAt: number;
 }
 
 export interface MemoryGameServer {
@@ -202,6 +231,15 @@ export interface MemoryGameServer {
    * key: the in-memory server keeps no accounts, so the caller says.
    */
   usernamesFor(playerId: string | null, saved: boolean): Usernames;
+  /**
+   * Block and report (#320) as `playerId` (`null`: nobody signed in), as
+   * if they were signed in.
+   */
+  safetyFor(playerId: string | null): Safety;
+  /** Every report kept, oldest first (copies). The owner's view, for tests. */
+  reportsOf(): MemoryReport[];
+  /** The owner deletes a report after the review, like a row deleted in the dashboard. For tests. */
+  deleteReport(reporterId: string, reportedId: string): void;
   /** The player's name (#400, #405): the username, else the guest name, else `null`. For tests. */
   nameOf(playerId: string): PlayerName | null;
   /** The event log of the game, oldest first (copies). `replay` rebuilds the game from it. */
@@ -240,6 +278,8 @@ interface MemoryGame extends SavedGame {
 
 interface Listener {
   readonly gameId: string;
+  /** The player who watches: the view hides the names they block (#320). */
+  readonly playerId: string;
   readonly onView: (view: OnlineGameView) => void;
   active: boolean;
 }
@@ -256,6 +296,8 @@ interface ListListener {
 interface InviteListener {
   /** The normalized code, or `null` for text that is not a code. */
   readonly code: string | null;
+  /** The player who watches: the view hides the name they block (#320). */
+  readonly playerId: string;
   readonly onView: (view: InviteView | null) => void;
   active: boolean;
 }
@@ -306,6 +348,10 @@ function toErrorData(error: unknown): unknown {
     const data: InviteErrorData = { code: error.code, message: error.message };
     return data;
   }
+  if (error instanceof SafetyError) {
+    const data: SafetyErrorData = { code: error.code, message: error.message };
+    return data;
+  }
   return error;
 }
 
@@ -325,7 +371,18 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const deletedPlayers = new Set<string>();
   /** The name of each player (#400, #405), like the Convex `playerNames` table. */
   const nameRecords = new Map<string, NameRecord & UsernameRecord>();
+  /** Who answered each invite (#320), by code, like the Convex `answeredBy`. */
+  const answeredBy = new Map<string, string>();
+  /** Blocks (#320): blocker → (blocked → when), like the Convex `blocks` table. */
+  const blocks = new Map<string, Map<string, number>>();
+  /** Reports (#320), oldest first, like the Convex `reports` table. */
+  let reports: MemoryReport[] = [];
   let nextId = 1;
+
+  /** `viewerId` blocks `playerId`. */
+  function blocksPlayer(viewerId: string | null, playerId: string): boolean {
+    return viewerId !== null && (blocks.get(viewerId)?.has(playerId) ?? false);
+  }
 
   function draftOf(gameId: string): SavedDraft | null {
     const text = drafts.get(gameId);
@@ -382,13 +439,17 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     };
   }
 
-  /** The view input of `game`, without its flow. */
-  function gameInput(game: MemoryGame) {
+  /**
+   * The view input of `game`, without its flow, as `viewerId` sees it
+   * (`null`: no viewer, every name shows).
+   */
+  function gameInput(game: MemoryGame, viewerId: string | null) {
+    const names = namesOf({
+      white: nameRecords.get(game.players.white) ?? null,
+      black: nameRecords.get(game.players.black) ?? null,
+    });
     return {
-      names: namesOf({
-        white: nameRecords.get(game.players.white) ?? null,
-        black: nameRecords.get(game.players.black) ?? null,
-      }),
+      names: namesSeenBy(names, game.players, (id) => blocksPlayer(viewerId, id)),
       gameId: game.gameId,
       version: game.version,
       choice: game.choice,
@@ -398,9 +459,14 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     };
   }
 
-  function viewOf(game: MemoryGame): OnlineGameView {
+  function viewOf(game: MemoryGame, viewerId: string | null): OnlineGameView {
     const { flow, previousGame } = loadStored(game.flow);
-    return toView({ ...gameInput(game), flow, previousGame, draft: draftOf(game.gameId) });
+    return toView({
+      ...gameInput(game, viewerId),
+      flow,
+      previousGame,
+      draft: draftOf(game.gameId),
+    });
   }
 
   /** The games of `playerId` with `status`, like the Convex `listMyGames`. */
@@ -410,7 +476,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       if (game.status !== status || sideOf(game.players, playerId) === null) continue;
       summaries.push(
         summarizeGame(
-          { ...gameInput(game), flow: loadFlow(game.flow), updatedAt: game.updatedAt },
+          { ...gameInput(game, playerId), flow: loadFlow(game.flow), updatedAt: game.updatedAt },
           playerId,
         ),
       );
@@ -427,9 +493,10 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
 
   /** Sends the view of `game` as it is now to each listener of the game, not to the lists. */
   function notifyViews(game: MemoryGame): void {
-    const text = JSON.stringify(viewOf(game));
     for (const listener of listeners) {
-      if (listener.gameId === game.gameId) send(listener, text);
+      if (listener.gameId === game.gameId) {
+        send(listener, JSON.stringify(viewOf(game, listener.playerId)));
+      }
     }
   }
 
@@ -549,7 +616,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   function transportFor(playerId: string): GameTransport {
     return {
       subscribe(gameId, onView, onError) {
-        const listener: Listener = { gameId, onView, active: true };
+        const listener: Listener = { gameId, playerId, onView, active: true };
         const fail = (error: GameTransportErrorData) =>
           later(() => {
             if (listener.active) onError?.(error);
@@ -568,7 +635,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           fail({ code: 'NOT_FOUND', message: 'no such game' });
         } else {
           listeners.add(listener);
-          send(listener, JSON.stringify(viewOf(game)));
+          send(listener, JSON.stringify(viewOf(game, playerId)));
         }
         return () => {
           listener.active = false;
@@ -679,16 +746,23 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     return invite;
   }
 
-  /** The view of the invite of `text` (any case) at `now()`, or `null`, like the Convex `getInvite`. */
-  function inviteView(text: string): InviteView | null {
+  /**
+   * The view of the invite of `text` (any case) at `now()` as `viewerId`
+   * sees it, or `null`, like the Convex `getInvite`.
+   */
+  function inviteView(text: string, viewerId: string | null): InviteView | null {
     const code = normalizeInviteCode(text);
     const invite = code === null ? undefined : invites.get(code);
-    return invite === undefined ? null : toInviteView(invite, now(), nameOf(invite.from));
+    if (invite === undefined) return null;
+    const fromName = blocksPlayer(viewerId, invite.from) ? null : nameOf(invite.from);
+    return toInviteView(invite, now(), fromName);
   }
 
   /** Sends the view of `code` as it is now to `listener` on a later microtask, unless it stops first. */
   function sendInvite(listener: InviteListener): void {
-    const text = JSON.stringify(listener.code === null ? null : inviteView(listener.code));
+    const text = JSON.stringify(
+      listener.code === null ? null : inviteView(listener.code, listener.playerId),
+    );
     later(() => {
       if (listener.active) listener.onView(JSON.parse(text) as InviteView | null);
     });
@@ -777,13 +851,16 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   function invitesFor(playerId: string): Invites {
     return {
       getInvite(text) {
-        return inviteCall(() => inviteView(text));
+        return inviteCall(() => inviteView(text, playerId));
       },
       acceptInvite(text) {
         return inviteCall(() => {
           checkExists(playerId);
           const invite = loadInvite(text);
           checkAnswer(invite, playerId, now());
+          checkNotBlocked(
+            blocksPlayer(playerId, invite.from) || blocksPlayer(invite.from, playerId),
+          );
           // If the game cannot start, the invite stays open (the Convex
           // transaction rolls back too).
           const gameId = createGame(
@@ -793,6 +870,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             invite.targetPoints,
             invite.turnTimeMinutes,
           );
+          answeredBy.set(invite.code, playerId);
           saveInvite({ ...invite, status: 'accepted', gameId });
           return gameId;
         });
@@ -802,6 +880,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           checkExists(playerId);
           const invite = loadInvite(text);
           checkAnswer(invite, playerId, now());
+          answeredBy.set(invite.code, playerId);
           saveInvite({ ...invite, status: 'declined' });
         });
       },
@@ -826,7 +905,12 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       },
       watchInvite(text, onView) {
         // Like the Convex `getInvite`, text that is not a code sends `null`.
-        const listener: InviteListener = { code: normalizeInviteCode(text), onView, active: true };
+        const listener: InviteListener = {
+          code: normalizeInviteCode(text),
+          playerId,
+          onView,
+          active: true,
+        };
         inviteListeners.add(listener);
         sendInvite(listener);
         return () => {
@@ -872,6 +956,133 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     }
     deletedPlayers.add(playerId);
     nameRecords.delete(playerId);
+    // Blocks both ways and reports by and about the player (#320).
+    blocks.delete(playerId);
+    for (const blocked of blocks.values()) blocked.delete(playerId);
+    reports = reports.filter(
+      (report) => report.reporterId !== playerId && report.reportedId !== playerId,
+    );
+  }
+
+  /** The two players met (#320, `checkMet`): a game, or an invite one answered from the other. */
+  function met(callerId: string, playerId: string): boolean {
+    if (deletedPlayers.has(playerId)) return false;
+    for (const game of games.values()) {
+      if (sideOf(game.players, callerId) !== null && sideOf(game.players, playerId) !== null) {
+        return true;
+      }
+    }
+    for (const invite of invites.values()) {
+      const answerer = answeredBy.get(invite.code);
+      if (
+        (invite.from === callerId && answerer === playerId) ||
+        (invite.from === playerId && answerer === callerId)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Sends `playerId` their views, lists and invites again: a block changes the names they see. */
+  function notifyViewer(playerId: string): void {
+    for (const listener of listeners) {
+      const game = games.get(listener.gameId);
+      if (listener.playerId === playerId && game !== undefined) {
+        send(listener, JSON.stringify(viewOf(game, playerId)));
+      }
+    }
+    for (const listener of listListeners) {
+      if (listener.playerId === playerId) sendList(listener);
+    }
+    for (const listener of inviteListeners) {
+      if (listener.playerId === playerId) sendInvite(listener);
+    }
+  }
+
+  /** `callerId` blocks `playerId`, after the checks, like the Convex `blockAs`. */
+  function block(callerId: string, playerId: string): void {
+    const mine = blocks.get(callerId) ?? new Map<string, number>();
+    if (mine.has(playerId)) return;
+    checkBlockCap(mine.size);
+    mine.set(playerId, now());
+    blocks.set(callerId, mine);
+    notifyViewer(callerId);
+  }
+
+  /** Block and report (#320), like the Convex `safety.ts`. */
+  function safetyFor(playerId: string | null): Safety {
+    const caller = (): string => {
+      if (playerId === null) throw new SafetyError('NOT_SIGNED_IN', 'sign in first');
+      return playerId;
+    };
+    /** Like the Convex `existingPlayer`: a deleted id may not block or report. */
+    const existing = (): string => {
+      const id = caller();
+      if (deletedPlayers.has(id)) {
+        throw new SafetyError('NOT_SIGNED_IN', 'this account does not exist');
+      }
+      return id;
+    };
+    const call = async <T>(step: () => T): Promise<T> => {
+      await nextTick();
+      try {
+        const result = step();
+        return result === undefined ? result : copy(result);
+      } catch (error) {
+        throw toErrorData(error);
+      }
+    };
+    return {
+      block: (other) =>
+        call(() => {
+          const id = existing();
+          checkTarget(id, other);
+          checkMet(met(id, other));
+          block(id, other);
+        }),
+      unblock: (other) =>
+        call(() => {
+          const id = caller();
+          if (blocks.get(id)?.delete(other) === true) notifyViewer(id);
+        }),
+      listBlocked: () =>
+        call(() =>
+          [...(blocks.get(caller()) ?? new Map<string, number>())]
+            .map(([blocked, at]) => ({ playerId: blocked, name: nameOf(blocked), blockedAt: at }))
+            .sort((a, b) => b.blockedAt - a.blockedAt),
+        ),
+      report: (request) =>
+        call(() => {
+          const id = existing();
+          const { playerId: other } = request;
+          const reason = checkReason(request.reason);
+          checkTarget(id, other);
+          checkMet(met(id, other));
+          const kept = reports.some(
+            (report) => report.reporterId === id && report.reportedId === other,
+          );
+          if (!kept) {
+            const at = now();
+            const since = reportWindowStart(at);
+            checkReportCap(
+              reports.filter((report) => report.reporterId === id && report.createdAt > since)
+                .length,
+            );
+            reports.push({
+              reporterId: id,
+              reportedId: other,
+              reason,
+              username: nameRecords.get(other)?.username ?? null,
+              createdAt: at,
+            });
+          }
+          // A report also blocks; a full block list does not stop the report.
+          if (!blocksPlayer(id, other) && (blocks.get(id)?.size ?? 0) < MAX_BLOCKS) {
+            block(id, other);
+          }
+        }),
+    };
   }
 
   return {
@@ -885,17 +1096,27 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
 
     invitesFor,
 
-    getInvite: (text) => copy(inviteView(text)),
+    getInvite: (text) => copy(inviteView(text, null)),
 
     transportFor,
 
     usernamesFor,
 
+    safetyFor,
+
+    reportsOf: () => copy(reports),
+
+    deleteReport(reporterId, reportedId) {
+      reports = reports.filter(
+        (report) => report.reporterId !== reporterId || report.reportedId !== reportedId,
+      );
+    },
+
     nameOf,
 
     getGame(gameId) {
       const game = games.get(gameId);
-      return game === undefined ? null : copy(viewOf(game));
+      return game === undefined ? null : copy(viewOf(game, null));
     },
 
     events(gameId) {

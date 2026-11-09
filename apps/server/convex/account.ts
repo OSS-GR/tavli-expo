@@ -18,7 +18,9 @@
  *    Better Auth's own delete (`internalAdapter.deleteUser`) on the
  *    component's tables;
  * 5. schedules `deleteSentInvites`, which deletes the caller's other
- *    invites (accepted, declined, cancelled, expired) in pages (#306).
+ *    invites (accepted, declined, cancelled, expired) in pages (#306),
+ *    and `deleteSafetyRows`, which deletes the caller's blocks both ways
+ *    and the reports by and about the caller in pages (#320).
  *
  * The caller's token stays valid until it expires, so the call first
  * checks that the Better Auth user still exists (`existingPlayer`): a
@@ -146,6 +148,11 @@ export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promi
   // It runs after this transaction, when the user is gone, so no new
   // invite can come in (`createInvite` checks `existingPlayer`).
   await ctx.scheduler.runAfter(0, internal.account.deleteSentInvites, { from: callerId });
+
+  // Blocks both ways and reports by and about the caller (#320), in pages:
+  // others may block or report a player without a cap. No new row can
+  // name the caller now: both calls need the account to exist.
+  await ctx.scheduler.runAfter(0, internal.safety.deleteSafetyRows, { playerId: callerId });
 
   // The other active games, after this transaction. No new game can
   // start with the caller from now on: a game starts only from

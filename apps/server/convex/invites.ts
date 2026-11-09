@@ -36,6 +36,7 @@ import {
   checkAnswer,
   checkCancel,
   checkInviteCap,
+  checkNotBlocked,
   countOpenInvites,
   isInviteExpired,
   newInvite,
@@ -52,6 +53,7 @@ import { existingPlayer, signedInPlayer } from './caller';
 import { insertGame } from './games';
 import { createCryptoRng } from './model/cryptoRng';
 import { ensureGuestNumber, nameOf } from './playerNames';
+import { eitherBlocks, nameSeenBy } from './safety';
 import { gameChoice, gameTurnTimeMinutes } from './schema';
 
 /** Maps a Convex invite row to `InviteRecord`, defaulting `turnTimeMinutes` (#183). */
@@ -156,22 +158,24 @@ export const createInvite = mutation({
 /**
  * The invite with this code (any case), or `null` when there is none.
  * Any signed-in user with the code may read it: the code is the secret.
+ * A caller who blocks the inviter sees no name (#320).
  */
 export const getInvite = query({
   args: { code: v.string() },
   handler: async (ctx, { code: text }): Promise<InviteView | null> => {
-    await signedInPlayer(ctx);
+    const callerId = await signedInPlayer(ctx);
     const code = normalizeInviteCode(text);
     if (code === null) return null;
     const invite = await findByCode(ctx, code);
     if (invite === null) return null;
-    return toInviteView(toInviteRecord(invite), Date.now(), await nameOf(ctx, invite.from));
+    const fromName = await nameSeenBy(ctx, callerId, invite.from);
+    return toInviteView(toInviteRecord(invite), Date.now(), fromName);
   },
 });
 
 /**
  * The caller accepts the invite. In one transaction: checks the invite
- * (open, not expired, not your own), creates the game (the inviter plays
+ * (open, not expired, not your own, no block between the two: #320), creates the game (the inviter plays
  * white; the opening roll decides who starts), and marks the invite
  * `accepted` with the game id. Returns the game id.
  */
@@ -183,6 +187,8 @@ export const acceptInvite = mutation({
     const doc = await load(ctx, code);
     const invite = toInviteRecord(doc);
     guarded(() => checkAnswer(invite, callerId, Date.now()));
+    const blocked = await eitherBlocks(ctx, invite.from, callerId);
+    guarded(() => checkNotBlocked(blocked));
     const gameId: Id<'games'> = await insertGame(ctx, {
       callerId,
       players: { white: invite.from, black: callerId },

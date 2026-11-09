@@ -239,6 +239,14 @@ export function checkAnswer(invite: InviteRecord, callerId: string, now: number)
   if (invite.from === callerId) fail('OWN_INVITE', 'you cannot answer your own invite');
 }
 
+/**
+ * Accept only between players who do not block each other (#320). `blocked`:
+ * one of the two blocks the other. Check it after `checkAnswer`.
+ */
+export function checkNotBlocked(blocked: boolean): void {
+  if (blocked) fail('BLOCKED', 'one of you blocks the other');
+}
+
 /** `callerId` may cancel the invite: it is open, its time is not up, and the caller made it. */
 export function checkCancel(invite: InviteRecord, callerId: string, now: number): void {
   checkOpen(invite, now);

@@ -93,7 +93,8 @@ export interface OnlineGameView {
   readonly players: PerPlayer<string>;
   /**
    * The name of each side (#400): "Guest 4821". `null` when the server
-   * has none, for example after that player deleted their online data.
+   * has none, for example after that player deleted their online data,
+   * and for a player the caller blocks (#320).
    */
   readonly names: PerPlayer<PlayerName | null>;
   /** The match: rules, score, finished games and the winner. */
@@ -183,7 +184,7 @@ export interface GameSummary {
   readonly updatedAt: number;
   /** As in the view: when the turn of `waitingFor` runs out. `null` when finished. */
   readonly turnDeadline: number | null;
-  /** The other player's name, as in the view's `names` (#400). */
+  /** The other player's name, as in the view's `names` (#400): `null` when the caller blocks them (#320). */
   readonly opponentName: PlayerName | null;
 }
 

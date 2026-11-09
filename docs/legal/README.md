@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Last review: 2026-11-09 (#405, usernames and the terms of use).
+> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Last review: 2026-11-09 (#320, block and report).
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy and the terms before they go live.
 

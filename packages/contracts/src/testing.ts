@@ -50,6 +50,12 @@ export {
   type PushTokensContractSubject,
 } from './testing/push-notifications-contract';
 export {
+  safetyContract,
+  type SafetyContractCheck,
+  type SafetyContractPlayer,
+  type SafetyContractSubject,
+} from './testing/safety-contract';
+export {
   usernamesContract,
   type UsernamesContractCheck,
   type UsernamesContractPlayer,

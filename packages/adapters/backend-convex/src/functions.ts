@@ -1,6 +1,7 @@
 /**
  * References to the Convex functions in `apps/server/convex/games.ts`,
- * `invites.ts`, `push.ts`, `account.ts`, `appUpdate.ts` and `usernames.ts`, by name. The adapter does not import the generated `api`
+ * `invites.ts`, `push.ts`, `account.ts`, `appUpdate.ts`, `usernames.ts` and
+ * `safety.ts`, by name. The adapter does not import the generated `api`
  * of `apps/server`: that would pull the server code (and Better Auth) into
  * the app's type check, and `apps/server` already depends on this package
  * for its tests.
@@ -11,7 +12,8 @@
  * `convex/convexPushTokens.test.ts` for the push tokens,
  * `convex/convexOnlineData.test.ts` for the delete,
  * `convex/convexAppUpdates.test.ts` for the update policy,
- * `convex/convexUsernames.test.ts` for the usernames), so a rename
+ * `convex/convexUsernames.test.ts` for the usernames,
+ * `convex/convexSafety.test.ts` for block and report), so a rename
  * there fails a test.
  */
 import { makeFunctionReference } from 'convex/server';
@@ -20,6 +22,7 @@ import type { FunctionReference } from 'convex/server';
 import type {
   AppPlatform,
   AppUpdatePolicy,
+  BlockedPlayer,
   GameSummary,
   GameTransportErrorData,
   InviteView,
@@ -218,4 +221,37 @@ export const USERNAME_FUNCTION_NAMES = {
 export const USERNAME_FUNCTIONS: UsernameFunctions = {
   getMyUsername: makeFunctionReference(USERNAME_FUNCTION_NAMES.getMyUsername),
   setMyUsername: makeFunctionReference(USERNAME_FUNCTION_NAMES.setMyUsername),
+};
+
+/** The block and report functions in `apps/server/convex/safety.ts` (#320). */
+export interface SafetyFunctions {
+  readonly blockPlayer: FunctionReference<'mutation', 'public', { playerId: string }, null>;
+  readonly unblockPlayer: FunctionReference<'mutation', 'public', { playerId: string }, null>;
+  readonly listMyBlocks: FunctionReference<
+    'query',
+    'public',
+    Record<string, never>,
+    BlockedPlayer[]
+  >;
+  readonly reportPlayer: FunctionReference<
+    'mutation',
+    'public',
+    { playerId: string; reason: string },
+    null
+  >;
+}
+
+/** The Convex function names (`module:function`) of the block and report calls. */
+export const SAFETY_FUNCTION_NAMES = {
+  blockPlayer: 'safety:blockPlayer',
+  unblockPlayer: 'safety:unblockPlayer',
+  listMyBlocks: 'safety:listMyBlocks',
+  reportPlayer: 'safety:reportPlayer',
+} as const satisfies { readonly [K in keyof SafetyFunctions]: string };
+
+export const SAFETY_FUNCTIONS: SafetyFunctions = {
+  blockPlayer: makeFunctionReference(SAFETY_FUNCTION_NAMES.blockPlayer),
+  unblockPlayer: makeFunctionReference(SAFETY_FUNCTION_NAMES.unblockPlayer),
+  listMyBlocks: makeFunctionReference(SAFETY_FUNCTION_NAMES.listMyBlocks),
+  reportPlayer: makeFunctionReference(SAFETY_FUNCTION_NAMES.reportPlayer),
 };

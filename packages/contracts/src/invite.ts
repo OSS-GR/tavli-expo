@@ -60,7 +60,10 @@ export interface InviteView {
   readonly code: string;
   /** The player id of the inviter. The inviter plays white. */
   readonly from: string;
-  /** The inviter's name (#400): "Guest 4821". `null` when the server has none. */
+  /**
+   * The inviter's name (#400): "Guest 4821". `null` when the server has
+   * none, or when the caller blocks the inviter (#320).
+   */
   readonly fromName: PlayerName | null;
   /** The game the inviter picked. */
   readonly choice: OnlineGameChoice;
@@ -100,6 +103,11 @@ export const INVITE_ERROR_CODES = [
    * One frees its place once it is accepted, declined, cancelled or expired.
    */
   'TOO_MANY_INVITES',
+  /**
+   * One of the two players blocks the other (#320, `Safety`): no game
+   * starts between them. Only `acceptInvite` gives it.
+   */
+  'BLOCKED',
   /** Bad arguments (for example a code with a wrong length or character). */
   'BAD_REQUEST',
   /** The call has no signed-in user (the same code as in `GAME_TRANSPORT_ERROR_CODES`). */
@@ -178,8 +186,8 @@ export interface Invites {
   /**
    * Accepts the invite and starts the game (the inviter plays white).
    * Resolves with the `gameId`. Rejects with `InviteErrorData`:
-   * `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`
-   * or `BAD_REQUEST`.
+   * `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`,
+   * `BLOCKED` (#320) or `BAD_REQUEST`.
    */
   acceptInvite(code: string): Promise<string>;
   /** Says no to the invite. Rejects like `acceptInvite`. */
