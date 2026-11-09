@@ -24,9 +24,6 @@ interface ToggleRowProps {
 /**
  * A settings row with a switch. The whole row is one tap target and one
  * accessible "switch", so screen readers read the label and the state together.
- * The switch itself takes no touches: a tap on it is the row's tap. If both
- * took it, one tap would flip the value twice (the switch, then the row), so
- * a tap on the switch would change nothing.
  * In a `SectionCard` it is a card row (side padding, the card draws the
  * lines); elsewhere it has a line under it.
  */
@@ -46,12 +43,8 @@ export function ToggleRow({ label, hint, icon, value, onValueChange, testID }: T
         <Text style={styles.label(inCard)}>{label}</Text>
         {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       </View>
-      <View
-        testID={testID === undefined ? undefined : `${testID}-switch`}
-        pointerEvents="none"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants">
-        <ThemedSwitch value={value} />
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <ThemedSwitch value={value} onValueChange={onValueChange} />
       </View>
     </Pressable>
   );

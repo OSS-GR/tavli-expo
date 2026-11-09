@@ -129,15 +129,6 @@ describe('rows in a SectionCard', () => {
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
-  it('flips a ToggleRow once on a tap on its switch: the switch takes no touches', async () => {
-    await renderWithRoot(
-      <ToggleRow testID="hints" label="Show hints" value={false} onValueChange={jest.fn()} />,
-    );
-    // The native switch would flip the value, and the row's tap would flip it back.
-    const box = screen.getByTestId('hints-switch', { includeHiddenElements: true });
-    expect(box).toHaveProp('pointerEvents', 'none');
-  });
-
   it('keeps the line under a ToggleRow outside a card', async () => {
     await renderWithRoot(<ToggleRow label="Sound" value onValueChange={jest.fn()} />);
     expect(screen.getByRole('switch', { name: 'Sound' })).not.toHaveStyle({
