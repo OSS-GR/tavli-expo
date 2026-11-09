@@ -91,6 +91,8 @@ function RootStack() {
           <Stack.Screen name="game/[id]/review" options={{ headerShown: true }} />
           <Stack.Screen name="dev/board" />
           <Stack.Screen name="dev/online" />
+          {/* A match that is a race, for Fast forward and the Maestro flows. */}
+          <Stack.Screen name="dev/race" />
           {/* An invite link (#256): `tavlaki://invite/<code>`. */}
           <Stack.Screen name="invite/[code]" />
           {/* Play a friend online (#281): the setup, then the waiting screen. */}

@@ -1,0 +1,47 @@
+# Fast forward a race vs the bot (docs/rules/tavli-match.md, "Fast forward
+# a race"): a race opens with the race card, Play on leaves the button
+# next to Roll, the bot plays both sides, and the game ends with the
+# game-end sheet.
+appId: com.tavlaki.dev
+name: Fast forward a race to the end of the game
+env:
+  METRO_URL: http%3A%2F%2Flocalhost%3A8081
+---
+- runFlow: subflows/open-dev-build.yaml
+- runFlow: subflows/welcome.yaml
+- runFlow: subflows/open-race.yaml
+- assertVisible:
+    id: race-card
+- assertNotVisible:
+    id: roll-button
+- takeScreenshot: 01-race-card
+- tapOn:
+    id: race-play-on-button
+- assertVisible:
+    id: roll-button
+- assertVisible: 'Fast forward.*'
+- takeScreenshot: 01b-race-fast-forward-offered
+- tapOn:
+    id: fast-forward-button
+- assertVisible:
+    id: fast-forward-status
+- assertVisible:
+    id: fast-forward-stop-button
+- assertNotVisible:
+    id: roll-button
+- takeScreenshot: 02-fast-forward-running
+- extendedWaitUntil:
+    visible:
+      id: game-end-card
+    timeout: 180000
+- assertVisible:
+    id: next-game-button
+- takeScreenshot: 03-game-over
+# The next game starts with contact: no Fast forward and no status.
+- tapOn:
+    id: next-game-button
+- assertNotVisible:
+    id: fast-forward-status
+- assertNotVisible:
+    id: fast-forward-button
+- takeScreenshot: 04-next-game

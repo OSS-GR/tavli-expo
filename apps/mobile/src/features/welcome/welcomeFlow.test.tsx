@@ -43,6 +43,7 @@ const routes = {
   'game/[id]/review': stub('review'),
   'dev/board': stub('dev board'),
   'dev/online': stub('dev online'),
+  'dev/race': stub('dev race'),
   'invite/[code]': stub('invite'),
   'friend/index': stub('play a friend'),
   'friend/[code]': stub('invite wait'),

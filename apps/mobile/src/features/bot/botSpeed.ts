@@ -91,3 +91,20 @@ export const BOT_SPEED_TIMING: Readonly<Record<BotSpeed, BotTiming>> = {
 
 /** The default timing: Normal speed. */
 export const BOT_TIMING: BotTiming = BOT_SPEED_TIMING.normal;
+
+/**
+ * Fast forward a race (`docs/rules/tavli-match.md`, "Fast forward a race"):
+ * the bot plays both sides, much faster than any Bot speed. The dice show
+ * at rest (no throw, no tumble, no split of a double), so a roll only
+ * waits `afterRollMs` to be read. Each checker still lands before the next
+ * move (`FLIGHT_MS` and a short beat). No think time. A race has no hits.
+ */
+export const FAST_FORWARD_TIMING: BotTiming = {
+  beforeRollMs: 150,
+  afterRollMs: 350,
+  doubleMs: 0,
+  moveMs: 260,
+  hitMs: 0,
+  landMs: 230,
+  thinkMs: () => 0,
+};

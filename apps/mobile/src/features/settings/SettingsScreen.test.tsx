@@ -30,6 +30,7 @@ describe('<SettingsScreen />', () => {
     expect(screen.getByRole('switch', { name: 'Haptics' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Auto-confirm moves' })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: 'Show hints' })).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Offer fast forward in races' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Phone language' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Flip' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Face-to-face' })).toBeDisabled();
@@ -110,6 +111,27 @@ describe('<SettingsScreen />', () => {
     });
     await user.press(screen.getByRole('switch', { name: 'Show hints' }));
     expect(settingsStore.getState().showHints).toBe(true);
+  });
+
+  it('turns the race card off and back on, and sends only the key', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      consentStore.setState({ status: 'granted' });
+    });
+    await render(<SettingsScreen />);
+
+    const toggle = () => screen.getByRole('switch', { name: 'Offer fast forward in races' });
+    await user.press(toggle());
+    expect(settingsStore.getState().offerFastForward).toBe(false);
+    expect(toggle()).not.toBeChecked();
+    expect(recorded.sent.at(-1)).toEqual({
+      type: 'track',
+      event: 'settings_changed',
+      props: { key: 'offerFastForward' },
+    });
+    // "Don't ask again" on the card turns it off; the switch turns it back on.
+    await user.press(toggle());
+    expect(settingsStore.getState().offerFastForward).toBe(true);
   });
 
   it('changes the board view and ignores the locked option', async () => {

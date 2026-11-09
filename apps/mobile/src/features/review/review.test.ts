@@ -84,6 +84,35 @@ describe('lastGameTurns', () => {
     expect(turns[0]!.state.turnNumber).toBe(1);
   });
 
+  it('leaves out the turns where a fast forward chose a move or the confirm', () => {
+    const flow = oneBadTurn();
+    const of = (type: string) => flow.log.flatMap((e, i) => (e.type === type ? [i] : []));
+    const rolls = of('roll');
+    // White rolls first: White's second turn starts at rolls[2], and its
+    // first move comes right after the roll.
+    const secondTurn = rolls[2]!;
+    expect(flow.log[secondTurn + 1]?.type).toBe('move');
+    const white = lastGameTurns(flow, ['white'], [secondTurn + 1]);
+    expect(white).toHaveLength(ROLLS.length / 2 - 1);
+    expect(white.map((t) => t.state.turnNumber)).not.toContain(3);
+    // The confirm alone counts too.
+    const confirms = of('confirm').filter((i) => i > secondTurn);
+    expect(lastGameTurns(flow, ['white'], [confirms[0]!])).toHaveLength(ROLLS.length / 2 - 1);
+    // An index that names no event changes nothing.
+    expect(lastGameTurns(flow, ['white'], [0])).toHaveLength(ROLLS.length / 2);
+    // Every move skipped: nothing left to review.
+    expect(reviewGame(flow, ['white'], testAnalyzer, of('move'))).toEqual([]);
+  });
+
+  it('grades a turn the fast forward only rolled: the person chose the moves', () => {
+    const flow = oneBadTurn();
+    const rolls = flow.log.flatMap((e, i) => (e.type === 'roll' ? [i] : []));
+    expect(lastGameTurns(flow, ['white'], rolls)).toHaveLength(ROLLS.length / 2);
+    expect(reviewGame(flow, ['white'], testAnalyzer, rolls)).toEqual(
+      reviewGame(flow, ['white'], testAnalyzer),
+    );
+  });
+
   it('is empty for a log with no start event', () => {
     expect(lastGameTurns({ ...oneBadTurn(), log: [] }, ['white'])).toEqual([]);
   });

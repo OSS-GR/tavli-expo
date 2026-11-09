@@ -106,6 +106,10 @@
       "label": "Show hints",
       "hint": "A Hint button shows the best move for your roll"
     },
+    "offerFastForward": {
+      "label": "Offer fast forward in races",
+      "hint": "Vs the bot, a card offers fast forward when a game becomes a race"
+    },
     "boardView": {
       "label": "Board view (pass-and-play)",
       "flip": "Flip",
@@ -290,6 +294,11 @@
       "inviteCode": "Code: {{code}}",
       "openInvite": "Open the invite",
       "tooManyInvites": "The bot has too many open invites. Wait until one closes."
+    },
+    "race": {
+      "title": "Race (dev)",
+      "busy": "Setting up a race…",
+      "failed": "No race this time. Open this page again."
     }
   },
   "online": {
@@ -586,6 +595,7 @@
       "next": "The turn passes to {{name}}.",
       "ok": "OK",
       "autoClose": "Closes by itself after 3.5 s.",
+      "autoCloseSoon": "Closes by itself in a moment.",
       "body_you": "You rolled {{dice}}. No checker can move.",
       "next_you": "Your turn.",
       "lockedTitle": "Board locked",
@@ -653,6 +663,21 @@
       "waiting": "Bot's turn…",
       "moving": "Bot rolled {{dice}} and is moving…",
       "choseMoving": "Bot chose {{dice}} and is moving…"
+    },
+    "fastForward": {
+      "button": "Fast forward",
+      "label": "Fast forward: the bot plays both sides to the end of the game",
+      "playing": "Fast forward…",
+      "stop": "Stop",
+      "stopLabel": "Stop fast forward and play on yourself",
+      "started": "Fast forward. The bot plays both sides to the end of the game.",
+      "offer": {
+        "title": "It's a race",
+        "body": "No more contact: the checkers only run home now. The bot can play both sides to the end of this game.",
+        "playOn": "Play on",
+        "never": "Don't ask again",
+        "settingsNote": "The Fast forward button stays next to Roll dice. You can turn this card off in Settings."
+      }
     },
     "menu": {
       "open": "Game menu",

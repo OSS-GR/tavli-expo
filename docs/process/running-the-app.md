@@ -286,6 +286,7 @@ Apple lets you download a key only once. If it is lost or leaks: make a new key 
 | `/settings` | Settings (language, sound, haptics, board options) |
 | `/dev/board` | **Dev only.** The board with sample positions. You can flip the board. **Dice → Throw on the board** turns on the dice throw spike (#183, [findings](../design/dice-throw-spike.md)). |
 | `/dev/online` | **Dev only.** An online game vs the bot on the in-memory server (#255). Pick a game, a time limit (1 minute, 5 minutes, or 24 hours by default) and a match length, then tap **Start game**. **Make an invite** makes an invite from the bot instead and shows its code and links (#256). The game lives only while the app runs. |
+| `/dev/race` | **Dev only.** Starts a vs-bot Portes match (it replaces the saved one) and lets the bot play both sides until the game is a race with you to roll, then opens the board: **Fast forward** shows next to Roll. The Maestro flows use it. |
 | `/invite/<code>` | An invite to an online game (#256). It shows the game, the length and the time limit, with Accept and Decline. Opened by the link `tavlaki://invite/<code>`. |
 | `/_sitemap` | Expo Router's list of all routes. Tap one to open it. |
 
@@ -298,6 +299,10 @@ Dev routes only work in development builds. Release builds (the `preview` profil
 - Android emulator: `adb shell am start -a android.intent.action.VIEW -d "tavlaki://dev/board"`
 
 To try the online screen: open `tavlaki://dev/online` (or pick `dev/online` in `/_sitemap`). The bot plays its turns on its own, and a turn timer that runs out ends that game, as on the real server.
+
+To try Fast forward: open `tavlaki://dev/race` and tap **Fast forward** on the race card (or **Play on**, then **Fast forward** next to Roll).
+
+**Maestro (end-to-end).** The flows live in `apps/mobile/.maestro/` (how to run them: its `README.md`). They need the dev build on the iOS simulator and Metro running, because they open `tavlaki://dev/race`. Run them from `apps/mobile`: `maestro test .maestro/fast-forward.yaml .maestro/fast-forward-stop.yaml`.
 
 To try an invite link (#256):
 

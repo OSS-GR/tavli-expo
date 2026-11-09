@@ -10,6 +10,9 @@
  *
  * - Only turns of a person count: vs the bot, the bot's turns are left
  *   out; in pass-and-play both players count.
+ * - A turn that a fast forward played for the person is left out too: the
+ *   bot chose it (`skipped`, the log indexes of its roll or chosen double,
+ *   from `GameStoreState.autoEvents`).
  * - A turn with no choice (a pass, or a roll with one legal turn) is not
  *   graded. Answers to a variant's question (the Plakoto mother, the
  *   Acey-Deucey chosen double) are not turns, so they are never graded.
@@ -78,20 +81,40 @@ export interface Mistake extends GradedTurn {
   readonly band: MistakeBand;
 }
 
+/** No turn is left out. */
+const NO_EVENTS: readonly number[] = [];
+
 /**
  * The turns of the last game in `flow` that `players` played after a roll,
  * oldest first. It replays the match log with the engine (the log holds
  * every die), and keeps the last game only. A pass is left out: the
- * player had nothing to choose.
+ * player had nothing to choose. So is a turn where a fast forward chose
+ * something: an answer, a move, an undo or the confirm at a log index in
+ * `skipped`. A roll is no choice, so a turn the fast forward only rolled,
+ * then the person played after Stop, is graded.
  */
-export function lastGameTurns(flow: MatchFlow, players: readonly PlayerId[]): PlayedTurn[] {
+export function lastGameTurns(
+  flow: MatchFlow,
+  players: readonly PlayerId[],
+  skipped: readonly number[] = NO_EVENTS,
+): PlayedTurn[] {
   const [start, ...events] = flow.log;
   if (start === undefined || start.type !== 'start') return [];
+  const skip = new Set(skipped);
   let current = replay([start]);
   let turns: PlayedTurn[] = [];
-  for (const event of events) {
+  // A fast forward chose something in this turn.
+  let autoChose = false;
+  for (const [i, event] of events.entries()) {
     if (event.type === 'start') return [];
     const next = applyMatchAction(current, event as MatchAction);
+    if (event.type === 'roll' || event.type === 'rollOpening') {
+      // A new roll starts a new turn.
+      autoChose = false;
+    } else if (skip.has(i + 1)) {
+      // `events` starts at log index 1.
+      autoChose = true;
+    }
     if (event.type === 'nextGame') {
       turns = [];
     } else {
@@ -102,9 +125,10 @@ export function lastGameTurns(flow: MatchFlow, players: readonly PlayerId[]): Pl
       // with the roll. A roll with no legal move passes in one step, from
       // a state with no dice: it is never graded.
       const moving = current.game.phase === 'moving' || current.game.phase === 'awaiting-confirm';
-      if (ended && moving && turn.moves.length > 0 && players.includes(turn.player)) {
+      if (ended && moving && turn.moves.length > 0 && players.includes(turn.player) && !autoChose) {
         turns.push({ state: current.game.state, turn });
       }
+      if (ended) autoChose = false;
     }
     current = next;
   }
@@ -160,8 +184,9 @@ export function reviewGame(
   flow: MatchFlow,
   players: readonly PlayerId[],
   analyzer: Analyzer,
+  skipped: readonly number[] = NO_EVENTS,
 ): Mistake[] {
-  const graded = lastGameTurns(flow, players)
+  const graded = lastGameTurns(flow, players, skipped)
     .map((played) => gradeTurn(analyzer, played))
     .filter((g): g is GradedTurn => g !== null);
   return biggestMistakes(graded);

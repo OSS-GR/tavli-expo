@@ -1,0 +1,28 @@
+# Opens the dev build on the Metro server and waits for the app.
+# METRO_URL is the URL-encoded Metro address (default: localhost:8081 on
+# the same Mac as the simulator).
+appId: com.tavlaki.dev
+---
+- launchApp:
+    clearState: true
+- openLink: exp+tavlaki://expo-development-client/?url=${METRO_URL}
+# iOS may ask before it opens a link in the app.
+- tapOn:
+    text: Open
+    optional: true
+# The first bundle can take a few minutes to build.
+- extendedWaitUntil:
+    visible:
+      id: welcome-language
+    timeout: 300000
+# The dev menu shows a one-time tip the first time it loads. Only then:
+# the language step has a Continue button too.
+- runFlow:
+    when:
+      visible: .*developer menu.*
+    commands:
+      - tapOn: Continue
+# The first load is busy for a moment (the dev menu, DevTools): taps sent
+# right away can be lost.
+- waitForAnimationToEnd:
+    timeout: 5000

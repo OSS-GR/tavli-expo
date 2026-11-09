@@ -86,6 +86,7 @@ export function SettingsScreen({
   const language = useSettings((s) => s.language);
   const autoConfirmMoves = useSettings((s) => s.autoConfirmMoves);
   const showHints = useSettings((s) => s.showHints);
+  const offerFastForward = useSettings((s) => s.offerFastForward);
   const boardFlipMode = useSettings((s) => s.boardFlipMode);
   const theme = useSettings((s) => s.theme);
   const moveList = useSettings((s) => s.moveList);
@@ -161,6 +162,14 @@ export function SettingsScreen({
             hint={t('settings.hints.hint')}
             value={showHints}
             onValueChange={(value) => setSetting('showHints', value)}
+          />
+          <ToggleRow
+            testID="settings-offer-fast-forward"
+            icon="fastForward"
+            label={t('settings.offerFastForward.label')}
+            hint={t('settings.offerFastForward.hint')}
+            value={offerFastForward}
+            onValueChange={(value) => setSetting('offerFastForward', value)}
           />
           <SettingBlock icon="flipVertical" label={t('settings.boardView.label')}>
             <SegmentedControl

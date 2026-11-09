@@ -85,6 +85,16 @@ export type BoardStore = Pick<
 export interface GameStoreState extends BoardStoreState {
   /** A new match with the same players and rules; the last winner starts. */
   rematch: () => void;
+  /**
+   * Fast forward a race: the log indexes of the actions (roll, answer,
+   * move, undo, confirm) that fast forward made for a person. The game
+   * review leaves out a turn where it chose something: the bot chose it.
+   * Memory only, like the review: a saved match forgets them. A rematch
+   * starts a new list.
+   */
+  readonly autoEvents: readonly number[];
+  /** Marks the event at this log index as made by fast forward for a person. */
+  markAutoEvent: (logIndex: number) => void;
 }
 
 export type GameStore = StoreApi<GameStoreState>;
@@ -119,6 +129,7 @@ export function createGameStore({
     flow,
     matchKey: nextMatchKey(),
     lastError: null,
+    autoEvents: [],
     dispatch: (action) => {
       const previous = get().flow;
       let next: MatchFlow;
@@ -135,8 +146,12 @@ export function createGameStore({
     },
     rematch: () => {
       const next = createRematchFlow(get().flow, ctx);
-      set({ flow: next, matchKey: nextMatchKey(), lastError: null });
+      set({ flow: next, matchKey: nextMatchKey(), lastError: null, autoEvents: [] });
       if (analytics) quietly(() => analytics.gameStarted(next));
+    },
+    markAutoEvent: (logIndex) => {
+      const { autoEvents } = get();
+      if (!autoEvents.includes(logIndex)) set({ autoEvents: [...autoEvents, logIndex] });
     },
   }));
 }

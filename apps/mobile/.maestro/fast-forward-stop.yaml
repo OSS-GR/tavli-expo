@@ -1,0 +1,26 @@
+# Stop gives you the board back: no status, and your own buttons return
+# (Roll, or Undo and Confirm when your turn had begun).
+appId: com.tavlaki.dev
+name: Stop a fast forward and play on yourself
+env:
+  METRO_URL: http%3A%2F%2Flocalhost%3A8081
+---
+- runFlow: subflows/open-dev-build.yaml
+- runFlow: subflows/welcome.yaml
+- runFlow: subflows/open-race.yaml
+- assertVisible:
+    id: race-card
+- tapOn:
+    id: race-fast-forward-button
+- assertVisible:
+    id: fast-forward-stop-button
+- tapOn:
+    id: fast-forward-stop-button
+- assertNotVisible:
+    id: fast-forward-status
+# Your turn, or the bot ends its own turn first and then it is yours.
+- extendedWaitUntil:
+    visible:
+      id: (roll-button|confirm-button)
+    timeout: 30000
+- takeScreenshot: 05-stopped

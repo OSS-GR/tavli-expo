@@ -267,7 +267,7 @@ Rules:
 
 - **Game engine and bot:** Vitest 5. Aim for very high coverage. Add property-based tests (for example `fast-check`) for "every legal move keeps 15 checkers per side".
 - **App components:** Jest + `jest-expo` preset + React Native Testing Library 14. Use the pnpm `transformIgnorePatterns` from the Expo guide.
-- **E2E:** Maestro flows in `.maestro/`. Run them locally on a simulator and on EAS Workflows (`type: maestro` job).
+- **E2E:** Maestro flows in `apps/mobile/.maestro/` (see its `README.md`). Run them locally on a simulator and on EAS Workflows (`type: maestro` job).
 - **Do** test every rule variant (Portes, Plakoto, Fevga, Asodio) with fixed seeds and known positions.
 - **Do** add `testID` props to key UI (board, dice, roll button) for Maestro.
 - **Do not** snapshot-test whole screens. Snapshots break often and catch little.

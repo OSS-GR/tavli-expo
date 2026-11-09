@@ -47,7 +47,7 @@ import { HIT_DELAY_MS } from '@/features/board/flights';
 
 import { BOT_TIMING, type BotTiming } from './botSpeed';
 
-export { BOT_SPEED_TIMING, BOT_TIMING, type BotTiming } from './botSpeed';
+export { BOT_SPEED_TIMING, BOT_TIMING, FAST_FORWARD_TIMING, type BotTiming } from './botSpeed';
 
 /** What the bot may do. Each returns `false` when the engine refuses it. */
 export interface BotTurnActions {
