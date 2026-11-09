@@ -115,6 +115,29 @@ function keep(phone: Phone, response: Response): void {
   phone.cookie = [...now].map(([name, value]) => `${name}=${value}`).join('; ');
 }
 
+/**
+ * A `fetch` for Better Auth's real client that sends each request to the
+ * test server as `phone`: the app's origin, the session cookie, and the
+ * cookies each reply sets (what the Expo plugin does on a phone).
+ */
+export function phoneFetch(t: Convex, phone: Phone): typeof fetch {
+  return async (input, init) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    const headers = new Headers(request.headers);
+    headers.set('origin', ORIGIN);
+    if (phone.cookie !== '') headers.set('cookie', phone.cookie);
+    const body = request.method === 'GET' ? undefined : await request.text();
+    const response = await t.fetch(`${url.pathname}${url.search}`, {
+      method: request.method,
+      headers,
+      ...(body === undefined || body === '' ? {} : { body }),
+    });
+    keep(phone, response);
+    return response;
+  };
+}
+
 export interface Reply {
   readonly status: number;
   readonly body: Record<string, unknown>;

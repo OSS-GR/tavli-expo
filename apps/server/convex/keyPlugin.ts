@@ -125,8 +125,10 @@ export function keyPlugin(options: KeyPluginOptions) {
           if (accounts.some((account) => account.providerId === providerId)) {
             throw keyError('CONFLICT', 'PROVIDER_TAKEN');
           }
-          // The account hook claims the key first (`claimKey`): if another
-          // user got it a moment ago, this throws KEY_BELONGS_TO_OTHER.
+          // The account hook claims the key first (`claimKey`), in one
+          // transaction: if another user got it a moment ago, this throws
+          // KEY_BELONGS_TO_OTHER; if a save of another Apple id by this
+          // user just passed the check above, PROVIDER_TAKEN.
           await internalAdapter.createAccount({ userId: user.id, providerId, accountId });
 
           // The key's email, when no other user has it (emails are unique).

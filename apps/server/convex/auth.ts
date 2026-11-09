@@ -152,13 +152,14 @@ export function createAuth(ctx: AuthCtx) {
           // Each new key is claimed first, in one transaction (`claimKey`).
           before: async (account) => {
             if (!isKeyProviderId(account.providerId)) return;
-            const owner = await actionCtx(ctx).runMutation(internal.authKeys.claimKey, {
+            const claim = await actionCtx(ctx).runMutation(internal.authKeys.claimKey, {
               providerId: account.providerId,
               accountId: account.accountId,
               userId: account.userId,
               now: Date.now(),
             });
-            if (owner !== account.userId) throw keyError('CONFLICT', 'KEY_BELONGS_TO_OTHER');
+            if (claim === 'belongs-to-other') throw keyError('CONFLICT', 'KEY_BELONGS_TO_OTHER');
+            if (claim === 'provider-taken') throw keyError('CONFLICT', 'PROVIDER_TAKEN');
           },
         },
       },

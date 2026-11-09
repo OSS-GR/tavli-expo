@@ -17,13 +17,13 @@ Versions: `better-auth` and `@better-auth/expo` 1.6.33, `@convex-dev/better-auth
 
 ## Files
 
-| File                      | Job                                                                                                                       |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `src/provider.ts`         | `fromBetterAuthClient`: the port on any object with the client methods it uses (`BetterAuthClient`). No vendor imports    |
-| `src/client.ts`           | `createBetterAuthClient` and `createBetterAuthProvider`: the real Expo client with the Expo, anonymous and Convex plugins |
-| `src/secureStore.ts`      | `createSecureSessionStorage`: `expo-secure-store` as the cookie store. The only file that imports it                      |
-| `src/provider.test.ts`    | Runs `authProviderContract` (`@tavli/contracts/testing`) on a fake client, plus the adapter's own rules                   |
-| `src/secureStore.test.ts` | The cookie store on a mocked `expo-secure-store`                                                                          |
+| File                      | Job                                                                                                                                                                                                                                                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/provider.ts`         | `fromBetterAuthClient`: the port on any object with the client methods it uses (`BetterAuthClient`). No vendor imports. Also exported as `@tavli/auth-better-auth/provider` (no Expo imports), so `apps/server/convex/betterAuthClient.test.ts` can run it on the real client against the real routes |
+| `src/client.ts`           | `createBetterAuthClient` and `createBetterAuthProvider`: the real Expo client with the Expo, anonymous and Convex plugins                                                                                                                                                                             |
+| `src/secureStore.ts`      | `createSecureSessionStorage`: `expo-secure-store` as the cookie store. The only file that imports it                                                                                                                                                                                                  |
+| `src/provider.test.ts`    | Runs `authProviderContract` (`@tavli/contracts/testing`) on a fake client, plus the adapter's own rules                                                                                                                                                                                               |
+| `src/secureStore.test.ts` | The cookie store on a mocked `expo-secure-store`                                                                                                                                                                                                                                                      |
 
 ## How the app uses it
 

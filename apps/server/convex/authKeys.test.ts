@@ -285,8 +285,27 @@ describe('a guest saves their account with Apple', () => {
       userId: 'someone-else',
       now: Date.now(),
     });
-    expect(claimed).toBe(owner.id);
+    expect(claimed).toBe('belongs-to-other');
     expect(await claims(t)).toMatchObject([{ accountId: 'apple-ann', userId: owner.id }]);
+  });
+
+  it('two Apple ids saved on one account at once: the second is turned down (the race path)', async () => {
+    const t = setup();
+    const phone = newPhone();
+    const id = await guest(t, phone);
+    // A save of apple-bob by this user passed its checks and claimed the
+    // key, but has not made its account row yet.
+    await t.mutation(internal.authKeys.claimKey, {
+      providerId: 'apple',
+      accountId: 'apple-bob',
+      userId: id,
+      now: Date.now(),
+    });
+    const reply = await saveApple(t, apple, phone, 'apple-ann');
+    expect(reply.status).toBe(409);
+    expect(reply.body['code']).toBe('PROVIDER_TAKEN');
+    expect(await claims(t)).toMatchObject([{ accountId: 'apple-bob', userId: id }]);
+    expect(await keysOf(t, phone)).toEqual([]);
   });
 
   it('a second Apple id on the same account is turned down', async () => {
@@ -375,9 +394,10 @@ describe('claimKey and useKeyNonce', () => {
   it('the first claim wins; a second user gets the owner back and writes nothing', async () => {
     const t = setup();
     const key = { providerId: 'apple', accountId: 'apple-ann', now: 1_000 };
-    expect(await t.mutation(internal.authKeys.claimKey, { ...key, userId: 'u1' })).toBe('u1');
-    expect(await t.mutation(internal.authKeys.claimKey, { ...key, userId: 'u2' })).toBe('u1');
-    expect(await t.mutation(internal.authKeys.claimKey, { ...key, userId: 'u1' })).toBe('u1');
+    const claim = (userId: string) => t.mutation(internal.authKeys.claimKey, { ...key, userId });
+    expect(await claim('u1')).toBe('claimed');
+    expect(await claim('u2')).toBe('belongs-to-other');
+    expect(await claim('u1')).toBe('claimed');
     expect(await claims(t)).toHaveLength(1);
     // Another user's claim stays when someone else releases it.
     const own = { providerId: key.providerId, accountId: key.accountId };
@@ -392,13 +412,29 @@ describe('claimKey and useKeyNonce', () => {
     const key = { providerId: 'apple', accountId: 'apple-ann' };
     const claim = (userId: string, now: number) =>
       t.mutation(internal.authKeys.claimKey, { ...key, userId, now });
-    expect(await claim('u1', 1_000)).toBe('u1');
-    expect(await claim('u2', 1_000 + CLAIM_GRACE_MS - 1)).toBe('u1');
-    expect(await claim('u2', 1_000 + CLAIM_GRACE_MS)).toBe('u2');
+    expect(await claim('u1', 1_000)).toBe('claimed');
+    expect(await claim('u2', 1_000 + CLAIM_GRACE_MS - 1)).toBe('belongs-to-other');
+    expect(await claim('u2', 1_000 + CLAIM_GRACE_MS)).toBe('claimed');
     // The repaired claim starts its own grace time.
-    expect(await claim('u3', 1_000 + 2 * CLAIM_GRACE_MS - 1)).toBe('u2');
+    expect(await claim('u3', 1_000 + 2 * CLAIM_GRACE_MS - 1)).toBe('belongs-to-other');
     expect(await claims(t)).toMatchObject([
       { ...key, userId: 'u2', claimedAt: 1_000 + CLAIM_GRACE_MS },
+    ]);
+  });
+
+  it('a user claims one key per provider; their stale claim does not count', async () => {
+    const t = setup();
+    const claim = (accountId: string, userId: string, now: number) =>
+      t.mutation(internal.authKeys.claimKey, { providerId: 'apple', accountId, userId, now });
+    expect(await claim('apple-ann', 'u1', 1_000)).toBe('claimed');
+    expect(await claim('apple-bob', 'u1', 1_000 + CLAIM_GRACE_MS - 1)).toBe('provider-taken');
+    // Another user may still claim apple-bob.
+    expect(await claim('apple-bob', 'u2', 1_000)).toBe('claimed');
+    // u1's claim on apple-ann has no account row: once stale, u1 may claim another.
+    expect(await claim('apple-cat', 'u1', 1_000 + CLAIM_GRACE_MS)).toBe('claimed');
+    expect(await claims(t)).toMatchObject([
+      { accountId: 'apple-bob', userId: 'u2' },
+      { accountId: 'apple-cat', userId: 'u1' },
     ]);
   });
 

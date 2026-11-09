@@ -417,6 +417,9 @@ importers:
       '@edge-runtime/vm':
         specifier: 5.0.0
         version: 5.0.0
+      '@tavli/auth-better-auth':
+        specifier: workspace:*
+        version: link:../../packages/adapters/auth-better-auth
       '@tavli/backend-convex':
         specifier: workspace:*
         version: link:../../packages/adapters/backend-convex

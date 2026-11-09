@@ -10,7 +10,8 @@
  *   `databaseHooks.account.create.before`), on sign-in and on save. A
  *   claim with no `account` row behind it after `CLAIM_GRACE_MS` is stale
  *   (that write failed, or a remove failed halfway) and goes to the next
- *   user who claims the key.
+ *   user who claims the key. A user holds at most one key per provider:
+ *   `/key/save` checks it too, but two saves at once would both pass.
  * - `releaseKey`: drops the claim when the key is removed (`removeKey`).
  * - `useKeyNonce`: a nonce works once (`model/keyNonce.ts`).
  *
@@ -21,6 +22,7 @@
 import { v } from 'convex/values';
 
 import { components } from './_generated/api';
+import type { Doc } from './_generated/dataModel';
 import { internalMutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 
@@ -34,36 +36,61 @@ export const OLD_NONCES_PER_USE = 10;
  */
 export const CLAIM_GRACE_MS = 60 * 1000;
 
+/** What `claimKey` found. */
+export const CLAIM_RESULTS = ['claimed', 'belongs-to-other', 'provider-taken'] as const;
+
+export type ClaimResult = (typeof CLAIM_RESULTS)[number];
+
+/**
+ * True while `claim` holds: it is younger than `CLAIM_GRACE_MS` at `now`,
+ * or an `account` row has its key.
+ */
+async function holds(ctx: MutationCtx, claim: Doc<'authKeys'>, now: number): Promise<boolean> {
+  if (now - claim.claimedAt < CLAIM_GRACE_MS) return true;
+  const account: unknown = await ctx.runQuery(components.betterAuth.adapter.findOne, {
+    model: 'account',
+    where: [
+      { field: 'providerId', value: claim.providerId },
+      { field: 'accountId', value: claim.accountId },
+    ],
+  });
+  return account !== null;
+}
+
 /**
  * Claims `(providerId, accountId)` for `userId` at `now` (epoch ms).
- * Returns the owner: the same `userId` when the key was free, was
- * already theirs or held a stale claim, else the other user's id (and
- * writes nothing).
+ * - `claimed`: the key is `userId`'s now (it was free, theirs already, or
+ *   held a stale claim).
+ * - `belongs-to-other`: another user holds it. Nothing is written.
+ * - `provider-taken`: `userId` holds another key of this provider (one
+ *   Apple id per account). Nothing is written. A stale claim of theirs
+ *   does not count, and is deleted.
  */
 export const claimKey = internalMutation({
   args: { providerId: v.string(), accountId: v.string(), userId: v.string(), now: v.number() },
-  returns: v.string(),
-  handler: async (ctx, { providerId, accountId, userId, now }) => {
+  returns: v.union(...CLAIM_RESULTS.map((result) => v.literal(result))),
+  handler: async (ctx, { providerId, accountId, userId, now }): Promise<ClaimResult> => {
     const owner = await ctx.db
       .query('authKeys')
       .withIndex('by_key', (q) => q.eq('providerId', providerId).eq('accountId', accountId))
       .unique();
+    if (owner !== null && owner.userId === userId) return 'claimed';
+    if (owner !== null && (await holds(ctx, owner, now))) return 'belongs-to-other';
+    const mine = await ctx.db
+      .query('authKeys')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect();
+    for (const other of mine) {
+      if (other.providerId !== providerId) continue;
+      if (await holds(ctx, other, now)) return 'provider-taken';
+      await ctx.db.delete(other._id);
+    }
     if (owner === null) {
       await ctx.db.insert('authKeys', { providerId, accountId, userId, claimedAt: now });
-      return userId;
+    } else {
+      await ctx.db.patch(owner._id, { userId, claimedAt: now });
     }
-    if (owner.userId === userId || now - owner.claimedAt < CLAIM_GRACE_MS) return owner.userId;
-    // An old claim: it holds only when an `account` row has the key.
-    const account: unknown = await ctx.runQuery(components.betterAuth.adapter.findOne, {
-      model: 'account',
-      where: [
-        { field: 'providerId', value: providerId },
-        { field: 'accountId', value: accountId },
-      ],
-    });
-    if (account !== null) return owner.userId;
-    await ctx.db.patch(owner._id, { userId, claimedAt: now });
-    return userId;
+    return 'claimed';
   },
 });
 
