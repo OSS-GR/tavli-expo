@@ -1377,7 +1377,7 @@
       "other": "Something else"
     },
     "sending": "Sending…",
-    "slow": "This takes long. It goes through when the connection is back.",
+    "slow": "This takes long. You may close this: Settings → Blocked players shows later whether it went through.",
     "blocked": {
       "title": "Player blocked",
       "body": "You will not get invites from this player. To unblock them, go to Settings → Blocked players."

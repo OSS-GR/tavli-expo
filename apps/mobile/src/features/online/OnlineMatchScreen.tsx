@@ -172,9 +172,9 @@ function OnlineBoard({
   // A report or block on its way keeps its dialog open (`onHold`).
   const [held, setHeld] = useState(false);
   const close = () => setOverlay(NO_OVERLAY);
-  useKnownBlocks(safety);
-  const opponentId = view?.players[opponent(side)] ?? null;
-  const opponentBlocked = useIsBlocked(opponentId);
+  const me = view?.players[side] ?? null;
+  useKnownBlocks(safety, me);
+  const opponentBlocked = useIsBlocked(me, view?.players[opponent(side)] ?? null);
 
   // Resign match while your turn is on its way: the store takes no action
   // then, so the resign waits and goes as soon as the call is done.
@@ -352,9 +352,15 @@ function OnlineBoard({
         onCancel={close}
       />
     );
-  } else if (overlay.kind === 'safety' && safety) {
+  } else if (overlay.kind === 'safety' && safety && me !== null) {
     content = (
-      <ReportOrBlock player={overlay.player} safety={safety} onClose={close} onHold={setHeld} />
+      <ReportOrBlock
+        me={me}
+        player={overlay.player}
+        safety={safety}
+        onClose={close}
+        onHold={setHeld}
+      />
     );
   }
 

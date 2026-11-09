@@ -101,8 +101,9 @@ export function MatchEndScreen({
   const { theme } = useUnistyles();
   const seats = online !== undefined ? online.seats : seatsFor(setup, t);
   const name = (player: PlayerId) => seats[player].name;
-  const reportText = (o: OnlineMatchEnd) =>
-    safetyActionText(o.blocked ?? false, name(opponent(o.me)), t);
+  const report = online
+    ? safetyActionText(online.blocked ?? false, name(opponent(online.me)), t)
+    : null;
   const winner = match.winner ?? 'white';
   // Like the win jingle (`matchWin`): only a win by a person is celebrated.
   const humans =
@@ -300,11 +301,11 @@ export function MatchEndScreen({
             kind="secondary"
             onPress={onHome}
           />
-          {online?.onReportOrBlock ? (
+          {online?.onReportOrBlock && report !== null ? (
             <ActionButton
               testID="end-report-block"
-              label={reportText(online).label}
-              accessibilityLabel={reportText(online).accessibilityLabel}
+              label={report.label}
+              accessibilityLabel={report.accessibilityLabel}
               kind="text"
               onPress={online.onReportOrBlock}
             />

@@ -65,8 +65,9 @@ function FinishedOnlineMatches({ auth, games, safety, onMatches }: FinishedOnlin
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
   const { state, retry } = useMyOnlineGames(auth, games, 'finished');
   // Asked only once the list is in: the session is there then.
-  useKnownBlocks(state.status === 'loaded' ? safety : undefined);
-  const blockedIds = useBlockedIds();
+  const me = state.status === 'loaded' ? state.me : null;
+  useKnownBlocks(safety, me);
+  const blockedIds = useBlockedIds(me);
   const has = state.status === 'loading' || (state.status === 'loaded' && state.games.length > 0);
   useEffect(() => {
     onMatches?.(has);
@@ -110,8 +111,13 @@ function FinishedOnlineMatches({ auth, games, safety, onMatches }: FinishedOnlin
           )
         }
       />
-      {safety ? (
-        <ReportOrBlockSheet player={reporting} safety={safety} onClose={() => setReporting(null)} />
+      {safety && me !== null ? (
+        <ReportOrBlockSheet
+          me={me}
+          player={reporting}
+          safety={safety}
+          onClose={() => setReporting(null)}
+        />
       ) : null}
     </View>
   );

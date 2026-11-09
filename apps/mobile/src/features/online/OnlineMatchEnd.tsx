@@ -61,8 +61,10 @@ function OnlineMatchEndView({
   const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
   const view = useOnlineStore(store, (s) => s.view);
   const side = useOnlineStore(store, (s) => s.side);
-  useKnownBlocks(safety);
+  const me = view !== null && side !== null ? view.players[side] : null;
+  useKnownBlocks(safety, me);
   const blocked = useIsBlocked(
+    me,
     view !== null && side !== null ? view.players[opponent(side)] : null,
   );
   const loadError = useOnlineStore(store, (s) => s.loadError);
@@ -87,7 +89,12 @@ function OnlineMatchEndView({
         onHome={onHome}
       />
       {safety ? (
-        <ReportOrBlockSheet player={reporting} safety={safety} onClose={() => setReporting(null)} />
+        <ReportOrBlockSheet
+          me={view.players[side]}
+          player={reporting}
+          safety={safety}
+          onClose={() => setReporting(null)}
+        />
       ) : null}
     </>
   );

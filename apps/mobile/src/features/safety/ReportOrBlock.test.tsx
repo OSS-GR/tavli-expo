@@ -35,7 +35,7 @@ async function flush(): Promise<void> {
 
 async function show(player: SafetyPlayer, safety: Safety = onlineFake.safety) {
   const onClose = jest.fn();
-  await render(<ReportOrBlockSheet player={player} safety={safety} onClose={onClose} />);
+  await render(<ReportOrBlockSheet me={ME} player={player} safety={safety} onClose={onClose} />);
   return onClose;
 }
 
@@ -200,12 +200,64 @@ describe('<ReportOrBlock />', () => {
     await act(async () => {
       jest.advanceTimersByTime(SENDING_HOLD_MS);
     });
-    expect(screen.getByText(/It goes through when the connection is back/)).toBeOnTheScreen();
+    expect(
+      screen.getByText(/Blocked players shows later whether it went through/),
+    ).toBeOnTheScreen();
     await user.press(screen.getByTestId('safety-close'));
     expect(onClose).toHaveBeenCalledTimes(1);
     await act(async () => {
       answer();
     });
+  });
+
+  it('a dialog opened again while the call is on its way follows it: no second call', async () => {
+    const player = meetFriend();
+    let answer: () => void = () => {};
+    const report = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const safety = { ...onlineFake.safety, report };
+    const first = await render(
+      <ReportOrBlockSheet me={ME} player={player} safety={safety} onClose={jest.fn()} />,
+    );
+    const user = setupUser();
+    await user.press(screen.getByTestId('safety-report'));
+    await user.press(screen.getByTestId('safety-reason-harassment'));
+    await act(async () => {
+      jest.advanceTimersByTime(SENDING_HOLD_MS);
+    });
+    await user.press(screen.getByTestId('safety-close'));
+    await first.unmount();
+    await render(
+      <ReportOrBlockSheet me={ME} player={player} safety={safety} onClose={jest.fn()} />,
+    );
+    expect(screen.getByTestId('safety-sending')).toBeOnTheScreen();
+    await act(async () => {
+      answer();
+    });
+    await flush();
+    expect(screen.getByTestId('safety-done')).toBeOnTheScreen();
+    expect(report).toHaveBeenCalledTimes(1);
+  });
+
+  it('a call that throws at once fails like a rejected one, and lets the sheet close', async () => {
+    const player = meetFriend();
+    const block = jest.fn(() => {
+      throw new Error('broken');
+    });
+    const onClose = await show(player, { ...onlineFake.safety, block });
+    const user = setupUser();
+    await user.press(screen.getByTestId('safety-block'));
+    await user.press(screen.getByTestId('safety-block-yes'));
+    await flush();
+    expect(screen.getByTestId('safety-failed')).toBeOnTheScreen();
+    // The tap outside the dialog (the first Close) works again.
+    const [outside] = screen.getAllByRole('button', { name: 'Close', includeHiddenElements: true });
+    await user.press(outside!);
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('a refused call shows a final error, with no Try again', async () => {
@@ -224,7 +276,7 @@ describe('<ReportOrBlock />', () => {
 
   it('a player blocked already gets Report only', async () => {
     const player = meetFriend();
-    markBlocked(FRIEND);
+    markBlocked(ME, FRIEND);
     const name = `Guest ${onlineFake.guestNumber(FRIEND)}`;
     await show(player);
     expect(screen.getByRole('header', { name: `Report ${name}` })).toBeOnTheScreen();
@@ -236,13 +288,18 @@ describe('<ReportOrBlock />', () => {
     const player = meetFriend();
     const seen: boolean[] = [];
     function Probe() {
-      seen.push(useIsBlocked(FRIEND));
+      seen.push(useIsBlocked(ME, FRIEND));
       return null;
     }
     await render(
       <>
         <Probe />
-        <ReportOrBlockSheet player={player} safety={onlineFake.safety} onClose={jest.fn()} />
+        <ReportOrBlockSheet
+          me={ME}
+          player={player}
+          safety={onlineFake.safety}
+          onClose={jest.fn()}
+        />
       </>,
     );
     expect(seen.at(-1)).toBe(false);

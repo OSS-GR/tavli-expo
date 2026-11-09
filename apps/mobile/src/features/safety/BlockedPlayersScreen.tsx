@@ -43,7 +43,8 @@ type State =
   | { readonly kind: 'loading' }
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
-  | { readonly kind: 'ready'; readonly players: readonly BlockedPlayer[] };
+  /** `me`: the signed-in user, whose blocks these are. */
+  | { readonly kind: 'ready'; readonly me: string; readonly players: readonly BlockedPlayer[] };
 
 export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScreenProps) {
   const { t, i18n } = useTranslation();
@@ -70,8 +71,11 @@ export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScr
         if (user === null) return { kind: 'signedOut' };
         const players = await safety.listBlocked();
         // The other screens offer Report only for these players.
-        setBlockedList(players.map((p) => p.playerId));
-        return { kind: 'ready', players };
+        setBlockedList(
+          user.id,
+          players.map((p) => p.playerId),
+        );
+        return { kind: 'ready', me: user.id, players };
       })
       .then(
         (next) => {
@@ -100,17 +104,18 @@ export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScr
   );
 
   const unblock = (player: BlockedPlayer) => {
-    if (busy !== null) return;
+    if (busy !== null || state.kind !== 'ready') return;
+    const { me } = state;
     setBusy(player.playerId);
     setUnblockFailed(false);
     safety.unblock(player.playerId).then(
       () => {
-        markUnblocked(player.playerId);
+        markUnblocked(me, player.playerId);
         if (!live.current) return;
         setBusy(null);
         setState((s) =>
           s.kind === 'ready'
-            ? { kind: 'ready', players: s.players.filter((p) => p.playerId !== player.playerId) }
+            ? { ...s, players: s.players.filter((p) => p.playerId !== player.playerId) }
             : s,
         );
         unblockCount += 1;

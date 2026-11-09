@@ -79,7 +79,7 @@ describe('<BlockedPlayersScreen />', () => {
     await blockAll('ann', 'bob');
     const seen: Record<string, boolean> = {};
     function Probe({ id }: { id: string }) {
-      seen[id] = useIsBlocked(id);
+      seen[id] = useIsBlocked(ME, id);
       return null;
     }
     await render(
