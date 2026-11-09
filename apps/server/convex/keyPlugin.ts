@@ -102,20 +102,29 @@ export function keyPlugin(options: KeyPluginOptions) {
         async (ctx) => {
           const { provider: providerId, token, nonce } = readSaveBody(ctx.body);
           const provider = ctx.context.socialProviders.find((p) => p.id === providerId);
-          if (provider?.verifyIdToken === undefined) throw keyError('BAD_REQUEST', 'BAD_REQUEST');
-          // The same check as a sign-in: Apple's signature, our app, our nonce (once).
-          if (!(await provider.verifyIdToken(token, nonce, ctx))) {
+          // Our own check (`verifyKeyIdToken` in `auth.ts`), the one Better
+          // Auth's sign-in also runs first: Apple's signature, our app, our
+          // nonce (once). A provider without it is never trusted here.
+          const verify = provider?.options?.verifyIdToken;
+          if (provider === undefined || verify === undefined) {
+            throw keyError('BAD_REQUEST', 'BAD_REQUEST');
+          }
+          if (!(await verify(token, nonce, ctx))) {
             throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
           }
           const info = await provider.getUserInfo({ idToken: token });
-          if (info === null || info.user.id === undefined || String(info.user.id) === '') {
-            throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
-          }
-          const accountId = String(info.user.id);
+          if (info === null) throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
+          // The provider's own account id (Apple: `sub`), as its sign-in reads it.
+          const subject = await provider.accountSubject({
+            tokens: { idToken: token },
+            profile: info.data,
+          });
+          const accountId = String(subject ?? '');
+          if (accountId === '') throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
           const { internalAdapter } = ctx.context;
           const user = ctx.context.session.user;
 
-          const linked = await internalAdapter.findAccountByProviderId(accountId, providerId);
+          const linked = await internalAdapter.findAccountByKey({ providerId, accountId });
           if (linked !== null) {
             if (linked.userId !== user.id) throw keyError('CONFLICT', 'KEY_BELONGS_TO_OTHER');
             // Saved already: nothing to do.
