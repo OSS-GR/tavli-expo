@@ -245,8 +245,8 @@ export const usernames: Usernames | undefined = online?.usernames;
 /**
  * Block and report (#435, App Store guideline 1.2), on the same client as
  * `games`. The Report or block dialog (`features/safety/`) and Settings →
- * Blocked players use it. A dev game uses `safetyFor` of the in-memory
- * server instead (`useOnlineConnection`).
+ * Blocked players use it. A dev game uses `devSafetyFor` instead
+ * (`useOnlineConnection`).
  */
 export const safety: Safety | undefined = online?.safety;
 
@@ -291,6 +291,22 @@ export function gameTransportFor(playerId: string): GameTransport {
     transports.set(playerId, transport);
   }
   return transport;
+}
+
+const safetyPorts = new Map<string, Safety>();
+
+/**
+ * Dev games' block and report for `playerId`, on the same in-memory server
+ * as `gameTransportFor`. One port per player for the app run, like the
+ * transports, so a screen gets the same object on each render.
+ */
+export function devSafetyFor(playerId: string): Safety {
+  let port = safetyPorts.get(playerId);
+  if (port === undefined) {
+    port = onlineServer().safetyFor(playerId);
+    safetyPorts.set(playerId, port);
+  }
+  return port;
 }
 
 const invitePorts = new Map<string, Invites>();

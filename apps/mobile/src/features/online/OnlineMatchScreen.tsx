@@ -163,6 +163,8 @@ function OnlineBoard({
   const noticeCount = useOnlineStore(store, (s) => s.noticeCount);
   const clockOffset = useOnlineStore(store, (s) => s.clockOffset);
   const [overlay, setOverlay] = useState<Overlay>(NO_OVERLAY);
+  // A report or block on its way keeps its dialog open (`onHold`).
+  const [held, setHeld] = useState(false);
   const close = () => setOverlay(NO_OVERLAY);
 
   // Resign match while your turn is on its way: the store takes no action
@@ -340,7 +342,9 @@ function OnlineBoard({
       />
     );
   } else if (overlay.kind === 'safety' && safety) {
-    content = <ReportOrBlock player={overlay.player} safety={safety} onClose={close} />;
+    content = (
+      <ReportOrBlock player={overlay.player} safety={safety} onClose={close} onHold={setHeld} />
+    );
   }
 
   return (
@@ -359,7 +363,9 @@ function OnlineBoard({
       />
       <Sheet
         visible={content !== null}
-        onClose={close}
+        onClose={() => {
+          if (!held) close();
+        }}
         closeLabel={t('game.menu.resume')}
         look={overlay.kind === 'menu' ? 'sheet' : 'dialog'}
         // The game screen turns with the phone (#185); its menu and dialog too.

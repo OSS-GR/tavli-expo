@@ -1373,9 +1373,11 @@
       "name": "Offensive name",
       "cheating": "Cheating or abuse of the game",
       "harassment": "Harassment",
-      "other": "Something else"
+      "other": "Something else",
+      "blockedAlready": "You block this player already. A report tells us more."
     },
     "sending": "Sending…",
+    "slow": "This takes long. You may close this: Settings → Blocked players shows later whether it went through.",
     "blocked": {
       "title": "Player blocked",
       "body": "You will not get invites from this player. To unblock them, go to Settings → Blocked players."
@@ -1391,7 +1393,8 @@
       "tooManyReports": "You sent {{max}} reports in the last 24 hours, the most you can. Try again tomorrow.",
       "unknownPlayer": "This player's account is gone.",
       "signedOut": "You are not signed in to online play on this phone.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "refused": "The server did not take this. Close and try later."
     },
     "list": {
       "title": "Blocked players",
