@@ -17,9 +17,9 @@
     "@tavli/contracts": "workspace:*"
   },
   "peerDependencies": {
-    "@sentry/react-native": "~8.28.0"
+    "@sentry/react-native": "~8.33.0"
   },
   "devDependencies": {
-    "@sentry/react-native": "~8.28.0"
+    "@sentry/react-native": "~8.33.0"
   }
 }
