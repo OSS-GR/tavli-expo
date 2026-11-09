@@ -162,6 +162,40 @@ export default defineSchema({
     .index('by_user', ['userId']),
 
   /**
+   * Apple's refresh token for an Apple key (#398), so the server can
+   * revoke it when the key or the account goes. The app sends the Apple
+   * sheet's code once (`/key/apple-code`); the server trades it at Apple
+   * and keeps the token, encrypted with the Better Auth secret. Deleted
+   * with the key (`appleTokens.ts`).
+   */
+  appleTokens: defineTable({
+    /** The Better Auth user id: the player id. */
+    userId: v.string(),
+    /** Apple's `sub`: the key's `accountId`. */
+    accountId: v.string(),
+    /** The app (bundle id) or the Services ID the code was for: Apple's `client_id`. */
+    clientId: v.string(),
+    /** Encrypted (Better Auth's `encryptOAuthTokens` format). */
+    refreshToken: v.string(),
+    savedAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_account', ['accountId']),
+
+  /**
+   * Apple tokens waiting for their revoke (#398). A row holds no user id:
+   * the key or the account is gone already. `revokeAppleToken` deletes it
+   * after the revoke, or after its last try.
+   */
+  appleRevokes: defineTable({
+    clientId: v.string(),
+    /** Encrypted, as in `appleTokens`. */
+    refreshToken: v.string(),
+    /** Tries so far. */
+    attempts: v.number(),
+  }),
+
+  /**
    * Sign-in nonces that were used (#397), so each works once. A row stays
    * until its nonce runs out (`expiresAt`, epoch ms); `useKeyNonce`
    * deletes a few old rows each time.

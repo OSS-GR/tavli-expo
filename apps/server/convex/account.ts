@@ -11,7 +11,9 @@
  * 2. keeps each finished game for the other player, with the caller's id
  *    in it (`gameOnDelete` in `model/account.ts`);
  * 3. deletes every open invite the caller sent, every push token, and
- *    the caller's sign-in key claims (`authKeys`, #397);
+ *    the caller's sign-in key claims (`authKeys`, #397); moves the
+ *    caller's Apple tokens to the revoke queue, and schedules the revoke
+ *    (`appleTokens.ts`, #398);
  * 4. deletes the Better Auth user, its sessions and its accounts, with
  *    Better Auth's own delete (`internalAdapter.deleteUser`) on the
  *    component's tables;
@@ -30,6 +32,7 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { internalMutation, mutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
+import { revokeAppleTokensOf } from './appleTokens';
 import { createAuth } from './auth';
 import { deleteKeysOf } from './authKeys';
 import { existingPlayer } from './caller';
@@ -89,56 +92,67 @@ export const deleteMyAccount = mutation({
   handler: async (ctx) => {
     // A token outlives its user (it is valid until it expires), so a
     // valid token is not enough: the user must still exist.
-    const callerId = await existingPlayer(ctx);
-
-    // Finished games stay as they are (`keep`); only active ones change.
-    // The first page now, so most players see all their games end in
-    // this call; the rest go in `resignActiveGames`, below.
-    const moreGames = await resignPage(ctx, callerId);
-
-    // The open invites, now, so nobody can accept one once the user is
-    // gone. The cap keeps them few (`MAX_OPEN_INVITES`). An open invite's
-    // scheduled `expireInvite` then finds no row and does nothing. The
-    // closed ones are never pruned, so they can be many:
-    // `deleteSentInvites` deletes them below, in pages.
-    for (const invite of await openInvitesOf(ctx, callerId, Date.now())) {
-      await ctx.db.delete(invite._id);
-    }
-
-    const tokens = await ctx.db
-      .query('pushTokens')
-      .withIndex('by_player', (q) => q.eq('playerId', callerId))
-      .collect();
-    for (const token of tokens) await ctx.db.delete(token._id);
-
-    // The sign-in key claims (#397), so the Apple id is free again.
-    await deleteKeysOf(ctx, callerId);
-
-    // Better Auth's own delete: the user's sessions, its accounts (Apple,
-    // Google, …), then the user, with Better Auth's hooks, through the
-    // component adapter. The `/delete-user` route is not used: it needs a
-    // request with a fresh session, and it is off, so no client can
-    // delete a user without the steps above.
-    const { internalAdapter } = await createAuth(ctx).$context;
-    await internalAdapter.deleteUser(callerId);
-
-    // It runs after this transaction, when the user is gone, so no new
-    // invite can come in (`createInvite` checks `existingPlayer`).
-    await ctx.scheduler.runAfter(0, internal.account.deleteSentInvites, { from: callerId });
-
-    // The other active games, after this transaction. No new game can
-    // start with the caller from now on: a game starts only from
-    // `acceptInvite`, the caller's open invites are gone (above), and the
-    // caller can no longer accept one (`existingPlayer` finds no user).
-    // So the pages only shrink the set of active games. Until they run,
-    // a game can stay active for a moment; its turn timer (`checkTimeout`)
-    // still works, as it reads no user.
-    if (moreGames) {
-      await ctx.scheduler.runAfter(0, internal.account.resignActiveGames, { playerId: callerId });
-    }
+    await deleteAccountOf(ctx, await existingPlayer(ctx));
     return null;
   },
 });
+
+/**
+ * The steps of `deleteMyAccount` for `callerId`, a user who exists. Also
+ * run when Apple says the person's last key ended (`endAppleKey`).
+ */
+export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promise<void> {
+  // Finished games stay as they are (`keep`); only active ones change.
+  // The first page now, so most players see all their games end in
+  // this call; the rest go in `resignActiveGames`, below.
+  const moreGames = await resignPage(ctx, callerId);
+
+  // The open invites, now, so nobody can accept one once the user is
+  // gone. The cap keeps them few (`MAX_OPEN_INVITES`). An open invite's
+  // scheduled `expireInvite` then finds no row and does nothing. The
+  // closed ones are never pruned, so they can be many:
+  // `deleteSentInvites` deletes them below, in pages.
+  for (const invite of await openInvitesOf(ctx, callerId, Date.now())) {
+    await ctx.db.delete(invite._id);
+  }
+
+  const tokens = await ctx.db
+    .query('pushTokens')
+    .withIndex('by_player', (q) => q.eq('playerId', callerId))
+    .collect();
+  for (const token of tokens) await ctx.db.delete(token._id);
+
+  // The sign-in key claims (#397), so the Apple id is free again.
+  await deleteKeysOf(ctx, callerId);
+
+  // Apple asks us to revoke its token (#398). The tokens go to a queue
+  // that holds no user id; the revoke runs after this transaction, so
+  // it never holds up or undoes the delete.
+  await revokeAppleTokensOf(ctx, callerId);
+
+  // Better Auth's own delete: the user's sessions, its accounts (Apple,
+  // Google, …), then the user, with Better Auth's hooks, through the
+  // component adapter. The `/delete-user` route is not used: it needs a
+  // request with a fresh session, and it is off, so no client can
+  // delete a user without the steps above.
+  const { internalAdapter } = await createAuth(ctx).$context;
+  await internalAdapter.deleteUser(callerId);
+
+  // It runs after this transaction, when the user is gone, so no new
+  // invite can come in (`createInvite` checks `existingPlayer`).
+  await ctx.scheduler.runAfter(0, internal.account.deleteSentInvites, { from: callerId });
+
+  // The other active games, after this transaction. No new game can
+  // start with the caller from now on: a game starts only from
+  // `acceptInvite`, the caller's open invites are gone (above), and the
+  // caller can no longer accept one (`existingPlayer` finds no user).
+  // So the pages only shrink the set of active games. Until they run,
+  // a game can stay active for a moment; its turn timer (`checkTimeout`)
+  // still works, as it reads no user.
+  if (moreGames) {
+    await ctx.scheduler.runAfter(0, internal.account.resignActiveGames, { playerId: callerId });
+  }
+}
 
 /**
  * Resigns up to `GAME_RESIGN_PAGE` active games of `playerId`, a deleted

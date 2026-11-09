@@ -8,7 +8,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 
 | Path | What it holds |
 |---|---|
-| `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `drafts`, `invites`, `pushTokens`, `authKeys` and `usedKeyNonces` |
+| `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `drafts`, `invites`, `pushTokens`, `authKeys`, `usedKeyNonces`, `appleTokens` and `appleRevokes` |
 | `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
 | `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315) |
 | `apps/server/convex/appUpdate.ts` | `updatePolicy`: the lowest app build the server works with, from the deployment's env vars ([Update needed](#update-needed), #390). The one public function with no sign-in |
@@ -18,9 +18,10 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `apps/server/convex/caller.ts` | `signedInPlayer(ctx)`: the caller's player id from the sign-in token, and `existingPlayer(ctx)`: the same, for an account that still exists ([Sign-in](#sign-in)) |
 | `apps/server/convex/convex.config.ts` | The Convex app: it uses the Better Auth component |
 | `apps/server/convex/auth.ts` | Better Auth: the component client and `createAuth` (anonymous, Expo, Convex and key plugins, Sign in with Apple; the delete and link routes are off) |
-| `apps/server/convex/keyPlugin.ts` | Our Better Auth plugin for [sign-in keys](#sign-in-keys): `/key/nonce`, `/key/save`, `/key/list`, `/key/remove` |
+| `apps/server/convex/keyPlugin.ts` | Our Better Auth plugin for [sign-in keys](#sign-in-keys): `/key/nonce`, `/key/save`, `/key/list`, `/key/remove`, `/key/apple-code` |
 | `apps/server/convex/authKeys.ts` | The key claims and used nonces, each in one transaction: `claimKey`, `releaseKey`, `useKeyNonce`, `deleteKeysOf` |
-| `apps/server/convex/model/keyNonce.ts`, `model/appleIdToken.ts` | The pure parts: the signed nonce, and the Apple id token check (jose) |
+| `apps/server/convex/appleTokens.ts` | [Apple's tokens](#apple-tokens-and-the-revoke): `saveAppleToken`, the revoke queue (`revokeAppleTokensOf`, `revokeAppleToken`) and Apple's notices (`appleNotifications`, `endAppleKey`) |
+| `apps/server/convex/model/keyNonce.ts`, `model/appleIdToken.ts`, `model/appleTokens.ts` | The pure parts: the signed nonce, the Apple id token check (jose), and Apple's token calls, client secret and notices |
 | `apps/server/convex/auth.config.ts` | The token issuer Convex trusts: Better Auth on the deployment's site URL |
 | `apps/server/convex/http.ts` | The HTTP routes: Better Auth under `/api/auth` |
 | `packages/online/src/online-game.ts` | The game logic, with no Convex code. Pure: dice come from an `Rng` argument |
@@ -111,6 +112,24 @@ Who owns each sign-in key (#397). Better Auth keeps its own `account` row per ke
 | `claimedAt` | When this user claimed the key (server clock): the start of `CLAIM_GRACE_MS`. |
 
 `claimKey` writes it, `releaseKey` and `deleteMyAccount` (`deleteKeysOf`) delete rows.
+
+### `appleTokens`
+
+Apple's refresh token for an Apple key (#398), so the server can revoke it when the key or the account goes. See [Apple tokens and the revoke](#apple-tokens-and-the-revoke).
+
+| Field | Notes |
+|---|---|
+| `userId` | The player id. Index `by_user`. |
+| `accountId` | Apple's `sub` (the key's `accountId`). Index `by_account`: one row per key. |
+| `clientId` | The bundle id (or the Services ID) the code was for: Apple's `client_id` for the revoke. |
+| `refreshToken` | Encrypted with Better Auth's secret, the way `encryptOAuthTokens` keeps tokens. |
+| `savedAt` | When it was saved. |
+
+`saveAppleToken` writes it. Key removal, account delete and Apple's notices delete rows.
+
+### `appleRevokes`
+
+Apple tokens waiting for their revoke (#398): `clientId`, `refreshToken` (encrypted) and `attempts`. The rows hold no player id; `revokeAppleToken` deletes each one after the revoke or its last try.
 
 ### `usedKeyNonces`
 
@@ -288,8 +307,18 @@ Issue #397, ADR-0008. A key is a way to sign in to one account: Apple now. A gue
 - **One owner per key:** Better Auth writes rows one call at a time, and its `account` table has no unique index. So before Better Auth makes an `account` row for a key, `databaseHooks.account.create.before` calls `claimKey` (the `authKeys` table, one mutation): the first user to claim an Apple id owns it, and a later claim by another user fails with `KEY_BELONGS_TO_OTHER`. `/key/remove` calls `releaseKey`, and `deleteMyAccount` calls `deleteKeysOf`, so a deleted account frees its Apple id. A claim with no `account` row behind it is stale after `CLAIM_GRACE_MS` (1 minute; the account write failed, or a remove stopped halfway) and goes to the next user who claims the key, so a failed write never locks an Apple id out. `claimKey` also refuses a user who holds a live claim on another key of the same provider (`PROVIDER_TAKEN`): `/key/save` checks that first, but two saves of two Apple ids on one account at the same moment would both pass that check.
 - **How `/key/save` reads the token:** it runs the provider's `verifyIdToken` option (our `verifyKeyIdToken` in `auth.ts`; Better Auth's own sign-in runs that option before its built-in check), and takes the account id from the provider's `accountSubject` (Apple: `sub`), as Better Auth's sign-in does. Since Better Auth 1.7, `getUserInfo` gives no id. A provider with no `verifyIdToken` option is refused.
 - **Turned off on purpose:** `/link-social` (it does not check that a key is free) and `/unlink-account` (it does not know the last-key rule), next to `/delete-anonymous-user`. Implicit linking by email is off (`disableImplicitLinking`), and a later sign-in never deletes a guest (`disableDeleteAnonymousUser`): only `deleteMyAccount` deletes. Apple's name and photo are never kept (`mapProfileToUser`); the username comes in #405.
-- **Not yet:** the Apple web flow (Apple on Android) needs a client secret made from the `.p8` key (#401). Apple's server-to-server notifications and the token revoke on delete are #398.
+- **Not yet:** the Apple web flow (Apple on Android) needs a client secret made from the `.p8` key (#401). The app does not send the Apple `authorizationCode` to `/key/apple-code` yet (#401), so no token is kept until then.
 - **Tests:** `convex/authKeys.test.ts` signs in over HTTP with a fake Apple (`convex/test.apple.ts`): `useFakeApple(await fakeApple())` swaps Apple's keys with `setAppleKeys` and sets the env vars; `stopFakeApple()` in `afterEach`. Tests never reach Apple. `convex/betterAuthClient.test.ts` runs the `authProviderContract()` checks on the [Better Auth adapter](../../packages/adapters/auth-better-auth/README.md) with Better Auth's real client (no Expo plugin): `phoneFetch(t, phone)` sends its requests to convex-test with the app's origin and keeps the cookies, so the client's paths, bodies and error codes are checked against the real routes.
+
+### Apple tokens and the revoke
+
+Issue #398. Apple asks an app with Sign in with Apple to revoke the person's token when they delete their account in the app.
+
+- **Keep the token:** after a sign-in or a save, the app sends the Apple sheet's code once: `POST /key/apple-code` `{ authorizationCode, clientId }` (session). `clientId` is the app's bundle id (one of `APPLE_BUNDLE_IDS`) or the Services ID. The server trades the code at Apple's `/auth/token` with a client secret, checks that the id token Apple sends back is for the user's own Apple key (`sub`), encrypts the refresh token (Better Auth's `setTokenUtil`) and keeps it in `appleTokens`. Errors: `400 NO_KEY` (no Apple key), `400 BAD_REQUEST`, `401 INVALID_CODE` (Apple said no, another Apple id, or no `APPLE_*` key in the env). A newer code replaces the token; the old one is dropped, not revoked, because a revoke ends the person's Sign in with Apple for the app.
+- **The client secret:** an ES256 JWT signed with the team's `.p8` key (`APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`), `sub` = the client id, 5 minutes; a new one for each call (`makeAppleClientSecret` in `model/appleTokens.ts`).
+- **Revoke:** `deleteMyAccount` and `/key/remove` (`releaseKey`) move the tokens to `appleRevokes`, in their own transaction, and schedule `revokeAppleToken` with the queue row's id only: a token never goes into scheduler args or logs. The issue first said to make the delete an action that revokes before the mutation. We kept the mutation: the builds in TestFlight call `deleteMyAccount` as a mutation, and the queue makes the revoke part of the delete's own transaction, so it can never be lost or undo the delete. The action calls Apple's `/auth/revoke`; a failure tries once more after `REVOKE_RETRY_MS` (30 s), then the row goes with a log line that holds no token, email or Apple id. With no `APPLE_*` key the row goes with a log line.
+- **Apple's notices:** `POST /apple/notifications` (`http.ts`) takes Apple's server-to-server notices: `{ "payload": "<JWT>" }`, RS256 from Apple, for one of our bundle ids or the Services ID (else `400`). On `consent-revoked` or `account-delete`, `endAppleKey` drops that Apple key with its tokens (no revoke: Apple ended them); with the user's last key it deletes the whole account (`deleteAccountOf`, the steps of `deleteMyAccount`). A notice from before the key was made (`event_time`) is about an older key of the same Apple id and changes nothing. The email notices change nothing. The owner sets the URL in Apple's developer site ([running the app](../process/running-the-app.md#sign-in-with-apple-396)).
+- **Tests:** `convex/appleTokens.test.ts` uses a fake `AppleTokenClient` (`setAppleTokenClient`) and signs notices with the fake Apple's key; `convex/model/appleTokens.test.ts` checks the client secret, Apple's calls (a fake `fetch`) and the notice check. No test reaches Apple.
 
 ### Who calls
 
@@ -505,7 +534,7 @@ One transaction. If any step throws, nothing is deleted. Two steps go on after t
 2. **Active games:** the caller resigns each one (`resignAs` in `games.ts`, the same checks and the same `save` as `resign`). The other player wins the match. The save bumps the version, so the turn timer's check does nothing, it deletes the game's [draft](#drafts) (#374), and `scheduleTurnPush` runs as on every save (a resign ends the match: the other player gets ["game over"](#game-over), nobody gets "your turn"). Nothing caps a player's active games (each accepted invite starts one), so the call resigns only the first `GAME_RESIGN_PAGE` (25) of them (#309). One resign reads the game, writes it and one `moves` row, and runs the engine once. So 25 make about 50 writes, far below Convex's limit of 16,000 per transaction. The run time (Convex allows 1 second) is an estimate, not measured. When the page was full, the call schedules the internal mutation `resignActiveGames`, which resigns the next page (`by_white`, then `by_black`) and runs again while its page was full. See [Games after the call](#games-after-the-call).
 3. **Finished games** (and the games just resigned) stay for the other player, as they are. See [What is kept](#what-is-kept).
 4. **Open invites:** the caller's open invites whose time is not up are deleted (`openInvitesOf` in `invites.ts`), so nobody can accept one. The cap keeps them few (at most `MAX_OPEN_INVITES`). An open invite's scheduled `expireInvite` then finds no row and does nothing. Invites someone else sent stay, also when the caller answered them.
-5. **Push tokens:** every `pushTokens` row of the caller is deleted.
+5. **Push tokens:** every `pushTokens` row of the caller is deleted. So are the key claims (`authKeys`), and the caller's Apple tokens move to the revoke queue (`appleRevokes`, no user id): the revoke at Apple runs after the call ([Apple tokens and the revoke](#apple-tokens-and-the-revoke), #398).
 6. **Better Auth:** the user, its sessions and its accounts (Apple, Google, … once they exist) are deleted with Better Auth's own delete, `internalAdapter.deleteUser`, from `createAuth(ctx).$context`. It runs on the component's tables through the component adapter, with Better Auth's database hooks. It is the step that the `/delete-user` route and the anonymous plugin's `/delete-anonymous-user` route run too.
 7. **The other invites** (accepted, declined, cancelled, expired) are deleted after the call, in pages (#306). Nothing prunes finished invites, so a player can have many, and one Convex transaction may write at most 16,000 documents. The call schedules the internal mutation `deleteSentInvites`. Each run deletes up to `INVITE_DELETE_PAGE` (200) invites of the caller (`by_from`) and runs again when its page was full. Nobody can accept these invites (they are closed or their time is up), and no new one can come in: the user is gone, so `createInvite` refuses the old token.
 

@@ -15,8 +15,10 @@
  *
  * Env vars, set by the owner on each deployment (never in the repo):
  * - `BETTER_AUTH_SECRET`: a long random secret;
- * - `APPLE_SERVICES_ID`: turns Apple on. The other `APPLE_*` vars (team
- *   id, key id, private key) are for the web flow and the revoke (#398).
+ * - `APPLE_SERVICES_ID`: turns Apple on;
+ * - `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`: the key that
+ *   signs our calls to Apple, to trade a code and to revoke a token
+ *   (#398, `model/appleTokens.ts`). Without them no token is kept.
  * See "Sign in with Apple" in `docs/process/running-the-app.md`.
  */
 
@@ -31,9 +33,11 @@ import type { JWTVerifyGetKey } from 'jose';
 
 import { components, internal } from './_generated/api';
 import type { DataModel } from './_generated/dataModel';
+import { appleClientIds, appleTokenClient } from './appleTokens';
 import authConfig from './auth.config';
 import { isKeyProviderId, keyError, keyPlugin } from './keyPlugin';
 import { APPLE_KEYS_URL, verifyAppleIdToken } from './model/appleIdToken';
+import { appleKeyConfig, makeAppleClientSecret, subjectOfAppleIdToken } from './model/appleTokens';
 import { checkKeyNonce } from './model/keyNonce';
 
 /** The Better Auth component: its tables and the helpers to read them. */
@@ -67,12 +71,44 @@ export function setAppleKeys(keys: JWTVerifyGetKey | null): void {
   appleKeys = keys;
 }
 
-function currentAppleKeys(): JWTVerifyGetKey {
+/** Apple's public keys: for id tokens and for Apple's notices (`appleTokens.ts`). */
+export function currentAppleKeys(): JWTVerifyGetKey {
   appleKeys ??= createRemoteJWKSet(new URL(APPLE_KEYS_URL));
   return appleKeys;
 }
 
 type AuthCtx = GenericCtx<DataModel>;
+
+/**
+ * Trades an Apple authorization code (#398) for its refresh token. `null`
+ * when the `APPLE_*` key is missing or bad, when Apple says no, or when
+ * the code is for another Apple id than `accountId`. Such a token is
+ * dropped, not revoked: a revoke would end that other person's Sign in
+ * with Apple for the app.
+ */
+async function exchangeAppleCode(call: {
+  clientId: string;
+  code: string;
+  accountId: string;
+}): Promise<string | null> {
+  const key = appleKeyConfig(process.env);
+  if (key === null) return null;
+  let clientSecret: string;
+  try {
+    clientSecret = await makeAppleClientSecret(key, call.clientId, Date.now());
+  } catch {
+    console.error('apple code: APPLE_PRIVATE_KEY is not a valid key');
+    return null;
+  }
+  const traded = await appleTokenClient().exchangeCode({
+    clientId: call.clientId,
+    clientSecret,
+    code: call.code,
+  });
+  if (traded === null) return null;
+  if (subjectOfAppleIdToken(traded.idToken) !== call.accountId) return null;
+  return traded.refreshToken;
+}
 
 /**
  * The context for our internal mutations. The Better Auth routes run in
@@ -173,6 +209,11 @@ export function createAuth(ctx: AuthCtx) {
       keyPlugin({
         releaseKey: async (key) => {
           await actionCtx(ctx).runMutation(internal.authKeys.releaseKey, key);
+        },
+        appleClientIds,
+        exchangeAppleCode,
+        saveAppleToken: async (token) => {
+          await actionCtx(ctx).runMutation(internal.appleTokens.saveAppleToken, token);
         },
       }),
     ],

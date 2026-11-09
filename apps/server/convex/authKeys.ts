@@ -12,7 +12,8 @@
  *   (that write failed, or a remove failed halfway) and goes to the next
  *   user who claims the key. A user holds at most one key per provider:
  *   `/key/save` checks it too, but two saves at once would both pass.
- * - `releaseKey`: drops the claim when the key is removed (`removeKey`).
+ * - `releaseKey`: drops the claim when the key is removed (`removeKey`),
+ *   and revokes its Apple token (`appleTokens.ts`, #398).
  * - `useKeyNonce`: a nonce works once (`model/keyNonce.ts`).
  *
  * All are internal: only the Better Auth routes (`http.ts`) call them.
@@ -25,6 +26,7 @@ import { components } from './_generated/api';
 import type { Doc } from './_generated/dataModel';
 import { internalMutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
+import { revokeAppleTokensOf } from './appleTokens';
 
 /** Old nonce rows `useKeyNonce` deletes per call, so the table stays small. */
 export const OLD_NONCES_PER_USE = 10;
@@ -95,15 +97,27 @@ export const claimKey = internalMutation({
 });
 
 /** Drops `userId`'s claim on `(providerId, accountId)`. Another user's claim stays. */
+export async function releaseClaim(
+  ctx: MutationCtx,
+  { providerId, accountId, userId }: { providerId: string; accountId: string; userId: string },
+): Promise<void> {
+  const owner = await ctx.db
+    .query('authKeys')
+    .withIndex('by_key', (q) => q.eq('providerId', providerId).eq('accountId', accountId))
+    .unique();
+  if (owner !== null && owner.userId === userId) await ctx.db.delete(owner._id);
+}
+
+/**
+ * The key was removed (`/key/remove`): drops the claim, and revokes the
+ * key's Apple token (#398).
+ */
 export const releaseKey = internalMutation({
   args: { providerId: v.string(), accountId: v.string(), userId: v.string() },
   returns: v.null(),
-  handler: async (ctx, { providerId, accountId, userId }) => {
-    const owner = await ctx.db
-      .query('authKeys')
-      .withIndex('by_key', (q) => q.eq('providerId', providerId).eq('accountId', accountId))
-      .unique();
-    if (owner !== null && owner.userId === userId) await ctx.db.delete(owner._id);
+  handler: async (ctx, key) => {
+    await releaseClaim(ctx, key);
+    if (key.providerId === 'apple') await revokeAppleTokensOf(ctx, key.userId, key.accountId);
     return null;
   },
 });
