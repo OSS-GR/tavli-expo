@@ -1,6 +1,6 @@
 # App Store privacy labels (App Privacy)
 
-> The answers for App Store Connect → App Privacy. Issue #137. Google Play: [play-data-safety.md](play-data-safety.md). Last review: 2026-11-09 (#401, Sign in with Apple).
+> The answers for App Store Connect → App Privacy. Issue #137. Google Play: [play-data-safety.md](play-data-safety.md). Last review: 2026-11-09 (#320, block and report).
 
 **This is not legal advice.** The answers follow the code on `main` on 2026-10-28 and Apple's App Privacy categories as we know them. The owner gives the final answers in App Store Connect.
 
@@ -103,7 +103,7 @@ Apple asks apps that make an account to let people delete it in the app (App Rev
 - [ ] `NSPrivacyCollectedDataTypeLinked` in `apps/mobile/app.json` matches the "linked" answers above (today: `true` for all eight).
 - [ ] Both Convex deployments are in the EU (`eu-west-1`), and you accepted Convex's data processing terms (DPA). The deployments have `BETTER_AUTH_SECRET` set (`npx convex env set`; never in the repo).
 - [ ] Check where Expo's push service processes the data, and whether its terms need a data processing agreement (DPA).
-- [ ] Email Address is ticked since Sign in with Apple (#401). Usernames (#405) are screen names, so they fall under User ID (Apple: "screen name, handle"), not Name or Other User Content. The server also keeps when the player accepted the terms and ticked the age box: no age or birthday. When Google or the email code ships, check the label again.
+- [ ] Email Address is ticked since Sign in with Apple (#401). Usernames (#405) are screen names, so they fall under User ID (Apple: "screen name, handle"), not Name or Other User Content. The server also keeps when the player accepted the terms and ticked the age box: no age or birthday. Blocks and reports (#320) are tied to the user id: a report keeps a reason from a fixed list and the reported username, with no free text, so no new data type (User ID covers them). When Google or the email code ships, check the label again.
 
 ## Pre-consent crash reports (#139)
 

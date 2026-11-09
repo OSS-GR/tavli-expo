@@ -83,6 +83,7 @@ import {
   summarizeGame,
   timeOut,
   toView,
+  namesSeenBy,
 } from '@tavli/online';
 import type { LoadedFlow, SavedDraft, SteppedFlow } from '@tavli/online';
 
@@ -93,8 +94,9 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import { signedInPlayer } from './caller';
 import { createCryptoRng } from './model/cryptoRng';
 import { NEW_MATCH_WAIT, turnWait } from './model/push';
-import { ensureGuestNumber, nameOf, namesOfPlayers } from './playerNames';
+import { ensureGuestNumber, namesOfPlayers } from './playerNames';
 import { scheduleTurnPush } from './push';
+import { blocks, nameSeenBy } from './safety';
 import { gameChoice, gameStatus, gameTurnTimeMinutes } from './schema';
 
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
@@ -587,7 +589,12 @@ export const getGame = query({
     if (game === null) return null;
     const { flow, previousGame } = loadStored(game.flow);
     const draft = savedDraft(await draftRow(ctx, game._id));
-    const names = await namesOfPlayers(ctx, game.players);
+    // A side the caller blocks shows no name (#320).
+    const other = game.players.white === callerId ? game.players.black : game.players.white;
+    const hidden = await blocks(ctx, callerId, other);
+    const names = namesSeenBy(await namesOfPlayers(ctx, game.players), game.players, (id) =>
+      id === other ? hidden : false,
+    );
     return toView({ ...gameInput(game), flow, previousGame, draft, names });
   },
 });
@@ -634,14 +641,15 @@ export const listMyGames = query({
         callerId,
       );
     // Pick the newest games first, then read the names of those only (#400),
-    // once per player. `summarizeGame` picks the other side's name.
+    // once per player. `summarizeGame` picks the other side's name. A
+    // player the caller blocks shows no name (#320).
     const latest = latestGames(games.map((entry) => summarize(entry, NO_NAMES)));
     const byId = new Map(games.map((entry) => [entry.game._id as string, entry]));
     const names = new Map<string, Promise<PlayerName | null>>();
     const name = (playerId: string) => {
       let found = names.get(playerId);
       if (found === undefined) {
-        found = nameOf(ctx, playerId);
+        found = nameSeenBy(ctx, callerId, playerId);
         names.set(playerId, found);
       }
       return found;

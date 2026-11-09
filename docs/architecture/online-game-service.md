@@ -14,6 +14,9 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `packages/online/src/names.ts` | The pure part of guest names: `pickGuestNumber(rng)` (fair, 1000–9999), `nameFrom` (the username first), `namesOf`, `NO_NAMES` |
 | `apps/server/convex/usernames.ts` | [Usernames](#usernames) (#405): `getMyUsername`, `setMyUsername`, and the owner's `clearUsername` (internal) |
 | `packages/online/src/usernames.ts` | The pure part of usernames: `checkUsername`, `usernameKey`, `isAllowedUsername` (the block and reserved lists), `planUsername`, `myUsernameOf` |
+| `apps/server/convex/safety.ts` | [Block and report](#block-and-report) (#320): `blockPlayer`, `unblockPlayer`, `listMyBlocks`, `reportPlayer`, and `deleteSafetyRows` (internal, the account delete) |
+| `packages/online/src/safety.ts` | The pure checks of block and report: `checkTarget`, `checkMet`, `checkBlockCap`, `checkReason`, `checkReportCap`, `namesSeenBy` |
+| `packages/contracts/src/safety.ts` | The `Safety` port, `REPORT_REASONS`, the caps, the error codes; contract checks `safetyContract()` in `@tavli/contracts/testing` |
 | `packages/contracts/src/username.ts` | The `Usernames` port, `MyUsername`, the error codes, `TERMS_VERSION`; contract checks `usernamesContract()` in `@tavli/contracts/testing` |
 | `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315) |
 | `apps/server/convex/appUpdate.ts` | `updatePolicy`: the lowest app build the server works with, from the deployment's env vars ([Update needed](#update-needed), #390). The one public function with no sign-in |
@@ -179,6 +182,38 @@ One per saved account (#405, ADR-0008): a Better Auth user that is not anonymous
 - **`clearUsername`** (internal, the owner's tool from the dashboard): with no `name` it clears the username; with a `name` it renames after `checkUsername` and the uniqueness check (the block list is the owner's call). Either way the 30 days start over.
 - **The adapter** is `createConvexUsernames` (`USERNAME_FUNCTIONS` in `backend-convex`), checked against `api` and run through `usernamesContract()` in `convex/convexUsernames.test.ts`. The memory server has `usernamesFor(playerId, saved)`.
 - **Never** send a username to analytics or the logs.
+
+### `blocks`
+
+One row per block (#320): `blockerId` blocks `blockedId`.
+
+| Field | Notes |
+|---|---|
+| `blockerId`, `blockedId` | Better Auth user ids. Index `by_blocker` (`blockerId`, `blockedId`); index `by_blocked` for the account delete. |
+| `createdAt` | When. `listMyBlocks` lists the newest first. |
+
+### `reports`
+
+One row per report (#320). The owner reads them in the Convex dashboard and deletes each row after the review.
+
+| Field | Notes |
+|---|---|
+| `reporterId`, `reportedId` | Better Auth user ids. Index `by_pair` (one row per pair while it is kept), `by_reporter` (`reporterId`, `createdAt`: the daily cap), `by_reported` (the account delete). |
+| `reason` | One of `REPORT_REASONS`: `name`, `cheating`, `harassment`, `other`. No free text. |
+| `username` | Optional. The reported player's username when the report came in, so the owner sees it after a rename. A guest has none. |
+| `createdAt` | When. |
+
+## Block and report
+
+Issue #320, App Store guideline 1.2: usernames are content that players write, so a player can block and report another. The pure checks are in `packages/online/src/safety.ts`; both servers run them. The app screens are #435.
+
+- **Who.** Only a player you met: a game between the two (`games.by_pair`, both side orders), or an invite one of you answered (accepted or declined) from the other (`invites.by_answer`). The other account must still exist. Else `UNKNOWN_PLAYER`; yourself or an empty id is `BAD_REQUEST`. So a stranger who learns an id cannot block or report it.
+- **A block** hides the blocked player's name **from the blocker only**: `getGame` names, `listMyGames` `opponentName` and `getInvite` `fromName` say `null`. `acceptInvite` refuses an invite between the two, both ways (`BLOCKED`, through `checkNotBlocked`); the invite stays open. Running games go on, and the blocked player is not told. A second block or unblock changes nothing. At most `MAX_BLOCKS` (200): `TOO_MANY_BLOCKS`.
+- **A report** keeps the reason and the username at that moment, and blocks too (unless the block list is full: the report still goes in). One row per pair while the owner keeps it: a second report adds no row and the cap does not count it. At most `MAX_REPORTS_PER_DAY` (10) new reports in 24 hours (`TOO_MANY_REPORTS`). The reason is a `v.string()`, checked by `checkReason`, so a wrong one is `BAD_REQUEST`.
+- **The owner's review.** Read `reports` in the Convex dashboard (dev or prod). Act on the name with `clearUsername` ([Usernames](#usernames)), then delete the report row. There is no end date and no email: a row stays until the owner deletes it, or until the account delete of either player.
+- **Callers.** `blockPlayer` and `reportPlayer` use `existingPlayer` (they save the caller's id); `unblockPlayer` and `listMyBlocks` use `signedInPlayer`.
+- **The adapter** is `createConvexSafety` (`SAFETY_FUNCTIONS` in `backend-convex`), checked against `api` and run through `safetyContract()` in `convex/convexSafety.test.ts`. The memory server has `safetyFor(playerId)`, `reportsOf()` and `deleteReport(reporter, reported)` (the owner's delete, for tests).
+- **Never** send ids, names or reasons to analytics or the logs.
 
 ## Rules of a game choice
 
@@ -440,9 +475,10 @@ inviter                 server                                   friend
   │                     3. status at now: open?    → INVITE_EXPIRED when the
   │                        time is up (marked or not), else INVITE_CLOSED
   │                     4. not your own?           → OWN_INVITE
-  │                     5. insertGame (white = inviter): waits for
+  │                     5. no block either way?    → BLOCKED (#320)
+  │                     6. insertGame (white = inviter): waits for
   │                        both opening dice, turn clock
-  │                     6. invite → accepted, gameId
+  │                     7. invite → accepted, gameId
   │ ◄── getInvite / listMyInvites / getGame (reactive) ─────────► │ gameId
 ```
 
@@ -486,7 +522,7 @@ One player may have at most **10** open invites at a time (`MAX_OPEN_INVITES`, #
 
 ### Errors
 
-A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }` (`InviteErrorData`, `isInviteErrorData` in contracts). The codes are `INVITE_ERROR_CODES`: `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`, `NOT_YOUR_INVITE`, `TOO_MANY_INVITES` (only `createInvite`), `BAD_REQUEST` and `NOT_SIGNED_IN`. If `insertGame` fails inside `acceptInvite`, the error is a game error (`GameTransportErrorData`).
+A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }` (`InviteErrorData`, `isInviteErrorData` in contracts). The codes are `INVITE_ERROR_CODES`: `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`, `NOT_YOUR_INVITE`, `TOO_MANY_INVITES` (only `createInvite`), `BLOCKED` (only `acceptInvite`, #320), `BAD_REQUEST` and `NOT_SIGNED_IN`. If `insertGame` fails inside `acceptInvite`, the error is a game error (`GameTransportErrorData`).
 
 ## Push
 
@@ -567,7 +603,7 @@ Issue #302. App stores ask for in-app account deletion. The server part is the p
 
 ### What it does
 
-One transaction. If any step throws, nothing is deleted. Two steps go on after the call, in pages: the active games past the first page (step 2) and the closed invites (step 7).
+One transaction. If any step throws, nothing is deleted. Three steps go on after the call, in pages: the active games past the first page (step 2), the closed invites (step 7) and the blocks and reports (step 8).
 
 1. **Checks the user still exists.** A Convex token stays valid until it expires (15 minutes, the `convex` plugin's default), also after its user is deleted. So the call reads the Better Auth user (`existingPlayer`). No user: `NOT_SIGNED_IN`. A second call after a delete gets this clean error.
 2. **Active games:** the caller resigns each one (`resignAs` in `games.ts`, the same checks and the same `save` as `resign`). The other player wins the match. The save bumps the version, so the turn timer's check does nothing, it deletes the game's [draft](#drafts) (#374), and `scheduleTurnPush` runs as on every save (a resign ends the match: the other player gets ["game over"](#game-over), nobody gets "your turn"). Nothing caps a player's active games (each accepted invite starts one), so the call resigns only the first `GAME_RESIGN_PAGE` (25) of them (#309). One resign reads the game, writes it and one `moves` row, and runs the engine once. So 25 make about 50 writes, far below Convex's limit of 16,000 per transaction. The run time (Convex allows 1 second) is an estimate, not measured. When the page was full, the call schedules the internal mutation `resignActiveGames`, which resigns the next page (`by_white`, then `by_black`) and runs again while its page was full. See [Games after the call](#games-after-the-call).
@@ -576,6 +612,8 @@ One transaction. If any step throws, nothing is deleted. Two steps go on after t
 5. **Push tokens:** every `pushTokens` row of the caller is deleted. So are the key claims (`authKeys`) and the [guest name and username](#playernames) (`playerNames`, #400, #405), and the caller's Apple tokens move to the revoke queue (`appleRevokes`, no user id): the revoke at Apple runs after the call ([Apple tokens and the revoke](#apple-tokens-and-the-revoke), #398).
 6. **Better Auth:** the user, its sessions and its accounts (Apple, Google, … once they exist) are deleted with Better Auth's own delete, `internalAdapter.deleteUser`, from `createAuth(ctx).$context`. It runs on the component's tables through the component adapter, with Better Auth's database hooks. It is the step that the `/delete-user` route and the anonymous plugin's `/delete-anonymous-user` route run too.
 7. **The other invites** (accepted, declined, cancelled, expired) are deleted after the call, in pages (#306). Nothing prunes finished invites, so a player can have many, and one Convex transaction may write at most 16,000 documents. The call schedules the internal mutation `deleteSentInvites`. Each run deletes up to `INVITE_DELETE_PAGE` (200) invites of the caller (`by_from`) and runs again when its page was full. Nobody can accept these invites (they are closed or their time is up), and no new one can come in: the user is gone, so `createInvite` refuses the old token.
+
+8. **Blocks and reports** (#320) are deleted after the call too: `deleteSafetyRows` deletes up to `SAFETY_DELETE_PAGE` (200) rows a run, over the caller's blocks, the blocks of the caller, the reports by and the reports about the caller, and runs again when its page was full. No new row can name the player: `blockPlayer` and `reportPlayer` need both accounts to exist.
 
 Push tokens stay in the main transaction: they are capped (`MAX_PUSH_TOKENS_PER_PLAYER`, 5).
 

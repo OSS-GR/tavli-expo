@@ -1,7 +1,8 @@
 /**
  * Online games, in pure TypeScript (#251): the game model the server runs
  * (`online-game.ts`), the checks around each call (`calls.ts`), the invite
- * checks and codes (`invites.ts`), the "my games" summaries
+ * checks and codes (`invites.ts`), the block and report checks
+ * (`safety.ts`), the "my games" summaries
  * (`summaries.ts`), and an in-memory server that gives a
  * `GameTransport` and an `Invites` per player (`memory-server.ts`).
  *
@@ -79,6 +80,7 @@ export {
   checkAnswer,
   checkCancel,
   checkInviteCap,
+  checkNotBlocked,
   countOpenInvites,
   inviteExpiresAt,
   inviteStatus,
@@ -90,7 +92,22 @@ export {
   toInviteView,
 } from './invites';
 export type { InviteRecord, NewInviteOptions } from './invites';
+export {
+  SafetyError,
+  checkBlockCap,
+  checkMet,
+  checkReason,
+  checkReportCap,
+  checkTarget,
+  namesSeenBy,
+  reportWindowStart,
+} from './safety';
 export { latestGames, newestFirst, summarizeGame } from './summaries';
 export type { SummaryInput } from './summaries';
 export { createMemoryGameServer } from './memory-server';
-export type { LoggedEvent, MemoryGameServer, MemoryGameServerOptions } from './memory-server';
+export type {
+  LoggedEvent,
+  MemoryGameServer,
+  MemoryGameServerOptions,
+  MemoryReport,
+} from './memory-server';

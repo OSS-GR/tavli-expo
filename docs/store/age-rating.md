@@ -1,6 +1,6 @@
 # Age rating
 
-> The answers for the App Store age rating and the Google Play content rating (IARC). Issue #137. Last review: 2026-11-09 (#405, usernames).
+> The answers for the App Store age rating and the Google Play content rating (IARC). Issue #137. Last review: 2026-11-09 (#320, block and report).
 
 Tavlaki is a board game. It has dice, but no betting, no real money, no prizes, no purchases, no ads and no chat. Online play is only with a friend you invite (#281). Players with a saved account pick a **username** that other players see (#405): that is user-generated content. The answers below should give **4+** on the App Store and **PEGI 3 / ESRB Everyone** on Google Play.
 
@@ -78,8 +78,8 @@ Usernames are user content, so both stores ask for these. What we have:
 
 - **Terms of use** that forbid bad names, accepted in the app before a username is saved (`docs/legal/terms.md`, `https://tavlaki.com/terms`).
 - **A filter**: the name rules and the block and reserved lists (`packages/online/src/usernames.ts`), on the phone and on the server.
-- **Action on reports**: the owner renames or clears a name with `clearUsername` (Convex dashboard, `apps/server/convex/usernames.ts`).
-- **Report**: by email to the contact address in the terms. An in-app report button is #320. **Owner:** Apple 1.2 asks for a way to report in the app and to block a player; online games are only with a friend you invited, so say that in the review notes, and ship #320 if Apple asks.
+- **Block and report** (#320, server): a player can block or report a player they met (a game, or an invite they answered). A report has a reason from a list (name, cheating, harassment, other) and blocks too. The blocker no longer sees the name, and no new game between the two starts from an invite. Reports land in the `reports` table (`apps/server/convex/safety.ts`). The buttons in the app are #435: ship it before the review. Until then reports go by email to the contact address in the terms.
+- **Action on reports**: the owner reads `reports` in the Convex dashboard, renames or clears a name with `clearUsername` (`apps/server/convex/usernames.ts`), and then deletes the report row. **Owner:** Apple 1.2 asks that you act on reports in a timely way; check the table often.
 - **Contact**: the address in the terms and on the store page.
 
 ## When to redo the ratings

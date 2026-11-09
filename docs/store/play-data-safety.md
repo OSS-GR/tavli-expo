@@ -80,4 +80,4 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 - [ ] The answers here and in [app-privacy.md](app-privacy.md) say the same thing.
 - [ ] Convex: both deployments in the EU (`eu-west-1`), Convex's DPA accepted, `BETTER_AUTH_SECRET` set on both.
 - [ ] Answer the account creation and account deletion questions (Section 1) after you check Google's current rules for guest accounts.
-- [ ] Usernames (#405) are in User IDs. Redo this form when Apple on Android, Google, the email code or EAS Update ship. Then Personal info (maybe email) and account creation change.
+- [ ] Usernames (#405) are in User IDs. Blocks and reports (#320) keep only user ids, a reason from a fixed list and the reported username: no new data type. Redo this form when Apple on Android, Google, the email code or EAS Update ship. Then Personal info (maybe email) and account creation change.

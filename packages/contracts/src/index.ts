@@ -122,6 +122,23 @@ export type {
   UsernameErrorData,
   Usernames,
 } from './username';
+export {
+  MAX_BLOCKS,
+  MAX_REPORTS_PER_DAY,
+  REPORT_REASONS,
+  REPORT_WINDOW_MS,
+  SAFETY_ERROR_CODES,
+  isReportReason,
+  isSafetyErrorData,
+} from './safety';
+export type {
+  BlockedPlayer,
+  ReportReason,
+  ReportRequest,
+  Safety,
+  SafetyErrorCode,
+  SafetyErrorData,
+} from './safety';
 export { createMemoryAppleSheet } from './apple-sheet';
 export type { AppleSheet, AppleSheetProof, MemoryAppleSheet } from './apple-sheet';
 export type { OnlineData } from './online-data';
