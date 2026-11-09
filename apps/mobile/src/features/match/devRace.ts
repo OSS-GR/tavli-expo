@@ -31,7 +31,8 @@ export interface PlayToRaceOptions {
 /**
  * Plays on until the game on the board is a race with `player` to roll.
  * A game that ends first is followed by the next one. Returns `false` when
- * the match ended (or `maxActions` ran out) before a race came.
+ * the match ended (or `maxActions` ran out) before a race came, or when
+ * the store refused an action (so it never loops on a refused one).
  */
 export async function playToRace(store: GameStore, options: PlayToRaceOptions): Promise<boolean> {
   const { runner, rng, player = 'white', difficulty = 'medium', maxActions = 3000 } = options;
@@ -41,7 +42,7 @@ export async function playToRace(store: GameStore, options: PlayToRaceOptions): 
     const phase = matchPhase(flow);
     if (phase === 'match-over') return false;
     if (phase === 'game-over') {
-      act({ type: 'nextGame' });
+      if (!act({ type: 'nextGame' })) return false;
       continue;
     }
     const game = flow.game;
@@ -50,24 +51,24 @@ export async function playToRace(store: GameStore, options: PlayToRaceOptions): 
       case 'opening-roll': {
         const roller = PLAYERS.find((p) => game.opening?.[p] === null);
         if (game.opening === null || roller === undefined) {
-          act({ type: 'chooseStarter', player });
+          if (!act({ type: 'chooseStarter', player })) return false;
         } else {
-          act({ type: 'rollOpening', player: roller });
+          if (!act({ type: 'rollOpening', player: roller })) return false;
         }
         break;
       }
       case 'awaiting-roll':
         if (toMove === player && isRace(game.state)) return true;
-        act({ type: 'roll', player: toMove });
+        if (!act({ type: 'roll', player: toMove })) return false;
         break;
       case 'awaiting-answer': {
         const prompt = currentPrompt(game);
         if (prompt === null) return false;
-        act({ type: 'answer', player: prompt.player, choice: botAnswer(prompt) });
+        if (!act({ type: 'answer', player: prompt.player, choice: botAnswer(prompt) })) return false;
         break;
       }
       case 'awaiting-confirm':
-        act({ type: 'confirm', player: toMove });
+        if (!act({ type: 'confirm', player: toMove })) return false;
         break;
       case 'moving': {
         const dice = game.state.dice;
@@ -79,8 +80,10 @@ export async function playToRace(store: GameStore, options: PlayToRaceOptions): 
           difficulty,
           seed: rng.nextUint32(),
         });
-        for (const move of turn.moves) act({ type: 'move', player: toMove, move });
-        act({ type: 'confirm', player: toMove });
+        for (const move of turn.moves) {
+          if (!act({ type: 'move', player: toMove, move })) return false;
+        }
+        if (!act({ type: 'confirm', player: toMove })) return false;
         break;
       }
       case 'game-over':

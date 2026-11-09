@@ -26,6 +26,9 @@ command -v maestro >/dev/null || curl -fsSL "https://get.maestro.mobile.dev" | b
 
 cd "$ROOT/apps/mobile"
 CI=1 EXPO_NO_TELEMETRY=1 npx expo start --dev-client --port 8081 > "$OUT/metro.log" 2>&1 &
+METRO_PID=$!
+# Stop Metro when the script ends, also on an error or Ctrl-C.
+trap 'kill "$METRO_PID" 2>/dev/null' EXIT
 until curl -s http://localhost:8081/status | grep -q running; do sleep 1; done
 BUNDLE=$(curl -s -H "expo-platform: ios" -H "accept: application/expo+json,application/json" http://localhost:8081 \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['launchAsset']['url'])")
