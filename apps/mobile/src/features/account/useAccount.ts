@@ -124,15 +124,15 @@ export function addableKeys(
   keys: readonly AuthKey[],
   appleAvailable: boolean,
 ): readonly AuthKeyProvider[] {
+  // A new provider must say here whether this phone can add it.
+  const canAdd: Record<AuthKeyProvider, boolean> = {
+    apple: appleAvailable,
+    // No screen asks for the code yet (#433).
+    email: false,
+  };
   return AUTH_KEY_PROVIDERS.filter(
-    (provider) =>
-      !keys.some((key) => key.provider === provider) && canAdd(provider, appleAvailable),
+    (provider) => canAdd[provider] && !keys.some((key) => key.provider === provider),
   );
-}
-
-/** The email code has no screen yet (#433), so only Apple can be added. */
-function canAdd(provider: AuthKeyProvider, appleAvailable: boolean): boolean {
-  return provider === 'apple' && appleAvailable;
 }
 
 /** Loads the state (see the top of this file). */

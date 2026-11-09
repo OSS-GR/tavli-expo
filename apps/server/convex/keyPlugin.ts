@@ -9,9 +9,11 @@
  *
  * - `POST /key/nonce`: a one-time nonce for the Apple sheet (no session).
  * - `POST /key/email-code`: sends a sign-in code to an address (#399, no
- *   session). The same answer whether or not the address has an account.
- * - `POST /key/email-sign-in`: the address and its code. Signs in to the
- *   account that has the email key, or to a new saved account.
+ *   session needed) and gives the phone the code's ticket. The same
+ *   answer whether or not the address has an account.
+ * - `POST /key/email-sign-in`: the address, its code and the ticket, on a
+ *   phone with no session. Signs in to the account that has the email
+ *   key, or to a new saved account.
  * - `POST /key/save`: adds a key to the signed-in user (an Apple id token,
  *   or an email code). A key that is
  *   another user's gives `KEY_BELONGS_TO_OTHER` and changes nothing. For
@@ -47,7 +49,7 @@ import { setTokenUtil } from 'better-auth/oauth2';
 import { isEmailCode, isEmailCodeLanguage, normalizeEmail } from '@tavli/contracts';
 import type { EmailCodeLanguage, GuestMoveCounts, MailSender } from '@tavli/contracts';
 
-import type { EmailCodeUse } from './emailCodes';
+import type { EmailCodeStart, EmailCodeUse } from './emailCodes';
 import {
   addressKey,
   callerKey,
@@ -55,7 +57,10 @@ import {
   codeExpiresAt,
   codeKey,
   emailCodeMail,
+  isCodeTicket,
+  makeCodeTicket,
   makeEmailCode,
+  ticketKey,
 } from './model/emailCode';
 import { makeKeyNonce, KEY_NONCE_RANDOM_BYTES } from './model/keyNonce';
 import { checkMoveTicket, makeMoveTicket } from './model/moveTicket';
@@ -88,6 +93,7 @@ export const KEY_ERROR_CODES = {
   MAIL_FAILED: 'the code email could not be sent; try again later',
   WRONG_CODE: 'the code is wrong',
   CODE_EXPIRED: 'the code ran out or was used; ask for a new one',
+  SIGNED_IN: 'sign out first; a signed-in user adds the key with /key/save',
 } as const;
 
 export type KeyErrorCode = keyof typeof KEY_ERROR_CODES;
@@ -107,11 +113,11 @@ export function keyError(status: Status, code: KeyErrorCode): APIError {
 /** What `/key/save` proves: an id token, or an email code. */
 type SaveBody =
   | { provider: Exclude<KeyProviderId, 'email'>; token: string; nonce: string }
-  | { provider: 'email'; email: string; code: string };
+  | ({ provider: 'email' } & EmailBody);
 
 /**
  * The body of `/key/save`: `{ provider, idToken: { token, nonce } }`, or
- * `{ provider: 'email', email, code }`.
+ * `{ provider: 'email', email, code, ticket }`.
  */
 function readSaveBody(body: unknown): SaveBody {
   const { provider, idToken } = (body ?? {}) as { provider?: unknown; idToken?: unknown };
@@ -144,12 +150,25 @@ function readEmailCodeBody(body: unknown): { email: string; language: EmailCodeL
   return { email: readEmail(email), language };
 }
 
-/** The address and code of `/key/email-sign-in` and an email `/key/save`. */
-function readEmailBody(body: unknown): { email: string; code: string } {
-  const { email, code } = (body ?? {}) as { email?: unknown; code?: unknown };
-  const address = readEmail(email);
-  // Not 6 digits: a wrong code all the same (it counts as a try).
-  return { email: address, code: typeof code === 'string' && isEmailCode(code) ? code : '' };
+/** The address, the code and its ticket. `''` stands for a code or ticket of the wrong form. */
+interface EmailBody {
+  readonly email: string;
+  readonly code: string;
+  readonly ticket: string;
+}
+
+/** The body of `/key/email-sign-in` and of an email `/key/save`. */
+function readEmailBody(body: unknown): EmailBody {
+  const { email, code, ticket } = (body ?? {}) as {
+    email?: unknown;
+    code?: unknown;
+    ticket?: unknown;
+  };
+  return {
+    email: readEmail(email),
+    code: typeof code === 'string' && isEmailCode(code) ? code : '',
+    ticket: typeof ticket === 'string' && isCodeTicket(ticket) ? ticket : '',
+  };
 }
 
 /** The body of `/key/move`: `{ ticket }`. */
@@ -240,17 +259,24 @@ export interface KeyPluginOptions {
   readonly mailSender: () => MailSender | null;
   /**
    * Checks the send limits, logs the send and keeps the code
-   * (`startEmailCode` in `emailCodes.ts`).
+   * (`startEmailCode` in `emailCodes.ts`). `ok` gives the new rows.
    */
   readonly startEmailCode: (start: {
     address: string;
     caller: string | null;
     codeHash: string;
+    ticket: string;
+    known: boolean;
     expiresAt: number;
     now: number;
-  }) => Promise<{ ok: true } | { ok: false; retryAfterMs: number }>;
+  }) => Promise<EmailCodeStart>;
+  /** Takes a send back when its mail did not go out (`cancelEmailCode`). */
+  readonly cancelEmailCode: (
+    rows: Omit<Extract<EmailCodeStart, { ok: true }>, 'ok'>,
+  ) => Promise<void>;
   /** Checks a code and counts a wrong try (`useEmailCode` in `emailCodes.ts`). */
   readonly useEmailCode: (use: {
+    ticket: string;
     address: string;
     codeHash: string;
     now: number;
@@ -266,13 +292,21 @@ interface ProvenKey {
 
 export function keyPlugin(options: KeyPluginOptions) {
   /**
-   * Checks an email code for `email` and uses it up. A wrong code counts
-   * as a try (`WRONG_CODE`); no live code is `CODE_EXPIRED`.
+   * Checks the email code of a body and uses it up. A wrong code counts
+   * as a try of that ticket's code (`WRONG_CODE`); no live code for the
+   * ticket and the address is `CODE_EXPIRED`. A code of the wrong form is
+   * `WRONG_CODE` and no try: it cannot be right.
    */
-  async function checkEmailCode(secret: string, email: string, code: string): Promise<void> {
-    const address = await addressKey(secret, email);
-    const codeHash = await codeKey(secret, address, code);
-    const use = await options.useEmailCode({ address, codeHash, now: Date.now() });
+  async function checkEmailCode(secret: string, body: EmailBody): Promise<void> {
+    if (body.ticket === '') throw keyError('UNAUTHORIZED', 'CODE_EXPIRED');
+    if (body.code === '') throw keyError('UNAUTHORIZED', 'WRONG_CODE');
+    const address = await addressKey(secret, body.email);
+    const use = await options.useEmailCode({
+      ticket: await ticketKey(secret, body.ticket),
+      address,
+      codeHash: await codeKey(secret, address, body.code),
+      now: Date.now(),
+    });
     if (use === 'wrong') throw keyError('UNAUTHORIZED', 'WRONG_CODE');
     if (use === 'dead') throw keyError('UNAUTHORIZED', 'CODE_EXPIRED');
   }
@@ -320,20 +354,26 @@ export function keyPlugin(options: KeyPluginOptions) {
               emailVerified: info.user.emailVerified === true,
             };
           };
+          const { internalAdapter } = ctx.context;
+          const user = ctx.context.session.user;
+          const accounts = await internalAdapter.findAccounts(user.id);
           let proven: ProvenKey;
           if (body.provider === 'email') {
+            // What this user has already needs no code, so a refusal here
+            // does not use one up. Whether the address is another user's
+            // key is told only after the code proves it.
+            const own = accounts.find((account) => account.providerId === 'email');
+            if (own?.accountId === body.email) return ctx.json({ user: userOutput(user) });
+            if (own !== undefined) throw keyError('CONFLICT', 'PROVIDER_TAKEN');
             // The code proves the address: it is the key's id and the email.
-            await checkEmailCode(ctx.context.secret, body.email, body.code);
+            await checkEmailCode(ctx.context.secret, body);
             proven = { accountId: body.email, email: body.email, emailVerified: true };
           } else {
             proven = await proveIdToken(body.token, body.nonce);
           }
           const { accountId } = proven;
-          const { internalAdapter } = ctx.context;
-          const user = ctx.context.session.user;
 
           const linked = await internalAdapter.findAccountByKey({ providerId, accountId });
-          const accounts = await internalAdapter.findAccounts(user.id);
           if (linked !== null) {
             if (linked.userId === user.id) {
               // Saved already: nothing to do.
@@ -395,14 +435,27 @@ export function keyPlugin(options: KeyPluginOptions) {
         // No session is fine: a phone with none signs in with the code.
         const session = await getSessionFromCtx(ctx).catch(() => null);
         const caller = callerOf(ctx.request?.headers ?? ctx.headers, session?.user.id ?? null);
-        const code = makeEmailCode((bytes) => crypto.getRandomValues(new Uint8Array(bytes)));
+        const random = (bytes: number) => crypto.getRandomValues(new Uint8Array(bytes));
+        const code = makeEmailCode(random);
+        const ticket = makeCodeTicket(random);
         const address = await addressKey(secret, email);
         const now = Date.now();
-        // Never looks up an account: the answer is the same for any address.
+        // The answer is the same for any address. The key lookup picks only
+        // the limits: a player with an email key is never under the day cap
+        // of new addresses, so a flood of sends to strangers cannot lock
+        // them out. While that cap is full, only a new address gets
+        // RATE_LIMITED.
+        const known =
+          (await ctx.context.internalAdapter.findAccountByKey({
+            providerId: 'email',
+            accountId: email,
+          })) !== null;
         const started = await options.startEmailCode({
           address,
           caller: caller === null ? null : await callerKey(secret, caller),
           codeHash: await codeKey(secret, address, code),
+          ticket: await ticketKey(secret, ticket),
+          known,
           expiresAt: codeExpiresAt(now),
           now,
         });
@@ -414,19 +467,29 @@ export function keyPlugin(options: KeyPluginOptions) {
           });
         }
         const sent = await sender.send({ to: email, ...emailCodeMail(code, language) });
-        if (!sent.ok) {
-          // The mail service refused the address itself, or failed. Never
-          // log the address or the code.
-          throw sent.error === 'Rejected'
-            ? keyError('BAD_REQUEST', 'INVALID_EMAIL')
-            : keyError('BAD_GATEWAY', 'MAIL_FAILED');
+        // Never log the address or the code.
+        if (!sent.ok && sent.error !== 'Rejected') {
+          // The mail did not go out: take the send back, so it costs no
+          // limit. Earlier codes of the address still work.
+          await options.cancelEmailCode({ code: started.code, sends: started.sends });
+          throw keyError('BAD_GATEWAY', 'MAIL_FAILED');
         }
-        return ctx.json({ sent: true });
+        // `Rejected`: the mail service refuses the address itself (a
+        // bounce or a block list). The answer stays the same as for any
+        // other address, so no one learns which ones those are; the send
+        // still counts.
+        return ctx.json({ sent: true, ticket });
       }),
 
       emailSignIn: createAuthEndpoint('/key/email-sign-in', { method: 'POST' }, async (ctx) => {
-        const { email, code } = readEmailBody(ctx.body);
-        await checkEmailCode(ctx.context.secret, email, code);
+        const body = readEmailBody(ctx.body);
+        // A signed-in phone adds the key with `/key/save` (a guest keeps its
+        // games, or gets the move offer); a sign-in here would leave them.
+        if ((await getSessionFromCtx(ctx).catch(() => null)) !== null) {
+          throw keyError('CONFLICT', 'SIGNED_IN');
+        }
+        const { email } = body;
+        await checkEmailCode(ctx.context.secret, body);
         const { internalAdapter } = ctx.context;
         const keyOwner = async () => {
           const key = await internalAdapter.findAccountByKey({

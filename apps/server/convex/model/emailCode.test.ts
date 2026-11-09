@@ -14,9 +14,13 @@ import {
   DAY,
   DEFAULT_CODES_PER_DAY,
   emailCodeMail,
+  isCodeTicket,
+  makeCodeTicket,
   makeEmailCode,
+  MAX_CODES_PER_DAY,
   SEND_LOG_MS,
   sendWait,
+  ticketKey,
 } from './emailCode';
 
 const MINUTE = 60 * 1000;
@@ -39,6 +43,39 @@ describe('codesPerDay', () => {
     for (const bad of ['', '0', '-3', '2.5', 'many', '99999999']) {
       expect(codesPerDay({ EMAIL_CODES_PER_DAY: bad })).toBe(DEFAULT_CODES_PER_DAY);
     }
+  });
+
+  it('cuts a larger cap to MAX_CODES_PER_DAY', () => {
+    expect(codesPerDay({ EMAIL_CODES_PER_DAY: String(MAX_CODES_PER_DAY) })).toBe(MAX_CODES_PER_DAY);
+    expect(codesPerDay({ EMAIL_CODES_PER_DAY: '9999999' })).toBe(MAX_CODES_PER_DAY);
+  });
+});
+
+describe('the code ticket', () => {
+  it('is 16 random bytes as base64url, and only that form passes', () => {
+    const ticket = makeCodeTicket((bytes) => new Uint8Array(bytes).fill(0xfb));
+    expect(ticket).toBe('-_v7-_v7-_v7-_v7-_v7-w');
+    expect(isCodeTicket(ticket)).toBe(true);
+    const random = makeCodeTicket((bytes) => crypto.getRandomValues(new Uint8Array(bytes)));
+    expect(isCodeTicket(random)).toBe(true);
+    for (const bad of [
+      '',
+      'short',
+      `${ticket}x`,
+      '+/v7-_v7-_v7-_v7-_v7-w',
+      '-_v7-_v7-_v7-_v7-_v7-=',
+    ]) {
+      expect(isCodeTicket(bad)).toBe(false);
+    }
+    expect(() => makeCodeTicket(() => new Uint8Array(4))).toThrow();
+  });
+
+  it('is kept as an HMAC of its own purpose', async () => {
+    const ticket = 'A'.repeat(22);
+    const kept = await ticketKey(SECRET, ticket);
+    expect(kept).not.toContain(ticket);
+    expect(kept).not.toBe(await callerKey(SECRET, ticket));
+    expect(kept).not.toBe(await ticketKey(`${SECRET}-other`, ticket));
   });
 });
 

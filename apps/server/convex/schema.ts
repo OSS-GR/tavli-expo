@@ -276,11 +276,13 @@ export default defineSchema({
     .index('by_expires', ['expiresAt']),
 
   /**
-   * Live email sign-in codes (#399, `emailCodes.ts`): one per address,
-   * for `EMAIL_CODE_TTL_MS`. Holds HMACs only (`model/emailCode.ts`):
-   * never the address and never the code.
+   * Live email sign-in codes (#399, `emailCodes.ts`): one per send, for
+   * `EMAIL_CODE_TTL_MS`, found by its ticket. Holds HMACs only
+   * (`model/emailCode.ts`): never the address, the ticket or the code.
    */
   emailCodes: defineTable({
+    /** `ticketKey` of the ticket the send gave the phone. */
+    ticket: v.string(),
     /** `addressKey` of the address. */
     address: v.string(),
     /** `codeKey` of the address and the code. */
@@ -289,13 +291,13 @@ export default defineSchema({
     /** Wrong tries so far. */
     tries: v.number(),
   })
-    .index('by_address', ['address'])
+    .index('by_ticket', ['ticket'])
     .index('by_expires', ['expiresAt']),
 
   /**
    * The email code send log (#399), for the send limits: one row per
    * bucket and send, kept `SEND_LOG_MS`. A bucket is an HMAC of the
-   * address or the caller, or `all` for the day cap.
+   * address or the caller, or `new` for the day cap of new addresses.
    */
   emailCodeSends: defineTable({
     bucket: v.string(),

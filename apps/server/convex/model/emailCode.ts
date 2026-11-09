@@ -2,15 +2,22 @@
  * The email sign-in code (#399, ADR-0008 points 3 and 10): the pure parts.
  *
  * - **The code:** 6 random digits, the same chance for each.
- * - **What we keep:** never the code and never the address in our own
- *   tables. The code row holds an HMAC of the address (`addressKey`) and
- *   an HMAC of the address and the code (`codeKey`), both with the Better
- *   Auth secret, so a copy of the table gives no code and no address.
- *   The send log holds HMACs too (`callerKey`).
+ * - **The ticket:** each send also gives the phone that asked a random
+ *   ticket (`makeCodeTicket`). A code is checked only with its ticket, so
+ *   someone who types another person's address cannot use up the tries
+ *   of that person's code: without the ticket a try reaches no code.
+ * - **What we keep:** never the code, the ticket or the address in our
+ *   own tables. The code row holds an HMAC of the address (`addressKey`),
+ *   of the ticket (`ticketKey`) and of the address and the code
+ *   (`codeKey`), all with the Better Auth secret, so a copy of the table
+ *   gives no code and no address. The send log holds HMACs too
+ *   (`callerKey`).
  * - **Send limits:** per address (`ADDRESS_LIMITS`), per caller
- *   (`CALLER_LIMITS`: the signed-in user, else the phone's IP address),
- *   and for the whole server per day (`codesPerDay`, so a flood cannot
- *   use up the mail plan). Better Auth's own limiter lives in memory,
+ *   (`CALLER_LIMITS`: the signed-in user, else the IP address the request
+ *   names), and per day for addresses that are no email key yet
+ *   (`codesPerDay`, so a flood cannot use up the mail plan; an email
+ *   key's address has only its own limits, so a flood never locks out a
+ *   player who has one). Better Auth's own limiter lives in memory,
  *   which a new Convex isolate loses, so the log is a Convex table.
  * - **The email:** a neutral subject with no code in it, plain text and
  *   simple HTML, in English or Greek.
@@ -45,17 +52,26 @@ export const CALLER_LIMITS: readonly SendLimit[] = [
 ];
 
 /**
- * Sends a day for the whole server when `EMAIL_CODES_PER_DAY` is not set.
+ * Sends a day to new addresses when `EMAIL_CODES_PER_DAY` is not set.
  * AhaSend's free plan sends 1,000 mails a month: about 33 a day.
  */
 export const DEFAULT_CODES_PER_DAY = 30;
 
-/** The day cap from `EMAIL_CODES_PER_DAY`: a whole number from 1 up, else the default. */
+/**
+ * The highest day cap. A send reads up to this many log rows of one
+ * bucket, so it stays far below Convex's read limit.
+ */
+export const MAX_CODES_PER_DAY = 1000;
+
+/**
+ * The day cap from `EMAIL_CODES_PER_DAY`: a whole number from 1 to
+ * `MAX_CODES_PER_DAY` (a larger one is cut to it), else the default.
+ */
 export function codesPerDay(env: Readonly<Record<string, string | undefined>>): number {
   const text = env['EMAIL_CODES_PER_DAY']?.trim() ?? '';
   if (!/^\d{1,7}$/.test(text)) return DEFAULT_CODES_PER_DAY;
   const value = Number(text);
-  return value >= 1 ? value : DEFAULT_CODES_PER_DAY;
+  return value >= 1 ? Math.min(value, MAX_CODES_PER_DAY) : DEFAULT_CODES_PER_DAY;
 }
 
 /**
@@ -112,19 +128,44 @@ export function codeKey(secret: string, address: string, code: string): Promise<
   return signText(secret, 'tavlaki-email-code:', `${address}:${code}`);
 }
 
+/** Random bytes in a ticket: 128 bits, so no one guesses one. */
+export const CODE_TICKET_BYTES = 16;
+
+/** A new ticket: `CODE_TICKET_BYTES` random bytes as base64url. */
+export function makeCodeTicket(random: (bytes: number) => Uint8Array): string {
+  const bytes = random(CODE_TICKET_BYTES);
+  if (bytes.length < CODE_TICKET_BYTES) throw new Error('not enough random bytes');
+  let text = '';
+  for (const byte of bytes.subarray(0, CODE_TICKET_BYTES)) text += String.fromCharCode(byte);
+  return btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** Whether `text` has a ticket's form (22 base64url characters). */
+export function isCodeTicket(text: string): boolean {
+  return /^[A-Za-z0-9_-]{22}$/.test(text);
+}
+
+/** A ticket as we keep it: an HMAC. */
+export function ticketKey(secret: string, ticket: string): Promise<string> {
+  return signText(secret, 'tavlaki-email-ticket:', ticket);
+}
+
 /** A caller as the send log keeps it: an HMAC. */
 export function callerKey(secret: string, caller: string): Promise<string> {
   return signText(secret, 'tavlaki-email-caller:', caller);
 }
 
-/** The bucket of the server-wide day cap in the send log. */
-export const ALL_SENDS = 'all';
+/** The bucket of the day cap for new addresses in the send log. */
+export const NEW_ADDRESS_SENDS = 'new';
 
 /**
  * Who asks for a code, for the caller limit: the signed-in user, else the
- * IP address the request came from, else `null` (only the address and the
- * day cap count then). A phone can pick its own `x-forwarded-for`, so this
- * limit slows a script down; the address limit and the day cap stop it.
+ * IP address the request names, else `null` (only the address and the
+ * day cap count then). Convex gives an HTTP route no client address it
+ * vouches for, and a script can pick its own `x-forwarded-for` or make
+ * guests, so this limit only slows a script down. The address limit
+ * stops a flood to one address, and the day cap a flood to many; a
+ * player with an email key is never under the day cap.
  */
 export function callerOf(headers: Headers | undefined, userId: string | null): string | null {
   if (userId !== null && userId !== '') return `user:${userId}`;

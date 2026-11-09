@@ -42,8 +42,8 @@ interface FakeServer {
   anonymous: Set<string>;
   /** `apple:<sub>` or `email:<address>` → user id. */
   keys: Map<string, string>;
-  /** Live email codes (#399): address → code and wrong tries. */
-  emailCodes: Map<string, { code: string; tries: number }>;
+  /** Live email codes (#399): ticket → address, code and wrong tries. */
+  emailCodes: Map<string, { email: string; code: string; tries: number }>;
   /** Every code sent: the fake inbox. */
   sentCodes: { email: string; code: string; language: unknown }[];
   /** Nonces made and not used yet. */
@@ -53,7 +53,10 @@ interface FakeServer {
   /** The Apple codes sent to `/key/apple-code`: user id, client id and code. */
   appleCodes: { user: string; clientId: unknown; code: unknown }[];
   /** The next calls of this name fail with this result error (or throw when `'throw'`). */
-  failures: Map<string, { status?: number; message?: string; code?: string } | 'throw'>;
+  failures: Map<
+    string,
+    { status?: number; message?: string; code?: string; retryAfterMs?: number } | 'throw'
+  >;
   /** Move tickets (#403) not used yet: ticket → guest and account. */
   moveTickets: Map<string, { source: string; target: string }>;
   calls: string[];
@@ -105,15 +108,16 @@ function provenEmail(
 ): string | BetterAuthResult<unknown> {
   const email = normalizeEmail(String(body?.['email'] ?? ''));
   if (email === null) return refused(400, 'INVALID_EMAIL');
-  const live = server.emailCodes.get(email);
-  if (live === undefined) return refused(401, 'CODE_EXPIRED');
+  const ticket = String(body?.['ticket'] ?? '');
+  const live = server.emailCodes.get(ticket);
+  if (live === undefined || live.email !== email) return refused(401, 'CODE_EXPIRED');
   if (live.code !== body?.['code']) {
     live.tries += 1;
     if (live.tries < EMAIL_CODE_TRIES) return refused(401, 'WRONG_CODE');
-    server.emailCodes.delete(email);
+    server.emailCodes.delete(ticket);
     return refused(401, 'CODE_EXPIRED');
   }
-  server.emailCodes.delete(email);
+  server.emailCodes.delete(ticket);
   return email;
 }
 
@@ -154,10 +158,12 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
       if (email === null) return refused(400, 'INVALID_EMAIL');
       const code = String(200000 + server.sentCodes.length + 1);
       server.sentCodes.push({ email, code, language: body?.['language'] });
-      server.emailCodes.set(email, { code, tries: 0 });
-      return ok({ sent: true });
+      const ticket = `ticket-${server.sentCodes.length}`;
+      server.emailCodes.set(ticket, { email, code, tries: 0 });
+      return ok({ sent: true, ticket });
     }
     if (path === '/key/email-sign-in') {
+      if (id !== undefined) return refused(409, 'SIGNED_IN');
       const email = provenEmail(server, body);
       if (typeof email !== 'string') return email;
       let owner = server.keys.get(`email:${email}`);
@@ -499,9 +505,15 @@ describe('fromBetterAuthClient', () => {
     expect(server.calls).toContain('fetch /key/email-code');
     const wrong = { provider: 'email' as const, email: 'eleni@example.com', code: '000000' };
     expect(await rejection(auth.signInWithKey(wrong))).toMatchObject({ code: 'WRONG_CODE' });
-    server.failures.set('fetch /key/email-code', { status: 429, code: 'RATE_LIMITED' });
-    expect(await rejection(auth.requestEmailCode('eleni@example.com', 'el'))).toMatchObject({
+    server.failures.set('fetch /key/email-code', {
+      status: 429,
       code: 'RATE_LIMITED',
+      retryAfterMs: 60_000,
+    });
+    expect(await rejection(auth.requestEmailCode('eleni@example.com', 'el'))).toEqual({
+      code: 'RATE_LIMITED',
+      message: expect.any(String),
+      retryAfterMs: 60_000,
     });
     server.failures.set('fetch /key/email-code', { status: 502, code: 'MAIL_FAILED' });
     expect(await rejection(auth.requestEmailCode('eleni@example.com', 'el'))).toMatchObject({
@@ -514,6 +526,21 @@ describe('fromBetterAuthClient', () => {
     // An email key sends no Apple code.
     await auth.signInWithKey({ ...wrong, code: '200001' });
     expect(server.calls).not.toContain('fetch /key/apple-code');
+  });
+
+  it('sends the code with the ticket this phone got, so another phone cannot use it (#399)', async () => {
+    const asker = subject();
+    await asker.auth.requestEmailCode(' Eleni@Example.com ', 'en');
+    const [sent] = asker.server.sentCodes;
+    // A second phone on the same server knows the address and the code, not the ticket.
+    const other = subject(asker.server).auth;
+    const credential = { provider: 'email' as const, email: 'eleni@example.com', code: sent!.code };
+    expect(await rejection(other.signInWithKey(credential))).toMatchObject({
+      code: 'REJECTED',
+    });
+    // The asker's code still works: the other phone's try reached no code.
+    await asker.auth.signInWithKey(credential);
+    expect((await asker.auth.ready())?.isGuest).toBe(false);
   });
 
   it('passes the move offer of a guest’s KEY_BELONGS_TO_OTHER, and drops a broken one (#403)', async () => {

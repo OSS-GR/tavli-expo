@@ -28,9 +28,13 @@ import type { Convex, FakeApple, Phone } from './test.apple';
 
 const MINUTE = 60 * 1000;
 const ANN = 'ann@example.com';
+/** The answer to every code request that went through. */
+const SENT = { status: 200, body: { sent: true, ticket: expect.any(String) } };
 
 let apple: FakeApple;
 let mail: RecordingMailSender;
+/** The ticket of the newest code each address got (normalized address). */
+let tickets: Map<string, string>;
 
 beforeAll(async () => {
   apple = await fakeApple();
@@ -40,6 +44,7 @@ beforeEach(() => {
   useFakeApple(apple);
   mail = createRecordingMailSender();
   setMailSender(mail);
+  tickets = new Map();
 });
 
 afterEach(() => {
@@ -48,8 +53,11 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function askCode(t: Convex, phone: Phone, email: string, language = 'en') {
-  return call(t, phone, 'key/email-code', { email, language });
+async function askCode(t: Convex, phone: Phone, email: string, language = 'en') {
+  const reply = await call(t, phone, 'key/email-code', { email, language });
+  const ticket = reply.body['ticket'];
+  if (typeof ticket === 'string') tickets.set(email.trim().toLowerCase(), ticket);
+  return reply;
 }
 
 /** The code in the newest email to `email`. */
@@ -60,12 +68,22 @@ function codeIn(email: string): string {
   return code;
 }
 
+/** What proves `email` (normalized): a code, by default the newest, and its ticket. */
+function proof(email: string, code = codeIn(email)) {
+  return { email, code, ticket: tickets.get(email) ?? '' };
+}
+
 async function signInWithCode(t: Convex, phone: Phone, email: string) {
   expect((await askCode(t, phone, email)).status).toBe(200);
   return await call(t, phone, 'key/email-sign-in', {
+    ...proof(email.trim().toLowerCase()),
     email,
-    code: codeIn(email.trim().toLowerCase()),
   });
+}
+
+/** Another code than `code`. */
+function wrongTo(code: string): string {
+  return code === '000000' ? '000001' : '000000';
 }
 
 async function userRow(t: Convex, id: string) {
@@ -84,7 +102,7 @@ describe('asking for a code', () => {
   it('mails a code in the asked language and keeps only hashes', async () => {
     const t = setup();
     const reply = await askCode(t, newPhone(), '  Ann@Example.com ', 'el');
-    expect(reply).toEqual({ status: 200, body: { sent: true } });
+    expect(reply).toEqual({ status: 200, body: { sent: true, ticket: expect.any(String) } });
     expect(mail.sent).toHaveLength(1);
     expect(mail.sent[0]!.to).toBe(ANN);
     expect(mail.sent[0]!.subject).toBe('Ο κωδικός σύνδεσης στο Tavlaki');
@@ -92,12 +110,14 @@ describe('asking for a code', () => {
     const { codes, sends } = await tables(t);
     expect(codes).toHaveLength(1);
     expect(codes[0]!.tries).toBe(0);
-    // The send log: the address, the caller (no IP in the test: none) and the day cap.
-    expect(sends.map((row) => row.bucket.split(':')[0]).sort()).toEqual(['address', 'all']);
+    // The send log: the address, the caller (no IP in the test: none) and
+    // the day cap of new addresses.
+    expect(sends.map((row) => row.bucket.split(':')[0]).sort()).toEqual(['address', 'new']);
     const stored = JSON.stringify({ codes, sends });
     expect(stored).not.toContain('ann');
     expect(stored).not.toContain('example');
     expect(stored).not.toContain(code);
+    expect(stored).not.toContain(tickets.get(ANN));
   });
 
   it('gives the same answer for a known and a new address', async () => {
@@ -107,7 +127,10 @@ describe('asking for a code', () => {
     await call(t, phone, 'sign-out', {});
     const known = await askCode(t, newPhone(), ANN);
     const fresh = await askCode(t, newPhone(), 'bea@example.com');
-    expect(known).toEqual(fresh);
+    // Each gets its own ticket; nothing else differs.
+    expect(known).toEqual(SENT);
+    expect(fresh).toEqual(SENT);
+    expect(fresh.body['ticket']).not.toBe(known.body['ticket']);
   });
 
   it('refuses a bad address or language', async () => {
@@ -131,16 +154,28 @@ describe('asking for a code', () => {
     expect(reply.body['code']).toBe('EMAIL_OFF');
 
     setMailSender(mail);
+    const phone = newPhone();
+    expect((await askCode(t, phone, ANN)).status).toBe(200);
+    const sent = proof(ANN);
+    const before = await tables(t);
     mail.fail(ANN);
     reply = await askCode(t, newPhone(), ANN);
     expect(reply.status).toBe(502);
     expect(reply.body['code']).toBe('MAIL_FAILED');
     expect(JSON.stringify(reply.body)).not.toContain(ANN);
+    // The failed send is taken back: no new code, no limit used, and the
+    // code sent before still works.
+    expect(await tables(t)).toEqual(before);
+    expect((await call(t, phone, 'key/email-sign-in', sent)).status).toBe(200);
+  });
 
+  it('answers a refused address like any other (no one learns which ones the mail service refuses)', async () => {
+    const t = setup();
     mail.fail(ANN, 'Rejected');
-    reply = await askCode(t, newPhone(), ANN);
-    expect(reply.status).toBe(400);
-    expect(reply.body['code']).toBe('INVALID_EMAIL');
+    const refused = await askCode(t, newPhone(), ANN);
+    const fine = await askCode(t, newPhone(), 'bea@example.com');
+    expect(refused).toEqual(SENT);
+    expect(fine).toEqual(SENT);
   });
 
   it('limits the codes to one address', async () => {
@@ -156,46 +191,79 @@ describe('asking for a code', () => {
     expect((await askCode(t, newPhone(), 'bea@example.com')).status).toBe(200);
   });
 
-  it('limits the codes of the whole server a day (EMAIL_CODES_PER_DAY)', async () => {
+  it('limits the codes to new addresses a day (EMAIL_CODES_PER_DAY), never a player’s email key', async () => {
     const t = setup();
     vi.stubEnv('EMAIL_CODES_PER_DAY', '2');
-    expect((await askCode(t, newPhone(), 'a@example.com')).status).toBe(200);
+    // Ann has an email key; her sign-in was the first new address.
+    expect((await signInWithCode(t, newPhone(), ANN)).status).toBe(200);
     expect((await askCode(t, newPhone(), 'b@example.com')).status).toBe(200);
     const reply = await askCode(t, newPhone(), 'c@example.com');
     expect(reply.status).toBe(429);
     expect(mail.sent).toHaveLength(2);
+    // A flood of new addresses never locks out a player with an email key.
+    expect((await askCode(t, newPhone(), ANN)).status).toBe(200);
+    expect(mail.sent).toHaveLength(3);
   });
 });
 
 describe('the send limits over time (startEmailCode)', () => {
   const now = Date.UTC(2026, 10, 9);
 
-  function start(t: Convex, at: number, more: { address?: string; caller?: string | null } = {}) {
+  function start(
+    t: Convex,
+    at: number,
+    more: { address?: string; caller?: string | null; known?: boolean; perDay?: number } = {},
+  ) {
     return t.mutation(internal.emailCodes.startEmailCode, {
       address: more.address ?? 'address-1',
       caller: more.caller ?? null,
       codeHash: `code-${at}`,
+      ticket: `ticket-${at}-${more.address ?? 'address-1'}`,
+      known: more.known ?? false,
       expiresAt: at + EMAIL_CODE_TTL_MS,
       now: at,
-      perDay: 1_000,
+      perDay: more.perDay ?? 1_000,
     });
   }
+  const sent = { ok: true };
 
   it('lets an address send again once the window has passed', async () => {
     const t = setup();
-    for (let i = 0; i < 3; i++) expect(await start(t, now + i)).toEqual({ ok: true });
+    for (let i = 0; i < 3; i++) expect(await start(t, now + i)).toMatchObject(sent);
     expect(await start(t, now + 3 * MINUTE)).toEqual({
       ok: false,
       retryAfterMs: 15 * MINUTE - 3 * MINUTE,
     });
-    expect(await start(t, now + 15 * MINUTE)).toEqual({ ok: true });
+    expect(await start(t, now + 15 * MINUTE)).toMatchObject(sent);
+  });
+
+  it('counts the day cap only for new addresses', async () => {
+    const t = setup();
+    expect(await start(t, now, { address: 'a', perDay: 1 })).toMatchObject(sent);
+    expect(await start(t, now + 1, { address: 'b', perDay: 1 })).toMatchObject({ ok: false });
+    expect(await start(t, now + 2, { address: 'c', perDay: 1, known: true })).toMatchObject(sent);
+    expect(await start(t, now + DAY, { address: 'b', perDay: 1 })).toMatchObject(sent);
+  });
+
+  it('takes a send back (cancelEmailCode)', async () => {
+    const t = setup();
+    const first = await start(t, now);
+    const second = await start(t, now + 1);
+    if (!second.ok) throw new Error('not sent');
+    await t.mutation(internal.emailCodes.cancelEmailCode, {
+      code: second.code,
+      sends: second.sends,
+    });
+    const { codes, sends } = await tables(t);
+    expect(codes.map((row) => row._id)).toEqual([first.ok ? first.code : null]);
+    expect(sends.every((row) => row.at === now)).toBe(true);
   });
 
   it('caps an address a day', async () => {
     const t = setup();
     const max = ADDRESS_LIMITS[1]!.max;
     for (let i = 0; i < max; i++) {
-      expect(await start(t, now + i * 20 * MINUTE)).toEqual({ ok: true });
+      expect(await start(t, now + i * 20 * MINUTE)).toMatchObject(sent);
     }
     const late = now + max * 20 * MINUTE;
     expect(await start(t, late)).toEqual({ ok: false, retryAfterMs: now + DAY - late });
@@ -205,24 +273,24 @@ describe('the send limits over time (startEmailCode)', () => {
     const t = setup();
     const max = CALLER_LIMITS[0]!.max;
     for (let i = 0; i < max; i++) {
-      expect(await start(t, now + i, { address: `address-${i}`, caller: 'caller-1' })).toEqual({
-        ok: true,
-      });
+      expect(
+        await start(t, now + i, { address: `address-${i}`, caller: 'caller-1' }),
+      ).toMatchObject(sent);
     }
     expect(await start(t, now + max, { address: 'address-x', caller: 'caller-1' })).toMatchObject({
       ok: false,
     });
-    expect(await start(t, now + max, { address: 'address-x', caller: 'caller-2' })).toEqual({
-      ok: true,
-    });
+    expect(await start(t, now + max, { address: 'address-x', caller: 'caller-2' })).toMatchObject(
+      sent,
+    );
   });
 
-  it('keeps one code per address: a new one replaces the old', async () => {
+  it('keeps a code per send: a new one ends no other phone’s code', async () => {
     const t = setup();
     await start(t, now);
     await start(t, now + 1);
     const { codes } = await tables(t);
-    expect(codes.map((row) => row.codeHash)).toEqual([`code-${now + 1}`]);
+    expect(codes.map((row) => row.codeHash)).toEqual([`code-${now}`, `code-${now + 1}`]);
   });
 
   it('drops a few old rows on each call', async () => {
@@ -231,6 +299,7 @@ describe('the send limits over time (startEmailCode)', () => {
       for (let i = 0; i < OLD_ROWS_PER_CALL + 2; i++) {
         await ctx.db.insert('emailCodeSends', { bucket: 'all', at: now - SEND_LOG_MS - i });
         await ctx.db.insert('emailCodes', {
+          ticket: `old-${i}`,
           address: `old-${i}`,
           codeHash: 'x',
           expiresAt: now - 1,
@@ -251,20 +320,44 @@ describe('using a code (useEmailCode)', () => {
 
   it('is dead after its time, also for the right code', async () => {
     const t = setup();
-    await t.mutation(internal.emailCodes.startEmailCode, {
-      address: 'a',
-      caller: null,
-      codeHash: 'right',
-      expiresAt: now + EMAIL_CODE_TTL_MS,
-      now,
-      perDay: 10,
-    });
+    await startCode(t);
     const use = (codeHash: string, at: number) =>
-      t.mutation(internal.emailCodes.useEmailCode, { address: 'a', codeHash, now: at });
+      t.mutation(internal.emailCodes.useEmailCode, {
+        ticket: 't',
+        address: 'a',
+        codeHash,
+        now: at,
+      });
     expect(await use('wrong', now + 1)).toBe('wrong');
     expect(await use('right', now + EMAIL_CODE_TTL_MS)).toBe('dead');
     expect((await tables(t)).codes).toHaveLength(0);
   });
+
+  it('reaches no code without its ticket, and counts no try then', async () => {
+    const t = setup();
+    await startCode(t);
+    const use = (ticket: string, address: string) =>
+      t.mutation(internal.emailCodes.useEmailCode, { ticket, address, codeHash: 'wrong', now });
+    for (let i = 0; i < 5; i++) {
+      expect(await use('other', 'a')).toBe('dead');
+      // The ticket of another address.
+      expect(await use('t', 'b')).toBe('dead');
+    }
+    expect((await tables(t)).codes.map((row) => row.tries)).toEqual([0]);
+  });
+
+  function startCode(t: Convex) {
+    return t.mutation(internal.emailCodes.startEmailCode, {
+      address: 'a',
+      caller: null,
+      codeHash: 'right',
+      ticket: 't',
+      known: false,
+      expiresAt: now + EMAIL_CODE_TTL_MS,
+      now,
+      perDay: 10,
+    });
+  }
 });
 
 describe('signing in with a code', () => {
@@ -309,32 +402,66 @@ describe('signing in with a code', () => {
   it('refuses a wrong, used or missing code', async () => {
     const t = setup();
     const phone = newPhone();
-    let reply = await call(t, phone, 'key/email-sign-in', { email: ANN, code: '123456' });
+    const reply = await call(t, phone, 'key/email-sign-in', { email: ANN, code: '123456' });
     expect([reply.status, reply.body['code']]).toEqual([401, 'CODE_EXPIRED']);
     await askCode(t, phone, ANN);
-    const code = codeIn(ANN);
-    const wrong = code === '000000' ? '000001' : '000000';
-    reply = await call(t, phone, 'key/email-sign-in', { email: ANN, code: wrong });
-    expect([reply.status, reply.body['code']]).toEqual([401, 'WRONG_CODE']);
-    // Not 6 digits: a wrong try all the same.
-    reply = await call(t, phone, 'key/email-sign-in', { email: ANN, code: 'abc' });
-    expect([reply.status, reply.body['code']]).toEqual([401, 'WRONG_CODE']);
-    reply = await call(t, phone, 'key/email-sign-in', { email: ANN, code: wrong });
-    expect([reply.status, reply.body['code']]).toEqual([401, 'CODE_EXPIRED']);
-    reply = await call(t, phone, 'key/email-sign-in', { email: ANN, code });
-    expect([reply.status, reply.body['code']]).toEqual([401, 'CODE_EXPIRED']);
+    const right = proof(ANN);
+    const wrong = { ...right, code: wrongTo(right.code) };
+    const signIn = async (body: object) => {
+      const answer = await call(t, phone, 'key/email-sign-in', body);
+      return [answer.status, answer.body['code']];
+    };
+    expect(await signIn(wrong)).toEqual([401, 'WRONG_CODE']);
+    // Not 6 digits: wrong, but no try (it cannot be right).
+    expect(await signIn({ ...right, code: 'abc' })).toEqual([401, 'WRONG_CODE']);
+    expect(await signIn(wrong)).toEqual([401, 'WRONG_CODE']);
+    // The third wrong try ends the code.
+    expect(await signIn(wrong)).toEqual([401, 'CODE_EXPIRED']);
+    expect(await signIn(right)).toEqual([401, 'CODE_EXPIRED']);
     expect(phone.cookie).toBe('');
+  });
+
+  it('a stranger with the address but not the ticket cannot use up the code', async () => {
+    const t = setup();
+    const phone = newPhone();
+    await askCode(t, phone, ANN);
+    const right = proof(ANN);
+    const stranger = newPhone();
+    for (const ticket of ['', 'A'.repeat(22), 'not a ticket']) {
+      for (let i = 0; i < 3; i++) {
+        const reply = await call(t, stranger, 'key/email-sign-in', {
+          email: ANN,
+          code: wrongTo(right.code),
+          ticket,
+        });
+        expect(reply.body['code']).toBe('CODE_EXPIRED');
+      }
+    }
+    // A new code for the address, asked by the stranger, ends no other code.
+    await askCode(t, stranger, ANN);
+    expect((await call(t, phone, 'key/email-sign-in', right)).status).toBe(200);
+  });
+
+  it('refuses a signed-in phone, which saves the key instead, and keeps the code', async () => {
+    const t = setup();
+    const phone = newPhone();
+    const id = await guest(t, phone);
+    await askCode(t, phone, ANN);
+    const reply = await call(t, phone, 'key/email-sign-in', proof(ANN));
+    expect([reply.status, reply.body['code']]).toEqual([409, 'SIGNED_IN']);
+    // The guest is still signed in, and the code still saves it.
+    const saved = await call(t, phone, 'key/save', { provider: 'email', ...proof(ANN) });
+    expect(userOf(saved)).toEqual({ id, isAnonymous: false });
   });
 
   it('two sign-ins at once make one account', async () => {
     const t = setup();
     await askCode(t, newPhone(), ANN);
-    const code = codeIn(ANN);
-    // The second phone's code is used up by then, so both use the same one:
-    // one of them wins it.
+    const right = proof(ANN);
+    // Both use the same code and ticket: one of them wins it.
     const [a, b] = await Promise.all([
-      call(t, newPhone(), 'key/email-sign-in', { email: ANN, code }),
-      call(t, newPhone(), 'key/email-sign-in', { email: ANN, code }),
+      call(t, newPhone(), 'key/email-sign-in', right),
+      call(t, newPhone(), 'key/email-sign-in', right),
     ]);
     expect([a.status, b.status].sort()).toEqual([200, 401]);
     expect((await tables(t)).claims).toHaveLength(1);
@@ -349,8 +476,8 @@ describe('saving an email key', () => {
     await askCode(t, phone, ANN, 'el');
     const reply = await call(t, phone, 'key/save', {
       provider: 'email',
+      ...proof(ANN),
       email: 'ANN@example.com',
-      code: codeIn(ANN),
     });
     expect(reply.status).toBe(200);
     expect(userOf(reply)).toEqual({ id, isAnonymous: false });
@@ -377,33 +504,38 @@ describe('saving an email key', () => {
     const phone = newPhone();
     await guest(t, phone);
     await askCode(t, phone, ANN);
-    const reply = await call(t, phone, 'key/save', {
-      provider: 'email',
-      email: ANN,
-      code: codeIn(ANN),
-    });
+    const reply = await call(t, phone, 'key/save', { provider: 'email', ...proof(ANN) });
     expect([reply.status, reply.body['code']]).toEqual([409, 'KEY_BELONGS_TO_OTHER']);
     const move = reply.body['move'] as { ticket: string };
     const moved = await call(t, phone, 'key/move', { ticket: move.ticket });
     expect(userOf(moved).id).toBe(owner.id);
   });
 
-  it('refuses a second email key, and a wrong code', async () => {
+  it('refuses a second email key before it uses the code', async () => {
     const t = setup();
     const phone = newPhone();
     expect((await signInWithCode(t, phone, ANN)).status).toBe(200);
-    await askCode(t, phone, 'bea@example.com');
-    let reply = await call(t, phone, 'key/save', {
-      provider: 'email',
-      email: 'bea@example.com',
-      code: codeIn('bea@example.com'),
-    });
+    const bea = 'bea@example.com';
+    await askCode(t, phone, bea);
+    const save = (body: object) => call(t, phone, 'key/save', { provider: 'email', ...body });
+    const reply = await save(proof(bea));
     expect([reply.status, reply.body['code']]).toEqual([409, 'PROVIDER_TAKEN']);
-    await askCode(t, phone, 'cy@example.com');
-    reply = await call(t, phone, 'key/save', {
+    // Its own address again: nothing to do, and no code needed.
+    expect((await save({ email: ANN, code: '000000', ticket: '' })).status).toBe(200);
+    // The refused save left Bea's code unused.
+    expect((await call(t, newPhone(), 'key/email-sign-in', proof(bea))).status).toBe(200);
+  });
+
+  it('refuses a wrong code', async () => {
+    const t = setup();
+    const phone = newPhone();
+    await guest(t, phone);
+    await askCode(t, phone, ANN);
+    const right = proof(ANN);
+    const reply = await call(t, phone, 'key/save', {
       provider: 'email',
-      email: 'cy@example.com',
-      code: codeIn('cy@example.com') === '000000' ? '000001' : '000000',
+      ...right,
+      code: wrongTo(right.code),
     });
     expect([reply.status, reply.body['code']]).toEqual([401, 'WRONG_CODE']);
   });

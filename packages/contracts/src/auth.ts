@@ -117,6 +117,11 @@ export interface AuthErrorData {
    * merge.
    */
   readonly move?: GuestMoveOffer;
+  /**
+   * With `RATE_LIMITED`, when the server says: how long to wait before the
+   * next code may go out, ms.
+   */
+  readonly retryAfterMs?: number;
 }
 
 /** What a guest has, now that it might move into an account (#403). Plain JSON. */

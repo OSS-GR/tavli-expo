@@ -239,6 +239,9 @@ export function createAuth(ctx: AuthCtx) {
             ...start,
             perDay: codesPerDay(process.env),
           }),
+        cancelEmailCode: async (rows) => {
+          await actionCtx(ctx).runMutation(internal.emailCodes.cancelEmailCode, rows);
+        },
         useEmailCode: async (use) =>
           await actionCtx(ctx).runMutation(internal.emailCodes.useEmailCode, use),
       }),
