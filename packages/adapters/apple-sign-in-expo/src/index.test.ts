@@ -24,6 +24,7 @@ vi.mock('expo-apple-authentication', () => ({
 vi.mock('./AppleSignInButton', () => ({ AppleSignInButton: () => null }));
 
 const { createExpoAppleSheet } = await import('./index');
+const { isAppleSheetUnfinished } = await import('@tavli/contracts');
 
 function appleError(code: string): Error {
   return Object.assign(new Error(code), { code });
@@ -45,10 +46,16 @@ describe('createExpoAppleSheet', () => {
     expect(apple.calls).toEqual([{ requestedScopes: [1], nonce: 'nonce-1' }]);
   });
 
-  it('a closed sheet is null; other problems reject', async () => {
+  it('a closed sheet is null; no Apple ID is unfinished (#442); other problems reject', async () => {
     const sheet = createExpoAppleSheet();
     apple.answer = appleError('ERR_REQUEST_CANCELED');
     expect(await sheet.signIn('n')).toBeNull();
+    apple.answer = appleError('ERR_REQUEST_UNKNOWN');
+    const unfinished = await sheet.signIn('n').then(
+      () => 'resolved',
+      (error: unknown) => error,
+    );
+    expect(isAppleSheetUnfinished(unfinished)).toBe(true);
     apple.answer = appleError('ERR_REQUEST_FAILED');
     await expect(sheet.signIn('n')).rejects.toThrow('ERR_REQUEST_FAILED');
     apple.answer = { identityToken: null, authorizationCode: 'c' };

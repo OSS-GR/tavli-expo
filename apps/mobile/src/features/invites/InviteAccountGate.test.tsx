@@ -104,6 +104,28 @@ describe('InviteAccountGate', () => {
     expect(await screen.findByText('invite for guest-1')).toBeOnTheScreen();
   });
 
+  it('a phone with no Apple ID points to Settings, not the connection (#442)', async () => {
+    const user = setupUser();
+    const store = createMemoryAuthStore();
+    const appleSheet = createMemoryAppleSheet();
+    appleSheet.next = 'unfinished';
+    const announce = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .mockImplementation(() => {});
+    await openGate(createMemoryAuthProvider(store), appleSheet);
+    await user.press(await screen.findByRole('button', { name: 'Continue with Apple' }));
+    const text =
+      'Apple sign-in did not finish. Check that this phone is signed in to an Apple ID in Settings, or continue as a guest.';
+    expect(await screen.findByText(text)).toBeOnTheScreen();
+    expect(announce).toHaveBeenCalledWith(text);
+    expect(screen.queryByText(/Check the connection/)).toBeNull();
+    expect(store.session).toBeNull();
+    // The guest still works.
+    await user.press(screen.getByRole('button', { name: 'Continue as a guest' }));
+    expect(await screen.findByText('invite for guest-1')).toBeOnTheScreen();
+    announce.mockRestore();
+  });
+
   it('shows no Apple button where Apple sign-in does not work (Android)', async () => {
     const appleSheet = createMemoryAppleSheet();
     appleSheet.available = false;

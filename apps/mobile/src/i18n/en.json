@@ -471,7 +471,8 @@
     "guestNote": "A guest account has no name and no email. Only this phone can open it.",
     "notNow": "Not now",
     "busy": "Signing you in…",
-    "failed": "That did not work. Check the connection and try again."
+    "failed": "That did not work. Check the connection and try again.",
+    "appleUnfinished": "Apple sign-in did not finish. Check that this phone is signed in to an Apple ID in Settings, or continue as a guest."
   },
   "join": {
     "title": "Join with a code",

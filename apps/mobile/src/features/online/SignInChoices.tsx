@@ -60,7 +60,13 @@ export function SignInChoices({
     onSignedIn,
     usernames,
   });
-  useAnnouncement(failed ? t('signIn.failed') : null);
+  const failedText =
+    failed === null
+      ? null
+      : failed === 'appleUnfinished'
+        ? t('signIn.appleUnfinished')
+        : t('signIn.failed');
+  useAnnouncement(failedText);
   if (step !== null && usernames !== undefined) {
     return (
       <UsernameForm
@@ -104,9 +110,9 @@ export function SignInChoices({
         onPress={onNotNow}
       />
       {busy !== null ? <Text style={styles.line}>{t('signIn.busy')}</Text> : null}
-      {failed ? (
+      {failedText !== null ? (
         <Text testID="sign-in-failed" style={styles.line}>
-          {t('signIn.failed')}
+          {failedText}
         </Text>
       ) : null}
     </View>
