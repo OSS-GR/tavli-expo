@@ -87,6 +87,7 @@ const VIEW: InviteView = {
   status: 'open',
   expiresAt: 1,
   gameId: null,
+  fromName: { kind: 'guest', number: '4821' },
 };
 
 describe('function names', () => {

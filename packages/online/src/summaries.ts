@@ -45,6 +45,7 @@ export function summarizeGame(input: SummaryInput, playerId: string): GameSummar
     winner: view.match.winner,
     updatedAt: input.updatedAt,
     turnDeadline: view.turnDeadline,
+    opponentName: view.names[mySide === 'white' ? 'black' : 'white'],
   };
 }
 

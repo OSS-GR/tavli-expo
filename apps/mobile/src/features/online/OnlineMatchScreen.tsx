@@ -47,6 +47,7 @@ import { currentGameLabel, variantName } from '@/features/match/summary';
 import { onlineBoardStore, type OnlineBoardStore } from './boardStore';
 import { clockText, clockTickMs } from './clock';
 import { useOnlineStore, type OnlineNotice, type OnlineStore } from './onlineStore';
+import { playerNameText } from './playerName';
 import { onlineSeats } from './seats';
 import { timeLeft } from './timeLeft';
 import { useOnlineGame } from './useOnlineGame';
@@ -181,7 +182,9 @@ function OnlineBoard({
   // The newest flow: the next game, while the board still holds the last one.
   const latest = useOnlineStore(store, (s) => s.flow) ?? flow;
 
-  const seats = onlineSeats(side, t);
+  const opponentName = view?.names[side === 'white' ? 'black' : 'white'] ?? null;
+  const seats = onlineSeats(side, t, opponentName);
+  const named = playerNameText(opponentName, t);
   const name = (player: PlayerId) => seats[player].name;
   if (view === null) return null;
 
@@ -234,7 +237,9 @@ function OnlineBoard({
       ? t('online.status.rolling')
       : sending
         ? t('online.status.sending')
-        : t('online.status.waiting'),
+        : named === null
+          ? t('online.status.waiting')
+          : t('online.status.waitingForName', { name: named }),
     clock:
       clockSide === null || shown === null || finished
         ? null

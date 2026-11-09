@@ -110,15 +110,21 @@ export function onlineDataContract(): OnlineDataContractCheck[] {
       },
     },
     {
-      name: 'a finished match stays as it was',
+      name: 'a finished match stays as it was, without my name',
       run: async (subject) => {
         const gameId = await startMatch(subject);
         // The friend resigns: I win.
         await subject.gamesFor('friend').resign(gameId);
         const before = await friendSummary(subject, 'finished', gameId);
         if (before === undefined) throw new Error('the match did not finish');
+        if (before.opponentName === null) throw new Error('my name: none before the delete');
         await subject.dataFor('me').deleteMyData();
-        same(await friendSummary(subject, 'finished', gameId), before, 'the finished match');
+        // My guest name goes with my data (#400); the rest stays.
+        same(
+          await friendSummary(subject, 'finished', gameId),
+          { ...before, opponentName: null },
+          'the finished match',
+        );
       },
     },
     {

@@ -848,7 +848,10 @@ describe('online games (#255)', () => {
     });
     expect(router.getPathname()).toBe(`${board}/match-end`);
     expect(
-      await screen.findByRole('header', { name: 'Opponent wins the match!' }),
+      await screen.findByRole('header', {
+        // The bot has a guest name (#400).
+        name: `Guest ${onlineFake.guestNumber('bot')} wins the match!`,
+      }),
     ).toBeOnTheScreen();
     expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
     // No rematch online, and no History record.
@@ -1227,7 +1230,9 @@ describe('your online games on Home (#297)', () => {
     await act(async () => appRouter.back());
     expect(router.getPathname()).toBe('/');
     const row = await screen.findByTestId(`online-game-${gameId}`);
-    expect(row).toHaveAccessibleName(/^Portes vs friend, /);
+    expect(row).toHaveAccessibleName(
+      new RegExp(`^Portes vs Guest ${onlineFake.guestNumber('bob')}, `),
+    );
     await user.press(row);
     expect(router.getPathname()).toBe(`/game/${gameId}`);
     expect(
@@ -1354,7 +1359,9 @@ describe('online matches in History (#313)', () => {
     await user.press(await screen.findByRole('link', { name: 'History' }));
     expect(router.getPathname()).toBe('/history');
     expect(await screen.findByTestId(`history-online-${gameId}`)).toHaveAccessibleName(
-      /^Portes vs friend, 0 to 0, first to 3, You won, /,
+      new RegExp(
+        `^Portes vs Guest ${onlineFake.guestNumber('bob')}, 0 to 0, first to 3, You won, `,
+      ),
     );
     expect(screen.getByRole('header', { name: 'Online' })).toBeOnTheScreen();
     expect(historyStore.getState().records).toEqual([]);

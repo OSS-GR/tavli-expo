@@ -29,7 +29,7 @@ Tick these six. Leave every other type empty.
 
 | Category | Data type | What it is in Tavlaki |
 |----------|-----------|-----------------------|
-| Personal info | **User IDs** | The guest account's random user id on Convex (online play with a friend, #281) |
+| Personal info | **User IDs** | The guest account's random user id on Convex (online play with a friend, #281), and its guest name ("Guest" and 4 random digits, picked by the server, #400) |
 | App activity | **Other actions** | The online games on Convex: the moves, rolls and score of a game with a friend (Google's "Other actions" names gameplay) |
 | App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, hint shown, review opened, invite created, push permission answered, online sign-in (`apple` or `guest` only) |
 | App info and performance | **Crash logs** | Sentry crash and error reports |

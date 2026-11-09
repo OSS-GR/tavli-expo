@@ -52,8 +52,10 @@
     "online": {
       "title": "Τα online παιχνίδια σου",
       "vsFriend": "{{game}} με φίλο",
+      "vsName": "{{game}} · {{name}}",
       "yourTurn": "Σειρά σου",
       "waiting": "Περιμένουμε τον φίλο σου",
+      "waitingForName": "Περιμένουμε: {{name}}",
       "score": "{{me}}–{{friend}}",
       "scoreSpoken": "{{me}} προς {{friend}}",
       "timeLeft": "Χρόνος: {{time}}",
@@ -243,7 +245,8 @@
     "online": {
       "title": "Online",
       "youWon": "Κέρδισες",
-      "friendWon": "Κέρδισε ο φίλος σου"
+      "friendWon": "Κέρδισε ο φίλος σου",
+      "nameWon": "{{name}} κέρδισε"
     }
   },
   "languages": {
@@ -303,9 +306,12 @@
   },
   "online": {
     "opponent": "Αντίπαλος",
+    "guestName": "Επισκέπτης {{number}}",
     "waiting": "Περιμένουμε τον αντίπαλο",
+    "waitingForName": "Περιμένουμε: {{name}}",
     "status": {
       "waiting": "Περιμένουμε τον αντίπαλο…",
+      "waitingForName": "Περιμένουμε: {{name}}…",
       "sending": "Στέλνουμε τη σειρά σου…",
       "rolling": "Ρίχνουμε τα ζάρια…"
     },
@@ -341,6 +347,7 @@
     "open": {
       "title": "Πρόσκληση για παιχνίδι",
       "from": "Ένας φίλος σε προσκαλεί σε ματς στο διαδίκτυο.",
+      "fromName": "{{name}} σε προσκαλεί σε ματς στο διαδίκτυο.",
       "game": "Παιχνίδι",
       "length": "Διάρκεια ματς",
       "lengthValue_one": "Νικά όποιος φτάσει τον {{count}} βαθμό",

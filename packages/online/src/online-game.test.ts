@@ -42,6 +42,7 @@ const VIEW = {
   turnDeadline: 1000,
   players: PLAYERS,
   previousGame: null,
+  names: { white: { kind: 'guest', number: '4821' }, black: null },
 } as const;
 
 /** A new match in its opening roll (#379). */

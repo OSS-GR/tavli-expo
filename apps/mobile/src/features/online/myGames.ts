@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { clockText, clockTickMs } from './clock';
-import { gameScore, gameTitle } from './gameText';
+import { gameScore, gameTitle, waitingText } from './gameText';
 import { useSessionWatch, type SessionWatchState, type StartSessionWatch } from './sessionWatch';
 import { timeLeft } from './timeLeft';
 
@@ -84,7 +84,7 @@ export function gameRowText(
   offset: number,
 ): GameRowText {
   const title = gameTitle(game, t);
-  const turn = game.myTurn ? t('home.online.yourTurn') : t('home.online.waiting');
+  const turn = game.myTurn ? t('home.online.yourTurn') : waitingText(game, t);
   const { text: score, spoken: scoreSpoken } = gameScore(game, t);
   const left = timeLeft(game, localNow, offset);
   const time =

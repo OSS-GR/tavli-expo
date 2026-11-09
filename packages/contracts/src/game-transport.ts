@@ -24,6 +24,8 @@ import type {
   VariantPrompt,
 } from '@tavli/engine';
 
+import type { PlayerName } from './player-name';
+
 /**
  * The games a player can start online: one game (Portes, Plakoto, Fevga or
  * Asodio), or `tavli`, the Portes → Plakoto → Fevga rotation.
@@ -89,6 +91,11 @@ export interface OnlineGameView {
   readonly turnDeadline: number | null;
   /** The player id (account) on each side. */
   readonly players: PerPlayer<string>;
+  /**
+   * The name of each side (#400): "Guest 4821". `null` when the server
+   * has none, for example after that player deleted their online data.
+   */
+  readonly names: PerPlayer<PlayerName | null>;
   /** The match: rules, score, finished games and the winner. */
   readonly match: Match;
   /**
@@ -147,8 +154,8 @@ export const MAX_LISTED_GAMES = 50;
 
 /**
  * One online game in the caller's list (#296): enough to show it on Home
- * and open it. It says nothing about the other player but their side.
- * Open the game (`subscribe`) for the full view.
+ * and open it. It says nothing about the other player but their side and
+ * their name. Open the game (`subscribe`) for the full view.
  */
 export interface GameSummary {
   readonly gameId: string;
@@ -176,6 +183,8 @@ export interface GameSummary {
   readonly updatedAt: number;
   /** As in the view: when the turn of `waitingFor` runs out. `null` when finished. */
   readonly turnDeadline: number | null;
+  /** The other player's name, as in the view's `names` (#400). */
+  readonly opponentName: PlayerName | null;
 }
 
 /** What `listMyGames` lists. */

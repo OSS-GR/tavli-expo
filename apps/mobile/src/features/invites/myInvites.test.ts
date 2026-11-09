@@ -18,6 +18,7 @@ function invite(code: string, fields: Partial<InviteView> = {}): InviteView {
     // Made an hour ago.
     expiresAt: NOW - HOUR + INVITE_TIME_MS,
     gameId: null,
+    fromName: null,
     ...fields,
   };
 }

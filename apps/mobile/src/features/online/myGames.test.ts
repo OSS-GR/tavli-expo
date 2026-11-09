@@ -1,4 +1,4 @@
-import { ASYNC_TURN_TIME_MS, type GameSummary } from '@tavli/contracts';
+import { ASYNC_TURN_TIME_MS, guestName, type GameSummary } from '@tavli/contracts';
 
 import i18n from '@/i18n';
 
@@ -23,6 +23,7 @@ function summary(gameId: string, fields: Partial<GameSummary> = {}): GameSummary
     winner: null,
     updatedAt: NOW - HOUR,
     turnDeadline: NOW - HOUR + ASYNC_TURN_TIME_MS,
+    opponentName: null,
     ...fields,
   };
 }
@@ -78,6 +79,19 @@ describe('gameRowText', () => {
       turn: 'Waiting for your friend',
       score: '1–3',
       label: 'Tavli vs friend, Waiting for your friend, 1 to 3, 23 h left',
+    });
+  });
+
+  it('names the other player by their guest name (#400)', () => {
+    const named = summary('a', { ...waiting, opponentName: guestName('4821') });
+    expect(gameRowText(named, en, NOW, 0)).toMatchObject({
+      title: 'Portes vs Guest 4821',
+      turn: 'Waiting for Guest 4821',
+      label: 'Portes vs Guest 4821, Waiting for Guest 4821, 3 to 1, 23 h left',
+    });
+    expect(gameRowText(named, el, NOW, 0)).toMatchObject({
+      title: 'Πόρτες · Επισκέπτης 4821',
+      turn: 'Περιμένουμε: Επισκέπτης 4821',
     });
   });
 

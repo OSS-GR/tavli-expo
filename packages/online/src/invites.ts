@@ -11,7 +11,13 @@
  */
 
 import { INVITE_CODE_ALPHABET, INVITE_CODE_LENGTH, INVITE_TIME_MS } from '@tavli/contracts';
-import type { InviteErrorCode, InviteStatus, InviteView, OnlineGameChoice } from '@tavli/contracts';
+import type {
+  InviteErrorCode,
+  InviteStatus,
+  InviteView,
+  OnlineGameChoice,
+  PlayerName,
+} from '@tavli/contracts';
 import { isTurnTimeMinutes } from '@tavli/contracts';
 import type { Rng } from '@tavli/engine';
 
@@ -239,11 +245,19 @@ export function checkCancel(invite: InviteRecord, callerId: string, now: number)
   if (invite.from !== callerId) fail('NOT_YOUR_INVITE', 'only the inviter can cancel an invite');
 }
 
-/** What a client may see of the invite at `now`. */
-export function toInviteView(invite: InviteRecord, now: number): InviteView {
+/**
+ * What a client may see of the invite at `now`. `fromName` is the
+ * inviter's name (#400), or `null` when the server has none.
+ */
+export function toInviteView(
+  invite: InviteRecord,
+  now: number,
+  fromName: PlayerName | null,
+): InviteView {
   return {
     code: invite.code,
     from: invite.from,
+    fromName,
     choice: invite.choice,
     targetPoints: invite.targetPoints,
     turnTimeMinutes: invite.turnTimeMinutes,

@@ -61,6 +61,7 @@ import {
   createOnlineMatch,
   eventActor,
   latestGames,
+  NO_NAMES,
   loadFlow,
   loadStored,
   matchStatus,
@@ -87,6 +88,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import { signedInPlayer } from './caller';
 import { createCryptoRng } from './model/cryptoRng';
 import { NEW_MATCH_WAIT, turnWait } from './model/push';
+import { ensureGuestNumber, nameOf, namesOfPlayers } from './playerNames';
 import { scheduleTurnPush } from './push';
 import { gameChoice, gameStatus, gameTurnTimeMinutes } from './schema';
 
@@ -331,6 +333,9 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
   const flow = guarded(() =>
     createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
   );
+  // Both players have a guest name from now on (#400).
+  await ensureGuestNumber(ctx, players.white);
+  await ensureGuestNumber(ctx, players.black);
   const version = 1;
   const now = Date.now();
   const gameId = await ctx.db.insert('games', {
@@ -577,7 +582,8 @@ export const getGame = query({
     if (game === null) return null;
     const { flow, previousGame } = loadStored(game.flow);
     const draft = savedDraft(await draftRow(ctx, game._id));
-    return toView({ ...gameInput(game), flow, previousGame, draft });
+    const names = await namesOfPlayers(ctx, game.players);
+    return toView({ ...gameInput(game), flow, previousGame, draft, names });
   },
 });
 
@@ -613,17 +619,34 @@ export const listMyGames = query({
       gamesOnSide(ctx, 'by_white', callerId, status),
       gamesOnSide(ctx, 'by_black', callerId, status),
     ]);
-    return latestGames(
-      [...asWhite, ...asBlack].map((game) =>
+    const games = [...asWhite, ...asBlack];
+    // The newest games first, then the names (#400): one read per opponent.
+    const latest = latestGames(
+      games.map((game) =>
         summarizeGame(
           {
             ...gameInput(game),
             flow: loadFlow(game.flow),
             updatedAt: game.updatedAt ?? game._creationTime,
+            names: NO_NAMES,
           },
           callerId,
         ),
       ),
     );
+    const opponentOf = new Map(
+      games.map((game) => {
+        const other = game.players.white === callerId ? game.players.black : game.players.white;
+        return [game._id as string, other];
+      }),
+    );
+    const opponents = [...new Set(latest.map((summary) => opponentOf.get(summary.gameId) ?? ''))];
+    const names = new Map(
+      await Promise.all(opponents.map(async (id) => [id, await nameOf(ctx, id)] as const)),
+    );
+    return latest.map((summary) => ({
+      ...summary,
+      opponentName: names.get(opponentOf.get(summary.gameId) ?? '') ?? null,
+    }));
   },
 });

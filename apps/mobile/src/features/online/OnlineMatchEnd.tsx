@@ -60,7 +60,7 @@ function OnlineMatchEndView({
   return (
     <MatchEndScreen
       online={{
-        seats: onlineSeats(side, t),
+        seats: onlineSeats(side, t, view.names[side === 'white' ? 'black' : 'white']),
         me: side,
         label: t('online.label', { game: t(`games.${view.choice}`) }),
       }}

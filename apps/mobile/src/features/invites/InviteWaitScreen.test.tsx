@@ -450,6 +450,7 @@ describe('waitState', () => {
     status: 'open',
     expiresAt: START + INVITE_TIME_MS,
     gameId: null,
+    fromName: null,
   } as const;
 
   it('turns each view into a state', () => {

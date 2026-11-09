@@ -140,6 +140,8 @@ async function openGame(
 }
 
 const view = (game: Game) => game.server.getGame(game.gameId)!;
+/** The bot's guest name (#400): the screen names the other player by it. */
+const botName = (game: Game) => `Guest ${game.server.nameOf('bot')?.number}`;
 
 /**
  * Moves the clock until the server waits for you, and the screen has that
@@ -236,7 +238,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     // The server has your turn; the bot thinks.
     expect(view(game).version).toBeGreaterThan(before);
     expect(view(game).game.lastTurn?.player).toBe('white');
-    expect(screen.getByTestId('online-wait')).toHaveTextContent('Waiting for Opponent…');
+    expect(screen.getByTestId('online-wait')).toHaveTextContent(`Waiting for ${botName(game)}…`);
 
     // The bot's whole turn arrives, and it is your turn again.
     await untilYourTurn(game);
@@ -382,7 +384,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       const { score } = view(game).match;
       expect(score.white).toBeGreaterThan(0);
       expect(screen.getByTestId('game-end-card')).toHaveTextContent(
-        new RegExp(`You ${score.white} – 0 Opponent`),
+        new RegExp(`You ${score.white} – 0 ${botName(game)}`),
       );
 
       // The sheet closes: game 2 shows. "Your turn.", no dice yet.
@@ -423,7 +425,9 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(screen.queryByTestId('game-end-card')).toBeNull();
       expect(screen.queryByTestId('next-game-button')).toBeNull();
       await wait(1);
-      expect(screen.getByTestId('game-end-card')).toHaveTextContent(/Opponent wins the game/);
+      expect(screen.getByTestId('game-end-card')).toHaveTextContent(
+        new RegExp(`${botName(game)} wins the game`),
+      );
       await wait(2000);
       // The server has game 2; its view keeps the bot's winning turn.
       expect(view(game).match.games).toEqual([
@@ -518,7 +522,9 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(sounds.played).toContain('diceRoll');
       expect(screen.getByTestId('opening-message')).toHaveTextContent(`You rolled ${white}.`);
       expect(screen.queryByTestId('roll-button')).toBeNull();
-      expect(screen.getByTestId('opening-waiting')).toHaveTextContent('Waiting for Opponent…');
+      expect(screen.getByTestId('opening-waiting')).toHaveTextContent(
+        `Waiting for ${botName(game)}…`,
+      );
 
       // The bot taps its die after a moment; its die comes with the view.
       await wait(ONLINE_BOT_ROLL_MS);
@@ -759,7 +765,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(diceLabel()).toMatch(new RegExp(`^Dice ${high(dice)}`));
       // The card waits until the thrown dice have shown, as after your throw.
       await wait(PASS_AFTER_THROW_MS);
-      expect(screen.getByTestId('pass-card')).toHaveTextContent(passText('Opponent', dice));
+      expect(screen.getByTestId('pass-card')).toHaveTextContent(passText(botName(game), dice));
       expect(screen.queryByTestId('roll-button')).toBeNull();
       // The card closes by itself; then your turn waits for your roll.
       await wait(BOT_PASS_NOTICE_MS);
@@ -814,7 +820,9 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     await user.press(screen.getByTestId('confirm-button'));
     expect(view(game).waitingFor).toBe('black');
     // The bot's strip says the server waits for it, with its time left.
-    expect(screen.getByTestId('strip-top')).toHaveTextContent(/waiting for opponent/i);
+    expect(screen.getByTestId('strip-top')).toHaveTextContent(
+      new RegExp(`Waiting for ${botName(game)}`, 'i'),
+    );
     expect(screen.getByTestId('strip-top')).toHaveTextContent(/\d+ s/);
     expect(screen.queryByTestId('confirm-button')).toBeNull();
     expect(screen.queryByTestId('undo-button')).toBeNull();
@@ -845,7 +853,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect.objectContaining({ winner: 'black', reason: 'timeout' }),
     ]);
     const sheet = await screen.findByTestId('game-end-card');
-    expect(sheet).toHaveTextContent(/Opponent wins the game/);
+    expect(sheet).toHaveTextContent(new RegExp(`${botName(game)} wins the game`));
     expect(sheet).toHaveTextContent(/You ran out of time/);
     expect(sheet).toHaveTextContent(/Next: game 2 · Portes/);
     expect(view(game).status).toBe('active');
@@ -956,7 +964,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     // Online you resign the whole match: there is no game resign.
     expect(screen.queryByTestId('menu-resign-game')).toBeNull();
     await user.press(screen.getByTestId('menu-resign-match'));
-    expect(screen.getByTestId('resign-match-dialog')).toHaveTextContent(/Opponent/);
+    expect(screen.getByTestId('resign-match-dialog')).toHaveTextContent(new RegExp(botName(game)));
     await user.press(screen.getByRole('button', { name: 'Resign' }));
     await act(async () => {
       jest.advanceTimersByTime(2000);

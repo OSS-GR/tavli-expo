@@ -22,6 +22,8 @@
 import type { MoveInput, PlayerId } from '@tavli/engine';
 
 import { isGameTransportErrorData } from '../game-transport';
+import { isGuestNumber } from '../player-name';
+import type { PlayerName } from '../player-name';
 import type {
   GameSummary,
   GameTransport,
@@ -295,7 +297,19 @@ function sameAsView(summary: GameSummary, view: OnlineGameView, side: PlayerId):
   same(summary.score, view.match.score, 'summary.score');
   same(summary.winner, view.match.winner, 'summary.winner');
   same(summary.turnDeadline, view.turnDeadline, 'summary.turnDeadline');
+  same(
+    summary.opponentName,
+    view.names[side === 'white' ? 'black' : 'white'],
+    'summary.opponentName',
+  );
   if (typeof summary.updatedAt !== 'number') throw new Error('summary.updatedAt is not a number');
+}
+
+/** Throws unless `name` is a guest name (#400). */
+function isGuest(name: PlayerName | null, what: string): void {
+  if (name === null || name.kind !== 'guest' || !isGuestNumber(name.number)) {
+    throw new Error(`${what}: expected a guest name, got ${JSON.stringify(name)}`);
+  }
 }
 
 /** A `watchMyGames` watch that keeps every list and error it gets. */
@@ -1167,6 +1181,34 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         same(early.lists.length, 0, 'lists after stop() inside the same tick');
         same(stranger.errors, [], 'errors');
         stranger.stop();
+      },
+    },
+    {
+      name: 'both players see a guest name for each side, the same in every view and list (#400)',
+      run: async (subject) => {
+        const first = await subject.createGame(PORTES);
+        const { watchers, view } = await startGame(subject, first);
+        isGuest(view.names.white, 'names.white');
+        isGuest(view.names.black, 'names.black');
+        same(watchers.white.last().names, view.names, "White's view of the names");
+        // A player keeps their number: a second game shows the same names.
+        const second = await subject.createGame(PORTES);
+        const again = await startGame(subject, second, { open: false });
+        same(again.view.names, view.names, 'the names in a second game');
+        same(
+          (await summaryOf(subject.transportFor('white'), 'active', first)).opponentName,
+          view.names.black,
+          "White's list names Black",
+        );
+        same(
+          (await summaryOf(subject.transportFor('black'), 'active', first)).opponentName,
+          view.names.white,
+          "Black's list names White",
+        );
+        for (const watcher of [watchers, again.watchers]) {
+          watcher.white.stop();
+          watcher.black.stop();
+        }
       },
     },
   ];

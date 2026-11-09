@@ -157,11 +157,13 @@ describe('<HomeOnlineGames />', () => {
     const gameId = await newGame();
     const user = setupUser();
     const { onOpen } = await show();
-    const turn = myTurn(gameId) ? 'Your turn' : 'Waiting for your friend';
+    // The friend has a guest name (#400).
+    const friend = `Guest ${onlineFake.guestNumber(FRIEND)}`;
+    const turn = myTurn(gameId) ? 'Your turn' : `Waiting for ${friend}`;
     const row = screen.getByRole('button', {
-      name: `Portes vs friend, ${turn}, 0 to 0, 24 h left`,
+      name: `Portes vs ${friend}, ${turn}, 0 to 0, 24 h left`,
     });
-    expect(within(row).getByText('Portes vs friend')).toBeOnTheScreen();
+    expect(within(row).getByText(`Portes vs ${friend}`)).toBeOnTheScreen();
     expect(within(row).getByText('0–0 · 24 h left')).toBeOnTheScreen();
     // One or two rows show no "See all".
     expect(screen.queryByTestId('online-games-see-all')).toBeNull();
@@ -175,7 +177,10 @@ describe('<HomeOnlineGames />', () => {
     while (myTurn(gameId)) gameId = await newGame();
     await show();
     const row = () => screen.getByTestId(`online-game-${gameId}`);
-    expect(row()).toHaveAccessibleName(/^Portes vs friend, Waiting for your friend/);
+    const friend = `Guest ${onlineFake.guestNumber(FRIEND)}`;
+    expect(row()).toHaveAccessibleName(
+      `Portes vs ${friend}, Waiting for ${friend}, 0 to 0, 24 h left`,
+    );
     const before = view(gameId);
     await act(async () => {
       await onlineFake.transportFor(FRIEND).sendTurn({
@@ -186,7 +191,7 @@ describe('<HomeOnlineGames />', () => {
     });
     await flush();
     expect(view(gameId).waitingFor).toBe('white');
-    expect(row()).toHaveAccessibleName(/^Portes vs friend, Your turn/);
+    expect(row()).toHaveAccessibleName(new RegExp(`^Portes vs ${friend}, Your turn`));
     // Your turn now: the row moves to the top.
     expect(rowIds()[0]).toBe(gameId);
     // A new game shows up too, and a finished one goes.
@@ -326,7 +331,9 @@ describe('<HomeOnlineGames />', () => {
     await show();
     expect(screen.getByRole('header', { name: 'Τα online παιχνίδια σου' })).toBeOnTheScreen();
     expect(
-      screen.getByRole('button', { name: 'Πόρτες με φίλο, Σειρά σου, 0 προς 0, Χρόνος: 24 ώρες' }),
+      screen.getByRole('button', {
+        name: `Πόρτες · Επισκέπτης ${onlineFake.guestNumber(FRIEND)}, Σειρά σου, 0 προς 0, Χρόνος: 24 ώρες`,
+      }),
     ).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');

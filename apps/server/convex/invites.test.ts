@@ -125,16 +125,22 @@ describe('createInvite', () => {
       status: 'open',
       expiresAt: START + INVITE_TIME_MS,
       gameId: null,
+      fromName: { kind: 'guest', number: expect.stringMatching(/^[1-9][0-9]{3}$/) as string },
     });
   });
 
   it('tries again when a code is taken', async () => {
     const t = await setup();
-    // The first call reads zeros: its first code is 22222222. The second
-    // call gives zeros again for the first code (a clash), then ones.
+    // The first call reads zeros: its first code is 22222222. Then Alice
+    // gets her guest number (#400, its own read). The second call gives
+    // zeros again for the first code (a clash), then ones.
     const spy = vi.spyOn(globalThis.crypto, 'getRandomValues');
     spy.mockImplementationOnce((array) => {
       (array as Uint32Array).fill(0);
+      return array;
+    });
+    spy.mockImplementationOnce((array) => {
+      (array as Uint32Array).fill(3821);
       return array;
     });
     spy.mockImplementationOnce((array) => {
@@ -146,6 +152,7 @@ describe('createInvite', () => {
     expect(await createInvite(t, ALICE)).toBe('22222222');
     expect(await createInvite(t, BOB)).toBe('33333333');
     expect((await invite(t, '22222222')).from).toBe(ALICE);
+    expect((await invite(t, '22222222')).fromName).toEqual({ kind: 'guest', number: '4821' });
     expect((await invite(t, '33333333')).from).toBe(BOB);
   });
 

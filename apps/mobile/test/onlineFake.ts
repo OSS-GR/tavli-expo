@@ -208,6 +208,15 @@ export const onlineFake = {
   server: () => server,
   /** The cached transport of `playerId` on the current server. */
   transportFor,
+  /**
+   * The 4 digits of `playerId`'s guest name on the current server (#400).
+   * Throws while the player has none (before their first invite or game).
+   */
+  guestNumber(playerId: string): string {
+    const name = server.nameOf(playerId);
+    if (name === null) throw new Error(`${playerId} has no guest name yet`);
+    return name.number;
+  },
   /** The cached `Invites` port of `playerId` on the current server. */
   invitesFor,
   /**

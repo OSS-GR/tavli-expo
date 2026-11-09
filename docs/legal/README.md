@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90). Last review: 2026-11-09 (#401, Sign in with Apple is live on iPhone).
+> The privacy policy for the app and the stores (issue #90). Last review: 2026-11-09 (#400, guest names such as "Guest 4821").
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy before it goes live.
 
@@ -55,7 +55,7 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 
 ## Delete my online data (#315)
 
-The app shows no account, so the feature is called **Delete my online data** (Settings → Privacy), never "delete my account". The row shows on a phone that played online. The server call is `deleteMyAccount` (#302): it deletes, for the signed-in user, the sign-in user, its sessions and linked accounts (Better Auth), every invite the user sent, and every push token. It resigns the user's running games, so the other player wins. It **keeps** finished games and their move logs for the other player. They hold the user's random user id, but no name and no email, and once the sign-in user is gone the id names nobody. Invites someone else sent that the user answered stay with their sender. The app then signs out, so the next invite makes a new guest. See "Delete an account" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md#delete-an-account).
+The app shows no account, so the feature is called **Delete my online data** (Settings → Privacy), never "delete my account". The row shows on a phone that played online. The server call is `deleteMyAccount` (#302): it deletes, for the signed-in user, the sign-in user, its sessions and linked accounts (Better Auth), every invite the user sent, every push token, and the guest name (#400). It resigns the user's running games, so the other player wins. It **keeps** finished games and their move logs for the other player. They hold the user's random user id, but no name (the guest name is gone) and no email, and once the sign-in user is gone the id names nobody. Invites someone else sent that the user answered stay with their sender. The app then signs out, so the next invite makes a new guest. See "Delete an account" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md#delete-an-account).
 
 The policy's "Delete your online data" section (all four files) and the store answers describe it. A change to what the delete removes or keeps updates them in the same PR.
 
