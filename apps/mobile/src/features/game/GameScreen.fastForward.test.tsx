@@ -129,6 +129,11 @@ async function show(store: GameStore, bot: BotSeat) {
   });
 }
 
+/** The log indexes of White's actions (yours): rolls, answers, moves, undos, confirms. */
+function yourEvents(log: readonly { readonly type: string; readonly player?: string }[]): number[] {
+  return log.flatMap((e, i) => (e.type !== 'rollOpening' && e.player === 'white' ? [i] : []));
+}
+
 /** Moves the fake clock. The bot's steps chain timers through promises, so it runs them as they come. */
 const tick = async (ms: number) => {
   await act(async () => {
@@ -271,12 +276,11 @@ describe('<GameScreen /> fast forward a race', () => {
     // Your side played at the fast forward level; the bot's at its own.
     const levels = new Set(runner.requests.map((r) => `${r.state.toMove}:${r.difficulty}`));
     expect(levels).toEqual(new Set(['white:hard', 'black:easy']));
-    // Every roll for you is marked for the review, and only those.
-    const yourRolls = flow.log.flatMap((e, i) =>
-      e.type === 'roll' && e.player === 'white' ? [i] : [],
-    );
-    expect(yourRolls.length).toBeGreaterThan(1);
-    expect(autoEvents).toEqual(yourRolls);
+    // Every action for you is marked for the review, and only those.
+    const yours = yourEvents(flow.log);
+    expect(yours.filter((i) => flow.log[i]?.type === 'roll').length).toBeGreaterThan(1);
+    expect(yours.some((i) => flow.log[i]?.type === 'move')).toBe(true);
+    expect(autoEvents).toEqual(yours);
     // The game is over: no status, no Stop.
     expect(screen.queryByTestId('fast-forward-status', { includeHiddenElements: true })).toBeNull();
   });
@@ -312,8 +316,10 @@ describe('<GameScreen /> fast forward a race', () => {
       },
       { timeout: 30_000 },
     );
+    // Your roll, moves and confirm.
     const marked = autoEvents.length;
-    expect(marked).toBe(1);
+    expect(autoEvents).toEqual(yourEvents(store.getState().flow.log));
+    expect(marked).toBeGreaterThan(2);
 
     await user.press(screen.getByTestId('fast-forward-stop-button'));
     expect(screen.queryByTestId('fast-forward-status')).toBeNull();
@@ -337,12 +343,16 @@ describe('<GameScreen /> fast forward a race', () => {
     const user = setupUser();
     const store = newStore();
     setPosition(store, longRace);
-    const { bot, runner } = setup();
+    const { bot, runner, autoEvents } = setup();
     await show(store, bot);
     await user.press(screen.getByTestId('race-fast-forward-button'));
     await tick(FAST_FORWARD_TIMING.beforeRollMs);
     expect(store.getState().flow.game.phase).toBe('moving');
     await user.press(screen.getByTestId('fast-forward-stop-button'));
+    // Only the roll is marked: the moves are yours, so the review grades them.
+    const log = store.getState().flow.log;
+    expect(autoEvents).toEqual([log.length - 1]);
+    expect(log[log.length - 1]?.type).toBe('roll');
     const asked = runner.requests.length;
     await tick(30_000);
     const game = store.getState().flow.game;

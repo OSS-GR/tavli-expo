@@ -88,8 +88,10 @@ const NO_EVENTS: readonly number[] = [];
  * The turns of the last game in `flow` that `players` played after a roll,
  * oldest first. It replays the match log with the engine (the log holds
  * every die), and keeps the last game only. A pass is left out: the
- * player had nothing to choose. So is a turn whose dice came from an event
- * at a log index in `skipped` (a fast forward rolled or chose them).
+ * player had nothing to choose. So is a turn where a fast forward chose
+ * something: an answer, a move, an undo or the confirm at a log index in
+ * `skipped`. A roll is no choice, so a turn the fast forward only rolled,
+ * then the person played after Stop, is graded.
  */
 export function lastGameTurns(
   flow: MatchFlow,
@@ -101,14 +103,17 @@ export function lastGameTurns(
   const skip = new Set(skipped);
   let current = replay([start]);
   let turns: PlayedTurn[] = [];
-  // The log index of the event that gave this turn its dice.
-  let diceFrom = -1;
+  // A fast forward chose something in this turn.
+  let autoChose = false;
   for (const [i, event] of events.entries()) {
     if (event.type === 'start') return [];
     const next = applyMatchAction(current, event as MatchAction);
-    // `events` starts at log index 1.
-    if (event.type === 'roll' || event.type === 'answer' || event.type === 'rollOpening') {
-      diceFrom = i + 1;
+    if (event.type === 'roll' || event.type === 'rollOpening') {
+      // A new roll starts a new turn.
+      autoChose = false;
+    } else if (skip.has(i + 1)) {
+      // `events` starts at log index 1.
+      autoChose = true;
     }
     if (event.type === 'nextGame') {
       turns = [];
@@ -125,10 +130,11 @@ export function lastGameTurns(
         moving &&
         turn.moves.length > 0 &&
         players.includes(turn.player) &&
-        !skip.has(diceFrom)
+        !autoChose
       ) {
         turns.push({ state: current.game.state, turn });
       }
+      if (ended) autoChose = false;
     }
     current = next;
   }

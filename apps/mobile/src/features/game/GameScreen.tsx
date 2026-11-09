@@ -215,8 +215,9 @@ export interface FastForwardSeat {
   /** On top of `FAST_FORWARD_TIMING`, for both sides (tests). */
   readonly timing?: Partial<BotTiming>;
   /**
-   * Fast forward rolled or answered for the person: the log index of that
-   * event. The review leaves that turn out (`GameStoreState.autoEvents`).
+   * Fast forward played an action for the person: the log index of that
+   * event. The review leaves out a turn where it chose something
+   * (`GameStoreState.autoEvents`).
    */
   readonly onAutoEvent?: (logIndex: number) => void;
 }
@@ -967,10 +968,15 @@ export function GameScreen({
   // A fast forward shows its dice at rest: no throw, no tumble. Stop keeps
   // them at rest for the rest of that turn, so they do not roll again.
   const [restTurn, setRestTurn] = useState<string | null>(null);
-  // The review leaves out your turns that the fast forward played.
+  // The review leaves out your turns whose moves the fast forward chose:
+  // each action it plays for your side is marked by its log index.
   const markAuto = (side: PlayerId) => {
     if (side === botPlayer) return;
     fastForwardSeat?.onAutoEvent?.(store.getState().flow.log.length - 1);
+  };
+  const marked = (side: PlayerId, done: boolean): boolean => {
+    if (done && fastForwarding) markAuto(side);
+    return done;
   };
   const botRoll = useEffectEvent((side: PlayerId) => {
     if (!dispatch({ type: 'roll', player: side })) return false;
@@ -983,14 +989,15 @@ export function GameScreen({
     }
     return true;
   });
-  const botMove = useEffectEvent((move: Move) => playMove(move, geoRef.current, null, false));
-  const botUndo = useEffectEvent(() => undo());
-  const botConfirm = useEffectEvent(() => confirm());
+  const botMove = useEffectEvent((side: PlayerId, move: Move) =>
+    marked(side, playMove(move, geoRef.current, null, false)),
+  );
+  const botUndo = useEffectEvent((side: PlayerId) => marked(side, undo()));
+  const botConfirm = useEffectEvent((side: PlayerId) => marked(side, confirm()));
   // The bot's answer to the mother question; a short note says what it chose.
   const [botChoice, setBotChoice] = useState<{ key: string; choice: string } | null>(null);
   const botAnswer = useEffectEvent((side: PlayerId, choice: string) => {
-    if (!dispatch({ type: 'answer', player: side, choice })) return false;
-    if (fastForwarding) markAuto(side);
+    if (!marked(side, dispatch({ type: 'answer', player: side, choice }))) return false;
     if (side === botPlayer) setBotChoice({ key: botKey, choice });
     return true;
   });
@@ -1017,9 +1024,9 @@ export function GameScreen({
       getFlow: () => store.getState().flow,
       actions: {
         roll: () => botRoll(side),
-        move: botMove,
-        undo: botUndo,
-        confirm: botConfirm,
+        move: (move) => botMove(side, move),
+        undo: () => botUndo(side),
+        confirm: () => botConfirm(side),
         answer: (choice) => botAnswer(side, choice),
       },
       onError: (error) => console.error('bot turn failed', error),

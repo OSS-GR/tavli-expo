@@ -86,10 +86,11 @@ export interface GameStoreState extends BoardStoreState {
   /** A new match with the same players and rules; the last winner starts. */
   rematch: () => void;
   /**
-   * Fast forward a race: the log indexes of the rolls and answers that fast
-   * forward made for a person. The game review leaves those turns out: the
-   * bot chose them. Memory only, like the review: a saved match forgets
-   * them. A rematch starts a new list.
+   * Fast forward a race: the log indexes of the actions (roll, answer,
+   * move, undo, confirm) that fast forward made for a person. The game
+   * review leaves out a turn where it chose something: the bot chose it.
+   * Memory only, like the review: a saved match forgets them. A rematch
+   * starts a new list.
    */
   readonly autoEvents: readonly number[];
   /** Marks the event at this log index as made by fast forward for a person. */
