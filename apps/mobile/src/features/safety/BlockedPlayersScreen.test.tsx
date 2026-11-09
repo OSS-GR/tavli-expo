@@ -129,6 +129,17 @@ describe('the Blocked players row of Settings', () => {
     expect(screen.queryByTestId('settings-blocked')).toBeNull();
   });
 
+  it('shows when the screen shows again after a sign-in (Settings → Account)', async () => {
+    const onBlocked = jest.fn();
+    const view = await renderWithRoot(
+      <SettingsScreen onAccount={jest.fn()} onBlocked={onBlocked} visit={1} />,
+    );
+    expect(screen.queryByTestId('settings-blocked')).toBeNull();
+    rememberOnlineAccount();
+    await view.rerender(<SettingsScreen onAccount={jest.fn()} onBlocked={onBlocked} visit={2} />);
+    expect(screen.getByTestId('settings-blocked')).toBeOnTheScreen();
+  });
+
   it('is hidden in a build with no online play', async () => {
     rememberOnlineAccount();
     await renderWithRoot(<SettingsScreen />);

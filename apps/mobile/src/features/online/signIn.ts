@@ -21,6 +21,7 @@ import {
   isAppleSheetUnfinished,
   type Analytics,
   type AppleSheet,
+  type AuthKeyCredential,
   type AuthProvider,
   type AuthUser,
   type MyUsername,
@@ -42,6 +43,26 @@ export type SignInMethod = 'apple' | 'guest';
 export type SignInFailure = 'appleUnfinished' | 'other';
 
 /**
+ * Apple's proof for our server: a nonce from the server (`keyNonce`), then
+ * Apple's sheet with it. `null` when the player closed the sheet. Both
+ * `signInWithKey` and `saveKey` (Settings → Account, #402) take it.
+ */
+export async function appleCredential(
+  auth: AuthProvider,
+  sheet: AppleSheet,
+): Promise<AuthKeyCredential | null> {
+  const nonce = await auth.keyNonce();
+  const proof = await sheet.signIn(nonce);
+  if (proof === null) return null;
+  return {
+    provider: 'apple',
+    idToken: proof.idToken,
+    nonce,
+    ...(proof.authorizationCode === null ? {} : { authorizationCode: proof.authorizationCode }),
+  };
+}
+
+/**
  * Signs in with Apple's sheet. Resolves with the user, or `null` when the
  * player closed the sheet. Rejects when the sheet or the server failed.
  */
@@ -49,15 +70,9 @@ export async function signInWithApple(
   auth: AuthProvider,
   sheet: AppleSheet,
 ): Promise<AuthUser | null> {
-  const nonce = await auth.keyNonce();
-  const proof = await sheet.signIn(nonce);
-  if (proof === null) return null;
-  const user = await auth.signInWithKey({
-    provider: 'apple',
-    idToken: proof.idToken,
-    nonce,
-    ...(proof.authorizationCode === null ? {} : { authorizationCode: proof.authorizationCode }),
-  });
+  const credential = await appleCredential(auth, sheet);
+  if (credential === null) return null;
+  const user = await auth.signInWithKey(credential);
   onlineAccountReady();
   return user;
 }
