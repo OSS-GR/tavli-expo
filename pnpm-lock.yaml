@@ -201,7 +201,7 @@ importers:
         version: 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.15)(expo-linking@58.0.16)(expo-network@58.0.4(expo@58.0.23)(react@19.3.0))(expo-secure-store@58.0.2(expo@58.0.23))
       '@convex-dev/better-auth':
         specifier: 0.13.0
-        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.46.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       '@sentry/react-native':
         specifier: ~8.28.0
         version: 8.28.0(ebb2f84e0e5c4f5f22a083b65ac1276f)
@@ -254,8 +254,8 @@ importers:
         specifier: 1.7.18
         version: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2)))
       convex:
-        specifier: 1.46.0
-        version: 1.46.0(react@19.3.0)
+        specifier: 1.49.0
+        version: 1.49.0(react@19.3.0)
       expo:
         specifier: ~58.0.23
         version: 58.0.23(@babel/core@7.29.7(supports-color@8.1.1))(@expo/metro-runtime@58.0.17)(expo-router@58.0.30)(react-dom@19.3.0(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(typescript@6.0.3)
@@ -311,8 +311,8 @@ importers:
         specifier: ~58.0.21
         version: 58.0.21(expo-dev-client@58.0.18(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)))(expo@58.0.23)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)
       i18next:
-        specifier: 26.5.10
-        version: 26.5.10(typescript@6.0.3)
+        specifier: 26.7.1
+        version: 26.7.1(typescript@6.0.3)
       posthog-react-native:
         specifier: 4.83.0
         version: 4.83.0(5926e744aa7c77bba3d1452b4db9825b)
@@ -324,7 +324,7 @@ importers:
         version: 19.3.0(react@19.3.0)
       react-i18next:
         specifier: 17.1.9
-        version: 17.1.9(i18next@26.5.10(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(typescript@6.0.3)
+        version: 17.1.9(i18next@26.7.1(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(typescript@6.0.3)
       react-native:
         specifier: 0.88.1
         version: 0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
@@ -391,7 +391,7 @@ importers:
         version: 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.15)(expo-linking@58.0.16)(expo-network@58.0.4(expo@58.0.23)(react@19.3.0))(expo-secure-store@58.0.2(expo@58.0.23))
       '@convex-dev/better-auth':
         specifier: 0.13.0
-        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.46.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       '@tavli/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -408,8 +408,8 @@ importers:
         specifier: 1.7.18
         version: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2)))
       convex:
-        specifier: 1.46.0
-        version: 1.46.0(react@19.3.0)
+        specifier: 1.49.0
+        version: 1.49.0(react@19.3.0)
       jose:
         specifier: 6.2.13
         version: 6.2.13
@@ -425,7 +425,7 @@ importers:
         version: link:../../packages/adapters/backend-convex
       convex-test:
         specifier: 0.0.61
-        version: 0.0.61(convex@1.46.0(react@19.3.0))
+        version: 0.0.61(convex@1.49.0(react@19.3.0))
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -461,13 +461,13 @@ importers:
         version: 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.15)(expo-linking@58.0.16)(expo-network@58.0.4(expo@58.0.23)(react@19.3.0))(expo-secure-store@58.0.2(expo@58.0.23))
       '@convex-dev/better-auth':
         specifier: 0.13.0
-        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.46.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       better-auth:
         specifier: 1.7.18
         version: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2)))
       convex:
-        specifier: 1.46.0
-        version: 1.46.0(react@19.3.0)
+        specifier: 1.49.0
+        version: 1.49.0(react@19.3.0)
       expo-secure-store:
         specifier: ~58.0.2
         version: 58.0.2(expo@58.0.23)
@@ -479,8 +479,8 @@ importers:
         version: link:../../contracts
     devDependencies:
       convex:
-        specifier: 1.46.0
-        version: 1.46.0(react@19.3.0)
+        specifier: 1.49.0
+        version: 1.49.0(react@19.3.0)
 
   packages/adapters/crash-sentry:
     dependencies:
@@ -3391,9 +3391,9 @@ packages:
     peerDependencies:
       convex: ^1.43.0
 
-  convex@1.46.0:
-    resolution: {integrity: sha512-dhBwDQTZDOhi5SUGAX17EWNehCdNq6/UFrSL0eLZuGfMkdsQbCVWVRZCzbZ5CF+/pgvoGxtApbEoTSipqL4JTw==}
-    engines: {node: '>=20.0.0', npm: '>=7.0.0'}
+  convex@1.49.0:
+    resolution: {integrity: sha512-mkr9oXF8/arkCI1kvYyGytWd62oVXNABh4uwLeI4UQVN6Zuudm4DlmSzNUJKF63djk6f/uUXC+6ffuVSkPLvzA==}
+    engines: {node: '>=22.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
       '@auth0/auth0-react': ^2.0.1
@@ -4318,8 +4318,8 @@ packages:
     resolution: {integrity: sha512-B4FFZ6q/T2jhhksgkbEW3HBvWIfDW85snkQgawt07S7J5QXTk6BkNV+0yAeZrM5QpMAdYlocGoljn0sJ/WQkFw==}
     engines: {node: '>=10.17.0'}
 
-  i18next@26.5.10:
-    resolution: {integrity: sha512-YS4EiLQhhk0wGThm4Zy+BL2c9rBNIK+kAbksi4l/B+D6kVRQLIFZgu2b/MU2LibJJHwWNTYoOYR52T+jfV8kPQ==}
+  i18next@26.7.1:
+    resolution: {integrity: sha512-cX+3RRVczel/V2kCMTACckSGSpqgtWYEA6beXNYVms7dOQiHojdPYHD26lT4IKimNeoGWrLvtPgjftbRvmZJVw==}
     peerDependencies:
       typescript: ^5 || ^6 || ^7
     peerDependenciesMeta:
@@ -7092,13 +7092,13 @@ snapshots:
 
   '@better-fetch/fetch@1.3.3': {}
 
-  '@convex-dev/better-auth@0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.46.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
+  '@convex-dev/better-auth@0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
     dependencies:
       '@better-fetch/fetch': 1.3.3
       better-auth: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.5)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.27.0)(terser@5.51.2)))
       common-tags: 1.8.2
-      convex: 1.46.0(react@19.3.0)
-      convex-helpers: 0.1.129(@standard-schema/spec@1.1.0)(convex@1.46.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)(zod@4.6.7)
+      convex: 1.49.0(react@19.3.0)
+      convex-helpers: 0.1.129(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)(zod@4.6.7)
       jose: 6.2.13
       react: 19.3.0
       semver: 7.8.5
@@ -9541,20 +9541,20 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  convex-helpers@0.1.129(@standard-schema/spec@1.1.0)(convex@1.46.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)(zod@4.6.7):
+  convex-helpers@0.1.129(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)(zod@4.6.7):
     dependencies:
-      convex: 1.46.0(react@19.3.0)
+      convex: 1.49.0(react@19.3.0)
     optionalDependencies:
       '@standard-schema/spec': 1.1.0
       react: 19.3.0
       typescript: 6.0.3
       zod: 4.6.7
 
-  convex-test@0.0.61(convex@1.46.0(react@19.3.0)):
+  convex-test@0.0.61(convex@1.49.0(react@19.3.0)):
     dependencies:
-      convex: 1.46.0(react@19.3.0)
+      convex: 1.49.0(react@19.3.0)
 
-  convex@1.46.0(react@19.3.0):
+  convex@1.49.0(react@19.3.0):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.9.10
@@ -10662,7 +10662,7 @@ snapshots:
 
   human-signals@2.1.0: {}
 
-  i18next@26.5.10(typescript@6.0.3):
+  i18next@26.7.1(typescript@6.0.3):
     optionalDependencies:
       typescript: 6.0.3
 
@@ -12069,11 +12069,11 @@ snapshots:
     dependencies:
       react: 19.3.0
 
-  react-i18next@17.1.9(i18next@26.5.10(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(typescript@6.0.3):
+  react-i18next@17.1.9(i18next@26.7.1(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(typescript@6.0.3):
     dependencies:
       '@babel/runtime': 7.29.10
       html-parse-stringify: 4.0.1
-      i18next: 26.5.10(typescript@6.0.3)
+      i18next: 26.7.1(typescript@6.0.3)
       react: 19.3.0
       use-sync-external-store: 1.7.0(react@19.3.0)
     optionalDependencies:
