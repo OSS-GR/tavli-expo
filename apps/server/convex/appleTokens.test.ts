@@ -282,16 +282,39 @@ describe('the revoke', () => {
     expect(logged).not.toContain(id);
   });
 
-  it('without the APPLE_* key the token is dropped with a log line', async () => {
+  it('without the APPLE_* key the token is dropped with an error in the log', async () => {
     const t = setup();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const id = await signInWithCode(t, newPhone(), 'apple-ann', 'rt-ann');
     vi.stubEnv('APPLE_KEY_ID', '');
     await t.withIdentity({ subject: id }).mutation(api.account.deleteMyAccount, {});
     await flush(t);
     expect(tokens.revoked).toEqual([]);
     expect(await revokeRows(t)).toEqual([]);
-    expect(JSON.stringify(warn.mock.calls)).toContain('no APPLE_* key');
+    expect(JSON.stringify(error.mock.calls)).toContain('no APPLE_* key');
+  });
+
+  it('a try that never ends still leaves no row: the next step is booked first', async () => {
+    const t = setup();
+    const id = await signInWithCode(t, newPhone(), 'apple-ann', 'rt-ann');
+    await t.withIdentity({ subject: id }).mutation(api.account.deleteMyAccount, {});
+    const [queued] = await revokeRows(t);
+    // Two tries that crash, as if Apple's call never came back.
+    for (let i = 0; i < REVOKE_TRIES; i += 1) {
+      await t.mutation(internal.appleTokens.startRevoke, { id: queued!._id });
+    }
+    expect(await revokeRows(t)).toMatchObject([{ attempts: REVOKE_TRIES }]);
+    const steps = await t.run(
+      async (ctx) => await ctx.db.system.query('_scheduled_functions').collect(),
+    );
+    expect(steps.some((job) => job.name.includes('dropRevoke'))).toBe(true);
+    tokens.revokeAnswer = false;
+    await flush(t);
+    vi.advanceTimersByTime(REVOKE_RETRY_MS);
+    await t.finishInProgressScheduledFunctions();
+    vi.advanceTimersByTime(REVOKE_RETRY_MS);
+    await t.finishInProgressScheduledFunctions();
+    expect(await revokeRows(t)).toEqual([]);
   });
 
   it('removing a key revokes its token (releaseKey)', async () => {

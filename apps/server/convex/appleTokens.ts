@@ -12,7 +12,8 @@
  *   token). So the data delete never waits on Apple, and a failed revoke
  *   never undoes it.
  * - `revokeAppleToken`: calls Apple, tries once more after
- *   `REVOKE_RETRY_MS`, then drops the row. The log never holds the
+ *   `REVOKE_RETRY_MS`, then drops the row. Each try books its next step
+ *   first (`startRevoke`), so a crashed try leaves no row behind. The log never holds the
  *   token, the email or the Apple id.
  * - `appleNotifications`: Apple's server-to-server notices (`http.ts`).
  *   When a person stops using Sign in with Apple for the app, or deletes
@@ -24,7 +25,7 @@ import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import type { Doc } from './_generated/dataModel';
-import { httpAction, internalAction, internalMutation, internalQuery } from './_generated/server';
+import { httpAction, internalAction, internalMutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { deleteAccountOf } from './account';
 import { APPLE_BUNDLE_IDS, createAuth, currentAppleKeys } from './auth';
@@ -115,11 +116,6 @@ export async function revokeAppleTokensOf(
   }
 }
 
-export const revokeRow = internalQuery({
-  args: { id: v.id('appleRevokes') },
-  handler: async (ctx, { id }) => await ctx.db.get(id),
-});
-
 export const dropRevoke = internalMutation({
   args: { id: v.id('appleRevokes') },
   returns: v.null(),
@@ -129,58 +125,70 @@ export const dropRevoke = internalMutation({
   },
 });
 
-export const retryRevoke = internalMutation({
-  args: { id: v.id('appleRevokes'), attempts: v.number() },
-  returns: v.null(),
-  handler: async (ctx, { id, attempts }) => {
-    if ((await ctx.db.get(id)) === null) return null;
+/**
+ * Starts one try of a revoke: counts it, and books the next step before
+ * Apple is called, so a try that crashes or times out never leaves its
+ * row behind. Before the last try that step is the next try; for the
+ * last try it is the drop. A step that finds no row does nothing.
+ */
+export const startRevoke = internalMutation({
+  args: { id: v.id('appleRevokes') },
+  handler: async (ctx, { id }) => {
+    const row = await ctx.db.get(id);
+    if (row === null) return null;
+    const attempts = row.attempts + 1;
     await ctx.db.patch(id, { attempts });
-    await ctx.scheduler.runAfter(REVOKE_RETRY_MS, internal.appleTokens.revokeAppleToken, { id });
-    return null;
+    if (attempts < REVOKE_TRIES) {
+      await ctx.scheduler.runAfter(REVOKE_RETRY_MS, internal.appleTokens.revokeAppleToken, { id });
+    } else {
+      await ctx.scheduler.runAfter(REVOKE_RETRY_MS, internal.appleTokens.dropRevoke, { id });
+    }
+    return { clientId: row.clientId, refreshToken: row.refreshToken, attempts };
   },
 });
 
 /**
  * Revokes one queued token at Apple. Runs after the delete, so the data
- * is gone whatever Apple says. Without the `APPLE_*` key in the env it
- * cannot sign the call: the row goes, with a log line.
+ * is gone whatever Apple says. A token is kept only while the `APPLE_*`
+ * key is set (`/key/apple-code` needs it), so a missing key here means
+ * the env changed: the row goes, with an error in the log.
  */
 export const revokeAppleToken = internalAction({
   args: { id: v.id('appleRevokes') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
-    const row = await ctx.runQuery(internal.appleTokens.revokeRow, { id });
+    const row = await ctx.runMutation(internal.appleTokens.startRevoke, { id });
     if (row === null) return null;
     const key = appleKeyConfig(process.env);
-    let revoked = false;
-    if (key !== null) {
-      try {
-        const auth = await createAuth(ctx).$context;
-        // Better Auth's own key (`setTokenUtil` encrypted it with it).
-        const refreshToken = await symmetricDecrypt({
-          key: auth.secretConfig,
-          data: row.refreshToken,
-        });
-        const clientSecret = await makeAppleClientSecret(key, row.clientId, Date.now());
-        revoked = await appleTokenClient().revoke({
-          clientId: row.clientId,
-          clientSecret,
-          refreshToken,
-        });
-      } catch {
-        // A bad key or a token we cannot read: the same as Apple saying no.
-        revoked = false;
-      }
-    }
-    const attempts = row.attempts + 1;
-    if (revoked || key === null || attempts >= REVOKE_TRIES) {
+    if (key === null) {
       await ctx.runMutation(internal.appleTokens.dropRevoke, { id });
-      // Never the token, the email or the Apple id.
-      if (key === null) console.warn('apple revoke skipped: no APPLE_* key in the env');
-      else if (!revoked) console.warn('apple revoke failed', { attempts });
+      console.error('apple revoke skipped: no APPLE_* key in the env');
       return null;
     }
-    await ctx.runMutation(internal.appleTokens.retryRevoke, { id, attempts });
+    let revoked = false;
+    try {
+      const auth = await createAuth(ctx).$context;
+      // Better Auth's own key (`setTokenUtil` encrypted it with it).
+      const refreshToken = await symmetricDecrypt({
+        key: auth.secretConfig,
+        data: row.refreshToken,
+      });
+      const clientSecret = await makeAppleClientSecret(key, row.clientId, Date.now());
+      revoked = await appleTokenClient().revoke({
+        clientId: row.clientId,
+        clientSecret,
+        refreshToken,
+      });
+    } catch {
+      // A bad key or a token we cannot read: the same as Apple saying no.
+      revoked = false;
+    }
+    if (revoked || row.attempts >= REVOKE_TRIES) {
+      await ctx.runMutation(internal.appleTokens.dropRevoke, { id });
+      // Never the token, the email or the Apple id.
+      if (!revoked) console.warn('apple revoke failed', { attempts: row.attempts });
+    }
+    // Else the next try is booked already (`startRevoke`).
     return null;
   },
 });
