@@ -6,7 +6,7 @@ This is not legal advice. The owner should have a lawyer or a GDPR expert check 
 
 # Tavlaki privacy policy
 
-**Last updated:** 2 November 2026
+**Last updated:** 9 November 2026
 
 Ελληνικά: [tavlaki.com/el/privacy](https://tavlaki.com/el/privacy)
 
@@ -210,7 +210,7 @@ If you are a parent and think your child allowed usage data, write to us, and we
 
 These features are planned. They are **not** in the app today. We will update this policy before they go live and tell you in the app.
 
-- **Sign-in with Apple, Google or an email link**, and **friends**. These will store your account and friends list on our server (Convex), with sign-in through Better Auth. (Guest accounts and online games with a friend are live now: see above.)
+- **Sign-in with Apple, Google or an email link**, and **friends**. These will store your account and friends list on our server (Convex), with sign-in through Better Auth. (Guest accounts and online games with a friend are live now: see above.) With Sign in with Apple, the server will also keep a token from Apple, encrypted, while the Apple sign-in stays on your account. We keep it only to cancel your Sign in with Apple for Tavlaki at Apple when you delete your online data or remove the Apple sign-in. If you stop using Sign in with Apple for Tavlaki in your Apple settings, Apple tells our server, and the server removes that sign-in (and your online data, if it was your only sign-in).
 - **App updates over the air** (EAS Update by Expo). The app will ask Expo's servers at launch if a newer version exists. This request carries technical facts only.
 
 ## This website

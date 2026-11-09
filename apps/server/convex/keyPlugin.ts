@@ -12,6 +12,9 @@
  *   another user's gives `KEY_BELONGS_TO_OTHER` and changes nothing.
  * - `GET /key/list`: the signed-in user's keys.
  * - `POST /key/remove`: removes a key, never the last one (`LAST_KEY`).
+ * - `POST /key/apple-code`: the Apple sheet's `authorizationCode`, once
+ *   after a sign-in or a save (#398). The server trades it at Apple and
+ *   keeps the refresh token, encrypted, so it can revoke it later.
  *
  * Sign-in with a key on a phone with no session is Better Auth's own
  * `/sign-in/social` with an id token. Both paths check the token with
@@ -21,6 +24,7 @@
 
 import type { BetterAuthPlugin } from 'better-auth';
 import { APIError, createAuthEndpoint, sessionMiddleware } from 'better-auth/api';
+import { setTokenUtil } from 'better-auth/oauth2';
 
 import { makeKeyNonce, KEY_NONCE_RANDOM_BYTES } from './model/keyNonce';
 
@@ -40,6 +44,8 @@ export const KEY_ERROR_CODES = {
   PROVIDER_TAKEN: 'this account has a key of this kind already',
   INVALID_TOKEN: 'the id token or its nonce is not valid',
   BAD_REQUEST: 'the request is not valid',
+  NO_KEY: 'this account has no key of this kind',
+  INVALID_CODE: 'the authorization code is not valid',
 } as const;
 
 export type KeyErrorCode = keyof typeof KEY_ERROR_CODES;
@@ -72,6 +78,23 @@ function readRemoveBody(body: unknown): KeyProviderId {
   return provider;
 }
 
+/** The body of `/key/apple-code`: `{ authorizationCode, clientId }`. */
+function readAppleCodeBody(body: unknown): { code: string; clientId: string } {
+  const { authorizationCode, clientId } = (body ?? {}) as {
+    authorizationCode?: unknown;
+    clientId?: unknown;
+  };
+  if (
+    typeof authorizationCode !== 'string' ||
+    authorizationCode === '' ||
+    typeof clientId !== 'string' ||
+    clientId === ''
+  ) {
+    throw keyError('BAD_REQUEST', 'BAD_REQUEST');
+  }
+  return { code: authorizationCode, clientId };
+}
+
 /** The user fields these routes send back: never the email or the name. */
 function userOutput(user: { id: string; isAnonymous?: boolean | null }) {
   return { id: user.id, isAnonymous: user.isAnonymous === true };
@@ -84,6 +107,28 @@ export interface KeyPluginOptions {
     accountId: string;
     userId: string;
   }) => Promise<void>;
+  /** The apps and the Services ID that may send a code (Apple's `client_id`). */
+  readonly appleClientIds: () => readonly string[];
+  /**
+   * Trades an Apple code (`exchangeAppleCode` in `auth.ts`). Returns the
+   * refresh token when Apple took the code and its id token is for
+   * `accountId`, else `null`.
+   */
+  readonly exchangeAppleCode: (call: {
+    clientId: string;
+    code: string;
+    accountId: string;
+  }) => Promise<string | null>;
+  /**
+   * Keeps a token, encrypted already (`saveAppleToken` in `appleTokens.ts`).
+   * `false` when the key is gone by then: nothing is kept.
+   */
+  readonly saveAppleToken: (token: {
+    userId: string;
+    accountId: string;
+    clientId: string;
+    refreshToken: string;
+  }) => Promise<boolean>;
 }
 
 export function keyPlugin(options: KeyPluginOptions) {
@@ -189,6 +234,43 @@ export function keyPlugin(options: KeyPluginOptions) {
           await internalAdapter.deleteAccount(target.id);
           await options.releaseKey({ providerId, accountId: target.accountId, userId });
           return ctx.json({ removed: true });
+        },
+      ),
+
+      appleCode: createAuthEndpoint(
+        '/key/apple-code',
+        { method: 'POST', use: [sessionMiddleware] },
+        async (ctx) => {
+          const { code, clientId } = readAppleCodeBody(ctx.body);
+          if (!options.appleClientIds().includes(clientId)) {
+            throw keyError('BAD_REQUEST', 'BAD_REQUEST');
+          }
+          const userId = ctx.context.session.user.id;
+          const key = (await ctx.context.internalAdapter.findAccounts(userId)).find(
+            (account) => account.providerId === 'apple',
+          );
+          if (key === undefined) throw keyError('BAD_REQUEST', 'NO_KEY');
+          // The code must be for this user's own Apple id.
+          const token = await options.exchangeAppleCode({
+            clientId,
+            code,
+            accountId: key.accountId,
+          });
+          if (token === null) throw keyError('UNAUTHORIZED', 'INVALID_CODE');
+          // Encrypted the way Better Auth keeps OAuth tokens (`encryptOAuthTokens`).
+          const refreshToken = await setTokenUtil(token, ctx.context);
+          if (typeof refreshToken !== 'string' || refreshToken === '') {
+            throw keyError('UNAUTHORIZED', 'INVALID_CODE');
+          }
+          const saved = await options.saveAppleToken({
+            userId,
+            accountId: key.accountId,
+            clientId,
+            refreshToken,
+          });
+          // The key went while Apple traded the code.
+          if (!saved) throw keyError('BAD_REQUEST', 'NO_KEY');
+          return ctx.json({ saved: true });
         },
       ),
     },
