@@ -14,6 +14,7 @@ import { rememberOnlineAccount } from '@/features/online/accountHint';
 import { consentStore } from '@/features/privacy/consentStore';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { pressMakeInvite } from '../../../test/signIn';
 import { TEST_BUILD, onlineFake } from '../../../test/onlineFake';
 
 import { TESTFLIGHT_STORE_URL, TESTFLIGHT_URL } from './decision';
@@ -205,7 +206,7 @@ describe('Play a friend', () => {
     expect(onlineFake.appUpdates.calls).toEqual([]);
     expect(updateShows()).toBe(false);
     const user = setupUser();
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await pressMakeInvite(user);
     await flush();
     expect(onlineFake.appUpdates.calls).toEqual(['ios']);
     expect(screen.getByRole('header', TITLE)).toBeOnTheScreen();

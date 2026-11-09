@@ -22,6 +22,7 @@ import { boardStepStore } from '@/features/welcome/boardStepStore';
 import { analytics, onlineServer, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { pressMakeInvite } from '../../../test/signIn';
 import { onlineFake } from '../../../test/onlineFake';
 
 import { resetTurnPushesForTest } from './appTurnPushes';
@@ -111,7 +112,7 @@ async function makeInvite(turnTimeMinutes: number | null = null) {
   if (turnTimeMinutes !== null) {
     await user.press(screen.getByRole('radio', { name: `${turnTimeMinutes} min` }));
   }
-  await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+  await pressMakeInvite(user);
   expect(await screen.findByText('invite wait')).toBeOnTheScreen();
   await flush();
   return user;
@@ -135,7 +136,7 @@ describe('the offer', () => {
     await act(async () => {
       router.push('/friend');
     });
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await pressMakeInvite(user);
     await flush();
     expect(screen.queryByRole('header', OFFER)).toBeNull();
     expect(onlineFake.notifications.prompts).toBe(0);
@@ -215,7 +216,7 @@ describe('the offer', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const user = setupUser();
     await renderRouter(realRoutes, { initialUrl: '/friend' });
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await pressMakeInvite(user);
     await flush();
     expect(screen.getByRole('header', OFFER)).toBeOnTheScreen();
     expect(screen.queryByTestId('invite-wait-screen')).toBeNull();

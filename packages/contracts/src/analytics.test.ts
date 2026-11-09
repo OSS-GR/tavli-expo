@@ -99,6 +99,7 @@ describe('event names', () => {
       'review_opened',
       'invite_created',
       'push_permission_answered',
+      'online_sign_in',
     ]);
   });
 

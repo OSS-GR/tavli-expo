@@ -29,6 +29,7 @@ import { tutorialStore } from '@/features/tutorial/store';
 import { analytics, onlineServer, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../test/clock';
+import { pressMakeInvite } from '../test/signIn';
 import { nativePath } from '../test/nativeParent';
 import { onlineFake } from '../test/onlineFake';
 import { layoutTutorialBoard, playLessonByTaps } from '../test/tutorialTaps';
@@ -948,9 +949,9 @@ describe('invites (#256)', () => {
     });
     // Opening the link makes no account: the screen asks first.
     expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
-    expect(screen.getByText(/An online game needs a free account\./)).toBeOnTheScreen();
+    expect(screen.getByText(/An online game needs a free account/)).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(0);
-    await user.press(screen.getByRole('button', { name: 'Show the invite' }));
+    await user.press(screen.getByRole('button', { name: 'Continue as a guest' }));
     expect(await screen.findByText('Plakoto')).toBeOnTheScreen();
     expect(screen.getByText('None')).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(1);
@@ -1001,7 +1002,7 @@ describe('play a friend online (#281)', () => {
   async function makeInvite(user: ReturnType<typeof setupUser>, router: Router) {
     await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     expect(router.getPathname()).toBe('/friend');
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     const code = router.getPathname().split('/').at(-1)!;
     expect(code).toMatch(/^[0-9A-Z]{8}$/);
@@ -1015,7 +1016,7 @@ describe('play a friend online (#281)', () => {
     await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
     await user.press(screen.getByRole('radio', { name: '1' }));
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     const code = router.getPathname().split('/').at(-1)!;
     expect(router.getPathname()).toBe(`/friend/${code}`);
@@ -1080,7 +1081,7 @@ describe('play a friend online (#281)', () => {
       .mockRejectedValueOnce(new Error('offline'));
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await pressMakeInvite(user);
     expect(
       await screen.findByText('The invite was not made. Check the connection and try again.'),
     ).toBeOnTheScreen();
@@ -1141,7 +1142,7 @@ describe('join with a code (#333)', () => {
     // Like a link: no account until the player asks for the invite.
     expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(0);
-    await user.press(screen.getByRole('button', { name: 'Show the invite' }));
+    await user.press(screen.getByRole('button', { name: 'Continue as a guest' }));
     expect(await screen.findByText('Plakoto')).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(1);
 
@@ -1214,7 +1215,7 @@ describe('your online games on Home (#297)', () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     const code = router.getPathname().split('/').at(-1)!;
     let gameId = '';
@@ -1265,7 +1266,7 @@ describe('your invites on Home (#314)', () => {
   /** Home → Play a friend → Make an invite → Back to Home. Returns the code. */
   async function inviteThenHome(user: ReturnType<typeof setupUser>, router: Router) {
     await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     const code = router.getPathname().split('/').at(-1)!;
     await act(async () => appRouter.back());

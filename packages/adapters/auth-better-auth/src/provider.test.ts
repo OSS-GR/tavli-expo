@@ -46,6 +46,8 @@ interface FakeServer {
   nonces: Set<string>;
   /** Token lifetime, ms. */
   tokenTime: number;
+  /** The Apple codes sent to `/key/apple-code`: user id, client id and code. */
+  appleCodes: { user: string; clientId: unknown; code: unknown }[];
   /** The next calls of this name fail with this result error (or throw when `'throw'`). */
   failures: Map<string, { status?: number; message?: string } | 'throw'>;
   calls: string[];
@@ -60,6 +62,7 @@ function createServer(): FakeServer {
     appleKeys: new Map(),
     nonces: new Set(),
     tokenTime: 15 * 60 * 1000,
+    appleCodes: [],
     failures: new Map(),
     calls: [],
   };
@@ -131,6 +134,14 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
       server.anonymous.delete(id);
       return ok({ user: userData(id) });
     }
+    if (path === '/key/apple-code') {
+      server.appleCodes.push({
+        user: id,
+        clientId: body?.['clientId'],
+        code: body?.['authorizationCode'],
+      });
+      return ok({ saved: true });
+    }
     if (path === '/key/remove') {
       const keys = keysOf();
       if (keys.length === 0) return ok({ removed: false });
@@ -193,13 +204,13 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
   };
 }
 
-function subject(server = createServer()) {
+function subject(server = createServer(), appleClientId: string | null = null) {
   const phone = { cookie: null as string | null };
   const now = () => server.clock;
   return {
     server,
     phone,
-    auth: fromBetterAuthClient(createClient(server, phone), { now }),
+    auth: fromBetterAuthClient(createClient(server, phone), { now, appleClientId }),
     restart: () => fromBetterAuthClient(createClient(server, phone), { now }),
     tokenSubject: (token: string) => String(jwtPayload(token)['sub']),
     appleIdToken: (sub: string, nonce: string) => Promise.resolve(fakeAppleToken(sub, nonce)),
@@ -420,5 +431,46 @@ describe('fromBetterAuthClient', () => {
     expect(saved).toEqual({ id: guest.id, isGuest: false });
     // The id did not change, so the token stays valid.
     expect(await auth.getToken()).toBe(before);
+  });
+
+  it('sends the Apple code once after a key sign-in or a save, with the bundle id', async () => {
+    const { auth, server } = subject(createServer(), 'com.tavlaki');
+    const signIn = await appleCredential(auth, 'a');
+    const user = await auth.signInWithKey({ ...signIn, authorizationCode: 'code-a' });
+    await auth.signOut();
+    await auth.signInAsGuest();
+    const guest = auth.currentUser()!;
+    await auth.saveKey({ ...(await appleCredential(auth, 'b')), authorizationCode: 'code-b' });
+    expect(server.appleCodes).toEqual([
+      { user: user.id, clientId: 'com.tavlaki', code: 'code-a' },
+      { user: guest.id, clientId: 'com.tavlaki', code: 'code-b' },
+    ]);
+  });
+
+  it('sends no code without one or without a bundle id; a failed send keeps the sign-in', async () => {
+    const plain = subject();
+    await plain.auth.signInWithKey({
+      ...(await appleCredential(plain.auth, 'a')),
+      authorizationCode: 'code-a',
+    });
+    expect(plain.server.calls).not.toContain('fetch /key/apple-code');
+
+    const { auth, server } = subject(createServer(), 'com.tavlaki');
+    await auth.signInWithKey(await appleCredential(auth, 'a'));
+    expect(server.calls).not.toContain('fetch /key/apple-code');
+    await auth.signOut();
+    server.failures.set('fetch /key/apple-code', 'throw');
+    const user = await auth.signInWithKey({
+      ...(await appleCredential(auth, 'a')),
+      authorizationCode: 'code-a',
+    });
+    expect(auth.currentUser()).toEqual(user);
+    server.failures.set('fetch /key/apple-code', { status: 401, message: 'INVALID_CODE' });
+    await auth.signOut();
+    await auth.signInWithKey({
+      ...(await appleCredential(auth, 'a')),
+      authorizationCode: 'code-a',
+    });
+    expect(auth.currentUser()?.isGuest).toBe(false);
   });
 });

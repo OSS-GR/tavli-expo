@@ -1,9 +1,11 @@
 /**
  * Play a friend online (#281): the choices, "Make an invite" on an
- * in-memory server, the guest account (made once), the analytics event,
- * the errors (no account, no invite, too many invites) and Greek.
+ * in-memory server, the sign-in sheet (#401: Apple, the guest made once,
+ * Not now), the analytics events, the errors (no account, no invite, too
+ * many invites) and Greek.
  */
 import {
+  createMemoryAppleSheet,
   createMemoryAuthProvider,
   createMemoryAuthStore,
   createRecordingAnalytics,
@@ -48,13 +50,15 @@ function setup() {
   };
   const analytics = createRecordingAnalytics();
   analytics.optIn();
-  return { auth, authStore, server, invites, analytics };
+  const appleSheet = createMemoryAppleSheet();
+  return { auth, authStore, server, invites, analytics, appleSheet };
 }
 
 async function open(parts: {
   auth: AuthProvider;
   invites: Invites;
   analytics: ReturnType<typeof createRecordingAnalytics>;
+  appleSheet: ReturnType<typeof createMemoryAppleSheet>;
 }) {
   const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
   const view = await renderWithRoot(<FriendSetupScreen {...parts} {...props} />);
@@ -68,7 +72,7 @@ describe('FriendSetupScreen', () => {
     expect(screen.getByRole('header', { name: 'Play a friend online' })).toBeOnTheScreen();
     expect(
       screen.getByText(
-        'An online game needs a free account. We make a guest account for you, with no name and no email.',
+        'An online game needs a free account. When you make the invite, you pick how you sign in: you can play as a guest, with no name and no email.',
       ),
     ).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
@@ -77,7 +81,7 @@ describe('FriendSetupScreen', () => {
     expect(parts.authStore.guests).toBe(0);
   });
 
-  it('makes the guest, then the invite with the choices, and sends invite_created', async () => {
+  it('asks how to sign in, makes the guest, then the invite with the choices', async () => {
     const user = setupUser();
     const parts = setup();
     const { onCreated } = await open(parts);
@@ -87,7 +91,12 @@ describe('FriendSetupScreen', () => {
     expect(screen.getByText('No time limit: 24 hours per turn')).toBeOnTheScreen();
 
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(await screen.findByRole('header', { name: 'Play online' })).toBeOnTheScreen();
+    expect(parts.authStore.guests).toBe(0);
+    expect(onCreated).not.toHaveBeenCalled();
+    await user.press(screen.getByRole('button', { name: 'Continue as a guest' }));
     expect(onCreated).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
     const code = onCreated.mock.calls[0]![0];
     expect(parts.authStore.guests).toBe(1);
     expect(parts.server.getInvite(code)).toMatchObject({
@@ -98,6 +107,7 @@ describe('FriendSetupScreen', () => {
       status: 'open',
     });
     expect(parts.analytics.sent).toEqual([
+      { type: 'track', event: 'online_sign_in', props: { method: 'guest' } },
       {
         type: 'track',
         event: 'invite_created',
@@ -116,6 +126,7 @@ describe('FriendSetupScreen', () => {
     const parts = setup();
     const first = await open(parts);
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Continue as a guest' }));
     expect(first.onCreated).toHaveBeenCalledTimes(1);
     await first.unmount();
 
@@ -123,6 +134,8 @@ describe('FriendSetupScreen', () => {
     const auth = createMemoryAuthProvider(parts.authStore);
     const second = await open({ ...parts, auth });
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    // A saved session: no sheet.
+    expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
     expect(second.onCreated).toHaveBeenCalledTimes(1);
     expect(parts.authStore.guests).toBe(1);
     expect(parts.server.getInvite(second.onCreated.mock.calls[0]![0])?.from).toBe('guest-1');
@@ -138,13 +151,64 @@ describe('FriendSetupScreen', () => {
     const createInvite = jest.spyOn(parts.invites, 'createInvite');
     const { onCreated } = await open({ ...parts, auth });
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Continue as a guest' }));
     expect(
-      screen.getByText('Your free account was not made. Check the connection and try again.'),
+      screen.getByText('That did not work. Check the connection and try again.'),
     ).toBeOnTheScreen();
     expect(createInvite).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
     expect(parts.analytics.sent).toEqual([]);
+    await user.press(screen.getByRole('button', { name: 'Not now' }));
     expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
+  });
+
+  it('says so when the saved session does not load, and makes no invite', async () => {
+    const user = setupUser();
+    const parts = setup();
+    const auth: AuthProvider = {
+      ...parts.auth,
+      ready: () => Promise.reject({ code: 'NETWORK', message: 'offline' }),
+    };
+    const { onCreated } = await open({ ...parts, auth });
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(
+      screen.getByText('Your free account was not made. Check the connection and try again.'),
+    ).toBeOnTheScreen();
+    expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
+    expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  it('Not now closes the sheet and makes nothing', async () => {
+    const user = setupUser();
+    const parts = setup();
+    const createInvite = jest.spyOn(parts.invites, 'createInvite');
+    const { onCreated } = await open(parts);
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Not now' }));
+    expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
+    expect(parts.authStore.session).toBeNull();
+    expect(createInvite).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(parts.analytics.sent).toEqual([]);
+    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
+  });
+
+  it('signs in with Apple, then makes the invite as that user', async () => {
+    const user = setupUser();
+    const parts = setup();
+    const { onCreated } = await open(parts);
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Continue with Apple' }));
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    expect(parts.server.getInvite(onCreated.mock.calls[0]![0])?.from).toBe('user-1');
+    expect(parts.appleSheet.shown).toEqual(['nonce-1']);
+    expect(parts.authStore.appleCodes).toEqual(['code-apple-1']);
+    expect(parts.authStore.guests).toBe(0);
+    expect(parts.analytics.sent[0]).toEqual({
+      type: 'track',
+      event: 'online_sign_in',
+      props: { method: 'apple' },
+    });
   });
 
   it('says so when the server does not make the invite, and the user can try again', async () => {
@@ -157,11 +221,14 @@ describe('FriendSetupScreen', () => {
       .mockImplementation(real);
     const { onCreated } = await open({ ...parts, invites: { ...parts.invites, createInvite } });
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Continue as a guest' }));
     expect(
       screen.getByText('The invite was not made. Check the connection and try again.'),
     ).toBeOnTheScreen();
     expect(onCreated).not.toHaveBeenCalled();
-    expect(parts.analytics.sent).toEqual([]);
+    expect(parts.analytics.sent).toEqual([
+      { type: 'track', event: 'online_sign_in', props: { method: 'guest' } },
+    ]);
 
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     expect(onCreated).toHaveBeenCalledTimes(1);
@@ -204,6 +271,7 @@ describe('FriendSetupScreen', () => {
 
   it('a second tap while the invite is made makes no second invite', async () => {
     const parts = setup();
+    await parts.auth.signInAsGuest();
     const createInvite = jest.spyOn(parts.invites, 'createInvite');
     const { onCreated } = await open(parts);
     const button = screen.getByRole('button', { name: 'Make an invite' });
@@ -250,15 +318,16 @@ describe('FriendSetupScreen', () => {
   it('Back before the account is ready makes no invite', async () => {
     const user = setupUser();
     const parts = setup();
+    await parts.auth.signInAsGuest();
     let release = () => {};
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
     const auth: AuthProvider = {
       ...parts.auth,
-      signInAsGuest: async () => {
+      ready: async () => {
         await held;
-        return parts.auth.signInAsGuest();
+        return parts.auth.ready();
       },
     };
     const createInvite = jest.spyOn(parts.invites, 'createInvite');
@@ -276,6 +345,7 @@ describe('FriendSetupScreen', () => {
     const user = setupUser();
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const parts = setup();
+    await parts.auth.signInAsGuest();
     const createInvite = jest
       .fn<Promise<string>, Parameters<Invites['createInvite']>>()
       .mockRejectedValue(new Error('offline'));

@@ -1,6 +1,6 @@
 # Google Play data safety form
 
-> The answers for Play Console → App content → Data safety. Issue #137. Apple: [app-privacy.md](app-privacy.md). Last review: 2026-11-02 (#315, Delete my online data).
+> The answers for Play Console → App content → Data safety. Issue #137. Apple: [app-privacy.md](app-privacy.md). Last review: 2026-11-09 (#401, the sign-in choices; Sign in with Apple is iPhone only).
 
 **This is not legal advice.** The answers follow the code on `main` on 2026-10-28 and the Data safety categories as we know them. The owner gives the final answers in the Play Console.
 
@@ -19,7 +19,7 @@ The facts (what leaves the phone, when, and the code that does it) are in [app-p
 |----------|--------|-----|
 | Does your app collect or share any of the required user data types? | **Yes** | Crash reports, opt-in usage data, and the guest account and games of online play with a friend |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** | Every SDK sends over HTTPS (`https://eu.i.posthog.com`, the Sentry DSN is `https://…`, Convex `https://…eu-west-1.convex.cloud` and its `.convex.site` sign-in URL; the Convex server sends pushes to `https://exp.host`). **Owner:** check that the DSN starts with `https://`. |
-| Which methods of account creation does your app support? | **Owner decides.** Suggested: **Other**, "a guest account with a random id, made by the app for online play" | Since #281 the app makes a guest account (Better Auth anonymous) when the player makes or opens an invite. It has no username, password, name or email. Google's account deletion rules then ask for a way to delete the account in the app, and a web page that says how: the app has **Settings → Privacy → Delete my online data** (#315), and the policy's [Delete your online data](../legal/privacy.md#delete-your-online-data) section can be that page (the email in [Your rights](../legal/privacy.md#your-rights) works too). **Owner:** check Google's current rules before you answer. |
+| Which methods of account creation does your app support? | **Owner decides.** Suggested: **Other**, "a guest account with a random id, made by the app for online play" | Since #281 the app makes a guest account (Better Auth anonymous) when the player makes or opens an invite and taps **Continue as a guest** (#401). It has no username, password, name or email. Sign in with Apple is on iPhone only for now (#401): the Android app shows no Apple button, so it collects no email. Google's account deletion rules then ask for a way to delete the account in the app, and a web page that says how: the app has **Settings → Privacy → Delete my online data** (#315), and the policy's [Delete your online data](../legal/privacy.md#delete-your-online-data) section can be that page (the email in [Your rights](../legal/privacy.md#your-rights) works too). **Owner:** check Google's current rules before you answer. |
 | Do you provide a way for users to request that their data is deleted? | **Yes**. Methods: in the app (**Settings → Privacy → Delete my online data**, #315), and an email to `privacy@tavlaki.com` | The in-app row deletes the online data at once: it resigns the games in progress and deletes the invites the player made, the push tokens and the guest account; finished games stay under the old random id, which leads to no account (the policy's [Delete your online data](../legal/privacy.md#delete-your-online-data)). The [privacy policy](../legal/privacy.md#your-rights) also promises deletion on request by that email. The app does not show the install id or the user id yet, so finding one person's data can be hard; the policy says so. For online play, an invite code leads to the user id. Showing the id in Settings would help (an idea in [legal/README.md](../legal/README.md#ideas-for-later-app-changes-not-part-of-90)). **Owner:** make `privacy@tavlaki.com` work before launch. |
 | Independent security review | Leave off | — |
 
@@ -31,7 +31,7 @@ Tick these six. Leave every other type empty.
 |----------|-----------|-----------------------|
 | Personal info | **User IDs** | The guest account's random user id on Convex (online play with a friend, #281) |
 | App activity | **Other actions** | The online games on Convex: the moves, rolls and score of a game with a friend (Google's "Other actions" names gameplay) |
-| App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, hint shown, review opened, invite created, push permission answered |
+| App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, hint shown, review opened, invite created, push permission answered, online sign-in (`apple` or `guest` only) |
 | App info and performance | **Crash logs** | Sentry crash and error reports |
 | App info and performance | **Diagnostics** | Device facts and breadcrumbs in crash reports; after Allow also app hangs / ANRs and Sentry sessions; device facts on PostHog events |
 | Device or other IDs | **Device or other IDs** | The random install id and PostHog's random ids; the Expo push token on Convex, after the player turns on turn notifications (#285) |
@@ -67,7 +67,7 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 |------|--------|
 | Privacy policy | `https://tavlaki.com/privacy` |
 | Ads | **No, my app does not contain ads** |
-| App access | **All functionality is available without special access** (online play makes its own guest account; there is no sign-in screen) |
+| App access | **All functionality is available without special access** (online play offers **Continue as a guest**, which needs no login details; on Android it is the only way in) |
 | Advertising ID | **No**, the app does not use an advertising ID. **Owner:** check that the release build's merged `AndroidManifest.xml` has no `com.google.android.gms.permission.AD_ID` permission (no dependency should add it today). |
 | Content rating | See [age-rating.md](age-rating.md) |
 | Target audience and content | See [age-rating.md](age-rating.md#google-play-target-audience) |
@@ -80,4 +80,4 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 - [ ] The answers here and in [app-privacy.md](app-privacy.md) say the same thing.
 - [ ] Convex: both deployments in the EU (`eu-west-1`), Convex's DPA accepted, `BETTER_AUTH_SECRET` set on both.
 - [ ] Answer the account creation and account deletion questions (Section 1) after you check Google's current rules for guest accounts.
-- [ ] Redo this form when sign-in with Apple, Google or an email link or EAS Update ship. Then Personal info (maybe name or email) and account deletion change.
+- [ ] Redo this form when Apple on Android, Google, the email code, usernames (#405) or EAS Update ship. Then Personal info (maybe name or email) and account creation change.

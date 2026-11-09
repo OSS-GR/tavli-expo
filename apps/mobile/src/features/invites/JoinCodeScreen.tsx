@@ -8,7 +8,7 @@
  * - The phone checks the text first: a bad code says why and makes no
  *   server call. A good code goes to the route (`onCode`), which opens the
  *   invite screen (`/invite/<CODE>`). That screen does the rest, as for a
- *   link: the free account only after "Show the invite", then the invite
+ *   link: the free account only from the sign-in choices, then the invite
  *   and Accept. This screen makes no account and calls no server.
  * - Keyboard: the field and Continue stay above the keyboard
  *   (`KeyboardAvoidingView` on iOS; Android resizes the window). The

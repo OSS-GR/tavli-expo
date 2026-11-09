@@ -184,6 +184,10 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <td>You answered your phone's question about turn notifications. Includes the answer only (allowed or not allowed), never the push token or any id</td>
 </tr>
 <tr class="odd">
+<td>Signed in for online play</td>
+<td>You signed in to play online. Includes how only (Apple or guest), never the email, the Apple id or any id</td>
+</tr>
+<tr class="even">
 <td>Screen viewed</td>
 <td>You opened a screen. Includes the screen's name (for example "settings"), never personal data</td>
 </tr>
@@ -200,14 +204,16 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <p>A few events made just before you turned it off may still upload. Nothing new is collected.</p>
 <p>The switch does not cover online games with a friend and their turn notifications: they need the game server (see the next sections).</p>
 <h3 id="online-games-with-a-friend-convex">Online games with a friend (Convex)</h3>
-<p>Only if you play a friend online. When you tap <strong>Make an invite</strong>, or <strong>Show the invite</strong> on an invite link, the app makes a <strong>guest account</strong> on our game server, once. The server runs on Convex, in the EU region <code>eu-west-1</code> (Ireland). Sign-in goes through Better Auth, on the same server.</p>
+<p>Only if you play a friend online. When you tap <strong>Make an invite</strong>, or open an invite link, the app asks how you want to sign in: <strong>Continue with Apple</strong> (on iPhone) or <strong>Continue as a guest</strong>. <strong>Not now</strong> signs in nothing. Then the app makes your account on our game server, once. The server runs on Convex, in the EU region <code>eu-west-1</code> (Ireland). Sign-in goes through Better Auth, on the same server.</p>
 <ul>
-<li>The guest account has a <strong>random user id</strong>, made by the server. It has no name and no email. (The sign-in software fills in a made-up placeholder for both.)</li>
+<li>Every account has a <strong>random user id</strong>, made by the server.</li>
+<li>A <strong>guest account</strong> has no name and no email. (The sign-in software fills in a made-up placeholder for both.) Only this phone can open it.</li>
+<li><strong>Sign in with Apple</strong> (only if you pick it): Apple gives our server your <strong>Apple id</strong> (a random id Apple makes for Tavlaki) and an <strong>email</strong>: your own, or a relay address from Apple if you pick <strong>Hide My Email</strong>. The server keeps both with your account, and the sign-in token from Apple's sheet, encrypted (it holds the same Apple id and email). It also keeps a token from Apple, encrypted, while the Apple sign-in stays on your account. We keep that token only to cancel your Sign in with Apple for Tavlaki at Apple when you delete your online data. We never keep your name or photo from Apple, and other players never see your email. With Apple you can sign in to the same account on a new phone. If you stop using Sign in with Apple for Tavlaki in your Apple settings, Apple tells our server, and the server removes that sign-in (and your online data, if it was your only sign-in).</li>
 <li>The server keeps your <strong>invites</strong> (the invite code, the game, the points to win, the time limit, if a friend accepted or declined, and when it expires) and your <strong>online games</strong> (the two players' user ids, the rules, every move and roll, the score, and the turn times) under that user id. Your friend's app sees the invite and the game you play together. While you play a turn, the server also keeps the moves you made so far, so your friend sees each move as you make it, also a move you take back. The next saved turn deletes them.</li>
 <li>The server keeps your <strong>sign-in session</strong>: a random session token, when it expires, and, as the sign-in software records it, the IP address and the app's user agent (the app name and the phone system) when the session was made.</li>
-<li>The app keeps the <strong>sign-in cookie</strong> in your phone's secure store (the iOS Keychain or the Android Keystore). The next invite uses it, so the app makes the guest account only once.</li>
+<li>The app keeps the <strong>sign-in cookie</strong> in your phone's secure store (the iOS Keychain or the Android Keystore). The next invite uses it, so the app asks you to sign in only once.</li>
 <li>The invite code and the link go where <strong>you</strong> share them (for example a chat app). Anyone with the code can see the invite and accept it until it expires.</li>
-<li>The user id <strong>never goes to analytics</strong> (PostHog) and never goes into crash reports (Sentry).</li>
+<li>The user id, the Apple id and the email <strong>never go to analytics</strong> (PostHog) and never go into crash reports (Sentry). Usage data gets only how you signed in (Apple or guest), and only if you allowed usage data.</li>
 </ul>
 <p>Before you make or open an invite, the app does not talk to the game server. When you open an invite link or a link to an online game, the app first asks the game server if this phone has a saved sign-in (it sends the sign-in cookie, if there is one). That check makes no account, and without a saved sign-in nothing is saved for you. With a saved sign-in, the app then loads the invite or the game.</p>
 <h3 id="delete-your-online-data">Delete your online data</h3>
@@ -216,9 +222,10 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>resigns your online games in progress, so you lose them and your friend wins;</li>
 <li>deletes the invites you made, so nobody can accept them;</li>
 <li>deletes your push tokens, so turn notifications stop;</li>
-<li>deletes your guest account and its sign-in sessions.</li>
+<li>deletes your account and its sign-in sessions, with Apple's sign-in: the Apple id, the email and Apple's tokens;</li>
+<li>cancels your Sign in with Apple for Tavlaki at Apple, if you used it.</li>
 </ul>
-<p>Then the app signs out and deletes the sign-in cookie on your phone. If you play online again, the app makes a new guest account with a new user id.</p>
+<p>Then the app signs out and deletes the sign-in cookie on your phone. If you play online again, you sign in again, and the app makes a new account with a new user id.</p>
 <p>What stays: finished online games (with their moves) stay for the other player. They hold your old random user id, but no name and no email, and once the account is gone that id leads to nobody. An invite a friend made and you answered stays with that friend. The games and the history on your phone stay too.</p>
 <h3 id="turn-notifications-expo">Turn notifications (Expo)</h3>
 <p>Only if you turn them on. After you make or accept an invite for an online game, the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch. <strong>Not now</strong> is kept: the app does not ask again by itself. You can turn them on later in <strong>Settings → Notifications</strong>, and off in your phone's settings.</p>
@@ -235,7 +242,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>No ads, and no ad networks or ad ids.</li>
 <li>No tracking across other apps or websites.</li>
 <li>No selling or renting of your data. We do not share it with anyone except the four services below, and only to run the app.</li>
-<li>No contacts, no location, no microphone, no camera. No sign-in with your name, email, Apple or Google account: online games use a guest account with a random id only.</li>
+<li>No contacts, no location, no microphone, no camera. No sign-in with your name or a Google account. Sign in with Apple is your choice: a guest account needs no name and no email.</li>
 </ul>
 <h2 id="services-that-process-the-data">Services that process the data</h2>
 <p>We use four services. They process the data for us, under their data processing terms, and may not use it for their own purposes.</p>
@@ -263,7 +270,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 </tr>
 <tr class="odd">
 <td><strong>Convex</strong> (Convex, Inc., USA)</td>
-<td>The game server for online games with a friend: the guest account, the sign-in session, invites, online games and push tokens</td>
+<td>The game server for online games with a friend: the account (with Apple: the Apple id, the email and Apple's tokens), the sign-in session, invites, online games and push tokens</td>
 <td>The EU (<code>eu-west-1</code>, Ireland)</td>
 <td>Until you delete them in the app (<strong>Settings → Privacy → Delete my online data</strong>) or ask us to. Finished games then stay, under an id that leads to nobody (see "Delete your online data"). The app does not delete old invites and games by itself yet. A sign-in session runs out 7 days after it was last renewed (Better Auth's default). A push token: see "Turn notifications" above.</td>
 </tr>
@@ -281,7 +288,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li><strong>Usage data:</strong> your consent (GDPR Article 6(1)(a)). You can withdraw it at any time in Settings. Withdrawing does not undo what was lawful before.</li>
 <li><strong>Crash reports before you answer:</strong> these hold no id at all, and we do not think they identify you. If they still count as personal data, we rely on our legitimate interest in finding and fixing crashes (GDPR Article 6(1)(f)). You can object at any time: tap <strong>Don't allow</strong>, or turn off the switch in Settings.</li>
 <li><strong>Crash reports after Allow:</strong> your consent, as for usage data.</li>
-<li><strong>Online games with a friend:</strong> the guest account, the sign-in session, your invites and your online games are needed to give you the online game you asked for (GDPR Article 6(1)(b)). If you do not want them, do not make or open an invite: the rest of the app works without them.</li>
+<li><strong>Online games with a friend:</strong> the account (with Sign in with Apple: the Apple id and the email), the sign-in session, your invites and your online games are needed to give you the online game you asked for (GDPR Article 6(1)(b)). If you do not want them, do not make or open an invite: the rest of the app works without them.</li>
 <li><strong>Turn notifications:</strong> you asked for them when you tapped <strong>Turn on</strong> in the app, so the push token is needed to give you that service (GDPR Article 6(1)(b)). Turn them off in your phone's settings at any time.</li>
 </ul>
 <h2 id="your-rights">Your rights</h2>
@@ -295,7 +302,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li><strong>complain</strong> to a data protection authority. In Greece this is the Hellenic Data Protection Authority (<a href="https://www.dpa.gr"><span>www.dpa.gr</span></a>).</li>
 </ul>
 <p>To ask, write to <strong><a href="mailto:privacy@tavlaki.com">privacy@tavlaki.com</a></strong>. We answer within one month.</p>
-<p>Please note: we do not know who you are. The app does not show the install id or the user id yet, so we may not be able to find your data. Tell us your phone model and roughly when you used the app, and we will do our best. For online games, also send an invite code you made or accepted: it leads us to your user id, and then to your invites and games. Usage data and crash reports age out under the times in the table above. Deleting the app deletes the install id, the sign-in cookie and everything on your phone, but not your invites and games on the server: to delete those, tap <strong>Delete my online data</strong> in <strong>Settings → Privacy</strong> before you delete the app, or write to us. A push token of a deleted app stops working, and the server deletes it when Expo says so.</p>
+<p>Please note: we do not know who you are. The app does not show the install id or the user id yet, so we may not be able to find your data. Tell us your phone model and roughly when you used the app, and we will do our best. For online games, also send an invite code you made or accepted, or the email of your Apple sign-in: it leads us to your user id, and then to your invites and games. Usage data and crash reports age out under the times in the table above. Deleting the app deletes the install id, the sign-in cookie and everything on your phone, but not your invites and games on the server: to delete those, tap <strong>Delete my online data</strong> in <strong>Settings → Privacy</strong> before you delete the app, or write to us. A push token of a deleted app stops working, and the server deletes it when Expo says so.</p>
 <h2 id="children">Children</h2>
 <p>Tavlaki is not aimed at children under 13.</p>
 <p>In Greece, a child under 15 can give consent for an app like this only with a parent's or guardian's permission (Greek Law 4624/2019, Article 21). Other EU countries use an age between 13 and 16. If you are under that age, please ask a parent before you tap <strong>Allow usage data</strong>. The app works fully if you tap <strong>Don't allow</strong>.</p>
@@ -303,7 +310,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <h2 id="coming-later-not-live-yet">Coming later (not live yet)</h2>
 <p>These features are planned. They are <strong>not</strong> in the app today. We will update this policy before they go live and tell you in the app.</p>
 <ul>
-<li><strong>Sign-in with Apple, Google or an email link</strong>, and <strong>friends</strong>. These will store your account and friends list on our server (Convex), with sign-in through Better Auth. (Guest accounts and online games with a friend are live now: see above.) With Sign in with Apple, the server will also keep a token from Apple, encrypted, while the Apple sign-in stays on your account. We keep it only to cancel your Sign in with Apple for Tavlaki at Apple when you delete your online data or remove the Apple sign-in. If you stop using Sign in with Apple for Tavlaki in your Apple settings, Apple tells our server, and the server removes that sign-in (and your online data, if it was your only sign-in).</li>
+<li><strong>Sign-in with Google or an email code</strong>, <strong>Sign in with Apple on Android</strong>, <strong>usernames</strong> and <strong>friends</strong>. These will store your account and friends list on our server (Convex), with sign-in through Better Auth. (Guest accounts, Sign in with Apple on iPhone and online games with a friend are live now: see above.)</li>
 <li><strong>App updates over the air</strong> (EAS Update by Expo). The app will ask Expo's servers at launch if a newer version exists. This request carries technical facts only.</li>
 </ul>
 <h2 id="this-website">This website</h2>

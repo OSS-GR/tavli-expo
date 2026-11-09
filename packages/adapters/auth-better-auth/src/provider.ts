@@ -169,6 +169,11 @@ function expiresAt(token: string): number | null {
 export interface FromBetterAuthClientOptions {
   /** The clock, in epoch ms, for token expiry. Default: `Date.now`. */
   readonly now?: () => number;
+  /**
+   * The app's bundle id: Apple's `client_id` for the code trade
+   * (`/key/apple-code`, #398). Without it the provider sends no Apple code.
+   */
+  readonly appleClientId?: string | null;
 }
 
 /** An `AuthProvider` on a Better Auth client. */
@@ -177,6 +182,7 @@ export function fromBetterAuthClient(
   options: FromBetterAuthClientOptions = {},
 ): AuthProvider {
   const now = options.now ?? (() => Date.now());
+  const appleClientId = options.appleClientId ?? null;
   const listeners = new Set<(user: AuthUser | null) => void>();
   let user: AuthUser | null = null;
   let token: { readonly value: string; readonly expiresAt: number | null } | null = null;
@@ -291,7 +297,29 @@ export function fromBetterAuthClient(
       throw authError(result.error, 'key sign-in failed');
     }
     set(toUser(data));
+    await sendAppleCode(credential);
     return toUser(data);
+  }
+
+  /**
+   * Sends Apple's one-time code after a sign-in or a save with an Apple
+   * key (#398), so the server keeps Apple's token to revoke it later. Best
+   * effort: the player is signed in either way, and a failed send is only
+   * a token the server cannot revoke.
+   */
+  async function sendAppleCode(credential: AuthKeyCredential): Promise<void> {
+    const code = credential.authorizationCode;
+    if (credential.provider !== 'apple' || code === undefined || code === '') return;
+    if (appleClientId === null || appleClientId === '') return;
+    try {
+      await client.$fetch('/key/apple-code', {
+        method: 'POST',
+        body: { authorizationCode: code, clientId: appleClientId },
+        throw: false,
+      });
+    } catch {
+      // No network: the sign-in stands.
+    }
   }
 
   async function signedIn(what: string): Promise<AuthUser> {
@@ -347,6 +375,7 @@ export function fromBetterAuthClient(
       );
       if (data.user === undefined) throw authError(null, 'no user in the reply');
       set(toUser(data.user));
+      await sendAppleCode(credential);
       return toUser(data.user);
     },
     async listKeys() {

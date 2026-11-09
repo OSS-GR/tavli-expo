@@ -105,6 +105,8 @@ export type {
   AuthUser,
   MemoryAuthStore,
 } from './auth';
+export { createMemoryAppleSheet } from './apple-sheet';
+export type { AppleSheet, AppleSheetProof, MemoryAppleSheet } from './apple-sheet';
 export type { OnlineData } from './online-data';
 export { APP_PLATFORMS, NO_UPDATE_POLICY, createMemoryAppUpdates } from './app-update';
 export type { AppPlatform, AppUpdatePolicy, AppUpdates, MemoryAppUpdates } from './app-update';
