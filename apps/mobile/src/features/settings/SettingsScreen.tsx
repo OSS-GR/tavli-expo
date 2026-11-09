@@ -73,6 +73,11 @@ export interface SettingsScreenProps {
    * it, and only when this phone used online play (`hasOnlineAccount()`).
    */
   onUsername?: () => void;
+  /**
+   * Opens Settings → Blocked players (#435). Like Username, it shows only
+   * when this phone used online play (`hasOnlineAccount()`).
+   */
+  onBlocked?: () => void;
 }
 
 export function SettingsScreen({
@@ -82,6 +87,7 @@ export function SettingsScreen({
   turnPushes,
   onlineData,
   onUsername,
+  onBlocked,
 }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
   const locales = useLocales();
@@ -290,15 +296,26 @@ export function SettingsScreen({
           </SectionCard>
         ) : null}
 
-        {onUsername && usedOnline ? (
+        {(onUsername || onBlocked) && usedOnline ? (
           <SectionCard title={t('settings.sections.online')}>
-            <SectionRow
-              testID="settings-username"
-              icon="users"
-              label={t('settings.username.label')}
-              hint={t('settings.username.hint')}
-              onPress={onUsername}
-            />
+            {onUsername ? (
+              <SectionRow
+                testID="settings-username"
+                icon="users"
+                label={t('settings.username.label')}
+                hint={t('settings.username.hint')}
+                onPress={onUsername}
+              />
+            ) : null}
+            {onBlocked ? (
+              <SectionRow
+                testID="settings-blocked"
+                icon="userX"
+                label={t('settings.blocked.label')}
+                hint={t('settings.blocked.hint')}
+                onPress={onBlocked}
+              />
+            ) : null}
           </SectionCard>
         ) : null}
 

@@ -18,12 +18,14 @@
  *   over the end of that game (the board store holds it, #286); its
  *   button closes it, and then the next game shows.
  * - There is no game resign online: Resign match goes to the server.
+ * - Report or block (#435): the menu opens the dialog for the other
+ *   player (`features/safety`), in the same sheet.
  * - No Hint and no Review (there is no analyzer online), and nothing goes
  *   to the save slot or History: the server keeps the game.
  *
  * Navigation stays in the route (`app/game/[id]/index.tsx`).
  */
-import { turnDeadlineMs, type GameTransport } from '@tavli/contracts';
+import { turnDeadlineMs, type GameTransport, type Safety } from '@tavli/contracts';
 import { opponent, type PlayerId, type PresetId } from '@tavli/engine';
 import { mayRollOpening } from '@tavli/online';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -44,6 +46,7 @@ import { GameMenu } from '@/features/match/GameMenu';
 import { MissingGame } from '@/features/match/MissingGame';
 import { resignMatchText } from '@/features/match/resign';
 import { currentGameLabel, variantName } from '@/features/match/summary';
+import { ReportOrBlock, safetyName, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { onlineBoardStore, type OnlineBoardStore } from './boardStore';
 import { clockText, clockTickMs } from './clock';
@@ -56,6 +59,8 @@ import { useOnlineGame } from './useOnlineGame';
 export interface OnlineMatchScreenProps {
   gameId: string;
   transport: GameTransport;
+  /** Block and report (#435). Without it the menu has no Report or block row. */
+  safety?: Safety;
   /** The player id of this phone. */
   me: string;
   /** Another screen is on top (Settings). */
@@ -113,7 +118,14 @@ function OnlineLoader({ store, ...props }: OnlineMatchScreenProps & { store: Onl
   return <OnlineBoard {...props} store={store} board={board} side={side} />;
 }
 
-type Overlay = 'none' | 'menu' | 'resignMatch';
+type Overlay =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'menu' }
+  | { readonly kind: 'resignMatch' }
+  /** Report or block (#435), with the player as the menu named them. */
+  | { readonly kind: 'safety'; readonly player: SafetyPlayer };
+
+const NO_OVERLAY: Overlay = { kind: 'none' };
 
 const NOTICE_KEYS = {
   timedOut: { title: 'online.notice.timedOutTitle', text: 'online.notice.timedOut' },
@@ -128,6 +140,7 @@ function OnlineBoard({
   board,
   side,
   gameId,
+  safety,
   paused = false,
   covered = false,
   onExit,
@@ -149,8 +162,8 @@ function OnlineBoard({
   const notice = useOnlineStore(store, (s) => s.notice);
   const noticeCount = useOnlineStore(store, (s) => s.noticeCount);
   const clockOffset = useOnlineStore(store, (s) => s.clockOffset);
-  const [overlay, setOverlay] = useState<Overlay>('none');
-  const close = () => setOverlay('none');
+  const [overlay, setOverlay] = useState<Overlay>(NO_OVERLAY);
+  const close = () => setOverlay(NO_OVERLAY);
 
   // Resign match while your turn is on its way: the store takes no action
   // then, so the resign waits and goes as soon as the call is done.
@@ -268,7 +281,7 @@ function OnlineBoard({
   });
 
   let content = null;
-  if (overlay === 'menu') {
+  if (overlay.kind === 'menu') {
     content = (
       <GameMenu
         gameLabel={gameLabel}
@@ -278,7 +291,7 @@ function OnlineBoard({
           finished ? null : t('game.menu.resignMatchHint', { name: name(opponent(side)) })
         }
         rulesLabel={t('game.menu.rules', { game: playing })}
-        onResignMatch={() => setOverlay('resignMatch')}
+        onResignMatch={() => setOverlay({ kind: 'resignMatch' })}
         onRules={() => {
           close();
           const { state } = flow.game;
@@ -288,6 +301,16 @@ function OnlineBoard({
           close();
           onSettings();
         }}
+        {...(safety
+          ? {
+              reportOrBlockHint: t('safety.actionHint', { name: safetyName(opponentName, t) }),
+              onReportOrBlock: () =>
+                setOverlay({
+                  kind: 'safety',
+                  player: { id: view.players[opponent(side)], name: opponentName },
+                }),
+            }
+          : {})}
         exitHint={t('online.exitHint')}
         onExit={() => {
           close();
@@ -296,7 +319,7 @@ function OnlineBoard({
         onResume={close}
       />
     );
-  } else if (overlay === 'resignMatch' && !finished) {
+  } else if (overlay.kind === 'resignMatch' && !finished) {
     // The game in play counts for the opponent, as in a local match.
     const { lines, note } = resignMatchText(flow, side, name, t);
     content = (
@@ -316,6 +339,8 @@ function OnlineBoard({
         onCancel={close}
       />
     );
+  } else if (overlay.kind === 'safety' && safety) {
+    content = <ReportOrBlock player={overlay.player} safety={safety} onClose={close} />;
   }
 
   return (
@@ -324,9 +349,9 @@ function OnlineBoard({
         store={board}
         seats={seats}
         online={online}
-        paused={paused || covered || overlay !== 'none'}
+        paused={paused || covered || overlay.kind !== 'none'}
         covered={covered || content !== null}
-        onOpenMenu={() => setOverlay('menu')}
+        onOpenMenu={() => setOverlay({ kind: 'menu' })}
         onHome={onExit}
         onMatchOver={onMatchOver}
         gameLabel={gameLabel}
@@ -336,7 +361,7 @@ function OnlineBoard({
         visible={content !== null}
         onClose={close}
         closeLabel={t('game.menu.resume')}
-        look={overlay === 'menu' ? 'sheet' : 'dialog'}
+        look={overlay.kind === 'menu' ? 'sheet' : 'dialog'}
         // The game screen turns with the phone (#185); its menu and dialog too.
         turns>
         {content}

@@ -32,6 +32,8 @@
  *   user signed in to `auth`: a saved account when that user is not a
  *   guest (Sign in with Apple), like the Convex functions. With nobody
  *   signed in it fails `NOT_SIGNED_IN`.
+ * - `safety` is block and report (#435) on the server, as the user signed
+ *   in to `auth`. With nobody signed in it fails `NOT_SIGNED_IN`.
  * - `appUpdates` is the update policy (#390): it blocks no build until a
  *   test sets one (`onlineFake.appUpdates.set('ios', …)`). `appBuild()`
  *   is this build: iOS build `TEST_BUILD`, until a test calls
@@ -55,6 +57,7 @@ import {
   type GameTransportErrorData,
   type Invites,
   type OnlineData,
+  type Safety,
   type Usernames,
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
@@ -203,6 +206,14 @@ const usernames: Usernames = {
   },
 };
 
+/** Block and report on the server, as the user signed in to `auth` at that moment. */
+const safety: Safety = {
+  block: (playerId) => server.safetyFor(auth.currentUser()?.id ?? null).block(playerId),
+  unblock: (playerId) => server.safetyFor(auth.currentUser()?.id ?? null).unblock(playerId),
+  listBlocked: () => server.safetyFor(auth.currentUser()?.id ?? null).listBlocked(),
+  report: (request) => server.safetyFor(auth.currentUser()?.id ?? null).report(request),
+};
+
 export const onlineFake = {
   auth,
   /** Apple's sheet on the phone: set `next`, `sub` or `available` to act it out. */
@@ -214,6 +225,7 @@ export const onlineFake = {
   onlineData,
   appUpdates,
   usernames,
+  safety,
   /** This build, like `appBuild()` of `@/services`. */
   appBuild: (): AppBuild | null => build,
   /** Sets this build for the rest of the test (`null`: no store build). */

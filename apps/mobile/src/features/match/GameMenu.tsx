@@ -63,6 +63,13 @@ export interface GameMenuProps {
   onResignMatch: () => void;
   onRules: () => void;
   onSettings: () => void;
+  /**
+   * Report or block the other player (#435). Online games only; without
+   * it there is no row.
+   */
+  onReportOrBlock?: () => void;
+  /** The hint of the Report or block row, with the other player's name. */
+  reportOrBlockHint?: string;
   onExit: () => void;
   exitHint: string;
   onResume: () => void;
@@ -106,6 +113,15 @@ export function GameMenu(props: GameMenuProps) {
         title={t('game.menu.settings')}
         onPress={props.onSettings}
       />
+      {props.onReportOrBlock ? (
+        <MenuRow
+          testID="menu-report-block"
+          icon={'⚑'}
+          title={t('safety.action')}
+          {...(props.reportOrBlockHint ? { hint: props.reportOrBlockHint } : {})}
+          onPress={props.onReportOrBlock}
+        />
+      ) : null}
       <MenuRow
         testID="menu-exit"
         icon={'⌂'}

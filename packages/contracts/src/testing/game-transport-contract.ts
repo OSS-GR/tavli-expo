@@ -298,6 +298,11 @@ function sameAsView(summary: GameSummary, view: OnlineGameView, side: PlayerId):
   same(summary.winner, view.match.winner, 'summary.winner');
   same(summary.turnDeadline, view.turnDeadline, 'summary.turnDeadline');
   same(
+    summary.opponentId,
+    view.players[side === 'white' ? 'black' : 'white'],
+    'summary.opponentId',
+  );
+  same(
     summary.opponentName,
     view.names[side === 'white' ? 'black' : 'white'],
     'summary.opponentName',

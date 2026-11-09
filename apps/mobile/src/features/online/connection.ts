@@ -10,14 +10,17 @@
  *   to a game makes no account by itself. With no saved session the game
  *   cannot be opened (`signedOut`).
  *
+ * Block and report (#435) go to the same server: `safety` from
+ * `@/services`, or the in-memory server's `safetyFor` for a dev game.
+ *
  * Never send the user id to analytics.
  */
-import type { GameTransport } from '@tavli/contracts';
+import type { GameTransport, Safety } from '@tavli/contracts';
 import { useEffect, useState } from 'react';
 
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { checkAppUpdate } from '@/features/update/updateCheck';
-import { auth, gameTransportFor, games, onlinePlayerId } from '@/services';
+import { auth, gameTransportFor, games, onlinePlayerId, onlineServer, safety } from '@/services';
 
 import { rememberOnlineAccount } from './accountHint';
 import { isDevGame } from './devGameIds';
@@ -25,8 +28,13 @@ import { isDevGame } from './devGameIds';
 export type OnlineConnection =
   /** Loading the saved session. */
   | { readonly status: 'connecting' }
-  /** Ready to open the game: its transport and the player id of this phone. */
-  | { readonly status: 'ready'; readonly transport: GameTransport; readonly me: string }
+  /** Ready to open the game: its transport, block and report, and the player id of this phone. */
+  | {
+      readonly status: 'ready';
+      readonly transport: GameTransport;
+      readonly safety: Safety;
+      readonly me: string;
+    }
   /** This build has no online server (no Convex URL). */
   | { readonly status: 'off' }
   /** Nobody is signed in on this phone. */
@@ -35,6 +43,19 @@ export type OnlineConnection =
   | { readonly status: 'failed' };
 
 type Session = { readonly me: string } | 'signedOut' | 'failed' | null;
+
+/** The dev games' block and report, one per in-memory server (Jest makes a new server per test). */
+const devSafety = new WeakMap<object, Safety>();
+
+function devSafetyOf(): Safety {
+  const server = onlineServer();
+  let made = devSafety.get(server);
+  if (made === undefined) {
+    made = server.safetyFor(onlinePlayerId);
+    devSafety.set(server, made);
+  }
+  return made;
+}
 
 /** The connection for the online game `gameId`. */
 export function useOnlineConnection(gameId: string): OnlineConnection {
@@ -65,10 +86,15 @@ export function useOnlineConnection(gameId: string): OnlineConnection {
   }, [dev]);
 
   if (dev) {
-    return { status: 'ready', transport: gameTransportFor(onlinePlayerId), me: onlinePlayerId };
+    return {
+      status: 'ready',
+      transport: gameTransportFor(onlinePlayerId),
+      safety: devSafetyOf(),
+      me: onlinePlayerId,
+    };
   }
-  if (auth === undefined || games === undefined) return { status: 'off' };
+  if (auth === undefined || games === undefined || safety === undefined) return { status: 'off' };
   if (session === null) return { status: 'connecting' };
   if (session === 'signedOut' || session === 'failed') return { status: session };
-  return { status: 'ready', transport: games, me: session.me };
+  return { status: 'ready', transport: games, safety, me: session.me };
 }

@@ -11,6 +11,8 @@ import { isInviteErrorData, type InviteView } from '@tavli/contracts';
  * - `used`: someone accepted or declined it, or the inviter took it back.
  * - `notFound`: no invite has this code, or the link has no code.
  * - `own`: this phone made the invite.
+ * - `blocked`: this phone's user blocks the inviter (#435), so Accept
+ *   is refused (`BLOCKED`). The invite stays open for others.
  * - `failed`: the invite did not load (for example no network).
  */
 export type InviteScreenState =
@@ -20,6 +22,7 @@ export type InviteScreenState =
   | { readonly kind: 'used' }
   | { readonly kind: 'notFound' }
   | { readonly kind: 'own' }
+  | { readonly kind: 'blocked' }
   | { readonly kind: 'failed' };
 
 export type InviteScreenKind = InviteScreenState['kind'];
@@ -54,6 +57,8 @@ export function stateOfError(error: unknown): InviteScreenState | null {
       return { kind: 'notFound' };
     case 'OWN_INVITE':
       return { kind: 'own' };
+    case 'BLOCKED':
+      return { kind: 'blocked' };
     default:
       return null;
   }

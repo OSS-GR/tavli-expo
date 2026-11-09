@@ -1,10 +1,11 @@
 /**
  * Connects an online game route (#266): a spinner while it loads the
  * session, "This game could not be opened." when online play is off,
- * nobody is signed in or the session did not load, else `children` with the transport and the player id
+ * nobody is signed in or the session did not load, else `children` with
+ * the transport, block and report (`Safety`, #435) and the player id
  * (`useOnlineConnection`, `connection.ts`).
  */
-import type { GameTransport } from '@tavli/contracts';
+import type { GameTransport, Safety } from '@tavli/contracts';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -16,7 +17,11 @@ import { useOnlineConnection } from './connection';
 export interface OnlineConnectProps {
   readonly gameId: string;
   readonly onHome: () => void;
-  readonly children: (connection: { transport: GameTransport; me: string }) => ReactNode;
+  readonly children: (connection: {
+    transport: GameTransport;
+    safety: Safety;
+    me: string;
+  }) => ReactNode;
 }
 
 export function OnlineConnect({ gameId, onHome, children }: OnlineConnectProps) {
@@ -29,7 +34,11 @@ export function OnlineConnect({ gameId, onHome, children }: OnlineConnectProps) 
     );
   }
   if (connection.status !== 'ready') return <MissingGame onHome={onHome} />;
-  return children({ transport: connection.transport, me: connection.me });
+  return children({
+    transport: connection.transport,
+    safety: connection.safety,
+    me: connection.me,
+  });
 }
 
 const styles = StyleSheet.create((theme) => ({

@@ -3,6 +3,7 @@ import {
   type createRecordingSoundPlayer,
   type GameTransport,
   type OnlineGameChoice,
+  type Safety,
 } from '@tavli/contracts';
 import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
@@ -99,6 +100,8 @@ async function openGame(
   prepare?: (server: MemoryGameServer, gameId: string) => void,
   /** Rolls your opening die on the screen and waits for the card to close (#379). */
   playOpening = true,
+  /** The `Safety` port for the menu's Report or block (#435). None: no such row. */
+  safetyOf?: (server: MemoryGameServer) => Safety,
 ): Promise<Game> {
   const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
   const gameId = server.createGame(
@@ -128,6 +131,7 @@ async function openGame(
       onSettings={jest.fn()}
       onRules={jest.fn()}
       onMatchOver={onMatchOver}
+      {...(safetyOf ? { safety: safetyOf(server) } : {})}
     />,
   );
   const board = await screen.findByTestId('game-board', { includeHiddenElements: true });
@@ -972,5 +976,59 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     expect(view(game).status).toBe('finished');
     expect(view(game).match.resignedBy).toBe('white');
     expect(game.onMatchOver).toHaveBeenCalledTimes(1);
+  });
+  describe('Report or block (#435)', () => {
+    const openWithSafety = () =>
+      openGame('portes', 1, 5, BOT_THINK_MS, undefined, undefined, true, (server) =>
+        server.safetyFor('me'),
+      );
+
+    it('blocks the other player from the menu', async () => {
+      const user = setupUser();
+      const game = await openWithSafety();
+      const name = botName(game);
+      await user.press(screen.getByRole('button', { name: 'Game menu' }));
+      expect(screen.getByTestId('menu-report-block')).toHaveTextContent(
+        new RegExp(`Block ${name}, or report them to us`),
+      );
+      await user.press(screen.getByTestId('menu-report-block'));
+      expect(screen.getByRole('header', { name: `Report or block ${name}` })).toBeOnTheScreen();
+      await user.press(screen.getByTestId('safety-block'));
+      await user.press(screen.getByTestId('safety-block-yes'));
+      await act(async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+      });
+      // The dialog keeps the name it opened with.
+      expect(screen.getByRole('header', { name: 'Player blocked' })).toBeOnTheScreen();
+      const blocked = await game.server.safetyFor('me').listBlocked();
+      expect(blocked.map((p) => p.playerId)).toEqual(['bot']);
+      await user.press(screen.getByTestId('safety-close'));
+      expect(screen.queryByTestId('safety-done')).toBeNull();
+      // The game goes on.
+      expect(view(game).status).toBe('active');
+    });
+
+    it('reports the other player from the menu', async () => {
+      const user = setupUser();
+      const game = await openWithSafety();
+      await user.press(screen.getByRole('button', { name: 'Game menu' }));
+      await user.press(screen.getByTestId('menu-report-block'));
+      await user.press(screen.getByTestId('safety-report'));
+      await user.press(screen.getByTestId('safety-reason-name'));
+      await act(async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+      });
+      expect(screen.getByTestId('safety-done')).toBeOnTheScreen();
+      expect(game.server.reportsOf()).toEqual([
+        expect.objectContaining({ reporterId: 'me', reportedId: 'bot', reason: 'name' }),
+      ]);
+    });
+
+    it('a screen with no Safety port has no such row', async () => {
+      const user = setupUser();
+      await openGame();
+      await user.press(screen.getByRole('button', { name: 'Game menu' }));
+      expect(screen.queryByTestId('menu-report-block')).toBeNull();
+    });
   });
 });

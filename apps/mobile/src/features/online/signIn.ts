@@ -6,6 +6,8 @@
  *   then `signInWithKey`. The adapter sends Apple's one-time code to the
  *   server after the sign-in, so the server can revoke Apple's token when
  *   the account goes (#398). A closed sheet is no sign-in and no problem.
+ *   A sheet that ended unfinished (no Apple ID on the phone, #442) has its
+ *   own text: the connection is not the problem.
  * - Guest: `signInForOnline` (the saved session first, so the guest is
  *   made once).
  * - Each new sign-in sends `online_sign_in` with the way only (`apple` or
@@ -15,13 +17,14 @@
  *   `finishStep` then hands the user on. When the server cannot say, the
  *   user goes on at once: the name can wait for Settings.
  */
-import type {
-  Analytics,
-  AppleSheet,
-  AuthProvider,
-  AuthUser,
-  MyUsername,
-  Usernames,
+import {
+  isAppleSheetUnfinished,
+  type Analytics,
+  type AppleSheet,
+  type AuthProvider,
+  type AuthUser,
+  type MyUsername,
+  type Usernames,
 } from '@tavli/contracts';
 import { useEffect, useRef, useState } from 'react';
 
@@ -31,6 +34,12 @@ import { onlineAccountReady, signInForOnline } from './account';
 import { needsUsernameStep } from './usernameStep';
 
 export type SignInMethod = 'apple' | 'guest';
+
+/**
+ * Why the last try failed: Apple's sheet ended unfinished (most often no
+ * Apple ID on the phone, #442), or anything else (the connection).
+ */
+export type SignInFailure = 'appleUnfinished' | 'other';
 
 /**
  * Signs in with Apple's sheet. Resolves with the user, or `null` when the
@@ -58,8 +67,8 @@ export interface SignInChoicesState {
   readonly appleAvailable: boolean;
   /** The way being tried, or `null`. */
   readonly busy: SignInMethod | null;
-  /** The last try failed (not a closed Apple sheet). */
-  readonly failed: boolean;
+  /** Why the last try failed, or `null` (a closed Apple sheet is no failure). */
+  readonly failed: SignInFailure | null;
   readonly choose: (method: SignInMethod) => void;
   /** A saved account with no username yet: show the username step. */
   readonly step: { readonly user: AuthUser; readonly mine: MyUsername } | null;
@@ -87,7 +96,7 @@ export function useSignInChoices({
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [step, setStep] = useState<SignInChoicesState['step']>(null);
   const [busy, setBusy] = useState<SignInMethod | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<SignInFailure | null>(null);
   // One try at a time: a second tap before the render sees `busy` does nothing.
   const trying = useRef(false);
   // False once the screen is gone (the sign-in answers later).
@@ -116,7 +125,7 @@ export function useSignInChoices({
     if (trying.current) return;
     trying.current = true;
     setBusy(method);
-    setFailed(false);
+    setFailed(null);
     const signIn = method === 'apple' ? signInWithApple(auth, appleSheet) : signInForOnline(auth);
     signIn.then(
       (user) => {
@@ -154,11 +163,11 @@ export function useSignInChoices({
           },
         );
       },
-      () => {
+      (error: unknown) => {
         trying.current = false;
         if (!mounted.current) return;
         setBusy(null);
-        setFailed(true);
+        setFailed(isAppleSheetUnfinished(error) ? 'appleUnfinished' : 'other');
       },
     );
   };

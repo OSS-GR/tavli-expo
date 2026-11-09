@@ -50,6 +50,7 @@ const routes = {
   join: stub('join with a code'),
   'online-games': stub('online games'),
   username: stub('username'),
+  blocked: stub('blocked players'),
 };
 
 /** A URL for each app route (not the layout, not the welcome flow). */

@@ -52,8 +52,13 @@ describe('useOnlineConnection', () => {
     expect(result.current).toEqual({
       status: 'ready',
       transport: onlineFake.transportFor('me'),
+      safety: expect.objectContaining({ report: expect.any(Function) }),
       me: 'me',
     });
+    // The same port on each render.
+    const first = result.current.status === 'ready' ? result.current.safety : null;
+    await flush();
+    expect(result.current.status === 'ready' ? result.current.safety : undefined).toBe(first);
     await flush();
     expect(onlineFake.authStore.guests).toBe(0);
   });
@@ -67,6 +72,7 @@ describe('useOnlineConnection', () => {
     expect(result.current).toEqual({
       status: 'ready',
       transport: onlineFake.games,
+      safety: onlineFake.safety,
       me: 'guest-1',
     });
     expect(onlineFake.authStore.guests).toBe(0);

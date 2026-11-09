@@ -1,10 +1,13 @@
 /**
  * Match end of an online game (#255): the final score from the server,
  * with no Rematch and no Change settings. The route
- * (`app/game/[id]/match-end.tsx`) shows it for an online id.
+ * (`app/game/[id]/match-end.tsx`) shows it for an online id. With `safety`
+ * it has Report or block for the other player (#435).
  */
-import type { GameTransport } from '@tavli/contracts';
+import type { GameTransport, Safety } from '@tavli/contracts';
+import { opponent } from '@tavli/engine';
 import { Redirect } from 'expo-router';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -12,6 +15,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
 import { MissingGame } from '@/features/match/MissingGame';
 import { gameHref } from '@/features/match/routes';
+import { ReportOrBlockSheet, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { useOnlineStore, type OnlineStore } from './onlineStore';
 import { onlineSeats } from './seats';
@@ -20,6 +24,8 @@ import { useOnlineGame } from './useOnlineGame';
 export interface OnlineMatchEndProps {
   gameId: string;
   transport: GameTransport;
+  /** Block and report (#435). Without it there is no Report or block. */
+  safety?: Safety;
   me: string;
   onHome: () => void;
 }
@@ -47,9 +53,11 @@ function Waiting() {
 function OnlineMatchEndView({
   store,
   gameId,
+  safety,
   onHome,
 }: OnlineMatchEndProps & { store: OnlineStore }) {
   const { t } = useTranslation();
+  const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
   const view = useOnlineStore(store, (s) => s.view);
   const side = useOnlineStore(store, (s) => s.side);
   const loadError = useOnlineStore(store, (s) => s.loadError);
@@ -57,18 +65,26 @@ function OnlineMatchEndView({
   if (side === null) return <MissingGame onHome={onHome} />;
   // A match that is not over yet belongs on the board.
   if (view.status !== 'finished') return <Redirect href={gameHref(gameId)} />;
+  const other = opponent(side);
+  const player: SafetyPlayer = { id: view.players[other], name: view.names[other] };
   return (
-    <MatchEndScreen
-      online={{
-        seats: onlineSeats(side, t, view.names[side === 'white' ? 'black' : 'white']),
-        me: side,
-        label: t('online.label', { game: t(`games.${view.choice}`) }),
-      }}
-      match={view.match}
-      // The result is read once per app run (#216).
-      announceKey={`online:${gameId}`}
-      onHome={onHome}
-    />
+    <>
+      <MatchEndScreen
+        online={{
+          seats: onlineSeats(side, t, view.names[other]),
+          me: side,
+          label: t('online.label', { game: t(`games.${view.choice}`) }),
+          ...(safety ? { onReportOrBlock: () => setReporting(player) } : {}),
+        }}
+        match={view.match}
+        // The result is read once per app run (#216).
+        announceKey={`online:${gameId}`}
+        onHome={onHome}
+      />
+      {safety ? (
+        <ReportOrBlockSheet player={reporting} safety={safety} onClose={() => setReporting(null)} />
+      ) : null}
+    </>
   );
 }
 

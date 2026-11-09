@@ -8,9 +8,10 @@
  * online account (`hasOnlineAccount`), and it never makes one. With no
  * online server (`auth` or `games` is `undefined`), no note, no session
  * or no finished match it shows nothing. A row has no tap: Home opens
- * only games in play.
+ * only games in play. With `safety`, each row ends with Report or block
+ * for the other player (#435).
  */
-import type { AuthProvider, GameTransport } from '@tavli/contracts';
+import type { AuthProvider, GameTransport, Safety } from '@tavli/contracts';
 import { useLocales } from 'expo-localization';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +22,7 @@ import { SectionTitle } from '@/components/SectionCard';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 import { OnlineGameList } from '@/features/online/OnlineGameList';
 import { useMyOnlineGames } from '@/features/online/myGames';
+import { ReportOrBlockSheet, safetyName, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { dateLocale, onlineHistoryRow } from './format';
 import { MatchList } from './MatchList';
@@ -28,6 +30,8 @@ import { MatchList } from './MatchList';
 export interface OnlineHistoryProps {
   auth: AuthProvider | undefined;
   games: GameTransport | undefined;
+  /** Block and report (#435). Without it the rows have no Report or block. */
+  safety?: Safety | undefined;
   /**
    * `true` while the list loads or holds a match, else `false`: History
    * shows "No matches yet" only with no local record and no online match.
@@ -35,21 +39,23 @@ export interface OnlineHistoryProps {
   onMatches?: (has: boolean) => void;
 }
 
-export function OnlineHistory({ auth, games, onMatches }: OnlineHistoryProps) {
+export function OnlineHistory({ auth, games, safety, onMatches }: OnlineHistoryProps) {
   // Read once when History opens: no note, no network call.
   const [account] = useState(hasOnlineAccount);
   if (!account || auth === undefined || games === undefined) return null;
-  return <FinishedOnlineMatches auth={auth} games={games} onMatches={onMatches} />;
+  return <FinishedOnlineMatches auth={auth} games={games} safety={safety} onMatches={onMatches} />;
 }
 
 interface FinishedOnlineMatchesProps {
   auth: AuthProvider;
   games: GameTransport;
+  safety: Safety | undefined;
   onMatches: ((has: boolean) => void) | undefined;
 }
 
-function FinishedOnlineMatches({ auth, games, onMatches }: FinishedOnlineMatchesProps) {
+function FinishedOnlineMatches({ auth, games, safety, onMatches }: FinishedOnlineMatchesProps) {
   const { t, i18n } = useTranslation();
+  const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
   const { state, retry } = useMyOnlineGames(auth, games, 'finished');
   const has = state.status === 'loading' || (state.status === 'loaded' && state.games.length > 0);
@@ -75,11 +81,27 @@ function FinishedOnlineMatches({ auth, games, onMatches }: FinishedOnlineMatches
                 ...onlineHistoryRow(game, t, locale),
                 key: game.gameId,
                 testID: `history-online-${game.gameId}`,
+                ...(safety
+                  ? {
+                      action: {
+                        icon: 'flag' as const,
+                        label: t('safety.actionLabel', {
+                          name: safetyName(game.opponentName, t),
+                        }),
+                        testID: `history-report-${game.gameId}`,
+                        onPress: () =>
+                          setReporting({ id: game.opponentId, name: game.opponentName }),
+                      },
+                    }
+                  : {}),
               }))}
             />
           )
         }
       />
+      {safety ? (
+        <ReportOrBlockSheet player={reporting} safety={safety} onClose={() => setReporting(null)} />
+      ) : null}
     </View>
   );
 }
