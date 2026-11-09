@@ -26,6 +26,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
+import { playerNameText } from '@/features/online/playerName';
 
 import { stateOfError, stateOfView, type InviteScreenState } from './inviteState';
 
@@ -172,7 +173,9 @@ function OpenInvite({ view, busy, failed, onAccept, onDecline }: OpenInviteProps
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
   const title = t('invite.open.title');
-  const from = t('invite.open.from');
+  const fromName = playerNameText(view.fromName, t);
+  const from =
+    fromName === null ? t('invite.open.from') : t('invite.open.fromName', { name: fromName });
   const rows = [
     { label: t('invite.open.game'), value: t(`games.${view.choice}`) },
     {

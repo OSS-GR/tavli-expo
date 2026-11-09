@@ -28,6 +28,11 @@
  *   id then gets `NOT_SIGNED_IN` where Convex checks that the account
  *   exists (`existingPlayer`): make, accept or decline an invite, and
  *   delete again.
+ * - Guest names (#400): like the Convex server, a player gets a guest
+ *   number when they first make an invite or start a game, and keeps it.
+ *   Views, lists and invites carry the names; a deleted player has none.
+ *   The numbers come from their own RNG (`nameRng`), so they never change
+ *   the dice of a seeded `rng`.
  *
  * Time comes from the `now` option. Nothing runs on a timer: call
  * `runDueTimeouts()` to apply the time outs whose deadline has passed (the
@@ -37,7 +42,7 @@
  * in-memory version of the Convex `expireInvite`).
  */
 
-import { normalizeInviteCode } from '@tavli/contracts';
+import { guestName, normalizeInviteCode } from '@tavli/contracts';
 import type {
   GameSummary,
   GameTransport,
@@ -49,7 +54,9 @@ import type {
   OnlineGameChoice,
   OnlineGameStatus,
   OnlineGameView,
+  PlayerName,
 } from '@tavli/contracts';
+import { createSeededRng } from '@tavli/engine';
 import type { FlowEvent, MatchFlow, PerPlayer, PlayerId, Rng } from '@tavli/engine';
 
 import {
@@ -97,6 +104,7 @@ import {
   toView,
 } from './online-game';
 import type { LoadedFlow, SavedDraft, SteppedFlow } from './online-game';
+import { namesOf, pickGuestNumber } from './names';
 import { latestGames, summarizeGame } from './summaries';
 
 export interface MemoryGameServerOptions {
@@ -104,6 +112,11 @@ export interface MemoryGameServerOptions {
   readonly rng: Rng;
   /** The server clock, in epoch milliseconds. */
   readonly now: () => number;
+  /**
+   * The guest numbers (#400). Default: a seeded RNG of its own, so the
+   * dice of `rng` stay the same with or without names.
+   */
+  readonly nameRng?: Rng;
 }
 
 /** One event of a game's log, like a row of the Convex `moves` table. */
@@ -173,6 +186,8 @@ export interface MemoryGameServer {
   getInvite(code: string): InviteView | null;
   /** The game as a client sees it (a copy), or `null` when there is no such game. */
   getGame(gameId: string): OnlineGameView | null;
+  /** The player's guest name (#400), or `null` before their first invite or game. For tests. */
+  nameOf(playerId: string): PlayerName | null;
   /** The event log of the game, oldest first (copies). `replay` rebuilds the game from it. */
   events(gameId: string): LoggedEvent[];
   /**
@@ -269,6 +284,7 @@ function toErrorData(error: unknown): unknown {
 
 export function createMemoryGameServer(options: MemoryGameServerOptions): MemoryGameServer {
   const { rng, now } = options;
+  const nameRng = options.nameRng ?? createSeededRng(400);
   const games = new Map<string, MemoryGame>();
   const listeners = new Set<Listener>();
   const listListeners = new Set<ListListener>();
@@ -280,6 +296,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const drafts = new Map<string, string>();
   /** Player ids whose data was deleted (#315), like a Better Auth user that is gone. */
   const deletedPlayers = new Set<string>();
+  /** The guest number of each player (#400), like the Convex `playerNames` table. */
+  const guestNumbers = new Map<string, string>();
   let nextId = 1;
 
   function draftOf(gameId: string): SavedDraft | null {
@@ -287,9 +305,23 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     return text === undefined ? null : (JSON.parse(text) as SavedDraft);
   }
 
+  /** Gives `playerId` a guest number, once (#400), like the Convex `ensureGuestNumber`. */
+  function ensureGuestNumber(playerId: string): void {
+    if (!guestNumbers.has(playerId)) guestNumbers.set(playerId, pickGuestNumber(nameRng));
+  }
+
+  function nameOf(playerId: string): PlayerName | null {
+    const number = guestNumbers.get(playerId);
+    return number === undefined ? null : guestName(number);
+  }
+
   /** The view input of `game`, without its flow. */
   function gameInput(game: MemoryGame) {
     return {
+      names: namesOf({
+        white: guestNumbers.get(game.players.white) ?? null,
+        black: guestNumbers.get(game.players.black) ?? null,
+      }),
       gameId: game.gameId,
       version: game.version,
       choice: game.choice,
@@ -546,6 +578,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     checkNewGame(callerId, players);
     checkTurnTimeMinutes(turnTimeMinutes);
     const flow = createOnlineMatch({ choice, targetPoints, players: copy(players) }, rng);
+    ensureGuestNumber(players.white);
+    ensureGuestNumber(players.black);
     const gameId = `game-${nextId}`;
     nextId += 1;
     const version = 1;
@@ -582,7 +616,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   function inviteView(text: string): InviteView | null {
     const code = normalizeInviteCode(text);
     const invite = code === null ? undefined : invites.get(code);
-    return invite === undefined ? null : toInviteView(invite, now());
+    return invite === undefined ? null : toInviteView(invite, now(), nameOf(invite.from));
   }
 
   /** Sends the view of `code` as it is now to `listener` on a later microtask, unless it stops first. */
@@ -642,6 +676,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     // throws before it saves anything.
     const invite = newInvite(options, '', now());
     const code = pickInviteCodeNow(rng, (taken) => invites.has(taken));
+    ensureGuestNumber(callerId);
     saveInvite({ ...invite, code });
     return code;
   }
@@ -659,7 +694,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       .filter((invite) => invite.from === playerId && invite.status === 'open')
       .filter((invite) => !isInviteExpired(invite, at))
       .reverse()
-      .map((invite) => toInviteView(invite, at));
+      .map((invite) => toInviteView(invite, at, nameOf(invite.from)));
   }
 
   /** Runs `step` on a later microtask; errors reject as plain data. */
@@ -769,6 +804,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       if (listener.playerId === playerId) sendInviteList(listener);
     }
     deletedPlayers.add(playerId);
+    guestNumbers.delete(playerId);
   }
 
   return {
@@ -785,6 +821,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     getInvite: (text) => copy(inviteView(text)),
 
     transportFor,
+
+    nameOf,
 
     getGame(gameId) {
       const game = games.get(gameId);

@@ -16,7 +16,7 @@ import {
   type MatchSetup,
 } from '@/features/match/setup';
 import { matchLabel } from '@/features/match/summary';
-import { gameScore, gameTitle } from '@/features/online/gameText';
+import { gameScore, gameTitle, opponentWonText } from '@/features/online/gameText';
 
 import type { HistoryRecord } from './records';
 import { winRate, type StatLine } from './stats';
@@ -187,7 +187,11 @@ export interface OnlineHistoryRow {
   readonly label: string;
 }
 
-/** One finished online match (#313). The other player is "your friend", as on Home. */
+/**
+ * One finished online match (#313). The other player has their name
+ * ("Guest 4821", #400), or is "your friend" when the server has none, as
+ * on Home.
+ */
 export function onlineHistoryRow(
   game: GameSummary,
   t: TFunction,
@@ -198,11 +202,7 @@ export function onlineHistoryRow(
   const target = t('home.continue.target', { target: game.targetPoints });
   const badge = game.winner === null ? null : game.winner === game.mySide ? 'won' : 'lost';
   const result =
-    badge === null
-      ? null
-      : badge === 'won'
-        ? t('history.online.youWon')
-        : t('history.online.friendWon');
+    badge === null ? null : badge === 'won' ? t('history.online.youWon') : opponentWonText(game, t);
   const date = formatDate(game.updatedAt, locale);
   const label = [title, score.spoken, target, result, date].filter(Boolean).join(', ');
   return { title, score: `${score.text} · ${target}`, badge, result, date, label };

@@ -150,15 +150,17 @@ describe('<OnlineHistory />', () => {
     expect(screen.getByRole('header', { name: 'Online' })).toBeOnTheScreen();
     expect(rowIds()).toEqual([lost, won]);
     expect(rowIds()).not.toContain(active);
+    // The friend has a guest name (#400).
+    const friend = `Guest ${onlineFake.guestNumber(FRIEND)}`;
     const lostRow = screen.getByTestId(`history-online-${lost}`);
     expect(lostRow).toHaveAccessibleName(
-      'Plakoto vs friend, 0 to 0, first to 5, Your friend won, Oct 28, 2026',
+      `Plakoto vs ${friend}, 0 to 0, first to 5, ${friend} won, Oct 28, 2026`,
     );
-    expect(within(lostRow).getByText('Your friend won')).toBeOnTheScreen();
+    expect(within(lostRow).getByText(`${friend} won`)).toBeOnTheScreen();
     expect(within(lostRow).getByText('0–0 · first to 5')).toBeOnTheScreen();
     const wonRow = screen.getByTestId(`history-online-${won}`);
     expect(wonRow).toHaveAccessibleName(
-      'Portes vs friend, 0 to 0, first to 5, You won, Oct 28, 2026',
+      `Portes vs ${friend}, 0 to 0, first to 5, You won, Oct 28, 2026`,
     );
     expect(within(wonRow).getByText('You won')).toBeOnTheScreen();
     // History opens no game: a row is no button.
@@ -312,11 +314,12 @@ describe('<OnlineHistory />', () => {
     });
     await show();
     expect(screen.getByRole('header', { name: 'Online' })).toBeOnTheScreen();
+    const friend = `Επισκέπτης ${onlineFake.guestNumber(FRIEND)}`;
     expect(screen.getByTestId(`history-online-${won}`)).toHaveAccessibleName(
-      /^Πόρτες με φίλο, 0 προς 0, στους 5, Κέρδισες, 28 Οκτ 2026$/,
+      new RegExp(`^Πόρτες · ${friend}, 0 προς 0, στους 5, Κέρδισες, 28 Οκτ 2026$`),
     );
     expect(screen.getByTestId(`history-online-${lost}`)).toHaveAccessibleName(
-      /^Πόρτες με φίλο, 0 προς 0, στους 5, Κέρδισε ο φίλος σου, /,
+      new RegExp(`^Πόρτες · ${friend}, 0 προς 0, στους 5, ${friend} κέρδισε, `),
     );
   });
 });

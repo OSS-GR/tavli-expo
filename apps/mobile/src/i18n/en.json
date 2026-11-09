@@ -52,8 +52,10 @@
     "online": {
       "title": "Your online games",
       "vsFriend": "{{game}} vs friend",
+      "vsName": "{{game}} vs {{name}}",
       "yourTurn": "Your turn",
       "waiting": "Waiting for your friend",
+      "waitingForName": "Waiting for {{name}}",
       "score": "{{me}}–{{friend}}",
       "scoreSpoken": "{{me}} to {{friend}}",
       "timeLeft": "{{time}} left",
@@ -243,7 +245,8 @@
     "online": {
       "title": "Online",
       "youWon": "You won",
-      "friendWon": "Your friend won"
+      "friendWon": "Your friend won",
+      "nameWon": "{{name}} won"
     }
   },
   "languages": {
@@ -303,9 +306,12 @@
   },
   "online": {
     "opponent": "Opponent",
+    "guestName": "Guest {{number}}",
     "waiting": "Waiting for Opponent",
+    "waitingForName": "Waiting for {{name}}",
     "status": {
       "waiting": "Waiting for Opponent…",
+      "waitingForName": "Waiting for {{name}}…",
       "sending": "Sending your turn…",
       "rolling": "Rolling the dice…"
     },
@@ -341,6 +347,7 @@
     "open": {
       "title": "Game invite",
       "from": "A friend invites you to an online match.",
+      "fromName": "{{name}} invites you to an online match.",
       "game": "Game",
       "length": "Match length",
       "lengthValue_one": "First to {{count}} point",

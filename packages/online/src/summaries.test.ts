@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { MAX_LISTED_GAMES } from '@tavli/contracts';
+import { MAX_LISTED_GAMES, guestName } from '@tavli/contracts';
 import type { GameSummary } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 
@@ -21,6 +21,7 @@ function input(choice: 'portes' | 'tavli' = 'portes'): SummaryInput {
     turnTimeMinutes: null,
     turnDeadline: 5000,
     players: PLAYERS,
+    names: { white: guestName('1111'), black: guestName('2222') },
     flow: createOnlineMatch({ choice, targetPoints: 3, players: PLAYERS }, rng),
     updatedAt: 1234,
   };
@@ -54,6 +55,7 @@ describe('summarizeGame', () => {
         winner: null,
         updatedAt: 1234,
         turnDeadline: 5000,
+        opponentName: guestName(side === 'white' ? '2222' : '1111'),
       });
     }
   });
@@ -72,10 +74,16 @@ describe('summarizeGame', () => {
     expect(finished.score).toEqual(flow.match.score);
   });
 
-  it('tells nothing about the other player but their side', () => {
+  it('tells nothing about the other player but their side and name', () => {
     const text = JSON.stringify(summarizeGame(input(), 'alice'));
     expect(text).not.toContain('bob');
     expect(text).not.toContain('alice');
+  });
+
+  it('gives no name for an opponent the server has none for (#400)', () => {
+    const game = { ...input(), names: { white: guestName('1111'), black: null } };
+    expect(summarizeGame(game, 'alice').opponentName).toBeNull();
+    expect(summarizeGame(game, 'bob').opponentName).toEqual(guestName('1111'));
   });
 
   it('refuses a player who is not in the game', () => {

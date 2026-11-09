@@ -18,6 +18,7 @@ import {
   isInviteErrorData,
 } from '../invite';
 import type { InviteErrorCode, InviteView, Invites, NewInvite } from '../invite';
+import { isGuestNumber } from '../player-name';
 
 /** The game of an invite the checks make. */
 export type InvitesContractGame = NewInvite;
@@ -522,6 +523,29 @@ export function invitesContract(): InvitesContractCheck[] {
         same([...a.errors, ...b.errors, ...friend.errors, ...early.errors], [], 'the errors');
         b.stop();
         friend.stop();
+      },
+    },
+    {
+      name: 'an invite names the inviter as a guest, with the same number on every invite (#400)',
+      run: async (subject) => {
+        const code = await createFrom(subject);
+        const view = await viewOf(subject.invitesFor('friend'), code);
+        const name = view.fromName;
+        if (name === null || name.kind !== 'guest' || !isGuestNumber(name.number)) {
+          throw new Error(`view.fromName: expected a guest name, got ${JSON.stringify(name)}`);
+        }
+        same(
+          (await viewOf(subject.invitesFor('inviter'), code)).fromName,
+          name,
+          "the inviter's view",
+        );
+        const second = await createFrom(subject);
+        same((await viewOf(subject.invitesFor('other'), second)).fromName, name, 'a second invite');
+        same(
+          (await subject.invitesFor('inviter').listMyInvites()).map((invite) => invite.fromName),
+          [name, name],
+          'the open invites',
+        );
       },
     },
   ];

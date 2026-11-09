@@ -557,7 +557,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
         <MatchEndScreen
           match={view.match}
           online={{
-            seats: onlineSeats('white', i18n.t),
+            seats: onlineSeats('white', i18n.t, view.names.black),
             me: 'white',
             label: i18n.t('online.label', { game: i18n.t('games.portes') }),
           }}

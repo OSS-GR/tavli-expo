@@ -1,4 +1,4 @@
-import { createMemoryStorage, type GameSummary, type Storage } from '@tavli/contracts';
+import { createMemoryStorage, guestName, type GameSummary, type Storage } from '@tavli/contracts';
 import {
   VARIANT_REGISTRY,
   createSeededRng,
@@ -1287,6 +1287,7 @@ describe('online history texts (#313)', () => {
     winner: 'black',
     updatedAt: Date.UTC(2026, 9, 28, 12),
     turnDeadline: null,
+    opponentName: null,
   };
 
   it('names the winner, with your points first', () => {
@@ -1304,6 +1305,23 @@ describe('online history texts (#313)', () => {
       result: 'Your friend won',
       label: 'Plakoto vs friend, 2 to 5, first to 5, Your friend won, 28 Oct 2026',
     });
+  });
+
+  it('names the other player by their guest name (#400)', async () => {
+    const named = { ...finished, mySide: 'white' as const, opponentName: guestName('4821') };
+    expect(onlineHistoryRow(named, t, 'en-GB')).toMatchObject({
+      title: 'Plakoto vs Guest 4821',
+      result: 'Guest 4821 won',
+      label: 'Plakoto vs Guest 4821, 2 to 5, first to 5, Guest 4821 won, 28 Oct 2026',
+    });
+    await i18n.changeLanguage('el');
+    try {
+      expect(onlineHistoryRow(named, t, 'el').label).toBe(
+        'Πλακωτό · Επισκέπτης 4821, 2 προς 5, στους 5, Επισκέπτης 4821 κέρδισε, 28 Οκτ 2026',
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('shows no result when the server gives no winner', () => {

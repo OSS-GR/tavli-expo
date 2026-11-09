@@ -33,6 +33,7 @@ import type {
   GameTransportErrorCode,
   OnlineGameChoice,
   OnlineGameView,
+  PlayerName,
   TurnDraft,
 } from '@tavli/contracts';
 import {
@@ -480,6 +481,8 @@ export interface ViewInput {
    * when it belongs to `version` and the server waits for a move.
    */
   readonly draft?: SavedDraft | null;
+  /** The name of each side (#400, `namesOf`). */
+  readonly names: PerPlayer<PlayerName | null>;
 }
 
 /** A draft as a server keeps it (#374): the game version it belongs to. */
@@ -508,6 +511,7 @@ export function toView(input: ViewInput): OnlineGameView {
     turnTimeMinutes,
     turnDeadline: finished ? null : turnDeadline,
     players,
+    names: input.names,
     match: flow.match,
     game: flow.game,
     previousGame,

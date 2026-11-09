@@ -51,6 +51,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import { existingPlayer, signedInPlayer } from './caller';
 import { insertGame } from './games';
 import { createCryptoRng } from './model/cryptoRng';
+import { ensureGuestNumber, nameOf } from './playerNames';
 import { gameChoice, gameTurnTimeMinutes } from './schema';
 
 /** Maps a Convex invite row to `InviteRecord`, defaulting `turnTimeMinutes` (#183). */
@@ -144,6 +145,8 @@ export const createInvite = mutation({
     );
     const options = { from: callerId, choice, targetPoints, turnTimeMinutes };
     const invite = guarded(() => newInvite(options, code, now));
+    // The invite names the inviter (#400).
+    await ensureGuestNumber(ctx, callerId);
     const inviteId = await ctx.db.insert('invites', { ...invite, gameId: null, answeredBy: null });
     await ctx.scheduler.runAt(invite.expiresAt, internal.invites.expireInvite, { inviteId });
     return code;
@@ -161,7 +164,8 @@ export const getInvite = query({
     const code = normalizeInviteCode(text);
     if (code === null) return null;
     const invite = await findByCode(ctx, code);
-    return invite === null ? null : toInviteView(toInviteRecord(invite), Date.now());
+    if (invite === null) return null;
+    return toInviteView(toInviteRecord(invite), Date.now(), await nameOf(ctx, invite.from));
   },
 });
 
@@ -226,9 +230,11 @@ export const listMyInvites = query({
     const callerId = await signedInPlayer(ctx);
     const now = Date.now();
     const open = (await openInvitesOf(ctx, callerId, now)).map(toInviteRecord);
+    // All from the caller: one name.
+    const fromName = await nameOf(ctx, callerId);
     return open
       .filter((invite) => !isInviteExpired(invite, now))
-      .map((invite) => toInviteView(invite, now));
+      .map((invite) => toInviteView(invite, now, fromName));
   },
 });
 

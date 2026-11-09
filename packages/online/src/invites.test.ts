@@ -3,7 +3,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { INVITE_CODE_ALPHABET, INVITE_TIME_MS, normalizeInviteCode } from '@tavli/contracts';
+import {
+  INVITE_CODE_ALPHABET,
+  INVITE_TIME_MS,
+  guestName,
+  normalizeInviteCode,
+} from '@tavli/contracts';
 import type { InviteErrorCode, InviteStatus } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import type { Rng } from '@tavli/engine';
@@ -232,9 +237,10 @@ describe('checkCancel', () => {
 describe('toInviteView', () => {
   it('shows the invite fields, and expired once the time is up', () => {
     const open = invite();
-    expect(toInviteView(open, NOW)).toEqual({
+    expect(toInviteView(open, NOW, guestName('4821'))).toEqual({
       code: 'ABCD2345',
       from: 'alice',
+      fromName: { kind: 'guest', number: '4821' },
       choice: 'portes',
       targetPoints: 3,
       turnTimeMinutes: 1,
@@ -242,8 +248,8 @@ describe('toInviteView', () => {
       expiresAt: NOW + INVITE_TIME_MS,
       gameId: null,
     });
-    expect(toInviteView(open, open.expiresAt).status).toBe('expired');
-    expect(toInviteView({ ...invite('accepted'), gameId: 'g1' }, NOW)).toMatchObject({
+    expect(toInviteView(open, open.expiresAt, null).status).toBe('expired');
+    expect(toInviteView({ ...invite('accepted'), gameId: 'g1' }, NOW, null)).toMatchObject({
       status: 'accepted',
       gameId: 'g1',
     });

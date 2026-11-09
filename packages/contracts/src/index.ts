@@ -105,6 +105,8 @@ export type {
   AuthUser,
   MemoryAuthStore,
 } from './auth';
+export { guestName, isGuestNumber } from './player-name';
+export type { GuestName, PlayerName } from './player-name';
 export { createMemoryAppleSheet } from './apple-sheet';
 export type { AppleSheet, AppleSheetProof, MemoryAppleSheet } from './apple-sheet';
 export type { OnlineData } from './online-data';

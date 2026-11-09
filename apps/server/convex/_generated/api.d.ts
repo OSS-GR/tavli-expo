@@ -25,6 +25,7 @@ import type * as model_appleTokens from "../model/appleTokens.js";
 import type * as model_cryptoRng from "../model/cryptoRng.js";
 import type * as model_keyNonce from "../model/keyNonce.js";
 import type * as model_push from "../model/push.js";
+import type * as playerNames from "../playerNames.js";
 import type * as push from "../push.js";
 
 import type {
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   "model/cryptoRng": typeof model_cryptoRng;
   "model/keyNonce": typeof model_keyNonce;
   "model/push": typeof model_push;
+  playerNames: typeof playerNames;
   push: typeof push;
 }>;
 

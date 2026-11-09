@@ -142,6 +142,17 @@ export default defineSchema({
     .index('by_token', ['token']),
 
   /**
+   * Each player's guest number (#400): four digits, shown to the other
+   * player as "Guest 4821". One row per player, made once
+   * (`ensureGuestNumber` in `playerNames.ts`), deleted with the account.
+   */
+  playerNames: defineTable({
+    playerId: v.string(),
+    /** `1000` to `9999` (`pickGuestNumber`). Not unique. */
+    guestNumber: v.string(),
+  }).index('by_player', ['playerId']),
+
+  /**
    * Who owns each sign-in key (#397): one row per Apple id (later Google).
    * Better Auth's `account` table has no unique index, so two users could
    * get the same key. Every new key goes through `claimKey`

@@ -16,7 +16,7 @@ Tavlaki is a Greek backgammon (tavli) app for iPhone and Android. This policy sa
 
 - You do not need an account to play on your phone.
 - Your settings and the games on your phone stay on your phone.
-- **Online games with a friend** need a free guest account on our server. The app makes it only when you make or open an invite. It has a random user id, and no name and no email. The server keeps your invites and online games under that id.
+- **Online games with a friend** need a free guest account on our server. The app makes it only when you make or open an invite. It has a random user id and a random guest name, such as "Guest 4821". It has no real name and no email. The server keeps your invites and online games under that id.
 - You can **delete your online data** in the app at any time: **Settings → Privacy → Delete my online data**.
 - **Turn notifications** are off until you turn them on. The app offers them only after you make or accept an invite for an async game. If you turn them on, our server keeps your phone's push token, to tell you when it is your turn or your game is over.
 - On the first launch, the app asks if it may send **anonymous usage data**. You choose **Allow usage data** or **Don't allow**. You can change your answer any time in **Settings → Privacy**.
@@ -123,7 +123,8 @@ The switch does not cover online games with a friend and their turn notification
 Only if you play a friend online. When you tap **Make an invite**, or open an invite link, the app asks how you want to sign in: **Continue with Apple** (on iPhone) or **Continue as a guest**. **Not now** signs in nothing. Then the app makes your account on our game server, once. The server runs on Convex, in the EU region `eu-west-1` (Ireland). Sign-in goes through Better Auth, on the same server.
 
 - Every account has a **random user id**, made by the server.
-- A **guest account** has no name and no email. (The sign-in software fills in a made-up placeholder for both.) Only this phone can open it.
+- Every account also gets a **guest name**: "Guest" and 4 random digits (for example "Guest 4821"). The server picks the digits once, when you make your first invite or start your first online game. You do not pick them, and they do not come from your phone. Other players may have the same number. Your friend sees it on your invite, in the game and in their lists of online games. Anyone who signs in with your invite code sees it on the invite too.
+- A **guest account** has no real name and no email. (The sign-in software fills in a made-up placeholder for both.) Only this phone can open it.
 - **Sign in with Apple** (only if you pick it): Apple gives our server your **Apple id** (a random id Apple makes for Tavlaki) and an **email**: your own, or a relay address from Apple if you pick **Hide My Email**. The server keeps both with your account, and the sign-in token from Apple's sheet, encrypted (it holds the same Apple id and email). It also keeps a token from Apple, encrypted, while the Apple sign-in stays on your account. We keep that token only to cancel your Sign in with Apple for Tavlaki at Apple when you delete your online data. We never keep your name or photo from Apple, and other players never see your email. With Apple you can sign in to the same account on a new phone. If you stop using Sign in with Apple for Tavlaki in your Apple settings, Apple tells our server, and the server removes that sign-in (and your online data, if it was your only sign-in).
 - The server keeps your **invites** (the invite code, the game, the points to win, the time limit, if a friend accepted or declined, and when it expires) and your **online games** (the two players' user ids, the rules, every move and roll, the score, and the turn times) under that user id. Your friend's app sees the invite and the game you play together. While you play a turn, the server also keeps the moves you made so far, so your friend sees each move as you make it, also a move you take back. The next saved turn deletes them.
 - The server keeps your **sign-in session**: a random session token, when it expires, and, as the sign-in software records it, the IP address and the app's user agent (the app name and the phone system) when the session was made.
@@ -140,12 +141,13 @@ In the app, go to **Settings → Privacy** and tap **Delete my online data**. Th
 - resigns your online games in progress, so you lose them and your friend wins;
 - deletes the invites you made, so nobody can accept them;
 - deletes your push tokens, so turn notifications stop;
+- deletes your guest name;
 - deletes your account and its sign-in sessions, with Apple's sign-in: the Apple id, the email and Apple's tokens;
 - cancels your Sign in with Apple for Tavlaki at Apple, if you used it.
 
-Then the app signs out and deletes the sign-in cookie on your phone. If you play online again, you sign in again, and the app makes a new account with a new user id.
+Then the app signs out and deletes the sign-in cookie on your phone. If you play online again, you sign in again, and the app makes a new account with a new user id and a new guest name.
 
-What stays: finished online games (with their moves) stay for the other player. They hold your old random user id, but no name and no email, and once the account is gone that id leads to nobody. An invite a friend made and you answered stays with that friend. The games and the history on your phone stay too.
+What stays: finished online games (with their moves) stay for the other player. They hold your old random user id, but no name and no email (your friend's app then shows no name for you), and once the account is gone that id leads to nobody. An invite a friend made and you answered stays with that friend. The games and the history on your phone stay too.
 
 ### Turn notifications (Expo)
 

@@ -171,6 +171,8 @@ describe('deleteMyAccount', () => {
 
     expect(await authRows(t, 'user', alice)).toHaveLength(1);
     expect(await authRows(t, 'session', alice)).toHaveLength(1);
+    const bobsName = (await as(t, alice).query(api.games.getGame, { gameId: active }))?.names.black;
+    expect(bobsName?.kind).toBe('guest');
     expect(await authRows(t, 'account', alice)).toHaveLength(1);
 
     await flush(t);
@@ -202,6 +204,11 @@ describe('deleteMyAccount', () => {
     // Alice's push tokens are gone; Bob's stays.
     const tokens = await t.run(async (ctx) => await ctx.db.query('pushTokens').collect());
     expect(tokens.map((row) => row.token)).toEqual(['ExponentPushToken[bob-phone]']);
+
+    // Alice's guest number is gone (#400): Bob's view names only himself.
+    const names = await t.run(async (ctx) => await ctx.db.query('playerNames').collect());
+    expect(names.map((row) => row.playerId)).toEqual([bob]);
+    expect(kept?.names).toEqual({ white: bobsName, black: null });
 
     // The Better Auth user, its session and its account are gone; Bob's stay.
     expect(await authRows(t, 'user', alice)).toEqual([]);

@@ -9,6 +9,7 @@
  */
 
 import type { OnlineGameChoice } from './game-transport';
+import type { PlayerName } from './player-name';
 
 /**
  * How long an invite stays open, in milliseconds: 24 hours. Then it
@@ -59,6 +60,8 @@ export interface InviteView {
   readonly code: string;
   /** The player id of the inviter. The inviter plays white. */
   readonly from: string;
+  /** The inviter's name (#400): "Guest 4821". `null` when the server has none. */
+  readonly fromName: PlayerName | null;
   /** The game the inviter picked. */
   readonly choice: OnlineGameChoice;
   /** The match length in points. */

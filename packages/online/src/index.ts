@@ -10,6 +10,7 @@
  * `docs/architecture/online-game-service.md`.
  */
 
+export { NO_NAMES, namesOf, pickGuestNumber } from './names';
 export {
   OnlineGameError,
   advance,
