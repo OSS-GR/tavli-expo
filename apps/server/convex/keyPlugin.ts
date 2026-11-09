@@ -119,13 +119,16 @@ export interface KeyPluginOptions {
     code: string;
     accountId: string;
   }) => Promise<string | null>;
-  /** Keeps a token, encrypted already (`saveAppleToken` in `appleTokens.ts`). */
+  /**
+   * Keeps a token, encrypted already (`saveAppleToken` in `appleTokens.ts`).
+   * `false` when the key is gone by then: nothing is kept.
+   */
   readonly saveAppleToken: (token: {
     userId: string;
     accountId: string;
     clientId: string;
     refreshToken: string;
-  }) => Promise<void>;
+  }) => Promise<boolean>;
 }
 
 export function keyPlugin(options: KeyPluginOptions) {
@@ -259,12 +262,14 @@ export function keyPlugin(options: KeyPluginOptions) {
           if (typeof refreshToken !== 'string' || refreshToken === '') {
             throw keyError('UNAUTHORIZED', 'INVALID_CODE');
           }
-          await options.saveAppleToken({
+          const saved = await options.saveAppleToken({
             userId,
             accountId: key.accountId,
             clientId,
             refreshToken,
           });
+          // The key went while Apple traded the code.
+          if (!saved) throw keyError('BAD_REQUEST', 'NO_KEY');
           return ctx.json({ saved: true });
         },
       ),

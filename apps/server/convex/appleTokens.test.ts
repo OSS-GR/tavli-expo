@@ -8,7 +8,7 @@ import type { CryptoKey } from 'jose';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
-import { REVOKE_RETRY_MS, REVOKE_TRIES, setAppleTokenClient } from './appleTokens';
+import { REVOKE_TRIES, REVOKE_WAITS_MS, setAppleTokenClient } from './appleTokens';
 import { APPLE_ISSUER } from './model/appleIdToken';
 import type { AppleTokenClient } from './model/appleTokens';
 import {
@@ -96,6 +96,14 @@ afterEach(() => {
 async function flush(t: Convex) {
   vi.advanceTimersByTime(0);
   await t.finishInProgressScheduledFunctions();
+}
+
+/** Runs every later try of the revoke, and the drop after the last. */
+async function runRetries(t: Convex) {
+  for (const wait of [...REVOKE_WAITS_MS, REVOKE_WAITS_MS[0]]) {
+    vi.advanceTimersByTime(wait);
+    await t.finishInProgressScheduledFunctions();
+  }
 }
 
 async function tokenRows(t: Convex) {
@@ -212,6 +220,34 @@ describe('/key/apple-code', () => {
     expect(tokens.revoked).toEqual([]);
   });
 
+  it('keeps nothing when the key or the account goes while Apple trades the code', async () => {
+    const t = setup();
+    const phone = newPhone();
+    const id = userOf(await signInWithApple(t, apple, phone, 'apple-ann')).id;
+    tokens.codes.set('ann', { sub: 'apple-ann', refreshToken: 'rt-ann' });
+    const exchange = tokens.exchangeCode;
+    tokens.exchangeCode = async (request) => {
+      await t.withIdentity({ subject: id }).mutation(api.account.deleteMyAccount, {});
+      return await exchange(request);
+    };
+    const reply = await call(t, phone, 'key/apple-code', {
+      authorizationCode: 'ann',
+      clientId: 'com.tavlaki',
+    });
+    expect(reply).toMatchObject({ status: 400, body: { code: 'NO_KEY' } });
+    expect(await tokenRows(t)).toEqual([]);
+    // The save checks the key and its user in the same transaction.
+    const row = { accountId: 'apple-ann', clientId: 'com.tavlaki', refreshToken: 'x' };
+    expect(await t.mutation(internal.appleTokens.saveAppleToken, { ...row, userId: id })).toBe(
+      false,
+    );
+    const bob = userOf(await signInWithApple(t, apple, newPhone(), 'apple-bob')).id;
+    expect(await t.mutation(internal.appleTokens.saveAppleToken, { ...row, userId: bob })).toBe(
+      false,
+    );
+    expect(await tokenRows(t)).toEqual([]);
+  });
+
   it('keeps nothing without the APPLE_* key in the env', async () => {
     const t = setup();
     vi.stubEnv('APPLE_PRIVATE_KEY', '');
@@ -261,7 +297,7 @@ describe('the revoke', () => {
     expect(await revokeRows(t)).toEqual([]);
   });
 
-  it('a failed revoke tries once more, then drops the token and logs no token or id', async () => {
+  it('a failed revoke tries again over about an hour, then drops the token and logs no token or id', async () => {
     const t = setup();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     tokens.revokeAnswer = false;
@@ -271,15 +307,33 @@ describe('the revoke', () => {
     expect(tokens.revoked).toHaveLength(1);
     expect(await revokeRows(t)).toMatchObject([{ attempts: 1 }]);
 
-    vi.advanceTimersByTime(REVOKE_RETRY_MS);
-    await t.finishInProgressScheduledFunctions();
+    await runRetries(t);
     expect(tokens.revoked).toHaveLength(REVOKE_TRIES);
+    expect(tokens.revoked.map((r) => r.refreshToken)).toEqual(Array(REVOKE_TRIES).fill('rt-ann'));
     expect(await revokeRows(t)).toEqual([]);
     const logged = JSON.stringify(warn.mock.calls);
     expect(logged).toContain('apple revoke failed');
     expect(logged).not.toContain('rt-ann');
     expect(logged).not.toContain('apple-ann');
     expect(logged).not.toContain(id);
+  });
+
+  it('an error in a try logs only its name, and the next try still runs', async () => {
+    const t = setup();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const id = await signInWithCode(t, newPhone(), 'apple-ann', 'rt-ann');
+    tokens.revoke = async () => {
+      throw new Error('boom rt-ann apple-ann');
+    };
+    await t.withIdentity({ subject: id }).mutation(api.account.deleteMyAccount, {});
+    await flush(t);
+    expect(await revokeRows(t)).toMatchObject([{ attempts: 1 }]);
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).toContain('apple revoke error');
+    expect(logged).not.toContain('rt-ann');
+    expect(logged).not.toContain('apple-ann');
+    await runRetries(t);
+    expect(await revokeRows(t)).toEqual([]);
   });
 
   it('without the APPLE_* key the token is dropped with an error in the log', async () => {
@@ -310,10 +364,7 @@ describe('the revoke', () => {
     expect(steps.some((job) => job.name.includes('dropRevoke'))).toBe(true);
     tokens.revokeAnswer = false;
     await flush(t);
-    vi.advanceTimersByTime(REVOKE_RETRY_MS);
-    await t.finishInProgressScheduledFunctions();
-    vi.advanceTimersByTime(REVOKE_RETRY_MS);
-    await t.finishInProgressScheduledFunctions();
+    await runRetries(t);
     expect(await revokeRows(t)).toEqual([]);
   });
 
@@ -356,11 +407,13 @@ describe('/apple/notifications', () => {
     const t = setup();
     const phone = newPhone();
     await signInWithCode(t, phone, 'apple-ann', 'rt-ann');
-    expect(await notice(t, { type: 'account-delete', sub: 'apple-ann' })).toBe(200);
+    expect(
+      await notice(t, { type: 'account-delete', sub: 'apple-ann', event_time: Date.now() }),
+    ).toBe(200);
     expect((await call(t, phone, 'key/list')).status).toBe(401);
   });
 
-  it('changes nothing for an email notice, an unknown Apple id or an old notice', async () => {
+  it('changes nothing for an email notice, an unknown Apple id, an old notice or one with no time', async () => {
     const t = setup();
     const phone = newPhone();
     await signInWithCode(t, phone, 'apple-ann', 'rt-ann');
@@ -370,6 +423,8 @@ describe('/apple/notifications', () => {
     expect(
       await notice(t, { type: 'consent-revoked', sub: 'apple-ann', event_time: START - 60_000 }),
     ).toBe(200);
+    // With no time it could be such an old notice too.
+    expect(await notice(t, { type: 'account-delete', sub: 'apple-ann' })).toBe(200);
     expect((await call(t, phone, 'key/list')).status).toBe(200);
     expect(await tokenRows(t)).toHaveLength(1);
   });

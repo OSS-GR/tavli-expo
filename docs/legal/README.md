@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90). Last review: 2026-11-02 (#315, Delete my online data).
+> The privacy policy for the app and the stores (issue #90). Last review: 2026-11-09 (#398, the Apple token in "Coming later").
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy before it goes live.
 
@@ -67,5 +67,6 @@ The policy's "Delete your online data" section (all four files) and the store an
 - Better Auth keeps the IP address and the user agent on each sign-in session. If we do not need them, turn that off on the server (Better Auth's `advanced.ipAddress.disableIpTracking`) and update the policy.
 - Android backup: decide if app data (the install id, saved games) should be left out of Android Auto Backup.
 - When sign-in with Apple, Google or an email link, friends or EAS Update go live, update the "Coming later" section first.
+- Sign in with Apple (#397, #398, #401): the server can keep Apple's refresh token, encrypted (`appleTokens`), to revoke it on delete, and takes Apple's notices. No token is kept until the app sends the sign-in code (#401). When the Apple sign-in goes live, move that text out of "Coming later" and update the store answers and the `app.json` manifest.
 - Online play with a friend is live (#281). The policy's "Online games with a friend (Convex)" section, the store answers and the iOS manifest (`NSPrivacyCollectedDataTypeUserID`, `NSPrivacyCollectedDataTypeGameplayContent`) describe it. The guest account is made only by `signInForOnline` (`apps/mobile/src/features/online/account.ts`), when the player taps **Make an invite** or **Show the invite**. A new screen that makes a guest, or a new server table with player data, updates the policy in the same PR.
 - Turn notifications are on for all online games (#285, #317). The policy's "Turn notifications (Expo)" section, the Expo row in the vendor table, the store answers and the iOS manifest (`NSPrivacyCollectedDataTypeDeviceID`) describe them. The app asks only after the player makes or accepts an invite (`apps/mobile/src/features/notifications/`), and sends the push token only to our server, and only after the player taps **Turn on** in the app (also on a phone that allows pushes already, such as Android 12). A change to when the app asks, or to what the server keeps per token, updates the policy in the same PR.

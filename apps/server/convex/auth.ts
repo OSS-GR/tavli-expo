@@ -212,9 +212,8 @@ export function createAuth(ctx: AuthCtx) {
         },
         appleClientIds,
         exchangeAppleCode,
-        saveAppleToken: async (token) => {
-          await actionCtx(ctx).runMutation(internal.appleTokens.saveAppleToken, token);
-        },
+        saveAppleToken: async (token) =>
+          await actionCtx(ctx).runMutation(internal.appleTokens.saveAppleToken, token),
       }),
     ],
   });

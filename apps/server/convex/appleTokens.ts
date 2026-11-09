@@ -11,10 +11,10 @@
  *   schedule `revokeAppleToken` with the queue row's id only (never the
  *   token). So the data delete never waits on Apple, and a failed revoke
  *   never undoes it.
- * - `revokeAppleToken`: calls Apple, tries once more after
- *   `REVOKE_RETRY_MS`, then drops the row. Each try books its next step
- *   first (`startRevoke`), so a crashed try leaves no row behind. The log never holds the
- *   token, the email or the Apple id.
+ * - `revokeAppleToken`: calls Apple, tries again after each of
+ *   `REVOKE_WAITS_MS` (about an hour in all), then drops the row. Each try
+ *   books its next step first (`startRevoke`), so a crashed try leaves no
+ *   row behind. The log never holds the token, the email or the Apple id.
  * - `appleNotifications`: Apple's server-to-server notices (`http.ts`).
  *   When a person stops using Sign in with Apple for the app, or deletes
  *   their Apple account, the key goes; with its last key, the account.
@@ -40,11 +40,14 @@ import {
 } from './model/appleTokens';
 import type { AppleTokenClient } from './model/appleTokens';
 
-/** How long the second try of a revoke waits. */
-export const REVOKE_RETRY_MS = 30 * 1000;
+/** The wait before each later try of a revoke, so a short outage at Apple does not lose it. */
+export const REVOKE_WAITS_MS = [30 * 1000, 5 * 60 * 1000, 60 * 60 * 1000] as const;
 
-/** Tries per revoke: the first, and one more. */
-export const REVOKE_TRIES = 2;
+/** Tries per revoke: the first, and one after each wait. */
+export const REVOKE_TRIES = REVOKE_WAITS_MS.length + 1;
+
+/** How long the drop waits after the last try starts: longer than one call to Apple. */
+const DROP_AFTER_MS = REVOKE_WAITS_MS[0];
 
 let client: AppleTokenClient | null = null;
 
@@ -68,6 +71,11 @@ export function appleClientIds(): string[] {
  * Keeps the token of `userId`'s Apple key `accountId`. A newer token
  * replaces the old one, which is dropped, not revoked: a revoke ends the
  * person's Sign in with Apple for the app, not just that token.
+ *
+ * The key is checked again here, in the same transaction as the insert:
+ * the route traded the code with Apple first, and the key or the account
+ * may have gone in the meantime (key removal, account delete, Apple's
+ * notice). Then nothing is kept, and the answer is `false`.
  */
 export const saveAppleToken = internalMutation({
   args: {
@@ -76,15 +84,21 @@ export const saveAppleToken = internalMutation({
     clientId: v.string(),
     refreshToken: v.string(),
   },
-  returns: v.null(),
+  returns: v.boolean(),
   handler: async (ctx, args) => {
+    const { internalAdapter } = await createAuth(ctx).$context;
+    const key = await internalAdapter.findAccountByKey({
+      providerId: 'apple',
+      accountId: args.accountId,
+    });
+    if (key === null || key.userId !== args.userId) return false;
     const old = await ctx.db
       .query('appleTokens')
       .withIndex('by_account', (q) => q.eq('accountId', args.accountId))
       .collect();
     for (const row of old) await ctx.db.delete(row._id);
     await ctx.db.insert('appleTokens', { ...args, savedAt: Date.now() });
-    return null;
+    return true;
   },
 });
 
@@ -139,9 +153,10 @@ export const startRevoke = internalMutation({
     const attempts = row.attempts + 1;
     await ctx.db.patch(id, { attempts });
     if (attempts < REVOKE_TRIES) {
-      await ctx.scheduler.runAfter(REVOKE_RETRY_MS, internal.appleTokens.revokeAppleToken, { id });
+      const wait = REVOKE_WAITS_MS[attempts - 1] ?? DROP_AFTER_MS;
+      await ctx.scheduler.runAfter(wait, internal.appleTokens.revokeAppleToken, { id });
     } else {
-      await ctx.scheduler.runAfter(REVOKE_RETRY_MS, internal.appleTokens.dropRevoke, { id });
+      await ctx.scheduler.runAfter(DROP_AFTER_MS, internal.appleTokens.dropRevoke, { id });
     }
     return { clientId: row.clientId, refreshToken: row.refreshToken, attempts };
   },
@@ -179,8 +194,13 @@ export const revokeAppleToken = internalAction({
         clientSecret,
         refreshToken,
       });
-    } catch {
+    } catch (error) {
       // A bad key or a token we cannot read: the same as Apple saying no.
+      // Only the error's name: its text could quote the key or the token.
+      console.warn('apple revoke error', {
+        error: error instanceof Error ? error.name : 'unknown',
+        attempts: row.attempts,
+      });
       revoked = false;
     }
     if (revoked || row.attempts >= REVOKE_TRIES) {
@@ -206,13 +226,13 @@ export type EndKeyResult = (typeof END_KEY_RESULTS)[number];
  * ms) is about an older key of the same Apple id, and changes nothing.
  */
 export const endAppleKey = internalMutation({
-  args: { accountId: v.string(), eventTime: v.optional(v.number()) },
+  args: { accountId: v.string(), eventTime: v.number() },
   returns: v.union(...END_KEY_RESULTS.map((result) => v.literal(result))),
   handler: async (ctx, { accountId, eventTime }): Promise<EndKeyResult> => {
     const { internalAdapter } = await createAuth(ctx).$context;
     const account = await internalAdapter.findAccountByKey({ providerId: 'apple', accountId });
     if (account === null) return 'no-key';
-    if (eventTime !== undefined && eventTime < new Date(account.createdAt).getTime()) {
+    if (eventTime < new Date(account.createdAt).getTime()) {
       return 'stale';
     }
     const tokens = await ctx.db
@@ -237,8 +257,8 @@ export const endAppleKey = internalMutation({
  * `POST /apple/notifications`: Apple's server-to-server notices (set on
  * the App ID in Apple's developer site). A notice that is not Apple's
  * signed JWT for one of our apps gets 400. Only `consent-revoked` and
- * `account-delete` change anything; the email notices are read for
- * nothing.
+ * `account-delete` with an `event_time` change anything; the email
+ * notices are read for nothing.
  */
 export const appleNotifications = httpAction(async (ctx, request) => {
   let body: unknown = null;
@@ -252,10 +272,12 @@ export const appleNotifications = httpAction(async (ctx, request) => {
     keys: currentAppleKeys(),
   });
   if (notice === null) return new Response(null, { status: 400 });
-  if (endsKey(notice)) {
+  // Apple puts the time in every notice. One without it could be an old
+  // notice about an earlier key of the same Apple id, so it changes nothing.
+  if (endsKey(notice) && notice.eventTime !== undefined) {
     await ctx.runMutation(internal.appleTokens.endAppleKey, {
       accountId: notice.sub,
-      ...(notice.eventTime === undefined ? {} : { eventTime: notice.eventTime }),
+      eventTime: notice.eventTime,
     });
   }
   return new Response(null, { status: 200 });
