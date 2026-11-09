@@ -208,7 +208,8 @@ One row per report (#320). The owner reads them in the Convex dashboard and dele
 Issue #320, App Store guideline 1.2: usernames are content that players write, so a player can block and report another. The pure checks are in `packages/online/src/safety.ts`; both servers run them. The app screens are #435.
 
 - **Who.** Only a player you met: a game between the two (`games.by_pair`, both side orders), or an invite one of you answered (accepted or declined) from the other (`invites.by_answer`). The other account must still exist. Else `UNKNOWN_PLAYER`; yourself or an empty id is `BAD_REQUEST`. So a stranger who learns an id cannot block or report it.
-- **A block** hides the blocked player's name **from the blocker only**: `getGame` names, `listMyGames` `opponentName` and `getInvite` `fromName` say `null`. `acceptInvite` refuses an invite between the two, both ways (`BLOCKED`, through `checkNotBlocked`); the invite stays open. Running games go on, and the blocked player is not told. A second block or unblock changes nothing. At most `MAX_BLOCKS` (200): `TOO_MANY_BLOCKS`.
+- **A block** hides the blocked player's name **from the blocker only**: `getGame` names (`playerNamesSeenBy`), `listMyGames` `opponentName` and `getInvite` `fromName` (`nameSeenBy`) say `null`. No game between the two starts from an invite (`checkNotBlocked`): the blocker's own accept gets `BLOCKED`. Running games go on.
+- **The blocked player is never told** (owner decision, #439): the blocker's open invites look expired to them (`getInvite` and `watchInvite` through `inviteSeenBy`), and their accept or decline gets `INVITE_EXPIRED`. The invite stays open for the blocker and for everyone else. After an unblock it is open again. A second block or unblock changes nothing. At most `MAX_BLOCKS` (200): `TOO_MANY_BLOCKS`.
 - **A report** keeps the reason and the username at that moment, and blocks too (unless the block list is full: the report still goes in). One row per pair while the owner keeps it: a second report adds no row and the cap does not count it. At most `MAX_REPORTS_PER_DAY` (10) new reports in 24 hours (`TOO_MANY_REPORTS`). The reason is a `v.string()`, checked by `checkReason`, so a wrong one is `BAD_REQUEST`.
 - **The owner's review.** Read `reports` in the Convex dashboard (dev or prod). Act on the name with `clearUsername` ([Usernames](#usernames)), then delete the report row. There is no end date and no email: a row stays until the owner deletes it, or until the account delete of either player.
 - **Callers.** `blockPlayer` and `reportPlayer` use `existingPlayer` (they save the caller's id); `unblockPlayer` and `listMyBlocks` use `signedInPlayer`.
@@ -475,7 +476,9 @@ inviter                 server                                   friend
   │                     3. status at now: open?    → INVITE_EXPIRED when the
   │                        time is up (marked or not), else INVITE_CLOSED
   │                     4. not your own?           → OWN_INVITE
-  │                     5. no block either way?    → BLOCKED (#320)
+  │                     5. no block?               → BLOCKED when the caller
+  │                        blocks the inviter, INVITE_EXPIRED when the
+  │                        inviter blocks the caller (#320, #439)
   │                     6. insertGame (white = inviter): waits for
   │                        both opening dice, turn clock
   │                     7. invite → accepted, gameId
@@ -522,7 +525,7 @@ One player may have at most **10** open invites at a time (`MAX_OPEN_INVITES`, #
 
 ### Errors
 
-A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }` (`InviteErrorData`, `isInviteErrorData` in contracts). The codes are `INVITE_ERROR_CODES`: `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`, `NOT_YOUR_INVITE`, `TOO_MANY_INVITES` (only `createInvite`), `BLOCKED` (only `acceptInvite`, #320), `BAD_REQUEST` and `NOT_SIGNED_IN`. If `insertGame` fails inside `acceptInvite`, the error is a game error (`GameTransportErrorData`).
+A rejected invite call throws a `ConvexError` whose `data` is `{ code, message }` (`InviteErrorData`, `isInviteErrorData` in contracts). The codes are `INVITE_ERROR_CODES`: `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_CLOSED`, `OWN_INVITE`, `NOT_YOUR_INVITE`, `TOO_MANY_INVITES` (only `createInvite`), `BLOCKED` (only `acceptInvite`, when the caller blocks the inviter, #320), `BAD_REQUEST` and `NOT_SIGNED_IN`. If `insertGame` fails inside `acceptInvite`, the error is a game error (`GameTransportErrorData`).
 
 ## Push
 

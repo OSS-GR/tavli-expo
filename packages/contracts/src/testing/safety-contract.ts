@@ -222,16 +222,22 @@ export function safetyContract(): readonly SafetyContractCheck[] {
       },
     },
     {
-      name: 'a block hides the inviter name and stops new games both ways',
+      name: 'a block hides the inviter name from the blocker, whose accept gets BLOCKED',
       run: async (subject) => {
-        const gameId = await playGame(subject, 'alice', 'bob');
+        await playGame(subject, 'alice', 'bob');
         await subject.safetyFor('alice').block(subject.idOf('bob'));
 
+        // The blocker: no name, and `BLOCKED` on accept.
         const fromBob = await subject.invitesFor('bob').createInvite(GAME);
         same(
           (await subject.invitesFor('alice').getInvite(fromBob))?.fromName,
           null,
           'the inviter name alice sees',
+        );
+        same(
+          (await subject.invitesFor('alice').getInvite(fromBob))?.status,
+          'open',
+          "bob's invite as alice sees it",
         );
         check(
           (await subject.invitesFor('carol').getInvite(fromBob))?.fromName !== null,
@@ -242,21 +248,54 @@ export function safetyContract(): readonly SafetyContractCheck[] {
           'BLOCKED',
           'alice accepts bob',
         );
-        const fromAlice = await subject.invitesFor('alice').createInvite(GAME);
-        await inviteFailsWith(
-          subject.invitesFor('bob').acceptInvite(fromAlice),
-          'BLOCKED',
-          'bob accepts alice',
+        same(
+          (await subject.invitesFor('bob').getInvite(fromBob))?.status,
+          'open',
+          "bob's invite stays open",
         );
+      },
+    },
+    {
+      name: 'a blocked player sees the blocker invite as expired and is never told',
+      run: async (subject) => {
+        const gameId = await playGame(subject, 'alice', 'bob');
+        await subject.safetyFor('alice').block(subject.idOf('bob'));
+
+        const fromAlice = await subject.invitesFor('alice').createInvite(GAME);
         same(
           (await subject.invitesFor('bob').getInvite(fromAlice))?.status,
+          'expired',
+          "alice's invite as bob sees it",
+        );
+        await inviteFailsWith(
+          subject.invitesFor('bob').acceptInvite(fromAlice),
+          'INVITE_EXPIRED',
+          'bob accepts alice',
+        );
+        await inviteFailsWith(
+          subject.invitesFor('bob').declineInvite(fromAlice),
+          'INVITE_EXPIRED',
+          'bob declines alice',
+        );
+        same(
+          (await subject.invitesFor('alice').getInvite(fromAlice))?.status,
           'open',
-          'the invite stays open',
+          'the invite stays open for alice',
+        );
+        same(
+          (await subject.invitesFor('carol').getInvite(fromAlice))?.status,
+          'open',
+          'and for carol',
         );
         // The running game goes on.
         same((await firstView(subject, 'bob', gameId)).status, 'active', 'the old game');
 
         await subject.safetyFor('alice').unblock(subject.idOf('bob'));
+        same(
+          (await subject.invitesFor('bob').getInvite(fromAlice))?.status,
+          'open',
+          'open again after unblock',
+        );
         check(
           typeof (await subject.invitesFor('bob').acceptInvite(fromAlice)) === 'string',
           'a game starts after unblock',

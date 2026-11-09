@@ -40,7 +40,8 @@
  * - Block and report (#320): `safetyFor(playerId)` runs the same checks
  *   as the Convex `safety.ts` (`@tavli/online` `safety.ts`). A blocker's
  *   views, lists and invites show `null` for the blocked player's name,
- *   and `acceptInvite` gives `BLOCKED` between the two. `reportsOf()`
+ *   a blocked player sees the blocker's open invites as expired, and
+ *   `acceptInvite` refuses between the two (`checkNotBlocked`). `reportsOf()`
  *   shows the reports, like the Convex dashboard.
  *
  * Time comes from the `now` option. Nothing runs on a timer: call
@@ -97,6 +98,7 @@ import {
   checkCancel,
   checkInviteCap,
   checkNotBlocked,
+  inviteSeenBy,
   countOpenInvites,
   isInviteExpired,
   newInvite,
@@ -755,7 +757,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     const invite = code === null ? undefined : invites.get(code);
     if (invite === undefined) return null;
     const fromName = blocksPlayer(viewerId, invite.from) ? null : nameOf(invite.from);
-    return toInviteView(invite, now(), fromName);
+    const hidden = viewerId !== null && blocksPlayer(invite.from, viewerId);
+    return inviteSeenBy(toInviteView(invite, now(), fromName), hidden);
   }
 
   /** Sends the view of `code` as it is now to `listener` on a later microtask, unless it stops first. */
@@ -858,9 +861,10 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           checkExists(playerId);
           const invite = loadInvite(text);
           checkAnswer(invite, playerId, now());
-          checkNotBlocked(
-            blocksPlayer(playerId, invite.from) || blocksPlayer(invite.from, playerId),
-          );
+          checkNotBlocked({
+            byCaller: blocksPlayer(playerId, invite.from),
+            byInviter: blocksPlayer(invite.from, playerId),
+          });
           // If the game cannot start, the invite stays open (the Convex
           // transaction rolls back too).
           const gameId = createGame(
@@ -880,6 +884,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           checkExists(playerId);
           const invite = loadInvite(text);
           checkAnswer(invite, playerId, now());
+          checkNotBlocked({ byCaller: false, byInviter: blocksPlayer(invite.from, playerId) });
           answeredBy.set(invite.code, playerId);
           saveInvite({ ...invite, status: 'declined' });
         });
@@ -947,6 +952,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     for (const invite of [...invites.values()]) {
       if (invite.from !== playerId) continue;
       invites.delete(invite.code);
+      answeredBy.delete(invite.code);
       for (const listener of inviteListeners) {
         if (listener.code === invite.code) sendInvite(listener);
       }
@@ -1000,14 +1006,25 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     }
   }
 
-  /** `callerId` blocks `playerId`, after the checks, like the Convex `blockAs`. */
+  /**
+   * A block between the two changed: the blocker sees other names, and the
+   * blocked player sees the blocker's open invites as expired (or open again).
+   */
+  function notifyBlock(blockerId: string, blockedId: string): void {
+    notifyViewer(blockerId);
+    for (const listener of inviteListeners) {
+      if (listener.playerId === blockedId) sendInvite(listener);
+    }
+  }
+
+  /** `callerId` blocks `playerId`, after the checks, like the Convex `blockPlayer`. */
   function block(callerId: string, playerId: string): void {
     const mine = blocks.get(callerId) ?? new Map<string, number>();
     if (mine.has(playerId)) return;
     checkBlockCap(mine.size);
     mine.set(playerId, now());
     blocks.set(callerId, mine);
-    notifyViewer(callerId);
+    notifyBlock(callerId, playerId);
   }
 
   /** Block and report (#320), like the Convex `safety.ts`. */
@@ -1044,7 +1061,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       unblock: (other) =>
         call(() => {
           const id = caller();
-          if (blocks.get(id)?.delete(other) === true) notifyViewer(id);
+          if (blocks.get(id)?.delete(other) === true) notifyBlock(id, other);
         }),
       listBlocked: () =>
         call(() =>

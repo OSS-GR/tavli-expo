@@ -83,7 +83,6 @@ import {
   summarizeGame,
   timeOut,
   toView,
-  namesSeenBy,
 } from '@tavli/online';
 import type { LoadedFlow, SavedDraft, SteppedFlow } from '@tavli/online';
 
@@ -94,9 +93,9 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import { signedInPlayer } from './caller';
 import { createCryptoRng } from './model/cryptoRng';
 import { NEW_MATCH_WAIT, turnWait } from './model/push';
-import { ensureGuestNumber, namesOfPlayers } from './playerNames';
+import { ensureGuestNumber } from './playerNames';
 import { scheduleTurnPush } from './push';
-import { blocks, nameSeenBy } from './safety';
+import { nameSeenBy, playerNamesSeenBy } from './safety';
 import { gameChoice, gameStatus, gameTurnTimeMinutes } from './schema';
 
 /** Throws a `ConvexError` with `GameTransportErrorData`, so clients get the code. */
@@ -590,11 +589,7 @@ export const getGame = query({
     const { flow, previousGame } = loadStored(game.flow);
     const draft = savedDraft(await draftRow(ctx, game._id));
     // A side the caller blocks shows no name (#320).
-    const other = game.players.white === callerId ? game.players.black : game.players.white;
-    const hidden = await blocks(ctx, callerId, other);
-    const names = namesSeenBy(await namesOfPlayers(ctx, game.players), game.players, (id) =>
-      id === other ? hidden : false,
-    );
+    const names = await playerNamesSeenBy(ctx, callerId, game.players);
     return toView({ ...gameInput(game), flow, previousGame, draft, names });
   },
 });

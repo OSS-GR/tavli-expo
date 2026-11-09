@@ -155,6 +155,20 @@ describe('block and report on the in-memory server', () => {
     expect(views.at(-1)?.names.black).not.toBeNull();
   });
 
+  it('sends the blocked player the blocker invite as expired, and open again after unblock', async () => {
+    const { server } = setup();
+    await meet(server, 'bob', 'alice');
+    const code = await server.invitesFor('alice').createInvite(GAME);
+    const seen: (string | undefined)[] = [];
+    server.invitesFor('bob').watchInvite(code, (view) => seen.push(view?.status));
+    await flush();
+    await server.safetyFor('alice').block('bob');
+    await flush();
+    await server.safetyFor('alice').unblock('bob');
+    await flush();
+    expect(seen).toEqual(['open', 'expired', 'open']);
+  });
+
   it('account delete removes the reports by and about the player', async () => {
     const { server } = setup();
     await meet(server, 'bob', 'alice');

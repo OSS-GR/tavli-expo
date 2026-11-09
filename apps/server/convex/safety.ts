@@ -4,8 +4,10 @@
  *
  * - `blockPlayer`, `unblockPlayer`, `listMyBlocks`: a block hides the
  *   blocked player's name from the blocker (`getGame`, `listMyGames`,
- *   `getInvite` show `null`), and `acceptInvite` refuses an invite between
- *   the two (`BLOCKED`, both ways). Running games go on.
+ *   `getInvite` show `null`). A player the blocker blocks sees the
+ *   blocker's open invites as expired, and `acceptInvite` refuses an
+ *   invite between the two (`checkNotBlocked`). Running games go on.
+ *   The blocked player is never told.
  * - `reportPlayer`: a reason from `REPORT_REASONS` and the reported
  *   player's username at that moment, in the `reports` table. It blocks
  *   too. One report per pair while the owner keeps it; at most
@@ -36,15 +38,17 @@ import {
   checkReason,
   checkReportCap,
   checkTarget,
+  namesSeenBy,
   reportWindowStart,
 } from '@tavli/online';
+import type { PerPlayer } from '@tavli/engine';
 
 import { internal } from './_generated/api';
 import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { authComponent } from './auth';
 import { existingPlayer, signedInPlayer } from './caller';
-import { nameOf, nameRowOf } from './playerNames';
+import { nameOf, nameRowOf, namesOfPlayers } from './playerNames';
 
 /** Throws a `ConvexError` with `SafetyErrorData`, so clients get the code. */
 function fail(code: SafetyErrorCode, message: string): never {
@@ -76,12 +80,6 @@ export async function blocks(ctx: QueryCtx, blockerId: string, blockedId: string
   return (await blockRow(ctx, blockerId, blockedId)) !== null;
 }
 
-/** One of the two blocks the other (`acceptInvite`). */
-export async function eitherBlocks(ctx: QueryCtx, a: string, b: string): Promise<boolean> {
-  const [ab, ba] = await Promise.all([blocks(ctx, a, b), blocks(ctx, b, a)]);
-  return ab || ba;
-}
-
 /** The name `viewerId` sees for `playerId`: `null` when the viewer blocks them. */
 export async function nameSeenBy(
   ctx: QueryCtx,
@@ -90,6 +88,20 @@ export async function nameSeenBy(
 ): Promise<PlayerName | null> {
   if (viewerId !== playerId && (await blocks(ctx, viewerId, playerId))) return null;
   return await nameOf(ctx, playerId);
+}
+
+/** The names of a game's players as `viewerId` sees them: `null` for a side the viewer blocks. */
+export async function playerNamesSeenBy(
+  ctx: QueryCtx,
+  viewerId: string,
+  players: PerPlayer<string>,
+): Promise<PerPlayer<PlayerName | null>> {
+  const [names, white, black] = await Promise.all([
+    namesOfPlayers(ctx, players),
+    players.white !== viewerId && blocks(ctx, viewerId, players.white),
+    players.black !== viewerId && blocks(ctx, viewerId, players.black),
+  ]);
+  return namesSeenBy(names, players, (id) => (id === players.white ? white : black));
 }
 
 /** A game between `white` and `black`, in this order of sides. */
@@ -135,10 +147,20 @@ async function blockCount(ctx: QueryCtx, blockerId: string): Promise<number> {
   return rows.length;
 }
 
-/** Saves the block, after the checks. A block that is there already changes nothing. */
-async function addBlock(ctx: MutationCtx, callerId: string, playerId: string): Promise<void> {
+/**
+ * Saves the block, after the checks. A block that is there already
+ * changes nothing. A full list: `refuse` throws `TOO_MANY_BLOCKS`, `skip`
+ * saves nothing (a report still goes in).
+ */
+async function addBlock(
+  ctx: MutationCtx,
+  callerId: string,
+  playerId: string,
+  whenFull: 'refuse' | 'skip',
+): Promise<void> {
   if (await blocks(ctx, callerId, playerId)) return;
   const count = await blockCount(ctx, callerId);
+  if (whenFull === 'skip' && count >= MAX_BLOCKS) return;
   guarded(() => checkBlockCap(count));
   await ctx.db.insert('blocks', {
     blockerId: callerId,
@@ -156,7 +178,7 @@ export const blockPlayer = mutation({
     guarded(() => checkTarget(callerId, playerId));
     const known = await met(ctx, callerId, playerId);
     guarded(() => checkMet(known));
-    await addBlock(ctx, callerId, playerId);
+    await addBlock(ctx, callerId, playerId, 'refuse');
     return null;
   },
 });
@@ -232,7 +254,7 @@ export const reportPlayer = mutation({
       });
     }
     // A full block list does not stop the report.
-    if ((await blockCount(ctx, callerId)) < MAX_BLOCKS) await addBlock(ctx, callerId, playerId);
+    await addBlock(ctx, callerId, playerId, 'skip');
     return null;
   },
 });
