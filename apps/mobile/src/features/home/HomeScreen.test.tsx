@@ -159,7 +159,7 @@ describe('<HomeScreen />', () => {
     expect(screen.getByText('Good afternoon')).toBeOnTheScreen();
     await rerender(<HomeScreen {...setup()} hour={22} />);
     expect(screen.getByText('Good evening')).toBeOnTheScreen();
-    expect(screen.getByText('Greek tavli with friends')).toBeOnTheScreen();
+    expect(screen.getByText('Welcome to the kafeneio. Grab a chair.')).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Tavlaki' })).toBeOnTheScreen();
   });
 

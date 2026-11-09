@@ -139,7 +139,7 @@ describe('first launch', () => {
     expect(storage.getString(WELCOME_BOARD_STORAGE_KEY)).toBe('done');
     // Continue alone keeps the board as it was.
     expect(settingsStore.getState()).toMatchObject(DEFAULT_SETTINGS);
-    expect(screen.getByText('Greek tavli with friends')).toBeOnTheScreen();
+    expect(screen.getByText('Welcome to the kafeneio. Grab a chair.')).toBeOnTheScreen();
     expect(consentStore.getState().status).toBe('granted');
     expect(recorded.isOptedIn()).toBe(true);
     expect(recorded.sent.map((s) => s.type)).toContain('identify');
