@@ -12,6 +12,7 @@ import {
   type PerPlayer,
   type PlayerId,
 } from '@tavli/engine';
+import type { TFunction } from 'i18next';
 
 import { HUMAN_SIDE, type MatchMode } from './setup';
 
@@ -45,4 +46,48 @@ export function previewResign(flow: MatchFlow, player: PlayerId): ResignPreview 
   const winner = opponent(player);
   const score = { ...flow.match.score, [winner]: flow.match.score[winner] + result.points };
   return { result, score };
+}
+
+/**
+ * What the opponent gets for the game in play when `player` resigns the
+ * match (docs/rules/tavli-match.md, "Resigning"): the same as Resign game.
+ * `null` when no game is in play (the opening roll, or a game that is
+ * over): the score stays as it is.
+ */
+export function previewResignMatch(flow: MatchFlow, player: PlayerId): ResignPreview | null {
+  return canResignGame(flow, player) ? previewResign(flow, player) : null;
+}
+
+export interface ResignMatchText {
+  readonly lines: string[];
+  /** The score after the resign, when a game in play adds points to it. */
+  readonly note?: string;
+}
+
+/**
+ * The text of the Resign match dialog, for the local and the online screen.
+ * It says that the game in play counts, with its points, and shows the
+ * score after the resign.
+ */
+export function resignMatchText(
+  flow: MatchFlow,
+  player: PlayerId,
+  name: (player: PlayerId) => string,
+  t: TFunction,
+): ResignMatchText {
+  const winner = name(opponent(player));
+  const preview = previewResignMatch(flow, player);
+  if (preview === null) return { lines: [t('game.resign.matchBody', { winner })] };
+  return {
+    lines: [t('game.resign.matchBodyGame', { winner, count: preview.result.points })],
+    note: t('game.resign.after', {
+      score: t('game.end.score', {
+        white: name('white'),
+        black: name('black'),
+        whiteScore: preview.score.white,
+        blackScore: preview.score.black,
+      }),
+      target: flow.match.targetPoints,
+    }),
+  };
 }

@@ -128,7 +128,7 @@ function playTurn(s: MatchSession) {
 }
 
 describe('a record is saved when a match ends', () => {
-  it('vs bot: the bot resigns the match, you win', () => {
+  it('vs bot: the bot resigns the match, you win the game in play too', () => {
     const { sessions, history, clock } = registry();
     const s = sessions.start({ ...defaultSetup('bot'), botLevel: 'medium', game: 'plakoto' });
     openGame(s);
@@ -143,13 +143,14 @@ describe('a record is saved when a match ends', () => {
         botLevel: 'medium',
         names: { white: '', black: '' },
         targetPoints: 3,
-        score: { white: 0, black: 0 },
+        // The game in play counts for you, like Resign game: a diplo.
+        score: { white: 2, black: 0 },
         end: 'finished',
         winner: 'white',
         resignedBy: 'black',
         timedOutBy: null,
-        games: 0,
-        diploWins: { white: 0, black: 0 },
+        games: 1,
+        diploWins: { white: 1, black: 0 },
         draws: 0,
         matchNumber: 1,
         openingRoll: 'useOpeningDice',
@@ -208,12 +209,29 @@ describe('a record is saved when a match ends', () => {
     });
   });
 
-  it('vs bot: you resign a game, then the match: the record keeps the 0–2 (#181)', () => {
+  it('vs bot: you resign a game, then the match in the next game: the record adds that game, 0–4 (#181)', () => {
     const { sessions, history } = registry();
     const s = sessions.start(defaultSetup('bot'));
     openGame(s);
     s.store.getState().dispatch({ type: 'resign', player: 'white' });
     s.store.getState().dispatch({ type: 'nextGame' });
+    s.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
+    expect(history.getState().records).toHaveLength(1);
+    expect(history.getState().records[0]).toMatchObject({
+      winner: 'black',
+      resignedBy: 'white',
+      score: { white: 0, black: 4 },
+      games: 2,
+      diploWins: { white: 0, black: 2 },
+      end: 'finished',
+    });
+  });
+
+  it('vs bot: you resign the match when a game is over: nothing is added to the 0–2 (#181)', () => {
+    const { sessions, history } = registry();
+    const s = sessions.start({ ...defaultSetup('bot'), targetPoints: 5 });
+    openGame(s);
+    s.store.getState().dispatch({ type: 'resign', player: 'white' });
     s.store.getState().dispatch({ type: 'resignMatch', player: 'white' });
     expect(history.getState().records).toHaveLength(1);
     expect(history.getState().records[0]).toMatchObject({

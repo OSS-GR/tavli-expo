@@ -787,7 +787,13 @@ interface Match {
   `resignResult`. Plakoto needs none: a player whose mother is pinned has
   borne off nothing, so the shared rule already gives 2.
 - `resignMatch(match, player)` ends the match now. The opponent wins; the
-  score stays as it is.
+  score stays as it is. It knows no game: the pure `Match` has none. The
+  `resignMatch` action of `applyMatchAction` scores the game in play first,
+  with the same `resignGame` as the `resign` action (`tavli-match.md`,
+  "Resigning"), through `resignMatchInGame(match, player, result, { starter })`.
+  That function adds the game, then ends the match as resigned by `player`,
+  also when the game took the opponent to the target (`validateMatch` allows
+  this only for a last game with the reason `resigned`).
 - `createRematch(match)`: same rules and players, score 0–0. With
   `rematchStarter: "lastGameWinner"` (default, owner rule) the winner of the
   last game starts with no opening roll. That is always the match winner.

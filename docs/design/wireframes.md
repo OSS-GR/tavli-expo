@@ -384,7 +384,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 - **Elements:**
   - Celebration area (cup and confetti) when a human wins.
   - "You won the match!" / "Bot won the match" / "Maria won the match!".
-  - After **Resign match**: "You resigned the match." / "Maria resigned the match." The score stays as it was (#181).
+  - After **Resign match**: "You resigned the match." / "Maria resigned the match." The score holds the game in play too, like Resign game (#181, owner change 2026-11-09).
   - Big final score "3 – 1", with the names under it.
   - Line: game, opponent, target.
   - Game list: one row per game with winner, **Mono / Diplo** chip and points.

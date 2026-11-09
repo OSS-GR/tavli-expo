@@ -106,6 +106,7 @@ export {
   recordGameResult,
   resignGame,
   resignMatch,
+  resignMatchInGame,
   startNextGame,
   validateMatch,
 } from './match';

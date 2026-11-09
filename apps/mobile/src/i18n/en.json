@@ -736,6 +736,8 @@
       "after": "Match after resign: {{score}} (to {{target}})",
       "matchTitle": "Resign the match?",
       "matchBody": "{{winner}} wins the match. The match ends now.",
+      "matchBodyGame_one": "{{winner}} wins the match. The game in play counts: {{winner}} wins {{count}} point.",
+      "matchBodyGame_other": "{{winner}} wins the match. The game in play counts: {{winner}} wins {{count}} points.",
       "confirm": "Resign",
       "keep": "Keep playing"
     },

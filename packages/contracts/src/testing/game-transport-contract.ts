@@ -907,6 +907,9 @@ export function gameTransportContract(): GameTransportContractCheck[] {
         same(black, white, 'Black view');
         same(white.status, 'finished', 'status');
         same(white.match.winner, other(resigner), 'match.winner');
+        // The game in play counts for the winner, like Resign game (a diplo).
+        same(white.match.score[other(resigner)], 2, 'the winner gets the game in play');
+        same(white.match.score[resigner], 0, 'the resigner gets nothing');
         same(white.waitingFor, null, 'waitingFor');
         same(white.turnDeadline, null, 'turnDeadline');
         await rejectsWith(

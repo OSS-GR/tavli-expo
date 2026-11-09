@@ -230,10 +230,15 @@ describe('<MatchScreen /> vs bot', () => {
 
     await user.press(button('Game menu'));
     await user.press(button('Resign match, Bot wins the match'));
-    expect(screen.getByText('Bot wins the match. The match ends now.')).toBeOnTheScreen();
+    // The game in play counts for the bot, like Resign game (2026-11-09).
+    expect(
+      screen.getByText('Bot wins the match. The game in play counts: Bot wins 2 points.'),
+    ).toBeOnTheScreen();
+    expect(screen.getByText(/^Match after resign: You 0 – 2 Bot \(to \d\)$/)).toBeOnTheScreen();
     await user.press(button('Resign'));
 
     expect(s.store.getState().flow.match.winner).toBe('black');
+    expect(s.store.getState().flow.match.score).toEqual({ white: 0, black: 2 });
     // No card over the board: the match-end screen opens after a moment.
     expect(screen.queryByTestId('game-end-card')).toBeNull();
     expect(props.onMatchOver).not.toHaveBeenCalled();
@@ -243,9 +248,9 @@ describe('<MatchScreen /> vs bot', () => {
     expect(props.onMatchOver).toHaveBeenCalledTimes(1);
   });
 
-  it('Resign match after a resigned game keeps the 0–2 (#181)', async () => {
+  it('Resign match in the next game after a resigned game adds that game: 0–4 (#181)', async () => {
     const user = setupUser();
-    const s = session(defaultSetup('bot'));
+    const s = session({ ...defaultSetup('bot'), targetPoints: 5 });
     startWith(s, 'white');
     const { props, view } = show(s);
     await view;
@@ -261,14 +266,19 @@ describe('<MatchScreen /> vs bot', () => {
       within(screen.getByTestId('game-menu')).getByText('Portes · vs Bot (Easy) · You 0 – 2 Bot'),
     ).toBeOnTheScreen();
     await user.press(button('Resign match, Bot wins the match'));
+    expect(
+      screen.getByText('Bot wins the match. The game in play counts: Bot wins 2 points.'),
+    ).toBeOnTheScreen();
+    expect(screen.getByText('Match after resign: You 0 – 4 Bot (to 5)')).toBeOnTheScreen();
     await user.press(button('Resign'));
 
     expect(s.store.getState().flow.match).toMatchObject({
       status: 'finished',
       winner: 'black',
       resignedBy: 'white',
-      score: { white: 0, black: 2 },
+      score: { white: 0, black: 4 },
     });
+    expect(s.store.getState().flow.match.games).toHaveLength(2);
     await act(async () => {
       jest.advanceTimersByTime(MATCH_END_DELAY_MS);
     });

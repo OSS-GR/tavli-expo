@@ -301,7 +301,12 @@ export function recordGameResult(
   };
 }
 
-/** Ends the match now: `player` resigns it and the opponent wins. The score stays as it is. */
+/**
+ * Ends the match now: `player` resigns it and the opponent wins. The score
+ * stays as it is. A game in play is not part of a `Match`: the
+ * `resignMatch` action of the match flow scores it first (`applyMatchAction`),
+ * and then calls this.
+ */
 export function resignMatch(match: Match, player: PlayerId): Match {
   if (match.status !== 'in-progress') illegal('the match is over');
   if (!isPlayerId(player)) illegal(`bad player ${JSON.stringify(player)}`);
@@ -312,6 +317,34 @@ export function resignMatch(match: Match, player: PlayerId): Match {
     winner: opponent(player),
     resignedBy: player,
   };
+}
+
+/**
+ * `player` resigns the match while a game is in play. That game is lost
+ * first, like Resign game: `result` is what `resignGame` gave, and it goes
+ * into the match (docs/rules/tavli-match.md, "Resigning"). Then the match
+ * ends and the opponent wins it, also when that game already took them to
+ * the target: the match still counts as resigned by `player`.
+ *
+ * Throws `ILLEGAL_ACTION` when the match is over, or when `result` is not a
+ * resigned game won by the opponent of `player`.
+ */
+export function resignMatchInGame(
+  match: Match,
+  player: PlayerId,
+  result: GameResult,
+  options: RecordGameOptions = {},
+): Match {
+  if (match.status !== 'in-progress') illegal('the match is over');
+  if (!isPlayerId(player)) illegal(`bad player ${JSON.stringify(player)}`);
+  if (result.reason !== 'resigned' || result.winner !== opponent(player)) {
+    illegal('the game in play must be lost by the resigning player');
+  }
+  const recorded = recordGameResult(match, result, options);
+  // The game may have ended the match already (a score reached the target).
+  return recorded.status === 'in-progress'
+    ? resignMatch(recorded, player)
+    : { ...recorded, resignedBy: player };
 }
 
 /**
@@ -530,7 +563,14 @@ export function validateMatch(value: unknown): Match {
   if (resignedBy !== null) {
     if (status !== 'finished') fail('match.status', 'a resigned match is finished');
     if (winner !== opponent(resignedBy)) fail('match.winner', 'the opponent of resignedBy wins');
-    if (reachedBy !== null) fail('match.resignedBy', 'the match was already won');
+    if (reachedBy !== null) {
+      // Only the game in play when the match was resigned may have taken the
+      // opponent to the target (`resignMatchInGame`): it is the last game.
+      const last = games[games.length - 1];
+      if (last?.reason !== 'resigned' || last.winner !== winner) {
+        fail('match.resignedBy', 'the match was already won');
+      }
+    }
   } else if (reachedBy !== null) {
     if (status !== 'finished') fail('match.status', 'a score reached the target');
     if (winner !== reachedBy) fail('match.winner', `expected "${reachedBy}"`);
