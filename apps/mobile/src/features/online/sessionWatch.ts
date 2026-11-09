@@ -19,10 +19,10 @@ export type SessionWatchState<Loaded extends object> =
   /** Loading the session, then the first list. */
   | { readonly status: 'loading' }
   /**
-   * The newest list, as `toLoaded` made it, for the user `me`. `failed`:
-   * the watch failed after this list came, so it may be old.
+   * The newest list, as `toLoaded` made it. `failed`: the watch failed
+   * after this list came, so it may be old.
    */
-  | (Loaded & { readonly status: 'loaded'; readonly failed: boolean; readonly me: string })
+  | (Loaded & { readonly status: 'loaded'; readonly failed: boolean })
   /**
    * The session or the first list did not load. `retry` tries again. A
    * session that `ready()` gives as `null` counts as this too: Better Auth
@@ -96,7 +96,7 @@ export function useSessionWatch<Value, Loaded extends object>(
       setState((last) => (switched || last.status !== 'loaded' ? { status: 'loading' } : last));
       stop = start((value) => {
         if (!live) return;
-        setState({ ...toLoaded(value), status: 'loaded', failed: false, me: id });
+        setState({ ...toLoaded(value), status: 'loaded', failed: false });
       }, fail);
     };
 

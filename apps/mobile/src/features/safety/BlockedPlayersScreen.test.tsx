@@ -12,7 +12,6 @@ import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { onlineFake } from '../../../test/onlineFake';
 import { renderWithRoot } from '../../../test/render';
 
-import { useIsBlocked } from './blocked';
 import { BlockedPlayersScreen } from './BlockedPlayersScreen';
 
 runOnFakeTimers();
@@ -73,28 +72,6 @@ describe('<BlockedPlayersScreen />', () => {
     await user.press(screen.getByTestId('blocked-ann-unblock'));
     await flush();
     expect(screen.getByTestId('blocked-empty')).toBeOnTheScreen();
-  });
-
-  it('tells the other screens who is blocked, and who is unblocked', async () => {
-    await blockAll('ann', 'bob');
-    const seen: Record<string, boolean> = {};
-    function Probe({ id }: { id: string }) {
-      seen[id] = useIsBlocked(ME, id);
-      return null;
-    }
-    await render(
-      <>
-        <Probe id="ann" />
-        <Probe id="bob" />
-        <BlockedPlayersScreen auth={auth!} safety={onlineFake.safety} onBack={jest.fn()} />
-      </>,
-    );
-    await flush();
-    expect(seen).toEqual({ ann: true, bob: true });
-    const user = setupUser();
-    await user.press(screen.getByTestId('blocked-bob-unblock'));
-    await flush();
-    expect(seen).toEqual({ ann: true, bob: false });
   });
 
   it('a failed Unblock keeps the row and says so', async () => {

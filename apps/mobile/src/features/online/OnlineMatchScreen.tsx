@@ -46,13 +46,7 @@ import { GameMenu } from '@/features/match/GameMenu';
 import { MissingGame } from '@/features/match/MissingGame';
 import { resignMatchText } from '@/features/match/resign';
 import { currentGameLabel, variantName } from '@/features/match/summary';
-import { useIsBlocked, useKnownBlocks } from '@/features/safety/blocked';
-import {
-  ReportOrBlock,
-  safetyActionText,
-  safetyName,
-  type SafetyPlayer,
-} from '@/features/safety/ReportOrBlock';
+import { ReportOrBlock, safetyName, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { onlineBoardStore, type OnlineBoardStore } from './boardStore';
 import { clockText, clockTickMs } from './clock';
@@ -172,9 +166,6 @@ function OnlineBoard({
   // A report or block on its way keeps its dialog open (`onHold`).
   const [held, setHeld] = useState(false);
   const close = () => setOverlay(NO_OVERLAY);
-  const me = view?.players[side] ?? null;
-  useKnownBlocks(safety, me);
-  const opponentBlocked = useIsBlocked(me, view?.players[opponent(side)] ?? null);
 
   // Resign match while your turn is on its way: the store takes no action
   // then, so the resign waits and goes as soon as the call is done.
@@ -291,7 +282,6 @@ function OnlineBoard({
     blackScore: flow.match.score.black,
   });
 
-  const reportText = safetyActionText(opponentBlocked, safetyName(opponentName, t), t);
   let content = null;
   if (overlay.kind === 'menu') {
     content = (
@@ -315,8 +305,7 @@ function OnlineBoard({
         }}
         {...(safety
           ? {
-              reportOrBlockTitle: reportText.label,
-              reportOrBlockHint: reportText.hint,
+              reportOrBlockHint: t('safety.actionHint', { name: safetyName(opponentName, t) }),
               onReportOrBlock: () =>
                 setOverlay({
                   kind: 'safety',
@@ -352,15 +341,9 @@ function OnlineBoard({
         onCancel={close}
       />
     );
-  } else if (overlay.kind === 'safety' && safety && me !== null) {
+  } else if (overlay.kind === 'safety' && safety) {
     content = (
-      <ReportOrBlock
-        me={me}
-        player={overlay.player}
-        safety={safety}
-        onClose={close}
-        onHold={setHeld}
-      />
+      <ReportOrBlock player={overlay.player} safety={safety} onClose={close} onHold={setHeld} />
     );
   }
 

@@ -24,7 +24,6 @@ import { isHumanWin } from '@/features/game/gameFeedback';
 import { winType, type WinType } from '@/features/game/turnNotices';
 import type { Seat } from '@/features/game/seats';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
-import { safetyActionText } from '@/features/safety/ReportOrBlock';
 
 import { seatsFor } from './seats';
 import { HUMAN_SIDE, type MatchSetup } from './setup';
@@ -39,8 +38,6 @@ export interface OnlineMatchEnd {
   readonly label: string;
   /** Report or block the other player (#435). Without it there is no button. */
   readonly onReportOrBlock?: () => void;
-  /** The other player is blocked already: the button says Report. */
-  readonly blocked?: boolean;
 }
 
 interface LocalMatchEnd {
@@ -101,9 +98,6 @@ export function MatchEndScreen({
   const { theme } = useUnistyles();
   const seats = online !== undefined ? online.seats : seatsFor(setup, t);
   const name = (player: PlayerId) => seats[player].name;
-  const report = online
-    ? safetyActionText(online.blocked ?? false, name(opponent(online.me)), t)
-    : null;
   const winner = match.winner ?? 'white';
   // Like the win jingle (`matchWin`): only a win by a person is celebrated.
   const humans =
@@ -301,11 +295,11 @@ export function MatchEndScreen({
             kind="secondary"
             onPress={onHome}
           />
-          {online?.onReportOrBlock && report !== null ? (
+          {online?.onReportOrBlock ? (
             <ActionButton
               testID="end-report-block"
-              label={report.label}
-              accessibilityLabel={report.accessibilityLabel}
+              label={t('safety.action')}
+              accessibilityLabel={t('safety.actionLabel', { name: name(opponent(online.me)) })}
               kind="text"
               onPress={online.onReportOrBlock}
             />

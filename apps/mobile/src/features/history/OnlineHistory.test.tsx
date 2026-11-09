@@ -336,31 +336,6 @@ describe('<OnlineHistory />', () => {
     // The row stays; the blocked player's name no longer shows.
     expect(screen.getByTestId(`history-online-${won}`)).toBeOnTheScreen();
     expect(screen.queryByText(new RegExp(friend))).toBeNull();
-    // A report blocks too: the row now offers Report only.
-    expect(screen.getByTestId(`history-report-${won}`)).toHaveAccessibleName('Report this player');
-  });
-
-  it('a player blocked before (another app run) gets Report only', async () => {
-    signIn();
-    rememberOnlineAccount();
-    const won = await finished(FRIEND);
-    await onlineFake.server().safetyFor(ME).block(FRIEND);
-    await render(
-      <HistoryScreen
-        records={[RECORD]}
-        onPlay={jest.fn()}
-        online={(onMatches) => (
-          <OnlineHistory auth={auth} games={games} safety={safety} onMatches={onMatches} />
-        )}
-      />,
-    );
-    await flush();
-    const action = screen.getByTestId(`history-report-${won}`);
-    expect(action).toHaveAccessibleName('Report this player');
-    const user = setupUser();
-    await user.press(action);
-    expect(screen.getByTestId('safety-reasons')).toBeOnTheScreen();
-    expect(screen.queryByTestId('safety-block')).toBeNull();
   });
 
   it('speaks Greek', async () => {

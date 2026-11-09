@@ -7,7 +7,6 @@ import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPus
 import { forgetPushTapsForTest } from '../src/features/notifications/pushTaps';
 import { forgetOnlineAccount } from '../src/features/online/accountHint';
 import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
-import { resetBlockedForTest } from '../src/features/safety/blocked';
 import { resetUpdateCheckForTest } from '../src/features/update/updateCheck';
 
 import { resetOnlineFake } from './onlineFake';
@@ -32,6 +31,4 @@ beforeEach(() => {
   forgetPushTapsForTest();
   // Update needed (#390): no answer and no online game screen yet.
   resetUpdateCheckForTest();
-  // Block and report (#441 review): no block known yet.
-  resetBlockedForTest();
 });

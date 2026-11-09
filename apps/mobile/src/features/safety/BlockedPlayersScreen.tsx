@@ -28,8 +28,6 @@ import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { dateLocale, formatDate } from '@/features/history/format';
 import { playerNameText } from '@/features/online/playerName';
 
-import { markUnblocked, setBlockedList } from './blocked';
-
 export interface BlockedPlayersScreenProps {
   auth: AuthProvider;
   safety: Safety;
@@ -43,8 +41,7 @@ type State =
   | { readonly kind: 'loading' }
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
-  /** `me`: the signed-in user, whose blocks these are. */
-  | { readonly kind: 'ready'; readonly me: string; readonly players: readonly BlockedPlayer[] };
+  | { readonly kind: 'ready'; readonly players: readonly BlockedPlayer[] };
 
 export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScreenProps) {
   const { t, i18n } = useTranslation();
@@ -69,13 +66,7 @@ export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScr
       .ready()
       .then(async (user): Promise<State> => {
         if (user === null) return { kind: 'signedOut' };
-        const players = await safety.listBlocked();
-        // The other screens offer Report only for these players.
-        setBlockedList(
-          user.id,
-          players.map((p) => p.playerId),
-        );
-        return { kind: 'ready', me: user.id, players };
+        return { kind: 'ready', players: await safety.listBlocked() };
       })
       .then(
         (next) => {
@@ -104,18 +95,16 @@ export function BlockedPlayersScreen({ auth, safety, onBack }: BlockedPlayersScr
   );
 
   const unblock = (player: BlockedPlayer) => {
-    if (busy !== null || state.kind !== 'ready') return;
-    const { me } = state;
+    if (busy !== null) return;
     setBusy(player.playerId);
     setUnblockFailed(false);
     safety.unblock(player.playerId).then(
       () => {
-        markUnblocked(me, player.playerId);
         if (!live.current) return;
         setBusy(null);
         setState((s) =>
           s.kind === 'ready'
-            ? { ...s, players: s.players.filter((p) => p.playerId !== player.playerId) }
+            ? { kind: 'ready', players: s.players.filter((p) => p.playerId !== player.playerId) }
             : s,
         );
         unblockCount += 1;

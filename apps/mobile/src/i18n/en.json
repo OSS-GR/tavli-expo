@@ -1349,7 +1349,6 @@
     "action": "Report or block",
     "actionHint": "Block {{name}}, or report them to us",
     "actionLabel": "Report or block {{name}}",
-    "reportHint": "Report {{name}} to us",
     "thisPlayer": "this player",
     "cancel": "Cancel",
     "close": "Close",
@@ -1374,7 +1373,8 @@
       "name": "Offensive name",
       "cheating": "Cheating or abuse of the game",
       "harassment": "Harassment",
-      "other": "Something else"
+      "other": "Something else",
+      "blockedAlready": "You block this player already. A report tells us more."
     },
     "sending": "Sending…",
     "slow": "This takes long. You may close this: Settings → Blocked players shows later whether it went through.",

@@ -2,20 +2,22 @@
  * Report or block another player (#435, App Store guideline 1.2). One
  * dialog in a `Sheet`, in steps:
  *
- * 1. **Choose**: Block or Report (or Cancel).
+ * 1. **Checking**: the dialog asks the server whether the user blocks this
+ *    player already (`Safety.listBlocked`). Then **Choose**: Block or
+ *    Report (or Cancel). A player blocked already gets the reasons at
+ *    once: the dialog never offers Block again. When the list does not
+ *    come within `CHECK_WAIT_MS`, or fails, it shows Choose: a second
+ *    block of the same player does no harm.
  * 2. **Block**: a short confirm, then `Safety.block`.
  *    **Report**: one reason from `REPORT_REASONS`, then `Safety.report`
  *    (a report blocks too). No free text.
  * 3. **Done**, or **failed** with what went wrong and, when it may help,
  *    Try again.
  *
- * One call at a time, also over dialogs (`inFlight`). While it is on its
- * way the sheet stays open (`onHold`), so the user learns whether it
- * worked. A call can wait long when the phone is offline: after
- * `SENDING_HOLD_MS` the dialog says so and offers Close.
- *
- * A player the user blocks already (`useIsBlocked`) gets Report only: the
- * dialog opens on the reasons and never offers Block again.
+ * One call at a time. While it is on its way the sheet stays open
+ * (`onHold`), so the user learns whether it worked. A call can wait long
+ * when the phone is offline: after `SENDING_HOLD_MS` the dialog says so
+ * and offers Close.
  *
  * The online game menu, the end of an online match and History's Online
  * section open it. Each step moves screen reader focus to its title
@@ -44,8 +46,6 @@ import { Sheet } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { playerNameText } from '@/features/online/playerName';
 
-import { markBlocked, useIsBlocked } from './blocked';
-
 /** The player to report or block: their id and the name the screen shows. */
 export interface SafetyPlayer {
   readonly id: string;
@@ -66,9 +66,11 @@ type Action =
   { readonly kind: 'block' } | { readonly kind: 'report'; readonly reason: ReportReason };
 
 type Step =
+  | { readonly kind: 'checking' }
   | { readonly kind: 'choose' }
   | { readonly kind: 'block' }
-  | { readonly kind: 'report' }
+  /** `blocked`: the user blocks this player already. */
+  | { readonly kind: 'report'; readonly blocked: boolean }
   /** `slow`: the call takes longer than `SENDING_HOLD_MS`; the user may close. */
   | { readonly kind: 'sending'; readonly action: Action; readonly slow: boolean }
   | { readonly kind: 'done'; readonly action: Action }
@@ -96,6 +98,9 @@ function mayRetry(fail: FailKind): boolean {
   return fail === 'other';
 }
 
+/** How long the dialog waits for the list of blocks before it shows Choose. */
+export const CHECK_WAIT_MS = 3_000;
+
 /** How long the sheet stays open while a call is on its way. */
 export const SENDING_HOLD_MS = 10_000;
 
@@ -104,27 +109,7 @@ export function safetyName(name: PlayerName | null, t: TFunction): string {
   return playerNameText(name, t) ?? t('safety.thisPlayer');
 }
 
-/**
- * The words of the button that opens the dialog: "Report or block", or
- * "Report" for a player the user blocks already.
- */
-export function safetyActionText(blocked: boolean, name: string, t: TFunction) {
-  return blocked
-    ? {
-        label: t('safety.report'),
-        accessibilityLabel: t('safety.reportLabel', { name }),
-        hint: t('safety.reportHint', { name }),
-      }
-    : {
-        label: t('safety.action'),
-        accessibilityLabel: t('safety.actionLabel', { name }),
-        hint: t('safety.actionHint', { name }),
-      };
-}
-
 export interface ReportOrBlockProps {
-  /** The signed-in user (`onlinePlayerId` in dev games): whose blocks these are. */
-  me: string;
   player: SafetyPlayer;
   safety: Safety;
   onClose: () => void;
@@ -132,24 +117,10 @@ export interface ReportOrBlockProps {
   onHold?: (hold: boolean) => void;
 }
 
-/**
- * The calls on their way, by `<me>:<player id>`. A dialog closed after
- * `SENDING_HOLD_MS` and opened again follows the same call: it never
- * sends a second one.
- */
-const inFlight = new Map<string, { readonly action: Action; readonly call: Promise<void> }>();
-
 /** The steps of the dialog. Show it in a `Sheet` (`ReportOrBlockSheet`). */
-export function ReportOrBlock({ me, player, safety, onClose, onHold }: ReportOrBlockProps) {
+export function ReportOrBlock({ player, safety, onClose, onHold }: ReportOrBlockProps) {
   const { t } = useTranslation();
-  const key = `${me}:${player.id}`;
-  const blocked = useIsBlocked(me, player.id);
-  // A call on its way shows as sending; a blocked player gets Report only.
-  const [step, setStep] = useState<Step>(() => {
-    const pending = inFlight.get(key);
-    if (pending !== undefined) return { kind: 'sending', action: pending.action, slow: false };
-    return { kind: blocked ? 'report' : 'choose' };
-  });
+  const [step, setStep] = useState<Step>({ kind: 'checking' });
   const live = useRef(true);
   // One call at a time: a second tap before the render sees `sending` does nothing.
   const sending = useRef(false);
@@ -158,11 +129,47 @@ export function ReportOrBlock({ me, player, safety, onClose, onHold }: ReportOrB
   useEffect(() => {
     hold.current = onHold;
   }, [onHold]);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+      if (slowTimer.current !== null) clearTimeout(slowTimer.current);
+      if (sending.current) hold.current?.(false);
+    };
+  }, []);
 
-  /** Waits for `call`: the sheet stays open, until `SENDING_HOLD_MS` at most. */
-  const follow = useRef((action: Action, call: Promise<void>) => {
+  // Checking: does the user block this player already? Only the first answer counts.
+  useEffect(() => {
+    let checking = true;
+    const show = (next: Step) => {
+      if (!checking) return;
+      checking = false;
+      clearTimeout(timer);
+      setStep((now) => (now.kind === 'checking' ? next : now));
+    };
+    const timer = setTimeout(() => show({ kind: 'choose' }), CHECK_WAIT_MS);
+    safety.listBlocked().then(
+      (players) =>
+        show(
+          players.some((p) => p.playerId === player.id)
+            ? { kind: 'report', blocked: true }
+            : { kind: 'choose' },
+        ),
+      () => show({ kind: 'choose' }),
+    );
+    return () => {
+      checking = false;
+      clearTimeout(timer);
+    };
+  }, [safety, player.id]);
+
+  const name = safetyName(player.name, t);
+
+  const run = (action: Action) => {
+    if (sending.current) return;
     sending.current = true;
     hold.current?.(true);
+    setStep({ kind: 'sending', action, slow: false });
     slowTimer.current = setTimeout(() => {
       slowTimer.current = null;
       if (!live.current || !sending.current) return;
@@ -177,52 +184,17 @@ export function ReportOrBlock({ me, player, safety, onClose, onHold }: ReportOrB
       hold.current?.(false);
       setStep(next);
     };
-    call.then(
-      () => end({ kind: 'done', action }),
-      (error: unknown) => end({ kind: 'failed', action, fail: failKind(error) }),
-    );
-  });
-
-  useEffect(() => {
-    live.current = true;
-    const pending = inFlight.get(key);
-    if (pending !== undefined) follow.current(pending.action, pending.call);
-    return () => {
-      live.current = false;
-      if (slowTimer.current !== null) clearTimeout(slowTimer.current);
-      if (sending.current) hold.current?.(false);
-      sending.current = false;
-    };
-    // Once per dialog: a new player opens a new dialog.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const name = safetyName(player.name, t);
-
-  const run = (action: Action) => {
-    if (sending.current) return;
-    const pending = inFlight.get(key);
-    if (pending !== undefined) {
-      setStep({ kind: 'sending', action: pending.action, slow: false });
-      follow.current(pending.action, pending.call);
-      return;
-    }
     // A call that throws at once rejects instead.
-    const call = new Promise<void>((resolve) => {
+    new Promise<void>((resolve) => {
       resolve(
         action.kind === 'block'
           ? safety.block(player.id)
           : safety.report({ playerId: player.id, reason: action.reason }),
       );
-    });
-    inFlight.set(key, { action, call });
-    call.then(
-      // A report blocks too. The other screens learn it also after the dialog closed.
-      () => markBlocked(me, player.id),
-      () => {},
+    }).then(
+      () => end({ kind: 'done', action }),
+      (error: unknown) => end({ kind: 'failed', action, fail: failKind(error) }),
     );
-    void call.catch(() => {}).finally(() => inFlight.delete(key));
-    setStep({ kind: 'sending', action, slow: false });
-    follow.current(action, call);
   };
 
   // A new key per step: each step mounts again, and its title gets focus.
@@ -253,6 +225,17 @@ function StepView({ step, name, onRun, onStep, onClose }: StepViewProps) {
     <ActionButton testID="safety-cancel" label={t('safety.cancel')} onPress={onClose} />
   );
   switch (step.kind) {
+    case 'checking':
+      return (
+        <Dialog
+          testID="safety-checking"
+          titleRef={titleRef}
+          title={t('safety.choose.title', { name })}
+          lines={[]}>
+          <ActivityIndicator />
+          {cancel}
+        </Dialog>
+      );
     case 'choose':
       return (
         <Dialog
@@ -272,7 +255,7 @@ function StepView({ step, name, onRun, onStep, onClose }: StepViewProps) {
             kind="secondary"
             label={t('safety.report')}
             accessibilityLabel={t('safety.reportLabel', { name })}
-            onPress={() => onStep({ kind: 'report' })}
+            onPress={() => onStep({ kind: 'report', blocked: false })}
           />
           {cancel}
         </Dialog>
@@ -300,7 +283,10 @@ function StepView({ step, name, onRun, onStep, onClose }: StepViewProps) {
           testID="safety-reasons"
           titleRef={titleRef}
           title={t('safety.reasons.title', { name })}
-          lines={[t('safety.reasons.body')]}>
+          lines={[
+            ...(step.blocked ? [t('safety.reasons.blockedAlready')] : []),
+            t('safety.reasons.body'),
+          ]}>
           {REPORT_REASONS.map((reason) => (
             <ActionButton
               key={reason}
@@ -370,8 +356,6 @@ function StepView({ step, name, onRun, onStep, onClose }: StepViewProps) {
 }
 
 export interface ReportOrBlockSheetProps {
-  /** The signed-in user: whose blocks these are. */
-  me: string;
   /** The player to report or block. `null`: the sheet is closed. */
   player: SafetyPlayer | null;
   safety: Safety;
@@ -379,7 +363,7 @@ export interface ReportOrBlockSheetProps {
 }
 
 /** `ReportOrBlock` in its own dialog sheet, for screens with no sheet of their own. */
-export function ReportOrBlockSheet({ me, player, safety, onClose }: ReportOrBlockSheetProps) {
+export function ReportOrBlockSheet({ player, safety, onClose }: ReportOrBlockSheetProps) {
   const { t } = useTranslation();
   const [held, setHeld] = useState(false);
   return (
@@ -392,7 +376,7 @@ export function ReportOrBlockSheet({ me, player, safety, onClose }: ReportOrBloc
       closeLabel={t('safety.close')}
       look="dialog">
       {player !== null ? (
-        <ReportOrBlock me={me} player={player} safety={safety} onClose={onClose} onHold={setHeld} />
+        <ReportOrBlock player={player} safety={safety} onClose={onClose} onHold={setHeld} />
       ) : null}
     </Sheet>
   );

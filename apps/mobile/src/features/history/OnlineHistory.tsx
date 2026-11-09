@@ -22,13 +22,7 @@ import { SectionTitle } from '@/components/SectionCard';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 import { OnlineGameList } from '@/features/online/OnlineGameList';
 import { useMyOnlineGames } from '@/features/online/myGames';
-import { useBlockedIds, useKnownBlocks } from '@/features/safety/blocked';
-import {
-  ReportOrBlockSheet,
-  safetyActionText,
-  safetyName,
-  type SafetyPlayer,
-} from '@/features/safety/ReportOrBlock';
+import { ReportOrBlockSheet, safetyName, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { dateLocale, onlineHistoryRow } from './format';
 import { MatchList } from './MatchList';
@@ -64,10 +58,6 @@ function FinishedOnlineMatches({ auth, games, safety, onMatches }: FinishedOnlin
   const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
   const { state, retry } = useMyOnlineGames(auth, games, 'finished');
-  // Asked only once the list is in: the session is there then.
-  const me = state.status === 'loaded' ? state.me : null;
-  useKnownBlocks(safety, me);
-  const blockedIds = useBlockedIds(me);
   const has = state.status === 'loading' || (state.status === 'loaded' && state.games.length > 0);
   useEffect(() => {
     onMatches?.(has);
@@ -95,11 +85,9 @@ function FinishedOnlineMatches({ auth, games, safety, onMatches }: FinishedOnlin
                   ? {
                       action: {
                         icon: 'flag' as const,
-                        label: safetyActionText(
-                          blockedIds.includes(game.opponentId),
-                          safetyName(game.opponentName, t),
-                          t,
-                        ).accessibilityLabel,
+                        label: t('safety.actionLabel', {
+                          name: safetyName(game.opponentName, t),
+                        }),
                         testID: `history-report-${game.gameId}`,
                         onPress: () =>
                           setReporting({ id: game.opponentId, name: game.opponentName }),
@@ -111,13 +99,8 @@ function FinishedOnlineMatches({ auth, games, safety, onMatches }: FinishedOnlin
           )
         }
       />
-      {safety && me !== null ? (
-        <ReportOrBlockSheet
-          me={me}
-          player={reporting}
-          safety={safety}
-          onClose={() => setReporting(null)}
-        />
+      {safety ? (
+        <ReportOrBlockSheet player={reporting} safety={safety} onClose={() => setReporting(null)} />
       ) : null}
     </View>
   );

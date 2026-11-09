@@ -11,8 +11,12 @@ import i18n from '@/i18n';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { onlineFake } from '../../../test/onlineFake';
 
-import { markBlocked, useIsBlocked } from './blocked';
-import { ReportOrBlockSheet, SENDING_HOLD_MS, type SafetyPlayer } from './ReportOrBlock';
+import {
+  CHECK_WAIT_MS,
+  ReportOrBlockSheet,
+  SENDING_HOLD_MS,
+  type SafetyPlayer,
+} from './ReportOrBlock';
 
 runOnFakeTimers();
 
@@ -33,9 +37,11 @@ async function flush(): Promise<void> {
   });
 }
 
+/** Opens the dialog and lets it ask the server for the list of blocks. */
 async function show(player: SafetyPlayer, safety: Safety = onlineFake.safety) {
   const onClose = jest.fn();
-  await render(<ReportOrBlockSheet me={ME} player={player} safety={safety} onClose={onClose} />);
+  await render(<ReportOrBlockSheet player={player} safety={safety} onClose={onClose} />);
+  await flush();
   return onClose;
 }
 
@@ -210,39 +216,6 @@ describe('<ReportOrBlock />', () => {
     });
   });
 
-  it('a dialog opened again while the call is on its way follows it: no second call', async () => {
-    const player = meetFriend();
-    let answer: () => void = () => {};
-    const report = jest.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          answer = resolve;
-        }),
-    );
-    const safety = { ...onlineFake.safety, report };
-    const first = await render(
-      <ReportOrBlockSheet me={ME} player={player} safety={safety} onClose={jest.fn()} />,
-    );
-    const user = setupUser();
-    await user.press(screen.getByTestId('safety-report'));
-    await user.press(screen.getByTestId('safety-reason-harassment'));
-    await act(async () => {
-      jest.advanceTimersByTime(SENDING_HOLD_MS);
-    });
-    await user.press(screen.getByTestId('safety-close'));
-    await first.unmount();
-    await render(
-      <ReportOrBlockSheet me={ME} player={player} safety={safety} onClose={jest.fn()} />,
-    );
-    expect(screen.getByTestId('safety-sending')).toBeOnTheScreen();
-    await act(async () => {
-      answer();
-    });
-    await flush();
-    expect(screen.getByTestId('safety-done')).toBeOnTheScreen();
-    expect(report).toHaveBeenCalledTimes(1);
-  });
-
   it('a call that throws at once fails like a rejected one, and lets the sheet close', async () => {
     const player = meetFriend();
     const block = jest.fn(() => {
@@ -274,40 +247,62 @@ describe('<ReportOrBlock />', () => {
     expect(screen.queryByTestId('safety-retry')).toBeNull();
   });
 
-  it('a player blocked already gets Report only', async () => {
+  it('a player blocked already gets the reasons at once: no second Block', async () => {
     const player = meetFriend();
-    markBlocked(ME, FRIEND);
+    await onlineFake.server().safetyFor(ME).block(FRIEND);
     const name = `Guest ${onlineFake.guestNumber(FRIEND)}`;
     await show(player);
     expect(screen.getByRole('header', { name: `Report ${name}` })).toBeOnTheScreen();
+    expect(
+      screen.getByText('You block this player already. A report tells us more.'),
+    ).toBeOnTheScreen();
     expect(screen.queryByTestId('safety-block')).toBeNull();
     expect(screen.queryByTestId('safety-choose')).toBeNull();
   });
 
-  it('a block or a report marks the player blocked for the other screens', async () => {
+  it('waits for the list of blocks, then shows Block and Report', async () => {
     const player = meetFriend();
-    const seen: boolean[] = [];
-    function Probe() {
-      seen.push(useIsBlocked(ME, FRIEND));
-      return null;
-    }
+    const listBlocked = jest.fn(() => new Promise<never>(() => {}));
+    const onClose = jest.fn();
     await render(
-      <>
-        <Probe />
-        <ReportOrBlockSheet
-          me={ME}
-          player={player}
-          safety={onlineFake.safety}
-          onClose={jest.fn()}
-        />
-      </>,
+      <ReportOrBlockSheet
+        player={player}
+        safety={{ ...onlineFake.safety, listBlocked }}
+        onClose={onClose}
+      />,
     );
-    expect(seen.at(-1)).toBe(false);
+    expect(screen.getByTestId('safety-checking')).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(CHECK_WAIT_MS - 1);
+    });
+    expect(screen.getByTestId('safety-checking')).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(screen.getByTestId('safety-block')).toBeOnTheScreen();
+    expect(listBlocked).toHaveBeenCalledTimes(1);
+  });
+
+  it('a list of blocks that fails shows Block and Report', async () => {
+    const player = meetFriend();
+    const listBlocked = jest.fn().mockRejectedValue(new Error('offline'));
+    await show(player, { ...onlineFake.safety, listBlocked });
+    expect(screen.getByTestId('safety-choose')).toBeOnTheScreen();
+  });
+
+  it('Cancel while checking closes and sends nothing', async () => {
+    const player = meetFriend();
+    const onClose = jest.fn();
+    await render(
+      <ReportOrBlockSheet
+        player={player}
+        safety={{ ...onlineFake.safety, listBlocked: () => new Promise<never>(() => {}) }}
+        onClose={onClose}
+      />,
+    );
     const user = setupUser();
-    await user.press(screen.getByTestId('safety-report'));
-    await user.press(screen.getByTestId('safety-reason-name'));
-    await flush();
-    expect(seen.at(-1)).toBe(true);
+    await user.press(screen.getByTestId('safety-cancel'));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('shows in Greek', async () => {

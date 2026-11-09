@@ -70,8 +70,6 @@ export interface GameMenuProps {
   onReportOrBlock?: () => void;
   /** The hint of the Report or block row, with the other player's name. */
   reportOrBlockHint?: string;
-  /** The row's title: "Report or block", or "Report" for a blocked player. */
-  reportOrBlockTitle?: string;
   onExit: () => void;
   exitHint: string;
   onResume: () => void;
@@ -119,7 +117,7 @@ export function GameMenu(props: GameMenuProps) {
         <MenuRow
           testID="menu-report-block"
           icon={'⚑'}
-          title={props.reportOrBlockTitle ?? t('safety.action')}
+          title={t('safety.action')}
           {...(props.reportOrBlockHint ? { hint: props.reportOrBlockHint } : {})}
           onPress={props.onReportOrBlock}
         />
