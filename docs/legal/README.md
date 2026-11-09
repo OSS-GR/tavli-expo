@@ -64,11 +64,11 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 
 A saved account (Sign in with Apple) may pick a username; guests keep "Guest 4821". The policy's "Online games with a friend" section says what the server keeps: the name as typed, its simple form for the uniqueness check, when the name last changed, the terms version and when it was accepted, and when the age box was ticked (never the age). Usernames are user content: the terms forbid bad names, the server filters them, and the owner renames or clears a name with `clearUsername`. See `docs/store/age-rating.md` ("User-generated content rules"). The age is 16, or 13 by the phone's region (`minimumAge`): **Owner:** a lawyer checks the list.
 
-## Delete my online data (#315)
+## Delete my account (#315, #402)
 
-The app shows no account, so the feature is called **Delete my online data** (Settings → Privacy), never "delete my account". The row shows on a phone that played online. The server call is `deleteMyAccount` (#302): it deletes, for the signed-in user, the sign-in user, its sessions and linked accounts (Better Auth), every invite the user sent, every push token, and the guest name and username with the terms and age record (#400, #405). It resigns the user's running games, so the other player wins. It **keeps** finished games and their move logs for the other player. They hold the user's random user id, but no name (the guest name is gone) and no email, and once the sign-in user is gone the id names nobody. Invites someone else sent that the user answered stay with their sender. The app then signs out, so the next invite makes a new guest. See "Delete an account" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md#delete-an-account).
+Settings → Account (#402) shows the account: the guest name or the username, the ways to sign in, Sign out (saved accounts only) and **Delete my account** (a guest sees **Delete my guest account**). Until #402 the row was "Delete my online data" in Settings → Privacy. The delete row shows when the phone is signed in. The server call is `deleteMyAccount` (#302): it deletes, for the signed-in user, the sign-in user, its sessions and linked accounts (Better Auth), every invite the user sent, every push token, and the guest name and username with the terms and age record (#400, #405). It resigns the user's running games, so the other player wins. It **keeps** finished games and their move logs for the other player. They hold the user's random user id, but no name (the guest name is gone) and no email, and once the sign-in user is gone the id names nobody. Invites someone else sent that the user answered stay with their sender. The app then signs out, so the next invite makes a new guest. See "Delete an account" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md#delete-an-account).
 
-The policy's "Delete your online data" section (all four files) and the store answers describe it. A change to what the delete removes or keeps updates them in the same PR.
+The policy's "Delete your account" section (all four files) and the store answers describe it. A change to what the delete removes or keeps updates them in the same PR.
 
 ## Before you publish the terms (owner checklist, #405)
 
@@ -80,7 +80,7 @@ The policy's "Delete your online data" section (all four files) and the store an
 ## Ideas for later (app changes, not part of #90)
 
 - Open `https://tavlaki.com/el/privacy` when the app language is Greek.
-- Show the install id and the online user id in Settings → Privacy, so people can quote them in a data request.
+- Show the install id and the online user id in Settings (Privacy or Account), so people can quote them in a data request.
 - Delete old invites and finished online games on the server after a set time, and say how long in the policy.
 - Better Auth keeps the IP address and the user agent on each sign-in session. If we do not need them, turn that off on the server (Better Auth's `advanced.ipAddress.disableIpTracking`) and update the policy.
 - Android backup: decide if app data (the install id, saved games) should be left out of Android Auto Backup.

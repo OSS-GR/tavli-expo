@@ -81,7 +81,7 @@ createOnlineData: (client) => createConvexOnlineData({ client }), // #315
 - The `ConvexClient` opens its socket on the first call to `games`, not at app start. It sends the token of `auth` (`@tavli/auth-better-auth`). With nobody signed in, calls fail `NOT_SIGNED_IN`.
 - `services.ts` exports the invites as `invites` (#281), on the same client (one socket). Dev invites stay on the in-memory server.
 - `services.ts` exports the push tokens as `pushTokens` (#285), on the same client. Only the turn notifications flow (`apps/mobile/src/features/notifications/turnPushes.ts`) calls it.
-- `services.ts` exports the delete as `onlineData` (#315), on the same client. Only Settings → Delete my online data (`apps/mobile/src/features/online/deleteData.ts`) calls it.
+- `services.ts` exports the delete as `onlineData` (#315), on the same client. Only Settings → Account → Delete my account (`apps/mobile/src/features/online/deleteData.ts`, #402) calls it.
 - `createConvexGameTransportFromUrl(url, auth)` does both steps in one call, for a tool or a test that needs no shared client.
 
 ## Setup

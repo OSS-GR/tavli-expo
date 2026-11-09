@@ -18,7 +18,7 @@ describe('the username step (#405)', () => {
   });
 
   it('shows only for a saved account with no username', () => {
-    const base = { nextChangeAt: null, ageChecked: false, termsVersion: null };
+    const base = { nextChangeAt: null, ageChecked: false, termsVersion: null, guestNumber: null };
     expect(needsUsernameStep({ ...base, saved: true, name: null })).toBe(true);
     expect(needsUsernameStep({ ...base, saved: false, name: null })).toBe(false);
     expect(

@@ -125,7 +125,7 @@ describe('<BlockedPlayersScreen />', () => {
 
 describe('the Blocked players row of Settings', () => {
   it('is hidden on a phone that never played online', async () => {
-    await renderWithRoot(<SettingsScreen onBlocked={jest.fn()} />);
+    await renderWithRoot(<SettingsScreen onAccount={jest.fn()} onBlocked={jest.fn()} />);
     expect(screen.queryByTestId('settings-blocked')).toBeNull();
   });
 
@@ -139,7 +139,7 @@ describe('the Blocked players row of Settings', () => {
     const user = setupUser();
     const onBlocked = jest.fn();
     rememberOnlineAccount();
-    await renderWithRoot(<SettingsScreen onBlocked={onBlocked} />);
+    await renderWithRoot(<SettingsScreen onAccount={jest.fn()} onBlocked={onBlocked} />);
     await user.press(screen.getByRole('button', { name: /^Blocked players/ }));
     expect(onBlocked).toHaveBeenCalledTimes(1);
   });

@@ -35,7 +35,7 @@ If you are younger, please do not pick a username. You can still play on your ph
 - **Guest account:** the app makes it when you first play online. It has a random guest name, such as "Guest 4821". Only that phone can open it.
 - **Saved account:** with Sign in with Apple you can open the same account on a new phone, and pick a username.
 - Keep your phone and your Apple account safe. What happens in your online games is on your account.
-- You can delete your online data at any time: **Settings → Privacy → Delete my online data**.
+- You can delete your online data at any time: **Settings → Account → Delete my account**.
 
 ## Usernames
 

@@ -180,20 +180,6 @@
       "label": "Share anonymous usage data",
       "hint": "Which modes you play, which settings you change, and crash reports. Off also stops crash reports. No names or emails."
     },
-    "onlineData": {
-      "label": "Delete my online data",
-      "hint": "Your online games and invites on our server.",
-      "deleting": "Deleting your online data…",
-      "failed": "Could not delete your online data. Check the connection and try again.",
-      "done": "Your online data is deleted.",
-      "doneHint": "The next Play a friend starts fresh.",
-      "confirmTitle": "Delete your online data?",
-      "confirmGames": "Games in progress end now. You resign them, so you lose them.",
-      "confirmInvites": "Your open invites are cancelled.",
-      "confirmPushes": "Turn notifications stop.",
-      "confirmKept": "Finished games stay for the other players, with no name. Your games and history on this phone stay too. You cannot undo it.",
-      "confirm": "Delete"
-    },
     "privacyPolicy": "Privacy policy",
     "version": "Tavlaki {{version}}",
     "learnToPlay": "Learn to play",
@@ -209,13 +195,90 @@
       "confirmBody": "This deletes the list and the stats of your past matches on this phone. You cannot undo it.",
       "confirm": "Clear"
     },
-    "username": {
-      "label": "Username",
-      "hint": "The name other players see"
+    "account": {
+      "label": "Account",
+      "hint": "Sign-in, username and your online data"
     },
     "blocked": {
       "label": "Blocked players",
       "hint": "Players you blocked or reported"
+    }
+  },
+  "account": {
+    "title": "Account",
+    "loading": "Loading your account…",
+    "failed": "Could not load your account. Check the connection and try again.",
+    "retry": "Try again",
+    "offline": {
+      "intro": "You are not signed in. You play on this phone only.",
+      "kept": "Kept on this phone: your games against the bot, your history and your settings.",
+      "appleNote": "Sign in with Apple to use your account from another phone. A guest account is made only when you make or open an invite.",
+      "noApple": "Online play starts when you make or open an invite: Home → Play a friend."
+    },
+    "guest": {
+      "name": "You play as {{name}}",
+      "noName": "You play as a guest.",
+      "kept": "Kept on our server: your online games, your invites and your guest name. Kept on this phone: your games against the bot, your history and your settings.",
+      "onlyHere": "A guest account opens only on this phone. If you lose the phone or delete the app, it is gone.",
+      "save": "Save your account with Apple to open it on a new phone and to pick a username. Your guest games stay.",
+      "noApple": "You can save a guest account with Sign in with Apple, on an iPhone for now.",
+      "delete": "Delete my guest account",
+      "deleteHint": "Your online games, invites and guest name on our server."
+    },
+    "saved": {
+      "name": "You play as {{name}}",
+      "noName": "You have no username yet. Other players see your guest name.",
+      "kept": "Your account is saved: sign in with Apple to open it on another phone. Your games against the bot, your history and your settings stay on this phone.",
+      "username": "Username",
+      "usernameNone": "Pick one",
+      "keys": "Ways to sign in",
+      "lastKey": "An account keeps at least one way to sign in.",
+      "remove": "Remove",
+      "removeLabel": "Remove {{provider}}",
+      "add": "Add {{provider}}",
+      "signOut": "Sign out",
+      "signOutHint": "Your account stays. Sign in with Apple to come back.",
+      "delete": "Delete my account",
+      "deleteHint": "Your account, username and online games on our server."
+    },
+    "provider": {
+      "apple": "Sign in with Apple"
+    },
+    "busy": {
+      "signIn": "Signing you in…",
+      "save": "Saving your account…",
+      "removeKey": "Removing…",
+      "signOut": "Signing out…",
+      "delete": "Deleting your account…"
+    },
+    "problem": {
+      "appleUnfinished": "Apple sign-in did not finish. Check that this phone is signed in to an Apple ID in Settings.",
+      "keyTaken": "This Apple ID has another Tavlaki account already. Your guest account stays as it is.",
+      "lastKey": "An account keeps at least one way to sign in.",
+      "deleteFailed": "Could not delete your account. Check the connection and try again.",
+      "other": "That did not work. Check the connection and try again."
+    },
+    "note": {
+      "saved": "Your account is saved.",
+      "signedOut": "You are signed out.",
+      "deleted": "Your account is deleted. The next Play a friend starts fresh."
+    },
+    "signOutDialog": {
+      "title": "Sign out?",
+      "comeBack": "To play online on this phone again, sign in with Apple.",
+      "kept": "Your online games and your username stay with your account.",
+      "confirm": "Sign out"
+    },
+    "deleteDialog": {
+      "guestTitle": "Delete your guest account?",
+      "savedTitle": "Delete your account?",
+      "games": "Games in progress end now. You resign them, so you lose them.",
+      "invites": "Your open invites are cancelled.",
+      "pushes": "Turn notifications stop.",
+      "guestName": "Your guest name is deleted.",
+      "savedName": "Your username and your Sign in with Apple are removed.",
+      "kept": "Finished games stay for the other players, with no name. Your games and history on this phone stay too. You cannot undo it.",
+      "confirm": "Delete"
     }
   },
   "history": {

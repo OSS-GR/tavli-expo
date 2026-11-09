@@ -1,9 +1,7 @@
 /**
- * Delete my online data (#315). App stores ask for this in the app.
- *
- * The app makes no account the player sees. Online play makes a hidden
- * guest id (`AuthProvider.signInAsGuest`) when the player makes or opens
- * an invite. This port deletes what the server keeps under that id. On
+ * Delete my account (#315; Settings → Account since #402). App stores ask
+ * for this in the app. This port deletes what the server keeps under the
+ * player's id (a guest or a saved account). On
  * Convex it is `deleteMyAccount` (`apps/server/convex/account.ts`, #302):
  *
  * - every match still in progress is resigned: the other player wins;

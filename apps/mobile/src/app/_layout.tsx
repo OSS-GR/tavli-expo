@@ -78,6 +78,7 @@ function RootStack() {
           <Stack.Screen name="index" />
           <Stack.Screen name="new-game" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="account" />
           <Stack.Screen name="username" />
           <Stack.Screen name="blocked" />
           <Stack.Screen name="history" />

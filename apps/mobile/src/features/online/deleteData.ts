@@ -1,9 +1,8 @@
 /**
- * Delete my online data (#315). App stores ask for this in the app.
+ * Delete my account (#315, #402). App stores ask for this in the app.
  *
- * The app shows no account: online play makes a hidden guest id when the
- * player makes or opens an invite (`account.ts`). So Settings says
- * "Delete my online data", never "account". The server call is the
+ * Settings → Account says "Delete my account" (a guest: "Delete my guest
+ * account"). Until #402 it was "Delete my online data". The server call is the
  * `OnlineData` port (Convex `deleteMyAccount`, #302): it resigns the
  * games in progress, deletes the open invites, the push tokens and the
  * sign-in user, and keeps finished games with no name.
@@ -16,7 +15,7 @@
  *    call and sends it later, so it would never answer;
  * 3. the sign-out, so the next Play a friend makes a new guest;
  * 4. the phone forgets its account note (`accountHint.ts`), so Home
- *    lists no online games and Settings hides the row.
+ *    lists no online games and Settings → Account shows no account.
  *
  * `NOT_SIGNED_IN` from the delete means the data is gone already (an
  * earlier call that got no answer, or a session that ran out): the steps

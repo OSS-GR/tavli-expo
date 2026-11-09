@@ -282,6 +282,7 @@ describe('myUsernameOf', () => {
       nextChangeAt: null,
       ageChecked: false,
       termsVersion: null,
+      guestNumber: null,
     });
     expect(
       myUsernameOf(
@@ -290,6 +291,7 @@ describe('myUsernameOf', () => {
           usernameChangedAt: NOW,
           ageCheckedAt: NOW,
           termsVersion: TERMS_VERSION,
+          guestNumber: '4821',
         },
         true,
         NOW + DAY,
@@ -300,6 +302,7 @@ describe('myUsernameOf', () => {
       nextChangeAt: NOW + USERNAME_CHANGE_MS,
       ageChecked: true,
       termsVersion: TERMS_VERSION,
+      guestNumber: '4821',
     });
   });
 });

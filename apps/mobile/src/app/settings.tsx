@@ -18,8 +18,7 @@ export default function SettingsRoute() {
         onLearnToPlay={(game) => router.push(tutorialHref('settings', game))}
         onHistory={() => router.push('/history')}
         turnPushes={pushes}
-        onlineData={auth && onlineData ? { auth, data: onlineData, pushes } : undefined}
-        onUsername={auth && usernames ? () => router.push('/username') : undefined}
+        onAccount={auth && usernames && onlineData ? () => router.push('/account') : undefined}
         onBlocked={auth && safety ? () => router.push('/blocked') : undefined}
       />
     </>

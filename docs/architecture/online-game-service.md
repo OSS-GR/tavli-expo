@@ -602,7 +602,7 @@ It uses the same action, `sendTurnPush`, with `kind: 'matchEnd'` (`kind` may be 
 
 ## Delete an account
 
-Issue #302. App stores ask for in-app account deletion. The server part is the public mutation `deleteMyAccount` in `convex/account.ts`. The app calls it **Delete my online data** (#315, see [In the app](#in-the-app)). It takes no arguments: the caller comes from `existingPlayer(ctx)` ([Who calls](#who-calls)).
+Issue #302. App stores ask for in-app account deletion. The server part is the public mutation `deleteMyAccount` in `convex/account.ts`. The app calls it **Delete my account** in Settings → Account (#402; #315 called it Delete my online data; see [In the app](#in-the-app)). It takes no arguments: the caller comes from `existingPlayer(ctx)` ([Who calls](#who-calls)).
 
 ### What it does
 
@@ -634,7 +634,7 @@ The pure part, what happens to each game (`gameOnDelete`: `resign`, `keep` or `s
 
 ### In the app
 
-Issue #315. The app shows no account, so Settings → Privacy says **Delete my online data** ([App shell](app-shell.md#delete-my-online-data-315)). The port is `OnlineData` (`packages/contracts/src/online-data.ts`, one call: `deleteMyData()`; contract checks `onlineDataContract` in `@tavli/contracts/testing`). On Convex it is `createConvexOnlineData` (`@tavli/backend-convex`, `src/onlineData.ts`): it calls `deleteMyAccount`, named in `ACCOUNT_FUNCTIONS` (`src/functions.ts`). `convex/convexOnlineData.test.ts` checks that name against `api` and runs the contract checks through the adapter on the real function. The in-memory server has `onlineDataFor(playerId)` with the same steps (resign, cancel the open invites, forget the player) for the app's Jest tests and dev games.
+Issue #315, then #402. Settings → Account says **Delete my account** (a guest: **Delete my guest account**, [App shell](app-shell.md#settings--account-402)). The port is `OnlineData` (`packages/contracts/src/online-data.ts`, one call: `deleteMyData()`; contract checks `onlineDataContract` in `@tavli/contracts/testing`). On Convex it is `createConvexOnlineData` (`@tavli/backend-convex`, `src/onlineData.ts`): it calls `deleteMyAccount`, named in `ACCOUNT_FUNCTIONS` (`src/functions.ts`). `convex/convexOnlineData.test.ts` checks that name against `api` and runs the contract checks through the adapter on the real function. The in-memory server has `onlineDataFor(playerId)` with the same steps (resign, cancel the open invites, forget the player) for the app's Jest tests and dev games.
 
 The app removes the push token first, then deletes, then signs out (`deleteOnlineData` in `apps/mobile/src/features/online/deleteData.ts`). `NOT_SIGNED_IN` from the delete counts as done: the data is gone already. Better Auth's sign-out still answers after the user is deleted (`account.test.ts`: the old session cookie reaches `/api/auth/sign-out`, and no session row is left), so a retry never gets stuck.
 
@@ -763,7 +763,7 @@ A deploy does not change the stored data. Convex refuses a schema that the store
 - It has no sign-in: `transportFor(playerId)` stands for that user, signed in. Errors reject with plain `GameTransportErrorData`, with the server codes. A missing game calls `onError` with `NOT_FOUND`, and a stranger's `subscribe` calls it with `NOT_A_PLAYER`.
 - Time comes from `now()`. `runDueTimeouts()` is the in-memory `checkTimeout`: it applies every time out whose deadline has passed, each at its own deadline, like the scheduler. A late `sendTurn` gets `TIMED_OUT`, and the time out is saved.
 - `events(gameId)` is the event log (like the `moves` rows), so a test can `replay` it.
-- Delete my online data (#315): `onlineDataFor(playerId)` gives that player's `OnlineData` port. Its `deleteMyData()` is the in-memory `deleteMyAccount`, in one go: it resigns the active matches, keeps the finished games and deletes the invites the player sent. After it, the id gets `NOT_SIGNED_IN` where Convex checks the user (`existingPlayer`): make, accept or decline an invite, and delete again.
+- Delete my account (#315, #402): `onlineDataFor(playerId)` gives that player's `OnlineData` port. Its `deleteMyData()` is the in-memory `deleteMyAccount`, in one go: it resigns the active matches, keeps the finished games and deletes the invites the player sent. After it, the id gets `NOT_SIGNED_IN` where Convex checks the user (`existingPlayer`): make, accept or decline an invite, and delete again.
 - Invites (#256): `createInvite(callerId, choice, targetPoints, turnTimeMinutes)` makes an open invite, like the Convex mutation (the code comes from the server's `rng`, through `pickInviteCodeNow`, which shares its loop with `pickInviteCode`). It has the same [cap](#cap-on-open-invites): `TOO_MANY_INVITES` at 10 open invites (#275). `cancelInvite(callerId, code)` takes an open invite back, like the Convex `cancelInvite`. `invitesFor(playerId)` gives that player's `Invites` port, and `getInvite(code)` reads one invite. They use the same checks (`invites.ts`). `acceptInvite` starts the game through `createGame` (the inviter plays white); if the game cannot start, the invite stays open. No timer: an open invite counts as expired once `now()` reaches `expiresAt`. Errors reject with plain `InviteErrorData` (a game error with `GameTransportErrorData`).
 
 ### Contract checks

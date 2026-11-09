@@ -222,8 +222,8 @@ export const notifications: PushNotifications | undefined = online?.notification
 export const pushTokens: PushTokens | undefined = online?.pushTokens;
 
 /**
- * Delete my online data (#315), on the same client as `games`. Only
- * Settings calls it, through `deleteOnlineData`
+ * Delete my account (#315, #402), on the same client as `games`. Only
+ * Settings → Account calls it, through `deleteOnlineData`
  * (`features/online/deleteData.ts`).
  */
 export const onlineData: OnlineData | undefined = online?.onlineData;
