@@ -10,7 +10,8 @@ import type { SessionStorage } from './client';
 /**
  * `expo-secure-store` as `SessionStorage`. A value the phone cannot read
  * (for example a backup restored on a new phone, without the old key) reads
- * as `null`: the user is then signed out, and the app still starts.
+ * as `null`: the user is then signed out, and the app still starts. A
+ * failed write throws: the Expo client catches and logs it.
  */
 export function createSecureSessionStorage(): SessionStorage {
   return {
