@@ -4,10 +4,10 @@
  *
  * Top to bottom: the logo and Settings, a greeting, then a big hero card
  * with a board picture. The hero is the saved game ("Continue game") or,
- * with no save, "Play vs bot". Then your online games and invites, the
- * "Learn to play" banner, the other play modes as tiles ("Join with a
- * code" under "Play a friend" when online play is on, #333), and How to
- * play and History as pills.
+ * with no save, "Play vs bot". Then the reminder card (#404, when one is
+ * due), your online games and invites, the "Learn to play" banner, the
+ * other play modes as tiles ("Join with a code" under "Play a friend"
+ * when online play is on, #333), and How to play and History as pills.
  */
 import type { Difficulty } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
@@ -52,6 +52,8 @@ export interface HomeScreenProps {
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). It takes the hero's place. */
   continueCard?: ReactNode;
+  /** The reminder card (#404): save a guest account, or play online. */
+  reminderCard?: ReactNode;
   /** "Your online games" (#297), when this phone has an online account. */
   onlineGames?: ReactNode;
   /** "Your invites" (#314), when this phone has an online account. */
@@ -73,6 +75,7 @@ export function HomeScreen({
   onJoinWithCode,
   botLevels,
   continueCard,
+  reminderCard,
   onlineGames,
   invites,
   learnCard,
@@ -137,6 +140,7 @@ export function HomeScreen({
             onPress={() => onNewGame('bot')}
           />
         )}
+        {reminderCard}
         {onlineGames}
         {invites}
         {learnCard}

@@ -84,6 +84,21 @@
       "subtitle": "A one-minute lesson on the board: move, hit and bear off.",
       "start": "Start the lesson",
       "dismiss": "Not now"
+    },
+    "reminder": {
+      "guest": {
+        "title": "Save your online games?",
+        "body": "You play as a guest. Only this phone can open a guest account. Save it, and you can sign in again on a new phone.",
+        "save": "Save my account",
+        "dismiss": "Keep playing as a guest"
+      },
+      "offline": {
+        "title": "Play a friend online?",
+        "body": "Make an invite and send the link. Your friend plays on their own phone.",
+        "play": "Play a friend",
+        "dismiss": "Not now"
+      },
+      "stop": "Don't ask again"
     }
   },
   "settings": {

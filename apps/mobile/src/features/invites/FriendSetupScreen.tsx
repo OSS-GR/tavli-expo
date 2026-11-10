@@ -7,7 +7,8 @@
  *   "Make an invite" uses the saved session when there is one; else it
  *   opens the sign-in sheet (#401, `SignInSheet`: Apple, Continue as a
  *   guest, Not now), and makes the invite right after the sign-in. Not
- *   now closes the sheet and makes nothing.
+ *   now closes the sheet, makes nothing and starts the reminders on Home
+ *   (#404).
  * - It talks to the server only through the `Invites` port.
  * - A new invite sends `invite_created` (no code, no ids).
  * - Back while the invite is being made: the screen makes no invite, or
@@ -53,6 +54,7 @@ import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
 import { onlineAccountReady } from '@/features/online/account';
 import { SignInSheet } from '@/features/online/SignInSheet';
 import { formatTimeLimit } from '@/features/online/clock';
+import { reminders } from '@/features/reminders/reminders';
 
 import { sendInviteCreated } from './inviteAnalytics';
 
@@ -258,7 +260,11 @@ export function FriendSetupScreen({
             setSigningIn(false);
             void make(true);
           }}
-          onClose={() => setSigningIn(false)}
+          onClose={() => {
+            // Not now: the save reminders start (#404), as after a guest sign-in.
+            reminders.start();
+            setSigningIn(false);
+          }}
           {...(appleSheet === undefined ? {} : { appleSheet })}
           {...(analytics === undefined ? {} : { analytics })}
         />

@@ -40,6 +40,7 @@ The app saves these things on your phone only. They never leave it.
 - **Your games:** the match you are playing, so you can go back to it, and your last choices on the New game screen. In pass-and-play, this includes the player names you type. Names are never sent anywhere.
 - **Your privacy answer** (allow or don't allow).
 - **Your answer** (**Turn on** or **Not now**) to turn notifications, so the app does not ask again by itself and sends the push token only after **Turn on**.
+- **When the app last asked** you to save your guest account or to play online (the times and how many asks), so it asks four times at most and stops after **Don't ask again** or a sign-in with Apple.
 - **An install id:** a random code, made on your phone. It is not your name, email, phone number or a device id. It does not come from your phone's hardware. The app makes it only after you tap **Allow usage data**.
 
 Deleting the app deletes all of this from your phone. If you install the app again, you get a new install id. (On Android, your phone's own backup may keep a copy of app data and bring it back when you reinstall.)
