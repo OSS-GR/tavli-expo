@@ -43,6 +43,12 @@
  *   a blocked player sees the blocker's open invites as expired, and
  *   `acceptInvite` refuses between the two (`checkNotBlocked`). `reportsOf()`
  *   shows the reports, like the Convex dashboard.
+ * - Friends (#406): `friendsFor(playerId)` runs the same checks as the
+ *   Convex `friends.ts` (`@tavli/online` `friends.ts`). The server keeps
+ *   no accounts, so `markSaved(playerId)` says which players saved theirs
+ *   (only they may have friends). A friend invite is an invite with `to`:
+ *   only that friend reads and answers it. A block ends the friendship.
+ *   The tokens come from their own RNG (`tokenRng`).
  *
  * Time comes from the `now` option. Nothing runs on a timer: call
  * `runDueTimeouts()` to apply the time outs whose deadline has passed (the
@@ -52,8 +58,17 @@
  * in-memory version of the Convex `expireInvite`).
  */
 
-import { MAX_BLOCKS, normalizeInviteCode } from '@tavli/contracts';
+import {
+  MAX_BLOCKS,
+  MAX_RECENT_PLAYERS,
+  normalizeFriendToken,
+  normalizeInviteCode,
+} from '@tavli/contracts';
 import type {
+  FoundPlayer,
+  Friends,
+  FriendsErrorData,
+  FriendStatus,
   GameSummary,
   GameTransport,
   GuestMoveCounts,
@@ -94,12 +109,29 @@ import {
 } from './calls';
 import type { SavedGame } from './calls';
 import {
+  FriendsError,
+  checkFriendTarget,
+  checkFriends,
+  checkOpenRequest,
+  checkSaved,
+  checkSearchCap,
+  friendStatusOf,
+  pickFriendTokenNow,
+  planRequest,
+  recentOpponents,
+  recordOf,
+  searchWindowStart,
+} from './friends';
+import type { FriendRequestRecord, RequestRoute } from './friends';
+import {
   InviteError,
+  checkAddressee,
   checkAnswer,
   checkCancel,
   checkInviteCap,
   checkNotBlocked,
   inviteSeenBy,
+  inviteVisibleTo,
   countOpenInvites,
   isInviteExpired,
   newInvite,
@@ -125,7 +157,7 @@ import {
 import type { LoadedFlow, SavedDraft, SteppedFlow } from './online-game';
 import { nameFrom, namesOf, pickGuestNumber } from './names';
 import type { NameRecord } from './names';
-import { myUsernameOf, planUsername } from './usernames';
+import { myUsernameOf, planUsername, usernameKey } from './usernames';
 import type { UsernameRecord } from './usernames';
 import {
   SafetyError,
@@ -155,6 +187,8 @@ export interface MemoryGameServerOptions {
    * dice of `rng` stay the same with or without names.
    */
   readonly nameRng?: Rng;
+  /** The friend link tokens (#406). Default: a seeded RNG of its own, like `nameRng`. */
+  readonly tokenRng?: Rng;
 }
 
 /** One event of a game's log, like a row of the Convex `moves` table. */
@@ -245,6 +279,16 @@ export interface MemoryGameServer {
    * if they were signed in.
    */
   safetyFor(playerId: string | null): Safety;
+  /**
+   * Friends (#406) as `playerId` (`null`: nobody signed in), as if they
+   * were signed in. Only players marked with `markSaved` may have friends.
+   */
+  friendsFor(playerId: string | null): Friends;
+  /**
+   * `playerId` has a saved account (a sign-in key). The in-memory server
+   * keeps no accounts, so the caller says. A player stays saved.
+   */
+  markSaved(playerId: string): void;
   /** Every report kept, oldest first (copies). The owner's view, for tests. */
   reportsOf(): MemoryReport[];
   /** The owner deletes a report after the review, like a row deleted in the dashboard. For tests. */
@@ -374,6 +418,10 @@ function toErrorData(error: unknown): unknown {
     const data: SafetyErrorData = { code: error.code, message: error.message };
     return data;
   }
+  if (error instanceof FriendsError) {
+    const data: FriendsErrorData = { code: error.code, message: error.message };
+    return data;
+  }
   return error;
 }
 
@@ -399,6 +447,18 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const blocks = new Map<string, Map<string, number>>();
   /** Reports (#320), oldest first, like the Convex `reports` table. */
   let reports: MemoryReport[] = [];
+  const tokenRng = options.tokenRng ?? createSeededRng(406);
+  /** Players with a saved account (#406), like a Better Auth user that is not anonymous. */
+  const savedPlayers = new Set<string>();
+  /** Friends (#406), both ways: player → (friend → since), like the Convex `friends` table. */
+  const friendEdges = new Map<string, Map<string, number>>();
+  /** Friend requests (#406) by `requestKey(from, to)`, like the Convex `friendRequests` table. */
+  const friendRequests = new Map<string, FriendRequestRecord>();
+  /** Friend link tokens (#406): token → owner, and owner → token. */
+  const friendTokens = new Map<string, string>();
+  const tokenOf = new Map<string, string>();
+  /** Username searches (#406): player → times, like the Convex `friendSearches` table. */
+  const searches = new Map<string, number[]>();
   let nextId = 1;
 
   /** `viewerId` blocks `playerId`. */
@@ -775,7 +835,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   function inviteView(text: string, viewerId: string | null): InviteView | null {
     const code = normalizeInviteCode(text);
     const invite = code === null ? undefined : invites.get(code);
-    if (invite === undefined) return null;
+    if (invite === undefined || !inviteVisibleTo(invite, viewerId)) return null;
     const fromName = blocksPlayer(viewerId, invite.from) ? null : nameOf(invite.from);
     const hidden = viewerId !== null && blocksPlayer(invite.from, viewerId);
     return inviteSeenBy(toInviteView(invite, now(), fromName), hidden);
@@ -831,11 +891,18 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     choice: OnlineGameChoice,
     targetPoints: number,
     turnTimeMinutes: number | null,
+    to?: string,
   ): string {
     checkExists(callerId);
     // The cap first, like the Convex function (#275).
     checkInviteCap(countOpenInvites(invites.values(), callerId, now()));
-    const options = { from: callerId, choice, targetPoints, turnTimeMinutes };
+    const options = {
+      from: callerId,
+      choice,
+      targetPoints,
+      turnTimeMinutes,
+      ...(to === undefined ? {} : { to }),
+    };
     // Check the arguments before a code is drawn, as the Convex function
     // throws before it saves anything.
     const invite = newInvite(options, '', now());
@@ -880,6 +947,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         return inviteCall(() => {
           checkExists(playerId);
           const invite = loadInvite(text);
+          checkAddressee(invite, playerId);
           checkAnswer(invite, playerId, now());
           checkNotBlocked({
             byCaller: blocksPlayer(playerId, invite.from),
@@ -903,6 +971,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         return inviteCall(() => {
           checkExists(playerId);
           const invite = loadInvite(text);
+          checkAddressee(invite, playerId);
           checkAnswer(invite, playerId, now());
           checkNotBlocked({ byCaller: false, byInviter: blocksPlayer(invite.from, playerId) });
           answeredBy.set(invite.code, playerId);
@@ -970,7 +1039,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       save(game, playerId, before, resign(before.flow, side, rng), at);
     }
     for (const invite of [...invites.values()]) {
-      if (invite.from !== playerId) continue;
+      if (invite.from !== playerId && invite.to !== playerId) continue;
       invites.delete(invite.code);
       answeredBy.delete(invite.code);
       for (const listener of inviteListeners) {
@@ -988,11 +1057,21 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     reports = reports.filter(
       (report) => report.reporterId !== playerId && report.reportedId !== playerId,
     );
+    // Friends, requests, the link and the searches (#406).
+    endFriendship(playerId);
+    const token = tokenOf.get(playerId);
+    if (token !== undefined) friendTokens.delete(token);
+    tokenOf.delete(playerId);
+    searches.delete(playerId);
   }
 
   /** The two players met (#320, `checkMet`): a game, or an invite one answered from the other. */
   function met(callerId: string, playerId: string): boolean {
     if (deletedPlayers.has(playerId)) return false;
+    // A friend, or a request either way (#406).
+    if (isFriend(callerId, playerId)) return true;
+    if (friendRequests.has(requestKey(callerId, playerId))) return true;
+    if (friendRequests.has(requestKey(playerId, callerId))) return true;
     for (const game of games.values()) {
       if (sideOf(game.players, callerId) !== null && sideOf(game.players, playerId) !== null) {
         return true;
@@ -1044,6 +1123,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     checkBlockCap(mine.size);
     mine.set(playerId, now());
     blocks.set(callerId, mine);
+    // A block ends the friendship and the requests between the two (#406).
+    endFriendship(callerId, playerId);
     notifyBlock(callerId, playerId);
   }
 
@@ -1118,6 +1199,348 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           if (!blocksPlayer(id, other) && (blocks.get(id)?.size ?? 0) < MAX_BLOCKS) {
             block(id, other);
           }
+        }),
+    };
+  }
+
+  /** The key of the request from `from` to `to` in `friendRequests`. */
+  function requestKey(from: string, to: string): string {
+    return `${from}\n${to}`;
+  }
+
+  function isFriend(a: string, b: string): boolean {
+    return friendEdges.get(a)?.has(b) ?? false;
+  }
+
+  function friendCount(playerId: string): number {
+    return friendEdges.get(playerId)?.size ?? 0;
+  }
+
+  /**
+   * Ends the friendship of `a` and `b`, and deletes the requests between
+   * them (#406). With no `b`: every friendship and request of `a`.
+   */
+  function endFriendship(a: string, b?: string): void {
+    const others = b === undefined ? [...(friendEdges.get(a)?.keys() ?? [])] : [b];
+    for (const other of others) {
+      friendEdges.get(other)?.delete(a);
+      friendEdges.get(a)?.delete(other);
+    }
+    for (const key of [...friendRequests.keys()]) {
+      const [from = '', to = ''] = key.split('\n');
+      if (b === undefined ? from === a || to === a : key === requestKey(a, b) || key === requestKey(b, a)) {
+        friendRequests.delete(key);
+      }
+    }
+  }
+
+  /** `playerId` has a saved account that exists. */
+  function isSaved(playerId: string): boolean {
+    return savedPlayers.has(playerId) && !deletedPlayers.has(playerId);
+  }
+
+  function statusBetween(callerId: string, playerId: string): FriendStatus {
+    return friendStatusOf({
+      self: callerId === playerId,
+      friends: isFriend(callerId, playerId),
+      mine: friendRequests.get(requestKey(callerId, playerId)) ?? null,
+      theirs: friendRequests.get(requestKey(playerId, callerId)) ?? null,
+    });
+  }
+
+  /** A block either way between the two. */
+  function blockedEither(a: string, b: string): boolean {
+    return blocksPlayer(a, b) || blocksPlayer(b, a);
+  }
+
+  /** The player with this username key, if saved, like the Convex `by_username_key` lookup. */
+  function holderOfUsername(text: string): string | null {
+    const key = usernameKey(text.trim());
+    if (key === '') return null;
+    for (const [playerId, record] of nameRecords) {
+      if (record.usernameKey === key && isSaved(playerId)) return playerId;
+    }
+    return null;
+  }
+
+  /** The owner of the link with `text` (any case), if they exist. */
+  function ownerOfToken(text: string): string | null {
+    const token = normalizeFriendToken(text);
+    const owner = token === null ? undefined : friendTokens.get(token);
+    return owner === undefined || deletedPlayers.has(owner) ? null : owner;
+  }
+
+  /** What the caller may see of a player found by link or username: `null` with a block. */
+  function found(callerId: string, playerId: string | null): FoundPlayer | null {
+    if (playerId === null || blockedEither(callerId, playerId)) return null;
+    return { name: nameOf(playerId), status: statusBetween(callerId, playerId) };
+  }
+
+  /** Counts one username search of `playerId` at `now()`, after the cap check. */
+  function countSearch(playerId: string): void {
+    const at = now();
+    const since = searchWindowStart(at);
+    const recent = (searches.get(playerId) ?? []).filter((time) => time > since);
+    checkSearchCap(recent.length);
+    searches.set(playerId, [...recent, at]);
+  }
+
+  /** The record of `me` against `other`, from the finished games. */
+  function recordBetween(me: string, other: string) {
+    return recordOf(
+      [...games.values()].map((game) => ({
+        players: game.players,
+        status: game.status,
+        winner: game.status === 'finished' ? loadFlow(game.flow).match.winner : null,
+      })),
+      me,
+      other,
+    );
+  }
+
+  function openRequestCount(playerId: string, side: 'from' | 'to'): number {
+    let count = 0;
+    for (const [key, request] of friendRequests) {
+      const [from, to] = key.split('\n');
+      if (request.status === 'open' && (side === 'from' ? from : to) === playerId) count += 1;
+    }
+    return count;
+  }
+
+  function makeFriends(a: string, b: string): void {
+    const at = now();
+    for (const [one, other] of [
+      [a, b],
+      [b, a],
+    ] as const) {
+      const mine = friendEdges.get(one) ?? new Map<string, number>();
+      mine.set(other, at);
+      friendEdges.set(one, mine);
+    }
+    friendRequests.delete(requestKey(a, b));
+    friendRequests.delete(requestKey(b, a));
+  }
+
+  /** A request from `callerId` to `playerId` (`null`: not found), like the Convex `askFriend`. */
+  function request(callerId: string, playerId: string | null, route: RequestRoute): FriendStatus {
+    if (playerId === null) throw new FriendsError('NOT_FOUND', 'no such player');
+    const mine = friendRequests.get(requestKey(callerId, playerId)) ?? null;
+    const plan = planRequest({
+      route,
+      self: callerId === playerId,
+      savedTarget: isSaved(playerId),
+      met: route !== 'met' || met(callerId, playerId),
+      callerBlocks: blocksPlayer(callerId, playerId),
+      targetBlocks: blocksPlayer(playerId, callerId),
+      friends: isFriend(callerId, playerId),
+      mine,
+      theirs: friendRequests.get(requestKey(playerId, callerId)) ?? null,
+      openSent: openRequestCount(callerId, 'from'),
+      openReceived: openRequestCount(playerId, 'to'),
+      callerFriends: friendCount(callerId),
+      targetFriends: friendCount(playerId),
+      now: now(),
+    });
+    if (plan.kind === 'status') return plan.status;
+    if (plan.kind === 'accept') {
+      makeFriends(callerId, playerId);
+      return 'friends';
+    }
+    friendRequests.set(requestKey(callerId, playerId), {
+      status: 'open',
+      createdAt: now(),
+      declinedAt: null,
+    });
+    return 'sent';
+  }
+
+  /** Friends (#406), like the Convex `friends.ts`. */
+  function friendsFor(playerId: string | null): Friends {
+    const caller = (): string => {
+      if (playerId === null || deletedPlayers.has(playerId)) {
+        throw new FriendsError('NOT_SIGNED_IN', 'sign in first');
+      }
+      return playerId;
+    };
+    const saved = (): string => {
+      const id = caller();
+      checkSaved(savedPlayers.has(id));
+      return id;
+    };
+    const call = async <T>(step: () => T): Promise<T> => {
+      await nextTick();
+      try {
+        const result = step();
+        return result === undefined ? result : copy(result);
+      } catch (error) {
+        throw toErrorData(error);
+      }
+    };
+    const requestsOf = (id: string, side: 'from' | 'to') =>
+      [...friendRequests]
+        .map(([key, record]) => {
+          const [from = '', to = ''] = key.split('\n');
+          return { from, to, record };
+        })
+        .filter(({ from, to, record }) => record.status === 'open' && (side === 'from' ? from : to) === id)
+        .map(({ from, to, record }) => {
+          const other = side === 'from' ? to : from;
+          return { playerId: other, name: nameOf(other), sentAt: record.createdAt };
+        })
+        .sort((a, b) => b.sentAt - a.sentAt);
+    return {
+      listFriends: () =>
+        call(() => {
+          const id = saved();
+          return [...(friendEdges.get(id) ?? new Map<string, number>())]
+            .map(([friend, since]) => ({
+              playerId: friend,
+              name: nameOf(friend),
+              since,
+              record: recordBetween(id, friend),
+            }))
+            .sort((a, b) => b.since - a.since);
+        }),
+      listRequests: () =>
+        call(() => {
+          const id = saved();
+          return { incoming: requestsOf(id, 'to'), outgoing: requestsOf(id, 'from') };
+        }),
+      recentPlayers: () =>
+        call(() => {
+          const id = saved();
+          return recentOpponents(
+            [...games.values()].map((game) => ({ players: game.players, updatedAt: game.updatedAt })),
+            id,
+          )
+            .filter(({ playerId: other }) => isSaved(other) && !blockedEither(id, other))
+            .slice(0, MAX_RECENT_PLAYERS)
+            .map(({ playerId: other, playedAt }) => ({
+              playerId: other,
+              name: nameOf(other),
+              status: statusBetween(id, other),
+              playedAt,
+            }));
+        }),
+      findPlayer: (username) =>
+        call(() => {
+          const id = saved();
+          countSearch(id);
+          return found(id, holderOfUsername(username));
+        }),
+      myFriendLink: () =>
+        call(() => {
+          const id = saved();
+          const kept = tokenOf.get(id);
+          if (kept !== undefined) return kept;
+          const token = pickFriendTokenNow(tokenRng, (taken) => friendTokens.has(taken));
+          friendTokens.set(token, id);
+          tokenOf.set(id, token);
+          return token;
+        }),
+      resetFriendLink: () =>
+        call(() => {
+          const id = saved();
+          const old = tokenOf.get(id);
+          if (old !== undefined) friendTokens.delete(old);
+          const token = pickFriendTokenNow(tokenRng, (taken) => friendTokens.has(taken));
+          friendTokens.set(token, id);
+          tokenOf.set(id, token);
+          return token;
+        }),
+      openFriendLink: (token) => call(() => found(caller(), ownerOfToken(token))),
+      requestByLink: (token) =>
+        call(() => {
+          const id = saved();
+          const owner = ownerOfToken(token);
+          if (owner !== null && owner !== id && blockedEither(id, owner)) {
+            throw new FriendsError('NOT_FOUND', 'no such player');
+          }
+          return request(id, owner, 'link');
+        }),
+      requestByUsername: (username) =>
+        call(() => {
+          const id = saved();
+          countSearch(id);
+          return request(id, holderOfUsername(username), 'username');
+        }),
+      sendRequest: (other) =>
+        call(() => {
+          const id = saved();
+          checkFriendTarget(id, other);
+          return request(id, other, 'met');
+        }),
+      acceptRequest: (other) =>
+        call(() => {
+          const id = saved();
+          const theirs = friendRequests.get(requestKey(other, id)) ?? null;
+          checkOpenRequest(theirs);
+          const plan = planRequest({
+            route: 'met',
+            self: false,
+            savedTarget: isSaved(other),
+            met: true,
+            callerBlocks: blocksPlayer(id, other),
+            targetBlocks: blocksPlayer(other, id),
+            friends: isFriend(id, other),
+            mine: null,
+            theirs,
+            openSent: 0,
+            openReceived: 0,
+            callerFriends: friendCount(id),
+            targetFriends: friendCount(other),
+            now: now(),
+          });
+          if (plan.kind === 'accept') makeFriends(id, other);
+        }),
+      declineRequest: (other) =>
+        call(() => {
+          const id = saved();
+          const key = requestKey(other, id);
+          const theirs = friendRequests.get(key);
+          if (theirs?.status !== 'open') return;
+          friendRequests.set(key, { ...theirs, status: 'declined', declinedAt: now() });
+        }),
+      cancelRequest: (other) =>
+        call(() => {
+          const id = saved();
+          const key = requestKey(id, other);
+          if (friendRequests.get(key)?.status === 'open') friendRequests.delete(key);
+        }),
+      removeFriend: (other) =>
+        call(() => {
+          const id = saved();
+          if (!isFriend(id, other)) return;
+          friendEdges.get(id)?.delete(other);
+          friendEdges.get(other)?.delete(id);
+        }),
+      inviteFriend: (other, game) => {
+        const { choice, targetPoints, turnTimeMinutes } = copy(game);
+        return call(() => {
+          const id = saved();
+          checkFriends(isFriend(id, other));
+          try {
+            return makeInvite(id, choice, targetPoints, turnTimeMinutes, other);
+          } catch (error) {
+            if (error instanceof InviteError && error.code === 'TOO_MANY_INVITES') {
+              throw new FriendsError('TOO_MANY_INVITES', error.message);
+            }
+            if (error instanceof InviteError && error.code === 'BAD_REQUEST') {
+              throw new FriendsError('BAD_REQUEST', error.message);
+            }
+            throw error;
+          }
+        });
+      },
+      listFriendInvites: () =>
+        call(() => {
+          const id = saved();
+          const at = now();
+          return [...invites.values()]
+            .filter((invite) => invite.to === id && invite.status === 'open')
+            .filter((invite) => !isInviteExpired(invite, at) && !blockedEither(id, invite.from))
+            .reverse()
+            .map((invite) => toInviteView(invite, at, nameOf(invite.from)));
         }),
     };
   }
@@ -1228,6 +1651,12 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     usernamesFor,
 
     safetyFor,
+
+    friendsFor,
+
+    markSaved(playerId) {
+      savedPlayers.add(playerId);
+    },
 
     reportsOf: () => copy(reports),
 

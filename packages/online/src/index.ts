@@ -2,7 +2,7 @@
  * Online games, in pure TypeScript (#251): the game model the server runs
  * (`online-game.ts`), the checks around each call (`calls.ts`), the invite
  * checks and codes (`invites.ts`), the block and report checks
- * (`safety.ts`), the "my games" summaries
+ * (`safety.ts`), the friends checks (`friends.ts`), the "my games" summaries
  * (`summaries.ts`), moving a guest into an account (`guest-move.ts`),
  * and an in-memory server that gives a
  * `GameTransport` and an `Invites` per player (`memory-server.ts`).
@@ -78,6 +78,7 @@ export {
   InviteError,
   MAX_CODE_TRIES,
   MAX_OPEN_INVITES,
+  checkAddressee,
   checkAnswer,
   checkCancel,
   checkInviteCap,
@@ -86,14 +87,43 @@ export {
   countOpenInvites,
   inviteExpiresAt,
   inviteStatus,
+  inviteVisibleTo,
   isInviteExpired,
   newInvite,
   newInviteCode,
   pickInviteCode,
   pickInviteCodeNow,
+  randomCode,
   toInviteView,
 } from './invites';
 export type { InviteRecord, NewInviteOptions } from './invites';
+export {
+  FriendsError,
+  NO_RECORD,
+  checkFriendCaps,
+  checkFriendTarget,
+  checkFriends,
+  checkOpenRequest,
+  checkSaved,
+  checkSearchCap,
+  friendStatusOf,
+  newFriendToken,
+  pickFriendToken,
+  pickFriendTokenNow,
+  planRequest,
+  recentOpponents,
+  recordAfter,
+  recordOf,
+  searchWindowStart,
+} from './friends';
+export type {
+  FriendRequestRecord,
+  PlanRequestInput,
+  RecentGame,
+  RecordGame,
+  RequestPlan,
+  RequestRoute,
+} from './friends';
 export {
   SafetyError,
   checkBlockCap,
