@@ -87,7 +87,11 @@ export type AccountProblem =
   /** The last key: an account keeps at least one. */
   | 'lastKey'
   | 'deleteFailed'
-  /** Anything else: most often the connection. */
+  /** Apple is off on the server (`KEY_OFF`, #462): no Services ID yet. */
+  | 'appleOff'
+  /** The server could not be reached. */
+  | 'network'
+  /** Anything else. */
   | 'other';
 
 /** What just happened, said once on the screen. */
@@ -136,6 +140,8 @@ export interface Account {
   readonly moveGuest: () => void;
   /** Closes the offer: the guest stays as it is. */
   readonly keepGuest: () => void;
+  /** OK on the problem popup. */
+  readonly dismissProblem: () => void;
   readonly removeKey: (provider: AuthKeyProvider) => void;
   readonly signOut: () => void;
   readonly deleteAccount: () => void;
@@ -188,6 +194,9 @@ function problemOf(error: unknown): AccountProblem {
   if (isAuthErrorData(error)) {
     if (error.code === 'KEY_BELONGS_TO_OTHER') return 'keyTaken';
     if (error.code === 'LAST_KEY') return 'lastKey';
+    // Only Apple's actions get here: the email form has its own problems.
+    if (error.code === 'KEY_OFF') return 'appleOff';
+    if (error.code === 'NETWORK') return 'network';
   }
   return 'other';
 }
@@ -401,6 +410,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
         () => done('moved'),
       );
     },
+    dismissProblem: () => setProblem(null),
     keepGuest: () => {
       if (offer === null) return;
       setOffer(null);

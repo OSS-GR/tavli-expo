@@ -521,7 +521,7 @@ describe('fromBetterAuthClient', () => {
     });
     server.failures.set('fetch /key/email-code', { status: 503, code: 'EMAIL_OFF' });
     expect(await rejection(auth.requestEmailCode('eleni@example.com', 'el'))).toMatchObject({
-      code: 'REJECTED',
+      code: 'KEY_OFF',
     });
     // An email key sends no Apple code.
     await auth.signInWithKey({ ...wrong, code: '200001' });
@@ -561,6 +561,23 @@ describe('fromBetterAuthClient', () => {
     const broken = await rejection(auth.saveKey(await appleCredential(auth, 'a')));
     expect(broken).toMatchObject({ code: 'KEY_BELONGS_TO_OTHER' });
     expect(broken).not.toHaveProperty('move');
+  });
+
+  it('passes KEY_OFF when the server has that kind of key off (#462)', async () => {
+    const { auth, server } = subject();
+    await auth.signInAsGuest();
+    server.failures.set('fetch /key/save', { status: 503, code: 'KEY_OFF' } as { status: number });
+    expect(await rejection(auth.saveKey(await appleCredential(auth, 'a')))).toMatchObject({
+      code: 'KEY_OFF',
+    });
+    await auth.signOut();
+    // Better Auth's own sign-in with no Apple provider.
+    server.failures.set('signIn.social', { status: 404, code: 'PROVIDER_NOT_FOUND' } as {
+      status: number;
+    });
+    expect(await rejection(auth.signInWithKey(await appleCredential(auth, 'b')))).toMatchObject({
+      code: 'KEY_OFF',
+    });
   });
 
   it('after a move the token is the account’s, and a failed move keeps the guest', async () => {

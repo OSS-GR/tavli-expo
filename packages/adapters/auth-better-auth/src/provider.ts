@@ -113,6 +113,13 @@ const PASSED_CODES: readonly AuthErrorCode[] = [
 const NETWORK_CODES: readonly string[] = ['MAIL_FAILED'];
 
 /**
+ * Server error codes that mean this kind of key is off there (#462): our
+ * routes (`KEY_OFF`, `EMAIL_OFF`) and Better Auth's sign-in with no such
+ * provider (`PROVIDER_NOT_FOUND`).
+ */
+const KEY_OFF_CODES: readonly string[] = ['KEY_OFF', 'EMAIL_OFF', 'PROVIDER_NOT_FOUND'];
+
+/**
  * A failed call as `AuthErrorData`: an HTTP status means the server said
  * no (`REJECTED`, or the server's code when the port has it).
  */
@@ -125,7 +132,9 @@ function authError(
   const text = (error as { message?: unknown } | null)?.message;
   const message = typeof text === 'string' && text !== '' ? `${what}: ${text}` : what;
   const serverCode = (error as { code?: unknown } | null)?.code;
-  const passed = PASSED_CODES.find((code) => code === serverCode);
+  const passed = KEY_OFF_CODES.includes(String(serverCode))
+    ? 'KEY_OFF'
+    : PASSED_CODES.find((code) => code === serverCode);
   const code =
     !rejected || NETWORK_CODES.includes(String(serverCode)) ? 'NETWORK' : (passed ?? 'REJECTED');
   // A guest's save with another account's key carries a move offer (#403).

@@ -27,6 +27,10 @@ export const walnutKafeneio = {
     // `accent` over `surface` at 22% and 55% (#342).
     accentWash: '#503A20',
     accentLine: '#83632F',
+    // Problems (#462): a warm coral, apart from the brass of the main button.
+    problem: '#F2A48C',
+    problemWash: '#572A22',
+    problemLine: '#B0584A',
     turn: '#F2C14E',
     turnText: '#F6D27A',
     switchTrackOff: '#5A4330',

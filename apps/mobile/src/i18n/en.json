@@ -4,6 +4,9 @@
     "cancel": "Cancel",
     "back": "Back"
   },
+  "problem": {
+    "ok": "OK"
+  },
   "crash": {
     "title": "Something went wrong",
     "body": "Sorry, Tavlaki hit a problem. Restart the app to keep playing.",
@@ -273,12 +276,38 @@
       "delete": "Deleting your account…"
     },
     "problem": {
-      "appleUnfinished": "Apple sign-in did not finish. Check that this phone is signed in to an Apple ID in Settings.",
-      "keyTaken": "This Apple ID has another Tavlaki account already. Your guest account stays as it is.",
-      "keyTakenEmail": "This email has another Tavlaki account already. Your guest account stays as it is.",
-      "lastKey": "An account keeps at least one way to sign in.",
-      "deleteFailed": "Could not delete your account. Check the connection and try again.",
-      "other": "That did not work. Check the connection and try again."
+      "appleUnfinished": {
+        "title": "Apple sign-in did not finish",
+        "text": "Check that this phone is signed in to an Apple ID in Settings."
+      },
+      "keyTaken": {
+        "title": "This Apple ID has an account",
+        "text": "This Apple ID has another Tavlaki account already. Your guest account stays as it is."
+      },
+      "keyTakenEmail": {
+        "title": "This email has an account",
+        "text": "This email has another Tavlaki account already. Your guest account stays as it is."
+      },
+      "lastKey": {
+        "title": "This is your last way to sign in",
+        "text": "An account keeps at least one way to sign in. Add another one first."
+      },
+      "deleteFailed": {
+        "title": "Your account was not deleted",
+        "text": "Check the connection and try again."
+      },
+      "appleOff": {
+        "title": "Sign in with Apple is not ready",
+        "text": "It is off on our server for now. Try email, or try again later."
+      },
+      "network": {
+        "title": "No connection",
+        "text": "We could not reach our server. Check the connection and try again."
+      },
+      "other": {
+        "title": "That did not work",
+        "text": "Try again. If it keeps happening, try another way to sign in."
+      }
     },
     "note": {
       "saved": "Your account is saved.",
@@ -688,8 +717,24 @@
     "guestNote": "A guest account has no name and no email. Only this phone can open it.",
     "notNow": "Not now",
     "busy": "Signing you in…",
-    "failed": "That did not work. Check the connection and try again.",
-    "appleUnfinished": "Apple sign-in did not finish. Check that this phone is signed in to an Apple ID in Settings, or continue as a guest."
+    "problem": {
+      "appleUnfinished": {
+        "title": "Apple sign-in did not finish",
+        "text": "Check that this phone is signed in to an Apple ID in Settings, or continue as a guest."
+      },
+      "appleOff": {
+        "title": "Sign in with Apple is not ready",
+        "text": "It is off on our server for now. Try email or a guest account, or try again later."
+      },
+      "network": {
+        "title": "No connection",
+        "text": "We could not reach our server. Check the connection and try again."
+      },
+      "other": {
+        "title": "That did not work",
+        "text": "Try again. If it keeps happening, try another way to sign in."
+      }
+    }
   },
   "emailCode": {
     "title": "Sign in with email",
@@ -719,7 +764,9 @@
       "wrongCode": "This code is wrong. Check the email and try again.",
       "codeUsed": "This code does not work any more. Send a new code.",
       "keyTaken": "This email has another Tavlaki account already.",
-      "other": "That did not work. Check the connection and try again."
+      "emailOff": "Email sign-in is off on our server for now. Try another way, or try again later.",
+      "network": "We could not reach our server. Check the connection and try again.",
+      "other": "That did not work. Try again, or try another way to sign in."
     }
   },
   "join": {

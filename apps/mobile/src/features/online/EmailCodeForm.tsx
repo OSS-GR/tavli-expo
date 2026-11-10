@@ -35,6 +35,7 @@ import { Platform, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { FieldProblem } from '@/components/Problem';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 
@@ -108,7 +109,6 @@ export function EmailCodeForm({ auth, title, onCode, onBack, backLabel }: EmailC
         ? t('emailCode.problem.rateLimitedMinutes', { count: problem.minutes })
         : t(`emailCode.problem.${problem.problem}`);
   const noteText = note === null ? null : t(`emailCode.${note}`);
-  useAnnouncement(problemText, problemText === null ? undefined : `email-code:${event}`);
   useAnnouncement(noteText, noteText === null ? undefined : `email-code:${event}`);
 
   const show = (next: EmailCodeProblemState | null, nextNote: Note = null) => {
@@ -220,11 +220,11 @@ export function EmailCodeForm({ auth, title, onCode, onBack, backLabel }: EmailC
           {noteText}
         </Text>
       ) : null}
-      {problemText !== null ? (
-        <Text testID="email-code-problem" style={styles.line}>
-          {problemText}
-        </Text>
-      ) : null}
+      <FieldProblem
+        testID="email-code-problem"
+        text={problemText}
+        eventKey={`email-code:${event}`}
+      />
       <ActionButton
         testID="email-code-back"
         kind="text"

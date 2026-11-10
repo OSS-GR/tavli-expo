@@ -15,7 +15,7 @@ import {
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
-import { screen } from '@testing-library/react-native';
+import { screen, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
@@ -29,12 +29,14 @@ const STEP = { acceptTerms: TERMS_VERSION, ageChecked: true } as const;
 
 let server: MemoryGameServer;
 let auth: AuthProvider;
+let store: ReturnType<typeof createMemoryAuthStore>;
 
 beforeEach(() => {
   jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
   jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent').mockImplementation(() => {});
   server = createMemoryGameServer({ rng: createSeededRng(1), now: () => Date.UTC(2026, 10, 9) });
-  auth = createMemoryAuthProvider(createMemoryAuthStore());
+  store = createMemoryAuthStore();
+  auth = createMemoryAuthProvider(store);
 });
 
 afterEach(() => {
@@ -137,5 +139,32 @@ describe('the username step after a sign-in', () => {
     await user.press(await screen.findByRole('button', { name: 'Continue with Apple' }));
     expect(onSignedIn).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId('username-form')).toBeNull();
+  });
+});
+
+describe('a failed sign-in (#462)', () => {
+  it('shows the problem box in place of the choices; OK shows them again', async () => {
+    const user = setupUser();
+    store.offKeys.push('apple');
+    const { onSignedIn } = await open(undefined);
+    await user.press(await screen.findByRole('button', { name: 'Continue with Apple' }));
+    const problem = within(await screen.findByTestId('sign-in-failed'));
+    expect(
+      problem.getByRole('header', { name: 'Sign in with Apple is not ready' }),
+    ).toBeOnTheScreen();
+    expect(
+      problem.getByText(
+        'It is off on our server for now. Try email or a guest account, or try again later.',
+      ),
+    ).toBeOnTheScreen();
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
+      'Sign in with Apple is not ready. It is off on our server for now. Try email or a guest account, or try again later.',
+    );
+    expect(screen.queryByTestId('sign-in-choices')).toBeNull();
+    expect(onSignedIn).not.toHaveBeenCalled();
+    await user.press(problem.getByRole('button', { name: 'OK' }));
+    expect(screen.getByTestId('sign-in-choices')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Continue as a guest' }));
+    expect(onSignedIn).toHaveBeenCalledTimes(1);
   });
 });

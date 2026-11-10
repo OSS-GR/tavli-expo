@@ -52,6 +52,12 @@ describe('themes', () => {
         ['onAccent', 'accentLight'], // the main button's gradient (#356)
         ['text', 'accentWash'], // the "Learn to play" banner on Home (#342)
         ['textDim', 'accentWash'],
+        // Error popups and lines (#462).
+        ['problem', 'problemWash'],
+        ['text', 'problemWash'],
+        ['textDim', 'problemWash'],
+        ['problem', 'surface'],
+        ['problem', 'background'],
         // Locked or disabled labels ("Coming soon", a disabled Undo). WCAG lets
         // disabled controls be fainter, but locked labels still carry meaning.
         ['textDisabled', 'background'],
@@ -64,6 +70,8 @@ describe('themes', () => {
         const { colors } = theme;
         expect(contrastRatio(colors.accent, colors.background)).toBeGreaterThanOrEqual(3);
         expect(contrastRatio(colors.accent, colors.surface)).toBeGreaterThanOrEqual(3);
+        // The outline of an error popup (#462).
+        expect(contrastRatio(colors.problemLine, colors.surface)).toBeGreaterThanOrEqual(3);
         expect(contrastRatio(colors.switchThumb, colors.switchTrackOff)).toBeGreaterThanOrEqual(3);
       });
 

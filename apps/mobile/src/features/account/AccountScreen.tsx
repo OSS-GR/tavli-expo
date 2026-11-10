@@ -17,9 +17,13 @@
  *   games or Keep the guest.
  * - Saved: the username (to Settings → Username), the ways to sign in
  *   (never remove the last), Sign out and Delete my account.
- * - Each problem and note is read to screen readers (`useAnnouncement`).
- *   The dialogs hide the screen behind them (`Sheet`) and move focus to
- *   their title. No text has a line limit, so large fonts wrap and scroll.
+ * - A failed action opens the problem popup (`ProblemCard`, #462): what
+ *   went wrong, what to do, OK. It shares one `Sheet` with the move
+ *   dialog, so Keep my guest account turns the dialog into the problem
+ *   with no second Modal (iOS does not show one as another closes).
+ * - Each note is read to screen readers (`useAnnouncement`). The dialogs
+ *   hide the screen behind them (`Sheet`) and move focus to their title.
+ *   No text has a line limit, so large fonts wrap and scroll.
  *
  * Navigation stays in the route (`app/account.tsx`).
  */
@@ -38,6 +42,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ProblemCard } from '@/components/Problem';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionCard, SectionRow } from '@/components/SectionCard';
@@ -71,9 +76,7 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
   const [emailStep, setEmailStep] = useState<EmailStep | null>(null);
   const { state, busy, problem, note, said } = account;
 
-  const problemText = problem === null ? null : t(`account.problem.${problem}`);
   const noteText = note === null ? null : t(`account.note.${note}`);
-  useAnnouncement(problemText, problemText === null ? undefined : `account:${said}`);
   useAnnouncement(noteText, noteText === null ? undefined : `account:${said}`);
   useAnnouncement(busy === null ? null : t(`account.busy.${busy}`));
 
@@ -171,21 +174,28 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
                   {t(`account.busy.${busy}`)}
                 </Text>
               ) : null}
-              {problemText !== null ? (
-                <Text testID="account-problem" style={styles.line}>
-                  {problemText}
-                </Text>
-              ) : null}
             </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
       <Sheet
-        visible={account.offer !== null}
-        onClose={account.keepGuest}
-        closeLabel={t('common.cancel')}
+        visible={account.offer !== null || problem !== null}
+        onClose={account.offer !== null ? account.keepGuest : account.dismissProblem}
+        closeLabel={t(account.offer !== null ? 'common.cancel' : 'problem.ok')}
         look="dialog">
-        {account.offer !== null ? (
+        {problem !== null && account.offer === null ? (
+          <ProblemCard
+            // A new key per problem, so each one takes the focus again.
+            key={said}
+            testID="account-problem"
+            problem={{
+              title: t(`account.problem.${problem}.title`),
+              text: t(`account.problem.${problem}.text`),
+            }}
+            okLabel={t('problem.ok')}
+            onOk={account.dismissProblem}
+          />
+        ) : account.offer !== null ? (
           <MoveDialog
             title={t(
               account.offerKey === 'email'
