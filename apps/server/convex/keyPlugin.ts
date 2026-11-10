@@ -86,7 +86,7 @@ export function isKeyProviderId(value: unknown): value is KeyProviderId {
  */
 export function logKeyRefusal(
   reason: string,
-  extra: { audience?: string; code?: string; cookie?: boolean } = {},
+  extra: { audience?: string; code?: string; cookie?: boolean; provider?: string } = {},
 ): false {
   console.warn('apple key refused', { reason, ...extra });
   return false;
@@ -98,10 +98,18 @@ export function logKeyRefusal(
  * own (a missing session, a bad body, a second key of one kind), so this
  * line is the one that names them.
  */
-function logSaveRefusal(error: unknown): unknown {
+function logSaveRefusal(error: unknown, body: unknown): unknown {
+  // A move offer (#403) is an answer the app asks about, not a refusal.
+  if (error instanceof APIError && error.body?.['move'] !== undefined) return error;
   const code = error instanceof APIError ? String(error.body?.code ?? error.status) : 'INTERNAL';
-  logKeyRefusal('save-refused', { code });
+  logKeyRefusal('save-refused', { code, ...providerOf(body) });
   return error;
+}
+
+/** The key kind a body names (`apple`, `email`), for the log; nothing else from it. */
+function providerOf(body: unknown): { provider?: string } {
+  const provider = (body as { provider?: unknown } | null | undefined)?.provider;
+  return isKeyProviderId(provider) ? { provider } : {};
 }
 
 /**
@@ -112,7 +120,10 @@ const keySessionMiddleware = createAuthMiddleware(async (ctx) => {
   const session = await getSessionFromCtx(ctx);
   if (!session?.session) {
     const headers = ctx.request?.headers ?? ctx.headers;
-    logKeyRefusal('no-session', { cookie: headers?.has('cookie') === true });
+    logKeyRefusal('no-session', {
+      cookie: headers?.has('cookie') === true,
+      ...providerOf(ctx.body),
+    });
     throw new APIError('UNAUTHORIZED', { message: 'Unauthorized', code: 'UNAUTHORIZED' });
   }
   return { session };
@@ -481,7 +492,7 @@ export function keyPlugin(options: KeyPluginOptions) {
           } catch (error) {
             // `verify` and some checks above log their own reason; this
             // line names the answer the phone got (#462).
-            throw logSaveRefusal(error);
+            throw logSaveRefusal(error, ctx.body);
           }
         },
       ),

@@ -582,12 +582,18 @@ describe('the log of a turned-down Apple token (#462)', () => {
     expect((await saveApple(t, apple, phone, 'apple-ann')).status).toBe(200);
     expect((await saveApple(t, apple, phone, 'apple-bob')).status).toBe(409);
 
+    // A guest whose key has an account gets a move offer (#403): no refusal line.
+    const other = newPhone();
+    await guest(t, other);
+    const offer = await saveApple(t, apple, other, 'apple-ann');
+    expect(offer.body['move']).toBeDefined();
+
     const calls = warn.mock.calls.filter((args) => args[0] === 'apple key refused');
     expect(calls.map((args) => args[1])).toEqual([
-      { reason: 'no-session', cookie: false },
-      { reason: 'no-session', cookie: true },
-      { reason: 'save-refused', code: 'BAD_REQUEST' },
-      { reason: 'save-refused', code: 'PROVIDER_TAKEN' },
+      { reason: 'no-session', cookie: false, provider: 'apple' },
+      { reason: 'no-session', cookie: true, provider: 'apple' },
+      { reason: 'save-refused', code: 'BAD_REQUEST', provider: 'apple' },
+      { reason: 'save-refused', code: 'PROVIDER_TAKEN', provider: 'apple' },
     ]);
     expect(refusals(warn).text).not.toContain(phone.cookie);
   });
