@@ -76,6 +76,7 @@ describe('<FriendLinkScreen />', () => {
     onlineFake.authStore.session = { id: ME, isGuest: true };
     const props = await show(token);
     expect(screen.getByTestId('friend-link-guest')).toBeOnTheScreen();
+    expect(screen.getByTestId('friend-link-benefits')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Ask to be friends' })).toBeNull();
     await setupUser().press(screen.getByRole('button', { name: 'Save my account' }));
     expect(props.onAccount).toHaveBeenCalled();

@@ -49,6 +49,7 @@ import { SectionCard, SectionRow } from '@/components/SectionCard';
 import { Sheet } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
+import { AccountBenefits } from '@/features/online/AccountBenefits';
 import { EmailCodeForm } from '@/features/online/EmailCodeForm';
 import { AppleSignInButton } from '@/services';
 
@@ -294,6 +295,7 @@ function Guest({
       </SectionCard>
       <SectionCard padded>
         <View style={styles.block}>
+          <AccountBenefits testID="account-benefits" />
           <Text style={styles.line}>{t('account.guest.save')}</Text>
           {account.appleAvailable ? (
             <AppleButton

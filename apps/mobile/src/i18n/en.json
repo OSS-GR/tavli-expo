@@ -93,7 +93,9 @@
         "title": "Save your online games?",
         "body": "You play as a guest. Only this phone can open a guest account. Save it, and you can sign in again on a new phone.",
         "save": "Save my account",
-        "dismiss": "Keep playing as a guest"
+        "dismiss": "Keep playing as a guest",
+        "wins_one": "You have won {{count}} online match as a guest. Save your account to keep it on any phone.",
+        "wins_other": "You have won {{count}} online matches as a guest. Save your account to keep them on any phone."
       },
       "offline": {
         "title": "Play a friend online?",
@@ -242,7 +244,7 @@
       "noName": "You play as a guest.",
       "kept": "Kept on our server: your online games, your invites and your guest name. Kept on this phone: your games against the bot, your history and your settings.",
       "onlyHere": "A guest account opens only on this phone. If you lose the phone or delete the app, it is gone.",
-      "save": "Save your account to open it on a new phone and to pick a username. Your guest games stay.",
+      "save": "Save your account to sign in again on any phone. Your guest games stay.",
       "saveEmail": "Save with email",
       "delete": "Delete my guest account",
       "deleteHint": "Your online games, invites and guest name on our server."
@@ -714,7 +716,7 @@
     "email": "Continue with email",
     "emailNote": "With an email code you can sign in again on any phone. We keep your email address for the sign-in. Other players never see it.",
     "guest": "Continue as a guest",
-    "guestNote": "A guest account has no name and no email. Only this phone can open it.",
+    "guestNote": "A guest plays on this phone only, with no friends list.",
     "notNow": "Not now",
     "busy": "Signing you in…",
     "problem": {
@@ -1642,6 +1644,31 @@
       "unblockLabel": "Unblock {{name}}",
       "unblocked": "Unblocked: {{name}}",
       "unblockFailed": "Unblock did not work. Check the connection and try again."
+    }
+  },
+  "benefits": {
+    "title": "A saved account gives you",
+    "username": {
+      "title": "Your own username",
+      "text": "Friends find you by it, and they see it in each game."
+    },
+    "record": {
+      "title": "Your record with each friend",
+      "text": "Each match you finish against a friend counts."
+    },
+    "invites": {
+      "title": "Invites in one tap",
+      "text": "Invite a friend from your list. They get a notification if they turned them on."
+    },
+    "anyPhone": {
+      "title": "Your games on any phone",
+      "text": "Sign in on a new phone, and your online games are there."
+    },
+    "sample": {
+      "tag": "Example",
+      "name": "Eleni",
+      "score": "{{wins}}–{{losses}}",
+      "label": "Example: your record with {{name}}. You won {{wins}}, they won {{losses}}."
     }
   }
 }

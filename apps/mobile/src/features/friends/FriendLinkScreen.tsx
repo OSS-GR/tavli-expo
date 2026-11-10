@@ -23,6 +23,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionCard } from '@/components/SectionCard';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
+import { AccountBenefits } from '@/features/online/AccountBenefits';
 import { playerNameText } from '@/features/online/playerName';
 
 import { friendsProblem, type FriendsProblem } from './friendsData';
@@ -180,6 +181,7 @@ export function FriendLinkScreen({
                 <Text testID="friend-link-guest" style={styles.line}>
                   {t('friends.guest')}
                 </Text>
+                <AccountBenefits testID="friend-link-benefits" />
                 <ActionButton
                   testID="friend-link-account"
                   label={t('friends.saveAccount')}

@@ -142,6 +142,29 @@ describe('the username step after a sign-in', () => {
   });
 });
 
+describe('what a saved account gives (#463)', () => {
+  it('shows the four rows, the sample friend record and what a guest lacks', async () => {
+    await open(undefined);
+    const benefits = within(screen.getByTestId('sign-in-benefits'));
+    expect(benefits.getByRole('header', { name: 'A saved account gives you' })).toBeOnTheScreen();
+    for (const title of [
+      'Your own username',
+      'Your record with each friend',
+      'Invites in one tap',
+      'Your games on any phone',
+    ]) {
+      expect(benefits.getByLabelText(new RegExp(`^${title}\\. `))).toBeOnTheScreen();
+    }
+    expect(screen.getByTestId('sign-in-benefits-sample')).toHaveAccessibleName(
+      'Example: your record with Eleni. You won 5, they won 3.',
+    );
+    expect(
+      screen.getByText('A guest plays on this phone only, with no friends list.'),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText(/leaderboard|coming soon/i)).toBeNull();
+  });
+});
+
 describe('a failed sign-in (#462)', () => {
   it('shows the problem box in place of the choices; OK shows them again', async () => {
     const user = setupUser();
