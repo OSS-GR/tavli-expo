@@ -9,6 +9,7 @@ import { forgetOnlineAccount } from '../src/features/online/accountHint';
 import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
 import { resetRemindersForTest } from '../src/features/reminders/reminders';
 import { resetUpdateCheckForTest } from '../src/features/update/updateCheck';
+import { markWhatsNewSeenForTest } from '../src/features/whats-new/seen';
 
 import { resetOnlineFake } from './onlineFake';
 
@@ -34,4 +35,6 @@ beforeEach(() => {
   resetUpdateCheckForTest();
   // Save reminders (#404): no first choice yet.
   resetRemindersForTest();
+  // What's new (#471): every release seen, so Home's button has no dot.
+  markWhatsNewSeenForTest();
 });

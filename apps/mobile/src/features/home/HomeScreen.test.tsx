@@ -1,4 +1,5 @@
 import { act, render, screen, userEvent } from '@testing-library/react-native';
+import * as Reanimated from 'react-native-reanimated';
 
 import i18n from '@/i18n';
 
@@ -31,6 +32,53 @@ describe('<HomeScreen />', () => {
     expect(props.onSettings).toHaveBeenCalled();
     await user.press(screen.getByRole('link', { name: 'How to play' }));
     expect(props.onHowToPlay).toHaveBeenCalled();
+  });
+
+  it("shows What's new by name left of Settings, only with a handler (#471)", async () => {
+    const user = userEvent.setup();
+    const onWhatsNew = jest.fn();
+    const { rerender } = await render(<HomeScreen {...setup()} />);
+    expect(screen.queryByTestId('home-whats-new')).toBeNull();
+
+    await rerender(<HomeScreen {...setup()} onWhatsNew={onWhatsNew} />);
+    expect(screen.getByText("What's new")).toBeOnTheScreen();
+    expect(screen.queryByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeNull();
+    expect(
+      screen.queryByTestId('home-whats-new-heartbeat', { includeHiddenElements: true }),
+    ).toBeNull();
+    const row = screen.getByTestId('home-settings').parent!;
+    const order = row.children.map((child) =>
+      typeof child === 'string' ? child : (child.props.testID as string | undefined),
+    );
+    expect(order.indexOf('home-whats-new')).toBeLessThan(order.indexOf('home-settings'));
+    await user.press(screen.getByRole('button', { name: "What's new" }));
+    expect(onWhatsNew).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives What's new a dot and a heartbeat while a release is new (#471)", async () => {
+    await render(<HomeScreen {...setup()} onWhatsNew={jest.fn()} whatsNewFresh />);
+    expect(
+      screen.getByRole('button', { name: "What's new. New in this update." }),
+    ).toBeOnTheScreen();
+    expect(screen.getByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeTruthy();
+    expect(
+      screen.getByTestId('home-whats-new-heartbeat', { includeHiddenElements: true }),
+    ).toBeTruthy();
+  });
+
+  it("keeps What's new still with reduce motion: the dot only (#471)", async () => {
+    const reduce = jest.spyOn(Reanimated, 'useReducedMotion').mockReturnValue(true);
+    try {
+      await render(<HomeScreen {...setup()} onWhatsNew={jest.fn()} whatsNewFresh />);
+      expect(
+        screen.getByTestId('home-whats-new-dot', { includeHiddenElements: true }),
+      ).toBeTruthy();
+      expect(
+        screen.queryByTestId('home-whats-new-heartbeat', { includeHiddenElements: true }),
+      ).toBeNull();
+    } finally {
+      reduce.mockRestore();
+    }
   });
 
   it('lists the bot levels under "Play vs bot" (#182)', async () => {

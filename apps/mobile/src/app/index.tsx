@@ -15,6 +15,7 @@ import {
   FRIEND_HREF,
   JOIN_HREF,
   ONLINE_GAMES_HREF,
+  WHATS_NEW_HREF,
   gameHref,
   inviteWaitHref,
   newGameHref,
@@ -28,6 +29,7 @@ import { reminders } from '@/features/reminders/reminders';
 import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
+import { whatsNewSeen } from '@/features/whats-new/seen';
 import { auth, botLevels, games, invites } from '@/services';
 
 interface SlotState {
@@ -53,6 +55,8 @@ export default function HomeRoute() {
   // online account: with none, Home does not even load the session (no
   // network call at start).
   const [onlineAccount, setOnlineAccount] = useState(hasOnlineAccount);
+  // What's new (#471): the dot and the heartbeat until the page opens.
+  const [whatsNewFresh, setWhatsNewFresh] = useState(() => whatsNewSeen.due());
   const focused = useIsFocused();
   // Read them again each time Home shows (back from a game or an invite).
   useFocusEffect(
@@ -62,6 +66,7 @@ export default function HomeRoute() {
       // show it again whenever the text changes (a language switch).
       setSlot(readSlot());
       setOnlineAccount(hasOnlineAccount());
+      setWhatsNewFresh(whatsNewSeen.due());
     }, []),
   );
   const { saved } = slot;
@@ -151,6 +156,8 @@ export default function HomeRoute() {
       }
       onNewGame={(mode) => router.push(newGameHref(mode))}
       onSettings={() => router.push('/settings')}
+      onWhatsNew={() => router.push(WHATS_NEW_HREF)}
+      whatsNewFresh={whatsNewFresh}
       onHowToPlay={() => router.push(rulesHref('portes'))}
       onHistory={() => router.push('/history')}
       // Online play needs the server: a build without one shows "Coming soon".

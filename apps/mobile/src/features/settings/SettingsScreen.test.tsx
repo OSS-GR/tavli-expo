@@ -357,10 +357,21 @@ describe('<SettingsScreen />', () => {
     expect(recorded.sent).toHaveLength(count);
   });
 
-  it('has no Help section without a way to open the tutorial', async () => {
+  it("has no Help section without a way to open the tutorial or What's new", async () => {
     await render(<SettingsScreen />);
     expect(screen.queryByRole('header', { name: 'Help' })).not.toBeOnTheScreen();
     expect(screen.queryByTestId('settings-learn-to-play')).not.toBeOnTheScreen();
+    expect(screen.queryByTestId('settings-whats-new')).not.toBeOnTheScreen();
+  });
+
+  it("Help → What's new opens the page (#471), also with no tutorial", async () => {
+    const user = userEvent.setup();
+    const onWhatsNew = jest.fn();
+    await render(<SettingsScreen onWhatsNew={onWhatsNew} />);
+    expect(screen.getByRole('header', { name: 'Help' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('settings-learn-to-play')).not.toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: "What's new" }));
+    expect(onWhatsNew).toHaveBeenCalledTimes(1);
   });
 
   it.each([

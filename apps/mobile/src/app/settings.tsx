@@ -2,7 +2,7 @@ import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FRIENDS_HREF, RATINGS_HREF, tutorialHref } from '@/features/match/routes';
+import { FRIENDS_HREF, RATINGS_HREF, WHATS_NEW_HREF, tutorialHref } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { auth, friends, onlineData, ratings, safety, usernames } from '@/services';
@@ -22,6 +22,7 @@ export default function SettingsRoute() {
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         onLearnToPlay={(game) => router.push(tutorialHref('settings', game))}
         onHistory={() => router.push('/history')}
+        onWhatsNew={() => router.push(WHATS_NEW_HREF)}
         turnPushes={pushes}
         onAccount={auth && usernames && onlineData ? () => router.push('/account') : undefined}
         onBlocked={auth && safety ? () => router.push('/blocked') : undefined}

@@ -17,6 +17,12 @@ import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 import { createBoardStepStore, WELCOME_BOARD_STORAGE_KEY } from '@/features/welcome/boardStep';
 import { boardStepStore } from '@/features/welcome/boardStepStore';
+import { RELEASES } from '@/features/whats-new/releases';
+import {
+  WHATS_NEW_STORAGE_KEY,
+  forgetWhatsNewForTest,
+  whatsNewSeen,
+} from '@/features/whats-new/seen';
 import i18n from '@/i18n';
 import { analytics, storage } from '@/services';
 
@@ -60,6 +66,7 @@ const routes = {
   'friends/invite/[id]': stub('friend invite'),
   'add/[token]': stub('friend link'),
   ratings: stub('leaderboards'),
+  'whats-new': stub("what's new"),
 };
 
 /** A URL for each app route (not the layout, not the welcome flow). */
@@ -157,6 +164,18 @@ describe('first launch', () => {
     expect(recorded.sent.map((s) => s.type)).toContain('identify');
     expect(recorded.sent).toContainEqual({ type: 'track', event: 'app_opened', props: {} });
     expect(recorded.sent).toContainEqual({ type: 'screen', name: '/' });
+  });
+
+  it("marks every What's new release seen for a new player: Home's button has no dot (#471)", async () => {
+    forgetWhatsNewForTest();
+    const user = userEvent.setup();
+    await openApp();
+    await passWelcome(user, "Don't allow");
+    expect(screen).toHavePathname('/');
+    expect(storage.getString(WHATS_NEW_STORAGE_KEY)).toBe(RELEASES[0]!.date);
+    expect(whatsNewSeen.due()).toBe(false);
+    expect(screen.getByTestId('home-whats-new')).toBeOnTheScreen();
+    expect(screen.queryByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeNull();
   });
 
   it('is shown only once: the answer and the board step are saved', async () => {

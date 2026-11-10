@@ -26,6 +26,8 @@ import { settingsStore } from '@/features/settings/store';
 import { LESSON_SETS, LESSONS } from '@/features/tutorial/lessons';
 import { TUTORIAL_STORAGE_KEY, tutorialStorageKey } from '@/features/tutorial/progress';
 import { tutorialStore } from '@/features/tutorial/store';
+import { RELEASES } from '@/features/whats-new/releases';
+import { WHATS_NEW_STORAGE_KEY, whatsNewSeen } from '@/features/whats-new/seen';
 import { analytics, onlinePlayerId, onlineServer, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../test/clock';
@@ -1525,5 +1527,61 @@ describe('leaderboards (#407)', () => {
     await user.press(await screen.findByTestId('settings-friends'));
     await user.press(await screen.findByRole('button', { name: 'Leaderboards' }));
     expect(router.getPathname()).toBe('/ratings');
+  });
+});
+
+describe("what's new (#471)", () => {
+  it("Settings → What's new lists the releases, and Back returns to Settings", async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/settings' });
+    await user.press(screen.getByRole('button', { name: "What's new" }));
+    expect(router.getPathname()).toBe('/whats-new');
+    expect(screen.getByRole('header', { name: "What's new" })).toBeOnTheScreen();
+    expect(screen.getByTestId(`whats-new-release-${RELEASES[0]!.date}`)).toBeOnTheScreen();
+    expect(screen.getByText('Leaderboards')).toBeOnTheScreen();
+    await user.press(screen.getByTestId('whats-new-back'));
+    expect(router.getPathname()).toBe('/settings');
+  });
+
+  it("Home's What's new button opens the page, with no dot when nothing is new", async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    const button = screen.getByRole('button', { name: "What's new" });
+    expect(screen.queryByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeNull();
+    expect(
+      screen.queryByTestId('home-whats-new-heartbeat', { includeHiddenElements: true }),
+    ).toBeNull();
+    await user.press(button);
+    expect(router.getPathname()).toBe('/whats-new');
+  });
+
+  it('after an update, the button has the dot until the page opens', async () => {
+    // A phone that saw only the older release.
+    storage.setString(WHATS_NEW_STORAGE_KEY, RELEASES[1]!.date);
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    expect(screen.getByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeTruthy();
+    expect(
+      screen.getByTestId('home-whats-new-heartbeat', { includeHiddenElements: true }),
+    ).toBeTruthy();
+    // Home alone marks nothing seen: the dot stays after Settings.
+    await user.press(screen.getByRole('button', { name: 'Settings' }));
+    await act(async () => appRouter.back());
+    expect(whatsNewSeen.due()).toBe(true);
+
+    await user.press(screen.getByRole('button', { name: "What's new. New in this update." }));
+    expect(router.getPathname()).toBe('/whats-new');
+    expect(whatsNewSeen.due()).toBe(false);
+    await user.press(screen.getByTestId('whats-new-back'));
+    expect(router.getPathname()).toBe('/');
+    expect(screen.getByRole('button', { name: "What's new" })).toBeOnTheScreen();
+    expect(screen.queryByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('opening the page from a link marks every release seen', async () => {
+    storage.setString(WHATS_NEW_STORAGE_KEY, RELEASES[1]!.date);
+    await renderRouter('./src/app', { initialUrl: '/whats-new' });
+    expect(screen.getByTestId('whats-new-screen')).toBeOnTheScreen();
+    expect(whatsNewSeen.due()).toBe(false);
   });
 });

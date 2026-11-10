@@ -2,7 +2,7 @@
  * Home (wireframe 3, redesigned in #342): start or continue a game in one
  * or two taps.
  *
- * Top to bottom: the logo and Settings, a greeting, then a big hero card
+ * Top to bottom: the logo, What's new (#471) and Settings, a greeting, then a big hero card
  * with a board picture. The hero is the saved game ("Continue game") or,
  * with no save, "Play vs bot". Then the reminder card (#404, when one is
  * due), your online games and invites, the "Learn to play" banner, the
@@ -22,6 +22,7 @@ import type { IconName } from '@/components/icons';
 import { Toast, useToast } from '@/components/Toast';
 import type { MatchMode } from '@/features/match/setup';
 import { rulesDirection, startBoard } from '@/features/rules/content';
+import { WhatsNewButton } from '@/features/whats-new/WhatsNewButton';
 
 import { greetingFor } from './greeting';
 import { HomeHero, type HeroBoard } from './HomeHero';
@@ -35,6 +36,10 @@ const ONE_COLUMN_FONT_SCALE = 1.3;
 export interface HomeScreenProps {
   onNewGame: (mode: MatchMode) => void;
   onSettings: () => void;
+  /** Opens What's new (#471). The button shows only with it. */
+  onWhatsNew?: () => void;
+  /** A release this phone has not opened: the button's dot and heartbeat. */
+  whatsNewFresh?: boolean;
   onHowToPlay: () => void;
   /** Opens the match history (#142). The link shows only with it. */
   onHistory?: () => void;
@@ -69,6 +74,8 @@ export interface HomeScreenProps {
 export function HomeScreen({
   onNewGame,
   onSettings,
+  onWhatsNew,
+  whatsNewFresh = false,
   onHowToPlay,
   onHistory,
   onPlayFriend,
@@ -114,6 +121,7 @@ export function HomeScreen({
             <Text style={styles.appName} accessibilityRole="header">
               {t('home.title')}
             </Text>
+            {onWhatsNew ? <WhatsNewButton fresh={whatsNewFresh} onPress={onWhatsNew} /> : null}
             <Pressable
               testID="home-settings"
               accessibilityRole="button"

@@ -75,6 +75,9 @@ export function inviteWaitHref(code: string) {
 /** Leaderboards (#407): your rating and the boards, from Settings → Online and Friends. */
 export const RATINGS_HREF = '/ratings';
 
+/** What's new (#471): what each app update added, from Settings → Help and Home's button. */
+export const WHATS_NEW_HREF = '/whats-new';
+
 /** Friends (#406): the friends list, from Settings → Online. */
 export const FRIENDS_HREF = '/friends';
 
