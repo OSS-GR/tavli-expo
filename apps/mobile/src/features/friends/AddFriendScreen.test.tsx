@@ -121,17 +121,17 @@ describe('<AddFriendScreen />', () => {
 
   it('a load that started before New link never brings the old link back', async () => {
     signInSaved();
-    // The next myFriendLink waits until the test lets it answer.
-    let answerOld: (() => void) | undefined;
+    // While `held` is a list, myFriendLink waits until the test lets it answer.
+    let held: (() => void)[] | null = null;
     const slow: Friends = {
       ...onlineFake.friends,
       myFriendLink: async () => {
-        const old = await onlineFake.friends.myFriendLink();
-        if (answerOld === undefined) return old;
-        await new Promise<void>((resolve) => {
-          answerOld = resolve;
-        });
-        return old;
+        const token = await onlineFake.friends.myFriendLink();
+        if (held !== null) {
+          const wait = held;
+          await new Promise<void>((resolve) => wait.push(resolve));
+        }
+        return token;
       },
     };
     const props = { onBack: jest.fn(), onLink: jest.fn(), onAccount: jest.fn() };
@@ -141,10 +141,13 @@ describe('<AddFriendScreen />', () => {
     await render(ui(1));
     await flush();
     const old = await myLink();
-    // The player comes back: a load starts and hangs with the old link.
-    answerOld = () => undefined;
+    // The player comes back: a load starts and waits with the old link.
+    const waiting: (() => void)[] = [];
+    held = waiting;
     await screen.rerender(ui(2));
     await flush();
+    expect(waiting).toHaveLength(1);
+    held = null;
     const user = setupUser();
     await user.press(screen.getByRole('button', { name: 'New link' }));
     await user.press(screen.getByTestId('dialog-confirm'));
@@ -152,12 +155,66 @@ describe('<AddFriendScreen />', () => {
     const fresh = await myLink();
     expect(fresh).not.toBe(old);
     expect(screen.getByTestId('add-friend-link')).toHaveTextContent(fresh);
-    // The slow load answers with the old link: it is dropped.
+    // The waiting load answers with the old link: it is dropped.
     await act(async () => {
-      answerOld?.();
+      for (const answer of waiting) answer();
     });
     await flush();
     expect(screen.getByTestId('add-friend-link')).toHaveTextContent(fresh);
+  });
+
+  it('on a new visit, shows no QR code and shares nothing until the link loads', async () => {
+    signInSaved();
+    let held: (() => void)[] | null = null;
+    let down = false;
+    const slow: Friends = {
+      ...onlineFake.friends,
+      myFriendLink: async () => {
+        if (down) throw new Error('offline');
+        const token = await onlineFake.friends.myFriendLink();
+        if (held !== null) {
+          const wait = held;
+          await new Promise<void>((resolve) => wait.push(resolve));
+        }
+        return token;
+      },
+    };
+    const share = jest.spyOn(Share, 'share');
+    const props = { onBack: jest.fn(), onLink: jest.fn(), onAccount: jest.fn() };
+    const ui = (visit: number) => (
+      <AddFriendScreen auth={auth!} friends={slow} visit={visit} {...props} />
+    );
+    await render(ui(1));
+    await flush();
+    expect(screen.getByTestId('add-friend-qr')).toBeOnTheScreen();
+    // The link was reset on another phone; the player comes back.
+    await onlineFake.server().friendsFor(ME).resetFriendLink();
+    const waiting: (() => void)[] = [];
+    held = waiting;
+    await screen.rerender(ui(2));
+    await flush();
+    expect(screen.queryByTestId('add-friend-qr')).toBeNull();
+    expect(screen.getByTestId('add-friend-checking')).toHaveTextContent('Checking your link…');
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: 'Share' }));
+    expect(share).not.toHaveBeenCalled();
+    held = null;
+    await act(async () => {
+      for (const answer of waiting) answer();
+    });
+    await flush();
+    expect(screen.getByTestId('add-friend-link')).toHaveTextContent(await myLink());
+    // A reload that fails keeps the link hidden and says why.
+    down = true;
+    await screen.rerender(ui(3));
+    await flush();
+    expect(screen.queryByTestId('add-friend-qr')).toBeNull();
+    expect(screen.getByTestId('add-friend-refresh-failed')).toBeOnTheScreen();
+    down = false;
+    await user.press(screen.getByTestId('add-friend-refresh-retry'));
+    await flush();
+    expect(screen.getByTestId('add-friend-qr')).toBeOnTheScreen();
+    expect(screen.queryByTestId('add-friend-refresh-failed')).toBeNull();
   });
 
   it('finds a player by exact username and asks them', async () => {

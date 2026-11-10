@@ -116,7 +116,7 @@ describe('<FriendsScreen />', () => {
     expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
   });
 
-  it('keeps the list when a reload on the way back fails on the network', async () => {
+  it('keeps the list and says it may be old when a reload on the way back fails', async () => {
     signInSaved();
     await befriend('ann');
     let down = false;
@@ -148,6 +148,16 @@ describe('<FriendsScreen />', () => {
     await screen.rerender(ui(2));
     await flush();
     expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
+    expect(screen.getByTestId('friends-refresh-failed')).toHaveTextContent(
+      'This may be out of date: it did not load again. Check the connection and try again.',
+    );
+    // Try again loads quietly: the list stays, the note goes.
+    down = false;
+    await befriend('bob');
+    await setupUser().press(screen.getByTestId('friends-refresh-retry'));
+    await flush();
+    expect(screen.getByText(nameOf('bob'))).toBeOnTheScreen();
+    expect(screen.queryByTestId('friends-refresh-failed')).toBeNull();
   });
 
   it('lists friends with the record, and Invite opens the setup for that friend', async () => {

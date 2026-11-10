@@ -27,7 +27,16 @@ import type {
 } from '@tavli/contracts';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, Platform, ScrollView, Share, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  ScrollView,
+  Share,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -42,7 +51,7 @@ import { playerNameText } from '@/features/online/playerName';
 
 import { friendLinkUrl, friendTokenFromLink } from './friendLink';
 import { friendsProblem, useFriendsData, type FriendsProblem } from './friendsData';
-import { friendsStyles as styles, NotReady, useProblemText } from './FriendsParts';
+import { friendsStyles as styles, NotReady, RefreshFailed, useProblemText } from './FriendsParts';
 import { QrCode } from './QrCode';
 
 export interface AddFriendScreenProps {
@@ -64,6 +73,8 @@ interface AddData {
 
 /** The QR code's width in points. */
 const QR_SIZE = 200;
+/** Keeps the room of the QR code while the link is checked. */
+const QR_SPACE = { minHeight: QR_SIZE, justifyContent: 'center' } as const;
 
 /** Names each problem and each sent request for this app run (`useAnnouncement`). */
 let eventCount = 0;
@@ -90,7 +101,7 @@ export function AddFriendScreen({
     const [token, recent] = await Promise.all([friends.myFriendLink(), friends.recentPlayers()]);
     return { token, recent };
   }, [friends]);
-  const { state, reload, retry, replace } = useFriendsData(auth, load, visit);
+  const { state, current, reload, retry, replace } = useFriendsData(auth, load, visit);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
   const [sent, setSent] = useState<{ name: string; status: FriendStatus; n: number } | null>(null);
@@ -182,6 +193,9 @@ export function AddFriendScreen({
           />
         ) : (
           <>
+            {state.refreshFailed === true ? (
+              <RefreshFailed onRetry={reload} testID="add-friend" />
+            ) : null}
             {problemText !== null ? (
               <Text testID="add-friend-problem" style={styles.line}>
                 {problemText}
@@ -195,22 +209,33 @@ export function AddFriendScreen({
             <SectionCard title={t('friends.add.linkTitle')} padded>
               <View style={styles.padded}>
                 <Text style={styles.line}>{t('friends.add.linkIntro')}</Text>
-                <View style={styles.center}>
-                  <QrCode
-                    testID="add-friend-qr"
-                    value={link}
-                    size={QR_SIZE}
-                    label={t('friends.add.qrLabel')}
-                  />
-                  <Text style={styles.hint}>{t('friends.add.qrHint')}</Text>
-                  <Text testID="add-friend-link" style={styles.hint} selectable>
-                    {link}
-                  </Text>
-                </View>
+                {/* Until the link is known to be current (a new visit, or a
+                    reload that failed), it may be one reset on another phone:
+                    no QR code and no sharing. */}
+                {current ? (
+                  <View style={styles.center}>
+                    <QrCode
+                      testID="add-friend-qr"
+                      value={link}
+                      size={QR_SIZE}
+                      label={t('friends.add.qrLabel')}
+                    />
+                    <Text style={styles.hint}>{t('friends.add.qrHint')}</Text>
+                    <Text testID="add-friend-link" style={styles.hint} selectable>
+                      {link}
+                    </Text>
+                  </View>
+                ) : (
+                  <View testID="add-friend-checking" style={[styles.center, QR_SPACE]}>
+                    {state.refreshFailed === true ? null : <ActivityIndicator />}
+                    <Text style={styles.hint}>{t('friends.add.checking')}</Text>
+                  </View>
+                )}
                 <View style={styles.buttons}>
                   <ActionButton
                     testID="add-friend-share"
                     compact
+                    disabled={!current}
                     label={t('friends.add.share')}
                     onPress={() => {
                       Share.share({ message }).catch((error: unknown) =>
@@ -222,6 +247,7 @@ export function AddFriendScreen({
                     testID="add-friend-sms"
                     kind="secondary"
                     compact
+                    disabled={!current}
                     label={t('friends.add.textMessage')}
                     onPress={() => {
                       Linking.openURL(smsUrl(message)).catch(() => undefined);

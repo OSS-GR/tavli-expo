@@ -25,9 +25,12 @@
  * - Friend invite (#406, `friend`): the same setup, but the invite goes
  *   to one friend (`Friends.inviteFriend`), who gets a push. The title
  *   and the intro say so.
- *   It needs a saved account: a guest gets "Friends need a saved
- *   account…", nobody signed in "You are not signed in…", and neither
- *   gets the sign-in sheet.
+ *   It needs a saved account, so it checks the account when it opens
+ *   (and on each new `visit`, after Settings → Account) and again on
+ *   Make an invite. A guest gets "Friends need a saved account…" and
+ *   **Save my account**, nobody signed in "You are not signed in…" and
+ *   **Open Account** (`onAccount`), in place of Make an invite; neither
+ *   gets the sign-in sheet. `NOT_SAVED` from the server counts as a guest.
  *
  * Navigation stays in the route (`app/friend/index.tsx`, and
  * `app/friends/invite/[id].tsx` for a friend invite).
@@ -82,10 +85,17 @@ export interface FriendSetupScreenProps {
    * `invites.createInvite`. It resolves with the code.
    */
   friend?: { readonly invite: (game: NewInvite) => Promise<string> };
+  /** A friend invite with no saved account: opens Settings → Account. */
+  onAccount?: () => void;
+  /** Counts the times the screen shows (the route): a friend invite checks the account again. */
+  visit?: number;
 }
 
+/** Why a friend invite cannot be made from this account. */
+type NotSaved = 'guest' | 'signedOut';
+
 /** Why "Make an invite" did not work. */
-type Problem = 'account' | 'make' | 'tooMany' | 'notSaved' | 'signedOut';
+type Problem = 'account' | 'make' | 'tooMany';
 
 /** The turn time limit options: null is the 24-hour default, others are minutes. */
 const TIME_LIMITS: readonly (number | null)[] = [null, 5, 1];
@@ -98,6 +108,8 @@ export function FriendSetupScreen({
   analytics,
   appleSheet,
   friend,
+  onAccount,
+  visit = 0,
 }: FriendSetupScreenProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
@@ -112,6 +124,23 @@ export function FriendSetupScreen({
   // No saved session: the sign-in sheet is open.
   const [signingIn, setSigningIn] = useState(false);
   const titleRef = useFocusOnShow();
+  // A friend invite and an account that cannot make one.
+  const [notSaved, setNotSaved] = useState<NotSaved | null>(null);
+  const forFriend = friend !== undefined;
+  useEffect(() => {
+    if (!forFriend) return;
+    let live = true;
+    // A failed check says nothing: Make an invite checks again.
+    auth.ready().then(
+      (user) => {
+        if (live) setNotSaved(user === null ? 'signedOut' : user.isGuest ? 'guest' : null);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [auth, forFriend, visit]);
   // False once the screen is gone (the server answers later).
   const mounted = useRef(true);
   useEffect(() => {
@@ -134,6 +163,12 @@ export function FriendSetupScreen({
       setBusy(false);
       setProblem({ kind: next });
     };
+    const refused = (why: NotSaved) => {
+      making.current = false;
+      if (!mounted.current) return;
+      setBusy(false);
+      setNotSaved(why);
+    };
     let user: AuthUser | null;
     try {
       user = await auth.ready();
@@ -146,7 +181,7 @@ export function FriendSetupScreen({
     if (friend !== undefined && (user === null || user.isGuest)) {
       // A friend invite needs a saved account (ADR-0008): no sign-in sheet,
       // since a guest made there could not invite a friend either.
-      failed(user === null ? 'signedOut' : 'notSaved');
+      refused(user === null ? 'signedOut' : 'guest');
       return;
     }
     if (user === null) {
@@ -164,8 +199,11 @@ export function FriendSetupScreen({
       const tooMany =
         (isInviteErrorData(error) || isFriendsErrorData(error)) &&
         error.code === 'TOO_MANY_INVITES';
-      const notSaved = isFriendsErrorData(error) && error.code === 'NOT_SAVED';
-      failed(tooMany ? 'tooMany' : notSaved ? 'notSaved' : 'make');
+      if (isFriendsErrorData(error) && error.code === 'NOT_SAVED') {
+        refused('guest');
+        return;
+      }
+      failed(tooMany ? 'tooMany' : 'make');
       return;
     }
     if (!mounted.current) {
@@ -198,11 +236,16 @@ export function FriendSetupScreen({
         ? t('friend.tooMany', { max: MAX_OPEN_INVITES })
         : problem?.kind === 'make'
           ? t('friend.makeFailed')
-          : problem?.kind === 'notSaved'
-            ? t('friends.guest')
-            : problem?.kind === 'signedOut'
-              ? t('friends.signedOut')
-              : null;
+          : null;
+  const notSavedText =
+    notSaved === 'guest'
+      ? t('friends.guest')
+      : notSaved === 'signedOut'
+        ? t('friends.signedOut')
+        : null;
+  useEffect(() => {
+    if (notSavedText !== null) AccessibilityInfo.announceForAccessibility(notSavedText);
+  }, [notSavedText]);
   // iOS VoiceOver does not read `accessibilityRole="alert"`: read each problem.
   useEffect(() => {
     if (problemText !== null) AccessibilityInfo.announceForAccessibility(problemText);
@@ -277,12 +320,27 @@ export function FriendSetupScreen({
           </Text>
         ) : null}
         {busy ? <Text style={styles.hint}>{t('friend.making')}</Text> : null}
-        <ActionButton
-          testID="friend-make"
-          label={t('friend.make')}
-          disabled={busy}
-          onPress={() => void make()}
-        />
+        {notSavedText !== null ? (
+          <>
+            <Text testID="friend-not-saved" style={styles.problem}>
+              {notSavedText}
+            </Text>
+            {onAccount !== undefined ? (
+              <ActionButton
+                testID="friend-account-open"
+                label={notSaved === 'guest' ? t('friends.saveAccount') : t('friends.openAccount')}
+                onPress={onAccount}
+              />
+            ) : null}
+          </>
+        ) : (
+          <ActionButton
+            testID="friend-make"
+            label={t('friend.make')}
+            disabled={busy}
+            onPress={() => void make()}
+          />
+        )}
       </View>
       {signingIn ? (
         <SignInSheet

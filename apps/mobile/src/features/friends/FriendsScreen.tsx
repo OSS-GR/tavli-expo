@@ -42,7 +42,7 @@ import { playerNameText } from '@/features/online/playerName';
 import { ReportOrBlockSheet, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { friendsProblem, useFriendsData, type FriendsProblem } from './friendsData';
-import { friendsStyles as styles, NotReady, useProblemText } from './FriendsParts';
+import { friendsStyles as styles, NotReady, RefreshFailed, useProblemText } from './FriendsParts';
 
 export interface FriendsScreenProps {
   /** Counts the times the screen shows (the route): each new one loads again. */
@@ -137,6 +137,9 @@ export function FriendsScreen({
         ) : (
           <>
             <ActionButton testID="friends-add" label={t('friends.addButton')} onPress={onAdd} />
+            {state.refreshFailed === true ? (
+              <RefreshFailed onRetry={reload} testID="friends" />
+            ) : null}
             {problemText !== null ? (
               <Text testID="friends-problem" style={styles.line}>
                 {problemText}

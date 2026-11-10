@@ -26,6 +26,13 @@ import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { enterEmailCode } from '../../../test/emailCode';
 import { renderWithRoot } from '../../../test/render';
 
+/** Lets the account check answer (it answers on later microtasks). */
+async function flush(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  });
+}
+
 const START = Date.UTC(2026, 9, 28, 12, 0, 0);
 
 runOnFakeTimers();
@@ -320,32 +327,57 @@ describe('FriendSetupScreen', () => {
     expect(props.onCreated).not.toHaveBeenCalled();
   });
 
-  it('a friend invite as a guest says it needs a saved account, with no sign-in sheet (#406)', async () => {
+  it('a friend invite as a guest says it needs a saved account when it opens (#406)', async () => {
     const user = setupUser();
     const parts = setup();
     await parts.auth.signInAsGuest();
     const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
+    const onAccount = jest.fn();
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
-    await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
-    expect(screen.getByTestId('friend-problem')).toHaveTextContent(
+    await renderWithRoot(
+      <FriendSetupScreen {...parts} {...props} friend={{ invite }} onAccount={onAccount} />,
+    );
+    await flush();
+    // No tap needed: the screen says so as it opens, in place of Make an invite.
+    expect(screen.getByTestId('friend-not-saved')).toHaveTextContent(
       'Friends need a saved account. Save your guest account first: your games stay.',
     );
+    expect(screen.queryByTestId('friend-make')).toBeNull();
+    await user.press(screen.getByRole('button', { name: 'Save my account' }));
+    expect(onAccount).toHaveBeenCalledTimes(1);
     expect(invite).not.toHaveBeenCalled();
-    expect(props.onCreated).not.toHaveBeenCalled();
   });
 
-  it('a friend invite with nobody signed in makes no guest (#406)', async () => {
-    const user = setupUser();
+  it('a friend invite checks the account again on a new visit (#406)', async () => {
+    const parts = setup();
+    await parts.auth.signInAsGuest();
+    const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn(), onAccount: jest.fn() };
+    const ui = (visit: number) => (
+      <FriendSetupScreen {...parts} {...props} friend={{ invite }} visit={visit} />
+    );
+    await renderWithRoot(ui(1));
+    await flush();
+    expect(screen.getByTestId('friend-not-saved')).toBeOnTheScreen();
+    // Back from Account with a saved account.
+    parts.authStore.session = { id: 'saved-1', isGuest: false };
+    await screen.rerender(ui(2));
+    await flush();
+    expect(screen.queryByTestId('friend-not-saved')).toBeNull();
+    expect(screen.getByTestId('friend-make')).toBeOnTheScreen();
+  });
+
+  it('a friend invite with nobody signed in makes no guest and offers Account (#406)', async () => {
     const parts = setup();
     const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
-    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn(), onAccount: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await flush();
     expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
-    expect(screen.getByTestId('friend-problem')).toHaveTextContent(
+    expect(screen.getByTestId('friend-not-saved')).toHaveTextContent(
       'You are not signed in to online play on this phone. Friends need a saved account.',
     );
+    expect(screen.getByRole('button', { name: 'Open Account' })).toBeOnTheScreen();
     expect(parts.authStore.guests).toBe(0);
     expect(invite).not.toHaveBeenCalled();
   });
@@ -358,7 +390,9 @@ describe('FriendSetupScreen', () => {
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
-    expect(screen.getByTestId('friend-problem')).toHaveTextContent(/Friends need a saved account/);
+    expect(screen.getByTestId('friend-not-saved')).toHaveTextContent(
+      /Friends need a saved account/,
+    );
   });
 
   it('a second tap while the invite is made makes no second invite', async () => {
