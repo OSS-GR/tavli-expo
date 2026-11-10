@@ -58,7 +58,7 @@
     "qrcode-generator": "2.0.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-i18next": "17.1.9",
+    "react-i18next": "17.1.11",
     "react-native": "0.88.1",
     "react-native-gesture-handler": "~3.3.0",
     "react-native-mmkv": "4.3.2",
