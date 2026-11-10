@@ -85,6 +85,81 @@ describe('<FriendsScreen />', () => {
     expect(props.onAdd).toHaveBeenCalled();
   });
 
+  it('loads again each time the screen shows (a new visit)', async () => {
+    signInSaved();
+    const props = {
+      onBack: jest.fn(),
+      onAdd: jest.fn(),
+      onInvite: jest.fn(),
+      onOpenInvite: jest.fn(),
+      onAccount: jest.fn(),
+    };
+    const ui = (visit: number) => (
+      <FriendsScreen
+        auth={auth!}
+        friends={onlineFake.friends}
+        safety={onlineFake.safety}
+        visit={visit}
+        {...props}
+      />
+    );
+    await render(ui(1));
+    await flush();
+    expect(screen.getByTestId('friends-empty')).toBeOnTheScreen();
+    // A friend is added on another screen; then the player comes back.
+    await befriend('ann');
+    await screen.rerender(ui(1));
+    await flush();
+    expect(screen.queryByText(nameOf('ann'))).toBeNull();
+    await screen.rerender(ui(2));
+    await flush();
+    expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
+  });
+
+  it('keeps the list and says it may be old when a reload on the way back fails', async () => {
+    signInSaved();
+    await befriend('ann');
+    let down = false;
+    const flaky: Friends = {
+      ...onlineFake.friends,
+      listFriends: () =>
+        down ? Promise.reject(new Error('offline')) : onlineFake.friends.listFriends(),
+    };
+    const props = {
+      onBack: jest.fn(),
+      onAdd: jest.fn(),
+      onInvite: jest.fn(),
+      onOpenInvite: jest.fn(),
+      onAccount: jest.fn(),
+    };
+    const ui = (visit: number) => (
+      <FriendsScreen
+        auth={auth!}
+        friends={flaky}
+        safety={onlineFake.safety}
+        visit={visit}
+        {...props}
+      />
+    );
+    await render(ui(1));
+    await flush();
+    expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
+    down = true;
+    await screen.rerender(ui(2));
+    await flush();
+    expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
+    expect(screen.getByTestId('friends-refresh-failed')).toHaveTextContent(
+      'This may be out of date: it did not load again. Check the connection and try again.',
+    );
+    // Try again loads quietly: the list stays, the note goes.
+    down = false;
+    await befriend('bob');
+    await setupUser().press(screen.getByTestId('friends-refresh-retry'));
+    await flush();
+    expect(screen.getByText(nameOf('bob'))).toBeOnTheScreen();
+    expect(screen.queryByTestId('friends-refresh-failed')).toBeNull();
+  });
+
   it('lists friends with the record, and Invite opens the setup for that friend', async () => {
     signInSaved();
     await befriend('ann');

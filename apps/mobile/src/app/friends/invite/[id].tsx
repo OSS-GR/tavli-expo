@@ -6,6 +6,7 @@
  */
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 
+import { useVisit } from '@/features/friends/useVisit';
 import { FriendSetupScreen } from '@/features/invites/FriendSetupScreen';
 import { FRIENDS_HREF, inviteWaitHref, parseIdParam } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
@@ -14,6 +15,8 @@ import { auth, friends, invites } from '@/services';
 export default function FriendInviteRoute() {
   const params = useLocalSearchParams<{ id?: string }>();
   const playerId = parseIdParam(params.id);
+  // Counts the times the screen shows: back from Account, it checks again.
+  const visit = useVisit();
   if (auth === undefined || invites === undefined || friends === undefined) {
     return <Redirect href="/" />;
   }
@@ -24,6 +27,8 @@ export default function FriendInviteRoute() {
       auth={auth}
       invites={invites}
       friend={{ invite: (game) => service.inviteFriend(playerId, game) }}
+      visit={visit}
+      onAccount={() => router.push('/account')}
       onCreated={(code) => {
         router.replace(inviteWaitHref(code));
         // Every online game can last a while: offer turn notifications (#285).

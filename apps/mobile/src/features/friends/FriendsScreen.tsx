@@ -42,9 +42,11 @@ import { playerNameText } from '@/features/online/playerName';
 import { ReportOrBlockSheet, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { friendsProblem, useFriendsData, type FriendsProblem } from './friendsData';
-import { friendsStyles as styles, NotReady, useProblemText } from './FriendsParts';
+import { friendsStyles as styles, NotReady, RefreshFailed, useProblemText } from './FriendsParts';
 
 export interface FriendsScreenProps {
+  /** Counts the times the screen shows (the route): each new one loads again. */
+  visit?: number;
   auth: AuthProvider;
   friends: Friends;
   /** Report or block. `undefined`: the rows have no such button. */
@@ -78,6 +80,7 @@ export function FriendsScreen({
   onInvite,
   onOpenInvite,
   onAccount,
+  visit = 0,
 }: FriendsScreenProps) {
   const { t, i18n } = useTranslation();
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
@@ -90,7 +93,7 @@ export function FriendsScreen({
     ]);
     return { friends: list, requests, invites: invites.filter((i) => i.status === 'open') };
   }, [friends]);
-  const { state, reload, retry } = useFriendsData(auth, load);
+  const { state, reload, retry } = useFriendsData(auth, load, visit);
   // The player whose call is on its way.
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
@@ -134,6 +137,9 @@ export function FriendsScreen({
         ) : (
           <>
             <ActionButton testID="friends-add" label={t('friends.addButton')} onPress={onAdd} />
+            {state.refreshFailed === true ? (
+              <RefreshFailed onRetry={reload} testID="friends" />
+            ) : null}
             {problemText !== null ? (
               <Text testID="friends-problem" style={styles.line}>
                 {problemText}

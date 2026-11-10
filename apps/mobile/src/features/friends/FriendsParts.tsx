@@ -73,6 +73,25 @@ export function NotReady({ state, onRetry, onAccount, testID }: NotReadyProps) {
   }
 }
 
+/** A quiet reload failed: what shows may be old. Try again loads quietly. */
+export function RefreshFailed({ onRetry, testID }: { onRetry: () => void; testID: string }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Text testID={`${testID}-refresh-failed`} style={styles.line}>
+        {t('friends.refreshFailed')}
+      </Text>
+      <ActionButton
+        testID={`${testID}-refresh-retry`}
+        kind="secondary"
+        compact
+        label={t('friends.retry')}
+        onPress={onRetry}
+      />
+    </>
+  );
+}
+
 /** The text of a problem. */
 export function useProblemText(problem: FriendsProblem | null): string | null {
   const { t } = useTranslation();

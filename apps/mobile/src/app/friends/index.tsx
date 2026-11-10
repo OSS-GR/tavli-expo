@@ -5,14 +5,18 @@
 import { Redirect, router } from 'expo-router';
 
 import { FriendsScreen } from '@/features/friends/FriendsScreen';
+import { useVisit } from '@/features/friends/useVisit';
 import { ADD_FRIEND_HREF, friendInviteHref, inviteHref } from '@/features/match/routes';
 import { auth, friends, safety } from '@/services';
 
 export default function FriendsRoute() {
+  // Counts the times the screen shows, so it loads again on the way back.
+  const visit = useVisit();
   if (auth === undefined || friends === undefined) return <Redirect href="/settings" />;
   return (
     <FriendsScreen
       auth={auth}
+      visit={visit}
       friends={friends}
       {...(safety === undefined ? {} : { safety })}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/settings'))}
