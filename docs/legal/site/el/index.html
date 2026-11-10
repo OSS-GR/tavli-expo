@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ταβλάκι: ελληνικό τάβλι για iPhone</title>
+<meta name="description" content="Πόρτες, Πλακωτό, Φεύγα και Ασόδιο σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.">
+<meta name="theme-color" content="#3B2A1D">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="Ταβλάκι: ελληνικό τάβλι για iPhone">
+<meta property="og:description" content="Πόρτες, Πλακωτό, Φεύγα και Ασόδιο σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.">
+<meta property="og:image" content="https://tavlaki.com/img/board-1280.webp">
+<meta property="og:url" content="https://tavlaki.com/el/">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" hreflang="en" href="https://tavlaki.com/">
+<link rel="alternate" hreflang="el" href="https://tavlaki.com/el/">
+<style>
+/* The Greek homepage. The English page (../index.html) is the source: copy
+   every change of the style and the text from there. */
+:root {
+  --walnut: #3B2A1D; --walnut-deep: #2E1F15; --line: #6A4E35;
+  --ivory: #F1E6CF; --ivory-dim: #BFA987;
+  --brass: #C89B45; --brass-light: #E0B867; --on-brass: #22160C;
+  --point-dark: #2B1F19; --point-light: #CFB98E; --field: #8A6038;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--walnut); color: var(--ivory); font: 17px/1.6 var(--sans); }
+a { color: var(--brass-light); text-underline-offset: 0.18em; }
+a:focus-visible, .get:focus-visible { outline: 3px solid var(--brass-light); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; color: var(--ivory); }
+p { margin: 0 0 1rem; }
+.wrap { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
+
+/* Header: the icon, the name and the other language. */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
+.brand { display: flex; align-items: center; gap: 0.75rem; color: var(--ivory); text-decoration: none; font: 600 1.35rem/1 var(--serif); }
+.brand img { width: 44px; height: 44px; border-radius: 10px; }
+
+/* The points: one half of a tavli board, the page's frame. */
+.points { display: block; width: 100%; height: 40px; }
+
+/* Hero */
+.hero { display: grid; gap: 1.5rem; padding-top: 2.5rem; padding-bottom: 3rem; align-items: center; }
+.hero h1 { font-size: clamp(2.1rem, 6vw, 3.5rem); line-height: 1.1; letter-spacing: -0.01em; margin: 0 0 1.25rem; }
+.hero h1 span { display: block; text-wrap: balance; }
+.lead { font-size: 1.15rem; color: var(--ivory); max-width: 34rem; }
+.get { display: inline-block; margin: 0.5rem 0 0.75rem; padding: 0.85rem 1.75rem; border-radius: 999px; background: linear-gradient(var(--brass-light), var(--brass)); color: var(--on-brass); font-weight: 700; font-size: 1.05rem; text-decoration: none; box-shadow: 0 2px 0 #83632F; }
+.get:hover { background: var(--brass-light); }
+.note { color: var(--ivory-dim); font-size: 0.95rem; max-width: 30rem; }
+.board { display: block; width: 100%; height: auto; }
+@media (min-width: 56rem) {
+  .hero { grid-template-columns: 5fr 7fr; gap: 3rem; padding-top: 3.5rem; padding-bottom: 4rem; }
+}
+
+/* Sections */
+section { padding: 2.5rem 0; border-top: 1px solid var(--line); }
+section h2 { font-size: clamp(1.6rem, 3.5vw, 2.1rem); line-height: 1.2; margin: 0 0 1.5rem; }
+.measure { max-width: 40rem; }
+
+/* The four games: each name has a checker beside it, ivory and black in turn. */
+.games { display: grid; gap: 1.25rem 3rem; margin: 0 0 1.5rem; }
+.games div { position: relative; padding-left: 2.25rem; }
+.games dt { font: 600 1.3rem/1.3 var(--serif); margin: 0 0 0.25rem; }
+.games dd { margin: 0; color: var(--ivory-dim); }
+.games div::before { content: ""; position: absolute; left: 0; top: 0.2rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: radial-gradient(circle, #ECE2CB 0 45%, #D8CBAE 46% 52%, #ECE2CB 53%); box-shadow: inset 0 0 0 1px #6E5A3C, 0 1px 2px rgba(0, 0, 0, 0.5); }
+.games div:nth-child(even)::before { background: radial-gradient(circle, #1E1A17 0 45%, #3A332D 46% 52%, #1E1A17 53%); box-shadow: inset 0 0 0 1px #8C8279, 0 1px 2px rgba(0, 0, 0, 0.5); }
+.games span { font: italic 400 1rem var(--serif); color: var(--ivory-dim); margin-left: 0.4rem; }
+@media (min-width: 48rem) { .games { grid-template-columns: 1fr 1fr; } }
+
+/* Ways to play: three columns split like the board's bar. */
+.ways { display: grid; gap: 2rem; }
+.ways h3 { font-size: 1.3rem; line-height: 1.3; margin: 0 0 0.5rem; }
+.ways p { color: var(--ivory-dim); }
+@media (min-width: 56rem) {
+  .ways { grid-template-columns: repeat(3, 1fr); gap: 0; }
+  .ways > div { padding: 0 2rem; border-left: 1px solid var(--line); }
+  .ways > div:first-child { padding-left: 0; border-left: 0; }
+}
+/* No ads and Help side by side on wide screens. */
+.pair { display: grid; gap: 2.5rem; }
+.pair > div { max-width: 36rem; }
+@media (min-width: 56rem) { .pair { grid-template-columns: 1fr 1fr; gap: 4rem; } }
+.plain { margin: 0; padding-left: 1.25rem; }
+.plain li { margin: 0 0 0.6rem; }
+
+/* Footer: the other half of the board, points up. */
+footer { background: var(--walnut-deep); margin-top: 1rem; }
+footer .wrap { padding-top: 1.5rem; padding-bottom: 2.5rem; color: var(--ivory-dim); font-size: 0.95rem; }
+footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <a class="brand" href="/el/"><img src="/img/icon-192.webp" alt="" width="44" height="44">Ταβλάκι</a>
+  <a href="/" lang="en" hreflang="en">English</a>
+</header>
+
+<svg class="points" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="points-down" width="64" height="40" patternUnits="userSpaceOnUse">
+      <rect width="64" height="40" fill="#8A6038"/>
+      <polygon points="0,0 16,40 32,0" fill="#CFB98E"/>
+      <polygon points="32,0 48,40 64,0" fill="#2B1F19"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="40" fill="url(#points-down)"/>
+</svg>
+
+<main>
+<div class="wrap hero">
+  <div>
+    <h1><span>Καλώς ήρθες στο καφενείο.</span> <span>Τράβα μια καρέκλα.</span></h1>
+    <p class="lead">Το Ταβλάκι είναι ελληνικό τάβλι για iPhone: Πόρτες, Πλακωτό, Φεύγα και Ασόδιο, σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.</p>
+    <!-- After the App Store launch, link https://apps.apple.com/app/id6828172932 here and on the English page, and drop the beta note. -->
+    <a class="get" href="https://testflight.apple.com/join/8vkMaRAm" rel="noreferrer">Κατέβασε το Ταβλάκι</a>
+    <p class="note">Δωρεάν. Το Ταβλάκι είναι σε δοκιμαστική έκδοση στο TestFlight, την εφαρμογή της Apple για δοκιμαστικές εκδόσεις. Το Android έρχεται αργότερα.</p>
+  </div>
+  <img class="board" src="/img/board-1280.webp" srcset="/img/board-720.webp 720w, /img/board-1280.webp 1280w" sizes="(min-width: 56rem) 42rem, 100vw" width="1280" height="960" alt="Παρτίδα Πόρτες στο Ταβλάκι. Ένα άσπρο πούλι είναι σηκωμένο και φαίνεται η θέση όπου μπορεί να πάει. Κάτω από το ταμπλό, τα ζάρια δείχνουν 6 και 3.">
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>Τα τέσσερα ελληνικά παιχνίδια</h2>
+    <dl class="games">
+      <div><dt>Πόρτες</dt><dd>Το κλασικό. Χτύπα τα ακάλυπτα πούλια και φτιάξε τις πόρτες σου.</dd></div>
+      <div><dt>Πλακωτό</dt><dd>Δεν χτυπάς, πλακώνεις. Αν πλακώσεις τη «μάνα» του αντιπάλου, το τελευταίο πούλι στην αφετηρία του, εκείνος διαλέγει: παραιτείται και χάνει 2 βαθμούς ή συνεχίζει.</dd></div>
+      <div><dt>Φεύγα</dt><dd>Ούτε χτύπημα ούτε πλάκωμα. Ένα πούλι κρατά τη θέση, οπότε κλείνεις τον δρόμο του αντιπάλου πιάνοντας θέσεις μπροστά του.</dd></div>
+      <div><dt>Ασόδιο</dt><dd>Φέρε ασόδυο (1-2) ή διπλές για να ανοίξει το ταμπλό, βάλε μέσα και τα 15 πούλια και προχώρα σαν ένας στρατός.</dd></div>
+    </dl>
+    <p class="measure">Ή παίξε ολόκληρο Τάβλι: Πόρτες, Πλακωτό και Φεύγα με τη σειρά, στους 1, 3, 5 ή 7 βαθμούς.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Τρεις τρόποι να παίξεις</h2>
+    <div class="ways">
+      <div>
+        <h3>Με τον υπολογιστή</h3>
+        <p>Εύκολο, Μέτριο ή Δύσκολο, σε κάθε παιχνίδι. Ο υπολογιστής παίζει μέσα στο κινητό σου, οπότε δεν χρειάζεσαι internet.</p>
+      </div>
+      <div>
+        <h3>Δύο παίκτες, ένα κινητό</h3>
+        <p>Παίζετε με τη σειρά στο ίδιο κινητό. Το ταμπλό γυρίζει προς τον παίκτη που έχει σειρά.</p>
+      </div>
+      <div>
+        <h3>Με φίλο online</h3>
+        <p>Στείλε έναν σύνδεσμο πρόσκλησης ή έναν κωδικό και παίξτε με τον ρυθμό σας: η εφαρμογή σού λέει πότε είναι η σειρά σου. Πρόσθεσε φίλους και ανέβα στις κατατάξεις. Συνδέσου με Apple ή με κωδικό στο email σου, ή ξεκίνα ως επισκέπτης.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="measure">
+    <h2>Μαθαίνεις παίζοντας</h2>
+    <ul class="plain">
+      <li>Πρώτη φορά στο τάβλι; Ένα μάθημα ενός λεπτού στο κανονικό ταμπλό σού μαθαίνει τις Πόρτες, και κάθε παιχνίδι έχει τη σελίδα «Πώς παίζεται».</li>
+      <li>Ζήτα υπόδειξη όταν κολλήσεις, και δες ξανά μια παρτίδα με την ανάλυση.</li>
+      <li>Ελληνικά και αγγλικά. Το παιχνίδι αποθηκεύεται μόνο του, οπότε συνεχίζεις όποτε θέλεις.</li>
+    </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap pair">
+    <div>
+    <h2>Χωρίς διαφημίσεις</h2>
+    <p>Τα παιχνίδια στο κινητό σου δεν θέλουν λογαριασμό. Εσύ αποφασίζεις αν η εφαρμογή θα στέλνει ανώνυμα δεδομένα χρήσης, και αλλάζεις γνώμη όποτε θέλεις στις Ρυθμίσεις. Για το online παιχνίδι κρατάμε μόνο ό,τι χρειάζεται για να τρέχουν τα παιχνίδια σου: διάβασε την <a href="/el/privacy/">πολιτική απορρήτου</a>.</p>
+    </div>
+    <div>
+    <h2>Βοήθεια</h2>
+    <p>Ερώτηση, πρόβλημα ή ιδέα; Γράψε στο <a href="mailto:support@tavlaki.com">support@tavlaki.com</a>.</p>
+    <p>Σου έστειλε κωδικό ένας φίλος; Άνοιξε το Ταβλάκι και πάτα <strong>Μπες με κωδικό</strong>.</p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <svg class="points" aria-hidden="true" focusable="false">
+    <defs>
+      <pattern id="points-up" width="64" height="40" patternUnits="userSpaceOnUse">
+        <rect width="64" height="40" fill="#8A6038"/>
+        <polygon points="0,40 16,0 32,40" fill="#2B1F19"/>
+        <polygon points="32,40 48,0 64,40" fill="#CFB98E"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="40" fill="url(#points-up)"/>
+  </svg>
+  <div class="wrap">
+    <nav aria-label="Σελίδες">
+      <a href="/el/privacy/">Πολιτική απορρήτου</a>
+      <a href="/el/terms/">Όροι χρήσης</a>
+      <a href="mailto:support@tavlaki.com">support@tavlaki.com</a>
+      <a href="/" lang="en" hreflang="en">English</a>
+    </nav>
+    <p>Ο ιστότοπος δεν βάζει cookies, δεν τρέχει scripts και δεν φορτώνει τίποτα από άλλους ιστότοπους.</p>
+  </div>
+</footer>
+</body>
+</html>

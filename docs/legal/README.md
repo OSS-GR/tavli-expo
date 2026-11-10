@@ -10,6 +10,9 @@
 |------|------------|
 | [privacy.md](privacy.md) | English policy. **Source of truth.** |
 | [privacy.el.md](privacy.el.md) | Greek policy. Same content as the English one. |
+| [site/index.html](site/index.html) | The English homepage, served at `https://tavlaki.com/`: the games, the ways to play, **Get Tavlaki** (the TestFlight link) and the support address `support@tavlaki.com` |
+| [site/el/index.html](site/el/index.html) | The Greek homepage, served at `https://tavlaki.com/el/`. Same content and style as the English one: copy every change |
+| [site/img/](site/img/) | The homepage pictures: the board (a render of the app's board) and the app icon. Also `site/favicon.png` and `site/apple-touch-icon.png` |
 | [site/privacy/index.html](site/privacy/index.html) | English static page, served at `https://tavlaki.com/privacy` |
 | [site/el/privacy/index.html](site/el/privacy/index.html) | Greek static page, served at `https://tavlaki.com/el/privacy` |
 | [terms.md](terms.md) | English terms of use (#405). **Source of truth.** A draft for the lawyer check. |
@@ -31,8 +34,9 @@ The app opens `https://tavlaki.com/privacy` (`PRIVACY_POLICY_URL` in `apps/mobil
 - **Terms of use:** the same rules: change all four terms files together. The version date at the top is `TERMS_VERSION` (`packages/contracts/src/username.ts`). Raise both only when players must accept the terms again: the app then asks each saved player before their next username change, and the server refuses a change without it (`TERMS_NEEDED`).
 - **Change all four files together.** Edit the English Markdown first, then the Greek Markdown, then both HTML pages. Change the "Last updated" date in all four.
 - The policy describes what the code does. When a PR changes what data leaves the phone (a new event, a new vendor, a new id), it updates this policy in the same PR. The event list must match [`docs/architecture/analytics-events.md`](../architecture/analytics-events.md). The same PR also updates the store privacy answers ([`docs/store/app-privacy.md`](../store/app-privacy.md), [`docs/store/play-data-safety.md`](../store/play-data-safety.md)) and the iOS privacy manifest in `apps/mobile/app.json`.
-- The HTML pages are plain HTML with inline CSS. No JavaScript, no fonts or images from other sites, no cookies. Keep it that way: the policy says so.
-- `<!-- OWNER: ... -->` comments in the Markdown mark things the owner must confirm. They are left out of the HTML. The invite fallback page has no Markdown source, so its `OWNER` comment is in the HTML.
+- The HTML pages are plain HTML with inline CSS. No JavaScript, no fonts or images from other sites, no cookies. Keep it that way: the policy says so. The homepages show local images only (`site/img/`).
+- **The homepages:** change `site/index.html` first, then copy the change to `site/el/index.html` (text and style). The **Get Tavlaki** buttons on both homepages and on the invite page link the TestFlight public link. After the App Store launch, change all four buttons to `https://apps.apple.com/app/id6828172932` and drop the beta notes. `link.test.ts` checks the link and the no-script rule.
+- `<!-- OWNER: ... -->` comments in the Markdown mark things the owner must confirm. They are left out of the HTML.
 
 ## How to make the HTML from the Markdown
 
@@ -50,6 +54,7 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 2. Point `tavlaki.com` at the host. Both `https://tavlaki.com/privacy` and `https://tavlaki.com/el/privacy` must open the pages. Cloudflare serves `privacy/index.html` at `/privacy/` and redirects `/privacy` there.
 3. Use HTTPS. Do not add analytics or cookies to the site.
 4. Put `https://tavlaki.com/privacy` in App Store Connect (App Privacy → Privacy Policy URL) and in the Google Play Console (App content → Privacy policy).
+5. Put `https://tavlaki.com` in App Store Connect as the Support URL and the Marketing URL (Greek localization: `https://tavlaki.com/el/`). The homepage shows `support@tavlaki.com`: make that address work.
 
 ## Invite links (#332)
 
@@ -57,11 +62,11 @@ The share link of an invite is `https://tavlaki.com/i/<code>`. On an iPhone with
 
 Owner steps (`tavlaki.com` DNS is on Cloudflare, so a Cloudflare Worker is the simplest host; any static host with rewrites and headers works):
 
-1. In the fallback page, replace both `https://testflight.apple.com/join/OWNER-TESTFLIGHT-LINK` links with the TestFlight public link (App Store Connect → TestFlight → External Testing → your group → Public Link). After the App Store launch, use `https://apps.apple.com/app/id6828172932` and drop the beta note (both languages). This is a repo change: open a PR, or ask an agent.
+1. Done: the fallback page and the homepages link the TestFlight public link (App Store Connect → TestFlight → External Testing → your group → Public Link). After the App Store launch, see "The homepages" under [Rules](#rules).
 2. Cloudflare dashboard → **Workers & Pages** → **Create application** → connect GitHub and pick this repo. Project name `tavlaki` (the `name` in `wrangler.jsonc`), build command empty, deploy command `npx wrangler deploy`, **Preview builds** off, and under **Advanced settings** the **Path** `docs/legal`. Pick **Create new token** for the API token. Add the build variable `SKIP_DEPENDENCY_INSTALL` = `1`: without it Cloudflare installs the whole app's packages first (it finds the pnpm workspace above the path). Each push to `main` then publishes the site. Optional: in the Worker's **Settings → Build**, set the build watch paths to `docs/legal/*`, so other pushes start no build.
 3. The Worker → **Settings → Domains & Routes** → **Add** → **Custom domain** → `tavlaki.com`. Cloudflare adds the DNS record and the HTTPS certificate (the Proton Mail records stay as they are). Do not add the record by hand. The link domain is `tavlaki.com`, not `www`; never redirect `tavlaki.com` to `www`, or iOS cannot read the file. Then turn off **Email Address Obfuscation** (Security → Settings): it adds a Cloudflare script to pages that show an email address, such as the privacy policy, and the pages promise no scripts. Do not turn on Cloudflare Web Analytics for the site.
 4. Check the association file: `curl -sI https://tavlaki.com/.well-known/apple-app-site-association` must answer `200`, `content-type: application/json`, and no redirect. `_headers` sets the type; if the host ignores `_headers`, set the header in the host's settings.
-5. Check the fallback page: `https://tavlaki.com/i/ABCD2345` shows "Get Tavlaki" and the address stays the same. `_redirects` rewrites `/i/*` to `/i/` (status `200`, a rewrite; `/i/index.html` as the target is a loop on Cloudflare, and the deploy fails). If your host does not read `_redirects`, add the same rewrite there. Also check that `https://tavlaki.com/privacy` and `/terms` still open.
+5. Check the fallback page: `https://tavlaki.com/i/ABCD2345` shows "Get Tavlaki" and the address stays the same. `_redirects` rewrites `/i/*` to `/i/` (status `200`, a rewrite; `/i/index.html` as the target is a loop on Cloudflare, and the deploy fails). If your host does not read `_redirects`, add the same rewrite there. Also check that `https://tavlaki.com/`, `/el/`, `/privacy` and `/terms` still open.
 6. Make a new production build (`eas build -p ios --profile production`) and send it to TestFlight. The entitlement `applinks:tavlaki.com` is in that build only: older builds never open the link. EAS turns on the Associated Domains capability for `com.tavlaki` by itself.
 7. Test on an iPhone: "Universal links" in [`docs/process/running-the-app.md`](../process/running-the-app.md#universal-links-332).
 

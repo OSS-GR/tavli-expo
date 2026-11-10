@@ -158,9 +158,9 @@ The first release of Tavlaki.
 | In-app purchases | None |
 | Contains ads (Google Play) | No |
 | Privacy policy URL | `https://tavlaki.com/privacy` |
-| Support URL (App Store, required) | **Owner:** for example `https://tavlaki.com` with a contact address. No page exists yet. |
-| Marketing URL (App Store, optional) | `https://tavlaki.com` (when the site exists) |
-| Contact email (Google Play, required) | **Owner:** for example `support@tavlaki.com`. It is public on the listing. |
+| Support URL (App Store, required) | `https://tavlaki.com` (Greek: `https://tavlaki.com/el/`). The homepage shows `support@tavlaki.com`. **Owner:** make that address work. |
+| Marketing URL (App Store, optional) | `https://tavlaki.com` (Greek: `https://tavlaki.com/el/`) |
+| Contact email (Google Play, required) | `support@tavlaki.com`, the address on the homepage. It is public on the listing. |
 | Copyright (App Store) | **Owner:** `2026 <your name or company>` |
 | Age rating | See [age-rating.md](age-rating.md) |
 | Privacy answers | [app-privacy.md](app-privacy.md) (Apple), [play-data-safety.md](play-data-safety.md) (Google) |
