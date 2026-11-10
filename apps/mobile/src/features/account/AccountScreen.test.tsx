@@ -230,6 +230,14 @@ describe('<AccountScreen /> as a guest', () => {
     expect(screen.queryByTestId('account-sign-out')).toBeNull();
   });
 
+  it('shows a guest what a saved account gives, with no sample (#463)', async () => {
+    await guest();
+    await open();
+    expect(await screen.findByTestId('account-benefits')).toBeOnTheScreen();
+    expect(screen.getByLabelText(/^Your record with each friend\./)).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-benefits-sample')).toBeNull();
+  });
+
   it('a guest with no number yet plays as "a guest"', async () => {
     await signInForOnline(auth!);
     await open();

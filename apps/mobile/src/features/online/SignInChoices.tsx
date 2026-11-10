@@ -10,6 +10,9 @@
  * - Continue with email shows the email code step (`EmailCodeForm`) in
  *   place of the choices; its Back shows the choices again. The caller
  *   (and the invite in its route) stays the same all the while.
+ * - Above them, what a saved account gives (`AccountBenefits`, #463),
+ *   with the sample friend record. The guest note says what a guest
+ *   lacks.
  * - Not now signs in nothing: the caller closes or goes Home.
  * - After a sign-in with a key, a saved account with no username yet sees
  *   the username step (`UsernameForm`, #405) in place of the choices; its
@@ -34,6 +37,7 @@ import {
   usernames as appUsernames,
 } from '@/services';
 
+import { AccountBenefits } from './AccountBenefits';
 import { EmailCodeForm } from './EmailCodeForm';
 import { useSignInChoices } from './signIn';
 import { UsernameForm } from './UsernameForm';
@@ -106,6 +110,7 @@ export function SignInChoices({
   }
   return (
     <View testID="sign-in-choices" style={styles.choices}>
+      <AccountBenefits sample testID="sign-in-benefits" />
       {appleAvailable ? (
         <View style={styles.choice}>
           <AppleSignInButton

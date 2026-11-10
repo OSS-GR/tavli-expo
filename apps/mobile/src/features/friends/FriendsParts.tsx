@@ -8,6 +8,8 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 
+import { AccountBenefits } from '@/features/online/AccountBenefits';
+
 import type { FriendsLoad, FriendsProblem } from './friendsData';
 
 export interface NotReadyProps {
@@ -49,6 +51,7 @@ export function NotReady({ state, onRetry, onAccount, testID }: NotReadyProps) {
           <Text testID={`${testID}-guest`} style={styles.line}>
             {t('friends.guest')}
           </Text>
+          <AccountBenefits testID={`${testID}-benefits`} />
           <ActionButton
             testID={`${testID}-account`}
             label={t('friends.saveAccount')}

@@ -66,6 +66,8 @@ describe('<FriendsScreen />', () => {
     onlineFake.authStore.session = { id: ME, isGuest: true };
     const props = await show();
     expect(screen.getByTestId('friends-guest')).toBeOnTheScreen();
+    // What a saved account gives (#463).
+    expect(screen.getByTestId('friends-benefits')).toBeOnTheScreen();
     await setupUser().press(screen.getByRole('button', { name: 'Save my account' }));
     expect(props.onAccount).toHaveBeenCalled();
   });

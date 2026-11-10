@@ -1337,6 +1337,34 @@ describe('save reminders on Home (#404)', () => {
     expect(router.getPathname()).toBe('/account');
   });
 
+  it("puts a guest's online wins on the card (#463)", async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await pressMakeInvite(user);
+    expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
+    await act(async () => appRouter.back());
+    const me = onlineFake.authStore.session!.id;
+    // Two finished matches: the guest wins one (Bob resigns), loses one.
+    await act(async () => {
+      const won = onlineFake
+        .server()
+        .createGame(me, { white: me, black: 'bob' }, 'portes', 3, null);
+      await onlineFake.transportFor('bob').resign(won);
+      const lost = onlineFake
+        .server()
+        .createGame(me, { white: me, black: 'bob' }, 'portes', 3, null);
+      await onlineFake.transportFor(me).resign(lost);
+    });
+    await backToHomeAfter(router, DAY_MS);
+    const card = await screen.findByTestId('home-reminder-guest');
+    expect(
+      await within(card).findByText(
+        'You have won 1 online match as a guest. Save your account to keep it on any phone.',
+      ),
+    ).toBeOnTheScreen();
+  });
+
   it('asks a player who said Not now on the sign-in sheet to play a friend', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });

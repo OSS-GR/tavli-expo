@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { anyGameLevels } from '@/features/bot/levels';
 import { ContinueCard } from '@/features/home/ContinueCard';
+import { GuestReminderCard } from '@/features/home/GuestReminderCard';
 import { HomeInvites } from '@/features/home/HomeInvites';
 import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
@@ -93,16 +94,30 @@ export default function HomeRoute() {
       }
       reminderCard={
         card ? (
-          <ReminderCard
-            kind={card.kind}
-            last={card.last}
-            onAccept={() => {
-              reminder.hide();
-              router.push(card.kind === 'guest' ? '/account' : FRIEND_HREF);
-            }}
-            onDismiss={reminder.hide}
-            onStop={reminder.stop}
-          />
+          card.kind === 'guest' && auth !== undefined && games !== undefined ? (
+            <GuestReminderCard
+              auth={auth}
+              games={games}
+              last={card.last}
+              onAccept={() => {
+                reminder.hide();
+                router.push('/account');
+              }}
+              onDismiss={reminder.hide}
+              onStop={reminder.stop}
+            />
+          ) : (
+            <ReminderCard
+              kind={card.kind}
+              last={card.last}
+              onAccept={() => {
+                reminder.hide();
+                router.push(card.kind === 'guest' ? '/account' : FRIEND_HREF);
+              }}
+              onDismiss={reminder.hide}
+              onStop={reminder.stop}
+            />
+          )
         ) : null
       }
       onlineGames={
