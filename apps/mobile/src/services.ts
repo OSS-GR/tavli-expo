@@ -264,8 +264,9 @@ export const friends: Friends | undefined = online?.friends;
 
 /**
  * Ratings and boards of saved accounts (#407), on the same client as
- * `games`. The boards screen (`features/ratings/`) and Settings → Account
- * ("Show me on the global board") use it. A guest gets `NOT_SAVED`.
+ * `games`. The Leaderboards screen (`features/ratings/`) uses it, also for
+ * "Show me on the global board" on its Everyone tab. A guest gets
+ * `NOT_SAVED`.
  */
 export const ratings: Ratings | undefined = online?.ratings;
 
