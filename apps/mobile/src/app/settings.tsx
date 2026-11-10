@@ -2,10 +2,10 @@ import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FRIENDS_HREF, tutorialHref } from '@/features/match/routes';
+import { FRIENDS_HREF, RATINGS_HREF, tutorialHref } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
-import { auth, friends, onlineData, safety, usernames } from '@/services';
+import { auth, friends, onlineData, ratings, safety, usernames } from '@/services';
 
 export default function SettingsRoute() {
   const { t } = useTranslation();
@@ -26,6 +26,7 @@ export default function SettingsRoute() {
         onAccount={auth && usernames && onlineData ? () => router.push('/account') : undefined}
         onBlocked={auth && safety ? () => router.push('/blocked') : undefined}
         onFriends={auth && friends ? () => router.push(FRIENDS_HREF) : undefined}
+        onRatings={auth && ratings ? () => router.push(RATINGS_HREF) : undefined}
         visit={visit}
       />
     </>

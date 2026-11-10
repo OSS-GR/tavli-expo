@@ -225,6 +225,10 @@
       "label": "Friends",
       "hint": "Add friends and invite them to a game"
     },
+    "ratings": {
+      "label": "Leaderboards",
+      "hint": "Your rating, your friends and the top players"
+    },
     "blocked": {
       "label": "Blocked players",
       "hint": "Players you blocked or reported"
@@ -607,6 +611,7 @@
     "saveAccount": "Save my account",
     "unnamed": "A player with no name",
     "addButton": "Add a friend",
+    "ratingsButton": "Leaderboards",
     "add": {
       "title": "Add a friend",
       "linkTitle": "Your friend link",
@@ -709,6 +714,53 @@
       "accept": "Accept",
       "friends": "You and {{name}} are friends.",
       "openFriends": "See your friends"
+    }
+  },
+  "ratings": {
+    "title": "Leaderboards",
+    "signedOut": "You are not signed in to online play on this phone. Ratings need a saved account.",
+    "guest": "Ratings need a saved account. Save your guest account first: your games stay.",
+    "failed": "The leaderboards did not load. Try again.",
+    "unnamed": "Player",
+    "mine": {
+      "title": "Your rating",
+      "matches_one": "{{count}} rated match",
+      "matches_other": "{{count}} rated matches",
+      "label_one": "Your rating: {{rating}}, from {{count}} rated match.",
+      "label_other": "Your rating: {{rating}}, from {{count}} rated matches."
+    },
+    "status": {
+      "hidden": "You are hidden from the global board.",
+      "fewMatches_one": "Play {{count}} more rated match to show on the global board.",
+      "fewMatches_other": "Play {{count}} more rated matches to show on the global board.",
+      "noUsername": "Pick a username to show on the global board.",
+      "listed": "You can show on the global board. Only the top 50 players show there.",
+      "pickUsername": "Pick a username"
+    },
+    "board": {
+      "label": "Leaderboard",
+      "friends": "Friends",
+      "everyone": "Everyone"
+    },
+    "friends": {
+      "empty": "None of your friends has a rated match yet."
+    },
+    "everyone": {
+      "empty": "Nobody shows on the global board yet."
+    },
+    "showMe": {
+      "label": "Show me on the global board",
+      "hint_one": "Your username and rating, after {{count}} rated match.",
+      "hint_other": "Your username and rating, after {{count}} rated matches."
+    },
+    "row": {
+      "me": "{{name}} (you)",
+      "label": "Place {{rank}}: {{name}}, rating {{rating}}"
+    },
+    "note": "Everyone starts at 1500. A finished online match between two saved accounts counts, also a resign or a time out. A win against a stronger player and a longer match move your rating more. At most 3 matches against the same player count each day. Matches with a guest or the bot never count.",
+    "problem": {
+      "title": "Your choice was not saved",
+      "text": "Try again in a moment."
     }
   },
   "signIn": {
@@ -1665,6 +1717,10 @@
     "anyPhone": {
       "title": "Your games on any phone",
       "text": "Sign in on a new phone, and your online games are there."
+    },
+    "ratings": {
+      "title": "A rating and leaderboards",
+      "text": "Matches against other saved players count. See your friends and the top players."
     },
     "sample": {
       "tag": "Example",

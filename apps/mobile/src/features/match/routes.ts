@@ -72,6 +72,9 @@ export function inviteWaitHref(code: string) {
   return { pathname: '/friend/[code]', params: { code } } as const;
 }
 
+/** Leaderboards (#407): your rating and the boards, from Settings → Online and Friends. */
+export const RATINGS_HREF = '/ratings';
+
 /** Friends (#406): the friends list, from Settings → Online. */
 export const FRIENDS_HREF = '/friends';
 

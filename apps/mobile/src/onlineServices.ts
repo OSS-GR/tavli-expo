@@ -4,14 +4,15 @@
  * tokens (`PushTokens`), the phone's turn notifications
  * (`PushNotifications`), Delete my online data (`OnlineData`) and the
  * update policy (`AppUpdates`), usernames (`Usernames`), block and report
- * (`Safety`, #435) and friends (`Friends`, #406), built on first use.
+ * (`Safety`, #435), friends (`Friends`, #406) and ratings (`Ratings`,
+ * #407), built on first use.
  *
  * `services.ts` passes the adapters. This file imports none, so Jest can
  * test it with fakes. Nothing here runs at app start:
  * - the sign-in client is made on the first call to `auth`;
  * - the Convex client (one socket) opens on the first call to `games`,
  *   `invites`, `pushTokens`, `onlineData`, `appUpdates`, `usernames`,
- *   `safety` or `friends`; they share it;
+ *   `safety`, `friends` or `ratings`; they share it;
  * - the notifications adapter is made on its first call. The root layout
  *   listens for taps on a push at start (`usePushTaps`): that only reads
  *   the phone, with no network call and no prompt. Turn notifications are
@@ -30,6 +31,7 @@ import type {
   OnlineData,
   PushNotifications,
   PushTokens,
+  Ratings,
   Safety,
   Usernames,
 } from '@tavli/contracts';
@@ -53,6 +55,8 @@ export interface OnlineServices {
   readonly safety: Safety;
   /** Friends of saved accounts (#406), on the same client. */
   readonly friends: Friends;
+  /** Ratings and boards of saved accounts (#407), on the same client. */
+  readonly ratings: Ratings;
 }
 
 /** How to make the real parts. `services.ts` passes the adapters. */
@@ -79,6 +83,8 @@ export interface OnlineAdapters<Client> {
   createSafety(client: Client): Safety;
   /** Friends on the shared client. */
   createFriends(client: Client): Friends;
+  /** Ratings on the shared client. */
+  createRatings(client: Client): Ratings;
 }
 
 /** Calls `make` once, on the first call, and keeps the result. */
@@ -199,6 +205,16 @@ export function lazyFriends(get: () => Friends): Friends {
   };
 }
 
+/** A `Ratings` port that makes the real one on its first call. */
+export function lazyRatings(get: () => Ratings): Ratings {
+  return {
+    mine: () => get().mine(),
+    friendsBoard: () => get().friendsBoard(),
+    globalBoard: () => get().globalBoard(),
+    setShown: (shown) => get().setShown(shown),
+  };
+}
+
 /** A `PushNotifications` port that makes the real one on its first use. */
 export function lazyPushNotifications(get: () => PushNotifications): PushNotifications {
   return {
@@ -225,7 +241,7 @@ export function createOnlineServices<Client>(
   if (server === undefined) return undefined;
   const auth = once(() => adapters.createAuth(server.siteUrl));
   // Every server call (games, invites, push tokens, the delete, the update
-  // policy, usernames, block and report, friends) shares this client: one socket.
+  // policy, usernames, block and report, friends, ratings) shares this client: one socket.
   const client = once(() => adapters.createClient(server.url, auth()));
   const games = once(() => adapters.createGames(client()));
   const invites = once(() => adapters.createInvites(client()));
@@ -236,6 +252,7 @@ export function createOnlineServices<Client>(
   const usernames = once(() => adapters.createUsernames(client()));
   const safety = once(() => adapters.createSafety(client()));
   const friends = once(() => adapters.createFriends(client()));
+  const ratings = once(() => adapters.createRatings(client()));
   return {
     auth: lazyAuthProvider(auth),
     games: lazyGameTransport(games),
@@ -247,5 +264,6 @@ export function createOnlineServices<Client>(
     usernames: lazyUsernames(usernames),
     safety: lazySafety(safety),
     friends: lazyFriends(friends),
+    ratings: lazyRatings(ratings),
   };
 }

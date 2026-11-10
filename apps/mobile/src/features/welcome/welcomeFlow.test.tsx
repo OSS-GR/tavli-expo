@@ -59,6 +59,7 @@ const routes = {
   'friends/add': stub('add a friend'),
   'friends/invite/[id]': stub('friend invite'),
   'add/[token]': stub('friend link'),
+  ratings: stub('leaderboards'),
 };
 
 /** A URL for each app route (not the layout, not the welcome flow). */

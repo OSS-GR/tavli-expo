@@ -1511,3 +1511,19 @@ describe('friends (#406)', () => {
     expect(await screen.findByRole('button', { name: 'Ask to be friends' })).toBeOnTheScreen();
   });
 });
+
+describe('leaderboards (#407)', () => {
+  it('Settings → Leaderboards shows my rating; Friends opens it too', async () => {
+    onlineFake.authStore.session = { id: 'me', isGuest: false };
+    rememberOnlineAccount();
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/settings' });
+    await user.press(await screen.findByTestId('settings-ratings'));
+    expect(router.getPathname()).toBe('/ratings');
+    expect(await screen.findByTestId('ratings-mine-rating')).toHaveTextContent('1500');
+    await user.press(screen.getByTestId('ratings-back'));
+    await user.press(await screen.findByTestId('settings-friends'));
+    await user.press(await screen.findByRole('button', { name: 'Leaderboards' }));
+    expect(router.getPathname()).toBe('/ratings');
+  });
+});

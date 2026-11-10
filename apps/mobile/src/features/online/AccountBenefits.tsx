@@ -2,7 +2,8 @@
  * What a saved account gives (#463), the same rows everywhere: the sign-in
  * choices, Settings → Account for a guest, and the Friends screens for a
  * guest. Only what is built: a username, a record with each friend,
- * friend invites with a notification, and your games on any phone. No
+ * friend invites with a notification, your games on any phone, and a
+ * rating on the leaderboards (#407). No
  * "coming soon".
  *
  * `sample` adds a made-up friend record (a name, a score and a small bar)
@@ -24,9 +25,10 @@ export const BENEFITS: readonly { readonly id: BenefitId; readonly icon: IconNam
   { id: 'record', icon: 'users' },
   { id: 'invites', icon: 'bell' },
   { id: 'anyPhone', icon: 'smartphone' },
+  { id: 'ratings', icon: 'trophy' },
 ];
 
-export type BenefitId = 'username' | 'record' | 'invites' | 'anyPhone';
+export type BenefitId = 'username' | 'record' | 'invites' | 'anyPhone' | 'ratings';
 
 /** The made-up record of the sample: the name is in the strings. */
 export const SAMPLE_RECORD = { wins: 5, losses: 3 } as const;
