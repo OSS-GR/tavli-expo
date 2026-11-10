@@ -27,10 +27,14 @@
  *   and the intro say so.
  *   It needs a saved account, so it checks the account when it opens
  *   (and on each new `visit`, after Settings → Account) and again on
- *   Make an invite. A guest gets "Friends need a saved account…" and
- *   **Save my account**, nobody signed in "You are not signed in…" and
- *   **Open Account** (`onAccount`), in place of Make an invite; neither
- *   gets the sign-in sheet. `NOT_SAVED` from the server counts as a guest.
+ *   Make an invite. Only the newest check counts. With no note of an
+ *   online account on this phone (`hasOnlineAccount`) the open check
+ *   asks no server: nobody is signed in. A failed check shows Make an
+ *   invite, so the player can try again. A guest gets "Friends need a
+ *   saved account…" and **Save my account**, nobody signed in "You are
+ *   not signed in…" and **Open Account** (`onAccount`), in place of
+ *   Make an invite; neither gets the sign-in sheet. `NOT_SAVED` from the
+ *   server counts as a guest.
  *
  * Navigation stays in the route (`app/friend/index.tsx`, and
  * `app/friends/invite/[id].tsx` for a friend invite).
@@ -64,6 +68,7 @@ import { SegmentedControl, type SegmentOption } from '@/components/settings/Segm
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
 import { onlineAccountReady } from '@/features/online/account';
+import { hasOnlineAccount } from '@/features/online/accountHint';
 import { SignInSheet } from '@/features/online/SignInSheet';
 import { formatTimeLimit } from '@/features/online/clock';
 import { reminders } from '@/features/reminders/reminders';
@@ -126,16 +131,25 @@ export function FriendSetupScreen({
   const titleRef = useFocusOnShow();
   // A friend invite and an account that cannot make one.
   const [notSaved, setNotSaved] = useState<NotSaved | null>(null);
+  // Each account check (on show and on Make an invite) gets a number: only
+  // the newest one may set `notSaved`, so a slow older answer is dropped.
+  const checks = useRef(0);
   const forFriend = friend !== undefined;
   useEffect(() => {
     if (!forFriend) return;
+    checks.current += 1;
+    const check = checks.current;
     let live = true;
-    // A failed check says nothing: Make an invite checks again.
-    auth.ready().then(
-      (user) => {
-        if (live) setNotSaved(user === null ? 'signedOut' : user.isGuest ? 'guest' : null);
-      },
-      () => undefined,
+    const settle = (next: NotSaved | null) => {
+      if (live && check === checks.current) setNotSaved(next);
+    };
+    // No note of an account on this phone: nobody is signed in. Loading
+    // the session would ask the server (#297), so do not.
+    const answer = hasOnlineAccount() ? auth.ready() : Promise.resolve(null);
+    answer.then(
+      (user) => settle(user === null ? 'signedOut' : user.isGuest ? 'guest' : null),
+      // A failed check (offline) shows Make an invite, which checks again.
+      () => settle(null),
     );
     return () => {
       live = false;
@@ -163,11 +177,14 @@ export function FriendSetupScreen({
       setBusy(false);
       setProblem({ kind: next });
     };
+    checks.current += 1;
+    const check = checks.current;
     const refused = (why: NotSaved) => {
       making.current = false;
       if (!mounted.current) return;
       setBusy(false);
-      setNotSaved(why);
+      // A newer check (the player came back from Account) knows better.
+      if (check === checks.current) setNotSaved(why);
     };
     let user: AuthUser | null;
     try {

@@ -262,6 +262,26 @@ describe('<FriendsScreen />', () => {
     expect(screen.getByTestId('friend-ann')).toBeOnTheScreen();
   });
 
+  it.each([
+    ['NOT_SAVED', 'friends-guest'],
+    ['NOT_SIGNED_IN', 'friends-signed-out'],
+  ])(
+    'a call that gets %s shows that in place of the list, as a load would',
+    async (code, shown) => {
+      signInSaved();
+      await befriend('ann');
+      const removeFriend = jest.fn().mockRejectedValue({ code, message: 'no' });
+      await show({ ...onlineFake.friends, removeFriend });
+      const user = setupUser();
+      await user.press(screen.getByRole('button', { name: `Remove ${nameOf('ann')}` }));
+      await user.press(screen.getByTestId('dialog-confirm'));
+      await flush();
+      expect(screen.getByTestId(shown)).toBeOnTheScreen();
+      expect(screen.queryByTestId('friend-ann')).toBeNull();
+      expect(screen.queryByTestId('friends-problem')).toBeNull();
+    },
+  );
+
   it('a failed load offers Try again', async () => {
     signInSaved();
     const listFriends = jest.fn().mockRejectedValueOnce(new Error('offline'));

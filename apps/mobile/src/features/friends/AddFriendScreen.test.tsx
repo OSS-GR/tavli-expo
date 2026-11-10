@@ -217,6 +217,71 @@ describe('<AddFriendScreen />', () => {
     expect(screen.queryByTestId('add-friend-refresh-failed')).toBeNull();
   });
 
+  it('after New link, a failed reload keeps the new link shown and shareable', async () => {
+    signInSaved();
+    let down = false;
+    const flaky: Friends = {
+      ...onlineFake.friends,
+      recentPlayers: async () => {
+        if (down) throw new Error('offline');
+        return onlineFake.friends.recentPlayers();
+      },
+    };
+    await show(flaky);
+    down = true;
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: 'New link' }));
+    await user.press(screen.getByTestId('dialog-confirm'));
+    await flush();
+    // The server just gave this link: it is right, though the reload failed.
+    expect(screen.getByTestId('add-friend-refresh-failed')).toBeOnTheScreen();
+    expect(screen.getByTestId('add-friend-qr')).toBeOnTheScreen();
+    expect(screen.getByTestId('add-friend-link')).toHaveTextContent(await myLink());
+    expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled();
+  });
+
+  it('after Ask, a failed reload keeps the link of this visit shown', async () => {
+    signInSaved();
+    meet('ann');
+    let down = false;
+    const flaky: Friends = {
+      ...onlineFake.friends,
+      myFriendLink: async () => {
+        if (down) throw new Error('offline');
+        return onlineFake.friends.myFriendLink();
+      },
+    };
+    await show(flaky);
+    down = true;
+    await setupUser().press(
+      screen.getByRole('button', { name: `Ask ${nameOf('ann')} to be friends` }),
+    );
+    await flush();
+    expect(screen.getByTestId('add-friend-sent')).toBeOnTheScreen();
+    expect(screen.getByTestId('add-friend-refresh-failed')).toBeOnTheScreen();
+    expect(screen.getByTestId('add-friend-qr')).toBeOnTheScreen();
+  });
+
+  it.each([
+    ['NOT_SAVED', 'add-friend-guest'],
+    ['NOT_SIGNED_IN', 'add-friend-signed-out'],
+  ])(
+    'a call that gets %s shows that in place of the link, as a load would',
+    async (code, shown) => {
+      signInSaved();
+      meet('ann');
+      const sendRequest = jest.fn().mockRejectedValue({ code, message: 'no' });
+      await show({ ...onlineFake.friends, sendRequest });
+      await setupUser().press(
+        screen.getByRole('button', { name: `Ask ${nameOf('ann')} to be friends` }),
+      );
+      await flush();
+      expect(screen.getByTestId(shown)).toBeOnTheScreen();
+      expect(screen.queryByTestId('add-friend-qr')).toBeNull();
+      expect(screen.queryByTestId('add-friend-problem')).toBeNull();
+    },
+  );
+
   it('finds a player by exact username and asks them', async () => {
     signInSaved();
     onlineFake.server().markSaved('ann');

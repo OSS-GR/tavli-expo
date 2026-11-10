@@ -18,6 +18,7 @@ import { createMemoryGameServer, MAX_OPEN_INVITES } from '@tavli/online';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
+import { forgetOnlineAccount, rememberOnlineAccount } from '@/features/online/accountHint';
 import i18n from '@/i18n';
 
 import { FriendSetupScreen } from './FriendSetupScreen';
@@ -39,6 +40,11 @@ runOnFakeTimers();
 
 afterAll(async () => {
   await i18n.changeLanguage('en');
+});
+
+// The note "an online account was used here" stays in storage between tests.
+afterEach(() => {
+  forgetOnlineAccount();
 });
 
 /** The sign-in and the server, like the app's: each invite call comes from the signed-in user. */
@@ -301,6 +307,7 @@ describe('FriendSetupScreen', () => {
     const parts = setup();
     // A friend invite needs a saved account.
     parts.authStore.session = { id: 'saved-1', isGuest: false };
+    rememberOnlineAccount();
     const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
@@ -319,6 +326,7 @@ describe('FriendSetupScreen', () => {
     const user = setupUser();
     const parts = setup();
     parts.authStore.session = { id: 'saved-1', isGuest: false };
+    rememberOnlineAccount();
     const invite = jest.fn().mockRejectedValue({ code: 'TOO_MANY_INVITES', message: 'too many' });
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
@@ -331,6 +339,7 @@ describe('FriendSetupScreen', () => {
     const user = setupUser();
     const parts = setup();
     await parts.auth.signInAsGuest();
+    rememberOnlineAccount();
     const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
     const onAccount = jest.fn();
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
@@ -351,6 +360,7 @@ describe('FriendSetupScreen', () => {
   it('a friend invite checks the account again on a new visit (#406)', async () => {
     const parts = setup();
     await parts.auth.signInAsGuest();
+    rememberOnlineAccount();
     const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn(), onAccount: jest.fn() };
     const ui = (visit: number) => (
@@ -382,10 +392,79 @@ describe('FriendSetupScreen', () => {
     expect(invite).not.toHaveBeenCalled();
   });
 
+  it('a friend invite with no account note on this phone asks no server (#406)', async () => {
+    const parts = setup();
+    const ready = jest.spyOn(parts.auth, 'ready');
+    const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn(), onAccount: jest.fn() };
+    await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
+    await flush();
+    expect(ready).not.toHaveBeenCalled();
+    expect(screen.getByTestId('friend-not-saved')).toHaveTextContent(/You are not signed in/);
+  });
+
+  it('a friend invite whose account check fails shows Make an invite again (#406)', async () => {
+    const parts = setup();
+    await parts.auth.signInAsGuest();
+    rememberOnlineAccount();
+    const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn(), onAccount: jest.fn() };
+    const ui = (visit: number) => (
+      <FriendSetupScreen {...parts} {...props} friend={{ invite }} visit={visit} />
+    );
+    await renderWithRoot(ui(1));
+    await flush();
+    expect(screen.getByTestId('friend-not-saved')).toBeOnTheScreen();
+    // Back from Account, offline: the check fails. The old answer may be
+    // wrong now, so the player gets Make an invite, which checks again.
+    jest.spyOn(parts.auth, 'ready').mockRejectedValueOnce(new Error('offline'));
+    await screen.rerender(ui(2));
+    await flush();
+    expect(screen.queryByTestId('friend-not-saved')).toBeNull();
+    expect(screen.getByTestId('friend-make')).toBeOnTheScreen();
+  });
+
+  it('a friend invite drops an older account answer after a newer one (#406)', async () => {
+    const user = setupUser();
+    const parts = setup();
+    parts.authStore.session = { id: 'saved-1', isGuest: false };
+    rememberOnlineAccount();
+    // Make an invite's check waits until the test lets it answer "a guest".
+    const real = parts.auth.ready.bind(parts.auth);
+    let answer: (() => void) | null = null;
+    const ready = jest.spyOn(parts.auth, 'ready');
+    const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn(), onAccount: jest.fn() };
+    const ui = (visit: number) => (
+      <FriendSetupScreen {...parts} {...props} friend={{ invite }} visit={visit} />
+    );
+    await renderWithRoot(ui(1));
+    await flush();
+    ready.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          answer = () => resolve({ id: 'saved-1', isGuest: true });
+        }),
+    );
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(answer).not.toBeNull();
+    // The player comes back to the screen: a newer check says saved.
+    ready.mockImplementation(real);
+    await screen.rerender(ui(2));
+    await flush();
+    // The older answer comes last: it must not bring the block back.
+    await act(async () => answer?.());
+    await flush();
+    expect(screen.queryByTestId('friend-not-saved')).toBeNull();
+    expect(screen.getByTestId('friend-make')).toBeEnabled();
+    expect(invite).not.toHaveBeenCalled();
+  });
+
   it('a friend invite says it needs a saved account on NOT_SAVED from the server (#406)', async () => {
     const user = setupUser();
     const parts = setup();
     parts.authStore.session = { id: 'saved-1', isGuest: false };
+    rememberOnlineAccount();
     const invite = jest.fn().mockRejectedValue({ code: 'NOT_SAVED', message: 'not saved' });
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
