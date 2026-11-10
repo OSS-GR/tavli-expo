@@ -7,14 +7,19 @@
  * It is a `Sheet` (a `Modal`), so screen readers stay in it; focus moves
  * to its title. Show it only while it is needed (mount it then), so the
  * focus moves each time it opens.
+ *
+ * Each time it opens it tells the reminders (#404, `sheetShown`): it is
+ * an ask too, so Home shows no card the same day.
  */
 import type { Analytics, AppleSheet, AuthProvider, AuthUser } from '@tavli/contracts';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { Sheet } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
+import { reminders } from '@/features/reminders/reminders';
 
 import { SignInChoices } from './SignInChoices';
 
@@ -37,6 +42,9 @@ export function SignInSheet({
 }: SignInSheetProps) {
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
+  useEffect(() => {
+    reminders.sheetShown();
+  }, []);
   return (
     <Sheet visible onClose={onClose} closeLabel={t('signIn.notNow')} testID="sign-in-sheet">
       <Text ref={titleRef} style={styles.title} accessibilityRole="header">

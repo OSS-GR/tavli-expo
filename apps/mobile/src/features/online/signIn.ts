@@ -16,6 +16,8 @@
  *   with no username yet gets `step` (the choices show `UsernameForm`);
  *   `finishStep` then hands the user on. When the server cannot say, the
  *   user goes on at once: the name can wait for Settings.
+ * - Reminders (#404): the first guest sign-in starts the save reminders
+ *   on Home; a sign-in with a key stops them.
  */
 import {
   isAppleSheetUnfinished,
@@ -30,6 +32,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 
 import { quietly } from '@/features/analytics/quietly';
+import { reminders } from '@/features/reminders/reminders';
 
 import { onlineAccountReady, signInForOnline } from './account';
 import { needsUsernameStep } from './usernameStep';
@@ -147,6 +150,8 @@ export function useSignInChoices({
         trying.current = false;
         if (user !== null) {
           quietly(() => analytics.track('online_sign_in', { method }));
+          if (user.isGuest) reminders.start();
+          else reminders.stop();
         }
         if (!mounted.current) return;
         if (user === null) {

@@ -8,6 +8,7 @@ import { HomeInvites } from '@/features/home/HomeInvites';
 import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
+import { ReminderCard } from '@/features/home/ReminderCard';
 import { matchSessions } from '@/features/match/appSessions';
 import {
   FRIEND_HREF,
@@ -22,9 +23,11 @@ import {
 import type { SavedMatch } from '@/features/match/savedMatch';
 import { continueSummary } from '@/features/match/summary';
 import { hasOnlineAccount } from '@/features/online/accountHint';
+import { reminders } from '@/features/reminders/reminders';
+import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
-import { auth, botLevels, games, invites } from '@/services';
+import { appleSheet, auth, botLevels, games, invites } from '@/services';
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -63,6 +66,14 @@ export default function HomeRoute() {
   const { saved } = slot;
   const showLearn = offersTutorial(useTutorial((s) => s.status));
   const dismissLearn = useTutorial((s) => s.dismiss);
+  // Save a guest account, or play online (#404). Only with online play.
+  const reminder = useReminderCard({
+    focused,
+    reminders,
+    auth: invites === undefined ? undefined : auth,
+    appleSheet,
+  });
+  const { card } = reminder;
 
   return (
     <HomeScreen
@@ -78,6 +89,20 @@ export default function HomeRoute() {
               direction: saved.flow.game.state.rules.movement.direction,
             }}
             onPress={() => router.push(gameHref(saved.id))}
+          />
+        ) : null
+      }
+      reminderCard={
+        card ? (
+          <ReminderCard
+            kind={card.kind}
+            last={card.last}
+            onAccept={() => {
+              reminder.hide();
+              router.push(card.kind === 'guest' ? '/account' : FRIEND_HREF);
+            }}
+            onDismiss={reminder.hide}
+            onStop={reminder.stop}
           />
         ) : null
       }

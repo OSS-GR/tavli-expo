@@ -1283,6 +1283,57 @@ describe('your online games on Home (#297)', () => {
   });
 });
 
+describe('save reminders on Home (#404)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  type Router = { getPathname: () => string };
+
+  /** Leaves Home for Settings and comes back, `ms` later on the phone clock. */
+  async function backToHomeAfter(router: Router, ms: number) {
+    await act(async () => {
+      jest.setSystemTime(Date.now() + ms);
+      appRouter.push('/settings');
+    });
+    expect(router.getPathname()).toBe('/settings');
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe('/');
+  }
+
+  it('asks a guest to save the account a day after the first guest sign-in', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await pressMakeInvite(user);
+    expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe('/');
+    expect(screen.queryByTestId('home-reminder-guest')).toBeNull();
+    // An hour later: still nothing.
+    await backToHomeAfter(router, 60 * 60 * 1000);
+    expect(screen.queryByTestId('home-reminder-guest')).toBeNull();
+    // A day later: the card, and Save opens the account screen.
+    await backToHomeAfter(router, DAY_MS);
+    expect(await screen.findByTestId('home-reminder-guest')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Save my account' }));
+    expect(router.getPathname()).toBe('/account');
+  });
+
+  it('asks a player who said Not now on the sign-in sheet to play a friend', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Not now' }));
+    expect(onlineFake.authStore.guests).toBe(0);
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe('/');
+    await backToHomeAfter(router, DAY_MS);
+    expect(await screen.findByTestId('home-reminder-offline')).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
+    await user.press(screen.getByRole('button', { name: 'Play a friend' }));
+    expect(router.getPathname()).toBe('/friend');
+  });
+});
+
 describe('your invites on Home (#314)', () => {
   type Router = { getPathname: () => string };
 

@@ -379,6 +379,18 @@ Settings → Online play → **Account** (`app/account.tsx`, in the guarded app 
 - **Split out of #402:** Download my data (#445), Sign out of all phones (#446), the web page to ask for deletion (#447). "Show me on the global board" waits for the boards.
 - **Tests.** `features/account/AccountScreen.test.tsx` (the Settings row; offline with no server call, Apple sign-in with no guest, no Apple ID, a closed sheet, Android; guest name, save with the same id, a taken Apple ID, delete with its dialog, Cancel, a time out then a retry; saved: username, sign out and back, the delete dialog, an add row, a refused last key; a load failure and Try again; Greek), `deleteData.test.ts` (the order token, delete, sign-out; `NOT_SIGNED_IN`; a failed call; the time limit), `onlineServices.test.ts` and, on the server, `convexOnlineData.test.ts`.
 
+## Save reminders (#404)
+
+After the player's first choice, a card on Home asks again, four times at most (ADR-0008 point 7). Code: `features/reminders/` (`schedule.ts` pure, `reminders.ts` the store, `useReminderCard.ts` the Home hook) and `features/home/ReminderCard.tsx` (on `HomeBanner`, shared with the Learn card).
+
+- **The clock starts** at the first guest sign-in (`useSignInChoices`, any screen) or the first **Not now** on Play a friend's sign-in sheet. Not now on an invite link starts nothing. A guest from before #404 starts it on the first Home visit.
+- **The steps:** 24 hours, 1 week, 2 weeks and 1 month after the start (`STEP_AFTER_MS`); at most one ask a day. A player back after a long gap gets one card, which counts as the latest step due but never as the last; the last comes at least 2 weeks after the one before (`LAST_GAP_MS`). Every due time is after the saved times, so a clock that moved back only waits longer.
+- **Other asks:** the sign-in sheet (`SignInSheet`, each time it opens) counts as the ask when one is due, and otherwise holds the cards back a day (`sheetShown`). The turn-notification offer holds them back a day too (`otherPrompt`).
+- **Which card** (`useReminderCard`, once per Home visit, gone when Home leaves the view): with `hasOnlineAccount()`, Home loads the session. A saved account (a key) stops the reminders for good. A guest gets **Save your online games?** (**Save my account** → `/account`, **Keep playing as a guest**), only where `appleSheet.isAvailable()`: elsewhere the ask waits. No session or no answer: no card. With no account, the **Play a friend online?** card (**Play a friend**, **Not now**). A build without online play shows none. On the last ask the second button is **Don't ask again** (`stop`).
+- **Never** over a game or a sheet (only on Home in view), and never as a push.
+- **Privacy:** the state (times and a count, key `saveReminders`) stays on the phone: never on the server, never in analytics. The privacy policy lists it under "What stays on your phone".
+- **Tests:** `schedule.test.ts` (the steps, the long gap, the day limit, a clock moved back, the sheet and the offer), `useReminderCard.test.tsx` (both cards, no key sheet, a key user, no session, no online play, the last card, a broken storage) and the `#404` tests in `navigation.test.tsx` (a guest a day later → `/account`; Not now → the offline card → `/friend`). `test/afterEnv.ts` clears the schedule before each test.
+
 ## Update needed (#390)
 
 When the server stops working with this build, the app shows one full screen: the title "Update needed", one line ("This version no longer works with online play. Update to keep playing.") and one button, **Update**. There is no way past it. The server side (the env vars and the query) is in [Online game service → Update needed](online-game-service.md#update-needed). Code: `apps/mobile/src/features/update/`.

@@ -9,8 +9,11 @@
  * The root layout (`app/_layout.tsx`) shows it over any screen. It is a
  * `Sheet` (a `Modal`), so screen readers stay in it, and focus moves to
  * its title. Over the game screen it turns with the phone.
+ *
+ * When it shows, Home shows no reminder card that day (#404, `otherPrompt`).
  */
 import { usePathname } from 'expo-router';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -19,6 +22,7 @@ import { useStore } from 'zustand';
 import { ActionButton } from '@/components/ActionButton';
 import { Sheet } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
+import { reminders } from '@/features/reminders/reminders';
 
 import type { TurnPushes } from './turnPushes';
 
@@ -30,6 +34,9 @@ export function TurnPushPrompt({ pushes }: { pushes: TurnPushes }) {
   const offering = useStore(pushes.store, (s) => s.offering);
   const asking = useStore(pushes.store, (s) => s.asking);
   const pathname = usePathname();
+  useEffect(() => {
+    if (offering) reminders.otherPrompt();
+  }, [offering]);
   const notNow = () => {
     if (!asking) pushes.notNow();
   };
