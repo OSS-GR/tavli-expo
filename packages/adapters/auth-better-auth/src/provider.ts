@@ -46,7 +46,7 @@ export interface BetterAuthCallOptions {
   readonly fetchOptions: { readonly throw: false };
 }
 
-/** The body of an id token sign-in (`signIn.social`) and of `/key/save`. */
+/** The body of an id token sign-in (`signIn.social`). */
 export interface BetterAuthIdTokenInput {
   readonly provider: AppleKeyCredential['provider'];
   readonly idToken: { readonly token: string; readonly nonce: string };
@@ -172,14 +172,21 @@ function idTokenInput(credential: AppleKeyCredential): BetterAuthIdTokenInput {
 }
 
 /**
- * The body of `/key/save`: an id token, or an email, its code and the
- * code's ticket (`''` when this phone has none: the server then says
- * `CODE_EXPIRED`).
+ * The body of `/key/save`: an id token as `keyToken`, or an email, its
+ * code and the code's ticket (`''` when this phone has none: the server
+ * then says `CODE_EXPIRED`).
+ *
+ * Never `idToken`: the Expo client plugin sends no cookie with a body that
+ * has an `idToken` (it takes that for a sign-in), and the save needs the
+ * session (#477).
  */
 function saveInput(credential: AuthKeyCredential, ticket: string): object {
   return credential.provider === 'email'
     ? { provider: 'email', email: credential.email, code: credential.code, ticket }
-    : idTokenInput(credential);
+    : {
+        provider: credential.provider,
+        keyToken: { token: credential.idToken, nonce: credential.nonce },
+      };
 }
 
 /** The key of an address in the ticket map: as the server reads it. */

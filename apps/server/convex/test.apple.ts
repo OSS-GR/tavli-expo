@@ -116,9 +116,26 @@ function keep(phone: Phone, response: Response): void {
 }
 
 /**
+ * The Expo client plugin's cookie rule (`@better-auth/expo`, `init`): a body
+ * with an `idToken` is a sign-in, so it goes with no cookie (only
+ * `/link-social` keeps it). A route that needs the session must never take
+ * an `idToken` field (#477).
+ */
+function expoSendsCookie(pathname: string, body: string | undefined): boolean {
+  if (body === undefined || body === '' || pathname.endsWith('/link-social')) return true;
+  try {
+    const parsed = JSON.parse(body) as { idToken?: unknown } | null;
+    return parsed?.idToken === undefined;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * A `fetch` for Better Auth's real client that sends each request to the
- * test server as `phone`: the app's origin, the session cookie, and the
- * cookies each reply sets (what the Expo plugin does on a phone).
+ * test server as `phone`: the app's origin, the session cookie (not with
+ * an `idToken` body: `expoSendsCookie`), and the cookies each reply sets
+ * (what the Expo plugin does on a phone).
  */
 export function phoneFetch(t: Convex, phone: Phone): typeof fetch {
   return async (input, init) => {
@@ -126,8 +143,10 @@ export function phoneFetch(t: Convex, phone: Phone): typeof fetch {
     const url = new URL(request.url);
     const headers = new Headers(request.headers);
     headers.set('origin', ORIGIN);
-    if (phone.cookie !== '') headers.set('cookie', phone.cookie);
     const body = request.method === 'GET' ? undefined : await request.text();
+    if (phone.cookie !== '' && expoSendsCookie(url.pathname, body)) {
+      headers.set('cookie', phone.cookie);
+    }
     const response = await t.fetch(`${url.pathname}${url.search}`, {
       method: request.method,
       headers,
@@ -212,7 +231,7 @@ export async function saveApple(
 ): Promise<Reply> {
   const value = await nonce(t, phone);
   const token = await appleToken(apple, { sub, nonce: value });
-  return await call(t, phone, 'key/save', { provider: 'apple', idToken: { token, nonce: value } });
+  return await call(t, phone, 'key/save', { provider: 'apple', keyToken: { token, nonce: value } });
 }
 
 /** The `sub` and other claims of a JWT (no signature check). */

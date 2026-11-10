@@ -329,7 +329,7 @@ describe('a guest saves their account with Apple', () => {
     const token = await appleToken(apple, { sub: 'apple-ann', nonce: 'another-nonce' });
     const reply = await call(t, phone, 'key/save', {
       provider: 'apple',
-      idToken: { token, nonce: value },
+      keyToken: { token, nonce: value },
     });
     expect(reply.status).toBe(401);
     expect((await userRow(t, id))?.isAnonymous).toBe(true);

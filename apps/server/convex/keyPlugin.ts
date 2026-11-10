@@ -169,13 +169,17 @@ type SaveBody =
   | ({ provider: 'email' } & EmailBody);
 
 /**
- * The body of `/key/save`: `{ provider, idToken: { token, nonce } }`, or
+ * The body of `/key/save`: `{ provider, keyToken: { token, nonce } }`, or
  * `{ provider: 'email', email, code, ticket }`.
+ *
+ * Never `idToken`: Better Auth's Expo client sends no cookie with a body
+ * that has an `idToken` (that body is a sign-in), so the save would come
+ * with no session (#477).
  */
 function readSaveBody(body: unknown): SaveBody {
-  const { provider, idToken } = (body ?? {}) as { provider?: unknown; idToken?: unknown };
+  const { provider, keyToken } = (body ?? {}) as { provider?: unknown; keyToken?: unknown };
   if (provider === 'email') return { provider, ...readEmailBody(body) };
-  const { token, nonce } = (idToken ?? {}) as { token?: unknown; nonce?: unknown };
+  const { token, nonce } = (keyToken ?? {}) as { token?: unknown; nonce?: unknown };
   if (
     !isKeyProviderId(provider) ||
     provider === 'email' ||
