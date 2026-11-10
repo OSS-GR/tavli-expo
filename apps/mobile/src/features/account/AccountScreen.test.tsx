@@ -150,10 +150,28 @@ describe('<AccountScreen /> offline', () => {
     onlineFake.appleSheet.next = 'unfinished';
     await open();
     await user.press(await screen.findByTestId('account-apple'));
-    const text =
-      'Apple sign-in did not finish. Check that this phone is signed in to an Apple ID in Settings.';
-    expect(await screen.findByText(text)).toBeOnTheScreen();
-    expect(announce).toHaveBeenCalledWith(text);
+    const text = 'Check that this phone is signed in to an Apple ID in Settings.';
+    const problem = within(await screen.findByTestId('account-problem'));
+    expect(problem.getByText('Apple sign-in did not finish')).toBeOnTheScreen();
+    expect(problem.getByText(text)).toBeOnTheScreen();
+    expect(announce).toHaveBeenCalledWith(`Apple sign-in did not finish. ${text}`);
+    expect(onlineFake.authStore.session).toBeNull();
+    // OK closes the popup; the screen stays as it was.
+    await user.press(problem.getByText('OK'));
+    expect(screen.queryByTestId('account-problem')).toBeNull();
+    expect(screen.getByTestId('account-offline')).toBeOnTheScreen();
+  });
+
+  it('with Apple off on the server says so, not "check the connection" (#462)', async () => {
+    const user = setupUser();
+    onlineFake.authStore.offKeys.push('apple');
+    await open();
+    await user.press(await screen.findByTestId('account-apple'));
+    const problem = within(await screen.findByTestId('account-problem'));
+    expect(problem.getByText('Sign in with Apple is not ready')).toBeOnTheScreen();
+    expect(
+      problem.getByText('It is off on our server for now. Try email, or try again later.'),
+    ).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toBeNull();
   });
 
@@ -342,9 +360,9 @@ describe('<AccountScreen /> as a guest', () => {
     // The offer runs out before the tap.
     onlineFake.authStore.openMoveTickets.length = 0;
     await user.press(dialog.getByText('Move my games'));
-    expect(
-      await screen.findByText('That did not work. Check the connection and try again.'),
-    ).toBeOnTheScreen();
+    const problem = within(await screen.findByTestId('account-problem'));
+    expect(problem.getByText('That did not work')).toBeOnTheScreen();
+    expect(screen.queryByText(/Check the connection/)).toBeNull();
     expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: true });
   });
 
@@ -413,10 +431,13 @@ describe('<AccountScreen /> as a guest', () => {
     await act(async () => {
       await jest.advanceTimersByTimeAsync(DELETE_TIME_LIMIT_MS);
     });
-    const failed = 'Could not delete your account. Check the connection and try again.';
-    expect(screen.getByText(failed)).toBeOnTheScreen();
-    expect(announce).toHaveBeenLastCalledWith(failed);
+    const problem = within(screen.getByTestId('account-problem'));
+    expect(problem.getByText('Your account was not deleted')).toBeOnTheScreen();
+    expect(announce).toHaveBeenLastCalledWith(
+      'Your account was not deleted. Check the connection and try again.',
+    );
     expect(hasOnlineAccount()).toBe(true);
+    await user.press(problem.getByText('OK'));
     await user.press(
       (await dialogFrom(user, 'account-delete')).getByRole('button', { name: 'Delete' }),
     );
@@ -526,7 +547,8 @@ describe('<AccountScreen /> with a saved account', () => {
     const remove = await screen.findAllByRole('button', { name: 'Remove Sign in with Apple' });
     await user.press(remove[0]!);
     expect(await screen.findByTestId('account-problem')).toHaveTextContent(
-      'An account keeps at least one way to sign in.',
+      'An account keeps at least one way to sign in. Add another one first.',
+      { exact: false },
     );
     expect(onlineFake.authStore.keys).toEqual({ 'apple:apple-1': 'user-1' });
   });

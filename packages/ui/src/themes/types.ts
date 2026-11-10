@@ -30,6 +30,12 @@ export interface UiColors {
   accentWash: string;
   /** A brass outline on a surface (#342). Opaque. */
   accentLine: string;
+  /** Text and icons that mark a problem (#462): an error popup, a wrong code. */
+  problem: string;
+  /** The back of an error popup or line: a red tint on a surface (#462). Opaque. */
+  problemWash: string;
+  /** The outline of an error popup or line (#462). Opaque. */
+  problemLine: string;
   /** Turn ring around the active player. */
   turn: string;
   /** Turn text, for example "Σειρά σου". */

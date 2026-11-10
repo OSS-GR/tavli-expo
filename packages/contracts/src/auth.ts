@@ -102,6 +102,11 @@ export const AUTH_ERROR_CODES = [
   'WRONG_CODE',
   /** `requestEmailCode` too often for this address, phone or server. Try again later. */
   'RATE_LIMITED',
+  /**
+   * This kind of key is off on the server (#462): Apple with no Services
+   * ID, or email with no mail service. Another kind may still work.
+   */
+  'KEY_OFF',
 ] as const;
 
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
@@ -282,6 +287,8 @@ export interface MemoryAuthStore {
   sentEmailCodes: { email: string; code: string; language: EmailCodeLanguage }[];
   /** The live code of each address and its wrong tries. */
   emailCodes: Record<string, { code: string; tries: number }>;
+  /** Kinds of key that are off on this "server" (#462): their calls give `KEY_OFF`. */
+  offKeys: AuthKeyProvider[];
 }
 
 /**
@@ -306,6 +313,7 @@ export function createMemoryAuthStore(): MemoryAuthStore {
     openMoveTickets: [],
     sentEmailCodes: [],
     emailCodes: {},
+    offKeys: [],
   };
 }
 
@@ -355,6 +363,7 @@ export function createMemoryAuthProvider(
 
   /** The key a credential proves (`<provider>:<sub>`), using up its nonce or code. */
   function provenKey(credential: AuthKeyCredential): string {
+    if (store.offKeys.includes(credential.provider)) throw authError('KEY_OFF', 'this key is off');
     if (credential.provider === 'email') return provenEmail(credential);
     const prefix = MEMORY_APPLE_TOKEN_PREFIX;
     const at = store.openNonces.indexOf(credential.nonce);
@@ -397,6 +406,7 @@ export function createMemoryAuthProvider(
     },
     async requestEmailCode(email, language) {
       await Promise.resolve();
+      if (store.offKeys.includes('email')) throw authError('KEY_OFF', 'email codes are off');
       const address = normalizeEmail(email);
       if (address === null || !isEmailCodeLanguage(language)) {
         throw authError('REJECTED', 'not a valid address');

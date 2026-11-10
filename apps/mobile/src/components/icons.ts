@@ -194,6 +194,10 @@ export const ICONS = {
       'M18 2H6v7a6 6 0 0 0 12 0V2Z',
     ],
   },
+  // A problem: error popups and lines (#462).
+  circleAlert: {
+    strokes: [circle(12, 12, 10), 'M12 8v4', 'M12 16h.01'],
+  },
   // Report or block a player (#435).
   flag: {
     strokes: ['M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z', 'M4 22v-7'],

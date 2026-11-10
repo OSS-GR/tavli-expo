@@ -25,6 +25,7 @@
  */
 import {
   isAppleSheetUnfinished,
+  isAuthErrorData,
   type Analytics,
   type AppleSheet,
   type AuthKeyCredential,
@@ -45,10 +46,22 @@ import { needsUsernameStep } from './usernameStep';
 export type SignInMethod = 'apple' | 'email' | 'guest';
 
 /**
- * Why the last try failed: Apple's sheet ended unfinished (most often no
- * Apple ID on the phone, #442), or anything else (the connection).
+ * Why the last try failed (#462): Apple's sheet ended unfinished (most
+ * often no Apple ID on the phone, #442), Apple is off on the server
+ * (`KEY_OFF`), the server could not be reached, or anything else. Only
+ * `network` blames the connection.
  */
-export type SignInFailure = 'appleUnfinished' | 'other';
+export type SignInFailure = 'appleUnfinished' | 'appleOff' | 'network' | 'other';
+
+/** What a failed Apple or guest sign-in means. */
+export function signInFailureOf(error: unknown): SignInFailure {
+  if (isAppleSheetUnfinished(error)) return 'appleUnfinished';
+  if (isAuthErrorData(error)) {
+    if (error.code === 'KEY_OFF') return 'appleOff';
+    if (error.code === 'NETWORK') return 'network';
+  }
+  return 'other';
+}
 
 /**
  * Apple's proof for our server: a nonce from the server (`keyNonce`), then
@@ -105,6 +118,8 @@ export interface SignInChoicesState {
   readonly busy: SignInMethod | null;
   /** Why the last try failed, or `null` (a closed Apple sheet is no failure). */
   readonly failed: SignInFailure | null;
+  /** OK on the problem: the choices show again. */
+  readonly dismissFailed: () => void;
   readonly choose: (method: 'apple' | 'guest') => void;
   /**
    * Signs in with the email form's code. Rejects with the server's answer,
@@ -214,7 +229,7 @@ export function useSignInChoices({
         trying.current = false;
         if (!mounted.current) return;
         setBusy(null);
-        setFailed(isAppleSheetUnfinished(error) ? 'appleUnfinished' : 'other');
+        setFailed(signInFailureOf(error));
       },
     );
   };
@@ -238,5 +253,7 @@ export function useSignInChoices({
     onSignedIn(step.user);
   };
 
-  return { appleAvailable, busy, failed, choose, withEmail, step, finishStep };
+  const dismissFailed = () => setFailed(null);
+
+  return { appleAvailable, busy, failed, dismissFailed, choose, withEmail, step, finishStep };
 }

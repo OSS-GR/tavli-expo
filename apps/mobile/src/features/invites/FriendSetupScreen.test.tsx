@@ -167,12 +167,12 @@ describe('FriendSetupScreen', () => {
     const { onCreated } = await open({ ...parts, auth });
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     await user.press(await screen.findByRole('button', { name: 'Continue as a guest' }));
-    expect(
-      screen.getByText('That did not work. Check the connection and try again.'),
-    ).toBeOnTheScreen();
+    expect(screen.getByText('No connection')).toBeOnTheScreen();
     expect(createInvite).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
     expect(parts.analytics.sent).toEqual([]);
+    // OK shows the choices again.
+    await user.press(screen.getByRole('button', { name: 'OK' }));
     await user.press(screen.getByRole('button', { name: 'Not now' }));
     expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
   });

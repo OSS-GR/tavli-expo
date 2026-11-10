@@ -14,9 +14,10 @@
  * - After a sign-in with a key, a saved account with no username yet sees
  *   the username step (`UsernameForm`, #405) in place of the choices; its
  *   Save or Not now hands the user on.
- * - A problem line is read to screen readers (`useAnnouncement`; iOS
- *   VoiceOver does not read `accessibilityRole="alert"`). No text has a
- *   line limit, so large fonts wrap.
+ * - A failed try shows the problem box (`ProblemCard`, #462) in place of
+ *   the choices, with its title, what to do and OK; OK shows the choices
+ *   again. The box takes the screen reader's focus. No text has a line
+ *   limit, so large fonts wrap.
  */
 import type { Analytics, AppleSheet, AuthProvider, AuthUser, Usernames } from '@tavli/contracts';
 import { useState } from 'react';
@@ -25,7 +26,7 @@ import { Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
-import { useAnnouncement } from '@/features/game/useAnnouncement';
+import { ProblemCard } from '@/components/Problem';
 import {
   analytics as appAnalytics,
   appleSheet as appAppleSheet,
@@ -60,20 +61,14 @@ export function SignInChoices({
   const { t } = useTranslation();
   const { theme } = useUnistyles();
   const [withEmailForm, setWithEmailForm] = useState(false);
-  const { appleAvailable, busy, failed, choose, withEmail, step, finishStep } = useSignInChoices({
-    auth,
-    appleSheet,
-    analytics,
-    onSignedIn,
-    usernames,
-  });
-  const failedText =
-    failed === null
-      ? null
-      : failed === 'appleUnfinished'
-        ? t('signIn.appleUnfinished')
-        : t('signIn.failed');
-  useAnnouncement(failedText);
+  const { appleAvailable, busy, failed, dismissFailed, choose, withEmail, step, finishStep } =
+    useSignInChoices({
+      auth,
+      appleSheet,
+      analytics,
+      onSignedIn,
+      usernames,
+    });
   if (step !== null && usernames !== undefined) {
     return (
       <UsernameForm
@@ -82,6 +77,19 @@ export function SignInChoices({
         title={t('username.title')}
         onDone={finishStep}
         onNotNow={finishStep}
+      />
+    );
+  }
+  if (failed !== null) {
+    return (
+      <ProblemCard
+        testID="sign-in-failed"
+        problem={{
+          title: t(`signIn.problem.${failed}.title`),
+          text: t(`signIn.problem.${failed}.text`),
+        }}
+        okLabel={t('problem.ok')}
+        onOk={dismissFailed}
       />
     );
   }
@@ -138,11 +146,6 @@ export function SignInChoices({
         onPress={onNotNow}
       />
       {busy !== null ? <Text style={styles.line}>{t('signIn.busy')}</Text> : null}
-      {failedText !== null ? (
-        <Text testID="sign-in-failed" style={styles.line}>
-          {failedText}
-        </Text>
-      ) : null}
     </View>
   );
 }

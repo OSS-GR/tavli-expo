@@ -11,7 +11,7 @@ import {
   type AuthProvider,
   type MemoryAppleSheet,
 } from '@tavli/contracts';
-import { act, screen } from '@testing-library/react-native';
+import { act, screen, within } from '@testing-library/react-native';
 import { AccessibilityInfo, AppState, Text } from 'react-native';
 
 import i18n from '@/i18n';
@@ -119,9 +119,10 @@ describe('InviteAccountGate', () => {
     appleSheet.next = 'fail';
     await openGate(createMemoryAuthProvider(createMemoryAuthStore()), appleSheet);
     await user.press(await screen.findByRole('button', { name: 'Continue with Apple' }));
-    expect(
-      await screen.findByText('That did not work. Check the connection and try again.'),
-    ).toBeOnTheScreen();
+    const problem = within(await screen.findByTestId('sign-in-failed'));
+    expect(problem.getByText('That did not work')).toBeOnTheScreen();
+    expect(screen.queryByText(/Check the connection/)).toBeNull();
+    await user.press(problem.getByRole('button', { name: 'OK' }));
     await user.press(screen.getByRole('button', { name: 'Continue as a guest' }));
     expect(await screen.findByText('invite for guest-1')).toBeOnTheScreen();
   });
@@ -137,12 +138,13 @@ describe('InviteAccountGate', () => {
     await openGate(createMemoryAuthProvider(store), appleSheet);
     await user.press(await screen.findByRole('button', { name: 'Continue with Apple' }));
     const text =
-      'Apple sign-in did not finish. Check that this phone is signed in to an Apple ID in Settings, or continue as a guest.';
+      'Check that this phone is signed in to an Apple ID in Settings, or continue as a guest.';
     expect(await screen.findByText(text)).toBeOnTheScreen();
-    expect(announce).toHaveBeenCalledWith(text);
+    expect(announce).toHaveBeenCalledWith(`Apple sign-in did not finish. ${text}`);
     expect(screen.queryByText(/Check the connection/)).toBeNull();
     expect(store.session).toBeNull();
     // The guest still works.
+    await user.press(screen.getByRole('button', { name: 'OK' }));
     await user.press(screen.getByRole('button', { name: 'Continue as a guest' }));
     expect(await screen.findByText('invite for guest-1')).toBeOnTheScreen();
     announce.mockRestore();
@@ -180,12 +182,16 @@ describe('InviteAccountGate', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     await openGate(auth);
     await user.press(await screen.findByRole('button', { name: 'Continue as a guest' }));
-    const text = 'That did not work. Check the connection and try again.';
-    expect(await screen.findByText(text)).toBeOnTheScreen();
+    expect(
+      await screen.findByText('We could not reach our server. Check the connection and try again.'),
+    ).toBeOnTheScreen();
     // Read out: iOS VoiceOver does not read alert roles.
-    expect(announce).toHaveBeenLastCalledWith(text);
+    expect(announce).toHaveBeenLastCalledWith(
+      'No connection. We could not reach our server. Check the connection and try again.',
+    );
     announce.mockRestore();
     fail = false;
+    await user.press(screen.getByRole('button', { name: 'OK' }));
     await user.press(screen.getByRole('button', { name: 'Continue as a guest' }));
     expect(await screen.findByText('invite for guest-1')).toBeOnTheScreen();
   });

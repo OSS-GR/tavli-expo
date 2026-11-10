@@ -300,12 +300,23 @@ describe('the email code step', () => {
     await openEmail(user, { auth: flaky });
     await user.type(screen.getByTestId('email-code-address'), 'eleni@example.com');
     await user.press(screen.getByTestId('email-code-send'));
-    expect(
-      await screen.findByText('That did not work. Check the connection and try again.'),
-    ).toBeOnTheScreen();
+    expect(await screen.findByTestId('email-code-problem')).toHaveTextContent(
+      'We could not reach our server. Check the connection and try again.',
+    );
     fail = false;
     await user.press(screen.getByTestId('email-code-send'));
     expect(await screen.findByTestId('email-code-input')).toBeOnTheScreen();
+  });
+
+  it('with email off on the server says so in the problem line (#462)', async () => {
+    const user = setupUser();
+    store.offKeys.push('email');
+    await openEmail(user);
+    await user.type(screen.getByTestId('email-code-address'), 'eleni@example.com');
+    await user.press(screen.getByTestId('email-code-send'));
+    const text = 'Email sign-in is off on our server for now. Try another way, or try again later.';
+    expect(await screen.findByTestId('email-code-problem')).toHaveTextContent(text);
+    expect(announce).toHaveBeenCalledWith(text);
   });
 
   it('speaks Greek, and the email goes out in Greek', async () => {

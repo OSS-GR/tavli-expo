@@ -2,7 +2,7 @@
 // convex-test. A fake Apple signs the id tokens (`test.apple.ts`): no test
 // reaches Apple.
 
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import { authComponent } from './auth';
@@ -331,6 +331,18 @@ describe('a guest saves their account with Apple', () => {
     });
     expect(reply.status).toBe(401);
     expect((await userRow(t, id))?.isAnonymous).toBe(true);
+  });
+
+  it('with Apple off (no APPLE_SERVICES_ID) answers 503 KEY_OFF and saves nothing (#462)', async () => {
+    const t = setup();
+    const phone = newPhone();
+    const id = await guest(t, phone);
+    vi.stubEnv('APPLE_SERVICES_ID', '');
+    const reply = await saveApple(t, apple, phone, 'apple-ann');
+    expect(reply.status).toBe(503);
+    expect(reply.body['code']).toBe('KEY_OFF');
+    expect((await userRow(t, id))?.isAnonymous).toBe(true);
+    expect(await claims(t)).toEqual([]);
   });
 
   it('needs a session', async () => {

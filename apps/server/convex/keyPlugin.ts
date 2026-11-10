@@ -89,6 +89,7 @@ export const KEY_ERROR_CODES = {
   BAD_TICKET: 'the move ticket is not valid, or it ran out',
   INVALID_EMAIL: 'the address is not valid',
   EMAIL_OFF: 'email codes are off on this server',
+  KEY_OFF: 'this kind of key is off on this server',
   RATE_LIMITED: 'too many codes asked for; try again later',
   MAIL_FAILED: 'the code email could not be sent; try again later',
   WRONG_CODE: 'the code is wrong',
@@ -331,10 +332,11 @@ export function keyPlugin(options: KeyPluginOptions) {
             // Our own check (`verifyKeyIdToken` in `auth.ts`), the one Better
             // Auth's sign-in also runs first: Apple's signature, our app, our
             // nonce (once). A provider without it is never trusted here.
-            const verify = provider?.options?.verifyIdToken;
-            if (provider === undefined || verify === undefined) {
-              throw keyError('BAD_REQUEST', 'BAD_REQUEST');
-            }
+            // No provider: this kind of key is off here (Apple with no
+            // `APPLE_SERVICES_ID`, #462). The app says so, not "no connection".
+            if (provider === undefined) throw keyError('SERVICE_UNAVAILABLE', 'KEY_OFF');
+            const verify = provider.options?.verifyIdToken;
+            if (verify === undefined) throw keyError('BAD_REQUEST', 'BAD_REQUEST');
             if (!(await verify(token, nonce, ctx))) {
               throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
             }

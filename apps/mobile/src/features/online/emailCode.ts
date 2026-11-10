@@ -41,7 +41,7 @@ export function resendSecondsLeft(sentAt: number, now: number): number {
 export type EmailCodeProblem =
   /** The phone's check: not an address. */
   | 'badAddress'
-  /** The server would not send a code to it (or email codes are off). */
+  /** The server would not send a code to it. */
   | 'sendRefused'
   /** Too many codes for now. `minutes`, when the server says how long. */
   | 'rateLimited'
@@ -51,7 +51,11 @@ export type EmailCodeProblem =
   | 'codeUsed'
   /** Another account has this address (saving a key). */
   | 'keyTaken'
-  /** Anything else: most often the connection. */
+  /** Email codes are off on the server (`KEY_OFF`, #462). */
+  | 'emailOff'
+  /** The server could not be reached. */
+  | 'network'
+  /** Anything else. */
   | 'other';
 
 export interface EmailCodeProblemState {
@@ -70,6 +74,8 @@ export function sendProblemOf(error: unknown): EmailCodeProblemState {
       : { problem: 'rateLimited', minutes: Math.ceil(wait / 60_000) };
   }
   if (error.code === 'REJECTED') return { problem: 'sendRefused' };
+  if (error.code === 'KEY_OFF') return { problem: 'emailOff' };
+  if (error.code === 'NETWORK') return { problem: 'network' };
   return { problem: 'other' };
 }
 
@@ -79,5 +85,7 @@ export function codeProblemOf(error: unknown): EmailCodeProblemState {
   if (error.code === 'WRONG_CODE') return { problem: 'wrongCode' };
   if (error.code === 'REJECTED') return { problem: 'codeUsed' };
   if (error.code === 'KEY_BELONGS_TO_OTHER') return { problem: 'keyTaken' };
+  if (error.code === 'KEY_OFF') return { problem: 'emailOff' };
+  if (error.code === 'NETWORK') return { problem: 'network' };
   return { problem: 'other' };
 }
