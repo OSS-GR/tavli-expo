@@ -157,7 +157,7 @@ describe('universal links (#332)', () => {
 });
 
 describe('the homepage', () => {
-  const TESTFLIGHT = 'https://testflight.apple.com/join/8vkMaRAm';
+  const TESTFLIGHT = 'https://testflight.apple.com/join/RTCQhMCc';
   const pages = [
     ['en', 'docs/legal/site/index.html', 'Join with a code'],
     ['el', 'docs/legal/site/el/index.html', 'Μπες με κωδικό'],
