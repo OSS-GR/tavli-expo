@@ -1,8 +1,8 @@
 /**
  * An invite link on first launch (#256). The app routes are guarded until
  * the user answers the welcome flow (`app/_layout.tsx`), so the router
- * sends `/invite/<code>` to the language step first. The layout keeps the
- * code here, and the welcome group's redirect then opens the invite
+ * sends `/invite/<code>` (or the share link's `/i/<code>`, #332) to the
+ * language step first. The layout keeps the code here, and the welcome group's redirect then opens the invite
  * instead of Home.
  */
 import { usePathname } from 'expo-router';

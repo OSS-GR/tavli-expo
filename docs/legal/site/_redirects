@@ -1,0 +1,6 @@
+# Cloudflare Pages (and Netlify) rewrite rules (#332). Not served as a page.
+# Every invite link https://tavlaki.com/i/<code> shows the fallback page
+# i/index.html. The address stays the same (200 is a rewrite, not a
+# redirect), so the friend still sees the code at the end of it.
+# Never redirect /.well-known/apple-app-site-association: iOS refuses it.
+/i/*  /i/index.html  200
