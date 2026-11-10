@@ -14,7 +14,7 @@
  * keyboard: on iOS the sheet moves up with it (`KeyboardAvoidingView`);
  * Android resizes the window.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -36,7 +36,9 @@ export interface SheetProps {
   /**
    * `dialog`: a card with side margins (13). `sheet`: full width (7).
    * `bare`: placed like `dialog`, with no box of its own: the content
-   * brings its own (the problem popup, #480).
+   * brings its own (the problem popup, #480). It adds no padding or gap
+   * either: the content does its own spacing. A sheet that closes keeps
+   * the look it had while it fades out.
    */
   look?: SheetLook;
   /** The screen under it turns with the phone (the game screen): the sheet turns too. */
@@ -54,6 +56,12 @@ export function Sheet({
   children,
   testID,
 }: SheetProps) {
+  // Keep the last look while the Modal fades out: a caller that picks the
+  // look from what it shows (Settings → Account) must not restyle a
+  // closing sheet.
+  const [kept, setKept] = useState(look);
+  if (visible && kept !== look) setKept(look);
+  const shown = visible ? look : kept;
   return (
     <Modal
       visible={visible}
@@ -62,7 +70,7 @@ export function Sheet({
       onRequestClose={onClose}
       supportedOrientations={turns ? TURNS : UPRIGHT}>
       <KeyboardAvoidingView
-        style={styles.root(look)}
+        style={styles.root(shown)}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable
           style={styles.scrim}
@@ -70,10 +78,10 @@ export function Sheet({
           accessibilityRole="button"
           accessibilityLabel={closeLabel}
         />
-        <View testID={testID} style={styles.sheet(look)} accessibilityViewIsModal>
+        <View testID={testID} style={styles.sheet(shown)} accessibilityViewIsModal>
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.content(look)}
+            contentContainerStyle={styles.content(shown)}
             keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
@@ -108,7 +116,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     maxHeight: '100%',
     width: '100%',
     maxWidth: MAX_SHEET_WIDTH,
-    overflow: 'hidden',
+    // `bare` clips nothing: the content's own border and corners show whole.
+    overflow: look === 'bare' ? 'visible' : 'hidden',
     marginTop: rt.insets.top,
     marginBottom: look === 'sheet' ? 0 : rt.insets.bottom + theme.space.lg,
     // `bare` has no box: no fill, no border, and no corners that would cut
