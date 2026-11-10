@@ -363,6 +363,16 @@ App Store guideline 1.2: a player can block or report another player in the app.
 - **Terms.** "Usernames" in the terms of use (all four files) says how to report in the app.
 - **Tests.** `ReportOrBlock.test.tsx` (block, report, Cancel, no name, focus, a failure with and without Try again, a double tap, the sheet held while sending, a dialog opened again during a call, a call that throws, a refused call, a blocked player, Greek), `blocked.test.tsx` (one list per player, once per player, a late list, the retry), `BlockedPlayersScreen.test.tsx` (the list, Unblock, a failed Unblock, empty, no session, Try again, the Settings row, the known blocks), `OnlineMatchScreen.test.tsx` (the menu, Report only after a block), `OnlineHistory.test.tsx` (the row, Report only after a report and for an earlier block), `navigation.test.tsx` (match end of a dev game, Report only after a block), `InviteScreen.test.tsx` (`BLOCKED`), `onlineServices.test.ts`, `connection.test.tsx`.
 
+## Friends (#406)
+
+The server, the `Friends` port and its Convex adapter are done (see [Friends](online-game-service.md#friends-406)); the app screens are not built yet. What they must keep:
+
+- **Saved accounts only.** A guest gets `NOT_SAVED`; offer the save (Apple or the email code) first. Only `openFriendLink` answers a guest.
+- **No contacts permission.** Share the friend link with the share sheet or a QR code; never read the address book. `apps/mobile/src/noContactsPermission.test.ts` fails on `NSContactsUsageDescription`, `READ_CONTACTS` or `WRITE_CONTACTS` in any variant.
+- **A friend invite push** has `data.inviteCode` (no `gameId`): a tap must open `/invite/<code>`.
+- **Report or block** on every friend row, as on other rows with a name (#435). A block ends the friendship.
+- **No analytics** of ids, names, tokens or search text.
+
 ## Settings → Account (#402)
 
 Settings → Online play → **Account** (`app/account.tsx`, in the guarded app group) shows who this phone plays as online and the account's actions (ADR-0008). The row shows in every build with online play (`auth`, `usernames` and `onlineData`), also on a phone that never played online. Code: `features/account/useAccount.ts` (the state and the calls) and `features/account/AccountScreen.tsx`. Until #402 Settings had a Username row and **Delete my online data** in Privacy (#315); both moved here, and the delete is now **Delete my account**.

@@ -166,11 +166,7 @@ export function friendsContract(): readonly FriendsContractCheck[] {
         await failsWith(friends.declineRequest(bob), 'NOT_SIGNED_IN', `declineRequest() ${what}`);
         await failsWith(friends.cancelRequest(bob), 'NOT_SIGNED_IN', `cancelRequest() ${what}`);
         await failsWith(friends.removeFriend(bob), 'NOT_SIGNED_IN', `removeFriend() ${what}`);
-        await failsWith(
-          friends.inviteFriend(bob, GAME),
-          'NOT_SIGNED_IN',
-          `inviteFriend() ${what}`,
-        );
+        await failsWith(friends.inviteFriend(bob, GAME), 'NOT_SIGNED_IN', `inviteFriend() ${what}`);
         await failsWith(
           friends.listFriendInvites(),
           'NOT_SIGNED_IN',
@@ -190,11 +186,7 @@ export function friendsContract(): readonly FriendsContractCheck[] {
         await failsWith(guest.myFriendLink(), 'NOT_SAVED', `myFriendLink() ${what}`);
         await failsWith(guest.listFriendInvites(), 'NOT_SAVED', `listFriendInvites() ${what}`);
         const token = await subject.friendsFor('bob').myFriendLink();
-        same(
-          (await guest.openFriendLink(token))?.status,
-          'none',
-          'a guest opens a friend link',
-        );
+        same((await guest.openFriendLink(token))?.status, 'none', 'a guest opens a friend link');
         await failsWith(guest.requestByLink(token), 'NOT_SAVED', `requestByLink() ${what}`);
 
         // Alice played the guest, but cannot ask them, and does not see them.
@@ -262,7 +254,11 @@ export function friendsContract(): readonly FriendsContractCheck[] {
         same(incoming.length, 1, "alice's incoming requests");
         same(incoming[0]?.playerId, bobId, 'the request is from bob');
         check(typeof incoming[0]?.sentAt === 'number', 'sentAt is a number');
-        same((await bob.listRequests()).outgoing.map((row) => row.playerId), [aliceId], 'sent');
+        same(
+          (await bob.listRequests()).outgoing.map((row) => row.playerId),
+          [aliceId],
+          'sent',
+        );
         same((await alice.listRequests()).outgoing, [], "alice's sent requests");
 
         await alice.acceptRequest(bobId);
@@ -309,7 +305,11 @@ export function friendsContract(): readonly FriendsContractCheck[] {
         );
 
         same(await alice.sendRequest(bobId), 'sent', 'alice asks bob');
-        same((await bob.listRequests()).incoming.map((row) => row.playerId), [aliceId], 'in');
+        same(
+          (await bob.listRequests()).incoming.map((row) => row.playerId),
+          [aliceId],
+          'in',
+        );
         await alice.cancelRequest(bobId);
         await alice.cancelRequest(bobId);
         same(await bob.listRequests(), { incoming: [], outgoing: [] }, 'after the cancel');
@@ -364,7 +364,11 @@ export function friendsContract(): readonly FriendsContractCheck[] {
           null,
           'alice: no such name',
         );
-        same(await bob.listRequests(), { incoming: [], outgoing: [] }, 'the block ends the request');
+        same(
+          await bob.listRequests(),
+          { incoming: [], outgoing: [] },
+          'the block ends the request',
+        );
       },
     },
     {
@@ -395,7 +399,10 @@ export function friendsContract(): readonly FriendsContractCheck[] {
           'the status in the list',
         );
         same(
-          (await subject.friendsFor('bob').recentPlayers()).map((row) => [row.playerId, row.status]),
+          (await subject.friendsFor('bob').recentPlayers()).map((row) => [
+            row.playerId,
+            row.status,
+          ]),
           [[aliceId, 'received']],
           "bob's recent players",
         );
@@ -492,7 +499,11 @@ export function friendsContract(): readonly FriendsContractCheck[] {
         const code = await alice.inviteFriend(bobId, GAME);
 
         const forBob = await subject.friendsFor('bob').listFriendInvites();
-        same(forBob.map((invite) => invite.code), [code], "bob's friend invites");
+        same(
+          forBob.map((invite) => invite.code),
+          [code],
+          "bob's friend invites",
+        );
         same(forBob[0]?.from, subject.idOf('alice'), 'from alice');
         check(forBob[0]?.fromName !== null, 'with her name');
         same(await alice.listFriendInvites(), [], "alice's friend invites");

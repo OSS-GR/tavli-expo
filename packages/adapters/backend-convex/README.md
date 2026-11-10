@@ -1,6 +1,6 @@
 # @tavli/backend-convex
 
-The `GameTransport`, `Invites`, `PushTokens`, `OnlineData`, `AppUpdates` and `Usernames` ports (`@tavli/contracts`) on the [Convex](https://www.convex.dev/) client. They call the functions in `apps/server/convex/games.ts`, `invites.ts`, `push.ts`, `account.ts`, `appUpdate.ts` and `usernames.ts`. Decision: [ADR-0004](../../../docs/decisions/0004-backend-auth.md) (point 9). Issues: #253 (games), #281 (invites), #285 (push tokens), #315 (delete my online data), #390 (update needed), #405 (usernames).
+The `GameTransport`, `Invites`, `PushTokens`, `OnlineData`, `AppUpdates`, `Usernames` and `Friends` ports (`@tavli/contracts`) on the [Convex](https://www.convex.dev/) client. They call the functions in `apps/server/convex/games.ts`, `invites.ts`, `push.ts`, `account.ts`, `appUpdate.ts`, `usernames.ts` and `friends.ts`. Decision: [ADR-0004](../../../docs/decisions/0004-backend-auth.md) (point 9). Issues: #253 (games), #281 (invites), #285 (push tokens), #315 (delete my online data), #390 (update needed), #405 (usernames), #406 (friends).
 
 Version: `convex` 1.49.0, a peer dependency (the app installs it). Keep it on the same version as `apps/server`.
 
@@ -35,6 +35,13 @@ Version: `convex` 1.49.0, a peer dependency (the app installs it). Keep it on th
 - **`createConvexOnlineData({ client })`** needs only `mutation` (`ConvexOnlineDataClient`).
 - **`deleteMyData()`** calls `deleteMyAccount` (#302) with no arguments, and resolves once the mutation resolves.
 - **Errors.** Like the push tokens: `NOT_SIGNED_IN` (nobody signed in, or the data is already gone) rejects as plain data; any other error stays as it is. While the phone is offline, the Convex client keeps the call and sends it later, so the app puts its own time limit on it.
+
+### Friends (#406)
+
+- **`createConvexFriends({ client })`** needs `mutation` and `query` (`ConvexFriendsClient`). Each port call runs one function of `FRIEND_FUNCTIONS` (`friends:<name>`): `sendRequest` is `sendFriendRequest`, `acceptRequest` is `acceptFriendRequest`, and so on.
+- **`requestByUsername`** gets a failed request as a value (`{ ok: false, code, message }`), so the server keeps the search in its count, and rejects with `{ code, message }`.
+- **Errors.** A `ConvexError` with `FriendsErrorData` rejects with `{ code, message }` (`toFriendsError`), `NOT_SIGNED_IN` and `NOT_SAVED` too. Any other error stays as it is.
+- `apps/server/convex/convexFriends.test.ts` checks the names and types against `api` and runs `friendsContract()` through the adapter.
 
 ### Update needed (#390)
 

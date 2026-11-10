@@ -91,6 +91,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { signedInPlayer } from './caller';
+import { recordFriendMatch } from './friendEdges';
 import { createCryptoRng } from './model/cryptoRng';
 import { NEW_MATCH_WAIT, turnWait } from './model/push';
 import { ensureGuestNumber } from './playerNames';
@@ -217,7 +218,8 @@ function savedDraft(row: Doc<'drafts'> | null): SavedDraft | null {
  * the wait moved to the other player of an async game, or a new game
  * started (#280), or a "game over" push when the step ended an async
  * match (#316). `deadline` is passed to `startClock`. A step ends the
- * draft of the turn (#374): its row goes.
+ * draft of the turn (#374): its row goes. A step that ends the match
+ * adds it to the record of two friends (#406, `recordFriendMatch`).
  */
 async function save(
   ctx: MutationCtx,
@@ -248,6 +250,10 @@ async function save(
   });
   const draft = await draftRow(ctx, game._id);
   if (draft !== null) await ctx.db.delete(draft._id);
+  const winner = flow.match.winner;
+  if (game.status === 'active' && winner !== null) {
+    await recordFriendMatch(ctx, game.players, winner);
+  }
   await scheduleTurnPush(ctx, game, version, turnWait(before.flow), turnWait(flow), callerId);
   return version;
 }

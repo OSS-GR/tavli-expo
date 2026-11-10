@@ -22,6 +22,10 @@
  * are in `@tavli/online` (`safety.ts`), which the in-memory server runs
  * too: never copy them here. This file adds the database.
  *
+ * A block also ends the friendship and the requests between the two
+ * (#406, `endFriendship`), and hides each from the other in the friend
+ * search, the friend link and recent players (`friends.ts`).
+ *
  * The account delete (`deleteAccountOf`) schedules `deleteSafetyRows`:
  * the caller's blocks both ways and the reports by and about them, in
  * pages. Never send ids, names or reasons to analytics or the logs.
@@ -48,6 +52,7 @@ import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { authComponent } from './auth';
 import { existingPlayer, signedInPlayer } from './caller';
+import { endFriendship, metAsFriends } from './friendEdges';
 import { nameOf, nameRowOf, namesOfPlayers } from './playerNames';
 
 /** Throws a `ConvexError` with `SafetyErrorData`, so clients get the code. */
@@ -123,17 +128,19 @@ async function answeredInvite(ctx: QueryCtx, from: string, answeredBy: string): 
 }
 
 /**
- * The two met (`checkMet`): a game, or an invite one answered from the
- * other. And `playerId` still has an account: finished games outlive it.
- * Five indexed lookups at most.
+ * The two met (`checkMet`): a game, an invite one answered from the
+ * other, a friendship or a friend request either way (#406). And
+ * `playerId` still has an account: finished games outlive it. Eight
+ * indexed lookups at most. `friends.ts` uses it for `sendFriendRequest`.
  */
-async function met(ctx: QueryCtx, callerId: string, playerId: string): Promise<boolean> {
+export async function met(ctx: QueryCtx, callerId: string, playerId: string): Promise<boolean> {
   if ((await authComponent.getAnyUserById(ctx, playerId)) === null) return false;
   const found = await Promise.all([
     gameBetween(ctx, callerId, playerId),
     gameBetween(ctx, playerId, callerId),
     answeredInvite(ctx, callerId, playerId),
     answeredInvite(ctx, playerId, callerId),
+    metAsFriends(ctx, callerId, playerId),
   ]);
   return found.some(Boolean);
 }
@@ -150,7 +157,8 @@ async function blockCount(ctx: QueryCtx, blockerId: string): Promise<number> {
 /**
  * Saves the block, after the checks. A block that is there already
  * changes nothing. A full list: `refuse` throws `TOO_MANY_BLOCKS`, `skip`
- * saves nothing (a report still goes in).
+ * saves nothing (a report still goes in). A block ends the friendship
+ * and the requests between the two (#406), also when the list is full.
  */
 async function addBlock(
   ctx: MutationCtx,
@@ -158,6 +166,7 @@ async function addBlock(
   playerId: string,
   whenFull: 'refuse' | 'skip',
 ): Promise<void> {
+  await endFriendship(ctx, callerId, playerId);
   if (await blocks(ctx, callerId, playerId)) return;
   const count = await blockCount(ctx, callerId);
   if (whenFull === 'skip' && count >= MAX_BLOCKS) return;

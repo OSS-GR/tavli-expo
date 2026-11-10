@@ -124,6 +124,11 @@ export default defineSchema({
     gameId: v.union(v.id('games'), v.null()),
     /** The player who accepted or declined the invite. */
     answeredBy: v.union(v.string(), v.null()),
+    /**
+     * A friend invite (#406, `inviteFriend` in `friends.ts`): the one
+     * friend who may read and answer it. Absent: anyone with the code.
+     */
+    to: v.optional(v.string()),
   })
     .index('by_code', ['code'])
     // "My open invites" and the cap on them (#275): the open invites of
@@ -132,7 +137,9 @@ export default defineSchema({
     // "Did these two meet?" (#320, `safety.ts`): an invite one answered from the other.
     .index('by_answer', ['from', 'answeredBy'])
     // Moving a guest into an account (#403, `guestMove.ts`): the invites one answered.
-    .index('by_answered', ['answeredBy']),
+    .index('by_answered', ['answeredBy'])
+    // A player's friend invites (#406): the open ones to answer, and the account delete.
+    .index('by_to', ['to', 'status', 'expiresAt']),
 
   /**
    * The Expo push tokens of each player's phones (#280), for "your turn"
@@ -208,6 +215,69 @@ export default defineSchema({
     .index('by_reporter', ['reporterId', 'createdAt'])
     .index('by_pair', ['reporterId', 'reportedId'])
     .index('by_reported', ['reportedId']),
+
+  /**
+   * Friends (#406, `friends.ts`): two rows per friendship, one from each
+   * side, so each player reads their list with one index range. At most
+   * `MAX_FRIENDS` rows per player. The record is kept on the row: it is
+   * counted from the finished games when the two become friends, then
+   * `recordFriendMatch` adds each match that ends (`games.ts`).
+   */
+  friends: defineTable({
+    playerId: v.string(),
+    friendId: v.string(),
+    /** When the two became friends, epoch ms (server clock). */
+    since: v.number(),
+    /** Matches `playerId` won against `friendId`. */
+    wins: v.number(),
+    /** Matches `friendId` won against `playerId`. */
+    losses: v.number(),
+  })
+    .index('by_player', ['playerId', 'since'])
+    .index('by_pair', ['playerId', 'friendId'])
+    .index('by_friend', ['friendId']),
+
+  /**
+   * Friend requests (#406): one row per sender and receiver. An open row
+   * waits for an answer; a declined row stays so the sender waits
+   * `FRIEND_REQUEST_WAIT_MS`, then a new request reuses it. An accept, a
+   * cancel and a block delete the row.
+   */
+  friendRequests: defineTable({
+    fromId: v.string(),
+    toId: v.string(),
+    status: v.union(v.literal('open'), v.literal('declined')),
+    /** When it was sent (or sent again), epoch ms (server clock). */
+    createdAt: v.number(),
+    /** When it was declined. `null` while open. */
+    declinedAt: v.union(v.number(), v.null()),
+  })
+    .index('by_pair', ['fromId', 'toId'])
+    .index('by_from', ['fromId', 'status', 'createdAt'])
+    .index('by_to', ['toId', 'status', 'createdAt']),
+
+  /**
+   * Friend link tokens (#406): one per player who asked for a link, made
+   * with `createCryptoRng`. A reset replaces the token. Never the id.
+   */
+  friendLinks: defineTable({
+    playerId: v.string(),
+    /** `FRIEND_TOKEN_LENGTH` characters from `FRIEND_TOKEN_ALPHABET`. Unique. */
+    token: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_token', ['token'])
+    .index('by_player', ['playerId']),
+
+  /**
+   * Username searches (#406), for the cap of `FRIEND_SEARCHES_PER_HOUR`.
+   * Only the time: never the name searched for. Rows older than the
+   * window are deleted at the next search.
+   */
+  friendSearches: defineTable({
+    playerId: v.string(),
+    at: v.number(),
+  }).index('by_player', ['playerId', 'at']),
 
   /**
    * Who owns each sign-in key (#397): one row per Apple id (later Google).

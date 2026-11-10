@@ -1228,7 +1228,11 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     }
     for (const key of [...friendRequests.keys()]) {
       const [from = '', to = ''] = key.split('\n');
-      if (b === undefined ? from === a || to === a : key === requestKey(a, b) || key === requestKey(b, a)) {
+      if (
+        b === undefined
+          ? from === a || to === a
+          : key === requestKey(a, b) || key === requestKey(b, a)
+      ) {
         friendRequests.delete(key);
       }
     }
@@ -1382,7 +1386,10 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           const [from = '', to = ''] = key.split('\n');
           return { from, to, record };
         })
-        .filter(({ from, to, record }) => record.status === 'open' && (side === 'from' ? from : to) === id)
+        .filter(
+          ({ from, to, record }) =>
+            record.status === 'open' && (side === 'from' ? from : to) === id,
+        )
         .map(({ from, to, record }) => {
           const other = side === 'from' ? to : from;
           return { playerId: other, name: nameOf(other), sentAt: record.createdAt };
@@ -1410,7 +1417,10 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         call(() => {
           const id = saved();
           return recentOpponents(
-            [...games.values()].map((game) => ({ players: game.players, updatedAt: game.updatedAt })),
+            [...games.values()].map((game) => ({
+              players: game.players,
+              updatedAt: game.updatedAt,
+            })),
             id,
           )
             .filter(({ playerId: other }) => isSaved(other) && !blockedEither(id, other))
