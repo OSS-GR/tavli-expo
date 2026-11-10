@@ -85,7 +85,11 @@ export type AppleIdTokenCheckResult =
 /** A bundle id or Services ID: letters, digits, dots and dashes. */
 const PLAIN_ID = /^[A-Za-z0-9.-]{1,100}$/;
 
-/** The token's `aud`, unchecked, when it is plain id text. */
+/**
+ * The token's `aud` when it is plain id text. Read only after a
+ * `wrong-audience` error: jose checks Apple's signature before the
+ * claims, so this text comes from Apple, not from the caller.
+ */
 function audienceOf(token: string): string | undefined {
   try {
     const part = token.split('.')[1] ?? '';
