@@ -41,15 +41,15 @@ beforeEach(async () => {
 });
 
 describe('<NewGameScreen /> vs bot', () => {
-  it('starts Portes to 3 vs an easy bot by default', async () => {
+  it('starts one game of Portes vs an easy bot by default (#479)', async () => {
     const user = userEvent.setup();
     const { ui, onStart } = show('bot');
     await render(ui);
 
     expect(screen.getByRole('header', { name: 'Play vs bot' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
-    expect(screen.getByRole('radio', { name: '3' })).toBeChecked();
-    expect(screen.getByText('First to 3 points. Mono = 1, diplo = 2.')).toBeOnTheScreen();
+    expect(screen.getByRole('radio', { name: '1' })).toBeChecked();
+    expect(screen.getByText('First to 1 point. Mono = 1, diplo = 2.')).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: 'Easy' })).toBeChecked();
 
     await user.press(screen.getByRole('button', { name: 'Start game' }));

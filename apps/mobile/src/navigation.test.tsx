@@ -390,6 +390,7 @@ describe('app navigation', () => {
     const user = setupUser();
     const session = matchSessions.start({
       ...defaultSetup('local'),
+      targetPoints: 3,
       game: 'tavli',
       rulesVersions: { ...defaultSetup('local').rulesVersions, plakoto: 'plakoto.federation' },
     });
@@ -1416,7 +1417,7 @@ describe('your invites on Home (#314)', () => {
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     const code = await inviteThenHome(user, router);
     const row = await screen.findByTestId(`home-invite-${code}`);
-    expect(row).toHaveAccessibleName(/^Invite, Portes, first to 3 points, None, /);
+    expect(row).toHaveAccessibleName(/^Invite, Portes, first to 1 point, None, /);
     await user.press(row);
     expect(router.getPathname()).toBe(`/friend/${code}`);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();

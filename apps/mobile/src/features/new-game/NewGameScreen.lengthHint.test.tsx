@@ -61,6 +61,9 @@ describe('<NewGameScreen /> match length hint (#245)', () => {
   it('says 1 point per checker left only for Acey-Deucey American', async () => {
     const user = userEvent.setup();
     await render(show());
+    // One game is the default (#479): pick 3 to see the plural.
+    expect(lengthHint()).toHaveTextContent('First to 1 point. Mono = 1, diplo = 2.');
+    await user.press(screen.getByRole('radio', { name: '3' }));
     const tavli = 'First to 3 points. Mono = 1, diplo = 2.';
     expect(lengthHint()).toHaveTextContent(tavli);
 
@@ -102,6 +105,7 @@ describe('<NewGameScreen /> match length hint (#245)', () => {
     try {
       const user = userEvent.setup();
       await render(show());
+      await user.press(screen.getByRole('radio', { name: '3' }));
       expect(lengthHint()).toHaveTextContent(
         'Νικά όποιος φτάσει τους 3 βαθμούς. Μονό = 1, διπλό = 2.',
       );

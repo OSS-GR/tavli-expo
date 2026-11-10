@@ -119,7 +119,7 @@ export function FriendSetupScreen({
   const { t } = useTranslation();
   const { theme } = useUnistyles();
   const [choice, setChoice] = useState<OnlineGameChoice>('portes');
-  const [targetPoints, setTargetPoints] = useState<MatchLength>(3);
+  const [targetPoints, setTargetPoints] = useState<MatchLength>(1);
   const [turnTimeMinutes, setTurnTimeMinutes] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   // One invite per tap: a second tap before the render sees `busy` does nothing.

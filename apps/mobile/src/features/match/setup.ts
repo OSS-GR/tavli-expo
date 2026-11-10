@@ -340,7 +340,7 @@ export function defaultSetup(mode: MatchMode): MatchSetup {
   return {
     mode,
     game: 'portes',
-    targetPoints: 3,
+    targetPoints: 1,
     botLevel: 'easy',
     names: { white: '', black: '' },
     openingRoll: DEFAULT_OPENING_ROLL,

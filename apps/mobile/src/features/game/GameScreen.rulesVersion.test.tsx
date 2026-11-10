@@ -27,6 +27,8 @@ function start(game: MatchSetup['game'], rulesVersions: Partial<RulesVersions>):
   });
   const setup: MatchSetup = {
     ...defaultSetup('local'),
+    // A Tavli match needs more than one game to reach Plakoto.
+    targetPoints: 3,
     game,
     rulesVersions: { ...defaultSetup('local').rulesVersions, ...rulesVersions },
   };

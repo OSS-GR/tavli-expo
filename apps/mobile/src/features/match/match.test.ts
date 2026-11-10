@@ -48,11 +48,11 @@ const botSetup: MatchSetup = { ...defaultSetup('bot'), targetPoints: 5 };
 const localSetup: MatchSetup = { ...defaultSetup('local'), names: { white: 'Maria', black: '' } };
 
 describe('match setup', () => {
-  it('defaults to a match to 3 vs an easy bot', () => {
+  it('defaults to one game vs an easy bot (#479)', () => {
     expect(defaultSetup('bot')).toEqual({
       mode: 'bot',
       game: 'portes',
-      targetPoints: 3,
+      targetPoints: 1,
       botLevel: 'easy',
       names: { white: '', black: '' },
       openingRoll: 'useOpeningDice',
@@ -257,7 +257,7 @@ describe('match setup', () => {
         gameLevels(['easy']),
       ),
     ).toEqual({ ...defaultSetup('bot'), targetPoints: 7, names: { white: 'Ann', black: '' } });
-    expect(sanitizeSetup({ targetPoints: 4, botLevel: 'hard' }, 'bot').targetPoints).toBe(3);
+    expect(sanitizeSetup({ targetPoints: 4, botLevel: 'hard' }, 'bot').targetPoints).toBe(1);
     expect(
       sanitizeSetup({ botLevel: 'medium' }, 'bot', gameLevels(['easy', 'medium'])).botLevel,
     ).toBe('medium');

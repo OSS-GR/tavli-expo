@@ -91,7 +91,7 @@ describe('FriendSetupScreen', () => {
       ),
     ).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
-    expect(screen.getByText('First to 3 points')).toBeOnTheScreen();
+    expect(screen.getByText('First to 1 point')).toBeOnTheScreen();
     expect(screen.getByText('No time limit: 24 hours per turn')).toBeOnTheScreen();
     expect(parts.authStore.guests).toBe(0);
   });
@@ -315,7 +315,7 @@ describe('FriendSetupScreen', () => {
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     expect(invite).toHaveBeenCalledWith({
       choice: 'portes',
-      targetPoints: 3,
+      targetPoints: 1,
       turnTimeMinutes: null,
     });
     expect(props.onCreated).toHaveBeenCalledWith('ABCD2345', expect.anything());
