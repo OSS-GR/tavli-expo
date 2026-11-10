@@ -274,14 +274,21 @@ Apple lets you download a key only once. If it is lost or leaks: make a new key 
 
 The server mails sign-in codes through [AhaSend](https://ahasend.com) (AhaSend B.V., Amsterdam; data stays in the EU; free plan: 1,000 mails a month, no card). The owner does these steps once; never put a key in the repo, an issue or a chat.
 
-1. Sign up at AhaSend and accept the data processing agreement (<https://ahasend.com/dpa>).
-2. Add the domain `tavlaki.com` and set the DNS records AhaSend shows: SPF (`include:spf.ahasend.com` in the domain's SPF record), the two DKIM CNAMEs (`managed._domainkey`, `managed2._domainkey`) and a DMARC record. Wait until AhaSend shows the domain as verified.
-3. Make an API key that may only send for that domain (`messages:send:tavlaki.com`).
+Our mail setup (done 2026-11-09): `tavlaki.com` and `oss.house` use Cloudflare DNS, and Proton Mail holds their mailboxes (`support@` and `privacy@tavlaki.com`). AhaSend sends only from the subdomain `mail.tavlaki.com`, so the codes never touch Proton's records or the reputation of our own mail.
+
+1. Sign up at AhaSend and accept the data processing agreement (<https://ahasend.com/dpa>). AhaSend refuses free addresses such as Gmail; the account uses an `oss.house` address.
+2. Add the sending domain `mail.tavlaki.com` (a subdomain, as AhaSend advises). In Cloudflare (`tavlaki.com` → DNS), add the records AhaSend shows; the Name field takes only the part before `.tavlaki.com`:
+   - TXT `mail`: `v=spf1 include:spf.ahasend.com ~all` (its own SPF record: the one on `tavlaki.com` stays Proton's);
+   - CNAME `ahasend._domainkey.mail` and `ahasend2._domainkey.mail` (the two DKIM keys);
+   - CNAME `psrp.mail` → `rp.ahasend.com` (Return-Path, for bounces).
+
+   Set every CNAME to **DNS only** (grey cloud). The DMARC record of `tavlaki.com` (`p=quarantine`) also covers the subdomain. Leave out the optional tracking CNAME (`t.mail`; the app turns tracking off and the privacy policy says so) and the optional MX (no one needs replies to a code, and replies should not wait on AhaSend's servers). Wait until AhaSend shows the domain as verified.
+3. Make an API key that may only send for that domain (`messages:send:mail.tavlaki.com`).
 4. Set the Convex env vars on **both** deployments (dashboard → **Settings** → **Environment Variables**):
    - `AHASEND_API_KEY` = the key (`aha-sk-…`)
    - `AHASEND_ACCOUNT_ID` = the account id from AhaSend's dashboard
-   - `MAIL_FROM` = the sender, for example `no-reply@tavlaki.com`
-   - optional: `MAIL_FROM_NAME` (default `Tavlaki`), `EMAIL_CODES_PER_DAY` (default 30), and `AHASEND_SANDBOX` = `true` on dev to test without delivering mail.
+   - `MAIL_FROM` = `login@mail.tavlaki.com` (it must be on the verified domain; it needs no mailbox)
+   - optional: `MAIL_FROM_NAME` (default `Tavlaki`), `EMAIL_CODES_PER_DAY` (default 30), and `AHASEND_SANDBOX` = `true` on dev to test without delivering mail. Both deployments share the plan's 1,000 mails a month.
 
 With any of the first three missing, email codes are off: `/key/email-code` answers `503 EMAIL_OFF`. Watch the monthly count in AhaSend's dashboard; raise `EMAIL_CODES_PER_DAY` only when the plan allows it (at most 1,000).
 
