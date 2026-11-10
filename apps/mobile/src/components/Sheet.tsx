@@ -14,7 +14,7 @@
  * keyboard: on iOS the sheet moves up with it (`KeyboardAvoidingView`);
  * Android resizes the window.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -26,13 +26,21 @@ import {
 } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+export type SheetLook = 'sheet' | 'dialog' | 'bare';
+
 export interface SheetProps {
   visible: boolean;
   onClose: () => void;
   /** Read by screen readers on the dimmed part, for example "Resume". */
   closeLabel: string;
-  /** `dialog`: a card with side margins (13). `sheet`: full width (7). */
-  look?: 'sheet' | 'dialog';
+  /**
+   * `dialog`: a card with side margins (13). `sheet`: full width (7).
+   * `bare`: placed like `dialog`, with no box of its own: the content
+   * brings its own (the problem popup, #480). It adds no padding or gap
+   * either: the content does its own spacing. A sheet that closes keeps
+   * the look it had while it fades out.
+   */
+  look?: SheetLook;
   /** The screen under it turns with the phone (the game screen): the sheet turns too. */
   turns?: boolean;
   children: ReactNode;
@@ -48,6 +56,12 @@ export function Sheet({
   children,
   testID,
 }: SheetProps) {
+  // Keep the last look while the Modal fades out: a caller that picks the
+  // look from what it shows (Settings → Account) must not restyle a
+  // closing sheet.
+  const [kept, setKept] = useState(look);
+  if (visible && kept !== look) setKept(look);
+  const shown = visible ? look : kept;
   return (
     <Modal
       visible={visible}
@@ -56,7 +70,7 @@ export function Sheet({
       onRequestClose={onClose}
       supportedOrientations={turns ? TURNS : UPRIGHT}>
       <KeyboardAvoidingView
-        style={styles.root(look)}
+        style={styles.root(shown)}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable
           style={styles.scrim}
@@ -64,10 +78,10 @@ export function Sheet({
           accessibilityRole="button"
           accessibilityLabel={closeLabel}
         />
-        <View testID={testID} style={styles.sheet(look)} accessibilityViewIsModal>
+        <View testID={testID} style={styles.sheet(shown)} accessibilityViewIsModal>
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.content(look)}
+            contentContainerStyle={styles.content(shown)}
             keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
@@ -85,40 +99,50 @@ const TURNS: ModalProps['supportedOrientations'] = ['portrait', 'landscape'];
 export const MAX_SHEET_WIDTH = 560;
 
 const styles = StyleSheet.create((theme, rt) => ({
-  root: (look: 'sheet' | 'dialog') => ({
+  root: (look: SheetLook) => ({
     flex: 1,
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: look === 'dialog' ? theme.space.lg : 0,
+    paddingHorizontal: look === 'sheet' ? 0 : theme.space.lg,
   }),
   scrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: theme.colors.backgroundDeep,
     opacity: 0.7,
   },
-  sheet: (look: 'sheet' | 'dialog') => ({
+  sheet: (look: SheetLook) => ({
     // Never taller than the screen: the content scrolls instead.
     flexShrink: 1,
     maxHeight: '100%',
     width: '100%',
     maxWidth: MAX_SHEET_WIDTH,
-    overflow: 'hidden',
+    // `bare` clips nothing: the content's own border and corners show whole.
+    overflow: look === 'bare' ? 'visible' : 'hidden',
     marginTop: rt.insets.top,
-    marginBottom: look === 'dialog' ? rt.insets.bottom + theme.space.lg : 0,
-    borderTopLeftRadius: theme.radii.xl,
-    borderTopRightRadius: theme.radii.xl,
-    borderBottomLeftRadius: look === 'dialog' ? theme.radii.xl : 0,
-    borderBottomRightRadius: look === 'dialog' ? theme.radii.xl : 0,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    marginBottom: look === 'sheet' ? 0 : rt.insets.bottom + theme.space.lg,
+    // `bare` has no box: no fill, no border, and no corners that would cut
+    // the content's own.
+    ...(look === 'bare'
+      ? {}
+      : {
+          borderTopLeftRadius: theme.radii.xl,
+          borderTopRightRadius: theme.radii.xl,
+          borderBottomLeftRadius: look === 'sheet' ? 0 : theme.radii.xl,
+          borderBottomRightRadius: look === 'sheet' ? 0 : theme.radii.xl,
+          backgroundColor: theme.colors.surface,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        }),
   }),
   scroll: {
     flexGrow: 0,
   },
-  content: (look: 'sheet' | 'dialog') => ({
-    gap: theme.space.sm,
-    padding: theme.space.xl,
-    paddingBottom: look === 'sheet' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
-  }),
+  content: (look: SheetLook) =>
+    look === 'bare'
+      ? {}
+      : {
+          gap: theme.space.sm,
+          padding: theme.space.xl,
+          paddingBottom: look === 'sheet' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
+        },
 }));

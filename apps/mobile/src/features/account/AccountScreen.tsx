@@ -183,7 +183,8 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
         visible={account.offer !== null || problem !== null}
         onClose={account.offer !== null ? account.keepGuest : account.dismissProblem}
         closeLabel={t(account.offer !== null ? 'common.cancel' : 'problem.ok')}
-        look="dialog">
+        // A problem brings its own card: no sheet box around it (#480).
+        look={account.offer === null ? 'bare' : 'dialog'}>
         {problem !== null && account.offer === null ? (
           <ProblemCard
             // A new key per problem, so each one takes the focus again.
