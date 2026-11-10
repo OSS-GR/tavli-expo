@@ -1,7 +1,6 @@
 /**
- * What's new (#471), from Settings → Help and the one-time Home card.
- * Opening it marks every release seen, so the Home card does not show
- * after it.
+ * What's new (#471), from Settings → Help and Home's What's new button.
+ * Opening it marks every release seen, so the button's dot goes away.
  */
 import { router } from 'expo-router';
 import { useEffect } from 'react';

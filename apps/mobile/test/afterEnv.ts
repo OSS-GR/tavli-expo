@@ -35,6 +35,6 @@ beforeEach(() => {
   resetUpdateCheckForTest();
   // Save reminders (#404): no first choice yet.
   resetRemindersForTest();
-  // What's new (#471): every release seen, so Home shows no card.
+  // What's new (#471): every release seen, so Home's button has no dot.
   markWhatsNewSeenForTest();
 });

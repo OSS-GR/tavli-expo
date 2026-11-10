@@ -35,7 +35,7 @@ describe("What's new seen (#471)", () => {
     expect(storage.getString(WHATS_NEW_STORAGE_KEY)).toBe('2026-12-01');
   });
 
-  it('a player who answers a new consent text again keeps the card', () => {
+  it('a player who answers a new consent text again keeps the dot', () => {
     const storage = answered();
     const seen = createWhatsNewSeen(storage, RELEASES);
     seen.begin();
@@ -70,7 +70,7 @@ describe("What's new seen (#471)", () => {
     expect(storage.getString(WHATS_NEW_STORAGE_KEY)).toBeUndefined();
   });
 
-  it('a storage error shows no card and throws nothing', () => {
+  it('a storage error shows no dot and throws nothing', () => {
     const broken: Storage = {
       getString: () => {
         throw new Error('disk');

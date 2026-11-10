@@ -1,7 +1,7 @@
 /**
  * Which releases of What's new this phone has seen (#471), saved through
- * the `Storage` port under `WHATS_NEW_STORAGE_KEY`. Home shows its card
- * once when a newer release is in the app (`due`).
+ * the `Storage` port under `WHATS_NEW_STORAGE_KEY`. Home's button shows a
+ * dot while a newer release is in the app (`due`).
  *
  * The saved value is the date of the newest release seen. It holds no id
  * and no account. It never leaves the phone and never goes to analytics.
@@ -14,7 +14,7 @@
  * - A saved date that the list does not have (an older build after a
  *   newer one) counts as seen.
  *
- * A storage error is no problem: the card is only a nudge.
+ * A storage error is no problem: the dot is only a nudge.
  */
 import type { Storage } from '@tavli/contracts';
 
@@ -29,7 +29,7 @@ export const WHATS_NEW_STORAGE_KEY = 'whatsNewSeen';
 export interface WhatsNewSeen {
   /** True when the app has a release this phone has not seen. */
   due(): boolean;
-  /** Marks every release seen (the card showed, or the page opened). */
+  /** Marks every release seen (the page opened). */
   markSeen(): void;
   /**
    * Call right before the consent answer is saved: a new player has seen
@@ -62,7 +62,7 @@ export function createWhatsNewSeen(
     try {
       storage.setString(WHATS_NEW_STORAGE_KEY, newest);
     } catch {
-      // Only a nudge: the card may show once more.
+      // Only a nudge: the dot may show once more.
     }
   };
   return {
@@ -78,7 +78,7 @@ export function createWhatsNewSeen(
     },
     markSeen: save,
     begin: () => {
-      // A player who answers again (a new consent text) keeps the card.
+      // A player who answers again (a new consent text) keeps the dot.
       if (read() === undefined && !answered()) save();
     },
   };
@@ -87,7 +87,7 @@ export function createWhatsNewSeen(
 /** The app's What's new state, on the app's storage. */
 export const whatsNewSeen = createWhatsNewSeen(appStorage);
 
-/** Tests only: every release seen, so Home shows no card. */
+/** Tests only: every release seen, so Home's button shows no dot. */
 export function markWhatsNewSeenForTest(): void {
   whatsNewSeen.markSeen();
 }

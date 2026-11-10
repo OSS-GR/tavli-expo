@@ -8,8 +8,8 @@
  * find it, in one or two plain sentences. List only built features: never
  * "coming soon".
  *
- * A new release at the top shows the one-time Home card to players who
- * update (`seen.ts`). Never change the id of a release that shipped: the
+ * A new release at the top puts a dot on Home's What's new button for
+ * players who update (`seen.ts`). Never change the id of a release that shipped: the
  * phone saves it.
  */
 import type { IconName } from '@/components/icons';
