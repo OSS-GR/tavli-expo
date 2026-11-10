@@ -274,6 +274,41 @@ export default defineSchema({
    * Only the time: never the name searched for. Rows older than the
    * window are deleted at the next search.
    */
+  /**
+   * Ratings (#407, `ratings.ts`): one row per saved player with a rated
+   * match or a "Show me" change. No row: `START_RATING`, shown.
+   */
+  ratings: defineTable({
+    playerId: v.string(),
+    /** The rating as kept (not rounded). */
+    rating: v.number(),
+    /** The points of the rated matches so far (the FIBS experience). */
+    experience: v.number(),
+    /** Rated matches so far. */
+    matches: v.number(),
+    /** "Show me on the global board". */
+    shown: v.boolean(),
+    /** `isBoardable`: `shown` with `MIN_BOARD_MATCHES` rated matches. The global board reads `by_board`. */
+    boardable: v.boolean(),
+  })
+    .index('by_player', ['playerId'])
+    .index('by_board', ['boardable', 'rating']),
+
+  /**
+   * Rated matches of a pair of players on one UTC day (#407,
+   * `RATED_MATCHES_PER_PAIR_PER_DAY`). One row per pair (`a` < `b`,
+   * `pairOf`), kept for its last day.
+   */
+  ratedPairs: defineTable({
+    a: v.string(),
+    b: v.string(),
+    /** Whole UTC days since 1970 (`utcDay`). */
+    day: v.number(),
+    count: v.number(),
+  })
+    .index('by_pair', ['a', 'b'])
+    .index('by_b', ['b']),
+
   friendSearches: defineTable({
     playerId: v.string(),
     at: v.number(),

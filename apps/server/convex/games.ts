@@ -96,6 +96,7 @@ import { createCryptoRng } from './model/cryptoRng';
 import { NEW_MATCH_WAIT, turnWait } from './model/push';
 import { ensureGuestNumber } from './playerNames';
 import { scheduleTurnPush } from './push';
+import { rateMatch } from './ratings';
 import { nameSeenBy, playerNamesSeenBy } from './safety';
 import { gameChoice, gameStatus, gameTurnTimeMinutes } from './schema';
 
@@ -219,7 +220,9 @@ function savedDraft(row: Doc<'drafts'> | null): SavedDraft | null {
  * started (#280), or a "game over" push when the step ended an async
  * match (#316). `deadline` is passed to `startClock`. A step ends the
  * draft of the turn (#374): its row goes. A step that ends the match
- * adds it to the record of two friends (#406, `recordFriendMatch`).
+ * adds it to the record of two friends (#406, `recordFriendMatch`) and
+ * rates it (#407, `rateMatch`), unless `rated` is false (an account
+ * delete).
  */
 async function save(
   ctx: MutationCtx,
@@ -229,6 +232,7 @@ async function save(
   flow: SteppedFlow,
   now: number,
   deadline?: number | null,
+  rated = true,
 ): Promise<number> {
   const version = game.version + 1;
   const eventCount = await writeEvents(ctx, game._id, game.eventCount, version, callerId, flow);
@@ -253,6 +257,7 @@ async function save(
   const winner = flow.match.winner;
   if (game.status === 'active' && winner !== null) {
     await recordFriendMatch(ctx, game.players, winner);
+    if (rated) await rateMatch(ctx, game.players, winner, game.targetPoints, now);
   }
   await scheduleTurnPush(ctx, game, version, turnWait(before.flow), turnWait(flow), callerId);
   return version;
@@ -527,16 +532,18 @@ export const resign = mutation({
  * `callerId` resigns the match in the caller's transaction: the same
  * checks and the same save as `resign`, so the opponent gets the result
  * and the push rules hold. `resign` and `deleteMyAccount` (`account.ts`,
- * #302) both use it. Returns the new version.
+ * #302) both use it; the delete passes `rated: false` (#407). Returns the
+ * new version.
  */
 export async function resignAs(
   ctx: MutationCtx,
   gameId: Id<'games'>,
   callerId: string,
+  rated = true,
 ): Promise<number> {
   const { game, side, before } = await loadForCaller(ctx, gameId, callerId, null);
   const next = guarded(() => resignMatch(before.flow, side, createCryptoRng()));
-  return await save(ctx, game, callerId, before, next, Date.now());
+  return await save(ctx, game, callerId, before, next, Date.now(), undefined, rated);
 }
 
 /**

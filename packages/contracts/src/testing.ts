@@ -2,7 +2,7 @@
  * Test helpers for adapters. Import them from `@tavli/contracts/testing`,
  * in test files only. The crash reporter contract uses Vitest; the
  * analytics, auth provider, friends, game transport, invites, online data, mail sender, push
- * provider, push notifications, push tokens and usernames checks are plain
+ * provider, push notifications, push tokens, ratings and usernames checks are plain
  * functions, so any test runner can use them.
  */
 export {
@@ -23,6 +23,12 @@ export {
   type FriendsContractPlayer,
   type FriendsContractSubject,
 } from './testing/friends-contract';
+export {
+  ratingsContract,
+  type RatingsContractCheck,
+  type RatingsContractPlayer,
+  type RatingsContractSubject,
+} from './testing/ratings-contract';
 export {
   gameTransportContract,
   type GameTransportContractCheck,

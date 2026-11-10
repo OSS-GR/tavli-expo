@@ -4,6 +4,7 @@
 // (`t.withIdentity`). The `GameTransport` contract checks
 // (`@tavli/contracts/testing`) then run on top.
 
+import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { getFunctionName } from 'convex/server';
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server';
@@ -40,7 +41,10 @@ const PLAYERS = { white: ALICE, black: BOB };
 type Tester = ReturnType<typeof setup>;
 
 function setup() {
-  return convexTest(schema, modules);
+  const t = convexTest(schema, modules);
+  // A match that ends asks Better Auth whether both players are saved (#407).
+  betterAuthTest.register(t);
+  return t;
 }
 
 // Every game schedules a turn timer. Fake timers keep those checks from

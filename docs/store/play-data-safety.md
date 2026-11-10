@@ -1,6 +1,6 @@
 # Google Play data safety form
 
-> The answers for Play Console → App content → Data safety. Issue #137. Apple: [app-privacy.md](app-privacy.md). Last review: 2026-11-09 (#401, the sign-in choices; Sign in with Apple is iPhone only; #406, friends).
+> The answers for Play Console → App content → Data safety. Issue #137. Apple: [app-privacy.md](app-privacy.md). Last review: 2026-11-09 (#401, the sign-in choices; Sign in with Apple is iPhone only; #406, friends; #407, ratings).
 
 **This is not legal advice.** The answers follow the code on `main` on 2026-10-28 and the Data safety categories as we know them. The owner gives the final answers in the Play Console.
 
@@ -31,7 +31,7 @@ Tick these seven. Leave every other type empty.
 |----------|-----------|-----------------------|
 | Personal info | **User IDs** | The guest account's random user id on Convex (online play with a friend, #281), its guest name ("Guest" and 4 random digits, picked by the server, #400) and the username a saved account picks (#405; Google's User IDs cover a screen name) |
 | Contacts | **Contacts** | The friends list on Convex (#406, saved accounts only): Google's "Contacts" includes social graph information. The app never reads the phone's contacts and asks for no contacts permission. |
-| App activity | **Other actions** | The online games on Convex: the moves, rolls and score of a game with a friend (Google's "Other actions" names gameplay) |
+| App activity | **Other actions** | The online games on Convex: the moves, rolls and score of a game with a friend (Google's "Other actions" names gameplay), and a saved account's rating from them (#407) |
 | App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, hint shown, review opened, invite created, push permission answered, online sign-in (`apple` or `guest` only) |
 | App info and performance | **Crash logs** | Sentry crash and error reports |
 | App info and performance | **Diagnostics** | Device facts and breadcrumbs in crash reports; after Allow also app hangs / ANRs and Sentry sessions; device facts on PostHog events |
