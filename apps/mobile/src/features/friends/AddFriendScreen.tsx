@@ -14,7 +14,8 @@
  * - **Recent players** of your online games, with Ask.
  *
  * Friends need a saved account (`NotReady` shows the other states).
- * One call at a time; a failed call says why, also to screen readers.
+ * One call at a time; a failed call says why, also to screen readers. A
+ * call that finds the player signed out or a guest shows that instead.
  *
  * Navigation stays in the route (`app/friends/add.tsx`).
  */
@@ -101,7 +102,7 @@ export function AddFriendScreen({
     const [token, recent] = await Promise.all([friends.myFriendLink(), friends.recentPlayers()]);
     return { token, recent };
   }, [friends]);
-  const { state, current, reload, retry, replace } = useFriendsData(auth, load, visit);
+  const { state, current, reload, retry, replace, sessionLost } = useFriendsData(auth, load, visit);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
   const [sent, setSent] = useState<{ name: string; status: FriendStatus; n: number } | null>(null);
@@ -136,6 +137,8 @@ export function AddFriendScreen({
       },
       (error: unknown) => {
         setBusy(false);
+        // Signed out or a guest: the screen says so, as after a load.
+        if (sessionLost(error)) return;
         eventCount += 1;
         setProblem({ kind: friendsProblem(error), n: eventCount });
       },
@@ -209,9 +212,9 @@ export function AddFriendScreen({
             <SectionCard title={t('friends.add.linkTitle')} padded>
               <View style={styles.padded}>
                 <Text style={styles.line}>{t('friends.add.linkIntro')}</Text>
-                {/* Until the link is known to be current (a new visit, or a
-                    reload that failed), it may be one reset on another phone:
-                    no QR code and no sharing. */}
+                {/* Until this visit's load answers (or New link sets the
+                    link), it may be one reset on another phone: no QR code
+                    and no sharing. */}
                 {current ? (
                   <View style={styles.center}>
                     <QrCode

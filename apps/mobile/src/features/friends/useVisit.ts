@@ -3,12 +3,18 @@
  * render, then one more each time the player comes back to it. A friends
  * screen passes it to `useFriendsData`, which loads again on a new one.
  *
- * It counts a focus only after a blur (the navigation events), not each
- * run of an effect: React's Strict Mode runs effects twice in dev, and
- * that must not count as a second visit.
+ * The player comes back in two ways:
+ *
+ * - from another screen: a focus after a blur (the navigation events);
+ * - from another app: the app turns `active` after `background` or
+ *   `inactive` while this screen has the focus. There is no blur then.
+ *
+ * It counts events, not runs of an effect: React's Strict Mode runs
+ * effects twice in dev, and that must not count as a second visit.
  */
 import { useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 export function useVisit(): number {
   const navigation = useNavigation();
@@ -26,6 +32,17 @@ export function useVisit(): number {
     return () => {
       offBlur();
       offFocus();
+    };
+  }, [navigation]);
+  useEffect(() => {
+    let last = AppState.currentState;
+    const sub = AppState.addEventListener('change', (next) => {
+      const back = next === 'active' && (last === 'background' || last === 'inactive');
+      last = next;
+      if (back && navigation.isFocused()) setVisit((n) => n + 1);
+    });
+    return () => {
+      sub.remove();
     };
   }, [navigation]);
   return visit;

@@ -11,7 +11,8 @@
  *   when the sheet closes.
  * - A request to you has Accept and Decline; one you sent has Cancel.
  * - One call at a time. A call that fails keeps the list and says so,
- *   also to screen readers (`useAnnouncement`).
+ *   also to screen readers (`useAnnouncement`). A call that finds the
+ *   player signed out or a guest shows that instead of the list.
  * - Focus moves to the title. Large fonts scroll: no text has a line limit.
  *
  * Navigation stays in the route (`app/friends/index.tsx`).
@@ -93,7 +94,7 @@ export function FriendsScreen({
     ]);
     return { friends: list, requests, invites: invites.filter((i) => i.status === 'open') };
   }, [friends]);
-  const { state, reload, retry } = useFriendsData(auth, load, visit);
+  const { state, reload, retry, sessionLost } = useFriendsData(auth, load, visit);
   // The player whose call is on its way.
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
@@ -115,6 +116,8 @@ export function FriendsScreen({
       },
       (error: unknown) => {
         setBusy(null);
+        // Signed out or a guest: the screen says so, as after a load.
+        if (sessionLost(error)) return;
         problemCount += 1;
         setProblem({ kind: friendsProblem(error), n: problemCount });
         reload();
