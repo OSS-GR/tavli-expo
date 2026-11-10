@@ -18,6 +18,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `packages/online/src/safety.ts` | The pure checks of block and report: `checkTarget`, `checkMet`, `checkBlockCap`, `checkReason`, `checkReportCap`, `namesSeenBy` |
 | `packages/contracts/src/safety.ts` | The `Safety` port, `REPORT_REASONS`, the caps, the error codes; contract checks `safetyContract()` in `@tavli/contracts/testing` |
 | `apps/server/convex/friends.ts` | [Friends](#friends-406): the public friend functions, `deleteFriendsOf` and `deleteFriendRows` (internal, the account delete) |
+| `apps/server/convex/ratings.ts` | [Ratings](#ratings-407): the public rating functions, `rateMatch` (called from `save`), `deleteRatingOf` and `deleteRatedPairs` (internal, the account delete) |
 | `apps/server/convex/friendEdges.ts` | The friend rows that `safety.ts` and `games.ts` read or change: `endFriendship`, `metAsFriends`, `recordFriendMatch`. It imports no function file, so there is no import cycle |
 | `packages/online/src/friends.ts` | The pure checks of friends: `planRequest` (the caps, the wait, the order of the checks), `friendStatusOf`, `checkSearchCap`, `newFriendToken`, `recordOf`, `recordAfter`, `recentOpponents` |
 | `packages/contracts/src/friends.ts` | The `Friends` port, the caps, the error codes, `normalizeFriendToken`; contract checks `friendsContract()` in `@tavli/contracts/testing` |
@@ -236,6 +237,23 @@ One row per player who opened their friend link. `token` is `FRIEND_TOKEN_LENGTH
 
 One row per username search (`findPlayer`, `requestByUsername`): `playerId` and `at`, never the text. Index `by_player` (`playerId`, `at`). A search reads at most `FRIEND_SEARCHES_PER_HOUR` rows of the last hour, and deletes up to 50 older rows of the caller.
 
+### `ratings`
+
+One row per saved player with a rated match or a "Show me" change (#407). No row: `START_RATING` (1500), shown. A guest never has one.
+
+| Field | Notes |
+|---|---|
+| `playerId` | Better Auth user id. Index `by_player`. |
+| `rating` | The FIBS rating as kept (not rounded; players see it rounded). |
+| `experience` | The points of the rated matches so far. Below 400 the change is multiplied by `max(1, 5 − experience / 100)`. |
+| `matches` | Rated matches so far. |
+| `shown` | "Show me on the global board" (on by default). |
+| `boardable` | `shown` and at least `MIN_BOARD_MATCHES` (5) rated matches (`isBoardable`). Index `by_board` (`boardable`, `rating`): the global board reads it best first. |
+
+### `ratedPairs`
+
+One row per pair of players (`a` < `b`, `pairOf`): the rated matches of their last UTC `day` (`count`). A match past `RATED_MATCHES_PER_PAIR_PER_DAY` (3) that day is not rated. Index `by_pair` (`a`, `b`) and `by_b` (the account delete).
+
 ## Block and report
 
 Issue #320, App Store guideline 1.2: usernames are content that players write, so a player can block and report another. The pure checks are in `packages/online/src/safety.ts`; both servers run them. The app screens (#435) are in `apps/mobile/src/features/safety/`: see [Block and report](app-shell.md#block-and-report-435).
@@ -263,6 +281,20 @@ Issue #406. A saved player (a Better Auth user that is not anonymous, ADR-0008) 
 - **Callers.** Every public function uses `signedInPlayer` or, when it saves the caller's id, `existingPlayer`.
 - **The adapter** is `createConvexFriends` (`FRIEND_FUNCTIONS` in `backend-convex`), checked against `api` and run through `friendsContract()` in `convex/convexFriends.test.ts`.
 - **Never** send ids, names, tokens or search text to analytics or the logs.
+
+## Ratings (#407)
+
+Issue #407, ADR-0008 item 9. Saved players get one rating from their online matches, and see a friends board and a global board. The math and the rules are in `packages/online/src/ratings.ts` (`afterRatedMatch`, `planRatedMatch`, `friendsBoardRows`, `globalBoardRows`); the in-memory server runs them too (`ratingsFor(id)`). Never copy them into `ratings.ts`. The port is `Ratings` (`packages/contracts/src/ratings.ts`), the contract checks `ratingsContract()`.
+
+- **The formula** is FIBS's: the underdog wins with `1 / (10^(d·√n / 2000) + 1)` (`d` the rating gap, `n` the match length), the winner gains `4·√n·(1 − their chance)` and the loser loses the same, times each player's experience factor. Two new players in a 3-point match move about 17 points.
+- **What counts.** `save` in `games.ts` calls `rateMatch` in the save that ends a match, next to `recordFriendMatch`: a resign and a time out count. Both players must have a saved account then (`isAnonymous !== true`), and the pair must be under `RATED_MATCHES_PER_PAIR_PER_DAY` that UTC day. A match that ends by an account delete is never rated (`resignAs(…, false)`). A guest's match never counts, and a guest has no row, so the guest move has nothing to move.
+- **The friends board** (`friendsBoard`): the caller always, and each friend (`friends.by_player`, at most `MAX_FRIENDS`) with a rated match. A friend with no username shows their guest name.
+- **The global board** (`globalBoard`): reads `by_board` best first, at most `GLOBAL_BOARD_READ` rows, and keeps the rows with a username. Places count every such row; then the players the caller blocked go (`blocks.by_blocker`), and the first `GLOBAL_BOARD_ROWS` (50) stay. The blocked player still sees the blocker, like names (#320).
+- **"Show me"** (`setShowOnBoard`) writes the row (a new player gets one with the start rating).
+- **Callers.** Every public function needs a saved caller who exists (`NOT_SIGNED_IN`, `NOT_SAVED`).
+- **The account delete** deletes the caller's row at once (off the boards) and schedules `deleteRatedPairs` for the pair counts, in pages of `RATED_PAIR_DELETE_PAGE`.
+- **The adapter** is `createConvexRatings` (`RATING_FUNCTIONS` in `backend-convex`), checked against `api` and run through `ratingsContract()` in `convex/convexRatings.test.ts`.
+- **Never** send ids, names or ratings to analytics or the logs.
 
 ## Rules of a game choice
 
@@ -686,7 +718,7 @@ Issue #302. App stores ask for in-app account deletion. The server part is the p
 
 ### What it does
 
-One transaction. If any step throws, nothing is deleted. Four steps go on after the call, in pages: the active games past the first page (step 2), the closed invites (step 7), the blocks and reports (step 8) and the friend rows (step 9).
+One transaction. If any step throws, nothing is deleted. Five steps go on after the call, in pages: the active games past the first page (step 2), the closed invites (step 7), the blocks and reports (step 8), the friend rows (step 9) and the rating pair counts (step 10).
 
 1. **Checks the user still exists.** A Convex token stays valid until it expires (15 minutes, the `convex` plugin's default), also after its user is deleted. So the call reads the Better Auth user (`existingPlayer`). No user: `NOT_SIGNED_IN`. A second call after a delete gets this clean error.
 2. **Active games:** the caller resigns each one (`resignAs` in `games.ts`, the same checks and the same `save` as `resign`). The other player wins the match. The save bumps the version, so the turn timer's check does nothing, it deletes the game's [draft](#drafts) (#374), and `scheduleTurnPush` runs as on every save (a resign ends the match: the other player gets ["game over"](#game-over), nobody gets "your turn"). Nothing caps a player's active games (each accepted invite starts one), so the call resigns only the first `GAME_RESIGN_PAGE` (25) of them (#309). One resign reads the game, writes it and one `moves` row, and runs the engine once. So 25 make about 50 writes, far below Convex's limit of 16,000 per transaction. The run time (Convex allows 1 second) is an estimate, not measured. When the page was full, the call schedules the internal mutation `resignActiveGames`, which resigns the next page (`by_white`, then `by_black`) and runs again while its page was full. See [Games after the call](#games-after-the-call).
@@ -699,6 +731,8 @@ One transaction. If any step throws, nothing is deleted. Four steps go on after 
 8. **Blocks and reports** (#320) are deleted after the call too: `deleteSafetyRows` deletes up to `SAFETY_DELETE_PAGE` (200) rows a run, over the caller's blocks, the blocks of the caller, the reports by and the reports about the caller, and runs again when its page was full. No new row can name the player: `blockPlayer` and `reportPlayer` need both accounts to exist.
 
 9. **Friends** (#406): the call deletes every friendship of the caller at once (`deleteFriendsOf`: both rows each, at most `MAX_FRIENDS`), so the friends see it gone. Then `deleteFriendRows` deletes, up to `FRIEND_DELETE_PAGE` (200) rows a run, what is left: friend rows, requests from and to the caller, the friend link, the search times and the invites sent to the caller (`invites.by_to`). It runs again while its page was full.
+
+10. **Ratings** (#407): the matches resigned in step 2 are never rated (`resignAs(…, false)`). The call deletes the caller's `ratings` row at once, so they leave the boards. Then `deleteRatedPairs` deletes the caller's `ratedPairs` rows, up to `RATED_PAIR_DELETE_PAGE` (200) a run, and runs again while its page was full.
 
 Push tokens stay in the main transaction: they are capped (`MAX_PUSH_TOKENS_PER_PLAYER`, 5).
 

@@ -34,6 +34,7 @@ import type * as model_moveTicket from "../model/moveTicket.js";
 import type * as model_push from "../model/push.js";
 import type * as playerNames from "../playerNames.js";
 import type * as push from "../push.js";
+import type * as ratings from "../ratings.js";
 import type * as safety from "../safety.js";
 import type * as usernames from "../usernames.js";
 
@@ -70,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   "model/push": typeof model_push;
   playerNames: typeof playerNames;
   push: typeof push;
+  ratings: typeof ratings;
   safety: typeof safety;
   usernames: typeof usernames;
 }>;

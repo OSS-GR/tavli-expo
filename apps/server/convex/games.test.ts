@@ -3,6 +3,7 @@
 // Each call is signed in with a convex-test identity (#131): `as(t, id)`
 // calls as the user whose token subject is `id`.
 
+import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
@@ -26,7 +27,10 @@ const PLAYERS = { white: ALICE, black: BOB };
 type Tester = ReturnType<typeof setup>;
 
 function setup() {
-  return convexTest(schema, modules);
+  const t = convexTest(schema, modules);
+  // A match that ends asks Better Auth whether both players are saved (#407).
+  betterAuthTest.register(t);
+  return t;
 }
 
 /** Calls as the signed-in user `id` (the token `subject`, the player id). */

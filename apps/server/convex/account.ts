@@ -46,6 +46,7 @@ import { resignAs } from './games';
 import { openInvitesOf } from './invites';
 import { gameOnDelete } from './model/account';
 import { deletePlayerNameOf } from './playerNames';
+import { deleteRatingOf } from './ratings';
 
 /**
  * How many invites one run of `deleteSentInvites` deletes: one write
@@ -80,7 +81,8 @@ async function resignPage(ctx: MutationCtx, playerId: string): Promise<boolean> 
       .take(GAME_RESIGN_PAGE - resigned);
     for (const game of games) {
       if (gameOnDelete(game, playerId) !== 'resign') continue;
-      await resignAs(ctx, game._id, playerId);
+      // A match that ends by an account delete is never rated (#407).
+      await resignAs(ctx, game._id, playerId, false);
       resigned += 1;
     }
     if (resigned === GAME_RESIGN_PAGE) return true;
@@ -134,6 +136,10 @@ export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promi
   // and the friend invites go in `deleteFriendRows`, below, in pages.
   await deleteFriendsOf(ctx, callerId);
 
+  // The rating (#407): off the boards at once. The pair counts go in
+  // `deleteRatedPairs`, below, in pages.
+  await deleteRatingOf(ctx, callerId);
+
   // The sign-in key claims (#397), so the Apple id is free again.
   await deleteKeysOf(ctx, callerId);
 
@@ -167,6 +173,9 @@ export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promi
   // No new row can name the caller now: every friends call needs the
   // account to exist, as the caller and as the other player.
   await ctx.scheduler.runAfter(0, internal.friends.deleteFriendRows, { playerId: callerId });
+
+  // The pair counts of the ratings (#407): one per player met, no cap.
+  await ctx.scheduler.runAfter(0, internal.ratings.deleteRatedPairs, { playerId: callerId });
 
   // The other active games, after this transaction. No new game can
   // start with the caller from now on: a game starts only from

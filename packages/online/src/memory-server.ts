@@ -80,7 +80,10 @@ import type {
   OnlineGameChoice,
   OnlineGameStatus,
   OnlineGameView,
+  MyRating,
   PlayerName,
+  Ratings,
+  RatingsErrorData,
   ReportReason,
   Safety,
   SafetyErrorData,
@@ -123,6 +126,19 @@ import {
   searchWindowStart,
 } from './friends';
 import type { FriendRequestRecord, RequestRoute } from './friends';
+import {
+  NEW_RATING,
+  RatingsError,
+  afterRatedMatch,
+  checkRatingsSaved,
+  friendsBoardRows,
+  globalBoardRows,
+  isBoardable,
+  pairOf,
+  planRatedMatch,
+  shownRating,
+} from './ratings';
+import type { BoardPlayer, PairCount, RatingRecord } from './ratings';
 import {
   InviteError,
   checkAddressee,
@@ -285,6 +301,12 @@ export interface MemoryGameServer {
    */
   friendsFor(playerId: string | null): Friends;
   /**
+   * Ratings (#407) as `playerId` (`null`: nobody signed in), as if they
+   * were signed in. Only players marked with `markSaved` have a rating,
+   * and a match counts only when both players are saved when it ends.
+   */
+  ratingsFor(playerId: string | null): Ratings;
+  /**
    * `playerId` has a saved account (a sign-in key). The in-memory server
    * keeps no accounts, so the caller says. A player stays saved.
    */
@@ -422,6 +444,10 @@ function toErrorData(error: unknown): unknown {
     const data: FriendsErrorData = { code: error.code, message: error.message };
     return data;
   }
+  if (error instanceof RatingsError) {
+    const data: RatingsErrorData = { code: error.code, message: error.message };
+    return data;
+  }
   return error;
 }
 
@@ -459,7 +485,37 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const tokenOf = new Map<string, string>();
   /** Username searches (#406): player → times, like the Convex `friendSearches` table. */
   const searches = new Map<string, number[]>();
+  /** Ratings (#407), like the Convex `ratings` table. No row: `NEW_RATING`, shown. */
+  const ratings = new Map<string, RatingRecord & { readonly shown: boolean }>();
+  /** Rated matches per pair and UTC day (#407), by `pairOf` joined with a newline, like `ratedPairs`. */
+  const ratedPairs = new Map<string, PairCount>();
   let nextId = 1;
+
+  function ratingOf(playerId: string): RatingRecord & { readonly shown: boolean } {
+    return ratings.get(playerId) ?? { ...NEW_RATING, shown: true };
+  }
+
+  /**
+   * A match just ended with `winner` (#407): rate it when both players are
+   * saved and the pair is under its daily count, like the Convex `rateMatch`.
+   */
+  function rateMatch(players: PerPlayer<string>, winner: PlayerId, length: number, at: number) {
+    const winnerId = players[winner];
+    const loserId = winner === 'white' ? players.black : players.white;
+    const key = pairOf(winnerId, loserId).join('\n');
+    const plan = planRatedMatch({
+      saved: isSaved(winnerId) && isSaved(loserId),
+      pair: ratedPairs.get(key) ?? null,
+      now: at,
+    });
+    if (!plan.rated) return;
+    ratedPairs.set(key, plan.pair);
+    const won = ratingOf(winnerId);
+    const lost = ratingOf(loserId);
+    const next = afterRatedMatch(won, lost, length);
+    ratings.set(winnerId, { ...next.winner, shown: won.shown });
+    ratings.set(loserId, { ...next.loser, shown: lost.shown });
+  }
 
   /** `viewerId` blocks `playerId`. */
   function blocksPlayer(viewerId: string | null, playerId: string): boolean {
@@ -623,7 +679,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   /**
    * Saves the flow after a step: a version bump, its log rows and the turn
    * deadline (by default a new one). `before` is what the step loaded its
-   * flow from.
+   * flow from. A step that ends the match rates it (#407), unless `rated`
+   * is false (an account delete).
    */
   function save(
     game: MemoryGame,
@@ -632,6 +689,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     flow: SteppedFlow,
     at: number,
     turnDeadline: number | null = nextDeadline(game.turnTimeMinutes, flow, at),
+    rated = true,
   ): void {
     const version = game.version + 1;
     const saved: MemoryGame = {
@@ -646,6 +704,10 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     games.set(game.gameId, saved);
     // A new step ends the draft (#374).
     drafts.delete(game.gameId);
+    const winner = flow.match.winner;
+    if (rated && game.status === 'active' && winner !== null) {
+      rateMatch(game.players, winner, game.targetPoints, at);
+    }
     notify(saved);
   }
 
@@ -1036,7 +1098,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       const side = sideOf(game.players, playerId);
       if (side === null) continue;
       const before = loadStored(game.flow);
-      save(game, playerId, before, resign(before.flow, side, rng), at);
+      // A match that ends by an account delete never counts (#407).
+      save(game, playerId, before, resign(before.flow, side, rng), at, undefined, false);
     }
     for (const invite of [...invites.values()]) {
       if (invite.from !== playerId && invite.to !== playerId) continue;
@@ -1063,6 +1126,11 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     if (token !== undefined) friendTokens.delete(token);
     tokenOf.delete(playerId);
     searches.delete(playerId);
+    // The rating and the pair counts (#407).
+    ratings.delete(playerId);
+    for (const key of [...ratedPairs.keys()]) {
+      if (key.split('\n').includes(playerId)) ratedPairs.delete(key);
+    }
   }
 
   /** The two players met (#320, `checkMet`): a game, or an invite one answered from the other. */
@@ -1356,6 +1424,71 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       declinedAt: null,
     });
     return 'sent';
+  }
+
+  /** Ratings (#407), like the Convex `ratings.ts`. */
+  function ratingsFor(playerId: string | null): Ratings {
+    const saved = (): string => {
+      if (playerId === null || deletedPlayers.has(playerId)) {
+        throw new RatingsError('NOT_SIGNED_IN', 'sign in first');
+      }
+      checkRatingsSaved(savedPlayers.has(playerId));
+      return playerId;
+    };
+    const call = async <T>(step: () => T): Promise<T> => {
+      await nextTick();
+      try {
+        const result = step();
+        return result === undefined ? result : copy(result);
+      } catch (error) {
+        throw toErrorData(error);
+      }
+    };
+    const usernameOf = (id: string): PlayerName | null =>
+      nameRecords.get(id)?.username === undefined ? null : nameOf(id);
+    const boardPlayer = (id: string, name: PlayerName | null): BoardPlayer => {
+      const { rating, matches } = ratingOf(id);
+      return { playerId: id, name, rating, matches };
+    };
+    return {
+      mine: () =>
+        call((): MyRating => {
+          const id = saved();
+          const row = ratingOf(id);
+          return {
+            rating: shownRating(row.rating),
+            matches: row.matches,
+            shown: row.shown,
+            listed: isBoardable(row) && usernameOf(id) !== null,
+          };
+        }),
+      friendsBoard: () =>
+        call(() => {
+          const id = saved();
+          const friends = [...(friendEdges.get(id)?.keys() ?? [])].filter(
+            (friend) => isSaved(friend) && (ratings.get(friend)?.matches ?? 0) > 0,
+          );
+          return friendsBoardRows(
+            [id, ...friends].map((player) => boardPlayer(player, nameOf(player))),
+            id,
+          );
+        }),
+      globalBoard: () =>
+        call(() => {
+          const id = saved();
+          const top = [...ratings]
+            .filter(([player, row]) => isSaved(player) && isBoardable(row))
+            .map(([player]) => boardPlayer(player, usernameOf(player)))
+            .filter((player) => player.name !== null)
+            .sort((a, b) => b.rating - a.rating || (a.playerId < b.playerId ? -1 : 1));
+          return globalBoardRows(top, id, (player) => blocksPlayer(id, player));
+        }),
+      setShown: (shown) =>
+        call(() => {
+          const id = saved();
+          ratings.set(id, { ...ratingOf(id), shown });
+        }),
+    };
   }
 
   /** Friends (#406), like the Convex `friends.ts`. */
@@ -1663,6 +1796,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     safetyFor,
 
     friendsFor,
+
+    ratingsFor,
 
     markSaved(playerId) {
       savedPlayers.add(playerId);

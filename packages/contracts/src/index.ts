@@ -248,3 +248,13 @@ export {
   type TutorialSource,
   type SentAnalytics,
 } from './analytics';
+export {
+  GLOBAL_BOARD_ROWS,
+  MIN_BOARD_MATCHES,
+  RATED_MATCHES_PER_PAIR_PER_DAY,
+  RATINGS_ERROR_CODES,
+  START_RATING,
+  isRatingsErrorData,
+  withRanks,
+} from './ratings';
+export type { BoardRow, MyRating, Ratings, RatingsErrorCode, RatingsErrorData } from './ratings';

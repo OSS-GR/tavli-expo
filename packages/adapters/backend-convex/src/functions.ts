@@ -14,7 +14,8 @@
  * `convex/convexAppUpdates.test.ts` for the update policy,
  * `convex/convexUsernames.test.ts` for the usernames,
  * `convex/convexSafety.test.ts` for block and report,
- * `convex/convexFriends.test.ts` for the friends), so a rename
+ * `convex/convexFriends.test.ts` for the friends,
+ * `convex/convexRatings.test.ts` for the ratings), so a rename
  * there fails a test.
  */
 import { makeFunctionReference } from 'convex/server';
@@ -24,19 +25,21 @@ import type {
   AppPlatform,
   AppUpdatePolicy,
   BlockedPlayer,
+  BoardRow,
   FoundPlayer,
   Friend,
   FriendRequests,
   FriendStatus,
-  RecentPlayer,
   GameSummary,
   GameTransportErrorData,
   InviteView,
+  MyRating,
   MyUsername,
   NewInvite,
   OnlineGameStatus,
   OnlineGameView,
   PushPlatform,
+  RecentPlayer,
   SendTurnRequest,
 } from '@tavli/contracts';
 
@@ -335,4 +338,28 @@ export const FRIEND_FUNCTIONS: FriendFunctions = {
   removeFriend: makeFunctionReference(FRIEND_FUNCTION_NAMES.removeFriend),
   inviteFriend: makeFunctionReference(FRIEND_FUNCTION_NAMES.inviteFriend),
   listFriendInvites: makeFunctionReference(FRIEND_FUNCTION_NAMES.listFriendInvites),
+};
+
+type RatingQuery<Result> = FunctionReference<'query', 'public', Record<string, never>, Result>;
+
+/** The functions in `apps/server/convex/ratings.ts` (#407). */
+export interface RatingFunctions {
+  readonly myRating: RatingQuery<MyRating>;
+  readonly friendsBoard: RatingQuery<BoardRow[]>;
+  readonly globalBoard: RatingQuery<BoardRow[]>;
+  readonly setShowOnBoard: FunctionReference<'mutation', 'public', { shown: boolean }, null>;
+}
+
+export const RATING_FUNCTION_NAMES = {
+  myRating: 'ratings:myRating',
+  friendsBoard: 'ratings:friendsBoard',
+  globalBoard: 'ratings:globalBoard',
+  setShowOnBoard: 'ratings:setShowOnBoard',
+} as const satisfies { readonly [K in keyof RatingFunctions]: string };
+
+export const RATING_FUNCTIONS: RatingFunctions = {
+  myRating: makeFunctionReference(RATING_FUNCTION_NAMES.myRating),
+  friendsBoard: makeFunctionReference(RATING_FUNCTION_NAMES.friendsBoard),
+  globalBoard: makeFunctionReference(RATING_FUNCTION_NAMES.globalBoard),
+  setShowOnBoard: makeFunctionReference(RATING_FUNCTION_NAMES.setShowOnBoard),
 };
