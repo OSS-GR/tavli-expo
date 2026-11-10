@@ -239,7 +239,10 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
 
     async turnOn() {
       if (store.getState().asking) return store.getState().permission ?? 'undetermined';
-      store.setState({ asking: true });
+      // The offer closes at once: the system prompt takes over. A Mac asks
+      // with a banner the player may miss, so the answer can come much
+      // later, and the offer must not wait for it (#475).
+      store.setState({ asking: true, offering: false });
       let answer: PushPermission = store.getState().permission ?? 'undetermined';
       try {
         const before = await notifications.permission();

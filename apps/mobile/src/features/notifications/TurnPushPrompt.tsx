@@ -2,7 +2,8 @@
  * The offer of turn notifications (#285): "We tell you when it is your
  * turn", with "Turn on" and "Not now". It shows after the player makes or
  * accepts an async invite (`TurnPushes.offer`), never at first launch.
- * "Turn on" opens the system prompt. "Not now", the dimmed part and the
+ * "Turn on" closes it and opens the system prompt, whose answer may come
+ * much later (a Mac asks with a banner, #475). "Not now", the dimmed part and the
  * Android back button all count as "Not now": the app does not offer
  * again by itself (Settings still can).
  *

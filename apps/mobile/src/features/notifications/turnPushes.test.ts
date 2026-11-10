@@ -187,6 +187,27 @@ describe('turnOn', () => {
     expect(pushes.store.getState().offering).toBe(true);
   });
 
+  it('closes the offer at once; the answer may come much later (#475)', async () => {
+    const { pushes, notifications, pushTokens, auth } = setup();
+    await auth.signInAsGuest();
+    // A Mac asks with a banner: the call waits until the player answers it.
+    let answer: (permission: 'granted') => void = () => {};
+    jest
+      .spyOn(notifications, 'requestPermission')
+      .mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    await pushes.offer();
+    const asked = pushes.turnOn();
+    expect(pushes.store.getState()).toMatchObject({ offering: false, asking: true });
+    await settle();
+    expect(pushes.store.getState()).toMatchObject({ offering: false, asking: true });
+    notifications.setPermission('granted');
+    answer('granted');
+    await expect(asked).resolves.toBe('granted');
+    await settle();
+    expect(pushes.store.getState()).toMatchObject({ asking: false, turnedOn: true });
+    expect(pushTokens.calls).toHaveLength(1);
+  });
+
   it('a second tap while the prompt is open does nothing', async () => {
     const { pushes, notifications } = setup();
     const first = pushes.turnOn();
