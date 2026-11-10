@@ -4,9 +4,14 @@
  */
 import { createMemoryStorage, type Storage } from '@tavli/contracts';
 import { act, render, screen } from '@testing-library/react-native';
+import { Text } from 'react-native';
 
 import { ReminderCard } from '@/features/home/ReminderCard';
 import { rememberOnlineAccount } from '@/features/online/accountHint';
+import { CONSENT_STORAGE_KEY } from '@/features/privacy/consent';
+import { RELEASES } from '@/features/whats-new/releases';
+import { createWhatsNewSeen, WHATS_NEW_STORAGE_KEY } from '@/features/whats-new/seen';
+import { useWhatsNewCard } from '@/features/whats-new/useWhatsNewCard';
 import { auth } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
@@ -171,5 +176,59 @@ describe('the reminder card (#404)', () => {
     // A saved value it cannot read counts as no schedule.
     storage.setString(REMINDERS_STORAGE_KEY, 'not json');
     expect(createReminders(storage, () => now).state().start).toBeNull();
+  });
+});
+
+describe("with the What's new card (#471)", () => {
+  /** Home's order: the reminder hook first, then What's new over it. */
+  function HomeWithWhatsNew({ focused }: { focused: boolean }) {
+    const reminder = useReminderCard({ focused, reminders, auth });
+    const whatsNew = useWhatsNewCard({ focused, seen, reminders });
+    if (whatsNew.shown) return <Text testID="home-whats-new">new</Text>;
+    const { card } = reminder;
+    return card ? (
+      <ReminderCard
+        kind={card.kind}
+        last={card.last}
+        onAccept={reminder.hide}
+        onDismiss={reminder.hide}
+        onStop={reminder.stop}
+      />
+    ) : null;
+  }
+
+  let seen: ReturnType<typeof createWhatsNewSeen>;
+
+  beforeEach(() => {
+    // A phone that answered the consent screen and saw only the older release.
+    const phone = createMemoryStorage({
+      [CONSENT_STORAGE_KEY]: '{"status":"denied"}',
+      [WHATS_NEW_STORAGE_KEY]: RELEASES[1]!.date,
+    });
+    seen = createWhatsNewSeen(phone);
+  });
+
+  async function visitBoth(at: number): Promise<void> {
+    now = at;
+    await render(<HomeWithWhatsNew focused={false} />);
+    await screen.rerender(<HomeWithWhatsNew focused />);
+    await flush();
+  }
+
+  it.each([
+    ['no account', () => undefined],
+    ['a guest', signInAsGuest],
+  ])('a due reminder (%s) waits a day and keeps its ask', async (_, setUp) => {
+    setUp();
+    reminders.start();
+    await visitBoth(T0 + DAY_MS);
+    expect(screen.getByTestId('home-whats-new')).toBeOnTheScreen();
+    expect(shownCard()).toBeNull();
+    expect(reminders.state().asked).toBe(0);
+
+    await visitBoth(T0 + 2 * DAY_MS);
+    expect(screen.queryByTestId('home-whats-new')).toBeNull();
+    expect(shownCard()).not.toBeNull();
+    expect(reminders.state().asked).toBe(1);
   });
 });
