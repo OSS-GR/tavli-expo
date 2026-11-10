@@ -20,7 +20,7 @@
 | Q4 (a) | **Opening roll:** federation rule. The starter plays the two deciding dice. Other options live in Kafeneio mode. | `docs/rules/tavli-match.md` |
 | Q4 (b) | Scores are only **mono (1)** and **diplo (2)**. A "backgammon" counts as diplo. | `docs/rules/portes.md`, `tavli-match.md` |
 | Q4 (d) | Owner has not played Fevga; PM checked the federation text (ΕΟΠΤ 3.4.ii): the first checker must **pass the opponent's mother** before any other checker moves. | `docs/rules/fevga.md` → `runnerTarget="passMother"` |
-| Q4 (e) | Default match: **one game** (first to 1 point; owner, 2026-11-10, #479; was first to 3). | `docs/rules/tavli-match.md` → `targetPoints=1` |
+| Q4 (e) | Default match: **first to 3 points** in the rules presets. The app's New game and Play a friend start at **one game** (owner, 2026-11-10, #479). | `docs/rules/tavli-match.md` → `targetPoints=3`; `defaultSetup` in the app |
 | Q5 follow-ups | A1 four checkers per double; A2 no moves while loading (not 100% sure); A3 no extra rolls; A4 bear-off and scoring as Portes; A5 deadlock = draw. | `docs/rules/asodio.md` |
 | Q13 | **Name: Tavlaki.** Store name "Tavlaki: Kafeneio Backgammon", Greek "Ταβλάκι: Τάβλι του Καφενείου", bundle ID **`com.tavlaki`**. | `docs/vision.md` → Name |
 | Q14 | Owner bought **`tavlaki.com`**. Bundle ID follows it: `com.tavlaki`. | `docs/vision.md` → Name |
