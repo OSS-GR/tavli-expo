@@ -1457,3 +1457,29 @@ describe('online matches in History (#313)', () => {
     expect(onlineFake.authStore.guests).toBe(0);
   });
 });
+
+describe('friends (#406)', () => {
+  it('Settings → Friends → Add a friend shows my friend link', async () => {
+    onlineFake.authStore.session = { id: 'me', isGuest: false };
+    rememberOnlineAccount();
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/settings' });
+    await user.press(await screen.findByTestId('settings-friends'));
+    expect(router.getPathname()).toBe('/friends');
+    await user.press(await screen.findByRole('button', { name: 'Add a friend' }));
+    expect(router.getPathname()).toBe('/friends/add');
+    const token = await onlineFake.server().friendsFor('me').myFriendLink();
+    expect(await screen.findByTestId('add-friend-link')).toHaveTextContent(
+      `tavlaki://add/${token}`,
+    );
+  });
+
+  it('a friend link opens its screen', async () => {
+    const server = onlineFake.server();
+    server.markSaved('ann');
+    const token = await server.friendsFor('ann').myFriendLink();
+    onlineFake.authStore.session = { id: 'me', isGuest: false };
+    await renderRouter('./src/app', { initialUrl: `/add/${token.toLowerCase()}` });
+    expect(await screen.findByRole('button', { name: 'Ask to be friends' })).toBeOnTheScreen();
+  });
+});

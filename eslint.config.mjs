@@ -50,6 +50,10 @@ const vendorImports = {
     'expo-notifications',
     // Sign in with Apple: use the `AppleSheet` port and `@tavli/apple-sign-in-expo`.
     'expo-apple-authentication',
+    // Friends (#406): the app reads no contacts and has no camera (the phone's
+    // own camera reads the QR code). Wrap either in an adapter behind a port first.
+    'expo-contacts',
+    'expo-camera',
   ],
   message:
     'Vendor SDKs belong in packages/adapters/* (or apps/server). Use a port from @tavli/contracts instead. See ADR-0002.',

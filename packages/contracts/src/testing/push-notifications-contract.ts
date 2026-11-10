@@ -169,7 +169,7 @@ export function pushNotificationsContract(): PushNotificationsContractCheck[] {
       },
     },
     {
-      name: 'onTap gives the game id of each tap, later, and nothing after stop',
+      name: 'onTap gives the game id and the invite code of each tap, later, and nothing after stop',
       run: async (subject) => {
         const { notifications } = subject;
         const taps: PushTap[] = [];
@@ -181,18 +181,25 @@ export function pushNotificationsContract(): PushNotificationsContractCheck[] {
         await settleAll(subject);
         subject.tap({ gameId: 7 });
         await settleAll(subject);
+        subject.tap({ inviteCode: 'ABCD2345' });
+        await settleAll(subject);
         same(
           taps.map((tap) => tap.gameId),
-          ['game-1', null, null],
+          ['game-1', null, null, null],
           'the game ids',
         );
+        same(
+          taps.map((tap) => tap.inviteCode),
+          [null, null, null, 'ABCD2345'],
+          'the invite codes',
+        );
         for (const tap of taps) checkTap(tap, 'onTap');
-        same(new Set(taps.map((tap) => tap.id)).size, 3, 'different taps have different ids');
+        same(new Set(taps.map((tap) => tap.id)).size, 4, 'different taps have different ids');
         stop();
         stop();
         subject.tap({ gameId: 'game-2' });
         await settleAll(subject);
-        same(taps.length, 3, 'taps after stop');
+        same(taps.length, 4, 'taps after stop');
       },
     },
     {

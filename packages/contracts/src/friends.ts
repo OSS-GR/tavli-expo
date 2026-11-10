@@ -7,9 +7,10 @@
  *
  * - **Friend link.** Each saved player has one random token
  *   (`FRIEND_TOKEN_LENGTH` characters, never the account id). The app
- *   shares it as a link, a QR code, or through the system contact picker
- *   and the share sheet. `resetFriendLink` makes a new token: the old
- *   link stops working.
+ *   shares it as a link or a QR code, through the share sheet or a text
+ *   message: the system picks the person, and the app never reads the
+ *   contacts. `resetFriendLink` makes a new token: the old link stops
+ *   working.
  * - **Username search.** An exact match on the username key (case,
  *   accents and look-alike letters do not count), at most
  *   `FRIEND_SEARCHES_PER_HOUR` per hour. "No such player" and "a block

@@ -70,6 +70,8 @@ export interface SettingsScreenProps {
    * phone used online play (`hasOnlineAccount()`, read again each `visit`).
    */
   onBlocked?: () => void;
+  /** Opens Friends (#406). `undefined`: no Friends row. */
+  onFriends?: () => void;
   /**
    * Changes each time the screen shows again (the route's focus), so a
    * sign-in on Settings → Account shows the Blocked players row.
@@ -84,6 +86,7 @@ export function SettingsScreen({
   turnPushes,
   onAccount,
   onBlocked,
+  onFriends,
   visit = 0,
 }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
@@ -305,6 +308,15 @@ export function SettingsScreen({
               hint={t('settings.account.hint')}
               onPress={onAccount}
             />
+            {onFriends && usedOnline ? (
+              <SectionRow
+                testID="settings-friends"
+                icon="users"
+                label={t('settings.friends.label')}
+                hint={t('settings.friends.hint')}
+                onPress={onFriends}
+              />
+            ) : null}
             {onBlocked && usedOnline ? (
               <SectionRow
                 testID="settings-blocked"

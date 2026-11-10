@@ -1,7 +1,10 @@
-// Friends (#406): the app never reads the contacts. The contact picker
-// (one person, picked by the player) needs no permission, so the app
-// config must never ask for one: no `NSContactsUsageDescription` on iOS,
-// no `READ_CONTACTS` or `WRITE_CONTACTS` on Android.
+// Friends (#406): the app never reads the contacts and has no camera.
+// A friend link goes out through the share sheet or the Messages app,
+// where the system picks the person; a friend scans the QR code with the
+// phone's own camera. So the app config must never ask for either: no
+// `NSContactsUsageDescription` or `NSCameraUsageDescription` on iOS, no
+// `READ_CONTACTS`, `WRITE_CONTACTS` or `CAMERA` on Android, and the app
+// does not depend on expo-contacts or expo-camera.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,6 +49,18 @@ function pluginOf(config: ExpoConfig, name: string): unknown[] | undefined {
   return undefined;
 }
 
+describe('the app', () => {
+  it('does not depend on expo-contacts or expo-camera', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const names = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+    expect(names).not.toContain('expo-contacts');
+    expect(names).not.toContain('expo-camera');
+  });
+});
+
 describe.each(['development', 'preview', 'production'])('the %s app config', (variant) => {
   const config = variantConfig(variant);
 
@@ -54,6 +69,13 @@ describe.each(['development', 'preview', 'production'])('the %s app config', (va
     const contacts = pluginOf(config, 'expo-contacts');
     // The plugin writes the usage text from its `contactsPermission` option.
     expect(JSON.stringify(contacts?.[1] ?? {})).not.toContain('contactsPermission');
+  });
+
+  it('has no camera usage text and no camera permission', () => {
+    expect(JSON.stringify(config.ios ?? {})).not.toContain('NSCameraUsageDescription');
+    expect(pluginOf(config, 'expo-camera')).toBeUndefined();
+    expect(config.android?.permissions ?? []).not.toContain('android.permission.CAMERA');
+    expect(config.android?.permissions ?? []).not.toContain('CAMERA');
   });
 
   it('asks for no contacts permission on Android', () => {

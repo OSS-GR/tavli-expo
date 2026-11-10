@@ -5,6 +5,7 @@ import {
   createMemoryPushNotifications,
   createMemoryPushTokens,
   gameIdOfPush,
+  inviteCodeOfPush,
   isPushPermission,
 } from './push-notifications';
 import { pushNotificationsContract, pushTokensContract } from './testing';
@@ -101,6 +102,22 @@ describe('createMemoryPushTokens', () => {
     ]);
     tokens.reset();
     expect({ saved: tokens.saved, calls: tokens.calls }).toEqual({ saved: [], calls: [] });
+  });
+});
+
+describe('inviteCodeOfPush (#406)', () => {
+  it('reads a string invite code, else null', () => {
+    expect(inviteCodeOfPush({ inviteCode: 'ABCD2345' })).toBe('ABCD2345');
+    for (const data of [
+      null,
+      'ABCD2345',
+      {},
+      { inviteCode: '' },
+      { inviteCode: 3 },
+      { gameId: 'g' },
+    ]) {
+      expect(inviteCodeOfPush(data)).toBeNull();
+    }
   });
 });
 

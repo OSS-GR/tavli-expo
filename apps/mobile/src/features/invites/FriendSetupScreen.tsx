@@ -22,9 +22,15 @@
  *   the pickers in `SectionCard`s, and "Make an invite" stays at the
  *   bottom while the list fades out under it.
  *
- * Navigation stays in the route (`app/friend/index.tsx`).
+ * - Friend invite (#406, `friend`): the same setup, but the invite goes
+ *   to one friend (`Friends.inviteFriend`), who gets a push. The title
+ *   and the intro say so.
+ *
+ * Navigation stays in the route (`app/friend/index.tsx`, and
+ * `app/friends/invite/[id].tsx` for a friend invite).
  */
 import {
+  isFriendsErrorData,
   isInviteErrorData,
   ONLINE_GAME_CHOICES,
   type Analytics,
@@ -68,6 +74,11 @@ export interface FriendSetupScreenProps {
   analytics?: Analytics;
   /** For tests. Default: the app's. */
   appleSheet?: AppleSheet;
+  /**
+   * A friend invite (#406): makes the invite for one friend instead of
+   * `invites.createInvite`. It resolves with the code.
+   */
+  friend?: { readonly invite: (game: NewInvite) => Promise<string> };
 }
 
 /** Why "Make an invite" did not work. */
@@ -83,6 +94,7 @@ export function FriendSetupScreen({
   onBack,
   analytics,
   appleSheet,
+  friend,
 }: FriendSetupScreenProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
@@ -138,9 +150,12 @@ export function FriendSetupScreen({
     if (!signedIn) onlineAccountReady();
     let code: string;
     try {
-      code = await invites.createInvite(game);
+      code = await (friend === undefined ? invites.createInvite(game) : friend.invite(game));
     } catch (error) {
-      failed(isInviteErrorData(error) && error.code === 'TOO_MANY_INVITES' ? 'tooMany' : 'make');
+      const tooMany =
+        (isInviteErrorData(error) || isFriendsErrorData(error)) &&
+        error.code === 'TOO_MANY_INVITES';
+      failed(tooMany ? 'tooMany' : 'make');
       return;
     }
     if (!mounted.current) {
@@ -188,7 +203,7 @@ export function FriendSetupScreen({
   return (
     <Screen testID="friend-setup">
       <ScreenHeader
-        title={t('friend.title')}
+        title={friend === undefined ? t('friend.title') : t('friends.invite.title')}
         titleRef={titleRef}
         onBack={onBack}
         backLabel={t('common.back')}
@@ -199,7 +214,9 @@ export function FriendSetupScreen({
           <View style={styles.heroBadge}>
             <Icon name="globe" size={26} color={theme.colors.accent} />
           </View>
-          <Text style={styles.intro}>{t('friend.intro')}</Text>
+          <Text style={styles.intro}>
+            {friend === undefined ? t('friend.intro') : t('friends.invite.intro')}
+          </Text>
         </View>
         <SectionCard title={t('friend.game')}>
           <OptionList

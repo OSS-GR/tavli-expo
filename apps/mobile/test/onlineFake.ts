@@ -34,6 +34,9 @@
  *   signed in it fails `NOT_SIGNED_IN`.
  * - `safety` is block and report (#435) on the server, as the user signed
  *   in to `auth`. With nobody signed in it fails `NOT_SIGNED_IN`.
+ * - `friends` is the `Friends` port (#406) on the server, as the user
+ *   signed in to `auth`: a user who is not a guest is a saved account
+ *   (`markSaved`), so a guest gets `NOT_SAVED`.
  * - `appUpdates` is the update policy (#390): it blocks no build until a
  *   test sets one (`onlineFake.appUpdates.set('ios', …)`). `appBuild()`
  *   is this build: iOS build `TEST_BUILD`, until a test calls
@@ -53,6 +56,7 @@ import {
   createMemoryAuthStore,
   createMemoryPushNotifications,
   createMemoryPushTokens,
+  type Friends,
   type GameTransport,
   type GameTransportErrorData,
   type Invites,
@@ -229,6 +233,35 @@ const safety: Safety = {
   report: (request) => server.safetyFor(auth.currentUser()?.id ?? null).report(request),
 };
 
+/**
+ * Friends on the server (#406), as the user signed in to `auth` at that
+ * moment. A user who is not a guest counts as a saved account.
+ */
+function friendsCaller(): Friends {
+  const user = auth.currentUser();
+  if (user !== null && !user.isGuest) server.markSaved(user.id);
+  return server.friendsFor(user?.id ?? null);
+}
+
+const friends: Friends = {
+  listFriends: () => friendsCaller().listFriends(),
+  listRequests: () => friendsCaller().listRequests(),
+  recentPlayers: () => friendsCaller().recentPlayers(),
+  findPlayer: (username) => friendsCaller().findPlayer(username),
+  myFriendLink: () => friendsCaller().myFriendLink(),
+  resetFriendLink: () => friendsCaller().resetFriendLink(),
+  openFriendLink: (token) => friendsCaller().openFriendLink(token),
+  requestByLink: (token) => friendsCaller().requestByLink(token),
+  requestByUsername: (username) => friendsCaller().requestByUsername(username),
+  sendRequest: (playerId) => friendsCaller().sendRequest(playerId),
+  acceptRequest: (playerId) => friendsCaller().acceptRequest(playerId),
+  declineRequest: (playerId) => friendsCaller().declineRequest(playerId),
+  cancelRequest: (playerId) => friendsCaller().cancelRequest(playerId),
+  removeFriend: (playerId) => friendsCaller().removeFriend(playerId),
+  inviteFriend: (playerId, game) => friendsCaller().inviteFriend(playerId, game),
+  listFriendInvites: () => friendsCaller().listFriendInvites(),
+};
+
 export const onlineFake = {
   auth,
   /** Apple's sheet on the phone: set `next`, `sub` or `available` to act it out. */
@@ -241,6 +274,7 @@ export const onlineFake = {
   appUpdates,
   usernames,
   safety,
+  friends,
   /** This build, like `appBuild()` of `@/services`. */
   appBuild: (): AppBuild | null => build,
   /** Sets this build for the rest of the test (`null`: no store build). */
