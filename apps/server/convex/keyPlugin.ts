@@ -77,6 +77,17 @@ export function isKeyProviderId(value: unknown): value is KeyProviderId {
   return typeof value === 'string' && (KEY_PROVIDER_IDS as readonly string[]).includes(value);
 }
 
+/**
+ * Logs why a key's id token was turned down (#462: the phone only hears
+ * INVALID_TOKEN or KEY_OFF) and returns `false`. Only the check's name and, for a
+ * token for another app, its bundle id: never the token, the nonce,
+ * Apple's id or an email.
+ */
+export function logKeyRefusal(reason: string, extra: { audience?: string } = {}): false {
+  console.warn('apple key refused', { reason, ...extra });
+  return false;
+}
+
 /** The error codes of these routes, beside Better Auth's own. */
 export const KEY_ERROR_CODES = {
   KEY_BELONGS_TO_OTHER: 'this key belongs to another account',
@@ -334,21 +345,31 @@ export function keyPlugin(options: KeyPluginOptions) {
             // nonce (once). A provider without it is never trusted here.
             // No provider: this kind of key is off here (Apple with no
             // `APPLE_SERVICES_ID`, #462). The app says so, not "no connection".
-            if (provider === undefined) throw keyError('SERVICE_UNAVAILABLE', 'KEY_OFF');
+            if (provider === undefined) {
+              logKeyRefusal(`${providerId}-off`);
+              throw keyError('SERVICE_UNAVAILABLE', 'KEY_OFF');
+            }
             const verify = provider.options?.verifyIdToken;
             if (verify === undefined) throw keyError('BAD_REQUEST', 'BAD_REQUEST');
+            // `verify` logs why it said no.
             if (!(await verify(token, nonce, ctx))) {
               throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
             }
             const info = await provider.getUserInfo({ idToken: token });
-            if (info === null) throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
+            if (info === null) {
+              logKeyRefusal('no-user-info');
+              throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
+            }
             // The provider's own account id (Apple: `sub`), as its sign-in reads it.
             const subject = await provider.accountSubject({
               tokens: { idToken: token },
               profile: info.data,
             });
             const accountId = String(subject ?? '');
-            if (accountId === '') throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
+            if (accountId === '') {
+              logKeyRefusal('no-account-id');
+              throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
+            }
             const email = info.user.email?.toLowerCase();
             return {
               accountId,

@@ -3,10 +3,12 @@
 // reaches Apple.
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import { authComponent } from './auth';
 import { CLAIM_GRACE_MS } from './authKeys';
+import { KEY_NONCE_TTL_MS } from './model/keyNonce';
 import {
   appleToken,
   call,
@@ -459,5 +461,103 @@ describe('claimKey and useKeyNonce', () => {
     expect(await use('b', 5_000, 2_000)).toBe(true);
     const rows = await t.run(async (ctx) => await ctx.db.query('usedKeyNonces').collect());
     expect(rows.map((row) => row.nonce)).toEqual(['b']);
+  });
+});
+
+describe('the log of a turned-down Apple token (#462)', () => {
+  /** The reasons logged so far, and every logged word as one text. */
+  function refusals(warn: MockInstance<typeof console.warn>) {
+    const calls = warn.mock.calls.filter((args) => args[0] === 'apple key refused');
+    return {
+      reasons: calls.map((args) => (args[1] as { reason: string }).reason),
+      text: JSON.stringify(calls),
+    };
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('names the check that failed, and never the token, the nonce or the Apple id', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const t = setup();
+    const other = await fakeApple();
+    const secrets: string[] = [];
+    const tryToken = async (
+      options: Partial<Parameters<typeof appleToken>[1]>,
+      nonceInBody?: string,
+    ) => {
+      const value = nonceInBody ?? (await nonce(t, newPhone()));
+      const token = await appleToken(apple, { sub: 'apple-ann', nonce: value, ...options });
+      secrets.push(value, token);
+      const reply = await call(t, newPhone(), 'sign-in/social', {
+        provider: 'apple',
+        idToken: { token, nonce: value },
+      });
+      expect(reply.status).toBe(401);
+    };
+
+    await tryToken({}, 'madeup');
+    await tryToken({ nonce: undefined });
+    await tryToken({ nonce: 'another-nonce' });
+    await tryToken({ aud: 'com.someone.else' });
+    await tryToken({ iss: 'https://example.com' });
+    await tryToken({ signWith: other.privateKey });
+    await tryToken({ iat: Math.floor(Date.now() / 1000) - 700 });
+
+    const value = await nonce(t, newPhone());
+    const good = {
+      provider: 'apple',
+      idToken: { token: await appleToken(apple, { sub: 'apple-bob', nonce: value }), nonce: value },
+    };
+    expect((await call(t, newPhone(), 'sign-in/social', good)).status).toBe(200);
+    expect((await call(t, newPhone(), 'sign-in/social', good)).status).toBe(401);
+    secrets.push(value, good.idToken.token);
+
+    const { reasons, text } = refusals(warn);
+    expect(reasons).toEqual([
+      'nonce-not-ours',
+      'token-has-no-nonce',
+      'nonce-mismatch',
+      'wrong-audience',
+      'wrong-issuer',
+      'bad-signature',
+      'expired',
+      'nonce-used',
+    ]);
+    // A token for another app names that app's bundle id.
+    expect(text).toContain('com.someone.else');
+    for (const secret of [...secrets, 'apple-ann', 'apple-bob', 'privaterelay']) {
+      expect(text).not.toContain(secret);
+    }
+  });
+
+  it('says when the nonce ran out, when there is none, and when Apple is off', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const t = setup();
+    const value = await nonce(t, newPhone());
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + KEY_NONCE_TTL_MS + 1_000);
+    const late = await call(t, newPhone(), 'sign-in/social', {
+      provider: 'apple',
+      idToken: { token: await appleToken(apple, { sub: 'apple-ann', nonce: value }), nonce: value },
+    });
+    expect(late.status).toBe(401);
+    vi.useRealTimers();
+
+    const none = await call(t, newPhone(), 'sign-in/social', {
+      provider: 'apple',
+      idToken: { token: await appleToken(apple, { sub: 'apple-ann' }) },
+    });
+    expect(none.status).toBe(401);
+
+    const phone = newPhone();
+    await guest(t, phone);
+    vi.stubEnv('APPLE_SERVICES_ID', '');
+    expect((await saveApple(t, apple, phone, 'apple-ann')).status).toBe(503);
+
+    expect(refusals(warn).reasons).toEqual(['nonce-expired', 'no-nonce', 'apple-off']);
   });
 });

@@ -40,9 +40,9 @@ import { components, internal } from './_generated/api';
 import type { DataModel } from './_generated/dataModel';
 import { appleClientIds, appleTokenClient } from './appleTokens';
 import authConfig from './auth.config';
-import { isKeyProviderId, keyError, keyPlugin } from './keyPlugin';
+import { isKeyProviderId, keyError, keyPlugin, logKeyRefusal } from './keyPlugin';
 import { mailSender } from './mail';
-import { APPLE_KEYS_URL, verifyAppleIdToken } from './model/appleIdToken';
+import { APPLE_KEYS_URL, checkAppleIdToken } from './model/appleIdToken';
 import { appleKeyConfig, makeAppleClientSecret, subjectOfAppleIdToken } from './model/appleTokens';
 import { codesPerDay } from './model/emailCode';
 import { checkKeyNonce } from './model/keyNonce';
@@ -137,28 +137,41 @@ export function createAuth(ctx: AuthCtx) {
   /**
    * Apple's `verifyIdToken`. Better Auth's own lets a token with no nonce
    * through; this one asks for a nonce from `/key/nonce` and uses it up.
+   * A refusal logs which check failed (`logKeyRefusal`), never the token,
+   * the nonce or Apple's id.
    */
   async function verifyKeyIdToken(
     token: string,
     nonce: string | undefined,
     secret: string,
   ): Promise<boolean> {
-    if (servicesId === undefined || nonce === undefined || nonce === '') return false;
+    if (servicesId === undefined) return logKeyRefusal('apple-off');
+    if (nonce === undefined || nonce === '') return logKeyRefusal('no-nonce');
     const now = Date.now();
     const expiresAt = await checkKeyNonce(secret, nonce, now);
-    if (expiresAt === null) return false;
-    const claims = await verifyAppleIdToken(token, {
+    if (expiresAt === null) {
+      // Signed by us but past its time, or not ours at all.
+      const ours = (await checkKeyNonce(secret, nonce, 0)) !== null;
+      return logKeyRefusal(ours ? 'nonce-expired' : 'nonce-not-ours');
+    }
+    const checked = await checkAppleIdToken(token, {
       audiences: [...APPLE_BUNDLE_IDS, servicesId],
       keys: currentAppleKeys(),
       nonce,
       now,
     });
-    if (claims === null) return false;
-    return await actionCtx(ctx).runMutation(internal.authKeys.useKeyNonce, {
+    if (!checked.ok) {
+      return logKeyRefusal(
+        checked.problem,
+        checked.audience === undefined ? {} : { audience: checked.audience },
+      );
+    }
+    const fresh = await actionCtx(ctx).runMutation(internal.authKeys.useKeyNonce, {
       nonce,
       expiresAt,
       now,
     });
+    return fresh ? true : logKeyRefusal('nonce-used');
   }
 
   return betterAuth({
