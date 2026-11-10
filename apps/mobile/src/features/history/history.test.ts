@@ -130,7 +130,12 @@ function playTurn(s: MatchSession) {
 describe('a record is saved when a match ends', () => {
   it('vs bot: the bot resigns the match, you win the game in play too', () => {
     const { sessions, history, clock } = registry();
-    const s = sessions.start({ ...defaultSetup('bot'), botLevel: 'medium', game: 'plakoto' });
+    const s = sessions.start({
+      ...defaultSetup('bot'),
+      targetPoints: 3,
+      botLevel: 'medium',
+      game: 'plakoto',
+    });
     openGame(s);
     clock.now = 5_000;
     s.store.getState().dispatch({ type: 'resignMatch', player: 'black' });
@@ -211,7 +216,7 @@ describe('a record is saved when a match ends', () => {
 
   it('vs bot: you resign a game, then the match in the next game: the record adds that game, 0–4 (#181)', () => {
     const { sessions, history } = registry();
-    const s = sessions.start(defaultSetup('bot'));
+    const s = sessions.start({ ...defaultSetup('bot'), targetPoints: 3 });
     openGame(s);
     s.store.getState().dispatch({ type: 'resign', player: 'white' });
     s.store.getState().dispatch({ type: 'nextGame' });

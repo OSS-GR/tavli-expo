@@ -142,7 +142,7 @@ describe('<MatchScreen /> vs bot', () => {
 
   it('resigns the game after the confirm dialog (diplo at the start)', async () => {
     const user = setupUser();
-    const s = session(defaultSetup('bot'));
+    const s = session({ ...defaultSetup('bot'), targetPoints: 3 });
     startWith(s, 'white');
     const { props, view } = show(s);
     await view;
@@ -186,7 +186,7 @@ describe('<MatchScreen /> vs bot', () => {
 
   it('offers Review on the game-end sheet when the route gives it (#215)', async () => {
     const user = setupUser();
-    const s = session(defaultSetup('bot'));
+    const s = session({ ...defaultSetup('bot'), targetPoints: 3 });
     startWith(s, 'white');
     const onReview = jest.fn();
     await renderWithRoot(
@@ -211,7 +211,7 @@ describe('<MatchScreen /> vs bot', () => {
   });
 
   it('has no Review button without a review to open', async () => {
-    const s = session(defaultSetup('bot'));
+    const s = session({ ...defaultSetup('bot'), targetPoints: 3 });
     startWith(s, 'white');
     await show(s).view;
     await act(async () => {
@@ -336,7 +336,11 @@ describe('<MatchScreen /> pass-and-play', () => {
 
   it('a resign after a checker is off is a mono, and the card says why (#181)', async () => {
     const user = setupUser();
-    const s = session({ ...defaultSetup('local'), names: { white: 'Maria', black: 'Nikos' } });
+    const s = session({
+      ...defaultSetup('local'),
+      targetPoints: 3,
+      names: { white: 'Maria', black: 'Nikos' },
+    });
     // Both players are bearing off; Maria (white) has 6 checkers off.
     const state = {
       ...portes.initialState({ startingPlayer: 'white' }),

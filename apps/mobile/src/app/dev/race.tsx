@@ -25,7 +25,13 @@ export default function DevRaceRoute() {
   useEffect(() => {
     if (!__DEV__) return;
     let gone = false;
-    const setup = sanitizeSetup({ ...defaultSetup('bot'), botLevel: 'medium' }, 'bot', botLevels);
+    // To 3 points, not the one-game default (#479): the Maestro flow plays a
+    // next game after the race.
+    const setup = sanitizeSetup(
+      { ...defaultSetup('bot'), targetPoints: 3, botLevel: 'medium' },
+      'bot',
+      botLevels,
+    );
     const session = matchSessions.start(setup);
     void playToRace(session.store, { runner: botRunner, rng: createLocalRng() }).then(
       (ok) => {
