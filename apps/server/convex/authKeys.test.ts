@@ -558,6 +558,37 @@ describe('the log of a turned-down Apple token (#462)', () => {
     vi.stubEnv('APPLE_SERVICES_ID', '');
     expect((await saveApple(t, apple, phone, 'apple-ann')).status).toBe(503);
 
-    expect(refusals(warn).reasons).toEqual(['nonce-expired', 'no-nonce', 'apple-off']);
+    expect(refusals(warn).reasons).toEqual([
+      'nonce-expired',
+      'no-nonce',
+      'apple-off',
+      'save-refused',
+    ]);
+  });
+
+  it('a refused save names its answer, also with no reason of its own', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const t = setup();
+
+    // No session: the phone sent no cookie, then an old one.
+    const phone = newPhone();
+    expect((await saveApple(t, apple, phone, 'apple-ann')).status).toBe(401);
+    await guest(t, phone);
+    const old = { cookie: `${phone.cookie}x` };
+    expect((await saveApple(t, apple, old, 'apple-ann')).status).toBe(401);
+
+    // A bad body, then a second Apple key for one user.
+    expect((await call(t, phone, 'key/save', { provider: 'apple' })).status).toBe(400);
+    expect((await saveApple(t, apple, phone, 'apple-ann')).status).toBe(200);
+    expect((await saveApple(t, apple, phone, 'apple-bob')).status).toBe(409);
+
+    const calls = warn.mock.calls.filter((args) => args[0] === 'apple key refused');
+    expect(calls.map((args) => args[1])).toEqual([
+      { reason: 'no-session', cookie: false },
+      { reason: 'no-session', cookie: true },
+      { reason: 'save-refused', code: 'BAD_REQUEST' },
+      { reason: 'save-refused', code: 'PROVIDER_TAKEN' },
+    ]);
+    expect(refusals(warn).text).not.toContain(phone.cookie);
   });
 });
