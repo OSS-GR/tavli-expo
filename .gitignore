@@ -26,3 +26,6 @@ pnpm-debug.log*
 
 # Agent worktrees (local only)
 .claude/worktrees/
+
+# Cloudflare's wrangler (the site in docs/legal/, #332)
+.wrangler/

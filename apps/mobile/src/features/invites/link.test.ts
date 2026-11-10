@@ -136,7 +136,11 @@ describe('universal links (#332)', () => {
   });
 
   it('the site shows the fallback page for every share link, with no script', () => {
-    expect(read('docs/legal/site/_redirects')).toMatch(/^\/i\/\*\s+\/i\/index\.html\s+200$/m);
+    // A rewrite to `/i/`: Cloudflare refuses `/i/index.html` as a loop (it
+    // serves index.html at its folder path).
+    expect(read('docs/legal/site/_redirects')).toMatch(/^\/i\/\*\s+\/i\/\s+200$/m);
+    // The Worker serves site/ only; its temp files stay outside it.
+    expect(read('docs/legal/wrangler.jsonc')).toMatch(/"directory":\s*"\.\/site"/);
     expect(read('docs/legal/site/_headers')).toMatch(
       /^\/\.well-known\/apple-app-site-association\n\s+Content-Type: application\/json$/m,
     );

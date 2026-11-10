@@ -1,0 +1,14 @@
+// The website tavlaki.com (#332): a Cloudflare Worker that only serves the
+// static files in site/ (no code). Cloudflare deploys it from `main` with
+// Path `docs/legal` and the deploy command `npx wrangler deploy`
+// (see "How to publish" in README.md). _redirects and _headers in site/ are
+// rules, not pages. Wrangler writes its temp files next to this file, so they
+// stay out of site/ (they would be served otherwise).
+{
+  "$schema": "https://unpkg.com/wrangler@4.160.0/config-schema.json",
+  "name": "tavlaki",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./site",
+  },
+}

@@ -1,4 +1,4 @@
-# Cloudflare Pages (and Netlify) headers (#332). Not served as a page.
+# Cloudflare headers (#332): Workers static assets, also Pages and Netlify.
 # iOS reads this file for universal links. It must be JSON, over HTTPS,
 # with no redirect. The file has no extension, so name the type here.
 /.well-known/apple-app-site-association
