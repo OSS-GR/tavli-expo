@@ -188,7 +188,7 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
         if (typeof email !== 'string') return email;
         key = `email:${email}`;
       } else {
-        const sub = provenSub(server, body?.['idToken'] as { token: string; nonce: string });
+        const sub = provenSub(server, body?.['keyToken'] as { token: string; nonce: string });
         if (sub === null) return refused(401, 'INVALID_TOKEN');
         key = `apple:${sub}`;
       }
