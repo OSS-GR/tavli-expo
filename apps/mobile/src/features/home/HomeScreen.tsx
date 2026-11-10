@@ -52,7 +52,10 @@ export interface HomeScreenProps {
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). It takes the hero's place. */
   continueCard?: ReactNode;
-  /** The reminder card (#404): save a guest account, or play online. */
+  /**
+   * The reminder card (#404): save a guest account, or play online. The
+   * one-time What's new card (#471) goes in the same place.
+   */
   reminderCard?: ReactNode;
   /** "Your online games" (#297), when this phone has an online account. */
   onlineGames?: ReactNode;

@@ -49,11 +49,13 @@ export interface SettingsScreenProps {
   /**
    * Opens the lessons of a game (#128, #159): "Learn to play" lets the
    * player pick Portes, Plakoto, Fevga or Asodio. The Help section shows
-   * only with it.
+   * with it or with `onWhatsNew`.
    */
   onLearnToPlay?: (game: TutorialGame) => void;
   /** Opens the match history (#142). The History section shows only with it. */
   onHistory?: () => void;
+  /** Opens What's new (#471): a row in the Help section. */
+  onWhatsNew?: () => void;
   /**
    * Turn notifications (#285). The Notifications section shows only with
    * it: a build with no online play has none.
@@ -85,6 +87,7 @@ export function SettingsScreen({
   onBack,
   onLearnToPlay,
   onHistory,
+  onWhatsNew,
   turnPushes,
   onAccount,
   onBlocked,
@@ -284,9 +287,18 @@ export function SettingsScreen({
           </SettingBlock>
         </SectionCard>
 
-        {onLearnToPlay ? (
+        {onLearnToPlay || onWhatsNew ? (
           <SectionCard title={t('settings.sections.help')}>
-            <TutorialSettings onOpen={onLearnToPlay} />
+            {onLearnToPlay ? <TutorialSettings onOpen={onLearnToPlay} /> : null}
+            {onWhatsNew ? (
+              <SectionRow
+                testID="settings-whats-new"
+                icon="sparkles"
+                label={t('settings.whatsNew.label')}
+                hint={t('settings.whatsNew.hint')}
+                onPress={onWhatsNew}
+              />
+            ) : null}
           </SectionCard>
         ) : null}
 

@@ -15,6 +15,7 @@ import {
   FRIEND_HREF,
   JOIN_HREF,
   ONLINE_GAMES_HREF,
+  WHATS_NEW_HREF,
   gameHref,
   inviteWaitHref,
   newGameHref,
@@ -28,6 +29,9 @@ import { reminders } from '@/features/reminders/reminders';
 import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
+import { WhatsNewCard } from '@/features/whats-new/WhatsNewCard';
+import { whatsNewSeen } from '@/features/whats-new/seen';
+import { useWhatsNewCard } from '@/features/whats-new/useWhatsNewCard';
 import { auth, botLevels, games, invites } from '@/services';
 
 interface SlotState {
@@ -74,6 +78,9 @@ export default function HomeRoute() {
     auth: invites === undefined ? undefined : auth,
   });
   const { card } = reminder;
+  // What's new (#471): once after an update with new entries. It holds the
+  // reminder card back for the day (`otherPrompt`).
+  const whatsNew = useWhatsNewCard({ focused, seen: whatsNewSeen, reminders });
 
   return (
     <HomeScreen
@@ -93,7 +100,15 @@ export default function HomeRoute() {
         ) : null
       }
       reminderCard={
-        card ? (
+        whatsNew.shown ? (
+          <WhatsNewCard
+            onOpen={() => {
+              whatsNew.hide();
+              router.push(WHATS_NEW_HREF);
+            }}
+            onDismiss={whatsNew.hide}
+          />
+        ) : card ? (
           card.kind === 'guest' && auth !== undefined && games !== undefined ? (
             <GuestReminderCard
               auth={auth}

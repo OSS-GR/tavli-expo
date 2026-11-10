@@ -232,6 +232,10 @@
     "blocked": {
       "label": "Blocked players",
       "hint": "Players you blocked or reported"
+    },
+    "whatsNew": {
+      "label": "What's new",
+      "hint": "What each update added"
     }
   },
   "account": {
@@ -761,6 +765,58 @@
     "problem": {
       "title": "Your choice was not saved",
       "text": "Try again in a moment."
+    }
+  },
+  "whatsNew": {
+    "title": "What's new",
+    "intro": "What each update of Tavlaki added, newest first, and where to find it.",
+    "card": {
+      "title": "New in this update",
+      "body": "See what the update added, and where to find it.",
+      "open": "See what's new",
+      "dismiss": "Not now"
+    },
+    "entries": {
+      "signIn": {
+        "title": "Sign in with Apple or email",
+        "body": "Sign in with Apple on an iPhone, or with a code we send to your email. Playing as a guest? Save your account in Settings → Account to keep your online games on a new phone."
+      },
+      "usernames": {
+        "title": "Usernames",
+        "body": "With a saved account you can pick a username. Other players see it in place of your guest name. Pick one in Settings → Account."
+      },
+      "friends": {
+        "title": "Friends",
+        "body": "Add friends with your link, a QR code or their username, then invite them to a game in one tap. You need a saved account. Find it in Settings → Online play once you have signed in."
+      },
+      "leaderboards": {
+        "title": "Leaderboards",
+        "body": "Online matches between saved accounts change your rating. See where you stand among your friends and all players in Settings → Online play → Leaderboards."
+      },
+      "reportBlock": {
+        "title": "Report or block a player",
+        "body": "If another player bothers you, tap Report or block in the game menu, at the end of a match or in your friends list. After a block, no new game starts between you."
+      },
+      "fastForward": {
+        "title": "Fast forward a race",
+        "body": "Against the bot, when the checkers can no longer meet, tap Fast forward and the bot plays the race out for both sides. You can turn the offer off in Settings."
+      },
+      "home": {
+        "title": "A new Home",
+        "body": "Your saved game, or a quick game against the bot, sits at the top. Every other way to play is right below it."
+      },
+      "playFriend": {
+        "title": "Play a friend online",
+        "body": "Tap Play a friend on Home, make an invite and send the link. Your friend plays on their own phone."
+      },
+      "joinCode": {
+        "title": "Join with a code",
+        "body": "Got an invite code from a friend? Tap Join with a code on Home and type it in."
+      },
+      "turnPushes": {
+        "title": "Turn notifications",
+        "body": "In an online game, the app can tell you when it is your turn. Turn them on in Settings → Notifications."
+      }
     }
   },
   "signIn": {

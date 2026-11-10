@@ -6,6 +6,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { Screen } from '@/components/Screen';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
+import { whatsNewSeen } from '@/features/whats-new/seen';
 
 import { useBoardStep } from './boardStepStore';
 import { WelcomeTop } from './WelcomeTop';
@@ -38,6 +39,8 @@ export function WelcomeConsentScreen({ onBack, onAnswered }: WelcomeConsentScree
     // Before the answer: the guard must never see the consent answered
     // while the board step is not due yet, or it opens Home at once.
     beginBoardStep();
+    // A new player has seen every release of What's new (#471).
+    whatsNewSeen.begin();
     setConsent(granted);
     onAnswered?.();
   };
