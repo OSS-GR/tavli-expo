@@ -128,6 +128,33 @@ export type {
   Usernames,
 } from './username';
 export {
+  FRIENDS_ERROR_CODES,
+  FRIEND_REQUEST_WAIT_MS,
+  FRIEND_SEARCHES_PER_HOUR,
+  FRIEND_SEARCH_WINDOW_MS,
+  FRIEND_STATUSES,
+  FRIEND_TOKEN_ALPHABET,
+  FRIEND_TOKEN_LENGTH,
+  MAX_FRIENDS,
+  MAX_INCOMING_FRIEND_REQUESTS,
+  MAX_OPEN_FRIEND_REQUESTS,
+  MAX_RECENT_PLAYERS,
+  isFriendsErrorData,
+  normalizeFriendToken,
+} from './friends';
+export type {
+  FoundPlayer,
+  Friend,
+  FriendRecord,
+  FriendRequest,
+  FriendRequests,
+  FriendStatus,
+  Friends,
+  FriendsErrorCode,
+  FriendsErrorData,
+  RecentPlayer,
+} from './friends';
+export {
   MAX_BLOCKS,
   MAX_REPORTS_PER_DAY,
   REPORT_REASONS,

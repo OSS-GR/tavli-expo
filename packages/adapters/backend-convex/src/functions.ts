@@ -1,7 +1,7 @@
 /**
  * References to the Convex functions in `apps/server/convex/games.ts`,
- * `invites.ts`, `push.ts`, `account.ts`, `appUpdate.ts`, `usernames.ts` and
- * `safety.ts`, by name. The adapter does not import the generated `api`
+ * `invites.ts`, `push.ts`, `account.ts`, `appUpdate.ts`, `usernames.ts`,
+ * `safety.ts` and `friends.ts`, by name. The adapter does not import the generated `api`
  * of `apps/server`: that would pull the server code (and Better Auth) into
  * the app's type check, and `apps/server` already depends on this package
  * for its tests.
@@ -13,7 +13,8 @@
  * `convex/convexOnlineData.test.ts` for the delete,
  * `convex/convexAppUpdates.test.ts` for the update policy,
  * `convex/convexUsernames.test.ts` for the usernames,
- * `convex/convexSafety.test.ts` for block and report), so a rename
+ * `convex/convexSafety.test.ts` for block and report,
+ * `convex/convexFriends.test.ts` for the friends), so a rename
  * there fails a test.
  */
 import { makeFunctionReference } from 'convex/server';
@@ -23,6 +24,11 @@ import type {
   AppPlatform,
   AppUpdatePolicy,
   BlockedPlayer,
+  FoundPlayer,
+  Friend,
+  FriendRequests,
+  FriendStatus,
+  RecentPlayer,
   GameSummary,
   GameTransportErrorData,
   InviteView,
@@ -254,4 +260,79 @@ export const SAFETY_FUNCTIONS: SafetyFunctions = {
   unblockPlayer: makeFunctionReference(SAFETY_FUNCTION_NAMES.unblockPlayer),
   listMyBlocks: makeFunctionReference(SAFETY_FUNCTION_NAMES.listMyBlocks),
   reportPlayer: makeFunctionReference(SAFETY_FUNCTION_NAMES.reportPlayer),
+};
+
+/** What `requestByUsername` returns: a failed request is a value, so the search stays counted. */
+export type FriendRequestResult =
+  { ok: true; status: FriendStatus } | { ok: false; code: string; message: string };
+
+type FriendQuery<Result> = FunctionReference<'query', 'public', Record<string, never>, Result>;
+type FriendMutation<Args extends Record<string, unknown>, Result> = FunctionReference<
+  'mutation',
+  'public',
+  Args,
+  Result
+>;
+
+/** The functions in `apps/server/convex/friends.ts` (#406). */
+export interface FriendFunctions {
+  readonly listFriends: FriendQuery<Friend[]>;
+  readonly listFriendRequests: FriendQuery<FriendRequests>;
+  readonly recentPlayers: FriendQuery<RecentPlayer[]>;
+  readonly findPlayer: FriendMutation<{ username: string }, FoundPlayer | null>;
+  readonly myFriendLink: FriendMutation<Record<string, never>, string>;
+  readonly resetFriendLink: FriendMutation<Record<string, never>, string>;
+  readonly openFriendLink: FunctionReference<
+    'query',
+    'public',
+    { token: string },
+    FoundPlayer | null
+  >;
+  readonly requestByLink: FriendMutation<{ token: string }, FriendStatus>;
+  readonly requestByUsername: FriendMutation<{ username: string }, FriendRequestResult>;
+  readonly sendFriendRequest: FriendMutation<{ playerId: string }, FriendStatus>;
+  readonly acceptFriendRequest: FriendMutation<{ playerId: string }, null>;
+  readonly declineFriendRequest: FriendMutation<{ playerId: string }, null>;
+  readonly cancelFriendRequest: FriendMutation<{ playerId: string }, null>;
+  readonly removeFriend: FriendMutation<{ playerId: string }, null>;
+  readonly inviteFriend: FriendMutation<NewInviteArgs & { playerId: string }, string>;
+  readonly listFriendInvites: FriendQuery<InviteView[]>;
+}
+
+export const FRIEND_FUNCTION_NAMES = {
+  listFriends: 'friends:listFriends',
+  listFriendRequests: 'friends:listFriendRequests',
+  recentPlayers: 'friends:recentPlayers',
+  findPlayer: 'friends:findPlayer',
+  myFriendLink: 'friends:myFriendLink',
+  resetFriendLink: 'friends:resetFriendLink',
+  openFriendLink: 'friends:openFriendLink',
+  requestByLink: 'friends:requestByLink',
+  requestByUsername: 'friends:requestByUsername',
+  sendFriendRequest: 'friends:sendFriendRequest',
+  acceptFriendRequest: 'friends:acceptFriendRequest',
+  declineFriendRequest: 'friends:declineFriendRequest',
+  cancelFriendRequest: 'friends:cancelFriendRequest',
+  removeFriend: 'friends:removeFriend',
+  inviteFriend: 'friends:inviteFriend',
+  listFriendInvites: 'friends:listFriendInvites',
+} as const satisfies { readonly [K in keyof FriendFunctions]: string };
+
+export const FRIEND_FUNCTIONS: FriendFunctions = {
+  listFriends: makeFunctionReference(FRIEND_FUNCTION_NAMES.listFriends),
+  listFriendRequests: makeFunctionReference(FRIEND_FUNCTION_NAMES.listFriendRequests),
+  recentPlayers: makeFunctionReference(FRIEND_FUNCTION_NAMES.recentPlayers),
+  findPlayer: makeFunctionReference(FRIEND_FUNCTION_NAMES.findPlayer),
+  myFriendLink: makeFunctionReference(FRIEND_FUNCTION_NAMES.myFriendLink),
+  resetFriendLink: makeFunctionReference(FRIEND_FUNCTION_NAMES.resetFriendLink),
+  openFriendLink: makeFunctionReference(FRIEND_FUNCTION_NAMES.openFriendLink),
+  requestByLink: makeFunctionReference(FRIEND_FUNCTION_NAMES.requestByLink),
+  requestByUsername: makeFunctionReference(FRIEND_FUNCTION_NAMES.requestByUsername),
+  sendFriendRequest: makeFunctionReference(FRIEND_FUNCTION_NAMES.sendFriendRequest),
+  acceptFriendRequest: makeFunctionReference(FRIEND_FUNCTION_NAMES.acceptFriendRequest),
+  declineFriendRequest: makeFunctionReference(FRIEND_FUNCTION_NAMES.declineFriendRequest),
+  cancelFriendRequest: makeFunctionReference(FRIEND_FUNCTION_NAMES.cancelFriendRequest),
+  removeFriend: makeFunctionReference(FRIEND_FUNCTION_NAMES.removeFriend),
+  inviteFriend: makeFunctionReference(FRIEND_FUNCTION_NAMES.inviteFriend),
+  listFriendInvites: makeFunctionReference(FRIEND_FUNCTION_NAMES.listFriendInvites),
 };

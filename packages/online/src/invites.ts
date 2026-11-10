@@ -58,11 +58,19 @@ function randomChar(rng: Rng): string {
   }
 }
 
+/**
+ * `length` fair random characters from `INVITE_CODE_ALPHABET`. Friend
+ * link tokens (#406) use it too: they share the alphabet.
+ */
+export function randomCode(rng: Rng, length: number): string {
+  let code = '';
+  for (let i = 0; i < length; i++) code += randomChar(rng);
+  return code;
+}
+
 /** A new random code: `INVITE_CODE_LENGTH` characters from `INVITE_CODE_ALPHABET`. */
 export function newInviteCode(rng: Rng): string {
-  let code = '';
-  for (let i = 0; i < INVITE_CODE_LENGTH; i++) code += randomChar(rng);
-  return code;
+  return randomCode(rng, INVITE_CODE_LENGTH);
 }
 
 /**
@@ -117,6 +125,11 @@ export interface InviteRecord {
   readonly status: InviteStatus;
   readonly expiresAt: number;
   readonly gameId: string | null;
+  /**
+   * A friend invite (#406): the one player who may read and answer it.
+   * Absent: anyone with the code may.
+   */
+  readonly to?: string;
 }
 
 export interface NewInviteOptions {
@@ -125,6 +138,8 @@ export interface NewInviteOptions {
   readonly targetPoints: number;
   /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
   readonly turnTimeMinutes: number | null;
+  /** A friend invite (#406): the one friend it is for. */
+  readonly to?: string;
 }
 
 /** When an invite made at `now` expires. */
@@ -137,7 +152,7 @@ export function inviteExpiresAt(now: number): number {
  * length here, as the engine would, so a friend's accept does not fail on it.
  */
 export function newInvite(options: NewInviteOptions, code: string, now: number): InviteRecord {
-  const { from, choice, targetPoints, turnTimeMinutes } = options;
+  const { from, choice, targetPoints, turnTimeMinutes, to } = options;
   if (from === '') fail('BAD_REQUEST', 'the player id is empty');
   if (!Number.isSafeInteger(targetPoints) || targetPoints < 1) {
     fail('BAD_REQUEST', 'target points must be an integer of 1 or more');
@@ -154,6 +169,7 @@ export function newInvite(options: NewInviteOptions, code: string, now: number):
     status: 'open',
     expiresAt: inviteExpiresAt(now),
     gameId: null,
+    ...(to === undefined ? {} : { to }),
   };
 }
 
@@ -237,6 +253,23 @@ function checkOpen(invite: InviteRecord, now: number): void {
 export function checkAnswer(invite: InviteRecord, callerId: string, now: number): void {
   checkOpen(invite, now);
   if (invite.from === callerId) fail('OWN_INVITE', 'you cannot answer your own invite');
+}
+
+/**
+ * A friend invite (#406) is for its friend only: the inviter and that
+ * friend see it, anyone else finds no invite. An invite with no `to` is
+ * for anyone with the code.
+ */
+export function inviteVisibleTo(
+  invite: Pick<InviteRecord, 'from' | 'to'>,
+  viewerId: string | null,
+): boolean {
+  return invite.to === undefined || viewerId === invite.from || viewerId === invite.to;
+}
+
+/** `callerId` may see the invite (`inviteVisibleTo`), else `INVITE_NOT_FOUND`, as for no invite. */
+export function checkAddressee(invite: Pick<InviteRecord, 'from' | 'to'>, callerId: string): void {
+  if (!inviteVisibleTo(invite, callerId)) fail('INVITE_NOT_FOUND', 'no invite has this code');
 }
 
 /**

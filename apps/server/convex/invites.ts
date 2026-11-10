@@ -14,6 +14,11 @@
  * `checkTimeout` does for turns. The calls check the time too, so an
  * invite is closed at `expiresAt` also when the scheduler is late.
  *
+ * Friend invites (#406): `inviteFriend` (`friends.ts`) saves an invite
+ * with `to`, through the same `insertInvite`. Only `from` and `to` may
+ * read or answer it (`inviteVisibleTo`, `checkAddressee`): anyone else
+ * gets `null` or `INVITE_NOT_FOUND`, as for no invite.
+ *
  * Cap (#275): one player may have at most `MAX_OPEN_INVITES` (10) open
  * invites whose time is not up. `createInvite` counts them on the
  * `by_from` index; each one is a row and a scheduled `expireInvite`.
@@ -29,15 +34,17 @@
 import { ConvexError, v } from 'convex/values';
 
 import { normalizeInviteCode } from '@tavli/contracts';
-import type { InviteErrorCode, InviteView } from '@tavli/contracts';
+import type { InviteErrorCode, InviteView, NewInvite } from '@tavli/contracts';
 import {
   InviteError,
   MAX_OPEN_INVITES,
+  checkAddressee,
   checkAnswer,
   checkCancel,
   checkInviteCap,
   checkNotBlocked,
   inviteSeenBy,
+  inviteVisibleTo,
   countOpenInvites,
   isInviteExpired,
   newInvite,
@@ -58,7 +65,7 @@ import { blocks, nameSeenBy } from './safety';
 import { gameChoice, gameTurnTimeMinutes } from './schema';
 
 /** Maps a Convex invite row to `InviteRecord`, defaulting `turnTimeMinutes` (#183). */
-function toInviteRecord(doc: Doc<'invites'>): InviteRecord {
+export function toInviteRecord(doc: Doc<'invites'>): InviteRecord {
   return {
     code: doc.code,
     from: doc.from,
@@ -68,6 +75,7 @@ function toInviteRecord(doc: Doc<'invites'>): InviteRecord {
     status: doc.status,
     expiresAt: doc.expiresAt,
     gameId: doc.gameId,
+    ...(doc.to === undefined ? {} : { to: doc.to }),
   };
 }
 
@@ -124,6 +132,39 @@ async function load(ctx: MutationCtx, text: string): Promise<Doc<'invites'>> {
 }
 
 /**
+ * Saves a new open invite from `callerId`, after the cap check (#275),
+ * and schedules its `expireInvite`. `to`: a friend invite (#406,
+ * `inviteFriend` in `friends.ts`), for that player only. Returns the row
+ * id and the code. `TOO_MANY_INVITES` and `BAD_REQUEST` are codes of the
+ * friends port too, so `inviteFriend` passes them on as they are.
+ */
+export async function insertInvite(
+  ctx: MutationCtx,
+  callerId: string,
+  game: NewInvite,
+  to?: string,
+): Promise<{ inviteId: Id<'invites'>; code: string }> {
+  const now = Date.now();
+  // Reading at most the cap is enough to know if the caller is at it.
+  const open = await openInvitesOf(ctx, callerId, now, MAX_OPEN_INVITES);
+  guarded(() => checkInviteCap(countOpenInvites(open, callerId, now)));
+  const code = await pickInviteCode(
+    createCryptoRng(),
+    async (candidate) => (await findByCode(ctx, candidate)) !== null,
+  );
+  const { choice, targetPoints, turnTimeMinutes } = game;
+  const options = { from: callerId, choice, targetPoints, turnTimeMinutes };
+  const invite = guarded(() =>
+    newInvite(to === undefined ? options : { ...options, to }, code, now),
+  );
+  // The invite names the inviter (#400).
+  await ensureGuestNumber(ctx, callerId);
+  const inviteId = await ctx.db.insert('invites', { ...invite, gameId: null, answeredBy: null });
+  await ctx.scheduler.runAt(invite.expiresAt, internal.invites.expireInvite, { inviteId });
+  return { inviteId, code };
+}
+
+/**
  * Makes an open invite from the caller. It expires in 24 hours. Returns
  * the code (8 capital letters and digits). A caller who already has
  * `MAX_OPEN_INVITES` (10) open invites gets `TOO_MANY_INVITES` (#275).
@@ -136,23 +177,9 @@ export const createInvite = mutation({
     turnTimeMinutes: gameTurnTimeMinutes,
   },
   returns: v.string(),
-  handler: async (ctx, { choice, targetPoints, turnTimeMinutes }) => {
+  handler: async (ctx, game) => {
     const callerId = await existingPlayer(ctx);
-    const now = Date.now();
-    // Reading at most the cap is enough to know if the caller is at it.
-    const open = await openInvitesOf(ctx, callerId, now, MAX_OPEN_INVITES);
-    guarded(() => checkInviteCap(countOpenInvites(open, callerId, now)));
-    const code = await pickInviteCode(
-      createCryptoRng(),
-      async (candidate) => (await findByCode(ctx, candidate)) !== null,
-    );
-    const options = { from: callerId, choice, targetPoints, turnTimeMinutes };
-    const invite = guarded(() => newInvite(options, code, now));
-    // The invite names the inviter (#400).
-    await ensureGuestNumber(ctx, callerId);
-    const inviteId = await ctx.db.insert('invites', { ...invite, gameId: null, answeredBy: null });
-    await ctx.scheduler.runAt(invite.expiresAt, internal.invites.expireInvite, { inviteId });
-    return code;
+    return (await insertInvite(ctx, callerId, game)).code;
   },
 });
 
@@ -160,7 +187,8 @@ export const createInvite = mutation({
  * The invite with this code (any case), or `null` when there is none.
  * Any signed-in user with the code may read it: the code is the secret.
  * A caller who blocks the inviter sees no name, and a caller the inviter
- * blocks sees an open invite as expired (#320, `inviteSeenBy`).
+ * blocks sees an open invite as expired (#320, `inviteSeenBy`). A friend
+ * invite (#406) is `null` for anyone but its two players.
  */
 export const getInvite = query({
   args: { code: v.string() },
@@ -169,7 +197,8 @@ export const getInvite = query({
     const code = normalizeInviteCode(text);
     if (code === null) return null;
     const invite = await findByCode(ctx, code);
-    if (invite === null) return null;
+    // A friend invite is for its two players only (#406).
+    if (invite === null || !inviteVisibleTo(toInviteRecord(invite), callerId)) return null;
     const [fromName, hidden] = await Promise.all([
       nameSeenBy(ctx, callerId, invite.from),
       blocks(ctx, invite.from, callerId),
@@ -192,6 +221,7 @@ export const acceptInvite = mutation({
     const callerId = await existingPlayer(ctx);
     const doc = await load(ctx, code);
     const invite = toInviteRecord(doc);
+    guarded(() => checkAddressee(invite, callerId));
     guarded(() => checkAnswer(invite, callerId, Date.now()));
     const [byCaller, byInviter] = await Promise.all([
       blocks(ctx, callerId, invite.from),
@@ -221,6 +251,7 @@ export const declineInvite = mutation({
     const callerId = await existingPlayer(ctx);
     const doc = await load(ctx, code);
     const invite = toInviteRecord(doc);
+    guarded(() => checkAddressee(invite, callerId));
     guarded(() => checkAnswer(invite, callerId, Date.now()));
     const byInviter = await blocks(ctx, invite.from, callerId);
     guarded(() => checkNotBlocked({ byCaller: false, byInviter }));

@@ -248,3 +248,36 @@ export function tokensOverCap<T extends { readonly token: string }>(
   if (over <= 0) return [];
   return rows.filter((row) => row.token !== keep).slice(0, over);
 }
+
+/**
+ * The text of a friend invite push (#406): a friend invites the player to
+ * a game. English for now; the one place to change it. It holds no names
+ * and no emails: not even which friend.
+ */
+export const FRIEND_INVITE_PUSH_TEXT = {
+  title: 'Tavlaki',
+  body: 'A friend invites you to a game.',
+} as const;
+
+/**
+ * One friend invite message per token, with `high` priority and a time
+ * to live up to the invite's end (`turnPushTtl` on `expiresAt`). The data
+ * holds only the invite code, so a tap opens the invite. No time left: no
+ * messages.
+ */
+export function friendInviteMessages(
+  tokens: readonly string[],
+  inviteCode: string,
+  expiresAt: number,
+  now: number,
+): PushMessage[] {
+  const ttlSeconds = turnPushTtl(expiresAt, now);
+  if (ttlSeconds === null) return [];
+  return tokens.map((to) => ({
+    to,
+    ...FRIEND_INVITE_PUSH_TEXT,
+    data: { inviteCode },
+    priority: 'high',
+    ttlSeconds,
+  }));
+}

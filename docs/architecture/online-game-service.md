@@ -8,7 +8,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 
 | Path | What it holds |
 |---|---|
-| `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `drafts`, `invites`, `pushTokens`, `authKeys`, `usedKeyNonces`, `appleTokens`, `appleRevokes` and `playerNames` |
+| `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `drafts`, `invites`, `pushTokens`, `authKeys`, `usedKeyNonces`, `appleTokens`, `appleRevokes`, `playerNames`, `blocks`, `reports`, `friends`, `friendRequests`, `friendLinks` and `friendSearches` |
 | `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
 | `apps/server/convex/playerNames.ts` | [Guest names and usernames](#playernames) (#400, #405): `ensureGuestNumber`, `nameRowOf`, `nameOf`, `namesOfPlayers`, `deletePlayerNameOf` |
 | `packages/online/src/names.ts` | The pure part of guest names: `pickGuestNumber(rng)` (fair, 1000–9999), `nameFrom` (the username first), `namesOf`, `NO_NAMES` |
@@ -17,6 +17,10 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `apps/server/convex/safety.ts` | [Block and report](#block-and-report) (#320): `blockPlayer`, `unblockPlayer`, `listMyBlocks`, `reportPlayer`, and `deleteSafetyRows` (internal, the account delete) |
 | `packages/online/src/safety.ts` | The pure checks of block and report: `checkTarget`, `checkMet`, `checkBlockCap`, `checkReason`, `checkReportCap`, `namesSeenBy` |
 | `packages/contracts/src/safety.ts` | The `Safety` port, `REPORT_REASONS`, the caps, the error codes; contract checks `safetyContract()` in `@tavli/contracts/testing` |
+| `apps/server/convex/friends.ts` | [Friends](#friends-406): the public friend functions, `deleteFriendsOf` and `deleteFriendRows` (internal, the account delete) |
+| `apps/server/convex/friendEdges.ts` | The friend rows that `safety.ts` and `games.ts` read or change: `endFriendship`, `metAsFriends`, `recordFriendMatch`. It imports no function file, so there is no import cycle |
+| `packages/online/src/friends.ts` | The pure checks of friends: `planRequest` (the caps, the wait, the order of the checks), `friendStatusOf`, `checkSearchCap`, `newFriendToken`, `recordOf`, `recordAfter`, `recentOpponents` |
+| `packages/contracts/src/friends.ts` | The `Friends` port, the caps, the error codes, `normalizeFriendToken`; contract checks `friendsContract()` in `@tavli/contracts/testing` |
 | `packages/contracts/src/username.ts` | The `Usernames` port, `MyUsername`, the error codes, `TERMS_VERSION`; contract checks `usernamesContract()` in `@tavli/contracts/testing` |
 | `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315) |
 | `apps/server/convex/appUpdate.ts` | `updatePolicy`: the lowest app build the server works with, from the deployment's env vars ([Update needed](#update-needed), #390). The one public function with no sign-in |
@@ -51,7 +55,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `packages/contracts/src/online-data.ts` | The `OnlineData` port: `deleteMyData()` ([In the app](#in-the-app), #315) |
 | `packages/contracts/src/auth.ts` | The `AuthProvider` port, `AuthUser`, the auth error codes and the in-memory provider |
 | `packages/adapters/auth-better-auth` | `AuthProvider` on the Better Auth Expo client (its `README.md`) |
-| `packages/adapters/backend-convex` | `GameTransport`, `Invites` and `OnlineData` on the Convex client ([The port](#the-port), [invites adapter](#the-convex-invites-adapter), its `README.md`) |
+| `packages/adapters/backend-convex` | `GameTransport`, `Invites`, `OnlineData` and `Friends` on the Convex client ([The port](#the-port), [invites adapter](#the-convex-invites-adapter), its `README.md`) |
 | `apps/server/convex/test.network.ts` | Fake Convex clients over one convex-test backend, one per signed-in user, for the adapter tests |
 
 Only `apps/server` and the adapters (`auth-better-auth`, `backend-convex`) import `convex` and Better Auth. The ports in `packages/contracts` and `@tavli/online` are plain TypeScript. The app must not import server code, so it uses `@tavli/online` and the ports.
@@ -203,6 +207,35 @@ One row per report (#320). The owner reads them in the Convex dashboard and dele
 | `username` | Optional. The reported player's username when the report came in, so the owner sees it after a rename. A guest has none. |
 | `createdAt` | When. |
 
+### `friends`
+
+Two rows per friendship (#406), one for each player, so each side reads its list with one index range.
+
+| Field | Notes |
+|---|---|
+| `playerId`, `friendId` | Better Auth user ids. Index `by_player` (`playerId`, `since`: the list, at most `MAX_FRIENDS`), `by_pair` (`playerId`, `friendId`), `by_friend` (the account delete). |
+| `since` | When the two became friends. |
+| `wins`, `losses` | The matches `playerId` won and lost against `friendId`. Counted from the finished games (`games.by_pair`, up to `RECORD_GAMES_READ`) at the accept, then one more for each match that ends (`recordFriendMatch` in `save`). |
+
+### `friendRequests`
+
+One row per pair and direction (#406): `fromId` asks `toId`.
+
+| Field | Notes |
+|---|---|
+| `fromId`, `toId` | Better Auth user ids. Index `by_pair`, `by_from` (`fromId`, `status`, `createdAt`: the outgoing cap), `by_to` (`toId`, `status`, `createdAt`: the inbox cap). |
+| `status` | `open` or `declined`. An accept and a cancel delete the row. |
+| `createdAt` | When it was sent. |
+| `declinedAt` | When it was declined, or `null`. The sender may ask again `FRIEND_REQUEST_WAIT_MS` (30 days) after it: the new request reuses the row. |
+
+### `friendLinks`
+
+One row per player who opened their friend link. `token` is `FRIEND_TOKEN_LENGTH` (16) characters from `createCryptoRng`, never the user id. Index `by_token` (the link) and `by_player`. A reset gives a new token; the old one then finds nobody.
+
+### `friendSearches`
+
+One row per username search (`findPlayer`, `requestByUsername`): `playerId` and `at`, never the text. Index `by_player` (`playerId`, `at`). A search reads at most `FRIEND_SEARCHES_PER_HOUR` rows of the last hour, and deletes up to 50 older rows of the caller.
+
 ## Block and report
 
 Issue #320, App Store guideline 1.2: usernames are content that players write, so a player can block and report another. The pure checks are in `packages/online/src/safety.ts`; both servers run them. The app screens (#435) are in `apps/mobile/src/features/safety/`: see [Block and report](app-shell.md#block-and-report-435).
@@ -215,6 +248,21 @@ Issue #320, App Store guideline 1.2: usernames are content that players write, s
 - **Callers.** `blockPlayer` and `reportPlayer` use `existingPlayer` (they save the caller's id); `unblockPlayer` and `listMyBlocks` use `signedInPlayer`.
 - **The adapter** is `createConvexSafety` (`SAFETY_FUNCTIONS` in `backend-convex`), checked against `api` and run through `safetyContract()` in `convex/convexSafety.test.ts`. The memory server has `safetyFor(playerId)`, `reportsOf()` and `deleteReport(reporter, reported)` (the owner's delete, for tests).
 - **Never** send ids, names or reasons to analytics or the logs.
+- **A block ends a friendship** (#406): `blockPlayer` and `reportPlayer` call `endFriendship` (both `friends` rows and the requests both ways). A friend or a request between the two also counts as "met" (`metAsFriends`).
+
+## Friends (#406)
+
+Issue #406. A saved player (a Better Auth user that is not anonymous, ADR-0008) can add friends. A guest gets `NOT_SAVED`; only `openFriendLink` answers a guest, so a guest who opens a link sees whose it is. The pure checks are in `packages/online/src/friends.ts`; the in-memory server runs them too (`friendsFor(id)`, `markSaved(id)`). Never copy a check into `friends.ts`.
+
+- **Ways to find a player.** The friend link (`myFriendLink`, `resetFriendLink`, `openFriendLink`, `requestByLink`), the exact username (`findPlayer`, `requestByUsername`; the match is on `usernameKey`), and the players of recent games (`recentPlayers`: the newest `RECENT_GAMES_PER_RANGE` games of each side order, at most `MAX_RECENT_PLAYERS`). No call takes a phone number or an email: the server does no contact matching.
+- **The same answer for "no such player" and "blocked".** A block either way hides the two from each other: search and link give `null`, a request gets `NOT_FOUND` (as for a guest, a gone account or a stranger), and recent players leave them out. Only a player who blocks someone they met and asks them by id (`sendFriendRequest`) gets `BLOCKED`: they know already.
+- **Search limit.** At most `FRIEND_SEARCHES_PER_HOUR` (30) username searches in a moving hour (`TOO_MANY_SEARCHES`). A Convex mutation that throws rolls back its writes, so `requestByUsername` returns a failed request as a value (`{ ok: false, code, message }`): the search still counts. The adapter turns it back into the error.
+- **Requests** must be accepted. `planRequest` checks, in order: yourself (`BAD_REQUEST`), the target (saved, met for a request by id, no block: else `NOT_FOUND`), already friends (`friends`), the target's open request (the request is an answer: they become friends, if both have room), the caller's open request (`sent`), the wait after a decline (`TRY_LATER`), the caller's outgoing cap (`MAX_OPEN_FRIEND_REQUESTS`, `TOO_MANY_REQUESTS`), the caller's friends (`MAX_FRIENDS`, `TOO_MANY_FRIENDS`), and the target's inbox and friends (`MAX_INCOMING_FRIEND_REQUESTS`, `MAX_FRIENDS`: `TRY_LATER`). So the sender never learns that they were declined or that the other side is full. An accept checks both friend caps again (`TOO_MANY_FRIENDS`).
+- **The record** lives on the `friends` rows ([`friends`](#friends)), so the list reads no games.
+- **Invite a friend.** `inviteFriend` makes an invite with `to` set (`insertInvite` in `invites.ts`, so it counts toward `MAX_OPEN_INVITES`), and schedules `sendFriendInvitePush` (`push.ts`). The push holds only the invite code (`data.inviteCode`) and the fixed text `FRIEND_INVITE_PUSH_TEXT`. Only `to` may read it (`getInvite` through `inviteVisibleTo`), accept it or decline it (`checkAddressee`); `listFriendInvites` lists the open ones sent to the caller.
+- **Callers.** Every public function uses `signedInPlayer` or, when it saves the caller's id, `existingPlayer`.
+- **The adapter** is `createConvexFriends` (`FRIEND_FUNCTIONS` in `backend-convex`), checked against `api` and run through `friendsContract()` in `convex/convexFriends.test.ts`.
+- **Never** send ids, names, tokens or search text to analytics or the logs.
 
 ## Rules of a game choice
 
@@ -484,8 +532,9 @@ Owner answer Q10: friends find each other by invite link (and later by username)
 | `expiresAt` | number | Epoch ms (server clock): the time of `createInvite` + `INVITE_TIME_MS` (24 hours) |
 | `gameId` | id · `null` | The game, once `accepted` |
 | `answeredBy` | string · `null` | The player who accepted or declined |
+| `to` | string · missing | Only on a friend invite (#406): the one player who may read and answer it |
 
-Indexes: `by_code` (on `code`) and `by_from` (on `[from, status, expiresAt]`, for "my open invites" and the [cap](#cap-on-open-invites)). The open invites of one player whose time is not up are one range: `status = open` and `expiresAt > now`.
+Indexes: `by_code` (on `code`), `by_to` (on `[to, status, expiresAt]`, a friend's open invites) and `by_from` (on `[from, status, expiresAt]`, for "my open invites" and the [cap](#cap-on-open-invites)). The open invites of one player whose time is not up are one range: `status = open` and `expiresAt > now`.
 
 ### Codes
 
@@ -637,7 +686,7 @@ Issue #302. App stores ask for in-app account deletion. The server part is the p
 
 ### What it does
 
-One transaction. If any step throws, nothing is deleted. Three steps go on after the call, in pages: the active games past the first page (step 2), the closed invites (step 7) and the blocks and reports (step 8).
+One transaction. If any step throws, nothing is deleted. Four steps go on after the call, in pages: the active games past the first page (step 2), the closed invites (step 7), the blocks and reports (step 8) and the friend rows (step 9).
 
 1. **Checks the user still exists.** A Convex token stays valid until it expires (15 minutes, the `convex` plugin's default), also after its user is deleted. So the call reads the Better Auth user (`existingPlayer`). No user: `NOT_SIGNED_IN`. A second call after a delete gets this clean error.
 2. **Active games:** the caller resigns each one (`resignAs` in `games.ts`, the same checks and the same `save` as `resign`). The other player wins the match. The save bumps the version, so the turn timer's check does nothing, it deletes the game's [draft](#drafts) (#374), and `scheduleTurnPush` runs as on every save (a resign ends the match: the other player gets ["game over"](#game-over), nobody gets "your turn"). Nothing caps a player's active games (each accepted invite starts one), so the call resigns only the first `GAME_RESIGN_PAGE` (25) of them (#309). One resign reads the game, writes it and one `moves` row, and runs the engine once. So 25 make about 50 writes, far below Convex's limit of 16,000 per transaction. The run time (Convex allows 1 second) is an estimate, not measured. When the page was full, the call schedules the internal mutation `resignActiveGames`, which resigns the next page (`by_white`, then `by_black`) and runs again while its page was full. See [Games after the call](#games-after-the-call).
@@ -648,6 +697,8 @@ One transaction. If any step throws, nothing is deleted. Three steps go on after
 7. **The other invites** (accepted, declined, cancelled, expired) are deleted after the call, in pages (#306). Nothing prunes finished invites, so a player can have many, and one Convex transaction may write at most 16,000 documents. The call schedules the internal mutation `deleteSentInvites`. Each run deletes up to `INVITE_DELETE_PAGE` (200) invites of the caller (`by_from`) and runs again when its page was full. Nobody can accept these invites (they are closed or their time is up), and no new one can come in: the user is gone, so `createInvite` refuses the old token.
 
 8. **Blocks and reports** (#320) are deleted after the call too: `deleteSafetyRows` deletes up to `SAFETY_DELETE_PAGE` (200) rows a run, over the caller's blocks, the blocks of the caller, the reports by and the reports about the caller, and runs again when its page was full. No new row can name the player: `blockPlayer` and `reportPlayer` need both accounts to exist.
+
+9. **Friends** (#406): the call deletes every friendship of the caller at once (`deleteFriendsOf`: both rows each, at most `MAX_FRIENDS`), so the friends see it gone. Then `deleteFriendRows` deletes, up to `FRIEND_DELETE_PAGE` (200) rows a run, what is left: friend rows, requests from and to the caller, the friend link, the search times and the invites sent to the caller (`invites.by_to`). It runs again while its page was full.
 
 Push tokens stay in the main transaction: they are capped (`MAX_PUSH_TOKENS_PER_PLAYER`, 5).
 

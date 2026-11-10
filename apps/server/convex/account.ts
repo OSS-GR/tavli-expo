@@ -13,14 +13,17 @@
  * 3. deletes every open invite the caller sent, every push token, and
  *    the caller's sign-in key claims (`authKeys`, #397); moves the
  *    caller's Apple tokens to the revoke queue, and schedules the revoke
- *    (`appleTokens.ts`, #398);
+ *    (`appleTokens.ts`, #398); ends the caller's friendships, both rows
+ *    (`deleteFriendsOf`, #406);
  * 4. deletes the Better Auth user, its sessions and its accounts, with
  *    Better Auth's own delete (`internalAdapter.deleteUser`) on the
  *    component's tables;
  * 5. schedules `deleteSentInvites`, which deletes the caller's other
  *    invites (accepted, declined, cancelled, expired) in pages (#306),
  *    and `deleteSafetyRows`, which deletes the caller's blocks both ways
- *    and the reports by and about the caller in pages (#320).
+ *    and the reports by and about the caller in pages (#320), and
+ *    `deleteFriendRows`: the friend requests both ways, the friend link,
+ *    the search log and the friend invites to the caller (#406).
  *
  * The caller's token stays valid until it expires, so the call first
  * checks that the Better Auth user still exists (`existingPlayer`): a
@@ -38,6 +41,7 @@ import { revokeAppleTokensOf } from './appleTokens';
 import { createAuth } from './auth';
 import { deleteKeysOf } from './authKeys';
 import { existingPlayer } from './caller';
+import { deleteFriendsOf } from './friends';
 import { resignAs } from './games';
 import { openInvitesOf } from './invites';
 import { gameOnDelete } from './model/account';
@@ -125,6 +129,11 @@ export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promi
     .collect();
   for (const token of tokens) await ctx.db.delete(token._id);
 
+  // The friendships (#406), both rows, so the friends see them end at
+  // once. `MAX_FRIENDS` caps them. The requests, the link, the search log
+  // and the friend invites go in `deleteFriendRows`, below, in pages.
+  await deleteFriendsOf(ctx, callerId);
+
   // The sign-in key claims (#397), so the Apple id is free again.
   await deleteKeysOf(ctx, callerId);
 
@@ -153,6 +162,11 @@ export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promi
   // others may block or report a player without a cap. No new row can
   // name the caller now: both calls need the account to exist.
   await ctx.scheduler.runAfter(0, internal.safety.deleteSafetyRows, { playerId: callerId });
+
+  // The rest of the friend rows (#406): declined requests have no cap.
+  // No new row can name the caller now: every friends call needs the
+  // account to exist, as the caller and as the other player.
+  await ctx.scheduler.runAfter(0, internal.friends.deleteFriendRows, { playerId: callerId });
 
   // The other active games, after this transaction. No new game can
   // start with the caller from now on: a game starts only from

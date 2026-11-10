@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Last review: 2026-11-09 (#320 block and report on the server, #435 how to report in the app, #403 moving a guest into an account, #399 the email code and AhaSend, #404 the reminder times on the phone).
+> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Last review: 2026-11-09 (#320 block and report on the server, #435 how to report in the app, #403 moving a guest into an account, #399 the email code and AhaSend, #404 the reminder times on the phone, #406 friends on the server).
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy and the terms before they go live.
 
@@ -83,6 +83,10 @@ Do not add analytics, cookies or outside fonts to the site. The invite pages car
 ## Usernames (#405)
 
 A saved account (Sign in with Apple) may pick a username; guests keep "Guest 4821". The policy's "Online games with a friend" section says what the server keeps: the name as typed, its simple form for the uniqueness check, when the name last changed, the terms version and when it was accepted, and when the age box was ticked (never the age). Usernames are user content: the terms forbid bad names, the server filters them, and the owner renames or clears a name with `clearUsername`. See `docs/store/age-rating.md` ("User-generated content rules"). The age is 16, or 13 by the phone's region (`minimumAge`): **Owner:** a lawyer checks the list.
+
+## Friends (#406)
+
+A saved account may add friends: by a friend link (a random token, not the user id), by an exact username, or from recent opponents. The policy's "Online games with a friend" section lists what the server keeps: the friends and their match record, the requests (a declined one for 30 days), the link token, the times of recent username searches (never the text) and the friend invites. The app never asks for the contacts permission and never reads the address book (`apps/mobile/src/noContactsPermission.test.ts`). The stores still count a friends list as "Contacts" (social graph): both store answers and the `app.json` manifest tick it.
 
 ## Delete my account (#315, #402)
 

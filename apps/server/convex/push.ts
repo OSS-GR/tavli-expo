@@ -16,8 +16,9 @@
  * tokens through the `PushProvider` port, and removes the tokens the push
  * service calls dead. A save that ends an async match schedules the same
  * action with `kind: 'matchEnd'`: "game over" to the player who did not
- * end it (both players after a time out). The pure parts are in
- * `model/push.ts`.
+ * end it (both players after a time out). A friend invite (#406,
+ * `inviteFriend` in `friends.ts`) schedules `sendFriendInvitePush` to
+ * the friend. The pure parts are in `model/push.ts`.
  *
  * The sender is the Expo Push adapter (`@tavli/push-expo`) on `fetch`.
  * Tests swap it with `setPushProvider` (a recording provider), so they
@@ -41,6 +42,7 @@ import {
   MAX_PUSH_RETRIES,
   PUSH_RETRY_MS,
   deadTokens,
+  friendInviteMessages,
   matchEndPushSides,
   pushMessages,
   pushStillDue,
@@ -329,6 +331,105 @@ export const sendTurnPush = internalAction({
         version,
         playerId,
         kind,
+        attempt: attempt + 1,
+        tokens: retry,
+      });
+    }
+    return null;
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Friend invites (#406)
+
+/**
+ * Called by `inviteFriend` (`friends.ts`) in its transaction: schedules
+ * `sendFriendInvitePush` to `toId` when they have a push token. It sends
+ * nothing itself, so a failed push can never undo the invite.
+ */
+export async function scheduleFriendInvitePush(
+  ctx: MutationCtx,
+  inviteId: Id<'invites'>,
+  toId: string,
+): Promise<void> {
+  const token = await ctx.db
+    .query('pushTokens')
+    .withIndex('by_player', (q) => q.eq('playerId', toId))
+    .first();
+  if (token === null) return;
+  await ctx.scheduler.runAfter(0, internal.push.sendFriendInvitePush, { inviteId });
+}
+
+/**
+ * The friend's tokens for a friend invite push, newest first (or only
+ * those in `only`, a retry), with the code and the end of the invite. No
+ * tokens when the invite is gone or no longer open.
+ */
+export const friendInvitePushTokens = internalQuery({
+  args: { inviteId: v.id('invites'), only: v.optional(v.array(v.string())) },
+  returns: v.union(
+    v.object({
+      playerId: v.string(),
+      code: v.string(),
+      expiresAt: v.number(),
+      tokens: v.array(v.string()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, { inviteId, only }) => {
+    const invite = await ctx.db.get(inviteId);
+    if (invite?.status !== 'open' || invite.to === undefined) return null;
+    const playerId = invite.to;
+    const rows = await ctx.db
+      .query('pushTokens')
+      .withIndex('by_player', (q) => q.eq('playerId', playerId))
+      .order('desc')
+      .collect();
+    const wanted = only === undefined ? null : new Set(only);
+    const tokens = rows
+      .map((row) => row.token)
+      .filter((token) => wanted === null || wanted.has(token));
+    return { playerId, code: invite.code, expiresAt: invite.expiresAt, tokens };
+  },
+});
+
+/**
+ * Sends "A friend invites you to a game" to the friend's phones
+ * (`FRIEND_INVITE_PUSH_TEXT`, no names), with the invite code in the data
+ * and a time to live up to the invite's end. Removes the dead tokens and
+ * tries the failed ones once more after `PUSH_RETRY_MS`, as
+ * `sendTurnPush` does. An invite that was answered, cancelled or expired
+ * by then gets no push.
+ */
+export const sendFriendInvitePush = internalAction({
+  args: {
+    inviteId: v.id('invites'),
+    /** 0 (or missing) for the first send, 1 for the retry. */
+    attempt: v.optional(v.number()),
+    /** A retry: only these tokens. */
+    tokens: v.optional(v.array(v.string())),
+  },
+  returns: v.null(),
+  handler: async (ctx, { inviteId, attempt = 0, tokens: only }) => {
+    const due = await ctx.runQuery(internal.push.friendInvitePushTokens, {
+      inviteId,
+      ...(only === undefined ? {} : { only }),
+    });
+    if (due === null || due.tokens.length === 0) return null;
+    const messages = friendInviteMessages(due.tokens, due.code, due.expiresAt, Date.now());
+    if (messages.length === 0) return null;
+    const results = await pushProvider().send(messages);
+    const dead = deadTokens(messages, results);
+    if (dead.length > 0) {
+      await ctx.runMutation(internal.push.removeDeadTokens, {
+        playerId: due.playerId,
+        tokens: dead,
+      });
+    }
+    const retry = retryTokens(messages, results);
+    if (retry.length > 0 && attempt < MAX_PUSH_RETRIES) {
+      await ctx.scheduler.runAfter(PUSH_RETRY_MS, internal.push.sendFriendInvitePush, {
+        inviteId,
         attempt: attempt + 1,
         tokens: retry,
       });

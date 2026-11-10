@@ -6,7 +6,8 @@
  * - `send` never throws. A broken push service must not break the caller.
  *   Each message gets its own result, in the order of the messages.
  * - A message holds no names and no emails: only a fixed text and the
- *   game id (`data.gameId`), so the app can open the game on a tap.
+ *   game id (`data.gameId`), so the app can open the game on a tap, or
+ *   the code of a friend invite (`data.inviteCode`, #406).
  *
  * The Expo Push adapter is `@tavli/push-expo`. The recording provider
  * below is for tests. The contract checks are `pushProviderContract` in
@@ -14,14 +15,19 @@
  * `docs/architecture/online-game-service.md`.
  */
 
+/** What a push opens: a game, or a friend invite (#406). */
+export type PushData =
+  | { readonly gameId: string; readonly inviteCode?: never }
+  | { readonly inviteCode: string; readonly gameId?: never };
+
 /** One push to one device. Plain JSON. */
 export interface PushMessage {
   /** The device's push token. */
   readonly to: string;
   readonly title: string;
   readonly body: string;
-  /** What the app reads when the player taps the push. */
-  readonly data: { readonly gameId: string };
+  /** What the app reads when the player taps the push: a game, or a friend invite (#406). */
+  readonly data: PushData;
   /** `high` asks the phone to show it at once. Left out: the service's default. */
   readonly priority?: 'normal' | 'high';
   /**

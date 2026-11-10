@@ -90,7 +90,11 @@ function toExpo(message: PushMessage) {
     to: message.to,
     title: message.title,
     body: message.body,
-    data: { gameId: message.data.gameId },
+    // Only the known keys go out: a game id or an invite code (#406).
+    data:
+      message.data.gameId === undefined
+        ? { inviteCode: message.data.inviteCode }
+        : { gameId: message.data.gameId },
     sound: 'default',
     ...(message.priority === undefined ? {} : { priority: message.priority }),
     ...(message.ttlSeconds === undefined ? {} : { ttl: message.ttlSeconds }),

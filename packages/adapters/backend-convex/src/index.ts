@@ -1,11 +1,11 @@
 /**
  * `GameTransport` (#253), `Invites` (#281), `PushTokens` (#285),
- * `OnlineData` (#315), `AppUpdates` (#390), `Usernames` (#405) and `Safety` (#320)
- * adapters backed by Convex
- * (ADR-0004).
+ * `OnlineData` (#315), `AppUpdates` (#390), `Usernames` (#405), `Safety`
+ * (#320) and `Friends` (#406) adapters backed by Convex (ADR-0004).
  *
  * They call the functions in `apps/server/convex/games.ts`, `invites.ts`,
- * `push.ts`, `account.ts`, `appUpdate.ts`, `usernames.ts` and `safety.ts`. The server reads the caller from the sign-in token
+ * `push.ts`, `account.ts`, `appUpdate.ts`, `usernames.ts`, `safety.ts`
+ * and `friends.ts`. The server reads the caller from the sign-in token
  * (`AuthProvider`). See README.md.
  */
 export {
@@ -24,6 +24,8 @@ export {
   ACCOUNT_FUNCTIONS,
   APP_UPDATE_FUNCTION_NAMES,
   APP_UPDATE_FUNCTIONS,
+  FRIEND_FUNCTION_NAMES,
+  FRIEND_FUNCTIONS,
   GAME_FUNCTION_NAMES,
   GAME_FUNCTIONS,
   INVITE_FUNCTION_NAMES,
@@ -36,6 +38,8 @@ export {
   USERNAME_FUNCTIONS,
   type AccountFunctions,
   type AppUpdateFunctions,
+  type FriendFunctions,
+  type FriendRequestResult,
   type GameFunctions,
   type InviteFunctions,
   type NewInviteArgs,
@@ -45,6 +49,12 @@ export {
   type UsernameFunctions,
   type WriteResult,
 } from './functions';
+export {
+  createConvexFriends,
+  toFriendsError,
+  type ConvexFriendsClient,
+  type ConvexFriendsOptions,
+} from './friends';
 export {
   createConvexInvites,
   toInviteError,

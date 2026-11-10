@@ -7,6 +7,8 @@ import { createOnlineMatch, resign, rollDice, timeOut, waitingFor } from '@tavli
 import { openFlow } from '@tavli/online/testing';
 
 import {
+  FRIEND_INVITE_PUSH_TEXT,
+  friendInviteMessages,
   MATCH_END_PUSH_TEXT,
   MATCH_END_PUSH_TTL_SECONDS,
   MAX_PUSH_TOKENS_PER_PLAYER,
@@ -280,5 +282,38 @@ describe('tokensOverCap', () => {
     const all = rows(MAX_PUSH_TOKENS_PER_PLAYER + 1);
     expect(names(tokensOverCap(all, 't0'))).toEqual(['t1']);
     expect(names(tokensOverCap(all, 't1'))).toEqual(['t0']);
+  });
+});
+
+describe('friendInviteMessages (#406)', () => {
+  const NOW = Date.UTC(2026, 10, 9, 12, 0, 0);
+
+  it('sends only the invite code, high, until the invite ends', () => {
+    expect(friendInviteMessages(['t1', 't2'], 'ABCD2345', NOW + 90_500, NOW)).toEqual([
+      {
+        to: 't1',
+        ...FRIEND_INVITE_PUSH_TEXT,
+        data: { inviteCode: 'ABCD2345' },
+        priority: 'high',
+        ttlSeconds: 90,
+      },
+      {
+        to: 't2',
+        ...FRIEND_INVITE_PUSH_TEXT,
+        data: { inviteCode: 'ABCD2345' },
+        priority: 'high',
+        ttlSeconds: 90,
+      },
+    ]);
+  });
+
+  it('sends nothing with less than a second left', () => {
+    expect(friendInviteMessages(['t1'], 'ABCD2345', NOW + 999, NOW)).toEqual([]);
+  });
+
+  it('names no one', () => {
+    expect(`${FRIEND_INVITE_PUSH_TEXT.title} ${FRIEND_INVITE_PUSH_TEXT.body}`).not.toMatch(
+      /Guest|@/,
+    );
   });
 });

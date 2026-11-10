@@ -1,6 +1,6 @@
 # Google Play data safety form
 
-> The answers for Play Console → App content → Data safety. Issue #137. Apple: [app-privacy.md](app-privacy.md). Last review: 2026-11-09 (#401, the sign-in choices; Sign in with Apple is iPhone only).
+> The answers for Play Console → App content → Data safety. Issue #137. Apple: [app-privacy.md](app-privacy.md). Last review: 2026-11-09 (#401, the sign-in choices; Sign in with Apple is iPhone only; #406, friends).
 
 **This is not legal advice.** The answers follow the code on `main` on 2026-10-28 and the Data safety categories as we know them. The owner gives the final answers in the Play Console.
 
@@ -25,18 +25,19 @@ The facts (what leaves the phone, when, and the code that does it) are in [app-p
 
 ## Section 2: Data types
 
-Tick these six. Leave every other type empty.
+Tick these seven. Leave every other type empty.
 
 | Category | Data type | What it is in Tavlaki |
 |----------|-----------|-----------------------|
 | Personal info | **User IDs** | The guest account's random user id on Convex (online play with a friend, #281), its guest name ("Guest" and 4 random digits, picked by the server, #400) and the username a saved account picks (#405; Google's User IDs cover a screen name) |
+| Contacts | **Contacts** | The friends list on Convex (#406, saved accounts only): Google's "Contacts" includes social graph information. The app never reads the phone's contacts and asks for no contacts permission. |
 | App activity | **Other actions** | The online games on Convex: the moves, rolls and score of a game with a friend (Google's "Other actions" names gameplay) |
 | App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, hint shown, review opened, invite created, push permission answered, online sign-in (`apple` or `guest` only) |
 | App info and performance | **Crash logs** | Sentry crash and error reports |
 | App info and performance | **Diagnostics** | Device facts and breadcrumbs in crash reports; after Allow also app hangs / ANRs and Sentry sessions; device facts on PostHog events |
 | Device or other IDs | **Device or other IDs** | The random install id and PostHog's random ids; the Expo push token on Convex, after the player turns on turn notifications (#285) |
 
-Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is set not to store IPs, and the Better Auth session keeps the IP for sign-in only, never to find a place), Personal info except User IDs (name, email, address, phone, and the rest: the guest account has no real name or email), Financial info, Health and fitness, Messages, Photos and videos, Audio files, Files and docs, Calendar, Contacts, App activity → In-app search, Installed apps, Other user-generated content (pass-and-play names stay on the phone), Web browsing, App info and performance → Other app performance data.
+Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is set not to store IPs, and the Better Auth session keeps the IP for sign-in only, never to find a place), Personal info except User IDs (name, email, address, phone, and the rest: the guest account has no real name or email), Financial info, Health and fitness, Messages, Photos and videos, Audio files, Files and docs, Calendar, App activity → In-app search (the server keeps only the times of username searches, for the limit, never the text), Installed apps, Other user-generated content (pass-and-play names stay on the phone), Web browsing, App info and performance → Other app performance data.
 
 ## Section 3: Questions for each data type
 
@@ -44,6 +45,7 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 |-----------|-----------|--------|-----------------------|----------------------|----------|
 | User IDs | Yes | No | No | **Required** (see note) | **App functionality** |
 | Other actions | Yes | No | No | **Required** (see note) | **App functionality** |
+| Contacts | Yes | No | No | **Optional** (only a saved player who adds friends) | **App functionality** |
 | App interactions | Yes | No | No | **Optional** | **Analytics** |
 | Crash logs | Yes | No | No | **Required** (see note) | **Analytics** |
 | Diagnostics | Yes | No | No | **Required** (see note) | **Analytics** |
@@ -57,7 +59,7 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 ## What the Play listing will show
 
 - **No data shared with third parties.**
-- **Data collected:** Personal info, App activity, App info and performance, Device or other IDs.
+- **Data collected:** Personal info, Contacts, App activity, App info and performance, Device or other IDs.
 - **Data is encrypted in transit.**
 - **You can request that data be deleted.**
 
@@ -80,4 +82,4 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 - [ ] The answers here and in [app-privacy.md](app-privacy.md) say the same thing.
 - [ ] Convex: both deployments in the EU (`eu-west-1`), Convex's DPA accepted, `BETTER_AUTH_SECRET` set on both.
 - [ ] Answer the account creation and account deletion questions (Section 1) after you check Google's current rules for guest accounts.
-- [ ] Usernames (#405) are in User IDs. Blocks and reports (#320) keep only user ids, a reason from a fixed list and the reported username: no new data type. Redo this form when Apple on Android, Google, the email code screen (#433; the server part is #399) or EAS Update ship. With the email code, Personal info → **Email address** is collected (account management, optional, linked, not shared: AhaSend is a processor), and account creation adds "email address with a one-time code".
+- [ ] Usernames (#405) are in User IDs. Blocks and reports (#320) keep only user ids, a reason from a fixed list and the reported username: no new data type. Friends (#406) are under Contacts. Redo this form when Apple on Android, Google, the email code screen (#433; the server part is #399) or EAS Update ship. With the email code, Personal info → **Email address** is collected (account management, optional, linked, not shared: AhaSend is a processor), and account creation adds "email address with a one-time code".

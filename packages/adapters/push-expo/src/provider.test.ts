@@ -97,6 +97,15 @@ describe('createExpoPushProvider', () => {
     ]);
   });
 
+  it('sends the invite code of a friend invite push (#406)', async () => {
+    const expo = fakeExpo();
+    const push = createExpoPushProvider({ fetch: expo.fetch });
+    await push.send([
+      { to: 'ExponentPushToken[a]', title: 'T', body: 'B', data: { inviteCode: 'ABC234' } },
+    ]);
+    expect(expo.requests[0]?.body[0]).toMatchObject({ data: { inviteCode: 'ABC234' } });
+  });
+
   it('sends priority and ttl only when the message has them', async () => {
     const expo = fakeExpo();
     const push = createExpoPushProvider({ fetch: expo.fetch });

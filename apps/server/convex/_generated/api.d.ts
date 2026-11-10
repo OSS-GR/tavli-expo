@@ -15,6 +15,8 @@ import type * as auth from "../auth.js";
 import type * as authKeys from "../authKeys.js";
 import type * as caller from "../caller.js";
 import type * as emailCodes from "../emailCodes.js";
+import type * as friendEdges from "../friendEdges.js";
+import type * as friends from "../friends.js";
 import type * as games from "../games.js";
 import type * as guestMove from "../guestMove.js";
 import type * as http from "../http.js";
@@ -49,6 +51,8 @@ declare const fullApi: ApiFromModules<{
   authKeys: typeof authKeys;
   caller: typeof caller;
   emailCodes: typeof emailCodes;
+  friendEdges: typeof friendEdges;
+  friends: typeof friends;
   games: typeof games;
   guestMove: typeof guestMove;
   http: typeof http;
