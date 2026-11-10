@@ -72,10 +72,18 @@ export interface ProblemDialogProps {
   testID?: string;
 }
 
-/** A popup for a failed action on a screen with no sheet open. */
+/**
+ * A popup for a failed action on a screen with no sheet open: the problem
+ * card alone, with no sheet box around it (`bare`, #480).
+ */
 export function ProblemDialog({ problem, okLabel, onOk, testID = 'problem' }: ProblemDialogProps) {
   return (
-    <Sheet visible={problem !== null} onClose={onOk} closeLabel={okLabel} look="dialog">
+    <Sheet
+      visible={problem !== null}
+      onClose={onOk}
+      closeLabel={okLabel}
+      look="bare"
+      testID={`${testID}-sheet`}>
       {problem !== null ? (
         <ProblemCard problem={problem} okLabel={okLabel} onOk={onOk} testID={testID} />
       ) : null}
