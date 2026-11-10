@@ -292,6 +292,21 @@ describe('a tap on a push', () => {
     expect(screen).toHavePathname('/game/k57abc');
   });
 
+  it('of a friend invite opens the invite (#406)', async () => {
+    await renderRouter(routes, { initialUrl: '/' });
+    await flush();
+    await tapPush({ inviteCode: 'abcd2345' });
+    expect(screen).toHavePathname('/invite/ABCD2345');
+  });
+
+  it('with a code that is not an invite code opens nothing (#406)', async () => {
+    await renderRouter(routes, { initialUrl: '/' });
+    await flush();
+    await tapPush({ inviteCode: '../settings' });
+    await tapPush({ inviteCode: 7 });
+    expect(screen).toHavePathname('/');
+  });
+
   it('with no game, or a local game, opens nothing', async () => {
     await renderRouter(routes, { initialUrl: '/' });
     await flush();
@@ -412,7 +427,7 @@ describe('a tap on a push, when the router does not take the navigation (#325)',
   });
 
   it('opens the tap that opened the app once, when the listener gets it too', async () => {
-    const opening: PushTap = { id: 'push-1', gameId: 'k57abc' };
+    const opening: PushTap = { id: 'push-1', gameId: 'k57abc', inviteCode: null };
     let listener: ((tap: PushTap) => void) | null = null;
     const replaced = jest.replaceProperty(services, 'notifications', {
       ...onlineFake.notifications,
@@ -435,7 +450,7 @@ describe('a tap on a push, when the router does not take the navigation (#325)',
     await waitForRetry();
     expect(screen).toHavePathname('/');
     // A new tap on a push of the same game opens it again.
-    await act(async () => listener?.({ id: 'push-2', gameId: 'k57abc' }));
+    await act(async () => listener?.({ id: 'push-2', gameId: 'k57abc', inviteCode: null }));
     await flush();
     expect(screen).toHavePathname('/game/k57abc');
   });

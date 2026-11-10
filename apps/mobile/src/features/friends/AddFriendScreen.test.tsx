@@ -1,0 +1,170 @@
+/**
+ * Add a friend (#406), on the Jest online fake: the link and QR code,
+ * Share and Text message, username search, a pasted link and recent
+ * players. Nothing here reads the contacts.
+ */
+import { TERMS_VERSION, type Friends } from '@tavli/contracts';
+import { act, render, screen } from '@testing-library/react-native';
+import { Linking, Share } from 'react-native';
+
+import { auth } from '@/services';
+
+import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { onlineFake } from '../../../test/onlineFake';
+
+import { AddFriendScreen } from './AddFriendScreen';
+
+runOnFakeTimers();
+
+const ME = 'me';
+const STEP = { acceptTerms: TERMS_VERSION, ageChecked: true } as const;
+
+async function flush(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  });
+}
+
+function signInSaved(): void {
+  onlineFake.authStore.session = { id: ME, isGuest: false };
+  onlineFake.server().markSaved(ME);
+}
+
+/** A saved player I met in a game. */
+function meet(id: string): void {
+  const server = onlineFake.server();
+  server.markSaved(id);
+  server.createGame(ME, { white: ME, black: id }, 'portes', 3, null);
+}
+
+const nameOf = (id: string) => `Guest ${onlineFake.guestNumber(id)}`;
+
+async function show(friends: Friends = onlineFake.friends) {
+  const props = { onBack: jest.fn(), onLink: jest.fn(), onAccount: jest.fn() };
+  await render(<AddFriendScreen auth={auth!} friends={friends} {...props} />);
+  await flush();
+  return props;
+}
+
+async function myLink(): Promise<string> {
+  return `tavlaki://add/${await onlineFake.server().friendsFor(ME).myFriendLink()}`;
+}
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('<AddFriendScreen />', () => {
+  it('a guest reads that friends need a saved account', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    await show();
+    expect(screen.getByTestId('add-friend-guest')).toBeOnTheScreen();
+  });
+
+  it('shows my friend link and its QR code', async () => {
+    signInSaved();
+    await show();
+    const link = await myLink();
+    expect(screen.getByTestId('add-friend-link')).toHaveTextContent(link);
+    expect(screen.getByRole('image', { name: 'QR code of your friend link' })).toBeOnTheScreen();
+  });
+
+  it('Share opens the share sheet, Text message the Messages app, with the link', async () => {
+    signInSaved();
+    const share = jest
+      .spyOn(Share, 'share')
+      .mockResolvedValue({ action: 'sharedAction', activityType: undefined });
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await show();
+    const link = await myLink();
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: 'Share' }));
+    expect(share).toHaveBeenCalledWith({ message: `Be my friend on Tavlaki: ${link}` });
+    await user.press(screen.getByRole('button', { name: 'Text message' }));
+    const url = open.mock.calls[0]![0];
+    expect(url).toMatch(/^sms:[&?]body=/);
+    expect(decodeURIComponent(url)).toContain(link);
+  });
+
+  it('New link asks first, then shows a new link; the old one stops working', async () => {
+    signInSaved();
+    await show();
+    const old = await myLink();
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: 'New link' }));
+    await user.press(screen.getByTestId('dialog-confirm'));
+    await flush();
+    const now = await myLink();
+    expect(now).not.toBe(old);
+    expect(screen.getByTestId('add-friend-link')).toHaveTextContent(now);
+  });
+
+  it('finds a player by exact username and asks them', async () => {
+    signInSaved();
+    onlineFake.server().markSaved('ann');
+    await onlineFake
+      .server()
+      .usernamesFor('ann', true)
+      .setMine({ name: 'Maria', ...STEP });
+    await show();
+    const user = setupUser();
+    await user.type(screen.getByLabelText('Username'), 'nobody');
+    await user.press(screen.getByRole('button', { name: 'Search' }));
+    await flush();
+    expect(screen.getByTestId('add-friend-not-found')).toBeOnTheScreen();
+    await user.clear(screen.getByLabelText('Username'));
+    await user.type(screen.getByLabelText('Username'), 'maria');
+    await user.press(screen.getByRole('button', { name: 'Search' }));
+    await flush();
+    expect(screen.getByText('Maria')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Ask Maria to be friends' }));
+    await flush();
+    expect(screen.getByTestId('add-friend-sent')).toHaveTextContent(
+      'Asked Maria. You are friends when they accept.',
+    );
+    const { incoming } = await onlineFake.server().friendsFor('ann').listRequests();
+    expect(incoming.map((r) => r.playerId)).toEqual([ME]);
+  });
+
+  it('a pasted friend link opens; other text says it is not one', async () => {
+    signInSaved();
+    const props = await show();
+    const user = setupUser();
+    await user.type(screen.getByLabelText('Friend link'), 'hello');
+    await user.press(screen.getByRole('button', { name: 'Open the link' }));
+    expect(screen.getByTestId('add-friend-paste-bad')).toBeOnTheScreen();
+    expect(props.onLink).not.toHaveBeenCalled();
+    await user.clear(screen.getByLabelText('Friend link'));
+    await user.type(screen.getByLabelText('Friend link'), 'tavlaki://add/abcdefgh23456789');
+    await user.press(screen.getByRole('button', { name: 'Open the link' }));
+    expect(props.onLink).toHaveBeenCalledWith('ABCDEFGH23456789');
+  });
+
+  it('lists recent players: Ask sends a request, and the row then says so', async () => {
+    signInSaved();
+    meet('ann');
+    await show();
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: `Ask ${nameOf('ann')} to be friends` }));
+    await flush();
+    expect(screen.getByTestId('recent-ann-status')).toHaveTextContent(
+      'You asked. They have not answered yet.',
+    );
+  });
+
+  it('a refused request says why', async () => {
+    signInSaved();
+    meet('ann');
+    const sendRequest = jest
+      .fn()
+      .mockRejectedValue({ code: 'TOO_MANY_REQUESTS', message: 'too many' });
+    await show({ ...onlineFake.friends, sendRequest });
+    await setupUser().press(
+      screen.getByRole('button', { name: `Ask ${nameOf('ann')} to be friends` }),
+    );
+    await flush();
+    expect(screen.getByTestId('add-friend-problem')).toHaveTextContent(
+      'You have too many open requests. Wait for answers, or cancel one.',
+    );
+  });
+});

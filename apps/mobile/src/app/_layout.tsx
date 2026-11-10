@@ -7,10 +7,10 @@ import { useAppAnalytics } from '@/features/analytics/useAppAnalytics';
 import { CrashBoundary } from '@/features/crash/CrashBoundary';
 import { usePendingInvite } from '@/features/invites/pendingInvite';
 import { matchSessions } from '@/features/match/appSessions';
-import { gameHref, inviteHref } from '@/features/match/routes';
+import { inviteHref } from '@/features/match/routes';
 import { useSaveOnBackground } from '@/features/match/useSaveOnBackground';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
-import { usePushTaps } from '@/features/notifications/pushTaps';
+import { tapTargetHref, usePushTaps } from '@/features/notifications/pushTaps';
 import { TurnPushPrompt } from '@/features/notifications/TurnPushPrompt';
 import { needsWelcome } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
@@ -46,15 +46,16 @@ function RootStack() {
   // An invite link that opened the app before the answer (#256): after the
   // welcome flow, the invite opens instead of Home.
   const pendingInvite = usePendingInvite(welcome);
-  // A tap on a turn push (#285) opens its game; before the answer, after
-  // the welcome flow (an invite link first).
-  const pendingGame = usePushTaps(welcome, notifications);
+  // A tap on a turn push (#285) opens its game, a tap on a friend invite
+  // push (#406) its invite; before the answer, after the welcome flow (an
+  // invite link first).
+  const pendingTap = usePushTaps(welcome, notifications);
   const pushes = turnPushes();
   const afterWelcome =
     pendingInvite !== null
       ? inviteHref(pendingInvite)
-      : pendingGame !== null
-        ? gameHref(pendingGame)
+      : pendingTap !== null
+        ? tapTargetHref(pendingTap)
         : '/';
 
   return (
@@ -103,6 +104,11 @@ function RootStack() {
           <Stack.Screen name="friend/[code]" />
           {/* Join with a code (#333): opens the invite route above. */}
           <Stack.Screen name="join" />
+          {/* Friends (#406): the list, Add a friend, a friend invite, a friend link. */}
+          <Stack.Screen name="friends/index" />
+          <Stack.Screen name="friends/add" />
+          <Stack.Screen name="friends/invite/[id]" />
+          <Stack.Screen name="add/[token]" />
           {/* Your online games (#297): "See all" on Home. */}
           <Stack.Screen name="online-games" options={{ headerShown: true }} />
         </Stack.Protected>

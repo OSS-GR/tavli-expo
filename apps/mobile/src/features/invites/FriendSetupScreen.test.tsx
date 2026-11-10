@@ -11,6 +11,7 @@ import {
   createRecordingAnalytics,
   type AuthProvider,
   type Invites,
+  type NewInvite,
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, MAX_OPEN_INVITES } from '@tavli/online';
@@ -267,6 +268,36 @@ describe('FriendSetupScreen', () => {
     await act(async () => {
       await i18n.changeLanguage('en');
     });
+  });
+
+  it('a friend invite (#406) goes to that friend, with its own title', async () => {
+    const user = setupUser();
+    const parts = setup();
+    await parts.auth.signInAsGuest();
+    const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
+    await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
+    expect(screen.getByRole('header', { name: 'Invite a friend' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(invite).toHaveBeenCalledWith({
+      choice: 'portes',
+      targetPoints: 3,
+      turnTimeMinutes: null,
+    });
+    expect(props.onCreated).toHaveBeenCalledWith('ABCD2345', expect.anything());
+    expect(await parts.invites.listMyInvites()).toEqual([]);
+  });
+
+  it('a friend invite says so on TOO_MANY_INVITES from the friends port (#406)', async () => {
+    const user = setupUser();
+    const parts = setup();
+    await parts.auth.signInAsGuest();
+    const invite = jest.fn().mockRejectedValue({ code: 'TOO_MANY_INVITES', message: 'too many' });
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
+    await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(screen.getByTestId('friend-problem')).toHaveTextContent(/You have 10 open invites/);
+    expect(props.onCreated).not.toHaveBeenCalled();
   });
 
   it('a second tap while the invite is made makes no second invite', async () => {

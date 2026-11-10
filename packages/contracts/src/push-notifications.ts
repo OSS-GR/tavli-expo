@@ -54,6 +54,11 @@ export interface PushTap {
   readonly id: string;
   /** `data.gameId` of the push, or `null` when it has none (or it is not a string). */
   readonly gameId: string | null;
+  /**
+   * `data.inviteCode` of a friend invite push (#406), or `null` when it has
+   * none (or it is not a string).
+   */
+  readonly inviteCode: string | null;
 }
 
 export interface PushNotifications {
@@ -114,6 +119,13 @@ export function gameIdOfPush(data: unknown): string | null {
   if (typeof data !== 'object' || data === null) return null;
   const gameId = (data as { gameId?: unknown }).gameId;
   return typeof gameId === 'string' && gameId !== '' ? gameId : null;
+}
+
+/** The data of a friend invite push (#406): `inviteCode` when it is a string that is not empty. */
+export function inviteCodeOfPush(data: unknown): string | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const code = (data as { inviteCode?: unknown }).inviteCode;
+  return typeof code === 'string' && code !== '' ? code : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +243,11 @@ export function createMemoryPushNotifications(
     },
     tap(data, options = {}) {
       taps += 1;
-      const tap: PushTap = { id: `tap-${taps}`, gameId: gameIdOfPush(data) };
+      const tap: PushTap = {
+        id: `tap-${taps}`,
+        gameId: gameIdOfPush(data),
+        inviteCode: inviteCodeOfPush(data),
+      };
       if (options.opensApp === true) opening = tap;
       else tell(tapListeners, tap);
       return { ...tap };

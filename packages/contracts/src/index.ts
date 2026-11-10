@@ -214,6 +214,7 @@ export {
   createMemoryPushNotifications,
   createMemoryPushTokens,
   gameIdOfPush,
+  inviteCodeOfPush,
   isPushPermission,
 } from './push-notifications';
 export type {

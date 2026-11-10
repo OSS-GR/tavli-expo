@@ -3,15 +3,15 @@
  * online games (`GameTransport`), invites (`Invites`), the server's push
  * tokens (`PushTokens`), the phone's turn notifications
  * (`PushNotifications`), Delete my online data (`OnlineData`) and the
- * update policy (`AppUpdates`), usernames (`Usernames`) and block and report
- * (`Safety`, #435), built on first use.
+ * update policy (`AppUpdates`), usernames (`Usernames`), block and report
+ * (`Safety`, #435) and friends (`Friends`, #406), built on first use.
  *
  * `services.ts` passes the adapters. This file imports none, so Jest can
  * test it with fakes. Nothing here runs at app start:
  * - the sign-in client is made on the first call to `auth`;
  * - the Convex client (one socket) opens on the first call to `games`,
- *   `invites`, `pushTokens`, `onlineData`, `appUpdates`, `usernames` or
- *   `safety`; they share it;
+ *   `invites`, `pushTokens`, `onlineData`, `appUpdates`, `usernames`,
+ *   `safety` or `friends`; they share it;
  * - the notifications adapter is made on its first call. The root layout
  *   listens for taps on a push at start (`usePushTaps`): that only reads
  *   the phone, with no network call and no prompt. Turn notifications are
@@ -24,6 +24,7 @@
 import type {
   AppUpdates,
   AuthProvider,
+  Friends,
   GameTransport,
   Invites,
   OnlineData,
@@ -50,6 +51,8 @@ export interface OnlineServices {
   readonly usernames: Usernames;
   /** Block and report (#435), on the same client. */
   readonly safety: Safety;
+  /** Friends of saved accounts (#406), on the same client. */
+  readonly friends: Friends;
 }
 
 /** How to make the real parts. `services.ts` passes the adapters. */
@@ -74,6 +77,8 @@ export interface OnlineAdapters<Client> {
   createUsernames(client: Client): Usernames;
   /** Block and report on the shared client. */
   createSafety(client: Client): Safety;
+  /** Friends on the shared client. */
+  createFriends(client: Client): Friends;
 }
 
 /** Calls `make` once, on the first call, and keeps the result. */
@@ -172,6 +177,28 @@ export function lazySafety(get: () => Safety): Safety {
   };
 }
 
+/** A `Friends` port that makes the real one on its first call. */
+export function lazyFriends(get: () => Friends): Friends {
+  return {
+    listFriends: () => get().listFriends(),
+    listRequests: () => get().listRequests(),
+    recentPlayers: () => get().recentPlayers(),
+    findPlayer: (username) => get().findPlayer(username),
+    myFriendLink: () => get().myFriendLink(),
+    resetFriendLink: () => get().resetFriendLink(),
+    openFriendLink: (token) => get().openFriendLink(token),
+    requestByLink: (token) => get().requestByLink(token),
+    requestByUsername: (username) => get().requestByUsername(username),
+    sendRequest: (playerId) => get().sendRequest(playerId),
+    acceptRequest: (playerId) => get().acceptRequest(playerId),
+    declineRequest: (playerId) => get().declineRequest(playerId),
+    cancelRequest: (playerId) => get().cancelRequest(playerId),
+    removeFriend: (playerId) => get().removeFriend(playerId),
+    inviteFriend: (playerId, game) => get().inviteFriend(playerId, game),
+    listFriendInvites: () => get().listFriendInvites(),
+  };
+}
+
 /** A `PushNotifications` port that makes the real one on its first use. */
 export function lazyPushNotifications(get: () => PushNotifications): PushNotifications {
   return {
@@ -198,7 +225,7 @@ export function createOnlineServices<Client>(
   if (server === undefined) return undefined;
   const auth = once(() => adapters.createAuth(server.siteUrl));
   // Every server call (games, invites, push tokens, the delete, the update
-  // policy, usernames, block and report) shares this client: one socket.
+  // policy, usernames, block and report, friends) shares this client: one socket.
   const client = once(() => adapters.createClient(server.url, auth()));
   const games = once(() => adapters.createGames(client()));
   const invites = once(() => adapters.createInvites(client()));
@@ -208,6 +235,7 @@ export function createOnlineServices<Client>(
   const appUpdates = once(() => adapters.createAppUpdates(client()));
   const usernames = once(() => adapters.createUsernames(client()));
   const safety = once(() => adapters.createSafety(client()));
+  const friends = once(() => adapters.createFriends(client()));
   return {
     auth: lazyAuthProvider(auth),
     games: lazyGameTransport(games),
@@ -218,5 +246,6 @@ export function createOnlineServices<Client>(
     appUpdates: lazyAppUpdates(appUpdates),
     usernames: lazyUsernames(usernames),
     safety: lazySafety(safety),
+    friends: lazyFriends(friends),
   };
 }

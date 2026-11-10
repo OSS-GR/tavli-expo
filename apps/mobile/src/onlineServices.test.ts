@@ -16,7 +16,7 @@ import { createMemoryGameServer } from '@tavli/online';
 
 import { onlineFake } from '../test/onlineFake';
 
-import { createOnlineServices, once, type OnlineAdapters } from './onlineServices';
+import { createOnlineServices, lazyFriends, once, type OnlineAdapters } from './onlineServices';
 import {
   appUpdates as servicesAppUpdates,
   usernames as servicesUsernames,
@@ -27,6 +27,7 @@ import {
   onlineData as servicesOnlineData,
   pushTokens as servicesPushTokens,
   safety as servicesSafety,
+  friends as servicesFriends,
 } from './services';
 
 const SERVER = {
@@ -116,6 +117,14 @@ function memoryAdapters() {
         listBlocked: () => caller().listBlocked(),
         report: (request) => caller().report(request),
       };
+    },
+    createFriends: ({ auth }) => {
+      made.push('friends');
+      return lazyFriends(() => {
+        const user = auth.currentUser();
+        if (user !== null && !user.isGuest) server.markSaved(user.id);
+        return server.friendsFor(user?.id ?? null);
+      });
     },
   };
   return { adapters, authStore, server, made, phone, updates };
@@ -251,9 +260,13 @@ describe('createOnlineServices', () => {
     phone.rollToken();
     phone.tap({ gameId: 'g2' }, { opensApp: true });
     await settle();
-    expect(taps).toEqual([{ id: 'tap-1', gameId: 'g1' }]);
+    expect(taps).toEqual([{ id: 'tap-1', gameId: 'g1', inviteCode: null }]);
     expect(tokens).toEqual(['ExponentPushToken[memory-2]']);
-    await expect(online.notifications.lastTap()).resolves.toEqual({ id: 'tap-2', gameId: 'g2' });
+    await expect(online.notifications.lastTap()).resolves.toEqual({
+      id: 'tap-2',
+      gameId: 'g2',
+      inviteCode: null,
+    });
     stopTaps();
     stopTokens();
     // One client for the games too.
@@ -313,6 +326,17 @@ describe('createOnlineServices', () => {
     expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
   });
 
+  it('runs friends on the same client, as the signed-in user (#406)', async () => {
+    const { adapters, made } = memoryAdapters();
+    const online = createOnlineServices(SERVER, adapters)!;
+    await expect(online.friends.listFriends()).rejects.toMatchObject({ code: 'NOT_SIGNED_IN' });
+    expect(made).toEqual([`auth ${SERVER.siteUrl}`, `client ${SERVER.url}`, 'friends']);
+    // A guest has no friends: friends need a saved account.
+    await online.auth.signInAsGuest();
+    await expect(online.friends.myFriendLink()).rejects.toMatchObject({ code: 'NOT_SAVED' });
+    expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
+  });
+
   it('passes every sign-in call through', async () => {
     const { adapters } = memoryAdapters();
     const online = createOnlineServices(SERVER, adapters)!;
@@ -341,6 +365,7 @@ describe('the Jest fake of @/services', () => {
     expect(servicesAppUpdates).toBe(onlineFake.appUpdates);
     expect(servicesUsernames).toBe(onlineFake.usernames);
     expect(servicesSafety).toBe(onlineFake.safety);
+    expect(servicesFriends).toBe(onlineFake.friends);
   });
 
   it('saves push tokens as the signed-in guest, and refuses them while nobody is signed in', async () => {

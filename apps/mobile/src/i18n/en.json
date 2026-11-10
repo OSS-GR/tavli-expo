@@ -214,6 +214,10 @@
       "label": "Account",
       "hint": "Sign-in, username and your online data"
     },
+    "friends": {
+      "label": "Friends",
+      "hint": "Add friends and invite them to a game"
+    },
     "blocked": {
       "label": "Blocked players",
       "hint": "Players you blocked or reported"
@@ -555,6 +559,120 @@
     },
     "again": "Make a new invite",
     "home": "Home"
+  },
+  "friends": {
+    "title": "Friends",
+    "loading": "Loading…",
+    "failed": "Friends did not load. Check the connection and try again.",
+    "retry": "Try again",
+    "signedOut": "You are not signed in to online play on this phone. Friends need a saved account.",
+    "guest": "Friends need a saved account. Save your guest account first: your games stay.",
+    "openAccount": "Open Account",
+    "saveAccount": "Save my account",
+    "unnamed": "A player with no name",
+    "addButton": "Add a friend",
+    "add": {
+      "title": "Add a friend",
+      "linkTitle": "Your friend link",
+      "linkIntro": "Send your link to a friend. When they open it, they can ask to be your friend.",
+      "qrLabel": "QR code of your friend link",
+      "qrHint": "Your friend scans it with the phone camera.",
+      "share": "Share",
+      "shareMessage": "Be my friend on Tavlaki: {{link}}",
+      "textMessage": "Text message",
+      "reset": "New link",
+      "resetTitle": "Make a new link?",
+      "resetBody": "Your old link and QR code stop working. Friends you have stay.",
+      "resetConfirm": "Make a new link",
+      "usernameTitle": "Find by username",
+      "usernameLabel": "Username",
+      "usernamePlaceholder": "The exact username",
+      "search": "Search",
+      "notFound": "No player has that username.",
+      "ask": "Ask to be friends",
+      "askLabel": "Ask {{name}} to be friends",
+      "sent": "Asked {{name}}. You are friends when they accept.",
+      "nowFriends": "You and {{name}} are friends now.",
+      "pasteTitle": "Paste a friend link",
+      "pasteLabel": "Friend link",
+      "openLink": "Open the link",
+      "pasteBad": "That is not a friend link.",
+      "recentTitle": "You played with",
+      "recentEmpty": "Players of your online games show here.",
+      "noContacts": "Tavlaki never reads your contacts. Share and Text message open your phone's own apps, and you pick who gets the link."
+    },
+    "note": "Only your friends see you here. A block ends a friendship.",
+    "problem": {
+      "signedOut": "You are not signed in any more. Open Account to sign in.",
+      "notSaved": "Friends need a saved account.",
+      "notFound": "That player cannot be found.",
+      "blocked": "You blocked this player. Unblock them in Settings → Blocked players first.",
+      "notFriends": "You are not friends any more.",
+      "tooManyFriends": "One of you has the most friends there can be.",
+      "tooManyRequests": "You have too many open requests. Wait for answers, or cancel one.",
+      "tryLater": "You cannot ask this player now. Try again later.",
+      "tooManySearches": "Too many searches. Try again in an hour.",
+      "tooManyInvites": "You have too many open invites. Cancel one first.",
+      "failed": "That did not work. Check the connection and try again."
+    },
+    "status": {
+      "self": "This is you.",
+      "friends": "You are friends.",
+      "sent": "You asked. They have not answered yet.",
+      "received": "They asked to be your friend.",
+      "none": "You are not friends."
+    },
+    "invites": {
+      "title": "Invites from friends",
+      "from": "{{name}} invites you",
+      "game_one": "{{game}}, {{count}} point",
+      "game_other": "{{game}}, {{count}} points",
+      "open": "Open"
+    },
+    "incoming": {
+      "title": "Asked to be your friend",
+      "sent": "Asked on {{date}}",
+      "accept": "Accept",
+      "acceptLabel": "Accept {{name}}",
+      "decline": "Decline",
+      "declineLabel": "Decline {{name}}"
+    },
+    "outgoing": {
+      "title": "You asked",
+      "sent": "Asked on {{date}}",
+      "cancel": "Cancel",
+      "cancelLabel": "Cancel your request to {{name}}"
+    },
+    "list": {
+      "title": "Your friends",
+      "empty": "No friends yet. Tap Add a friend.",
+      "record": "Matches: you won {{wins}}, they won {{losses}}",
+      "invite": "Invite",
+      "inviteLabel": "Invite {{name}} to a game",
+      "remove": "Remove",
+      "removeLabel": "Remove {{name}}",
+      "report": "Report or block"
+    },
+    "remove": {
+      "title": "Remove {{name}}?",
+      "body": "You stop being friends, and your record goes. They are not told. You can ask again later.",
+      "confirm": "Remove"
+    },
+    "invite": {
+      "title": "Invite a friend",
+      "intro": "Pick the game. Your friend gets a notification, and the game starts when they accept."
+    },
+    "link": {
+      "title": "Friend link",
+      "signedOut": "You are not signed in to online play on this phone. Friends need a saved account.",
+      "notFound": "This link does not work. Ask your friend for a new one.",
+      "whose": "This is the friend link of {{name}}.",
+      "self": "This is your own link. Send it to a friend.",
+      "ask": "Ask to be friends",
+      "accept": "Accept",
+      "friends": "You and {{name}} are friends.",
+      "openFriends": "See your friends"
+    }
   },
   "signIn": {
     "title": "Play online",

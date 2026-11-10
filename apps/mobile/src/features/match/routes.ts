@@ -72,6 +72,22 @@ export function inviteWaitHref(code: string) {
   return { pathname: '/friend/[code]', params: { code } } as const;
 }
 
+/** Friends (#406): the friends list, from Settings → Online. */
+export const FRIENDS_HREF = '/friends';
+
+/** Add a friend (#406): your link and QR code, username search, recent players. */
+export const ADD_FRIEND_HREF = '/friends/add';
+
+/** Invite a friend to a game (#406): the Play a friend setup, for one friend. */
+export function friendInviteHref(playerId: string) {
+  return { pathname: '/friends/invite/[id]', params: { id: playerId } } as const;
+}
+
+/** The screen of a friend link (#406): what `tavlaki://add/<token>` opens. */
+export function friendLinkHref(token: string) {
+  return { pathname: '/add/[token]', params: { token } } as const;
+}
+
 /** The match-end screen of a finished match, local or online (wireframe 9). */
 export function matchEndHref(id: string) {
   return { pathname: '/game/[id]/match-end', params: { id } } as const;

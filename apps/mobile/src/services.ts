@@ -16,6 +16,7 @@ import { createBetterAuthProvider, createSecureSessionStorage } from '@tavli/aut
 import {
   createConvexAppUpdates,
   createConvexClient,
+  createConvexFriends,
   createConvexGameTransport,
   createConvexInvites,
   createConvexOnlineData,
@@ -34,6 +35,7 @@ import {
   type BotRunner,
   type CrashReporter,
   type Feedback,
+  type Friends,
   type GameTransport,
   type Invites,
   type OnlineData,
@@ -174,6 +176,7 @@ const online = createOnlineServices(convexServer(), {
   createAppUpdates: (client) => createConvexAppUpdates({ client }),
   createUsernames: (client) => createConvexUsernames({ client }),
   createSafety: (client) => createConvexSafety({ client }),
+  createFriends: (client) => createConvexFriends({ client }),
   createNotifications: () =>
     createExpoPushNotifications({
       platform: Platform.OS === 'android' ? 'android' : 'ios',
@@ -249,6 +252,12 @@ export const usernames: Usernames | undefined = online?.usernames;
  * (`useOnlineConnection`).
  */
 export const safety: Safety | undefined = online?.safety;
+
+/**
+ * Friends of saved accounts (#406), on the same client as `games`. The
+ * friends screens (`features/friends/`) use it. A guest gets `NOT_SAVED`.
+ */
+export const friends: Friends | undefined = online?.friends;
 
 /**
  * This build (#390): the phone system, the store build number and the app

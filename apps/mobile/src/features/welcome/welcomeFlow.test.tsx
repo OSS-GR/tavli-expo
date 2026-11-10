@@ -52,6 +52,10 @@ const routes = {
   account: stub('account'),
   username: stub('username'),
   blocked: stub('blocked players'),
+  'friends/index': stub('friends'),
+  'friends/add': stub('add a friend'),
+  'friends/invite/[id]': stub('friend invite'),
+  'add/[token]': stub('friend link'),
 };
 
 /** A URL for each app route (not the layout, not the welcome flow). */
@@ -62,7 +66,8 @@ const appUrls = Object.keys(routes)
       .replace(/\/?index$/, '')
       .replace('[id]', 'local-abc')
       .replace('[variant]', 'portes')
-      .replace('[code]', 'ABCD2345'),
+      .replace('[code]', 'ABCD2345')
+      .replace('[token]', 'ABCDEFGH23456789'),
   )
   .map((url) => url || '/');
 

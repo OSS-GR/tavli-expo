@@ -23,7 +23,7 @@
  *   shows nothing when it loads: the open app shows the turn by itself.
  *   A tap on a push in the background still opens the game. See README.md.
  */
-import { gameIdOfPush } from '@tavli/contracts';
+import { gameIdOfPush, inviteCodeOfPush } from '@tavli/contracts';
 import type { PushNotifications, PushPermission, PushPlatform, PushTap } from '@tavli/contracts';
 import {
   AndroidImportance,
@@ -99,7 +99,8 @@ export function toPermission(status: NotificationPermissionsStatus): PushPermiss
 export function tapOf(response: NotificationResponse | null): PushTap | null {
   if (response === null || response.actionIdentifier !== DEFAULT_ACTION_IDENTIFIER) return null;
   const { request } = response.notification;
-  return { id: request.identifier, gameId: gameIdOfPush(request.content.data) };
+  const { data } = request.content;
+  return { id: request.identifier, gameId: gameIdOfPush(data), inviteCode: inviteCodeOfPush(data) };
 }
 
 /** Runs `call`; a throw or a rejection gives `fallback`. */
