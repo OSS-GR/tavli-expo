@@ -155,3 +155,46 @@ describe('universal links (#332)', () => {
     expect(page).toContain('Μπες με κωδικό');
   });
 });
+
+describe('the homepage', () => {
+  const TESTFLIGHT = 'https://testflight.apple.com/join/8vkMaRAm';
+  const pages = [
+    ['en', 'docs/legal/site/index.html', 'Join with a code'],
+    ['el', 'docs/legal/site/el/index.html', 'Μπες με κωδικό'],
+  ] as const;
+
+  it.each(pages)('the %s page runs no script and loads nothing from other sites', (lang, file) => {
+    const page = read(file);
+    expect(page).toContain(`<html lang="${lang}">`);
+    expect(page).not.toMatch(
+      /<script|<iframe|<link rel="stylesheet"|@import|url\(\s*["']?https?:/i,
+    );
+    // Images come from the site itself.
+    for (const [, src] of page.matchAll(/<img[^>]*\ssrc="([^"]+)"/g)) {
+      expect(src).toMatch(/^\/img\//);
+    }
+    // Links out go only to the store, TestFlight and the site's own address.
+    const outside = [...page.matchAll(/https?:\/\/[^\s"'<>)]+/g)].map(([url]) => new URL(url).host);
+    expect(
+      outside.filter(
+        (host) => !['tavlaki.com', 'testflight.apple.com', 'apps.apple.com'].includes(host),
+      ),
+    ).toEqual([]);
+  });
+
+  it.each(pages)(
+    'the %s page links TestFlight, support and the code screen',
+    (_lang, file, joinWithCode) => {
+      const page = read(file);
+      expect(page).toContain(`href="${TESTFLIGHT}"`);
+      expect(page).toContain('href="mailto:support@tavlaki.com"');
+      expect(page).toContain(joinWithCode);
+    },
+  );
+
+  it('the invite page links the same TestFlight link in both languages', () => {
+    const page = read('docs/legal/site/i/index.html');
+    expect(page.split(`href="${TESTFLIGHT}"`)).toHaveLength(3);
+    expect(page).not.toContain('OWNER');
+  });
+});

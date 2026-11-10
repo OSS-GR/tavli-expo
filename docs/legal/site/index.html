@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tavlaki: Greek tavli for iPhone</title>
+<meta name="description" content="Portes, Plakoto, Fevga and Asodio on a walnut board. Play the bot, a friend on the same phone, or a friend online.">
+<meta name="theme-color" content="#3B2A1D">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="Tavlaki: Greek tavli for iPhone">
+<meta property="og:description" content="Portes, Plakoto, Fevga and Asodio on a walnut board. Play the bot, a friend on the same phone, or a friend online.">
+<meta property="og:image" content="https://tavlaki.com/img/board-1280.webp">
+<meta property="og:url" content="https://tavlaki.com/">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" hreflang="en" href="https://tavlaki.com/">
+<link rel="alternate" hreflang="el" href="https://tavlaki.com/el/">
+<style>
+/* The homepage (see docs/legal/README.md). The colors are the app's walnut
+   theme (packages/ui/src/themes/walnut-kafeneio.ts). No JavaScript, no fonts
+   or images from other sites, no cookies: keep it that way. Copy any change
+   to the Greek page (el/index.html). The board pictures are renders of the
+   app's own board. */
+:root {
+  --walnut: #3B2A1D; --walnut-deep: #2E1F15; --line: #6A4E35;
+  --ivory: #F1E6CF; --ivory-dim: #BFA987;
+  --brass: #C89B45; --brass-light: #E0B867; --on-brass: #22160C;
+  --point-dark: #2B1F19; --point-light: #CFB98E; --field: #8A6038;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+  --space: clamp(3.5rem, 8vw, 6rem);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--walnut); color: var(--ivory); font: 17px/1.6 var(--sans); }
+a { color: var(--brass-light); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--ivory); }
+a:focus-visible, .get:focus-visible { outline: 3px solid var(--brass-light); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; color: var(--ivory); text-wrap: balance; }
+p { margin: 0 0 1rem; text-wrap: pretty; }
+img { display: block; max-width: 100%; height: auto; }
+.wrap { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
+@media (min-width: 40rem) { .wrap { padding: 0 2rem; } }
+
+/* Header: the icon, the name and the other language. */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
+.brand { display: flex; align-items: center; gap: 0.75rem; color: var(--ivory); text-decoration: none; font: 600 1.35rem/1 var(--serif); }
+.brand img { width: 44px; height: 44px; border-radius: 10px; }
+.brand:hover { color: var(--ivory); }
+
+/* The points: the edge of a tavli board, the page's frame. */
+.points { display: block; width: 100%; height: 40px; }
+
+/* Hero */
+.hero { display: grid; gap: 2rem; padding-top: 2.5rem; padding-bottom: 1rem; align-items: center; }
+.hero h1 { font-size: clamp(2.3rem, 6.5vw, 3.9rem); line-height: 1.06; letter-spacing: -0.015em; margin: 0 0 1.25rem; }
+.hero h1 span { display: block; }
+.lead { font-size: 1.2rem; line-height: 1.55; max-width: 32rem; }
+.get { display: inline-block; margin: 0.75rem 0 1rem; padding: 0.9rem 1.9rem; border-radius: 999px; background: linear-gradient(var(--brass-light), var(--brass)); color: var(--on-brass); font-weight: 700; font-size: 1.05rem; text-decoration: none; box-shadow: 0 2px 0 #83632F, 0 8px 24px rgba(0, 0, 0, 0.35); }
+.get:hover { background: var(--brass-light); color: var(--on-brass); }
+.note { color: var(--ivory-dim); font-size: 0.95rem; max-width: 30rem; }
+@media (min-width: 56rem) {
+  .hero { grid-template-columns: 5fr 7fr; gap: 3rem; padding-top: 4rem; }
+}
+
+/* Sections */
+section { padding: var(--space) 0; }
+section h2 { font-size: clamp(1.75rem, 3.6vw, 2.4rem); line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 0.75rem; }
+.intro { color: var(--ivory-dim); font-size: 1.1rem; max-width: 36rem; margin-bottom: 2.25rem; }
+
+/* The four games: a picture of each game's board, with its name in both languages. */
+.games { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem 1.75rem; }
+.games h3 { font-size: 1.4rem; line-height: 1.25; margin: 0 0 0.35rem; }
+.games h3 span { font-style: italic; font-weight: 400; font-size: 1.05rem; color: var(--ivory-dim); margin-left: 0.35rem; }
+.games p { color: var(--ivory-dim); margin: 0; }
+.games img { margin: 0 0 1rem; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
+/* On a phone, a smaller picture beside the text. */
+@media (max-width: 35.99rem) {
+  .games { gap: 1.75rem; }
+  .games li { display: grid; grid-template-columns: 9rem 1fr; gap: 0 1rem; align-items: start; }
+  .games img { grid-row: span 2; margin: 0.3rem 0 0; }
+  .games h3 { font-size: 1.25rem; }
+  .games h3 span { display: block; margin: 0; font-size: 1rem; }
+  .games p { font-size: 0.95rem; }
+}
+@media (min-width: 36rem) { .games { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 64rem) { .games { grid-template-columns: repeat(4, 1fr); } }
+.match { margin: 2.75rem 0 0; padding-top: 1.5rem; border-top: 1px solid var(--line); font: 1.2rem/1.5 var(--serif); }
+
+/* Ways to play: on the darker wood of the board's frame, split like its bar. */
+.band { background: var(--walnut-deep); }
+.ways { display: grid; gap: 2.25rem; margin-top: 2.25rem; }
+.ways h3 { font-size: 1.35rem; line-height: 1.3; margin: 0 0 0.5rem; }
+.ways p { color: var(--ivory-dim); margin: 0; }
+@media (min-width: 56rem) {
+  .ways { grid-template-columns: repeat(3, 1fr); gap: 0; }
+  .ways > div { padding: 0 2rem; border-left: 1px solid var(--line); }
+  .ways > div:first-child { padding-left: 0; border-left: 0; }
+}
+
+/* Learn as you play: the heading beside the list, each item marked with a checker. */
+.learn { display: grid; gap: 1rem 3rem; }
+@media (min-width: 56rem) { .learn { grid-template-columns: 5fr 7fr; } }
+.checkers { list-style: none; margin: 0; padding: 0; }
+.checkers li { position: relative; padding: 1rem 0 1rem 2.6rem; border-top: 1px solid var(--line); }
+.checkers li:last-child { border-bottom: 1px solid var(--line); }
+.checkers li::before { content: ""; position: absolute; left: 0; top: 1.05rem; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: radial-gradient(circle, #ECE2CB 0 44%, #D8CBAE 45% 52%, #ECE2CB 53%); box-shadow: inset 0 0 0 1px #6E5A3C, 0 1px 3px rgba(0, 0, 0, 0.5); }
+.checkers li:nth-child(even)::before { background: radial-gradient(circle, #1E1A17 0 44%, #3A332D 45% 52%, #1E1A17 53%); box-shadow: inset 0 0 0 1px #8C8279, 0 1px 3px rgba(0, 0, 0, 0.5); }
+
+/* Privacy and Help side by side on wide screens. */
+.pair-sec { padding-top: 0; }
+.pair { display: grid; gap: 3rem; }
+.pair > div { max-width: 34rem; }
+.pair h2 { font-size: clamp(1.5rem, 3vw, 1.9rem); margin-bottom: 1rem; }
+.pair p { color: var(--ivory-dim); }
+.pair strong { color: var(--ivory); }
+@media (min-width: 56rem) { .pair { grid-template-columns: 1fr 1fr; gap: 4rem; } }
+
+/* The last word, before the footer. */
+.close { text-align: center; padding-bottom: calc(var(--space) * 0.8); }
+.close h2 { font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.1; margin: 0 0 0.5rem; }
+.close p { color: var(--ivory-dim); font-size: 1.15rem; margin: 0 0 0.5rem; }
+.close .note { margin: 0 auto; }
+
+/* Footer: the other edge of the board, points up. */
+footer { background: var(--walnut-deep); }
+footer .wrap { padding-top: 1.75rem; padding-bottom: 2.5rem; color: var(--ivory-dim); font-size: 0.95rem; }
+footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <a class="brand" href="/"><img src="/img/icon-192.webp" alt="" width="44" height="44">Tavlaki</a>
+  <a href="/el/" lang="el" hreflang="el">Ελληνικά</a>
+</header>
+
+<svg class="points" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="points-down" width="64" height="40" patternUnits="userSpaceOnUse">
+      <rect width="64" height="40" fill="#8A6038"/>
+      <polygon points="0,0 16,40 32,0" fill="#CFB98E"/>
+      <polygon points="32,0 48,40 64,0" fill="#2B1F19"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="40" fill="url(#points-down)"/>
+</svg>
+
+<main>
+<div class="wrap hero">
+  <div>
+    <h1><span>Welcome to the kafeneio.</span> <span>Grab a chair.</span></h1>
+    <p class="lead">Tavlaki is Greek tavli for iPhone: Portes, Plakoto, Fevga and Asodio, on a walnut board. Play the bot, a friend on the same phone, or a friend online.</p>
+    <!-- After the App Store launch, link https://apps.apple.com/app/id6828172932 in both buttons here and on the Greek page, and drop the beta notes. -->
+    <a class="get" href="https://testflight.apple.com/join/8vkMaRAm" rel="noreferrer">Get Tavlaki</a>
+    <p class="note">Free. Tavlaki is in beta on TestFlight, Apple's app for test versions. Android comes later.</p>
+  </div>
+  <img src="/img/board-1280.webp" srcset="/img/board-720.webp 720w, /img/board-1280.webp 1280w" sizes="(min-width: 56rem) 42rem, 100vw" width="1280" height="960" alt="A game of Portes in Tavlaki. A white checker is picked up, and the point it can move to is marked. Below the board, the dice show 6 and 3.">
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>The four Greek games</h2>
+    <p class="intro">Same board, same 15 checkers each, four ways to play them.</p>
+    <ul class="games">
+      <li>
+        <img src="/img/game-portes.webp" width="800" height="488" loading="lazy" alt="A Portes game: a white checker that was hit waits on the bar.">
+        <h3>Portes<span lang="el">Πόρτες</span></h3>
+        <p>The classic game. Hit a lone checker and build your doors.</p>
+      </li>
+      <li>
+        <img src="/img/game-plakoto.webp" width="800" height="488" loading="lazy" alt="A Plakoto game: two white checkers are pinned under black ones.">
+        <h3>Plakoto<span lang="el">Πλακωτό</span></h3>
+        <p>No hitting: you pin the other checker under yours. Pin the mother, their last checker on the start point, and they lose 2 points or play on.</p>
+      </li>
+      <li>
+        <img src="/img/game-fevga.webp" width="800" height="488" loading="lazy" alt="A Fevga game: each player holds points in the other's way.">
+        <h3>Fevga<span lang="el">Φεύγα</span></h3>
+        <p>No hitting and no pinning. One checker holds a point, so you block the way by holding the points in front of the other player.</p>
+      </li>
+      <li>
+        <img src="/img/game-asodio.webp" width="800" height="488" loading="lazy" alt="An Asodio game: the checkers that have not come in yet wait in the middle of the board.">
+        <h3>Asodio<span lang="el">Ασόδιο</span></h3>
+        <p>Roll a 1-2 or a double to open the board, bring in all 15 checkers, then move forward as one army.</p>
+      </li>
+    </ul>
+    <p class="match">Or play a full Tavli match: Portes, Plakoto and Fevga in turn, to 1, 3, 5 or 7 points.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Three ways to play</h2>
+    <div class="ways">
+      <div>
+        <h3>Against the bot</h3>
+        <p>Easy, Medium or Hard, in every game. The bot plays on your phone, so you need no internet.</p>
+      </div>
+      <div>
+        <h3>Two players, one phone</h3>
+        <p>Take turns on the same phone. The board turns to the player whose turn it is.</p>
+      </div>
+      <div>
+        <h3>A friend online</h3>
+        <p>Send an invite link or a code, and play at your own pace: the app tells you when it is your turn. Add friends and climb the leaderboards. Sign in with Apple or an email code, or start as a guest.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap learn">
+    <div>
+      <h2>Learn as you play</h2>
+      <p class="intro">New to tavli, or to one of the games? The app teaches you at the board.</p>
+    </div>
+    <ul class="checkers">
+      <li>A one-minute lesson on the real board teaches Portes, and every game has a How to play page.</li>
+      <li>Ask for a hint when you are stuck, and look back over a game with the review.</li>
+      <li>Greek and English. Your game saves by itself, so you can continue later.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="pair-sec">
+  <div class="wrap pair">
+    <div>
+      <h2>Privacy</h2>
+      <p>No ads. Games on your phone need no account. You choose if the app may send anonymous usage data, and you can change your answer in Settings. Online play keeps only what it needs to run your games: read the <a href="/privacy/">privacy policy</a>.</p>
+    </div>
+    <div>
+      <h2>Help</h2>
+      <p>A question, a problem or an idea? Write to <a href="mailto:support@tavlaki.com">support@tavlaki.com</a>.</p>
+      <p>Got a code from a friend? Open Tavlaki and tap <strong>Join with a code</strong>.</p>
+    </div>
+  </div>
+</section>
+
+<div class="wrap close">
+  <h2 lang="el">Καλή παρτίδα.</h2>
+  <p>Have a good game, as players say when they sit down at the board.</p>
+  <a class="get" href="https://testflight.apple.com/join/8vkMaRAm" rel="noreferrer">Get Tavlaki</a>
+  <p class="note">Free, on TestFlight for now.</p>
+</div>
+</main>
+
+<footer>
+  <svg class="points" aria-hidden="true" focusable="false">
+    <defs>
+      <pattern id="points-up" width="64" height="40" patternUnits="userSpaceOnUse">
+        <rect width="64" height="40" fill="#8A6038"/>
+        <polygon points="0,40 16,0 32,40" fill="#2B1F19"/>
+        <polygon points="32,40 48,0 64,40" fill="#CFB98E"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="40" fill="url(#points-up)"/>
+  </svg>
+  <div class="wrap">
+    <nav aria-label="Pages">
+      <a href="/privacy/">Privacy policy</a>
+      <a href="/terms/">Terms of use</a>
+      <a href="mailto:support@tavlaki.com">support@tavlaki.com</a>
+      <a href="/el/" lang="el" hreflang="el">Ελληνικά</a>
+    </nav>
+    <p>This site sets no cookies, runs no scripts and loads nothing from other sites.</p>
+  </div>
+</footer>
+</body>
+</html>
