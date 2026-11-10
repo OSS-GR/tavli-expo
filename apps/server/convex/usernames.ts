@@ -39,6 +39,7 @@ import { authComponent } from './auth';
 import { signedInPlayer } from './caller';
 import { createCryptoRng } from './model/cryptoRng';
 import { nameRowOf } from './playerNames';
+import { refreshBoardable } from './ratings';
 
 /** Throws a `ConvexError` with `UsernameErrorData`. */
 function fail(code: UsernameErrorCode, message: string): never {
@@ -106,6 +107,8 @@ export const setMyUsername = mutation({
       id = row._id;
       await ctx.db.patch(id, plan.patch);
     }
+    // The global board index holds "has a username" (#407).
+    await refreshBoardable(ctx, playerId);
     return myUsernameOf(await ctx.db.get(id), saved, now);
   },
 });
@@ -127,6 +130,7 @@ export const clearUsername = internalMutation({
         usernameKey: undefined,
         usernameChangedAt: undefined,
       });
+      await refreshBoardable(ctx, playerId);
       return null;
     }
     const check = checkUsername(name);
@@ -139,6 +143,7 @@ export const clearUsername = internalMutation({
       usernameKey: key,
       usernameChangedAt: undefined,
     });
+    await refreshBoardable(ctx, playerId);
     return null;
   },
 });

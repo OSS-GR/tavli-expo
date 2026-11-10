@@ -270,11 +270,6 @@ export default defineSchema({
     .index('by_player', ['playerId']),
 
   /**
-   * Username searches (#406), for the cap of `FRIEND_SEARCHES_PER_HOUR`.
-   * Only the time: never the name searched for. Rows older than the
-   * window are deleted at the next search.
-   */
-  /**
    * Ratings (#407, `ratings.ts`): one row per saved player with a rated
    * match or a "Show me" change. No row: `START_RATING`, shown.
    */
@@ -288,7 +283,11 @@ export default defineSchema({
     matches: v.number(),
     /** "Show me on the global board". */
     shown: v.boolean(),
-    /** `isBoardable`: `shown` with `MIN_BOARD_MATCHES` rated matches. The global board reads `by_board`. */
+    /**
+     * `isBoardable` (`shown` with `MIN_BOARD_MATCHES` rated matches) and a
+     * username. The global board reads `by_board`; a username change
+     * updates it (`refreshBoardable`).
+     */
     boardable: v.boolean(),
   })
     .index('by_player', ['playerId'])
@@ -309,6 +308,11 @@ export default defineSchema({
     .index('by_pair', ['a', 'b'])
     .index('by_b', ['b']),
 
+  /**
+   * Username searches (#406), for the cap of `FRIEND_SEARCHES_PER_HOUR`.
+   * Only the time: never the name searched for. Rows older than the
+   * window are deleted at the next search.
+   */
   friendSearches: defineTable({
     playerId: v.string(),
     at: v.number(),
