@@ -18,8 +18,9 @@
 | [site/el/terms/index.html](site/el/terms/index.html) | Greek static page, served at `https://tavlaki.com/el/terms` |
 | [site/.well-known/apple-app-site-association](site/.well-known/apple-app-site-association) | iOS universal links (#332): `https://tavlaki.com/i/<code>` opens the app. JSON with no file extension |
 | [site/i/index.html](site/i/index.html) | The invite fallback page (#332), served for every `https://tavlaki.com/i/<code>`. English and Greek on one page |
-| [site/_redirects](site/_redirects) | Host rule (Cloudflare Pages, Netlify): rewrite `/i/*` to the fallback page |
+| [site/_redirects](site/_redirects) | Host rule (Cloudflare Workers static assets, Pages, Netlify): rewrite `/i/*` to the fallback page |
 | [site/_headers](site/_headers) | Host rule: serve the association file as `application/json`; `noindex` on invite pages |
+| [wrangler.jsonc](wrangler.jsonc) | The Cloudflare Worker that serves `site/` at `tavlaki.com` (static files only, no code) |
 
 The app opens the terms from the username step (`termsUrl` in `apps/mobile/src/features/online/usernameStep.ts`): `https://tavlaki.com/el/terms` when the app language is Greek, else `https://tavlaki.com/terms`.
 
@@ -45,8 +46,8 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 
 ## How to publish
 
-1. Use any static host with rewrites and headers (Cloudflare Pages or Netlify read `_redirects` and `_headers`; GitHub Pages cannot rewrite `/i/*`). Publish the `docs/legal/site/` folder as the site root, `.well-known/` included. See [Invite links](#invite-links-332) for the steps on Cloudflare Pages.
-2. Point `tavlaki.com` at the host. Both `https://tavlaki.com/privacy` and `https://tavlaki.com/el/privacy` must open the pages. Most hosts serve `privacy/index.html` for `/privacy` and `/privacy/` by themselves.
+1. The site is a Cloudflare Worker with static assets (`wrangler.jsonc`): it serves the `site/` folder as the site root, `.well-known/` included, and reads `_redirects` and `_headers`. Cloudflare builds it from `main`. See [Invite links](#invite-links-332) for the steps. (Any static host with rewrites and headers works too, such as Netlify; GitHub Pages cannot rewrite `/i/*`.)
+2. Point `tavlaki.com` at the host. Both `https://tavlaki.com/privacy` and `https://tavlaki.com/el/privacy` must open the pages. Cloudflare serves `privacy/index.html` at `/privacy/` and redirects `/privacy` there.
 3. Use HTTPS. Do not add analytics or cookies to the site.
 4. Put `https://tavlaki.com/privacy` in App Store Connect (App Privacy → Privacy Policy URL) and in the Google Play Console (App content → Privacy policy).
 
@@ -54,13 +55,13 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 
 The share link of an invite is `https://tavlaki.com/i/<code>`. On an iPhone with Tavlaki (a production build: TestFlight or the App Store), iOS opens it in the app. Anywhere else it opens the fallback page `site/i/index.html`: **Get Tavlaki**, where the code is (the end of the address), and how to enter it with **Join with a code** (#333). The page runs no script and loads nothing from other sites, like the other pages. The app side is "Invites" in [`docs/architecture/app-shell.md`](../architecture/app-shell.md#invites-256).
 
-Owner steps (`tavlaki.com` DNS is on Cloudflare, so Cloudflare Pages is the simplest host; any static host with rewrites and headers works):
+Owner steps (`tavlaki.com` DNS is on Cloudflare, so a Cloudflare Worker is the simplest host; any static host with rewrites and headers works):
 
 1. In the fallback page, replace both `https://testflight.apple.com/join/OWNER-TESTFLIGHT-LINK` links with the TestFlight public link (App Store Connect → TestFlight → External Testing → your group → Public Link). After the App Store launch, use `https://apps.apple.com/app/id6828172932` and drop the beta note (both languages). This is a repo change: open a PR, or ask an agent.
-2. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**: pick this repo, branch `main`, no build command, build output directory `docs/legal/site`. Each push to `main` then publishes the site. (Or upload the folder by hand with **Direct Upload**.)
-3. The project → **Custom domains** → add `tavlaki.com` (and `www.tavlaki.com` if you want it). Cloudflare adds the DNS records and the HTTPS certificate. Today HTTP on `tavlaki.com` redirects to `www`: remove that redirect rule (Rules → Redirect Rules or Page Rules), or iOS cannot read the file. The link domain is `tavlaki.com`, not `www`.
+2. Cloudflare dashboard → **Workers & Pages** → **Create application** → connect GitHub and pick this repo. Project name `tavlaki` (the `name` in `wrangler.jsonc`), build command empty, deploy command `npx wrangler deploy`, **Preview builds** off, and under **Advanced settings** the **Path** `docs/legal`. Pick **Create new token** for the API token. Add the build variable `SKIP_DEPENDENCY_INSTALL` = `1`: without it Cloudflare installs the whole app's packages first (it finds the pnpm workspace above the path). Each push to `main` then publishes the site. Optional: in the Worker's **Settings → Build**, set the build watch paths to `docs/legal/*`, so other pushes start no build.
+3. The Worker → **Settings → Domains & Routes** → **Add** → **Custom domain** → `tavlaki.com`. Cloudflare adds the DNS record and the HTTPS certificate (the Proton Mail records stay as they are). Do not add the record by hand. The link domain is `tavlaki.com`, not `www`; never redirect `tavlaki.com` to `www`, or iOS cannot read the file. Then turn off **Email Address Obfuscation** (Security → Settings): it adds a Cloudflare script to pages that show an email address, such as the privacy policy, and the pages promise no scripts. Do not turn on Cloudflare Web Analytics for the site.
 4. Check the association file: `curl -sI https://tavlaki.com/.well-known/apple-app-site-association` must answer `200`, `content-type: application/json`, and no redirect. `_headers` sets the type; if the host ignores `_headers`, set the header in the host's settings.
-5. Check the fallback page: `https://tavlaki.com/i/ABCD2345` shows "Get Tavlaki" and the address stays the same. `_redirects` rewrites `/i/*` to `/i/index.html` (status `200`, a rewrite). If your host does not read `_redirects`, add the same rewrite there. Also check that `https://tavlaki.com/privacy` and `/terms` still open.
+5. Check the fallback page: `https://tavlaki.com/i/ABCD2345` shows "Get Tavlaki" and the address stays the same. `_redirects` rewrites `/i/*` to `/i/` (status `200`, a rewrite; `/i/index.html` as the target is a loop on Cloudflare, and the deploy fails). If your host does not read `_redirects`, add the same rewrite there. Also check that `https://tavlaki.com/privacy` and `/terms` still open.
 6. Make a new production build (`eas build -p ios --profile production`) and send it to TestFlight. The entitlement `applinks:tavlaki.com` is in that build only: older builds never open the link. EAS turns on the Associated Domains capability for `com.tavlaki` by itself.
 7. Test on an iPhone: "Universal links" in [`docs/process/running-the-app.md`](../process/running-the-app.md#universal-links-332).
 

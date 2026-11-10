@@ -1,6 +1,9 @@
-# Cloudflare Pages (and Netlify) rewrite rules (#332). Not served as a page.
+# Cloudflare rewrite rules (#332): Workers static assets, also Pages and Netlify.
+# Not served as a page.
 # Every invite link https://tavlaki.com/i/<code> shows the fallback page
 # i/index.html. The address stays the same (200 is a rewrite, not a
 # redirect), so the friend still sees the code at the end of it.
+# The target is /i/, not /i/index.html: Cloudflare serves index.html at its
+# folder path, so /i/index.html would redirect to /i/ and loop.
 # Never redirect /.well-known/apple-app-site-association: iOS refuses it.
-/i/*  /i/index.html  200
+/i/*  /i/  200
