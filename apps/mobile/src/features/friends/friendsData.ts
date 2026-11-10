@@ -52,8 +52,12 @@ export function friendsProblem(error: unknown): FriendsProblem {
  * Runs `load` as the signed-in player. `reload` loads again and keeps
  * what shows until the answer comes; `retry` shows the spinner first.
  * An older answer never replaces a newer one. A new `visit` (the route
- * counts each time the screen shows) loads again too, so a screen is
- * fresh when the player comes back to it.
+ * counts each time the screen shows, `useVisit`) loads again too, so a
+ * screen is fresh when the player comes back to it. A quiet reload that
+ * fails on the network keeps the list that shows (a call on it may still
+ * run); a sign-out or a guest still replaces it. `replace` sets what a
+ * call just changed (a new friend link): a load that started before it
+ * is dropped, so it never brings the old data back.
  */
 export function useFriendsData<T>(auth: AuthProvider, load: () => Promise<T>, visit = 0) {
   const [state, setState] = useState<FriendsLoad<T>>({ kind: 'loading' });
@@ -70,7 +74,8 @@ export function useFriendsData<T>(auth: AuthProvider, load: () => Promise<T>, vi
     latest.current += 1;
     const run = latest.current;
     const settle = (next: FriendsLoad<T>) => {
-      if (live.current && run === latest.current) setState(next);
+      if (!live.current || run !== latest.current) return;
+      setState((shown) => (next.kind === 'failed' && shown.kind === 'ready' ? shown : next));
     };
     auth
       .ready()
@@ -100,5 +105,13 @@ export function useFriendsData<T>(auth: AuthProvider, load: () => Promise<T>, vi
     reload();
   }, [reload]);
 
-  return { state, reload, retry };
+  const replace = useCallback((change: (data: T) => T) => {
+    // Older loads may hold the data from before the change: drop them.
+    latest.current += 1;
+    setState((shown) =>
+      shown.kind === 'ready' ? { kind: 'ready', data: change(shown.data) } : shown,
+    );
+  }, []);
+
+  return { state, reload, retry, replace };
 }

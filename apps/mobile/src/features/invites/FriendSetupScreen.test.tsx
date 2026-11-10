@@ -343,7 +343,9 @@ describe('FriendSetupScreen', () => {
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
-    expect(screen.getByTestId('friend-problem')).toHaveTextContent(/Friends need a saved account/);
+    expect(screen.getByTestId('friend-problem')).toHaveTextContent(
+      'You are not signed in to online play on this phone. Friends need a saved account.',
+    );
     expect(parts.authStore.guests).toBe(0);
     expect(invite).not.toHaveBeenCalled();
   });

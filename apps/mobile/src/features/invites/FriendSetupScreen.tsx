@@ -25,8 +25,9 @@
  * - Friend invite (#406, `friend`): the same setup, but the invite goes
  *   to one friend (`Friends.inviteFriend`), who gets a push. The title
  *   and the intro say so.
- *   It needs a saved account: a guest, or nobody signed in, gets the
- *   "Friends need a saved account" line and no sign-in sheet.
+ *   It needs a saved account: a guest gets "Friends need a saved
+ *   account…", nobody signed in "You are not signed in…", and neither
+ *   gets the sign-in sheet.
  *
  * Navigation stays in the route (`app/friend/index.tsx`, and
  * `app/friends/invite/[id].tsx` for a friend invite).
@@ -84,7 +85,7 @@ export interface FriendSetupScreenProps {
 }
 
 /** Why "Make an invite" did not work. */
-type Problem = 'account' | 'make' | 'tooMany' | 'notSaved';
+type Problem = 'account' | 'make' | 'tooMany' | 'notSaved' | 'signedOut';
 
 /** The turn time limit options: null is the 24-hour default, others are minutes. */
 const TIME_LIMITS: readonly (number | null)[] = [null, 5, 1];
@@ -145,7 +146,7 @@ export function FriendSetupScreen({
     if (friend !== undefined && (user === null || user.isGuest)) {
       // A friend invite needs a saved account (ADR-0008): no sign-in sheet,
       // since a guest made there could not invite a friend either.
-      failed('notSaved');
+      failed(user === null ? 'signedOut' : 'notSaved');
       return;
     }
     if (user === null) {
@@ -199,7 +200,9 @@ export function FriendSetupScreen({
           ? t('friend.makeFailed')
           : problem?.kind === 'notSaved'
             ? t('friends.guest')
-            : null;
+            : problem?.kind === 'signedOut'
+              ? t('friends.signedOut')
+              : null;
   // iOS VoiceOver does not read `accessibilityRole="alert"`: read each problem.
   useEffect(() => {
     if (problemText !== null) AccessibilityInfo.announceForAccessibility(problemText);

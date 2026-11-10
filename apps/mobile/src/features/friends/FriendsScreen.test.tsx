@@ -116,6 +116,40 @@ describe('<FriendsScreen />', () => {
     expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
   });
 
+  it('keeps the list when a reload on the way back fails on the network', async () => {
+    signInSaved();
+    await befriend('ann');
+    let down = false;
+    const flaky: Friends = {
+      ...onlineFake.friends,
+      listFriends: () =>
+        down ? Promise.reject(new Error('offline')) : onlineFake.friends.listFriends(),
+    };
+    const props = {
+      onBack: jest.fn(),
+      onAdd: jest.fn(),
+      onInvite: jest.fn(),
+      onOpenInvite: jest.fn(),
+      onAccount: jest.fn(),
+    };
+    const ui = (visit: number) => (
+      <FriendsScreen
+        auth={auth!}
+        friends={flaky}
+        safety={onlineFake.safety}
+        visit={visit}
+        {...props}
+      />
+    );
+    await render(ui(1));
+    await flush();
+    expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
+    down = true;
+    await screen.rerender(ui(2));
+    await flush();
+    expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
+  });
+
   it('lists friends with the record, and Invite opens the setup for that friend', async () => {
     signInSaved();
     await befriend('ann');

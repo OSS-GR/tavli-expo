@@ -119,6 +119,47 @@ describe('<AddFriendScreen />', () => {
     expect(screen.getByTestId('add-friend-link')).toHaveTextContent(await myLink());
   });
 
+  it('a load that started before New link never brings the old link back', async () => {
+    signInSaved();
+    // The next myFriendLink waits until the test lets it answer.
+    let answerOld: (() => void) | undefined;
+    const slow: Friends = {
+      ...onlineFake.friends,
+      myFriendLink: async () => {
+        const old = await onlineFake.friends.myFriendLink();
+        if (answerOld === undefined) return old;
+        await new Promise<void>((resolve) => {
+          answerOld = resolve;
+        });
+        return old;
+      },
+    };
+    const props = { onBack: jest.fn(), onLink: jest.fn(), onAccount: jest.fn() };
+    const ui = (visit: number) => (
+      <AddFriendScreen auth={auth!} friends={slow} visit={visit} {...props} />
+    );
+    await render(ui(1));
+    await flush();
+    const old = await myLink();
+    // The player comes back: a load starts and hangs with the old link.
+    answerOld = () => undefined;
+    await screen.rerender(ui(2));
+    await flush();
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: 'New link' }));
+    await user.press(screen.getByTestId('dialog-confirm'));
+    await flush();
+    const fresh = await myLink();
+    expect(fresh).not.toBe(old);
+    expect(screen.getByTestId('add-friend-link')).toHaveTextContent(fresh);
+    // The slow load answers with the old link: it is dropped.
+    await act(async () => {
+      answerOld?.();
+    });
+    await flush();
+    expect(screen.getByTestId('add-friend-link')).toHaveTextContent(fresh);
+  });
+
   it('finds a player by exact username and asks them', async () => {
     signInSaved();
     onlineFake.server().markSaved('ann');

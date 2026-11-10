@@ -90,9 +90,7 @@ export function AddFriendScreen({
     const [token, recent] = await Promise.all([friends.myFriendLink(), friends.recentPlayers()]);
     return { token, recent };
   }, [friends]);
-  const { state, reload, retry } = useFriendsData(auth, load, visit);
-  // A new token from New link, until the next load brings the server's.
-  const [newToken, setNewToken] = useState<{ token: string; over: AddData } | null>(null);
+  const { state, reload, retry, replace } = useFriendsData(auth, load, visit);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
   const [sent, setSent] = useState<{ name: string; status: FriendStatus; n: number } | null>(null);
@@ -158,12 +156,7 @@ export function AddFriendScreen({
     onLink(token);
   };
 
-  const token =
-    state.kind !== 'ready'
-      ? null
-      : newToken !== null && newToken.over === state.data
-        ? newToken.token
-        : state.data.token;
+  const token = state.kind === 'ready' ? state.data.token : null;
   const link = token === null ? null : friendLinkUrl(token);
   const message = link === null ? '' : t('friends.add.shareMessage', { link });
 
@@ -379,9 +372,7 @@ export function AddFriendScreen({
               setResetting(false);
               run(
                 () => friends.resetFriendLink(),
-                (next) => {
-                  if (state.kind === 'ready') setNewToken({ token: next, over: state.data });
-                },
+                (next) => replace((data) => ({ ...data, token: next })),
               );
             }}
             onCancel={() => setResetting(false)}
