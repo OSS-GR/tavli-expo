@@ -111,6 +111,8 @@ function RootStack() {
           <Stack.Screen name="friends/add" />
           <Stack.Screen name="friends/invite/[id]" />
           <Stack.Screen name="add/[token]" />
+          {/* Leaderboards (#407). */}
+          <Stack.Screen name="ratings" />
           {/* Your online games (#297): "See all" on Home. */}
           <Stack.Screen name="online-games" options={{ headerShown: true }} />
         </Stack.Protected>

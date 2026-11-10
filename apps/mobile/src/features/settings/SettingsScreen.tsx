@@ -72,6 +72,8 @@ export interface SettingsScreenProps {
   onBlocked?: () => void;
   /** Opens Friends (#406). `undefined`: no Friends row. */
   onFriends?: () => void;
+  /** Opens Leaderboards (#407). `undefined`: no Leaderboards row. Shows like Friends. */
+  onRatings?: () => void;
   /**
    * Changes each time the screen shows again (the route's focus), so a
    * sign-in on Settings → Account shows the Blocked players row.
@@ -87,6 +89,7 @@ export function SettingsScreen({
   onAccount,
   onBlocked,
   onFriends,
+  onRatings,
   visit = 0,
 }: SettingsScreenProps = {}) {
   const { t } = useTranslation();
@@ -315,6 +318,15 @@ export function SettingsScreen({
                 label={t('settings.friends.label')}
                 hint={t('settings.friends.hint')}
                 onPress={onFriends}
+              />
+            ) : null}
+            {onRatings && usedOnline ? (
+              <SectionRow
+                testID="settings-ratings"
+                icon="trophy"
+                label={t('settings.ratings.label')}
+                hint={t('settings.ratings.hint')}
+                onPress={onRatings}
               />
             ) : null}
             {onBlocked && usedOnline ? (

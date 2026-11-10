@@ -9,6 +9,7 @@
  *   Remove (asks first) and Report or block (`ReportOrBlockSheet`). A
  *   block ends the friendship on the server, so the list loads again
  *   when the sheet closes.
+ * - Leaderboards (#407) opens the boards, under Add a friend.
  * - A request to you has Accept and Decline; one you sent has Cancel.
  * - One call at a time. A call that fails keeps the list and says so,
  *   also to screen readers (`useAnnouncement`). A call that finds the
@@ -55,6 +56,8 @@ export interface FriendsScreenProps {
   onBack: () => void;
   /** Opens Add a friend. */
   onAdd: () => void;
+  /** Opens Leaderboards (#407). `undefined`: no button. */
+  onRatings?: () => void;
   /** Opens the game setup for a friend invite. */
   onInvite: (playerId: string) => void;
   /** Opens a friend invite to you (the invite screen). */
@@ -78,6 +81,7 @@ export function FriendsScreen({
   safety,
   onBack,
   onAdd,
+  onRatings,
   onInvite,
   onOpenInvite,
   onAccount,
@@ -140,6 +144,14 @@ export function FriendsScreen({
         ) : (
           <>
             <ActionButton testID="friends-add" label={t('friends.addButton')} onPress={onAdd} />
+            {onRatings ? (
+              <ActionButton
+                testID="friends-ratings"
+                kind="secondary"
+                label={t('friends.ratingsButton')}
+                onPress={onRatings}
+              />
+            ) : null}
             {state.refreshFailed === true ? (
               <RefreshFailed onRetry={reload} testID="friends" />
             ) : null}

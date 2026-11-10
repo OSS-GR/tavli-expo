@@ -34,6 +34,7 @@
  *   signed in it fails `NOT_SIGNED_IN`.
  * - `safety` is block and report (#435) on the server, as the user signed
  *   in to `auth`. With nobody signed in it fails `NOT_SIGNED_IN`.
+ * - `ratings` is the `Ratings` port (#407), like `friends`.
  * - `friends` is the `Friends` port (#406) on the server, as the user
  *   signed in to `auth`: a user who is not a guest is a saved account
  *   (`markSaved`), so a guest gets `NOT_SAVED`.
@@ -57,6 +58,7 @@ import {
   createMemoryPushNotifications,
   createMemoryPushTokens,
   type Friends,
+  type Ratings,
   type GameTransport,
   type GameTransportErrorData,
   type Invites,
@@ -262,6 +264,23 @@ const friends: Friends = {
   listFriendInvites: () => friendsCaller().listFriendInvites(),
 };
 
+/**
+ * Ratings on the server (#407), as the user signed in to `auth` at that
+ * moment. A user who is not a guest counts as a saved account.
+ */
+function ratingsCaller(): Ratings {
+  const user = auth.currentUser();
+  if (user !== null && !user.isGuest) server.markSaved(user.id);
+  return server.ratingsFor(user?.id ?? null);
+}
+
+const ratings: Ratings = {
+  mine: () => ratingsCaller().mine(),
+  friendsBoard: () => ratingsCaller().friendsBoard(),
+  globalBoard: () => ratingsCaller().globalBoard(),
+  setShown: (shown) => ratingsCaller().setShown(shown),
+};
+
 export const onlineFake = {
   auth,
   /** Apple's sheet on the phone: set `next`, `sub` or `available` to act it out. */
@@ -275,6 +294,7 @@ export const onlineFake = {
   usernames,
   safety,
   friends,
+  ratings,
   /** This build, like `appBuild()` of `@/services`. */
   appBuild: (): AppBuild | null => build,
   /** Sets this build for the rest of the test (`null`: no store build). */

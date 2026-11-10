@@ -25,14 +25,16 @@ import {
 } from '@tavli/backend-convex';
 import type { RatingFunctions } from '@tavli/backend-convex';
 import {
+  MIN_BOARD_MATCHES,
   RATED_MATCHES_PER_PAIR_PER_DAY,
   START_RATING,
+  TERMS_VERSION,
   createRecordingPushProvider,
 } from '@tavli/contracts';
 import { ratingsContract } from '@tavli/contracts/testing';
 import type { RatingsContractPlayer, RatingsContractSubject } from '@tavli/contracts/testing';
 
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import { setPushProvider } from './push';
 import { RATED_PAIR_DELETE_PAGE } from './ratings';
 import schema from './schema';
@@ -166,6 +168,38 @@ describe('ratings on Convex', () => {
     await runScheduled(t);
     const pairs = await t.run(async (ctx) => await ctx.db.query('ratedPairs').collect());
     expect(pairs).toEqual([]);
+  });
+
+  it('keeps "has a username" in the board index, so the board never skips rows', async () => {
+    const t = await setup();
+    for (let i = 0; i < MIN_BOARD_MATCHES; i += 1) {
+      await win(t, ALICE, i < RATED_MATCHES_PER_PAIR_PER_DAY ? BOB : CAROL);
+    }
+    const boardable = async () =>
+      (
+        await t.run(async (ctx) =>
+          ctx.db
+            .query('ratings')
+            .withIndex('by_player', (q) => q.eq('playerId', ALICE))
+            .first(),
+        )
+      )?.boardable;
+    // Enough matches, but no username: not in the index.
+    expect(await boardable()).toBe(false);
+    await as(t, ALICE).mutation(api.usernames.setMyUsername, {
+      name: 'AliceIndexed',
+      acceptTerms: TERMS_VERSION,
+      ageChecked: true,
+    });
+    expect(await boardable()).toBe(true);
+    // The owner clears it: off the index again.
+    await t.mutation(internal.usernames.clearUsername, { playerId: ALICE });
+    expect(await boardable()).toBe(false);
+    await t.mutation(internal.usernames.clearUsername, { playerId: ALICE, name: 'AliceAgain' });
+    expect(await boardable()).toBe(true);
+    // A rated match keeps it.
+    await win(t, ALICE, CAROL);
+    expect(await boardable()).toBe(true);
   });
 
   it('refuses a caller whose account is gone (a token outlives its user)', async () => {

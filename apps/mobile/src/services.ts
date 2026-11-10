@@ -17,6 +17,7 @@ import {
   createConvexAppUpdates,
   createConvexClient,
   createConvexFriends,
+  createConvexRatings,
   createConvexGameTransport,
   createConvexInvites,
   createConvexOnlineData,
@@ -36,6 +37,7 @@ import {
   type CrashReporter,
   type Feedback,
   type Friends,
+  type Ratings,
   type GameTransport,
   type Invites,
   type OnlineData,
@@ -177,6 +179,7 @@ const online = createOnlineServices(convexServer(), {
   createUsernames: (client) => createConvexUsernames({ client }),
   createSafety: (client) => createConvexSafety({ client }),
   createFriends: (client) => createConvexFriends({ client }),
+  createRatings: (client) => createConvexRatings({ client }),
   createNotifications: () =>
     createExpoPushNotifications({
       platform: Platform.OS === 'android' ? 'android' : 'ios',
@@ -258,6 +261,14 @@ export const safety: Safety | undefined = online?.safety;
  * friends screens (`features/friends/`) use it. A guest gets `NOT_SAVED`.
  */
 export const friends: Friends | undefined = online?.friends;
+
+/**
+ * Ratings and boards of saved accounts (#407), on the same client as
+ * `games`. The Leaderboards screen (`features/ratings/`) uses it, also for
+ * "Show me on the global board" on its Everyone tab. A guest gets
+ * `NOT_SAVED`.
+ */
+export const ratings: Ratings | undefined = online?.ratings;
 
 /**
  * This build (#390): the phone system, the store build number and the app

@@ -248,7 +248,7 @@ One row per saved player with a rated match or a "Show me" change (#407). No row
 | `experience` | The points of the rated matches so far. Below 400 the change is multiplied by `max(1, 5 − experience / 100)`. |
 | `matches` | Rated matches so far. |
 | `shown` | "Show me on the global board" (on by default). |
-| `boardable` | `shown` and at least `MIN_BOARD_MATCHES` (5) rated matches (`isBoardable`). Index `by_board` (`boardable`, `rating`): the global board reads it best first. |
+| `boardable` | `shown`, at least `MIN_BOARD_MATCHES` (5) rated matches (`isBoardable`) and a username. A username pick or clear writes it again (`refreshBoardable`, from `usernames.ts`). Index `by_board` (`boardable`, `rating`): the global board reads it best first, with no rows to skip. |
 
 ### `ratedPairs`
 
@@ -289,7 +289,7 @@ Issue #407, ADR-0008 item 9. Saved players get one rating from their online matc
 - **The formula** is FIBS's: the underdog wins with `1 / (10^(d·√n / 2000) + 1)` (`d` the rating gap, `n` the match length), the winner gains `4·√n·(1 − their chance)` and the loser loses the same, times each player's experience factor. Two new players in a 3-point match move about 17 points.
 - **What counts.** `save` in `games.ts` calls `rateMatch` in the save that ends a match, next to `recordFriendMatch`: a resign and a time out count. Both players must have a saved account then (`isAnonymous !== true`), and the pair must be under `RATED_MATCHES_PER_PAIR_PER_DAY` that UTC day. A match that ends by an account delete is never rated (`resignAs(…, false)`). A guest's match never counts, and a guest has no row, so the guest move has nothing to move.
 - **The friends board** (`friendsBoard`): the caller always, and each friend (`friends.by_player`, at most `MAX_FRIENDS`) with a rated match. A friend with no username shows their guest name.
-- **The global board** (`globalBoard`): reads `by_board` best first, at most `GLOBAL_BOARD_READ` rows, and keeps the rows with a username. Places count every such row; then the players the caller blocked go (`blocks.by_blocker`), and the first `GLOBAL_BOARD_ROWS` (50) stay. The blocked player still sees the blocker, like names (#320).
+- **The global board** (`globalBoard`): reads `by_board` best first, at most `GLOBAL_BOARD_READ` rows; a `boardable` row has a username, and the board checks it again. Places count every such row; then the players the caller blocked go (`blocks.by_blocker`), and the first `GLOBAL_BOARD_ROWS` (50) stay. The blocked player still sees the blocker, like names (#320).
 - **"Show me"** (`setShowOnBoard`) writes the row (a new player gets one with the start rating).
 - **Callers.** Every public function needs a saved caller who exists (`NOT_SIGNED_IN`, `NOT_SAVED`).
 - **The account delete** deletes the caller's row at once (off the boards) and schedules `deleteRatedPairs` for the pair counts, in pages of `RATED_PAIR_DELETE_PAGE`.

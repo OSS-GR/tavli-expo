@@ -13,8 +13,10 @@
  *   (`resignAs(…, false)`).
  * - Only saved players have a `ratings` row: a guest has none, so the
  *   guest move (#403) has nothing to move here.
- * - The global board reads `by_board` best first and keeps the rows with
- *   a username. The rows the caller blocked go (#320).
+ * - `boardable` holds `isBoardable` and a username, so the global board
+ *   reads `by_board` best first with no rows to skip: a username change
+ *   updates it (`refreshBoardable`, from `usernames.ts`). The board still
+ *   checks the username, and the rows the caller blocked go (#320).
  *
  * Every public function reads the caller from the sign-in and needs a
  * saved account. `deleteAccountOf` deletes the caller's row at once and
@@ -50,7 +52,11 @@ import { authComponent } from './auth';
 import { signedInPlayer } from './caller';
 import { nameRowOf } from './playerNames';
 
-/** How many rows of the board index the global board reads at most. */
+/**
+ * How many rows of the board index the global board reads at most: the
+ * rows it shows, the players the caller blocked, and room for a row whose
+ * username went since its last write.
+ */
 export const GLOBAL_BOARD_READ = GLOBAL_BOARD_ROWS + MAX_BLOCKS + 50;
 
 /** How many pair rows one run of `deleteRatedPairs` deletes. */
@@ -129,6 +135,10 @@ function recordOf(row: Doc<'ratings'> | null): RatingRecord & { readonly shown: 
   return { rating: row.rating, experience: row.experience, matches: row.matches, shown: row.shown };
 }
 
+async function hasUsername(ctx: QueryCtx, playerId: string): Promise<boolean> {
+  return (await nameRowOf(ctx, playerId))?.username !== undefined;
+}
+
 /** Saves `record` for `playerId` (`row`: their row, if any). */
 async function writeRating(
   ctx: MutationCtx,
@@ -136,7 +146,8 @@ async function writeRating(
   row: Doc<'ratings'> | null,
   record: RatingRecord & { readonly shown: boolean },
 ): Promise<void> {
-  const fields = { ...record, boardable: isBoardable(record) };
+  const boardable = isBoardable(record) && (await hasUsername(ctx, playerId));
+  const fields = { ...record, boardable };
   if (row === null) await ctx.db.insert('ratings', { playerId, ...fields });
   else await ctx.db.patch(row._id, fields);
 }
@@ -186,6 +197,17 @@ export async function rateMatch(
   const next = afterRatedMatch(won, lost, length);
   await writeRating(ctx, winnerId, wonRow, { ...next.winner, shown: won.shown });
   await writeRating(ctx, loserId, lostRow, { ...next.loser, shown: lost.shown });
+}
+
+/**
+ * The username of `playerId` was picked or cleared (`usernames.ts`):
+ * writes `boardable` again, so the global board index stays right.
+ */
+export async function refreshBoardable(ctx: MutationCtx, playerId: string): Promise<void> {
+  const row = await ratingRow(ctx, playerId);
+  if (row === null) return;
+  const boardable = isBoardable(row) && (await hasUsername(ctx, playerId));
+  if (row.boardable !== boardable) await ctx.db.patch(row._id, { boardable });
 }
 
 /** The username of `playerId` as a name, or `null` with none. */
@@ -238,8 +260,9 @@ export const friendsBoard = query({
 
 /**
  * The top `GLOBAL_BOARD_ROWS` listed players, best first. Reads at most
- * `GLOBAL_BOARD_READ` rows of `by_board`: enough for the rows with no
- * username and the players the caller blocked (`MAX_BLOCKS`).
+ * `GLOBAL_BOARD_READ` rows of `by_board`: a `boardable` row has a
+ * username, so the read only skips the players the caller blocked
+ * (`MAX_BLOCKS`).
  */
 export const globalBoard = query({
   args: {},

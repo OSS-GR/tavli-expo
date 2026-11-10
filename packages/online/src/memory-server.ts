@@ -1465,8 +1465,10 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       friendsBoard: () =>
         call(() => {
           const id = saved();
+          // Like Convex: each friend with a rated match (only saved
+          // accounts are friends or get rated).
           const friends = [...(friendEdges.get(id)?.keys() ?? [])].filter(
-            (friend) => isSaved(friend) && (ratings.get(friend)?.matches ?? 0) > 0,
+            (friend) => (ratings.get(friend)?.matches ?? 0) > 0,
           );
           return friendsBoardRows(
             [id, ...friends].map((player) => boardPlayer(player, nameOf(player))),

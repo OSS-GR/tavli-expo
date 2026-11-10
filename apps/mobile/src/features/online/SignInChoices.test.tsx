@@ -143,7 +143,7 @@ describe('the username step after a sign-in', () => {
 });
 
 describe('what a saved account gives (#463)', () => {
-  it('shows the four rows, the sample friend record and what a guest lacks', async () => {
+  it('shows the five rows, the sample friend record and what a guest lacks', async () => {
     await open(undefined);
     const benefits = within(screen.getByTestId('sign-in-benefits'));
     expect(benefits.getByRole('header', { name: 'A saved account gives you' })).toBeOnTheScreen();
@@ -152,6 +152,8 @@ describe('what a saved account gives (#463)', () => {
       'Your record with each friend',
       'Invites in one tap',
       'Your games on any phone',
+      // Leaderboards (#407).
+      'A rating and leaderboards',
     ]) {
       expect(benefits.getByLabelText(new RegExp(`^${title}\\. `))).toBeOnTheScreen();
     }
@@ -161,7 +163,7 @@ describe('what a saved account gives (#463)', () => {
     expect(
       screen.getByText('A guest plays on this phone only, with no friends list.'),
     ).toBeOnTheScreen();
-    expect(screen.queryByText(/leaderboard|coming soon/i)).toBeNull();
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
 

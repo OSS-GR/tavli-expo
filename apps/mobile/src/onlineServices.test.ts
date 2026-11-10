@@ -16,7 +16,13 @@ import { createMemoryGameServer } from '@tavli/online';
 
 import { onlineFake } from '../test/onlineFake';
 
-import { createOnlineServices, lazyFriends, once, type OnlineAdapters } from './onlineServices';
+import {
+  createOnlineServices,
+  lazyFriends,
+  lazyRatings,
+  once,
+  type OnlineAdapters,
+} from './onlineServices';
 import {
   appUpdates as servicesAppUpdates,
   usernames as servicesUsernames,
@@ -28,6 +34,7 @@ import {
   pushTokens as servicesPushTokens,
   safety as servicesSafety,
   friends as servicesFriends,
+  ratings as servicesRatings,
 } from './services';
 
 const SERVER = {
@@ -124,6 +131,14 @@ function memoryAdapters() {
         const user = auth.currentUser();
         if (user !== null && !user.isGuest) server.markSaved(user.id);
         return server.friendsFor(user?.id ?? null);
+      });
+    },
+    createRatings: ({ auth }) => {
+      made.push('ratings');
+      return lazyRatings(() => {
+        const user = auth.currentUser();
+        if (user !== null && !user.isGuest) server.markSaved(user.id);
+        return server.ratingsFor(user?.id ?? null);
       });
     },
   };
@@ -337,6 +352,17 @@ describe('createOnlineServices', () => {
     expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
   });
 
+  it('runs ratings on the same client, as the signed-in user (#407)', async () => {
+    const { adapters, made } = memoryAdapters();
+    const online = createOnlineServices(SERVER, adapters)!;
+    await expect(online.ratings.mine()).rejects.toMatchObject({ code: 'NOT_SIGNED_IN' });
+    expect(made).toEqual([`auth ${SERVER.siteUrl}`, `client ${SERVER.url}`, 'ratings']);
+    // A guest has no rating: ratings need a saved account.
+    await online.auth.signInAsGuest();
+    await expect(online.ratings.globalBoard()).rejects.toMatchObject({ code: 'NOT_SAVED' });
+    expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
+  });
+
   it('passes every sign-in call through', async () => {
     const { adapters } = memoryAdapters();
     const online = createOnlineServices(SERVER, adapters)!;
@@ -366,6 +392,7 @@ describe('the Jest fake of @/services', () => {
     expect(servicesUsernames).toBe(onlineFake.usernames);
     expect(servicesSafety).toBe(onlineFake.safety);
     expect(servicesFriends).toBe(onlineFake.friends);
+    expect(servicesRatings).toBe(onlineFake.ratings);
   });
 
   it('saves push tokens as the signed-in guest, and refuses them while nobody is signed in', async () => {

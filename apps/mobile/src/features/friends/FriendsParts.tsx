@@ -1,5 +1,5 @@
 /**
- * Parts the friends screens share (#406): what shows before the list
+ * Parts the friends screens share (#406), and the leaderboards (#407): what shows before the list
  * (loading, not signed in, a guest, a failed load), and the problem line.
  */
 import { useTranslation } from 'react-i18next';
@@ -18,10 +18,12 @@ export interface NotReadyProps {
   /** Opens Settings → Account, where a guest saves the account. */
   onAccount: () => void;
   testID: string;
+  /** Whose texts to read: the friends screens' (default) or the leaderboards' (#407). */
+  texts?: 'friends' | 'ratings';
 }
 
 /** The screen before its data: loading, not signed in, a guest, or a failed load. */
-export function NotReady({ state, onRetry, onAccount, testID }: NotReadyProps) {
+export function NotReady({ state, onRetry, onAccount, testID, texts = 'friends' }: NotReadyProps) {
   const { t } = useTranslation();
   switch (state.kind) {
     case 'loading':
@@ -35,7 +37,7 @@ export function NotReady({ state, onRetry, onAccount, testID }: NotReadyProps) {
       return (
         <>
           <Text testID={`${testID}-signed-out`} style={styles.line}>
-            {t('friends.signedOut')}
+            {t(`${texts}.signedOut`)}
           </Text>
           <ActionButton
             testID={`${testID}-account`}
@@ -49,7 +51,7 @@ export function NotReady({ state, onRetry, onAccount, testID }: NotReadyProps) {
       return (
         <>
           <Text testID={`${testID}-guest`} style={styles.line}>
-            {t('friends.guest')}
+            {t(`${texts}.guest`)}
           </Text>
           <AccountBenefits testID={`${testID}-benefits`} />
           <ActionButton
@@ -63,7 +65,7 @@ export function NotReady({ state, onRetry, onAccount, testID }: NotReadyProps) {
       return (
         <>
           <Text testID={`${testID}-failed`} style={styles.line}>
-            {t('friends.failed')}
+            {t(`${texts}.failed`)}
           </Text>
           <ActionButton
             testID={`${testID}-retry`}
