@@ -1,0 +1,9 @@
+# Cloudflare Pages (and Netlify) headers (#332). Not served as a page.
+# iOS reads this file for universal links. It must be JSON, over HTTPS,
+# with no redirect. The file has no extension, so name the type here.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+
+# Invite pages hold a code: keep them out of search engines.
+/i/*
+  X-Robots-Tag: noindex

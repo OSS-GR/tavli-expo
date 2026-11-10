@@ -2,10 +2,16 @@
  * Invite links (#256). Pure: no React, no router.
  *
  * Two forms open the invite screen:
- * - `tavlaki://invite/<code>`: the app scheme (`app.json`). It works now.
- * - `https://tavlaki.com/i/<code>`: the share link. The phone opens it in
- *   the app only once tavlaki.com hosts the universal link and App Link
- *   files (owner, a later issue). Until then it opens in the browser.
+ * - `tavlaki://invite/<code>`: the app scheme (`app.json`). Expo Router
+ *   makes it the path `/invite/<code>` (`app/invite/[code].tsx`).
+ * - `https://tavlaki.com/i/<code>`: the share link (#332). On an iPhone with
+ *   a production build, iOS opens it in the app (a universal link:
+ *   `ios.associatedDomains` in `app.json`, and the site's
+ *   `apple-app-site-association` in `docs/legal/site/.well-known/`). Expo
+ *   Router makes it the path `/i/<code>`, and `app/i/[code].tsx` sends it
+ *   on to `/invite/<code>`. Without the app, or on Android (App Links come
+ *   later), the link opens the site's fallback page (`docs/legal/site/i/`),
+ *   which tells the friend how to get the app and enter the code.
  *
  * The code may come in any case. A code with a wrong length, or with a
  * character that is not in `INVITE_CODE_ALPHABET`, is refused.
@@ -29,10 +35,8 @@ const LINK_FORMS = [
  * The invite code in `link`, in capital letters, or `null` when `link` is
  * not an invite link or its code is not a code.
  *
- * The router opens `tavlaki://invite/<code>` by itself. "Join with a code"
- * (#333, `typedCode.ts`) uses this for a pasted link. Universal links and
- * app links will use it later, when an `https://tavlaki.com/i/<code>` link
- * must be turned into the route.
+ * The router opens both links by itself (as routes). "Join with a code"
+ * (#333, `typedCode.ts`) uses this for a pasted link.
  */
 export function inviteCodeFromLink(link: string): string | null {
   const text = link.trim();
@@ -44,11 +48,12 @@ export function inviteCodeFromLink(link: string): string | null {
 }
 
 /**
- * The invite code in a router path (`/invite/<code>`, what Expo Router
- * makes of `tavlaki://invite/<code>`), in capital letters, or `null`.
+ * The invite code in a router path, in capital letters, or `null`. The path
+ * is `/invite/<code>` (what Expo Router makes of `tavlaki://invite/<code>`)
+ * or `/i/<code>` (of the share link `https://tavlaki.com/i/<code>`, #332).
  */
 export function inviteCodeFromPath(pathname: string): string | null {
-  const code = /^\/invite\/([0-9a-z]+)\/?$/i.exec(pathname)?.[1];
+  const code = /^\/(?:invite|i)\/([0-9a-z]+)\/?$/i.exec(pathname)?.[1];
   return code === undefined ? null : normalizeInviteCode(code);
 }
 

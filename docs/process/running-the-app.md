@@ -294,6 +294,33 @@ With any of the first three missing, email codes are off: `/key/email-code` answ
 
 If new players say that email sign-in answers "try again later" all day, the day cap of new addresses may be full: a script can fill it, since the server has no client address it can trust. Players who have an email key still get codes. Check the sends in AhaSend's dashboard. A flood ends by itself after a day; to let new players in sooner, raise `EMAIL_CODES_PER_DAY` for a while (it costs mail from the plan).
 
+### Universal links (#332)
+
+The share link `https://tavlaki.com/i/<code>` opens the invite in the app on an iPhone. Only **production** builds (TestFlight, the App Store) do this: `app.config.ts` (`withLinkDomains`) keeps `ios.associatedDomains` only for `APP_VARIANT=production`, and the site's association file names only `P36P357F6Z.com.tavlaki`. EAS turns on the Associated Domains capability of `com.tavlaki` by itself on the next build. The entitlement is native, so it changes the fingerprint: it needs a new build, not an EAS Update. iOS fetches the site file (through Apple's CDN) when the app is installed or updated, so publish the site first (the owner's steps: [Legal pages → Invite links](../legal/README.md#invite-links-332)).
+
+**Check the site** (from any computer):
+
+```bash
+curl -sI https://tavlaki.com/.well-known/apple-app-site-association
+```
+
+It must answer `200` with `content-type: application/json`, and no `301`/`302` (iOS follows no redirect). Apple's CDN copy, which phones read, can lag a few hours behind:
+
+```bash
+curl -s https://app-site-association.cdn-apple.com/a/v1/tavlaki.com
+```
+
+`https://tavlaki.com/i/ABCD2345` in a browser must show the fallback page ("Get Tavlaki"), with the address unchanged.
+
+**Check the app** (a TestFlight build on an iPhone):
+
+1. Make an invite in the app, or use any code: an unknown one shows "Invite not found", which also proves the link opened the app.
+2. Send the link to yourself in Messages or Notes, and tap it there. The app opens the invite. On first launch it shows language, consent and the board step first.
+3. Typing or pasting the link in Safari's address bar opens the site, not the app: iOS opens universal links only on a tap.
+4. If the link opens Safari: touch and hold it and pick **Open in "Tavlaki"** (iOS remembers a choice of Safari for the domain). With Developer Mode on, **Settings → Developer → Universal Links → Diagnostics** says whether the phone trusts the link for the app.
+
+**Check the route without a production build:** the dev build on the simulator opens the same path with the app scheme: `xcrun simctl openurl booted "tavlaki://i/ABCD2345"` (Expo Router makes it `/i/ABCD2345`, and `app/i/[code].tsx` sends it to `/invite/ABCD2345`).
+
 ### EAS Update (over-the-air updates), for later
 
 - Builds from each profile listen on the **channel** with the same name: `development`, `preview`, `production`.
@@ -336,7 +363,7 @@ To try an invite link (#256):
 2. Open the link: tap **Open the invite**, or on the iOS simulator run `xcrun simctl openurl booted "tavlaki://invite/ABCD2345"` (Android: `adb shell am start -a android.intent.action.VIEW -d "tavlaki://invite/ABCD2345"`).
 3. Tap **Accept**. The board opens, and the bot plays White.
 
-The invite lives on the in-memory server, so it works only while the app runs. A link that opens the app on first launch shows language and consent first, then the invite. The `https://tavlaki.com/i/<code>` link does not open the app yet: it needs universal links and app links.
+The invite lives on the in-memory server, so it works only while the app runs. A link that opens the app on first launch shows language and consent first, then the invite. The `https://tavlaki.com/i/<code>` share link opens the app only in a production build on an iPhone (see [Universal links](#universal-links-332)); `tavlaki://i/<code>` takes the same route in a dev build. Android App Links come later.
 
 **Dev menu:** press `m` in the Metro terminal, shake the phone, or press `Cmd+D` (iOS simulator) / `Cmd+M` or `Ctrl+M` (Android emulator). It has reload and the performance monitor.
 

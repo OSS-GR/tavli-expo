@@ -5,6 +5,7 @@ import { act, getMockContext, renderRouter, screen } from 'expo-router/testing-l
 import { Text } from 'react-native';
 
 import RootLayout from '@/app/_layout';
+import ShareLinkRoute from '@/app/i/[code]';
 import HomeScreen from '@/app/index';
 import SettingsRoute from '@/app/settings';
 import WelcomeBoardRoute from '@/app/welcome/board';
@@ -45,6 +46,8 @@ const routes = {
   'dev/online': stub('dev online'),
   'dev/race': stub('dev race'),
   'invite/[code]': stub('invite'),
+  // The real route: it sends the share link on to the invite route (#332).
+  'i/[code]': ShareLinkRoute,
   'friend/index': stub('play a friend'),
   'friend/[code]': stub('invite wait'),
   join: stub('join with a code'),
@@ -354,6 +357,17 @@ describe('first launch', () => {
     expect(screen).toHavePathname('/invite/ABCD2345');
     expect(screen.getByText('invite')).toBeOnTheScreen();
     // No welcome screen behind it.
+    expect(router.canGoBack()).toBe(false);
+  });
+
+  it('opens a share link (https://tavlaki.com/i/<code>) after the welcome flow too (#332)', async () => {
+    const user = userEvent.setup();
+    await openApp('/i/abcd2345');
+    expect(screen).toHavePathname('/welcome/language');
+    await passWelcome(user, "Don't allow");
+
+    expect(screen).toHavePathname('/invite/ABCD2345');
+    expect(screen.getByText('invite')).toBeOnTheScreen();
     expect(router.canGoBack()).toBe(false);
   });
 

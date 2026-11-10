@@ -20,6 +20,9 @@
  * could open that app instead of the dev app. Those variants have no dev
  * launcher to open anyway (see `withDevClientScheme`).
  *
+ * Only the production build opens `https://tavlaki.com/i/<code>` links in
+ * the app (universal links, #332): see `withLinkDomains`.
+ *
  * The result goes into the fingerprint (the runtime version). EAS Build
  * makes the fingerprint on your computer and again on the build server, and
  * the build fails when the two differ. So read only env vars that both
@@ -102,6 +105,23 @@ export function withDevClientScheme(
   return [...(plugins ?? []), ['expo-dev-client', { addGeneratedScheme: false }]];
 }
 
+/**
+ * The iOS config for `variant`. `app.json` lists the universal link domain
+ * (`ios.associatedDomains`, #332). Only the production build keeps it:
+ *
+ * - The site's `apple-app-site-association` file names only `com.tavlaki`,
+ *   so iOS would never open a link in a dev or preview app anyway.
+ * - A free Apple ID cannot sign the Associated Domains capability, so a
+ *   local dev build with one would fail to sign.
+ * - Preview builds are simulator builds with the dev server: their invite
+ *   codes are not on the production server.
+ */
+export function withLinkDomains(ios: ExpoConfig['ios'], variant: Variant): ExpoConfig['ios'] {
+  if (variant === 'production' || ios?.associatedDomains === undefined) return ios;
+  const { associatedDomains: _dropped, ...rest } = ios;
+  return rest;
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   const variant = readVariant();
   const { idSuffix, nameSuffix } = VARIANTS[variant];
@@ -116,7 +136,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: `${name}${nameSuffix}`,
     slug,
-    ios: { ...config.ios, bundleIdentifier: `${bundleIdentifier}${idSuffix}` },
+    ios: {
+      ...withLinkDomains(config.ios, variant),
+      bundleIdentifier: `${bundleIdentifier}${idSuffix}`,
+    },
     android: { ...config.android, package: `${androidPackage}${idSuffix}` },
     plugins: withDevClientScheme(config.plugins, variant),
     extra: { ...config.extra, convexUrl: url, ...(siteUrl ? { convexSiteUrl: siteUrl } : {}) },
