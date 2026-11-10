@@ -85,6 +85,37 @@ describe('<FriendsScreen />', () => {
     expect(props.onAdd).toHaveBeenCalled();
   });
 
+  it('loads again each time the screen shows (a new visit)', async () => {
+    signInSaved();
+    const props = {
+      onBack: jest.fn(),
+      onAdd: jest.fn(),
+      onInvite: jest.fn(),
+      onOpenInvite: jest.fn(),
+      onAccount: jest.fn(),
+    };
+    const ui = (visit: number) => (
+      <FriendsScreen
+        auth={auth!}
+        friends={onlineFake.friends}
+        safety={onlineFake.safety}
+        visit={visit}
+        {...props}
+      />
+    );
+    await render(ui(1));
+    await flush();
+    expect(screen.getByTestId('friends-empty')).toBeOnTheScreen();
+    // A friend is added on another screen; then the player comes back.
+    await befriend('ann');
+    await screen.rerender(ui(1));
+    await flush();
+    expect(screen.queryByText(nameOf('ann'))).toBeNull();
+    await screen.rerender(ui(2));
+    await flush();
+    expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
+  });
+
   it('lists friends with the record, and Invite opens the setup for that friend', async () => {
     signInSaved();
     await befriend('ann');

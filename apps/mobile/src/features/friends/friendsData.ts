@@ -51,9 +51,11 @@ export function friendsProblem(error: unknown): FriendsProblem {
 /**
  * Runs `load` as the signed-in player. `reload` loads again and keeps
  * what shows until the answer comes; `retry` shows the spinner first.
- * An older answer never replaces a newer one.
+ * An older answer never replaces a newer one. A new `visit` (the route
+ * counts each time the screen shows) loads again too, so a screen is
+ * fresh when the player comes back to it.
  */
-export function useFriendsData<T>(auth: AuthProvider, load: () => Promise<T>) {
+export function useFriendsData<T>(auth: AuthProvider, load: () => Promise<T>, visit = 0) {
   const [state, setState] = useState<FriendsLoad<T>>({ kind: 'loading' });
   const live = useRef(true);
   const latest = useRef(0);
@@ -89,7 +91,9 @@ export function useFriendsData<T>(auth: AuthProvider, load: () => Promise<T>) {
       });
   }, [auth, load]);
 
-  useEffect(reload, [reload]);
+  useEffect(() => {
+    reload();
+  }, [reload, visit]);
 
   const retry = useCallback(() => {
     setState({ kind: 'loading' });

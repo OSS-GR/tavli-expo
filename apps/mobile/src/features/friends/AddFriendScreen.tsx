@@ -46,6 +46,8 @@ import { friendsStyles as styles, NotReady, useProblemText } from './FriendsPart
 import { QrCode } from './QrCode';
 
 export interface AddFriendScreenProps {
+  /** Counts the times the screen shows (the route): each new one loads again. */
+  visit?: number;
   auth: AuthProvider;
   friends: Friends;
   onBack: () => void;
@@ -79,6 +81,7 @@ export function AddFriendScreen({
   onBack,
   onLink,
   onAccount,
+  visit = 0,
 }: AddFriendScreenProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
@@ -87,9 +90,9 @@ export function AddFriendScreen({
     const [token, recent] = await Promise.all([friends.myFriendLink(), friends.recentPlayers()]);
     return { token, recent };
   }, [friends]);
-  const { state, reload, retry } = useFriendsData(auth, load);
-  // A new token from New link, until the next load.
-  const [newToken, setNewToken] = useState<string | null>(null);
+  const { state, reload, retry } = useFriendsData(auth, load, visit);
+  // A new token from New link, until the next load brings the server's.
+  const [newToken, setNewToken] = useState<{ token: string; over: AddData } | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
   const [sent, setSent] = useState<{ name: string; status: FriendStatus; n: number } | null>(null);
@@ -155,7 +158,12 @@ export function AddFriendScreen({
     onLink(token);
   };
 
-  const token = state.kind === 'ready' ? (newToken ?? state.data.token) : null;
+  const token =
+    state.kind !== 'ready'
+      ? null
+      : newToken !== null && newToken.over === state.data
+        ? newToken.token
+        : state.data.token;
   const link = token === null ? null : friendLinkUrl(token);
   const message = link === null ? '' : t('friends.add.shareMessage', { link });
 
@@ -369,7 +377,12 @@ export function AddFriendScreen({
             cancelLabel={t('common.cancel')}
             onConfirm={() => {
               setResetting(false);
-              run(() => friends.resetFriendLink(), setNewToken);
+              run(
+                () => friends.resetFriendLink(),
+                (next) => {
+                  if (state.kind === 'ready') setNewToken({ token: next, over: state.data });
+                },
+              );
             }}
             onCancel={() => setResetting(false)}
           />

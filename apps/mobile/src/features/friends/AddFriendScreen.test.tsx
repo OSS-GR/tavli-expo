@@ -99,6 +99,26 @@ describe('<AddFriendScreen />', () => {
     expect(screen.getByTestId('add-friend-link')).toHaveTextContent(now);
   });
 
+  it('after New link, a later load shows the link the server has', async () => {
+    signInSaved();
+    const props = { onBack: jest.fn(), onLink: jest.fn(), onAccount: jest.fn() };
+    const ui = (visit: number) => (
+      <AddFriendScreen auth={auth!} friends={onlineFake.friends} visit={visit} {...props} />
+    );
+    await render(ui(1));
+    await flush();
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: 'New link' }));
+    await user.press(screen.getByTestId('dialog-confirm'));
+    await flush();
+    expect(screen.getByTestId('add-friend-link')).toHaveTextContent(await myLink());
+    // The link changes another way (another phone), then the screen loads again.
+    await onlineFake.server().friendsFor(ME).resetFriendLink();
+    await screen.rerender(ui(2));
+    await flush();
+    expect(screen.getByTestId('add-friend-link')).toHaveTextContent(await myLink());
+  });
+
   it('finds a player by exact username and asks them', async () => {
     signInSaved();
     onlineFake.server().markSaved('ann');

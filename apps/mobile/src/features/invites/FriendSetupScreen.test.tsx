@@ -292,7 +292,8 @@ describe('FriendSetupScreen', () => {
   it('a friend invite (#406) goes to that friend, with its own title', async () => {
     const user = setupUser();
     const parts = setup();
-    await parts.auth.signInAsGuest();
+    // A friend invite needs a saved account.
+    parts.authStore.session = { id: 'saved-1', isGuest: false };
     const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
@@ -310,13 +311,52 @@ describe('FriendSetupScreen', () => {
   it('a friend invite says so on TOO_MANY_INVITES from the friends port (#406)', async () => {
     const user = setupUser();
     const parts = setup();
-    await parts.auth.signInAsGuest();
+    parts.authStore.session = { id: 'saved-1', isGuest: false };
     const invite = jest.fn().mockRejectedValue({ code: 'TOO_MANY_INVITES', message: 'too many' });
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     expect(screen.getByTestId('friend-problem')).toHaveTextContent(/You have 10 open invites/);
     expect(props.onCreated).not.toHaveBeenCalled();
+  });
+
+  it('a friend invite as a guest says it needs a saved account, with no sign-in sheet (#406)', async () => {
+    const user = setupUser();
+    const parts = setup();
+    await parts.auth.signInAsGuest();
+    const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
+    await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(screen.getByTestId('friend-problem')).toHaveTextContent(
+      'Friends need a saved account. Save your guest account first: your games stay.',
+    );
+    expect(invite).not.toHaveBeenCalled();
+    expect(props.onCreated).not.toHaveBeenCalled();
+  });
+
+  it('a friend invite with nobody signed in makes no guest (#406)', async () => {
+    const user = setupUser();
+    const parts = setup();
+    const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
+    await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
+    expect(screen.getByTestId('friend-problem')).toHaveTextContent(/Friends need a saved account/);
+    expect(parts.authStore.guests).toBe(0);
+    expect(invite).not.toHaveBeenCalled();
+  });
+
+  it('a friend invite says it needs a saved account on NOT_SAVED from the server (#406)', async () => {
+    const user = setupUser();
+    const parts = setup();
+    parts.authStore.session = { id: 'saved-1', isGuest: false };
+    const invite = jest.fn().mockRejectedValue({ code: 'NOT_SAVED', message: 'not saved' });
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
+    await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    expect(screen.getByTestId('friend-problem')).toHaveTextContent(/Friends need a saved account/);
   });
 
   it('a second tap while the invite is made makes no second invite', async () => {

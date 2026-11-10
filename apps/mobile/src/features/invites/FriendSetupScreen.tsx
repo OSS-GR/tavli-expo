@@ -25,6 +25,8 @@
  * - Friend invite (#406, `friend`): the same setup, but the invite goes
  *   to one friend (`Friends.inviteFriend`), who gets a push. The title
  *   and the intro say so.
+ *   It needs a saved account: a guest, or nobody signed in, gets the
+ *   "Friends need a saved account" line and no sign-in sheet.
  *
  * Navigation stays in the route (`app/friend/index.tsx`, and
  * `app/friends/invite/[id].tsx` for a friend invite).
@@ -82,7 +84,7 @@ export interface FriendSetupScreenProps {
 }
 
 /** Why "Make an invite" did not work. */
-type Problem = 'account' | 'make' | 'tooMany';
+type Problem = 'account' | 'make' | 'tooMany' | 'notSaved';
 
 /** The turn time limit options: null is the 24-hour default, others are minutes. */
 const TIME_LIMITS: readonly (number | null)[] = [null, 5, 1];
@@ -140,6 +142,12 @@ export function FriendSetupScreen({
     }
     // Gone (Back) before the account was ready: make no invite.
     if (!mounted.current) return;
+    if (friend !== undefined && (user === null || user.isGuest)) {
+      // A friend invite needs a saved account (ADR-0008): no sign-in sheet,
+      // since a guest made there could not invite a friend either.
+      failed('notSaved');
+      return;
+    }
     if (user === null) {
       // Nobody signed in: the sheet asks how. Its sign-in calls `make` again.
       making.current = false;
@@ -155,7 +163,8 @@ export function FriendSetupScreen({
       const tooMany =
         (isInviteErrorData(error) || isFriendsErrorData(error)) &&
         error.code === 'TOO_MANY_INVITES';
-      failed(tooMany ? 'tooMany' : 'make');
+      const notSaved = isFriendsErrorData(error) && error.code === 'NOT_SAVED';
+      failed(tooMany ? 'tooMany' : notSaved ? 'notSaved' : 'make');
       return;
     }
     if (!mounted.current) {
@@ -188,7 +197,9 @@ export function FriendSetupScreen({
         ? t('friend.tooMany', { max: MAX_OPEN_INVITES })
         : problem?.kind === 'make'
           ? t('friend.makeFailed')
-          : null;
+          : problem?.kind === 'notSaved'
+            ? t('friends.guest')
+            : null;
   // iOS VoiceOver does not read `accessibilityRole="alert"`: read each problem.
   useEffect(() => {
     if (problemText !== null) AccessibilityInfo.announceForAccessibility(problemText);
