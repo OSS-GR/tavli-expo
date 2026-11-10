@@ -40,6 +40,7 @@ import type { BetterAuthPlugin } from 'better-auth';
 import {
   APIError,
   createAuthEndpoint,
+  createAuthMiddleware,
   getSessionFromCtx,
   sessionMiddleware,
 } from 'better-auth/api';
@@ -83,10 +84,50 @@ export function isKeyProviderId(value: unknown): value is KeyProviderId {
  * token for another app, its bundle id: never the token, the nonce,
  * Apple's id or an email.
  */
-export function logKeyRefusal(reason: string, extra: { audience?: string } = {}): false {
+export function logKeyRefusal(
+  reason: string,
+  extra: { audience?: string; code?: string; cookie?: boolean; provider?: string } = {},
+): false {
   console.warn('apple key refused', { reason, ...extra });
   return false;
 }
+
+/**
+ * Logs the answer a refused `/key/save` gave (its error code only) and
+ * returns the error to throw again. Some refusals have no reason of their
+ * own (a missing session, a bad body, a second key of one kind), so this
+ * line is the one that names them.
+ */
+function logSaveRefusal(error: unknown, body: unknown): unknown {
+  // A move offer (#403) is an answer the app asks about, not a refusal.
+  if (error instanceof APIError && error.body?.['move'] !== undefined) return error;
+  const code = error instanceof APIError ? String(error.body?.code ?? error.status) : 'INTERNAL';
+  logKeyRefusal('save-refused', { code, ...providerOf(body) });
+  return error;
+}
+
+/** The key kind a body names (`apple`, `email`), for the log; nothing else from it. */
+function providerOf(body: unknown): { provider?: string } {
+  const provider = (body as { provider?: unknown } | null | undefined)?.provider;
+  return isKeyProviderId(provider) ? { provider } : {};
+}
+
+/**
+ * Better Auth's `sessionMiddleware`, plus a log line when there is no
+ * session: whether the phone sent a cookie at all, never the cookie.
+ */
+const keySessionMiddleware = createAuthMiddleware(async (ctx) => {
+  const session = await getSessionFromCtx(ctx);
+  if (!session?.session) {
+    const headers = ctx.request?.headers ?? ctx.headers;
+    logKeyRefusal('no-session', {
+      cookie: headers?.has('cookie') === true,
+      ...providerOf(ctx.body),
+    });
+    throw new APIError('UNAUTHORIZED', { message: 'Unauthorized', code: 'UNAUTHORIZED' });
+  }
+  return { session };
+});
 
 /** The error codes of these routes, beside Better Auth's own. */
 export const KEY_ERROR_CODES = {
@@ -334,119 +375,125 @@ export function keyPlugin(options: KeyPluginOptions) {
 
       saveKey: createAuthEndpoint(
         '/key/save',
-        { method: 'POST', use: [sessionMiddleware] },
+        { method: 'POST', use: [keySessionMiddleware] },
         async (ctx) => {
-          const body = readSaveBody(ctx.body);
-          const providerId = body.provider;
-          const proveIdToken = async (token: string, nonce: string): Promise<ProvenKey> => {
-            const provider = ctx.context.socialProviders.find((p) => p.id === providerId);
-            // Our own check (`verifyKeyIdToken` in `auth.ts`), the one Better
-            // Auth's sign-in also runs first: Apple's signature, our app, our
-            // nonce (once). A provider without it is never trusted here.
-            // No provider: this kind of key is off here (Apple with no
-            // `APPLE_SERVICES_ID`, #462). The app says so, not "no connection".
-            if (provider === undefined) {
-              logKeyRefusal(`${providerId}-off`);
-              throw keyError('SERVICE_UNAVAILABLE', 'KEY_OFF');
-            }
-            const verify = provider.options?.verifyIdToken;
-            if (verify === undefined) throw keyError('BAD_REQUEST', 'BAD_REQUEST');
-            // `verify` logs why it said no.
-            if (!(await verify(token, nonce, ctx))) {
-              throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
-            }
-            const info = await provider.getUserInfo({ idToken: token });
-            if (info === null) {
-              logKeyRefusal('no-user-info');
-              throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
-            }
-            // The provider's own account id (Apple: `sub`), as its sign-in reads it.
-            const subject = await provider.accountSubject({
-              tokens: { idToken: token },
-              profile: info.data,
-            });
-            const accountId = String(subject ?? '');
-            if (accountId === '') {
-              logKeyRefusal('no-account-id');
-              throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
-            }
-            const email = info.user.email?.toLowerCase();
-            return {
-              accountId,
-              ...(email !== undefined && email !== '' ? { email } : {}),
-              emailVerified: info.user.emailVerified === true,
+          try {
+            const body = readSaveBody(ctx.body);
+            const providerId = body.provider;
+            const proveIdToken = async (token: string, nonce: string): Promise<ProvenKey> => {
+              const provider = ctx.context.socialProviders.find((p) => p.id === providerId);
+              // Our own check (`verifyKeyIdToken` in `auth.ts`), the one Better
+              // Auth's sign-in also runs first: Apple's signature, our app, our
+              // nonce (once). A provider without it is never trusted here.
+              // No provider: this kind of key is off here (Apple with no
+              // `APPLE_SERVICES_ID`, #462). The app says so, not "no connection".
+              if (provider === undefined) {
+                logKeyRefusal(`${providerId}-off`);
+                throw keyError('SERVICE_UNAVAILABLE', 'KEY_OFF');
+              }
+              const verify = provider.options?.verifyIdToken;
+              if (verify === undefined) throw keyError('BAD_REQUEST', 'BAD_REQUEST');
+              // `verify` logs why it said no.
+              if (!(await verify(token, nonce, ctx))) {
+                throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
+              }
+              const info = await provider.getUserInfo({ idToken: token });
+              if (info === null) {
+                logKeyRefusal('no-user-info');
+                throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
+              }
+              // The provider's own account id (Apple: `sub`), as its sign-in reads it.
+              const subject = await provider.accountSubject({
+                tokens: { idToken: token },
+                profile: info.data,
+              });
+              const accountId = String(subject ?? '');
+              if (accountId === '') {
+                logKeyRefusal('no-account-id');
+                throw keyError('UNAUTHORIZED', 'INVALID_TOKEN');
+              }
+              const email = info.user.email?.toLowerCase();
+              return {
+                accountId,
+                ...(email !== undefined && email !== '' ? { email } : {}),
+                emailVerified: info.user.emailVerified === true,
+              };
             };
-          };
-          const { internalAdapter } = ctx.context;
-          const user = ctx.context.session.user;
-          const accounts = await internalAdapter.findAccounts(user.id);
-          let proven: ProvenKey;
-          if (body.provider === 'email') {
-            // What this user has already needs no code, so a refusal here
-            // does not use one up. Whether the address is another user's
-            // key is told only after the code proves it.
-            const own = accounts.find((account) => account.providerId === 'email');
-            if (own?.accountId === body.email) return ctx.json({ user: userOutput(user) });
-            if (own !== undefined) throw keyError('CONFLICT', 'PROVIDER_TAKEN');
-            // The code proves the address: it is the key's id and the email.
-            await checkEmailCode(ctx.context.secret, body);
-            proven = { accountId: body.email, email: body.email, emailVerified: true };
-          } else {
-            proven = await proveIdToken(body.token, body.nonce);
-          }
-          const { accountId } = proven;
+            const { internalAdapter } = ctx.context;
+            const user = ctx.context.session.user;
+            const accounts = await internalAdapter.findAccounts(user.id);
+            let proven: ProvenKey;
+            if (body.provider === 'email') {
+              // What this user has already needs no code, so a refusal here
+              // does not use one up. Whether the address is another user's
+              // key is told only after the code proves it.
+              const own = accounts.find((account) => account.providerId === 'email');
+              if (own?.accountId === body.email) return ctx.json({ user: userOutput(user) });
+              if (own !== undefined) throw keyError('CONFLICT', 'PROVIDER_TAKEN');
+              // The code proves the address: it is the key's id and the email.
+              await checkEmailCode(ctx.context.secret, body);
+              proven = { accountId: body.email, email: body.email, emailVerified: true };
+            } else {
+              proven = await proveIdToken(body.token, body.nonce);
+            }
+            const { accountId } = proven;
 
-          const linked = await internalAdapter.findAccountByKey({ providerId, accountId });
-          if (linked !== null) {
-            if (linked.userId === user.id) {
-              // Saved already: nothing to do.
-              return ctx.json({ user: userOutput(user) });
+            const linked = await internalAdapter.findAccountByKey({ providerId, accountId });
+            if (linked !== null) {
+              if (linked.userId === user.id) {
+                // Saved already: nothing to do.
+                return ctx.json({ user: userOutput(user) });
+              }
+              // The key proves the person owns that account too. A guest
+              // may move its games there (#403): the ticket binds the two
+              // ids, so `/key/move` never takes an id from the app.
+              const isGuest =
+                isAnonymousUser(user) &&
+                !accounts.some((account) => isKeyProviderId(account.providerId));
+              const owner = await internalAdapter.findUserById(linked.userId);
+              if (!isGuest || owner === null || isAnonymousUser(owner)) {
+                throw keyError('CONFLICT', 'KEY_BELONGS_TO_OTHER');
+              }
+              const ticket = await makeMoveTicket(
+                ctx.context.secret,
+                { source: user.id, target: owner.id },
+                Date.now(),
+              );
+              const counts = await options.guestMoveCounts(user.id);
+              throw new APIError('CONFLICT', {
+                code: 'KEY_BELONGS_TO_OTHER',
+                message: KEY_ERROR_CODES.KEY_BELONGS_TO_OTHER,
+                move: { ticket, activeGames: counts.activeGames, openInvites: counts.openInvites },
+              });
             }
-            // The key proves the person owns that account too. A guest
-            // may move its games there (#403): the ticket binds the two
-            // ids, so `/key/move` never takes an id from the app.
-            const isGuest =
-              isAnonymousUser(user) &&
-              !accounts.some((account) => isKeyProviderId(account.providerId));
-            const owner = await internalAdapter.findUserById(linked.userId);
-            if (!isGuest || owner === null || isAnonymousUser(owner)) {
-              throw keyError('CONFLICT', 'KEY_BELONGS_TO_OTHER');
+            if (accounts.some((account) => account.providerId === providerId)) {
+              throw keyError('CONFLICT', 'PROVIDER_TAKEN');
             }
-            const ticket = await makeMoveTicket(
-              ctx.context.secret,
-              { source: user.id, target: owner.id },
-              Date.now(),
-            );
-            const counts = await options.guestMoveCounts(user.id);
-            throw new APIError('CONFLICT', {
-              code: 'KEY_BELONGS_TO_OTHER',
-              message: KEY_ERROR_CODES.KEY_BELONGS_TO_OTHER,
-              move: { ticket, activeGames: counts.activeGames, openInvites: counts.openInvites },
-            });
-          }
-          if (accounts.some((account) => account.providerId === providerId)) {
-            throw keyError('CONFLICT', 'PROVIDER_TAKEN');
-          }
-          // The account hook claims the key first (`claimKey`), in one
-          // transaction: if another user got it a moment ago, this throws
-          // KEY_BELONGS_TO_OTHER; if a save of another Apple id by this
-          // user just passed the check above, PROVIDER_TAKEN.
-          await internalAdapter.createAccount({ userId: user.id, providerId, accountId });
+            // The account hook claims the key first (`claimKey`), in one
+            // transaction: if another user got it a moment ago, this throws
+            // KEY_BELONGS_TO_OTHER; if a save of another Apple id by this
+            // user just passed the check above, PROVIDER_TAKEN.
+            await internalAdapter.createAccount({ userId: user.id, providerId, accountId });
 
-          // The key's email, when no other user has it (emails are unique).
-          const patch: { isAnonymous: boolean; email?: string; emailVerified?: boolean } = {
-            isAnonymous: false,
-          };
-          const { email } = proven;
-          if (email !== undefined) {
-            const other = await internalAdapter.findUserByEmail(email);
-            if (other === null || other.user.id === user.id) {
-              patch.email = email;
-              patch.emailVerified = proven.emailVerified;
+            // The key's email, when no other user has it (emails are unique).
+            const patch: { isAnonymous: boolean; email?: string; emailVerified?: boolean } = {
+              isAnonymous: false,
+            };
+            const { email } = proven;
+            if (email !== undefined) {
+              const other = await internalAdapter.findUserByEmail(email);
+              if (other === null || other.user.id === user.id) {
+                patch.email = email;
+                patch.emailVerified = proven.emailVerified;
+              }
             }
+            const updated = await internalAdapter.updateUser(user.id, patch);
+            return ctx.json({ user: userOutput({ ...user, ...patch, ...(updated ?? {}) }) });
+          } catch (error) {
+            // `verify` and some checks above log their own reason; this
+            // line names the answer the phone got (#462).
+            throw logSaveRefusal(error, ctx.body);
           }
-          const updated = await internalAdapter.updateUser(user.id, patch);
-          return ctx.json({ user: userOutput({ ...user, ...patch, ...(updated ?? {}) }) });
         },
       ),
 
