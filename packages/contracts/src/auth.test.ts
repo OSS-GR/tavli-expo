@@ -20,6 +20,11 @@ function memorySubject() {
       return token.slice(MEMORY_AUTH_TOKEN_PREFIX.length);
     },
     appleIdToken: (sub: string, nonce: string) => Promise.resolve(memoryAppleIdToken(sub, nonce)),
+    emailCode: (email: string) => {
+      const sent = store.sentEmailCodes.filter((mail) => mail.email === email).at(-1);
+      return sent === undefined ? Promise.reject(new Error('no code')) : Promise.resolve(sent.code);
+    },
+    store,
   };
 }
 
@@ -30,6 +35,14 @@ describe('the in-memory AuthProvider passes the contract (#131)', () => {
 });
 
 describe('the in-memory AuthProvider', () => {
+  it('keeps the sent codes in its inbox, in lower case and with the language', async () => {
+    const { auth, store } = memorySubject();
+    await auth.requestEmailCode(' Eleni@Example.com', 'el');
+    expect(store.sentEmailCodes).toEqual([
+      { email: 'eleni@example.com', code: '100001', language: 'el' },
+    ]);
+  });
+
   it('names guests guest-1, guest-2, …', async () => {
     const { auth } = memorySubject();
     expect(await auth.signInAsGuest()).toEqual({ id: 'guest-1', isGuest: true });

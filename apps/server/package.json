@@ -14,6 +14,7 @@
     "@convex-dev/better-auth": "0.13.0",
     "@tavli/contracts": "workspace:*",
     "@tavli/engine": "workspace:*",
+    "@tavli/mail-ahasend": "workspace:*",
     "@tavli/online": "workspace:*",
     "@tavli/push-expo": "workspace:*",
     "better-auth": "1.7.18",

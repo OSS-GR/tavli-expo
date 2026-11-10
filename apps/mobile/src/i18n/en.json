@@ -242,7 +242,8 @@
       "deleteHint": "Your account, username and online games on our server."
     },
     "provider": {
-      "apple": "Sign in with Apple"
+      "apple": "Sign in with Apple",
+      "email": "Email code"
     },
     "busy": {
       "signIn": "Signing you in…",

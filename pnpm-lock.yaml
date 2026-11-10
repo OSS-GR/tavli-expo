@@ -404,6 +404,9 @@ importers:
       '@tavli/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@tavli/mail-ahasend':
+        specifier: workspace:*
+        version: link:../../packages/adapters/mail-ahasend
       '@tavli/online':
         specifier: workspace:*
         version: link:../../packages/online
@@ -526,6 +529,12 @@ importers:
       expo-haptics:
         specifier: ~58.0.7
         version: 58.0.7(expo@58.0.23)
+
+  packages/adapters/mail-ahasend:
+    dependencies:
+      '@tavli/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
 
   packages/adapters/notifications-expo:
     dependencies:

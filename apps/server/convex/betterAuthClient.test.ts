@@ -1,7 +1,8 @@
 // The Better Auth adapter (`@tavli/auth-better-auth`) on Better Auth's
 // real client, against the real sign-in routes, offline (#397). The
 // client's fetch goes to convex-test as a phone that keeps its cookies
-// (`phoneFetch`), and the fake Apple signs the id tokens. The
+// (`phoneFetch`), the fake Apple signs the id tokens, and a recording
+// mail sender is the inbox of the email codes (#399). The
 // `AuthProvider` contract checks (`@tavli/contracts/testing`) run on top.
 // The adapter's own tests use a hand-written client; this one checks that
 // the real client and our routes agree on paths, bodies and error codes.
@@ -13,11 +14,12 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { fromBetterAuthClient, jwtPayload } from '@tavli/auth-better-auth/provider';
 import type { BetterAuthClient } from '@tavli/auth-better-auth/provider';
-import { isAuthErrorData } from '@tavli/contracts';
-import type { AuthProvider } from '@tavli/contracts';
+import { createRecordingMailSender, isAuthErrorData } from '@tavli/contracts';
+import type { AuthProvider, RecordingMailSender } from '@tavli/contracts';
 import { authProviderContract } from '@tavli/contracts/testing';
 import type { AuthProviderContractSubject } from '@tavli/contracts/testing';
 
+import { setMailSender } from './mail';
 import {
   appleToken,
   fakeApple,
@@ -30,6 +32,7 @@ import {
 import type { Convex, FakeApple, Phone } from './test.apple';
 
 let apple: FakeApple;
+let mail: RecordingMailSender;
 
 beforeAll(async () => {
   apple = await fakeApple();
@@ -37,11 +40,22 @@ beforeAll(async () => {
 
 beforeEach(() => {
   useFakeApple(apple);
+  mail = createRecordingMailSender();
+  setMailSender(mail);
 });
 
 afterEach(() => {
   stopFakeApple();
+  setMailSender(undefined);
 });
+
+/** The code in the newest email to `email`. */
+function codeSentTo(email: string): Promise<string> {
+  const message = mail.sent.filter((sent) => sent.to === email).at(-1);
+  const code = /\b\d{6}\b/.exec(message?.text ?? '')?.[0];
+  if (code === undefined) throw new Error('no code was sent to this address');
+  return Promise.resolve(code);
+}
 
 /** The app's client, minus the Expo plugin (it needs the phone): `phoneFetch` does its part. */
 function realClient(t: Convex, phone: Phone): BetterAuthClient {
@@ -61,6 +75,7 @@ function subject(): AuthProviderContractSubject & { t: Convex } {
     restart: () => fromBetterAuthClient(realClient(t, phone)),
     tokenSubject: (token: string) => String(jwtPayload(token)['sub']),
     appleIdToken: (sub: string, nonce: string) => appleToken(apple, { sub, nonce }),
+    emailCode: codeSentTo,
   };
 }
 

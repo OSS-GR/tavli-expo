@@ -99,10 +99,12 @@ export type {
   AuthErrorCode,
   AuthErrorData,
   AuthKey,
+  AppleKeyCredential,
   AuthKeyCredential,
   AuthKeyProvider,
   AuthProvider,
   AuthUser,
+  EmailKeyCredential,
   GuestMoveCounts,
   GuestMoveOffer,
   MemoryAuthGuestMoves,
@@ -160,6 +162,25 @@ export type {
   PushResult,
   RecordingPushProvider,
 } from './push';
+export { MAIL_ERROR_CODES, createRecordingMailSender, isMailErrorCode } from './mail';
+export type {
+  MailErrorCode,
+  MailMessage,
+  MailResult,
+  MailSender,
+  RecordingMailSender,
+} from './mail';
+export {
+  EMAIL_CODE_LANGUAGES,
+  EMAIL_CODE_LENGTH,
+  EMAIL_CODE_TRIES,
+  EMAIL_CODE_TTL_MS,
+  MAX_EMAIL_LENGTH,
+  isEmailCode,
+  isEmailCodeLanguage,
+  normalizeEmail,
+} from './email-code';
+export type { EmailCodeLanguage } from './email-code';
 export {
   PUSH_PERMISSIONS,
   PUSH_PLATFORMS,
