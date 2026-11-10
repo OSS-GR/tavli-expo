@@ -1,6 +1,8 @@
 import type { GameSummary } from '@tavli/contracts';
 
-import { onlineWins } from './GuestReminderCard';
+import { MAX_LISTED_GAMES } from '@tavli/contracts';
+
+import { listMayBeCut, onlineWins } from './GuestReminderCard';
 
 function game(winner: GameSummary['winner'], status: GameSummary['status'] = 'finished') {
   return { status, mySide: 'white', winner } as GameSummary;
@@ -14,5 +16,14 @@ describe('onlineWins (#463)', () => {
 
   it('counts the side the caller played, not White', () => {
     expect(onlineWins([{ ...game('black'), mySide: 'black' }])).toBe(1);
+  });
+});
+
+describe('listMayBeCut (#463)', () => {
+  it('is true only for a full list', () => {
+    expect(listMayBeCut(Array.from({ length: MAX_LISTED_GAMES - 1 }, () => game('white')))).toBe(
+      false,
+    );
+    expect(listMayBeCut(Array.from({ length: MAX_LISTED_GAMES }, () => game('white')))).toBe(true);
   });
 });

@@ -17,6 +17,8 @@ export interface ReminderCardProps {
   readonly last: boolean;
   /** The guest's online match wins: more than 0 puts the count in the line. */
   readonly wins?: number;
+  /** The list held only the newest games: the guest may have won more ("at least"). */
+  readonly winsAtLeast?: boolean;
   /** Save my account, or Play a friend. */
   readonly onAccept: () => void;
   /** Keep playing as a guest, or Not now. */
@@ -29,6 +31,7 @@ export function ReminderCard({
   kind,
   last,
   wins = 0,
+  winsAtLeast = false,
   onAccept,
   onDismiss,
   onStop,
@@ -36,7 +39,11 @@ export function ReminderCard({
   const { t } = useTranslation();
   const guest = kind === 'guest';
   const guestLine =
-    wins > 0 ? t('home.reminder.guest.wins', { count: wins }) : t('home.reminder.guest.body');
+    wins > 0
+      ? t(winsAtLeast ? 'home.reminder.guest.winsAtLeast' : 'home.reminder.guest.wins', {
+          count: wins,
+        })
+      : t('home.reminder.guest.body');
   return (
     <HomeBanner
       testID={`home-reminder-${kind}`}

@@ -4,9 +4,15 @@
  * finished online games list (`useMyOnlineGames`, the newest
  * `MAX_LISTED_GAMES`), which the card watches only while it shows. With
  * no win, no list yet or a failed list, the card keeps its usual text.
+ * A full list may leave older wins out, so the card says "at least".
  * Nothing new leaves the phone, and no analytics.
  */
-import type { AuthProvider, GameSummary, GameTransport } from '@tavli/contracts';
+import {
+  MAX_LISTED_GAMES,
+  type AuthProvider,
+  type GameSummary,
+  type GameTransport,
+} from '@tavli/contracts';
 
 import { useMyOnlineGames } from '@/features/online/myGames';
 
@@ -17,13 +23,23 @@ export function onlineWins(games: readonly GameSummary[]): number {
   return games.filter((game) => game.status === 'finished' && game.winner === game.mySide).length;
 }
 
-export interface GuestReminderCardProps extends Omit<ReminderCardProps, 'kind' | 'wins'> {
+/** True when the list may leave older games out (the server sends at most `MAX_LISTED_GAMES`). */
+export function listMayBeCut(games: readonly GameSummary[]): boolean {
+  return games.length >= MAX_LISTED_GAMES;
+}
+
+export interface GuestReminderCardProps extends Omit<
+  ReminderCardProps,
+  'kind' | 'wins' | 'winsAtLeast'
+> {
   readonly auth: AuthProvider;
   readonly games: GameTransport;
 }
 
 export function GuestReminderCard({ auth, games, ...card }: GuestReminderCardProps) {
   const { state } = useMyOnlineGames(auth, games, 'finished');
-  const wins = state.status === 'loaded' ? onlineWins(state.games) : 0;
-  return <ReminderCard kind="guest" wins={wins} {...card} />;
+  const loaded = state.status === 'loaded';
+  const wins = loaded ? onlineWins(state.games) : 0;
+  const atLeast = loaded && listMayBeCut(state.games);
+  return <ReminderCard kind="guest" wins={wins} winsAtLeast={atLeast} {...card} />;
 }

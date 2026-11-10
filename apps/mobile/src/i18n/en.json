@@ -95,7 +95,9 @@
         "save": "Save my account",
         "dismiss": "Keep playing as a guest",
         "wins_one": "You have won {{count}} online match as a guest. Save your account to keep it on any phone.",
-        "wins_other": "You have won {{count}} online matches as a guest. Save your account to keep them on any phone."
+        "wins_other": "You have won {{count}} online matches as a guest. Save your account to keep them on any phone.",
+        "winsAtLeast_one": "You have won at least {{count}} online match as a guest. Save your account to keep it on any phone.",
+        "winsAtLeast_other": "You have won at least {{count}} online matches as a guest. Save your account to keep them on any phone."
       },
       "offline": {
         "title": "Play a friend online?",
