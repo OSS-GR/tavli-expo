@@ -25,71 +25,103 @@
   --point-dark: #2B1F19; --point-light: #CFB98E; --field: #8A6038;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+  --space: clamp(3.5rem, 8vw, 6rem);
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--walnut); color: var(--ivory); font: 17px/1.6 var(--sans); }
-a { color: var(--brass-light); text-underline-offset: 0.18em; }
+a { color: var(--brass-light); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--ivory); }
 a:focus-visible, .get:focus-visible { outline: 3px solid var(--brass-light); outline-offset: 3px; border-radius: 4px; }
-h1, h2, h3 { font-family: var(--serif); font-weight: 600; color: var(--ivory); }
-p { margin: 0 0 1rem; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; color: var(--ivory); text-wrap: balance; }
+p { margin: 0 0 1rem; text-wrap: pretty; }
+img { display: block; max-width: 100%; height: auto; }
 .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
+@media (min-width: 40rem) { .wrap { padding: 0 2rem; } }
 
 /* Header: the icon, the name and the other language. */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
 .brand { display: flex; align-items: center; gap: 0.75rem; color: var(--ivory); text-decoration: none; font: 600 1.35rem/1 var(--serif); }
 .brand img { width: 44px; height: 44px; border-radius: 10px; }
+.brand:hover { color: var(--ivory); }
 
-/* The points: one half of a tavli board, the page's frame. */
+/* The points: the edge of a tavli board, the page's frame. */
 .points { display: block; width: 100%; height: 40px; }
 
 /* Hero */
-.hero { display: grid; gap: 1.5rem; padding-top: 2.5rem; padding-bottom: 3rem; align-items: center; }
-.hero h1 { font-size: clamp(2.1rem, 6vw, 3.5rem); line-height: 1.1; letter-spacing: -0.01em; margin: 0 0 1.25rem; }
-.hero h1 span { display: block; text-wrap: balance; }
-.lead { font-size: 1.15rem; color: var(--ivory); max-width: 34rem; }
-.get { display: inline-block; margin: 0.5rem 0 0.75rem; padding: 0.85rem 1.75rem; border-radius: 999px; background: linear-gradient(var(--brass-light), var(--brass)); color: var(--on-brass); font-weight: 700; font-size: 1.05rem; text-decoration: none; box-shadow: 0 2px 0 #83632F; }
-.get:hover { background: var(--brass-light); }
+.hero { display: grid; gap: 2rem; padding-top: 2.5rem; padding-bottom: 1rem; align-items: center; }
+.hero h1 { font-size: clamp(2.3rem, 6.5vw, 3.9rem); line-height: 1.06; letter-spacing: -0.015em; margin: 0 0 1.25rem; }
+.hero h1 span { display: block; }
+.lead { font-size: 1.2rem; line-height: 1.55; max-width: 32rem; }
+.get { display: inline-block; margin: 0.75rem 0 1rem; padding: 0.9rem 1.9rem; border-radius: 999px; background: linear-gradient(var(--brass-light), var(--brass)); color: var(--on-brass); font-weight: 700; font-size: 1.05rem; text-decoration: none; box-shadow: 0 2px 0 #83632F, 0 8px 24px rgba(0, 0, 0, 0.35); }
+.get:hover { background: var(--brass-light); color: var(--on-brass); }
 .note { color: var(--ivory-dim); font-size: 0.95rem; max-width: 30rem; }
-.board { display: block; width: 100%; height: auto; }
 @media (min-width: 56rem) {
-  .hero { grid-template-columns: 5fr 7fr; gap: 3rem; padding-top: 3.5rem; padding-bottom: 4rem; }
+  .hero { grid-template-columns: 5fr 7fr; gap: 3rem; padding-top: 4rem; }
 }
 
 /* Sections */
-section { padding: 2.5rem 0; border-top: 1px solid var(--line); }
-section h2 { font-size: clamp(1.6rem, 3.5vw, 2.1rem); line-height: 1.2; margin: 0 0 1.5rem; }
-.measure { max-width: 40rem; }
+section { padding: var(--space) 0; }
+section h2 { font-size: clamp(1.75rem, 3.6vw, 2.4rem); line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 0.75rem; }
+.intro { color: var(--ivory-dim); font-size: 1.1rem; max-width: 36rem; margin-bottom: 2.25rem; }
 
-/* The four games: each name has a checker beside it, ivory and black in turn. */
-.games { display: grid; gap: 1.25rem 3rem; margin: 0 0 1.5rem; }
-.games div { position: relative; padding-left: 2.25rem; }
-.games dt { font: 600 1.3rem/1.3 var(--serif); margin: 0 0 0.25rem; }
-.games dd { margin: 0; color: var(--ivory-dim); }
-.games div::before { content: ""; position: absolute; left: 0; top: 0.2rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: radial-gradient(circle, #ECE2CB 0 45%, #D8CBAE 46% 52%, #ECE2CB 53%); box-shadow: inset 0 0 0 1px #6E5A3C, 0 1px 2px rgba(0, 0, 0, 0.5); }
-.games div:nth-child(even)::before { background: radial-gradient(circle, #1E1A17 0 45%, #3A332D 46% 52%, #1E1A17 53%); box-shadow: inset 0 0 0 1px #8C8279, 0 1px 2px rgba(0, 0, 0, 0.5); }
-.games span { font: italic 400 1rem var(--serif); color: var(--ivory-dim); margin-left: 0.4rem; }
-@media (min-width: 48rem) { .games { grid-template-columns: 1fr 1fr; } }
+/* The four games: a picture of each game's board, with its name in both languages. */
+.games { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem 1.75rem; }
+.games h3 { font-size: 1.4rem; line-height: 1.25; margin: 0 0 0.35rem; }
+.games h3 span { font-style: italic; font-weight: 400; font-size: 1.05rem; color: var(--ivory-dim); margin-left: 0.35rem; }
+.games p { color: var(--ivory-dim); margin: 0; }
+.games img { margin: 0 0 1rem; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
+/* On a phone, a smaller picture beside the text. */
+@media (max-width: 35.99rem) {
+  .games { gap: 1.75rem; }
+  .games li { display: grid; grid-template-columns: 9rem 1fr; gap: 0 1rem; align-items: start; }
+  .games img { grid-row: span 2; margin: 0.3rem 0 0; }
+  .games h3 { font-size: 1.25rem; }
+  .games h3 span { display: block; margin: 0; font-size: 1rem; }
+  .games p { font-size: 0.95rem; }
+}
+@media (min-width: 36rem) { .games { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 64rem) { .games { grid-template-columns: repeat(4, 1fr); } }
+.match { margin: 2.75rem 0 0; padding-top: 1.5rem; border-top: 1px solid var(--line); font: 1.2rem/1.5 var(--serif); }
 
-/* Ways to play: three columns split like the board's bar. */
-.ways { display: grid; gap: 2rem; }
-.ways h3 { font-size: 1.3rem; line-height: 1.3; margin: 0 0 0.5rem; }
-.ways p { color: var(--ivory-dim); }
+/* Ways to play: on the darker wood of the board's frame, split like its bar. */
+.band { background: var(--walnut-deep); }
+.ways { display: grid; gap: 2.25rem; margin-top: 2.25rem; }
+.ways h3 { font-size: 1.35rem; line-height: 1.3; margin: 0 0 0.5rem; }
+.ways p { color: var(--ivory-dim); margin: 0; }
 @media (min-width: 56rem) {
   .ways { grid-template-columns: repeat(3, 1fr); gap: 0; }
   .ways > div { padding: 0 2rem; border-left: 1px solid var(--line); }
   .ways > div:first-child { padding-left: 0; border-left: 0; }
 }
-/* No ads and Help side by side on wide screens. */
-.pair { display: grid; gap: 2.5rem; }
-.pair > div { max-width: 36rem; }
-@media (min-width: 56rem) { .pair { grid-template-columns: 1fr 1fr; gap: 4rem; } }
-.plain { margin: 0; padding-left: 1.25rem; }
-.plain li { margin: 0 0 0.6rem; }
 
-/* Footer: the other half of the board, points up. */
-footer { background: var(--walnut-deep); margin-top: 1rem; }
-footer .wrap { padding-top: 1.5rem; padding-bottom: 2.5rem; color: var(--ivory-dim); font-size: 0.95rem; }
+/* Learn as you play: the heading beside the list, each item marked with a checker. */
+.learn { display: grid; gap: 1rem 3rem; }
+@media (min-width: 56rem) { .learn { grid-template-columns: 5fr 7fr; } }
+.checkers { list-style: none; margin: 0; padding: 0; }
+.checkers li { position: relative; padding: 1rem 0 1rem 2.6rem; border-top: 1px solid var(--line); }
+.checkers li:last-child { border-bottom: 1px solid var(--line); }
+.checkers li::before { content: ""; position: absolute; left: 0; top: 1.05rem; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: radial-gradient(circle, #ECE2CB 0 44%, #D8CBAE 45% 52%, #ECE2CB 53%); box-shadow: inset 0 0 0 1px #6E5A3C, 0 1px 3px rgba(0, 0, 0, 0.5); }
+.checkers li:nth-child(even)::before { background: radial-gradient(circle, #1E1A17 0 44%, #3A332D 45% 52%, #1E1A17 53%); box-shadow: inset 0 0 0 1px #8C8279, 0 1px 3px rgba(0, 0, 0, 0.5); }
+
+/* Privacy and Help side by side on wide screens. */
+.pair-sec { padding-top: 0; }
+.pair { display: grid; gap: 3rem; }
+.pair > div { max-width: 34rem; }
+.pair h2 { font-size: clamp(1.5rem, 3vw, 1.9rem); margin-bottom: 1rem; }
+.pair p { color: var(--ivory-dim); }
+.pair strong { color: var(--ivory); }
+@media (min-width: 56rem) { .pair { grid-template-columns: 1fr 1fr; gap: 4rem; } }
+
+/* The last word, before the footer. */
+.close { text-align: center; padding-bottom: calc(var(--space) * 0.8); }
+.close h2 { font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.1; margin: 0 0 0.5rem; }
+.close p { color: var(--ivory-dim); font-size: 1.15rem; margin: 0 0 0.5rem; }
+.close .note { margin: 0 auto; }
+
+/* Footer: the other edge of the board, points up. */
+footer { background: var(--walnut-deep); }
+footer .wrap { padding-top: 1.75rem; padding-bottom: 2.5rem; color: var(--ivory-dim); font-size: 0.95rem; }
 footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 1rem; }
 </style>
 </head>
@@ -115,27 +147,44 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 
   <div>
     <h1><span>Καλώς ήρθες στο καφενείο.</span> <span>Τράβα μια καρέκλα.</span></h1>
     <p class="lead">Το Ταβλάκι είναι ελληνικό τάβλι για iPhone: Πόρτες, Πλακωτό, Φεύγα και Ασόδιο, σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.</p>
-    <!-- After the App Store launch, link https://apps.apple.com/app/id6828172932 here and on the English page, and drop the beta note. -->
+    <!-- After the App Store launch, link https://apps.apple.com/app/id6828172932 in both buttons here and on the English page, and drop the beta notes. -->
     <a class="get" href="https://testflight.apple.com/join/8vkMaRAm" rel="noreferrer">Κατέβασε το Ταβλάκι</a>
     <p class="note">Δωρεάν. Το Ταβλάκι είναι σε δοκιμαστική έκδοση στο TestFlight, την εφαρμογή της Apple για δοκιμαστικές εκδόσεις. Το Android έρχεται αργότερα.</p>
   </div>
-  <img class="board" src="/img/board-1280.webp" srcset="/img/board-720.webp 720w, /img/board-1280.webp 1280w" sizes="(min-width: 56rem) 42rem, 100vw" width="1280" height="960" alt="Παρτίδα Πόρτες στο Ταβλάκι. Ένα άσπρο πούλι είναι σηκωμένο και φαίνεται η θέση όπου μπορεί να πάει. Κάτω από το ταμπλό, τα ζάρια δείχνουν 6 και 3.">
+  <img src="/img/board-1280.webp" srcset="/img/board-720.webp 720w, /img/board-1280.webp 1280w" sizes="(min-width: 56rem) 42rem, 100vw" width="1280" height="960" alt="Παρτίδα Πόρτες στο Ταβλάκι. Ένα άσπρο πούλι είναι σηκωμένο και φαίνεται η θέση όπου μπορεί να πάει. Κάτω από το ταμπλό, τα ζάρια δείχνουν 6 και 3.">
 </div>
 
 <section>
   <div class="wrap">
     <h2>Τα τέσσερα ελληνικά παιχνίδια</h2>
-    <dl class="games">
-      <div><dt>Πόρτες</dt><dd>Το κλασικό. Χτύπα τα ακάλυπτα πούλια και φτιάξε τις πόρτες σου.</dd></div>
-      <div><dt>Πλακωτό</dt><dd>Δεν χτυπάς, πλακώνεις. Αν πλακώσεις τη «μάνα» του αντιπάλου, το τελευταίο πούλι στην αφετηρία του, εκείνος διαλέγει: παραιτείται και χάνει 2 βαθμούς ή συνεχίζει.</dd></div>
-      <div><dt>Φεύγα</dt><dd>Ούτε χτύπημα ούτε πλάκωμα. Ένα πούλι κρατά τη θέση, οπότε κλείνεις τον δρόμο του αντιπάλου πιάνοντας θέσεις μπροστά του.</dd></div>
-      <div><dt>Ασόδιο</dt><dd>Φέρε ασόδυο (1-2) ή διπλές για να ανοίξει το ταμπλό, βάλε μέσα και τα 15 πούλια και προχώρα σαν ένας στρατός.</dd></div>
-    </dl>
-    <p class="measure">Ή παίξε ολόκληρο Τάβλι: Πόρτες, Πλακωτό και Φεύγα με τη σειρά, στους 1, 3, 5 ή 7 βαθμούς.</p>
+    <p class="intro">Ίδιο ταμπλό, ίδια 15 πούλια ο καθένας, τέσσερις τρόποι να τα παίξεις.</p>
+    <ul class="games">
+      <li>
+        <img src="/img/game-portes.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Πόρτες: ένα άσπρο πούλι που χτυπήθηκε περιμένει στη μέση του ταμπλό.">
+        <h3>Πόρτες</h3>
+        <p>Το κλασικό. Χτύπα τα ακάλυπτα πούλια και φτιάξε τις πόρτες σου.</p>
+      </li>
+      <li>
+        <img src="/img/game-plakoto.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Πλακωτό: δύο άσπρα πούλια είναι πλακωμένα κάτω από μαύρα.">
+        <h3>Πλακωτό</h3>
+        <p>Δεν χτυπάς, πλακώνεις. Αν πλακώσεις τη «μάνα» του αντιπάλου, το τελευταίο πούλι στην αφετηρία του, εκείνος διαλέγει: παραιτείται και χάνει 2 βαθμούς ή συνεχίζει.</p>
+      </li>
+      <li>
+        <img src="/img/game-fevga.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Φεύγα: κάθε παίκτης κρατά θέσεις στον δρόμο του άλλου.">
+        <h3>Φεύγα</h3>
+        <p>Ούτε χτύπημα ούτε πλάκωμα. Ένα πούλι κρατά τη θέση, οπότε κλείνεις τον δρόμο του αντιπάλου πιάνοντας θέσεις μπροστά του.</p>
+      </li>
+      <li>
+        <img src="/img/game-asodio.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Ασόδιο: τα πούλια που δεν έχουν μπει ακόμα περιμένουν στη μέση του ταμπλό.">
+        <h3>Ασόδιο</h3>
+        <p>Φέρε ασόδυο (1-2) ή διπλές για να ανοίξει το ταμπλό, βάλε μέσα και τα 15 πούλια και προχώρα σαν ένας στρατός.</p>
+      </li>
+    </ul>
+    <p class="match">Ή παίξε ολόκληρο Τάβλι: Πόρτες, Πλακωτό και Φεύγα με τη σειρά, στους 1, 3, 5 ή 7 βαθμούς.</p>
   </div>
 </section>
 
-<section>
+<section class="band">
   <div class="wrap">
     <h2>Τρεις τρόποι να παίξεις</h2>
     <div class="ways">
@@ -156,31 +205,39 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 
 </section>
 
 <section>
-  <div class="wrap">
-    <div class="measure">
-    <h2>Μαθαίνεις παίζοντας</h2>
-    <ul class="plain">
-      <li>Πρώτη φορά στο τάβλι; Ένα μάθημα ενός λεπτού στο κανονικό ταμπλό σού μαθαίνει τις Πόρτες, και κάθε παιχνίδι έχει τη σελίδα «Πώς παίζεται».</li>
+  <div class="wrap learn">
+    <div>
+      <h2>Μαθαίνεις παίζοντας</h2>
+      <p class="intro">Πρώτη φορά στο τάβλι ή σε κάποιο από τα παιχνίδια; Η εφαρμογή σού μαθαίνει πάνω στο ταμπλό.</p>
+    </div>
+    <ul class="checkers">
+      <li>Ένα μάθημα ενός λεπτού στο κανονικό ταμπλό σού μαθαίνει τις Πόρτες, και κάθε παιχνίδι έχει τη σελίδα «Πώς παίζεται».</li>
       <li>Ζήτα υπόδειξη όταν κολλήσεις, και δες ξανά μια παρτίδα με την ανάλυση.</li>
       <li>Ελληνικά και αγγλικά. Το παιχνίδι αποθηκεύεται μόνο του, οπότε συνεχίζεις όποτε θέλεις.</li>
     </ul>
+  </div>
+</section>
+
+<section class="pair-sec">
+  <div class="wrap pair">
+    <div>
+      <h2>Απόρρητο</h2>
+      <p>Χωρίς διαφημίσεις. Τα παιχνίδια στο κινητό σου δεν θέλουν λογαριασμό. Εσύ αποφασίζεις αν η εφαρμογή θα στέλνει ανώνυμα δεδομένα χρήσης, και αλλάζεις γνώμη όποτε θέλεις στις Ρυθμίσεις. Για το online παιχνίδι κρατάμε μόνο ό,τι χρειάζεται για να τρέχουν τα παιχνίδια σου: διάβασε την <a href="/el/privacy/">πολιτική απορρήτου</a>.</p>
+    </div>
+    <div>
+      <h2>Βοήθεια</h2>
+      <p>Ερώτηση, πρόβλημα ή ιδέα; Γράψε στο <a href="mailto:support@tavlaki.com">support@tavlaki.com</a>.</p>
+      <p>Σου έστειλε κωδικό ένας φίλος; Άνοιξε το Ταβλάκι και πάτα <strong>Μπες με κωδικό</strong>.</p>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap pair">
-    <div>
-    <h2>Χωρίς διαφημίσεις</h2>
-    <p>Τα παιχνίδια στο κινητό σου δεν θέλουν λογαριασμό. Εσύ αποφασίζεις αν η εφαρμογή θα στέλνει ανώνυμα δεδομένα χρήσης, και αλλάζεις γνώμη όποτε θέλεις στις Ρυθμίσεις. Για το online παιχνίδι κρατάμε μόνο ό,τι χρειάζεται για να τρέχουν τα παιχνίδια σου: διάβασε την <a href="/el/privacy/">πολιτική απορρήτου</a>.</p>
-    </div>
-    <div>
-    <h2>Βοήθεια</h2>
-    <p>Ερώτηση, πρόβλημα ή ιδέα; Γράψε στο <a href="mailto:support@tavlaki.com">support@tavlaki.com</a>.</p>
-    <p>Σου έστειλε κωδικό ένας φίλος; Άνοιξε το Ταβλάκι και πάτα <strong>Μπες με κωδικό</strong>.</p>
-    </div>
-  </div>
-</section>
+<div class="wrap close">
+  <h2>Καλή παρτίδα.</h2>
+  <p>Κατέβασε το Ταβλάκι και στήσε το ταμπλό.</p>
+  <a class="get" href="https://testflight.apple.com/join/8vkMaRAm" rel="noreferrer">Κατέβασε το Ταβλάκι</a>
+  <p class="note">Δωρεάν, στο TestFlight για αρχή.</p>
+</div>
 </main>
 
 <footer>

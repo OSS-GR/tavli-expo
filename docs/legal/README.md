@@ -12,7 +12,7 @@
 | [privacy.el.md](privacy.el.md) | Greek policy. Same content as the English one. |
 | [site/index.html](site/index.html) | The English homepage, served at `https://tavlaki.com/`: the games, the ways to play, **Get Tavlaki** (the TestFlight link) and the support address `support@tavlaki.com` |
 | [site/el/index.html](site/el/index.html) | The Greek homepage, served at `https://tavlaki.com/el/`. Same content and style as the English one: copy every change |
-| [site/img/](site/img/) | The homepage pictures: the board (a render of the app's board) and the app icon. Also `site/favicon.png` and `site/apple-touch-icon.png` |
+| [site/img/](site/img/) | The homepage pictures: the hero board and one board per game (`game-*.webp`), all renders of the app's own board (`BoardScene`, headless, as in `apps/mobile/tools/screenshots/`), and the app icon. Also `site/favicon.png` and `site/apple-touch-icon.png` |
 | [site/privacy/index.html](site/privacy/index.html) | English static page, served at `https://tavlaki.com/privacy` |
 | [site/el/privacy/index.html](site/el/privacy/index.html) | Greek static page, served at `https://tavlaki.com/el/privacy` |
 | [terms.md](terms.md) | English terms of use (#405). **Source of truth.** A draft for the lawyer check. |
