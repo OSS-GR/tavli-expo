@@ -2,7 +2,7 @@
  * The reminder card on Home (#404): which card shows on a visit, on the
  * Jest online fake (`auth` and Apple's sheet) and a test clock.
  */
-import { createMemoryAppleSheet, createMemoryStorage, type Storage } from '@tavli/contracts';
+import { createMemoryStorage, type Storage } from '@tavli/contracts';
 import { act, render, screen } from '@testing-library/react-native';
 
 import { ReminderCard } from '@/features/home/ReminderCard';
@@ -23,17 +23,15 @@ const T0 = Date.UTC(2026, 10, 1, 12);
 let now = T0;
 let storage: Storage;
 let reminders: Reminders;
-const appleSheet = createMemoryAppleSheet();
 
 beforeEach(() => {
   now = T0;
   storage = createMemoryStorage();
   reminders = createReminders(storage, () => now);
-  appleSheet.available = true;
 });
 
-function Home(props: Omit<ReminderCardOptions, 'reminders' | 'appleSheet'>) {
-  const { card, hide, stop } = useReminderCard({ ...props, reminders, appleSheet });
+function Home(props: Omit<ReminderCardOptions, 'reminders'>) {
+  const { card, hide, stop } = useReminderCard({ ...props, reminders });
   return card ? (
     <ReminderCard
       kind={card.kind}
@@ -95,16 +93,10 @@ describe('the reminder card (#404)', () => {
     expect(shownCard()).toBeNull();
   });
 
-  it('asks a guest to save the account, only where the phone can add a key', async () => {
+  it('asks a guest to save the account, also with no Apple sheet: email works (#433)', async () => {
     signInAsGuest();
     reminders.start();
-    appleSheet.available = false;
     await visit(T0 + DAY_MS);
-    expect(shownCard()).toBeNull();
-    // The ask waits: it is still due when Save can work.
-    expect(reminders.due()).toBe(true);
-    appleSheet.available = true;
-    await visit(T0 + DAY_MS + 60_000);
     expect(shownCard()).toBe('home-reminder-guest');
     expect(screen.getByRole('header', { name: 'Save your online games?' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Save my account' })).toBeOnTheScreen();

@@ -12,13 +12,14 @@ import {
   type MemoryAppleSheet,
 } from '@tavli/contracts';
 import { act, screen } from '@testing-library/react-native';
-import { AccessibilityInfo, Text } from 'react-native';
+import { AccessibilityInfo, AppState, Text } from 'react-native';
 
 import i18n from '@/i18n';
 
 import { InviteAccountGate } from './InviteAccountGate';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { newestCode, sendEmailCode } from '../../../test/emailCode';
 import { renderWithRoot } from '../../../test/render';
 
 runOnFakeTimers();
@@ -73,6 +74,27 @@ describe('InviteAccountGate', () => {
     ]);
     // Never the user id or the Apple id.
     expect(JSON.stringify(analytics.sent)).not.toMatch(/user-1|apple-1/);
+  });
+
+  it('signs in with an email code; the invite stays while the player reads the mail (#433)', async () => {
+    const user = setupUser();
+    const store = createMemoryAuthStore();
+    const { analytics } = await openGate(createMemoryAuthProvider(store));
+    await user.press(await screen.findByRole('button', { name: 'Continue with email' }));
+    await sendEmailCode(user, 'eleni@example.com');
+    // The player opens the mail app and comes back two minutes later.
+    await act(async () => {
+      AppState.currentState = 'background';
+      jest.advanceTimersByTime(2 * 60 * 1000);
+      AppState.currentState = 'active';
+    });
+    expect(screen.getByRole('header', { name: 'Check your email' })).toBeOnTheScreen();
+    await user.type(screen.getByTestId('email-code-input'), newestCode(store, 'eleni@example.com'));
+    expect(await screen.findByText('invite for user-1')).toBeOnTheScreen();
+    expect(store.guests).toBe(0);
+    expect(analytics.sent).toEqual([
+      { type: 'track', event: 'online_sign_in', props: { method: 'email' } },
+    ]);
   });
 
   it('a closed Apple sheet signs in nothing and shows no problem', async () => {
@@ -133,6 +155,8 @@ describe('InviteAccountGate', () => {
     expect(await screen.findByRole('button', { name: 'Continue as a guest' })).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Continue with Apple' })).toBeNull();
     expect(screen.queryByText(/With Apple you can sign in again/)).toBeNull();
+    // The email code works there.
+    expect(screen.getByRole('button', { name: 'Continue with email' })).toBeOnTheScreen();
   });
 
   it('shows the invite at once with a saved session, and makes no account', async () => {
@@ -191,6 +215,7 @@ describe('InviteAccountGate', () => {
     });
     await openGate(createMemoryAuthProvider(createMemoryAuthStore()));
     expect(await screen.findByRole('button', { name: 'Συνέχεια ως επισκέπτης' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Συνέχεια με email' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Όχι τώρα' })).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');

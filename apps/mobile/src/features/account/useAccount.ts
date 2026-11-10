@@ -3,16 +3,19 @@
  *
  * - A phone that never played online (`hasOnlineAccount()` is false) is
  *   `offline`, and the screen makes no server call. From there only Sign
- *   in with Apple makes a call: never a guest. A guest is made only when
+ *   in with Apple or an email code (#433) makes a call: never a guest. A guest is made only when
  *   the player makes or opens an invite (`signInForOnline`).
  * - Else the screen asks who is signed in (`auth.ready()`), the name
  *   (`Usernames.mine`) and, for a saved account, its keys
  *   (`AuthProvider.listKeys`). A session whose user is gone on the server
  *   (`NOT_SIGNED_IN`, for example after Apple's delete notice) is signed
  *   out and shows `offline`: never a dead end with only Try again.
- * - Save my account: a guest adds a key with Apple's sheet (`saveKey`) and
- *   keeps the same id, games and guest number. The same call adds a
- *   second kind of key to a saved account.
+ * - Save my account: a guest adds a key with Apple's sheet or an email
+ *   code (`saveKey`) and keeps the same id, games and guest number. The
+ *   same call adds a second kind of key to a saved account. The email
+ *   calls (`signInWithEmail`, `saveWithEmail`) take the code from
+ *   `EmailCodeForm` and reject with the server's answer, for the form to
+ *   show.
  * - A key that has an account already (#403): for a guest the server
  *   sends a move offer (`offer`). The screen shows its counts and asks.
  *   Move (`moveGuest`) moves the guest's games and invites into that
@@ -27,6 +30,8 @@
  *   action the screen loads again quietly: the cards stay until the new
  *   state is in.
  *
+ * - A key sign-in stops the save reminders on Home (#404).
+ *
  * Never send the user id, the Apple id or the email to analytics.
  */
 import {
@@ -39,6 +44,7 @@ import {
   type AuthKey,
   type AuthKeyProvider,
   type AuthProvider,
+  type EmailKeyCredential,
   type GuestMoveOffer,
   type MyUsername,
   type OnlineData,
@@ -50,7 +56,8 @@ import { quietly } from '@/features/analytics/quietly';
 import { onlineAccountReady, signOutOfOnline, type SignOutPushes } from '@/features/online/account';
 import { forgetOnlineAccount, hasOnlineAccount } from '@/features/online/accountHint';
 import { deleteOnlineData } from '@/features/online/deleteData';
-import { appleCredential, signInWithApple } from '@/features/online/signIn';
+import { appleCredential, signInWithApple, signInWithEmail } from '@/features/online/signIn';
+import { reminders } from '@/features/reminders/reminders';
 
 export type AccountState =
   /** No account on this phone: nothing was asked of the server. */
@@ -75,6 +82,8 @@ export type AccountProblem =
   | 'appleUnfinished'
   /** This Apple ID has another account already, and the guest stays (#403). */
   | 'keyTaken'
+  /** The same for an email address (#433). */
+  | 'keyTakenEmail'
   /** The last key: an account keeps at least one. */
   | 'lastKey'
   | 'deleteFailed'
@@ -103,6 +112,8 @@ export interface Account {
   readonly note: AccountNote | null;
   /** The server's offer to move this guest into the key's account (#403), or `null`. */
   readonly offer: GuestMoveOffer | null;
+  /** The kind of key the offer is for. */
+  readonly offerKey: AuthKeyProvider;
   /** Counts the problems and notes, so a screen reader hears each one (`useAnnouncement`). */
   readonly said: number;
   readonly reload: () => void;
@@ -110,6 +121,17 @@ export interface Account {
   readonly signInWithApple: () => void;
   /** A guest saves the account with Apple; a saved account adds an Apple key. */
   readonly saveWithApple: () => void;
+  /**
+   * Offline: signs in with the email form's code (#433). Rejects with the
+   * server's answer (`AuthErrorData`) for the form.
+   */
+  readonly signInWithEmail: (credential: EmailKeyCredential) => Promise<void>;
+  /**
+   * A guest saves the account with the email form's code; a saved account
+   * adds an email key. An address with another account gives a guest the
+   * move offer and resolves; else it rejects for the form.
+   */
+  readonly saveWithEmail: (credential: EmailKeyCredential) => Promise<void>;
   /** Moves the guest into the account of the offer, and signs in there. */
   readonly moveGuest: () => void;
   /** Closes the offer: the guest stays as it is. */
@@ -127,8 +149,8 @@ export function addableKeys(
   // A new provider must say here whether this phone can add it.
   const canAdd: Record<AuthKeyProvider, boolean> = {
     apple: appleAvailable,
-    // No screen asks for the code yet (#433).
-    email: false,
+    // The email code works on every phone (#433).
+    email: true,
   };
   return AUTH_KEY_PROVIDERS.filter(
     (provider) => canAdd[provider] && !keys.some((key) => key.provider === provider),
@@ -183,6 +205,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
   const [problem, setProblem] = useState<AccountProblem | null>(null);
   const [note, setNote] = useState<AccountNote | null>(null);
   const [offer, setOffer] = useState<GuestMoveOffer | null>(null);
+  const [offerKey, setOfferKey] = useState<AuthKeyProvider>('apple');
   const [said, setSaid] = useState(0);
   // One action at a time: a second tap before the render sees `busy` does nothing.
   const acting = useRef(false);
@@ -255,6 +278,32 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     );
   }
 
+  /**
+   * Runs the email form's call. Like `run`, but a failure goes back to the
+   * form (it says what the server's answer means), not to `problem`.
+   */
+  async function runForForm<T>(
+    action: AccountAction,
+    call: () => Promise<T>,
+    then: (result: T) => void,
+  ): Promise<void> {
+    // Another action runs: the form says "try again".
+    if (acting.current) throw new Error('busy');
+    acting.current = true;
+    setBusy(action);
+    setProblem(null);
+    setNote(null);
+    setOffer(null);
+    let result: T;
+    try {
+      result = await call();
+    } finally {
+      acting.current = false;
+      if (live.current) setBusy(null);
+    }
+    if (live.current) then(result);
+  }
+
   // After an action: load again with the cards still on the screen.
   const done = (next: AccountNote | null) => {
     if (next !== null) {
@@ -271,6 +320,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     problem,
     note,
     offer,
+    offerKey,
     said,
     reload,
     signInWithApple: () =>
@@ -280,7 +330,42 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
         (user) => {
           if (user === null) return;
           quietly(() => deps.analytics.track('online_sign_in', { method: 'apple' }));
+          reminders.stop();
           done(null);
+        },
+      ),
+    signInWithEmail: (credential) =>
+      runForForm(
+        'signIn',
+        () => signInWithEmail(deps.auth, credential),
+        () => {
+          quietly(() => deps.analytics.track('online_sign_in', { method: 'email' }));
+          reminders.stop();
+          done(null);
+        },
+      ),
+    saveWithEmail: (credential) =>
+      runForForm(
+        'save',
+        async (): Promise<'saved' | GuestMoveOffer> => {
+          try {
+            await deps.auth.saveKey(credential);
+          } catch (error) {
+            // A guest whose address has an account already: ask before a move.
+            if (isAuthErrorData(error) && error.code === 'KEY_BELONGS_TO_OTHER' && error.move) {
+              return error.move;
+            }
+            throw error;
+          }
+          return 'saved';
+        },
+        (result) => {
+          if (result === 'saved') {
+            done('saved');
+            return;
+          }
+          setOfferKey('email');
+          setOffer(result);
         },
       ),
     saveWithApple: () =>
@@ -302,7 +387,10 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
         },
         (result) => {
           if (result === 'saved') done('saved');
-          else if (result !== 'closed') setOffer(result);
+          else if (result !== 'closed') {
+            setOfferKey('apple');
+            setOffer(result);
+          }
         },
       ),
     moveGuest: () => {
@@ -316,7 +404,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     keepGuest: () => {
       if (offer === null) return;
       setOffer(null);
-      setProblem('keyTaken');
+      setProblem(offerKey === 'email' ? 'keyTakenEmail' : 'keyTaken');
       setSaid((n) => n + 1);
     },
     removeKey: (provider) =>

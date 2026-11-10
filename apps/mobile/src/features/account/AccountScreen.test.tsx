@@ -15,11 +15,13 @@ import { AccessibilityInfo } from 'react-native';
 import { signInForOnline } from '@/features/online/account';
 import { hasOnlineAccount, rememberOnlineAccount } from '@/features/online/accountHint';
 import { DELETE_TIME_LIMIT_MS } from '@/features/online/deleteData';
+import { reminders } from '@/features/reminders/reminders';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import i18n from '@/i18n';
 import { appleSheet, auth, onlineData, usernames } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { enterEmailCode } from '../../../test/emailCode';
 import { onlineFake } from '../../../test/onlineFake';
 import { renderWithRoot } from '../../../test/render';
 
@@ -164,13 +166,39 @@ describe('<AccountScreen /> offline', () => {
     expect(screen.queryByTestId('account-problem')).toBeNull();
   });
 
-  it('shows no Apple button where Apple sign-in does not work (Android)', async () => {
+  it('shows no Apple button where Apple sign-in does not work (Android); email works', async () => {
     onlineFake.appleSheet.available = false;
     await open();
-    expect(
-      screen.getByText('Online play starts when you make or open an invite: Home → Play a friend.'),
-    ).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Continue with email' })).toBeOnTheScreen();
     expect(screen.queryByTestId('account-apple')).toBeNull();
+  });
+
+  it('signs in with an email code and never makes a guest (#433)', async () => {
+    const user = setupUser();
+    const { analytics } = await open();
+    await user.press(screen.getByRole('button', { name: 'Continue with email' }));
+    expect(await screen.findByRole('header', { name: 'Sign in with email' })).toBeOnTheScreen();
+    await enterEmailCode(user, onlineFake.authStore, 'Eleni@Example.com');
+    expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
+    expect(onlineFake.authStore.session).toEqual({ id: 'user-1', isGuest: false });
+    expect(onlineFake.authStore.keys).toEqual({ 'email:eleni@example.com': 'user-1' });
+    expect(onlineFake.authStore.guests).toBe(0);
+    expect(hasOnlineAccount()).toBe(true);
+    expect(reminders.state().stopped).toBe(true);
+    expect(analytics.sent).toEqual([
+      { type: 'track', event: 'online_sign_in', props: { method: 'email' } },
+    ]);
+    // Never the address or the code.
+    expect(JSON.stringify(analytics.sent)).not.toMatch(/eleni|example|100001/i);
+  });
+
+  it('Cancel on the email step shows the cards again', async () => {
+    const user = setupUser();
+    await open();
+    await user.press(screen.getByRole('button', { name: 'Continue with email' }));
+    await user.press(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByTestId('account-offline')).toBeOnTheScreen();
+    expect(onlineFake.authStore.sentEmailCodes).toEqual([]);
   });
 });
 
@@ -235,6 +263,49 @@ describe('<AccountScreen /> as a guest', () => {
       ),
     ).toBeOnTheScreen();
     expect(screen.queryByTestId('account-move-dialog')).toBeNull();
+    expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: true });
+    expect(screen.getByTestId('account-guest')).toBeOnTheScreen();
+  });
+
+  it('saves the account with an email code and keeps the same id (#433)', async () => {
+    const user = setupUser();
+    await guest();
+    const { analytics } = await open();
+    await user.press(await screen.findByRole('button', { name: 'Save with email' }));
+    expect(await screen.findByRole('header', { name: 'Save with email' })).toBeOnTheScreen();
+    await enterEmailCode(user, onlineFake.authStore, 'kostas@example.com');
+    expect(await screen.findByText('Your account is saved.')).toBeOnTheScreen();
+    expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
+    expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: false });
+    expect(onlineFake.authStore.keys).toEqual({ 'email:kostas@example.com': 'guest-1' });
+    expect(screen.getByRole('button', { name: 'Remove Email code' })).toBeDisabled();
+    // A save is no new sign-in.
+    expect(analytics.sent).toEqual([]);
+  });
+
+  it('a guest on Android saves with email: no Apple button', async () => {
+    onlineFake.appleSheet.available = false;
+    await guest();
+    await open();
+    expect(await screen.findByRole('button', { name: 'Save with email' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-save-apple')).toBeNull();
+  });
+
+  it('an email with another account asks; Keep the guest says the email has one', async () => {
+    const user = setupUser();
+    await guest();
+    onlineFake.authStore.keys['email:maria@example.com'] = 'user-9';
+    await open();
+    await user.press(await screen.findByRole('button', { name: 'Save with email' }));
+    await enterEmailCode(user, onlineFake.authStore, 'maria@example.com');
+    const dialog = within(await screen.findByTestId('account-move-dialog'));
+    expect(dialog.getByText('This email has an account already')).toBeOnTheScreen();
+    await user.press(dialog.getByText('Keep the guest'));
+    expect(
+      await screen.findByText(
+        'This email has another Tavlaki account already. Your guest account stays as it is.',
+      ),
+    ).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: true });
     expect(screen.getByTestId('account-guest')).toBeOnTheScreen();
   });
@@ -391,7 +462,7 @@ describe('<AccountScreen /> with a saved account', () => {
     expect(await screen.findByText('You play as Maria')).toBeOnTheScreen();
   });
 
-  it('the delete dialog names the username and the Apple sign-in', async () => {
+  it('the delete dialog names the username and the ways to sign in', async () => {
     const user = setupUser();
     await saved('Maria');
     await open();
@@ -399,7 +470,7 @@ describe('<AccountScreen /> with a saved account', () => {
     const dialog = await dialogFrom(user, 'account-delete');
     expect(dialog.getByRole('header', { name: 'Delete your account?' })).toBeOnTheScreen();
     expect(
-      dialog.getByText('Your username and your Sign in with Apple are removed.'),
+      dialog.getByText('Your username and your ways to sign in are removed.'),
     ).toBeOnTheScreen();
     await user.press(dialog.getByRole('button', { name: 'Delete' }));
     expect(await screen.findByTestId('account-offline')).toBeOnTheScreen();
@@ -411,6 +482,36 @@ describe('<AccountScreen /> with a saved account', () => {
     const noKeys: AuthProvider = { ...auth!, listKeys: () => Promise.resolve([]) };
     await open({ auth: noKeys });
     expect(await screen.findByRole('button', { name: 'Add Sign in with Apple' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Add Email code' })).toBeOnTheScreen();
+  });
+
+  it('adds an email key to a saved account (#433)', async () => {
+    const user = setupUser();
+    await saved('Maria');
+    await open();
+    await user.press(await screen.findByRole('button', { name: 'Add Email code' }));
+    expect(await screen.findByRole('header', { name: 'Add Email code' })).toBeOnTheScreen();
+    await enterEmailCode(user, onlineFake.authStore, 'maria@example.com');
+    expect(await screen.findByText('Your account is saved.')).toBeOnTheScreen();
+    expect(await screen.findByTestId('account-key-email')).toBeOnTheScreen();
+    expect(onlineFake.authStore.keys).toEqual({
+      'apple:apple-1': 'user-1',
+      'email:maria@example.com': 'user-1',
+    });
+  });
+
+  it('an email of another saved account stays on the email step and says so', async () => {
+    const user = setupUser();
+    await saved('Maria');
+    onlineFake.authStore.keys['email:eleni@example.com'] = 'user-9';
+    await open();
+    await user.press(await screen.findByRole('button', { name: 'Add Email code' }));
+    await enterEmailCode(user, onlineFake.authStore, 'eleni@example.com');
+    expect(
+      await screen.findByText('This email has another Tavlaki account already.'),
+    ).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-move-dialog')).toBeNull();
+    expect(screen.getByTestId('email-code-form')).toBeOnTheScreen();
   });
 
   it('says so when the server refuses to remove the last key', async () => {
@@ -503,10 +604,11 @@ describe('<AccountScreen /> loading', () => {
 
 describe('addableKeys', () => {
   it('lists the kinds the account has not, that this phone can add', () => {
-    expect(addableKeys([], true)).toEqual(['apple']);
-    expect(addableKeys([], false)).toEqual([]);
-    expect(addableKeys([{ provider: 'apple' }], true)).toEqual([]);
-    // An email key has no screen to add it yet (#433).
+    expect(addableKeys([], true)).toEqual(['apple', 'email']);
+    // The email code works on every phone (#433).
+    expect(addableKeys([], false)).toEqual(['email']);
+    expect(addableKeys([{ provider: 'apple' }], true)).toEqual(['email']);
     expect(addableKeys([{ provider: 'email' }], true)).toEqual(['apple']);
+    expect(addableKeys([{ provider: 'apple' }, { provider: 'email' }], true)).toEqual([]);
   });
 });

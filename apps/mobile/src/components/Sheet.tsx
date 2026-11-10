@@ -9,9 +9,21 @@
  * Modal may stay sideways with the game (on iOS a Modal turns the screen
  * back to portrait if it does not list landscape). On a wide screen the
  * sheet keeps a readable width (`MAX_SHEET_WIDTH`) in the middle.
+ *
+ * A text field in it (the email code, the username) stays above the
+ * keyboard: on iOS the sheet moves up with it (`KeyboardAvoidingView`);
+ * Android resizes the window.
  */
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, View, type ModalProps } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+  type ModalProps,
+} from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 export interface SheetProps {
@@ -43,7 +55,9 @@ export function Sheet({
       animationType="fade"
       onRequestClose={onClose}
       supportedOrientations={turns ? TURNS : UPRIGHT}>
-      <View style={styles.root(look)}>
+      <KeyboardAvoidingView
+        style={styles.root(look)}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable
           style={styles.scrim}
           onPress={onClose}
@@ -51,11 +65,14 @@ export function Sheet({
           accessibilityLabel={closeLabel}
         />
         <View testID={testID} style={styles.sheet(look)} accessibilityViewIsModal>
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.content(look)}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.content(look)}
+            keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
