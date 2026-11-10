@@ -166,7 +166,7 @@ describe('first launch', () => {
     expect(recorded.sent).toContainEqual({ type: 'screen', name: '/' });
   });
 
-  it("marks every What's new release seen for a new player: Home shows no card (#471)", async () => {
+  it("marks every What's new release seen for a new player: Home's button has no dot (#471)", async () => {
     forgetWhatsNewForTest();
     const user = userEvent.setup();
     await openApp();
@@ -174,7 +174,8 @@ describe('first launch', () => {
     expect(screen).toHavePathname('/');
     expect(storage.getString(WHATS_NEW_STORAGE_KEY)).toBe(RELEASES[0]!.date);
     expect(whatsNewSeen.due()).toBe(false);
-    expect(screen.queryByTestId('home-whats-new')).toBeNull();
+    expect(screen.getByTestId('home-whats-new')).toBeOnTheScreen();
+    expect(screen.queryByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeNull();
   });
 
   it('is shown only once: the answer and the board step are saved', async () => {

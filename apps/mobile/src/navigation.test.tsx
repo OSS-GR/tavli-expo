@@ -1543,30 +1543,39 @@ describe("what's new (#471)", () => {
     expect(router.getPathname()).toBe('/settings');
   });
 
-  it("after an update, Home shows the card once, and it opens What's new", async () => {
+  it("Home's What's new button opens the page, with no dot when nothing is new", async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    const button = screen.getByRole('button', { name: "What's new" });
+    expect(screen.queryByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeNull();
+    expect(
+      screen.queryByTestId('home-whats-new-heartbeat', { includeHiddenElements: true }),
+    ).toBeNull();
+    await user.press(button);
+    expect(router.getPathname()).toBe('/whats-new');
+  });
+
+  it('after an update, the button has the dot until the page opens', async () => {
     // A phone that saw only the older release.
     storage.setString(WHATS_NEW_STORAGE_KEY, RELEASES[1]!.date);
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    expect(screen.getByRole('header', { name: 'New in this update' })).toBeOnTheScreen();
-    expect(whatsNewSeen.due()).toBe(false);
-
-    await user.press(screen.getByRole('button', { name: "See what's new" }));
-    expect(router.getPathname()).toBe('/whats-new');
-    await user.press(screen.getByTestId('whats-new-back'));
-    expect(router.getPathname()).toBe('/');
-    expect(screen.queryByTestId('home-whats-new')).toBeNull();
-  });
-
-  it('Not now hides the card, and it does not come back', async () => {
-    storage.setString(WHATS_NEW_STORAGE_KEY, RELEASES[1]!.date);
-    const user = setupUser();
-    await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(screen.getByTestId('home-whats-new-dismiss'));
-    expect(screen.queryByTestId('home-whats-new')).toBeNull();
+    expect(screen.getByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeTruthy();
+    expect(
+      screen.getByTestId('home-whats-new-heartbeat', { includeHiddenElements: true }),
+    ).toBeTruthy();
+    // Home alone marks nothing seen: the dot stays after Settings.
     await user.press(screen.getByRole('button', { name: 'Settings' }));
     await act(async () => appRouter.back());
-    expect(screen.queryByTestId('home-whats-new')).toBeNull();
+    expect(whatsNewSeen.due()).toBe(true);
+
+    await user.press(screen.getByRole('button', { name: "What's new. New in this update." }));
+    expect(router.getPathname()).toBe('/whats-new');
+    expect(whatsNewSeen.due()).toBe(false);
+    await user.press(screen.getByTestId('whats-new-back'));
+    expect(router.getPathname()).toBe('/');
+    expect(screen.getByRole('button', { name: "What's new" })).toBeOnTheScreen();
+    expect(screen.queryByTestId('home-whats-new-dot', { includeHiddenElements: true })).toBeNull();
   });
 
   it('opening the page from a link marks every release seen', async () => {

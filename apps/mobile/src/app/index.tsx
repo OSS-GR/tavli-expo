@@ -29,9 +29,7 @@ import { reminders } from '@/features/reminders/reminders';
 import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
-import { WhatsNewCard } from '@/features/whats-new/WhatsNewCard';
 import { whatsNewSeen } from '@/features/whats-new/seen';
-import { useWhatsNewCard } from '@/features/whats-new/useWhatsNewCard';
 import { auth, botLevels, games, invites } from '@/services';
 
 interface SlotState {
@@ -57,6 +55,8 @@ export default function HomeRoute() {
   // online account: with none, Home does not even load the session (no
   // network call at start).
   const [onlineAccount, setOnlineAccount] = useState(hasOnlineAccount);
+  // What's new (#471): the dot and the heartbeat until the page opens.
+  const [whatsNewFresh, setWhatsNewFresh] = useState(() => whatsNewSeen.due());
   const focused = useIsFocused();
   // Read them again each time Home shows (back from a game or an invite).
   useFocusEffect(
@@ -66,6 +66,7 @@ export default function HomeRoute() {
       // show it again whenever the text changes (a language switch).
       setSlot(readSlot());
       setOnlineAccount(hasOnlineAccount());
+      setWhatsNewFresh(whatsNewSeen.due());
     }, []),
   );
   const { saved } = slot;
@@ -78,9 +79,6 @@ export default function HomeRoute() {
     auth: invites === undefined ? undefined : auth,
   });
   const { card } = reminder;
-  // What's new (#471): once after an update with new entries. It holds the
-  // reminder card back for the day (`otherPrompt`).
-  const whatsNew = useWhatsNewCard({ focused, seen: whatsNewSeen, reminders });
 
   return (
     <HomeScreen
@@ -100,15 +98,7 @@ export default function HomeRoute() {
         ) : null
       }
       reminderCard={
-        whatsNew.shown ? (
-          <WhatsNewCard
-            onOpen={() => {
-              whatsNew.hide();
-              router.push(WHATS_NEW_HREF);
-            }}
-            onDismiss={whatsNew.hide}
-          />
-        ) : card ? (
+        card ? (
           card.kind === 'guest' && auth !== undefined && games !== undefined ? (
             <GuestReminderCard
               auth={auth}
@@ -166,6 +156,8 @@ export default function HomeRoute() {
       }
       onNewGame={(mode) => router.push(newGameHref(mode))}
       onSettings={() => router.push('/settings')}
+      onWhatsNew={() => router.push(WHATS_NEW_HREF)}
+      whatsNewFresh={whatsNewFresh}
       onHowToPlay={() => router.push(rulesHref('portes'))}
       onHistory={() => router.push('/history')}
       // Online play needs the server: a build without one shows "Coming soon".

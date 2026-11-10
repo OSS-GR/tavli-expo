@@ -21,6 +21,10 @@
       "evening": "Good evening"
     },
     "openSettings": "Settings",
+    "whatsNew": {
+      "label": "What's new",
+      "labelFresh": "What's new. New in this update."
+    },
     "newGame": "New game",
     "moreModes": "More ways to play",
     "playNow": "Play now",
@@ -770,12 +774,6 @@
   "whatsNew": {
     "title": "What's new",
     "intro": "What each update of Tavlaki added, newest first, and where to find it.",
-    "card": {
-      "title": "New in this update",
-      "body": "See what the update added, and where to find it.",
-      "open": "See what's new",
-      "dismiss": "Not now"
-    },
     "entries": {
       "signIn": {
         "title": "Sign in with Apple or email",
