@@ -174,6 +174,23 @@ describe('the offer', () => {
     });
   });
 
+  it('"Turn on" closes the offer while the system prompt is still open (#475)', async () => {
+    const user = await makeInvite(null);
+    // A Mac asks with a banner the player may not see: the call waits.
+    let answer: (permission: 'denied') => void = () => {};
+    jest
+      .spyOn(onlineFake.notifications, 'requestPermission')
+      .mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    await user.press(screen.getByRole('button', { name: 'Turn on' }));
+    await flush();
+    expect(screen.queryByRole('header', OFFER)).toBeNull();
+    await act(async () => {
+      answer('denied');
+    });
+    await flush();
+    expect(screen.queryByRole('header', OFFER)).toBeNull();
+  });
+
   it('accepting a timed invite offers it', async () => {
     const user = setupUser();
     onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
