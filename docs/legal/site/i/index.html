@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tavlaki invite · Πρόσκληση στο Tavlaki</title>
+<link rel="icon" href="data:,">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<style>
+:root { color-scheme: light dark; --bg: #fbf7f0; --fg: #2b2118; --muted: #6b5b4d; --line: #e2d6c4; --link: #8a3b12; --head: #f1e8da; --button: #8a3b12; --button-fg: #fbf7f0; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1c1712; --fg: #efe6da; --muted: #b9a996; --line: #3d3329; --link: #f0a46c; --head: #2a221b; --button: #f0a46c; --button-fg: #1c1712; } }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif; }
+main { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+h1 { font-size: 1.75rem; line-height: 1.25; margin: 0.5rem 0 1rem; }
+h2 { font-size: 1.3rem; line-height: 1.3; margin: 2rem 0 0.75rem; }
+section + section { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+p, ol { margin: 0 0 1rem; }
+ol { padding-left: 1.25rem; }
+li { margin: 0.25rem 0; }
+a { color: var(--link); overflow-wrap: anywhere; }
+code { font: 0.95em ui-monospace, Menlo, Consolas, monospace; background: var(--head); padding: 0.1em 0.3em; border-radius: 0.25em; }
+.button { display: inline-block; margin: 0 0 1rem; padding: 0.75rem 1.5rem; border-radius: 999px; background: var(--button); color: var(--button-fg); font-weight: 600; text-decoration: none; }
+.note { color: var(--muted); font-size: 0.95rem; }
+footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
+</style>
+</head>
+<body>
+<!--
+  The fallback page of an invite link (#332). The host serves this page for
+  every https://tavlaki.com/i/<code> (see _redirects and docs/legal/README.md).
+  On an iPhone with Tavlaki, iOS opens the link in the app instead.
+  No JavaScript: the page cannot read the code, so it says where to find it
+  (the end of the address). "Join with a code" in the app also takes the
+  whole address.
+-->
+<main>
+<section lang="en">
+<p>Ελληνικά: <a href="#el">πιο κάτω</a></p>
+<h1>You have an invite to play tavli</h1>
+<p>A friend invited you to an online game in Tavlaki, a Greek backgammon (tavli) app for iPhone.</p>
+<h2>1. Get Tavlaki</h2>
+<!-- OWNER: put the TestFlight public link here (TestFlight → External Testing → Public Link) in both buttons. After the App Store launch, use https://apps.apple.com/app/id6828172932 instead and drop the beta note. -->
+<p><a class="button" href="https://testflight.apple.com/join/OWNER-TESTFLIGHT-LINK">Get Tavlaki</a></p>
+<p class="note">Tavlaki is in beta on TestFlight, Apple's app for test versions. The link asks you to get TestFlight first, if you do not have it. Android comes later.</p>
+<h2>2. Enter the code</h2>
+<p>Your invite code is the end of this page's address, after <code>/i/</code>. It has 8 letters and digits. For example, in <code>tavlaki.com/i/ABCD2345</code> the code is <code>ABCD2345</code>.</p>
+<ol>
+<li>Open Tavlaki.</li>
+<li>On Home, tap <strong>Join with a code</strong>.</li>
+<li>Type the code, or paste this page's address. Then tap <strong>Continue</strong>.</li>
+</ol>
+<h2>Have Tavlaki already?</h2>
+<p>Go back to the message and tap the link again: it opens the invite in the app. If it opens this page again, touch and hold the link, then pick <strong>Open in “Tavlaki”</strong>. Or enter the code as above.</p>
+</section>
+<section lang="el" id="el">
+<h1>Έχεις πρόσκληση για τάβλι</h1>
+<p>Ένας φίλος σε προσκάλεσε σε ένα online παιχνίδι στο Tavlaki, μια εφαρμογή για τάβλι στο iPhone.</p>
+<h2>1. Κατέβασε το Tavlaki</h2>
+<p><a class="button" href="https://testflight.apple.com/join/OWNER-TESTFLIGHT-LINK">Κατέβασε το Tavlaki</a></p>
+<p class="note">Το Tavlaki είναι σε δοκιμαστική έκδοση στο TestFlight, την εφαρμογή της Apple για δοκιμαστικές εκδόσεις. Αν δεν έχεις το TestFlight, ο σύνδεσμος σου ζητά να το κατεβάσεις πρώτα. Το Android έρχεται αργότερα.</p>
+<h2>2. Γράψε τον κωδικό</h2>
+<p>Ο κωδικός της πρόσκλησης είναι το τέλος της διεύθυνσης αυτής της σελίδας, μετά το <code>/i/</code>. Έχει 8 γράμματα και ψηφία. Για παράδειγμα, στο <code>tavlaki.com/i/ABCD2345</code> ο κωδικός είναι <code>ABCD2345</code>.</p>
+<ol>
+<li>Άνοιξε το Tavlaki.</li>
+<li>Στην Αρχική, πάτα <strong>Μπες με κωδικό</strong>.</li>
+<li>Γράψε τον κωδικό ή επικόλλησε τη διεύθυνση αυτής της σελίδας. Μετά πάτα <strong>Συνέχεια</strong>.</li>
+</ol>
+<h2>Έχεις ήδη το Tavlaki;</h2>
+<p>Γύρισε στο μήνυμα και πάτα ξανά τον σύνδεσμο: ανοίγει την πρόσκληση στην εφαρμογή. Αν ανοίξει ξανά αυτή η σελίδα, κράτησε πατημένο τον σύνδεσμο και διάλεξε <strong>Άνοιγμα στο «Tavlaki»</strong>. Ή γράψε τον κωδικό όπως πιο πάνω.</p>
+</section>
+<footer lang="en">This page sets no cookies, runs no scripts and loads nothing from other sites. <a href="https://tavlaki.com/privacy">Privacy policy</a> · <span lang="el"><a href="https://tavlaki.com/el/privacy">Πολιτική απορρήτου</a></span></footer>
+</main>
+</body>
+</html>

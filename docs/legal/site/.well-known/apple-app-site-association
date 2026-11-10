@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["P36P357F6Z.com.tavlaki"],
+        "components": [
+          {
+            "/": "/i/*",
+            "comment": "An invite link (#332): https://tavlaki.com/i/<code> opens the invite in the app."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,4 +1,13 @@
-import { inviteAppUrl, inviteCodeFromLink, inviteCodeFromPath, inviteUrl } from './link';
+import fs from 'node:fs';
+import path from 'node:path';
+
+import {
+  INVITE_LINK_ORIGIN,
+  inviteAppUrl,
+  inviteCodeFromLink,
+  inviteCodeFromPath,
+  inviteUrl,
+} from './link';
 
 const CODE = 'ABCD2345';
 
@@ -54,12 +63,25 @@ describe('inviteCodeFromPath', () => {
     expect(inviteCodeFromPath('/invite/ABCD2345/')).toBe(CODE);
   });
 
-  it.each([['/invite/ABCD234O'], ['/invite/ABC'], ['/invite'], ['/game/ABCD2345'], ['/']])(
-    'refuses %j',
-    (path) => {
-      expect(inviteCodeFromPath(path)).toBeNull();
-    },
-  );
+  it('reads the code from the share link path, in any case (#332)', () => {
+    expect(inviteCodeFromPath('/i/abcd2345')).toBe(CODE);
+    expect(inviteCodeFromPath('/I/ABCD2345/')).toBe(CODE);
+  });
+
+  it.each([
+    ['/invite/ABCD234O'],
+    ['/invite/ABC'],
+    ['/invite'],
+    ['/game/ABCD2345'],
+    ['/'],
+    ['/i/ABCD234O'],
+    ['/i/'],
+    ['/i'],
+    ['/ix/ABCD2345'],
+    ['/i/ABCD2345/more'],
+  ])('refuses %j', (path) => {
+    expect(inviteCodeFromPath(path)).toBeNull();
+  });
 });
 
 describe('invite links', () => {
@@ -79,5 +101,53 @@ describe('invite links', () => {
   it('throws for text that is not a code', () => {
     expect(() => inviteUrl('ABCD234O')).toThrow('not an invite code');
     expect(() => inviteAppUrl('short')).toThrow('not an invite code');
+  });
+});
+
+/** The repo root, from `apps/mobile/src/features/invites`. */
+const ROOT = path.join(__dirname, '../../../../..');
+const read = (file: string) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+
+describe('universal links (#332)', () => {
+  const host = new URL(INVITE_LINK_ORIGIN).host;
+
+  it('the app config claims the share link domain', () => {
+    const app = JSON.parse(read('apps/mobile/app.json')) as {
+      expo: { ios: { bundleIdentifier: string; associatedDomains?: string[] } };
+    };
+    expect(app.expo.ios.associatedDomains).toEqual([`applinks:${host}`]);
+  });
+
+  it("the site's apple-app-site-association opens the share link path in the production app", () => {
+    const app = JSON.parse(read('apps/mobile/app.json')) as {
+      expo: { ios: { bundleIdentifier: string } };
+    };
+    const aasa = JSON.parse(read('docs/legal/site/.well-known/apple-app-site-association')) as {
+      applinks: { details: { appIDs: string[]; components: { '/': string }[] }[] };
+    };
+    expect(aasa.applinks.details).toEqual([
+      expect.objectContaining({
+        appIDs: [`P36P357F6Z.${app.expo.ios.bundleIdentifier}`],
+        components: [expect.objectContaining({ '/': '/i/*' })],
+      }),
+    ]);
+    // The path the app writes is the path the site hands to the app.
+    expect(new URL(inviteUrl(CODE)).pathname).toBe(`/i/${CODE}`);
+  });
+
+  it('the site shows the fallback page for every share link, with no script', () => {
+    expect(read('docs/legal/site/_redirects')).toMatch(/^\/i\/\*\s+\/i\/index\.html\s+200$/m);
+    expect(read('docs/legal/site/_headers')).toMatch(
+      /^\/\.well-known\/apple-app-site-association\n\s+Content-Type: application\/json$/m,
+    );
+    const page = read('docs/legal/site/i/index.html');
+    expect(page).not.toMatch(
+      /<script|<iframe|<img|https?:\/\/(?!tavlaki\.com|testflight\.apple\.com|apps\.apple\.com)/i,
+    );
+    // Both languages, with the app's own words for the code screen.
+    expect(page).toContain('<section lang="en">');
+    expect(page).toContain('<section lang="el" id="el">');
+    expect(page).toContain('Join with a code');
+    expect(page).toContain('Μπες με κωδικό');
   });
 });

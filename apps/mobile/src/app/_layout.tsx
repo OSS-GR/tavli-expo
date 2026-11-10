@@ -99,6 +99,8 @@ function RootStack() {
           <Stack.Screen name="dev/race" />
           {/* An invite link (#256): `tavlaki://invite/<code>`. */}
           <Stack.Screen name="invite/[code]" />
+          {/* The share link (#332): `https://tavlaki.com/i/<code>` goes on to the route above. */}
+          <Stack.Screen name="i/[code]" />
           {/* Play a friend online (#281): the setup, then the waiting screen. */}
           <Stack.Screen name="friend/index" />
           <Stack.Screen name="friend/[code]" />

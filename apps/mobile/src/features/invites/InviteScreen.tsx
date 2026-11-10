@@ -12,8 +12,9 @@
  * - Screen readers: each state moves focus to its title and reads the
  *   invite once. Large fonts scroll: no text has a line limit.
  *
- * The invite has no name of the inviter yet: players have no display
- * names (usernames come later, owner answer Q10). So it says "A friend".
+ * The invite names the friend (#433): "eleni invited you to play Portes
+ * online", with the username or the guest name ("Guest 4821") from the
+ * view (`fromName`, #400, #405). With no name it says "A friend".
  *
  * Navigation stays in the route (`app/invite/[code].tsx`).
  */
@@ -174,10 +175,13 @@ function OpenInvite({ view, busy, failed, onAccept, onDecline }: OpenInviteProps
   const titleRef = useFocusOnShow();
   const title = t('invite.open.title');
   const fromName = playerNameText(view.fromName, t);
+  const game = t(`games.${view.choice}`);
   const from =
-    fromName === null ? t('invite.open.from') : t('invite.open.fromName', { name: fromName });
+    fromName === null
+      ? t('invite.open.from', { game })
+      : t('invite.open.fromName', { name: fromName, game });
   const rows = [
-    { label: t('invite.open.game'), value: t(`games.${view.choice}`) },
+    { label: t('invite.open.game'), value: game },
     {
       label: t('invite.open.length'),
       value: t('invite.open.lengthValue', { count: view.targetPoints }),

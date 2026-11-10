@@ -16,6 +16,10 @@
 | [terms.el.md](terms.el.md) | Greek terms of use. Same content as the English one. |
 | [site/terms/index.html](site/terms/index.html) | English static page, served at `https://tavlaki.com/terms` |
 | [site/el/terms/index.html](site/el/terms/index.html) | Greek static page, served at `https://tavlaki.com/el/terms` |
+| [site/.well-known/apple-app-site-association](site/.well-known/apple-app-site-association) | iOS universal links (#332): `https://tavlaki.com/i/<code>` opens the app. JSON with no file extension |
+| [site/i/index.html](site/i/index.html) | The invite fallback page (#332), served for every `https://tavlaki.com/i/<code>`. English and Greek on one page |
+| [site/_redirects](site/_redirects) | Host rule (Cloudflare Pages, Netlify): rewrite `/i/*` to the fallback page |
+| [site/_headers](site/_headers) | Host rule: serve the association file as `application/json`; `noindex` on invite pages |
 
 The app opens the terms from the username step (`termsUrl` in `apps/mobile/src/features/online/usernameStep.ts`): `https://tavlaki.com/el/terms` when the app language is Greek, else `https://tavlaki.com/terms`.
 
@@ -27,7 +31,7 @@ The app opens `https://tavlaki.com/privacy` (`PRIVACY_POLICY_URL` in `apps/mobil
 - **Change all four files together.** Edit the English Markdown first, then the Greek Markdown, then both HTML pages. Change the "Last updated" date in all four.
 - The policy describes what the code does. When a PR changes what data leaves the phone (a new event, a new vendor, a new id), it updates this policy in the same PR. The event list must match [`docs/architecture/analytics-events.md`](../architecture/analytics-events.md). The same PR also updates the store privacy answers ([`docs/store/app-privacy.md`](../store/app-privacy.md), [`docs/store/play-data-safety.md`](../store/play-data-safety.md)) and the iOS privacy manifest in `apps/mobile/app.json`.
 - The HTML pages are plain HTML with inline CSS. No JavaScript, no fonts or images from other sites, no cookies. Keep it that way: the policy says so.
-- `<!-- OWNER: ... -->` comments in the Markdown mark things the owner must confirm. They are left out of the HTML.
+- `<!-- OWNER: ... -->` comments in the Markdown mark things the owner must confirm. They are left out of the HTML. The invite fallback page has no Markdown source, so its `OWNER` comment is in the HTML.
 
 ## How to make the HTML from the Markdown
 
@@ -41,10 +45,26 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 
 ## How to publish
 
-1. Use any static host (for example GitHub Pages, Cloudflare Pages or Netlify). Publish the `docs/legal/site/` folder as the site root.
+1. Use any static host with rewrites and headers (Cloudflare Pages or Netlify read `_redirects` and `_headers`; GitHub Pages cannot rewrite `/i/*`). Publish the `docs/legal/site/` folder as the site root, `.well-known/` included. See [Invite links](#invite-links-332) for the steps on Cloudflare Pages.
 2. Point `tavlaki.com` at the host. Both `https://tavlaki.com/privacy` and `https://tavlaki.com/el/privacy` must open the pages. Most hosts serve `privacy/index.html` for `/privacy` and `/privacy/` by themselves.
 3. Use HTTPS. Do not add analytics or cookies to the site.
 4. Put `https://tavlaki.com/privacy` in App Store Connect (App Privacy → Privacy Policy URL) and in the Google Play Console (App content → Privacy policy).
+
+## Invite links (#332)
+
+The share link of an invite is `https://tavlaki.com/i/<code>`. On an iPhone with Tavlaki (a production build: TestFlight or the App Store), iOS opens it in the app. Anywhere else it opens the fallback page `site/i/index.html`: **Get Tavlaki**, where the code is (the end of the address), and how to enter it with **Join with a code** (#333). The page runs no script and loads nothing from other sites, like the other pages. The app side is "Invites" in [`docs/architecture/app-shell.md`](../architecture/app-shell.md#invites-256).
+
+Owner steps (`tavlaki.com` DNS is on Cloudflare, so Cloudflare Pages is the simplest host; any static host with rewrites and headers works):
+
+1. In the fallback page, replace both `https://testflight.apple.com/join/OWNER-TESTFLIGHT-LINK` links with the TestFlight public link (App Store Connect → TestFlight → External Testing → your group → Public Link). After the App Store launch, use `https://apps.apple.com/app/id6828172932` and drop the beta note (both languages). This is a repo change: open a PR, or ask an agent.
+2. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**: pick this repo, branch `main`, no build command, build output directory `docs/legal/site`. Each push to `main` then publishes the site. (Or upload the folder by hand with **Direct Upload**.)
+3. The project → **Custom domains** → add `tavlaki.com` (and `www.tavlaki.com` if you want it). Cloudflare adds the DNS records and the HTTPS certificate. Today HTTP on `tavlaki.com` redirects to `www`: remove that redirect rule (Rules → Redirect Rules or Page Rules), or iOS cannot read the file. The link domain is `tavlaki.com`, not `www`.
+4. Check the association file: `curl -sI https://tavlaki.com/.well-known/apple-app-site-association` must answer `200`, `content-type: application/json`, and no redirect. `_headers` sets the type; if the host ignores `_headers`, set the header in the host's settings.
+5. Check the fallback page: `https://tavlaki.com/i/ABCD2345` shows "Get Tavlaki" and the address stays the same. `_redirects` rewrites `/i/*` to `/i/index.html` (status `200`, a rewrite). If your host does not read `_redirects`, add the same rewrite there. Also check that `https://tavlaki.com/privacy` and `/terms` still open.
+6. Make a new production build (`eas build -p ios --profile production`) and send it to TestFlight. The entitlement `applinks:tavlaki.com` is in that build only: older builds never open the link. EAS turns on the Associated Domains capability for `com.tavlaki` by itself.
+7. Test on an iPhone: "Universal links" in [`docs/process/running-the-app.md`](../process/running-the-app.md#universal-links-332).
+
+Do not add analytics, cookies or outside fonts to the site. The invite pages carry a code in the address, so `_headers` and the page ask search engines not to index them, and the page sends no referrer to the TestFlight link.
 
 ## Before you publish (owner checklist)
 

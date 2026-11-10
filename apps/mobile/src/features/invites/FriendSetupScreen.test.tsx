@@ -23,6 +23,7 @@ import i18n from '@/i18n';
 import { FriendSetupScreen } from './FriendSetupScreen';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { enterEmailCode } from '../../../test/emailCode';
 import { renderWithRoot } from '../../../test/render';
 
 const START = Date.UTC(2026, 9, 28, 12, 0, 0);
@@ -209,6 +210,24 @@ describe('FriendSetupScreen', () => {
       type: 'track',
       event: 'online_sign_in',
       props: { method: 'apple' },
+    });
+  });
+
+  it('signs in with an email code in the sheet, then makes the invite as that user (#433)', async () => {
+    const user = setupUser();
+    const parts = setup();
+    const { onCreated } = await open(parts);
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Continue with email' }));
+    expect(screen.getByTestId('sign-in-sheet')).toBeOnTheScreen();
+    await enterEmailCode(user, parts.authStore, 'eleni@example.com');
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    expect(parts.server.getInvite(onCreated.mock.calls[0]![0])?.from).toBe('user-1');
+    expect(parts.authStore.guests).toBe(0);
+    expect(parts.analytics.sent[0]).toEqual({
+      type: 'track',
+      event: 'online_sign_in',
+      props: { method: 'email' },
     });
   });
 

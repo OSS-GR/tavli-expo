@@ -61,7 +61,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li><strong>Your games:</strong> the match you are playing, so you can go back to it, and your last choices on the New game screen. In pass-and-play, this includes the player names you type. Names are never sent anywhere.</li>
 <li><strong>Your privacy answer</strong> (allow or don't allow).</li>
 <li><strong>Your answer</strong> (<strong>Turn on</strong> or <strong>Not now</strong>) to turn notifications, so the app does not ask again by itself and sends the push token only after <strong>Turn on</strong>.</li>
-<li><strong>When the app last asked</strong> you to save your guest account or to play online (the times and how many asks), so it asks four times at most and stops after <strong>Don't ask again</strong> or a sign-in with Apple.</li>
+<li><strong>When the app last asked</strong> you to save your guest account or to play online (the times and how many asks), so it asks four times at most and stops after <strong>Don't ask again</strong> or a sign-in with Apple or an email code.</li>
 <li><strong>An install id:</strong> a random code, made on your phone. It is not your name, email, phone number or a device id. It does not come from your phone's hardware. The app makes it only after you tap <strong>Allow usage data</strong>.</li>
 </ul>
 <p>Deleting the app deletes all of this from your phone. If you install the app again, you get a new install id. (On Android, your phone's own backup may keep a copy of app data and bring it back when you reinstall.)</p>
@@ -189,7 +189,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 </tr>
 <tr class="odd">
 <td>Signed in for online play</td>
-<td>You signed in to play online. Includes how only (Apple or guest), never the email, the Apple id or any id</td>
+<td>You signed in to play online. Includes how only (Apple, email or guest), never the email, the Apple id or any id</td>
 </tr>
 <tr class="even">
 <td>Screen viewed</td>
@@ -224,7 +224,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <li>The server keeps your <strong>sign-in session</strong>: a random session token, when it expires, and, as the sign-in software records it, the IP address and the app's user agent (the app name and the phone system) when the session was made.</li>
 <li>The app keeps the <strong>sign-in cookie</strong> in your phone's secure store (the iOS Keychain or the Android Keystore). The next invite uses it, so the app asks you to sign in only once. <strong>Sign out</strong> (Settings → Account, only for an account saved with Apple or an email code) ends the session on our server and deletes the cookie. Your account stays, and Sign in with Apple or a new email code opens it again.</li>
 <li>The invite code and the link go where <strong>you</strong> share them (for example a chat app). Anyone with the code can see the invite and accept it until it expires.</li>
-<li>The user id, the Apple id, the email and the username <strong>never go to analytics</strong> (PostHog) and never go into crash reports (Sentry). Usage data gets only how you signed in (Apple or guest), and only if you allowed usage data.</li>
+<li>The user id, the Apple id, the email and the username <strong>never go to analytics</strong> (PostHog) and never go into crash reports (Sentry). Usage data gets only how you signed in (Apple, email or guest), and only if you allowed usage data.</li>
 </ul>
 <p>Before you make or open an invite, or sign in with Apple in <strong>Settings → Account</strong>, the app does not talk to the game server. When you open an invite link or a link to an online game, the app first asks the game server if this phone has a saved sign-in (it sends the sign-in cookie, if there is one). That check makes no account, and without a saved sign-in nothing is saved for you. With a saved sign-in, the app then loads the invite or the game.</p>
 <h3 id="delete-your-account">Delete your account</h3>

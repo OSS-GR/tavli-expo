@@ -1,6 +1,7 @@
 /**
- * The ways into online play (#401, ADR-0008): Sign in with Apple, or a
- * guest account. `SignInChoices` shows them; this file does the work.
+ * The ways into online play (#401, #433, ADR-0008): Sign in with Apple,
+ * an email code, or a guest account. `SignInChoices` shows them; this
+ * file does the work.
  *
  * - Apple: a nonce from our server (`keyNonce`), Apple's sheet with it,
  *   then `signInWithKey`. The adapter sends Apple's one-time code to the
@@ -8,16 +9,19 @@
  *   the account goes (#398). A closed sheet is no sign-in and no problem.
  *   A sheet that ended unfinished (no Apple ID on the phone, #442) has its
  *   own text: the connection is not the problem.
+ * - Email (#433): `EmailCodeForm` asks for the code, then
+ *   `signInWithEmail` signs in with it (`signInWithKey`). The form says
+ *   what a wrong or used code means; a problem here goes back to it.
  * - Guest: `signInForOnline` (the saved session first, so the guest is
  *   made once).
- * - Each new sign-in sends `online_sign_in` with the way only (`apple` or
- *   `guest`): never the user id, the email or the Apple id.
+ * - Each new sign-in sends `online_sign_in` with the way only (`apple`,
+ *   `email` or `guest`): never the user id, the email or the Apple id.
  * - The username step (#405): after a sign-in with a key, a saved account
  *   with no username yet gets `step` (the choices show `UsernameForm`);
  *   `finishStep` then hands the user on. When the server cannot say, the
  *   user goes on at once: the name can wait for Settings.
  * - Reminders (#404): the first guest sign-in starts the save reminders
- *   on Home; a sign-in with a key stops them.
+ *   on Home; a sign-in with a key (Apple or email) stops them.
  */
 import {
   isAppleSheetUnfinished,
@@ -26,6 +30,7 @@ import {
   type AuthKeyCredential,
   type AuthProvider,
   type AuthUser,
+  type EmailKeyCredential,
   type MyUsername,
   type Usernames,
 } from '@tavli/contracts';
@@ -37,7 +42,7 @@ import { reminders } from '@/features/reminders/reminders';
 import { onlineAccountReady, signInForOnline } from './account';
 import { needsUsernameStep } from './usernameStep';
 
-export type SignInMethod = 'apple' | 'guest';
+export type SignInMethod = 'apple' | 'email' | 'guest';
 
 /**
  * Why the last try failed: Apple's sheet ended unfinished (most often no
@@ -80,6 +85,19 @@ export async function signInWithApple(
   return user;
 }
 
+/**
+ * Signs in with an email code (#433). Rejects with `AuthErrorData`:
+ * `WRONG_CODE` (type it again), `REJECTED` (a used or old code), …
+ */
+export async function signInWithEmail(
+  auth: AuthProvider,
+  credential: EmailKeyCredential,
+): Promise<AuthUser> {
+  const user = await auth.signInWithKey(credential);
+  onlineAccountReady();
+  return user;
+}
+
 export interface SignInChoicesState {
   /** Apple's sheet works on this phone (iPhone). `false` until the phone says. */
   readonly appleAvailable: boolean;
@@ -87,7 +105,12 @@ export interface SignInChoicesState {
   readonly busy: SignInMethod | null;
   /** Why the last try failed, or `null` (a closed Apple sheet is no failure). */
   readonly failed: SignInFailure | null;
-  readonly choose: (method: SignInMethod) => void;
+  readonly choose: (method: 'apple' | 'guest') => void;
+  /**
+   * Signs in with the email form's code. Rejects with the server's answer,
+   * for the form to show; on a sign-in it goes on like `choose`.
+   */
+  readonly withEmail: (credential: EmailKeyCredential) => Promise<void>;
   /** A saved account with no username yet: show the username step. */
   readonly step: { readonly user: AuthUser; readonly mine: MyUsername } | null;
   /** Ends the username step (saved or Not now) and hands the user on. */
@@ -139,7 +162,40 @@ export function useSignInChoices({
     };
   }, [appleSheet]);
 
-  const choose = (method: SignInMethod) => {
+  /** After a new sign-in: analytics, reminders, then the username step or on. */
+  const signedIn = (user: AuthUser, method: SignInMethod) => {
+    quietly(() => analytics.track('online_sign_in', { method }));
+    if (user.isGuest) reminders.start();
+    else reminders.stop();
+    if (!mounted.current) return;
+    if (user.isGuest || usernames === undefined) {
+      setBusy(null);
+      onSignedIn(user);
+      return;
+    }
+    // Busy while the server says whether a username is needed, so a
+    // second tap cannot start another sign-in. Each answer below clears
+    // it before the `mounted` check.
+    trying.current = true;
+    setBusy(method);
+    usernames.mine().then(
+      (mine) => {
+        trying.current = false;
+        if (!mounted.current) return;
+        setBusy(null);
+        if (needsUsernameStep(mine)) setStep({ user, mine });
+        else onSignedIn(user);
+      },
+      () => {
+        trying.current = false;
+        if (!mounted.current) return;
+        setBusy(null);
+        onSignedIn(user);
+      },
+    );
+  };
+
+  const choose = (method: 'apple' | 'guest') => {
     if (trying.current) return;
     trying.current = true;
     setBusy(method);
@@ -149,39 +205,10 @@ export function useSignInChoices({
       (user) => {
         trying.current = false;
         if (user !== null) {
-          quietly(() => analytics.track('online_sign_in', { method }));
-          if (user.isGuest) reminders.start();
-          else reminders.stop();
-        }
-        if (!mounted.current) return;
-        if (user === null) {
-          setBusy(null);
+          signedIn(user, method);
           return;
         }
-        if (user.isGuest || usernames === undefined) {
-          setBusy(null);
-          onSignedIn(user);
-          return;
-        }
-        // Busy again while the server says whether a username is needed,
-        // so a second tap cannot start another sign-in. Each answer below
-        // clears it before the `mounted` check.
-        trying.current = true;
-        usernames.mine().then(
-          (mine) => {
-            trying.current = false;
-            if (!mounted.current) return;
-            setBusy(null);
-            if (needsUsernameStep(mine)) setStep({ user, mine });
-            else onSignedIn(user);
-          },
-          () => {
-            trying.current = false;
-            if (!mounted.current) return;
-            setBusy(null);
-            onSignedIn(user);
-          },
-        );
+        if (mounted.current) setBusy(null);
       },
       (error: unknown) => {
         trying.current = false;
@@ -192,11 +219,24 @@ export function useSignInChoices({
     );
   };
 
+  const withEmail = async (credential: EmailKeyCredential) => {
+    // Another sign-in runs: the form says "try again".
+    if (trying.current) throw new Error('busy');
+    trying.current = true;
+    let user: AuthUser;
+    try {
+      user = await signInWithEmail(auth, credential);
+    } finally {
+      trying.current = false;
+    }
+    signedIn(user, 'email');
+  };
+
   const finishStep = () => {
     if (step === null) return;
     setStep(null);
     onSignedIn(step.user);
   };
 
-  return { appleAvailable, busy, failed, choose, step, finishStep };
+  return { appleAvailable, busy, failed, choose, withEmail, step, finishStep };
 }

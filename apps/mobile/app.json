@@ -19,6 +19,7 @@
     "ios": {
       "bundleIdentifier": "com.tavlaki",
       "usesAppleSignIn": true,
+      "associatedDomains": ["applinks:tavlaki.com"],
       "icon": {
         "light": "./assets/icon/icon.png",
         "dark": "./assets/icon/icon-ios-dark.png",

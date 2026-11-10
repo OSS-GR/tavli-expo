@@ -231,23 +231,23 @@
     "offline": {
       "intro": "You are not signed in. You play on this phone only.",
       "kept": "Kept on this phone: your games against the bot, your history and your settings.",
-      "appleNote": "Sign in with Apple to use your account from another phone. A guest account is made only when you make or open an invite.",
-      "noApple": "Online play starts when you make or open an invite: Home → Play a friend."
+      "email": "Continue with email",
+      "signInNote": "Sign in to use your account from another phone. A guest account is made only when you make or open an invite."
     },
     "guest": {
       "name": "You play as {{name}}",
       "noName": "You play as a guest.",
       "kept": "Kept on our server: your online games, your invites and your guest name. Kept on this phone: your games against the bot, your history and your settings.",
       "onlyHere": "A guest account opens only on this phone. If you lose the phone or delete the app, it is gone.",
-      "save": "Save your account with Apple to open it on a new phone and to pick a username. Your guest games stay.",
-      "noApple": "You can save a guest account with Sign in with Apple, on an iPhone for now.",
+      "save": "Save your account to open it on a new phone and to pick a username. Your guest games stay.",
+      "saveEmail": "Save with email",
       "delete": "Delete my guest account",
       "deleteHint": "Your online games, invites and guest name on our server."
     },
     "saved": {
       "name": "You play as {{name}}",
       "noName": "You have no username yet. Other players see your guest name.",
-      "kept": "Your account is saved: sign in with Apple to open it on another phone. Your games against the bot, your history and your settings stay on this phone.",
+      "kept": "Your account is saved: sign in with it to open it on another phone. Your games against the bot, your history and your settings stay on this phone.",
       "username": "Username",
       "usernameNone": "Pick one",
       "keys": "Ways to sign in",
@@ -256,7 +256,7 @@
       "removeLabel": "Remove {{provider}}",
       "add": "Add {{provider}}",
       "signOut": "Sign out",
-      "signOutHint": "Your account stays. Sign in with Apple to come back.",
+      "signOutHint": "Your account stays. Sign in again to come back.",
       "delete": "Delete my account",
       "deleteHint": "Your account, username and online games on our server."
     },
@@ -275,6 +275,7 @@
     "problem": {
       "appleUnfinished": "Apple sign-in did not finish. Check that this phone is signed in to an Apple ID in Settings.",
       "keyTaken": "This Apple ID has another Tavlaki account already. Your guest account stays as it is.",
+      "keyTakenEmail": "This email has another Tavlaki account already. Your guest account stays as it is.",
       "lastKey": "An account keeps at least one way to sign in.",
       "deleteFailed": "Could not delete your account. Check the connection and try again.",
       "other": "That did not work. Check the connection and try again."
@@ -287,12 +288,13 @@
     },
     "signOutDialog": {
       "title": "Sign out?",
-      "comeBack": "To play online on this phone again, sign in with Apple.",
+      "comeBack": "To play online on this phone again, sign in again.",
       "kept": "Your online games and your username stay with your account.",
       "confirm": "Sign out"
     },
     "moveDialog": {
       "title": "This Apple ID has an account already",
+      "titleEmail": "This email has an account already",
       "ask": "Move your guest’s games and invites into that account? This phone then plays as that account.",
       "games_one": "{{count}} game in progress",
       "games_other": "{{count}} games in progress",
@@ -310,7 +312,7 @@
       "invites": "Your open invites are cancelled.",
       "pushes": "Turn notifications stop.",
       "guestName": "Your guest name is deleted.",
-      "savedName": "Your username and your Sign in with Apple are removed.",
+      "savedName": "Your username and your ways to sign in are removed.",
       "kept": "Finished games stay for the other players, with no name. Your games and history on this phone stay too. You cannot undo it.",
       "confirm": "Delete"
     }
@@ -452,8 +454,8 @@
     "loading": "Loading the invite…",
     "open": {
       "title": "Game invite",
-      "from": "A friend invites you to an online match.",
-      "fromName": "{{name}} invites you to an online match.",
+      "from": "A friend invited you to play {{game}} online.",
+      "fromName": "{{name}} invited you to play {{game}} online.",
       "game": "Game",
       "length": "Match length",
       "lengthValue_one": "First to {{count}} point",
@@ -678,12 +680,45 @@
     "title": "Play online",
     "body": "An online game needs a free account. Pick how you sign in.",
     "appleNote": "With Apple you can sign in again on a new phone. We keep your Apple ID and the email Apple gives us, and you can hide your email. Other players never see them.",
+    "email": "Continue with email",
+    "emailNote": "With an email code you can sign in again on any phone. We keep your email address for the sign-in. Other players never see it.",
     "guest": "Continue as a guest",
     "guestNote": "A guest account has no name and no email. Only this phone can open it.",
     "notNow": "Not now",
     "busy": "Signing you in…",
     "failed": "That did not work. Check the connection and try again.",
     "appleUnfinished": "Apple sign-in did not finish. Check that this phone is signed in to an Apple ID in Settings, or continue as a guest."
+  },
+  "emailCode": {
+    "title": "Sign in with email",
+    "saveTitle": "Save with email",
+    "body": "We send a 6-digit code to your email. You need no password.",
+    "address": "Email address",
+    "send": "Send the code",
+    "sending": "Sending…",
+    "codeTitle": "Check your email",
+    "sent": "We sent a 6-digit code to {{email}}. It works for 5 minutes. If it does not come, check the spam folder.",
+    "code": "Code from the email",
+    "codeHint": "6 digits",
+    "confirm": "Continue",
+    "checking": "Checking the code…",
+    "resend": "Send a new code",
+    "resendWait_one": "You can ask for a new code in {{count}} second.",
+    "resendWait_other": "You can ask for a new code in {{count}} seconds.",
+    "resent": "We sent a new code. Only the newest one works.",
+    "change": "Change the email",
+    "back": "Back",
+    "problem": {
+      "badAddress": "This does not look like an email address. Check it and try again.",
+      "sendRefused": "We could not send a code to this address. Check it and try again.",
+      "rateLimited": "Too many codes for now. Try again later.",
+      "rateLimitedMinutes_one": "Too many codes for now. Try again in {{count}} minute.",
+      "rateLimitedMinutes_other": "Too many codes for now. Try again in {{count}} minutes.",
+      "wrongCode": "This code is wrong. Check the email and try again.",
+      "codeUsed": "This code does not work any more. Send a new code.",
+      "keyTaken": "This email has another Tavlaki account already.",
+      "other": "That did not work. Check the connection and try again."
+    }
   },
   "join": {
     "title": "Join with a code",
@@ -1486,11 +1521,11 @@
       "TOO_SOON": "You changed your name less than 30 days ago.",
       "TERMS_NEEDED": "Accept the terms of use first.",
       "AGE_NEEDED": "Tick the age box first.",
-      "NOT_SAVED": "A username needs a saved account (Sign in with Apple).",
+      "NOT_SAVED": "A username needs a saved account: save yours in Settings → Account.",
       "NOT_SIGNED_IN": "You are not signed in. Open online play and sign in first.",
       "failed": "Could not reach the server. Try again."
     },
-    "guestOnly": "A username needs a saved account. Sign in with Apple in online play to save yours. Guests play as “Guest” and a number.",
+    "guestOnly": "A username needs a saved account. Save yours in Settings → Account. Guests play as “Guest” and a number.",
     "loading": "Loading…"
   },
   "safety": {

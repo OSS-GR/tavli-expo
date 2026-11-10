@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { ExpoConfig } from 'expo/config';
 import Constants from 'expo-constants';
 
-import appConfig from '../app.config';
+import appConfig, { withLinkDomains } from '../app.config';
 
 import { APP_SCHEME, convexServer, convexUrl, readConvexSiteUrl, readConvexUrl } from './convexUrl';
 
@@ -181,6 +181,35 @@ describe('app.config.ts', () => {
     expect(extra).not.toHaveProperty('convexSiteUrl');
     const site = 'http://127.0.0.1:3211';
     expect(readConvexSiteUrl(configFor('development', local, site).extra)).toBe(site);
+  });
+
+  // Universal links (#332): only the production app has the site's
+  // apple-app-site-association entry, and a free Apple ID cannot sign the
+  // capability for a local dev build.
+  it.each([
+    ['development', undefined],
+    ['preview', undefined],
+    ['production', ['applinks:tavlaki.com']],
+  ] as const)('APP_VARIANT=%s has associated domains %j', (variant, domains) => {
+    setEnv('APP_VARIANT', variant);
+    const config = appConfig({
+      config: {
+        name: 'Tavlaki',
+        slug: 'tavlaki',
+        ios: { bundleIdentifier: 'com.tavlaki', associatedDomains: ['applinks:tavlaki.com'] },
+      },
+      projectRoot: '/app',
+      staticConfigPath: null,
+      packageJsonPath: null,
+    });
+    expect(config.ios?.associatedDomains).toEqual(domains);
+    expect(config.ios?.bundleIdentifier).toMatch(/^com\.tavlaki/);
+  });
+
+  it('withLinkDomains keeps an iOS config with no domains as it is', () => {
+    expect(withLinkDomains(undefined, 'development')).toBeUndefined();
+    const ios = { bundleIdentifier: 'com.tavlaki' };
+    expect(withLinkDomains(ios, 'preview')).toBe(ios);
   });
 
   it('keeps the other extra fields', () => {

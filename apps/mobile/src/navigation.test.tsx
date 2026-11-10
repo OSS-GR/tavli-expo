@@ -1000,6 +1000,26 @@ describe('invites (#256)', () => {
     expect(onlineFake.authStore.guests).toBe(0);
   });
 
+  it('a share link (https://tavlaki.com/i/<code>) opens the same invite screen (#332)', async () => {
+    const user = setupUser();
+    onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
+    const code = onlineServer().createInvite('friend', 'portes', 1, 1);
+    // iOS gives Expo Router the path of the universal link.
+    const router = await renderRouter('./src/app', { initialUrl: `/i/${code.toLowerCase()}` });
+    expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
+    expect(router.getPathname()).toBe(`/invite/${code.toLowerCase()}`);
+    // The share link route replaced itself: nothing to go back to.
+    expect(appRouter.canGoBack()).toBe(false);
+    await user.press(await screen.findByRole('button', { name: 'Accept' }));
+    expect(router.getPathname()).toMatch(/^\/game\/game-\d+$/);
+  });
+
+  it('a share link with a bad code shows "not found" and makes no account (#332)', async () => {
+    await renderRouter('./src/app', { initialUrl: '/i/ABCD234O' });
+    expect(await screen.findByRole('header', { name: 'Invite not found' })).toBeOnTheScreen();
+    expect(onlineFake.authStore.guests).toBe(0);
+  });
+
   it('an unknown invite shows "not found", and Home goes Home', async () => {
     const user = setupUser();
     onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
