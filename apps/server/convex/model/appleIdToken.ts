@@ -48,31 +48,123 @@ function flag(value: unknown): boolean {
   return value === true || value === 'true';
 }
 
-/** The claims of a good token, or `null` (any failed check). Never throws. */
-export async function verifyAppleIdToken(
+/**
+ * Why a token was turned down: a short code for the server log (#462).
+ * It names the check only, never the token, the nonce or Apple's id.
+ */
+export type AppleIdTokenProblem =
+  | 'no-nonce'
+  | 'no-audience'
+  | 'bad-token'
+  | 'unknown-key'
+  | 'keys-unreachable'
+  | 'bad-signature'
+  | 'wrong-issuer'
+  | 'wrong-audience'
+  | 'expired'
+  | 'too-old'
+  | 'bad-time'
+  | 'bad-claim'
+  | 'token-has-no-nonce'
+  | 'nonce-mismatch'
+  | 'no-subject';
+
+/** What `checkAppleIdToken` found. */
+export type AppleIdTokenCheckResult =
+  | { readonly ok: true; readonly claims: AppleIdClaims }
+  | {
+      readonly ok: false;
+      readonly problem: AppleIdTokenProblem;
+      /**
+       * The token's `aud` with `wrong-audience`: a bundle id, so the log
+       * can say which app sent it. Only plain id text, else absent.
+       */
+      readonly audience?: string;
+    };
+
+/** A bundle id or Services ID: letters, digits, dots and dashes. */
+const PLAIN_ID = /^[A-Za-z0-9.-]{1,100}$/;
+
+/**
+ * The token's `aud` when it is plain id text. Read only after a
+ * `wrong-audience` error: jose checks Apple's signature before the
+ * claims, so this text comes from Apple, not from the caller.
+ */
+function audienceOf(token: string): string | undefined {
+  try {
+    const part = token.split('.')[1] ?? '';
+    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
+    const aud: unknown = (JSON.parse(json) as Record<string, unknown>)['aud'];
+    const first = Array.isArray(aud) ? (aud as unknown[])[0] : aud;
+    return typeof first === 'string' && PLAIN_ID.test(first) ? first : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Names the check a `jwtVerify` error comes from (jose's `code` and `claim`). */
+function problemOf(error: unknown): AppleIdTokenProblem {
+  const { code, claim } = (error ?? {}) as { code?: unknown; claim?: unknown };
+  switch (code) {
+    case 'ERR_JWT_EXPIRED':
+      return claim === 'iat' ? 'too-old' : 'expired';
+    case 'ERR_JWT_CLAIM_VALIDATION_FAILED':
+      if (claim === 'iss') return 'wrong-issuer';
+      if (claim === 'aud') return 'wrong-audience';
+      if (claim === 'iat' || claim === 'nbf') return 'bad-time';
+      return 'bad-claim';
+    case 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED':
+      return 'bad-signature';
+    case 'ERR_JWKS_NO_MATCHING_KEY':
+    case 'ERR_JWKS_MULTIPLE_MATCHING_KEYS':
+      return 'unknown-key';
+    case 'ERR_JWKS_TIMEOUT':
+    case 'ERR_JWKS_INVALID':
+      return 'keys-unreachable';
+    default:
+      // jose names every token problem with an `ERR_` code; anything else
+      // came from fetching Apple's keys.
+      return typeof code === 'string' && code.startsWith('ERR_') ? 'bad-token' : 'keys-unreachable';
+  }
+}
+
+/** The claims of a good token, or the check that failed. Never throws. */
+export async function checkAppleIdToken(
   token: string,
   check: AppleIdTokenCheck,
-): Promise<AppleIdClaims | null> {
-  if (check.nonce === '' || check.audiences.length === 0) return null;
+): Promise<AppleIdTokenCheckResult> {
+  if (check.nonce === '') return { ok: false, problem: 'no-nonce' };
+  if (check.audiences.length === 0) return { ok: false, problem: 'no-audience' };
+  let payload;
   try {
-    const { payload } = await jwtVerify(token, check.keys, {
+    ({ payload } = await jwtVerify(token, check.keys, {
       issuer: APPLE_ISSUER,
       audience: [...check.audiences],
       algorithms: ['RS256'],
       maxTokenAge: '1h',
       ...(check.now === undefined ? {} : { currentDate: new Date(check.now) }),
-    });
-    const nonce = payload['nonce'];
-    if (typeof nonce !== 'string') return null;
-    if (nonce !== check.nonce && nonce !== (await sha256Hex(check.nonce))) return null;
-    if (typeof payload.sub !== 'string' || payload.sub === '') return null;
-    const email = payload['email'];
-    return {
+    }));
+  } catch (error) {
+    const problem = problemOf(error);
+    if (problem !== 'wrong-audience') return { ok: false, problem };
+    const audience = audienceOf(token);
+    return audience === undefined ? { ok: false, problem } : { ok: false, problem, audience };
+  }
+  const nonce = payload['nonce'];
+  if (typeof nonce !== 'string') return { ok: false, problem: 'token-has-no-nonce' };
+  if (nonce !== check.nonce && nonce !== (await sha256Hex(check.nonce))) {
+    return { ok: false, problem: 'nonce-mismatch' };
+  }
+  if (typeof payload.sub !== 'string' || payload.sub === '') {
+    return { ok: false, problem: 'no-subject' };
+  }
+  const email = payload['email'];
+  return {
+    ok: true,
+    claims: {
       sub: payload.sub,
       email: typeof email === 'string' && email !== '' ? email : undefined,
       emailVerified: flag(payload['email_verified']),
-    };
-  } catch {
-    return null;
-  }
+    },
+  };
 }
