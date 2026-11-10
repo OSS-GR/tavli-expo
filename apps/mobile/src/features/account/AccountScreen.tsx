@@ -3,15 +3,18 @@
  * what is kept where, and the account's actions. The state and the calls
  * are in `useAccount.ts`.
  *
- * - Offline (this phone never played online): no server call. On an
- *   iPhone, Continue with Apple signs in to an account (one made on
- *   another phone, or a new one). A guest is never made here.
- * - Guest: "You play as Guest 4821", Save my account (Apple), Delete my
- *   guest account. A guest has no Sign out: with no key it could never
- *   come back.
- * - A guest whose Apple ID has an account already gets the move dialog
- *   (#403): its games in progress and open invites, then Move my games
- *   or Keep the guest.
+ * - Offline (this phone never played online): no server call. Continue
+ *   with Apple (iPhone) or Continue with email (#433) signs in to an
+ *   account (one made on another phone, or a new one). A guest is never
+ *   made here.
+ * - Guest: "You play as Guest 4821", Save my account (Apple or email),
+ *   Delete my guest account. A guest has no Sign out: with no key it
+ *   could never come back.
+ * - The email code step (`EmailCodeForm`) shows in place of the cards;
+ *   its Cancel shows them again.
+ * - A guest whose Apple ID or email has an account already gets the move
+ *   dialog (#403): its games in progress and open invites, then Move my
+ *   games or Keep the guest.
  * - Saved: the username (to Settings → Username), the ways to sign in
  *   (never remove the last), Sign out and Delete my account.
  * - Each problem and note is read to screen readers (`useAnnouncement`).
@@ -20,10 +23,17 @@
  *
  * Navigation stays in the route (`app/account.tsx`).
  */
-import type { AuthKeyProvider } from '@tavli/contracts';
+import type { AuthKeyProvider, EmailKeyCredential } from '@tavli/contracts';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -34,6 +44,7 @@ import { SectionCard, SectionRow } from '@/components/SectionCard';
 import { Sheet } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
+import { EmailCodeForm } from '@/features/online/EmailCodeForm';
 import { AppleSignInButton } from '@/services';
 
 import { addableKeys, useAccount, type Account, type AccountDeps } from './useAccount';
@@ -49,11 +60,15 @@ export interface AccountScreenProps {
 
 type Dialog = 'signOut' | 'deleteGuest' | 'deleteSaved';
 
+/** What the email code step does with the code. */
+type EmailStep = 'signIn' | 'save' | 'add';
+
 export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountScreenProps) {
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
   const account = useAccount(deps, visit);
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [emailStep, setEmailStep] = useState<EmailStep | null>(null);
   const { state, busy, problem, note, said } = account;
 
   const problemText = problem === null ? null : t(`account.problem.${problem}`);
@@ -61,6 +76,18 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
   useAnnouncement(problemText, problemText === null ? undefined : `account:${said}`);
   useAnnouncement(noteText, noteText === null ? undefined : `account:${said}`);
   useAnnouncement(busy === null ? null : t(`account.busy.${busy}`));
+
+  const useCode = async (credential: EmailKeyCredential) => {
+    if (emailStep === 'signIn') await account.signInWithEmail(credential);
+    else await account.saveWithEmail(credential);
+    setEmailStep(null);
+  };
+  const emailTitle =
+    emailStep === 'signIn'
+      ? t('emailCode.title')
+      : emailStep === 'save'
+        ? t('emailCode.saveTitle')
+        : t('account.saved.add', { provider: t('account.provider.email') });
 
   const confirm = () => {
     const was = dialog;
@@ -78,58 +105,81 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
         backLabel={t('common.back')}
         testID="account-back"
       />
-      <ScrollView style={styles.body} contentContainerStyle={styles.content}>
-        {noteText !== null ? (
-          <Text testID="account-note" style={styles.line}>
-            {noteText}
-          </Text>
-        ) : null}
-        {state.kind === 'loading' ? (
-          <>
-            <ActivityIndicator />
-            <Text style={styles.line}>{t('account.loading')}</Text>
-          </>
-        ) : state.kind === 'failed' ? (
-          <>
-            <Text testID="account-failed" style={styles.line}>
-              {t('account.failed')}
-            </Text>
-            <ActionButton
-              testID="account-retry"
-              kind="secondary"
-              label={t('account.retry')}
-              onPress={account.reload}
-            />
-          </>
-        ) : state.kind === 'offline' ? (
-          <Offline account={account} />
-        ) : state.kind === 'guest' ? (
-          <Guest
-            account={account}
-            guestNumber={state.guestNumber}
-            onDelete={() => setDialog('deleteGuest')}
-          />
-        ) : (
-          <Saved
-            account={account}
-            username={state.username}
-            keys={state.keys.map((key) => key.provider)}
-            onUsername={onUsername}
-            onSignOut={() => setDialog('signOut')}
-            onDelete={() => setDialog('deleteSaved')}
-          />
-        )}
-        {busy !== null ? (
-          <Text testID="account-busy" style={styles.line}>
-            {t(`account.busy.${busy}`)}
-          </Text>
-        ) : null}
-        {problemText !== null ? (
-          <Text testID="account-problem" style={styles.line}>
-            {problemText}
-          </Text>
-        ) : null}
-      </ScrollView>
+      <KeyboardAvoidingView
+        style={styles.body}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled">
+          {emailStep !== null ? (
+            <SectionCard padded testID="account-email">
+              <EmailCodeForm
+                auth={deps.auth}
+                title={emailTitle}
+                onCode={useCode}
+                onBack={() => setEmailStep(null)}
+                backLabel={t('common.cancel')}
+              />
+            </SectionCard>
+          ) : (
+            <>
+              {noteText !== null ? (
+                <Text testID="account-note" style={styles.line}>
+                  {noteText}
+                </Text>
+              ) : null}
+              {state.kind === 'loading' ? (
+                <>
+                  <ActivityIndicator />
+                  <Text style={styles.line}>{t('account.loading')}</Text>
+                </>
+              ) : state.kind === 'failed' ? (
+                <>
+                  <Text testID="account-failed" style={styles.line}>
+                    {t('account.failed')}
+                  </Text>
+                  <ActionButton
+                    testID="account-retry"
+                    kind="secondary"
+                    label={t('account.retry')}
+                    onPress={account.reload}
+                  />
+                </>
+              ) : state.kind === 'offline' ? (
+                <Offline account={account} onEmail={() => setEmailStep('signIn')} />
+              ) : state.kind === 'guest' ? (
+                <Guest
+                  account={account}
+                  guestNumber={state.guestNumber}
+                  onEmail={() => setEmailStep('save')}
+                  onDelete={() => setDialog('deleteGuest')}
+                />
+              ) : (
+                <Saved
+                  account={account}
+                  username={state.username}
+                  keys={state.keys.map((key) => key.provider)}
+                  onUsername={onUsername}
+                  onAddEmail={() => setEmailStep('add')}
+                  onSignOut={() => setDialog('signOut')}
+                  onDelete={() => setDialog('deleteSaved')}
+                />
+              )}
+              {busy !== null ? (
+                <Text testID="account-busy" style={styles.line}>
+                  {t(`account.busy.${busy}`)}
+                </Text>
+              ) : null}
+              {problemText !== null ? (
+                <Text testID="account-problem" style={styles.line}>
+                  {problemText}
+                </Text>
+              ) : null}
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
       <Sheet
         visible={account.offer !== null}
         onClose={account.keepGuest}
@@ -137,6 +187,11 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
         look="dialog">
         {account.offer !== null ? (
           <MoveDialog
+            title={t(
+              account.offerKey === 'email'
+                ? 'account.moveDialog.titleEmail'
+                : 'account.moveDialog.title',
+            )}
             activeGames={account.offer.activeGames}
             openInvites={account.offer.openInvites}
             onMove={account.moveGuest}
@@ -172,7 +227,7 @@ function AppleButton({ testID, onPress }: { testID: string; onPress: () => void 
   );
 }
 
-function Offline({ account }: { account: Account }) {
+function Offline({ account, onEmail }: { account: Account; onEmail: () => void }) {
   const { t } = useTranslation();
   return (
     <SectionCard padded testID="account-offline">
@@ -180,18 +235,21 @@ function Offline({ account }: { account: Account }) {
         <Text style={styles.lead}>{t('account.offline.intro')}</Text>
         <Text style={styles.line}>{t('account.offline.kept')}</Text>
         {account.appleAvailable ? (
-          <>
-            <AppleButton
-              testID="account-apple"
-              onPress={() => {
-                if (account.busy === null) account.signInWithApple();
-              }}
-            />
-            <Text style={styles.note}>{t('account.offline.appleNote')}</Text>
-          </>
-        ) : (
-          <Text style={styles.note}>{t('account.offline.noApple')}</Text>
-        )}
+          <AppleButton
+            testID="account-apple"
+            onPress={() => {
+              if (account.busy === null) account.signInWithApple();
+            }}
+          />
+        ) : null}
+        <ActionButton
+          testID="account-email-sign-in"
+          kind={account.appleAvailable ? 'secondary' : 'primary'}
+          label={t('account.offline.email')}
+          disabled={account.busy !== null}
+          onPress={onEmail}
+        />
+        <Text style={styles.note}>{t('account.offline.signInNote')}</Text>
       </View>
     </SectionCard>
   );
@@ -200,10 +258,12 @@ function Offline({ account }: { account: Account }) {
 function Guest({
   account,
   guestNumber,
+  onEmail,
   onDelete,
 }: {
   account: Account;
   guestNumber: string | null;
+  onEmail: () => void;
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
@@ -224,19 +284,22 @@ function Guest({
       </SectionCard>
       <SectionCard padded>
         <View style={styles.block}>
+          <Text style={styles.line}>{t('account.guest.save')}</Text>
           {account.appleAvailable ? (
-            <>
-              <Text style={styles.line}>{t('account.guest.save')}</Text>
-              <AppleButton
-                testID="account-save-apple"
-                onPress={() => {
-                  if (account.busy === null) account.saveWithApple();
-                }}
-              />
-            </>
-          ) : (
-            <Text style={styles.note}>{t('account.guest.noApple')}</Text>
-          )}
+            <AppleButton
+              testID="account-save-apple"
+              onPress={() => {
+                if (account.busy === null) account.saveWithApple();
+              }}
+            />
+          ) : null}
+          <ActionButton
+            testID="account-save-email"
+            kind={account.appleAvailable ? 'secondary' : 'primary'}
+            label={t('account.guest.saveEmail')}
+            disabled={account.busy !== null}
+            onPress={onEmail}
+          />
         </View>
       </SectionCard>
       <SectionCard>
@@ -258,6 +321,7 @@ function Saved({
   username,
   keys,
   onUsername,
+  onAddEmail,
   onSignOut,
   onDelete,
 }: {
@@ -265,6 +329,7 @@ function Saved({
   username: string | null;
   keys: readonly AuthKeyProvider[];
   onUsername: () => void;
+  onAddEmail: () => void;
   onSignOut: () => void;
   onDelete: () => void;
 }) {
@@ -327,7 +392,7 @@ function Saved({
             icon="keyRound"
             label={t('account.saved.add', { provider: t(`account.provider.${provider}`) })}
             disabled={busy}
-            onPress={account.saveWithApple}
+            onPress={provider === 'email' ? onAddEmail : account.saveWithApple}
           />
         ))}
       </SectionCard>
@@ -358,11 +423,13 @@ function Saved({
  * Its own component, so each opening focuses the title again.
  */
 function MoveDialog({
+  title,
   activeGames,
   openInvites,
   onMove,
   onKeep,
 }: {
+  title: string;
   activeGames: number;
   openInvites: number;
   onMove: () => void;
@@ -374,7 +441,7 @@ function MoveDialog({
     <ConfirmDialog
       testID="account-move-dialog"
       titleRef={titleRef}
-      title={t('account.moveDialog.title')}
+      title={title}
       lines={[
         t('account.moveDialog.ask'),
         t('account.moveDialog.games', { count: activeGames }),

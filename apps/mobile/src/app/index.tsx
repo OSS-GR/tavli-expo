@@ -27,7 +27,7 @@ import { reminders } from '@/features/reminders/reminders';
 import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
-import { appleSheet, auth, botLevels, games, invites } from '@/services';
+import { auth, botLevels, games, invites } from '@/services';
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -71,7 +71,6 @@ export default function HomeRoute() {
     focused,
     reminders,
     auth: invites === undefined ? undefined : auth,
-    appleSheet,
   });
   const { card } = reminder;
 

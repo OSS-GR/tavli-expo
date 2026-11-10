@@ -5,10 +5,10 @@
  *
  * - A phone with an online account (`hasOnlineAccount`) loads the session.
  *   A saved account (a key) stops the reminders for good. A guest gets the
- *   guest card ("Save your online games?"), only where this phone can add
- *   a key (Apple's sheet works): elsewhere Save would lead nowhere yet, so
- *   the ask waits. A guest from before #404 starts the clock here. No
- *   session, or no answer from the server: no card.
+ *   guest card ("Save your online games?"). Save opens Settings → Account,
+ *   where every phone can add an email key (#433), and an iPhone Apple's.
+ *   A guest from before #404 starts the clock here. No session, or no
+ *   answer from the server: no card.
  * - A phone with no account gets the offline card ("Play online?"), only
  *   in a build with online play.
  * - A card shows only when an ask is due, and uses it as it shows: at
@@ -16,7 +16,7 @@
  *
  * The card never shows over a game or a sheet: only on Home in view.
  */
-import type { AppleSheet, AuthProvider } from '@tavli/contracts';
+import type { AuthProvider } from '@tavli/contracts';
 import { useEffect, useState } from 'react';
 
 import { hasOnlineAccount } from '@/features/online/accountHint';
@@ -38,7 +38,6 @@ export interface ReminderCardOptions {
   readonly reminders: Reminders;
   /** `undefined`: this build has no online play. */
   readonly auth: AuthProvider | undefined;
-  readonly appleSheet: AppleSheet;
 }
 
 export interface ReminderCard {
@@ -49,18 +48,13 @@ export interface ReminderCard {
   readonly stop: () => void;
 }
 
-export function useReminderCard({
-  focused,
-  reminders,
-  auth,
-  appleSheet,
-}: ReminderCardOptions): ReminderCard {
+export function useReminderCard({ focused, reminders, auth }: ReminderCardOptions): ReminderCard {
   const [card, setCard] = useState<ReminderCardState | null>(null);
 
   useEffect(() => {
     if (!focused) return;
     let live = true;
-    void pickCard(reminders, auth, appleSheet).then((kind) => {
+    void pickCard(reminders, auth).then((kind) => {
       if (!live || kind === null || !reminders.due()) return;
       const last = isLastAsk(reminders.state());
       reminders.ask();
@@ -71,7 +65,7 @@ export function useReminderCard({
       live = false;
       setCard(null);
     };
-  }, [focused, reminders, auth, appleSheet]);
+  }, [focused, reminders, auth]);
 
   return {
     card,
@@ -87,7 +81,6 @@ export function useReminderCard({
 async function pickCard(
   reminders: Reminders,
   auth: AuthProvider | undefined,
-  appleSheet: AppleSheet,
 ): Promise<ReminderKind | null> {
   if (auth === undefined || reminders.state().stopped) return null;
   if (!hasOnlineAccount()) return reminders.due() ? 'offline' : null;
@@ -98,7 +91,5 @@ async function pickCard(
     return null;
   }
   reminders.start();
-  if (!reminders.due()) return null;
-  const canSave = await appleSheet.isAvailable().catch(() => false);
-  return canSave ? 'guest' : null;
+  return reminders.due() ? 'guest' : null;
 }

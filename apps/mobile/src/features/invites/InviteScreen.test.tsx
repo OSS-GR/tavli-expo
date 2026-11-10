@@ -4,6 +4,7 @@
  */
 import {
   INVITE_TIME_MS,
+  TERMS_VERSION,
   type InviteErrorData,
   type InviteView,
   type Invites,
@@ -77,7 +78,7 @@ describe('InviteScreen', () => {
     expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
     // The inviter has a guest name (#400).
     const friend = `Guest ${guestNumberOf(server, FRIEND)}`;
-    expect(screen.getByText(`${friend} invites you to an online match.`)).toBeOnTheScreen();
+    expect(screen.getByText(`${friend} invited you to play Plakoto online.`)).toBeOnTheScreen();
     expect(screen.getByText('Plakoto')).toBeOnTheScreen();
     expect(screen.getByText('First to 5 points')).toBeOnTheScreen();
     expect(screen.getByText('None')).toBeOnTheScreen();
@@ -186,7 +187,17 @@ describe('InviteScreen', () => {
     };
     await openInvite(code, invites);
     expect(await screen.findByRole('header', { name: 'Game invite' })).toBeOnTheScreen();
-    expect(screen.getByText('A friend invites you to an online match.')).toBeOnTheScreen();
+    expect(screen.getByText('A friend invited you to play Portes online.')).toBeOnTheScreen();
+  });
+
+  it('names a friend with a username (#433)', async () => {
+    const { server } = setup();
+    await server
+      .usernamesFor(FRIEND, true)
+      .setMine({ name: 'eleni', acceptTerms: TERMS_VERSION, ageChecked: true });
+    const code = server.createInvite(FRIEND, 'portes', 3, null);
+    await openInvite(code, server.invitesFor(ME));
+    expect(await screen.findByText('eleni invited you to play Portes online.')).toBeOnTheScreen();
   });
 
   it('shows "not found" for an unknown code', async () => {
@@ -372,7 +383,7 @@ describe('InviteScreen', () => {
     await screen.findByRole('header', { name: 'Game invite' });
     expect(focus).toHaveBeenLastCalledWith(expect.anything(), 'focus');
     expect(announce).toHaveBeenLastCalledWith(
-      `Game invite Guest ${guestNumberOf(server, FRIEND)} invites you to an online match. ` +
+      `Game invite Guest ${guestNumberOf(server, FRIEND)} invited you to play Portes online. ` +
         'Game: Portes. Match length: First to 3 points. Time limit: 1 min.',
     );
     focus.mockRestore();
@@ -389,7 +400,7 @@ describe('InviteScreen', () => {
     expect(await screen.findByRole('header', { name: 'Πρόσκληση για παιχνίδι' })).toBeOnTheScreen();
     expect(
       screen.getByText(
-        `Επισκέπτης ${guestNumberOf(server, FRIEND)} σε προσκαλεί σε ματς στο διαδίκτυο.`,
+        `Επισκέπτης ${guestNumberOf(server, FRIEND)} σε προσκάλεσε να παίξετε Πόρτες online.`,
       ),
     ).toBeOnTheScreen();
     expect(screen.getByText('Πόρτες')).toBeOnTheScreen();

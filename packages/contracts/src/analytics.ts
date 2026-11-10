@@ -151,11 +151,11 @@ export interface AnalyticsEvents {
     answer: 'granted' | 'denied';
   };
   /**
-   * A new sign-in for online play (#401), from the sign-in choices: the
-   * way only. Never the user id, the email, the Apple id or a username.
+   * A new sign-in for online play (#401, #433), from the sign-in choices
+   * or Settings → Account: the way only. Never the user id, the email, the Apple id or a username.
    */
   online_sign_in: {
-    method: 'apple' | 'guest';
+    method: 'apple' | 'email' | 'guest';
   };
 }
 

@@ -40,7 +40,7 @@ The app saves these things on your phone only. They never leave it.
 - **Your games:** the match you are playing, so you can go back to it, and your last choices on the New game screen. In pass-and-play, this includes the player names you type. Names are never sent anywhere.
 - **Your privacy answer** (allow or don't allow).
 - **Your answer** (**Turn on** or **Not now**) to turn notifications, so the app does not ask again by itself and sends the push token only after **Turn on**.
-- **When the app last asked** you to save your guest account or to play online (the times and how many asks), so it asks four times at most and stops after **Don't ask again** or a sign-in with Apple.
+- **When the app last asked** you to save your guest account or to play online (the times and how many asks), so it asks four times at most and stops after **Don't ask again** or a sign-in with Apple or an email code.
 - **An install id:** a random code, made on your phone. It is not your name, email, phone number or a device id. It does not come from your phone's hardware. The app makes it only after you tap **Allow usage data**.
 
 Deleting the app deletes all of this from your phone. If you install the app again, you get a new install id. (On Android, your phone's own backup may keep a copy of app data and bring it back when you reinstall.)
@@ -103,7 +103,7 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Review opened | You opened the review of a game. Includes the game only, never the position, the dice, the moves or the mistakes |
 | Invite made | You made an invite to play a friend online. Includes the game, the points to win and the time limit only, never the invite code or any id |
 | Turn notifications answered | You answered your phone's question about turn notifications. Includes the answer only (allowed or not allowed), never the push token or any id |
-| Signed in for online play | You signed in to play online. Includes how only (Apple or guest), never the email, the Apple id or any id |
+| Signed in for online play | You signed in to play online. Includes how only (Apple, email or guest), never the email, the Apple id or any id |
 | Screen viewed | You opened a screen. Includes the screen's name (for example "settings"), never personal data |
 
 Each event also carries technical facts: the phone maker and model (for example "iPhone 15", never the name you gave your phone), the system and its version, screen size, the app name and version, language and time zone. It carries the install id, and random ids that PostHog keeps on your phone.
@@ -138,7 +138,7 @@ Only if you play a friend online. When you tap **Make an invite**, or open an in
 - The server keeps your **sign-in session**: a random session token, when it expires, and, as the sign-in software records it, the IP address and the app's user agent (the app name and the phone system) when the session was made.
 - The app keeps the **sign-in cookie** in your phone's secure store (the iOS Keychain or the Android Keystore). The next invite uses it, so the app asks you to sign in only once. **Sign out** (Settings → Account, only for an account saved with Apple or an email code) ends the session on our server and deletes the cookie. Your account stays, and Sign in with Apple or a new email code opens it again.
 - The invite code and the link go where **you** share them (for example a chat app). Anyone with the code can see the invite and accept it until it expires.
-- The user id, the Apple id, the email and the username **never go to analytics** (PostHog) and never go into crash reports (Sentry). Usage data gets only how you signed in (Apple or guest), and only if you allowed usage data.
+- The user id, the Apple id, the email and the username **never go to analytics** (PostHog) and never go into crash reports (Sentry). Usage data gets only how you signed in (Apple, email or guest), and only if you allowed usage data.
 
 Before you make or open an invite, or sign in with Apple in **Settings → Account**, the app does not talk to the game server. When you open an invite link or a link to an online game, the app first asks the game server if this phone has a saved sign-in (it sends the sign-in cookie, if there is one). That check makes no account, and without a saved sign-in nothing is saved for you. With a saved sign-in, the app then loads the invite or the game.
 
