@@ -5,9 +5,9 @@
  * Top to bottom: the logo and Settings, a greeting, then a big hero card
  * with a board picture. The hero is the saved game ("Continue game") or,
  * with no save, "Play vs bot". Then the reminder card (#404, when one is
- * due), your online games and invites, the "Learn to play" banner, the other play modes as tiles ("Join with a
- * code" under "Play a friend" when online play is on, #333), and How to
- * play and History as pills.
+ * due), your online games and invites, the "Learn to play" banner, the
+ * other play modes as tiles ("Join with a code" under "Play a friend"
+ * when online play is on, #333), and How to play and History as pills.
  */
 import type { Difficulty } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
