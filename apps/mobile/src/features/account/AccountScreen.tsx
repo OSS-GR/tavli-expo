@@ -137,7 +137,7 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
                   {noteText}
                 </Text>
               ) : null}
-              {account.usernameStep !== null && state.kind === 'saved' ? (
+              {account.usernameStep !== null ? (
                 <SectionCard padded testID="account-username-step">
                   <UsernameForm
                     usernames={deps.usernames}
