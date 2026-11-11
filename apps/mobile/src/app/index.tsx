@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { anyGameLevels } from '@/features/bot/levels';
 import { ContinueCard } from '@/features/home/ContinueCard';
 import { GuestReminderCard } from '@/features/home/GuestReminderCard';
+import { HomeFriendInvites } from '@/features/home/HomeFriendInvites';
 import { HomeInvites } from '@/features/home/HomeInvites';
 import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
@@ -13,10 +14,13 @@ import { ReminderCard } from '@/features/home/ReminderCard';
 import { matchSessions } from '@/features/match/appSessions';
 import {
   FRIEND_HREF,
+  FRIENDS_HREF,
   JOIN_HREF,
   ONLINE_GAMES_HREF,
+  RATINGS_HREF,
   WHATS_NEW_HREF,
   gameHref,
+  inviteHref,
   inviteWaitHref,
   newGameHref,
   rulesHref,
@@ -30,7 +34,7 @@ import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
 import { whatsNewSeen } from '@/features/whats-new/seen';
-import { auth, botLevels, games, invites } from '@/services';
+import { auth, botLevels, friends, games, invites, ratings } from '@/services';
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -146,6 +150,16 @@ export default function HomeRoute() {
           />
         ) : null
       }
+      friendInvites={
+        onlineAccount && auth !== undefined && friends !== undefined ? (
+          <HomeFriendInvites
+            auth={auth}
+            friends={friends}
+            focused={focused}
+            onOpen={(code) => router.push(inviteHref(code))}
+          />
+        ) : null
+      }
       learnCard={
         showLearn ? (
           <LearnCard
@@ -163,6 +177,10 @@ export default function HomeRoute() {
       // Online play needs the server: a build without one shows "Coming soon".
       onPlayFriend={invites === undefined ? undefined : () => router.push(FRIEND_HREF)}
       onJoinWithCode={invites === undefined ? undefined : () => router.push(JOIN_HREF)}
+      // Friends and Leaderboards (#486): the screens say what a guest or
+      // a phone with no account can do, so the tiles show to everyone.
+      onFriends={auth && friends ? () => router.push(FRIENDS_HREF) : undefined}
+      onRatings={auth && ratings ? () => router.push(RATINGS_HREF) : undefined}
     />
   );
 }

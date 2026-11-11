@@ -5,9 +5,11 @@
  * Top to bottom: the logo, What's new (#471) and Settings, a greeting, then a big hero card
  * with a board picture. The hero is the saved game ("Continue game") or,
  * with no save, "Play vs bot". Then the reminder card (#404, when one is
- * due), your online games and invites, the "Learn to play" banner, the
- * other play modes as tiles ("Join with a code" under "Play a friend"
- * when online play is on, #333), and How to play and History as pills.
+ * due), your online games and invites, the friend invites to you
+ * (#486), the "Learn to play" banner, the other play modes as tiles
+ * ("Join with a code" under "Play a friend" when online play is on, #333;
+ * then Friends and Leaderboards, #486), and How to play and History as
+ * pills.
  */
 import type { Difficulty } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
@@ -53,6 +55,10 @@ export interface HomeScreenProps {
    * with an online server).
    */
   onJoinWithCode?: () => void;
+  /** Opens Friends (#406). The tile shows only with it (a build with online play). */
+  onFriends?: () => void;
+  /** Opens the Leaderboards (#407). The tile shows only with it. */
+  onRatings?: () => void;
   /** The bot levels this build can play, easiest first (the "Play vs bot" subtitle). */
   botLevels: readonly Difficulty[];
   /** The "Continue game" card, when a saved game exists (#36). It takes the hero's place. */
@@ -63,6 +69,8 @@ export interface HomeScreenProps {
   onlineGames?: ReactNode;
   /** "Your invites" (#314), when this phone has an online account. */
   invites?: ReactNode;
+  /** "Invites from friends" (#486), when this phone has an online account. */
+  friendInvites?: ReactNode;
   /** The "Learn to play" card, until the tutorial is done or dismissed (#128). */
   learnCard?: ReactNode;
   /** A one-time message, for example "Your saved game could not be opened." */
@@ -80,11 +88,14 @@ export function HomeScreen({
   onHistory,
   onPlayFriend,
   onJoinWithCode,
+  onFriends,
+  onRatings,
   botLevels,
   continueCard,
   reminderCard,
   onlineGames,
   invites,
+  friendInvites,
   learnCard,
   notice = null,
   hour,
@@ -151,6 +162,7 @@ export function HomeScreen({
         {reminderCard}
         {onlineGames}
         {invites}
+        {friendInvites}
         {learnCard}
 
         <Text style={styles.section} accessibilityRole="header" accessibilityLabel={modesTitle}>
@@ -207,6 +219,28 @@ export function HomeScreen({
               subtitle={t('home.join.subtitle')}
               onPress={onJoinWithCode}
             />
+          ) : null}
+          {onFriends ? (
+            <View style={styles.cell}>
+              <ModeTile
+                testID="home-friends"
+                icon="handshake"
+                title={t('home.friends.title')}
+                subtitle={t('home.friends.subtitle')}
+                onPress={onFriends}
+              />
+            </View>
+          ) : null}
+          {onRatings ? (
+            <View style={styles.cell}>
+              <ModeTile
+                testID="home-ratings"
+                icon="trophy"
+                title={t('home.ratings.title')}
+                subtitle={t('home.ratings.subtitle')}
+                onPress={onRatings}
+              />
+            </View>
           ) : null}
         </View>
 

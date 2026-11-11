@@ -269,6 +269,16 @@ describe('app navigation', () => {
     expect(screen.getByText('This game could not be opened.')).toBeOnTheScreen();
   });
 
+  it('Home opens Friends and Leaderboards (#486)', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('button', { name: 'Friends, Add and invite' }));
+    expect(router.getPathname()).toBe('/friends');
+    await act(async () => appRouter.back());
+    await user.press(screen.getByRole('button', { name: 'Leaderboards, Your rating' }));
+    expect(router.getPathname()).toBe('/ratings');
+  });
+
   it('adds a finished match to History, opened from Home and Settings (#142)', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });

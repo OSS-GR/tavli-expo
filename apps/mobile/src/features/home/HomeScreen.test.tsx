@@ -142,6 +142,24 @@ describe('<HomeScreen />', () => {
     expect(onJoinWithCode).toHaveBeenCalledTimes(1);
   });
 
+  it('opens Friends and Leaderboards from their tiles when online play is on (#486)', async () => {
+    const user = userEvent.setup();
+    const onFriends = jest.fn();
+    const onRatings = jest.fn();
+    await render(<HomeScreen {...setup()} onFriends={onFriends} onRatings={onRatings} />);
+
+    await user.press(screen.getByRole('button', { name: 'Friends, Add and invite' }));
+    expect(onFriends).toHaveBeenCalledTimes(1);
+    await user.press(screen.getByRole('button', { name: 'Leaderboards, Your rating' }));
+    expect(onRatings).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no Friends or Leaderboards tile with no online play (#486)', async () => {
+    await render(<HomeScreen {...setup()} />);
+    expect(screen.queryByTestId('home-friends')).toBeNull();
+    expect(screen.queryByTestId('home-ratings')).toBeNull();
+  });
+
   it('hides the Continue card when there is no saved game, and shows one when given', async () => {
     const { rerender } = await render(<HomeScreen {...setup()} />);
     expect(screen.queryByText('Continue game')).toBeNull();
