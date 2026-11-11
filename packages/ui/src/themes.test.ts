@@ -58,6 +58,14 @@ describe('themes', () => {
         ['textDim', 'problemWash'],
         ['problem', 'surface'],
         ['problem', 'background'],
+        // Buttons (#491): the second button, a pressed one, brass text buttons.
+        ['text', 'surfaceRaised'],
+        ['onAccent', 'accentPressed'],
+        ['problem', 'problemPressed'],
+        ['accentLight', 'background'],
+        ['accentLight', 'surface'],
+        ['accentLight', 'surfaceRaised'],
+        ['accentLight', 'backgroundDeep'],
         // Locked or disabled labels ("Coming soon", a disabled Undo). WCAG lets
         // disabled controls be fainter, but locked labels still carry meaning.
         ['textDisabled', 'background'],
@@ -73,6 +81,9 @@ describe('themes', () => {
         // The outline of an error popup (#462).
         expect(contrastRatio(colors.problemLine, colors.surface)).toBeGreaterThanOrEqual(3);
         expect(contrastRatio(colors.switchThumb, colors.switchTrackOff)).toBeGreaterThanOrEqual(3);
+        // Disabled buttons still read as buttons (#491). WCAG exempts their text.
+        expect(contrastRatio(colors.onAccentMuted, colors.accentMuted)).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(colors.textFaint, colors.surfaceSunken)).toBeGreaterThanOrEqual(3);
       });
 
       it('keeps the checkers apart (3:1)', () => {

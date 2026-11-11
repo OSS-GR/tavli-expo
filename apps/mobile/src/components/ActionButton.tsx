@@ -1,18 +1,36 @@
-import { Pressable, Text } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import type { BoardColors, UiColors } from '@tavli/ui';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+
+import { Icon } from './Icon';
+import type { IconName } from './icons';
 
 /**
- * `primary`: brass gradient. `secondary`: surface with a thin border.
- * `text`: no frame, for a quiet last choice ("Home").
+ * `primary`: brass gradient, one per screen. `secondary`: a raised surface
+ * with a brass hairline. `text`: brass text with no frame ("See all").
+ * `destructive`: a red wash for an action that removes something.
+ * `destructiveText`: coral text only, for a quiet risky choice ("Cancel the
+ * invite").
  */
-export type ActionButtonKind = 'primary' | 'secondary' | 'text';
+export type ActionButtonKind = 'primary' | 'secondary' | 'text' | 'destructive' | 'destructiveText';
+
+/** `regular` is 52 pt tall; `small` is 36 pt (still a 44 pt hit area), for row buttons. */
+export type ActionButtonSize = 'regular' | 'small';
 
 export interface ActionButtonProps {
   label: string;
   /** A second, smaller line, e.g. "or swipe the board". */
   subtitle?: string;
   kind?: ActionButtonKind;
+  size?: ActionButtonSize;
+  /** A line icon before the label. It only decorates: screen readers hear the label. */
+  icon?: IconName;
   disabled?: boolean;
+  /**
+   * The action is running: a spinner shows before the label, presses are
+   * ignored and screen readers hear "busy". The button keeps its normal look.
+   */
+  busy?: boolean;
   onPress: () => void;
   testID?: string;
   /** Grow to fill the row. */
@@ -26,42 +44,76 @@ export interface ActionButtonProps {
   accessibilityLabel?: string;
 }
 
+/** The small button's hit area grows to 44 pt (36 + 4 + 4). */
+const SMALL_HIT_SLOP = { top: 4, bottom: 4, left: 0, right: 0 };
+
 /**
- * A big button in the Home style (#356; wireframe rules: main = brass
- * gradient, second = surface with a border, quiet = text only, disabled =
- * dashed). It shrinks a little when pressed. At least 52 pt tall, and text
- * may wrap for longer Greek labels and large system fonts.
+ * A button in the Figma polish pass style (#491, Components → Buttons):
+ * five kinds, a pressed look per kind, a flat disabled look (never dashed)
+ * and a busy state. It shrinks a little when pressed. Text may wrap for
+ * longer Greek labels and large system fonts; the button grows with it.
  */
 export function ActionButton({
   label,
   subtitle,
   kind = 'primary',
+  size = 'regular',
+  icon,
   disabled = false,
+  busy = false,
   onPress,
   testID,
   grow = false,
   compact = false,
   accessibilityLabel = label,
 }: ActionButtonProps) {
+  const { theme } = useUnistyles();
+  const inactive = disabled || busy;
+  const small = size === 'small';
+  const color = labelColor(theme.colors, kind, disabled);
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={subtitle ? `${accessibilityLabel}, ${subtitle}` : accessibilityLabel}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      // A busy button does nothing, so screen readers hear it as disabled and busy.
+      accessibilityState={{ disabled: inactive, busy }}
+      disabled={inactive}
       onPress={onPress}
+      {...(small ? { hitSlop: SMALL_HIT_SLOP } : {})}
       style={({ pressed }) => [
         styles.button(kind, disabled),
+        small && styles.small,
         grow && styles.grow,
         compact && styles.compact,
-        pressed && !disabled && styles.pressed,
+        pressed && !inactive && styles.pressed(kind),
       ]}>
-      {/* No line limit: with a large system font the text wraps, never cut. */}
-      <Text style={styles.label(kind, disabled)}>{label}</Text>
-      {subtitle ? <Text style={styles.subtitle(kind, disabled)}>{subtitle}</Text> : null}
+      <View style={styles.row}>
+        {busy ? (
+          <ActivityIndicator testID={testID ? `${testID}-busy` : undefined} color={color} />
+        ) : icon ? (
+          <Icon name={icon} color={color} size={small ? 18 : 20} />
+        ) : null}
+        {/* No line limit: with a large system font the text wraps, never cut. */}
+        <Text style={[styles.label, small && styles.smallLabel, { color }]}>{label}</Text>
+      </View>
+      {subtitle ? <Text style={[styles.subtitle, { color }]}>{subtitle}</Text> : null}
     </Pressable>
   );
+}
+
+function labelColor(colors: UiColors, kind: ActionButtonKind, disabled: boolean): string {
+  switch (kind) {
+    case 'primary':
+      return disabled ? colors.onAccentMuted : colors.onAccent;
+    case 'secondary':
+      return disabled ? colors.textFaint : colors.text;
+    case 'text':
+      return colors.accentLight;
+    case 'destructive':
+    case 'destructiveText':
+      return colors.problem;
+  }
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -71,32 +123,18 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.space.lg,
     paddingVertical: theme.space.sm,
     borderRadius: theme.radii.lg,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    ...(disabled
-      ? {
-          borderWidth: 2,
-          borderStyle: 'dashed' as const,
-          borderColor: theme.colors.border,
-          backgroundColor: 'transparent',
-        }
-      : kind === 'primary'
-        ? {
-            borderWidth: 1,
-            borderColor: theme.colors.accent,
-            backgroundColor: theme.colors.accent,
-            // Lit from the top left, like the Home tiles.
-            backgroundImage: `linear-gradient(160deg, ${theme.colors.accentLight} 0%, ${theme.colors.accent} 70%)`,
-            boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.35)',
-          }
-        : kind === 'secondary'
-          ? {
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.surface,
-            }
-          : { borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' }),
+    ...frame(theme.colors, theme.board, kind, disabled),
   }),
+  small: {
+    minHeight: 36,
+    minWidth: 0,
+    paddingHorizontal: theme.space.md,
+    paddingVertical: theme.space.xs,
+    borderRadius: theme.radii.md,
+  },
   grow: {
     flex: 1,
   },
@@ -104,26 +142,81 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
     paddingHorizontal: theme.space.xs,
   },
-  pressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.97 }],
+  pressed: (kind: ActionButtonKind) => ({
+    transform: [{ scale: 0.98 }],
+    ...pressedFrame(theme.colors, kind),
+  }),
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.space.sm,
   },
-  label: (kind: ActionButtonKind, disabled: boolean) => ({
+  label: {
     ...theme.type.bodyStrong,
     textAlign: 'center',
-    color: disabled
-      ? theme.colors.textDisabled
-      : kind === 'primary'
-        ? theme.colors.onAccent
-        : theme.colors.text,
-  }),
-  subtitle: (kind: ActionButtonKind, disabled: boolean) => ({
+    flexShrink: 1,
+  },
+  smallLabel: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  subtitle: {
     ...theme.type.caption,
     textAlign: 'center',
-    color: disabled
-      ? theme.colors.textDisabled
-      : kind === 'primary'
-        ? theme.colors.onAccent
-        : theme.colors.textDim,
-  }),
+  },
 }));
+
+/** Fill, outline and shadow per kind (Figma: Components → Buttons). */
+function frame(colors: UiColors, board: BoardColors, kind: ActionButtonKind, disabled: boolean) {
+  switch (kind) {
+    case 'primary':
+      return disabled
+        ? { borderColor: colors.accentMuted, backgroundColor: colors.accentMuted }
+        : {
+            borderColor: colors.accent,
+            backgroundColor: colors.accent,
+            // Lit from the top, like the Home tiles: a bright top edge and a drop shadow.
+            backgroundImage: `linear-gradient(160deg, ${colors.accentLight} 0%, ${colors.accent} 70%)`,
+            boxShadow: `inset 0px 1px 0px ${board.brassLight}, 0px 8px 18px rgba(0, 0, 0, 0.45)`,
+          };
+    case 'secondary':
+      return disabled
+        ? { borderColor: colors.surfaceRaised, backgroundColor: colors.surfaceSunken }
+        : {
+            borderColor: colors.accentLine,
+            backgroundColor: colors.surfaceRaised,
+            boxShadow: `inset 0px 1px 0px ${colors.border}`,
+          };
+    case 'destructive':
+      return {
+        borderColor: colors.problemLine,
+        backgroundColor: colors.problemWash,
+        ...(disabled ? { opacity: 0.45 } : {}),
+      };
+    case 'text':
+    case 'destructiveText':
+      return {
+        borderColor: 'transparent',
+        backgroundColor: 'transparent',
+        ...(disabled ? { opacity: 0.45 } : {}),
+      };
+  }
+}
+
+function pressedFrame(colors: UiColors, kind: ActionButtonKind) {
+  switch (kind) {
+    case 'primary':
+      return {
+        backgroundImage: `linear-gradient(160deg, ${colors.accent} 0%, ${colors.accentPressed} 70%)`,
+        boxShadow: 'inset 0px 2px 4px rgba(0, 0, 0, 0.35)',
+      };
+    case 'secondary':
+      return { backgroundColor: colors.surface };
+    case 'destructive':
+      return { backgroundColor: colors.problemPressed };
+    case 'text':
+    case 'destructiveText':
+      return { backgroundColor: colors.surfaceRaised };
+  }
+}

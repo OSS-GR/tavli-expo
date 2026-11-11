@@ -258,7 +258,7 @@ The owner's play test: "Say I rolled a 2 and a 3. I should see what a 2 move and
 ## Turn: undo, confirm, turn indicator
 
 - **Controls row** (wireframes 6b–6f): one big Roll button before the roll; then **Undo · Confirm**, two big buttons side by side (#184). The dice lie on the board.
-- **Undo** takes back the last single move (`undo` action); the checker flies back, and a hit checker comes back from the bar. Disabled (dashed) when there is nothing to undo.
+- **Undo** takes back the last single move (`undo` action); the checker flies back, and a hit checker comes back from the bar. Disabled (flat and faint, #491) when there is nothing to undo.
 - **Undo after a combined move** (#180) takes back the whole move: one engine `undo` per step, and one flight back along the path. `GameScreen` keeps a note of each combined move (`moveGroups.ts`: the turn's start state, the moves played right after it, its size). Undo takes back the group when the last moves of the turn are still that group; a single move played after it comes back first, on its own. The engine still sees single moves, so `undo_used` is sent once per step.
 - **Confirm** is enabled only when the engine says `canConfirm` (all dice used, or no move left). Then a hint shows: "All dice used. Confirm or undo."
 - **Auto-confirm** (Settings, default off): each move is sent with `autoConfirm`, so the engine ends a complete turn at once.
