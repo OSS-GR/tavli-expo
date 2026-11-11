@@ -135,9 +135,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.accent,
   },
   title: {
-    ...theme.type.title,
-    fontSize: 24,
-    lineHeight: 30,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   line: {

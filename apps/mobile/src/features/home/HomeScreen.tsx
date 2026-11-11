@@ -354,9 +354,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   greeting: {
     ...theme.type.display,
-    fontSize: 34,
-    lineHeight: 41,
-    letterSpacing: -0.5,
     color: theme.colors.text,
   },
   tagline: {

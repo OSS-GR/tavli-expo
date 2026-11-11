@@ -155,7 +155,9 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textDim,
   },
   chevron: {
-    ...theme.type.title,
+    ...theme.type.headline,
+    fontSize: 20,
+    lineHeight: 26,
     color: theme.colors.textDim,
   },
 }));

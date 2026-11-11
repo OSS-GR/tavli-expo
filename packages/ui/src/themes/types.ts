@@ -6,6 +6,10 @@ export interface UiColors {
   background: string;
   /** Darker edge of the background (for gradients and sheets). */
   backgroundDeep: string;
+  /** The warm glow at the top of a screen, like a lamp over the table (#493). Opaque. */
+  backgroundLamp: string;
+  /** The dark floor the glow fades to at the bottom of a screen (#493). Opaque. */
+  backgroundFloor: string;
   /** Cards, list groups and secondary buttons. */
   surface: string;
   /** A selected segment or option. */
@@ -16,6 +20,8 @@ export interface UiColors {
   surfaceSunken: string;
   /** Outlines of cards, segments and secondary buttons. */
   border: string;
+  /** The lit top edge of a tray or raised card (#493). Opaque. */
+  edgeLight: string;
   /** Thin lines between rows. */
   separator: string;
   /** Main text. */

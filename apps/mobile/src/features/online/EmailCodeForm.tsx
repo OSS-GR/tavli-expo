@@ -372,7 +372,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.space.sm,
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   body: {
@@ -380,7 +380,10 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textDim,
   },
   input: {
-    ...theme.type.title,
+    // A typed field stays in the system font: 1, l and I, and 0 and O, must look apart.
+    ...theme.type.headline,
+    fontSize: 20,
+    lineHeight: 26,
     minHeight: theme.touch.button,
     paddingHorizontal: theme.space.md,
     paddingVertical: theme.space.sm,

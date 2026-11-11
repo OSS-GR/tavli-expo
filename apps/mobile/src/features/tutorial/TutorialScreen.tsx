@@ -424,7 +424,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     flex: 1,
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   progress: {
@@ -503,7 +503,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.space.xl,
   },
   endTitle: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
     textAlign: 'center',
   },

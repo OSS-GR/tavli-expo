@@ -69,7 +69,7 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.border,
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   line: {

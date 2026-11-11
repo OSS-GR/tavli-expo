@@ -73,7 +73,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: 'flex-end',
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.title1,
     flex: 1,
     textAlign: 'center',
     color: theme.colors.text,

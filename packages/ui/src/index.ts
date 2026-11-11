@@ -12,4 +12,4 @@ export { withAlpha } from './color';
 export { contrastRatio, luminance } from './contrast';
 export { displayCaps } from './text';
 export * from './themes';
-export { radii, spacing, touch, typography } from './tokens';
+export { fonts, radii, spacing, touch, typography } from './tokens';

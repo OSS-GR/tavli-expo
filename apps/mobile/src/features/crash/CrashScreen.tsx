@@ -44,7 +44,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.space.sm,
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
     textAlign: 'center',
   },

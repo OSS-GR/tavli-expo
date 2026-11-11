@@ -141,7 +141,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.space.xs,
   },
   heading: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   gameLabel: {
@@ -189,7 +189,9 @@ const styles = StyleSheet.create((theme) => ({
     color: disabled ? theme.colors.textDisabled : theme.colors.textDim,
   }),
   chevron: (disabled: boolean) => ({
-    ...theme.type.title,
+    ...theme.type.headline,
+    fontSize: 20,
+    lineHeight: 26,
     color: disabled ? theme.colors.textDisabled : theme.colors.textDim,
   }),
   resume: {
