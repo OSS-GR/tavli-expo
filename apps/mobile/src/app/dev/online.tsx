@@ -172,7 +172,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
   },
   heading: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
     marginTop: theme.space.md,
   },

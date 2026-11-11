@@ -70,7 +70,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.space.sm,
   },
   heading: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   body: {

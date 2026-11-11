@@ -372,7 +372,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.space.sm,
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   body: {
@@ -380,7 +380,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textDim,
   },
   input: {
-    ...theme.type.title,
+    ...theme.type.title2,
     minHeight: theme.touch.button,
     paddingHorizontal: theme.space.md,
     paddingVertical: theme.space.sm,

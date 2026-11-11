@@ -64,7 +64,7 @@ export function SignInSheet({
 
 const styles = StyleSheet.create((theme) => ({
   title: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   body: {

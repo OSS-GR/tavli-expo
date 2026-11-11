@@ -347,10 +347,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.backgroundDeep,
   },
   title: {
-    ...theme.type.title,
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: '800',
+    ...theme.type.title1,
     color: theme.colors.text,
     textAlign: 'center',
   },
@@ -363,12 +360,10 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: 'center',
   },
   bigScore: {
-    ...theme.type.display,
+    ...theme.type.numeral,
     fontSize: 52,
     lineHeight: 60,
-    fontWeight: '800',
     color: theme.colors.text,
-    fontVariant: ['tabular-nums'],
     textAlign: 'center',
   },
   winnerScore: {

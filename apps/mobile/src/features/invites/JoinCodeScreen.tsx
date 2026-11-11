@@ -168,7 +168,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
   },
   input: {
-    ...theme.type.title,
+    ...theme.type.title2,
     minHeight: theme.touch.button,
     paddingHorizontal: theme.space.md,
     paddingVertical: theme.space.sm,

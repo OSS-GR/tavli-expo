@@ -146,7 +146,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
     textAlign: 'center',
   },
@@ -183,7 +183,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.textDim,
   },
   matchScore: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   matchTarget: {

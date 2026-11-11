@@ -457,7 +457,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
   },
   title: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   line: {
@@ -469,7 +469,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.space.lg,
   },
   pageTitle: {
-    ...theme.type.title,
+    ...theme.type.title2,
     textAlign: 'center',
     color: theme.colors.text,
   },
@@ -499,10 +499,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.accent,
   },
   code: {
-    ...theme.type.display,
-    fontWeight: '800',
+    ...theme.type.numeral,
     letterSpacing: 6,
-    fontVariant: ['tabular-nums'],
     textAlign: 'center',
     color: theme.colors.text,
   },

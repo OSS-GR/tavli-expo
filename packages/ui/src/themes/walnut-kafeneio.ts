@@ -12,12 +12,16 @@ export const walnutKafeneio = {
   colors: {
     background: '#3B2A1D',
     backgroundDeep: '#120C07',
+    // The screen glow from the Figma polish pass (#493): the lamp at the top, the floor below.
+    backgroundLamp: '#4A3423',
+    backgroundFloor: '#1A110A',
     surface: '#2E1F15',
     surfaceSelected: '#4A3423',
     // From the Figma polish pass (#491): one step up and one step down from `surface`.
     surfaceRaised: '#3A2819',
     surfaceSunken: '#1A110A',
     border: '#6A4E35',
+    edgeLight: '#5A4330',
     separator: '#4E3927',
     text: '#F1E6CF',
     textDim: '#BFA987',

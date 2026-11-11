@@ -297,7 +297,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.space.xxs,
   },
   rating: {
-    ...theme.type.display,
+    ...theme.type.numeral,
     color: theme.colors.accentLight,
   },
   row: {

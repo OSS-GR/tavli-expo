@@ -159,7 +159,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     padding: theme.space.lg,
   },
   heading: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   line: {

@@ -190,7 +190,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textDim,
   },
   chevron: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.textDim,
   },
 }));

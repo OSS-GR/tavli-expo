@@ -179,7 +179,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.space.xl,
   },
   emptyTitle: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
     textAlign: 'center',
   },

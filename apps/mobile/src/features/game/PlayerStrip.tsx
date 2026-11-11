@@ -179,7 +179,7 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.onAccent,
   },
   score: {
-    ...theme.type.title,
+    ...theme.type.title2,
     color: theme.colors.text,
   },
   target: {
