@@ -1,11 +1,16 @@
 /**
  * Friends (#406), on the Jest online fake: the list, requests both ways,
- * Remove, Invite, Report or block, and friend invites to you.
+ * Remove, Invite (and its short confirm with the last setup, #488),
+ * Report or block, and friend invites to you.
  */
-import type { Friends } from '@tavli/contracts';
+import type { Friends, NewInvite } from '@tavli/contracts';
 import { act, render, screen } from '@testing-library/react-native';
 
-import { auth } from '@/services';
+import {
+  FRIEND_INVITE_SETUP_KEY,
+  saveFriendInviteSetup,
+} from '@/features/invites/friendInviteSetup';
+import { analytics, auth, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { onlineFake } from '../../../test/onlineFake';
@@ -13,6 +18,11 @@ import { onlineFake } from '../../../test/onlineFake';
 import { FriendsScreen } from './FriendsScreen';
 
 runOnFakeTimers();
+
+// The last friend-invite setup stays in storage between tests.
+afterEach(() => {
+  storage.remove(FRIEND_INVITE_SETUP_KEY);
+});
 
 const ME = 'me';
 
@@ -51,6 +61,7 @@ async function show(friends: Friends = onlineFake.friends) {
     onBack: jest.fn(),
     onAdd: jest.fn(),
     onInvite: jest.fn(),
+    onInvited: jest.fn(),
     onOpenInvite: jest.fn(),
     onAccount: jest.fn(),
   };
@@ -93,6 +104,7 @@ describe('<FriendsScreen />', () => {
       onBack: jest.fn(),
       onAdd: jest.fn(),
       onInvite: jest.fn(),
+      onInvited: jest.fn(),
       onOpenInvite: jest.fn(),
       onAccount: jest.fn(),
     };
@@ -131,6 +143,7 @@ describe('<FriendsScreen />', () => {
       onBack: jest.fn(),
       onAdd: jest.fn(),
       onInvite: jest.fn(),
+      onInvited: jest.fn(),
       onOpenInvite: jest.fn(),
       onAccount: jest.fn(),
     };
@@ -162,7 +175,7 @@ describe('<FriendsScreen />', () => {
     expect(screen.queryByTestId('friends-refresh-failed')).toBeNull();
   });
 
-  it('lists friends with the record, and Invite opens the setup for that friend', async () => {
+  it('lists friends with the record, and Invite with no saved setup opens the full setup', async () => {
     signInSaved();
     await befriend('ann');
     const props = await show();
@@ -172,6 +185,99 @@ describe('<FriendsScreen />', () => {
       screen.getByRole('button', { name: `Invite ${nameOf('ann')} to a game` }),
     );
     expect(props.onInvite).toHaveBeenCalledWith('ann');
+  });
+
+  describe('Invite with the last setup (#488)', () => {
+    const LAST: NewInvite = { choice: 'plakoto', targetPoints: 3, turnTimeMinutes: null };
+
+    it('asks first with the setup, and says nothing of the 24-hour default', async () => {
+      signInSaved();
+      await befriend('ann');
+      saveFriendInviteSetup(LAST);
+      const props = await show();
+      await setupUser().press(
+        screen.getByRole('button', { name: `Invite ${nameOf('ann')} to a game` }),
+      );
+      expect(screen.getByRole('header', { name: `Invite ${nameOf('ann')}?` })).toBeOnTheScreen();
+      expect(screen.getByText('Plakoto, first to 3 points')).toBeOnTheScreen();
+      expect(screen.queryByText(/per turn|24 hours/)).toBeNull();
+      expect(props.onInvite).not.toHaveBeenCalled();
+      expect(await onlineFake.server().friendsFor('ann').listFriendInvites()).toEqual([]);
+    });
+
+    it('names a turn timer when the setup has one', async () => {
+      signInSaved();
+      await befriend('ann');
+      saveFriendInviteSetup({ choice: 'portes', targetPoints: 1, turnTimeMinutes: 5 });
+      await show();
+      await setupUser().press(
+        screen.getByRole('button', { name: `Invite ${nameOf('ann')} to a game` }),
+      );
+      expect(screen.getByText('Portes, first to 1 point')).toBeOnTheScreen();
+      expect(screen.getByText('5 minutes per turn')).toBeOnTheScreen();
+    });
+
+    it('Send sends that setup to the friend and opens the waiting screen', async () => {
+      signInSaved();
+      await befriend('ann');
+      saveFriendInviteSetup(LAST);
+      const sent = jest.spyOn(analytics, 'track');
+      const props = await show();
+      const user = setupUser();
+      await user.press(screen.getByRole('button', { name: `Invite ${nameOf('ann')} to a game` }));
+      await user.press(screen.getByTestId('friend-quick-send'));
+      await flush();
+      expect(props.onInvited).toHaveBeenCalledTimes(1);
+      const code = props.onInvited.mock.calls[0]![0] as string;
+      const toAnn = await onlineFake.server().friendsFor('ann').listFriendInvites();
+      expect(toAnn).toEqual([expect.objectContaining({ code, ...LAST })]);
+      expect(sent).toHaveBeenCalledWith('invite_created', {
+        game: 'plakoto',
+        matchLength: 3,
+        turnTimeMinutes: undefined,
+      });
+      expect(screen.queryByTestId('friend-quick-dialog')).toBeNull();
+      expect(props.onInvite).not.toHaveBeenCalled();
+      sent.mockRestore();
+    });
+
+    it('Change opens the full setup; Cancel sends nothing', async () => {
+      signInSaved();
+      await befriend('ann');
+      saveFriendInviteSetup(LAST);
+      const props = await show();
+      const user = setupUser();
+      const invite = () =>
+        user.press(screen.getByRole('button', { name: `Invite ${nameOf('ann')} to a game` }));
+      await invite();
+      await user.press(screen.getByTestId('friend-quick-cancel'));
+      expect(screen.queryByTestId('friend-quick-dialog')).toBeNull();
+      expect(props.onInvite).not.toHaveBeenCalled();
+      await invite();
+      await user.press(screen.getByTestId('friend-quick-change'));
+      expect(props.onInvite).toHaveBeenCalledWith('ann');
+      expect(props.onInvited).not.toHaveBeenCalled();
+      expect(await onlineFake.server().friendsFor('ann').listFriendInvites()).toEqual([]);
+    });
+
+    it('a failed send closes the confirm and says why', async () => {
+      signInSaved();
+      await befriend('ann');
+      saveFriendInviteSetup(LAST);
+      const inviteFriend = jest
+        .fn()
+        .mockRejectedValue({ code: 'TOO_MANY_INVITES', message: 'too many' });
+      const props = await show({ ...onlineFake.friends, inviteFriend });
+      const user = setupUser();
+      await user.press(screen.getByRole('button', { name: `Invite ${nameOf('ann')} to a game` }));
+      await user.press(screen.getByTestId('friend-quick-send'));
+      await flush();
+      expect(screen.queryByTestId('friend-quick-dialog')).toBeNull();
+      expect(screen.getByTestId('friends-problem')).toHaveTextContent(
+        'You have too many open invites. Cancel one first.',
+      );
+      expect(props.onInvited).not.toHaveBeenCalled();
+    });
   });
 
   it('Accept makes a friend; Decline takes the request away', async () => {

@@ -11,7 +11,9 @@ import {
   RATINGS_HREF,
   friendInviteHref,
   inviteHref,
+  inviteWaitHref,
 } from '@/features/match/routes';
+import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { auth, friends, safety } from '@/services';
 
 export default function FriendsRoute() {
@@ -28,6 +30,12 @@ export default function FriendsRoute() {
       onAdd={() => router.push(ADD_FRIEND_HREF)}
       onRatings={() => router.push(RATINGS_HREF)}
       onInvite={(playerId) => router.push(friendInviteHref(playerId))}
+      onInvited={(code) => {
+        // Back from the waiting screen comes here (#488).
+        router.push(inviteWaitHref(code));
+        // Every online game can last a while: offer turn notifications (#285).
+        void turnPushes()?.offer();
+      }}
       onOpenInvite={(code) => router.push(inviteHref(code))}
       onAccount={() => router.push('/account')}
     />
