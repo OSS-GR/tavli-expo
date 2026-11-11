@@ -22,6 +22,6 @@
   },
   "devDependencies": {
     "react-native-mmkv": "4.3.2",
-    "react-native-nitro-modules": "0.37.1"
+    "react-native-nitro-modules": "0.37.2"
   }
 }
