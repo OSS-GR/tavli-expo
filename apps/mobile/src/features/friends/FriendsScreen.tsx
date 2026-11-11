@@ -9,6 +9,14 @@
  *   Remove (asks first) and Report or block (`ReportOrBlockSheet`). A
  *   block ends the friendship on the server, so the list loads again
  *   when the sheet closes.
+ * - Invite (#488): with the last setup of a friend invite saved on the
+ *   phone (`friendInviteSetup.ts`), a short confirm shows it ("Invite
+ *   NAME?", the game and the length, the timer only when there is one):
+ *   Send sends it at once and opens the waiting screen (`onInvited`),
+ *   Change opens the full setup (`onInvite`), Cancel closes. With no saved
+ *   setup, Invite opens the full setup. The confirm stays open while it
+ *   sends. A send whose screen is gone leaves the invite open (the friend
+ *   has the push already; it shows on Home).
  * - Leaderboards (#407) opens the boards, under Add a friend.
  * - A request to you has Accept and Decline; one you sent has Cancel.
  * - One call at a time. A call that fails keeps the list and says so,
@@ -24,15 +32,17 @@ import type {
   FriendRequests,
   Friends,
   InviteView,
+  NewInvite,
   Safety,
 } from '@tavli/contracts';
 import { useLocales } from 'expo-localization';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ActionButton';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Dialog } from '@/components/Dialog';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RowDivider, SectionCard } from '@/components/SectionCard';
@@ -40,6 +50,8 @@ import { Sheet } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { dateLocale, formatDate } from '@/features/history/format';
+import { loadFriendInviteSetup, saveFriendInviteSetup } from '@/features/invites/friendInviteSetup';
+import { sendInviteCreated } from '@/features/invites/inviteAnalytics';
 import { playerNameText } from '@/features/online/playerName';
 import { ReportOrBlockSheet, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
@@ -58,8 +70,10 @@ export interface FriendsScreenProps {
   onAdd: () => void;
   /** Opens Leaderboards (#407). `undefined`: no button. */
   onRatings?: () => void;
-  /** Opens the game setup for a friend invite. */
+  /** Opens the full game setup for a friend invite (no saved setup yet, or Change). */
   onInvite: (playerId: string) => void;
+  /** Invite → Send made a friend invite (#488): opens its waiting screen. */
+  onInvited: (code: string) => void;
   /** Opens a friend invite to you (the invite screen). */
   onOpenInvite: (code: string) => void;
   /** Opens Settings → Account (a guest saves the account there). */
@@ -83,6 +97,7 @@ export function FriendsScreen({
   onAdd,
   onRatings,
   onInvite,
+  onInvited,
   onOpenInvite,
   onAccount,
   visit = 0,
@@ -104,6 +119,17 @@ export function FriendsScreen({
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
   const [removing, setRemoving] = useState<Friend | null>(null);
   const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
+  // Invite with the last setup (#488): the confirm, and its send on the way.
+  const [quick, setQuick] = useState<{ friend: Friend; game: NewInvite } | null>(null);
+  const [sending, setSending] = useState(false);
+  // False once the screen is gone (the server answers later).
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const problemText = useProblemText(problem?.kind ?? null);
   useAnnouncement(problemText, problem === null ? undefined : `friends-problem:${problem.n}`);
 
@@ -120,6 +146,40 @@ export function FriendsScreen({
       },
       (error: unknown) => {
         setBusy(null);
+        // Signed out or a guest: the screen says so, as after a load.
+        if (sessionLost(error)) return;
+        problemCount += 1;
+        setProblem({ kind: friendsProblem(error), n: problemCount });
+        reload();
+      },
+    );
+  };
+
+  /** Invite: the confirm with the last setup, or the full setup when there is none. */
+  const invite = (friend: Friend) => {
+    const game = loadFriendInviteSetup();
+    if (game === null) onInvite(friend.playerId);
+    else setQuick({ friend, game });
+  };
+
+  const send = () => {
+    if (quick === null || sending) return;
+    const { friend, game } = quick;
+    setSending(true);
+    setProblem(null);
+    friends.inviteFriend(friend.playerId, game).then(
+      (code) => {
+        saveFriendInviteSetup(game);
+        sendInviteCreated(game);
+        if (!mounted.current) return;
+        setSending(false);
+        setQuick(null);
+        onInvited(code);
+      },
+      (error: unknown) => {
+        if (!mounted.current) return;
+        setSending(false);
+        setQuick(null);
         // Signed out or a guest: the screen says so, as after a load.
         if (sessionLost(error)) return;
         problemCount += 1;
@@ -253,7 +313,7 @@ export function FriendsScreen({
                             disabled={busy !== null}
                             label={t('friends.list.invite')}
                             accessibilityLabel={t('friends.list.inviteLabel', { name })}
-                            onPress={() => onInvite(friend.playerId)}
+                            onPress={() => invite(friend)}
                           />
                           <ActionButton
                             testID={`friend-${friend.playerId}-remove`}
@@ -336,6 +396,28 @@ export function FriendsScreen({
           />
         ) : null}
       </Sheet>
+      <Sheet
+        visible={quick !== null}
+        onClose={() => {
+          // The confirm stays open while it sends.
+          if (!sending) setQuick(null);
+        }}
+        closeLabel={t('common.cancel')}
+        look="dialog">
+        {quick !== null ? (
+          <QuickInvite
+            name={nameOf(quick.friend.name)}
+            game={quick.game}
+            sending={sending}
+            onSend={send}
+            onChange={() => {
+              setQuick(null);
+              onInvite(quick.friend.playerId);
+            }}
+            onCancel={() => setQuick(null)}
+          />
+        ) : null}
+      </Sheet>
       {safety ? (
         <ReportOrBlockSheet
           player={reporting}
@@ -348,6 +430,60 @@ export function FriendsScreen({
         />
       ) : null}
     </Screen>
+  );
+}
+
+interface QuickInviteProps {
+  name: string;
+  game: NewInvite;
+  sending: boolean;
+  onSend: () => void;
+  onChange: () => void;
+  onCancel: () => void;
+}
+
+/**
+ * The short confirm of Invite (#488): the friend, the game and the length,
+ * and the turn time limit only when there is one (the 24-hour default
+ * says nothing). Focus moves to the title.
+ */
+function QuickInvite({ name, game, sending, onSend, onChange, onCancel }: QuickInviteProps) {
+  const { t } = useTranslation();
+  const titleRef = useFocusOnShow();
+  const lines = [
+    t('friends.quick.game', { game: t(`games.${game.choice}`), count: game.targetPoints }),
+    ...(game.turnTimeMinutes === null
+      ? []
+      : [t('friend.timeLimitHint', { count: game.turnTimeMinutes })]),
+    t('friends.quick.note'),
+  ];
+  return (
+    <Dialog
+      testID="friend-quick-dialog"
+      title={t('friends.quick.title', { name })}
+      lines={lines}
+      titleRef={titleRef}>
+      <ActionButton
+        testID="friend-quick-send"
+        label={sending ? t('friends.quick.sending') : t('friends.quick.send')}
+        disabled={sending}
+        onPress={onSend}
+      />
+      <ActionButton
+        testID="friend-quick-change"
+        kind="secondary"
+        label={t('friends.quick.change')}
+        disabled={sending}
+        onPress={onChange}
+      />
+      <ActionButton
+        testID="friend-quick-cancel"
+        kind="text"
+        label={t('common.cancel')}
+        disabled={sending}
+        onPress={onCancel}
+      />
+    </Dialog>
   );
 }
 

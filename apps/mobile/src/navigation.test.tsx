@@ -8,7 +8,7 @@ import { createGameFlow, portes } from '@tavli/engine';
 import { MAX_OPEN_INVITES } from '@tavli/online';
 import { fireEvent, within } from '@testing-library/react-native';
 import { router as appRouter } from 'expo-router';
-import { act, renderRouter, screen } from 'expo-router/testing-library';
+import { act, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { MATCH_END_DELAY_MS } from '@/features/game/GameScreen';
@@ -26,6 +26,10 @@ import { settingsStore } from '@/features/settings/store';
 import { LESSON_SETS, LESSONS } from '@/features/tutorial/lessons';
 import { TUTORIAL_STORAGE_KEY, tutorialStorageKey } from '@/features/tutorial/progress';
 import { tutorialStore } from '@/features/tutorial/store';
+import {
+  FRIEND_INVITE_SETUP_KEY,
+  saveFriendInviteSetup,
+} from '@/features/invites/friendInviteSetup';
 import { RELEASES } from '@/features/whats-new/releases';
 import { WHATS_NEW_STORAGE_KEY, whatsNewSeen } from '@/features/whats-new/seen';
 import { analytics, onlinePlayerId, onlineServer, storage } from '@/services';
@@ -1513,6 +1517,50 @@ describe('friends (#406)', () => {
     expect(await screen.findByTestId('add-friend-link')).toHaveTextContent(
       `tavlaki://add/${token}`,
     );
+  });
+
+  /** Me (saved) and `id` become friends, with names from a game. */
+  async function befriendMe(id: string): Promise<string> {
+    onlineFake.authStore.session = { id: 'me', isGuest: false };
+    rememberOnlineAccount();
+    const server = onlineFake.server();
+    server.markSaved('me');
+    server.markSaved(id);
+    server.createGame('me', { white: 'me', black: id }, 'portes', 3, null);
+    await server.friendsFor(id).sendRequest('me');
+    await server.friendsFor('me').acceptRequest(id);
+    return `Guest ${onlineFake.guestNumber(id)}`;
+  }
+
+  it('Friends → Invite → Send sends the last setup and opens the waiting screen (#488)', async () => {
+    const name = await befriendMe('ann');
+    saveFriendInviteSetup({ choice: 'fevga', targetPoints: 3, turnTimeMinutes: null });
+    try {
+      const user = setupUser();
+      const router = await renderRouter('./src/app', { initialUrl: '/friends' });
+      await user.press(await screen.findByRole('button', { name: `Invite ${name} to a game` }));
+      await user.press(screen.getByTestId('friend-quick-send'));
+      await waitFor(() => expect(router.getPathname()).toMatch(/^\/friend\/[A-Z0-9]+$/));
+      const [invite] = await onlineFake.server().friendsFor('ann').listFriendInvites();
+      expect(invite).toMatchObject({ choice: 'fevga', targetPoints: 3 });
+      expect(router.getPathname()).toBe(`/friend/${invite!.code}`);
+    } finally {
+      storage.remove(FRIEND_INVITE_SETUP_KEY);
+    }
+  });
+
+  it('Play a friend lists my friends; a tap opens the waiting screen of a friend invite (#488)', async () => {
+    const name = await befriendMe('ann');
+    try {
+      const user = setupUser();
+      const router = await renderRouter('./src/app', { initialUrl: '/friend' });
+      await user.press(await screen.findByRole('button', { name: `Send the invite to ${name}` }));
+      await waitFor(() => expect(router.getPathname()).toMatch(/^\/friend\/[A-Z0-9]+$/));
+      const [invite] = await onlineFake.server().friendsFor('ann').listFriendInvites();
+      expect(router.getPathname()).toBe(`/friend/${invite!.code}`);
+    } finally {
+      storage.remove(FRIEND_INVITE_SETUP_KEY);
+    }
   });
 
   it('a friend link opens its screen', async () => {

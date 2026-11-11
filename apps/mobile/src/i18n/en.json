@@ -616,7 +616,10 @@
       "retry": "Try again"
     },
     "again": "Make a new invite",
-    "home": "Home"
+    "home": "Home",
+    "friendsTitle": "Or send it to a friend",
+    "sendTo": "Send the invite to {{name}}",
+    "allFriends": "All your friends"
   },
   "friends": {
     "title": "Friends",
@@ -733,6 +736,15 @@
       "accept": "Accept",
       "friends": "You and {{name}} are friends.",
       "openFriends": "See your friends"
+    },
+    "quick": {
+      "title": "Invite {{name}}?",
+      "game_one": "{{game}}, first to {{count}} point",
+      "game_other": "{{game}}, first to {{count}} points",
+      "note": "They get a notification. The game starts when they accept.",
+      "send": "Send",
+      "sending": "Sending…",
+      "change": "Change"
     }
   },
   "ratings": {
@@ -825,6 +837,10 @@
       "turnPushes": {
         "title": "Turn notifications",
         "body": "In an online game, the app can tell you when it is your turn. Turn them on in Settings → Notifications."
+      },
+      "quickInvites": {
+        "title": "Quicker friend invites",
+        "body": "Play a friend now lists your friends: tap one to send the invite. On Friends, Invite sends your last game setup again after a short check, or tap Change to pick another."
       }
     }
   },

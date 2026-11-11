@@ -35,6 +35,19 @@
  *   not signed in…" and **Open Account** (`onAccount`), in place of
  *   Make an invite; neither gets the sign-in sheet. `NOT_SAVED` from the
  *   server counts as a guest.
+ *   It starts from the last setup of a friend invite (`friendInviteSetup.ts`,
+ *   #488), and each friend invite the server makes saves its setup.
+ *
+ * - Your friends (#488, `friends`): a phone with a note of an online
+ *   account (`hasOnlineAccount`) loads the saved account's friends when
+ *   the screen opens. With friends, a short list (`pickFriends`: name and
+ *   record) sits above Make an invite. A tap sends a friend invite at once
+ *   with the picks on the screen (the owner's call: the picks are right
+ *   above), then the waiting screen opens. A guest, nobody signed in, no
+ *   friends or a failed load: no list, and the screen is as before. The
+ *   list never makes an account and never opens the sign-in sheet. A tap
+ *   that finds the account gone drops the list and says so; a friend who
+ *   is gone (`NOT_FRIENDS`, a block) says so and loads the list again.
  *
  * Navigation stays in the route (`app/friend/index.tsx`, and
  * `app/friends/invite/[id].tsx` for a friend invite).
@@ -47,6 +60,8 @@ import {
   type AppleSheet,
   type AuthProvider,
   type AuthUser,
+  type Friend,
+  type Friends,
   type Invites,
   type NewInvite,
   type OnlineGameChoice,
@@ -62,17 +77,25 @@ import { ActionButton } from '@/components/ActionButton';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { RowIcon, SectionCard } from '@/components/SectionCard';
+import { RowIcon, SectionCard, SectionRow } from '@/components/SectionCard';
 import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { useFocusOnShow } from '@/features/accessibility/focus';
+import { friendsProblem, type FriendsProblem } from '@/features/friends/friendsData';
+import { FRIENDS_SHOWN, pickFriends } from '@/features/friends/pickFriends';
 import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
 import { onlineAccountReady } from '@/features/online/account';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 import { SignInSheet } from '@/features/online/SignInSheet';
 import { formatTimeLimit } from '@/features/online/clock';
+import { playerNameText } from '@/features/online/playerName';
 import { reminders } from '@/features/reminders/reminders';
 
+import {
+  loadFriendInviteSetup,
+  saveFriendInviteSetup,
+  TURN_TIME_LIMITS,
+} from './friendInviteSetup';
 import { sendInviteCreated } from './inviteAnalytics';
 
 export interface FriendSetupScreenProps {
@@ -94,16 +117,30 @@ export interface FriendSetupScreenProps {
   onAccount?: () => void;
   /** Counts the times the screen shows (the route): a friend invite checks the account again. */
   visit?: number;
+  /**
+   * Play a friend (#488): the friends port. A saved account with friends
+   * sees a short list; a tap sends a friend invite with the picks.
+   * Not used with `friend`.
+   */
+  friends?: Friends;
+  /** Opens the Friends screen, when there are more friends than the list shows. */
+  onFriends?: () => void;
 }
 
 /** Why a friend invite cannot be made from this account. */
 type NotSaved = 'guest' | 'signedOut';
 
-/** Why "Make an invite" did not work. */
-type Problem = 'account' | 'make' | 'tooMany';
+/** Why "Make an invite" (or a tap on a friend) did not work. */
+type Problem =
+  | { readonly kind: 'account' | 'make' | 'tooMany' }
+  | { readonly kind: 'friends'; readonly problem: FriendsProblem };
 
-/** The turn time limit options: null is the 24-hour default, others are minutes. */
-const TIME_LIMITS: readonly (number | null)[] = [null, 5, 1];
+/** The friends Play a friend shows (#488). */
+interface FriendList {
+  readonly shown: readonly Friend[];
+  /** More friends than `shown`. */
+  readonly more: boolean;
+}
 
 export function FriendSetupScreen({
   auth,
@@ -115,17 +152,25 @@ export function FriendSetupScreen({
   friend,
   onAccount,
   visit = 0,
+  friends,
+  onFriends,
 }: FriendSetupScreenProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
-  const [choice, setChoice] = useState<OnlineGameChoice>('portes');
-  const [targetPoints, setTargetPoints] = useState<MatchLength>(1);
-  const [turnTimeMinutes, setTurnTimeMinutes] = useState<number | null>(null);
+  // A friend invite starts from the last one's setup (#488).
+  const [initial] = useState(() => (friend === undefined ? null : loadFriendInviteSetup()));
+  const [choice, setChoice] = useState<OnlineGameChoice>(initial?.choice ?? 'portes');
+  const [targetPoints, setTargetPoints] = useState<MatchLength>(
+    (initial?.targetPoints ?? 1) as MatchLength,
+  );
+  const [turnTimeMinutes, setTurnTimeMinutes] = useState<number | null>(
+    initial?.turnTimeMinutes ?? null,
+  );
   const [busy, setBusy] = useState(false);
   // One invite per tap: a second tap before the render sees `busy` does nothing.
   const making = useRef(false);
   // A new object for each failure, so the same problem twice is read twice.
-  const [problem, setProblem] = useState<{ readonly kind: Problem } | null>(null);
+  const [problem, setProblem] = useState<Problem | null>(null);
   // No saved session: the sign-in sheet is open.
   const [signingIn, setSigningIn] = useState(false);
   const titleRef = useFocusOnShow();
@@ -155,6 +200,35 @@ export function FriendSetupScreen({
       live = false;
     };
   }, [auth, forFriend, visit]);
+  // Play a friend (#488): your friends, for a saved account. A new
+  // `listLoads` loads the list again (after a friend is gone).
+  const listFrom = friend === undefined ? friends : undefined;
+  const [friendList, setFriendList] = useState<FriendList | null>(null);
+  const [listLoads, setListLoads] = useState(0);
+  useEffect(() => {
+    // No note of an account on this phone: nobody is signed in, and
+    // loading the session would ask the server (#297).
+    if (listFrom === undefined || !hasOnlineAccount()) return;
+    let live = true;
+    auth
+      .ready()
+      .then((user) => (user === null || user.isGuest ? null : listFrom.listFriends()))
+      .then(
+        (list) => {
+          if (!live) return;
+          setFriendList(
+            list === null ? null : { shown: pickFriends(list), more: list.length > FRIENDS_SHOWN },
+          );
+        },
+        // A failed load shows no list: Make an invite still works.
+        () => {
+          if (live) setFriendList(null);
+        },
+      );
+    return () => {
+      live = false;
+    };
+  }, [auth, listFrom, listLoads]);
   // False once the screen is gone (the server answers later).
   const mounted = useRef(true);
   useEffect(() => {
@@ -164,18 +238,30 @@ export function FriendSetupScreen({
     };
   }, []);
 
-  /** `signedIn`: the sheet just signed in (and noted the account already). */
-  const make = async (signedIn = false) => {
+  /**
+   * `signedIn`: the sheet just signed in (and noted the account already).
+   * `to`: a friend from the list (#488) gets a friend invite.
+   */
+  const make = async ({ signedIn = false, to }: { signedIn?: boolean; to?: Friend } = {}) => {
     if (making.current) return;
     making.current = true;
     setBusy(true);
     setProblem(null);
     const game: NewInvite = { choice, targetPoints, turnTimeMinutes };
+    const target =
+      to !== undefined && listFrom !== undefined
+        ? { invite: (g: NewInvite) => listFrom.inviteFriend(to.playerId, g) }
+        : friend;
     const failed = (next: Problem) => {
       making.current = false;
       if (!mounted.current) return;
       setBusy(false);
-      setProblem({ kind: next });
+      setProblem(next);
+    };
+    /** A tap on a friend found no saved account: the list goes, and the screen says why. */
+    const listGone = (why: FriendsProblem) => {
+      if (mounted.current) setFriendList(null);
+      failed({ kind: 'friends', problem: why });
     };
     checks.current += 1;
     const check = checks.current;
@@ -190,11 +276,16 @@ export function FriendSetupScreen({
     try {
       user = await auth.ready();
     } catch {
-      failed('account');
+      failed({ kind: 'account' });
       return;
     }
     // Gone (Back) before the account was ready: make no invite.
     if (!mounted.current) return;
+    if (to !== undefined && (user === null || user.isGuest)) {
+      // The account changed since the list loaded: no sign-in sheet here.
+      listGone(user === null ? 'signedOut' : 'notSaved');
+      return;
+    }
     if (friend !== undefined && (user === null || user.isGuest)) {
       // A friend invite needs a saved account (ADR-0008): no sign-in sheet,
       // since a guest made there could not invite a friend either.
@@ -211,16 +302,28 @@ export function FriendSetupScreen({
     if (!signedIn) onlineAccountReady();
     let code: string;
     try {
-      code = await (friend === undefined ? invites.createInvite(game) : friend.invite(game));
+      code = await (target === undefined ? invites.createInvite(game) : target.invite(game));
     } catch (error) {
       const tooMany =
         (isInviteErrorData(error) || isFriendsErrorData(error)) &&
         error.code === 'TOO_MANY_INVITES';
       if (isFriendsErrorData(error) && error.code === 'NOT_SAVED') {
-        refused('guest');
+        if (to !== undefined) listGone('notSaved');
+        else refused('guest');
         return;
       }
-      failed(tooMany ? 'tooMany' : 'make');
+      if (tooMany) {
+        failed({ kind: 'tooMany' });
+        return;
+      }
+      if (to !== undefined && isFriendsErrorData(error)) {
+        // Not friends any more, a block, no session: say so, and load the
+        // list again.
+        setListLoads((n) => n + 1);
+        failed({ kind: 'friends', problem: friendsProblem(error) });
+        return;
+      }
+      failed({ kind: 'make' });
       return;
     }
     if (!mounted.current) {
@@ -229,6 +332,8 @@ export function FriendSetupScreen({
       invites.cancelInvite(code).catch(() => {});
       return;
     }
+    // The next friend invite starts from this setup (#488).
+    if (target !== undefined) saveFriendInviteSetup(game);
     sendInviteCreated(game, analytics);
     // The buttons stay off while the route opens the waiting screen.
     onCreated(code, game);
@@ -238,7 +343,7 @@ export function FriendSetupScreen({
     value: `${n}`,
     label: String(n),
   }));
-  const timeLimitOptions: SegmentOption<string>[] = TIME_LIMITS.map((value) => ({
+  const timeLimitOptions: SegmentOption<string>[] = TURN_TIME_LIMITS.map((value) => ({
     value: `${value}`,
     label: formatTimeLimit(value, t),
   }));
@@ -253,7 +358,9 @@ export function FriendSetupScreen({
         ? t('friend.tooMany', { max: MAX_OPEN_INVITES })
         : problem?.kind === 'make'
           ? t('friend.makeFailed')
-          : null;
+          : problem?.kind === 'friends'
+            ? t(`friends.problem.${problem.problem}`)
+            : null;
   const notSavedText =
     notSaved === 'guest'
       ? t('friends.guest')
@@ -321,6 +428,37 @@ export function FriendSetupScreen({
           />
           <Text style={styles.hint}>{timeLimitHint}</Text>
         </SectionCard>
+        {friendList !== null && friendList.shown.length > 0 ? (
+          <SectionCard title={t('friend.friendsTitle')} testID="friend-friends">
+            {friendList.shown.map((f) => {
+              const name = playerNameText(f.name, t) ?? t('friends.unnamed');
+              return (
+                <SectionRow
+                  key={f.playerId}
+                  testID={`friend-pick-${f.playerId}`}
+                  icon="user"
+                  label={name}
+                  hint={t('friends.list.record', {
+                    wins: f.record.wins,
+                    losses: f.record.losses,
+                  })}
+                  accessibilityLabel={t('friend.sendTo', { name })}
+                  disabled={busy}
+                  onPress={() => void make({ to: f })}
+                />
+              );
+            })}
+            {friendList.more && onFriends !== undefined ? (
+              <SectionRow
+                testID="friend-all-friends"
+                icon="users"
+                label={t('friend.allFriends')}
+                disabled={busy}
+                onPress={onFriends}
+              />
+            ) : null}
+          </SectionCard>
+        ) : null}
         <View style={styles.note}>
           <RowIcon name="shield" />
           <Text testID="friend-account" style={styles.noteText}>
@@ -364,7 +502,7 @@ export function FriendSetupScreen({
           auth={auth}
           onSignedIn={() => {
             setSigningIn(false);
-            void make(true);
+            void make({ signedIn: true });
           }}
           onClose={() => {
             // Not now: the save reminders start (#404), as after a guest sign-in.

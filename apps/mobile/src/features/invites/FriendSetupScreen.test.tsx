@@ -2,7 +2,8 @@
  * Play a friend online (#281): the choices, "Make an invite" on an
  * in-memory server, the sign-in sheet (#401: Apple, the guest made once,
  * Not now), the analytics events, the errors (no account, no invite, too
- * many invites) and Greek.
+ * many invites) and Greek. Your friends on Play a friend, and the last
+ * setup of a friend invite (#488).
  */
 import {
   createMemoryAppleSheet,
@@ -10,17 +11,25 @@ import {
   createMemoryAuthStore,
   createRecordingAnalytics,
   type AuthProvider,
+  type Friends,
   type Invites,
   type NewInvite,
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
-import { createMemoryGameServer, MAX_OPEN_INVITES } from '@tavli/online';
+import { createMemoryGameServer, MAX_OPEN_INVITES, type MemoryGameServer } from '@tavli/online';
+import { guestNumberOf } from '@tavli/online/testing';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
 import { forgetOnlineAccount, rememberOnlineAccount } from '@/features/online/accountHint';
 import i18n from '@/i18n';
+import { storage } from '@/services';
 
+import {
+  FRIEND_INVITE_SETUP_KEY,
+  loadFriendInviteSetup,
+  saveFriendInviteSetup,
+} from './friendInviteSetup';
 import { FriendSetupScreen } from './FriendSetupScreen';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
@@ -45,6 +54,7 @@ afterAll(async () => {
 // The note "an online account was used here" stays in storage between tests.
 afterEach(() => {
   forgetOnlineAccount();
+  storage.remove(FRIEND_INVITE_SETUP_KEY);
 });
 
 /** The sign-in and the server, like the app's: each invite call comes from the signed-in user. */
@@ -592,5 +602,196 @@ describe('FriendSetupScreen', () => {
     await act(async () => {
       await i18n.changeLanguage('en');
     });
+  });
+});
+
+describe('FriendSetupScreen: your friends (#488)', () => {
+  const ME = 'me';
+
+  /** A saved me, with a note of the account on this phone. */
+  function savedMe() {
+    const parts = setup();
+    parts.authStore.session = { id: ME, isGuest: false };
+    parts.server.markSaved(ME);
+    rememberOnlineAccount();
+    // The friends port as me, like the app's (the session is set first).
+    const friends: Friends = parts.server.friendsFor(ME);
+    return { ...parts, friends };
+  }
+
+  /** `id` and I meet in a game (so each of us has a name), then become friends. */
+  async function befriend(server: MemoryGameServer, id: string): Promise<void> {
+    server.markSaved(id);
+    server.createGame(ME, { white: ME, black: id }, 'portes', 3, null);
+    await server.friendsFor(id).sendRequest(ME);
+    await server.friendsFor(ME).acceptRequest(id);
+  }
+
+  const nameOf = (server: MemoryGameServer, id: string) => `Guest ${guestNumberOf(server, id)}`;
+
+  async function show(
+    parts: ReturnType<typeof savedMe>,
+    extra: { friends?: Friends; onFriends?: () => void } = {},
+  ) {
+    const props = { onCreated: jest.fn<void, [string, NewInvite]>(), onBack: jest.fn() };
+    await renderWithRoot(
+      <FriendSetupScreen {...parts} {...props} friends={parts.friends} {...extra} />,
+    );
+    await flush();
+    return props;
+  }
+
+  it('lists my friends with the record above Make an invite', async () => {
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    await show(parts);
+    expect(screen.getByTestId('friend-friends')).toBeOnTheScreen();
+    expect(screen.getByText(nameOf(parts.server, 'ann'))).toBeOnTheScreen();
+    expect(screen.getByText('Matches: you won 0, they won 0')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeOnTheScreen();
+  });
+
+  it('a tap on a friend sends a friend invite with the picks at once, and saves them', async () => {
+    const user = setupUser();
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    const props = await show(parts);
+    await user.press(screen.getByRole('radio', { name: /^Fevga/ }));
+    await user.press(screen.getByRole('radio', { name: '3' }));
+    await user.press(screen.getByRole('radio', { name: '5 min' }));
+    await user.press(
+      screen.getByRole('button', { name: `Send the invite to ${nameOf(parts.server, 'ann')}` }),
+    );
+    await flush();
+    const game = { choice: 'fevga', targetPoints: 3, turnTimeMinutes: 5 };
+    expect(props.onCreated).toHaveBeenCalledWith(expect.any(String), game);
+    const code = props.onCreated.mock.calls[0]![0];
+    expect(await parts.server.friendsFor('ann').listFriendInvites()).toEqual([
+      expect.objectContaining({ code, from: ME, ...game }),
+    ]);
+    // No code invite on the side, and no sign-in sheet.
+    expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
+    expect(loadFriendInviteSetup()).toEqual(game);
+    expect(parts.analytics.sent).toEqual([
+      {
+        type: 'track',
+        event: 'invite_created',
+        props: { game: 'fevga', matchLength: 3, turnTimeMinutes: 5 },
+      },
+    ]);
+  });
+
+  it('a code invite (Make an invite) saves no friend setup', async () => {
+    const user = setupUser();
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    const props = await show(parts);
+    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await flush();
+    expect(props.onCreated).toHaveBeenCalledTimes(1);
+    expect(loadFriendInviteSetup()).toBeNull();
+  });
+
+  it('shows five friends, and All your friends when there are more', async () => {
+    const user = setupUser();
+    const parts = savedMe();
+    for (const id of ['a1', 'a2', 'a3', 'a4', 'a5', 'a6']) await befriend(parts.server, id);
+    const onFriends = jest.fn();
+    await show(parts, { onFriends });
+    const rows = screen.getAllByTestId(/^friend-pick-/);
+    expect(rows).toHaveLength(5);
+    await user.press(screen.getByRole('button', { name: 'All your friends' }));
+    expect(onFriends).toHaveBeenCalledTimes(1);
+  });
+
+  it('a saved account with no friends sees the screen as before', async () => {
+    const parts = savedMe();
+    await show(parts);
+    expect(screen.queryByTestId('friend-friends')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeOnTheScreen();
+  });
+
+  it('a guest sees no list, and the friends port is not asked', async () => {
+    const parts = setup();
+    await parts.auth.signInAsGuest();
+    rememberOnlineAccount();
+    const listFriends = jest.fn();
+    const friends = { ...parts.server.friendsFor('guest-1'), listFriends } as Friends;
+    await show({ ...parts, friends });
+    expect(listFriends).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('friend-friends')).toBeNull();
+    expect(screen.queryByTestId('friend-not-saved')).toBeNull();
+  });
+
+  it('with no account note on this phone, asks no server and makes no account', async () => {
+    const parts = setup();
+    const ready = jest.spyOn(parts.auth, 'ready');
+    const listFriends = jest.fn();
+    const friends = { ...parts.server.friendsFor(null), listFriends } as Friends;
+    await show({ ...parts, friends });
+    expect(ready).not.toHaveBeenCalled();
+    expect(listFriends).not.toHaveBeenCalled();
+    expect(parts.authStore.guests).toBe(0);
+    expect(screen.queryByTestId('friend-friends')).toBeNull();
+  });
+
+  it('a failed load shows no list, and Make an invite still works', async () => {
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    const friends = {
+      ...parts.friends,
+      listFriends: jest.fn().mockRejectedValue(new Error('offline')),
+    } as Friends;
+    await show({ ...parts, friends });
+    expect(screen.queryByTestId('friend-friends')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
+  });
+
+  it('a friend who is gone says so, and the list loads again without them', async () => {
+    const user = setupUser();
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    await befriend(parts.server, 'bob');
+    const props = await show(parts);
+    // Ann ends the friendship on her phone.
+    await parts.server.friendsFor('ann').removeFriend(ME);
+    await user.press(
+      screen.getByRole('button', { name: `Send the invite to ${nameOf(parts.server, 'ann')}` }),
+    );
+    await flush();
+    expect(screen.getByTestId('friend-problem')).toHaveTextContent('You are not friends any more.');
+    expect(screen.queryByText(nameOf(parts.server, 'ann'))).toBeNull();
+    expect(screen.getByText(nameOf(parts.server, 'bob'))).toBeOnTheScreen();
+    expect(props.onCreated).not.toHaveBeenCalled();
+  });
+
+  it('a tap that finds the account gone drops the list and opens no sign-in sheet', async () => {
+    const user = setupUser();
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    const props = await show(parts);
+    parts.authStore.session = null;
+    await user.press(
+      screen.getByRole('button', { name: `Send the invite to ${nameOf(parts.server, 'ann')}` }),
+    );
+    await flush();
+    expect(screen.queryByTestId('friend-friends')).toBeNull();
+    expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
+    expect(screen.getByTestId('friend-problem')).toHaveTextContent(/not signed in any more/);
+    expect(props.onCreated).not.toHaveBeenCalled();
+  });
+
+  it('a friend invite (#406) starts from the last setup', async () => {
+    const parts = savedMe();
+    saveFriendInviteSetup({ choice: 'asodio', targetPoints: 5, turnTimeMinutes: 1 });
+    const invite = jest.fn<Promise<string>, [NewInvite]>().mockResolvedValue('ABCD2345');
+    const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
+    await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
+    await flush();
+    expect(screen.getByRole('radio', { name: /^Asodio/ })).toBeChecked();
+    expect(screen.getByText('First to 5 points')).toBeOnTheScreen();
+    expect(screen.getByText('1 minute per turn')).toBeOnTheScreen();
+    // The friend-invite screen shows no friends list.
+    expect(screen.queryByTestId('friend-friends')).toBeNull();
   });
 });
