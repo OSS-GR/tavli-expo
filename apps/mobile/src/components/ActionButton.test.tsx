@@ -95,6 +95,7 @@ describe('<ActionButton />', () => {
     );
     const button = screen.getByRole('button', { name: 'Make an invite' });
     expect(button).toBeBusy();
+    expect(button).toBeDisabled();
     expect(screen.getByTestId('send-busy')).toBeOnTheScreen();
     // Busy keeps the normal look: it is not a disabled button.
     expect(button).toHaveStyle({ backgroundColor: colors.accent });

@@ -76,7 +76,8 @@ export function ActionButton({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={subtitle ? `${accessibilityLabel}, ${subtitle}` : accessibilityLabel}
-      accessibilityState={{ disabled, busy }}
+      // A busy button does nothing, so screen readers hear it as disabled and busy.
+      accessibilityState={{ disabled: inactive, busy }}
       disabled={inactive}
       onPress={onPress}
       {...(small ? { hitSlop: SMALL_HIT_SLOP } : {})}
