@@ -349,7 +349,7 @@ describe('<AccountScreen /> as a guest', () => {
     expect(await screen.findByRole('header', { name: 'Pick a username' })).toBeOnTheScreen();
   });
 
-  it('a reload that fails drops the step: Try again, then the step (#483)', async () => {
+  it('a reload that fails after the save: Try again asks for the name (#483)', async () => {
     const user = setupUser();
     await guest();
     await open();
@@ -364,6 +364,87 @@ describe('<AccountScreen /> as a guest', () => {
     expect(screen.queryByTestId('account-username-step')).toBeNull();
     await user.press(screen.getByTestId('account-retry'));
     expect(await screen.findByRole('header', { name: 'Pick a username' })).toBeOnTheScreen();
+  });
+
+  it('a reload that fails after the save: a later visit does not ask (#483)', async () => {
+    const user = setupUser();
+    await guest();
+    const { showAgain } = await open();
+    await screen.findByTestId('account-guest');
+    const mine = usernames!.mine.bind(usernames);
+    jest
+      .spyOn(usernames!, 'mine')
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockImplementation(() => mine());
+    await user.press(screen.getByTestId('account-save-apple'));
+    expect(await screen.findByTestId('account-failed')).toBeOnTheScreen();
+    await act(async () => showAgain(1));
+    expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-username-step')).toBeNull();
+  });
+
+  it('a visit that fails during the Apple sheet still asks after the save (#483)', async () => {
+    const user = setupUser();
+    await guest();
+    const { showAgain } = await open();
+    await screen.findByTestId('account-guest');
+    const signIn = appleSheet.signIn.bind(appleSheet);
+    let release: () => void = () => {};
+    jest
+      .spyOn(appleSheet, 'signIn')
+      .mockImplementation(
+        (nonce) => new Promise((resolve) => (release = () => resolve(signIn(nonce)))),
+      );
+    const mine = usernames!.mine.bind(usernames);
+    jest
+      .spyOn(usernames!, 'mine')
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockImplementation(() => mine());
+    await user.press(screen.getByTestId('account-save-apple'));
+    // The screen shows again while the sheet is open, and that load fails.
+    await act(async () => showAgain(1));
+    expect(await screen.findByTestId('account-failed')).toBeOnTheScreen();
+    await act(async () => release());
+    expect(await screen.findByRole('header', { name: 'Pick a username' })).toBeOnTheScreen();
+  });
+
+  it('a load that fails while the step is open keeps the step and the typed name (#483)', async () => {
+    const user = setupUser();
+    await guest();
+    const { showAgain } = await open();
+    await user.press(await screen.findByTestId('account-save-apple'));
+    expect(await screen.findByTestId('account-username-step')).toBeOnTheScreen();
+    await user.type(screen.getByTestId('username-input'), 'Nikos');
+    jest.spyOn(usernames!, 'mine').mockRejectedValueOnce(new Error('offline'));
+    await act(async () => showAgain(1));
+    expect(screen.getByTestId('account-username-step')).toBeOnTheScreen();
+    expect(screen.getByTestId('username-input')).toHaveProp('value', 'Nikos');
+    // Not now shows what the load found: Try again.
+    await user.press(within(screen.getByTestId('account-username-step')).getByText('Not now'));
+    expect(screen.getByTestId('account-failed')).toBeOnTheScreen();
+  });
+
+  it('an older load that lands after Save keeps the new name (#483)', async () => {
+    const user = setupUser();
+    await guest();
+    const { showAgain } = await open();
+    await user.press(await screen.findByTestId('account-save-apple'));
+    expect(await screen.findByTestId('account-username-step')).toBeOnTheScreen();
+    // A visit load starts with no name yet, and is slow.
+    const before = await usernames!.mine();
+    let answer: () => void = () => {};
+    jest
+      .spyOn(usernames!, 'mine')
+      .mockImplementation(() => new Promise((resolve) => (answer = () => resolve(before))));
+    await act(async () => showAgain(1));
+    await user.type(screen.getByTestId('username-input'), 'Nikos');
+    await user.press(screen.getByRole('switch', { name: 'I accept the terms of use' }));
+    await user.press(screen.getByRole('switch', { name: 'I am 16 or older' }));
+    await user.press(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Nikos')).toBeOnTheScreen();
+    await act(async () => answer());
+    expect(screen.getByText('Nikos')).toBeOnTheScreen();
+    expect(screen.queryByText('Pick one')).toBeNull();
   });
 
   it('an Apple ID with another account asks; Keep the guest leaves the guest as it is', async () => {
