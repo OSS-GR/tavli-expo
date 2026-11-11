@@ -15,6 +15,9 @@
  * - A guest whose Apple ID or email has an account already gets the move
  *   dialog (#403): its games in progress and open invites, then Move my
  *   games or Keep the guest.
+ * - After a guest's save, a key sign-in or a move, a saved account with
+ *   no username sees the username step (`UsernameForm`, #483) in place
+ *   of the cards, under the note; Save or Not now shows them again.
  * - Saved: the username (to Settings → Username), the ways to sign in
  *   (never remove the last), Sign out and Delete my account.
  * - A failed action opens the problem popup (`ProblemCard`, #462): what
@@ -51,6 +54,7 @@ import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { AccountBenefits } from '@/features/online/AccountBenefits';
 import { EmailCodeForm } from '@/features/online/EmailCodeForm';
+import { UsernameForm } from '@/features/online/UsernameForm';
 import { AppleSignInButton } from '@/services';
 
 import { addableKeys, useAccount, type Account, type AccountDeps } from './useAccount';
@@ -133,7 +137,17 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
                   {noteText}
                 </Text>
               ) : null}
-              {state.kind === 'loading' ? (
+              {account.usernameStep !== null ? (
+                <SectionCard padded testID="account-username-step">
+                  <UsernameForm
+                    usernames={deps.usernames}
+                    mine={account.usernameStep}
+                    title={t('username.title')}
+                    onDone={account.finishUsernameStep}
+                    onNotNow={account.finishUsernameStep}
+                  />
+                </SectionCard>
+              ) : state.kind === 'loading' ? (
                 <>
                   <ActivityIndicator />
                   <Text style={styles.line}>{t('account.loading')}</Text>

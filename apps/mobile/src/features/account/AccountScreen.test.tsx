@@ -90,6 +90,12 @@ async function saved(name?: string): Promise<void> {
   }
 }
 
+/** The username step shows after the action (#483); Not now skips it. */
+async function skipName(user: ReturnType<typeof setupUser>) {
+  expect(await screen.findByRole('header', { name: 'Pick a username' })).toBeOnTheScreen();
+  await user.press(within(screen.getByTestId('account-username-step')).getByText('Not now'));
+}
+
 /** The confirm dialog, after a tap on `row`. */
 async function dialogFrom(user: ReturnType<typeof setupUser>, row: string) {
   await user.press(screen.getByTestId(row));
@@ -134,6 +140,7 @@ describe('<AccountScreen /> offline', () => {
     const user = setupUser();
     const { analytics } = await open();
     await user.press(await screen.findByTestId('account-apple'));
+    await skipName(user);
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toEqual({ id: 'user-1', isGuest: false });
     expect(onlineFake.authStore.guests).toBe(0);
@@ -197,6 +204,7 @@ describe('<AccountScreen /> offline', () => {
     await user.press(screen.getByRole('button', { name: 'Continue with email' }));
     expect(await screen.findByRole('header', { name: 'Sign in with email' })).toBeOnTheScreen();
     await enterEmailCode(user, onlineFake.authStore, 'Eleni@Example.com');
+    await skipName(user);
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toEqual({ id: 'user-1', isGuest: false });
     expect(onlineFake.authStore.keys).toEqual({ 'email:eleni@example.com': 'user-1' });
@@ -264,12 +272,32 @@ describe('<AccountScreen /> as a guest', () => {
     await user.press(await screen.findByTestId('account-save-apple'));
     expect(await screen.findByText('Your account is saved.')).toBeOnTheScreen();
     expect(announce).toHaveBeenCalledWith('Your account is saved.');
+    await skipName(user);
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: false });
     expect(onlineFake.authStore.keys).toEqual({ 'apple:apple-1': 'guest-1' });
     // The one key: Remove is off.
     expect(screen.getByRole('button', { name: 'Remove Sign in with Apple' })).toBeDisabled();
     expect(screen.getByText('An account keeps at least one way to sign in.')).toBeOnTheScreen();
+  });
+
+  it('asks for a username after the save, under the note; Save shows the name (#483)', async () => {
+    const user = setupUser();
+    await guest();
+    await open();
+    await user.press(await screen.findByTestId('account-save-apple'));
+    expect(await screen.findByRole('header', { name: 'Pick a username' })).toBeOnTheScreen();
+    expect(screen.getByText('Your account is saved.')).toBeOnTheScreen();
+    // The step stands in place of the cards.
+    expect(screen.queryByTestId('account-saved')).toBeNull();
+    await user.type(screen.getByTestId('username-input'), 'Nikos');
+    await user.press(screen.getByRole('switch', { name: 'I accept the terms of use' }));
+    await user.press(screen.getByRole('switch', { name: 'I am 16 or older' }));
+    await user.press(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-username-step')).toBeNull();
+    expect(onlineFake.server().nameOf('guest-1')).toEqual({ kind: 'username', name: 'Nikos' });
+    expect(await screen.findByText('Nikos')).toBeOnTheScreen();
   });
 
   it('an Apple ID with another account asks; Keep the guest leaves the guest as it is', async () => {
@@ -301,6 +329,7 @@ describe('<AccountScreen /> as a guest', () => {
     expect(await screen.findByRole('header', { name: 'Save with email' })).toBeOnTheScreen();
     await enterEmailCode(user, onlineFake.authStore, 'kostas@example.com');
     expect(await screen.findByText('Your account is saved.')).toBeOnTheScreen();
+    await skipName(user);
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: false });
     expect(onlineFake.authStore.keys).toEqual({ 'email:kostas@example.com': 'guest-1' });
@@ -355,6 +384,7 @@ describe('<AccountScreen /> as a guest', () => {
       white: 'user-9',
       black: 'friend',
     });
+    await skipName(user);
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
   });
 
@@ -529,6 +559,16 @@ describe('<AccountScreen /> with a saved account', () => {
     });
   });
 
+  it('adding a key to a saved account with no username does not ask for one (#483)', async () => {
+    const user = setupUser();
+    await saved();
+    await open();
+    await user.press(await screen.findByRole('button', { name: 'Add Email code' }));
+    await enterEmailCode(user, onlineFake.authStore, 'maria@example.com');
+    expect(await screen.findByTestId('account-key-email')).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-username-step')).toBeNull();
+  });
+
   it('an email of another saved account stays on the email step and says so', async () => {
     const user = setupUser();
     await saved('Maria');
@@ -591,6 +631,7 @@ describe('<AccountScreen /> loading', () => {
     expect(screen.getByTestId('account-guest')).toBeOnTheScreen();
     expect(screen.queryByText('Loading your account…')).toBeNull();
     await act(async () => answer());
+    await skipName(user);
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
   });
 
