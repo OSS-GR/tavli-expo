@@ -33,9 +33,13 @@
  * - A key sign-in stops the save reminders on Home (#404).
  * - The username step (#483): after an action that makes a saved account
  *   with no username (a guest's save, a key sign-in, a move), the screen
- *   shows `usernameStep` once, like the sign-in choices (#405). Save or
- *   Not now ends it (`finishUsernameStep`). Adding a second key to a
- *   saved account does not ask.
+ *   shows `usernameStep` once, like the sign-in choices (#405). The
+ *   action marks the step as owed (`owedName`) and the next load that
+ *   lands shows it, so a newer load cannot lose it. Save puts the new
+ *   name on the card with no reload; Not now only hides the step
+ *   (`finishUsernameStep`). A load that ends anywhere but `saved` drops
+ *   it. Adding a second key to a saved account does not ask; a save asks
+ *   only when the screen still showed a guest as it finished.
  *
  * Never send the user id, the Apple id or the email to analytics.
  */
@@ -129,8 +133,11 @@ export interface Account {
    * or a move (#483): the screen shows the username step. `null` else.
    */
   readonly usernameStep: MyUsername | null;
-  /** Save or Not now on the username step: shows the account again. */
-  readonly finishUsernameStep: () => void;
+  /**
+   * Ends the username step and shows the account again: with the new
+   * state after Save, with nothing after Not now.
+   */
+  readonly finishUsernameStep: (saved?: MyUsername) => void;
   /** Counts the problems and notes, so a screen reader hears each one (`useAnnouncement`). */
   readonly said: number;
   readonly reload: () => void;
@@ -243,6 +250,13 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
   const live = useRef(true);
   // Only the newest load may set the state.
   const loads = useRef(0);
+  // An action made a saved account: the next load that lands asks for a name.
+  const owedName = useRef(false);
+  // The state as last shown, for the end of an async action.
+  const shown = useRef(state);
+  useEffect(() => {
+    shown.current = state;
+  }, [state]);
   useEffect(() => {
     live.current = true;
     return () => {
@@ -264,28 +278,37 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     };
   }, [appleSheet]);
 
-  /** Loads the state; with `askName`, a saved account with no name gets the step. */
-  const load = useCallback(
-    (askName = false) => {
-      loads.current += 1;
-      const n = loads.current;
-      loadAccount(auth, usernames, pushes).then(
-        ({ state: next, mine }) => {
-          if (!live.current || n !== loads.current) return;
-          setState(next);
-          if (askName && next.kind === 'saved' && mine !== null && needsUsernameStep(mine)) {
-            setUsernameStep(mine);
-          }
-        },
-        () => {
-          if (live.current && n === loads.current) setState({ kind: 'failed' });
-        },
-      );
-    },
-    [auth, usernames, pushes],
-  );
+  /** Loads the state, and shows the username step when an action owes it. */
+  const load = useCallback(() => {
+    loads.current += 1;
+    const n = loads.current;
+    loadAccount(auth, usernames, pushes).then(
+      ({ state: next, mine }) => {
+        if (!live.current || n !== loads.current) return;
+        setState(next);
+        if (next.kind !== 'saved') {
+          // No saved account (signed out, or the session is gone): no step.
+          owedName.current = false;
+          setUsernameStep(null);
+          return;
+        }
+        if (owedName.current) {
+          owedName.current = false;
+          if (mine !== null && needsUsernameStep(mine)) setUsernameStep(mine);
+        }
+      },
+      () => {
+        if (!live.current || n !== loads.current) return;
+        // Try again loads again; the step stays owed until a load lands.
+        setState({ kind: 'failed' });
+        setUsernameStep(null);
+      },
+    );
+  }, [auth, usernames, pushes]);
 
-  useEffect(() => load(), [load, visit]);
+  useEffect(() => {
+    load();
+  }, [load, visit]);
 
   const reload = () => {
     setState(hasOnlineAccount() ? { kind: 'loading' } : { kind: 'offline' });
@@ -343,17 +366,32 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     if (live.current) then(result);
   }
 
-  // After an action: load again with the cards still on the screen. With
-  // `askName`, the action made a saved account: ask for a name if it has none.
-  const done = (next: AccountNote | null, askName = false) => {
+  // After an action: load again with the cards still on the screen.
+  const done = (next: AccountNote | null) => {
     if (next !== null) {
       setNote(next);
       setSaid((n) => n + 1);
     }
-    load(askName);
+    load();
   };
-  // A save asks for a name only when it turns a guest into a saved account.
-  const wasGuest = state.kind === 'guest';
+  // After an action that may make a saved account: ask for a name if it has none.
+  const doneSaved = (next: AccountNote | null) => {
+    owedName.current = true;
+    done(next);
+  };
+
+  /**
+   * The end of a save (Apple or email): the move offer, or the note. Only
+   * a save that turns a guest into a saved account asks for a name: read
+   * from the screen as the save ends, not as it began.
+   */
+  const afterSave = (result: 'saved' | GuestMoveOffer, key: AuthKeyProvider) => {
+    if (result !== 'saved') {
+      setOfferKey(key);
+      setOffer(result);
+    } else if (shown.current.kind === 'guest') doneSaved('saved');
+    else done('saved');
+  };
 
   return {
     state,
@@ -364,9 +402,12 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
     offer,
     offerKey,
     usernameStep,
-    finishUsernameStep: () => {
+    finishUsernameStep: (saved) => {
       setUsernameStep(null);
-      load();
+      // Save: the card shows the new name at once, with no reload.
+      if (saved !== undefined) {
+        setState((now) => (now.kind === 'saved' ? { ...now, username: saved.name } : now));
+      }
     },
     said,
     reload,
@@ -378,7 +419,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
           if (user === null) return;
           quietly(() => deps.analytics.track('online_sign_in', { method: 'apple' }));
           reminders.stop();
-          done(null, true);
+          doneSaved(null);
         },
       ),
     signInWithEmail: (credential) =>
@@ -388,7 +429,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
         () => {
           quietly(() => deps.analytics.track('online_sign_in', { method: 'email' }));
           reminders.stop();
-          done(null, true);
+          doneSaved(null);
         },
       ),
     saveWithEmail: (credential) =>
@@ -406,14 +447,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
           }
           return 'saved';
         },
-        (result) => {
-          if (result === 'saved') {
-            done('saved', wasGuest);
-            return;
-          }
-          setOfferKey('email');
-          setOffer(result);
-        },
+        (result) => afterSave(result, 'email'),
       ),
     saveWithApple: () =>
       run(
@@ -433,11 +467,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
           return 'saved';
         },
         (result) => {
-          if (result === 'saved') done('saved', wasGuest);
-          else if (result !== 'closed') {
-            setOfferKey('apple');
-            setOffer(result);
-          }
+          if (result !== 'closed') afterSave(result, 'apple');
         },
       ),
     moveGuest: () => {
@@ -445,7 +475,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
       run(
         'move',
         () => deps.auth.moveGuest(offer),
-        () => done('moved', true),
+        () => doneSaved('moved'),
       );
     },
     dismissProblem: () => setProblem(null),

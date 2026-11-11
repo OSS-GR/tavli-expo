@@ -137,14 +137,14 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
                   {noteText}
                 </Text>
               ) : null}
-              {account.usernameStep !== null ? (
+              {account.usernameStep !== null && state.kind === 'saved' ? (
                 <SectionCard padded testID="account-username-step">
                   <UsernameForm
                     usernames={deps.usernames}
                     mine={account.usernameStep}
                     title={t('username.title')}
                     onDone={account.finishUsernameStep}
-                    onNotNow={account.finishUsernameStep}
+                    onNotNow={() => account.finishUsernameStep()}
                   />
                 </SectionCard>
               ) : state.kind === 'loading' ? (
