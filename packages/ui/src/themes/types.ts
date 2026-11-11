@@ -10,6 +10,10 @@ export interface UiColors {
   surface: string;
   /** A selected segment or option. */
   surfaceSelected: string;
+  /** A raised card, a sheet or a second button: one step above `surface` (#491). Opaque. */
+  surfaceRaised: string;
+  /** Sunk into the page: inputs, tracks and a disabled second button (#491). Opaque. */
+  surfaceSunken: string;
   /** Outlines of cards, segments and secondary buttons. */
   border: string;
   /** Thin lines between rows. */
@@ -20,12 +24,20 @@ export interface UiColors {
   textDim: string;
   /** Text on a disabled control. */
   textDisabled: string;
+  /** The faintest text: chevrons, placeholders, a disabled second button (#491). */
+  textFaint: string;
   /** Main button, selected outline and "on" switch track (brass). */
   accent: string;
   /** The lit edge of the brass gradient on the main button (#356). Opaque. */
   accentLight: string;
   /** Text and icons on `accent` (and on `accentLight`). */
   onAccent: string;
+  /** The low end of the brass gradient while the main button is pressed (#491). Opaque. */
+  accentPressed: string;
+  /** A disabled main button: flat, muted brass (#491). Opaque. */
+  accentMuted: string;
+  /** Text on `accentMuted` (#491). */
+  onAccentMuted: string;
   /** A soft brass tint on a surface: the "Learn to play" banner (#342). Opaque. */
   accentWash: string;
   /** A brass outline on a surface (#342). Opaque. */
@@ -36,6 +48,8 @@ export interface UiColors {
   problemWash: string;
   /** The outline of an error popup or line (#462). Opaque. */
   problemLine: string;
+  /** A destructive button while pressed: a darker `problemWash` (#491). Opaque. */
+  problemPressed: string;
   /** Turn ring around the active player. */
   turn: string;
   /** Turn text, for example "Σειρά σου". */

@@ -14,16 +14,23 @@ export const walnutKafeneio = {
     backgroundDeep: '#120C07',
     surface: '#2E1F15',
     surfaceSelected: '#4A3423',
+    // From the Figma polish pass (#491): one step up and one step down from `surface`.
+    surfaceRaised: '#3A2819',
+    surfaceSunken: '#1A110A',
     border: '#6A4E35',
     separator: '#4E3927',
     text: '#F1E6CF',
     textDim: '#BFA987',
     // Raised from #8A7559 (3.1:1) in #134: locked labels like "Coming soon" must stay readable.
     textDisabled: '#A89274',
+    textFaint: '#8C7A62',
     accent: '#C89B45',
     // The top of the main button's brass gradient (#356).
     accentLight: '#E0B867',
     onAccent: '#22160C',
+    accentPressed: '#B0873A',
+    accentMuted: '#5E4628',
+    onAccentMuted: '#B8A07A',
     // `accent` over `surface` at 22% and 55% (#342).
     accentWash: '#503A20',
     accentLine: '#83632F',
@@ -31,6 +38,7 @@ export const walnutKafeneio = {
     problem: '#F2A48C',
     problemWash: '#572A22',
     problemLine: '#B0584A',
+    problemPressed: '#45211B',
     turn: '#F2C14E',
     turnText: '#F6D27A',
     switchTrackOff: '#5A4330',

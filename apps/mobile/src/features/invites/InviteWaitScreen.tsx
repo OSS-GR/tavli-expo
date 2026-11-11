@@ -291,9 +291,9 @@ function Waiting({ code, cancelling, cancelFailed, onCancel }: WaitingProps) {
       <View style={styles.spacer} />
       <ActionButton
         testID="invite-wait-cancel"
-        kind="secondary"
+        kind="destructiveText"
         label={t('friend.wait.cancel')}
-        disabled={cancelling}
+        busy={cancelling}
         onPress={onCancel}
       />
       {cancelling ? <Text style={styles.line}>{t('friend.wait.cancelling')}</Text> : null}
