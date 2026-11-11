@@ -46,6 +46,17 @@
       "title": "Join with a code",
       "subtitle": "Got a code from a friend?"
     },
+    "friends": {
+      "title": "Friends",
+      "subtitle": "Add and invite"
+    },
+    "ratings": {
+      "title": "Leaderboards",
+      "subtitle": "Your rating"
+    },
+    "friendInvites": {
+      "hint": "Opens the invite, to accept or decline it."
+    },
     "howToPlay": "How to play",
     "history": "History",
     "continue": {
@@ -785,11 +796,11 @@
       },
       "friends": {
         "title": "Friends",
-        "body": "Add friends with your link, a QR code or their username, then invite them to a game in one tap. You need a saved account. Find it in Settings → Online play once you have signed in."
+        "body": "Add friends with your link, a QR code or their username, then invite them to a game. You need a saved account. Find it on Home under Friends."
       },
       "leaderboards": {
         "title": "Leaderboards",
-        "body": "Online matches between saved accounts change your rating. See where you stand among your friends and all players in Settings → Online play → Leaderboards."
+        "body": "Online matches between saved accounts change your rating. See where you stand among your friends and all players: Home → Leaderboards."
       },
       "reportBlock": {
         "title": "Report or block a player",
