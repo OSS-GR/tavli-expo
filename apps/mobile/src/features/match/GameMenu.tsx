@@ -189,7 +189,9 @@ const styles = StyleSheet.create((theme) => ({
     color: disabled ? theme.colors.textDisabled : theme.colors.textDim,
   }),
   chevron: (disabled: boolean) => ({
-    ...theme.type.title2,
+    ...theme.type.headline,
+    fontSize: 20,
+    lineHeight: 26,
     color: disabled ? theme.colors.textDisabled : theme.colors.textDim,
   }),
   resume: {

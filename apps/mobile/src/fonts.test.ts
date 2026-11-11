@@ -23,6 +23,13 @@ describe('embedded fonts', () => {
     expect(fs.existsSync(path.join(APP_DIR, file))).toBe(true);
   });
 
+  it('gives the numeral font same-width digits', () => {
+    // `numeral` sets fontVariant tabular-nums, which needs the font's OpenType
+    // `tnum` feature. Its 4-letter tag is stored as plain bytes in the GSUB table.
+    const font = fs.readFileSync(path.join(APP_DIR, `assets/fonts/${fonts.numerals}.ttf`));
+    expect(font.includes('tnum')).toBe(true);
+  });
+
   it('keeps the font license next to the fonts', () => {
     expect(fs.existsSync(path.join(APP_DIR, 'assets/fonts/OFL.txt'))).toBe(true);
   });

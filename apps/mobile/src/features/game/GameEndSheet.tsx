@@ -183,7 +183,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.textDim,
   },
   matchScore: {
-    ...theme.type.title2,
+    ...theme.type.numeral,
+    fontSize: 22,
+    lineHeight: 28,
     color: theme.colors.text,
   },
   matchTarget: {

@@ -168,7 +168,10 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
   },
   input: {
-    ...theme.type.title2,
+    // A typed field stays in the system font: 1, l and I, and 0 and O, must look apart.
+    ...theme.type.headline,
+    fontSize: 20,
+    lineHeight: 26,
     minHeight: theme.touch.button,
     paddingHorizontal: theme.space.md,
     paddingVertical: theme.space.sm,
