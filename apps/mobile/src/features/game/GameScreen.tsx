@@ -108,7 +108,13 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
-import { useReducedMotion, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -177,10 +183,17 @@ import { useAnnouncement } from './useAnnouncement';
 export const OPENING_RESULT_MS = 3000;
 
 /**
- * "Grab a chair" (#509): how long the table scene holds the board before
- * the opening card: the scene, then a beat on its last frame.
+ * "Grab a chair" (#509) at game start: the scene plays on a cover over the
+ * board. The cover shows first while the screen slides in (`LEAD`), then
+ * the scene plays, rests a beat on its last frame (`HOLD`), and the cover
+ * fades out (`FADE`) to show the board. Then the opening card shows.
  */
-export const TABLE_INTRO_MS = TABLE_SCENE_MS + 150;
+export const TABLE_INTRO_LEAD_MS = 450;
+const TABLE_INTRO_HOLD_MS = 250;
+export const TABLE_INTRO_FADE_MS = 350;
+/** The whole game-start intro, from mount to the opening card. */
+export const TABLE_INTRO_MS =
+  TABLE_INTRO_LEAD_MS + TABLE_SCENE_MS + TABLE_INTRO_HOLD_MS + TABLE_INTRO_FADE_MS;
 
 /** The table scene's widest size at game start (Figma: 1.4× of 240). */
 const TABLE_INTRO_WIDTH = 336;
@@ -456,11 +469,20 @@ export function GameScreen({
   useEffect(() => {
     if (introMatch !== null) markMatchIntroPlayed(introMatch);
   }, [introMatch]);
+  // The cover over the board fades out once the chair is in.
+  const introCover = useSharedValue(1);
   useEffect(() => {
     if (!showIntro) return;
+    introCover.set(
+      withDelay(
+        TABLE_INTRO_MS - TABLE_INTRO_FADE_MS,
+        withTiming(0, { duration: TABLE_INTRO_FADE_MS }),
+      ),
+    );
     const timer = setTimeout(() => setIntroDone(true), TABLE_INTRO_MS);
     return () => clearTimeout(timer);
-  }, [showIntro]);
+  }, [showIntro, introCover]);
+  const introCoverStyle = useAnimatedStyle(() => ({ opacity: introCover.get() }));
   const windowSize = useWindowDimensions();
   // Just after a tie, Roll waits a moment (the dice land first).
   const tieKey = opening?.kind === 'tie' ? `${gameKey}:${opening.round}` : null;
@@ -1701,13 +1723,18 @@ export function GameScreen({
         style={styles.tapArea}
         onPress={() => setIntroDone(true)}
         accessible={false}>
-        <View style={styles.introScene}>
+        {/* `collapsable={false}`: its opacity changes, and the canvas keeps its parent (#173). */}
+        <Animated.View
+          testID="table-intro-cover"
+          style={[styles.introCover, introCoverStyle]}
+          collapsable={false}>
           <TableScene
             width={Math.min(TABLE_INTRO_WIDTH, windowSize.width - 32)}
             play
+            delayMs={TABLE_INTRO_LEAD_MS}
             testID="table-intro-scene"
           />
-        </View>
+        </Animated.View>
       </Pressable>
     );
   } else if (!over && showOpening && opening) {
@@ -2343,8 +2370,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     flex: 1,
     justifyContent: 'center',
   },
-  introScene: {
+  introCover: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.background,
   },
   hintRow: {
     position: 'absolute',

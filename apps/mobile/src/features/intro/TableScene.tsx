@@ -3,7 +3,8 @@
  * board drops onto the table, then your chair is pulled in (the timeline
  * is `tableFrame` in `tableMotion.ts`).
  *
- * With `play` it runs once from the start when it mounts; without it, or
+ * With `play` it runs once from the start when it mounts (after `delayMs`,
+ * on its first frame); without it, or
  * with "Reduce motion" on, it shows the last frame. It only decorates:
  * screen readers skip it, and it takes no touches.
  */
@@ -15,6 +16,7 @@ import {
   useDerivedValue,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
@@ -38,6 +40,8 @@ export interface TableSceneProps {
   width: number;
   /** Run the scene once from the start. Else (or with Reduce motion) the last frame. */
   play: boolean;
+  /** With `play`: wait this long on the first frame before the scene runs. */
+  delayMs?: number;
   testID?: string;
 }
 
@@ -48,7 +52,7 @@ export function tableSceneHeight(width: number): number {
 
 const LINE = 2.5;
 
-export function TableScene({ width, play, testID }: TableSceneProps) {
+export function TableScene({ width, play, delayMs = 0, testID }: TableSceneProps) {
   const { theme } = useUnistyles();
   const reduceMotion = useReducedMotion();
   const animate = play && !reduceMotion;
@@ -56,8 +60,13 @@ export function TableScene({ width, play, testID }: TableSceneProps) {
 
   useEffect(() => {
     if (!animate) return;
-    time.set(withTiming(TABLE_SCENE_MS, { duration: TABLE_SCENE_MS, easing: Easing.linear }));
-  }, [animate, time]);
+    time.set(
+      withDelay(
+        delayMs,
+        withTiming(TABLE_SCENE_MS, { duration: TABLE_SCENE_MS, easing: Easing.linear }),
+      ),
+    );
+  }, [animate, delayMs, time]);
 
   const frame = useDerivedValue(() => tableFrame(time.get()));
   const tableTransform = useDerivedValue(() => [{ translateY: frame.get().tableDip }]);

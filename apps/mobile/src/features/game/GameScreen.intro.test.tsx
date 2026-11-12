@@ -1,6 +1,6 @@
 /**
  * "Grab a chair" (#509): when a match opens, the table scene plays over the
- * board before the opening card. Once per match, never on a rematch; a tap
+ * board, on a cover that fades out, before the opening card. Once per match, never on a rematch; a tap
  * skips it; Reduce motion skips it. On fake timers: the intro waits on a timer.
  */
 import { createSeededRng } from '@tavli/engine';
@@ -8,9 +8,10 @@ import { act, screen } from '@testing-library/react-native';
 import * as Reanimated from 'react-native-reanimated';
 
 import { resetIntrosForTest } from '@/features/intro/introRuns';
+import { TABLE_SCENE_MS } from '@/features/intro/tableMotion';
 
 import { createGameStore, type GameStore } from './gameStore';
-import { GameScreen, TABLE_INTRO_MS } from './GameScreen';
+import { GameScreen, TABLE_INTRO_LEAD_MS, TABLE_INTRO_MS } from './GameScreen';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot as render } from '../../../test/render';
@@ -47,7 +48,12 @@ describe('<GameScreen /> table intro (#509)', () => {
     expect(screen.getByTestId('table-intro-scene', hidden)).toBeTruthy();
     expect(openingCard()).toBeNull();
 
-    await wait(TABLE_INTRO_MS - 1);
+    // The cover hides the board while the screen slides in and the scene plays.
+    await wait(TABLE_INTRO_LEAD_MS + TABLE_SCENE_MS);
+    expect(screen.getByTestId('table-intro-cover', hidden)).toBeTruthy();
+    expect(openingCard()).toBeNull();
+
+    await wait(TABLE_INTRO_MS - TABLE_INTRO_LEAD_MS - TABLE_SCENE_MS - 1);
     expect(intro()).toBeOnTheScreen();
     await wait(1);
     expect(intro()).toBeNull();
