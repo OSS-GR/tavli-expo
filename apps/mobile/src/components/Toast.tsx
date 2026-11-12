@@ -23,11 +23,26 @@ export function useToast(ms: number = TOAST_MS) {
   return [toast?.text ?? null, show] as const;
 }
 
-export function Toast({ text, testID = 'toast' }: { text: string | null; testID?: string }) {
+/**
+ * `announced`: the screen reads the text itself (`useAnnouncement`, both
+ * platforms), so the toast is no live region and Android reads it once.
+ */
+export function Toast({
+  text,
+  testID = 'toast',
+  announced = false,
+}: {
+  text: string | null;
+  testID?: string;
+  announced?: boolean;
+}) {
   if (text === null) return null;
   return (
     <View style={styles.wrap} pointerEvents="none">
-      <Text testID={testID} style={styles.toast} accessibilityLiveRegion="assertive">
+      <Text
+        testID={testID}
+        style={styles.toast}
+        accessibilityLiveRegion={announced ? 'none' : 'assertive'}>
         {text}
       </Text>
     </View>

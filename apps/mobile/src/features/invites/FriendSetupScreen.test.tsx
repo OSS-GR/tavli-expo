@@ -328,7 +328,7 @@ describe('FriendSetupScreen', () => {
       targetPoints: 1,
       turnTimeMinutes: null,
     });
-    expect(props.onCreated).toHaveBeenCalledWith('ABCD2345', expect.anything());
+    expect(props.onCreated).toHaveBeenCalledWith('ABCD2345');
     expect(await parts.invites.listMyInvites()).toEqual([]);
   });
 
@@ -634,7 +634,7 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     extra: { friends?: Friends; onFriends?: () => void } = {},
   ) {
     const props = {
-      onCreated: jest.fn<void, [string, NewInvite]>(),
+      onCreated: jest.fn<void, [string]>(),
       onFriendInvited: jest.fn<void, [string]>(),
       onBack: jest.fn(),
     };
@@ -678,8 +678,15 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     );
     expect(announce).toHaveBeenCalledWith(`Invite sent to ${nameOf(parts.server, 'ann')}`);
     announce.mockRestore();
-    // The buttons work again.
+    // The buttons work again, but Ann's row is off: a second tap sends no second invite.
     expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
+    const row = screen.getByRole('button', {
+      name: `Invite sent to ${nameOf(parts.server, 'ann')}`,
+    });
+    expect(row).toBeDisabled();
+    await user.press(row);
+    await flush();
+    expect(props.onFriendInvited).toHaveBeenCalledTimes(1);
     expect(await parts.server.friendsFor('ann').listFriendInvites()).toEqual([
       expect.objectContaining({ code, from: ME, ...game }),
     ]);

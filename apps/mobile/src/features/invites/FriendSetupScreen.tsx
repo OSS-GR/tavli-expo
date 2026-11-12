@@ -45,7 +45,8 @@
  *   with the picks on the screen (the owner's call: the picks are right
  *   above). The friend gets a push and needs no link, so the screen stays
  *   and says "Invite sent to NAME" (#507, `onFriendInvited`); no waiting
- *   screen opens. A guest, nobody signed in, no
+ *   screen opens. That friend's row turns off for the visit, so a second
+ *   tap sends no second invite. A guest, nobody signed in, no
  *   friends or a failed load: no list, and the screen is as before. The
  *   list never makes an account and never opens the sign-in sheet. A tap
  *   that finds the account gone drops the list and says so; a friend who
@@ -105,10 +106,11 @@ export interface FriendSetupScreenProps {
   auth: AuthProvider;
   invites: Invites;
   /**
-   * The server made the invite (`game`): a code invite shows its code; a
-   * friend invite (`friend`) goes back to Friends (#507).
+   * Make an invite made one: a code invite opens its waiting screen; a
+   * friend invite (`friend`) goes back to Friends (#507). A tap on the
+   * friends list calls `onFriendInvited` instead.
    */
-  onCreated: (code: string, game: NewInvite) => void;
+  onCreated: (code: string) => void;
   /**
    * A friend from the list got an invite (#507): the screen stays and says
    * so. The route offers turn notifications.
@@ -186,6 +188,9 @@ export function FriendSetupScreen({
   // The friend from the list who just got an invite (#507). A new object
   // for each send, so a second send is read again.
   const [sent, setSent] = useState<{ readonly name: string } | null>(null);
+  // Friends from the list who got an invite on this visit: their rows turn
+  // off, so a second tap sends no second invite.
+  const [invited, setInvited] = useState<ReadonlySet<string>>(() => new Set());
   // No saved session: the sign-in sheet is open.
   const [signingIn, setSigningIn] = useState(false);
   const titleRef = useFocusOnShow();
@@ -356,11 +361,12 @@ export function FriendSetupScreen({
       making.current = false;
       setBusy(false);
       setSent({ name: playerNameText(to.name, t) ?? t('friends.unnamed') });
+      setInvited((old) => new Set(old).add(to.playerId));
       onFriendInvited?.(code);
       return;
     }
     // The buttons stay off while the route opens the waiting screen.
-    onCreated(code, game);
+    onCreated(code);
   };
 
   const lengthOptions: SegmentOption<`${MatchLength}`>[] = MATCH_LENGTHS.map((n) => ({
@@ -460,15 +466,18 @@ export function FriendSetupScreen({
           <SectionCard title={t('friend.friendsTitle')} testID="friend-friends">
             {friendList.shown.map((f) => {
               const name = playerNameText(f.name, t) ?? t('friends.unnamed');
+              const done = invited.has(f.playerId);
               return (
                 <SectionRow
                   key={f.playerId}
                   testID={`friend-pick-${f.playerId}`}
                   icon="user"
                   label={name}
-                  hint={recordText(f.record, t) ?? undefined}
-                  accessibilityLabel={t('friend.sendTo', { name })}
-                  disabled={busy}
+                  hint={done ? t('friend.invited') : (recordText(f.record, t) ?? undefined)}
+                  accessibilityLabel={
+                    done ? t('friend.invitedTo', { name }) : t('friend.sendTo', { name })
+                  }
+                  disabled={busy || done}
                   onPress={() => void make({ to: f })}
                 />
               );

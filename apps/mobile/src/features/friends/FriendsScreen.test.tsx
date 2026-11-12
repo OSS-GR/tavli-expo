@@ -17,7 +17,7 @@ import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { onlineFake } from '../../../test/onlineFake';
 
 import { FriendsScreen } from './FriendsScreen';
-import { noteInviteSent, takeInviteSent } from './inviteSent';
+import { noteInviteSent, SENT_NOTE_MS, takeInviteSent } from './inviteSent';
 
 runOnFakeTimers();
 
@@ -337,6 +337,19 @@ describe('<FriendsScreen />', () => {
       );
       // The note is shown once.
       expect(takeInviteSent()).toBeNull();
+    });
+
+    it('drops a note that waited too long for Friends (#507)', async () => {
+      signInSaved();
+      await befriend('ann');
+      const sentAt = Date.now();
+      noteInviteSent({ playerId: 'ann', code: 'ABCD2345' });
+      // Only the note's clock moves: the server and the screen keep theirs.
+      const clock = jest.spyOn(Date, 'now').mockReturnValue(sentAt + SENT_NOTE_MS + 1);
+      expect(takeInviteSent()).toBeNull();
+      clock.mockRestore();
+      await show();
+      expect(screen.queryByTestId('friends-sent')).toBeNull();
     });
 
     it('Change opens the full setup; Cancel sends nothing', async () => {

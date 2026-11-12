@@ -517,7 +517,7 @@ export function FriendsScreen({
           />
         ) : null}
       </Sheet>
-      <Toast text={toast} testID="friends-sent" />
+      <Toast text={toast} testID="friends-sent" announced />
     </Screen>
   );
 }
