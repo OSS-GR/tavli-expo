@@ -7,10 +7,17 @@ import type { PerPlayer } from '@tavli/engine';
 export interface Seat {
   /** In sentences and the score line: "Maria", "You", "Bot". */
   readonly name: string;
-  /** In the player strip, for example "Bot · Easy". */
+  /** The name on the seat: "You", "Bot", "Maria". */
   readonly label: string;
-  /** The pill on the active strip: "Your turn", "Playing", "Maria’s turn". */
+  /** The turn words on the active seat: "Your turn", "Playing", "Maria’s turn". */
   readonly turnLabel: string;
+  /**
+   * The first part of the quiet status line, before the game: the bot level
+   * ("Easy · Portes") or "Online" (#499). None for a person on this phone.
+   */
+  readonly detail?: string;
+  /** A named online opponent: their id and name for the checker avatar (#499). */
+  readonly avatar?: { readonly key: string; readonly name: string };
   /** The human vs the bot: texts say "you" ("You win the game!"). */
   readonly you: boolean;
 }

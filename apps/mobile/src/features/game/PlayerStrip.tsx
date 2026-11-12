@@ -1,40 +1,67 @@
 /**
- * A player strip above or below the board (wireframe 6): checker color,
- * name and match score, on one line (#184). The player to move gets a
- * thick border and a "Your turn" pill, so color is never the only cue.
- * Asodio adds a short note after the name: the checkers still to enter, or
- * "Army frozen". A long name or a large font wraps the line; the strip then
- * grows. There is no pip count (#238).
+ * A player's seat above or below the board (#499, Figma: game parts).
+ * Both players get the same plate: the checker they play (or a checker
+ * avatar with initials for a named online opponent), the name, a status
+ * line and the match score as a numeral with a small "of 3".
+ *
+ * - The player to move gets a brass edge and a gold status line ("Your
+ *   turn · 6-6, 3 moves left"), so color is never the only cue: the words
+ *   say it too. There is no ALL-CAPS pill.
+ * - The other player's status line is quiet ("Easy · Portes", "Online ·
+ *   Portes"), or empty.
+ * - Asodio adds a short note: the checkers still to enter, or "Army frozen".
+ * - Online, the time left shows as a clock line ("4:54 to roll"). Under
+ *   30 s it turns the problem color.
+ * - A long name or a large font wraps the lines; the seat then grows. There
+ *   is no pip count (#238).
  *
  * `stacked` (landscape, #185): a small card for a side column, one part per
- * line: the color and the score, the turn pill, the name, the note.
+ * line: the checker and the score, the name, the status, the clock.
  */
 import type { CheckerStyle } from '@tavli/themes';
-import { displayCaps } from '@tavli/ui';
 import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-/** The height of a strip at the normal font size, in points (#184). The menu button matches it. */
-export const STRIP_HEIGHT = 36;
+import { CheckerAvatar } from '@/components/CheckerAvatar';
+import { Icon } from '@/components/Icon';
 
-const NBSP = '\u00A0';
+const NBSP = ' ';
 /**
  * A note such as "12 to enter" never breaks in the middle. When a long name
  * (or Greek) makes the line wrap, it breaks after the "·", so the note stays whole.
  */
 const keepTogether = (part: string) => part.replace(/ /g, NBSP);
 
+/** The time left on the seat of the player the server waits for (online). */
+export interface SeatClock {
+  /** "4:54 to roll", "0:28 to move", "2 h to move". */
+  readonly text: string;
+  /** Under 30 s: the line turns the problem color. */
+  readonly urgent: boolean;
+}
+
 export interface PlayerStripProps {
   name: string;
-  /** The player's checker style from the board theme (for the color swatch). */
+  /** The player's checker style from the board theme. */
   checker: CheckerStyle;
-  /** A short note under the name, e.g. "12 to enter" (Asodio). `null`: none. */
+  /**
+   * A named online opponent: a checker avatar with their initials in place
+   * of the plain checker. `key` is their player id (it picks the wood).
+   */
+  avatar?: { readonly key: string; readonly name: string } | null;
+  /** The quiet status line while not active: "Easy · Portes". `null`: none. */
+  status?: string | null;
+  /** After the turn words while active: "6-6, 3 moves left". `null`: none. */
+  turnDetail?: string | null;
+  /** A short note, e.g. "12 to enter" (Asodio). `null`: none. */
   note?: string | null;
+  /** The time left (online). `null`: none. */
+  clock?: SeatClock | null;
   score: number;
   target: number;
   active: boolean;
-  /** The pill text while active. Default: "Your turn". */
+  /** The turn words while active. Default: "Your turn". */
   turnLabel?: string;
   /** One part per line, for the narrow side columns in landscape (#185). */
   stacked?: boolean;
@@ -44,7 +71,11 @@ export interface PlayerStripProps {
 export function PlayerStrip({
   name,
   checker,
+  avatar = null,
+  status = null,
+  turnDetail = null,
   note = null,
+  clock = null,
   score,
   target,
   active,
@@ -53,139 +84,176 @@ export function PlayerStrip({
   testID,
 }: PlayerStripProps) {
   const { t } = useTranslation();
-  const pill = turnLabel ?? t('game.strip.turn');
-  const label = [name, note, t('game.strip.scoreLabel', { score, target }), active ? pill : null]
+  const { theme } = useUnistyles();
+  const turn = turnLabel ?? t('game.strip.turn');
+  // Screen readers hear the name, the notes, the score, then the turn. The
+  // dice have their own label, so the turn detail stays out.
+  const label = [
+    name,
+    active ? null : status,
+    note,
+    clock?.text ?? null,
+    t('game.strip.scoreLabel', { score, target }),
+    active ? turn : null,
+  ]
     .filter((part) => part !== null)
     .join(', ');
-  const swatch = (
-    <View
-      style={[styles.swatch, { backgroundColor: checker.fill, borderColor: checker.rim.color }]}
-    />
+
+  const line = (active ? [turn, turnDetail, note] : [status, note]).filter(
+    (part): part is string => part !== null,
   );
-  const scoreText = (
-    <Text style={styles.score}>
-      {score}
-      <Text style={styles.target}>{` /${target}`}</Text>
-    </Text>
-  );
-  const pillView = active ? (
-    <View style={[styles.pill, stacked && styles.pillStacked]}>
-      <Text style={styles.pillText}>{displayCaps(pill)}</Text>
+  const size = stacked ? 24 : 32;
+  const piece =
+    avatar !== null ? (
+      <CheckerAvatar playerKey={avatar.key} name={avatar.name} size={size} />
+    ) : (
+      <View
+        style={[
+          styles.checker(size),
+          { backgroundColor: checker.fill, borderColor: checker.rim.color },
+        ]}
+      />
+    );
+  const scoreView = (
+    <View style={styles.scoreBox}>
+      <Text style={styles.score(stacked)}>{score}</Text>
+      <Text style={styles.target}>{t('game.strip.of', { target })}</Text>
     </View>
-  ) : null;
+  );
+  const statusLine =
+    line.length === 0 ? null : (
+      <Text style={styles.status(active)}>
+        {line.map((part, index) => (index === 0 ? part : `${NBSP}· ${keepTogether(part)}`))}
+      </Text>
+    );
+  const clockColor = clock?.urgent
+    ? theme.colors.problem
+    : active
+      ? theme.colors.turnText
+      : theme.colors.textDim;
+  const clockLine =
+    clock === null ? null : (
+      <View testID={testID ? `${testID}-clock` : undefined} style={styles.clockRow}>
+        <Icon name="clock" color={clockColor} size={14} />
+        <Text style={[styles.clock, { color: clockColor }]}>{clock.text}</Text>
+      </View>
+    );
+
   if (stacked) {
     return (
       <View
         testID={testID}
-        style={styles.stacked(active)}
+        style={[styles.plate, styles.stacked, active && styles.active]}
         accessible
         accessibilityLabel={label}
         accessibilityState={{ selected: active }}>
         <View style={styles.stackedTop}>
-          {swatch}
-          {scoreText}
+          {piece}
+          {scoreView}
         </View>
-        {pillView}
         <Text style={styles.name}>{name}</Text>
-        {note === null ? null : <Text style={styles.note}>{keepTogether(note)}</Text>}
+        {statusLine}
+        {clockLine}
       </View>
     );
   }
   return (
     <View
       testID={testID}
-      style={styles.strip(active)}
+      style={[styles.plate, styles.row, active && styles.active]}
       accessible
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}>
-      {swatch}
-      <Text style={styles.who}>
+      {piece}
+      <View style={styles.texts}>
         <Text style={styles.name}>{name}</Text>
-        {note === null ? null : (
-          <>
-            <Text style={styles.note}>{`${NBSP}· `}</Text>
-            <Text style={styles.note}>{keepTogether(note)}</Text>
-          </>
-        )}
-      </Text>
-      {pillView}
-      {scoreText}
+        {statusLine}
+        {clockLine}
+      </View>
+      {scoreView}
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  strip: (active: boolean) => ({
+  plate: {
+    marginHorizontal: theme.space.sm,
+    borderRadius: theme.radii.tray,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    // The lit top edge of a tray.
+    boxShadow: `inset 0px 1px 0px ${theme.colors.edgeLight}`,
+  },
+  // Your turn: a brass edge.
+  active: {
+    borderWidth: 2,
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.surfaceRaised,
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.sm,
-    minHeight: STRIP_HEIGHT,
+    gap: theme.space.md,
     paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xxs,
-    marginHorizontal: theme.space.sm,
-    borderRadius: theme.radii.lg,
-    backgroundColor: theme.colors.surface,
-    borderWidth: active ? 3 : 1,
-    borderColor: active ? theme.colors.turn : theme.colors.border,
-  }),
-  stacked: (active: boolean) => ({
+    paddingVertical: theme.space.xs,
+  },
+  stacked: {
+    marginHorizontal: 0,
     gap: theme.space.xxs,
-    minHeight: STRIP_HEIGHT,
     paddingHorizontal: theme.space.sm,
     paddingVertical: theme.space.xs,
-    borderRadius: theme.radii.lg,
-    backgroundColor: theme.colors.surface,
-    borderWidth: active ? 3 : 1,
-    borderColor: active ? theme.colors.turn : theme.colors.border,
-  }),
+  },
   stackedTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: theme.space.sm,
   },
-  swatch: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  checker: (size: number) => ({
+    width: size,
+    height: size,
+    borderRadius: size / 2,
     borderWidth: 2,
-  },
-  who: {
+  }),
+  texts: {
     flex: 1,
   },
   name: {
     ...theme.type.bodyStrong,
+    fontSize: 16,
+    lineHeight: 21,
     color: theme.colors.text,
   },
-  note: {
-    ...theme.type.caption,
-    color: theme.colors.textDim,
+  status: (active: boolean) => ({
+    ...theme.type.footnote,
+    fontWeight: active ? '600' : '400',
+    color: active ? theme.colors.turnText : theme.colors.textDim,
+  }),
+  clockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.xs,
   },
-  pill: {
-    // A long pass-and-play name may not push the score off the strip.
+  clock: {
+    ...theme.type.footnote,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
     flexShrink: 1,
-    maxWidth: '50%',
-    paddingHorizontal: theme.space.sm,
-    paddingVertical: theme.space.xxs,
-    borderRadius: theme.radii.pill,
-    backgroundColor: theme.colors.turn,
   },
-  pillStacked: {
-    alignSelf: 'flex-start',
-    maxWidth: '100%',
+  scoreBox: {
+    alignItems: 'flex-end',
   },
-  pillText: {
-    ...theme.type.section,
-    color: theme.colors.onAccent,
-  },
-  score: {
+  score: (stacked: boolean) => ({
     ...theme.type.numeral,
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: stacked ? 20 : 24,
+    lineHeight: stacked ? 24 : 28,
     color: theme.colors.text,
-  },
+  }),
   target: {
-    ...theme.type.caption,
+    ...theme.type.footnote,
+    fontSize: 12,
+    lineHeight: 15,
     color: theme.colors.textDim,
   },
 }));

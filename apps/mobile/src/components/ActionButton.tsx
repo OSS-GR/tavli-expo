@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import type { BoardColors, UiColors } from '@tavli/ui';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -42,7 +42,15 @@ export interface ActionButtonProps {
   compact?: boolean;
   /** What screen readers say, when the label has a symbol ("↶ Undo" → "Undo"). */
   accessibilityLabel?: string;
+  /**
+   * A 52 pt square with only the icon (the game's Hint, #499). Screen
+   * readers still hear the label, and with a large font the label shows.
+   */
+  iconOnly?: boolean;
 }
+
+/** From this font scale an `iconOnly` button shows its label too. */
+export const ICON_ONLY_LABEL_SCALE = 1.3;
 
 /** The small button's hit area grows to 44 pt (36 + 4 + 4). */
 const SMALL_HIT_SLOP = { top: 4, bottom: 4, left: 0, right: 0 };
@@ -66,8 +74,11 @@ export function ActionButton({
   grow = false,
   compact = false,
   accessibilityLabel = label,
+  iconOnly = false,
 }: ActionButtonProps) {
   const { theme } = useUnistyles();
+  const { fontScale } = useWindowDimensions();
+  const square = iconOnly && icon !== undefined && fontScale < ICON_ONLY_LABEL_SCALE;
   const inactive = disabled || busy;
   const small = size === 'small';
   const color = labelColor(theme.colors, kind, disabled);
@@ -86,6 +97,7 @@ export function ActionButton({
         small && styles.small,
         grow && styles.grow,
         compact && styles.compact,
+        square && styles.square,
         pressed && !inactive && styles.pressed(kind),
       ]}>
       <View style={styles.row}>
@@ -95,7 +107,9 @@ export function ActionButton({
           <Icon name={icon} color={color} size={small ? 18 : 20} />
         ) : null}
         {/* No line limit: with a large system font the text wraps, never cut. */}
-        <Text style={[styles.label, small && styles.smallLabel, { color }]}>{label}</Text>
+        {square ? null : (
+          <Text style={[styles.label, small && styles.smallLabel, { color }]}>{label}</Text>
+        )}
       </View>
       {subtitle ? <Text style={[styles.subtitle, { color }]}>{subtitle}</Text> : null}
     </Pressable>
@@ -141,6 +155,11 @@ const styles = StyleSheet.create((theme) => ({
   compact: {
     minWidth: 0,
     paddingHorizontal: theme.space.xs,
+  },
+  square: {
+    width: theme.touch.button,
+    minWidth: theme.touch.button,
+    paddingHorizontal: 0,
   },
   pressed: (kind: ActionButtonKind) => ({
     transform: [{ scale: 0.98 }],

@@ -480,12 +480,12 @@
       "rolling": "Ρίχνουμε τα ζάρια…"
     },
     "clock": {
-      "seconds_one": "{{count}} δευτ.",
-      "seconds_other": "{{count}} δευτ.",
       "minutes_one": "{{count}} λεπτό",
       "minutes_other": "{{count}} λεπτά",
       "hours_one": "{{count}} ώρα",
-      "hours_other": "{{count}} ώρες"
+      "hours_other": "{{count}} ώρες",
+      "toRoll": "{{time}} για τη ζαριά",
+      "toMove": "{{time}} για την κίνηση"
     },
     "timeLimitNone": "Χωρίς",
     "timeLimit_one": "1 λεπτό",
@@ -504,7 +504,8 @@
       "rollFailed": "Η ζαριά σου δεν έφτασε στον διακομιστή. Έλεγξε τη σύνδεση και ρίξε ξανά.",
       "refusedTitle": "Δεν έγινε δεκτό",
       "refused": "Ο διακομιστής δεν δέχτηκε τη σειρά σου. Οι κινήσεις σου ακυρώθηκαν."
-    }
+    },
+    "seatDetail": "Online"
   },
   "invite": {
     "loading": "Φόρτωση πρόσκλησης…",
@@ -957,11 +958,12 @@
       "notRolled": "Δεν έχει ρίξει ακόμα",
       "rolled": "Έφερε {{value}}",
       "result_you": "Ξεκινάς εσύ, με {{high}}-{{low}}.",
-      "ok": "Εντάξει",
-      "autoClose": "Κλείνει μόνο του σε 3 δευτ.",
       "bodyReroll": "Κάθε παίκτης ρίχνει ένα ζάρι. Το μεγαλύτερο ξεκινά και ξαναρίχνει και τα δύο.",
       "resultReroll": "Ξεκινά: {{name}} ({{high}}-{{low}}). Ξαναρίχνει τα ζάρια.",
-      "resultReroll_you": "Ξεκινάς εσύ ({{high}}-{{low}}). Ξαναρίξε τα ζάρια."
+      "resultReroll_you": "Ξεκινάς εσύ ({{high}}-{{low}}). Ξαναρίξε τα ζάρια.",
+      "titleYou": "Ξεκινάς εσύ",
+      "titleStarts": "Ξεκινά: {{name}}",
+      "play": "Παίξε"
     },
     "chooser": {
       "title": "Ποιος ξεκινά;",
@@ -973,7 +975,8 @@
       "opening": "Ρίξε για να ξεκινήσετε",
       "openingFor": "{{name}}: ρίξε",
       "dice": "Ρίξε τα ζάρια",
-      "orSwipeBoard": "ή σύρε στο ταμπλό"
+      "orSwipeBoard": "ή σύρε στο ταμπλό",
+      "openingYours": "Ρίξε το ζάρι σου"
     },
     "dice": {
       "label": "Ζάρια {{values}}, μένουν {{left}} για παίξιμο"
@@ -1002,7 +1005,11 @@
       "playing": "Παίζει",
       "turnOf": "Σειρά: {{name}}",
       "toEnter": "Να μπουν: {{count}}",
-      "frozen": "Όλα παγωμένα"
+      "frozen": "Όλα παγωμένα",
+      "of": "από {{target}}",
+      "diceLeft_one": "{{dice}}, μένει {{count}} κίνηση",
+      "diceLeft_other": "{{dice}}, μένουν {{count}} κινήσεις",
+      "diceDone": "{{dice}}, παίχτηκαν όλα"
     },
     "hint": {
       "button": "Υπόδειξη",
@@ -1011,7 +1018,6 @@
       "text": "Υπόδειξη: {{moves}}"
     },
     "controls": {
-      "undo": "↶ Αναίρεση",
       "undoLabel": "Αναίρεση",
       "confirm": "Επιβεβαίωση",
       "allUsed": "Παίχτηκαν όλα τα ζάρια. Επιβεβαίωσε ή αναίρεσε."
@@ -1119,7 +1125,6 @@
     "you": "Εσύ",
     "bot": {
       "name": "Υπολογιστής",
-      "strip": "Υπολογιστής · {{level}}",
       "waiting": "Σειρά του υπολογιστή…",
       "moving": "Ο υπολογιστής έφερε {{dice}} και παίζει…",
       "choseMoving": "Ο υπολογιστής διάλεξε {{dice}} και παίζει…"
