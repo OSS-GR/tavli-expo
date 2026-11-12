@@ -43,7 +43,9 @@
  *   the screen opens. With friends, a short list (`pickFriends`: name and
  *   record) sits above Make an invite. A tap sends a friend invite at once
  *   with the picks on the screen (the owner's call: the picks are right
- *   above), then the waiting screen opens. A guest, nobody signed in, no
+ *   above). The friend gets a push and needs no link, so the screen stays
+ *   and says "Invite sent to NAME" (#507, `onFriendInvited`); no waiting
+ *   screen opens. A guest, nobody signed in, no
  *   friends or a failed load: no list, and the screen is as before. The
  *   list never makes an account and never opens the sign-in sheet. A tap
  *   that finds the account gone drops the list and says so; a friend who
@@ -102,8 +104,16 @@ import { sendInviteCreated } from './inviteAnalytics';
 export interface FriendSetupScreenProps {
   auth: AuthProvider;
   invites: Invites;
-  /** The server made the invite (`game`): show its code. */
+  /**
+   * The server made the invite (`game`): a code invite shows its code; a
+   * friend invite (`friend`) goes back to Friends (#507).
+   */
   onCreated: (code: string, game: NewInvite) => void;
+  /**
+   * A friend from the list got an invite (#507): the screen stays and says
+   * so. The route offers turn notifications.
+   */
+  onFriendInvited?: (code: string) => void;
   onBack: () => void;
   /** For tests. Default: the app's analytics. */
   analytics?: Analytics;
@@ -155,6 +165,7 @@ export function FriendSetupScreen({
   visit = 0,
   friends,
   onFriends,
+  onFriendInvited,
 }: FriendSetupScreenProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
@@ -172,6 +183,9 @@ export function FriendSetupScreen({
   const making = useRef(false);
   // A new object for each failure, so the same problem twice is read twice.
   const [problem, setProblem] = useState<Problem | null>(null);
+  // The friend from the list who just got an invite (#507). A new object
+  // for each send, so a second send is read again.
+  const [sent, setSent] = useState<{ readonly name: string } | null>(null);
   // No saved session: the sign-in sheet is open.
   const [signingIn, setSigningIn] = useState(false);
   const titleRef = useFocusOnShow();
@@ -248,6 +262,7 @@ export function FriendSetupScreen({
     making.current = true;
     setBusy(true);
     setProblem(null);
+    setSent(null);
     const game: NewInvite = { choice, targetPoints, turnTimeMinutes };
     const target =
       to !== undefined && listFrom !== undefined
@@ -336,6 +351,14 @@ export function FriendSetupScreen({
     // The next friend invite starts from this setup (#488).
     if (target !== undefined) saveFriendInviteSetup(game);
     sendInviteCreated(game, analytics);
+    if (to !== undefined) {
+      // A friend from the list gets a push and needs no link (#507): stay.
+      making.current = false;
+      setBusy(false);
+      setSent({ name: playerNameText(to.name, t) ?? t('friends.unnamed') });
+      onFriendInvited?.(code);
+      return;
+    }
     // The buttons stay off while the route opens the waiting screen.
     onCreated(code, game);
   };
@@ -375,6 +398,10 @@ export function FriendSetupScreen({
   useEffect(() => {
     if (problemText !== null) AccessibilityInfo.announceForAccessibility(problemText);
   }, [problem, problemText]);
+  const sentText = sent === null ? null : t('friends.sent', { name: sent.name });
+  useEffect(() => {
+    if (sentText !== null) AccessibilityInfo.announceForAccessibility(sentText);
+  }, [sent, sentText]);
 
   const gameOptions: ListOption<OnlineGameChoice>[] = ONLINE_GAME_CHOICES.map((game) => ({
     value: game,
@@ -473,6 +500,12 @@ export function FriendSetupScreen({
           </Text>
         ) : null}
         {busy ? <Text style={styles.hint}>{t('friend.making')}</Text> : null}
+        {sentText !== null ? (
+          <View testID="friend-sent" style={styles.sent}>
+            <Icon name="check" size={18} color={theme.colors.accent} />
+            <Text style={styles.sentText}>{sentText}</Text>
+          </View>
+        ) : null}
         {notSavedText !== null ? (
           <>
             <Text testID="friend-not-saved" style={styles.problem}>
@@ -572,6 +605,16 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   problem: {
     ...theme.type.body,
+    color: theme.colors.text,
+  },
+  sent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.sm,
+  },
+  sentText: {
+    ...theme.type.bodyStrong,
+    flexShrink: 1,
     color: theme.colors.text,
   },
   footer: {

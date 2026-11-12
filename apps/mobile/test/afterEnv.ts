@@ -1,6 +1,7 @@
 // Runs in each test file after the test framework is set up
 // (`setupFilesAfterEnv` in jest.config.js).
 
+import { takeInviteSent } from '../src/features/friends/inviteSent';
 import { resetRaceOffersForTest } from '../src/features/game/raceOffer';
 import { resetAnnouncements } from '../src/features/game/useAnnouncement';
 import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPushes';
@@ -19,6 +20,8 @@ import { resetOnlineFake } from './onlineFake';
 beforeEach(() => {
   resetAnnouncements();
   resetRaceOffersForTest();
+  // A friend invite sent from the full setup (#507): no note left for Friends.
+  takeInviteSent();
 });
 
 // Online play (`auth`, `games`, `onlineServer` of `@/services`): each test

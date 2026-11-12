@@ -785,6 +785,7 @@
       "sending": "Sending…",
       "change": "Change"
     },
+    "sent": "Invite sent to {{name}}",
     "ratingsHint": "Friends and everyone",
     "ratingsLabel": "Leaderboards, your rating {{rating}}",
     "empty": {

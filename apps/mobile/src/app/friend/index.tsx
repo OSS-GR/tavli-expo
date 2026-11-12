@@ -4,8 +4,8 @@
  * invite (`friend/<code>`), so Back from it goes Home. A build with no
  * online server goes Home. After an async invite the app offers turn
  * notifications (#285, #183). A saved account with friends sees a short
- * list of them (#488): a tap sends a friend invite, and its waiting screen
- * replaces this one too.
+ * list of them (#488): a tap sends a friend invite, and the screen stays
+ * and says so (#507): the friend gets a push and needs no link.
  */
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
@@ -30,7 +30,11 @@ export default function FriendRoute() {
       invites={invites}
       {...(friends === undefined ? {} : { friends })}
       onFriends={() => router.push(FRIENDS_HREF)}
-      onCreated={(code, game) => {
+      onFriendInvited={() => {
+        // Every online game can last a while: offer turn notifications (#285).
+        void turnPushes()?.offer();
+      }}
+      onCreated={(code) => {
         router.replace(inviteWaitHref(code));
         // Every online game can last a while: offer turn notifications (#285).
         void turnPushes()?.offer();
