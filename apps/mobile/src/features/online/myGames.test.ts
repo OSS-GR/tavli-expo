@@ -98,8 +98,8 @@ describe('gameRowText', () => {
 
   it('counts seconds in a live game, with the clock offset', () => {
     const live = summary('a', { turnTimeMinutes: 1, turnDeadline: NOW + 42_000 });
-    expect(gameRowText(live, en, NOW, 0).time).toBe('42 s left');
-    expect(gameRowText(live, en, NOW, 2000).time).toBe('40 s left');
+    expect(gameRowText(live, en, NOW, 0).time).toBe('0:42 left');
+    expect(gameRowText(live, en, NOW, 2000).time).toBe('0:40 left');
   });
 
   it('has no time with no turn timer', () => {

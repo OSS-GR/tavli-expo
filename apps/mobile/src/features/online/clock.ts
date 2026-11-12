@@ -1,8 +1,9 @@
 /**
  * The time left on an online turn as text (#255). Pure.
  *
- * Timed games count seconds ("42 s"). Games with no time limit (the 24-hour
- * default) count hours ("23 h"), and minutes in the last hour ("40 min").
+ * Timed games show a clock ("4:54", "0:28"; never "300 s", #499). Games
+ * with no time limit (the 24-hour default) count hours ("23 h"), and
+ * minutes in the last hour ("40 min").
  */
 import { ASYNC_TURN_TIME_MS } from '@tavli/contracts';
 import type { TFunction } from 'i18next';
@@ -25,12 +26,22 @@ const HOUR = 60 * MINUTE;
 export function clockText(ms: number, turnTimeMinutes: number | null, t: TFunction): string {
   const left = Math.max(0, ms);
   if (turnTimeMinutes !== null) {
-    // A time limit counts down in seconds.
-    return t('online.clock.seconds', { count: Math.ceil(left / SECOND) });
+    // A time limit counts down as minutes and seconds: "4:54".
+    const seconds = Math.ceil(left / SECOND);
+    const rest = seconds % 60;
+    return `${Math.floor(seconds / 60)}:${rest < 10 ? `0${rest}` : rest}`;
   }
   // No time limit: 24-hour async, hours then minutes.
   if (left >= HOUR) return t('online.clock.hours', { count: Math.floor(left / HOUR) });
   return t('online.clock.minutes', { count: Math.ceil(left / MINUTE) });
+}
+
+/** Under this time left the clock turns the problem color (#499). */
+export const URGENT_CLOCK_MS = 30 * SECOND;
+
+/** The time left is short: under 30 s. */
+export function clockUrgent(ms: number): boolean {
+  return ms < URGENT_CLOCK_MS;
 }
 
 /** How often the screen updates the clock: each second when timed, each half minute otherwise. */

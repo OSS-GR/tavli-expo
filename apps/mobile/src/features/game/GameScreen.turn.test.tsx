@@ -137,8 +137,10 @@ describe('<GameScreen /> turn indicator', () => {
     const bottom = () => within(screen.getByTestId('strip-bottom'));
     const upper = () => within(screen.getByTestId('strip-top'));
     expect(bottom().getByText('Ann')).toBeOnTheScreen();
-    expect(bottom().getByText('YOUR TURN')).toBeOnTheScreen();
-    expect(upper().queryByText('YOUR TURN')).toBeNull();
+    // Gold words on the seat, no ALL-CAPS pill (#499).
+    expect(bottom().getByText(/^Your turn/)).toBeOnTheScreen();
+    expect(upper().queryByText(/Your turn/)).toBeNull();
+    expect(screen.queryByText('YOUR TURN')).toBeNull();
 
     await touch(PAN, [top(13, 5), point(7)]);
     await touch(PAN, [top(8, 3), point(7)]);
@@ -148,7 +150,7 @@ describe('<GameScreen /> turn indicator', () => {
     );
     await user.press(button('Confirm'));
     expect(bottom().getByText('Bob')).toBeOnTheScreen();
-    expect(bottom().getByText('YOUR TURN')).toBeOnTheScreen();
+    expect(bottom().getByText(/^Your turn/)).toBeOnTheScreen();
     expect(upper().getByText('Ann')).toBeOnTheScreen();
     expect(store.getState().flow.game.state.toMove).toBe('black');
   });
@@ -164,8 +166,8 @@ describe('<GameScreen /> turn indicator', () => {
     await user.press(button('Confirm'));
     const bottom = within(screen.getByTestId('strip-bottom'));
     expect(bottom.getByText('Ann')).toBeOnTheScreen();
-    expect(bottom.queryByText('YOUR TURN')).toBeNull();
-    expect(within(screen.getByTestId('strip-top')).getByText('YOUR TURN')).toBeOnTheScreen();
+    expect(bottom.queryByText(/Your turn/)).toBeNull();
+    expect(within(screen.getByTestId('strip-top')).getByText(/^Your turn/)).toBeOnTheScreen();
   });
 });
 
@@ -202,9 +204,13 @@ describe('<GameScreen /> strips without a pip count (#238)', () => {
       for (const strip of [bottom, upper]) {
         // No "Pips 167" or «Πόντοι 167».
         expect(strip).not.toHaveTextContent(/pip|πόντ|167/i);
-        // No "·" is left after the name: Portes has no note.
-        expect(strip).not.toHaveTextContent(/·/);
       }
+      // Portes has no note: the other seat has no status line, and yours
+      // says only the turn and the roll (#499).
+      expect(upper).not.toHaveTextContent(/·/);
+      expect(bottom).toHaveTextContent(
+        language === 'en' ? /Your turn · 6-1, 2 moves left/ : /Σειρά σου · 6-1, μένουν 2 κινήσεις/,
+      );
     },
   );
 });

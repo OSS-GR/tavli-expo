@@ -2,7 +2,8 @@ import { screen, userEvent } from '@testing-library/react-native';
 import { themes } from '@tavli/ui';
 
 import { renderWithRoot } from '../../test/render';
-import { ActionButton } from './ActionButton';
+import { PORTRAIT_SE, resetWindow, setWindow } from '../../test/window';
+import { ActionButton, ICON_ONLY_LABEL_SCALE } from './ActionButton';
 
 const { colors } = themes['walnut-kafeneio'];
 
@@ -101,6 +102,45 @@ describe('<ActionButton />', () => {
     expect(button).toHaveStyle({ backgroundColor: colors.accent });
     await user.press(button);
     expect(onPress).not.toHaveBeenCalled();
+  });
+
+  describe('iconOnly (#499)', () => {
+    afterEach(async () => {
+      await resetWindow();
+    });
+
+    it('draws a 52 pt square with only the icon; screen readers hear the label', async () => {
+      // Jest's own window has font scale 2: set the normal size.
+      await setWindow(PORTRAIT_SE);
+      await renderWithRoot(
+        <ActionButton
+          testID="hint"
+          kind="secondary"
+          icon="lightbulb"
+          iconOnly
+          label="Hint"
+          onPress={jest.fn()}
+        />,
+      );
+      const button = screen.getByRole('button', { name: 'Hint' });
+      expect(button).toHaveStyle({ width: 52, minHeight: 52 });
+      expect(screen.queryByText('Hint')).toBeNull();
+    });
+
+    it('shows the label too with a large font', async () => {
+      await setWindow({ ...PORTRAIT_SE, fontScale: ICON_ONLY_LABEL_SCALE });
+      await renderWithRoot(
+        <ActionButton
+          kind="secondary"
+          icon="lightbulb"
+          iconOnly
+          label="Hint"
+          onPress={jest.fn()}
+        />,
+      );
+      expect(screen.getByText('Hint')).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Hint' })).not.toHaveStyle({ width: 52 });
+    });
   });
 
   it('draws a small button 36 pt tall with a 44 pt hit area', async () => {

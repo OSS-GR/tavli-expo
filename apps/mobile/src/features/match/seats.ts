@@ -19,8 +19,10 @@ export function seatsFor(setup: MatchSetup, t: TFunction): PerPlayer<Seat> {
       },
       black: {
         name: t('game.bot.name'),
-        label: t('game.bot.strip', { level }),
+        label: t('game.bot.name'),
         turnLabel: t('game.strip.playing'),
+        // The seat's status line: "Easy · Portes" (#499).
+        detail: level,
         you: false,
       },
     };

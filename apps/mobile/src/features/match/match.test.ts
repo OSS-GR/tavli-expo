@@ -270,13 +270,14 @@ describe('match setup', () => {
 });
 
 describe('seats', () => {
-  it('names you and the bot, with the level in the strip', () => {
+  it('names you and the bot, with the level on the seat', () => {
     const seats = seatsFor(botSetup, t);
     expect(seats.white).toEqual({ name: 'You', label: 'You', turnLabel: 'Your turn', you: true });
     expect(seats.black).toEqual({
       name: 'Bot',
-      label: 'Bot · Easy',
+      label: 'Bot',
       turnLabel: 'Playing',
+      detail: 'Easy',
       you: false,
     });
   });
@@ -292,7 +293,7 @@ describe('seats', () => {
     await i18n.changeLanguage('el');
     try {
       expect(seatsFor(localSetup, t).black.name).toBe('Παίκτης 2');
-      expect(seatsFor(botSetup, t).black.label).toBe('Υπολογιστής · Εύκολο');
+      expect(seatsFor(botSetup, t).black.detail).toBe('Εύκολο');
       expect(seatsFor(localSetup, t).black.turnLabel).toBe('Σειρά: Παίκτης 2');
     } finally {
       await i18n.changeLanguage('en');
