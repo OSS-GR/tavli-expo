@@ -85,12 +85,12 @@ export function TableScene({ width, play, testID }: TableSceneProps) {
   const brass = theme.colors.accentLight;
   const wood = theme.colors.surfaceRaised;
   const box = { width, height: tableSceneHeight(width) };
-  const stroke = (path: string, width = LINE) => (
+  const stroke = (path: string, strokeWidth = LINE) => (
     <Path
       key={path}
       path={path}
       style="stroke"
-      strokeWidth={width}
+      strokeWidth={strokeWidth}
       strokeCap="round"
       strokeJoin="round"
       color={brass}
