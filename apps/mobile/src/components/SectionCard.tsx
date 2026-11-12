@@ -2,8 +2,8 @@
  * A titled group in one rounded card, in the Home style (#356). See "Shared
  * screen parts" in `docs/architecture/app-shell.md`.
  *
- * - `SectionTitle`: the small caps title (a screen reader header).
- * - `SectionCard`: an optional title, then one card. By default each child
+ * - `SectionCard`: an optional title (a `SectionHeader`), then one card, a
+ *   tray (`Surface`, #496). By default each child
  *   is a row and thin lines sit between them; `padded` holds one block
  *   instead (a picker and its hint).
  * - `SectionRow`: a row with an optional icon, a label, a hint and a value.
@@ -12,13 +12,14 @@
  * `ToggleRow` and `OptionList` see when they sit in a `SectionCard` and then
  * draw as plain rows of that card.
  */
-import { displayCaps } from '@tavli/ui';
 import { Children, createContext, isValidElement, useContext, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { Icon } from './Icon';
 import type { IconName } from './icons';
+import { SectionHeader } from './SectionHeader';
+import { surfaceStyle } from './Surface';
 
 const InSectionCard = createContext(false);
 
@@ -27,18 +28,9 @@ export function useInSectionCard(): boolean {
   return useContext(InSectionCard);
 }
 
-/** The section title: caps (Greek drops the tonos), read as a header. */
-export function SectionTitle({ title }: { title: string }) {
-  return (
-    <Text style={styles.title} accessibilityRole="header" accessibilityLabel={title}>
-      {displayCaps(title)}
-    </Text>
-  );
-}
-
 /**
- * The card itself: surface, border, round corners and a shadow. The inner
- * view clips the rows to the corners; the outer one keeps the shadow.
+ * The card itself: a tray (#496). The inner view clips the rows to the
+ * corners; the outer one keeps the lit top edge.
  */
 export function CardFrame({ children, testID }: { children: ReactNode; testID?: string }) {
   return (
@@ -54,7 +46,7 @@ export function RowDivider() {
 }
 
 export interface SectionCardProps {
-  /** The small caps title above the card. */
+  /** The section header above the card. */
   title?: string;
   children: ReactNode;
   /**
@@ -71,7 +63,7 @@ export function SectionCard({ title, children, padded = false, testID }: Section
   const rows = Children.toArray(children);
   return (
     <View style={styles.section}>
-      {title ? <SectionTitle title={title} /> : null}
+      {title ? <SectionHeader title={title} /> : null}
       <CardFrame testID={testID}>
         {padded ? (
           <View style={styles.padded}>{children}</View>
@@ -176,20 +168,9 @@ const styles = StyleSheet.create((theme) => ({
   section: {
     gap: theme.space.sm,
   },
-  title: {
-    ...theme.type.section,
-    color: theme.colors.textDim,
-    paddingTop: theme.space.xs,
-  },
-  frame: {
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
-  },
+  frame: surfaceStyle(theme, 'tray'),
   clip: {
-    borderRadius: theme.radii.xl - 1,
+    borderRadius: theme.radii.tray,
     overflow: 'hidden',
   },
   padded: {

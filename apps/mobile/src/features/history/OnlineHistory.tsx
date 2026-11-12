@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
-import { SectionTitle } from '@/components/SectionCard';
+import { SectionHeader } from '@/components/SectionHeader';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 import { OnlineGameList } from '@/features/online/OnlineGameList';
 import { useMyOnlineGames } from '@/features/online/myGames';
@@ -68,7 +68,7 @@ function FinishedOnlineMatches({ auth, games, safety, onMatches }: FinishedOnlin
   if (state.status === 'loaded' && state.games.length === 0 && !state.failed) return null;
   return (
     <View testID="history-online" style={styles.section}>
-      <SectionTitle title={t('history.online.title')} />
+      <SectionHeader title={t('history.online.title')} />
       <OnlineGameList
         state={state}
         // Finished matches have no clock.

@@ -74,7 +74,8 @@ describe('<SettingsScreen />', () => {
     expect(settingsStore.getState().language).toBe('el');
     expect(i18n.language).toBe('el');
     expect(await screen.findByRole('header', { name: 'Παιχνίδι' })).toBeOnTheScreen();
-    expect(screen.getByText('ΠΑΙΧΝΙΔΙ')).toBeOnTheScreen();
+    // Section headers keep their own case, so Greek keeps its accents (#496).
+    expect(screen.getByText('Παιχνίδι')).toBeOnTheScreen();
     expect(screen.getByRole('switch', { name: 'Ήχος' })).toBeOnTheScreen();
     expect(screen.getByRole('switch', { name: 'Αυτόματη επιβεβαίωση κινήσεων' })).toBeOnTheScreen();
     expect(screen.queryByRole('switch', { name: 'Sound' })).not.toBeOnTheScreen();

@@ -12,12 +12,12 @@
  * screen loads the invite again.
  */
 import type { AuthProvider, InviteView, Invites } from '@tavli/contracts';
-import { displayCaps } from '@tavli/ui';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { SectionHeader } from '@/components/SectionHeader';
 import {
   INVITE_TICK_MS,
   inviteRowText,
@@ -43,7 +43,7 @@ export function HomeInvites({ auth, invites, focused, onOpen }: HomeInvitesProps
     const again = t('home.online.retry');
     return (
       <View testID="home-invites" style={styles.section}>
-        <Header title={title} />
+        <SectionHeader title={title} />
         <View style={styles.failed}>
           <Text testID="home-invites-failed" style={styles.note}>
             {t('home.invites.failed')}
@@ -72,14 +72,6 @@ export function HomeInvites({ auth, invites, focused, onOpen }: HomeInvitesProps
   );
 }
 
-function Header({ title }: { title: string }) {
-  return (
-    <Text style={styles.header} accessibilityRole="header" accessibilityLabel={title}>
-      {displayCaps(title)}
-    </Text>
-  );
-}
-
 interface InviteRowsProps {
   list: MyInvitesList;
   focused: boolean;
@@ -93,7 +85,7 @@ function InviteRows({ list, focused, onOpen }: InviteRowsProps) {
   const now = Math.max(ticked, list.receivedAt);
   return (
     <View testID="home-invites" style={styles.section}>
-      <Header title={t('home.invites.title')} />
+      <SectionHeader title={t('home.invites.title')} />
       <View style={styles.list}>
         {list.invites.map((invite) => (
           <InviteRow
@@ -142,11 +134,6 @@ function InviteRow({ invite, now, offset, onPress }: InviteRowProps) {
 const styles = StyleSheet.create((theme) => ({
   section: {
     gap: theme.space.sm,
-  },
-  header: {
-    ...theme.type.section,
-    color: theme.colors.textDim,
-    paddingTop: theme.space.sm,
   },
   list: {
     gap: theme.space.sm,

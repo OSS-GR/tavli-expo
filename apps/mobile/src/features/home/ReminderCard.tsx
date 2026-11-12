@@ -47,6 +47,7 @@ export function ReminderCard({
   return (
     <HomeBanner
       testID={`home-reminder-${kind}`}
+      tier="raised"
       icon={guest ? 'keyRound' : 'globe'}
       title={guest ? t('home.reminder.guest.title') : t('home.reminder.offline.title')}
       line={guest ? guestLine : t('home.reminder.offline.body')}

@@ -17,6 +17,13 @@ describe('typography', () => {
     const piazzolla = Object.entries(typography)
       .filter(([, style]) => 'fontFamily' in style)
       .map(([name]) => name);
-    expect(piazzolla).toEqual(['display', 'title1', 'title2', 'title3', 'numeral']);
+    expect(piazzolla).toEqual([
+      'display',
+      'title1',
+      'title2',
+      'title3',
+      'sectionHeader',
+      'numeral',
+    ]);
   });
 });
