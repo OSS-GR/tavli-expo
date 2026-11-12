@@ -925,7 +925,7 @@
       },
       "grabAChair": {
         "title": "Grab a chair",
-        "body": "A short scene at the kafeneio table: the tavli board drops onto the table and your chair is pulled in. It plays beside the greeting on Home and when a match opens. Tap to skip it. With Reduce Motion it stays still."
+        "body": "A short scene at the kafeneio: the table slides in, then the other chair, then the tavli board drops onto the table and your chair is pulled in. It plays beside the greeting on Home and when a match opens (tap to skip it there). With Reduce Motion it stays still."
       }
     }
   },
