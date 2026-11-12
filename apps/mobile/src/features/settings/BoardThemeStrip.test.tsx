@@ -6,7 +6,7 @@ import i18n from '@/i18n';
 import { findAllNodes, type JsonNode } from '../../../test/tree';
 
 import { DEFAULT_SETTINGS } from './settings';
-import { SettingsScreen } from './SettingsScreen';
+import { BoardLookSettings } from './BoardLookSettings';
 import { settingsStore } from './store';
 
 const olive = getTheme('olive-inlay');
@@ -42,10 +42,10 @@ beforeEach(async () => {
   });
 });
 
-describe('Settings → Board', () => {
+describe('Settings → Board & look → Board', () => {
   it('lists every board with a preview in its own theme, and saves the choice', async () => {
     const user = userEvent.setup();
-    await render(<SettingsScreen />);
+    await render(<BoardLookSettings />);
 
     expect(screen.getByRole('header', { name: 'Board' })).toBeOnTheScreen();
     expect(within(screen.getByTestId('settings-board-theme')).getAllByRole('radio')).toHaveLength(
@@ -84,7 +84,7 @@ describe('Settings → Board', () => {
     await act(async () => {
       await i18n.changeLanguage('el');
     });
-    await render(<SettingsScreen />);
+    await render(<BoardLookSettings />);
 
     expect(screen.getByRole('header', { name: 'Ταμπλό' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: olive.name.el })).toBeOnTheScreen();

@@ -33,14 +33,35 @@ async function openPhoneSettings(): Promise<void> {
   }
 }
 
-export function TurnPushSettings({ pushes }: { pushes: TurnPushes }) {
-  const { t } = useTranslation();
+/** What the Settings rows show: `null` until the phone answered. */
+export type TurnPushState = 'on' | 'undetermined' | 'denied';
+
+/**
+ * The state of turn notifications: on only when the player turned them on
+ * in the app and the phone allows them. It asks the phone once on mount
+ * (no server call).
+ */
+export function useTurnPushState(pushes: TurnPushes): TurnPushState | null {
   const permission = useStore(pushes.store, (s) => s.permission);
   const turnedOn = useStore(pushes.store, (s) => s.turnedOn);
-  const asking = useStore(pushes.store, (s) => s.asking);
-
   useEffect(() => {
     void pushes.refresh();
+  }, [pushes]);
+  return permission === null
+    ? null
+    : permission === 'denied'
+      ? 'denied'
+      : permission === 'granted' && turnedOn
+        ? 'on'
+        : 'undetermined';
+}
+
+export function TurnPushSettings({ pushes }: { pushes: TurnPushes }) {
+  const { t } = useTranslation();
+  const asking = useStore(pushes.store, (s) => s.asking);
+  const shown = useTurnPushState(pushes);
+
+  useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       // Allowed again in the phone settings: the token goes up (only when
       // the player turned them on in the app).
@@ -49,14 +70,6 @@ export function TurnPushSettings({ pushes }: { pushes: TurnPushes }) {
     return () => sub.remove();
   }, [pushes]);
 
-  const shown =
-    permission === null
-      ? null
-      : permission === 'denied'
-        ? 'denied'
-        : permission === 'granted' && turnedOn
-          ? 'on'
-          : 'undetermined';
   const state = shown === null ? null : t(`notifications.settings.${shown}`);
 
   return (

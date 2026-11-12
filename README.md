@@ -72,7 +72,7 @@ Never hard-code text in a screen. Section titles in caps go through `displayCaps
 1. In `apps/mobile/src/features/settings/settings.ts`: add the field to `Settings` and `DEFAULT_SETTINGS`, and a check in `sanitizeSettings`.
 2. If an old saved value must change meaning, raise `SETTINGS_VERSION` and add a step in `migrateSettings`.
 3. Read it with `useSettings((s) => s.mySetting)`. Change it with `setSetting('mySetting', value)`. It saves at once (MMKV through the `Storage` port).
-4. Add a row to the right `SectionCard` in `SettingsScreen.tsx` (labels through `t()`) and a test. Every row starts with an icon (`icon`, a Lucide name from `apps/mobile/src/components/icons.ts`): a switch is a `ToggleRow`, a picker and its hints go in a `SettingBlock`. A new icon needs its path data in `icons.ts` and its name in `docs/design/style/LICENSES.md`.
+4. Add it to the right Settings page (#501): Gameplay (`GameplaySettings.tsx`), Board & look (`BoardLookSettings.tsx`) or a small page in `SettingsSubPages.tsx` (labels through `t()`), and a test in `SettingsPages.test.tsx`. A switch is a `ToggleRow` with no icon; a picker and its hints go in a padded `SectionCard`. If the page's row on the index (`SettingsScreen.tsx`) sums up its values, show the new one there too. A new page needs a route in `apps/mobile/src/app/settings/`, a `SettingsPageId`, a row with a bare icon (`iconLook="bare"`, a Lucide name from `apps/mobile/src/components/icons.ts`) and a line in `app/_layout.tsx`. A new icon needs its path data in `icons.ts` and its name in `docs/design/style/LICENSES.md`.
 
 ### Style a screen
 

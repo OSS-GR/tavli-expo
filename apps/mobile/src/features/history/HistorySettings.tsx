@@ -27,6 +27,7 @@ export function HistorySettings({ onOpen }: HistorySettingsProps) {
       <SectionRow
         testID="settings-history"
         icon="history"
+        iconLook="bare"
         label={t('settings.history.open')}
         onPress={onOpen}
       />
@@ -34,6 +35,7 @@ export function HistorySettings({ onOpen }: HistorySettingsProps) {
       <SectionRow
         testID="settings-clear-history"
         icon="trash"
+        iconLook="bare"
         label={t('settings.history.clear')}
         hint={empty ? t('settings.history.empty') : undefined}
         disabled={empty}
