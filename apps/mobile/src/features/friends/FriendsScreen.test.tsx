@@ -10,12 +10,14 @@ import {
   FRIEND_INVITE_SETUP_KEY,
   saveFriendInviteSetup,
 } from '@/features/invites/friendInviteSetup';
+import { TOAST_MS } from '@/components/Toast';
 import { analytics, auth, storage } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { onlineFake } from '../../../test/onlineFake';
 
 import { FriendsScreen } from './FriendsScreen';
+import { noteInviteSent, SENT_NOTE_MS, takeInviteSent } from './inviteSent';
 
 runOnFakeTimers();
 
@@ -291,7 +293,7 @@ describe('<FriendsScreen />', () => {
       expect(screen.getByText('5 minutes per turn')).toBeOnTheScreen();
     });
 
-    it('Send sends that setup to the friend and opens the waiting screen', async () => {
+    it('Send sends that setup to the friend and stays, with "Invite sent" (#507)', async () => {
       signInSaved();
       await befriend('ann');
       saveFriendInviteSetup(LAST);
@@ -312,7 +314,42 @@ describe('<FriendsScreen />', () => {
       });
       expect(screen.queryByTestId('friend-quick-dialog')).toBeNull();
       expect(props.onInvite).not.toHaveBeenCalled();
+      // The friend gets a push and needs no link: the screen stays and says so.
+      expect(screen.getByTestId('friends-sent')).toHaveTextContent(
+        `Invite sent to ${nameOf('ann')}`,
+      );
+      expect(screen.getByTestId('friends-screen')).toBeOnTheScreen();
+      // The toast closes by itself.
+      await act(async () => {
+        jest.advanceTimersByTime(TOAST_MS);
+      });
+      expect(screen.queryByTestId('friends-sent')).toBeNull();
       sent.mockRestore();
+    });
+
+    it('a send from the full setup comes back with "Invite sent" (#507)', async () => {
+      signInSaved();
+      await befriend('ann');
+      noteInviteSent({ playerId: 'ann', code: 'ABCD2345' });
+      await show();
+      expect(screen.getByTestId('friends-sent')).toHaveTextContent(
+        `Invite sent to ${nameOf('ann')}`,
+      );
+      // The note is shown once.
+      expect(takeInviteSent()).toBeNull();
+    });
+
+    it('drops a note that waited too long for Friends (#507)', async () => {
+      signInSaved();
+      await befriend('ann');
+      const sentAt = Date.now();
+      noteInviteSent({ playerId: 'ann', code: 'ABCD2345' });
+      // Only the note's clock moves: the server and the screen keep theirs.
+      const clock = jest.spyOn(Date, 'now').mockReturnValue(sentAt + SENT_NOTE_MS + 1);
+      expect(takeInviteSent()).toBeNull();
+      clock.mockRestore();
+      await show();
+      expect(screen.queryByTestId('friends-sent')).toBeNull();
     });
 
     it('Change opens the full setup; Cancel sends nothing', async () => {

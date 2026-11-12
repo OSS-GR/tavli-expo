@@ -18,11 +18,15 @@
  * - Invite (#488): with the last setup of a friend invite saved on the
  *   phone (`friendInviteSetup.ts`), a short confirm shows it ("Invite
  *   NAME?", the game and the length, the timer only when there is one):
- *   Send sends it at once and opens the waiting screen (`onInvited`),
- *   Change opens the full setup (`onInvite`), Cancel closes. With no saved
- *   setup, Invite opens the full setup. The confirm stays open while it
- *   sends. A send whose screen is gone leaves the invite open (the friend
- *   has the push already; it shows on Home).
+ *   Send sends it at once, Change opens the full setup (`onInvite`),
+ *   Cancel closes. With no saved setup, Invite opens the full setup. The
+ *   confirm stays open while it sends. A send whose screen is gone leaves
+ *   the invite open (the friend has the push already; it shows on Home).
+ * - After a send (#507) the screen stays and shows "Invite sent to NAME"
+ *   (a toast, read to screen readers): the friend gets a push and needs
+ *   no link, so no waiting screen opens. `onInvited` lets the route offer
+ *   turn notifications. A send from the full setup comes back here with
+ *   a note (`inviteSent.ts`), and the same toast shows.
  * - Leaderboards (#407) is a row under Add a friend, with your rating as a
  *   chip once you have a rated match (`ratings.mine()`, quietly: a failed
  *   call shows no chip).
@@ -73,6 +77,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { CardFrame, RowDivider } from '@/components/SectionCard';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Sheet } from '@/components/Sheet';
+import { Toast, useToast } from '@/components/Toast';
 import { surfaceStyle } from '@/components/Surface';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
@@ -84,6 +89,7 @@ import { ReportOrBlock, type SafetyPlayer } from '@/features/safety/ReportOrBloc
 
 import { friendsProblem, useFriendsData, type FriendsProblem } from './friendsData';
 import { Footnote, friendsStyles, NotReady, RefreshFailed, useProblemText } from './FriendsParts';
+import { takeInviteSent, type SentInvite } from './inviteSent';
 import { recordText } from './record';
 
 export interface FriendsScreenProps {
@@ -102,7 +108,7 @@ export interface FriendsScreenProps {
   onRatings?: () => void;
   /** Opens the full game setup for a friend invite (no saved setup yet, or Change). */
   onInvite: (playerId: string) => void;
-  /** Invite → Send made a friend invite (#488): opens its waiting screen. */
+  /** Invite → Send made a friend invite (#488). The screen stays (#507). */
   onInvited: (code: string) => void;
   /** Opens a friend invite to you (the invite screen). */
   onOpenInvite: (code: string) => void;
@@ -181,6 +187,27 @@ export function FriendsScreen({
 
   const nameOf = (name: Friend['name']) => playerNameText(name, t) ?? t('friends.unnamed');
 
+  // "Invite sent to NAME" (#507), read once per invite.
+  const [toast, showToast] = useToast();
+  const [sentCode, setSentCode] = useState<string | null>(null);
+  useAnnouncement(toast, sentCode === null ? undefined : `friend-invite-sent:${sentCode}`);
+  const showSent = (name: string, code: string) => {
+    setSentCode(code);
+    showToast(t('friends.sent', { name }));
+  };
+  // A send from the full setup comes back with a note. Friends knows the name.
+  const arrived = useRef<SentInvite | null>(null);
+  useEffect(() => {
+    arrived.current = takeInviteSent() ?? arrived.current;
+  }, [visit]);
+  useEffect(() => {
+    const sent = arrived.current;
+    if (sent === null || state.kind !== 'ready') return;
+    arrived.current = null;
+    const friend = state.data.friends.find((f) => f.playerId === sent.playerId);
+    showSent(friend === undefined ? t('friends.unnamed') : nameOf(friend.name), sent.code);
+  });
+
   const run = (playerId: string, call: () => Promise<unknown>) => {
     if (busy !== null) return;
     setBusy(playerId);
@@ -222,6 +249,7 @@ export function FriendsScreen({
         if (!mounted.current) return;
         setSending(false);
         setPanel(null);
+        showSent(nameOf(friend.name), code);
         onInvited(code);
       },
       (error: unknown) => {
@@ -489,6 +517,7 @@ export function FriendsScreen({
           />
         ) : null}
       </Sheet>
+      <Toast text={toast} testID="friends-sent" announced />
     </Screen>
   );
 }

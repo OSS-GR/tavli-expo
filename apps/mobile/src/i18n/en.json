@@ -656,6 +656,8 @@
     "home": "Home",
     "friendsTitle": "Or send it to a friend",
     "sendTo": "Send the invite to {{name}}",
+    "invited": "Invite sent",
+    "invitedTo": "Invite sent to {{name}}",
     "allFriends": "All your friends"
   },
   "friends": {
@@ -785,6 +787,7 @@
       "sending": "Sending…",
       "change": "Change"
     },
+    "sent": "Invite sent to {{name}}",
     "ratingsHint": "Friends and everyone",
     "ratingsLabel": "Leaderboards, your rating {{rating}}",
     "empty": {

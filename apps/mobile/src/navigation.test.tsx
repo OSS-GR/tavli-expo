@@ -1532,7 +1532,7 @@ describe('friends (#406)', () => {
     return `Guest ${onlineFake.guestNumber(id)}`;
   }
 
-  it('Friends → Invite → Send sends the last setup and opens the waiting screen (#488)', async () => {
+  it('Friends → Invite → Send sends the last setup and stays on Friends (#488, #507)', async () => {
     const name = await befriendMe('ann');
     saveFriendInviteSetup({ choice: 'fevga', targetPoints: 3, turnTimeMinutes: null });
     try {
@@ -1540,24 +1540,38 @@ describe('friends (#406)', () => {
       const router = await renderRouter('./src/app', { initialUrl: '/friends' });
       await user.press(await screen.findByRole('button', { name: `Invite ${name} to a game` }));
       await user.press(screen.getByTestId('friend-quick-send'));
-      await waitFor(() => expect(router.getPathname()).toMatch(/^\/friend\/[A-Z0-9]+$/));
+      expect(await screen.findByTestId('friends-sent')).toHaveTextContent(`Invite sent to ${name}`);
       const [invite] = await onlineFake.server().friendsFor('ann').listFriendInvites();
       expect(invite).toMatchObject({ choice: 'fevga', targetPoints: 3 });
-      expect(router.getPathname()).toBe(`/friend/${invite!.code}`);
+      expect(router.getPathname()).toBe('/friends');
     } finally {
       storage.remove(FRIEND_INVITE_SETUP_KEY);
     }
   });
 
-  it('Play a friend lists my friends; a tap opens the waiting screen of a friend invite (#488)', async () => {
+  it('the full setup of a friend invite goes back to Friends, which says it was sent (#507)', async () => {
+    const name = await befriendMe('ann');
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/friends' });
+    // No saved setup: Invite opens the full setup.
+    await user.press(await screen.findByRole('button', { name: `Invite ${name} to a game` }));
+    expect(router.getPathname()).toBe('/friends/invite/ann');
+    await user.press(await screen.findByRole('button', { name: 'Make an invite' }));
+    await waitFor(() => expect(router.getPathname()).toBe('/friends'));
+    expect(await screen.findByTestId('friends-sent')).toHaveTextContent(`Invite sent to ${name}`);
+    expect(await onlineFake.server().friendsFor('ann').listFriendInvites()).toHaveLength(1);
+    storage.remove(FRIEND_INVITE_SETUP_KEY);
+  });
+
+  it('Play a friend lists my friends; a tap sends a friend invite and stays (#488, #507)', async () => {
     const name = await befriendMe('ann');
     try {
       const user = setupUser();
       const router = await renderRouter('./src/app', { initialUrl: '/friend' });
       await user.press(await screen.findByRole('button', { name: `Send the invite to ${name}` }));
-      await waitFor(() => expect(router.getPathname()).toMatch(/^\/friend\/[A-Z0-9]+$/));
-      const [invite] = await onlineFake.server().friendsFor('ann').listFriendInvites();
-      expect(router.getPathname()).toBe(`/friend/${invite!.code}`);
+      expect(await screen.findByTestId('friend-sent')).toHaveTextContent(`Invite sent to ${name}`);
+      expect(await onlineFake.server().friendsFor('ann').listFriendInvites()).toHaveLength(1);
+      expect(router.getPathname()).toBe('/friend');
     } finally {
       storage.remove(FRIEND_INVITE_SETUP_KEY);
     }

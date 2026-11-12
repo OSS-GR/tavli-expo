@@ -328,7 +328,7 @@ describe('FriendSetupScreen', () => {
       targetPoints: 1,
       turnTimeMinutes: null,
     });
-    expect(props.onCreated).toHaveBeenCalledWith('ABCD2345', expect.anything());
+    expect(props.onCreated).toHaveBeenCalledWith('ABCD2345');
     expect(await parts.invites.listMyInvites()).toEqual([]);
   });
 
@@ -633,7 +633,11 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     parts: ReturnType<typeof savedMe>,
     extra: { friends?: Friends; onFriends?: () => void } = {},
   ) {
-    const props = { onCreated: jest.fn<void, [string, NewInvite]>(), onBack: jest.fn() };
+    const props = {
+      onCreated: jest.fn<void, [string]>(),
+      onFriendInvited: jest.fn<void, [string]>(),
+      onBack: jest.fn(),
+    };
     await renderWithRoot(
       <FriendSetupScreen {...parts} {...props} friends={parts.friends} {...extra} />,
     );
@@ -651,11 +655,12 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     expect(screen.getByRole('button', { name: 'Make an invite' })).toBeOnTheScreen();
   });
 
-  it('a tap on a friend sends a friend invite with the picks at once, and saves them', async () => {
+  it('a tap on a friend sends a friend invite with the picks at once, saves them and stays (#507)', async () => {
     const user = setupUser();
     const parts = savedMe();
     await befriend(parts.server, 'ann');
     const props = await show(parts);
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     await user.press(screen.getByRole('radio', { name: /^Fevga/ }));
     await user.press(screen.getByRole('radio', { name: '3' }));
     await user.press(screen.getByRole('radio', { name: '5 min' }));
@@ -664,8 +669,24 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     );
     await flush();
     const game = { choice: 'fevga', targetPoints: 3, turnTimeMinutes: 5 };
-    expect(props.onCreated).toHaveBeenCalledWith(expect.any(String), game);
-    const code = props.onCreated.mock.calls[0]![0];
+    // The friend gets a push: no waiting screen, the screen says so.
+    expect(props.onCreated).not.toHaveBeenCalled();
+    expect(props.onFriendInvited).toHaveBeenCalledTimes(1);
+    const code = props.onFriendInvited.mock.calls[0]![0];
+    expect(screen.getByTestId('friend-sent')).toHaveTextContent(
+      `Invite sent to ${nameOf(parts.server, 'ann')}`,
+    );
+    expect(announce).toHaveBeenCalledWith(`Invite sent to ${nameOf(parts.server, 'ann')}`);
+    announce.mockRestore();
+    // The buttons work again, but Ann's row is off: a second tap sends no second invite.
+    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
+    const row = screen.getByRole('button', {
+      name: `Invite sent to ${nameOf(parts.server, 'ann')}`,
+    });
+    expect(row).toBeDisabled();
+    await user.press(row);
+    await flush();
+    expect(props.onFriendInvited).toHaveBeenCalledTimes(1);
     expect(await parts.server.friendsFor('ann').listFriendInvites()).toEqual([
       expect.objectContaining({ code, from: ME, ...game }),
     ]);
