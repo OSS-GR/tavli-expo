@@ -85,6 +85,33 @@ export interface CheckerColors {
   darkRing: string;
 }
 
+/** The four woods of a checker avatar (#495): the board's own ivory, maple, walnut and ebony. */
+export type AvatarWood = 'bone' | 'maple' | 'walnut' | 'ebony';
+
+/** One avatar checker seen from above: a turned center ring, a face and a rim. */
+export interface AvatarWoodColors {
+  /** The face of the checker. */
+  face: string;
+  /** The turned center (the inner disc). */
+  center: string;
+  /** The lit ring around the center. */
+  ring: string;
+  /** The thin edge. */
+  rim: string;
+  /** The initials. */
+  text: string;
+}
+
+/** Checker avatars (#495, Figma: Patterns → Checker avatars). */
+export interface AvatarColors {
+  bone: AvatarWoodColors;
+  maple: AvatarWoodColors;
+  walnut: AvatarWoodColors;
+  ebony: AvatarWoodColors;
+  /** The brass ring that marks you. */
+  you: string;
+}
+
 export interface HighlightColors {
   /** Selected checker ring and legal target ring. */
   select: string;
@@ -113,6 +140,7 @@ export interface AppTheme {
   colors: UiColors;
   board: BoardColors;
   checker: CheckerColors;
+  avatar: AvatarColors;
   highlight: HighlightColors;
   dice: DiceColors;
   space: typeof spacing;

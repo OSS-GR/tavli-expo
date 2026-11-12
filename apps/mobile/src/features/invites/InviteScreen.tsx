@@ -27,6 +27,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
+import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { playerNameText } from '@/features/online/playerName';
 
 import { stateOfError, stateOfView, type InviteScreenState } from './inviteState';
@@ -206,7 +207,15 @@ function OpenInvite({ view, busy, failed, onAccept, onDecline }: OpenInviteProps
       <Text ref={titleRef} style={styles.title} accessibilityRole="header">
         {title}
       </Text>
-      <Text style={styles.line}>{from}</Text>
+      <View style={styles.fromRow}>
+        <CheckerAvatar
+          testID="invite-from-avatar"
+          playerKey={view.from}
+          name={fromName}
+          size={56}
+        />
+        <Text style={[styles.line, styles.fromText]}>{from}</Text>
+      </View>
       {rows.map((row) => (
         // One stop per detail for a screen reader: "Game, Portes".
         <View key={row.label} style={styles.row} accessible>
@@ -303,6 +312,14 @@ const styles = StyleSheet.create((theme, rt) => ({
   line: {
     ...theme.type.body,
     color: theme.colors.textDim,
+  },
+  fromRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+  },
+  fromText: {
+    flex: 1,
   },
   row: {
     gap: theme.space.xxs,

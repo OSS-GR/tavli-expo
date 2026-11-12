@@ -11,6 +11,8 @@ import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { CheckerAvatar } from '@/components/CheckerAvatar';
+import { playerNameText } from '@/features/online/playerName';
 
 import { gameRowText, type MyGamesState } from './myGames';
 
@@ -139,7 +141,11 @@ function OnlineGameRow({ game, now, offset, onPress }: OnlineGameRowProps) {
       accessibilityLabel={text.label}
       onPress={onPress}
       style={({ pressed }) => [styles.row(game.myTurn), pressed && styles.pressed]}>
-      <View style={styles.dot(game.myTurn)} importantForAccessibility="no" />
+      <CheckerAvatar
+        testID={`online-game-avatar-${game.gameId}`}
+        playerKey={game.opponentId}
+        name={playerNameText(game.opponentName, t)}
+      />
       <View style={styles.texts}>
         <Text style={styles.title}>{text.title}</Text>
         <Text style={styles.turn(game.myTurn)}>{text.turn}</Text>
@@ -173,12 +179,6 @@ const styles = StyleSheet.create((theme) => ({
   pressed: {
     opacity: 0.75,
   },
-  dot: (myTurn: boolean) => ({
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: myTurn ? theme.colors.accent : theme.colors.border,
-  }),
   texts: {
     flex: 1,
     gap: theme.space.xxs,
