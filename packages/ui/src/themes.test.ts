@@ -24,7 +24,16 @@ describe('themes', () => {
       });
 
       it('uses #RRGGBB colors', () => {
-        const groups = [theme.colors, theme.board, theme.checker, theme.highlight, theme.dice];
+        const { you, ...woods } = theme.avatar;
+        const groups = [
+          theme.colors,
+          theme.board,
+          theme.checker,
+          theme.highlight,
+          theme.dice,
+          ...Object.values(woods),
+          { you },
+        ];
         for (const group of groups) {
           for (const value of Object.values(group)) {
             expect(value).toMatch(HEX);
@@ -73,6 +82,17 @@ describe('themes', () => {
       ] as const)('keeps %s on %s readable (WCAG AA, 4.5:1)', (fg, bg) => {
         expect(contrastRatio(theme.colors[fg], theme.colors[bg])).toBeGreaterThanOrEqual(4.5);
       });
+
+      // Checker avatars (#495): the initials on each wood.
+      it.each(['bone', 'maple', 'walnut', 'ebony'] as const)(
+        'keeps the initials readable on a %s avatar (WCAG AA, 4.5:1)',
+        (wood) => {
+          const colors = theme.avatar[wood];
+          expect(contrastRatio(colors.text, colors.face)).toBeGreaterThanOrEqual(4.5);
+          expect(contrastRatio(colors.text, colors.center)).toBeGreaterThanOrEqual(4.5);
+          expect(contrastRatio(colors.text, colors.ring)).toBeGreaterThanOrEqual(4.5);
+        },
+      );
 
       it('keeps controls visible (WCAG 1.4.11, 3:1)', () => {
         const { colors } = theme;

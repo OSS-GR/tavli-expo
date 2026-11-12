@@ -72,7 +72,6 @@ export function HomeInvites({ auth, invites, focused, onOpen }: HomeInvitesProps
   );
 }
 
-
 interface InviteRowsProps {
   list: MyInvitesList;
   focused: boolean;

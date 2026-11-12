@@ -21,8 +21,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { SectionHeader } from '@/components/SectionHeader';
-
 import { playerNameText } from '@/features/online/playerName';
 
 export interface HomeFriendInvitesProps {
@@ -83,9 +83,8 @@ export function HomeFriendInvites({ auth, friends, focused, onOpen }: HomeFriend
       <SectionHeader title={title} />
       <View style={styles.list}>
         {list.map((invite) => {
-          const from = t('friends.invites.from', {
-            name: playerNameText(invite.fromName, t) ?? t('friends.unnamed'),
-          });
+          const name = playerNameText(invite.fromName, t);
+          const from = t('friends.invites.from', { name: name ?? t('friends.unnamed') });
           const game = t('friends.invites.game', {
             game: t(`games.${invite.choice}`),
             count: invite.targetPoints,
@@ -99,6 +98,7 @@ export function HomeFriendInvites({ auth, friends, focused, onOpen }: HomeFriend
               accessibilityHint={t('home.friendInvites.hint')}
               onPress={() => onOpen(invite.code)}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+              <CheckerAvatar playerKey={invite.from} name={name} />
               <View style={styles.texts}>
                 <Text style={styles.title}>{from}</Text>
                 <Text style={styles.line}>{game}</Text>

@@ -64,6 +64,21 @@ export const walnutKafeneio = {
     dark: '#1E1A17',
     darkRing: '#8C8279',
   },
+  // Checker avatars (#495): from the Figma polish pass. Maple is the board's
+  // field wood, a step lighter than walnut.
+  avatar: {
+    bone: { face: '#EADDC2', center: '#E0D1B2', ring: '#EFE4CD', rim: '#6B5232', text: '#4A2E1E' },
+    maple: { face: '#B98B5A', center: '#AD7F50', ring: '#C79B6B', rim: '#6B4A2A', text: '#2A1A10' },
+    walnut: {
+      face: '#4A2E1E',
+      center: '#553624',
+      ring: '#42291B',
+      rim: '#B89A78',
+      text: '#EADDC2',
+    },
+    ebony: { face: '#1E1A17', center: '#2A2420', ring: '#1A1613', rim: '#8C8279', text: '#ECE2CB' },
+    you: '#C99A3E',
+  },
   highlight: {
     select: '#F2C14E',
     halo: '#120A05',

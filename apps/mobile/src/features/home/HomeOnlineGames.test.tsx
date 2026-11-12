@@ -165,6 +165,14 @@ describe('<HomeOnlineGames />', () => {
     });
     expect(within(row).getByText(`Portes vs ${friend}`)).toBeOnTheScreen();
     expect(within(row).getByText('0–0 · 24 h left')).toBeOnTheScreen();
+    // The friend's checker avatar (#495), with a brass dot on your turn.
+    expect(
+      within(row).getByTestId(`avatar-game-${gameId}`, { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    expect(within(row).getByText('G', { includeHiddenElements: true })).toBeOnTheScreen();
+    expect(
+      within(row).queryByTestId(`avatar-turn-${gameId}`, { includeHiddenElements: true }) !== null,
+    ).toBe(myTurn(gameId));
     // One or two rows show no "See all".
     expect(screen.queryByTestId('online-games-see-all')).toBeNull();
     await user.press(row);
