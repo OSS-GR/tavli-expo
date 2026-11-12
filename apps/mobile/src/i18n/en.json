@@ -136,7 +136,8 @@
       "help": "Help",
       "history": "History",
       "notifications": "Notifications",
-      "online": "Online play"
+      "online": "Online",
+      "play": "Play"
     },
     "autoConfirm": {
       "label": "Auto-confirm moves",
@@ -151,13 +152,14 @@
       "hint": "Vs the bot, a card offers fast forward when a game becomes a race"
     },
     "boardView": {
-      "label": "Board view (pass-and-play)",
+      "label": "Pass-and-play view",
       "flip": "Flip",
       "faceToFace": "Face-to-face",
       "fixed": "Fixed",
       "flipHint": "The board turns to the player whose turn it is.",
       "fixedHint": "The board stays the same for both players.",
-      "faceToFaceSoon": "Face-to-face view comes in a later update."
+      "faceToFaceSoon": "Face-to-face view comes in a later update.",
+      "faceToFaceHint": "For two players across a table"
     },
     "botSpeed": {
       "label": "Bot speed",
@@ -211,7 +213,8 @@
       "off": "Off",
       "autoHint": "Shows a button for each move when a screen reader is on.",
       "onHint": "Shows a button for each move under the board.",
-      "offHint": "Play on the board only."
+      "offHint": "Play on the board only.",
+      "rowHint": "A button for each move, for screen readers"
     },
     "usageData": {
       "label": "Share anonymous usage data",
@@ -251,7 +254,40 @@
     "whatsNew": {
       "label": "What's new",
       "hint": "What each update added"
-    }
+    },
+    "value": {
+      "on": "On",
+      "off": "Off"
+    },
+    "gameplay": {
+      "title": "Gameplay",
+      "summary": "Auto-confirm, hints, bot speed"
+    },
+    "boardLook": {
+      "title": "Board & look"
+    },
+    "soundPage": {
+      "title": "Sound & haptics",
+      "summary": {
+        "soundOnHapticsOn": "Sound on, haptics on",
+        "soundOnHapticsOff": "Sound on, haptics off",
+        "soundOffHapticsOn": "Sound off, haptics on",
+        "soundOffHapticsOff": "Sound off, haptics off"
+      }
+    },
+    "usageDataPage": {
+      "title": "Usage data"
+    },
+    "howToPlay": "How to play",
+    "soon": "Soon",
+    "accountCard": {
+      "offline": "No online account",
+      "unknown": "Your account",
+      "phoneOnly": "On this phone only",
+      "saved": "Saved account",
+      "hint": "Opens your account"
+    },
+    "versionBuild": "Tavlaki {{version}} ({{build}})"
   },
   "account": {
     "title": "Account",
@@ -856,11 +892,15 @@
       },
       "turnPushes": {
         "title": "Turn notifications",
-        "body": "In an online game, the app can tell you when it is your turn. Turn them on in Settings → Notifications."
+        "body": "In an online game, the app can tell you when it is your turn. Turn them on in Settings → Turn notifications."
       },
       "quickInvites": {
         "title": "Quicker friend invites",
         "body": "Play a friend now lists your friends: tap one to send the invite. On Friends, Invite sends your last game setup again after a short check, or tap Change to pick another."
+      },
+      "newLook": {
+        "title": "A new look",
+        "body": "Warm, lamp-lit screens, new fonts and checker avatars with initials. The game seats, Friends, Leaderboards and Settings have a new design. Settings now has a page for each group."
       }
     }
   },

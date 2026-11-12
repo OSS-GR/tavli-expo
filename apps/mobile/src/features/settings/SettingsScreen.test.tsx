@@ -1,41 +1,58 @@
-import type { createRecordingAnalytics } from '@tavli/contracts';
+/**
+ * The Settings index (#501): the account card, the groups and the value
+ * each row shows. The settings themselves live on their pages
+ * (`SettingsPages.test.tsx`).
+ */
+import { TERMS_VERSION, memoryAppleIdToken } from '@tavli/contracts';
 import { act, render, screen, userEvent, within } from '@testing-library/react-native';
 
-// The analytics wiring, which the root layout loads in the app.
-import '@/features/analytics/store';
+import { signInForOnline } from '@/features/online/account';
+import { rememberOnlineAccount } from '@/features/online/accountHint';
 import { consentStore } from '@/features/privacy/consentStore';
+import { RELEASES } from '@/features/whats-new/releases';
+import { WHATS_NEW_STORAGE_KEY, markWhatsNewSeenForTest } from '@/features/whats-new/seen';
 import i18n from '@/i18n';
-import { analytics } from '@/services';
+import { auth, storage, usernames } from '@/services';
+
+import { onlineFake } from '../../../test/onlineFake';
 
 import { DEFAULT_SETTINGS } from './settings';
-import { SettingsScreen } from './SettingsScreen';
+import { SettingsScreen, type SettingsScreenProps } from './SettingsScreen';
 import { settingsStore } from './store';
 
-const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
+const GAME = { choice: 'portes', targetPoints: 3, turnTimeMinutes: null } as const;
 
 beforeEach(async () => {
   await act(async () => {
     settingsStore.setState({ ...DEFAULT_SETTINGS });
     consentStore.setState({ status: 'unset' });
   });
-  recorded.sent.length = 0;
 });
 
-describe('<SettingsScreen />', () => {
-  it('shows the settings in the phone language (English in tests)', async () => {
-    await render(<SettingsScreen />);
-
-    expect(screen.getByRole('header', { name: 'Game' })).toBeOnTheScreen();
-    expect(screen.getByRole('switch', { name: 'Sound' })).toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Haptics' })).toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Auto-confirm moves' })).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Show hints' })).toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Offer fast forward in races' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Phone language' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Flip' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Face-to-face' })).toBeDisabled();
+afterEach(async () => {
+  await act(async () => {
+    await i18n.changeLanguage('en');
   });
+});
 
+/** Settings with every way out, as the route gives them. */
+function allProps(): Required<Omit<SettingsScreenProps, 'turnPushes' | 'visit'>> {
+  return {
+    onBack: jest.fn(),
+    onPage: jest.fn(),
+    onLearnToPlay: jest.fn(),
+    onHowToPlay: jest.fn(),
+    onHistory: jest.fn(),
+    onWhatsNew: jest.fn(),
+    onAccount: jest.fn(),
+    account: { auth: auth!, usernames: usernames! },
+    onBlocked: jest.fn(),
+    onFriends: jest.fn(),
+    onRatings: jest.fn(),
+  };
+}
+
+describe('<SettingsScreen /> index', () => {
   it('has the screen header with a back button (#360)', async () => {
     const user = userEvent.setup();
     const onBack = jest.fn();
@@ -51,328 +68,139 @@ describe('<SettingsScreen />', () => {
     expect(screen.queryByTestId('settings-back')).toBeNull();
   });
 
-  it('has no pip count row (#238), in English and in Greek', async () => {
-    const user = userEvent.setup();
-    await render(<SettingsScreen />);
-    expect(screen.queryByTestId('settings-pip-counts')).toBeNull();
-    expect(screen.queryByText(/pip/i)).toBeNull();
+  it('groups the rows: Play, Online, Help and Privacy, then the version', async () => {
+    await render(<SettingsScreen {...allProps()} />);
 
-    await user.press(screen.getByRole('radio', { name: 'Ελληνικά' }));
-    expect(await screen.findByRole('header', { name: 'Παιχνίδι' })).toBeOnTheScreen();
-    expect(screen.queryByText('Μετρητής πόντων')).toBeNull();
-
-    await user.press(screen.getByRole('radio', { name: 'Γλώσσα κινητού' }));
-    expect(await screen.findByRole('switch', { name: 'Sound' })).toBeOnTheScreen();
-  });
-
-  it('switches to Greek at once when the user picks Ελληνικά', async () => {
-    const user = userEvent.setup();
-    await render(<SettingsScreen />);
-
-    await user.press(screen.getByRole('radio', { name: 'Ελληνικά' }));
-
-    expect(settingsStore.getState().language).toBe('el');
-    expect(i18n.language).toBe('el');
-    expect(await screen.findByRole('header', { name: 'Παιχνίδι' })).toBeOnTheScreen();
-    // Section headers keep their own case, so Greek keeps its accents (#496).
-    expect(screen.getByText('Παιχνίδι')).toBeOnTheScreen();
-    expect(screen.getByRole('switch', { name: 'Ήχος' })).toBeOnTheScreen();
-    expect(screen.getByRole('switch', { name: 'Αυτόματη επιβεβαίωση κινήσεων' })).toBeOnTheScreen();
-    expect(screen.queryByRole('switch', { name: 'Sound' })).not.toBeOnTheScreen();
-
-    // Back to the phone language (English in tests).
-    await user.press(screen.getByRole('radio', { name: 'Γλώσσα κινητού' }));
-    expect(await screen.findByRole('switch', { name: 'Sound' })).toBeOnTheScreen();
-  });
-
-  it('saves a toggle in the store', async () => {
-    const user = userEvent.setup();
-    await render(<SettingsScreen />);
-
-    await user.press(screen.getByRole('switch', { name: 'Sound' }));
-
-    expect(settingsStore.getState().sound).toBe(false);
-    expect(screen.getByRole('switch', { name: 'Sound' })).not.toBeChecked();
-  });
-
-  it('turns the Hint button off and on (#209), and sends only the key', async () => {
-    const user = userEvent.setup();
-    await act(async () => {
-      consentStore.setState({ status: 'granted' });
-    });
-    await render(<SettingsScreen />);
-
-    await user.press(screen.getByRole('switch', { name: 'Show hints' }));
-    expect(settingsStore.getState().showHints).toBe(false);
-    expect(screen.getByRole('switch', { name: 'Show hints' })).not.toBeChecked();
-    expect(recorded.sent.at(-1)).toEqual({
-      type: 'track',
-      event: 'settings_changed',
-      props: { key: 'showHints' },
-    });
-    await user.press(screen.getByRole('switch', { name: 'Show hints' }));
-    expect(settingsStore.getState().showHints).toBe(true);
-  });
-
-  it('turns the race card off and back on, and sends only the key', async () => {
-    const user = userEvent.setup();
-    await act(async () => {
-      consentStore.setState({ status: 'granted' });
-    });
-    await render(<SettingsScreen />);
-
-    const toggle = () => screen.getByRole('switch', { name: 'Offer fast forward in races' });
-    await user.press(toggle());
-    expect(settingsStore.getState().offerFastForward).toBe(false);
-    expect(toggle()).not.toBeChecked();
-    expect(recorded.sent.at(-1)).toEqual({
-      type: 'track',
-      event: 'settings_changed',
-      props: { key: 'offerFastForward' },
-    });
-    // "Don't ask again" on the card turns it off; the switch turns it back on.
-    await user.press(toggle());
-    expect(settingsStore.getState().offerFastForward).toBe(true);
-  });
-
-  it('changes the board view and ignores the locked option', async () => {
-    const user = userEvent.setup();
-    await render(<SettingsScreen />);
-
-    await user.press(screen.getByRole('radio', { name: 'Fixed' }));
-    expect(settingsStore.getState().boardFlipMode).toBe('fixed');
-    expect(screen.getByText('The board stays the same for both players.')).toBeOnTheScreen();
-
-    await user.press(screen.getByRole('radio', { name: 'Face-to-face' }));
-    expect(settingsStore.getState().boardFlipMode).toBe('fixed');
-  });
-
-  it('picks where your home is: bottom right by default, or bottom left (#175)', async () => {
-    const user = userEvent.setup();
-    await act(async () => {
-      consentStore.setState({ status: 'granted' });
-    });
-    await render(<SettingsScreen />);
-
-    const group = screen.getByTestId('settings-home-board');
-    expect(group).toHaveAccessibleName('Your home');
-    expect(within(group).getByRole('radio', { name: 'Bottom right' })).toBeChecked();
-    expect(within(group).getByRole('radio', { name: 'Bottom left' })).not.toBeChecked();
-    expect(screen.getByText('Your checkers go round counterclockwise.')).toBeOnTheScreen();
-    expect(screen.getByText('Your checkers go round clockwise.')).toBeOnTheScreen();
-    // A small board picture for each side, hidden from screen readers.
-    for (const side of ['right', 'left']) {
-      const preview = `settings-home-board-${side}-preview`;
-      expect(screen.queryByTestId(preview)).toBeNull();
-      expect(screen.getByTestId(preview, { includeHiddenElements: true })).toBeTruthy();
+    for (const name of ['Play', 'Online', 'Help', 'Privacy']) {
+      expect(screen.getByRole('header', { name })).toBeOnTheScreen();
     }
-
-    await user.press(within(group).getByRole('radio', { name: 'Bottom left' }));
-    expect(settingsStore.getState().homeBoardSide).toBe('left');
-    expect(within(group).getByRole('radio', { name: 'Bottom left' })).toBeChecked();
-    // Only the key goes out, never the value.
-    expect(recorded.sent.at(-1)).toEqual({
-      type: 'track',
-      event: 'settings_changed',
-      props: { key: 'homeBoardSide' },
-    });
-
-    await user.press(within(group).getByRole('radio', { name: 'Bottom right' }));
-    expect(settingsStore.getState().homeBoardSide).toBe('right');
+    // No setting sits on the index: each one is on its page.
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.getByText(/^Tavlaki .*\(20\)$/)).toBeOnTheScreen();
   });
 
-  it('names the home board sides in Greek', async () => {
+  it('shows the value of each group in its row', async () => {
+    await render(<SettingsScreen {...allProps()} />);
+
+    expect(screen.getByRole('button', { name: 'Gameplay' }).props.accessibilityHint).toBe(
+      'Auto-confirm, hints, bot speed',
+    );
+    expect(screen.getByRole('button', { name: 'Board & look' }).props.accessibilityHint).toBe(
+      'Walnut Kafeneio',
+    );
+    expect(screen.getByRole('button', { name: 'Sound & haptics' }).props.accessibilityHint).toBe(
+      'Sound on, haptics on',
+    );
+    expect(screen.getByRole('button', { name: 'Language, Phone language' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Usage data, Off' })).toBeOnTheScreen();
+
     await act(async () => {
-      await i18n.changeLanguage('el');
-    });
-    try {
-      await render(<SettingsScreen />);
-      const group = screen.getByTestId('settings-home-board');
-      expect(group).toHaveAccessibleName('Το σπίτι σου');
-      expect(within(group).getByRole('radio', { name: 'Κάτω δεξιά' })).toBeChecked();
-      expect(within(group).getByRole('radio', { name: 'Κάτω αριστερά' })).toBeOnTheScreen();
-      expect(screen.getByText('Τα πούλια σου γυρίζουν δεξιόστροφα.')).toBeOnTheScreen();
-    } finally {
-      await act(async () => {
-        await i18n.changeLanguage('en');
+      settingsStore.setState({
+        boardTheme: 'olive-inlay',
+        sound: false,
+        haptics: true,
+        language: 'en',
       });
-    }
-  });
-
-  it('picks the board layout: tall by default, or classic (#184)', async () => {
-    const user = userEvent.setup();
-    await act(async () => {
       consentStore.setState({ status: 'granted' });
     });
-    await render(<SettingsScreen />);
-
-    const group = screen.getByTestId('settings-board-layout');
-    expect(group).toHaveAccessibleName('Board layout');
-    expect(within(group).getByRole('radio', { name: 'Tall' })).toBeChecked();
-    expect(within(group).getByRole('radio', { name: 'Classic' })).not.toBeChecked();
-    expect(
-      screen.getByText('The board on its side, as big as the screen allows. Bigger checkers.'),
-    ).toBeOnTheScreen();
-    expect(
-      screen.getByText('The board as on a table, as wide as the screen. Smaller checkers.'),
-    ).toBeOnTheScreen();
-    // A small picture of each layout, hidden from screen readers.
-    for (const mode of ['tall', 'classic']) {
-      const preview = `settings-board-layout-${mode}-preview`;
-      expect(screen.queryByTestId(preview)).toBeNull();
-      expect(screen.getByTestId(preview, { includeHiddenElements: true })).toBeTruthy();
-    }
-
-    await user.press(within(group).getByRole('radio', { name: 'Classic' }));
-    expect(settingsStore.getState().boardLayout).toBe('classic');
-    expect(within(group).getByRole('radio', { name: 'Classic' })).toBeChecked();
-    // Only the key goes out, never the value.
-    expect(recorded.sent.at(-1)).toEqual({
-      type: 'track',
-      event: 'settings_changed',
-      props: { key: 'boardLayout' },
-    });
-
-    await user.press(within(group).getByRole('radio', { name: 'Tall' }));
-    expect(settingsStore.getState().boardLayout).toBe('tall');
+    expect(screen.getByRole('button', { name: 'Board & look' }).props.accessibilityHint).toBe(
+      'Olive Inlay',
+    );
+    expect(screen.getByRole('button', { name: 'Sound & haptics' }).props.accessibilityHint).toBe(
+      'Sound off, haptics on',
+    );
+    expect(screen.getByRole('button', { name: 'Language, English' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Usage data, On' })).toBeOnTheScreen();
   });
 
-  it('names the board layouts in Greek', async () => {
-    await act(async () => {
-      await i18n.changeLanguage('el');
-    });
-    try {
-      await render(<SettingsScreen />);
-      const group = screen.getByTestId('settings-board-layout');
-      expect(group).toHaveAccessibleName('Διάταξη ταμπλό');
-      expect(within(group).getByRole('radio', { name: 'Ψηλό' })).toBeChecked();
-      expect(within(group).getByRole('radio', { name: 'Κλασικό' })).toBeOnTheScreen();
-      expect(
-        screen.getByText(
-          'Μόνο για το παιχνίδι. Το μάθημα και οι κανόνες δείχνουν πάντα το ψηλό ταμπλό.',
-        ),
-      ).toBeOnTheScreen();
-    } finally {
-      await act(async () => {
-        await i18n.changeLanguage('en');
-      });
-    }
-  });
-
-  it('picks the move list: automatic by default, then on or off (#134)', async () => {
+  it.each([
+    ['Gameplay', 'gameplay'],
+    ['Board & look', 'board'],
+    ['Sound & haptics', 'sound'],
+    ['Language, Phone language', 'language'],
+    ['Usage data, Off', 'usage-data'],
+  ] as const)('the %s row opens its page', async (name, page) => {
     const user = userEvent.setup();
-    await render(<SettingsScreen />);
+    const props = allProps();
+    await render(<SettingsScreen {...props} />);
 
-    expect(screen.getByRole('header', { name: 'Accessibility' })).toBeOnTheScreen();
-    expect(screen.getByRole('radio', { name: 'Automatic' })).toBeChecked();
-    expect(
-      screen.getByText('Shows a button for each move when a screen reader is on.'),
-    ).toBeOnTheScreen();
-
-    await user.press(screen.getByRole('radio', { name: 'On' }));
-    expect(settingsStore.getState().moveList).toBe('on');
-    expect(screen.getByText('Shows a button for each move under the board.')).toBeOnTheScreen();
-
-    await user.press(screen.getByRole('radio', { name: 'Off' }));
-    expect(settingsStore.getState().moveList).toBe('off');
-    expect(screen.getByText('Play on the board only.')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name }));
+    expect(props.onPage).toHaveBeenCalledWith(page);
   });
 
-  it('picks the bot speed: Normal by default, then Slow or Fast (#172)', async () => {
+  it('opens the screens outside Settings', async () => {
     const user = userEvent.setup();
-    await render(<SettingsScreen />);
+    const props = allProps();
+    await render(<SettingsScreen {...props} />);
 
-    expect(screen.getByRole('radio', { name: 'Normal' })).toBeChecked();
-    expect(screen.getByText('The bot plays at a pace that is easy to follow.')).toBeOnTheScreen();
-
-    await user.press(screen.getByRole('radio', { name: 'Slow' }));
-    expect(settingsStore.getState().botSpeed).toBe('slow');
-    expect(
-      screen.getByText('The bot takes its time, so you can follow each move.'),
-    ).toBeOnTheScreen();
-
-    await user.press(screen.getByRole('radio', { name: 'Fast' }));
-    expect(settingsStore.getState().botSpeed).toBe('fast');
-    expect(screen.getByText('The bot plays quickly.')).toBeOnTheScreen();
-  });
-
-  it('shows the bot speed in Greek', async () => {
-    const user = userEvent.setup();
-    await render(<SettingsScreen />);
-
-    await user.press(screen.getByRole('radio', { name: 'Ελληνικά' }));
-    expect(await screen.findByText('Ταχύτητα υπολογιστή')).toBeOnTheScreen();
-    expect(screen.getByRole('radio', { name: 'Κανονικά' })).toBeChecked();
-    await user.press(screen.getByRole('radio', { name: 'Αργά' }));
-    expect(settingsStore.getState().botSpeed).toBe('slow');
-    expect(screen.getByRole('radio', { name: 'Γρήγορα' })).not.toBeChecked();
-
-    await user.press(screen.getByRole('radio', { name: 'Γλώσσα κινητού' }));
-    expect(await screen.findByRole('radio', { name: 'Slow' })).toBeChecked();
-  });
-
-  it('sends the bot speed key, never the value, when usage data is on', async () => {
-    const user = userEvent.setup();
-    await act(async () => {
-      consentStore.setState({ status: 'granted' });
-    });
-    await render(<SettingsScreen />);
-
-    await user.press(screen.getByRole('radio', { name: 'Fast' }));
-    expect(recorded.sent.at(-1)).toEqual({
-      type: 'track',
-      event: 'settings_changed',
-      props: { key: 'botSpeed' },
-    });
-  });
-
-  it('turns usage data on and off from Privacy (one switch for the Analytics port)', async () => {
-    const user = userEvent.setup();
-    await render(<SettingsScreen />);
-
-    expect(screen.getByRole('header', { name: 'Privacy' })).toBeOnTheScreen();
-    const toggle = screen.getByRole('switch', { name: 'Share anonymous usage data' });
-    expect(toggle).not.toBeChecked();
+    await user.press(screen.getByRole('button', { name: 'How to play' }));
+    expect(props.onHowToPlay).toHaveBeenCalledTimes(1);
+    await user.press(screen.getByRole('button', { name: "What's new" }));
+    expect(props.onWhatsNew).toHaveBeenCalledTimes(1);
+    await user.press(screen.getByRole('button', { name: 'Account' }));
+    expect(props.onAccount).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('link', { name: 'Privacy policy' })).toBeOnTheScreen();
-
-    await user.press(toggle);
-    expect(consentStore.getState().status).toBe('granted');
-    expect(recorded.isOptedIn()).toBe(true);
-    expect(screen.getByRole('switch', { name: 'Share anonymous usage data' })).toBeChecked();
-
-    // Opted in: a settings change sends its key.
-    await user.press(screen.getByRole('switch', { name: 'Sound' }));
-    expect(recorded.sent.at(-1)).toEqual({
-      type: 'track',
-      event: 'settings_changed',
-      props: { key: 'sound' },
-    });
-
-    await user.press(screen.getByRole('switch', { name: 'Share anonymous usage data' }));
-    expect(consentStore.getState().status).toBe('denied');
-    expect(recorded.isOptedIn()).toBe(false);
-
-    // Opted out: nothing more is sent.
-    const count = recorded.sent.length;
-    await user.press(screen.getByRole('switch', { name: 'Haptics' }));
-    expect(recorded.sent).toHaveLength(count);
   });
 
-  it("has no Help section without a way to open the tutorial or What's new", async () => {
+  it('shows Friends, Leaderboards and Blocked players only after online play', async () => {
+    const props = allProps();
+    const view = await render(<SettingsScreen {...props} visit={0} />);
+    for (const id of ['settings-friends', 'settings-ratings', 'settings-blocked']) {
+      expect(screen.queryByTestId(id)).toBeNull();
+    }
+
+    rememberOnlineAccount();
+    await view.rerender(<SettingsScreen {...props} visit={1} />);
+    for (const id of ['settings-friends', 'settings-ratings', 'settings-blocked']) {
+      expect(screen.getByTestId(id)).toBeOnTheScreen();
+    }
+  });
+
+  it('has no Online group in a build with no online play', async () => {
+    await render(<SettingsScreen onPage={jest.fn()} />);
+    expect(screen.queryByRole('header', { name: 'Online' })).toBeNull();
+    expect(screen.queryByTestId('settings-account-card')).toBeNull();
+  });
+
+  it("has no Help group without a way to open the tutorial, the rules or What's new", async () => {
     await render(<SettingsScreen />);
     expect(screen.queryByRole('header', { name: 'Help' })).not.toBeOnTheScreen();
     expect(screen.queryByTestId('settings-learn-to-play')).not.toBeOnTheScreen();
     expect(screen.queryByTestId('settings-whats-new')).not.toBeOnTheScreen();
   });
 
-  it("Help → What's new opens the page (#471), also with no tutorial", async () => {
-    const user = userEvent.setup();
-    const onWhatsNew = jest.fn();
-    await render(<SettingsScreen onWhatsNew={onWhatsNew} />);
-    expect(screen.getByRole('header', { name: 'Help' })).toBeOnTheScreen();
-    expect(screen.queryByTestId('settings-learn-to-play')).not.toBeOnTheScreen();
-    await user.press(screen.getByRole('button', { name: "What's new" }));
-    expect(onWhatsNew).toHaveBeenCalledTimes(1);
+  it("puts a gold dot on What's new while an update has news", async () => {
+    await render(<SettingsScreen onWhatsNew={jest.fn()} />);
+    expect(screen.queryByTestId('settings-whats-new-dot')).toBeNull();
+    expect(screen.getByRole('button', { name: "What's new" })).toBeOnTheScreen();
+  });
+
+  it('shows the dot when the last page seen is older (#471)', async () => {
+    storage.setString(WHATS_NEW_STORAGE_KEY, RELEASES[1]!.date);
+    try {
+      await render(<SettingsScreen onWhatsNew={jest.fn()} />);
+      expect(
+        screen.getByTestId('settings-whats-new-dot', { includeHiddenElements: true }),
+      ).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: "What's new. New in this update." }),
+      ).toBeOnTheScreen();
+    } finally {
+      markWhatsNewSeenForTest();
+    }
+  });
+
+  it('names the groups in Greek', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    await render(<SettingsScreen {...allProps()} />);
+    for (const name of ['Παιχνίδι', 'Online', 'Βοήθεια', 'Απόρρητο']) {
+      expect(screen.getByRole('header', { name })).toBeOnTheScreen();
+    }
+    expect(screen.getByRole('button', { name: 'Ταμπλό και εμφάνιση' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Δεδομένα χρήσης, Κλειστό' })).toBeOnTheScreen();
   });
 
   it.each([
@@ -422,5 +250,51 @@ describe('<SettingsScreen />', () => {
     await act(async () => {
       settingsStore.setState({ language: 'system' });
     });
+  });
+});
+
+describe('Settings → account card (#501)', () => {
+  it('says "On this phone only" and asks the server nothing on a phone that never played online', async () => {
+    const user = userEvent.setup();
+    const ready = jest.spyOn(auth!, 'ready');
+    const props = allProps();
+    await render(<SettingsScreen {...props} />);
+
+    const card = within(screen.getByTestId('settings-account-card'));
+    expect(card.getByText('No online account')).toBeOnTheScreen();
+    expect(card.getByText('On this phone only')).toBeOnTheScreen();
+    expect(ready).not.toHaveBeenCalled();
+    ready.mockRestore();
+
+    await user.press(screen.getByTestId('settings-account-card'));
+    expect(props.onAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the guest name of a guest, still on this phone only', async () => {
+    const user = await signInForOnline(auth!);
+    await onlineFake.invites.createInvite(GAME);
+    rememberOnlineAccount();
+    const number = onlineFake.guestNumber(user.id);
+    await render(<SettingsScreen {...allProps()} />);
+
+    const card = within(screen.getByTestId('settings-account-card'));
+    expect(await card.findByText(`Guest ${number}`)).toBeOnTheScreen();
+    expect(card.getByText('On this phone only')).toBeOnTheScreen();
+  });
+
+  it('shows the username of a saved account', async () => {
+    const nonce = await auth!.keyNonce();
+    await auth!.signInWithKey({
+      provider: 'apple',
+      idToken: memoryAppleIdToken('apple-1', nonce),
+      nonce,
+    });
+    rememberOnlineAccount();
+    await usernames!.setMine({ name: 'Lemoni', acceptTerms: TERMS_VERSION, ageChecked: true });
+    await render(<SettingsScreen {...allProps()} />);
+
+    const card = within(screen.getByTestId('settings-account-card'));
+    expect(await card.findByText('Lemoni')).toBeOnTheScreen();
+    expect(card.getByText('Saved account')).toBeOnTheScreen();
   });
 });

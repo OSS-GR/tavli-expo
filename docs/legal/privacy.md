@@ -165,7 +165,7 @@ What stays: finished online games (with their moves) stay for the other player. 
 
 ### Turn notifications (Expo)
 
-Only if you turn them on. After you make or accept an invite for an online game, the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Notifications**, and off in your phone's settings.
+Only if you turn them on. After you make or accept an invite for an online game, the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Turn notifications**, and off in your phone's settings.
 
 If you allow them:
 

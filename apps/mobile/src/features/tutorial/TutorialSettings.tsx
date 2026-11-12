@@ -32,6 +32,7 @@ export function TutorialSettings({ onOpen }: TutorialSettingsProps) {
       <SectionRow
         testID="settings-learn-to-play"
         icon="graduation"
+        iconLook="bare"
         label={t('settings.learnToPlay')}
         onPress={() => setPicking(true)}
       />

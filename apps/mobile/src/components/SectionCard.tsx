@@ -88,13 +88,21 @@ export interface SectionRowProps {
   hint?: string;
   /** A short value on the right, for example "Normal". */
   value?: string;
-  /** A Lucide icon in a small dark badge on the left. */
+  /** A Lucide icon on the left: in a small dark badge, or bare (`iconLook`). */
   icon?: IconName;
+  /**
+   * `badge` (default): the icon in a small dark badge. `bare`: the brass
+   * icon alone, as in the Settings index (#501).
+   */
+  iconLook?: 'badge' | 'bare';
   /** Makes the row one button, with a chevron on the right. */
   onPress?: () => void;
   /** Other content on the right, in place of `value`. */
   right?: ReactNode;
-  /** What screen readers say for a button row. Default: the label and the value. */
+  /**
+   * What screen readers say. Default for a button row: the label and the
+   * value. A row with no `onPress` reads as one item only with it.
+   */
   accessibilityLabel?: string;
   /** Default for a button row: the hint. */
   accessibilityHint?: string;
@@ -110,6 +118,7 @@ export function SectionRow({
   hint,
   value,
   icon,
+  iconLook = 'badge',
   onPress,
   right,
   accessibilityLabel,
@@ -121,7 +130,15 @@ export function SectionRow({
   const { theme } = useUnistyles();
   const content = (
     <>
-      {icon ? <RowIcon name={icon} /> : null}
+      {icon ? (
+        iconLook === 'bare' ? (
+          <View style={styles.bareIcon}>
+            <Icon name={icon} size={20} color={theme.colors.accent} />
+          </View>
+        ) : (
+          <RowIcon name={icon} />
+        )
+      ) : null}
       <View style={styles.texts}>
         <Text style={[styles.label, disabled && styles.disabled]}>{label}</Text>
         {hint ? <Text style={styles.hint}>{hint}</Text> : null}
@@ -131,8 +148,16 @@ export function SectionRow({
     </>
   );
   if (!onPress) {
+    // With a label for screen readers the row reads as one item (a locked option, say).
+    const oneItem = accessibilityLabel !== undefined;
     return (
-      <View testID={testID} style={styles.row}>
+      <View
+        testID={testID}
+        style={styles.row}
+        accessible={oneItem || undefined}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={oneItem ? (accessibilityHint ?? hint) : undefined}
+        accessibilityState={oneItem && disabled ? { disabled } : undefined}>
         {content}
       </View>
     );
@@ -199,6 +224,10 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.backgroundDeep,
+  },
+  bareIcon: {
+    width: 24,
+    alignItems: 'center',
   },
   texts: {
     flex: 1,

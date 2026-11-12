@@ -78,7 +78,15 @@ function RootStack() {
         <Stack.Protected guard={!welcome} redirectTo={welcomeStart}>
           <Stack.Screen name="index" />
           <Stack.Screen name="new-game" />
-          <Stack.Screen name="settings" />
+          {/* Settings and its pages (#501). */}
+          <Stack.Screen name="settings/index" />
+          <Stack.Screen name="settings/gameplay" />
+          <Stack.Screen name="settings/board" />
+          <Stack.Screen name="settings/sound" />
+          <Stack.Screen name="settings/language" />
+          <Stack.Screen name="settings/move-list" />
+          <Stack.Screen name="settings/notifications" />
+          <Stack.Screen name="settings/usage-data" />
           <Stack.Screen name="account" />
           <Stack.Screen name="username" />
           <Stack.Screen name="blocked" />

@@ -12,6 +12,7 @@ import InviteWaitRoute from '@/app/friend/[code]';
 import GameRoute from '@/app/game/[id]/index';
 import InviteRoute from '@/app/invite/[code]';
 import SettingsRoute from '@/app/settings';
+import NotificationsRoute from '@/app/settings/notifications';
 import WelcomeBoardRoute from '@/app/welcome/board';
 import WelcomeLanguageRoute from '@/app/welcome/language';
 import WelcomePrivacyRoute from '@/app/welcome/privacy';
@@ -56,7 +57,8 @@ const stub = (name: string) =>
 const routes = {
   _layout: RootLayout,
   index: stub('home'),
-  settings: SettingsRoute,
+  'settings/index': SettingsRoute,
+  'settings/notifications': NotificationsRoute,
   'welcome/language': WelcomeLanguageRoute,
   'welcome/privacy': WelcomePrivacyRoute,
   'welcome/board': WelcomeBoardRoute,
@@ -505,14 +507,23 @@ describe('Settings', () => {
     const ready = jest.spyOn(onlineFake.auth, 'ready');
     await renderRouter(routes, { initialUrl: '/settings' });
     await flush();
-    expect(screen.getByRole('header', { name: 'Notifications' })).toBeOnTheScreen();
-    expect(screen.getByText('Turn notifications')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Online' })).toBeOnTheScreen();
+    // The row on the index shows the state; its page turns them on (#501).
+    await user.press(screen.getByRole('button', { name: 'Turn notifications, Off' }));
+    await flush();
+    expect(screen).toHavePathname('/settings/notifications');
+    expect(screen.getByRole('header', { name: 'Turn notifications' })).toBeOnTheScreen();
     expect(screen.getByText(/^Off\. Turn them on/)).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Turn on' }));
     await flush();
     expect(onlineFake.notifications.prompts).toBe(1);
     expect(screen.getByText(/^On\./)).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Turn on' })).toBeNull();
+
+    await user.press(screen.getByTestId('settings-notifications-back'));
+    await flush();
+    expect(screen).toHavePathname('/settings');
+    expect(screen.getByRole('button', { name: 'Turn notifications, On' })).toBeOnTheScreen();
     // This phone never used an online account: no server call at all.
     expect(ready).not.toHaveBeenCalled();
     expect(onlineFake.pushTokens.calls).toEqual([]);
@@ -522,7 +533,7 @@ describe('Settings', () => {
   it('a phone that allows pushes but was never turned on in the app shows "Off"', async () => {
     const user = setupUser();
     onlineFake.notifications.setPermission('granted');
-    await renderRouter(routes, { initialUrl: '/settings' });
+    await renderRouter(routes, { initialUrl: '/settings/notifications' });
     await flush();
     expect(screen.getByText(/^Off\. Turn them on/)).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Turn on' }));
@@ -535,7 +546,7 @@ describe('Settings', () => {
     const user = setupUser();
     const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue();
     onlineFake.notifications.setPermission('denied');
-    await renderRouter(routes, { initialUrl: '/settings' });
+    await renderRouter(routes, { initialUrl: '/settings/notifications' });
     await flush();
     expect(screen.getByText('Off in the phone settings.')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Open phone settings ›' }));
