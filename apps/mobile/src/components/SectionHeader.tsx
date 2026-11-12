@@ -58,9 +58,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.space.sm,
   },
   title: {
-    ...theme.type.title3,
-    fontSize: 17,
-    lineHeight: 22,
+    ...theme.type.sectionHeader,
     flexShrink: 1,
     color: theme.colors.textDim,
   },

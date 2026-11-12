@@ -41,7 +41,7 @@ export interface MatchListAction {
 
 export interface MatchListProps {
   rows: readonly MatchListRow[];
-  /** The small caps title above the card. */
+  /** The section header above the card. */
   title?: string;
 }
 

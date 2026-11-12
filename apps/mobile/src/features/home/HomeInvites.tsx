@@ -43,7 +43,7 @@ export function HomeInvites({ auth, invites, focused, onOpen }: HomeInvitesProps
     const again = t('home.online.retry');
     return (
       <View testID="home-invites" style={styles.section}>
-        <Header title={title} />
+        <SectionHeader title={title} />
         <View style={styles.failed}>
           <Text testID="home-invites-failed" style={styles.note}>
             {t('home.invites.failed')}
@@ -72,9 +72,6 @@ export function HomeInvites({ auth, invites, focused, onOpen }: HomeInvitesProps
   );
 }
 
-function Header({ title }: { title: string }) {
-  return <SectionHeader title={title} />;
-}
 
 interface InviteRowsProps {
   list: MyInvitesList;
@@ -89,7 +86,7 @@ function InviteRows({ list, focused, onOpen }: InviteRowsProps) {
   const now = Math.max(ticked, list.receivedAt);
   return (
     <View testID="home-invites" style={styles.section}>
-      <Header title={t('home.invites.title')} />
+      <SectionHeader title={t('home.invites.title')} />
       <View style={styles.list}>
         {list.invites.map((invite) => (
           <InviteRow
