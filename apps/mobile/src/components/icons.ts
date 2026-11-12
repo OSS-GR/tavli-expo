@@ -204,6 +204,28 @@ export const ICONS = {
       'M18 2H6v7a6 6 0 0 0 12 0V2Z',
     ],
   },
+  // Leaderboards (#502): the global board switch and "How ratings work".
+  lock: {
+    strokes: [roundRect(3, 11, 18, 11, 2), 'M7 11V7a5 5 0 0 1 10 0v4'],
+  },
+  circleHelp: {
+    strokes: [circle(12, 12, 10), 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3', 'M12 17h.01'],
+  },
+  swords: {
+    strokes: [
+      'M14.5 17.5L3 6V3h3l11.5 11.5',
+      'M13 19l6-6',
+      'M16 16l4 4',
+      'M19 21l2-2',
+      'M14.5 6.5L18 3h3v3l-3.5 3.5',
+      'M5 14l4 4',
+      'M7 17l-3 3',
+      'M3 19l2 2',
+    ],
+  },
+  clock: {
+    strokes: [circle(12, 12, 10), 'M12 6v6l4 2'],
+  },
   // A problem: error popups and lines (#462).
   circleAlert: {
     strokes: [circle(12, 12, 10), 'M12 8v4', 'M12 16h.01'],
