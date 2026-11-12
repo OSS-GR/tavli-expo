@@ -637,14 +637,14 @@
     "add": {
       "title": "Add a friend",
       "linkTitle": "Your friend link",
-      "linkIntro": "Send your link to a friend. When they open it, they can ask to be your friend.",
+      "linkIntro": "When a friend opens it, they can ask to be your friend.",
       "qrLabel": "QR code of your friend link",
       "qrHint": "Your friend scans it with the phone camera.",
       "checking": "Checking your link…",
-      "share": "Share",
+      "share": "Share link",
       "shareMessage": "Be my friend on Tavlaki: {{link}}",
-      "textMessage": "Text message",
-      "reset": "New link",
+      "textMessage": "Message",
+      "reset": "Make a new link",
       "resetTitle": "Make a new link?",
       "resetBody": "Your old link and QR code stop working. Friends you have stay.",
       "resetConfirm": "Make a new link",
@@ -653,7 +653,7 @@
       "usernamePlaceholder": "The exact username",
       "search": "Search",
       "notFound": "No player has that username.",
-      "ask": "Ask to be friends",
+      "ask": "Add",
       "askLabel": "Ask {{name}} to be friends",
       "sent": "Asked {{name}}. You are friends when they accept.",
       "nowFriends": "You and {{name}} are friends now.",
@@ -663,7 +663,8 @@
       "pasteBad": "That is not a friend link.",
       "recentTitle": "You played with",
       "recentEmpty": "Players of your online games show here.",
-      "noContacts": "Tavlaki never reads your contacts. Share and Text message open your phone's own apps, and you pick who gets the link."
+      "noContacts": "Tavlaki never reads your contacts. You pick who gets the link.",
+      "pasteHint": "From a message or a note"
     },
     "note": "Only your friends see you here. A block ends a friendship.",
     "problem": {
@@ -710,12 +711,13 @@
     "list": {
       "title": "Your friends",
       "empty": "No friends yet. Tap Add a friend.",
-      "record": "Matches: you won {{wins}}, they won {{losses}}",
+      "lead": "You lead {{wins}}–{{losses}}",
+      "behind": "They lead {{losses}}–{{wins}}",
+      "even": "Even at {{wins}}–{{losses}}",
       "invite": "Invite",
       "inviteLabel": "Invite {{name}} to a game",
-      "remove": "Remove",
-      "removeLabel": "Remove {{name}}",
-      "report": "Report or block"
+      "report": "Report or block",
+      "more": "More for {{name}}"
     },
     "remove": {
       "title": "Remove {{name}}?",
@@ -745,6 +747,25 @@
       "send": "Send",
       "sending": "Sending…",
       "change": "Change"
+    },
+    "ratingsHint": "Friends and everyone",
+    "ratingsLabel": "Leaderboards, your rating {{rating}}",
+    "empty": {
+      "title": "No friends yet",
+      "body": "Send your link or find a username. Then invite a friend in one tap."
+    },
+    "chip": {
+      "self": "You",
+      "friends": "Friends",
+      "sent": "Asked",
+      "received": "Asked you",
+      "none": "Not friends"
+    },
+    "sheet": {
+      "since": "Friends since {{date}}",
+      "invite": "Invite to a game",
+      "remove": "Remove friend",
+      "removeLabel": "Remove {{name}}"
     }
   },
   "ratings": {

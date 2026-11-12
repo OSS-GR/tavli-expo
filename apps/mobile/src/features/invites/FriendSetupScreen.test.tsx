@@ -641,13 +641,13 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     return props;
   }
 
-  it('lists my friends with the record above Make an invite', async () => {
+  it('lists my friends above Make an invite, with no record line before a match', async () => {
     const parts = savedMe();
     await befriend(parts.server, 'ann');
     await show(parts);
     expect(screen.getByTestId('friend-friends')).toBeOnTheScreen();
     expect(screen.getByText(nameOf(parts.server, 'ann'))).toBeOnTheScreen();
-    expect(screen.getByText('Matches: you won 0, they won 0')).toBeOnTheScreen();
+    expect(screen.queryByText(/lead|Even at/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Make an invite' })).toBeOnTheScreen();
   });
 

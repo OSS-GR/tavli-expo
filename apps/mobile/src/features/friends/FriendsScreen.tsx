@@ -1,14 +1,20 @@
 /**
  * Friends (#406), from Settings → Online: friend invites to you, friend
- * requests both ways, and your friends with your record against each.
+ * requests both ways, and your friends with your record against each. The
+ * look is the Figma polish pass (#503, Screens → 03 Friends).
  *
  * - Friends need a saved account (ADR-0008). A guest reads that and gets
  *   a button to Settings → Account; nobody signed in reads that too. The
  *   screen makes no account.
- * - A friend row has Invite (a game invite with a push, no code),
- *   Remove (asks first) and Report or block (`ReportOrBlockSheet`). A
- *   block ends the friendship on the server, so the list loads again
- *   when the sheet closes.
+ * - A friend row has one action, Invite (a game invite with a push, no
+ *   code), and a "more" button that opens the friend sheet: Invite to a
+ *   game, Remove friend (asks first) and Report or block. A block ends the
+ *   friendship on the server, so the list loads again when it closes.
+ * - The record reads in words ("You lead 5–3", `record.ts`); with no
+ *   finished match there is no line.
+ * - One `Sheet` holds the friend sheet, the Remove confirm, the quick
+ *   invite and Report or block: one step replaces the other in place, so
+ *   iOS never needs a second `Modal`.
  * - Invite (#488): with the last setup of a friend invite saved on the
  *   phone (`friendInviteSetup.ts`), a short confirm shows it ("Invite
  *   NAME?", the game and the length, the timer only when there is one):
@@ -17,7 +23,11 @@
  *   setup, Invite opens the full setup. The confirm stays open while it
  *   sends. A send whose screen is gone leaves the invite open (the friend
  *   has the push already; it shows on Home).
- * - Leaderboards (#407) opens the boards, under Add a friend.
+ * - Leaderboards (#407) is a row under Add a friend, with your rating as a
+ *   chip once you have a rated match (`ratings.mine()`, quietly: a failed
+ *   call shows no chip).
+ * - With no friend, request or invite, the screen is the empty state: the
+ *   medallion, one sentence, Add a friend and a Leaderboards link.
  * - A request to you has Accept and Decline; one you sent has Cancel.
  * - One call at a time. A call that fails keeps the list and says so,
  *   also to screen readers (`useAnnouncement`). A call that finds the
@@ -33,42 +43,62 @@ import type {
   Friends,
   InviteView,
   NewInvite,
+  Ratings,
   Safety,
 } from '@tavli/contracts';
+import { fonts } from '@tavli/ui';
 import { useLocales } from 'expo-localization';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Children,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Dialog } from '@/components/Dialog';
+import { EmptyMedallion } from '@/components/EmptyMedallion';
+import { Icon } from '@/components/Icon';
+import type { IconName } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { RowDivider, SectionCard } from '@/components/SectionCard';
+import { CardFrame, RowDivider } from '@/components/SectionCard';
+import { SectionHeader } from '@/components/SectionHeader';
 import { Sheet } from '@/components/Sheet';
+import { surfaceStyle } from '@/components/Surface';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { dateLocale, formatDate } from '@/features/history/format';
 import { loadFriendInviteSetup, saveFriendInviteSetup } from '@/features/invites/friendInviteSetup';
 import { sendInviteCreated } from '@/features/invites/inviteAnalytics';
 import { playerNameText } from '@/features/online/playerName';
-import { ReportOrBlockSheet, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
+import { ReportOrBlock, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { friendsProblem, useFriendsData, type FriendsProblem } from './friendsData';
-import { friendsStyles as styles, NotReady, RefreshFailed, useProblemText } from './FriendsParts';
+import { Footnote, friendsStyles, NotReady, RefreshFailed, useProblemText } from './FriendsParts';
+import { recordText } from './record';
 
 export interface FriendsScreenProps {
   /** Counts the times the screen shows (the route): each new one loads again. */
   visit?: number;
   auth: AuthProvider;
   friends: Friends;
-  /** Report or block. `undefined`: the rows have no such button. */
+  /** Report or block. `undefined`: the friend sheet has no such row. */
   safety?: Safety;
+  /** Your rating for the Leaderboards row. `undefined`: no chip. */
+  ratings?: Ratings;
   onBack: () => void;
   /** Opens Add a friend. */
   onAdd: () => void;
-  /** Opens Leaderboards (#407). `undefined`: no button. */
+  /** Opens Leaderboards (#407). `undefined`: no row. */
   onRatings?: () => void;
   /** Opens the full game setup for a friend invite (no saved setup yet, or Change). */
   onInvite: (playerId: string) => void;
@@ -86,6 +116,13 @@ interface FriendsData {
   readonly invites: readonly InviteView[];
 }
 
+/** What the one sheet shows. */
+type Panel =
+  | { readonly kind: 'friend'; readonly friend: Friend }
+  | { readonly kind: 'remove'; readonly friend: Friend }
+  | { readonly kind: 'quick'; readonly friend: Friend; readonly game: NewInvite }
+  | { readonly kind: 'report'; readonly player: SafetyPlayer };
+
 /** Names each problem for this app run, so the same problem twice is read twice. */
 let problemCount = 0;
 
@@ -93,6 +130,7 @@ export function FriendsScreen({
   auth,
   friends,
   safety,
+  ratings,
   onBack,
   onAdd,
   onRatings,
@@ -117,11 +155,12 @@ export function FriendsScreen({
   // The player whose call is on its way.
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
-  const [removing, setRemoving] = useState<Friend | null>(null);
-  const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
-  // Invite with the last setup (#488): the confirm, and its send on the way.
-  const [quick, setQuick] = useState<{ friend: Friend; game: NewInvite } | null>(null);
+  const [panel, setPanel] = useState<Panel | null>(null);
+  // The quick invite's send is on its way.
   const [sending, setSending] = useState(false);
+  // Report or block holds the sheet open while it sends.
+  const [held, setHeld] = useState(false);
+  const rating = useMyRating(ratings, state.kind === 'ready', visit);
   // False once the screen is gone (the server answers later).
   const mounted = useRef(true);
   useEffect(() => {
@@ -158,13 +197,15 @@ export function FriendsScreen({
   /** Invite: the confirm with the last setup, or the full setup when there is none. */
   const invite = (friend: Friend) => {
     const game = loadFriendInviteSetup();
-    if (game === null) onInvite(friend.playerId);
-    else setQuick({ friend, game });
+    if (game === null) {
+      setPanel(null);
+      onInvite(friend.playerId);
+    } else setPanel({ kind: 'quick', friend, game });
   };
 
   const send = () => {
-    if (quick === null || sending) return;
-    const { friend, game } = quick;
+    if (panel?.kind !== 'quick' || sending) return;
+    const { friend, game } = panel;
     setSending(true);
     setProblem(null);
     friends.inviteFriend(friend.playerId, game).then(
@@ -173,13 +214,13 @@ export function FriendsScreen({
         sendInviteCreated(game);
         if (!mounted.current) return;
         setSending(false);
-        setQuick(null);
+        setPanel(null);
         onInvited(code);
       },
       (error: unknown) => {
         if (!mounted.current) return;
         setSending(false);
-        setQuick(null);
+        setPanel(null);
         // Signed out or a guest: the screen says so, as after a load.
         if (sessionLost(error)) return;
         problemCount += 1;
@@ -188,6 +229,191 @@ export function FriendsScreen({
       },
     );
   };
+
+  const closeReport = () => {
+    setPanel(null);
+    setHeld(false);
+    // A block ends the friendship: load the list again.
+    reload();
+  };
+
+  const closePanel = () => {
+    // The quick invite stays open while it sends; so does Report or block.
+    if (sending || held) return;
+    if (panel?.kind === 'report') closeReport();
+    else setPanel(null);
+  };
+
+  const lines = (
+    <>
+      {state.kind === 'ready' && state.refreshFailed === true ? (
+        <RefreshFailed onRetry={reload} testID="friends" />
+      ) : null}
+      {problemText !== null ? (
+        <Text testID="friends-problem" style={friendsStyles.line}>
+          {problemText}
+        </Text>
+      ) : null}
+    </>
+  );
+
+  let body: ReactNode;
+  if (state.kind !== 'ready') {
+    body = <NotReady state={state} onRetry={retry} onAccount={onAccount} testID="friends" />;
+  } else {
+    const { invites, requests, friends: list } = state.data;
+    const nothing =
+      list.length === 0 &&
+      invites.length === 0 &&
+      requests.incoming.length === 0 &&
+      requests.outgoing.length === 0;
+    body = nothing ? (
+      <>
+        {lines}
+        <EmptyFriends onAdd={onAdd} onRatings={onRatings} />
+      </>
+    ) : (
+      <>
+        <ActionButton
+          testID="friends-add"
+          icon="userPlus"
+          label={t('friends.addButton')}
+          onPress={onAdd}
+        />
+        {onRatings ? <RatingsRow rating={rating} onPress={onRatings} /> : null}
+        {lines}
+        {invites.length > 0 ? (
+          <Section title={t('friends.invites.title')} testID="friends-invites">
+            {invites.map((invite) => {
+              const name = nameOf(invite.fromName);
+              return (
+                <PersonRow
+                  key={invite.code}
+                  testID={`friend-invite-${invite.code}`}
+                  playerKey={invite.from}
+                  name={name}
+                  title={t('friends.invites.from', { name })}
+                  hint={t('friends.invites.game', {
+                    game: t(`games.${invite.choice}`),
+                    count: invite.targetPoints,
+                  })}>
+                  <ActionButton
+                    testID={`friend-invite-${invite.code}-open`}
+                    size="small"
+                    label={t('friends.invites.open')}
+                    onPress={() => onOpenInvite(invite.code)}
+                  />
+                </PersonRow>
+              );
+            })}
+          </Section>
+        ) : null}
+        {requests.incoming.length > 0 ? (
+          <Section title={t('friends.incoming.title')} testID="friends-incoming">
+            {requests.incoming.map((request) => {
+              const name = nameOf(request.name);
+              return (
+                <PersonRow
+                  key={request.playerId}
+                  testID={`friend-incoming-${request.playerId}`}
+                  playerKey={request.playerId}
+                  name={name}
+                  hint={t('friends.incoming.sent', { date: formatDate(request.sentAt, locale) })}
+                  below>
+                  <ActionButton
+                    testID={`friend-incoming-${request.playerId}-accept`}
+                    size="small"
+                    disabled={busy !== null}
+                    label={t('friends.incoming.accept')}
+                    accessibilityLabel={t('friends.incoming.acceptLabel', { name })}
+                    onPress={() =>
+                      run(request.playerId, () => friends.acceptRequest(request.playerId))
+                    }
+                  />
+                  <ActionButton
+                    testID={`friend-incoming-${request.playerId}-decline`}
+                    kind="secondary"
+                    size="small"
+                    disabled={busy !== null}
+                    label={t('friends.incoming.decline')}
+                    accessibilityLabel={t('friends.incoming.declineLabel', { name })}
+                    onPress={() =>
+                      run(request.playerId, () => friends.declineRequest(request.playerId))
+                    }
+                  />
+                </PersonRow>
+              );
+            })}
+          </Section>
+        ) : null}
+        <Section title={t('friends.list.title')} count={list.length} testID="friends-list">
+          {list.length === 0 ? (
+            <View style={friendsStyles.row}>
+              <Text testID="friends-empty" style={friendsStyles.line}>
+                {t('friends.list.empty')}
+              </Text>
+            </View>
+          ) : (
+            list.map((friend) => {
+              const name = nameOf(friend.name);
+              return (
+                <PersonRow
+                  key={friend.playerId}
+                  testID={`friend-${friend.playerId}`}
+                  playerKey={friend.playerId}
+                  name={name}
+                  hint={recordText(friend.record, t)}>
+                  <ActionButton
+                    testID={`friend-${friend.playerId}-invite`}
+                    kind="secondary"
+                    size="small"
+                    icon="send"
+                    disabled={busy !== null}
+                    label={t('friends.list.invite')}
+                    accessibilityLabel={t('friends.list.inviteLabel', { name })}
+                    onPress={() => invite(friend)}
+                  />
+                  <MoreButton
+                    testID={`friend-${friend.playerId}-more`}
+                    label={t('friends.list.more', { name })}
+                    onPress={() => setPanel({ kind: 'friend', friend })}
+                  />
+                </PersonRow>
+              );
+            })
+          )}
+        </Section>
+        {requests.outgoing.length > 0 ? (
+          <Section title={t('friends.outgoing.title')} testID="friends-outgoing">
+            {requests.outgoing.map((request) => {
+              const name = nameOf(request.name);
+              return (
+                <PersonRow
+                  key={request.playerId}
+                  testID={`friend-outgoing-${request.playerId}`}
+                  playerKey={request.playerId}
+                  name={name}
+                  hint={t('friends.outgoing.sent', { date: formatDate(request.sentAt, locale) })}>
+                  <ActionButton
+                    testID={`friend-outgoing-${request.playerId}-cancel`}
+                    kind="secondary"
+                    size="small"
+                    disabled={busy !== null}
+                    label={t('friends.outgoing.cancel')}
+                    accessibilityLabel={t('friends.outgoing.cancelLabel', { name })}
+                    onPress={() =>
+                      run(request.playerId, () => friends.cancelRequest(request.playerId))
+                    }
+                  />
+                </PersonRow>
+              );
+            })}
+          </Section>
+        ) : null}
+        <Footnote icon="info" text={t('friends.note')} />
+      </>
+    );
+  }
 
   return (
     <Screen testID="friends-screen">
@@ -198,238 +424,352 @@ export function FriendsScreen({
         backLabel={t('common.back')}
         testID="friends-back"
       />
-      <ScrollView style={styles.body} contentContainerStyle={styles.content}>
-        {state.kind !== 'ready' ? (
-          <NotReady state={state} onRetry={retry} onAccount={onAccount} testID="friends" />
-        ) : (
-          <>
-            <ActionButton testID="friends-add" label={t('friends.addButton')} onPress={onAdd} />
-            {onRatings ? (
-              <ActionButton
-                testID="friends-ratings"
-                kind="secondary"
-                label={t('friends.ratingsButton')}
-                onPress={onRatings}
-              />
-            ) : null}
-            {state.refreshFailed === true ? (
-              <RefreshFailed onRetry={reload} testID="friends" />
-            ) : null}
-            {problemText !== null ? (
-              <Text testID="friends-problem" style={styles.line}>
-                {problemText}
-              </Text>
-            ) : null}
-            {state.data.invites.length > 0 ? (
-              <SectionCard title={t('friends.invites.title')} testID="friends-invites">
-                {state.data.invites.map((invite, i) => (
-                  <View key={invite.code}>
-                    {i > 0 ? <RowDivider /> : null}
-                    <View testID={`friend-invite-${invite.code}`} style={styles.row}>
-                      <Text style={styles.name}>
-                        {t('friends.invites.from', { name: nameOf(invite.fromName) })}
-                      </Text>
-                      <Text style={styles.hint}>
-                        {t('friends.invites.game', {
-                          game: t(`games.${invite.choice}`),
-                          count: invite.targetPoints,
-                        })}
-                      </Text>
-                      <View style={styles.buttons}>
-                        <ActionButton
-                          testID={`friend-invite-${invite.code}-open`}
-                          compact
-                          label={t('friends.invites.open')}
-                          onPress={() => onOpenInvite(invite.code)}
-                        />
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </SectionCard>
-            ) : null}
-            {state.data.requests.incoming.length > 0 ? (
-              <SectionCard title={t('friends.incoming.title')} testID="friends-incoming">
-                {state.data.requests.incoming.map((request, i) => (
-                  <RequestRow
-                    key={request.playerId}
-                    first={i === 0}
-                    testID={`friend-incoming-${request.playerId}`}
-                    name={nameOf(request.name)}
-                    hint={t('friends.incoming.sent', {
-                      date: formatDate(request.sentAt, locale),
-                    })}
-                    busy={busy !== null}
-                    buttons={[
-                      {
-                        key: 'accept',
-                        label: t('friends.incoming.accept'),
-                        accessibilityLabel: t('friends.incoming.acceptLabel', {
-                          name: nameOf(request.name),
-                        }),
-                        primary: true,
-                        onPress: () =>
-                          run(request.playerId, () => friends.acceptRequest(request.playerId)),
-                      },
-                      {
-                        key: 'decline',
-                        label: t('friends.incoming.decline'),
-                        accessibilityLabel: t('friends.incoming.declineLabel', {
-                          name: nameOf(request.name),
-                        }),
-                        onPress: () =>
-                          run(request.playerId, () => friends.declineRequest(request.playerId)),
-                      },
-                    ]}
-                  />
-                ))}
-              </SectionCard>
-            ) : null}
-            <SectionCard title={t('friends.list.title')} testID="friends-list">
-              {state.data.friends.length === 0 ? (
-                <View style={styles.row}>
-                  <Text testID="friends-empty" style={styles.line}>
-                    {t('friends.list.empty')}
-                  </Text>
-                </View>
-              ) : (
-                state.data.friends.map((friend, i) => {
-                  const name = nameOf(friend.name);
-                  return (
-                    <View key={friend.playerId}>
-                      {i > 0 ? <RowDivider /> : null}
-                      <View testID={`friend-${friend.playerId}`} style={styles.row}>
-                        <Text style={styles.name}>{name}</Text>
-                        <Text style={styles.hint}>
-                          {t('friends.list.record', {
-                            wins: friend.record.wins,
-                            losses: friend.record.losses,
-                          })}
-                        </Text>
-                        <View style={styles.buttons}>
-                          <ActionButton
-                            testID={`friend-${friend.playerId}-invite`}
-                            compact
-                            disabled={busy !== null}
-                            label={t('friends.list.invite')}
-                            accessibilityLabel={t('friends.list.inviteLabel', { name })}
-                            onPress={() => invite(friend)}
-                          />
-                          <ActionButton
-                            testID={`friend-${friend.playerId}-remove`}
-                            kind="secondary"
-                            compact
-                            disabled={busy !== null}
-                            label={t('friends.list.remove')}
-                            accessibilityLabel={t('friends.list.removeLabel', { name })}
-                            onPress={() => setRemoving(friend)}
-                          />
-                          {safety ? (
-                            <ActionButton
-                              testID={`friend-${friend.playerId}-report`}
-                              kind="text"
-                              compact
-                              disabled={busy !== null}
-                              label={t('friends.list.report')}
-                              accessibilityLabel={t('safety.actionLabel', { name })}
-                              onPress={() =>
-                                setReporting({ id: friend.playerId, name: friend.name })
-                              }
-                            />
-                          ) : null}
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })
-              )}
-            </SectionCard>
-            {state.data.requests.outgoing.length > 0 ? (
-              <SectionCard title={t('friends.outgoing.title')} testID="friends-outgoing">
-                {state.data.requests.outgoing.map((request, i) => (
-                  <RequestRow
-                    key={request.playerId}
-                    first={i === 0}
-                    testID={`friend-outgoing-${request.playerId}`}
-                    name={nameOf(request.name)}
-                    hint={t('friends.outgoing.sent', {
-                      date: formatDate(request.sentAt, locale),
-                    })}
-                    busy={busy !== null}
-                    buttons={[
-                      {
-                        key: 'cancel',
-                        label: t('friends.outgoing.cancel'),
-                        accessibilityLabel: t('friends.outgoing.cancelLabel', {
-                          name: nameOf(request.name),
-                        }),
-                        onPress: () =>
-                          run(request.playerId, () => friends.cancelRequest(request.playerId)),
-                      },
-                    ]}
-                  />
-                ))}
-              </SectionCard>
-            ) : null}
-            <Text style={styles.hint}>{t('friends.note')}</Text>
-          </>
-        )}
+      <ScrollView style={friendsStyles.body} contentContainerStyle={friendsStyles.content}>
+        {body}
       </ScrollView>
       <Sheet
-        visible={removing !== null}
-        onClose={() => setRemoving(null)}
+        visible={panel !== null}
+        onClose={closePanel}
         closeLabel={t('common.cancel')}
-        look="dialog">
-        {removing !== null ? (
+        look={panel?.kind === 'friend' ? 'sheet' : 'dialog'}>
+        {panel?.kind === 'friend' ? (
+          <FriendSheet
+            friend={panel.friend}
+            name={nameOf(panel.friend.name)}
+            since={formatDate(panel.friend.since, locale)}
+            busy={busy !== null}
+            canReport={safety !== undefined}
+            onInvite={() => invite(panel.friend)}
+            onRemove={() => setPanel({ kind: 'remove', friend: panel.friend })}
+            onReport={() =>
+              setPanel({
+                kind: 'report',
+                player: { id: panel.friend.playerId, name: panel.friend.name },
+              })
+            }
+          />
+        ) : null}
+        {panel?.kind === 'remove' ? (
           <ConfirmDialog
             testID="friend-remove-dialog"
-            title={t('friends.remove.title', { name: nameOf(removing.name) })}
+            title={t('friends.remove.title', { name: nameOf(panel.friend.name) })}
             lines={[t('friends.remove.body')]}
             confirmLabel={t('friends.remove.confirm')}
             cancelLabel={t('common.cancel')}
             onConfirm={() => {
-              const friend = removing;
-              setRemoving(null);
+              const { friend } = panel;
+              setPanel(null);
               run(friend.playerId, () => friends.removeFriend(friend.playerId));
             }}
-            onCancel={() => setRemoving(null)}
+            onCancel={() => setPanel(null)}
           />
         ) : null}
-      </Sheet>
-      <Sheet
-        visible={quick !== null}
-        onClose={() => {
-          // The confirm stays open while it sends.
-          if (!sending) setQuick(null);
-        }}
-        closeLabel={t('common.cancel')}
-        look="dialog">
-        {quick !== null ? (
+        {panel?.kind === 'quick' ? (
           <QuickInvite
-            name={nameOf(quick.friend.name)}
-            game={quick.game}
+            name={nameOf(panel.friend.name)}
+            game={panel.game}
             sending={sending}
             onSend={send}
             onChange={() => {
-              setQuick(null);
-              onInvite(quick.friend.playerId);
+              setPanel(null);
+              onInvite(panel.friend.playerId);
             }}
-            onCancel={() => setQuick(null)}
+            onCancel={() => setPanel(null)}
+          />
+        ) : null}
+        {panel?.kind === 'report' && safety ? (
+          <ReportOrBlock
+            player={panel.player}
+            safety={safety}
+            onClose={closeReport}
+            onHold={setHeld}
           />
         ) : null}
       </Sheet>
-      {safety ? (
-        <ReportOrBlockSheet
-          player={reporting}
-          safety={safety}
-          onClose={() => {
-            setReporting(null);
-            // A block ends the friendship: load the list again.
-            reload();
-          }}
-        />
-      ) : null}
     </Screen>
+  );
+}
+
+/**
+ * Your rating for the Leaderboards row, once you have a rated match. It
+ * asks again on each visit; a failed call shows no chip.
+ */
+function useMyRating(ratings: Ratings | undefined, ready: boolean, visit: number): number | null {
+  const [rating, setRating] = useState<number | null>(null);
+  useEffect(() => {
+    if (ratings === undefined || !ready) return;
+    let live = true;
+    ratings.mine().then(
+      (mine) => {
+        if (live) setRating(mine.matches > 0 ? mine.rating : null);
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [ratings, ready, visit]);
+  return rating;
+}
+
+/** A section: its header (with an optional count), then one tray of rows. */
+function Section({
+  title,
+  count,
+  testID,
+  children,
+}: {
+  title: string;
+  count?: number;
+  testID: string;
+  children: ReactNode;
+}) {
+  // `toArray` keeps each row's key.
+  const rows = Children.toArray(children);
+  return (
+    <View style={styles.section}>
+      <SectionHeader title={title} {...(count === undefined ? {} : { count })} />
+      <CardFrame testID={testID}>
+        {rows.map((row, i) => (
+          <View key={isValidElement(row) ? row.key : i}>
+            {i > 0 ? <RowDivider /> : null}
+            {row}
+          </View>
+        ))}
+      </CardFrame>
+    </View>
+  );
+}
+
+interface PersonRowProps {
+  testID: string;
+  playerKey: string;
+  name: string;
+  /** The first line. Default: the name. */
+  title?: string;
+  /** The second line, or none. */
+  hint?: string | null;
+  /** Buttons on the right, or under the texts with `below`. */
+  children: ReactNode;
+  /** Puts the buttons under the texts (two buttons that need the room). */
+  below?: boolean;
+}
+
+/** One player in a list: a checker avatar, the name, a line, and the row's buttons. */
+function PersonRow({ testID, playerKey, name, title, hint, children, below }: PersonRowProps) {
+  const head = (
+    <View style={styles.person}>
+      <CheckerAvatar playerKey={playerKey} name={name} />
+      <View style={styles.texts}>
+        <Text style={styles.name}>{title ?? name}</Text>
+        {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      </View>
+      {below ? null : <View style={styles.trail}>{children}</View>}
+    </View>
+  );
+  return (
+    <View testID={testID} style={styles.personRow}>
+      {head}
+      {below ? <View style={styles.below}>{children}</View> : null}
+    </View>
+  );
+}
+
+/** The "…" button of a friend row: it opens the friend sheet. */
+function MoreButton({
+  testID,
+  label,
+  onPress,
+}: {
+  testID: string;
+  label: string;
+  onPress: () => void;
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.more, pressed && styles.pressed]}>
+      <Icon name="ellipsis" size={20} color={theme.colors.textDim} />
+    </Pressable>
+  );
+}
+
+/** Leaderboards as a row (#503): your rating as a chip once you have one. */
+function RatingsRow({ rating, onPress }: { rating: number | null; onPress: () => void }) {
+  const { t } = useTranslation();
+  const { theme } = useUnistyles();
+  const label = t('friends.ratingsButton');
+  return (
+    <Pressable
+      testID="friends-ratings"
+      accessibilityRole="button"
+      accessibilityLabel={rating === null ? label : t('friends.ratingsLabel', { rating })}
+      accessibilityHint={t('friends.ratingsHint')}
+      onPress={onPress}
+      style={({ pressed }) => [styles.ratings, pressed && styles.pressed]}>
+      <Icon name="trophy" size={22} color={theme.colors.accent} />
+      <View style={styles.texts}>
+        <Text style={styles.name}>{label}</Text>
+        <Text style={styles.hint}>{t('friends.ratingsHint')}</Text>
+      </View>
+      {rating === null ? null : (
+        <View testID="friends-rating-chip" style={styles.chip}>
+          <Text style={styles.chipText}>{rating}</Text>
+        </View>
+      )}
+      <Icon name="chevronRight" size={18} color={theme.colors.textDim} />
+    </Pressable>
+  );
+}
+
+/** The screen with no friend, request or invite (#503): one medallion, one sentence, one action. */
+function EmptyFriends({ onAdd, onRatings }: { onAdd: () => void; onRatings?: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.empty}>
+      <EmptyMedallion icon="handshake" testID="friends-medallion" />
+      <View style={styles.emptyTexts}>
+        <Text testID="friends-empty" style={styles.emptyTitle}>
+          {t('friends.empty.title')}
+        </Text>
+        <Text style={styles.emptyBody}>{t('friends.empty.body')}</Text>
+      </View>
+      <View style={styles.emptyButtons}>
+        <ActionButton
+          testID="friends-add"
+          icon="userPlus"
+          label={t('friends.addButton')}
+          onPress={onAdd}
+        />
+        {onRatings ? (
+          <ActionButton
+            testID="friends-ratings"
+            kind="text"
+            icon="trophy"
+            label={t('friends.ratingsButton')}
+            onPress={onRatings}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+interface FriendSheetProps {
+  friend: Friend;
+  name: string;
+  since: string;
+  busy: boolean;
+  canReport: boolean;
+  onInvite: () => void;
+  onRemove: () => void;
+  onReport: () => void;
+}
+
+/** The friend sheet (#503): who, since when and the record, then the actions. Focus moves to the name. */
+function FriendSheet({
+  friend,
+  name,
+  since,
+  busy,
+  canReport,
+  onInvite,
+  onRemove,
+  onReport,
+}: FriendSheetProps) {
+  const { t } = useTranslation();
+  const titleRef = useFocusOnShow();
+  const record = recordText(friend.record, t);
+  const line = [t('friends.sheet.since', { date: since }), record].filter(Boolean).join(' · ');
+  return (
+    <View testID="friend-sheet" style={styles.sheet}>
+      <View style={styles.person}>
+        <CheckerAvatar playerKey={friend.playerId} name={name} size={56} />
+        <View style={styles.texts}>
+          <Text ref={titleRef} accessibilityRole="header" style={styles.sheetTitle}>
+            {name}
+          </Text>
+          <Text style={styles.hint}>{line}</Text>
+        </View>
+      </View>
+      <ActionButton
+        testID="friend-sheet-invite"
+        icon="send"
+        disabled={busy}
+        label={t('friends.sheet.invite')}
+        accessibilityLabel={t('friends.list.inviteLabel', { name })}
+        onPress={onInvite}
+      />
+      <View style={styles.sheetCard}>
+        <SheetRow
+          testID="friend-sheet-remove"
+          icon="userX"
+          label={t('friends.sheet.remove')}
+          accessibilityLabel={t('friends.sheet.removeLabel', { name })}
+          disabled={busy}
+          onPress={onRemove}
+        />
+        {canReport ? (
+          <>
+            <RowDivider />
+            <SheetRow
+              testID="friend-sheet-report"
+              icon="flag"
+              label={t('friends.list.report')}
+              accessibilityLabel={t('safety.actionLabel', { name })}
+              disabled={busy}
+              problem
+              onPress={onReport}
+            />
+          </>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+interface SheetRowProps {
+  testID: string;
+  icon: IconName;
+  label: string;
+  accessibilityLabel: string;
+  disabled: boolean;
+  /** Coral, for Report or block. */
+  problem?: boolean;
+  onPress: () => void;
+}
+
+function SheetRow({
+  testID,
+  icon,
+  label,
+  accessibilityLabel,
+  disabled,
+  problem = false,
+  onPress,
+}: SheetRowProps) {
+  const { theme } = useUnistyles();
+  const color = disabled
+    ? theme.colors.textDisabled
+    : problem
+      ? theme.colors.problem
+      : theme.colors.text;
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.sheetRow, pressed && styles.pressed]}>
+      <Icon name={icon} size={20} color={problem && !disabled ? color : theme.colors.accent} />
+      <Text style={[styles.sheetRowText, { color }]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -487,45 +827,118 @@ function QuickInvite({ name, game, sending, onSend, onChange, onCancel }: QuickI
   );
 }
 
-interface RowButton {
-  key: string;
-  label: string;
-  accessibilityLabel: string;
-  primary?: boolean;
-  onPress: () => void;
-}
-
-interface RequestRowProps {
-  first: boolean;
-  testID: string;
-  name: string;
-  hint: string;
-  busy: boolean;
-  buttons: readonly RowButton[];
-}
-
-function RequestRow({ first, testID, name, hint, busy, buttons }: RequestRowProps) {
-  return (
-    <View>
-      {first ? null : <RowDivider />}
-      <View testID={testID} style={styles.row}>
-        <Text style={styles.name}>{name}</Text>
-        <Text style={styles.hint}>{hint}</Text>
-        <View style={styles.buttons}>
-          {buttons.map((button) => (
-            <ActionButton
-              key={button.key}
-              testID={`${testID}-${button.key}`}
-              kind={button.primary ? 'primary' : 'secondary'}
-              compact
-              disabled={busy}
-              label={button.label}
-              accessibilityLabel={button.accessibilityLabel}
-              onPress={button.onPress}
-            />
-          ))}
-        </View>
-      </View>
-    </View>
-  );
-}
+const styles = StyleSheet.create((theme) => ({
+  section: {
+    gap: theme.space.sm,
+  },
+  personRow: {
+    gap: theme.space.sm,
+    paddingHorizontal: theme.space.md,
+    paddingVertical: theme.space.md,
+  },
+  person: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+  },
+  texts: {
+    flex: 1,
+    gap: theme.space.xxs,
+  },
+  name: {
+    ...theme.type.bodyStrong,
+    color: theme.colors.text,
+  },
+  hint: {
+    ...theme.type.footnote,
+    color: theme.colors.textDim,
+  },
+  trail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.xs,
+  },
+  below: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space.sm,
+    // Under the texts, past the 40 pt avatar.
+    paddingLeft: 40 + theme.space.md,
+  },
+  more: {
+    width: theme.touch.minTarget,
+    height: theme.touch.minTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  ratings: {
+    ...surfaceStyle(theme, 'tray'),
+    minHeight: theme.touch.row,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.md,
+  },
+  chip: {
+    paddingHorizontal: theme.space.md,
+    paddingVertical: theme.space.xxs,
+    borderRadius: theme.radii.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.accentLine,
+    backgroundColor: theme.colors.accentWash,
+  },
+  chipText: {
+    ...theme.type.callout,
+    fontFamily: fonts.numerals,
+    color: theme.colors.accentLight,
+  },
+  empty: {
+    alignItems: 'stretch',
+    gap: theme.space.xl,
+    paddingTop: theme.space.xxxl,
+  },
+  emptyTexts: {
+    gap: theme.space.sm,
+  },
+  emptyTitle: {
+    ...theme.type.title2,
+    textAlign: 'center',
+    color: theme.colors.text,
+  },
+  emptyBody: {
+    ...theme.type.callout,
+    textAlign: 'center',
+    color: theme.colors.textDim,
+  },
+  emptyButtons: {
+    gap: theme.space.md,
+  },
+  sheet: {
+    gap: theme.space.lg,
+  },
+  sheetTitle: {
+    ...theme.type.title3,
+    color: theme.colors.text,
+  },
+  sheetCard: {
+    borderRadius: theme.radii.tray,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.surfaceRaised,
+  },
+  sheetRow: {
+    minHeight: theme.touch.row,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.md,
+  },
+  sheetRowText: {
+    ...theme.type.bodyStrong,
+    flex: 1,
+  },
+}));

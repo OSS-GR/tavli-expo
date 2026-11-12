@@ -14,7 +14,7 @@ import {
   inviteWaitHref,
 } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
-import { auth, friends, safety } from '@/services';
+import { auth, friends, ratings, safety } from '@/services';
 
 export default function FriendsRoute() {
   // Counts the times the screen shows, so it loads again on the way back.
@@ -26,6 +26,7 @@ export default function FriendsRoute() {
       visit={visit}
       friends={friends}
       {...(safety === undefined ? {} : { safety })}
+      {...(ratings === undefined ? {} : { ratings })}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/settings'))}
       onAdd={() => router.push(ADD_FRIEND_HREF)}
       onRatings={() => router.push(RATINGS_HREF)}

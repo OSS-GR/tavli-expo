@@ -258,6 +258,46 @@ export const ICONS = {
       'M5 18H3',
     ],
   },
+  // Friends and Add a friend in the Figma pass (#503).
+  userPlus: {
+    strokes: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', circle(9, 7, 4), 'M19 8v6', 'M22 11h-6'],
+  },
+  send: {
+    strokes: [
+      'M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z',
+      'm21.854 2.147-10.94 10.939',
+    ],
+  },
+  ellipsis: {
+    strokes: [circle(12, 12, 1), circle(19, 12, 1), circle(5, 12, 1)],
+  },
+  info: {
+    strokes: [circle(12, 12, 10), 'M12 16v-4', 'M12 8h.01'],
+  },
+  search: {
+    strokes: [circle(11, 11, 8), 'm21 21-4.3-4.3'],
+  },
+  share: {
+    strokes: ['M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8', 'M16 6l-4-4-4 4', 'M12 2v13'],
+  },
+  messageCircle: {
+    strokes: ['M7.9 20A9 9 0 1 0 4 16.1L2 22Z'],
+  },
+  rotateCcw: {
+    strokes: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5'],
+  },
+  chevronDown: {
+    strokes: ['m6 9 6 6 6-6'],
+  },
+  clipboard: {
+    strokes: [
+      roundRect(8, 2, 8, 4, 1),
+      'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2',
+    ],
+  },
+  lock: {
+    strokes: [roundRect(3, 11, 18, 11, 2), 'M7 11V7a5 5 0 0 1 10 0v4'],
+  },
 } as const satisfies Record<string, IconShape>;
 
 export type IconName = keyof typeof ICONS;

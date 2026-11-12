@@ -69,7 +69,7 @@ describe('<AddFriendScreen />', () => {
     expect(screen.getByRole('image', { name: 'QR code of your friend link' })).toBeOnTheScreen();
   });
 
-  it('Share opens the share sheet, Text message the Messages app, with the link', async () => {
+  it('Share link opens the share sheet, Message the Messages app, with the link', async () => {
     signInSaved();
     const share = jest
       .spyOn(Share, 'share')
@@ -78,9 +78,9 @@ describe('<AddFriendScreen />', () => {
     await show();
     const link = await myLink();
     const user = setupUser();
-    await user.press(screen.getByRole('button', { name: 'Share' }));
+    await user.press(screen.getByRole('button', { name: 'Share link' }));
     expect(share).toHaveBeenCalledWith({ message: `Be my friend on Tavlaki: ${link}` });
-    await user.press(screen.getByRole('button', { name: 'Text message' }));
+    await user.press(screen.getByRole('button', { name: 'Message' }));
     const url = open.mock.calls[0]![0];
     expect(url).toMatch(/^sms:[&?]body=/);
     expect(decodeURIComponent(url)).toContain(link);
@@ -91,7 +91,7 @@ describe('<AddFriendScreen />', () => {
     await show();
     const old = await myLink();
     const user = setupUser();
-    await user.press(screen.getByRole('button', { name: 'New link' }));
+    await user.press(screen.getByRole('button', { name: 'Make a new link' }));
     await user.press(screen.getByTestId('dialog-confirm'));
     await flush();
     const now = await myLink();
@@ -108,7 +108,7 @@ describe('<AddFriendScreen />', () => {
     await render(ui(1));
     await flush();
     const user = setupUser();
-    await user.press(screen.getByRole('button', { name: 'New link' }));
+    await user.press(screen.getByRole('button', { name: 'Make a new link' }));
     await user.press(screen.getByTestId('dialog-confirm'));
     await flush();
     expect(screen.getByTestId('add-friend-link')).toHaveTextContent(await myLink());
@@ -149,7 +149,7 @@ describe('<AddFriendScreen />', () => {
     expect(waiting).toHaveLength(1);
     held = null;
     const user = setupUser();
-    await user.press(screen.getByRole('button', { name: 'New link' }));
+    await user.press(screen.getByRole('button', { name: 'Make a new link' }));
     await user.press(screen.getByTestId('dialog-confirm'));
     await flush();
     const fresh = await myLink();
@@ -196,7 +196,7 @@ describe('<AddFriendScreen />', () => {
     expect(screen.queryByTestId('add-friend-qr')).toBeNull();
     expect(screen.getByTestId('add-friend-checking')).toHaveTextContent('Checking your link…');
     const user = setupUser();
-    await user.press(screen.getByRole('button', { name: 'Share' }));
+    await user.press(screen.getByRole('button', { name: 'Share link' }));
     expect(share).not.toHaveBeenCalled();
     held = null;
     await act(async () => {
@@ -230,14 +230,14 @@ describe('<AddFriendScreen />', () => {
     await show(flaky);
     down = true;
     const user = setupUser();
-    await user.press(screen.getByRole('button', { name: 'New link' }));
+    await user.press(screen.getByRole('button', { name: 'Make a new link' }));
     await user.press(screen.getByTestId('dialog-confirm'));
     await flush();
     // The server just gave this link: it is right, though the reload failed.
     expect(screen.getByTestId('add-friend-refresh-failed')).toBeOnTheScreen();
     expect(screen.getByTestId('add-friend-qr')).toBeOnTheScreen();
     expect(screen.getByTestId('add-friend-link')).toHaveTextContent(await myLink());
-    expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Share link' })).toBeEnabled();
   });
 
   it('after Ask, a failed reload keeps the link of this visit shown', async () => {
@@ -313,6 +313,9 @@ describe('<AddFriendScreen />', () => {
     signInSaved();
     const props = await show();
     const user = setupUser();
+    // The paste field shows once its row is open.
+    expect(screen.queryByLabelText('Friend link')).toBeNull();
+    await user.press(screen.getByTestId('add-friend-paste-row'));
     await user.type(screen.getByLabelText('Friend link'), 'hello');
     await user.press(screen.getByRole('button', { name: 'Open the link' }));
     expect(screen.getByTestId('add-friend-paste-bad')).toBeOnTheScreen();
@@ -330,9 +333,8 @@ describe('<AddFriendScreen />', () => {
     const user = setupUser();
     await user.press(screen.getByRole('button', { name: `Ask ${nameOf('ann')} to be friends` }));
     await flush();
-    expect(screen.getByTestId('recent-ann-status')).toHaveTextContent(
-      'You asked. They have not answered yet.',
-    );
+    expect(screen.getByTestId('recent-ann-status')).toHaveTextContent('Asked');
+    expect(screen.getByLabelText('You asked. They have not answered yet.')).toBeOnTheScreen();
   });
 
   it('a refused request says why', async () => {

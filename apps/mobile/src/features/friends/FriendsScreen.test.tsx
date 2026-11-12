@@ -3,7 +3,7 @@
  * Remove, Invite (and its short confirm with the last setup, #488),
  * Report or block, and friend invites to you.
  */
-import type { Friends, NewInvite } from '@tavli/contracts';
+import type { Friends, NewInvite, Ratings } from '@tavli/contracts';
 import { act, render, screen } from '@testing-library/react-native';
 
 import {
@@ -56,17 +56,30 @@ async function befriend(id: string): Promise<void> {
 
 const nameOf = (id: string) => `Guest ${onlineFake.guestNumber(id)}`;
 
-async function show(friends: Friends = onlineFake.friends) {
+/** Opens the friend sheet of `id` (the row's "more" button). */
+async function openSheet(user: ReturnType<typeof setupUser>, id: string): Promise<void> {
+  await user.press(screen.getByRole('button', { name: `More for ${nameOf(id)}` }));
+  expect(screen.getByTestId('friend-sheet')).toBeOnTheScreen();
+}
+
+async function show(friends: Friends = onlineFake.friends, ratings?: Ratings) {
   const props = {
     onBack: jest.fn(),
     onAdd: jest.fn(),
+    onRatings: jest.fn(),
     onInvite: jest.fn(),
     onInvited: jest.fn(),
     onOpenInvite: jest.fn(),
     onAccount: jest.fn(),
   };
   await render(
-    <FriendsScreen auth={auth!} friends={friends} safety={onlineFake.safety} {...props} />,
+    <FriendsScreen
+      auth={auth!}
+      friends={friends}
+      safety={onlineFake.safety}
+      {...(ratings === undefined ? {} : { ratings })}
+      {...props}
+    />,
   );
   await flush();
   return props;
@@ -90,12 +103,65 @@ describe('<FriendsScreen />', () => {
     expect(props.onAccount).not.toHaveBeenCalled();
   });
 
-  it('with no friends, says so and offers Add a friend', async () => {
+  it('with no friends, shows the empty state: Add a friend and a Leaderboards link', async () => {
     signInSaved();
     const props = await show();
-    expect(screen.getByTestId('friends-empty')).toBeOnTheScreen();
-    await setupUser().press(screen.getByRole('button', { name: 'Add a friend' }));
+    expect(screen.getByTestId('friends-empty')).toHaveTextContent('No friends yet');
+    expect(screen.getByTestId('friends-medallion', { includeHiddenElements: true })).toBeTruthy();
+    // Only one Add a friend: the empty state's.
+    expect(screen.getAllByRole('button', { name: 'Add a friend' })).toHaveLength(1);
+    expect(screen.queryByTestId('friends-list')).toBeNull();
+    const user = setupUser();
+    await user.press(screen.getByRole('button', { name: 'Add a friend' }));
     expect(props.onAdd).toHaveBeenCalled();
+    await user.press(screen.getByRole('button', { name: 'Leaderboards' }));
+    expect(props.onRatings).toHaveBeenCalled();
+  });
+
+  it('with a request but no friend, shows the list and says it has no friend', async () => {
+    signInSaved();
+    meet('ann');
+    await onlineFake.server().friendsFor('ann').sendRequest(ME);
+    await show();
+    expect(screen.getByTestId('friends-incoming')).toBeOnTheScreen();
+    expect(screen.getByTestId('friends-list')).toBeOnTheScreen();
+    expect(screen.getByTestId('friends-empty')).toHaveTextContent(
+      'No friends yet. Tap Add a friend.',
+    );
+  });
+
+  it('shows my rating on the Leaderboards row once I have a rated match', async () => {
+    signInSaved();
+    await befriend('ann');
+    const mine = jest
+      .fn()
+      .mockResolvedValue({ rating: 1490, matches: 1, shown: true, listed: false });
+    const ratings = { ...onlineFake.ratings, mine };
+    const props = await show(onlineFake.friends, ratings);
+    expect(screen.getByTestId('friends-rating-chip')).toHaveTextContent('1490');
+    const row = screen.getByRole('button', { name: 'Leaderboards, your rating 1490' });
+    await setupUser().press(row);
+    expect(props.onRatings).toHaveBeenCalled();
+  });
+
+  it('shows no rating chip before the first rated match', async () => {
+    signInSaved();
+    await befriend('ann');
+    const mine = jest
+      .fn()
+      .mockResolvedValue({ rating: 1500, matches: 0, shown: true, listed: false });
+    await show(onlineFake.friends, { ...onlineFake.ratings, mine });
+    expect(screen.getByRole('button', { name: 'Leaderboards' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('friends-rating-chip')).toBeNull();
+  });
+
+  it('shows no rating chip when the rating call fails, and no problem line', async () => {
+    signInSaved();
+    await befriend('ann');
+    const failing = jest.fn().mockRejectedValue(new Error('offline'));
+    await show(onlineFake.friends, { ...onlineFake.ratings, mine: failing });
+    expect(screen.queryByTestId('friends-rating-chip')).toBeNull();
+    expect(screen.queryByTestId('friends-problem')).toBeNull();
   });
 
   it('loads again each time the screen shows (a new visit)', async () => {
@@ -175,12 +241,15 @@ describe('<FriendsScreen />', () => {
     expect(screen.queryByTestId('friends-refresh-failed')).toBeNull();
   });
 
-  it('lists friends with the record, and Invite with no saved setup opens the full setup', async () => {
+  it('lists friends with a count, and Invite with no saved setup opens the full setup', async () => {
     signInSaved();
     await befriend('ann');
     const props = await show();
     expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
-    expect(screen.getByText('Matches: you won 0, they won 0')).toBeOnTheScreen();
+    // The section header counts the friends.
+    expect(screen.getByText('1')).toBeOnTheScreen();
+    // No finished match yet: no record line.
+    expect(screen.queryByText(/lead|Even at/)).toBeNull();
     await setupUser().press(
       screen.getByRole('button', { name: `Invite ${nameOf('ann')} to a game` }),
     );
@@ -310,15 +379,33 @@ describe('<FriendsScreen />', () => {
     expect(screen.queryByTestId('friends-outgoing')).toBeNull();
   });
 
+  it('the friend sheet shows since when, and Invite to a game invites', async () => {
+    signInSaved();
+    await befriend('ann');
+    const props = await show();
+    const user = setupUser();
+    await openSheet(user, 'ann');
+    expect(screen.getByRole('header', { name: nameOf('ann') })).toBeOnTheScreen();
+    expect(screen.getByText(/^Friends since /)).toBeOnTheScreen();
+    await user.press(screen.getByTestId('friend-sheet-invite'));
+    // No saved setup: the full setup opens, and the sheet closes.
+    expect(props.onInvite).toHaveBeenCalledWith('ann');
+    expect(screen.queryByTestId('friend-sheet')).toBeNull();
+  });
+
   it('Remove asks first, then ends the friendship', async () => {
     signInSaved();
     await befriend('ann');
     await show();
     const user = setupUser();
+    await openSheet(user, 'ann');
     await user.press(screen.getByRole('button', { name: `Remove ${nameOf('ann')}` }));
+    // The confirm takes the sheet's place: one sheet at a time.
+    expect(screen.queryByTestId('friend-sheet')).toBeNull();
     expect(screen.getByText(`Remove ${nameOf('ann')}?`)).toBeOnTheScreen();
     await user.press(screen.getByTestId('dialog-cancel'));
     expect(screen.getByTestId('friend-ann')).toBeOnTheScreen();
+    await openSheet(user, 'ann');
     await user.press(screen.getByRole('button', { name: `Remove ${nameOf('ann')}` }));
     await user.press(screen.getByTestId('dialog-confirm'));
     await flush();
@@ -331,6 +418,7 @@ describe('<FriendsScreen />', () => {
     await befriend('ann');
     await show();
     const user = setupUser();
+    await openSheet(user, 'ann');
     await user.press(screen.getByRole('button', { name: `Report or block ${nameOf('ann')}` }));
     await flush();
     await user.press(await screen.findByTestId('safety-block'));
@@ -361,6 +449,7 @@ describe('<FriendsScreen />', () => {
     const removeFriend = jest.fn().mockRejectedValue(new Error('offline'));
     await show({ ...onlineFake.friends, removeFriend });
     const user = setupUser();
+    await openSheet(user, 'ann');
     await user.press(screen.getByRole('button', { name: `Remove ${nameOf('ann')}` }));
     await user.press(screen.getByTestId('dialog-confirm'));
     await flush();
@@ -381,6 +470,7 @@ describe('<FriendsScreen />', () => {
       const removeFriend = jest.fn().mockRejectedValue({ code, message: 'no' });
       await show({ ...onlineFake.friends, removeFriend });
       const user = setupUser();
+      await openSheet(user, 'ann');
       await user.press(screen.getByRole('button', { name: `Remove ${nameOf('ann')}` }));
       await user.press(screen.getByTestId('dialog-confirm'));
       await flush();
