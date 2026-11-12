@@ -184,11 +184,12 @@ export const OPENING_RESULT_MS = 3000;
 
 /**
  * "Grab a chair" (#509) at game start: the scene plays on a cover over the
- * board. The cover shows first while the screen slides in (`LEAD`), then
- * the scene plays, rests a beat on its last frame (`HOLD`), and the cover
- * fades out (`FADE`) to show the board. Then the opening card shows.
+ * board. The cover shows first while the screen slides in (`LEAD`, and the
+ * scene's own short wait), then the scene builds up, rests a beat on its
+ * last frame (`HOLD`), and the cover fades out (`FADE`) to show the board.
+ * Then the opening card shows.
  */
-export const TABLE_INTRO_LEAD_MS = 450;
+export const TABLE_INTRO_LEAD_MS = 150;
 const TABLE_INTRO_HOLD_MS = 250;
 export const TABLE_INTRO_FADE_MS = 350;
 /** The whole game-start intro, from mount to the opening card. */

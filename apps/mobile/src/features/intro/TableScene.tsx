@@ -1,7 +1,7 @@
 /**
- * "Grab a chair" (#509): the kafeneio table scene, drawn with Skia. The
- * board drops onto the table, then your chair is pulled in (the timeline
- * is `tableFrame` in `tableMotion.ts`).
+ * "Grab a chair" (#509): the kafeneio table scene, drawn with Skia. It
+ * builds up piece by piece (#512): the table, their chair, the board, then
+ * your chair (the timeline is `tableFrame` in `tableMotion.ts`).
  *
  * With `play` it runs once from the start when it mounts (after `delayMs`,
  * on its first frame); without it, or
@@ -30,6 +30,7 @@ import {
   SCENE_HEIGHT,
   SCENE_PATHS,
   SCENE_WIDTH,
+  TABLE_ORIGIN,
   TABLE_SCENE_MS,
   tableFrame,
   type TableFrame,
@@ -69,7 +70,19 @@ export function TableScene({ width, play, delayMs = 0, testID }: TableSceneProps
   }, [animate, delayMs, time]);
 
   const frame = useDerivedValue(() => tableFrame(time.get()));
-  const tableTransform = useDerivedValue(() => [{ translateY: frame.get().tableDip }]);
+  const floorOpacity = useDerivedValue(() => 0.25 * frame.get().floor);
+  const tableTransform = useDerivedValue(() => {
+    const f = frame.get();
+    return [
+      { translateX: f.tableX },
+      { translateY: f.tableDip },
+      { rotate: (f.tableRotate * Math.PI) / 180 },
+    ];
+  });
+  const theirTransform = useDerivedValue(() => {
+    const f = frame.get();
+    return [{ translateX: f.theirX }, { translateY: f.theirY }];
+  });
   const boardTransform = useDerivedValue(() => {
     const f = frame.get();
     return [
@@ -122,13 +135,13 @@ export function TableScene({ width, play, delayMs = 0, testID }: TableSceneProps
             style="stroke"
             strokeWidth={1}
             color={brass}
-            opacity={0.25}
+            opacity={floorOpacity}
           />
-          <Group>
+          <Group transform={theirTransform}>
             <Path path={SCENE_PATHS.theirChair.fill} color={wood} />
             {SCENE_PATHS.theirChair.strokes.map((p) => stroke(p))}
           </Group>
-          <Group transform={tableTransform}>
+          <Group transform={tableTransform} origin={TABLE_ORIGIN}>
             {SCENE_PATHS.table.fills.map((p) => (
               <Path key={p} path={p} color={wood} />
             ))}

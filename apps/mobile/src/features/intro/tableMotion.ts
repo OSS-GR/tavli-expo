@@ -1,18 +1,38 @@
 /**
- * "Grab a chair" (#509): the kafeneio table scene. A tavli board drops
- * onto the table like a cartoon, then your chair is pulled in, its back to
- * us. This file is pure: the drawing (paths on a 240×180 grid) and the
- * motion as a function of time. `TableScene.tsx` draws it with Skia.
+ * "Grab a chair" (#509): the kafeneio table scene. It builds up piece by
+ * piece (#512): the table, their chair, the tavli board that drops like a
+ * cartoon, then your chair, its back to us. This file is pure: the drawing
+ * (paths on a 240×180 grid) and the motion as a function of time.
+ * `TableScene.tsx` draws it with Skia, which clips to the grid, so a part
+ * off the grid is out of sight.
  *
- * The timeline, in ms from the start:
- * - 0–300: the board falls, stretched, with speed lines.
- * - 300: it lands squashed; the table dips 2, dust puffs out.
- * - 360–520: one small bounce. 520–600: a last small squash.
- * - 640–1000: your chair is pulled in. 1000–1150: a 1° rock, then rest.
+ * The timeline, in ms from the start (`SCENE_TIMES`):
+ * - 0–300: a short wait, so the screen is in place. The floor fades in.
+ * - 300–800: the table slides in from the left and overshoots a little;
+ *   800–950 it rocks once and settles.
+ * - 950–1350: their chair slides in from the right, behind the table,
+ *   with a small hop.
+ * - 1400–1700: the board falls, stretched, with speed lines. 1700: it lands
+ *   squashed; the table dips 2, dust puffs out. 1760–1920: one small
+ *   bounce, 1920–2000 a last small squash.
+ * - 2000–2260: your chair comes up into sight, close to us. 2260–2620: it
+ *   is pulled in. 2620–2800: a 1° rock, then rest.
  */
 
+/** When each part of the scene starts, in ms. */
+export const SCENE_TIMES = {
+  tableIn: 300,
+  tableStop: 800,
+  tableSettle: 950,
+  theirIn: 950,
+  theirStop: 1350,
+  board: 1400,
+  yourRise: 2000,
+  yourIn: 2260,
+} as const;
+
 /** The whole scene, in ms. */
-export const TABLE_SCENE_MS = 1150;
+export const TABLE_SCENE_MS = 2800;
 
 /** The drawing grid. */
 export const SCENE_WIDTH = 240;
@@ -22,15 +42,25 @@ export const SCENE_HEIGHT = 180;
 export const BOARD_ORIGIN = { x: 120, y: 77 } as const;
 /** Where your chair turns and grows from: the middle of its feet. */
 export const CHAIR_ORIGIN = { x: 120, y: 172 } as const;
+/** Where the table turns as it skids: its middle on the floor. */
+export const TABLE_ORIGIN = { x: 120, y: 150 } as const;
 
-/** One frame of the scene. Every number is in grid units (degrees for `chairRotate`). */
+/** One frame of the scene. Every number is in grid units (degrees for the turns). */
 export interface TableFrame {
+  /** How much of the floor line shows, 0 to 1. */
+  readonly floor: number;
+  /** The table's slide (negative is left) and its turn. */
+  readonly tableX: number;
+  readonly tableRotate: number;
+  /** The table's dip at the landing. */
+  readonly tableDip: number;
+  /** Their chair's slide (positive is right) and hop (negative is up). */
+  readonly theirX: number;
+  readonly theirY: number;
   /** The board's drop above its place (negative is up). */
   readonly boardY: number;
   readonly boardScaleX: number;
   readonly boardScaleY: number;
-  /** The table's dip at the landing. */
-  readonly tableDip: number;
   /** The speed lines' opacity. */
   readonly lines: number;
   /** The dust's opacity and how far it has spread. */
@@ -42,12 +72,17 @@ export interface TableFrame {
   readonly chairRotate: number;
 }
 
-/** The last frame: the board on the table, your chair in. */
+/** The last frame: everything in place. */
 export const REST_FRAME: TableFrame = {
+  floor: 1,
+  tableX: 0,
+  tableRotate: 0,
+  tableDip: 0,
+  theirX: 0,
+  theirY: 0,
   boardY: 0,
   boardScaleX: 1,
   boardScaleY: 1,
-  tableDip: 0,
   lines: 0,
   dust: 0,
   // Where the faded dust ended.
@@ -74,80 +109,115 @@ function part(t: number, a: number, b: number): number {
   return clamp01((t - a) / (b - a));
 }
 
+/** Eases out past the end and back: 0 at 0, 1 at 1, a little over 1 near the end. */
+function outBack(p: number, s: number): number {
+  'worklet';
+  return 1 + (s + 1) * Math.pow(p - 1, 3) + s * Math.pow(p - 1, 2);
+}
+
 /** The scene at `t` ms. Before 0 is the first frame; from `TABLE_SCENE_MS` on, `REST_FRAME`. */
 export function tableFrame(t: number): TableFrame {
   'worklet';
   if (t >= TABLE_SCENE_MS) return REST_FRAME;
   const time = Math.max(0, t);
+  const T = SCENE_TIMES;
 
-  let boardY = 0;
+  const floor = part(time, 150, 450);
+
+  // The table: pushed in from the left, leaning back, then one rock.
+  const slide = part(time, T.tableIn, T.tableStop);
+  const tableX = lerp(-200, 0, outBack(slide, 1.1));
+  let tableRotate = -5 * (1 - slide) * (1 - slide);
+  if (time >= T.tableStop) {
+    const settle = part(time, T.tableStop, T.tableSettle);
+    tableRotate = 2.2 * Math.sin(Math.PI * settle) * (1 - settle);
+  }
+
+  // Their chair: in from the right, with a hop.
+  const come = part(time, T.theirIn, T.theirStop);
+  const theirX = lerp(150, 0, outBack(come, 1.2));
+  const theirY = -7 * Math.sin(Math.PI * Math.min(1, come * 1.25));
+
+  // The board: falls faster and faster, and stretches as it goes.
+  const b = time - T.board;
+  let boardY = -115;
   let boardScaleX = 1;
   let boardScaleY = 1;
   let lines = 0;
-  if (time < 300) {
-    // Falls faster and faster, and stretches as it goes.
-    const v = time / 300;
+  if (b >= 0 && b < 300) {
+    const v = b / 300;
     boardY = lerp(-115, 0, v * v);
     boardScaleX = lerp(1, 0.84, v);
     boardScaleY = lerp(1, 1.35, v);
-    lines = 0.85 * part(time, 120, 200);
-  } else if (time < 360) {
+    lines = 0.85 * part(b, 120, 200);
+  } else if (b >= 300 && b < 360) {
     // Lands squashed, then springs back.
-    const p = part(time, 300, 360);
+    const p = part(b, 300, 360);
     const out = 1 - (1 - p) * (1 - p);
+    boardY = 0;
     boardScaleX = lerp(1.2, 1, out);
     boardScaleY = lerp(0.55, 1, out);
-    lines = 0.85 * (1 - part(time, 300, 330));
-  } else if (time < 520) {
-    const h = Math.sin(Math.PI * part(time, 360, 520));
+    lines = 0.85 * (1 - part(b, 300, 330));
+  } else if (b >= 360 && b < 520) {
+    const h = Math.sin(Math.PI * part(b, 360, 520));
     boardY = -9 * h;
     boardScaleX = lerp(1, 0.94, h);
     boardScaleY = lerp(1, 1.1, h);
-  } else if (time < 600) {
-    const k = Math.sin(Math.PI * part(time, 520, 600));
+  } else if (b >= 520) {
+    const k = Math.sin(Math.PI * part(b, 520, 600));
+    boardY = 0;
     boardScaleX = 1 + 0.06 * k;
     boardScaleY = 1 - 0.1 * k;
   }
 
   let tableDip = 0;
-  if (time >= 300 && time < 380) {
-    const p = part(time, 300, 380);
+  if (b >= 300 && b < 380) {
+    const p = part(b, 300, 380);
     tableDip = 2 * (1 - p) * (1 - p);
-  } else if (time >= 520 && time < 580) {
-    tableDip = 0.8 * Math.sin(Math.PI * part(time, 520, 580));
+  } else if (b >= 520 && b < 580) {
+    tableDip = 0.8 * Math.sin(Math.PI * part(b, 520, 580));
   }
 
   let dust = 0;
   let dustSpread = 0;
-  if (time >= 300 && time < 680) {
-    const p = part(time, 300, 680);
+  if (b >= 300 && b < 680) {
+    const p = part(b, 300, 680);
     dust = 0.9 * (1 - p);
     dustSpread = 14 * (1 - (1 - p) * (1 - p));
-  } else if (time >= 680) {
+  } else if (b >= 680) {
     dustSpread = 14;
   }
 
-  // Your chair: out, close to us, until the board has settled.
+  // Your chair: below the grid until its turn, then up close to us.
   let chairScale = 1.32;
   let chairX = 14;
-  let chairY = 24;
+  let chairY = 160;
   let chairRotate = 3;
-  if (time >= 640) {
-    const raw = part(time, 640, 1000);
+  if (time < T.yourIn) {
+    const p = part(time, T.yourRise, T.yourIn);
+    chairY = lerp(160, 24, 1 - Math.pow(1 - p, 3));
+  } else {
+    const pullEnd = T.yourIn + 360;
+    const raw = part(time, T.yourIn, pullEnd);
     const p = 1 - Math.pow(1 - raw, 3);
     chairScale = lerp(1.32, 1, p);
     chairX = lerp(14, 0, p);
     chairY = lerp(24, 0, p);
     // A small scrape on the floor as it comes.
     chairRotate = lerp(3, 0, p) + Math.sin(raw * Math.PI * 3) * 1.4 * (1 - raw);
+    if (time >= pullEnd) chairRotate = -Math.sin(Math.PI * part(time, pullEnd, TABLE_SCENE_MS));
   }
-  if (time >= 1000) chairRotate = -Math.sin(Math.PI * part(time, 1000, TABLE_SCENE_MS));
 
   return {
+    floor,
+    tableX,
+    tableRotate,
+    tableDip,
+    theirX,
+    theirY,
     boardY,
     boardScaleX,
     boardScaleY,
-    tableDip,
     lines,
     dust,
     dustSpread,
