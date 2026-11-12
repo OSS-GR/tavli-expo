@@ -10,7 +10,6 @@ import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { SectionHeader } from '@/components/SectionHeader';
-
 import { OnlineGameList } from '@/features/online/OnlineGameList';
 import {
   HOME_GAME_ROWS,

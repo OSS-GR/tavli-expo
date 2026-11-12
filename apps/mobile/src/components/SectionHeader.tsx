@@ -19,7 +19,7 @@ export interface SectionHeaderAction {
 
 export interface SectionHeaderProps {
   title: string;
-  /** A count on the right, for example the number of friends. */
+  /** A count on the right, for example the number of friends. Hidden when `action` is set. */
   count?: number;
   /** A small text button on the right, in place of the count. */
   action?: SectionHeaderAction;
