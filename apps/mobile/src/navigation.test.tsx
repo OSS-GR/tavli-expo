@@ -1581,7 +1581,7 @@ describe('leaderboards (#407)', () => {
     const router = await renderRouter('./src/app', { initialUrl: '/settings' });
     await user.press(await screen.findByTestId('settings-ratings'));
     expect(router.getPathname()).toBe('/ratings');
-    expect(await screen.findByTestId('ratings-mine-rating')).toHaveTextContent('1500');
+    expect(await screen.findByTestId('ratings-mine-rating')).toHaveTextContent('—');
     await user.press(screen.getByTestId('ratings-back'));
     await user.press(await screen.findByTestId('settings-friends'));
     await user.press(await screen.findByRole('button', { name: 'Leaderboards' }));
