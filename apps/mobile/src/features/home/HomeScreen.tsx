@@ -2,7 +2,9 @@
  * Home (wireframe 3, redesigned in #342): start or continue a game in one
  * or two taps.
  *
- * Top to bottom: the logo, What's new (#471) and Settings, a greeting, then a big hero card
+ * Top to bottom: the logo, What's new (#471) and Settings, a greeting with
+ * the kafeneio table scene (#509; it plays the first time Home shows in an
+ * app run), then a big hero card
  * with a board picture. The hero is the saved game ("Continue game") or,
  * with no save, "Play vs bot". Then the reminder card (#404, when one is
  * due), your online games and invites, the friend invites to you
@@ -14,7 +16,7 @@
 import type { Difficulty } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
 import type { TFunction } from 'i18next';
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -24,6 +26,8 @@ import type { IconName } from '@/components/icons';
 import { screenBackground } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Toast, useToast } from '@/components/Toast';
+import { homeIntroDue, markHomeIntroPlayed } from '@/features/intro/introRuns';
+import { TableScene } from '@/features/intro/TableScene';
 import type { MatchMode } from '@/features/match/setup';
 import { rulesDirection, startBoard } from '@/features/rules/content';
 import { WhatsNewButton } from '@/features/whats-new/WhatsNewButton';
@@ -33,6 +37,9 @@ import { HomeHero, type HeroBoard } from './HomeHero';
 import { ModeTile } from './ModeTile';
 
 const LOGO = require('../../../assets/home/logo.webp') as number;
+
+/** The table scene's width beside the greeting (Figma: 144×108). */
+const SCENE_WIDTH = 144;
 
 /** Above this font scale the mode tiles and the pills take a row each. */
 const ONE_COLUMN_FONT_SCALE = 1.3;
@@ -108,6 +115,11 @@ export function HomeScreen({
   useEffect(() => {
     if (notice !== null) showToast(notice);
   }, [notice, showToast]);
+  // The table scene plays once per app run; after that it rests (#509).
+  const [playIntro] = useState(homeIntroDue);
+  useEffect(() => {
+    markHomeIntroPlayed();
+  }, []);
   const startPosition = useMemo<HeroBoard>(
     () => ({ board: startBoard('portes'), direction: rulesDirection('portes') }),
     [],
@@ -145,8 +157,13 @@ export function HomeScreen({
               <Icon name="settings" size={22} color={theme.colors.text} />
             </Pressable>
           </View>
-          <Text style={styles.greeting}>{greeting}</Text>
-          <Text style={styles.tagline}>{t('home.tagline')}</Text>
+          <View style={styles.welcome}>
+            <View style={styles.welcomeText}>
+              <Text style={styles.greeting}>{greeting}</Text>
+              <Text style={styles.tagline}>{t('home.tagline')}</Text>
+            </View>
+            <TableScene width={SCENE_WIDTH} play={playIntro} testID="home-table-scene" />
+          </View>
         </View>
 
         {continueCard ?? (
@@ -349,6 +366,16 @@ const styles = StyleSheet.create((theme, rt) => ({
   pressed: {
     opacity: 0.85,
     transform: [{ scale: 0.97 }],
+  },
+  welcome: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+  },
+  welcomeText: {
+    flex: 1,
+    minWidth: 0,
+    gap: theme.space.xs,
   },
   greeting: {
     ...theme.type.display,

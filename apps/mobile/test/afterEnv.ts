@@ -2,6 +2,7 @@
 // (`setupFilesAfterEnv` in jest.config.js).
 
 import { resetRaceOffersForTest } from '../src/features/game/raceOffer';
+import { resetIntrosForTest } from '../src/features/intro/introRuns';
 import { resetAnnouncements } from '../src/features/game/useAnnouncement';
 import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPushes';
 import { forgetPushTapsForTest } from '../src/features/notifications/pushTaps';
@@ -19,6 +20,9 @@ import { resetOnlineFake } from './onlineFake';
 beforeEach(() => {
   resetAnnouncements();
   resetRaceOffersForTest();
+  // The table scene (#509): Home rests on its last frame, and game start
+  // plays no intro (a test of it turns it on), so tests tap the opening card.
+  resetIntrosForTest();
 });
 
 // Online play (`auth`, `games`, `onlineServer` of `@/services`): each test

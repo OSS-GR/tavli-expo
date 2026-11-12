@@ -27,7 +27,8 @@ export type WhatsNewEntryId =
   | 'reportBlock'
   | 'fastForward'
   | 'quickInvites'
-  | 'newLook';
+  | 'newLook'
+  | 'grabAChair';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -43,6 +44,10 @@ export interface WhatsNewRelease {
 
 /** Every release, newest first. */
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    date: '2026-11-12',
+    entries: [{ id: 'grabAChair', icon: 'sparkles' }],
+  },
   {
     date: '2026-11-11',
     entries: [
