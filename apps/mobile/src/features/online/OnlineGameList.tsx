@@ -141,11 +141,21 @@ function OnlineGameRow({ game, now, offset, onPress }: OnlineGameRowProps) {
       accessibilityLabel={text.label}
       onPress={onPress}
       style={({ pressed }) => [styles.row(game.myTurn), pressed && styles.pressed]}>
-      <CheckerAvatar
-        testID={`online-game-avatar-${game.gameId}`}
-        playerKey={game.opponentId}
-        name={playerNameText(game.opponentName, t)}
-      />
+      <View>
+        <CheckerAvatar
+          testID={`avatar-game-${game.gameId}`}
+          playerKey={game.opponentId}
+          name={playerNameText(game.opponentName, t)}
+        />
+        {/* Your turn at a glance: a brass dot on the avatar. The row's text says it too. */}
+        {game.myTurn ? (
+          <View
+            testID={`avatar-turn-${game.gameId}`}
+            style={styles.turnDot}
+            importantForAccessibility="no"
+          />
+        ) : null}
+      </View>
       <View style={styles.texts}>
         <Text style={styles.title}>{text.title}</Text>
         <Text style={styles.turn(game.myTurn)}>{text.turn}</Text>
@@ -178,6 +188,17 @@ const styles = StyleSheet.create((theme) => ({
   }),
   pressed: {
     opacity: 0.75,
+  },
+  turnDot: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: theme.colors.surface,
+    backgroundColor: theme.colors.accent,
   },
   texts: {
     flex: 1,

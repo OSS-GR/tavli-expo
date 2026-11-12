@@ -12,9 +12,11 @@ import {
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, SERVER_ACTOR } from '@tavli/online';
 import { guestNumberOf } from '@tavli/online/testing';
-import { act, screen } from '@testing-library/react-native';
+import { themes } from '@tavli/ui';
+import { act, screen, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
+import { avatarWood } from '@/components/avatar';
 import i18n from '@/i18n';
 
 import { InviteScreen } from './InviteScreen';
@@ -198,6 +200,12 @@ describe('InviteScreen', () => {
     const code = server.createInvite(FRIEND, 'portes', 3, null);
     await openInvite(code, server.invitesFor(ME));
     expect(await screen.findByText('eleni invited you to play Portes online.')).toBeOnTheScreen();
+    // The inviter's checker avatar (#495): the wood from their id, the initial from the name.
+    const avatar = screen.getByTestId('avatar-invite-from', { includeHiddenElements: true });
+    expect(avatar).toHaveStyle({
+      backgroundColor: themes['walnut-kafeneio'].avatar[avatarWood(FRIEND)].face,
+    });
+    expect(within(avatar).getByText('E', { includeHiddenElements: true })).toBeOnTheScreen();
   });
 
   it('shows "not found" for an unknown code', async () => {

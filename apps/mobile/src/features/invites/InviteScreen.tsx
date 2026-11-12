@@ -25,9 +25,9 @@ import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
-import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { playerNameText } from '@/features/online/playerName';
 
 import { stateOfError, stateOfView, type InviteScreenState } from './inviteState';
@@ -209,7 +209,7 @@ function OpenInvite({ view, busy, failed, onAccept, onDecline }: OpenInviteProps
       </Text>
       <View style={styles.fromRow}>
         <CheckerAvatar
-          testID="invite-from-avatar"
+          testID="avatar-invite-from"
           playerKey={view.from}
           name={fromName}
           size={56}

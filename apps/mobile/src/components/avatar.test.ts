@@ -21,6 +21,9 @@ describe('initialsOf', () => {
     ['Επισκέπτης 4821', 'Ε'],
     ['ελένη.κ', 'ΕΚ'],
     ['maria t smith', 'MT'],
+    ['E\u0301va', 'É'],
+    ['\u0395\u03BB\u03B5\u0301\u03BD\u03B7.k', 'ΕK'],
+    ['ilker_k', 'IK'],
     ['4821', ''],
     ['', ''],
   ])('reads %s as %s', (name, initials) => {

@@ -23,13 +23,19 @@ export function avatarWood(key: string): AvatarWood {
  * Up to two initials from a name: the first letter of the first two words
  * ("eleni.k" → "EK", "nikos_k" → "NK", "Anna" → "A"). Words split at
  * anything that is not a letter or a digit. A word that starts with a digit
- * gives no initial ("Guest 4821" → "G"). Greek works too ("Ελένη" → "Ε").
+ * gives no initial ("Guest 4821" → "G"). Greek and accents work too
+ * ("Ελένη" → "Ε", "Éva" → "É").
  */
 export function initialsOf(name: string): string {
-  const words = name.split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 0);
+  // NFC first, so an accent typed as its own mark stays in its word.
+  const words = name
+    .normalize('NFC')
+    .split(/[^\p{L}\p{M}\p{N}]+/u)
+    .filter((word) => word.length > 0);
   const letters = words
     .slice(0, 2)
     .map((word) => Array.from(word)[0]!)
     .filter((letter) => /\p{L}/u.test(letter));
-  return letters.join('').toLocaleUpperCase();
+  // Not the phone's locale: a player gets the same initials on every phone.
+  return letters.join('').toUpperCase();
 }

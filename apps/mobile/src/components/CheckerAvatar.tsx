@@ -1,4 +1,4 @@
-import { fonts } from '@tavli/ui';
+import { fonts, withAlpha } from '@tavli/ui';
 import { Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -62,14 +62,14 @@ export function CheckerAvatar({
   );
 }
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((theme) => ({
   checker: (size: number) => ({
     width: size,
     height: size,
     borderRadius: size / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.5)',
+    boxShadow: `0px 2px 4px ${withAlpha(theme.colors.backgroundDeep, 0.5)}`,
   }),
   initials: (size: number) => ({
     fontFamily: fonts.numerals,
