@@ -13,10 +13,12 @@ export interface IconProps {
   color: string;
   /** Width and height in points. Icons keep their size with a large font. */
   size?: number;
+  /** Line width on the 24 pt grid. Default 2; the empty-state medallion uses 1.6. */
+  strokeWidth?: number;
   testID?: string;
 }
 
-export function Icon({ name, color, size = 24, testID }: IconProps) {
+export function Icon({ name, color, size = 24, strokeWidth = 2, testID }: IconProps) {
   const shape: { strokes: readonly string[]; fills?: readonly string[] } = ICONS[name];
   const box = { width: size, height: size };
   return (
@@ -35,7 +37,7 @@ export function Icon({ name, color, size = 24, testID }: IconProps) {
               key={path}
               path={path}
               style="stroke"
-              strokeWidth={2}
+              strokeWidth={strokeWidth}
               strokeCap="round"
               strokeJoin="round"
               color={color}

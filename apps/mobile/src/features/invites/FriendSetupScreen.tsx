@@ -83,6 +83,7 @@ import { SegmentedControl, type SegmentOption } from '@/components/settings/Segm
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { friendsProblem, type FriendsProblem } from '@/features/friends/friendsData';
 import { FRIENDS_SHOWN, pickFriends } from '@/features/friends/pickFriends';
+import { recordText } from '@/features/friends/record';
 import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
 import { onlineAccountReady } from '@/features/online/account';
 import { hasOnlineAccount } from '@/features/online/accountHint';
@@ -438,10 +439,7 @@ export function FriendSetupScreen({
                   testID={`friend-pick-${f.playerId}`}
                   icon="user"
                   label={name}
-                  hint={t('friends.list.record', {
-                    wins: f.record.wins,
-                    losses: f.record.losses,
-                  })}
+                  hint={recordText(f.record, t) ?? undefined}
                   accessibilityLabel={t('friend.sendTo', { name })}
                   disabled={busy}
                   onPress={() => void make({ to: f })}

@@ -24,6 +24,10 @@ describe('initialsOf', () => {
     ['E\u0301va', 'É'],
     ['\u0395\u03BB\u03B5\u0301\u03BD\u03B7.k', 'ΕK'],
     ['ilker_k', 'IK'],
+    ['ßtraße karl', 'SK'],
+    ['ŉ bob', 'NB'],
+    ['\u0301anna', 'A'],
+    ['\u0301\u0301 bob', 'B'],
     ['4821', ''],
     ['', ''],
   ])('reads %s as %s', (name, initials) => {

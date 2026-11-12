@@ -3,10 +3,12 @@
  * (loading, not signed in, a guest, a failed load), and the problem line.
  */
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Text } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { Icon } from '@/components/Icon';
+import type { IconName } from '@/components/icons';
 
 import { AccountBenefits } from '@/features/online/AccountBenefits';
 
@@ -97,6 +99,17 @@ export function RefreshFailed({ onRetry, testID }: { onRetry: () => void; testID
   );
 }
 
+/** A quiet note at the end of a screen, with a small icon (#503). */
+export function Footnote({ icon, text }: { icon: IconName; text: string }) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.footnote}>
+      <Icon name={icon} size={14} color={theme.colors.textDim} />
+      <Text style={styles.footnoteText}>{text}</Text>
+    </View>
+  );
+}
+
 /** The text of a problem. */
 export function useProblemText(problem: FriendsProblem | null): string | null {
   const { t } = useTranslation();
@@ -148,6 +161,17 @@ export const friendsStyles = StyleSheet.create((theme) => ({
   },
   padded: {
     gap: theme.space.md,
+  },
+  footnote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.space.sm,
+    paddingHorizontal: theme.space.xs,
+  },
+  footnoteText: {
+    ...theme.type.footnote,
+    flex: 1,
+    color: theme.colors.textDim,
   },
   center: {
     alignItems: 'center',
