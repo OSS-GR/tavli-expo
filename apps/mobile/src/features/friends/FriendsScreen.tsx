@@ -160,7 +160,14 @@ export function FriendsScreen({
   const [sending, setSending] = useState(false);
   // Report or block holds the sheet open while it sends.
   const [held, setHeld] = useState(false);
-  const rating = useMyRating(ratings, state.kind === 'ready', visit);
+  // Only the list shows the chip: the empty state asks for no rating.
+  const listShown =
+    state.kind === 'ready' &&
+    (state.data.friends.length > 0 ||
+      state.data.invites.length > 0 ||
+      state.data.requests.incoming.length > 0 ||
+      state.data.requests.outgoing.length > 0);
+  const rating = useMyRating(listShown ? ratings : undefined, visit);
   // False once the screen is gone (the server answers later).
   const mounted = useRef(true);
   useEffect(() => {
@@ -262,12 +269,7 @@ export function FriendsScreen({
     body = <NotReady state={state} onRetry={retry} onAccount={onAccount} testID="friends" />;
   } else {
     const { invites, requests, friends: list } = state.data;
-    const nothing =
-      list.length === 0 &&
-      invites.length === 0 &&
-      requests.incoming.length === 0 &&
-      requests.outgoing.length === 0;
-    body = nothing ? (
+    body = !listShown ? (
       <>
         {lines}
         <EmptyFriends onAdd={onAdd} onRatings={onRatings} />
@@ -430,7 +432,8 @@ export function FriendsScreen({
       <Sheet
         visible={panel !== null}
         onClose={closePanel}
-        closeLabel={t('common.cancel')}
+        // After a report or a block, "Cancel" would read as taking it back.
+        closeLabel={panel?.kind === 'report' ? t('safety.close') : t('common.cancel')}
         look={panel?.kind === 'friend' ? 'sheet' : 'dialog'}>
         {panel?.kind === 'friend' ? (
           <FriendSheet
@@ -494,22 +497,24 @@ export function FriendsScreen({
  * Your rating for the Leaderboards row, once you have a rated match. It
  * asks again on each visit; a failed call shows no chip.
  */
-function useMyRating(ratings: Ratings | undefined, ready: boolean, visit: number): number | null {
-  const [rating, setRating] = useState<number | null>(null);
+function useMyRating(ratings: Ratings | undefined, visit: number): number | null {
+  // Kept with the service it came from: with no list (or another account's
+  // service) the old rating never shows.
+  const [mine, setMine] = useState<{ from: Ratings; rating: number | null } | null>(null);
   useEffect(() => {
-    if (ratings === undefined || !ready) return;
+    if (ratings === undefined) return;
     let live = true;
     ratings.mine().then(
-      (mine) => {
-        if (live) setRating(mine.matches > 0 ? mine.rating : null);
+      (answer) => {
+        if (live) setMine({ from: ratings, rating: answer.matches > 0 ? answer.rating : null });
       },
       () => {},
     );
     return () => {
       live = false;
     };
-  }, [ratings, ready, visit]);
-  return rating;
+  }, [ratings, visit]);
+  return mine !== null && mine.from === ratings ? mine.rating : null;
 }
 
 /** A section: its header (with an optional count), then one tray of rows. */

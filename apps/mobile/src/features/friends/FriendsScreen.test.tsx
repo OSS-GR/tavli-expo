@@ -105,7 +105,12 @@ describe('<FriendsScreen />', () => {
 
   it('with no friends, shows the empty state: Add a friend and a Leaderboards link', async () => {
     signInSaved();
-    const props = await show();
+    const mine = jest
+      .fn()
+      .mockResolvedValue({ rating: 1490, matches: 1, shown: true, listed: false });
+    const props = await show(onlineFake.friends, { ...onlineFake.ratings, mine });
+    // The empty state shows no rating, so it asks for none.
+    expect(mine).not.toHaveBeenCalled();
     expect(screen.getByTestId('friends-empty')).toHaveTextContent('No friends yet');
     expect(screen.getByTestId('friends-medallion', { includeHiddenElements: true })).toBeTruthy();
     // Only one Add a friend: the empty state's.

@@ -19,6 +19,9 @@ export function avatarWood(key: string): AvatarWood {
   return AVATAR_WOODS[(hash >>> 0) % AVATAR_WOODS.length]!;
 }
 
+/** A letter that is not a modifier letter (like 'ʼ'). */
+const CAPITAL = /[\p{Lu}\p{Lt}\p{Ll}\p{Lo}]/u;
+
 /**
  * Up to two initials from a name: the first letter of the first two words
  * ("eleni.k" → "EK", "nikos_k" → "NK", "Anna" → "A"). Words split at
@@ -42,7 +45,8 @@ export function initialsOf(name: string): string {
       .filter((letter) => /\p{L}/u.test(letter))
       // Not the phone's locale: a player gets the same initials on every
       // phone. Only the first letter of a longer capital stays.
-      .map((letter) => Array.from(letter.toUpperCase())[0]!)
+      // A capital may start with a mark that is no letter of its own ('ŉ' gives 'ʼN'): skip it.
+      .map((letter) => Array.from(letter.toUpperCase()).find((c) => CAPITAL.test(c)) ?? letter)
       .join('')
   );
 }
