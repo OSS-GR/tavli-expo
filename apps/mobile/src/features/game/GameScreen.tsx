@@ -458,17 +458,20 @@ export function GameScreen({
   const showOpening = opening !== null && !(decided && openingDismissed === gameKey);
   // "Grab a chair" (#509): when a match opens, the table scene plays over the
   // board before the opening card. Once per match: the screen reads the
-  // match it opened with, so a rematch (a new `matchKey`) plays none. A tap
-  // skips it; Reduce motion and a screen reader skip it too.
+  // match it opened with, and a rematch (same store, new screen) plays none
+  // (`introRuns.ts`). A tap skips it; Reduce motion and a screen reader skip
+  // it too.
   const [introMatch] = useState(() =>
-    opening !== null && match.games.length === 0 && matchIntroDue(matchKey) ? matchKey : null,
+    opening !== null && match.games.length === 0 && matchIntroDue(matchKey, store)
+      ? matchKey
+      : null,
   );
   const [introDone, setIntroDone] = useState(false);
   const showIntro =
     introMatch !== null && !introDone && !reduceMotion && !showMoveList && showOpening;
   useEffect(() => {
-    if (introMatch !== null) markMatchIntroPlayed(introMatch);
-  }, [introMatch]);
+    if (introMatch !== null) markMatchIntroPlayed(introMatch, store);
+  }, [introMatch, store]);
   // The cover over the board fades out once the chair is in.
   const introCover = useSharedValue(1);
   useEffect(() => {

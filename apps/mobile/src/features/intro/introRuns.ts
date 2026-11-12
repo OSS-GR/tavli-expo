@@ -4,6 +4,11 @@
  * match opens (never on a rematch). This keeps what played in memory for
  * the app run. It saves nothing.
  *
+ * A rematch keeps its store but gets a new `matchKey`, and the app shows it
+ * on a new screen. So a match counts as played when its key or its store
+ * played: the store catches a rematch, the key an online game whose screen
+ * builds a new store each time it opens.
+ *
  * Read with the `…Due` functions when a screen mounts, and mark it played
  * in an effect (React may run a state initializer twice).
  */
@@ -13,6 +18,7 @@ const KEPT_MATCHES = 50;
 
 let homePlayed = false;
 let matchesPlayed: readonly string[] = [];
+let storesPlayed = new WeakSet<object>();
 /** Tests: game start plays no intro unless a test turns it on. */
 let matchIntros = true;
 
@@ -25,12 +31,16 @@ export function markHomeIntroPlayed(): void {
   homePlayed = true;
 }
 
-/** True when the match with this key (the game store's `matchKey`) has not played the scene. */
-export function matchIntroDue(matchKey: string): boolean {
-  return matchIntros && !matchesPlayed.includes(matchKey);
+/**
+ * True when neither the match with this key (the store's `matchKey`) nor
+ * its store has played the scene.
+ */
+export function matchIntroDue(matchKey: string, store: object): boolean {
+  return matchIntros && !matchesPlayed.includes(matchKey) && !storesPlayed.has(store);
 }
 
-export function markMatchIntroPlayed(matchKey: string): void {
+export function markMatchIntroPlayed(matchKey: string, store: object): void {
+  storesPlayed.add(store);
   if (matchesPlayed.includes(matchKey)) return;
   matchesPlayed = [...matchesPlayed, matchKey].slice(-KEPT_MATCHES);
 }
@@ -46,5 +56,6 @@ export function resetIntrosForTest({
 }: { home?: boolean; matches?: boolean } = {}): void {
   homePlayed = !home;
   matchesPlayed = [];
+  storesPlayed = new WeakSet();
   matchIntros = matches;
 }

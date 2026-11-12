@@ -3,7 +3,7 @@
  * board, on a cover that fades out, before the opening card. Once per match, never on a rematch; a tap
  * skips it; Reduce motion skips it. On fake timers: the intro waits on a timer.
  */
-import { createSeededRng } from '@tavli/engine';
+import { createSeededRng, getPreset } from '@tavli/engine';
 import { act, screen } from '@testing-library/react-native';
 import * as Reanimated from 'react-native-reanimated';
 
@@ -19,9 +19,12 @@ import { renderWithRoot as render } from '../../../test/render';
 const hidden = { includeHiddenElements: true };
 
 function newStore(): GameStore {
+  const portes = getPreset('portes');
   return createGameStore({
     players: { white: 'Ann', black: 'Bob' },
     targetPoints: 3,
+    // A rematch opens with a roll too, so it could show the intro.
+    rules: { ...portes, match: { ...portes.match, rematchStarter: 'openingRoll' } },
     rng: createSeededRng(5),
   });
 }
@@ -78,19 +81,22 @@ describe('<GameScreen /> table intro (#509)', () => {
     expect(openingCard()).toBeOnTheScreen();
   });
 
-  it('plays none on a rematch', async () => {
+  it('plays none on a rematch, which the app shows on a new screen', async () => {
     const store = newStore();
-    await render(<GameScreen store={store} />);
+    const first = await render(<GameScreen store={store} />);
     await wait(TABLE_INTRO_MS);
     // A rematch needs a finished match.
     await act(async () => {
       store.getState().dispatch({ type: 'resignMatch', player: 'black' });
     });
+    await first.unmount();
+    // Like the match-end route: rematch, then a new game screen.
     await act(async () => {
       store.getState().rematch();
     });
+    await render(<GameScreen store={store} />);
     expect(intro()).toBeNull();
-    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    expect(openingCard()).toBeOnTheScreen();
   });
 
   it('plays none with Reduce motion', async () => {
