@@ -87,7 +87,7 @@ describe('<GameScreen /> dice', () => {
     const diceLabel = `Dice ${game.state.dice!.join('-')}, 2 left to play`;
     expect(screen.queryByLabelText(diceLabel)).toBeNull();
     expect(screen.getByLabelText(diceLabel, { includeHiddenElements: true })).toBeOnTheScreen();
-    await user.press(screen.getByRole('button', { name: 'OK' }));
+    await user.press(screen.getByRole('button', { name: 'Play' }));
     expect(screen.getByLabelText(diceLabel)).toBeOnTheScreen();
     // A haptic for each die that landed, and the dice sounds.
     expect(haptics.calls).toEqual(['light', 'light']);

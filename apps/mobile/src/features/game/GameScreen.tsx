@@ -86,12 +86,14 @@ import {
   applyMoveToBoard,
   currentPrompt,
   isRace,
+  STANDARD_VARIANT_IDS,
   type GameRecord,
   type MatchFlow,
   type Move,
   type PerPlayer,
   type PlayerId,
   type Rng,
+  type StandardVariantId,
 } from '@tavli/engine';
 import {
   useCallback,
@@ -161,7 +163,7 @@ import { diceView, turnView, useGameStore, type BoardStore, type DieView } from 
 import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { isChoosingStarter, nextOpeningRoller, openingDiceInPlay, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
-import { PlayerStrip, STRIP_HEIGHT } from './PlayerStrip';
+import { PlayerStrip, type SeatClock } from './PlayerStrip';
 import { diceWereChosen, diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
 import { isStrongWin, passNotice, recordScoring, winType, type WinType } from './turnNotices';
@@ -253,8 +255,8 @@ export interface OnlineSide {
   readonly locked: boolean;
   /** The text in place of the buttons while the board is locked: "Waiting for Opponent…". */
   readonly status: string;
-  /** The time left on the strip of the player the server waits for: "42 s". */
-  readonly clock: { readonly player: PlayerId; readonly text: string } | null;
+  /** The time left on the seat of the player the server waits for: "0:42 to move". */
+  readonly clock: (SeatClock & { readonly player: PlayerId }) | null;
   /** The game-end sheet of the game that just ended. */
   readonly ended: OnlineEndedGame | null;
   readonly notice: OnlineNoticeCard | null;
@@ -1200,9 +1202,11 @@ export function GameScreen({
   // The opening Roll button sits on the opening card, next to the dice (#176).
   // Online it is only ever your own die: no name.
   const openingRollLabel =
-    online === undefined && openingTaps === 'perPlayer' && roller !== null
-      ? t('game.roll.openingFor', { name: nameOf(roller) })
-      : t('game.roll.opening');
+    online !== undefined
+      ? t('game.roll.openingYours')
+      : openingTaps === 'perPlayer' && roller !== null
+        ? t('game.roll.openingFor', { name: nameOf(roller) })
+        : t('game.roll.opening');
   // Online (#379): once your die is in, the card says what the server waits
   // for in place of Roll. While your roll is on its way, Roll waits.
   const openingWait = online !== undefined && roller === null ? online.status : null;
@@ -1273,6 +1277,7 @@ export function GameScreen({
         label={t('game.fastForward.button')}
         accessibilityLabel={t('game.fastForward.label')}
         kind="secondary"
+        icon="fastForward"
         onPress={() => setFastForwardKey(raceKey)}
         compact={landscape}
       />
@@ -1283,6 +1288,7 @@ export function GameScreen({
         testID="roll-button"
         label={t('game.roll.dice')}
         subtitle={t('game.roll.orSwipeBoard')}
+        icon="dices"
         onPress={() => roll()}
         grow={!landscape}
         compact={landscape}
@@ -1296,7 +1302,10 @@ export function GameScreen({
         label={hintProps.label}
         accessibilityLabel={hintProps.accessibilityLabel}
         kind="secondary"
-        disabled={hintProps.busy}
+        // A 52 pt square with a lightbulb; the word shows with a large font (#499).
+        icon="lightbulb"
+        iconOnly
+        busy={hintProps.busy}
         onPress={hintProps.onPress}
         compact
       />
@@ -1304,9 +1313,9 @@ export function GameScreen({
     undoButton = (
       <ActionButton
         testID="undo-button"
-        label={t('game.controls.undo')}
-        accessibilityLabel={t('game.controls.undoLabel')}
+        label={t('game.controls.undoLabel')}
         kind="secondary"
+        icon="undo"
         disabled={!view.canUndo || showPass || passWaits}
         onPress={undo}
         grow={!landscape}
@@ -1317,6 +1326,7 @@ export function GameScreen({
       <ActionButton
         testID="confirm-button"
         label={t('game.controls.confirm')}
+        icon="check"
         disabled={!view.canConfirm || showPass || passWaits}
         onPress={confirm}
         grow={!landscape}
@@ -1667,6 +1677,10 @@ export function GameScreen({
             theme={theme}
             status={opening}
             names={{ white: nameOf('white'), black: nameOf('black') }}
+            checkers={{
+              white: theme.checkers[toneOf('white')],
+              black: theme.checkers[toneOf('black')],
+            }}
             you={isYou('white') ? 'white' : isYou('black') ? 'black' : null}
             rollsAgain={rules.match.openingRoll === 'rerollBoth'}
             // The match too: each step is read once per app run (#216).
@@ -1708,14 +1722,33 @@ export function GameScreen({
     if (toEnter[player] > 0) return t('game.strip.toEnter', { count: toEnter[player] });
     return null;
   };
-  // Online: the time left sits on the strip of the player the server waits for.
-  const stripNote = (player: PlayerId): string | null => {
-    const notes = [asodioNote(player)];
+  // Online: the time left sits on the seat of the player the server waits for.
+  const seatClock = (player: PlayerId): SeatClock | null => {
     const clock = online?.clock ?? null;
-    if (clock !== null && clock.player === player) notes.push(clock.text);
-    const text = notes.filter((note) => note !== null).join(' · ');
-    return text === '' ? null : text;
+    return clock !== null && clock.player === player ? clock : null;
   };
+  // The quiet status line of a bot or an online opponent: "Easy · Portes" (#499).
+  const variant = game.state.variant;
+  const gameName = (STANDARD_VARIANT_IDS as readonly string[]).includes(variant)
+    ? t(`games.${variant as StandardVariantId}`)
+    : null;
+  const seatStatus = (player: PlayerId): string | null => {
+    const detail = seats[player].detail;
+    if (detail === undefined) return null;
+    return gameName === null ? detail : `${detail} · ${gameName}`;
+  };
+  // After the turn words on the active seat: "6-6, 3 moves left".
+  const turnDetail = (() => {
+    if (dice.length === 0 || showPass || passWaits) return null;
+    if (phase !== 'moving' && phase !== 'awaiting-confirm') return null;
+    const values = dice.map((die) => die.value);
+    const double = values.length === 4 && values.every((value) => value === values[0]);
+    const rolledText = double ? `${values[0]}-${values[0]}` : values.join('-');
+    const count = dice.filter((die) => !die.used).length;
+    return count === 0
+      ? t('game.strip.diceDone', { dice: rolledText })
+      : t('game.strip.diceLeft', { dice: rolledText, count });
+  })();
 
   // The screen reader hears the board's pinned checkers (Plakoto, Asodio),
   // the checkers to enter and the frozen ones (Asodio).
@@ -1765,7 +1798,11 @@ export function GameScreen({
       name={seats[player].label}
       turnLabel={seats[player].turnLabel}
       checker={theme.checkers[toneOf(player)]}
-      note={stripNote(player)}
+      avatar={seats[player].avatar ?? null}
+      status={seatStatus(player)}
+      turnDetail={turnDetail}
+      note={asodioNote(player)}
+      clock={seatClock(player)}
       score={match.score[player]}
       target={match.targetPoints}
       active={playing && active === player}
@@ -2118,8 +2155,9 @@ export function GameScreen({
   );
 }
 
-/** The menu circle is as tall as a strip; this slop makes its target 44 pt. */
-const MENU_SLOP = (44 - STRIP_HEIGHT) / 2;
+/** The menu circle beside the top seat; this slop makes its target 44 pt. */
+const MENU_SIZE = 40;
+const MENU_SLOP = (44 - MENU_SIZE) / 2;
 
 const styles = StyleSheet.create((theme, rt) => ({
   // Landscape keeps the notch, the round corners and the home bar free.
@@ -2172,9 +2210,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingTop: theme.space.xs,
   },
   menuButton: {
-    width: STRIP_HEIGHT,
-    height: STRIP_HEIGHT,
-    borderRadius: STRIP_HEIGHT / 2,
+    width: MENU_SIZE,
+    height: MENU_SIZE,
+    borderRadius: MENU_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.surface,
@@ -2182,7 +2220,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderColor: theme.colors.border,
   },
   menuSpacer: {
-    width: STRIP_HEIGHT + theme.space.sm,
+    width: MENU_SIZE + theme.space.sm,
   },
   menuIcon: {
     fontSize: 20,

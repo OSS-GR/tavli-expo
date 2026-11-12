@@ -239,11 +239,11 @@ describe('<HomeOnlineGames />', () => {
     const gameId = await newGame(1);
     await show();
     const row = screen.getByTestId(`online-game-${gameId}`);
-    expect(within(row).getByText('0–0 · 60 s left')).toBeOnTheScreen();
+    expect(within(row).getByText('0–0 · 1:00 left')).toBeOnTheScreen();
     await act(async () => {
       jest.advanceTimersByTime(5000);
     });
-    expect(within(row).getByText('0–0 · 55 s left')).toBeOnTheScreen();
+    expect(within(row).getByText('0–0 · 0:55 left')).toBeOnTheScreen();
   });
 
   it('says when the list did not load; Try again loads it', async () => {

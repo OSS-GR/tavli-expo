@@ -19,7 +19,7 @@ import i18n from '@/i18n';
 import { botLevels, botRunner } from '@/services';
 
 import { gameEnd, onlineBoardStore } from './boardStore';
-import { clockText, clockTickMs } from './clock';
+import { clockText, clockTickMs, clockUrgent } from './clock';
 import {
   DEV_BOT_ID,
   DEV_TICK_MS,
@@ -257,11 +257,15 @@ describe('remoteSteps (#374)', () => {
 
 describe('clockText', () => {
   const t = i18n.t;
-  it('counts seconds live, rounded up', () => {
-    expect(clockText(60_000, 1, t)).toBe('60 s');
-    expect(clockText(41_200, 1, t)).toBe('42 s');
-    expect(clockText(0, 1, t)).toBe('0 s');
-    expect(clockText(-5, 1, t)).toBe('0 s');
+  it('counts down live as a clock, rounded up, never "300 s" (#499)', () => {
+    expect(clockText(5 * 60_000, 5, t)).toBe('5:00');
+    expect(clockText(294_000, 5, t)).toBe('4:54');
+    expect(clockText(60_000, 1, t)).toBe('1:00');
+    expect(clockText(41_200, 1, t)).toBe('0:42');
+    expect(clockText(0, 1, t)).toBe('0:00');
+    expect(clockText(-5, 1, t)).toBe('0:00');
+    expect(clockUrgent(30_000)).toBe(false);
+    expect(clockUrgent(29_999)).toBe(true);
   });
 
   it('counts hours async, and minutes in the last hour', () => {
@@ -275,7 +279,7 @@ describe('clockText', () => {
   it('has Greek words', async () => {
     await i18n.changeLanguage('el');
     expect(clockText(5 * 60 * 60_000, null, i18n.t)).toBe('5 ώρες');
-    expect(clockText(1000, 1, i18n.t)).toBe('1 δευτ.');
+    expect(clockText(1000, 1, i18n.t)).toBe('0:01');
   });
 });
 
