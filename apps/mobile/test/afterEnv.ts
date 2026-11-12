@@ -3,6 +3,7 @@
 
 import { takeInviteSent } from '../src/features/friends/inviteSent';
 import { resetRaceOffersForTest } from '../src/features/game/raceOffer';
+import { resetIntrosForTest } from '../src/features/intro/introRuns';
 import { resetAnnouncements } from '../src/features/game/useAnnouncement';
 import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPushes';
 import { forgetPushTapsForTest } from '../src/features/notifications/pushTaps';
@@ -22,6 +23,9 @@ beforeEach(() => {
   resetRaceOffersForTest();
   // A friend invite sent from the full setup (#507): no note left for Friends.
   takeInviteSent();
+  // The table scene (#509): Home rests on its last frame, and game start
+  // plays no intro (a test of it turns it on), so tests tap the opening card.
+  resetIntrosForTest();
 });
 
 // Online play (`auth`, `games`, `onlineServer` of `@/services`): each test

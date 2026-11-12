@@ -28,6 +28,19 @@ import { analytics, storage } from '@/services';
 
 const recorded = analytics as ReturnType<typeof createRecordingAnalytics>;
 
+// The router testing library would mock Reanimated and worklets with the
+// packages' own mocks and replace ours (jest.setup.ts), which Home's table
+// scene needs (#509). Keep only its expo-linking mock, as navigation.test.tsx.
+jest.mock('expo-router/build/testing-library/mocks', () => {
+  jest.mock('expo-linking', () => ({
+    ...jest.requireActual('expo-linking'),
+    createURL: (path: string) => `tavlaki://${path}`,
+    resolveScheme: () => 'tavlaki',
+    addEventListener: () => ({ remove: () => undefined }),
+  }));
+  return {};
+});
+
 /** A stand-in for a route these tests only open by deep link. */
 const stub = (name: string) =>
   function StubRoute() {
