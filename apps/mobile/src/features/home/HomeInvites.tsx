@@ -12,12 +12,12 @@
  * screen loads the invite again.
  */
 import type { AuthProvider, InviteView, Invites } from '@tavli/contracts';
-import { displayCaps } from '@tavli/ui';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { SectionHeader } from '@/components/SectionHeader';
 import {
   INVITE_TICK_MS,
   inviteRowText,
@@ -73,11 +73,7 @@ export function HomeInvites({ auth, invites, focused, onOpen }: HomeInvitesProps
 }
 
 function Header({ title }: { title: string }) {
-  return (
-    <Text style={styles.header} accessibilityRole="header" accessibilityLabel={title}>
-      {displayCaps(title)}
-    </Text>
-  );
+  return <SectionHeader title={title} />;
 }
 
 interface InviteRowsProps {
@@ -142,11 +138,6 @@ function InviteRow({ invite, now, offset, onPress }: InviteRowProps) {
 const styles = StyleSheet.create((theme) => ({
   section: {
     gap: theme.space.sm,
-  },
-  header: {
-    ...theme.type.section,
-    color: theme.colors.textDim,
-    paddingTop: theme.space.sm,
   },
   list: {
     gap: theme.space.sm,

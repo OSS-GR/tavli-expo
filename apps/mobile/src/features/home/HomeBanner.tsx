@@ -1,13 +1,15 @@
 /**
  * A brass-edged banner on Home (#342): an icon, a title, a line and two
  * buttons. The "Learn to play" card (#128) and the reminder card (#404)
- * use it. No text has a line limit: large fonts wrap.
+ * use it. No text has a line limit: large fonts wrap. The reminder is the
+ * raised card that leads Home; the lesson card is a tray (#496).
  */
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/icons';
+import { surfaceStyle } from '@/components/Surface';
 
 export interface HomeBannerButton {
   readonly testID: string;
@@ -24,12 +26,22 @@ export interface HomeBannerProps {
   readonly main: HomeBannerButton;
   /** The underlined button next to it. */
   readonly other: HomeBannerButton;
+  /** How high the card sits. Default: `tray`. */
+  readonly tier?: 'tray' | 'raised';
 }
 
-export function HomeBanner({ testID, icon, title, line, main, other }: HomeBannerProps) {
+export function HomeBanner({
+  testID,
+  icon,
+  title,
+  line,
+  main,
+  other,
+  tier = 'tray',
+}: HomeBannerProps) {
   const { theme } = useUnistyles();
   return (
-    <View testID={testID} style={styles.card}>
+    <View testID={testID} style={styles.card(tier)}>
       <View style={styles.head}>
         <View style={styles.badge}>
           <Icon name={icon} size={22} color={theme.colors.turnText} />
@@ -65,16 +77,11 @@ export function HomeBanner({ testID, icon, title, line, main, other }: HomeBanne
 }
 
 const styles = StyleSheet.create((theme) => ({
-  // A brass-tinted banner (#342): it stands out from the walnut tiles.
-  card: {
+  card: (tier: 'tray' | 'raised') => ({
+    ...surfaceStyle(theme, tier),
     gap: theme.space.sm,
     padding: theme.space.lg,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.accentLine,
-    backgroundColor: theme.colors.surface,
-    backgroundImage: `linear-gradient(135deg, ${theme.colors.accentWash} 0%, ${theme.colors.surface} 80%)`,
-  },
+  }),
   head: {
     flexDirection: 'row',
     alignItems: 'flex-start',

@@ -43,7 +43,8 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { SectionCard, SectionTitle } from '@/components/SectionCard';
+import { SectionCard } from '@/components/SectionCard';
+import { SectionHeader } from '@/components/SectionHeader';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { Sheet } from '@/components/Sheet';
 import { Toast, useToast } from '@/components/Toast';
@@ -247,7 +248,7 @@ export function NewGameScreen({
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled">
           <View style={styles.section}>
-            <SectionTitle title={t('newGame.game')} />
+            <SectionHeader title={t('newGame.game')} />
             <View style={styles.gameGrid} accessibilityRole="radiogroup">
               {gameRows.map((row) => (
                 <View key={row.join('-')} style={styles.gameRow}>

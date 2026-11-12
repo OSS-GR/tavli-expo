@@ -52,7 +52,7 @@ describe('<ScreenHeader />', () => {
 });
 
 describe('<Screen />', () => {
-  it('paints the Home gradient', async () => {
+  it('lights the page from the top and fades to the floor', async () => {
     await renderWithRoot(
       <Screen testID="page">
         <Text>Body</Text>
@@ -61,7 +61,7 @@ describe('<Screen />', () => {
     const { colors } = themes['walnut-kafeneio'];
     expect(screen.getByTestId('page')).toHaveStyle(screenBackground(colors));
     expect(screenBackground(colors).backgroundImage).toBe(
-      `linear-gradient(180deg, ${colors.backgroundDeep} 0%, ${colors.background} 45%)`,
+      `linear-gradient(180deg, ${colors.backgroundLamp} 0%, ${colors.background} 38%, ${colors.backgroundFloor} 100%)`,
     );
   });
 });

@@ -21,7 +21,7 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { SectionTitle } from '@/components/SectionCard';
+import { SectionHeader } from '@/components/SectionHeader';
 
 import { dateLocale, historyRow, statParts, statTiles, type StatTile } from './format';
 import { MatchList } from './MatchList';
@@ -85,7 +85,7 @@ function LocalHistory({ records, locale }: { records: readonly HistoryRecord[]; 
   const stats = historyStats(records);
   return (
     <>
-      <SectionTitle title={t('history.stats')} />
+      <SectionHeader title={t('history.stats')} />
       {stats.map(({ game, byLevel, local }) => (
         <View key={game} testID={`history-stats-${game}`} style={styles.game}>
           <Text style={styles.gameTitle} accessibilityRole="header">

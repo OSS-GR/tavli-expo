@@ -21,6 +21,8 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/icons';
+import { screenBackground } from '@/components/Screen';
+import { SectionHeader } from '@/components/SectionHeader';
 import { Toast, useToast } from '@/components/Toast';
 import type { MatchMode } from '@/features/match/setup';
 import { rulesDirection, startBoard } from '@/features/rules/content';
@@ -165,9 +167,7 @@ export function HomeScreen({
         {friendInvites}
         {learnCard}
 
-        <Text style={styles.section} accessibilityRole="header" accessibilityLabel={modesTitle}>
-          {displayCaps(modesTitle)}
-        </Text>
+        <SectionHeader title={modesTitle} />
         <View style={styles.grid}>
           {hasSave ? (
             <ModeTile
@@ -305,9 +305,7 @@ export function levelList(levels: readonly Difficulty[], t: TFunction): string |
 const styles = StyleSheet.create((theme, rt) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-    // Deep at the top, lighter below: the cards sit on a lit table.
-    backgroundImage: `linear-gradient(180deg, ${theme.colors.backgroundDeep} 0%, ${theme.colors.background} 45%)`,
+    ...screenBackground(theme.colors),
   },
   content: {
     flexGrow: 1,
@@ -359,12 +357,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   tagline: {
     ...theme.type.body,
     color: theme.colors.textDim,
-  },
-  section: {
-    ...theme.type.section,
-    color: theme.colors.textDim,
-    paddingTop: theme.space.xs,
-    marginBottom: -theme.space.xs,
   },
   grid: {
     flexDirection: 'row',

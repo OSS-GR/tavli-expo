@@ -11,15 +11,15 @@ import { ToggleRow } from './settings/ToggleRow';
 const problems = () => textScalingProblems(screen.toJSON() as JsonNode | JsonNode[] | null);
 
 describe('<SectionCard />', () => {
-  it('shows the title in caps as a header', async () => {
+  it('shows the title as a section header over a tray', async () => {
     await renderWithRoot(
       <SectionCard title="Sound and feel" testID="card">
         <SectionRow label="Sound" />
       </SectionCard>,
     );
     expect(screen.getByRole('header', { name: 'Sound and feel' })).toBeOnTheScreen();
-    expect(screen.getByText('SOUND AND FEEL')).toBeOnTheScreen();
-    expect(screen.getByTestId('card')).toHaveStyle({ borderRadius: 20 });
+    expect(screen.getByText('Sound and feel')).toBeOnTheScreen();
+    expect(screen.getByTestId('card')).toHaveStyle({ borderRadius: 16 });
   });
 
   it('puts a line between rows, and none for a hidden row', async () => {

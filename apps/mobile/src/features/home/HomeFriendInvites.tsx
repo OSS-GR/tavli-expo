@@ -16,11 +16,12 @@
  */
 import type { AuthProvider, Friends, InviteView } from '@tavli/contracts';
 import { isFriendsErrorData } from '@tavli/contracts';
-import { displayCaps } from '@tavli/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+
+import { SectionHeader } from '@/components/SectionHeader';
 
 import { playerNameText } from '@/features/online/playerName';
 
@@ -79,9 +80,7 @@ export function HomeFriendInvites({ auth, friends, focused, onOpen }: HomeFriend
   const title = t('friends.invites.title');
   return (
     <View testID="home-friend-invites" style={styles.section}>
-      <Text style={styles.header} accessibilityRole="header" accessibilityLabel={title}>
-        {displayCaps(title)}
-      </Text>
+      <SectionHeader title={title} />
       <View style={styles.list}>
         {list.map((invite) => {
           const from = t('friends.invites.from', {
@@ -118,11 +117,6 @@ export function HomeFriendInvites({ auth, friends, focused, onOpen }: HomeFriend
 const styles = StyleSheet.create((theme) => ({
   section: {
     gap: theme.space.sm,
-  },
-  header: {
-    ...theme.type.section,
-    color: theme.colors.textDim,
-    paddingTop: theme.space.sm,
   },
   list: {
     gap: theme.space.sm,

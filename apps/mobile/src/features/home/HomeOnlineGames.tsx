@@ -5,10 +5,11 @@
  * all" opens the whole list.
  */
 import type { AuthProvider, GameTransport } from '@tavli/contracts';
-import { displayCaps } from '@tavli/ui';
 import { useTranslation } from 'react-i18next';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
+
+import { SectionHeader } from '@/components/SectionHeader';
 
 import { OnlineGameList } from '@/features/online/OnlineGameList';
 import {
@@ -38,9 +39,7 @@ export function HomeOnlineGames({ auth, games, focused, onOpen, onSeeAll }: Home
   const title = t('home.online.title');
   return (
     <View testID="home-online-games" style={styles.section}>
-      <Text style={styles.header} accessibilityRole="header" accessibilityLabel={title}>
-        {displayCaps(title)}
-      </Text>
+      <SectionHeader title={title} />
       <OnlineGameList
         state={state}
         now={now}
@@ -56,10 +55,5 @@ export function HomeOnlineGames({ auth, games, focused, onOpen, onSeeAll }: Home
 const styles = StyleSheet.create((theme) => ({
   section: {
     gap: theme.space.sm,
-  },
-  header: {
-    ...theme.type.section,
-    color: theme.colors.textDim,
-    paddingTop: theme.space.sm,
   },
 }));

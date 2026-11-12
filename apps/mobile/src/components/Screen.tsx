@@ -1,6 +1,6 @@
 /**
- * The page under a screen in the Home style (#356): the Home gradient, deep
- * at the top and lighter below, so cards sit on a lit table.
+ * The page under a screen in the Home style (#356): lit from the top, as by
+ * a kafeneio lamp, and fading to a dark floor (#496, the Figma polish pass).
  *
  * `Screen` pads the top safe area, so a `ScreenHeader` inside it sits below
  * the status bar. The bottom safe area is the screen's own job (usually the
@@ -20,7 +20,7 @@ import { StyleSheet } from 'react-native-unistyles';
 export function screenBackground(colors: UiColors) {
   return {
     backgroundColor: colors.background,
-    backgroundImage: `linear-gradient(180deg, ${colors.backgroundDeep} 0%, ${colors.background} 45%)`,
+    backgroundImage: `linear-gradient(180deg, ${colors.backgroundLamp} 0%, ${colors.background} 38%, ${colors.backgroundFloor} 100%)`,
   };
 }
 
