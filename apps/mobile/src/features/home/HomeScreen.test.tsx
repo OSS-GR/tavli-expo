@@ -3,6 +3,7 @@ import * as Reanimated from 'react-native-reanimated';
 
 import i18n from '@/i18n';
 
+import { homeIntroDue, resetIntrosForTest } from '@/features/intro/introRuns';
 import { startBoard } from '@/features/rules/content';
 
 import { ContinueCard } from './ContinueCard';
@@ -79,6 +80,16 @@ describe('<HomeScreen />', () => {
     } finally {
       reduce.mockRestore();
     }
+  });
+
+  it('plays the table scene by the greeting once per app run (#509)', async () => {
+    resetIntrosForTest({ home: true });
+    expect(homeIntroDue()).toBe(true);
+    await render(<HomeScreen {...setup()} />);
+    // Decoration: screen readers skip it.
+    expect(screen.getByTestId('home-table-scene', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId('home-table-scene')).toBeNull();
+    expect(homeIntroDue()).toBe(false);
   });
 
   it('lists the bot levels under "Play vs bot" (#182)', async () => {

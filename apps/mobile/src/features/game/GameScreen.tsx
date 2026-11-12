@@ -105,7 +105,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
 import { useReducedMotion, useSharedValue } from 'react-native-reanimated';
@@ -114,6 +114,9 @@ import { StyleSheet } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { MoveList } from '@/features/accessibility/MoveList';
 import { useMoveListShown } from '@/features/accessibility/screenReader';
+import { markMatchIntroPlayed, matchIntroDue } from '@/features/intro/introRuns';
+import { TableScene } from '@/features/intro/TableScene';
+import { TABLE_SCENE_MS } from '@/features/intro/tableMotion';
 import { useBoardTheme } from '@/features/board/BoardCanvas';
 import {
   armyFrozen,
@@ -172,6 +175,15 @@ import { useAnnouncement } from './useAnnouncement';
 
 /** How long the opening result ("Maria starts with 6-3.") stays, unless a tap closes it (#176). */
 export const OPENING_RESULT_MS = 3000;
+
+/**
+ * "Grab a chair" (#509): how long the table scene holds the board before
+ * the opening card: the scene, then a beat on its last frame.
+ */
+export const TABLE_INTRO_MS = TABLE_SCENE_MS + 150;
+
+/** The table scene's widest size at game start (Figma: 1.4× of 240). */
+const TABLE_INTRO_WIDTH = 336;
 /**
  * After an opening tie, Roll waits this long: the dice land first, so a
  * quick second tap does not skip the tie (#176). The tie itself stays on
@@ -431,6 +443,25 @@ export function GameScreen({
   }, [decided, gameKey]);
   // Online too (#379): the first game's opening waits for each player's die.
   const showOpening = opening !== null && !(decided && openingDismissed === gameKey);
+  // "Grab a chair" (#509): when a match opens, the table scene plays over the
+  // board before the opening card. Once per match: the screen reads the
+  // match it opened with, so a rematch (a new `matchKey`) plays none. A tap
+  // skips it; Reduce motion and a screen reader skip it too.
+  const [introMatch] = useState(() =>
+    opening !== null && match.games.length === 0 && matchIntroDue(matchKey) ? matchKey : null,
+  );
+  const [introDone, setIntroDone] = useState(false);
+  const showIntro =
+    introMatch !== null && !introDone && !reduceMotion && !showMoveList && showOpening;
+  useEffect(() => {
+    if (introMatch !== null) markMatchIntroPlayed(introMatch);
+  }, [introMatch]);
+  useEffect(() => {
+    if (!showIntro) return;
+    const timer = setTimeout(() => setIntroDone(true), TABLE_INTRO_MS);
+    return () => clearTimeout(timer);
+  }, [showIntro]);
+  const windowSize = useWindowDimensions();
   // Just after a tie, Roll waits a moment (the dice land first).
   const tieKey = opening?.kind === 'tie' ? `${gameKey}:${opening.round}` : null;
   const [tieSeen, setTieSeen] = useState<string | null>(null);
@@ -1663,6 +1694,22 @@ export function GameScreen({
         />
       </GameCard>
     );
+  } else if (!over && showIntro) {
+    card = (
+      <Pressable
+        testID="table-intro"
+        style={styles.tapArea}
+        onPress={() => setIntroDone(true)}
+        accessible={false}>
+        <View style={styles.introScene}>
+          <TableScene
+            width={Math.min(TABLE_INTRO_WIDTH, windowSize.width - 32)}
+            play
+            testID="table-intro-scene"
+          />
+        </View>
+      </Pressable>
+    );
   } else if (!over && showOpening && opening) {
     card = (
       <GestureDetector gesture={openingSwipe}>
@@ -2295,6 +2342,9 @@ const styles = StyleSheet.create((theme, rt) => ({
   tapArea: {
     flex: 1,
     justifyContent: 'center',
+  },
+  introScene: {
+    alignItems: 'center',
   },
   hintRow: {
     position: 'absolute',

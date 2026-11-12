@@ -922,6 +922,10 @@
       "newLook": {
         "title": "A new look",
         "body": "Warm, lamp-lit screens, new fonts and checker avatars with initials. The game seats, Friends, Leaderboards and Settings have a new design. Settings now has a page for each group."
+      },
+      "grabAChair": {
+        "title": "Grab a chair",
+        "body": "A short scene at the kafeneio table: the tavli board drops onto the table and your chair is pulled in. It plays beside the greeting on Home and when a match opens. Tap to skip it. With Reduce Motion it stays still."
       }
     }
   },
