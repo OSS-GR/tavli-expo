@@ -25,6 +25,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { Icon } from '@/components/Icon';
+import { surfaceStyle } from '@/components/Surface';
 
 const NBSP = ' ';
 /**
@@ -176,14 +177,12 @@ export function PlayerStrip({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  // The shared tray (#496), with a thin edge so the brass one replaces it.
   plate: {
+    ...surfaceStyle(theme, 'tray'),
     marginHorizontal: theme.space.sm,
-    borderRadius: theme.radii.tray,
-    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    // The lit top edge of a tray.
-    boxShadow: `inset 0px 1px 0px ${theme.colors.edgeLight}`,
   },
   // Your turn: a brass edge.
   active: {
