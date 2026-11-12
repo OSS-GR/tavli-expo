@@ -759,12 +759,13 @@
       "matches_one": "{{count}} rated match",
       "matches_other": "{{count}} rated matches",
       "label_one": "Your rating: {{rating}}, from {{count}} rated match.",
-      "label_other": "Your rating: {{rating}}, from {{count}} rated matches."
+      "label_other": "Your rating: {{rating}}, from {{count}} rated matches.",
+      "none": "Your rating: none yet. You have no rated match."
     },
     "status": {
       "hidden": "You are hidden from the global board.",
-      "fewMatches_one": "Play {{count}} more rated match to show on the global board.",
-      "fewMatches_other": "Play {{count}} more rated matches to show on the global board.",
+      "fewMatches_one": "{{count}} more rated match to join the global board",
+      "fewMatches_other": "{{count}} more rated matches to join the global board",
       "noUsername": "Pick a username to show on the global board.",
       "listed": "You can show on the global board. Only the top 50 players show there.",
       "pickUsername": "Pick a username"
@@ -783,16 +784,34 @@
     "showMe": {
       "label": "Show me on the global board",
       "hint_one": "Your username and rating, after {{count}} rated match.",
-      "hint_other": "Your username and rating, after {{count}} rated matches."
+      "hint_other": "Your username and rating, after {{count}} rated matches.",
+      "locked": "Opens after {{min}} rated matches. You have {{have}}."
     },
     "row": {
       "me": "{{name}} (you)",
-      "label": "Place {{rank}}: {{name}}, rating {{rating}}"
+      "label": "Place {{rank}}: {{name}}, rating {{rating}}",
+      "you": "You",
+      "matches_one": "{{count}} match",
+      "matches_other": "{{count}} matches",
+      "labelNone": "Place {{rank}}: {{name}}, no rating yet",
+      "pinned": "Not on the board yet",
+      "pinnedLabel": "{{name}}, not on the board yet, rating {{rating}}"
     },
-    "note": "Everyone starts at 1500. A finished online match between two saved accounts counts, also a resign or a time out. A win against a stronger player and a longer match move your rating more. At most 3 matches against the same player count each day. Matches with a guest or the bot never count.",
     "problem": {
       "title": "Your choice was not saved",
       "text": "Try again in a moment."
+    },
+    "how": {
+      "title": "How ratings work",
+      "hint": "Opens the rules of the rating.",
+      "start": "Everyone starts at {{rating}}",
+      "count": "Online matches between saved accounts count",
+      "countMore": "Also a resign or a time out",
+      "gain": "Beat a stronger player to gain more",
+      "gainMore": "Longer matches move it more",
+      "cap": "At most {{count}} matches a day against the same player count",
+      "never": "Guests and the bot never count",
+      "ok": "Got it"
     }
   },
   "whatsNew": {
