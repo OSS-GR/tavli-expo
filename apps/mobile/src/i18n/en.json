@@ -480,12 +480,12 @@
       "rolling": "Rolling the dice…"
     },
     "clock": {
-      "seconds_one": "{{count}} s",
-      "seconds_other": "{{count}} s",
       "minutes_one": "{{count}} min",
       "minutes_other": "{{count}} min",
       "hours_one": "{{count}} h",
-      "hours_other": "{{count}} h"
+      "hours_other": "{{count}} h",
+      "toRoll": "{{time}} to roll",
+      "toMove": "{{time}} to move"
     },
     "timeLimitNone": "None",
     "timeLimit_one": "1 min",
@@ -504,7 +504,8 @@
       "rollFailed": "Your roll did not reach the server. Check the connection, then roll again.",
       "refusedTitle": "Not accepted",
       "refused": "The server did not accept your turn. Your moves were taken back."
-    }
+    },
+    "seatDetail": "Online"
   },
   "invite": {
     "loading": "Loading the invite…",
@@ -976,11 +977,12 @@
       "notRolled": "Not rolled yet",
       "rolled": "Rolled {{value}}",
       "result_you": "You start with {{high}}-{{low}}.",
-      "ok": "OK",
-      "autoClose": "Closes by itself after 3 s.",
       "bodyReroll": "Each player rolls one die. The higher die starts and rolls both dice again.",
       "resultReroll": "{{name}} starts ({{high}}-{{low}}) and rolls again.",
-      "resultReroll_you": "You start ({{high}}-{{low}}). Roll again."
+      "resultReroll_you": "You start ({{high}}-{{low}}). Roll again.",
+      "titleYou": "You start",
+      "titleStarts": "{{name}} starts",
+      "play": "Play"
     },
     "chooser": {
       "title": "Who starts?",
@@ -992,7 +994,8 @@
       "opening": "Roll to start",
       "openingFor": "{{name}}: roll",
       "dice": "Roll dice",
-      "orSwipeBoard": "or swipe the board"
+      "orSwipeBoard": "or swipe the board",
+      "openingYours": "Roll your die"
     },
     "dice": {
       "label": "Dice {{values}}, {{left}} left to play"
@@ -1021,7 +1024,11 @@
       "playing": "Playing",
       "turnOf": "{{name}}’s turn",
       "toEnter": "{{count}} to enter",
-      "frozen": "Army frozen"
+      "frozen": "Army frozen",
+      "of": "of {{target}}",
+      "diceLeft_one": "{{dice}}, {{count}} move left",
+      "diceLeft_other": "{{dice}}, {{count}} moves left",
+      "diceDone": "{{dice}}, all played"
     },
     "hint": {
       "button": "Hint",
@@ -1030,7 +1037,6 @@
       "text": "Hint: {{moves}}"
     },
     "controls": {
-      "undo": "↶ Undo",
       "undoLabel": "Undo",
       "confirm": "Confirm",
       "allUsed": "All dice used. Confirm or undo."
@@ -1138,7 +1144,6 @@
     "you": "You",
     "bot": {
       "name": "Bot",
-      "strip": "Bot · {{level}}",
       "waiting": "Bot's turn…",
       "moving": "Bot rolled {{dice}} and is moving…",
       "choseMoving": "Bot chose {{dice}} and is moving…"

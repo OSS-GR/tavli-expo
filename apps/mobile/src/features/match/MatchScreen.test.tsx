@@ -94,7 +94,9 @@ describe('<MatchScreen /> vs bot', () => {
     await show(s).view;
 
     expect(within(screen.getByTestId('strip-bottom')).getByText('You')).toBeOnTheScreen();
-    expect(within(screen.getByTestId('strip-top')).getByText('Bot · Easy')).toBeOnTheScreen();
+    // The bot's seat: its name, then the level and the game (#499).
+    expect(within(screen.getByTestId('strip-top')).getByText('Bot')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('strip-top')).getByText('Easy · Portes')).toBeOnTheScreen();
     await user.press(button('Roll to start, or swipe the board'));
     const opening = game(s).opening;
     expect(opening?.ties.length || (opening?.white !== null && opening?.black !== null)).toBe(true);
@@ -108,14 +110,14 @@ describe('<MatchScreen /> vs bot', () => {
     // The bot's turn: a locked box, no Roll button, the bot strip is active.
     expect(screen.getByTestId('bot-turn')).toHaveTextContent("Bot's turn…");
     expect(screen.queryByTestId('roll-button')).toBeNull();
-    expect(screen.getByText('PLAYING')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('strip-top')).getByText(/^Playing/)).toBeOnTheScreen();
 
     await waitFor(() => expect(screen.getByTestId('roll-button')).toBeOnTheScreen(), WAIT);
     const { lastTurn, state } = game(s);
     expect(lastTurn?.player).toBe('black');
     expect(lastTurn?.moves.length).toBeGreaterThan(0);
     expect(state.toMove).toBe('white');
-    expect(screen.getByText('YOUR TURN')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('strip-bottom')).getByText(/^Your turn/)).toBeOnTheScreen();
   });
 
   it('waits while the menu is open and goes on after Resume', async () => {
@@ -430,12 +432,12 @@ describe('<MatchScreen /> pass-and-play turns', () => {
     await show(s).view;
 
     expect(bottom().getByText('Maria')).toBeOnTheScreen();
-    expect(bottom().getByText('MARIA’S TURN')).toBeOnTheScreen();
+    expect(bottom().getByText(/^Maria’s turn/)).toBeOnTheScreen();
 
     await act(async () => playTurn(s, [6, 5]));
     expect(game(s).state.toMove).toBe('black');
     expect(bottom().getByText('Nikos')).toBeOnTheScreen();
-    expect(bottom().getByText('NIKOS’S TURN')).toBeOnTheScreen();
+    expect(bottom().getByText(/^Nikos’s turn/)).toBeOnTheScreen();
     expect(top().getByText('Maria')).toBeOnTheScreen();
     // No "pass the phone" screen: Nikos can roll at once (wireframe 6e).
     expect(screen.getByRole('button', { name: 'Roll dice, or swipe the board' })).toBeOnTheScreen();
@@ -451,7 +453,7 @@ describe('<MatchScreen /> pass-and-play turns', () => {
 
     await act(async () => playTurn(s, [6, 5]));
     expect(bottom().getByText('Maria')).toBeOnTheScreen();
-    expect(top().getByText('NIKOS’S TURN')).toBeOnTheScreen();
+    expect(top().getByText(/^Nikos’s turn/)).toBeOnTheScreen();
 
     // A change in Settings (from the in-game menu) applies at once.
     await act(async () => {

@@ -170,7 +170,7 @@ The player's past local matches and simple stats, offline. Finished online match
 
 - Two optional names (max 16 characters, trimmed). Empty names show "Player 1" / "Player 2" in the app language, so they follow a language switch.
 - **Board view** on the new-game screen edits Settings → Board view (`features/settings/BoardViewPicker.tsx`), so both screens agree and a change from the in-game menu applies at once. **Flip** (default) turns the board to the player to move after each Confirm; **Fixed** keeps White at the bottom. **Face-to-face** shows locked (owner: after MVP1).
-- The pill on the active strip names the player ("Maria's turn"), as wireframe 6 asks.
+- The active seat's gold status line names the player ("Maria’s turn"), as wireframe 6 asks.
 - No "pass the phone" screen: wireframe 6e says pass-and-play has no locked state. After Confirm the board flips and the next player sees the Roll button with their name.
 - Each player taps for their own opening die.
 - Everything is local: no network call anywhere in a pass-and-play match.
@@ -198,7 +198,7 @@ Owner request (2026-11-06): skip the dull end of a game vs the bot. The rule is 
 
 ## In-game menu and resign
 
-- The menu button sits left of the top strip (tall layout), or alone at the top left next to the game label (classic layout, #184). The menu is a bottom sheet (`components/Sheet.tsx`, a React Native `Modal`): Resign game, Resign match, How to play, Settings, Exit to home, Resume.
+- The menu button sits left of the top seat (tall layout), or alone at the top left next to the game label (classic layout, #184). The menu is a bottom sheet (`components/Sheet.tsx`, a React Native `Modal`): Resign game, Resign match, How to play, Settings, Exit to home, Resume.
 - Who resigns (`features/match/resign.ts`): the human vs the bot; in pass-and-play the player to move. Nobody can resign the game during the opening roll.
 - The resign dialog shows what the engine would score (`resignGame`): diplo (2) if the resigner has borne off no checker, else mono (1), and the match score after it. Acey-Deucey American scores 1 point per checker the resigner has not borne off, and the dialog says so (#245). **Resign** is outlined, **Keep playing** is the main button.
 - Resign match ends the match at once (`resignMatch`). The game in play counts first, like Resign game: the opponent gets its mono or diplo, on top of the finished games, and never the target (`docs/rules/tavli-match.md`, "Resigning", #181, and the owner change of 2026-11-09). With no game in play (the opening roll, or a game that is over) the score stays as it is. The engine does this inside the `resignMatch` action, so online play gets it too. The dialog (`resignMatchText` in `features/match/resign.ts`, shared by the local and the online screen) names the points and shows the score after.
