@@ -49,7 +49,7 @@ import { currentGameLabel, variantName } from '@/features/match/summary';
 import { ReportOrBlock, safetyName, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { onlineBoardStore, type OnlineBoardStore } from './boardStore';
-import { clockText, clockTickMs } from './clock';
+import { clockText, clockTickMs, clockUrgent } from './clock';
 import { useOnlineStore, type OnlineNotice, type OnlineStore } from './onlineStore';
 import { playerNameText } from './playerName';
 import { onlineSeats } from './seats';
@@ -198,8 +198,9 @@ function OnlineBoard({
   // The newest flow: the next game, while the board still holds the last one.
   const latest = useOnlineStore(store, (s) => s.flow) ?? flow;
 
-  const opponentName = view?.names[side === 'white' ? 'black' : 'white'] ?? null;
-  const seats = onlineSeats(side, t, opponentName);
+  const opponentSide = side === 'white' ? 'black' : 'white';
+  const opponentName = view?.names[opponentSide] ?? null;
+  const seats = onlineSeats(side, t, opponentName, view?.players[opponentSide]);
   const named = playerNameText(opponentName, t);
   const name = (player: PlayerId) => seats[player].name;
   if (view === null) return null;
@@ -259,7 +260,17 @@ function OnlineBoard({
     clock:
       clockSide === null || shown === null || finished
         ? null
-        : { player: clockSide, text: clockText(shown, view.turnTimeMinutes, t) },
+        : {
+            player: clockSide,
+            // "4:54 to roll", "0:28 to move" (#499).
+            text: t(
+              view.game.phase === 'awaiting-roll' || view.game.phase === 'opening-roll'
+                ? 'online.clock.toRoll'
+                : 'online.clock.toMove',
+              { time: clockText(shown, view.turnTimeMinutes, t) },
+            ),
+            urgent: clockUrgent(shown),
+          },
     ended,
     notice: noticeCard,
   };

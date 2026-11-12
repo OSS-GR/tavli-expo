@@ -9,7 +9,8 @@ import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { closedOut, guestNumberOf, lastBearOff } from '@tavli/online/testing';
 import { getLayout, getTheme } from '@tavli/themes';
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { themes } from '@tavli/ui';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 import * as Reanimated from 'react-native-reanimated';
 
@@ -452,7 +453,9 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(view(game).turnDeadline).not.toBeNull();
       // The time left of game 2 shows on the strip of the player it waits for.
       const strip = view(game).waitingFor === 'white' ? 'strip-bottom' : 'strip-top';
-      expect(screen.getByTestId(strip, { includeHiddenElements: true })).toHaveTextContent(/\d+ s/);
+      expect(screen.getByTestId(strip, { includeHiddenElements: true })).toHaveTextContent(
+        /\d:\d\d to (roll|move)/,
+      );
 
       // Nobody plays game 2 while the sheet is open: the server ends it.
       sounds.played.length = 0;
@@ -827,7 +830,8 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     expect(screen.getByTestId('strip-top')).toHaveTextContent(
       new RegExp(`Waiting for ${botName(game)}`, 'i'),
     );
-    expect(screen.getByTestId('strip-top')).toHaveTextContent(/\d+ s/);
+    // A clock, never "60 s" (#499).
+    expect(screen.getByTestId('strip-top')).toHaveTextContent(/\d:\d\d to roll/);
     expect(screen.queryByTestId('confirm-button')).toBeNull();
     expect(screen.queryByTestId('undo-button')).toBeNull();
     // The bot's turn has no Roll button: the bot rolls on its own phone (#355).
@@ -845,7 +849,14 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     const user = setupUser();
     const game = await openGame('portes', 1, 5);
     await untilYourTurn(game);
-    expect(screen.getByTestId('strip-bottom')).toHaveTextContent(/\d+ s/);
+    expect(screen.getByTestId('strip-bottom')).toHaveTextContent(/\d:\d\d to (roll|move)/);
+    const clockText = () => within(screen.getByTestId('strip-bottom-clock')).getByText(/to/);
+    expect(clockText()).toHaveStyle({ color: themes['walnut-kafeneio'].colors.turnText });
+    // Under 30 s the clock turns the problem color.
+    await act(async () => {
+      jest.advanceTimersByTime(35_000);
+    });
+    expect(clockText()).toHaveStyle({ color: themes['walnut-kafeneio'].colors.problem });
 
     // You wait too long. The server ends the game (the in-memory server
     // runs its timers when asked).

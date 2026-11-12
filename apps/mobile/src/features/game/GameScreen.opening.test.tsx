@@ -70,14 +70,18 @@ afterEach(async () => {
 const announced = () => announce.mock.calls.map(([text]) => text as string);
 
 describe('<GameScreen /> opening roll (#176)', () => {
-  it('shows a blank die for each player and a Roll button with the name on the card', async () => {
+  it('shows an empty slot for each die and a Roll button with the name on the card', async () => {
     await render(<GameScreen store={newStore()} />);
-    // Two dice drawn on canvases, no "?" boxes.
-    expect(screen.queryByText('?')).toBeNull();
+    expect(card().getByRole('header', { name: 'Who starts?' })).toBeOnTheScreen();
+    // Each die keeps its canvas; over it an empty brass slot with a "?" (#499).
     const dice = card().getAllByLabelText('Not rolled yet');
     expect(dice).toHaveLength(2);
     for (const die of dice) expect(die.type).toBe('Canvas');
-    // The names sit under the dice.
+    for (const player of ['white', 'black']) {
+      const slot = screen.getByTestId(`opening-die-${player}-slot`, hidden);
+      expect(within(slot).getByText('?', hidden)).toBeOnTheScreen();
+    }
+    // The seat labels sit under the dice.
     expect(card().getByText('Ann')).toBeOnTheScreen();
     expect(card().getByText('Bob')).toBeOnTheScreen();
     // The Roll button is on the card, next to the dice.
@@ -197,7 +201,11 @@ describe('<GameScreen /> opening roll (#176)', () => {
     expect(message()).toHaveTextContent('Maria starts with 6-3.');
     expect(card().getByLabelText('Rolled 6')).toBeOnTheScreen();
     expect(card().getByLabelText('Rolled 3')).toBeOnTheScreen();
-    expect(card().getByText('Closes by itself after 3 s.')).toBeOnTheScreen();
+    // The title names the starter; the slots are gone.
+    expect(card().getByRole('header', { name: 'Maria starts' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('opening-die-white-slot', hidden)).toBeNull();
+    // It closes by itself, with no line that says so (#499).
+    expect(card().queryByText(/Closes by itself/)).toBeNull();
     expect(announced()).toContain('Maria starts with 6-3.');
     expect(OPENING_RESULT_MS).toBeGreaterThanOrEqual(3000);
 
@@ -208,14 +216,14 @@ describe('<GameScreen /> opening roll (#176)', () => {
     expect(screen.getByTestId('game-board')).toBeOnTheScreen();
   });
 
-  it('OK or a tap on the board closes the result early', async () => {
+  it('Play or a tap on the board closes the result early', async () => {
     const user = setupUser();
     const store = newStore();
     await render(<GameScreen store={store} />);
     await rollDie(store, 'white', 2);
     await rollDie(store, 'black', 5);
     expect(message()).toHaveTextContent('Bob starts with 5-2.');
-    await user.press(card().getByRole('button', { name: 'OK' }));
+    await user.press(card().getByRole('button', { name: 'Play' }));
     expect(screen.queryByTestId('opening-card')).toBeNull();
     expect(screen.getByTestId('game-board', hidden)).toBeOnTheScreen();
   });
@@ -235,6 +243,7 @@ describe('<GameScreen /> opening roll (#176)', () => {
     await rollDie(store, 'white', 5);
     await rollDie(store, 'black', 1);
     expect(message()).toHaveTextContent('You start with 5-1.');
+    expect(card().getByRole('header', { name: 'You start' })).toBeOnTheScreen();
   });
 
   it('Greek: the tie and the result', async () => {
@@ -254,7 +263,7 @@ describe('<GameScreen /> opening roll (#176)', () => {
     await rollDie(store, 'white', 6);
     await rollDie(store, 'black', 3);
     expect(message()).toHaveTextContent('Ξεκινά: Μαρία, με 6-3.');
-    expect(card().getByText('Κλείνει μόνο του σε 3 δευτ.')).toBeOnTheScreen();
-    expect(card().getByRole('button', { name: 'Εντάξει' })).toBeOnTheScreen();
+    expect(card().getByRole('header', { name: 'Ξεκινά: Μαρία' })).toBeOnTheScreen();
+    expect(card().getByRole('button', { name: 'Παίξε' })).toBeOnTheScreen();
   });
 });
