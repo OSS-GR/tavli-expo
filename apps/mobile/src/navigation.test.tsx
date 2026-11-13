@@ -1078,7 +1078,7 @@ describe('play a friend online (#281)', () => {
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     const code = router.getPathname().split('/').at(-1)!;
     expect(router.getPathname()).toBe(`/friend/${code}`);
-    expect(screen.getByText(`tavlaki://invite/${code}`)).toBeOnTheScreen();
+    expect(screen.getByTestId('invite-wait-code')).toHaveTextContent(code);
     // The guest was made for the invite, and owns it.
     expect(onlineFake.authStore.guests).toBe(1);
     expect(onlineServer().getInvite(code)).toMatchObject({
@@ -1386,7 +1386,7 @@ describe('save reminders on Home (#404)', () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await user.press(await screen.findByRole('button', { name: 'Not now' }));
     expect(onlineFake.authStore.guests).toBe(0);
     await act(async () => appRouter.back());
@@ -1435,7 +1435,7 @@ describe('your invites on Home (#314)', () => {
     await user.press(row);
     expect(router.getPathname()).toBe(`/friend/${code}`);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
-    expect(screen.getByText(`tavlaki://invite/${code}`)).toBeOnTheScreen();
+    expect(screen.getByTestId('invite-wait-code')).toHaveTextContent(code);
     await user.press(screen.getByRole('button', { name: 'Cancel the invite' }));
     expect(router.getPathname()).toBe('/');
     expect(onlineServer().getInvite(code)?.status).toBe('cancelled');
@@ -1556,7 +1556,7 @@ describe('friends (#406)', () => {
     // No saved setup: Invite opens the full setup.
     await user.press(await screen.findByRole('button', { name: `Invite ${name} to a game` }));
     expect(router.getPathname()).toBe('/friends/invite/ann');
-    await user.press(await screen.findByRole('button', { name: 'Make an invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Send the invite' }));
     await waitFor(() => expect(router.getPathname()).toBe('/friends'));
     expect(await screen.findByTestId('friends-sent')).toHaveTextContent(`Invite sent to ${name}`);
     expect(await onlineFake.server().friendsFor('ann').listFriendInvites()).toHaveLength(1);

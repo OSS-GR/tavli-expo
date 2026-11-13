@@ -75,6 +75,9 @@ describe('themes', () => {
         ['accentLight', 'surface'],
         ['accentLight', 'surfaceRaised'],
         ['accentLight', 'backgroundDeep'],
+        // The invite code's bone tiles (#516).
+        ['tileText', 'tileFace'],
+        ['tileText', 'tileFaceLight'],
         // Locked or disabled labels ("Coming soon", a disabled Undo). WCAG lets
         // disabled controls be fainter, but locked labels still carry meaning.
         ['textDisabled', 'background'],

@@ -5,13 +5,14 @@
  * online server goes Home. After an async invite the app offers turn
  * notifications (#285, #183). A saved account with friends sees a short
  * list of them (#488): a tap sends a friend invite, and the screen stays
- * and says so (#507): the friend gets a push and needs no link.
+ * and says so (#507): the friend gets a push and needs no link. "All
+ * friends" opens Friends and Add opens Add a friend (#516).
  */
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 
 import { FriendSetupScreen } from '@/features/invites/FriendSetupScreen';
-import { FRIENDS_HREF, inviteWaitHref } from '@/features/match/routes';
+import { ADD_FRIEND_HREF, FRIENDS_HREF, inviteWaitHref } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 import { useAppUpdateCheck } from '@/features/update/updateCheck';
@@ -30,6 +31,7 @@ export default function FriendRoute() {
       invites={invites}
       {...(friends === undefined ? {} : { friends })}
       onFriends={() => router.push(FRIENDS_HREF)}
+      onAddFriend={() => router.push(ADD_FRIEND_HREF)}
       onFriendInvited={() => {
         // Every online game can last a while: offer turn notifications (#285).
         void turnPushes()?.offer();

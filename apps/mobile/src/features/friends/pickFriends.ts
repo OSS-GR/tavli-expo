@@ -4,8 +4,11 @@
  */
 import type { Friend } from '@tavli/contracts';
 
-/** How many friends Play a friend shows. The rest are on the Friends screen. */
-export const FRIENDS_SHOWN = 5;
+/**
+ * How many friends the Who row of Play a friend shows: three fit next to
+ * Anyone and Add (#516). The rest are on the Friends screen.
+ */
+export const FRIENDS_SHOWN = 3;
 
 /** Up to `count` friends: most matches played first, then the newest friend. */
 export function pickFriends(friends: readonly Friend[], count = FRIENDS_SHOWN): Friend[] {

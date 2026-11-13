@@ -598,8 +598,7 @@
     "home": "Home"
   },
   "friend": {
-    "title": "Play a friend online",
-    "intro": "Pick the game. You get a link to send to a friend, and the game starts when they accept.",
+    "title": "Play a friend",
     "game": "Game",
     "length": "Match length",
     "timeLimit": "Time limit",
@@ -607,24 +606,26 @@
     "timeLimitHint_one": "1 minute per turn",
     "timeLimitHint_other": "{{count}} minutes per turn",
     "account": "An online game needs a free account. When you make the invite, you pick how you sign in: you can play as a guest, with no name and no email.",
-    "make": "Make an invite",
+    "make": "Make an invite link",
     "making": "Making the invite…",
     "makeFailed": "The invite was not made. Check the connection and try again.",
     "accountFailed": "Your free account was not made. Check the connection and try again.",
     "tooMany": "You have {{max}} open invites. Wait until a friend answers one, or until one expires, then make a new one.",
     "wait": {
       "title": "Send the invite",
-      "body": "Send this link to a friend. The game starts when they accept.",
-      "code": "Code",
-      "link": "Link",
-      "share": "Share the invite",
+      "body": "{{game}} · first to {{count}}. The game starts when your friend accepts.",
+      "code": "Invite code",
+      "share": "Share invite",
       "shareMessage": "Play tavli with me on Tavlaki. Open this link to join: {{link}}\nOr open Tavlaki, tap Join with a code and enter {{code}}.",
-      "status": "Waiting for your friend…",
-      "stay": "You can close this screen: your open invites are on Home. The invite stays open for 24 hours.",
+      "status": "Waiting for your friend",
+      "stay": "Open for {{time}}. You can leave: the invite stays on Home.",
       "cancel": "Cancel the invite",
       "cancelling": "Cancelling…",
       "cancelFailed": "The invite was not cancelled. Check the connection and try again.",
-      "loading": "Loading the invite…"
+      "loading": "Loading the invite…",
+      "expiring": "The invite is expiring now.",
+      "close": "Close",
+      "closeHint": "The invite stays open. You find it on Home."
     },
     "joined": {
       "title": "Your friend joined",
@@ -654,11 +655,15 @@
     },
     "again": "Make a new invite",
     "home": "Home",
-    "friendsTitle": "Or send it to a friend",
     "sendTo": "Send the invite to {{name}}",
     "invited": "Invite sent",
     "invitedTo": "Invite sent to {{name}}",
-    "allFriends": "All your friends"
+    "allFriends": "All friends",
+    "summary": "{{length}} · {{time}}.",
+    "who": "Who",
+    "anyone": "Anyone",
+    "anyoneLabel": "Anyone: make an invite link",
+    "add": "Add"
   },
   "friends": {
     "title": "Friends",
@@ -765,7 +770,8 @@
     },
     "invite": {
       "title": "Invite a friend",
-      "intro": "Pick the game. Your friend gets a notification, and the game starts when they accept."
+      "intro": "Pick the game. Your friend gets a notification, and the game starts when they accept.",
+      "send": "Send the invite"
     },
     "link": {
       "title": "Friend link",
