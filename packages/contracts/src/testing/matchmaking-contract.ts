@@ -337,6 +337,22 @@ export function matchmakingContract(): readonly MatchmakingContractCheck[] {
       },
     },
     {
+      name: 'hides the name of a matched opponent the caller blocks, from the caller only',
+      run: async (subject) => {
+        await seek(subject, 'alice');
+        await seek(subject, 'bob');
+        await subject.safetyFor('alice').block(subject.idOf('bob'));
+        const aliceSeek = await seekOf(subject, 'alice');
+        const bobSeek = await seekOf(subject, 'bob');
+        if (aliceSeek.kind !== 'matched' || bobSeek.kind !== 'matched') {
+          throw new Error(`both matched: ${JSON.stringify([aliceSeek, bobSeek])}`);
+        }
+        same(aliceSeek.opponent.name, null, 'alice sees no name');
+        check(aliceSeek.me.name !== null, 'alice still sees her own name');
+        check(bobSeek.opponent.name !== null, 'bob still sees alice');
+      },
+    },
+    {
       name: `never matches one pair more than ${RATED_MATCHES_PER_PAIR_PER_DAY} times a day`,
       run: async (subject) => {
         for (let i = 0; i < RATED_MATCHES_PER_PAIR_PER_DAY; i += 1) {

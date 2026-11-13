@@ -187,6 +187,24 @@ describe('matchmaking on Convex', () => {
     expect(await seekRows(t)).toEqual([]);
   });
 
+  it('pushes White, the older seek, when the match starts', async () => {
+    const t = await setup();
+    const push = createRecordingPushProvider();
+    setPushProvider(push);
+    for (const [id, token] of [
+      [ALICE, 'ExponentPushToken[alice-phone]'],
+      [BOB, 'ExponentPushToken[bob-phone]'],
+    ] as const) {
+      await as(t, id).mutation(api.push.registerPushToken, { token, platform: 'ios' });
+    }
+    await as(t, ALICE).mutation(api.matchmaking.seek, { game: 'portes' });
+    await as(t, BOB).mutation(api.matchmaking.seek, { game: 'portes' });
+    expect((await as(t, ALICE).query(api.matchmaking.mySeek, {})).kind).toBe('matched');
+    await passTime(t, 0);
+    // The opening waits for White's die: Alice hears, Bob is in the app.
+    expect(push.sent.map((message) => message.to)).toEqual(['ExponentPushToken[alice-phone]']);
+  });
+
   it('keeps a matched seek for a while, then forgets it; the game goes on', async () => {
     const t = await setup();
     await as(t, ALICE).mutation(api.matchmaking.seek, { game: 'plakoto' });

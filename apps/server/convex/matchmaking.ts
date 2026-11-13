@@ -65,9 +65,8 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import { authComponent } from './auth';
 import { signedInPlayer } from './caller';
 import { insertGame } from './games';
-import { nameOf } from './playerNames';
 import { pairRow, ratingRow } from './ratings';
-import { blocks } from './safety';
+import { blocks, nameSeenBy } from './safety';
 import { rankedGame } from './schema';
 
 /** How often the matching of a waiting seek runs again while its range grows. */
@@ -203,7 +202,10 @@ async function matchSeeks(ctx: MutationCtx, game: RankedGame, now: number): Prom
   for (const [older, newer] of pairs) {
     const players = matchedPlayers(older, newer);
     const gameId = await insertGame(ctx, {
-      callerId: players.white,
+      // The newer seek starts the game, so the push goes to White, who
+      // waited longer and may have left the app: the opening waits for
+      // White's die first (`turnPushSide` never pushes the caller).
+      callerId: players.black,
       players,
       choice: game,
       targetPoints: RANKED_TARGET_POINTS,
@@ -274,9 +276,10 @@ export const cancelSeek = mutation({
   },
 });
 
-async function seekPlayerOf(ctx: QueryCtx, playerId: string) {
+/** A player of a matched seek as `viewerId` sees them: no name when the viewer blocks them. */
+async function seekPlayerOf(ctx: QueryCtx, viewerId: string, playerId: string) {
   const rating = (await ratingRow(ctx, playerId))?.rating ?? NEW_RATING.rating;
-  return { name: await nameOf(ctx, playerId), rating: shownRating(rating) };
+  return { name: await nameSeenBy(ctx, viewerId, playerId), rating: shownRating(rating) };
 }
 
 /** The caller's seek: none, waiting, or matched with the game and both players. */
@@ -296,8 +299,8 @@ export const mySeek = query({
     if (game === null) return { kind: 'none' };
     const opponentId = game.players.white === playerId ? game.players.black : game.players.white;
     const [me, opponent] = await Promise.all([
-      seekPlayerOf(ctx, playerId),
-      seekPlayerOf(ctx, opponentId),
+      seekPlayerOf(ctx, playerId, playerId),
+      seekPlayerOf(ctx, playerId, opponentId),
     ]);
     return matchedSeek(row.game, game._id, me, opponent);
   },

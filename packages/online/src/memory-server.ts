@@ -1594,7 +1594,11 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     const game = seek.gameId === null ? undefined : games.get(seek.gameId);
     if (game === undefined) return { kind: 'none' };
     const opponentId = game.players.white === playerId ? game.players.black : game.players.white;
-    const player = (id: string) => ({ name: nameOf(id), rating: shownRating(ratingOf(id).rating) });
+    // A player the caller blocks shows no name (`nameSeenBy` on Convex).
+    const player = (id: string) => ({
+      name: blocksPlayer(playerId, id) ? null : nameOf(id),
+      rating: shownRating(ratingOf(id).rating),
+    });
     return matchedSeek(seek.game, game.gameId, player(playerId), player(opponentId));
   }
 
