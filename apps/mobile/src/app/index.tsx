@@ -185,7 +185,8 @@ export default function HomeRoute() {
         level: botSetup.botLevel,
       }}
       onBotLevel={(botLevel) => {
-        const next = { ...botSetup, botLevel };
+        // Cleaned like a start: a level the last game lacks becomes its easiest.
+        const next = sanitizeSetup({ ...botSetup, botLevel }, 'bot', botLevels);
         saveLastSetup(storage, next);
         setBotSetup(next);
       }}
