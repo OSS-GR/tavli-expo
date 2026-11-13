@@ -32,7 +32,8 @@ export type WhatsNewEntryId =
   | 'grabAChair'
   | 'plakotoFederation'
   | 'matchingColors'
-  | 'turnClock';
+  | 'turnClock'
+  | 'playRanked';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -51,6 +52,7 @@ export const RELEASES: readonly WhatsNewRelease[] = [
   {
     date: '2026-11-13',
     entries: [
+      { id: 'playRanked', icon: 'trophy' },
       { id: 'turnClock', icon: 'clock' },
       { id: 'matchingColors', icon: 'palette' },
       { id: 'plakotoFederation', icon: 'book' },

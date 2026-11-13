@@ -1548,6 +1548,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           return {
             rating: shownRating(row.rating),
             matches: row.matches,
+            experience: row.experience,
             shown: row.shown,
             listed: isBoardable(row) && usernameOf(id) !== null,
           };

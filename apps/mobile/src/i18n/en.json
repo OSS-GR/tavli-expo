@@ -42,6 +42,10 @@
       "subtitle": "Online",
       "soon": "Coming soon: play friends online."
     },
+    "ranked": {
+      "title": "Play ranked",
+      "subtitle": "Find a player now"
+    },
     "join": {
       "title": "Join with a code",
       "subtitle": "Got a code from a friend?"
@@ -892,6 +896,105 @@
       "ok": "Got it"
     }
   },
+  "ranked": {
+    "title": "Play ranked",
+    "failed": "Your account did not load. Try again.",
+    "retry": "Try again",
+    "expired": "Nobody came in 5 minutes, so the search stopped. Look again, or pick another game.",
+    "gate": {
+      "title": "Save your account to play ranked",
+      "text": "Ranked games change your rating. A rating needs a saved account, so your games and rating are never lost.",
+      "rating": "Your rating and leaderboards",
+      "ratingHint": "Start at 1500",
+      "phones": "Play on any phone",
+      "phonesHint": "Sign in with Apple or email",
+      "email": "Use email",
+      "notNow": "Not now"
+    },
+    "setup": {
+      "title": "Sit with a new player",
+      "text": "Someone close to your rating, from anywhere.",
+      "game": "Game",
+      "clock_one": "{{count}} minute a turn",
+      "clock_other": "{{count}} minutes a turn",
+      "clockHint": "A clock on screen counts down each turn",
+      "ranked": "Ranked",
+      "rating": "Your rating {{rating}} · no hints",
+      "noHints": "No hints",
+      "find": "Find a player",
+      "footnote_one": "Match to {{count}} point · federation rules",
+      "footnote_other": "Match to {{count}} points · federation rules"
+    },
+    "searching": {
+      "title": "Looking for a player…",
+      "about": "{{game}} · {{count}} min a turn · Ranked",
+      "waiting": "Waiting {{time}}",
+      "waitingHint": "Most games start within a minute",
+      "range": "Ratings {{low}} – {{high}}",
+      "rangeHint": "The range grows while you wait"
+    },
+    "nobody": {
+      "title": "Nobody yet",
+      "text": "Few players are free for {{game}} right now.",
+      "keep": "Keep looking",
+      "keepHint": "Ratings {{low}} – {{high}} now",
+      "other": "Try another game",
+      "otherHint_one": "{{game}} has {{count}} player looking",
+      "otherHint_other": "{{game}} has {{count}} players looking",
+      "otherNone": "Nobody is looking for {{game}} either",
+      "otherLoading": "Checking the other games…",
+      "bot": "Play the bot instead",
+      "botHint": "Your search stops"
+    },
+    "matched": {
+      "kicker": "A player sat down",
+      "said": "A player sat down: {{name}}, rating {{rating}}. The match starts in a moment.",
+      "playerLabel": "{{name}}, rating {{rating}}",
+      "youLabel": "You, rating {{rating}}",
+      "you": "You",
+      "clock": "{{count}} min a turn",
+      "stakes": "Win +{{win}} · lose −{{lose}}",
+      "stakesHint": "Rating change for this match",
+      "starting": "Starting in {{count}}…"
+    },
+    "rules": {
+      "title": "Before your first game",
+      "clockLead": "Two minutes a turn.",
+      "clockText": "A clock counts down on screen. If it runs out, you lose that game. Two in a row, and you lose the match.",
+      "kindLead": "Be kind.",
+      "kindText": "Your username is all they see. No chat, no photos.",
+      "helpLead": "No help.",
+      "helpText": "Ranked games have no hints. Bots spoil it for everyone.",
+      "reportLead": "Report or block",
+      "reportText": "anyone from the game menu. A blocked player is never matched with you again.",
+      "agree": "I agree",
+      "once": "Shown once ·",
+      "terms": "Terms of use"
+    },
+    "problem": {
+      "notSaved": {
+        "title": "Save your account first",
+        "text": "Ranked games need a saved account. Save it in Settings › Account."
+      },
+      "notSignedIn": {
+        "title": "You are signed out",
+        "text": "Sign in again in Settings › Account, then come back."
+      },
+      "network": {
+        "title": "That did not work",
+        "text": "The server did not answer. Try again in a moment."
+      }
+    },
+    "end": {
+      "rating": "Rating {{before}} → {{after}}",
+      "ratingNow": "Rating {{after}}",
+      "ratingHint": "Leaderboards",
+      "playAgain": "Play {{name}} again",
+      "newPlayer": "New player",
+      "addFriend": "Add friend",
+      "requestSent": "Friend request sent to {{name}}"
+    }
+  },
   "whatsNew": {
     "title": "What's new",
     "intro": "What each update added, and where to find it.",
@@ -977,6 +1080,11 @@
         "title": "App colors that match the board",
         "body": "Two new color themes: Olive Inlay, the first light one, and Kafeneio Night. The app colors now match the board you pick, or keep one look with any board.",
         "where": "Settings › Board & look › App colors"
+      },
+      "playRanked": {
+        "title": "Play ranked",
+        "body": "Play a new player close to your rating, live, with two minutes a turn. Each match changes your rating.",
+        "where": "Home › Play ranked"
       }
     }
   },

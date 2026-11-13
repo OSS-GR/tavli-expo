@@ -9,6 +9,8 @@ import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPus
 import { forgetPushTapsForTest } from '../src/features/notifications/pushTaps';
 import { forgetOnlineAccount } from '../src/features/online/accountHint';
 import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
+import { forgetRankedRulesForTest } from '../src/features/ranked/rankedRules';
+import { forgetRankedStartsForTest } from '../src/features/ranked/rankedStarts';
 import { resetRemindersForTest } from '../src/features/reminders/reminders';
 import { resetUpdateCheckForTest } from '../src/features/update/updateCheck';
 import { markWhatsNewSeenForTest } from '../src/features/whats-new/seen';
@@ -44,4 +46,7 @@ beforeEach(() => {
   resetRemindersForTest();
   // What's new (#471): every release seen, so Home's button has no dot.
   markWhatsNewSeenForTest();
+  // Play ranked (#532): the rules sheet not seen, no match start noted.
+  forgetRankedRulesForTest();
+  forgetRankedStartsForTest();
 });

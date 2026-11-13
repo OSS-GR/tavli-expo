@@ -6,6 +6,7 @@ import {
   afterRatedMatch,
   experienceFactor,
   isBoardable,
+  matchStakes,
   pairOf,
   planRatedMatch,
   shownRating,
@@ -61,6 +62,27 @@ describe('the FIBS formula (#407)', () => {
   it('shows whole numbers', () => {
     expect(shownRating(1506.4)).toBe(1506);
     expect(shownRating(1506.5)).toBe(1507);
+  });
+});
+
+describe('what a ranked match is worth (#532)', () => {
+  it('matches afterRatedMatch for both results', () => {
+    const me = { rating: 1490, experience: 30, matches: 10 };
+    const other = { rating: 1512, experience: 500, matches: 48 };
+    const stakes = matchStakes(me, other.rating, 3);
+    const won = afterRatedMatch(me, other, 3).winner.rating - me.rating;
+    const lost = me.rating - afterRatedMatch(other, me, 3).loser.rating;
+    expect(stakes).toEqual({ win: Math.round(won), lose: Math.round(lost) });
+  });
+
+  it('gives two settled equal players 2·√n each way', () => {
+    // 2·√3 = 3.46.
+    expect(matchStakes({ rating: 1500, experience: 400 }, 1500, 3)).toEqual({ win: 3, lose: 3 });
+  });
+
+  it('pays the underdog more for a win than it costs for a loss', () => {
+    const stakes = matchStakes({ rating: 1400, experience: 400 }, 1600, 3);
+    expect(stakes.win).toBeGreaterThan(stakes.lose);
   });
 });
 
