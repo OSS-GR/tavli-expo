@@ -4,17 +4,21 @@
  * Pass-and-play view, and the app colors. Every pick saves at once and
  * shows in the preview.
  *
+ * App colors (#528, Figma "13 Matching color themes"): Match the board (the
+ * default) takes the colors made for the picked board; a theme keeps its
+ * colors with any board. The whole app, this page too, changes at once.
+ *
  * Face-to-face is not built yet (owner: after MVP1): it is a locked row
  * with a "Soon" chip, not an option of the view picker.
  */
-import { THEME_IDS } from '@tavli/ui';
+import { MATCH_BOARD, THEME_CHOICES, themeForBoard, themes, type ThemeChoice } from '@tavli/ui';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { SectionCard, SectionRow } from '@/components/SectionCard';
 import { SectionHeader } from '@/components/SectionHeader';
-import { OptionList } from '@/components/settings/OptionList';
+import { OptionList, type ListOption } from '@/components/settings/OptionList';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { Surface } from '@/components/Surface';
 import { boardLayout, useBoardTheme } from '@/features/board/BoardCanvas';
@@ -42,6 +46,7 @@ export function BoardLookSettings({ onBack }: { onBack?: () => void }) {
   const homeSide = useSettings((s) => s.homeBoardSide);
   const flipMode = useSettings((s) => s.boardFlipMode);
   const appTheme = useSettings((s) => s.theme);
+  const boardThemeId = useSettings((s) => s.boardTheme);
   const setSetting = useSettings((s) => s.setSetting);
 
   const layoutOptions: SegmentOption<BoardLayoutMode>[] = BOARD_LAYOUT_MODES.map((mode) => ({
@@ -56,7 +61,22 @@ export function BoardLookSettings({ onBack }: { onBack?: () => void }) {
     value: mode,
     label: t(`settings.boardView.${mode}`),
   }));
-  const themeOptions = THEME_IDS.map((id) => ({ value: id, label: t(`themes.${id}`) }));
+  const matched = themeForBoard(boardThemeId);
+  const themeOptions: ListOption<ThemeChoice>[] = THEME_CHOICES.map((choice) =>
+    choice === MATCH_BOARD
+      ? {
+          value: choice,
+          label: t('settings.theme.matchBoard'),
+          hint: t(`settings.theme.matchBoardHint.${themes[matched].scheme}`, {
+            theme: t(`themes.${matched}`),
+          }),
+        }
+      : {
+          value: choice,
+          label: t(`themes.${choice}`),
+          hint: t(`settings.theme.${themes[choice].scheme}`),
+        },
+  );
   // The board as on a table: wide and low, so it fits the card.
   const aspectRatio = boardLayout(boardTheme, 'classic', homeSide).aspectRatio;
 
@@ -139,7 +159,8 @@ export function BoardLookSettings({ onBack }: { onBack?: () => void }) {
         />
       </SectionCard>
 
-      <SectionCard title={t('settings.theme.label')}>
+      <View style={styles.group}>
+        <SectionHeader title={t('settings.theme.label')} />
         <OptionList
           testID="settings-theme"
           label={t('settings.theme.label')}
@@ -147,7 +168,8 @@ export function BoardLookSettings({ onBack }: { onBack?: () => void }) {
           value={appTheme}
           onChange={(value) => setSetting('theme', value)}
         />
-      </SectionCard>
+        <BlockHint>{t('settings.theme.hint')}</BlockHint>
+      </View>
     </SettingsPage>
   );
 }

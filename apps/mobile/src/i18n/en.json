@@ -183,7 +183,14 @@
     },
     "theme": {
       "label": "App colors",
-      "hint": "The colors of menus and screens. More later."
+      "hint": "Match the board picks the colors made for each board. Pick one to keep it with any board.",
+      "matchBoard": "Match the board",
+      "matchBoardHint": {
+        "dark": "{{theme}} colors, dark",
+        "light": "{{theme}} colors, light"
+      },
+      "dark": "Dark",
+      "light": "Light"
     },
     "boardTheme": {
       "label": "Board",
@@ -454,7 +461,9 @@
     "en": "English"
   },
   "themes": {
-    "walnut-kafeneio": "Walnut kafeneio"
+    "walnut-kafeneio": "Walnut Kafeneio",
+    "olive-inlay": "Olive Inlay",
+    "kafeneio-night": "Kafeneio Night"
   },
   "dev": {
     "board": {
@@ -944,6 +953,11 @@
         "title": "Grab a chair",
         "body": "A short scene at the kafeneio: the table, the chairs, then the tavli board. Tap to skip it. With Reduce Motion it stays still.",
         "where": "Home, and when a match opens"
+      },
+      "matchingColors": {
+        "title": "App colors that match the board",
+        "body": "Two new color themes: Olive Inlay, the first light one, and Kafeneio Night. The app colors now match the board you pick, or keep one look with any board.",
+        "where": "Settings → Board & look → App colors"
       }
     }
   },
