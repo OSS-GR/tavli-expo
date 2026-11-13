@@ -7,9 +7,11 @@
  *   with Apple (iPhone) or Continue with email (#433) signs in to an
  *   account (one made on another phone, or a new one). A guest is never
  *   made here.
- * - Guest: "You play as Guest 4821", Save my account (Apple or email),
- *   Delete my guest account. A guest has no Sign out: with no key it
- *   could never come back.
+ * - Guest (Figma frame 09, #519): a hero (checker, "Guest 4821", "On
+ *   this phone only"), the Save your account card (Apple or email, and
+ *   what a saved account gives behind a text button), What we keep as two
+ *   rows, and Delete my guest account alone at the end in red. A guest
+ *   has no Sign out: with no key it could never come back.
  * - The email code step (`EmailCodeForm`) shows in place of the cards;
  *   its Cancel shows them again.
  * - A guest whose Apple ID or email has an account already gets the move
@@ -44,12 +46,15 @@ import {
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Icon } from '@/components/Icon';
 import { ProblemCard } from '@/components/Problem';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionCard, SectionRow } from '@/components/SectionCard';
 import { Sheet } from '@/components/Sheet';
+import { Surface } from '@/components/Surface';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { AccountBenefits } from '@/features/online/AccountBenefits';
@@ -169,6 +174,7 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
               ) : state.kind === 'guest' ? (
                 <Guest
                   account={account}
+                  id={state.id}
                   guestNumber={state.guestNumber}
                   onEmail={() => setEmailStep('save')}
                   onDelete={() => setDialog('deleteGuest')}
@@ -281,58 +287,111 @@ function Offline({ account, onEmail }: { account: Account; onEmail: () => void }
   );
 }
 
+/**
+ * A guest (Figma frame 09, #519): the hero (checker, guest name, "On this
+ * phone only"), the one raised card to save the account (the full list of
+ * what a saved account gives opens under "What a saved account gives"),
+ * What we keep as two rows, and Delete alone at the end in red.
+ */
 function Guest({
   account,
+  id,
   guestNumber,
   onEmail,
   onDelete,
 }: {
   account: Account;
+  id: string;
   guestNumber: string | null;
   onEmail: () => void;
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
-  const name =
+  const { theme } = useUnistyles();
+  const [showBenefits, setShowBenefits] = useState(false);
+  const shown =
     guestNumber === null
-      ? t('account.guest.noName')
-      : t('account.guest.name', { name: t('online.guestName', { number: guestNumber }) });
+      ? t('account.guest.anonymous')
+      : t('online.guestName', { number: guestNumber });
+  const said =
+    guestNumber === null ? t('account.guest.noName') : t('account.guest.name', { name: shown });
+  const chip = t('account.guest.chip');
+  const server = t('account.guest.server');
+  const serverHint = t('account.guest.serverHint');
+  const phone = t('account.guest.phone');
+  const phoneHint = t('account.guest.phoneHint');
   return (
     <>
-      <SectionCard padded testID="account-guest">
-        <View style={styles.block}>
-          <Text testID="account-name" style={styles.lead}>
-            {name}
-          </Text>
-          <Text style={styles.line}>{t('account.guest.kept')}</Text>
-          <Text style={styles.line}>{t('account.guest.onlyHere')}</Text>
+      <View
+        testID="account-guest"
+        style={styles.hero}
+        accessible
+        accessibilityLabel={`${said} ${chip}.`}>
+        <CheckerAvatar testID="account-avatar" playerKey={id} name={shown} size={72} />
+        <Text testID="account-name" style={styles.heroName}>
+          {shown}
+        </Text>
+        <View style={styles.chip}>
+          <Icon name="smartphone" size={13} color={theme.colors.textDim} />
+          <Text style={styles.chipText}>{chip}</Text>
         </View>
-      </SectionCard>
-      <SectionCard padded>
-        <View style={styles.block}>
-          <AccountBenefits testID="account-benefits" />
-          <Text style={styles.line}>{t('account.guest.save')}</Text>
-          {account.appleAvailable ? (
-            <AppleButton
-              testID="account-save-apple"
-              onPress={() => {
-                if (account.busy === null) account.saveWithApple();
-              }}
-            />
-          ) : null}
+      </View>
+      <Surface tier="raised" style={styles.saveCard} testID="account-save">
+        <View style={styles.saveTexts}>
+          <Text style={styles.saveTitle} accessibilityRole="header">
+            {t('account.guest.saveTitle')}
+          </Text>
+          <Text style={styles.saveBody}>{t('account.guest.saveBody')}</Text>
+        </View>
+        {account.appleAvailable ? (
+          <AppleButton
+            testID="account-save-apple"
+            onPress={() => {
+              if (account.busy === null) account.saveWithApple();
+            }}
+          />
+        ) : null}
+        <ActionButton
+          testID="account-save-email"
+          kind={account.appleAvailable ? 'secondary' : 'primary'}
+          icon="mail"
+          label={t('account.guest.saveEmail')}
+          disabled={account.busy !== null}
+          onPress={onEmail}
+        />
+        <View style={styles.more}>
           <ActionButton
-            testID="account-save-email"
-            kind={account.appleAvailable ? 'secondary' : 'primary'}
-            label={t('account.guest.saveEmail')}
-            disabled={account.busy !== null}
-            onPress={onEmail}
+            testID="account-benefits-toggle"
+            kind="text"
+            size="small"
+            icon="info"
+            label={t('account.guest.benefits')}
+            onPress={() => setShowBenefits((open) => !open)}
           />
         </View>
+        {showBenefits ? <AccountBenefits testID="account-benefits" /> : null}
+      </Surface>
+      <SectionCard title={t('account.guest.keep')} testID="account-kept">
+        <SectionRow
+          icon="globe"
+          iconLook="bare"
+          label={server}
+          hint={serverHint}
+          accessibilityLabel={`${server}: ${serverHint}`}
+        />
+        <SectionRow
+          icon="smartphone"
+          iconLook="bare"
+          label={phone}
+          hint={phoneHint}
+          accessibilityLabel={`${phone}: ${phoneHint}`}
+        />
       </SectionCard>
       <SectionCard>
         <SectionRow
           testID="account-delete"
           icon="trash"
+          tone="danger"
           label={t('account.guest.delete')}
           hint={t('account.guest.deleteHint')}
           disabled={account.busy !== null}
@@ -536,7 +595,8 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
   },
   content: {
-    gap: theme.space.lg,
+    // 20 pt between the parts (Figma frame 09).
+    gap: theme.space.lg + theme.space.xs,
     paddingHorizontal: theme.space.lg,
     paddingTop: theme.space.sm,
     paddingBottom: theme.space.lg,
@@ -560,5 +620,49 @@ const styles = StyleSheet.create((theme) => ({
   apple: {
     width: '100%',
     height: theme.touch.button,
+  },
+  hero: {
+    alignItems: 'center',
+    gap: theme.space.sm,
+    paddingTop: theme.space.xs,
+  },
+  heroName: {
+    ...theme.type.title1,
+    textAlign: 'center',
+    color: theme.colors.text,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.xs,
+    minHeight: 26,
+    paddingHorizontal: theme.space.sm + theme.space.xxs,
+    borderRadius: theme.radii.pill,
+    backgroundColor: theme.colors.surfaceSunken,
+  },
+  chipText: {
+    ...theme.type.footnote,
+    fontWeight: '600',
+    color: theme.colors.textDim,
+  },
+  saveCard: {
+    gap: theme.space.md + theme.space.xxs,
+    paddingHorizontal: theme.space.lg,
+    paddingTop: theme.space.lg + theme.space.xxs,
+    paddingBottom: theme.space.lg,
+  },
+  saveTexts: {
+    gap: theme.space.xs,
+  },
+  saveTitle: {
+    ...theme.type.title2,
+    color: theme.colors.text,
+  },
+  saveBody: {
+    ...theme.type.callout,
+    color: theme.colors.textDim,
+  },
+  more: {
+    alignItems: 'center',
   },
 }));

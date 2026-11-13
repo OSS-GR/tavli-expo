@@ -331,6 +331,12 @@ export const ICONS = {
       'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2',
     ],
   },
+  mail: {
+    strokes: [roundRect(2, 4, 20, 16, 2), 'm22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7'],
+  },
+  x: {
+    strokes: ['M18 6 6 18', 'm6 6 12 12'],
+  },
 } as const satisfies Record<string, IconShape>;
 
 export type IconName = keyof typeof ICONS;

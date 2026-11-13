@@ -5,8 +5,9 @@
  * - A saved session (this phone made or opened an invite before) shows
  *   the invite at once (`children`).
  * - Else a card says that an online game needs a free account, with the
- *   sign-in choices (#401, `SignInChoices`): Apple, Continue as a guest,
- *   and Not now (Home). Opening a link alone makes no account. The invite
+ *   sign-in choices (#401, `SignInChoices`): Apple, email, Continue as a
+ *   guest, and the close button of its header (`SignInHeader`, #519): Not
+ *   now goes Home. Opening a link alone makes no account. The invite
  *   code stays in the route, so the invite shows right after the sign-in.
  * - A build with no online server shows "Online play is off".
  * - Screen readers: each card moves focus to its title and is read once.
@@ -25,6 +26,7 @@ import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { useOnlineAccount } from '@/features/online/account';
 import { SignInChoices } from '@/features/online/SignInChoices';
+import { SignInHeader } from '@/features/online/SignInHeader';
 
 export interface InviteAccountGateProps {
   /** `undefined`: this build has no online server. */
@@ -67,11 +69,10 @@ function SignedInGate({
       {account.status === 'loading' ? (
         <Loading />
       ) : (
-        <AccountCard>
+        <AccountCard onClose={onHome}>
           <SignInChoices
             auth={auth}
             onSignedIn={signedIn}
-            onNotNow={onHome}
             {...(appleSheet === undefined ? {} : { appleSheet })}
             {...(analytics === undefined ? {} : { analytics })}
           />
@@ -105,8 +106,8 @@ function Loading() {
   );
 }
 
-/** The invite card over the sign-in choices (`children`). */
-function AccountCard({ children }: { children: ReactNode }) {
+/** The invite card over the sign-in choices (`children`). Its close button goes Home. */
+function AccountCard({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
   const title = t('invite.account.title');
@@ -114,10 +115,7 @@ function AccountCard({ children }: { children: ReactNode }) {
   useAnnouncement(`${title} ${body}`);
   return (
     <View testID="invite-account" style={styles.card}>
-      <Text ref={titleRef} style={styles.title} accessibilityRole="header">
-        {title}
-      </Text>
-      <Text style={styles.line}>{body}</Text>
+      <SignInHeader title={title} body={body} titleRef={titleRef} onClose={onClose} />
       <View style={styles.actions}>{children}</View>
     </View>
   );

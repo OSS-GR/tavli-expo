@@ -303,12 +303,19 @@
     "guest": {
       "name": "You play as {{name}}",
       "noName": "You play as a guest.",
-      "kept": "Kept on our server: your online games, your invites and your guest name. Kept on this phone: your games against the bot, your history and your settings.",
-      "onlyHere": "A guest account opens only on this phone. If you lose the phone or delete the app, it is gone.",
-      "save": "Save your account to sign in again on any phone. Your guest games stay.",
       "saveEmail": "Save with email",
       "delete": "Delete my guest account",
-      "deleteHint": "Your online games, invites and guest name on our server."
+      "deleteHint": "Ends your online games. This cannot be undone.",
+      "anonymous": "Guest",
+      "chip": "On this phone only",
+      "saveTitle": "Save your account",
+      "saveBody": "Sign in again on any phone. Your guest games, wins and invites stay.",
+      "benefits": "What a saved account gives",
+      "keep": "What we keep",
+      "server": "On our server",
+      "serverHint": "Online games, invites and your guest name",
+      "phone": "On this phone",
+      "phoneHint": "Bot games, history and settings"
     },
     "saved": {
       "name": "You play as {{name}}",
@@ -934,12 +941,9 @@
   },
   "signIn": {
     "title": "Play online",
-    "body": "An online game needs a free account. Pick how you sign in.",
-    "appleNote": "With Apple you can sign in again on a new phone. We keep your Apple ID and the email Apple gives us, and you can hide your email. Other players never see them.",
+    "body": "Pick how you sign in. It is free.",
     "email": "Continue with email",
-    "emailNote": "With an email code you can sign in again on any phone. We keep your email address for the sign-in. Other players never see it.",
     "guest": "Continue as a guest",
-    "guestNote": "A guest plays on this phone only, with no friends list.",
     "notNow": "Not now",
     "busy": "Signing you in…",
     "problem": {
@@ -959,7 +963,14 @@
         "title": "That did not work",
         "text": "Try again. If it keeps happening, try another way to sign in."
       }
-    }
+    },
+    "benefits": {
+      "username": "A username your friends can find",
+      "anyPhone": "Your games on any phone",
+      "ratings": "A rating and leaderboards"
+    },
+    "footnote": "A guest plays on this phone only. Other players never see your email.",
+    "privacy": "Privacy"
   },
   "emailCode": {
     "title": "Sign in with email",
@@ -1894,12 +1905,6 @@
     "ratings": {
       "title": "A rating and leaderboards",
       "text": "Matches against other saved players count. See your friends and the top players."
-    },
-    "sample": {
-      "tag": "Example",
-      "name": "Eleni",
-      "score": "{{wins}}–{{losses}}",
-      "label": "Example: your record with {{name}}. You won {{wins}}, they won {{losses}}."
     }
   }
 }
