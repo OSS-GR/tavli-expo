@@ -530,7 +530,9 @@
       "hours_one": "{{count}} h",
       "hours_other": "{{count}} h",
       "toRoll": "{{time}} to roll",
-      "toMove": "{{time}} to move"
+      "toMove": "{{time}} to move",
+      "lastSeconds": "Play now, or you lose this game",
+      "lastSecondsAlert": "Your time is almost up. Play now, or you lose this game."
     },
     "timeLimitNone": "None",
     "timeLimit_one": "1 min",
@@ -549,6 +551,14 @@
       "rollFailed": "Your roll did not reach the server. Check the connection, then roll again.",
       "refusedTitle": "Not accepted",
       "refused": "The server did not accept your turn. Your moves were taken back."
+    },
+    "timeRanOut": {
+      "eyebrow": "Time ran out",
+      "title": "{{name}} wins this game",
+      "points_one": "{{count}} point. The next game starts now.",
+      "points_other": "{{count}} points. The next game starts now.",
+      "ranked": "Miss your next turn too and you lose the match.",
+      "here": "I am here"
     },
     "seatDetail": "Online"
   },
@@ -887,6 +897,10 @@
     "title": "What's new",
     "intro": "What each update of Tavlaki added, newest first, and where to find it.",
     "entries": {
+      "turnClock": {
+        "title": "A turn clock",
+        "body": "In an online game with a turn time, a ring around the avatar of the player to move empties as the time runs, with the time left next to it. In your last 10 seconds it turns red and the phone ticks."
+      },
       "signIn": {
         "title": "Sign in with Apple or email",
         "body": "Sign in with Apple on an iPhone, or with a code we send to your email. Playing as a guest? Save your account in Settings → Account to keep your online games on a new phone."
@@ -1205,6 +1219,8 @@
       "resignedPerCheckerYou_other": "You resigned and did not bear off {{count}} checkers: 1 point each.",
       "resignedMatch": "{{name}} resigned the match.",
       "resignedMatch_you": "You resigned the match.",
+      "missedTwo": "{{name}} missed two turns in a row.",
+      "missedTwo_you": "You missed two turns in a row.",
       "home": "Home",
       "changeSettings": "Change settings",
       "matchLabel": "Match",

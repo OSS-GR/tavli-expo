@@ -29,7 +29,8 @@ export type WhatsNewEntryId =
   | 'quickInvites'
   | 'newLook'
   | 'grabAChair'
-  | 'matchingColors';
+  | 'matchingColors'
+  | 'turnClock';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -47,7 +48,10 @@ export interface WhatsNewRelease {
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
     date: '2026-11-13',
-    entries: [{ id: 'matchingColors', icon: 'palette' }],
+    entries: [
+      { id: 'turnClock', icon: 'clock' },
+      { id: 'matchingColors', icon: 'palette' },
+    ],
   },
   {
     date: '2026-11-12',
