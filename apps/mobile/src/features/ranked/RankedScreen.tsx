@@ -44,7 +44,7 @@ import {
   type Matchmaking,
 } from '@tavli/contracts';
 import { matchStakes } from '@tavli/online';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -420,15 +420,24 @@ function RankedSaved({
   const [counted, setCounted] = useState<{ id: string; left: number } | null>(null);
   const count = counted !== null && counted.id === matchedId ? counted.left : MATCH_START_SECONDS;
   const paused = dialog === 'report';
+  // The route passes a new `onGame` each render: keep the latest, and open
+  // each game once.
+  const openGame = useRef(onGame);
+  useEffect(() => {
+    openGame.current = onGame;
+  }, [onGame]);
+  const opened = useRef<string | null>(null);
   useEffect(() => {
     if (matchedId === null || paused) return;
     if (count <= 0) {
-      onGame(matchedId);
+      if (opened.current === matchedId) return;
+      opened.current = matchedId;
+      openGame.current(matchedId);
       return;
     }
     const id = setTimeout(() => setCounted({ id: matchedId, left: count - 1 }), 1000);
     return () => clearTimeout(id);
-  }, [matchedId, paused, count, onGame]);
+  }, [matchedId, paused, count]);
 
   const stakes = useMemo(() => {
     if (state.kind !== 'matched' || mine === null) return null;
@@ -459,8 +468,9 @@ function RankedSaved({
     void search.find(game);
   };
 
+  // Leave only when the search is gone: a failed cancel shows its problem.
   const back = async () => {
-    if (searching) await search.cancel('cancelled');
+    if (searching && !(await search.cancel('cancelled'))) return;
     onBack();
   };
 
@@ -530,7 +540,9 @@ function RankedSaved({
                 void search.switchGame(other);
               }}
               onBot={() => {
-                void search.cancel('bot').then(onBot);
+                void search.cancel('bot').then((done) => {
+                  if (done) onBot();
+                });
               }}
             />
           ) : (
@@ -578,7 +590,8 @@ function RankedSaved({
             <ActionButton
               testID="ranked-start"
               label={t('ranked.matched.starting', { count: Math.max(count, 0) })}
-              onPress={() => onGame(state.gameId)}
+              // Ends the count: the effect opens the game, once.
+              onPress={() => setCounted({ id: state.gameId, left: 0 })}
             />
             {safety !== undefined ? (
               <ActionButton

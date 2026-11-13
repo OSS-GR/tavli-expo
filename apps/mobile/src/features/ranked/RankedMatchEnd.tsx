@@ -4,8 +4,9 @@
  *
  * - The rating change: your rating when the match was found
  *   (`rankedStartRating`, this app run only) and now (`ratings.mine()`).
- *   After an app restart only the new rating shows. A tap opens the
- *   Leaderboards.
+ *   After an app restart only the new rating shows, and so does a match
+ *   that left it the same (not rated: the daily cap of a pair, an account
+ *   gone). A tap opens the Leaderboards.
  * - Play <name> again: only with a friend, through a friend invite. A
  *   ranked game starts only from the queue, so a new ranked match with
  *   the same player cannot be asked for.
@@ -124,15 +125,16 @@ export function RankedRatingChange({
   onLeaderboards: () => void;
 }) {
   const { t } = useTranslation();
-  const change = rating.before === null ? null : rating.after - rating.before;
-  const sign = change === null ? '' : change > 0 ? '+' : change < 0 ? '−' : '±';
+  const change =
+    rating.before === null || rating.before === rating.after ? null : rating.after - rating.before;
+  const sign = change === null ? '' : change > 0 ? '+' : '−';
   return (
     <SectionCard>
       <SectionRow
         testID="ranked-end-rating"
         icon="trophy"
         label={
-          rating.before === null
+          change === null || rating.before === null
             ? t('ranked.end.ratingNow', { after: rating.after })
             : t('ranked.end.rating', { before: rating.before, after: rating.after })
         }

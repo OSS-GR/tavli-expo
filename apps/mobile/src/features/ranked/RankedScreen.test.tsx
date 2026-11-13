@@ -51,7 +51,7 @@ async function open() {
     onGame: jest.fn(),
     onBot: jest.fn(),
   };
-  await renderWithRoot(
+  const view = await renderWithRoot(
     <RankedScreen
       account={{
         auth: auth!,
@@ -70,7 +70,7 @@ async function open() {
     />,
   );
   await flush();
-  return { analytics, ...props };
+  return { analytics, view, ...props };
 }
 
 /** A saved account (Apple) with a username, signed in on this phone. */
@@ -275,6 +275,21 @@ describe('<RankedScreen /> with a saved account', () => {
     expect(JSON.stringify(sent)).not.toMatch(/nikos|Maria|1500|user-/);
   });
 
+  it('a tap on Starting opens the game at once, and only once', async () => {
+    const user = setupUser();
+    await saved();
+    await otherLooks('portes');
+    const { onGame } = await open();
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    await flush();
+    await user.press(await screen.findByTestId('ranked-start'));
+    await flush();
+    expect(onGame).toHaveBeenCalledTimes(1);
+    await seconds(MATCH_START_SECONDS);
+    expect(onGame).toHaveBeenCalledTimes(1);
+  });
+
   it('Report or block holds the count while its sheet is open', async () => {
     const user = setupUser();
     await saved();
@@ -313,5 +328,44 @@ describe('<RankedScreen /> with a saved account', () => {
     await flush();
     expect(onBack).toHaveBeenCalled();
     expect(await onlineFake.matchmaking.mySeek()).toEqual({ kind: 'none' });
+  });
+
+  it('a failed cancel keeps you on the screen, searching, with the problem', async () => {
+    const user = setupUser();
+    await saved();
+    const { onBack, onBot } = await open();
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    await flush();
+    await screen.findByTestId('ranked-searching');
+    const cancel = jest
+      .spyOn(onlineFake.matchmaking, 'cancel')
+      .mockRejectedValueOnce(new Error('server'));
+    await user.press(screen.getByTestId('ranked-back'));
+    await flush();
+    expect(onBack).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('ranked-problem')).toHaveTextContent(
+      /Something went wrong on our side/,
+    );
+    expect((await onlineFake.matchmaking.mySeek()).kind).toBe('waiting');
+    cancel.mockRestore();
+    expect(onBot).not.toHaveBeenCalled();
+  });
+
+  it('leaving the screen another way (a swipe, Android back) cancels the search', async () => {
+    const user = setupUser();
+    await saved();
+    const { view, analytics } = await open();
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    await flush();
+    await screen.findByTestId('ranked-searching');
+    await act(async () => view.unmount());
+    await flush();
+    expect(await onlineFake.matchmaking.mySeek()).toEqual({ kind: 'none' });
+    expect(tracked(analytics).at(-1)).toMatchObject({
+      event: 'ranked_search_ended',
+      how: 'cancelled',
+    });
   });
 });

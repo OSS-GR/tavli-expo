@@ -40,6 +40,15 @@ describe('<RankedRatingChange />', () => {
     expect(screen.getByTestId('ranked-end-change')).toHaveTextContent('−11');
   });
 
+  it('a match that left the rating the same shows no change (not rated)', async () => {
+    await render(
+      <RankedRatingChange rating={{ before: 1500, after: 1500 }} onLeaderboards={jest.fn()} />,
+    );
+    expect(screen.getByTestId('ranked-end-rating')).toHaveTextContent(/Rating 1500/);
+    expect(screen.getByTestId('ranked-end-rating')).not.toHaveTextContent(/→/);
+    expect(screen.queryByTestId('ranked-end-change')).toBeNull();
+  });
+
   it('after an app restart shows only the new rating', async () => {
     await render(
       <RankedRatingChange rating={{ before: null, after: 1502 }} onLeaderboards={jest.fn()} />,

@@ -980,9 +980,13 @@
         "title": "You are signed out",
         "text": "Sign in again in Settings › Account, then come back."
       },
-      "network": {
+      "badRequest": {
+        "title": "That game is not ranked",
+        "text": "Pick Portes, Plakoto, Fevga or Tavli, then try again."
+      },
+      "failed": {
         "title": "That did not work",
-        "text": "The server did not answer. Try again in a moment."
+        "text": "Something went wrong on our side. Try again in a moment."
       }
     },
     "end": {

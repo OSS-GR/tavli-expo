@@ -166,6 +166,17 @@ export function HomeScreen({
       onPress={() => showToast(t('home.friend.soon'))}
     />
   );
+  // With Play ranked it sits in the grid; without, it spans the row.
+  const joinTile = onJoinWithCode ? (
+    <ModeTile
+      testID="home-join"
+      wide={!onPlayRanked}
+      icon="keyboard"
+      title={t('home.join.title')}
+      subtitle={t('home.join.subtitle')}
+      onPress={onJoinWithCode}
+    />
+  ) : null;
 
   return (
     <View style={styles.screen}>
@@ -246,32 +257,13 @@ export function HomeScreen({
                 />
               </View>
               <View style={styles.cell}>{localTile}</View>
-              {onJoinWithCode ? (
-                <View style={styles.cell}>
-                  <ModeTile
-                    testID="home-join"
-                    icon="keyboard"
-                    title={t('home.join.title')}
-                    subtitle={t('home.join.subtitle')}
-                    onPress={onJoinWithCode}
-                  />
-                </View>
-              ) : null}
+              {joinTile ? <View style={styles.cell}>{joinTile}</View> : null}
             </>
           ) : (
             <>
               <View style={styles.cell}>{localTile}</View>
               <View style={styles.cell}>{friendTile}</View>
-              {onJoinWithCode ? (
-                <ModeTile
-                  testID="home-join"
-                  wide
-                  icon="keyboard"
-                  title={t('home.join.title')}
-                  subtitle={t('home.join.subtitle')}
-                  onPress={onJoinWithCode}
-                />
-              ) : null}
+              {joinTile}
             </>
           )}
           {onFriends ? (

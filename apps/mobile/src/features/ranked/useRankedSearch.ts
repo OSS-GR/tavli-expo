@@ -13,6 +13,10 @@
  *   Cancel sends `cancel`.
  * - A search that turns `none` with no cancel from this phone ended on
  *   the server after five minutes: `expired` says so.
+ * - Leaving the screen any way (Back, the bot, a swipe, Android back)
+ *   with a search on cancels it, so no ranked game starts while the
+ *   player is away. The screen leaves by its own buttons only when the
+ *   cancel worked.
  * - The wait counts on the phone clock from the seek's `since` (clamped,
  *   so a wrong phone clock never shows a negative or endless wait).
  * - A match notes your rating then (`rememberRankedStart`) for the match
@@ -61,7 +65,7 @@ export type RankedSearchState =
     };
 
 /** Why the last call failed. */
-export type RankedProblem = 'notSaved' | 'notSignedIn' | 'network';
+export type RankedProblem = 'notSaved' | 'notSignedIn' | 'badRequest' | 'failed';
 
 export interface RankedSearch {
   readonly state: RankedSearchState;
@@ -71,8 +75,8 @@ export interface RankedSearch {
   /** The last search ended on the server with nobody found (five minutes). */
   readonly expired: boolean;
   readonly find: (game: RankedGame) => Promise<void>;
-  /** Ends the search; `how` is for analytics (Cancel, Back, the bot). */
-  readonly cancel: (how: Extract<RankedSearchEnd, 'cancelled' | 'bot'>) => Promise<void>;
+  /** Ends the search; `how` is for analytics (Cancel, Back, the bot). `false` when it failed. */
+  readonly cancel: (how: Extract<RankedSearchEnd, 'cancelled' | 'bot'>) => Promise<boolean>;
   /** Looks for `game` instead of the game of the search. */
   readonly switchGame: (game: RankedGame) => Promise<void>;
   readonly dismissProblem: () => void;
@@ -91,8 +95,11 @@ function problemOf(error: unknown): RankedProblem {
   if (isMatchmakingErrorData(error)) {
     if (error.code === 'NOT_SAVED') return 'notSaved';
     if (error.code === 'NOT_SIGNED_IN') return 'notSignedIn';
+    if (error.code === 'BAD_REQUEST') return 'badRequest';
   }
-  return 'network';
+  // The Convex client waits for the network, so any other error came
+  // from the server: never "check the connection".
+  return 'failed';
 }
 
 export function useRankedSearch({
@@ -124,9 +131,9 @@ export function useRankedSearch({
       const was = current.current;
       const isFirst = first.current;
       first.current = false;
-      const sent = asked.current;
-      asked.current = null;
       if (seek.kind === 'none') {
+        // A `none` can come before a seek this phone sent lands: keep
+        // `asked` for the seek's own update.
         if (was.kind === 'searching' && !endedHere.current) {
           setExpired(true);
           sendRankedSearchEnded(analytics, was.game, 'expired', now() - was.startedAt);
@@ -134,10 +141,16 @@ export function useRankedSearch({
         show({ kind: 'idle' });
         return;
       }
+      // A late `waiting` after this phone ended the search is old news.
+      if (seek.kind === 'waiting' && endedHere.current) return;
+      const sent = asked.current;
+      asked.current = null;
       if (seek.kind === 'waiting') {
-        endedHere.current = false;
         // The same search goes on: keep its start.
         if (was.kind === 'searching' && was.game === seek.game) return;
+        if (was.kind === 'searching') {
+          sendRankedSearchEnded(analytics, was.game, 'otherGame', now() - was.startedAt);
+        }
         const at = now();
         const waited = Math.min(SEEK_TTL_MS, Math.max(0, at - seek.since));
         show({ kind: 'searching', game: seek.game, startedAt: at - waited, rating: seek.rating });
@@ -151,8 +164,10 @@ export function useRankedSearch({
       }
       if (was.kind === 'matched' && was.gameId === seek.gameId) return;
       if (sent !== null) {
-        // Matched at once, before any `waiting` of this seek. After Try
-        // another game the old search already ended as `otherGame`.
+        // Matched at once, before any `waiting` of this seek.
+        if (was.kind === 'searching' && was.game !== seek.game) {
+          sendRankedSearchEnded(analytics, was.game, 'otherGame', now() - was.startedAt);
+        }
         sendRankedSearchEnded(analytics, seek.game, 'matched', now() - sent.at);
       } else if (was.kind === 'searching') {
         sendRankedSearchEnded(analytics, was.game, 'matched', now() - was.startedAt);
@@ -177,6 +192,36 @@ export function useRankedSearch({
     });
     return stop;
   }, [matchmaking, apply, show]);
+
+  // Leaving with a search on (a swipe, Android back, a deep link): cancel
+  // it, so no ranked game starts while the player is away. Only on
+  // unmount: the deps are read through a ref.
+  const deps = useRef({ analytics, matchmaking, now });
+  useEffect(() => {
+    deps.current = { analytics, matchmaking, now };
+  }, [analytics, matchmaking, now]);
+  useEffect(
+    () => () => {
+      const was = current.current;
+      if (endedHere.current) return;
+      if (was.kind !== 'searching' && asked.current === null) return;
+      endedHere.current = true;
+      const latest = deps.current;
+      if (was.kind === 'searching') {
+        sendRankedSearchEnded(
+          latest.analytics,
+          was.game,
+          'cancelled',
+          latest.now() - was.startedAt,
+        );
+      }
+      latest.matchmaking.cancel().catch(() => {
+        // Nothing to show on a screen that is gone: the server ends the
+        // seek after five minutes.
+      });
+    },
+    [],
+  );
 
   const run = useCallback(
     async (call: () => Promise<void>): Promise<boolean> => {
@@ -203,7 +248,7 @@ export function useRankedSearch({
       endedHere.current = false;
       sendRankedSearchStarted(analytics, game);
       asked.current = { game, at: now() };
-      await run(() => matchmaking.seek({ game }));
+      if (!(await run(() => matchmaking.seek({ game })))) asked.current = null;
     },
     [analytics, matchmaking, now, run],
   );
@@ -213,22 +258,25 @@ export function useRankedSearch({
       const was = current.current;
       endedHere.current = true;
       const done = await run(() => matchmaking.cancel());
-      if (done && was.kind === 'searching') {
+      if (!done) {
+        // The search goes on: a later expiry is a real one.
+        endedHere.current = false;
+        return false;
+      }
+      if (was.kind === 'searching') {
         sendRankedSearchEnded(analytics, was.game, how, now() - was.startedAt);
       }
+      return true;
     },
     [analytics, matchmaking, now, run],
   );
 
   const switchGame = useCallback(
     async (game: RankedGame) => {
-      const was = current.current;
-      if (was.kind === 'searching') {
-        sendRankedSearchEnded(analytics, was.game, 'otherGame', now() - was.startedAt);
-      }
+      // The old search ends as `otherGame` when the new seek shows (`apply`).
       sendRankedSearchStarted(analytics, game);
       asked.current = { game, at: now() };
-      await run(() => matchmaking.seek({ game }));
+      if (!(await run(() => matchmaking.seek({ game })))) asked.current = null;
     },
     [analytics, matchmaking, now, run],
   );
