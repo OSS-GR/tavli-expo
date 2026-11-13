@@ -25,14 +25,17 @@
  * before the current one, as it ended (`previousGame`, #299): `advance`
  * starts the next game at once, so the view would lose the turn that
  * ended a game. `advance` keeps that game (`SteppedFlow.endedGame`), and
- * `storeStep` saves it.
+ * `storeStep` saves it. It keeps each side's time outs in a row too
+ * (`timeoutsInARow`, #529): in a ranked match the second one in a row
+ * loses the match (`timeOut`).
  */
 
-import { turnDeadlineMs } from '@tavli/contracts';
+import { RANKED_TIMEOUTS_TO_LOSE, turnDeadlineMs } from '@tavli/contracts';
 import type {
   GameTransportErrorCode,
   OnlineGameChoice,
   OnlineGameView,
+  OnlineMatchEndReason,
   PlayerName,
   TurnDraft,
 } from '@tavli/contracts';
@@ -118,10 +121,18 @@ export function onlineGameRules(choice: OnlineGameChoice): RuleSet {
 
 /**
  * The `MatchFlow` without its log, as saved (on Convex, in `games.flow`),
- * and the game before the current one as it ended. Flows saved before
- * #299 have no `previousGame`: read it as `null`.
+ * the game before the current one as it ended, and each side's time outs
+ * in a row. Flows saved before #299 have no `previousGame`: read it as
+ * `null`. `timeoutsInARow` is left out while both counts are 0 (and in
+ * flows saved before #529): read it as 0 each.
  */
-export type StoredFlow = Omit<MatchFlow, 'log'> & { readonly previousGame?: GameFlow };
+export type StoredFlow = Omit<MatchFlow, 'log'> & {
+  readonly previousGame?: GameFlow;
+  readonly timeoutsInARow?: PerPlayer<number>;
+};
+
+/** No time outs yet. */
+export const NO_TIMEOUTS: PerPlayer<number> = { white: 0, black: 0 };
 
 /** A stored flow as read: the flow (with an empty log) and the game before it. */
 export interface LoadedFlow {
@@ -132,28 +143,49 @@ export interface LoadedFlow {
    * for a flow saved before #299 until its next game starts.
    */
   readonly previousGame: GameFlow | null;
+  /**
+   * How many of each side's turns in a row ended in a time out (#529),
+   * over the whole match, the opening roll too. A turn the side plays
+   * sets it back to 0 (`SteppedFlow.playedBy`).
+   */
+  readonly timeoutsInARow: PerPlayer<number>;
 }
 
 /**
  * The flow after a step. `endedGame` is the game that ended in the step,
  * as it ended, or `null` when no next game started in it. `advance` keeps
  * it when it starts the next game, so nothing plays the step again.
+ *
+ * `playedBy` is the side whose turn the step ended in time (#529): a
+ * full turn (`playTurn`), a roll with no legal move, their opening die,
+ * or an answer after which the server no longer waits for their move.
+ * `null` when the step ended nobody's turn: a roll they still have to
+ * play, a server step, a time out or a resign. `storeStep` sets that
+ * side's time outs in a row back to 0.
  */
 export interface SteppedFlow extends MatchFlow {
   readonly endedGame: GameFlow | null;
+  readonly playedBy: PlayerId | null;
 }
 
 /**
  * The stored text of `flow`. `previousGame` is the game before
- * `flow.game`, as it ended. After a step, use `storeStep`: it keeps the
- * game that ended.
+ * `flow.game`, as it ended. `timeoutsInARow` is each side's time outs in
+ * a row (default none). After a step, use `storeStep`: it keeps the game
+ * that ended and the counts.
  */
-export function storeFlow(flow: MatchFlow, previousGame: GameFlow | null): string {
+export function storeFlow(
+  flow: MatchFlow,
+  previousGame: GameFlow | null,
+  timeoutsInARow: PerPlayer<number> = NO_TIMEOUTS,
+): string {
+  const { white, black } = timeoutsInARow;
   const stored: StoredFlow = {
     schemaVersion: flow.schemaVersion,
     match: flow.match,
     game: flow.game,
     ...(previousGame === null ? {} : { previousGame }),
+    ...(white === 0 && black === 0 ? {} : { timeoutsInARow: { white, black } }),
   };
   return JSON.stringify(stored);
 }
@@ -167,8 +199,12 @@ export function loadStored(text: string): LoadedFlow {
   if (stored.schemaVersion !== MATCH_FLOW_SCHEMA_VERSION) {
     throw new Error(`stored flow has schema version ${String(stored.schemaVersion)}`);
   }
-  const { schemaVersion, match, game, previousGame } = stored;
-  return { flow: { schemaVersion, match, game, log: [] }, previousGame: previousGame ?? null };
+  const { schemaVersion, match, game, previousGame, timeoutsInARow } = stored;
+  return {
+    flow: { schemaVersion, match, game, log: [] },
+    previousGame: previousGame ?? null,
+    timeoutsInARow: timeoutsInARow ?? NO_TIMEOUTS,
+  };
 }
 
 /** Reads just the flow of a stored text (`loadStored(text).flow`). */
@@ -177,12 +213,27 @@ export function loadFlow(text: string): MatchFlow {
 }
 
 /**
- * The stored text after a step: `next`, and the game before its current
- * one. That is the game that ended in the step, else the one `before`
- * kept. `before` is what the step loaded its flow from.
+ * Each side's time outs in a row after a step (#529): one more for each
+ * time out in the step, and 0 for the side that played a turn in it
+ * (`playedBy`). `before` is what the step loaded its flow from.
+ */
+export function timeoutsAfter(before: LoadedFlow, next: SteppedFlow): PerPlayer<number> {
+  const counts = { ...before.timeoutsInARow };
+  for (const event of next.log) {
+    if (event.type === 'timeout') counts[event.player] += 1;
+  }
+  if (next.playedBy !== null) counts[next.playedBy] = 0;
+  return counts;
+}
+
+/**
+ * The stored text after a step: `next`, the game before its current
+ * one, and the time outs in a row (`timeoutsAfter`). That game is the
+ * one that ended in the step, else the one `before` kept. `before` is
+ * what the step loaded its flow from.
  */
 export function storeStep(before: LoadedFlow, next: SteppedFlow): string {
-  return storeFlow(next, next.endedGame ?? before.previousGame);
+  return storeFlow(next, next.endedGame ?? before.previousGame, timeoutsAfter(before, next));
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +262,7 @@ export function advance(
 ): SteppedFlow {
   let next = flow;
   let endedGame: GameFlow | null = null;
-  const done = (): SteppedFlow => ({ ...next, endedGame });
+  const done = (): SteppedFlow => ({ ...next, endedGame, playedBy: null });
   for (let i = 0; i < MAX_SERVER_STEPS; i++) {
     if (next.match.status === 'finished') return done();
     const { game } = next;
@@ -301,6 +352,19 @@ export function waitingFor(flow: MatchFlow): PlayerId | null {
 }
 
 /**
+ * True when, after a step of `player`, the server no longer waits for
+ * them to finish the turn they were in (#529): it waits for the other
+ * side or for a new roll, or the match is over. A roll they must still
+ * play, or a question in their turn, keeps the turn going.
+ */
+function turnEnded(next: MatchFlow, player: PlayerId): boolean {
+  const { phase } = next.game;
+  const turnGoesOn =
+    phase === 'moving' || phase === 'awaiting-answer' || phase === 'awaiting-confirm';
+  return !(turnGoesOn && waitingFor(next) === player);
+}
+
+/**
  * `player` rolls the dice of their turn (#355), with `rng` (on Convex the
  * secure RNG). Only the player to move, in `awaiting-roll`. A roll with no
  * legal move passes in the engine: `game.lastTurn` keeps its dice, and the
@@ -309,13 +373,17 @@ export function waitingFor(flow: MatchFlow): PlayerId | null {
  * In the opening roll (#379) it rolls the caller's opening die instead,
  * while that die is still to roll (else `ILLEGAL_ACTION`). Either player
  * may roll first. A tie clears both dice, and both roll again.
+ *
+ * The opening die and a pass end the player's turn in time (`playedBy`,
+ * #529); a roll they can play does not.
  */
 export function rollDice(flow: MatchFlow, player: PlayerId, rng: Rng): SteppedFlow {
   checkActive(flow);
   const { game } = flow;
   if (game.phase === 'opening-roll') {
     if (!mayRollOpening(flow, player)) fail('ILLEGAL_ACTION', `${player} already rolled`);
-    return advance(apply(flow, { type: 'rollOpening', player }, rng), rng);
+    const opened = advance(apply(flow, { type: 'rollOpening', player }, rng), rng);
+    return { ...opened, playedBy: player };
   }
   if (game.phase !== 'awaiting-roll') {
     fail(
@@ -324,7 +392,8 @@ export function rollDice(flow: MatchFlow, player: PlayerId, rng: Rng): SteppedFl
     );
   }
   if (game.state.toMove !== player) fail('NOT_YOUR_TURN', `it is ${game.state.toMove}'s roll`);
-  return advance(apply(flow, { type: 'roll', player }, rng), rng);
+  const rolled = advance(apply(flow, { type: 'roll', player }, rng), rng);
+  return { ...rolled, playedBy: turnEnded(rolled, player) ? player : null };
 }
 
 /**
@@ -360,7 +429,7 @@ export function playTurn(
     fail('ILLEGAL_MOVE', 'the turn is not complete: play every die you can');
   }
   next = apply(next, { type: 'confirm', player }, rng);
-  return advance(next, rng);
+  return { ...advance(next, rng), playedBy: player };
 }
 
 /** A copy of a move with only the fields of `MoveInput`. */
@@ -416,14 +485,15 @@ export function answerPrompt(
   const prompt = currentPrompt(flow.game);
   if (prompt === null) fail('ILLEGAL_ACTION', 'there is no question to answer');
   if (prompt.player !== player) fail('NOT_YOUR_TURN', `${prompt.player} must answer`);
-  return advance(apply(flow, { type: 'answer', player, choice }, rng), rng);
+  const answered = advance(apply(flow, { type: 'answer', player, choice }, rng), rng);
+  return { ...answered, playedBy: turnEnded(answered, player) ? player : null };
 }
 
 /** `player` resigns the whole match. Allowed at any time, on either turn. */
 export function resign(flow: MatchFlow, player: PlayerId, rng: Rng): SteppedFlow {
   checkActive(flow);
   // The match ends here: no next game starts, so no game ends "before" one.
-  return { ...apply(flow, { type: 'resignMatch', player }, rng), endedGame: null };
+  return { ...apply(flow, { type: 'resignMatch', player }, rng), endedGame: null, playedBy: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -442,6 +512,24 @@ export function isTimedOut(deadline: number | null, now: number): boolean {
   return deadline !== null && now >= deadline;
 }
 
+/** What `timeOut` needs to know for the Play ranked rule (#529). */
+export interface TimeOutOptions {
+  /** True for a Play ranked game. Default false: a friend game. */
+  readonly ranked?: boolean;
+  /** Each side's time outs in a row before this one (`LoadedFlow.timeoutsInARow`). */
+  readonly timeoutsInARow?: PerPlayer<number>;
+}
+
+/**
+ * True when a time out of `player` now ends a ranked match (#529,
+ * ADR-0009): their turns just before this one ended in time outs
+ * `RANKED_TIMEOUTS_TO_LOSE - 1` times in a row. Never in a friend game.
+ */
+export function losesRankedMatch(options: TimeOutOptions, player: PlayerId): boolean {
+  const before = (options.timeoutsInARow ?? NO_TIMEOUTS)[player];
+  return options.ranked === true && before + 1 >= RANKED_TIMEOUTS_TO_LOSE;
+}
+
 /**
  * The player the server waits for ran out of time: they lose the current
  * game (engine action `timeout`, always 1 point, #378). Then
@@ -450,8 +538,14 @@ export function isTimedOut(deadline: number | null, now: number): boolean {
  * In the opening roll (#379) the player who did not roll loses, when the
  * other did. When neither rolled, nobody loses: the server rolls both
  * dice, and the first turn starts.
+ *
+ * Play ranked (#529): when this is the player's second time out in a row
+ * (`losesRankedMatch`), they also resign the match (engine action
+ * `resignMatch`, so it scores like any resign), and the other player
+ * wins it. When the lost game already ended the match on points, that
+ * stays the result.
  */
-export function timeOut(flow: MatchFlow, rng: Rng): SteppedFlow {
+export function timeOut(flow: MatchFlow, rng: Rng, options: TimeOutOptions = {}): SteppedFlow {
   checkActive(flow);
   const { opening } = flow.game;
   if (flow.game.phase === 'opening-roll' && opening?.white === null && opening.black === null) {
@@ -459,7 +553,31 @@ export function timeOut(flow: MatchFlow, rng: Rng): SteppedFlow {
   }
   const player = waitingFor(flow);
   if (player === null) fail('GAME_OVER', 'the match is over');
-  return advance(apply(flow, { type: 'timeout', player }, rng), rng);
+  let next = apply(flow, { type: 'timeout', player }, rng);
+  if (next.match.status !== 'finished' && losesRankedMatch(options, player)) {
+    next = apply(next, { type: 'resignMatch', player }, rng);
+  }
+  return advance(next, rng);
+}
+
+/**
+ * Why the match of `flow` ended, or `null` while it runs (#529). A
+ * ranked match that `resignedBy` lost on time outs in a row
+ * (`timeoutsInARow` as saved after that step) is `timeouts-in-a-row`.
+ * In a ranked match only that rule takes a count to
+ * `RANKED_TIMEOUTS_TO_LOSE`, so a resign by hand never looks like it.
+ */
+export function matchEndReason(
+  flow: Pick<MatchFlow, 'match'>,
+  ranked: boolean,
+  timeoutsInARow: PerPlayer<number>,
+): OnlineMatchEndReason | null {
+  const { match } = flow;
+  if (match.status !== 'finished') return null;
+  if (match.resignedBy === null) return 'points';
+  return ranked && timeoutsInARow[match.resignedBy] >= RANKED_TIMEOUTS_TO_LOSE
+    ? 'timeouts-in-a-row'
+    : 'resigned';
 }
 
 // ---------------------------------------------------------------------------
@@ -471,11 +589,15 @@ export interface ViewInput {
   readonly choice: OnlineGameChoice;
   /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
   readonly turnTimeMinutes: number | null;
+  /** True for a Play ranked game (#529). */
+  readonly ranked: boolean;
   readonly turnDeadline: number | null;
   readonly players: PerPlayer<string>;
   readonly flow: MatchFlow;
   /** The game before `flow.game`, as it ended (`LoadedFlow.previousGame`). */
   readonly previousGame: GameFlow | null;
+  /** Each side's time outs in a row (`LoadedFlow.timeoutsInARow`): the end reason reads it. */
+  readonly timeoutsInARow: PerPlayer<number>;
   /**
    * The saved draft of this game (#374), or `null`. The view shows it only
    * when it belongs to `version` and the server waits for a move.
@@ -495,8 +617,8 @@ export interface SavedDraft extends TurnDraft {
  * rolls each roll when its player asks, #355), and nothing about the RNG.
  */
 export function toView(input: ViewInput): OnlineGameView {
-  const { gameId, version, choice, turnTimeMinutes, turnDeadline, players, flow, previousGame } =
-    input;
+  const { gameId, version, choice, turnTimeMinutes, ranked, turnDeadline, players, flow } = input;
+  const { previousGame, timeoutsInARow } = input;
   const saved = input.draft ?? null;
   const draft: TurnDraft | null =
     saved !== null && saved.version === version && flow.game.phase === 'moving'
@@ -509,6 +631,7 @@ export function toView(input: ViewInput): OnlineGameView {
     status: finished ? 'finished' : 'active',
     choice,
     turnTimeMinutes,
+    ranked,
     turnDeadline: finished ? null : turnDeadline,
     players,
     names: input.names,
@@ -516,6 +639,7 @@ export function toView(input: ViewInput): OnlineGameView {
     game: flow.game,
     previousGame,
     waitingFor: waitingFor(flow),
+    matchEndReason: matchEndReason(flow, ranked, timeoutsInARow),
     prompt: flow.match.status === 'finished' ? null : currentPrompt(flow.game),
     draft: finished ? null : draft,
   };

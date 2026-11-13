@@ -16,6 +16,7 @@ function summary(gameId: string, fields: Partial<GameSummary> = {}): GameSummary
     variant: 'portes',
     targetPoints: 5,
     turnTimeMinutes: null,
+    ranked: false,
     mySide: 'white',
     waitingFor: 'white',
     myTurn: true,
