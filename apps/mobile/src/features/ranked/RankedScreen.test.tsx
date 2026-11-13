@@ -51,26 +51,34 @@ async function open() {
     onGame: jest.fn(),
     onBot: jest.fn(),
   };
-  const view = await renderWithRoot(
+  const account = {
+    auth: auth!,
+    usernames: usernames!,
+    data: onlineData!,
+    appleSheet,
+    analytics,
+    pushes: undefined,
+  };
+  const ui = (visit: number) => (
     <RankedScreen
-      account={{
-        auth: auth!,
-        usernames: usernames!,
-        data: onlineData!,
-        appleSheet,
-        analytics,
-        pushes: undefined,
-      }}
+      account={account}
       matchmaking={onlineFake.matchmaking}
       ratings={onlineFake.ratings}
       games={games!}
       safety={safety!}
       analytics={analytics}
+      visit={visit}
       {...props}
-    />,
+    />
   );
+  const view = await renderWithRoot(ui(0));
   await flush();
-  return { analytics, view, ...props };
+  /** The app comes back to the front: the account loads again. */
+  const comeBack = async (visit: number) => {
+    await view.rerender(ui(visit));
+    await flush();
+  };
+  return { analytics, view, comeBack, ...props };
 }
 
 /** A saved account (Apple) with a username, signed in on this phone. */
@@ -350,6 +358,60 @@ describe('<RankedScreen /> with a saved account', () => {
     expect((await onlineFake.matchmaking.mySeek()).kind).toBe('waiting');
     cancel.mockRestore();
     expect(onBot).not.toHaveBeenCalled();
+  });
+
+  it('Back that loses the race to a match stays and shows the match', async () => {
+    const user = setupUser();
+    await saved();
+    const { onBack, analytics } = await open();
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    await flush();
+    await screen.findByTestId('ranked-searching');
+    // A player sits down just before the cancel lands.
+    const real = onlineFake.matchmaking.cancel.bind(onlineFake.matchmaking);
+    const cancel = jest.spyOn(onlineFake.matchmaking, 'cancel').mockImplementationOnce(async () => {
+      await otherLooks('portes');
+      await real();
+    });
+    await user.press(screen.getByTestId('ranked-back'));
+    await flush();
+    expect(onBack).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('ranked-matched')).toBeOnTheScreen();
+    const ended = tracked(analytics).filter((e) => e.event === 'ranked_search_ended');
+    expect(ended).toMatchObject([{ how: 'matched' }]);
+    cancel.mockRestore();
+  });
+
+  it('an account reload that fails while searching keeps the search', async () => {
+    const user = setupUser();
+    await saved();
+    const { comeBack } = await open();
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    await flush();
+    await screen.findByTestId('ranked-searching');
+    const mine = jest.spyOn(usernames!, 'mine').mockRejectedValueOnce(new Error('offline'));
+    await comeBack(1);
+    expect(mine).toHaveBeenCalled();
+    expect(screen.getByTestId('ranked-searching')).toBeOnTheScreen();
+    expect((await onlineFake.matchmaking.mySeek()).kind).toBe('waiting');
+    mine.mockRestore();
+  });
+
+  it('a seek the server refused starts no search in analytics', async () => {
+    const user = setupUser();
+    await saved();
+    const { analytics } = await open();
+    const seek = jest
+      .spyOn(onlineFake.matchmaking, 'seek')
+      .mockRejectedValueOnce(new Error('server'));
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    await flush();
+    expect(await screen.findByTestId('ranked-problem')).toBeOnTheScreen();
+    expect(tracked(analytics).filter((e) => e.event === 'ranked_search_started')).toEqual([]);
+    seek.mockRestore();
   });
 
   it('leaving the screen another way (a swipe, Android back) cancels the search', async () => {

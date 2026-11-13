@@ -264,14 +264,18 @@ export const seek = mutation({
   },
 });
 
-/** Ends the caller's seek, waiting or matched. No seek: nothing happens. */
+/**
+ * Ends the caller's waiting seek. A matched seek stays until `forgetSeek`,
+ * so a cancel that lands just after a match still shows the match (#532).
+ * No seek: nothing happens.
+ */
 export const cancelSeek = mutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
     const playerId = await savedCaller(ctx);
     const row = await seekRow(ctx, playerId);
-    if (row !== null) await ctx.db.delete(row._id);
+    if (row !== null && row.status === 'waiting') await ctx.db.delete(row._id);
     return null;
   },
 });

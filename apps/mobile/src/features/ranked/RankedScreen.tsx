@@ -125,7 +125,14 @@ export function RankedScreen(props: RankedScreenProps) {
   const account = useAccount(props.account, props.visit ?? 0);
   const [emailStep, setEmailStep] = useState(false);
   const { state } = account;
-  const saved = state.kind === 'saved' && account.usernameStep === null && !emailStep;
+  const savedNow = state.kind === 'saved' && account.usernameStep === null && !emailStep;
+  // Once saved, a reload (the app comes back, `visit`) that loads or fails
+  // keeps the search on screen: unmounting it would cancel a live search.
+  const [kept, setKept] = useState<{ readonly username: string | null } | null>(null);
+  if (savedNow && kept?.username !== state.username) setKept({ username: state.username });
+  const reloading = state.kind === 'loading' || state.kind === 'failed';
+  const saved = savedNow || (kept !== null && reloading);
+  const username = savedNow ? state.username : (kept?.username ?? null);
 
   const useCode = async (credential: EmailKeyCredential) => {
     if (state.kind === 'offline') await account.signInWithEmail(credential);
@@ -136,7 +143,7 @@ export function RankedScreen(props: RankedScreenProps) {
   return (
     <Screen testID="ranked-screen">
       {saved ? (
-        <RankedSaved {...props} titleRef={titleRef} username={state.username} />
+        <RankedSaved {...props} titleRef={titleRef} username={username} />
       ) : (
         <>
           <ScreenHeader
@@ -341,8 +348,13 @@ function useTicker(on: boolean, now: () => number): number {
   const [time, setTime] = useState(now);
   useEffect(() => {
     if (!on) return;
+    // Read the clock at once too: the setup may have been open a while.
+    const first = setTimeout(() => setTime(now()), 0);
     const id = setInterval(() => setTime(now()), 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
   }, [on, now]);
   return time;
 }

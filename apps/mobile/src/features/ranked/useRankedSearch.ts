@@ -143,14 +143,19 @@ export function useRankedSearch({
       }
       // A late `waiting` after this phone ended the search is old news.
       if (seek.kind === 'waiting' && endedHere.current) return;
-      const sent = asked.current;
-      asked.current = null;
+      // The first update of a seek this phone sent (an old update of another
+      // game is not it). It starts the search in analytics, after the end of
+      // the old one and before its own end.
+      const sent =
+        asked.current !== null && asked.current.game === seek.game ? asked.current : null;
+      if (sent !== null) asked.current = null;
       if (seek.kind === 'waiting') {
         // The same search goes on: keep its start.
         if (was.kind === 'searching' && was.game === seek.game) return;
         if (was.kind === 'searching') {
           sendRankedSearchEnded(analytics, was.game, 'otherGame', now() - was.startedAt);
         }
+        if (sent !== null) sendRankedSearchStarted(analytics, seek.game);
         const at = now();
         const waited = Math.min(SEEK_TTL_MS, Math.max(0, at - seek.since));
         show({ kind: 'searching', game: seek.game, startedAt: at - waited, rating: seek.rating });
@@ -168,6 +173,7 @@ export function useRankedSearch({
         if (was.kind === 'searching' && was.game !== seek.game) {
           sendRankedSearchEnded(analytics, was.game, 'otherGame', now() - was.startedAt);
         }
+        sendRankedSearchStarted(analytics, seek.game);
         sendRankedSearchEnded(analytics, seek.game, 'matched', now() - sent.at);
       } else if (was.kind === 'searching') {
         sendRankedSearchEnded(analytics, was.game, 'matched', now() - was.startedAt);
@@ -246,11 +252,14 @@ export function useRankedSearch({
     async (game: RankedGame) => {
       setExpired(false);
       endedHere.current = false;
-      sendRankedSearchStarted(analytics, game);
       asked.current = { game, at: now() };
-      if (!(await run(() => matchmaking.seek({ game })))) asked.current = null;
+      // The search starts in analytics with the seek's first update
+      // (`apply`). After Try another game the server replaces the seek, and
+      // `apply` ends the old search as `otherGame`.
+      const done = await run(() => matchmaking.seek({ game }));
+      if (!done) asked.current = null;
     },
-    [analytics, matchmaking, now, run],
+    [matchmaking, now, run],
   );
 
   const cancel = useCallback(
@@ -263,20 +272,13 @@ export function useRankedSearch({
         endedHere.current = false;
         return false;
       }
+      // The server matched the seek before the cancel landed: the match
+      // shows (it sent its own end), so the screen stays.
+      if (current.current.kind === 'matched') return false;
       if (was.kind === 'searching') {
         sendRankedSearchEnded(analytics, was.game, how, now() - was.startedAt);
       }
       return true;
-    },
-    [analytics, matchmaking, now, run],
-  );
-
-  const switchGame = useCallback(
-    async (game: RankedGame) => {
-      // The old search ends as `otherGame` when the new seek shows (`apply`).
-      sendRankedSearchStarted(analytics, game);
-      asked.current = { game, at: now() };
-      if (!(await run(() => matchmaking.seek({ game })))) asked.current = null;
     },
     [analytics, matchmaking, now, run],
   );
@@ -296,7 +298,7 @@ export function useRankedSearch({
     expired,
     find,
     cancel,
-    switchGame,
+    switchGame: find,
     dismissProblem: () => setProblem(null),
     lookingCounts,
   };

@@ -1706,7 +1706,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       cancel: () =>
         call(() => {
           const id = saved();
-          if (seeks.delete(id)) notifySeeks();
+          // A matched seek stays, like the Convex `cancelSeek`.
+          if (seeks.get(id)?.status === 'waiting' && seeks.delete(id)) notifySeeks();
         }),
       mySeek: () => call(() => seekViewOf(saved())),
       watchMySeek(onUpdate, onError) {
