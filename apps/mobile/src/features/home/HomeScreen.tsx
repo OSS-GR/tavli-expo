@@ -326,27 +326,11 @@ export function HomeScreen({
               onPress={() => onNewGame('bot')}
             />
           ) : null}
-          {inRows(gridTiles, perRow).map((row) => (
-            <View key={row.map((tile) => tile.key).join()} style={styles.row}>
-              {row.map((tile) => (
-                <View key={tile.key} style={styles.cell}>
-                  {tile.node}
-                </View>
-              ))}
-            </View>
-          ))}
+          <CellRows cells={gridTiles} perRow={perRow} />
         </View>
 
         <View style={styles.grid}>
-          {inRows(footerLinks, perRow).map((row) => (
-            <View key={row.map((link) => link.key).join()} style={styles.row}>
-              {row.map((link) => (
-                <View key={link.key} style={styles.cell}>
-                  {link.node}
-                </View>
-              ))}
-            </View>
-          ))}
+          <CellRows cells={footerLinks} perRow={perRow} />
         </View>
       </ScrollView>
       <Toast text={toast} />
@@ -354,14 +338,30 @@ export function HomeScreen({
   );
 }
 
-interface Cell {
+export interface Cell {
   key: string;
   node: ReactNode;
   /** Takes a whole row. */
   wide?: boolean;
 }
 
-/** Cells in rows of `perRow`; a wide cell gets a row of its own. */
+/** The cells in rows (`inRows`); the cells of a row share its width and height. */
+function CellRows({ cells, perRow }: { cells: readonly Cell[]; perRow: number }) {
+  return inRows(cells, perRow).map((row) => (
+    <View key={row.map((cell) => cell.key).join()} style={styles.row}>
+      {row.map((cell) => (
+        <View key={cell.key} style={styles.cell}>
+          {cell.node}
+        </View>
+      ))}
+    </View>
+  ));
+}
+
+/**
+ * Cells in rows of `perRow`; a wide cell gets a row of its own. A lone
+ * cell in the last row fills it too (`styles.cell` is `flex: 1`).
+ */
 export function inRows(cells: readonly Cell[], perRow: number): Cell[][] {
   const rows: Cell[][] = [];
   let row: Cell[] = [];
