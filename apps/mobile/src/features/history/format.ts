@@ -132,11 +132,10 @@ export function historyRow(record: HistoryRecord, t: TFunction, locale: string):
     setup.openingRoll === DEFAULT_OPENING_ROLL
       ? null
       : t('history.openingRoll', { rule: t(`newGame.houseRules.${setup.openingRoll}`) }),
-    // The rules version (#241); the default preset shows nothing. A Tavli
-    // match names the game it is for (#247).
+    // The rules version (#241); the default preset shows nothing.
     version === null
       ? null
-      : t(setup.game === 'tavli' ? 'history.rulesVersionPlakoto' : 'history.rulesVersion', {
+      : t('history.rulesVersion', {
           version: t(`newGame.rulesVersion.${VERSION_KEYS[version]}`),
         }),
     // A resigned match keeps its score (#181): say who resigned it.

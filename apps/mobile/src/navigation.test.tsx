@@ -400,13 +400,12 @@ describe('app navigation', () => {
     expect(router.getPathname()).toBe('/rules/portes');
   });
 
-  it('opens the rules of the Plakoto game of a Tavli match in its version (#247)', async () => {
+  it('opens the plain Plakoto rules from the Plakoto game of a Tavli match (#247, #514)', async () => {
     const user = setupUser();
     const session = matchSessions.start({
       ...defaultSetup('local'),
       targetPoints: 3,
       game: 'tavli',
-      rulesVersions: { ...defaultSetup('local').rulesVersions, plakoto: 'plakoto.federation' },
     });
     const { dispatch } = session.store.getState();
     // Game 1 (Portes, its default rules) ends with a resign; game 2 is Plakoto.
@@ -421,8 +420,9 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
     await user.press(screen.getByRole('button', { name: 'How to play Plakoto' }));
     expect(router.getPathname()).toBe('/rules/plakoto');
-    expect(router.getSearchParams()).toMatchObject({ version: 'plakoto.federation' });
-    expect(screen.getByTestId('rules-section-version')).toBeOnTheScreen();
+    // Plakoto has one rules version, so the page has no version section.
+    expect(router.getSearchParams()).not.toHaveProperty('version');
+    expect(screen.queryByTestId('rules-section-version')).toBeNull();
   });
 
   it('opens the Plakoto rules page', async () => {

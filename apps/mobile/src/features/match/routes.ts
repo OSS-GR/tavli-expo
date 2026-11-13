@@ -108,9 +108,8 @@ export function reviewHref(id: string) {
 /**
  * The rules page of a game (`/rules/portes`, …). `preset` is the engine
  * preset in play or chosen: a rules version of `variant` that is not the
- * default (#241) adds `version` (`/rules/plakoto?version=plakoto.federation`).
- * Another game's version adds nothing: the Tavli page of a match whose
- * Plakoto game plays Federation (#247) is the plain Tavli page.
+ * default (#241) adds `version` (`/rules/asodio?version=asodio.aceyDeuceyGreek`).
+ * Another game's version adds nothing.
  */
 export function rulesHref(variant: string, preset?: PresetId) {
   const other = preset === undefined ? null : otherVersion(preset);

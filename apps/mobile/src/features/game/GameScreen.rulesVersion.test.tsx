@@ -1,5 +1,5 @@
 /**
- * The rules version house rule (#241, Tavli #247) on the game screen: a match started
+ * The rules version house rule (#241; Plakoto federation only, #514) on the game screen: a match started
  * from New game plays the chosen engine preset. The screen only sends
  * engine actions; the engine asks for the double (#205). On fake timers:
  * the cards close on timers.
@@ -98,8 +98,8 @@ describe('<GameScreen /> rules version (#241)', () => {
     expect(screen.queryByTestId('choose-double-4', hidden)).toBeNull();
   });
 
-  it('a Federation Plakoto game plays the plakoto.federation rules', async () => {
-    const store = start('plakoto', { plakoto: 'plakoto.federation' });
+  it('a Plakoto game plays the federation rules: no choice (#514)', async () => {
+    const store = start('plakoto', {});
     const { match, game } = store.getState().flow;
     expect(match.rules.presetId).toBe('plakoto.federation');
     expect(game.state.rules.presetId).toBe('plakoto.federation');
@@ -109,32 +109,27 @@ describe('<GameScreen /> rules version (#241)', () => {
     expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
   });
 
-  it.each([
-    ['Federation', 'plakoto.federation', 'federation'],
-    ['the default', 'plakoto', 'offerConcede'],
-  ] as const)(
-    'a Tavli match with %s Plakoto plays Portes, then Plakoto in that version (#247)',
-    async (_, preset, motherRule) => {
-      const store = start('tavli', { plakoto: preset });
-      await render(<GameScreen store={store} />);
-      expect(store.getState().flow.game.state.variant).toBe('portes');
-      expect(store.getState().flow.game.state.rules.presetId).toBe('portes');
-      await send(store, { type: 'rollOpening', player: 'white', die: 6 });
-      await send(store, { type: 'rollOpening', player: 'black', die: 1 });
-      await wait(OPENING_RESULT_MS + 10);
-      // Game 1 ends; the next game of the rotation is Plakoto.
-      await send(store, { type: 'resign', player: 'white' });
-      await send(store, { type: 'nextGame' });
+  it('a Tavli match plays Portes, then Plakoto with the federation rules (#247, #514)', async () => {
+    const store = start('tavli', {});
+    expect(store.getState().flow.match.rules.presetId).toBe('tavli');
+    await render(<GameScreen store={store} />);
+    expect(store.getState().flow.game.state.variant).toBe('portes');
+    expect(store.getState().flow.game.state.rules.presetId).toBe('portes');
+    await send(store, { type: 'rollOpening', player: 'white', die: 6 });
+    await send(store, { type: 'rollOpening', player: 'black', die: 1 });
+    await wait(OPENING_RESULT_MS + 10);
+    // Game 1 ends; the next game of the rotation is Plakoto.
+    await send(store, { type: 'resign', player: 'white' });
+    await send(store, { type: 'nextGame' });
 
-      const { game, match } = store.getState().flow;
-      expect(match.games.map((g) => g.variant)).toEqual(['portes']);
-      expect(game.state.variant).toBe('plakoto');
-      expect(game.state.rules.presetId).toBe(preset);
-      expect(game.state.rules.mother.motherRule).toBe(motherRule);
-      // The winner of game 1 starts game 2 (`tavli-match.md` #4): no opening roll.
-      expect(game.phase).toBe('awaiting-roll');
-      expect(game.state.toMove).toBe('black');
-      expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
-    },
-  );
+    const { game, match } = store.getState().flow;
+    expect(match.games.map((g) => g.variant)).toEqual(['portes']);
+    expect(game.state.variant).toBe('plakoto');
+    expect(game.state.rules.presetId).toBe('plakoto.federation');
+    expect(game.state.rules.mother.motherRule).toBe('federation');
+    // The winner of game 1 starts game 2 (`tavli-match.md` #4): no opening roll.
+    expect(game.phase).toBe('awaiting-roll');
+    expect(game.state.toMove).toBe('black');
+    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+  });
 });

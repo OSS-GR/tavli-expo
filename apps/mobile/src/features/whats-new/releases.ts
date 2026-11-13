@@ -30,6 +30,7 @@ export type WhatsNewEntryId =
   | 'quickInvites'
   | 'newLook'
   | 'grabAChair'
+  | 'plakotoFederation'
   | 'matchingColors'
   | 'turnClock';
 
@@ -52,6 +53,7 @@ export const RELEASES: readonly WhatsNewRelease[] = [
     entries: [
       { id: 'turnClock', icon: 'clock' },
       { id: 'matchingColors', icon: 'palette' },
+      { id: 'plakotoFederation', icon: 'book' },
     ],
   },
   {

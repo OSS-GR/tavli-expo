@@ -128,24 +128,13 @@ describe('<HistoryScreen />', () => {
   });
 
   it('shows the rules version in the row and its label (#241)', async () => {
-    const records = [rec({ id: 'b', game: 'plakoto', preset: 'plakoto.federation' })];
+    const records = [rec({ id: 'b', game: 'asodio', preset: 'asodio.aceyDeuceyGreek' })];
     await render(<HistoryScreen records={records} onPlay={jest.fn()} />);
 
-    const score = 'You 3 – 1 Bot · first to 3 · Rules version: Federation';
+    const score = 'You 3 – 1 Bot · first to 3 · Rules version: Greek';
     expect(screen.getByText(score)).toBeOnTheScreen();
     expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
-      `Plakoto · vs Bot (Easy), ${score}, Won, Oct 27, 2026`,
-    );
-  });
-
-  it('shows the Plakoto version of a Tavli match in the row and its label (#247)', async () => {
-    const records = [rec({ id: 'b', game: 'tavli', preset: 'plakoto.federation' })];
-    await render(<HistoryScreen records={records} onPlay={jest.fn()} />);
-
-    const score = 'You 3 – 1 Bot · first to 3 · Rules version (Plakoto): Federation';
-    expect(screen.getByText(score)).toBeOnTheScreen();
-    expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
-      `Tavli · vs Bot (Easy), ${score}, Won, Oct 27, 2026`,
+      `Asodio · vs Bot (Easy), ${score}, Won, Oct 27, 2026`,
     );
   });
 

@@ -461,32 +461,18 @@ describe('<NewGameScreen /> rules version (#241)', () => {
     within(versions()).getByRole('radio', { name: `${group}: ${name}` });
   const hint = () => screen.getByTestId('new-game-rules-version-hint');
 
-  it('shows the choice only for Plakoto, Asodio and Tavli (its Plakoto game, #247)', async () => {
+  it('shows the choice only for Asodio: Plakoto plays federation only (#514)', async () => {
     const user = userEvent.setup();
     const { ui } = show('bot', EVERY_GAME);
     await render(ui);
     expect(screen.queryByTestId('new-game-rules-version')).toBeNull();
-    for (const game of ['Fevga', 'Portes']) {
+    for (const game of ['Fevga', 'Plakoto', 'Tavli', 'Portes']) {
       await user.press(screen.getByRole('radio', { name: new RegExp(`^${game}`) }));
       expect(screen.queryByTestId('new-game-rules-version')).toBeNull();
     }
-    await user.press(screen.getByRole('radio', { name: /^Tavli/ }));
-    expect(versions()).toHaveProp('accessibilityLabel', 'Rules version (Plakoto)');
-    expect(screen.getByText('Rules version (Plakoto)')).toBeOnTheScreen();
-    expect(
-      within(versions())
-        .getAllByRole('radio')
-        .map((r) => r.props.accessibilityLabel),
-    ).toEqual(['Rules version (Plakoto): Standard', 'Rules version (Plakoto): Federation']);
-    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
+    await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
     expect(versions()).toHaveProp('accessibilityLabel', 'Rules version');
     expect(screen.getByText('Rules version')).toBeOnTheScreen();
-    expect(
-      within(versions())
-        .getAllByRole('radio')
-        .map((r) => r.props.accessibilityLabel),
-    ).toEqual(['Rules version: Standard', 'Rules version: Federation']);
-    await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
     expect(
       within(versions())
         .getAllByRole('radio')
@@ -498,94 +484,51 @@ describe('<NewGameScreen /> rules version (#241)', () => {
     const user = userEvent.setup();
     const { ui, onStart } = show('local', EVERY_GAME);
     await render(ui);
-    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
+    await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
     expect(option('Standard')).toBeChecked();
-    expect(hint()).toHaveTextContent(
-      'If your mother is pinned, you choose: resign (2 points) or play on.',
-    );
+    expect(hint()).toHaveTextContent(/^Kafeneio rules: all 15 enter first/);
     await user.press(screen.getByRole('button', { name: 'Start game' }));
-    expect(onStart).toHaveBeenLastCalledWith({ ...defaultSetup('local'), game: 'plakoto' });
+    expect(onStart).toHaveBeenLastCalledWith({ ...defaultSetup('local'), game: 'asodio' });
   });
 
-  it('picks Federation for Plakoto and a version for Asodio, each with its hint', async () => {
+  it('picks a version for Asodio, each with its hint, and keeps it for the next Asodio', async () => {
     const user = userEvent.setup();
     const { ui, onStart } = show('bot', EVERY_GAME);
     await render(ui);
 
-    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
-    await user.press(option('Federation'));
-    expect(option('Federation')).toBeChecked();
-    expect(option('Standard')).not.toBeChecked();
-    expect(hint()).toHaveTextContent(
-      'Federation rules: pin the mother and win 2 points once your own point 24 is empty. Both mothers pinned: a draw.',
-    );
-
-    // Asodio keeps its own choice.
     await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
     expect(option('Standard')).toBeChecked();
-    expect(hint()).toHaveTextContent(/^Kafeneio rules: all 15 enter first/);
     await user.press(option('Greek'));
+    expect(option('Greek')).toBeChecked();
+    expect(option('Standard')).not.toBeChecked();
     expect(hint()).toHaveTextContent(/^Acey-Deucey, Greek rules: you hit, not pin\./);
     await user.press(option('American'));
     expect(hint()).toHaveTextContent(/1 point per checker left\.$/);
     await user.press(option('Greek'));
 
-    // Back to Plakoto: Federation is still picked.
+    // Another game and back: Greek is still picked.
     await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
-    expect(option('Federation')).toBeChecked();
+    await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
+    expect(option('Greek')).toBeChecked();
 
+    // A Plakoto match keeps the Asodio choice for later.
+    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     expect(onStart).toHaveBeenLastCalledWith({
       ...defaultSetup('bot'),
       game: 'plakoto',
-      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' },
+      rulesVersions: { asodio: 'asodio.aceyDeuceyGreek' },
     });
-  });
-
-  it('Tavli: picks the version of its Plakoto game; Plakoto shares it (#247)', async () => {
-    const user = userEvent.setup();
-    const { ui, onStart } = show('bot', EVERY_GAME);
-    await render(ui);
-    await user.press(screen.getByRole('radio', { name: /^Tavli/ }));
-    const group = 'Rules version (Plakoto)';
-    expect(option('Standard', group)).toBeChecked();
-    expect(hint()).toHaveTextContent(
-      'If your mother is pinned, you choose: resign (2 points) or play on.',
-    );
-    await user.press(option('Federation', group));
-    expect(option('Federation', group)).toBeChecked();
-    expect(hint()).toHaveTextContent(/^Federation rules: pin the mother/);
-
-    // One Plakoto version: a Plakoto match has it too.
-    await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
-    expect(option('Federation')).toBeChecked();
-    await user.press(screen.getByRole('radio', { name: /^Tavli/ }));
-
-    await user.press(screen.getByRole('button', { name: 'Start game' }));
-    expect(onStart).toHaveBeenLastCalledWith({
-      ...defaultSetup('bot'),
-      game: 'tavli',
-      rulesVersions: { ...defaultSetup('bot').rulesVersions, plakoto: 'plakoto.federation' },
-    });
-  });
-
-  it('Tavli: the default is the standard Plakoto', async () => {
-    const user = userEvent.setup();
-    const { ui, onStart } = show('local', EVERY_GAME);
-    await render(ui);
-    await user.press(screen.getByRole('radio', { name: /^Tavli/ }));
-    expect(option('Standard', 'Rules version (Plakoto)')).toBeChecked();
-    await user.press(screen.getByRole('button', { name: 'Start game' }));
-    expect(onStart).toHaveBeenLastCalledWith({ ...defaultSetup('local'), game: 'tavli' });
   });
 
   it('starts from the last choice', async () => {
     const { ui } = show('local', EVERY_GAME, {
       ...defaultSetup('local'),
       game: 'asodio',
-      rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+      rulesVersions: { asodio: 'asodio.aceyDeuceyAmerican' },
     });
     await render(ui);
+    expect(option('American')).toBeOnTheScreen();
     expect(option('American')).toBeChecked();
   });
 
@@ -597,7 +540,7 @@ describe('<NewGameScreen /> rules version (#241)', () => {
         mode="local"
         initial={{
           ...defaultSetup('local'),
-          rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' },
+          rulesVersions: { asodio: 'asodio.aceyDeuceyGreek' },
         }}
         botLevels={EVERY_GAME}
         onBack={jest.fn()}
@@ -608,10 +551,9 @@ describe('<NewGameScreen /> rules version (#241)', () => {
     await user.press(screen.getByRole('button', { name: 'How to play Plakoto' }));
     expect(onRules).toHaveBeenLastCalledWith('plakoto', 'plakoto.federation');
     await user.press(screen.getByRole('button', { name: 'How to play Asodio' }));
-    expect(onRules).toHaveBeenLastCalledWith('asodio', 'asodio.kafeneio');
-    // A Tavli match with Federation (#247): the match preset; the link stays /rules/tavli.
+    expect(onRules).toHaveBeenLastCalledWith('asodio', 'asodio.aceyDeuceyGreek');
     await user.press(screen.getByRole('button', { name: 'How to play Tavli' }));
-    expect(onRules).toHaveBeenLastCalledWith('tavli', 'plakoto.federation');
+    expect(onRules).toHaveBeenLastCalledWith('tavli', 'tavli');
   });
 
   it('Greek: the label, the choices and a hint', async () => {
@@ -623,24 +565,15 @@ describe('<NewGameScreen /> rules version (#241)', () => {
       const { ui } = show('local', EVERY_GAME);
       await render(ui);
       await user.press(screen.getByRole('radio', { name: /^Πλακωτό/ }));
+      expect(screen.queryByTestId('new-game-rules-version')).toBeNull();
+      await user.press(screen.getByRole('radio', { name: /^Ασόδιο/ }));
       expect(screen.getByText('Παραλλαγή')).toBeOnTheScreen();
       expect(versions()).toHaveProp('accessibilityLabel', 'Παραλλαγή');
-      for (const name of ['Κανονική', 'Ομοσπονδίας']) {
-        expect(option(name, 'Παραλλαγή')).toBeOnTheScreen();
-      }
-      await user.press(screen.getByRole('radio', { name: /^Ασόδιο/ }));
       for (const name of ['Κανονική', 'Ελληνική', 'Αμερικάνικη']) {
         expect(option(name, 'Παραλλαγή')).toBeOnTheScreen();
       }
       await user.press(option('Ελληνική', 'Παραλλαγή'));
       expect(hint()).toHaveTextContent(/^Ελληνικοί κανόνες: χτυπάς, δεν πλακώνεις\./);
-      // Tavli (#247): the version of its Plakoto game.
-      await user.press(screen.getByRole('radio', { name: /^Τάβλι/ }));
-      expect(screen.getByText('Παραλλαγή (Πλακωτό)')).toBeOnTheScreen();
-      expect(versions()).toHaveProp('accessibilityLabel', 'Παραλλαγή (Πλακωτό)');
-      for (const name of ['Κανονική', 'Ομοσπονδίας']) {
-        expect(option(name, 'Παραλλαγή (Πλακωτό)')).toBeOnTheScreen();
-      }
     } finally {
       await act(async () => {
         await i18n.changeLanguage('en');
@@ -660,20 +593,16 @@ describe('<NewGameScreen /> house rule names for screen readers (#243)', () => {
     {
       language: 'en',
       opening: ['Opening roll: Standard', 'Opening roll: Roll again', 'Opening roll: Choose'],
-      plakoto: ['Rules version: Standard', 'Rules version: Federation'],
       asodio: ['Rules version: Standard', 'Rules version: Greek', 'Rules version: American'],
-      tavli: ['Rules version (Plakoto): Standard', 'Rules version (Plakoto): Federation'],
     },
     {
       language: 'el',
       opening: ['Πρώτη ζαριά: Κανονικά', 'Πρώτη ζαριά: Ξαναρίχνει', 'Πρώτη ζαριά: Διαλέγουμε'],
-      plakoto: ['Παραλλαγή: Κανονική', 'Παραλλαγή: Ομοσπονδίας'],
       asodio: ['Παραλλαγή: Κανονική', 'Παραλλαγή: Ελληνική', 'Παραλλαγή: Αμερικάνικη'],
-      tavli: ['Παραλλαγή (Πλακωτό): Κανονική', 'Παραλλαγή (Πλακωτό): Ομοσπονδίας'],
     },
   ] as const;
 
-  describe.each(LANGUAGES)('$language', ({ language, opening, ...versionNames }) => {
+  describe.each(LANGUAGES)('$language', ({ language, opening, asodio }) => {
     beforeEach(async () => {
       await act(async () => {
         await i18n.changeLanguage(language);
@@ -696,7 +625,11 @@ describe('<NewGameScreen /> house rule names for screen readers (#243)', () => {
       const { ui } = show(mode, EVERY_GAME, { ...defaultSetup(mode), game });
       await render(ui);
       expect(names('new-game-opening-roll')).toEqual(opening);
-      expect(names('new-game-rules-version')).toEqual(versionNames[game]);
+      if (game === 'asodio') {
+        expect(names('new-game-rules-version')).toEqual(asodio);
+      } else {
+        expect(screen.queryByTestId('new-game-rules-version')).toBeNull();
+      }
       // No two radios on New game share a name (game, length, level, board view too).
       const all = screen
         .getAllByRole('radio')
@@ -707,7 +640,7 @@ describe('<NewGameScreen /> house rule names for screen readers (#243)', () => {
 
   it('keeps the visible text short and the selected state', async () => {
     const user = userEvent.setup();
-    const { ui, onStart } = show('bot', EVERY_GAME, { ...defaultSetup('bot'), game: 'plakoto' });
+    const { ui, onStart } = show('bot', EVERY_GAME, { ...defaultSetup('bot'), game: 'asodio' });
     await render(ui);
     // Both groups still show a plain "Standard".
     expect(screen.getAllByText('Standard')).toHaveLength(2);
@@ -719,22 +652,22 @@ describe('<NewGameScreen /> house rule names for screen readers (#243)', () => {
     expect(openingStandard()).toBeChecked();
     expect(versionStandard()).toBeChecked();
 
-    await user.press(screen.getByRole('radio', { name: 'Rules version: Federation' }));
-    expect(screen.getByRole('radio', { name: 'Rules version: Federation' })).toBeChecked();
+    await user.press(screen.getByRole('radio', { name: 'Rules version: Greek' }));
+    expect(screen.getByRole('radio', { name: 'Rules version: Greek' })).toBeChecked();
     expect(versionStandard()).not.toBeChecked();
     expect(openingStandard()).toBeChecked();
 
     await user.press(screen.getByRole('radio', { name: 'Opening roll: Choose' }));
     expect(screen.getByRole('radio', { name: 'Opening roll: Choose' })).toBeChecked();
     expect(openingStandard()).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Rules version: Federation' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Rules version: Greek' })).toBeChecked();
 
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     expect(onStart).toHaveBeenLastCalledWith({
       ...defaultSetup('bot'),
-      game: 'plakoto',
+      game: 'asodio',
       openingRoll: 'chosenStarterRolls',
-      rulesVersions: { ...defaultSetup('bot').rulesVersions, plakoto: 'plakoto.federation' },
+      rulesVersions: { asodio: 'asodio.aceyDeuceyGreek' },
     });
   });
 });

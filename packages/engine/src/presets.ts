@@ -82,9 +82,11 @@ const PORTES = preset('portes', 2, { match: { rotation: ['portes'] } });
  * A Tavli match: the federation rotation Portes → Plakoto → Fevga
  * (`tavli-match.md`, "Match format"). A match preset: each game uses its
  * own default preset with these `match` flags (`gameRules` in `match.ts`).
- * Its other groups are the Portes values.
+ * Its other groups are the Portes values. Version 2 (#514): its Plakoto
+ * game plays the federation rules. Version 1 played the old `plakoto`
+ * preset, and `gameRules` keeps that for matches made before #514.
  */
-const TAVLI = preset('tavli', 1, {});
+const TAVLI = preset('tavli', 2, {});
 
 const PLAKOTO = preset('plakoto', 1, {
   board: { startPosition: 'allOnOwn24' },
@@ -147,10 +149,15 @@ const PRESETS: { readonly [P in PresetId]: RuleSet } = {
   }),
 };
 
-/** The preset each standard game uses when nothing else is chosen. */
+/**
+ * The preset each standard game uses when nothing else is chosen. Plakoto
+ * plays the federation rules (owner, 2026-11-13, #514). The `plakoto` preset
+ * (`offerConcede`) stays, so games, saves and history made with it still
+ * read and replay.
+ */
 export const DEFAULT_PRESET_BY_GAME: { readonly [G in StandardVariantId]: PresetId } = {
   portes: 'portes',
-  plakoto: 'plakoto',
+  plakoto: 'plakoto.federation',
   fevga: 'fevga',
   asodio: 'asodio.kafeneio',
 };
