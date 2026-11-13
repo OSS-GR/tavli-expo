@@ -49,6 +49,11 @@ export const oliveInlay = {
     turn: '#9A6418',
     // `turn` is a ring; as text it needs a darker amber on cream.
     turnText: '#7E520F',
+    // The invite code's bone tiles (#516): bone on both, a darker lip on the light theme.
+    tileFace: '#E8D9B8',
+    tileFaceLight: '#F8F0DE',
+    tileEdge: '#B39A6E',
+    tileText: '#2E1E14',
     switchTrackOff: '#8F7A58',
     switchThumb: '#FFF9EC',
   },

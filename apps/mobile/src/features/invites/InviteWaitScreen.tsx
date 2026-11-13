@@ -1,6 +1,7 @@
 /**
- * The waiting screen of the inviter (#281): the code, the link
- * (`tavlaki://invite/<code>`), Share (the phone's share sheet) and Cancel.
+ * The waiting screen of the inviter (#281): the code, Share (the phone's
+ * share sheet, with the link `tavlaki://invite/<code>` and the code) and
+ * Cancel.
  *
  * - It watches the invite live (`Invites.watchInvite`). When the friend
  *   accepts, it shows "Your friend joined" and opens the game
@@ -15,15 +16,18 @@
  *   covers the screen (`covered`: the turn notifications offer, #285), the
  *   screen is hidden from screen readers, and a card takes focus and is
  *   read only once the sheet is gone.
- * - Look (#358): the Home style. The code is large on a brass-edged card
- *   with the link under it, Share is the main button, a dot pulses by
- *   "Waiting for your friend…" (still with reduce motion), and Cancel
- *   sits at the bottom.
+ * - Look (#516, Figma node `17:187`): Close (top left) goes Home and
+ *   leaves the invite open. The title and one line with the game and the
+ *   length. The code in two groups of four bone tiles on a raised card,
+ *   with Share under it (the link shows only in the share message). A
+ *   dot pulses by "Waiting for your friend" (still with reduce motion),
+ *   with the time the invite has left on the phone clock (as on Home).
+ *   Cancel sits at the bottom.
  *
  * Navigation stays in the route (`app/friend/[code].tsx`).
  */
-import { isInviteErrorData, type Invites } from '@tavli/contracts';
-import { displayCaps } from '@tavli/ui';
+import { isInviteErrorData, type InviteView, type Invites } from '@tavli/contracts';
+import { fonts, withAlpha } from '@tavli/ui';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, Share, Text, View } from 'react-native';
@@ -36,15 +40,19 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
-import { Icon } from '@/components/Icon';
+import { CheckerAvatar } from '@/components/CheckerAvatar';
+import { RoundButton } from '@/components/RoundButton';
 import { screenBackground } from '@/components/Screen';
+import { Surface } from '@/components/Surface';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
+import { clockText } from '@/features/online/clock';
 
 import { inviteAppUrl } from './link';
+import { INVITE_TICK_MS, inviteClockOffset } from './myInvites';
 import {
   isFinalWait,
   waitStateOfCancelError,
@@ -193,9 +201,11 @@ export function InviteWaitScreen({
           ) : shown.kind === 'open' ? (
             <Waiting
               code={code}
+              view={shown.view}
               cancelling={cancelling}
               cancelFailed={cancelFailed}
               onCancel={cancel}
+              onClose={onHome}
             />
           ) : shown.kind === 'joined' ? (
             <Joined code={code} gameId={shown.gameId} onGame={onGame} />
@@ -231,18 +241,27 @@ function Loading() {
 
 interface WaitingProps {
   code: string;
+  view: InviteView;
   cancelling: boolean;
   cancelFailed: boolean;
   onCancel: () => void;
+  onClose: () => void;
 }
 
-function Waiting({ code, cancelling, cancelFailed, onCancel }: WaitingProps) {
+function Waiting({ code, view, cancelling, cancelFailed, onCancel, onClose }: WaitingProps) {
   const { t } = useTranslation();
-  const { theme } = useUnistyles();
   const covered = useContext(Covered);
   const titleRef = useFocusOnShow(!covered);
   const title = t('friend.wait.title');
-  const body = t('friend.wait.body');
+  const body = t('friend.wait.body', {
+    game: t(`games.${view.choice}`),
+    count: view.targetPoints,
+  });
+  const left = useTimeLeft(view);
+  const stay =
+    left > 0
+      ? t('friend.wait.stay', { time: clockText(left, null, t) })
+      : t('friend.wait.expiring');
   const link = inviteAppUrl(code);
   // Read once per invite in this app run (#216).
   useAnnouncement(covered ? null : `${title} ${body}`, `invite-wait:${code}`);
@@ -255,39 +274,40 @@ function Waiting({ code, cancelling, cancelFailed, onCancel }: WaitingProps) {
   };
   return (
     <View testID="invite-wait-open" style={styles.waiting}>
-      <Text ref={titleRef} style={styles.pageTitle} accessibilityRole="header">
-        {title}
-      </Text>
-      <Text style={styles.lead}>{body}</Text>
-      <View style={styles.hero}>
-        {/* A screen reader spells the code out, one character at a time. */}
-        <View
-          style={styles.codeBlock}
-          accessible
-          accessibilityLabel={`${t('friend.wait.code')}: ${[...code].join(' ')}`}>
-          <Text style={styles.eyebrow}>{displayCaps(t('friend.wait.code'))}</Text>
-          <Text testID="invite-wait-code" style={styles.code} selectable>
-            {code}
-          </Text>
-        </View>
-        <View
-          style={styles.linkRow}
-          accessible
-          accessibilityLabel={`${t('friend.wait.link')}: ${link}`}>
-          <Icon name="link" size={20} color={theme.colors.textDim} />
-          <Text testID="invite-wait-link" style={styles.link} selectable>
-            {link}
-          </Text>
-        </View>
+      <View style={styles.topBar}>
+        <RoundButton
+          testID="invite-wait-close"
+          icon="x"
+          accessibilityLabel={t('friend.wait.close')}
+          accessibilityHint={t('friend.wait.closeHint')}
+          onPress={onClose}
+        />
       </View>
-      <ActionButton testID="invite-wait-share" label={t('friend.wait.share')} onPress={share} />
-      <View style={styles.waitCard}>
-        <View style={styles.status}>
-          <PulsingDot />
+      <View style={styles.head}>
+        <CheckerAvatar playerKey={code} wood="bone" size={32} />
+        <Text ref={titleRef} style={styles.pageTitle} accessibilityRole="header">
+          {title}
+        </Text>
+        <Text style={styles.lead}>{body}</Text>
+      </View>
+      <Surface tier="raised" style={styles.codeCard}>
+        <CodeTiles code={code} />
+        <ActionButton
+          testID="invite-wait-share"
+          icon="share"
+          label={t('friend.wait.share')}
+          onPress={share}
+        />
+      </Surface>
+      <Surface tier="tray" style={styles.statusCard}>
+        <PulsingDot />
+        <View style={styles.statusTexts}>
           <Text style={styles.statusText}>{t('friend.wait.status')}</Text>
+          <Text testID="invite-wait-left" style={styles.small}>
+            {stay}
+          </Text>
         </View>
-        <Text style={styles.small}>{t('friend.wait.stay')}</Text>
-      </View>
+      </Surface>
       <View style={styles.spacer} />
       <ActionButton
         testID="invite-wait-cancel"
@@ -306,11 +326,62 @@ function Waiting({ code, cancelling, cancelFailed, onCancel }: WaitingProps) {
   );
 }
 
+/** Characters per tile group: two groups of four are easy to read over the phone. */
+const CODE_GROUP = 4;
+
+/**
+ * The code in bone tiles (#516), two groups of four. A screen reader
+ * spells the code out, one character at a time.
+ */
+function CodeTiles({ code }: { code: string }) {
+  const { t } = useTranslation();
+  const groups: string[][] = [];
+  [...code].forEach((char, index) => {
+    if (index % CODE_GROUP === 0) groups.push([]);
+    groups[groups.length - 1]!.push(char);
+  });
+  return (
+    <View
+      style={styles.codeBlock}
+      accessible
+      accessibilityLabel={`${t('friend.wait.code')}: ${[...code].join(' ')}`}>
+      <Text style={styles.eyebrow}>{t('friend.wait.code')}</Text>
+      <View testID="invite-wait-code" style={styles.tiles}>
+        {groups.map((group, g) => (
+          <View key={g} style={styles.tileGroup}>
+            {group.map((char, i) => (
+              <View key={i} style={styles.tile}>
+                <Text style={styles.tileText}>{char}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The time the open invite has left on the phone clock, set right by the
+ * server clock as far as the view tells (`inviteClockOffset`, as on
+ * Home). It ticks like Home's list (`INVITE_TICK_MS`).
+ */
+function useTimeLeft(view: InviteView): number {
+  // The view of an open invite keeps its `expiresAt`: the first one sets the offset.
+  const [offset] = useState(() => inviteClockOffset([view], Date.now()));
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), INVITE_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+  return view.expiresAt - (now + offset);
+}
+
 /** One beat of the waiting dot, in ms: it fades out and back in. */
 const PULSE_MS = 900;
 
 /**
- * The dot by "Waiting for your friend…": it pulses while the invite is
+ * The dot by "Waiting for your friend": it pulses while the invite is
  * open. With reduce motion on it stays still. Screen readers skip it.
  */
 function PulsingDot() {
@@ -466,83 +537,87 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   waiting: {
     flexGrow: 1,
-    gap: theme.space.lg,
+    gap: 20,
+  },
+  // The close button sits alone on the right (#516).
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  head: {
+    alignItems: 'center',
+    gap: 6,
   },
   pageTitle: {
-    ...theme.type.title2,
+    ...theme.type.title1,
     textAlign: 'center',
     color: theme.colors.text,
   },
   lead: {
-    ...theme.type.body,
+    ...theme.type.callout,
     textAlign: 'center',
     color: theme.colors.textDim,
   },
-  hero: {
-    alignItems: 'center',
-    gap: theme.space.md,
-    paddingVertical: theme.space.xl,
+  codeCard: {
+    alignItems: 'stretch',
+    gap: theme.space.lg,
+    paddingTop: 22,
+    paddingBottom: 18,
     paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.surface,
-    backgroundImage: `linear-gradient(160deg, ${theme.colors.surfaceSelected} 0%, ${theme.colors.surface} 70%)`,
-    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
   },
   codeBlock: {
     alignItems: 'center',
-    gap: theme.space.xs,
+    gap: theme.space.lg,
   },
   eyebrow: {
-    ...theme.type.section,
-    color: theme.colors.accent,
-  },
-  code: {
-    ...theme.type.numeral,
-    letterSpacing: 6,
-    textAlign: 'center',
-    color: theme.colors.text,
-  },
-  linkRow: {
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.sm,
-    minHeight: 48,
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.sm,
-    borderRadius: theme.radii.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.separator,
-    backgroundColor: theme.colors.backgroundDeep,
-  },
-  link: {
-    ...theme.type.caption,
-    flex: 1,
+    ...theme.type.footnote,
     color: theme.colors.textDim,
   },
-  waitCard: {
-    gap: theme.space.sm,
-    padding: theme.space.lg,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
-  },
-  status: {
+  tiles: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    columnGap: 14,
+    rowGap: theme.space.sm,
+  },
+  tileGroup: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  // A bone tile, like a domino: a light face with a darker lip under it.
+  tile: {
+    minWidth: 38,
+    minHeight: 52,
+    paddingHorizontal: theme.space.xxs,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+    backgroundColor: theme.colors.tileFace,
+    backgroundImage: `linear-gradient(180deg, ${theme.colors.tileFaceLight} 0%, ${theme.colors.tileFace} 100%)`,
+    boxShadow: `0px 2px 0px ${theme.colors.tileEdge}, 0px 4px 8px rgba(0, 0, 0, 0.4)`,
+  },
+  tileText: {
+    ...theme.type.title1,
+    fontFamily: fonts.numerals,
+    color: theme.colors.tileText,
+  },
+  statusCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: theme.space.md,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: 14,
+  },
+  statusTexts: {
+    flex: 1,
+    gap: 3,
   },
   statusText: {
-    ...theme.type.bodyStrong,
-    flex: 1,
+    ...theme.type.headline,
     color: theme.colors.text,
   },
   small: {
-    ...theme.type.caption,
+    ...theme.type.footnote,
     color: theme.colors.textDim,
   },
   // The ring stays; only the dot inside it pulses.
@@ -559,6 +634,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     height: DOT,
     borderRadius: DOT / 2,
     backgroundColor: theme.colors.turn,
+    boxShadow: `0px 0px 0px 4px ${withAlpha(theme.colors.turn, 0.18)}`,
   },
   spacer: {
     flexGrow: 1,

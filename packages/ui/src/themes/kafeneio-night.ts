@@ -40,6 +40,11 @@ export const kafeneioNight = {
     problemPressed: '#431D19',
     turn: '#F2C14E',
     turnText: '#F6D27A',
+    // The invite code's bone tiles (#516), as on Walnut Kafeneio.
+    tileFace: '#E4D7BA',
+    tileFaceLight: '#F3EBD8',
+    tileEdge: '#B9A27A',
+    tileText: '#2A1C12',
     switchTrackOff: '#4D2E21',
     switchThumb: '#F3E8D6',
   },
