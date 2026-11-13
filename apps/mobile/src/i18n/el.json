@@ -1234,10 +1234,12 @@
     "menu": {
       "open": "Μενού παιχνιδιού",
       "title": "Μενού παιχνιδιού",
+      "close": "Κλείσιμο του μενού",
       "summaryBot": "{{game}} · με υπολογιστή ({{level}}) · {{score}}",
       "summaryLocal": "{{game}} · δύο παίκτες · {{score}}",
       "resignGame": "Παραίτηση από την παρτίδα",
-      "resignGameHint": "{{name}}: κερδίζει την παρτίδα",
+      "resignGamePoints_one": "{{name}}: κερδίζει {{count}} βαθμό",
+      "resignGamePoints_other": "{{name}}: κερδίζει {{count}} βαθμούς",
       "resignMatch": "Παραίτηση από το ματς",
       "resignMatchHint": "{{name}}: κερδίζει το ματς",
       "rules": "Κανόνες: {{game}}",
@@ -1334,6 +1336,7 @@
   },
   "matchEnd": {
     "finalScore": "Τελικό σκορ: {{score}}",
+    "game": "Παρτίδα {{number}}",
     "won": "{{name}}: κέρδισε",
     "won_you": "Κέρδισες",
     "wonOnTime": "{{name}}: κέρδισε λόγω χρόνου",

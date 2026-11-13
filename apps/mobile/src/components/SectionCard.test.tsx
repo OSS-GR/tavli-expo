@@ -1,4 +1,5 @@
 import { screen, userEvent } from '@testing-library/react-native';
+import { themes } from '@tavli/ui';
 import { StyleSheet, Text } from 'react-native';
 
 import { renderWithRoot } from '../../test/render';
@@ -98,6 +99,24 @@ describe('<SectionRow />', () => {
     expect(clear).toBeDisabled();
     await user.press(clear);
     expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('shows a risky action in coral, and dims it when disabled (#515)', async () => {
+    const { colors } = themes['walnut-kafeneio'];
+    await renderWithRoot(
+      <SectionCard>
+        <SectionRow label="Resign this game" icon="flag" tone="danger" onPress={jest.fn()} />
+        <SectionRow
+          label="Resign the match"
+          icon="flag"
+          tone="danger"
+          disabled
+          onPress={jest.fn()}
+        />
+      </SectionCard>,
+    );
+    expect(screen.getByText('Resign this game')).toHaveStyle({ color: colors.problem });
+    expect(screen.getByText('Resign the match')).toHaveStyle({ color: colors.textDisabled });
   });
 
   it('is not a button without onPress', async () => {

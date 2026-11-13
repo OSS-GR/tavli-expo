@@ -110,6 +110,11 @@ export interface SectionRowProps {
   accessibilityRole?: 'button' | 'link';
   /** A button row that cannot be pressed now: dim label, read as disabled. */
   disabled?: boolean;
+  /**
+   * `danger`: the label and the icon in the problem coral, for a risky
+   * action (Resign this game, #515). Default `normal`.
+   */
+  tone?: 'normal' | 'danger';
   testID?: string;
 }
 
@@ -125,22 +130,32 @@ export function SectionRow({
   accessibilityHint,
   accessibilityRole = 'button',
   disabled = false,
+  tone = 'normal',
   testID,
 }: SectionRowProps) {
   const { theme } = useUnistyles();
+  const danger = tone === 'danger';
+  // A risky row that cannot be pressed now loses its coral too.
+  const iconColor = danger
+    ? disabled
+      ? theme.colors.textDisabled
+      : theme.colors.problem
+    : theme.colors.accent;
   const content = (
     <>
       {icon ? (
         iconLook === 'bare' ? (
           <View style={styles.bareIcon}>
-            <Icon name={icon} size={20} color={theme.colors.accent} />
+            <Icon name={icon} size={20} color={iconColor} />
           </View>
         ) : (
-          <RowIcon name={icon} />
+          <RowIcon name={icon} color={iconColor} />
         )
       ) : null}
       <View style={styles.texts}>
-        <Text style={[styles.label, disabled && styles.disabled]}>{label}</Text>
+        <Text style={[styles.label, danger && styles.danger, disabled && styles.disabled]}>
+          {label}
+        </Text>
         {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       </View>
       {right ?? (value ? <Text style={styles.value}>{value}</Text> : null)}
@@ -177,12 +192,12 @@ export function SectionRow({
   );
 }
 
-/** The small dark badge with a brass icon at the start of a row. */
-export function RowIcon({ name }: { name: IconName }) {
+/** The small dark badge with a brass icon (or `color`) at the start of a row. */
+export function RowIcon({ name, color }: { name: IconName; color?: string }) {
   const { theme } = useUnistyles();
   return (
     <View style={styles.badge}>
-      <Icon name={name} size={20} color={theme.colors.accent} />
+      <Icon name={name} size={20} color={color ?? theme.colors.accent} />
     </View>
   );
 }
@@ -236,6 +251,9 @@ const styles = StyleSheet.create((theme) => ({
   label: {
     ...theme.type.bodyStrong,
     color: theme.colors.text,
+  },
+  danger: {
+    color: theme.colors.problem,
   },
   disabled: {
     color: theme.colors.textDisabled,

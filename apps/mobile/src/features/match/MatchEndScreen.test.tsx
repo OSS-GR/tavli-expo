@@ -9,6 +9,7 @@ import {
   type PlayerId,
 } from '@tavli/engine';
 import { act, screen, userEvent, within } from '@testing-library/react-native';
+import { themes } from '@tavli/ui';
 import { AccessibilityInfo } from 'react-native';
 import * as Reanimated from 'react-native-reanimated';
 
@@ -75,6 +76,47 @@ describe('<MatchEndScreen />', () => {
     const icon = within(screen.getByTestId('match-celebration-icon', hidden));
     expect(icon.getByTestId('match-trophy', hidden)).toBeOnTheScreen();
     expect(announce).toHaveBeenCalledWith('You won the match! You 3 – 1 Bot');
+  });
+
+  it('lists short game rows with the winner and Mono or Diplo; your points are brass (#515)', async () => {
+    const { colors } = themes['walnut-kafeneio'];
+    await show(
+      botSetup,
+      playedMatch([
+        ['white', 1],
+        ['black', 1],
+        ['white', 2],
+      ]),
+    ).view;
+
+    // A Portes match names Portes once, above: a row says only "Game 3".
+    const third = within(screen.getByTestId('match-game-3'));
+    expect(third.getByText('Game 3')).toBeOnTheScreen();
+    expect(third.getByText('You won · Diplo')).toBeOnTheScreen();
+    expect(third.getByText('+2')).toHaveStyle({ color: colors.turnText });
+    expect(within(screen.getByTestId('match-game-2')).getByText('+1')).toHaveStyle({
+      color: colors.textDim,
+    });
+    // The winner's number in the final score is brass too.
+    expect(screen.getByText('3')).toHaveStyle({ color: colors.turnText });
+  });
+
+  it('puts Review and Home side by side under Rematch, and Change settings as text (#515)', async () => {
+    await renderWithRoot(
+      <MatchEndScreen
+        setup={botSetup}
+        match={playedMatch([['white', 3]])}
+        onRematch={jest.fn()}
+        onReview={jest.fn()}
+        onChangeSettings={jest.fn()}
+        onHome={jest.fn()}
+      />,
+    );
+    const review = screen.getByTestId('review-button');
+    const home = screen.getByTestId('end-home-button');
+    // One row: the two buttons share a parent.
+    expect(review.parent).toBe(home.parent);
+    expect(screen.getByRole('button', { name: 'Change settings' })).toBeOnTheScreen();
   });
 
   it('offers a rematch where the last winner starts, change settings and home', async () => {

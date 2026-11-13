@@ -299,6 +299,11 @@ function OnlineBoard({
       <GameMenu
         gameLabel={gameLabel}
         summary={t('online.summary', { game, score })}
+        score={{
+          names: { white: name('white'), black: name('black') },
+          score: flow.match.score,
+          target: flow.match.targetPoints,
+        }}
         resignGameHint={null}
         resignMatchHint={
           finished ? null : t('game.menu.resignMatchHint', { name: name(opponent(side)) })

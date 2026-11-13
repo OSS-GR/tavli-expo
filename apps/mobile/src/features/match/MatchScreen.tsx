@@ -122,8 +122,19 @@ export function MatchScreen({
       <GameMenu
         gameLabel={gameLabel}
         summary={summary}
+        score={{
+          names: { white: name('white'), black: name('black') },
+          score: flow.match.score,
+          target: flow.match.targetPoints,
+        }}
         resignGameHint={
-          gameResignable ? t('game.menu.resignGameHint', { name: name(opponent(resigner)) }) : null
+          gameResignable
+            ? t('game.menu.resignGamePoints', {
+                name: name(opponent(resigner)),
+                // What the engine would score now: mono, diplo or per checker.
+                count: previewResign(flow, resigner).result.points,
+              })
+            : null
         }
         resignMatchHint={
           resigner !== null

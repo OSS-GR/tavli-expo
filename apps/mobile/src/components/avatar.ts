@@ -19,6 +19,15 @@ export function avatarWood(key: string): AvatarWood {
   return AVATAR_WOODS[(hash >>> 0) % AVATAR_WOODS.length]!;
 }
 
+/**
+ * The wood of a side's checker (#515): White plays the light checkers
+ * (`bone`), Black the dark ones (`ebony`), as on the board. For the score
+ * lines of the game menu and match end.
+ */
+export function sideWood(side: 'white' | 'black'): AvatarWood {
+  return side === 'white' ? 'bone' : 'ebony';
+}
+
 /** A letter that is not a modifier letter (like 'ʼ'). */
 const CAPITAL = /[\p{Lu}\p{Lt}\p{Ll}\p{Lo}]/u;
 

@@ -10,6 +10,11 @@
  * back to portrait if it does not list landscape). On a wide screen the
  * sheet keeps a readable width (`MAX_SHEET_WIDTH`) in the middle.
  *
+ * The `sheet` look follows the Figma polish pass (#515): the raised fill,
+ * a brass top edge, 28 pt top corners and a grab handle. The handle only
+ * decorates: the sheet closes with a tap on the dimmed part, the Android
+ * back button or the content's own button.
+ *
  * A text field in it (the email code, the username) stays above the
  * keyboard: on iOS the sheet moves up with it (`KeyboardAvoidingView`);
  * Android resizes the window.
@@ -79,6 +84,13 @@ export function Sheet({
           accessibilityLabel={closeLabel}
         />
         <View testID={testID} style={styles.sheet(shown)} accessibilityViewIsModal>
+          {shown === 'sheet' ? (
+            <View
+              style={styles.handle}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            />
+          ) : null}
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.content(shown)}
@@ -124,25 +136,45 @@ const styles = StyleSheet.create((theme, rt) => ({
     // the content's own.
     ...(look === 'bare'
       ? {}
-      : {
-          borderTopLeftRadius: theme.radii.xl,
-          borderTopRightRadius: theme.radii.xl,
-          borderBottomLeftRadius: look === 'sheet' ? 0 : theme.radii.xl,
-          borderBottomRightRadius: look === 'sheet' ? 0 : theme.radii.xl,
-          backgroundColor: theme.colors.surface,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-        }),
+      : look === 'sheet'
+        ? {
+            borderTopLeftRadius: theme.radii.sheet,
+            borderTopRightRadius: theme.radii.sheet,
+            backgroundColor: theme.colors.surfaceRaised,
+            borderTopWidth: 1,
+            borderColor: theme.colors.accentLine,
+            boxShadow: `inset 0px 1px 0px ${theme.colors.border}`,
+          }
+        : {
+            borderRadius: theme.radii.xl,
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          }),
   }),
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    marginTop: theme.space.sm,
+    backgroundColor: theme.colors.border,
+  },
   scroll: {
     flexGrow: 0,
   },
   content: (look: SheetLook) =>
     look === 'bare'
       ? {}
-      : {
-          gap: theme.space.sm,
-          padding: theme.space.xl,
-          paddingBottom: look === 'sheet' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
-        },
+      : look === 'sheet'
+        ? {
+            gap: theme.space.sm,
+            paddingHorizontal: theme.space.lg,
+            paddingTop: theme.space.lg,
+            paddingBottom: rt.insets.bottom + theme.space.lg,
+          }
+        : {
+            gap: theme.space.sm,
+            padding: theme.space.xl,
+          },
 }));

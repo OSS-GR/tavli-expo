@@ -50,4 +50,13 @@ describe('<CheckerAvatar />', () => {
     );
     expect(screen.queryByText('EK', { includeHiddenElements: true })).toBeNull();
   });
+
+  it('takes a fixed wood for a side: the light checker for White (#515)', async () => {
+    await renderWithRoot(<CheckerAvatar testID="avatar" wood="bone" size={18} />);
+    expect(screen.getByTestId('avatar', { includeHiddenElements: true })).toHaveStyle({
+      width: 18,
+      backgroundColor: avatar.bone.face,
+      borderColor: avatar.bone.rim,
+    });
+  });
 });

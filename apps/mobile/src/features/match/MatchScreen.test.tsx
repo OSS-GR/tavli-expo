@@ -13,6 +13,7 @@ import {
   type SideLayout,
 } from '@tavli/engine';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { themes } from '@tavli/ui';
 
 import { BOT_SPEED_TIMING, type BotTiming } from '@/features/bot/botTurn';
 import { SAMPLE_POSITIONS } from '@/features/board/positions';
@@ -151,8 +152,8 @@ describe('<MatchScreen /> vs bot', () => {
 
     await user.press(button('Game menu'));
     const menu = screen.getByTestId('game-menu');
-    expect(within(menu).getByText('Portes · vs Bot (Easy) · You 0 – 0 Bot')).toBeOnTheScreen();
-    await user.press(button('Resign game, Bot wins this game'));
+    expect(within(menu).getByLabelText('Portes · vs Bot (Easy) · You 0 – 0 Bot')).toBeOnTheScreen();
+    await user.press(button('Resign this game, Bot wins 2 points'));
 
     const dialog = screen.getByTestId('resign-game-dialog');
     expect(
@@ -168,7 +169,7 @@ describe('<MatchScreen /> vs bot', () => {
     expect(game(s).phase).toBe('awaiting-roll');
 
     await user.press(button('Game menu'));
-    await user.press(button('Resign game, Bot wins this game'));
+    await user.press(button('Resign this game, Bot wins 2 points'));
     await user.press(button('Resign'));
     expect(game(s).result).toEqual({ winner: 'black', points: 2, reason: 'resigned' });
     const card = screen.getByTestId('game-end-card');
@@ -231,7 +232,7 @@ describe('<MatchScreen /> vs bot', () => {
     await view;
 
     await user.press(button('Game menu'));
-    await user.press(button('Resign match, Bot wins the match'));
+    await user.press(button('Resign the match, Bot wins the match'));
     // The game in play counts for the bot, like Resign game (2026-11-09).
     expect(
       screen.getByText('Bot wins the match. The game in play counts: Bot wins 2 points.'),
@@ -258,16 +259,18 @@ describe('<MatchScreen /> vs bot', () => {
     await view;
 
     await user.press(button('Game menu'));
-    await user.press(button('Resign game, Bot wins this game'));
+    await user.press(button('Resign this game, Bot wins 2 points'));
     await user.press(button('Resign'));
     expect(s.store.getState().flow.match.score).toEqual({ white: 0, black: 2 });
     await user.press(button(/^Next game/));
     // The bot starts game 2: the menu stops it.
     await user.press(button('Game menu'));
     expect(
-      within(screen.getByTestId('game-menu')).getByText('Portes · vs Bot (Easy) · You 0 – 2 Bot'),
+      within(screen.getByTestId('game-menu')).getByLabelText(
+        'Portes · vs Bot (Easy) · You 0 – 2 Bot',
+      ),
     ).toBeOnTheScreen();
-    await user.press(button('Resign match, Bot wins the match'));
+    await user.press(button('Resign the match, Bot wins the match'));
     expect(
       screen.getByText('Bot wins the match. The game in play counts: Bot wins 2 points.'),
     ).toBeOnTheScreen();
@@ -304,8 +307,41 @@ describe('<MatchScreen /> vs bot', () => {
     expect(props.onSettings).toHaveBeenCalled();
 
     await user.press(button('Game menu'));
-    await user.press(button(/^Exit to home/));
+    await user.press(button(/^Exit to Home/));
     expect(props.onExit).toHaveBeenCalled();
+  });
+
+  it('shows the game as the title, the score with checkers, safe actions first (#515)', async () => {
+    const user = setupUser();
+    const s = session(defaultSetup('bot'));
+    startWith(s, 'white');
+    await show(s).view;
+
+    await user.press(button('Game menu'));
+    const menu = within(screen.getByTestId('game-menu'));
+    expect(menu.getByRole('header')).toHaveTextContent('Game 1 · Portes');
+    // The score line: each side's checker, the scores, the target.
+    const score = within(screen.getByTestId('menu-score'));
+    expect(score.getByText('· first to 1')).toBeOnTheScreen();
+    expect(screen.getByTestId('menu-checker-white', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('menu-checker-black', { includeHiddenElements: true })).toBeTruthy();
+    // Safe actions in one card, the resigns in another, in coral.
+    const safe = within(screen.getByTestId('menu-actions'));
+    expect(safe.getByRole('button', { name: 'How to play Portes' })).toBeOnTheScreen();
+    expect(
+      safe.getByRole('button', { name: 'Exit to Home, Your game is saved' }),
+    ).toBeOnTheScreen();
+    const resigns = within(screen.getByTestId('menu-resigns'));
+    expect(resigns.getAllByRole('button')).toHaveLength(2);
+    expect(resigns.getByText('Resign this game')).toHaveStyle({
+      color: themes['walnut-kafeneio'].colors.problem,
+    });
+    // Close and Resume both close the menu.
+    await user.press(button('Close the menu'));
+    expect(screen.queryByTestId('game-menu')).toBeNull();
+    await user.press(button('Game menu'));
+    await user.press(button('Resume'));
+    expect(screen.queryByTestId('game-menu')).toBeNull();
   });
 });
 
@@ -323,12 +359,12 @@ describe('<MatchScreen /> pass-and-play', () => {
     await show(s).view;
 
     await user.press(button('Game menu'));
-    expect(button('Resign game')).toBeDisabled();
+    expect(button('Resign this game')).toBeDisabled();
     await user.press(button('Resume'));
 
     await act(async () => startWith(s, 'black'));
     await user.press(button('Game menu'));
-    await user.press(button('Resign game, Maria wins this game'));
+    await user.press(button('Resign this game, Maria wins 2 points'));
     expect(
       screen.getByText(
         'Maria wins 2 points (diplo), because Nikos has not borne off any checker yet.',
@@ -354,7 +390,7 @@ describe('<MatchScreen /> pass-and-play', () => {
     await show(s).view;
 
     await user.press(button('Game menu'));
-    await user.press(button('Resign game, Nikos wins this game'));
+    await user.press(button('Resign this game, Nikos wins 1 point'));
     await user.press(button('Resign'));
     expect(game(s).result).toEqual({ winner: 'black', points: 1, reason: 'resigned' });
     const card = screen.getByTestId('game-end-card');
@@ -526,11 +562,11 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
       await expectGameLabel(user, layout, 'Game 1 · Portes');
       await user.press(button('Game menu'));
       expect(
-        within(screen.getByTestId('game-menu')).getByText(
+        within(screen.getByTestId('game-menu')).getByLabelText(
           'Tavli · pass-and-play · Player 1 0 – 0 Player 2',
         ),
       ).toBeOnTheScreen();
-      await user.press(button(/^Resign game/));
+      await user.press(button(/^Resign this game/));
       await user.press(button('Resign'));
 
       let card = screen.getByTestId('game-end-card');
@@ -554,7 +590,7 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
       expect(props.onRules).toHaveBeenCalled();
 
       await user.press(button('Game menu'));
-      await user.press(button(/^Resign game/));
+      await user.press(button(/^Resign this game/));
       await user.press(button('Resign'));
       card = screen.getByTestId('game-end-card');
       expect(within(card).getByTestId('next-game-label')).toHaveTextContent('Next: game 3 · Fevga');
@@ -674,7 +710,7 @@ describe('<MatchScreen /> Acey-Deucey American scoring (#245)', () => {
     await show(s).view;
 
     await user.press(button('Game menu'));
-    await user.press(button('Resign game, Nikos wins this game'));
+    await user.press(button('Resign this game, Nikos wins 1 point'));
     const dialog = within(screen.getByTestId('resign-game-dialog'));
     expect(
       dialog.getByText('Nikos wins 1 point, because Maria has 1 checker left to bear off.'),
@@ -698,7 +734,7 @@ describe('<MatchScreen /> Acey-Deucey American scoring (#245)', () => {
     await show(s).view;
 
     await user.press(button('Game menu'));
-    await user.press(button('Resign game, Bot wins this game'));
+    await user.press(button('Resign this game, Bot wins 5 points'));
     expect(
       within(screen.getByTestId('resign-game-dialog')).getByText(
         'Bot wins 5 points, because you have 5 checkers left to bear off: 1 point each.',
