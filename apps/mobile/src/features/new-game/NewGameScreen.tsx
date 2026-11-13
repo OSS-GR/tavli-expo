@@ -216,8 +216,10 @@ export function NewGameScreen({
             accessibilityRole="button"
             accessibilityLabel={t(`rules.title.${choice}`)}
             onPress={() => onRules(choice, gamePreset(choice, rulesVersions))}
-            style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
-            <Icon name="book" size={20} color={theme.colors.accent} />
+            style={({ pressed }) => [styles.rulesButton, pressed && styles.rulesPressed]}>
+            {/* A framed button with an info mark, so it reads as "the rules" and as pressable. */}
+            <Icon name="info" size={15} color={theme.colors.accent} />
+            <Icon name="book" size={18} color={theme.colors.accent} />
           </Pressable>
         ) : null}
       </View>
@@ -471,10 +473,19 @@ const styles = StyleSheet.create((theme, rt) => ({
   rulesButton: {
     minWidth: theme.touch.minTarget,
     minHeight: theme.touch.minTarget,
-    marginRight: theme.space.xxs,
+    marginRight: theme.space.sm,
+    paddingHorizontal: theme.space.xs + 2,
+    flexDirection: 'row',
+    gap: 3,
     borderRadius: theme.touch.minTarget / 2,
+    borderWidth: 1,
+    borderColor: theme.colors.accentLine,
+    backgroundColor: theme.colors.accentWash,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rulesPressed: {
+    backgroundColor: theme.colors.accentMuted,
   },
   chips: {
     flexDirection: 'row',

@@ -187,18 +187,19 @@
     },
     "theme": {
       "label": "App colors",
-      "hint": "Match the board picks the colors made for each board. Pick one to keep it with any board.",
+      "hint": "By default the app colors match the board, so a new board changes the whole app. Pick a theme to keep its colors with any board.",
       "matchBoard": "Match the board",
       "matchBoardHint": {
-        "dark": "{{theme}} colors, dark",
-        "light": "{{theme}} colors, light"
+        "dark": "Default. Now: {{theme}} colors, dark",
+        "light": "Default. Now: {{theme}} colors, light"
       },
       "dark": "Dark",
       "light": "Light"
     },
     "boardTheme": {
       "label": "Board",
-      "hint": "The game, the tutorial and the rules use this board."
+      "hint": "The game, the tutorial and the rules use this board.",
+      "hintMatched": "The game, the tutorial and the rules use this board. The app colors change with it (App colors, below)."
     },
     "boardLayout": {
       "label": "Board layout",
