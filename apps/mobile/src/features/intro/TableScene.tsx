@@ -142,6 +142,7 @@ export function TableScene({ width, play, delayMs = 0, testID }: TableSceneProps
             {SCENE_PATHS.theirChair.strokes.map((p) => stroke(p))}
           </Group>
           <Group transform={tableTransform} origin={TABLE_ORIGIN}>
+            {SCENE_PATHS.table.backLegs.map((p) => stroke(p))}
             {SCENE_PATHS.table.fills.map((p) => (
               <Path key={p} path={p} color={wood} />
             ))}
