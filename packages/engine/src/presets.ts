@@ -82,9 +82,11 @@ const PORTES = preset('portes', 2, { match: { rotation: ['portes'] } });
  * A Tavli match: the federation rotation Portes → Plakoto → Fevga
  * (`tavli-match.md`, "Match format"). A match preset: each game uses its
  * own default preset with these `match` flags (`gameRules` in `match.ts`).
- * Its other groups are the Portes values.
+ * Its other groups are the Portes values. Version 2 (#514): its Plakoto
+ * game plays the federation rules. Version 1 played the old `plakoto`
+ * preset, and `gameRules` keeps that for matches made before #514.
  */
-const TAVLI = preset('tavli', 1, {});
+const TAVLI = preset('tavli', 2, {});
 
 const PLAKOTO = preset('plakoto', 1, {
   board: { startPosition: 'allOnOwn24' },

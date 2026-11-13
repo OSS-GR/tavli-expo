@@ -503,6 +503,20 @@ describe('rotation and missing variants', () => {
     expect(gameRules(federation, 'portes').presetId).toBe('portes');
     expect(gameRules(federation, 'fevga').presetId).toBe('fevga');
   });
+
+  it('gameRules: a version 1 tavli match keeps the old Plakoto rules (#514)', () => {
+    const old = createMatch({ rules: { ...TAVLI, version: 1 }, targetPoints: 5 });
+    const plakoto = gameRules(old, 'plakoto');
+    expect(plakoto.presetId).toBe('plakoto');
+    expect(plakoto.mother.motherRule).toBe('offerConcede');
+    expect(plakoto.match).toEqual(old.rules.match);
+    // The other games are the same in both versions.
+    expect(gameRules(old, 'portes').presetId).toBe('portes');
+    expect(gameRules(old, 'fevga').presetId).toBe('fevga');
+    // A match read back from storage keeps its version.
+    const read = parseMatch(serializeMatch(old));
+    expect(gameRules(read, 'plakoto').mother.motherRule).toBe('offerConcede');
+  });
 });
 
 describe('validateMatch', () => {
