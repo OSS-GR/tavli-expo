@@ -68,6 +68,8 @@ import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { settingsStore } from '@/features/settings/store';
 import { TutorialScreen } from '@/features/tutorial/TutorialScreen';
 import { WelcomeBoardScreen } from '@/features/welcome/WelcomeBoardScreen';
+import { WelcomeConsentScreen } from '@/features/welcome/WelcomeConsentScreen';
+import { WelcomeLanguageScreen } from '@/features/welcome/WelcomeLanguageScreen';
 import i18n from '@/i18n';
 import { botRunner } from '@/services';
 
@@ -129,6 +131,18 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
   }
 
   it('Tutorial: the Plakoto mother card (#149)', tutorialMotherCard);
+
+  it('First launch: the language step (Figma frame 12)', async () => {
+    await renderWithRoot(<WelcomeLanguageScreen onContinue={jest.fn()} />);
+    expect(screen.getByTestId('welcome-language')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
+
+  it('First launch: the consent step (Figma frame 12)', async () => {
+    await renderWithRoot(<WelcomeConsentScreen onBack={jest.fn()} />);
+    expect(screen.getByTestId('welcome-consent')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
 
   it('First launch: the board step (#350)', async () => {
     await renderWithRoot(<WelcomeBoardScreen onBack={jest.fn()} onContinue={jest.fn()} />);

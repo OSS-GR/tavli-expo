@@ -69,7 +69,7 @@ describe('WelcomeBoardScreen', () => {
     await renderScreen();
 
     expect(screen.getByRole('header', { name: 'Set up your board' })).toBeOnTheScreen();
-    expect(screen.getByText('Step 3 of 3')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 3 of 3')).toBeOnTheScreen();
     expect(screen.getByText(/You can change it later in Settings/)).toBeOnTheScreen();
 
     const themes = within(screen.getByTestId('welcome-board-theme')).getAllByRole('radio');
@@ -147,7 +147,7 @@ describe('WelcomeBoardScreen', () => {
     });
     await renderScreen();
     expect(screen.getByRole('header', { name: 'Στήστε το ταμπλό σας' })).toBeOnTheScreen();
-    expect(screen.getByText('Βήμα 3 από 3')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Βήμα 3 από 3')).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: getTheme('walnut-kafeneio').name.el })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Κάτω δεξιά' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Ψηλό' })).toBeChecked();

@@ -54,11 +54,7 @@ export function WelcomeBoardScreen({ onBack, onContinue }: WelcomeBoardScreenPro
 
   return (
     <Screen testID="welcome-board">
-      <WelcomeTop
-        onBack={onBack}
-        backTestID="welcome-board-back"
-        step={t('welcome.privacy.step', { step: 3, total: 3 })}
-      />
+      <WelcomeTop step={3} total={3} onBack={onBack} backTestID="welcome-board-back" />
 
       {/* The live preview stays in view while the list scrolls. It only
           repeats the picks for the eye, so screen readers skip it. */}

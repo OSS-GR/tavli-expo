@@ -1308,24 +1308,30 @@
   "welcome": {
     "language": {
       "title": "Choose your language",
-      "phoneLanguage": "Phone language",
-      "note": "You can change this later in Settings.",
+      "phoneLanguage": "Your phone's language",
+      "names": {
+        "el": "Greek",
+        "en": "English"
+      },
+      "note": "You can change it later in Settings.",
       "continue": "Continue"
     },
     "privacy": {
       "step": "Step {{step}} of {{total}}",
-      "title": "Help us make Tavlaki better",
-      "intro": "We would like to collect anonymous usage data, for example:",
+      "title": "Help make Tavlaki better",
+      "intro": "Share anonymous usage data. You can change it any time in Settings.",
       "collect": {
-        "modes": "which modes and games you play",
-        "games": "when a game starts and ends",
-        "settings": "which settings you change",
-        "crashes": "crash reports, so we can fix bugs"
+        "title": "What we collect",
+        "body": "For example: which games and modes you play, when a game starts and ends, which settings you change, and crash reports, so we can fix bugs."
       },
-      "never": "We never collect your name, email or contacts. Until you choose, we only send anonymous crash reports. \"Don't allow\" turns off usage data and crash reports. Change it any time in Settings.",
+      "never": {
+        "title": "What we never collect",
+        "body": "Your name, your email or your contacts."
+      },
       "policy": "Read the privacy policy",
       "allow": "Allow usage data",
-      "deny": "Don't allow"
+      "deny": "Don't allow",
+      "denyNote": "Until you choose, we only send anonymous crash reports. \"Don't allow\" turns them off too."
     },
     "board": {
       "title": "Set up your board",
