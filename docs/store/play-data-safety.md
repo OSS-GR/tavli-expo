@@ -1,6 +1,6 @@
 # Google Play data safety form
 
-> The answers for Play Console → App content → Data safety. Issue #137. Apple: [app-privacy.md](app-privacy.md). Last review: 2026-11-09 (#401, the sign-in choices; Sign in with Apple is iPhone only; #406, friends; #407, ratings).
+> The answers for Play Console → App content → Data safety. Issue #137. Apple: [app-privacy.md](app-privacy.md). Last review: 2026-11-13 (#401, the sign-in choices; Sign in with Apple is iPhone only; #406, friends; #407, ratings; #531, Play ranked).
 
 **This is not legal advice.** The answers follow the code on `main` on 2026-10-28 and the Data safety categories as we know them. The owner gives the final answers in the Play Console.
 
@@ -31,7 +31,7 @@ Tick these seven. Leave every other type empty.
 |----------|-----------|-----------------------|
 | Personal info | **User IDs** | The guest account's random user id on Convex (online play with a friend, #281), its guest name ("Guest" and 4 random digits, picked by the server, #400) and the username a saved account picks (#405; Google's User IDs cover a screen name) |
 | Contacts | **Contacts** | The friends list on Convex (#406, saved accounts only): Google's "Contacts" includes social graph information. The app never reads the phone's contacts and asks for no contacts permission. |
-| App activity | **Other actions** | The online games on Convex: the moves, rolls and score of a game with a friend (Google's "Other actions" names gameplay), and a saved account's rating from them (#407) |
+| App activity | **Other actions** | The online games on Convex: the moves, rolls and score of a game with a friend (Google's "Other actions" names gameplay), and a saved account's rating from them (#407), and a Play ranked seek (#531: the game, the rating and the time, until matched or 5 minutes) |
 | App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, hint shown, review opened, invite created, push permission answered, online sign-in (`apple` or `guest` only) |
 | App info and performance | **Crash logs** | Sentry crash and error reports |
 | App info and performance | **Diagnostics** | Device facts and breadcrumbs in crash reports; after Allow also app hangs / ANRs and Sentry sessions; device facts on PostHog events |
@@ -82,4 +82,4 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 - [ ] The answers here and in [app-privacy.md](app-privacy.md) say the same thing.
 - [ ] Convex: both deployments in the EU (`eu-west-1`), Convex's DPA accepted, `BETTER_AUTH_SECRET` set on both.
 - [ ] Answer the account creation and account deletion questions (Section 1) after you check Google's current rules for guest accounts.
-- [ ] Usernames (#405) are in User IDs. Blocks and reports (#320) keep only user ids, a reason from a fixed list and the reported username: no new data type. Friends (#406) are under Contacts. Redo this form when Apple on Android, Google, the email code screen (#433; the server part is #399) or EAS Update ship. With the email code, Personal info → **Email address** is collected (account management, optional, linked, not shared: AhaSend is a processor), and account creation adds "email address with a one-time code".
+- [ ] Usernames (#405) are in User IDs. Blocks and reports (#320) keep only user ids, a reason from a fixed list and the reported username: no new data type. Friends (#406) are under Contacts. A Play ranked seek (#531: user id, game, rating, time, kept at most 5 minutes unmatched) is covered by User IDs and Other actions: no new data type. Redo this form when Apple on Android, Google, the email code screen (#433; the server part is #399) or EAS Update ship. With the email code, Personal info → **Email address** is collected (account management, optional, linked, not shared: AhaSend is a processor), and account creation adds "email address with a one-time code".

@@ -262,3 +262,27 @@ export {
   withRanks,
 } from './ratings';
 export type { BoardRow, MyRating, Ratings, RatingsErrorCode, RatingsErrorData } from './ratings';
+export {
+  MATCHED_SEEK_KEEP_MS,
+  MATCHMAKING_ERROR_CODES,
+  NOBODY_YET_MS,
+  RANKED_GAMES,
+  RANKED_TARGET_POINTS,
+  SEEK_RANGE_GROW_MS,
+  SEEK_RANGE_MAX,
+  SEEK_RANGE_START,
+  SEEK_TTL_MS,
+  isMatchmakingErrorData,
+  isRankedGame,
+  seekRange,
+} from './matchmaking';
+export type {
+  LookingCounts,
+  Matchmaking,
+  MatchmakingErrorCode,
+  MatchmakingErrorData,
+  MySeek,
+  RankedGame,
+  SeekPlayer,
+  SeekRequest,
+} from './matchmaking';

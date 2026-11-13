@@ -49,6 +49,11 @@
  *   (only they may have friends). A friend invite is an invite with `to`:
  *   only that friend reads and answers it. A block ends the friendship.
  *   The tokens come from their own RNG (`tokenRng`).
+ * - Play ranked (#531): `matchmakingFor(playerId)` runs the same rules as
+ *   the Convex `matchmaking.ts` (`@tavli/online` `matchmaking.ts`). A
+ *   seek matches at once when it can; `runMatching()` is the scheduled
+ *   matching job (the ranges grow with `now`) and ends old seeks. A match
+ *   starts a ranked game through `createGame`, like `insertGame`.
  *
  * Time comes from the `now` option. Nothing runs on a timer: call
  * `runDueTimeouts()` to apply the time outs whose deadline has passed (the
@@ -61,6 +66,9 @@
 import {
   MAX_BLOCKS,
   MAX_RECENT_PLAYERS,
+  RANKED_GAMES,
+  RANKED_TARGET_POINTS,
+  RANKED_TURN_TIME_MINUTES,
   normalizeFriendToken,
   normalizeInviteCode,
 } from '@tavli/contracts';
@@ -76,6 +84,9 @@ import type {
   InviteErrorData,
   InviteView,
   Invites,
+  Matchmaking,
+  MatchmakingErrorData,
+  MySeek,
   OnlineData,
   OnlineGameChoice,
   OnlineGameStatus,
@@ -84,6 +95,7 @@ import type {
   PlayerName,
   Ratings,
   RatingsErrorData,
+  RankedGame,
   ReportReason,
   Safety,
   SafetyErrorData,
@@ -140,6 +152,21 @@ import {
   shownRating,
 } from './ratings';
 import type { BoardPlayer, PairCount, RatingRecord } from './ratings';
+import {
+  MatchmakingError,
+  checkRankedChoice,
+  checkSeekSaved,
+  countLooking,
+  isMatchedSeekDone,
+  isSeekExpired,
+  matchedPlayers,
+  matchedSeek,
+  mayPair,
+  pickPairs,
+  planSeek,
+  waitingSeek,
+} from './matchmaking';
+import type { SeekRecord } from './matchmaking';
 import {
   InviteError,
   checkAddressee,
@@ -310,6 +337,21 @@ export interface MemoryGameServer {
    */
   ratingsFor(playerId: string | null): Ratings;
   /**
+   * Play ranked matching (#531) as `playerId` (`null`: nobody signed in),
+   * as if they were signed in. Only players marked with `markSaved` may
+   * seek.
+   */
+  matchmakingFor(playerId: string | null): Matchmaking;
+  /**
+   * The matching job at `now()`, like the scheduled Convex `matchTick`:
+   * ends the seeks whose time is up, forgets matched seeks after
+   * `MATCHED_SEEK_KEEP_MS`, and matches every ranked game with the
+   * ranges of `now()`. Nothing runs on a timer: move `now` and call it.
+   */
+  runMatching(): Promise<void>;
+  /** Tests only: sets the rating of `playerId`, like a Convex test that writes a `ratings` row. */
+  setRatingForTest(playerId: string, rating: number): void;
+  /**
    * `playerId` has a saved account (a sign-in key). The in-memory server
    * keeps no accounts, so the caller says. A player stays saved.
    */
@@ -403,6 +445,24 @@ interface InviteListListener {
   active: boolean;
 }
 
+/** A seek (#531), like a row of the Convex `seeks` table. */
+interface MemorySeek extends SeekRecord {
+  readonly status: 'waiting' | 'matched';
+  /** The game of a matched seek. */
+  readonly gameId: string | null;
+  /** When it matched, epoch ms. */
+  readonly matchedAt: number | null;
+}
+
+/** A watch of a player's seek (#531). */
+interface SeekListener {
+  readonly playerId: string;
+  readonly onUpdate: (seek: MySeek) => void;
+  /** The JSON of the last seek sent, so an unchanged one is not sent again. */
+  last: string | null;
+  active: boolean;
+}
+
 function copy<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -453,6 +513,10 @@ function toErrorData(error: unknown): unknown {
     const data: RatingsErrorData = { code: error.code, message: error.message };
     return data;
   }
+  if (error instanceof MatchmakingError) {
+    const data: MatchmakingErrorData = { code: error.code, message: error.message };
+    return data;
+  }
   return error;
 }
 
@@ -494,6 +558,9 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const ratings = new Map<string, RatingRecord & { readonly shown: boolean }>();
   /** Rated matches per pair and UTC day (#407), by `pairOf` joined with a newline, like `ratedPairs`. */
   const ratedPairs = new Map<string, PairCount>();
+  /** Seeks (#531), one per player, like the Convex `seeks` table. */
+  const seeks = new Map<string, MemorySeek>();
+  const seekListeners = new Set<SeekListener>();
   let nextId = 1;
 
   function ratingOf(playerId: string): RatingRecord & { readonly shown: boolean } {
@@ -1152,6 +1219,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     for (const key of [...ratedPairs.keys()]) {
       if (key.split('\n').includes(playerId)) ratedPairs.delete(key);
     }
+    // The seek (#531), so no match can start with the player.
+    if (seeks.delete(playerId)) notifySeeks();
   }
 
   /** The two players met (#320, `checkMet`): a game, or an invite one answered from the other. */
@@ -1514,6 +1583,163 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     };
   }
 
+  /** The caller's seek as `mySeek` gives it (#531), like the Convex `mySeek`. */
+  function seekViewOf(playerId: string): MySeek {
+    const seek = seeks.get(playerId);
+    const at = now();
+    if (seek === undefined) return { kind: 'none' };
+    if (seek.status === 'waiting') {
+      return isSeekExpired(seek, at) ? { kind: 'none' } : waitingSeek(seek, shownRating);
+    }
+    const game = seek.gameId === null ? undefined : games.get(seek.gameId);
+    if (game === undefined) return { kind: 'none' };
+    const opponentId = game.players.white === playerId ? game.players.black : game.players.white;
+    const player = (id: string) => ({ name: nameOf(id), rating: shownRating(ratingOf(id).rating) });
+    return matchedSeek(seek.game, game.gameId, player(playerId), player(opponentId));
+  }
+
+  /** Sends the seek of `listener` as it is now on a later microtask, when it changed. */
+  function sendSeek(listener: SeekListener): void {
+    const text = JSON.stringify(seekViewOf(listener.playerId));
+    later(() => {
+      if (!listener.active || text === listener.last) return;
+      listener.last = text;
+      listener.onUpdate(JSON.parse(text) as MySeek);
+    });
+  }
+
+  function notifySeeks(): void {
+    for (const listener of seekListeners) sendSeek(listener);
+  }
+
+  /** Ends old seeks at `now()`: waiting ones past `SEEK_TTL_MS`, matched ones past their keep time. */
+  function endOldSeeks(): void {
+    const at = now();
+    for (const [playerId, seek] of [...seeks]) {
+      const done =
+        seek.status === 'waiting'
+          ? isSeekExpired(seek, at)
+          : seek.matchedAt !== null && isMatchedSeekDone(seek.matchedAt, at);
+      if (done) seeks.delete(playerId);
+    }
+  }
+
+  /**
+   * Matches the waiting seeks of `game` at `now()`, like the Convex
+   * `matchGame`: `pickPairs` with `mayPair` on the blocks and the pair
+   * counts. Each pair starts a ranked game.
+   */
+  async function matchGame(game: RankedGame): Promise<void> {
+    const at = now();
+    const waiting = [...seeks.values()].filter(
+      (seek) => seek.status === 'waiting' && seek.game === game && !isSeekExpired(seek, at),
+    );
+    const pairs = await pickPairs(waiting, at, (a, b) =>
+      mayPair({
+        blocked: blockedEither(a.playerId, b.playerId),
+        pair: ratedPairs.get(pairOf(a.playerId, b.playerId).join('\n')) ?? null,
+        now: at,
+      }),
+    );
+    for (const [older, newer] of pairs) {
+      // Another run may have taken one of them since the read.
+      if (seeks.get(older.playerId) !== older || seeks.get(newer.playerId) !== newer) continue;
+      const players = matchedPlayers(older, newer);
+      const gameId = createGame(
+        players.white,
+        players,
+        game,
+        RANKED_TARGET_POINTS,
+        RANKED_TURN_TIME_MINUTES,
+        { ranked: true },
+      );
+      for (const seek of [older, newer]) {
+        seeks.set(seek.playerId, { ...seek, status: 'matched', gameId, matchedAt: at });
+      }
+    }
+  }
+
+  /** Play ranked matching (#531), like the Convex `matchmaking.ts`. */
+  function matchmakingFor(playerId: string | null): Matchmaking {
+    const saved = (): string => {
+      if (playerId === null || deletedPlayers.has(playerId)) {
+        throw new MatchmakingError('NOT_SIGNED_IN', 'sign in first');
+      }
+      checkSeekSaved(savedPlayers.has(playerId));
+      return playerId;
+    };
+    const call = async <T>(step: () => T | Promise<T>): Promise<T> => {
+      await nextTick();
+      try {
+        const result = await step();
+        return result === undefined ? result : copy(result);
+      } catch (error) {
+        throw toErrorData(error);
+      }
+    };
+    return {
+      seek: (request) =>
+        call(async () => {
+          const id = saved();
+          const game = checkRankedChoice((request as { game?: unknown } | null)?.game);
+          const at = now();
+          const existing = seeks.get(id) ?? null;
+          if (planSeek(existing, game, at) !== 'keep') {
+            seeks.set(id, {
+              playerId: id,
+              game,
+              rating: ratingOf(id).rating,
+              createdAt: at,
+              status: 'waiting',
+              gameId: null,
+              matchedAt: null,
+            });
+            await matchGame(game);
+          }
+          notifySeeks();
+        }),
+      cancel: () =>
+        call(() => {
+          const id = saved();
+          if (seeks.delete(id)) notifySeeks();
+        }),
+      mySeek: () => call(() => seekViewOf(saved())),
+      watchMySeek(onUpdate, onError) {
+        let id: string;
+        try {
+          id = saved();
+        } catch (error) {
+          let active = true;
+          later(() => {
+            if (active) onError?.(toErrorData(error));
+          });
+          return () => {
+            active = false;
+          };
+        }
+        const listener: SeekListener = { playerId: id, onUpdate, last: null, active: true };
+        seekListeners.add(listener);
+        sendSeek(listener);
+        return () => {
+          listener.active = false;
+          seekListeners.delete(listener);
+        };
+      },
+      lookingCounts: () =>
+        call(() => {
+          const id = saved();
+          const waiting = [...seeks.values()].filter((seek) => seek.status === 'waiting');
+          return countLooking(waiting, id, now());
+        }),
+    };
+  }
+
+  async function runMatching(): Promise<void> {
+    endOldSeeks();
+    for (const game of RANKED_GAMES) await matchGame(game);
+    notifySeeks();
+  }
+
   /** Friends (#406), like the Convex `friends.ts`. */
   function friendsFor(playerId: string | null): Friends {
     const caller = (): string => {
@@ -1790,6 +2016,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       kept.push(moved);
     }
     reports = kept;
+    // A guest cannot seek (#531): nothing to move. Drop a seek, if any.
+    seeks.delete(source);
     deletedPlayers.add(source);
     nameRecords.delete(source);
     notifyViewer(target);
@@ -1821,6 +2049,14 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     friendsFor,
 
     ratingsFor,
+
+    matchmakingFor,
+
+    runMatching,
+
+    setRatingForTest(playerId, rating) {
+      ratings.set(playerId, { ...ratingOf(playerId), rating });
+    },
 
     markSaved(playerId) {
       savedPlayers.add(playerId);
