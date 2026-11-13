@@ -173,19 +173,16 @@ const styles = StyleSheet.create((theme, rt) => ({
   scroll: {
     flexGrow: 0,
   },
-  content: (look: SheetLook) =>
-    look === 'bare'
-      ? {}
-      : look === 'raised'
-        ? {
-            gap: theme.space.sm,
-            paddingHorizontal: theme.space.lg,
-            paddingTop: theme.space.lg,
-            paddingBottom: rt.insets.bottom + theme.space.lg,
-          }
-        : {
-            gap: theme.space.sm,
-            padding: theme.space.xl,
-            paddingBottom: look === 'sheet' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
-          },
+  // One object for every look, so a theme change repaints it (#539).
+  content: (look: SheetLook) => ({
+    gap: look === 'bare' ? 0 : theme.space.sm,
+    paddingHorizontal: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,
+    paddingTop: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,
+    paddingBottom:
+      look === 'bare'
+        ? 0
+        : look === 'sheet' || look === 'raised'
+          ? rt.insets.bottom + theme.space.lg
+          : theme.space.xl,
+  }),
 }));

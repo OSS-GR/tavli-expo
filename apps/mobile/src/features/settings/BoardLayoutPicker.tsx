@@ -98,5 +98,8 @@ const styles = StyleSheet.create((theme) => ({
     gap: 2,
     justifyContent: classic ? 'center' : 'flex-start',
   }),
-  board: (classic: boolean) => (classic ? { height: 26 } : { flex: 1 }),
+  board: (classic: boolean) => ({
+    height: classic ? 26 : undefined,
+    flex: classic ? undefined : 1,
+  }),
 }));
