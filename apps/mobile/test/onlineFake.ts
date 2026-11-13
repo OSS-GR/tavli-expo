@@ -35,6 +35,9 @@
  * - `safety` is block and report (#435) on the server, as the user signed
  *   in to `auth`. With nobody signed in it fails `NOT_SIGNED_IN`.
  * - `ratings` is the `Ratings` port (#407), like `friends`.
+ * - `matchmaking` is the `Matchmaking` port (#531, Play ranked), like
+ *   `friends`. The server matches on each seek; after a test moves the
+ *   clock, `onlineFake.server().runMatching()` runs the job again.
  * - `friends` is the `Friends` port (#406) on the server, as the user
  *   signed in to `auth`: a user who is not a guest is a saved account
  *   (`markSaved`), so a guest gets `NOT_SAVED`.
@@ -62,6 +65,7 @@ import {
   type GameTransport,
   type GameTransportErrorData,
   type Invites,
+  type Matchmaking,
   type OnlineData,
   type Safety,
   type Usernames,
@@ -281,6 +285,27 @@ const ratings: Ratings = {
   setShown: (shown) => ratingsCaller().setShown(shown),
 };
 
+/**
+ * Play ranked matching on the server (#531), as the user signed in to
+ * `auth` at that moment (for `watchMySeek`: when the watch starts). A
+ * user who is not a guest counts as a saved account. The in-memory
+ * server runs the matching on each seek; `server().runMatching()` runs it
+ * again after a test moves the clock.
+ */
+function matchmakingCaller(): Matchmaking {
+  const user = auth.currentUser();
+  if (user !== null && !user.isGuest) server.markSaved(user.id);
+  return server.matchmakingFor(user?.id ?? null);
+}
+
+const matchmaking: Matchmaking = {
+  seek: (request) => matchmakingCaller().seek(request),
+  cancel: () => matchmakingCaller().cancel(),
+  mySeek: () => matchmakingCaller().mySeek(),
+  watchMySeek: (onUpdate, onError) => matchmakingCaller().watchMySeek(onUpdate, onError),
+  lookingCounts: () => matchmakingCaller().lookingCounts(),
+};
+
 export const onlineFake = {
   auth,
   /** Apple's sheet on the phone: set `next`, `sub` or `available` to act it out. */
@@ -295,6 +320,7 @@ export const onlineFake = {
   safety,
   friends,
   ratings,
+  matchmaking,
   /** This build, like `appBuild()` of `@/services`. */
   appBuild: (): AppBuild | null => build,
   /** Sets this build for the rest of the test (`null`: no store build). */

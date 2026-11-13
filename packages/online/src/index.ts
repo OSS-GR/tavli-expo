@@ -2,7 +2,8 @@
  * Online games, in pure TypeScript (#251): the game model the server runs
  * (`online-game.ts`), the checks around each call (`calls.ts`), the invite
  * checks and codes (`invites.ts`), the block and report checks
- * (`safety.ts`), the friends checks (`friends.ts`), the rating math (`ratings.ts`), the "my games" summaries
+ * (`safety.ts`), the friends checks (`friends.ts`), the rating math (`ratings.ts`), Play ranked
+ * matching (`matchmaking.ts`), the "my games" summaries
  * (`summaries.ts`), moving a guest into an account (`guest-move.ts`),
  * and an in-memory server that gives a
  * `GameTransport` and an `Invites` per player (`memory-server.ts`).
@@ -30,6 +31,26 @@ export {
   type PairCount,
   type RatingRecord,
 } from './ratings';
+export {
+  MatchmakingError,
+  candidatePairs,
+  checkRankedChoice,
+  checkSeekSaved,
+  countLooking,
+  inRange,
+  isMatchedSeekDone,
+  isSeekExpired,
+  liveSince,
+  matchedPlayers,
+  matchedSeek,
+  mayPair,
+  PAIR_CHECKS_PER_RUN,
+  pickPairs,
+  planSeek,
+  waitingSeek,
+  type SeekRecord,
+  type SeekState,
+} from './matchmaking';
 export { NO_NAMES, nameFrom, namesOf, pickGuestNumber, type NameRecord } from './names';
 export {
   checkUsername,
