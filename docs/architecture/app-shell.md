@@ -52,7 +52,7 @@ The Settings look (#360, #501) uses the [shared screen parts](#shared-screen-par
 ## Rules pages (#112, #124)
 
 - `/rules/portes`, `/rules/plakoto`, `/rules/fevga` and `/rules/asodio` each show a full page. `/rules/tavli` explains the match rotation and links to its three games (`TAVLI_GAMES`; Asodio is not in the rotation). Any other id says there are no rules.
-- Opened from Home (**How to play**), the in-game menu (**How to play Plakoto**: the game on the board, in Tavli the game of the rotation) and New game (the rules button on each game card: an info mark and a book in a framed pill, so it reads as a button). Only the route files call `router`.
+- Opened from Home (**How to play**), the in-game menu (**How to play Plakoto**: the game on the board, in Tavli the game of the rotation) and New game (the **Rules** button under each game card's description: a book and the word in a framed pill, so it reads as a button). Only the route files call `router`.
 - `features/rules/content.ts` lists each page's sections in reading order: goal, start position, dice and turns, how checkers move, hitting / pinning / no hitting, the special rules (Plakoto mother, Fevga first checker and six-in-a-row bans, Asodio entering and the loading lock, quarter by quarter, the draw), bearing off and points. Shared sections (`rules.common.*`) appear on every page; a game can add its own line to a shared section (for example Plakoto: no bearing off while pinned).
 - The texts live in one i18n group, `rules.*`. Each body is a few short lines split by `\n`; each line shows as one bullet paragraph. Greek uses tavli words: πόρτα, πλάκωμα, μάνα, εξάπορτο, μάζεμα, μονό / διπλό, βαθμοί.
 - The texts describe the **default presets** only (`DEFAULT_PRESET_BY_GAME`): Plakoto `motherRule: "federation"` (#514: a pinned mother wins 2 once the pinner's point 24 is empty; both mothers pinned is a draw), Fevga runner rule to pass the opponent's mother and the prime bans P1, P2 (points 6–11) and P3, Asodio `asodio.kafeneio` (A1–A6: a 1-2 or a double opens the board, a double enters four, entered checkers wait until all 15 are in, the quarter lock, pins, no bearing off while pinned, a deadlock is a draw). When a default flag changes, update the page.
@@ -552,7 +552,7 @@ Each board theme brings app colors made from its own wood (Figma "13 Matching co
 - The "Play vs bot" subtitle lists the bot levels: "Easy, Medium or Hard" (Greek: "Εύκολο, Μέτριο ή Δύσκολο"). `levelList` in `HomeScreen.tsx` builds it from the levels the bot plays in at least one game (`anyGameLevels` in `features/bot/levels.ts`), so it changes when the bot gets a level (#182).
 - A broken save on the board route shows the "could not be opened" card (not a dialog), with a Home button.
 - The game also saves mid-turn when the app goes to the background or the user exits (the wireframe accepts losing those moves; we keep them).
-- New game has a small rules button (info mark and book) on each game card that opens its rules page without choosing the game. The restyle mockup has one "How to play" link under the cards for the chosen game; we keep a button per card, so the rules of any game are one tap away.
+- New game has a small **Rules** button (a book and the word) on each game card that opens its rules page without choosing the game. The restyle mockup has one "How to play" link under the cards for the chosen game; we keep a button per card, so the rules of any game are one tap away.
 
 ## Tests
 

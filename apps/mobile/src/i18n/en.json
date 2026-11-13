@@ -1536,6 +1536,7 @@
     }
   },
   "newGame": {
+    "rulesButton": "Rules",
     "titleBot": "Play vs bot",
     "titleLocal": "Pass-and-play",
     "game": "Game",

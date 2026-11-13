@@ -1536,6 +1536,7 @@
     }
   },
   "newGame": {
+    "rulesButton": "Κανόνες",
     "titleBot": "Με τον υπολογιστή",
     "titleLocal": "Δύο παίκτες",
     "game": "Παιχνίδι",
