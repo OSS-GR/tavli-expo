@@ -34,6 +34,12 @@ export interface SheetProps {
   /** Read by screen readers on the dimmed part, for example "Resume". */
   closeLabel: string;
   /**
+   * The content has its own close button with the same job (the sign-in
+   * sheet): the dimmed part still closes on a tap, but screen readers
+   * skip it, so they do not hear two buttons with one label.
+   */
+  ownCloseButton?: boolean;
+  /**
    * `dialog`: a card with side margins (13). `sheet`: full width (7).
    * `bare`: placed like `dialog`, with no box of its own: the content
    * brings its own (the problem popup, #480). It adds no padding or gap
@@ -51,6 +57,7 @@ export function Sheet({
   visible,
   onClose,
   closeLabel,
+  ownCloseButton = false,
   look = 'sheet',
   turns = false,
   children,
@@ -75,8 +82,11 @@ export function Sheet({
         <Pressable
           style={styles.scrim}
           onPress={onClose}
+          accessible={!ownCloseButton}
           accessibilityRole="button"
           accessibilityLabel={closeLabel}
+          accessibilityElementsHidden={ownCloseButton}
+          importantForAccessibility={ownCloseButton ? 'no-hide-descendants' : 'auto'}
         />
         <View testID={testID} style={styles.sheet(shown)} accessibilityViewIsModal>
           <ScrollView

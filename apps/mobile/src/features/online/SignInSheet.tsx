@@ -48,7 +48,12 @@ export function SignInSheet({
     reminders.sheetShown();
   }, []);
   return (
-    <Sheet visible onClose={onClose} closeLabel={t('signIn.notNow')} testID="sign-in-sheet">
+    <Sheet
+      visible
+      onClose={onClose}
+      closeLabel={t('signIn.notNow')}
+      ownCloseButton
+      testID="sign-in-sheet">
       <View style={styles.content}>
         <SignInHeader
           title={t('signIn.title')}
