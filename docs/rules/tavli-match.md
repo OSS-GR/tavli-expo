@@ -215,6 +215,37 @@ scores. These are the app rules (owner, #63, #181 and 2026-11-09).
     show the real score and say who resigned the match ("You resigned the
     match").
 
+## Play ranked: time outs in a row (app rule)
+
+Online games have a turn clock (ADR-0007). A turn that runs out of time
+loses the game for 1 point, and the next game starts at once. Play ranked
+games add one rule (owner, 2026-11-13, ADR-0009, #529):
+
+- **Two time outs in a row by the same player lose the match.** The other
+  player wins the match, and it is rated like any finished match (a full
+  loss).
+- "In a row" means the player's turns, across games. The count of each
+  player starts at 0. Each time out of that player adds 1, and each turn
+  they play sets it back to 0. The other player's turns do not change it.
+- A **played turn** is a confirmed turn, a pass (a roll with no legal
+  move), an answer that ends the turn, or rolling your own opening die. A
+  roll that the player can still move is not yet a played turn: if the
+  clock runs out after it, the turn timed out.
+- The **opening roll** counts as a turn. When one player rolled their die
+  and the other did not, the other player times out. When neither rolled,
+  the server rolls both dice, and nobody timed out.
+- A time out always ends the game. So the second time out always falls in
+  a later game, often on the first turn of the next game.
+- The match ends through the engine's Resign match, played after the time
+  out. The game is already over then, so the resign adds no points: the
+  score keeps the lost games only. The match counts as resigned by the
+  late player, and the server tells the app why it ended
+  (`matchEndReason: 'timeouts-in-a-row'`).
+- If the second time out already gives the other player the target, the
+  match ends on points, as in any game.
+- Friend games are not ranked. A time out there only loses the game, also
+  when many come in a row.
+
 ## Fast forward a race (app rule)
 
 A game is a **race** when no checker can ever hit, pin or block an
@@ -305,6 +336,28 @@ The engine check is `isRace` (`packages/engine/src/race.ts`).
     checker off → diplo, 0–4: the opponent wins the match, and it still counts
     as resigned by that player (unlike edge case 22, where only the game was
     resigned).
+32. Play ranked: a player times out → they lose that game for 1 point, and
+    the next game starts; the match goes on. Two time outs never fall in
+    one game. Their next time out, in a later game, ends the match.
+33. Play ranked, match to 5, 0–0: Black times out (0–1 for White), then
+    times out on their first turn of the next game → White wins the match,
+    2–0. The match counts as resigned by Black, with the reason
+    `timeouts-in-a-row`.
+34. Play ranked: a time out, then a played turn by the same player (a
+    confirmed turn or a pass), then a time out → no match loss. A roll the
+    player can still move is not a played turn: a time out after it is the
+    second in a row.
+35. Play ranked: Black rolls their opening die and White does not → White
+    times out, and it counts as White's turn. Rolling your own opening die
+    is a played turn. When neither player rolls, the server rolls both and
+    nobody timed out.
+36. Not ranked (a friend game): two or more time outs in a row only lose
+    their games; the match never ends because of them.
+37. Play ranked: White times out, then Black times out → each has one time
+    out in a row; the match goes on.
+38. Play ranked, match to 2: the second time out in a row gives the other
+    player the second point → the match ends on points, not as a resigned
+    match.
 
 ## House-rule variants (flags)
 

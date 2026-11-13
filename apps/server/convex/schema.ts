@@ -41,6 +41,13 @@ export default defineSchema({
      * (#183).
      */
     turnTimeMinutes: gameTurnTimeMinutes,
+    /**
+     * A Play ranked game (#529, ADR-0009): two time outs in a row by the
+     * same player lose the match. Optional only because games saved
+     * before #529 have none: read a missing value as `false` (a friend
+     * game).
+     */
+    ranked: v.optional(v.boolean()),
     /** Match length in points. */
     targetPoints: v.number(),
     /** The match `RuleSet`, JSON text (`serializeRules`). */
@@ -48,9 +55,10 @@ export default defineSchema({
     /** The variant of the current game. */
     variant: v.string(),
     /**
-     * The engine `MatchFlow` without its log, and the game before the
-     * current one as it ended (#299): `StoredFlow` of `@tavli/online`,
-     * JSON text. The log is in `moves`.
+     * The engine `MatchFlow` without its log, the game before the
+     * current one as it ended (#299), and each side's time outs in a row
+     * (#529): `StoredFlow` of `@tavli/online`, JSON text. The log is in
+     * `moves`.
      */
     flow: v.string(),
     status: gameStatus,

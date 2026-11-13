@@ -100,6 +100,7 @@ import {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkRankedGame,
   checkTurnTimeMinutes,
   checkViewer,
   eventActor,
@@ -232,7 +233,8 @@ export interface MemoryGameServer {
   /**
    * Creates a game between `players`, like the Convex `createGame`: it
    * waits for each player's opening die (#379), and the opening's clock
-   * runs.
+   * runs. `options.ranked` makes a Play ranked game (#529, default
+   * false); it needs `RANKED_TURN_TIME_MINUTES`.
    * Returns the game id. Throws an `OnlineGameError` (`BAD_REQUEST`,
    * `ILLEGAL_ACTION`) for bad arguments.
    */
@@ -242,6 +244,7 @@ export interface MemoryGameServer {
     choice: OnlineGameChoice,
     targetPoints: number,
     turnTimeMinutes: number | null,
+    options?: { readonly ranked?: boolean },
   ): string;
   /**
    * The transport of `playerId`: every call it makes comes from that
@@ -355,6 +358,8 @@ interface MemoryGame extends SavedGame {
   readonly gameId: string;
   readonly choice: OnlineGameChoice;
   readonly turnTimeMinutes: number | null;
+  /** A Play ranked game (#529). */
+  readonly ranked: boolean;
   readonly targetPoints: number;
   /** `storeFlow` text. */
   readonly flow: string;
@@ -592,17 +597,19 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       version: game.version,
       choice: game.choice,
       turnTimeMinutes: game.turnTimeMinutes,
+      ranked: game.ranked,
       turnDeadline: game.turnDeadline,
       players: game.players,
     };
   }
 
   function viewOf(game: MemoryGame, viewerId: string | null): OnlineGameView {
-    const { flow, previousGame } = loadStored(game.flow);
+    const { flow, previousGame, timeoutsInARow } = loadStored(game.flow);
     return toView({
       ...gameInput(game, viewerId),
       flow,
       previousGame,
+      timeoutsInARow,
       draft: draftOf(game.gameId),
     });
   }
@@ -711,10 +718,20 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     notify(saved);
   }
 
-  /** The player the server waits for loses the current game. */
+  /**
+   * The player the server waits for loses the current game. In a ranked
+   * game, their second time out in a row loses the match (#529).
+   */
   function applyTimeout(game: MemoryGame, at: number): void {
     const before = loadStored(game.flow);
-    save(game, SERVER_ACTOR, before, timeOut(before.flow, rng), at);
+    const { timeoutsInARow } = before;
+    save(
+      game,
+      SERVER_ACTOR,
+      before,
+      timeOut(before.flow, rng, { ranked: game.ranked, timeoutsInARow }),
+      at,
+    );
   }
 
   /**
@@ -852,9 +869,12 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     choice: OnlineGameChoice,
     targetPoints: number,
     turnTimeMinutes: number | null,
+    options: { readonly ranked?: boolean } = {},
   ): string {
+    const ranked = options.ranked === true;
     checkNewGame(callerId, players);
     checkTurnTimeMinutes(turnTimeMinutes);
+    checkRankedGame(ranked, turnTimeMinutes);
     const flow = createOnlineMatch({ choice, targetPoints, players: copy(players) }, rng);
     ensureGuestNumber(players.white);
     ensureGuestNumber(players.black);
@@ -867,6 +887,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       players: copy(players),
       choice,
       turnTimeMinutes,
+      ranked,
       targetPoints,
       flow: storeFlow(flow, null),
       status: matchStatus(flow),

@@ -46,6 +46,7 @@ export {
   type UsernameRecord,
 } from './usernames';
 export {
+  NO_TIMEOUTS,
   OnlineGameError,
   advance,
   answerPrompt,
@@ -55,6 +56,8 @@ export {
   isTimedOut,
   loadFlow,
   loadStored,
+  losesRankedMatch,
+  matchEndReason,
   mayRollOpening,
   onlineGameRules,
   playTurn,
@@ -64,6 +67,7 @@ export {
   storeFlow,
   storeStep,
   timeOut,
+  timeoutsAfter,
   toView,
   waitingFor,
 } from './online-game';
@@ -73,6 +77,7 @@ export type {
   SavedDraft,
   SteppedFlow,
   StoredFlow,
+  TimeOutOptions,
   ViewInput,
 } from './online-game';
 export {
@@ -81,6 +86,7 @@ export {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkRankedGame,
   checkTurnTimeMinutes,
   checkViewer,
   eventActor,
