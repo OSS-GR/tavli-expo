@@ -161,7 +161,7 @@ export function swingAt(t: number): number {
   'worklet';
   const flip = flipAt(t);
   const calm = 1 - Math.sin(Math.PI * Math.abs(flip));
-  return SWING * calm * Math.sin((2 * Math.PI * t) / SWING_MS) - 2 * Math.PI * flip;
+  return SWING * calm * Math.sin((2 * Math.PI * loopTime(t)) / SWING_MS) - 2 * Math.PI * flip;
 }
 
 /** How high the toe is off the floor, in grid units. */
@@ -242,8 +242,8 @@ export function figurePose(t: number): FigurePose {
   const flick = Math.sin(Math.PI * Math.abs(flipAt(t)));
   const beadHand = { x: BEAD_HAND.x - 1.2 * Math.sin(angle), y: BEAD_HAND.y - 3 * flick };
   const toe = toeLiftAt(t);
-  // The steam fades fast once the cup leaves the saucer.
-  const steamy = (1 - lift) * (1 - lift);
+  // The steam is gone by the time the cup is a quarter of the way up.
+  const steamy = (1 - Math.min(1, 4 * lift)) ** 2;
   const m = loopTime(t);
   const steam = STEAM_FEET.map((foot, i) => {
     const p = ((m + (i * STEAM_MS) / 2) % STEAM_MS) / STEAM_MS;

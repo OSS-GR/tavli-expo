@@ -59,20 +59,17 @@ const SHIFT_X = 15;
 const SHIFT_Y = -8;
 
 /**
- * A player at the table. `key` picks the wood of the other player's cap
- * (yours is brass). The drawing shows no name: the screen says it in text.
+ * The other player at the table. `key` picks the wood of their cap (yours
+ * is brass). The drawing shows no name: the screen says it in text.
  */
 export interface TablePlayer {
   readonly key: string;
-  readonly name: string | null;
 }
 
 export interface RankedTableProps {
   /** Width in points; the height follows. */
   width: number;
-  /** You, on the right chair. */
-  me: TablePlayer;
-  /** The other player, or `null` for the empty chair. */
+  /** The other player, or `null` for the empty chair. You sit on the right chair. */
   opponent: TablePlayer | null;
   testID?: string;
 }
@@ -115,7 +112,7 @@ const LAMP = {
 
 const LINE = 2.5;
 
-export function RankedTable({ width, me, opponent, testID }: RankedTableProps) {
+export function RankedTable({ width, opponent, testID }: RankedTableProps) {
   const { theme } = useUnistyles();
   const height = rankedTableHeight(width);
   const scale = width / GRID_WIDTH;
