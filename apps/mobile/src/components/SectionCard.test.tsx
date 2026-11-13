@@ -100,6 +100,32 @@ describe('<SectionRow />', () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
+  it('draws a danger row in the problem color, with no chevron (#519)', async () => {
+    const user = userEvent.setup();
+    const onPress = jest.fn();
+    await renderWithRoot(
+      <SectionCard>
+        <SectionRow
+          icon="trash"
+          tone="danger"
+          label="Delete my guest account"
+          hint="Ends your online games."
+          onPress={onPress}
+        />
+      </SectionCard>,
+    );
+    const row = screen.getByRole('button', { name: 'Delete my guest account' });
+    expect(screen.getByText('Delete my guest account')).toHaveStyle({ color: '#F2A48C' });
+    // The trash icon only: no chevron.
+    const icons = findAllNodes(
+      screen.toJSON() as JsonNode | JsonNode[] | null,
+      (node) => node.type === 'Canvas',
+    );
+    expect(icons).toHaveLength(1);
+    await user.press(row);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
   it('is not a button without onPress', async () => {
     await renderWithRoot(<SectionRow label="Version" value="1.0" />);
     expect(screen.queryByRole('button')).toBeNull();

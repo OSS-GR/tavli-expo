@@ -244,24 +244,50 @@ describe('<AccountScreen /> as a guest', () => {
   it('shows the guest name and what is kept where; no Sign out', async () => {
     const number = await guest();
     await open();
-    expect(await screen.findByText(`You play as Guest ${number}`)).toBeOnTheScreen();
-    expect(screen.getByText(/Kept on our server: your online games/)).toBeOnTheScreen();
-    expect(screen.getByText(/A guest account opens only on this phone/)).toBeOnTheScreen();
+    const hero = await screen.findByTestId('account-guest');
+    expect(hero).toHaveAccessibleName(`You play as Guest ${number} On this phone only.`);
+    expect(screen.getByTestId('account-name')).toHaveTextContent(`Guest ${number}`);
+    // The checker only decorates: screen readers skip it.
+    expect(screen.getByTestId('account-avatar', { includeHiddenElements: true })).toBeOnTheScreen();
+    const kept = within(screen.getByTestId('account-kept'));
+    expect(
+      kept.getByLabelText('On our server: Online games, invites and your guest name'),
+    ).toBeOnTheScreen();
+    expect(kept.getByLabelText('On this phone: Bot games, history and settings')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'What we keep' })).toBeOnTheScreen();
     expect(screen.queryByTestId('account-sign-out')).toBeNull();
   });
 
-  it('shows a guest what a saved account gives, with no sample (#463)', async () => {
+  it('shows the delete row alone, with what it does in one line (#519)', async () => {
     await guest();
     await open();
-    expect(await screen.findByTestId('account-benefits')).toBeOnTheScreen();
+    const row = await screen.findByTestId('account-delete');
+    expect(row).toHaveAccessibleName('Delete my guest account');
+    expect(
+      within(row).getByText('Ends your online games. This cannot be undone.'),
+    ).toBeOnTheScreen();
+  });
+
+  it('shows what a saved account gives behind a button (#463, #519)', async () => {
+    const user = setupUser();
+    await guest();
+    await open();
+    await screen.findByTestId('account-save');
+    expect(screen.queryByTestId('account-benefits')).toBeNull();
+    await user.press(screen.getByRole('button', { name: 'What a saved account gives' }));
+    expect(screen.getByTestId('account-benefits')).toBeOnTheScreen();
     expect(screen.getByLabelText(/^Your record with each friend\./)).toBeOnTheScreen();
-    expect(screen.queryByTestId('account-benefits-sample')).toBeNull();
+    await user.press(screen.getByRole('button', { name: 'What a saved account gives' }));
+    expect(screen.queryByTestId('account-benefits')).toBeNull();
   });
 
   it('a guest with no number yet plays as "a guest"', async () => {
     await signInForOnline(auth!);
     await open();
-    expect(await screen.findByText('You play as a guest.')).toBeOnTheScreen();
+    expect(await screen.findByTestId('account-guest')).toHaveAccessibleName(
+      'You play as a guest. On this phone only.',
+    );
+    expect(screen.getByTestId('account-name')).toHaveTextContent('Guest');
   });
 
   it('a server from before #402 sends no guest number: no "Guest " with nothing after it', async () => {
@@ -274,7 +300,9 @@ describe('<AccountScreen /> as a guest', () => {
       },
     };
     await open({ usernames: old });
-    expect(await screen.findByText('You play as a guest.')).toBeOnTheScreen();
+    expect(await screen.findByTestId('account-guest')).toHaveAccessibleName(
+      'You play as a guest. On this phone only.',
+    );
   });
 
   it('saves the account with Apple and keeps the same id', async () => {
@@ -816,7 +844,10 @@ describe('<AccountScreen /> loading', () => {
     expect(
       await screen.findByRole('button', { name: /Διαγραφή του λογαριασμού επισκέπτη μου/ }),
     ).toBeOnTheScreen();
-    expect(screen.getByText(/^Παίζεις ως Επισκέπτης \d{4}$/)).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(/^Παίζεις ως Επισκέπτης \d{4} Μόνο σε αυτό το κινητό\.$/),
+    ).toBeOnTheScreen();
+    expect(screen.getByText('Τι κρατάμε')).toBeOnTheScreen();
   });
 });
 

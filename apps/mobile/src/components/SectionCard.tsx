@@ -110,6 +110,11 @@ export interface SectionRowProps {
   accessibilityRole?: 'button' | 'link';
   /** A button row that cannot be pressed now: dim label, read as disabled. */
   disabled?: boolean;
+  /**
+   * `danger`: a risky action that sits alone (Delete my guest account,
+   * #519): the label and a bare icon in the problem color, no chevron.
+   */
+  tone?: 'normal' | 'danger';
   testID?: string;
 }
 
@@ -125,26 +130,36 @@ export function SectionRow({
   accessibilityHint,
   accessibilityRole = 'button',
   disabled = false,
+  tone = 'normal',
   testID,
 }: SectionRowProps) {
   const { theme } = useUnistyles();
+  const danger = tone === 'danger';
   const content = (
     <>
       {icon ? (
-        iconLook === 'bare' ? (
+        iconLook === 'bare' || danger ? (
           <View style={styles.bareIcon}>
-            <Icon name={icon} size={20} color={theme.colors.accent} />
+            <Icon
+              name={icon}
+              size={20}
+              color={danger ? theme.colors.problem : theme.colors.accent}
+            />
           </View>
         ) : (
           <RowIcon name={icon} />
         )
       ) : null}
       <View style={styles.texts}>
-        <Text style={[styles.label, disabled && styles.disabled]}>{label}</Text>
+        <Text style={[styles.label, danger && styles.danger, disabled && styles.disabled]}>
+          {label}
+        </Text>
         {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       </View>
       {right ?? (value ? <Text style={styles.value}>{value}</Text> : null)}
-      {onPress ? <Icon name="chevronRight" size={18} color={theme.colors.textDim} /> : null}
+      {onPress && !danger ? (
+        <Icon name="chevronRight" size={18} color={theme.colors.textDim} />
+      ) : null}
     </>
   );
   if (!onPress) {
@@ -236,6 +251,9 @@ const styles = StyleSheet.create((theme) => ({
   label: {
     ...theme.type.bodyStrong,
     color: theme.colors.text,
+  },
+  danger: {
+    color: theme.colors.problem,
   },
   disabled: {
     color: theme.colors.textDisabled,

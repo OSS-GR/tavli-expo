@@ -16,7 +16,7 @@ import {
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { screen, within } from '@testing-library/react-native';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, Linking } from 'react-native';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
@@ -50,19 +50,17 @@ function savedUsernames(): Usernames {
 
 async function open(usernames: Usernames | undefined) {
   const onSignedIn = jest.fn<void, [AuthUser]>();
-  const onNotNow = jest.fn();
   const analytics = createRecordingAnalytics();
   await renderWithRoot(
     <SignInChoices
       auth={auth}
       onSignedIn={onSignedIn}
-      onNotNow={onNotNow}
       appleSheet={createMemoryAppleSheet()}
       analytics={analytics}
       usernames={usernames}
     />,
   );
-  return { onSignedIn, onNotNow };
+  return { onSignedIn };
 }
 
 describe('the username step after a sign-in', () => {
@@ -89,11 +87,10 @@ describe('the username step after a sign-in', () => {
 
   it('Not now goes on with no name', async () => {
     const user = setupUser();
-    const { onSignedIn, onNotNow } = await open(savedUsernames());
+    const { onSignedIn } = await open(savedUsernames());
     await user.press(await screen.findByRole('button', { name: 'Continue with Apple' }));
     await user.press(await screen.findByRole('button', { name: 'Not now' }));
     expect(onSignedIn).toHaveBeenCalledTimes(1);
-    expect(onNotNow).not.toHaveBeenCalled();
     expect(server.nameOf('user-1')).toBeNull();
   });
 
@@ -142,28 +139,49 @@ describe('the username step after a sign-in', () => {
   });
 });
 
-describe('what a saved account gives (#463)', () => {
-  it('shows the five rows, the sample friend record and what a guest lacks', async () => {
+describe('the choices (#463, #519)', () => {
+  it('shows three short benefits, then Apple, email and guest, then one footnote', async () => {
     await open(undefined);
     const benefits = within(screen.getByTestId('sign-in-benefits'));
-    expect(benefits.getByRole('header', { name: 'A saved account gives you' })).toBeOnTheScreen();
-    for (const title of [
-      'Your own username',
-      'Your record with each friend',
-      'Invites in one tap',
+    for (const line of [
+      'A username your friends can find',
       'Your games on any phone',
       // Leaderboards (#407).
       'A rating and leaderboards',
     ]) {
-      expect(benefits.getByLabelText(new RegExp(`^${title}\\. `))).toBeOnTheScreen();
+      expect(benefits.getByText(line)).toBeOnTheScreen();
     }
-    expect(screen.getByTestId('sign-in-benefits-sample')).toHaveAccessibleName(
-      'Example: your record with Eleni. You won 5, they won 3.',
+    expect(screen.getByRole('button', { name: 'Continue with Apple' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Continue with email' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Continue as a guest' })).toBeOnTheScreen();
+    expect(screen.getByTestId('sign-in-footnote')).toHaveTextContent(
+      'A guest plays on this phone only. Other players never see your email. Privacy',
     );
-    expect(
-      screen.getByText('A guest plays on this phone only, with no friends list.'),
-    ).toBeOnTheScreen();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+
+  it('opens the privacy policy from the footnote', async () => {
+    const user = setupUser();
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await open(undefined);
+    await user.press(screen.getByRole('link', { name: 'Privacy' }));
+    expect(openURL).toHaveBeenCalledWith('https://tavlaki.com/privacy');
+  });
+
+  it('makes email the main button where Apple is missing', async () => {
+    const sheet = createMemoryAppleSheet();
+    sheet.available = false;
+    await renderWithRoot(
+      <SignInChoices
+        auth={auth}
+        onSignedIn={jest.fn()}
+        appleSheet={sheet}
+        analytics={createRecordingAnalytics()}
+        usernames={undefined}
+      />,
+    );
+    expect(await screen.findByTestId('sign-in-email')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Continue with Apple' })).toBeNull();
   });
 });
 

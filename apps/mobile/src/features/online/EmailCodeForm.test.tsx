@@ -57,20 +57,18 @@ afterEach(async () => {
 
 async function open(options: { auth?: AuthProvider; usernames?: Usernames } = {}) {
   const onSignedIn = jest.fn<void, [AuthUser]>();
-  const onNotNow = jest.fn();
   const analytics = createRecordingAnalytics();
   analytics.optIn();
   await renderWithRoot(
     <SignInChoices
       auth={options.auth ?? auth}
       onSignedIn={onSignedIn}
-      onNotNow={onNotNow}
       appleSheet={createMemoryAppleSheet()}
       analytics={analytics}
       usernames={options.usernames}
     />,
   );
-  return { onSignedIn, onNotNow, analytics };
+  return { onSignedIn, analytics };
 }
 
 async function openEmail(user: ReturnType<typeof setupUser>, options = {}) {
@@ -84,11 +82,6 @@ describe('the email code step', () => {
     await open();
     const email = await screen.findByRole('button', { name: 'Continue with email' });
     expect(await screen.findByTestId('sign-in-apple')).toBeOnTheScreen();
-    expect(
-      screen.getByText(
-        'With an email code you can sign in again on any phone. We keep your email address for the sign-in. Other players never see it.',
-      ),
-    ).toBeOnTheScreen();
     expect(email).toBeOnTheScreen();
   });
 

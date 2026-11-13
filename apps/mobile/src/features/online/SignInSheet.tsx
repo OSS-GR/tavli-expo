@@ -1,8 +1,9 @@
 /**
- * The sign-in sheet (#401): "Play online", a line on why, and the sign-in
+ * The sign-in sheet (#401, look from Figma frame 09, #519): "Play online",
+ * one line under it and a close button (`SignInHeader`), then the sign-in
  * choices (`SignInChoices`). Play a friend shows it when "Make an invite"
- * finds no saved session. Not now, a tap on the dimmed part and the
- * Android back button close it and sign in nothing.
+ * finds no saved session. The close button (Not now), a tap on the dimmed
+ * part and the Android back button close it and sign in nothing.
  *
  * It is a `Sheet` (a `Modal`), so screen readers stay in it; focus moves
  * to its title. Show it only while it is needed (mount it then), so the
@@ -14,7 +15,7 @@
 import type { Analytics, AppleSheet, AuthProvider, AuthUser } from '@tavli/contracts';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Text } from 'react-native';
+import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { Sheet } from '@/components/Sheet';
@@ -22,6 +23,7 @@ import { useFocusOnShow } from '@/features/accessibility/focus';
 import { reminders } from '@/features/reminders/reminders';
 
 import { SignInChoices } from './SignInChoices';
+import { SignInHeader } from './SignInHeader';
 
 export interface SignInSheetProps {
   auth: AuthProvider;
@@ -46,30 +48,33 @@ export function SignInSheet({
     reminders.sheetShown();
   }, []);
   return (
-    <Sheet visible onClose={onClose} closeLabel={t('signIn.notNow')} testID="sign-in-sheet">
-      <Text ref={titleRef} style={styles.title} accessibilityRole="header">
-        {t('signIn.title')}
-      </Text>
-      <Text style={styles.body}>{t('signIn.body')}</Text>
-      <SignInChoices
-        auth={auth}
-        onSignedIn={onSignedIn}
-        onNotNow={onClose}
-        {...(appleSheet === undefined ? {} : { appleSheet })}
-        {...(analytics === undefined ? {} : { analytics })}
-      />
+    <Sheet
+      visible
+      onClose={onClose}
+      closeLabel={t('signIn.notNow')}
+      ownCloseButton
+      testID="sign-in-sheet">
+      <View style={styles.content}>
+        <SignInHeader
+          title={t('signIn.title')}
+          body={t('signIn.body')}
+          titleRef={titleRef}
+          onClose={onClose}
+        />
+        <SignInChoices
+          auth={auth}
+          onSignedIn={onSignedIn}
+          {...(appleSheet === undefined ? {} : { appleSheet })}
+          {...(analytics === undefined ? {} : { analytics })}
+        />
+      </View>
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  title: {
-    ...theme.type.title2,
-    color: theme.colors.text,
-  },
-  body: {
-    ...theme.type.body,
-    color: theme.colors.textDim,
-    marginBottom: theme.space.sm,
+  content: {
+    // 18 pt between the header and the choices (Figma frame 09).
+    gap: theme.space.lg + theme.space.xxs,
   },
 }));
