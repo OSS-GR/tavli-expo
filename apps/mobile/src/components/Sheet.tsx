@@ -137,12 +137,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   scroll: {
     flexGrow: 0,
   },
-  content: (look: SheetLook) =>
-    look === 'bare'
-      ? {}
-      : {
-          gap: theme.space.sm,
-          padding: theme.space.xl,
-          paddingBottom: look === 'sheet' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
-        },
+  content: (look: SheetLook) => ({
+    gap: look === 'bare' ? 0 : theme.space.sm,
+    padding: look === 'bare' ? 0 : theme.space.xl,
+    paddingBottom:
+      look === 'bare' ? 0 : look === 'sheet' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
+  }),
 }));

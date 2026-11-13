@@ -189,6 +189,7 @@ Not drawn (#350).
   - **Learn to play** banner (#128): a brass-tinted card with an icon, title, one line, **Start the lesson** (filled pill) and **Not now** (text). Shows until the tutorial is finished or dismissed.
   - Mode tiles (`ModeTile.tsx`) under a section title: "New game" with a saved game (then **Play vs bot** is a wide brass tile first), else "More ways to play".
     - **Pass-and-play** (subtitle "2 players, 1 phone") and **Play a friend** ("Online"), two in a row. With a font scale above 1.3 each takes a row.
+    - The tiles and the pills below sit in plain rows (`inRows` and `CellRows` in `HomeScreen.tsx`): two a row, one a row above font scale 1.3. A wide tile (Play vs bot, Join with a code) takes a row of its own, and a lone cell in the last row fills it. The cells of a row share its height, so two tiles side by side always match (a wrapping row could not do that, #539).
     - **Play a friend** without an online server: dashed tile with a "Coming soon" chip.
   - **How to play** (opens `/rules/portes`) and **History** as two pills with icons. Screen readers hear links.
   - Icons are Lucide line icons (ISC) drawn with Skia (`components/Icon.tsx`, `components/icons.ts`).

@@ -6,7 +6,8 @@
  * Look (#357): the shared `Screen`, `ScreenHeader` and `SectionCard`
  * parts. The games are cards, two per row, Tavli on a whole row; the
  * chosen card has a brass border, a lighter fill and a small brass check.
- * The book button on each card opens its rules without choosing it.
+ * The Rules button on each card (a book and "Rules") opens its rules
+ * without choosing the game.
  *
  * Game (#109): Portes, Plakoto, Fevga or Tavli (all three in rotation).
  * A game shows locked ("Coming soon") when the engine does not have it, or
@@ -82,7 +83,7 @@ export interface NewGameScreenProps {
   /** A saved game exists: Start asks first, because it ends that game (wireframe 4). */
   hasSavedGame?: boolean;
   /**
-   * Opens the rules of a game (the info button on its card). `preset` is
+   * Opens the rules of a game (the Rules button on its card). `preset` is
    * the game's chosen rules version (#241), so the page can name it.
    */
   onRules?: (game: GameChoice, preset: PresetId) => void;
@@ -216,8 +217,11 @@ export function NewGameScreen({
             accessibilityRole="button"
             accessibilityLabel={t(`rules.title.${choice}`)}
             onPress={() => onRules(choice, gamePreset(choice, rulesVersions))}
-            style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
-            <Icon name="book" size={20} color={theme.colors.accent} />
+            // 34 pt tall, so the slop makes the 44 pt target.
+            hitSlop={{ top: 5, bottom: 5 }}
+            style={({ pressed }) => [styles.rulesButton, pressed && styles.rulesPressed]}>
+            <Icon name="book" size={16} color={theme.colors.accent} />
+            <Text style={styles.rulesLabel}>{t('newGame.rulesButton')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -423,8 +427,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   gameCard: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
     borderRadius: theme.radii.lg,
     // The same border width either way, so the text does not move.
     borderWidth: 2,
@@ -436,14 +439,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundImage: `linear-gradient(160deg, ${theme.colors.surfaceSelected} 0%, ${theme.colors.surface} 80%)`,
   },
   gameChoice: {
-    flex: 1,
-    alignSelf: 'stretch',
-    justifyContent: 'center',
+    flexGrow: 1,
     gap: theme.space.xxs,
-    minHeight: 64,
-    paddingVertical: theme.space.sm,
-    paddingLeft: theme.space.md,
-    paddingRight: theme.space.xs,
+    paddingTop: theme.space.sm,
+    paddingBottom: theme.space.xs,
+    paddingHorizontal: theme.space.md,
   },
   gameNameLine: {
     flexDirection: 'row',
@@ -469,12 +469,26 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.accent,
   },
   rulesButton: {
-    minWidth: theme.touch.minTarget,
-    minHeight: theme.touch.minTarget,
-    marginRight: theme.space.xxs,
+    minHeight: 34,
+    alignSelf: 'flex-start',
+    marginLeft: theme.space.md - 4,
+    marginBottom: theme.space.sm,
+    paddingHorizontal: theme.space.sm,
+    flexDirection: 'row',
+    gap: theme.space.xxs + 2,
     borderRadius: theme.touch.minTarget / 2,
+    borderWidth: 1,
+    borderColor: theme.colors.accentLine,
+    backgroundColor: theme.colors.accentWash,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rulesLabel: {
+    ...theme.type.caption,
+    color: theme.colors.accent,
+  },
+  rulesPressed: {
+    backgroundColor: theme.colors.accentMuted,
   },
   chips: {
     flexDirection: 'row',
