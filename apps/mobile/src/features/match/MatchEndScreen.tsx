@@ -171,13 +171,14 @@ export function MatchEndScreen({
     </View>
   );
   const rematchLabel = t('game.end.rematch');
-  const home = (
+  // Home shares a row with Review (`grow`), or stands alone at full width.
+  const home = (grow: boolean) => (
     <ActionButton
       testID="end-home-button"
       label={t('game.end.home')}
       icon="house"
       kind="secondary"
-      grow
+      grow={grow}
       onPress={onHome}
     />
   );
@@ -306,10 +307,10 @@ export function MatchEndScreen({
                 grow
                 onPress={onReview}
               />
-              {home}
+              {home(true)}
             </View>
           ) : (
-            home
+            home(false)
           )}
           {onChangeSettings ? (
             <ActionButton
@@ -410,8 +411,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   rowGame: {
     ...theme.type.footnote,
+    // It gives way to the result (which grows) but keeps what it needs:
+    // a long Greek label wraps only when the row has no room left.
+    flexShrink: 1,
     minWidth: 56,
-    maxWidth: '40%',
     color: theme.colors.textDim,
   },
   noChecker: {

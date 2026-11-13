@@ -152,7 +152,9 @@ describe('<MatchScreen /> vs bot', () => {
 
     await user.press(button('Game menu'));
     const menu = screen.getByTestId('game-menu');
-    expect(within(menu).getByLabelText('Portes · vs Bot (Easy) · You 0 – 0 Bot')).toBeOnTheScreen();
+    expect(
+      within(menu).getByLabelText('Portes · vs Bot (Easy) · You 0 – 0 Bot · first to 3'),
+    ).toBeOnTheScreen();
     await user.press(button('Resign this game, Bot wins 2 points'));
 
     const dialog = screen.getByTestId('resign-game-dialog');
@@ -267,7 +269,7 @@ describe('<MatchScreen /> vs bot', () => {
     await user.press(button('Game menu'));
     expect(
       within(screen.getByTestId('game-menu')).getByLabelText(
-        'Portes · vs Bot (Easy) · You 0 – 2 Bot',
+        'Portes · vs Bot (Easy) · You 0 – 2 Bot · first to 5',
       ),
     ).toBeOnTheScreen();
     await user.press(button('Resign the match, Bot wins the match'));
@@ -563,7 +565,7 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
       await user.press(button('Game menu'));
       expect(
         within(screen.getByTestId('game-menu')).getByLabelText(
-          'Tavli · pass-and-play · Player 1 0 – 0 Player 2',
+          'Tavli · pass-and-play · Player 1 0 – 0 Player 2 · first to 5',
         ),
       ).toBeOnTheScreen();
       await user.press(button(/^Resign this game/));

@@ -4,8 +4,8 @@
  *
  * - The title is the game on the board ("Game 1 · Portes"), with a close
  *   button. Under it the score as a line with each side's checker:
- *   "You 0 – 0 Bot · first to 1". Screen readers hear the whole summary
- *   ("Portes · vs Bot (Easy) · You 0 – 0 Bot").
+ *   "You 0 – 0 Bot · first to 1". Screen readers hear it with the match:
+ *   "Portes · vs Bot (Easy) · You 0 – 0 Bot · first to 1".
  * - Safe actions first, in one card: How to play, Settings, Report or
  *   block (online), Exit to Home.
  * - Then the two resigns in a card of their own, in coral with a flag.
@@ -38,8 +38,11 @@ export interface GameMenuProps {
    * title (#515). Without it the title is "Game menu".
    */
   gameLabel?: string;
-  /** What screen readers hear for the score line: "Portes · vs Bot (Easy) · You 0 – 0 Bot". */
-  summary: string;
+  /**
+   * The match, for screen readers: "Portes · vs Bot (Easy)". The score
+   * line reads it first, then the score and the target from `score`.
+   */
+  about: string;
   score: MenuScore;
   /** `null` hides the hint and disables the row. */
   resignGameHint: string | null;
@@ -86,7 +89,7 @@ export function GameMenu(props: GameMenuProps) {
             accessibilityRole="header">
             {props.gameLabel ?? t('game.menu.title')}
           </Text>
-          <ScoreLine summary={props.summary} score={props.score} />
+          <ScoreLine about={props.about} score={props.score} />
         </View>
         <RoundButton
           testID="menu-close"
@@ -173,10 +176,22 @@ export function GameMenu(props: GameMenuProps) {
 
 /**
  * "You 0 – 0 Bot · first to 1", each name next to its side's checker. It
- * wraps with a large font. Screen readers hear `summary` in its place.
+ * wraps with a large font. Screen readers hear one line, made from the
+ * same score: "Portes · vs Bot (Easy) · You 0 – 0 Bot · first to 1".
  */
-function ScoreLine({ summary, score }: { summary: string; score: MenuScore }) {
+function ScoreLine({ about, score }: { about: string; score: MenuScore }) {
   const { t } = useTranslation();
+  const target = t('home.continue.target', { target: score.target });
+  const label = [
+    about,
+    t('game.end.score', {
+      white: score.names.white,
+      black: score.names.black,
+      whiteScore: score.score.white,
+      blackScore: score.score.black,
+    }),
+    target,
+  ].join(' · ');
   const side = (player: PlayerId) => (
     <CheckerAvatar
       testID={`menu-checker-${player}`}
@@ -186,7 +201,7 @@ function ScoreLine({ summary, score }: { summary: string; score: MenuScore }) {
     />
   );
   return (
-    <View testID="menu-score" style={styles.scoreLine} accessible accessibilityLabel={summary}>
+    <View testID="menu-score" style={styles.scoreLine} accessible accessibilityLabel={label}>
       {side('white')}
       <Text style={styles.scoreText}>
         {`${score.names.white} `}
@@ -198,9 +213,7 @@ function ScoreLine({ summary, score }: { summary: string; score: MenuScore }) {
         {` ${score.names.black}`}
       </Text>
       {side('black')}
-      <Text style={styles.target}>
-        {`· ${t('home.continue.target', { target: score.target })}`}
-      </Text>
+      <Text style={styles.target}>{`· ${target}`}</Text>
     </View>
   );
 }

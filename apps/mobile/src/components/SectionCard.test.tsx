@@ -105,9 +105,16 @@ describe('<SectionRow />', () => {
     const { colors } = themes['walnut-kafeneio'];
     await renderWithRoot(
       <SectionCard>
-        <SectionRow label="Resign this game" icon="flag" tone="danger" onPress={jest.fn()} />
+        <SectionRow
+          label="Resign this game"
+          hint="Bot wins 2 points"
+          icon="flag"
+          tone="danger"
+          onPress={jest.fn()}
+        />
         <SectionRow
           label="Resign the match"
+          hint="Bot wins the match"
           icon="flag"
           tone="danger"
           disabled
@@ -116,7 +123,11 @@ describe('<SectionRow />', () => {
       </SectionCard>,
     );
     expect(screen.getByText('Resign this game')).toHaveStyle({ color: colors.problem });
+    // The hint stays dim on a risky row, as in Figma.
+    expect(screen.getByText('Bot wins 2 points')).toHaveStyle({ color: colors.textDim });
+    // A disabled row is all one color: label and hint.
     expect(screen.getByText('Resign the match')).toHaveStyle({ color: colors.textDisabled });
+    expect(screen.getByText('Bot wins the match')).toHaveStyle({ color: colors.textDisabled });
   });
 
   it('is not a button without onPress', async () => {

@@ -528,7 +528,6 @@
     "timeLimit_other": "{{count}} λεπτά",
     "loading": "Φόρτωση παιχνιδιού…",
     "label": "{{game}} · διαδικτυακά",
-    "summary": "{{game}} · διαδικτυακά · {{score}}",
     "exitHint": "Το παιχνίδι συνεχίζεται και ο χρόνος τρέχει",
     "notice": {
       "timedOutTitle": "Τελείωσε ο χρόνος σου",
@@ -1235,8 +1234,6 @@
       "open": "Μενού παιχνιδιού",
       "title": "Μενού παιχνιδιού",
       "close": "Κλείσιμο του μενού",
-      "summaryBot": "{{game}} · με υπολογιστή ({{level}}) · {{score}}",
-      "summaryLocal": "{{game}} · δύο παίκτες · {{score}}",
       "resignGame": "Παραίτηση από την παρτίδα",
       "resignGamePoints_one": "{{name}}: κερδίζει {{count}} βαθμό",
       "resignGamePoints_other": "{{name}}: κερδίζει {{count}} βαθμούς",

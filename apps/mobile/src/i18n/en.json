@@ -528,7 +528,6 @@
     "timeLimit_other": "{{count}} min",
     "loading": "Loading the game…",
     "label": "{{game}} · online",
-    "summary": "{{game}} · online · {{score}}",
     "exitHint": "The game goes on, and the clock keeps running",
     "notice": {
       "timedOutTitle": "Your time ran out",
@@ -1235,8 +1234,6 @@
       "open": "Game menu",
       "title": "Game menu",
       "close": "Close the menu",
-      "summaryBot": "{{game}} · vs Bot ({{level}}) · {{score}}",
-      "summaryLocal": "{{game}} · pass-and-play · {{score}}",
       "resignGame": "Resign this game",
       "resignGamePoints_one": "{{name}} wins {{count}} point",
       "resignGamePoints_other": "{{name}} wins {{count}} points",
