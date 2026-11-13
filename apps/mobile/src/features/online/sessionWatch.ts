@@ -44,13 +44,14 @@ export type StartSessionWatch<Value> = (
  * into the loaded state with `toLoaded`. A failure after a list came
  * keeps that list (`failed: true`); `retry` starts the watch again.
  *
- * `onChange(null)` is a sign-out, and so is `loadSession()` giving `null`:
- * the server has no session for this phone (it ended, for example after a
- * year unused). Both show `signedOut` and forget the account note
- * (`forgetOnlineAccount`), so the next online step asks for a sign-in
- * instead of Home showing a Try again that can never work. A session that did not load (no network:
- * `loadSession()` rejects) shows `failed` and keeps the note; `retry`
- * loads it again.
+ * `onChange(null)` is a sign-out. So is `loadSession()` giving `null`:
+ * the server has no session for this phone (it ended, for example after
+ * a year unused). Both show `signedOut` and forget the account note
+ * (`forgetOnlineAccount`). Then the next online step asks for a sign-in,
+ * and Home shows no Try again that can never work.
+ *
+ * With no network, `loadSession()` rejects. That shows `failed` and
+ * keeps the note; `retry` loads the session again.
  *
  * `start` and `toLoaded` restart the watch when they change: keep them
  * stable (`useCallback`).

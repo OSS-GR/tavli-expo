@@ -162,7 +162,9 @@ export function isAuthErrorData(value: unknown): value is AuthErrorData {
 export interface AuthProvider {
   /**
    * Resolves once the provider has loaded a saved session (at app start),
-   * with the user or `null`. Call it before `currentUser`.
+   * with the user or `null`. Call it before `currentUser`. It never
+   * rejects: `null` may also mean it could not reach the server. To tell
+   * an ended session from no network, use `loadSession()`.
    */
   ready(): Promise<AuthUser | null>;
   /**
