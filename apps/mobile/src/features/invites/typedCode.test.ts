@@ -1,7 +1,7 @@
 import i18n from '@/i18n';
 
 import { inviteAppUrl, inviteUrl } from './link';
-import { readTypedCode } from './typedCode';
+import { codeSlots, readTypedCode } from './typedCode';
 
 const code = (text: string) => readTypedCode(text);
 
@@ -58,5 +58,23 @@ describe('readTypedCode (#333)', () => {
     expect(code('ABCD23😀5')).toEqual({ kind: 'problem', problem: 'characters' });
     expect(code('tavlaki://invite/ABCD234O')).toEqual({ kind: 'problem', problem: 'link' });
     expect(code('https://tavlaki.com/i/')).toEqual({ kind: 'problem', problem: 'link' });
+  });
+});
+
+describe('codeSlots (#521)', () => {
+  it('shows a code, or the typed part of one, in capital letters with no spaces or dashes', () => {
+    expect(codeSlots('')).toBe('');
+    expect(codeSlots('ab-c')).toBe('ABC');
+    expect(codeSlots(' abcd 2345 ')).toBe('ABCD2345');
+    expect(codeSlots('ΑΒΕΚ')).toBe('ABEK');
+  });
+
+  it('shows the code of a pasted link or message', () => {
+    expect(codeSlots('Join me: tavlaki://invite/abcd2345')).toBe('ABCD2345');
+  });
+
+  it('shows a text that is no code as typed, so a long one fills every slot', () => {
+    expect(codeSlots('ABCD234O')).toBe('ABCD234O');
+    expect(codeSlots('ABCD23456')).toBe('ABCD23456');
   });
 });

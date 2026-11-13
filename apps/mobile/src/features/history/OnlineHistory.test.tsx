@@ -202,7 +202,7 @@ describe('<OnlineHistory />', () => {
     await finished(FRIEND);
     await show([]);
     expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Play' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Play vs bot' })).toBeOnTheScreen();
     expect(screen.queryByTestId('history-online')).toBeNull();
   });
 

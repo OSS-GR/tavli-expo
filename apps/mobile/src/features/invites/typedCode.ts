@@ -66,10 +66,7 @@ export function readTypedCode(text: string): TypedCode {
     return code === null ? { kind: 'problem', problem: 'link' } : { kind: 'code', code };
   }
 
-  // Dashes: the ASCII one and the Unicode ones (U+2010 to U+2015).
-  const compact = [...trimmed.replace(/[\s\-\u2010-\u2015]/g, '')]
-    .map((char) => GREEK_LOOK_ALIKES[char] ?? char)
-    .join('');
+  const compact = compactText(trimmed);
   const code = normalizeInviteCode(compact);
   if (code !== null) return { kind: 'code', code };
   // A character that is never in a code says the most: say that first.
@@ -78,4 +75,23 @@ export function readTypedCode(text: string): TypedCode {
     return { kind: 'problem', problem: 'characters' };
   }
   return { kind: 'problem', problem: chars.length < INVITE_CODE_LENGTH ? 'short' : 'long' };
+}
+
+/** The text with no spaces or dashes, and Greek look-alikes as Latin letters. */
+function compactText(text: string): string {
+  // Dashes: the ASCII one and the Unicode ones (U+2010 to U+2015).
+  return [...text.replace(/[\s\-\u2010-\u2015]/g, '')]
+    .map((char) => GREEK_LOOK_ALIKES[char] ?? char)
+    .join('');
+}
+
+/**
+ * What the code slots of "Join with a code" show (#521): the code of a
+ * link or a message, else the typed characters in capital letters, with
+ * no spaces or dashes. It checks nothing: `readTypedCode` does.
+ */
+export function codeSlots(text: string): string {
+  const typed = readTypedCode(text);
+  if (typed.kind === 'code') return typed.code;
+  return compactText(text.trim()).toUpperCase();
 }

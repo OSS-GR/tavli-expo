@@ -7,7 +7,9 @@
  *
  * In the Home style (#359): the shared `Screen` and `ScreenHeader`, each
  * stat line as tiles (Played, Won, Win rate) with the other numbers in one
- * line under them, and the matches in a `SectionCard`.
+ * line under them, and the matches in a `SectionCard`. The empty state is
+ * the Figma pass's (#521): the medallion, one sentence, Play vs bot and a
+ * text button to the tutorial.
  *
  * It only shows what it is given. The route (`app/history.tsx`) reads the
  * store and navigates.
@@ -19,6 +21,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { EmptyMedallion } from '@/components/EmptyMedallion';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -34,8 +37,10 @@ const ONE_TILE_FONT_SCALE = 1.3;
 export interface HistoryScreenProps {
   /** Newest first. */
   records: readonly HistoryRecord[];
-  /** The empty state's Play button. */
+  /** The empty state's Play vs bot button. */
   onPlay: () => void;
+  /** The empty state's "Learn to play first". No button without it. */
+  onLearn?: () => void;
   /** The header's back button. No back button without it. */
   onBack?: () => void;
   /**
@@ -46,7 +51,7 @@ export interface HistoryScreenProps {
   online?: (onMatches: (has: boolean) => void) => ReactNode;
 }
 
-export function HistoryScreen({ records, onPlay, onBack, online }: HistoryScreenProps) {
+export function HistoryScreen({ records, onPlay, onLearn, onBack, online }: HistoryScreenProps) {
   const { t, i18n } = useTranslation();
   const locale = dateLocale(i18n.resolvedLanguage ?? i18n.language, useLocales());
   const [onlineMatches, setOnlineMatches] = useState(false);
@@ -64,13 +69,31 @@ export function HistoryScreen({ records, onPlay, onBack, online }: HistoryScreen
       />
       <ScrollView contentContainerStyle={[styles.content, empty && styles.emptyContent]}>
         {empty ? (
-          <>
-            <Text style={styles.emptyTitle} accessibilityRole="header">
-              {t('history.emptyTitle')}
-            </Text>
-            <Text style={styles.emptyText}>{t('history.empty')}</Text>
-            <ActionButton testID="history-play" label={t('history.play')} onPress={onPlay} />
-          </>
+          <View testID="history-empty" style={styles.empty}>
+            <EmptyMedallion icon="history" testID="history-medallion" />
+            <View style={styles.emptyTexts}>
+              <Text style={styles.emptyTitle} accessibilityRole="header">
+                {t('history.emptyTitle')}
+              </Text>
+              <Text style={styles.emptyText}>{t('history.empty')}</Text>
+            </View>
+            <View style={styles.emptyButtons}>
+              <ActionButton
+                testID="history-play"
+                icon="play"
+                label={t('history.play')}
+                onPress={onPlay}
+              />
+              {onLearn ? (
+                <ActionButton
+                  testID="history-learn"
+                  kind="text"
+                  label={t('history.learn')}
+                  onPress={onLearn}
+                />
+              ) : null}
+            </View>
+          </View>
         ) : null}
         {records.length > 0 ? <LocalHistory records={records} locale={locale} /> : null}
         {online?.(setOnlineMatches)}
@@ -175,8 +198,17 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   emptyContent: {
     flexGrow: 1,
+  },
+  // The empty state sits a little above the middle, as in the Figma pass.
+  empty: {
+    flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: theme.space.xl,
+    gap: theme.space.lg,
+    paddingHorizontal: theme.space.md,
+    paddingBottom: theme.space.xxxl + theme.space.xxl,
+  },
+  emptyTexts: {
+    gap: theme.space.xs + theme.space.xxs,
   },
   emptyTitle: {
     ...theme.type.title2,
@@ -184,10 +216,12 @@ const styles = StyleSheet.create((theme, rt) => ({
     textAlign: 'center',
   },
   emptyText: {
-    ...theme.type.body,
+    ...theme.type.callout,
     color: theme.colors.textDim,
     textAlign: 'center',
-    paddingBottom: theme.space.md,
+  },
+  emptyButtons: {
+    gap: theme.space.xs + theme.space.xxs,
   },
   game: {
     gap: theme.space.md,

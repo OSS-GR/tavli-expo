@@ -1,7 +1,7 @@
 /**
- * Join with a code (#333): the field, the phone's check (a bad code says
- * why and calls back nothing), the keyboard's Go key, a pasted link, the
- * screen reader announcement and Greek. The route and the invite after it
+ * Join with a code (#333): the field, the code slots (#521), the phone's
+ * check (a bad code says why and calls back nothing), the keyboard's Go
+ * key, a pasted link, the screen reader announcement and Greek. The route and the invite after it
  * are in `navigation.test.tsx`.
  */
 import { act, fireEvent, screen } from '@testing-library/react-native';
@@ -27,10 +27,16 @@ async function open() {
 }
 
 const field = () => screen.getByTestId('join-code-input');
-const continueButton = () => screen.getByRole('button', { name: 'Continue' });
+/** The characters on the bone tiles, in order. The slots are hidden from screen readers. */
+const tiles = () =>
+  screen
+    .queryAllByTestId('join-code-tile', { includeHiddenElements: true })
+    .map((tile) => tile.props.children as string);
+
+const continueButton = () => screen.getByRole('button', { name: 'Join the game' });
 
 describe('JoinCodeScreen', () => {
-  it('shows the title, the field and a Continue that waits for text', async () => {
+  it('shows the title, the field, empty slots and a Join the game that waits for 8 characters', async () => {
     await open();
     expect(screen.getByRole('header', { name: 'Join with a code' })).toBeOnTheScreen();
     expect(field().props).toMatchObject({
@@ -40,6 +46,17 @@ describe('JoinCodeScreen', () => {
       returnKeyType: 'go',
     });
     expect(continueButton()).toBeDisabled();
+    expect(tiles()).toEqual([]);
+  });
+
+  it('fills a slot per character, and turns Join the game on at 8 (#521)', async () => {
+    await open();
+    await fireEvent.changeText(field(), 'ab-cd 23');
+    expect(tiles()).toEqual(['A', 'B', 'C', 'D', '2', '3']);
+    expect(continueButton()).toBeDisabled();
+    await fireEvent.changeText(field(), 'abcd2345');
+    expect(tiles()).toEqual(['A', 'B', 'C', 'D', '2', '3', '4', '5']);
+    expect(continueButton()).toBeEnabled();
   });
 
   it('opens a typed code in capital letters', async () => {
@@ -65,6 +82,9 @@ describe('JoinCodeScreen', () => {
       field(),
       'Play tavli with me on Tavlaki. Open this link to join: tavlaki://invite/ABCD2345\nOr open Tavlaki, tap Join with a code and enter ABCD2345.',
     );
+    // The field keeps only the code, so the slots show it.
+    expect(field().props.value).toBe('ABCD2345');
+    expect(tiles()).toEqual(['A', 'B', 'C', 'D', '2', '3', '4', '5']);
     await fireEvent.press(continueButton());
     expect(props.onCode).toHaveBeenCalledWith('ABCD2345');
   });
@@ -75,7 +95,9 @@ describe('JoinCodeScreen', () => {
     const props = await open();
 
     await user.type(field(), 'ABCD234');
-    await user.press(continueButton());
+    // Join the game waits for 8 characters; the Go key checks sooner.
+    expect(continueButton()).toBeDisabled();
+    await fireEvent(field(), 'submitEditing');
     const short = 'The code is too short. A code has 8 characters.';
     expect(screen.getByTestId('join-problem')).toHaveTextContent(short);
     expect(announce).toHaveBeenCalledWith(short);
@@ -130,7 +152,7 @@ describe('JoinCodeScreen', () => {
     );
     // A Greek keyboard: Α, Β, Ε, Κ are read as Latin letters.
     await fireEvent.changeText(greekField, 'ΑΒΕΚ2345');
-    await fireEvent.press(screen.getByRole('button', { name: 'Συνέχεια' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Μπες στο παιχνίδι' }));
     expect(props.onCode).toHaveBeenCalledWith('ABEK2345');
     await act(async () => {
       await i18n.changeLanguage('en');
