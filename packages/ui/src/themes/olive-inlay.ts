@@ -25,6 +25,7 @@ export const oliveInlay = {
     surfaceSelected: '#EADCBE',
     surfaceRaised: '#FFF9EC',
     surfaceSunken: '#E6D8B9',
+    surfaceWell: '#EEE3CA',
     border: '#CDB994',
     edgeLight: '#FFFDF6',
     separator: '#E2D4B4',

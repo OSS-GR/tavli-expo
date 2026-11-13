@@ -55,6 +55,8 @@ export const typography = {
   title2: { fontFamily: fonts.titles, fontSize: 22, lineHeight: 28 },
   /** A small title inside a card. */
   title3: { fontFamily: fonts.titles, fontSize: 19, lineHeight: 24 },
+  /** A short title on a small tile: Home's game tiles (#517). */
+  title4: { fontFamily: fonts.titles, fontSize: 16, lineHeight: 20 },
   /** A section header over a card or list (`SectionHeader`, #496). */
   sectionHeader: { fontFamily: fonts.titles, fontSize: 17, lineHeight: 22 },
   /** A strong line in the system font, such as a row title. */

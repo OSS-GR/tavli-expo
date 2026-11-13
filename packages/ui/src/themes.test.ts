@@ -85,6 +85,9 @@ describe('themes', () => {
         ['accentLight', 'surface'],
         ['accentLight', 'surfaceRaised'],
         ['accentLight', 'backgroundDeep'],
+        // Home's level chip and game tiles (#517).
+        ['text', 'surfaceWell'],
+        ['textDim', 'surfaceWell'],
         // Locked or disabled labels ("Coming soon", a disabled Undo). WCAG lets
         // disabled controls be fainter, but locked labels still carry meaning.
         ['textDisabled', 'background'],

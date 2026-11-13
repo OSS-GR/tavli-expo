@@ -178,23 +178,23 @@ Not drawn (#350).
 
 - **Route:** `app/index.tsx`
 - **Purpose:** Start or continue a game in one or two taps (#34, #36).
-- **Redesign (#342).** The drawing above is the first layout. The app now differs: the empty art box is gone, the play modes are tiles with icons, and a hero card with a board picture leads the screen. The list below is the current layout. Screenshots (a web render of the app, iPhone size): [before and after](home/before-after.webp), [English: no save, a saved game, scrolled](home/home-en.webp), [Greek](home/home-el.webp).
+- **Redesign (#342, then the Figma pass #517, option G).** The drawing above is the first layout. The app now differs: the empty art box is gone, the play modes are tiles with icons, and a hero card with a board picture leads the screen. The list below is the current layout. Screenshots (a web render of the app, iPhone size): [before and after](home/before-after.webp), [English: no save, a saved game, scrolled](home/home-en.webp), [Greek](home/home-el.webp).
 - **Elements:**
-  - Top row: the app logo (the app icon, `assets/home/logo.webp`), "Tavlaki" (a header for screen readers) and a round **gear** icon button (Settings).
+  - Top row: a small ivory checker (`CheckerAvatar`, the bone wood), "Tavlaki" in Piazzolla (a header for screen readers), What's new and a round **gear** icon button (Settings, `RoundButton`).
   - A large greeting for the part of the day ("Good morning", "Good afternoon", "Good evening"; `features/home/greeting.ts`, the phone's hour) and the tagline under it.
-  - **Hero card** (`HomeHero.tsx`): a board picture (the classic wide board, `StaticBoard`, hidden from screen readers), a small caps line, a title, dim lines and a brass pill. The whole card is one button.
-    - *Saved game:* **Continue game**: the saved board as it was left, game and opponent, then score, target and time since the save. The pill says **Continue**.
-    - *No saved game:* **Play vs bot** over the Portes start position. The line under it lists the bot levels, for example "Easy, Medium or Hard" (built from the levels the bot plays in at least one game, #182). The pill says **Play now**.
+  - **Hero card.**
+    - *Saved game:* **Continue game** (`ContinueCard`, `HomeHero.tsx`): the saved board as it was left, game and opponent, then score, target and time since the save. The pill says **Continue**. The whole card is one button.
+    - *No saved game:* **Play vs bot** with quick start (`QuickStartHero.tsx`, #517): a raised card with the Portes start board at half width (hidden from screen readers), the title with a chevron (opens New game) and the level chip ("Medium ▾", a sheet of levels; a plain label with one level). Under them one button per game: Portes, Plakoto, Fevga, Tavli, each with its Greek name under it. One tap starts that game vs the bot. The game played last is the one brass button (a play icon); the others are dark wells (`surfaceWell`). With a large font they go two per row.
   - **Your online games** and **Your invites** (#297, #314) when this phone has an online account.
-  - **Learn to play** banner (#128): a brass-tinted card with an icon, title, one line, **Start the lesson** (filled pill) and **Not now** (text). Shows until the tutorial is finished or dismissed.
-  - Mode tiles (`ModeTile.tsx`) under a section title: "New game" with a saved game (then **Play vs bot** is a wide brass tile first), else "More ways to play".
-    - **Pass-and-play** (subtitle "2 players, 1 phone") and **Play a friend** ("Online"), two in a row. With a font scale above 1.3 each takes a row.
-    - The tiles and the pills below sit in plain rows (`inRows` and `CellRows` in `HomeScreen.tsx`): two a row, one a row above font scale 1.3. A wide tile (Play vs bot, Join with a code) takes a row of its own, and a lone cell in the last row fills it. The cells of a row share its height, so two tiles side by side always match (a wrapping row could not do that, #539).
+  - **Learn to play** row (#128, #517): a cap icon, title, one line, a small **Start** button and a close button (×, "Not now"). Shows until the tutorial is finished or dismissed.
+  - Mode tiles (`ModeTile.tsx`: a tray, a bare brass icon, the title in Piazzolla) under a section title: "New game" with a saved game (then **Play vs bot** is a wide tile first), else "More ways to play". No tile is brass.
+    - **Play a friend** ("Online, with a link") and **Pass-and-play** ("2 players, 1 phone"), then **Friends** and **Leaderboards**, two in a row. With a font scale above 1.3 each takes a row.
+    - The tiles sit in plain rows (`inRows` and `CellRows` in `HomeScreen.tsx`): two a row, one a row above font scale 1.3. A wide cell takes a row of its own, and a lone cell in the last row fills it. The cells of a row share its height, so two tiles side by side always match (a wrapping row could not do that, #539).
     - **Play a friend** without an online server: dashed tile with a "Coming soon" chip.
-  - **How to play** (opens `/rules/portes`) and **History** as two pills with icons. Screen readers hear links.
+  - One links list (`SectionCard`, bare icons, chevrons): **Join with a code** (with online play), **How to play** (opens `/rules/portes`) and **History**. Screen readers hear How to play and History as links.
   - Icons are Lucide line icons (ISC) drawn with Skia (`components/Icon.tsx`, `components/icons.ts`).
 - **States:**
-  - *No saved game:* the hero is Play vs bot.
+  - *No saved game:* the hero is Play vs bot with quick start.
   - *Saved game:* the hero is Continue game, and Play vs bot moves to the tiles. MVP1 keeps **one** saved game.
   - *Loading:* the native splash stays until settings and the save are read. This is local and fast, so there is no spinner.
   - *Saved game broken or too old:* it is dropped safely (#36). A one-time toast says "Your saved game could not be opened."

@@ -27,11 +27,23 @@
     },
     "newGame": "New game",
     "moreModes": "More ways to play",
-    "playNow": "Play now",
     "vsBot": {
       "title": "Play vs bot",
       "levels": "{{first}} or {{last}}",
       "levelsSeparator": ", "
+    },
+    "quickStart": {
+      "moreHint": "Opens New game: match length, level and house rules.",
+      "level": "Bot level: {{level}}",
+      "levelHint": "Changes the level for the game buttons.",
+      "play": "Play {{game}}",
+      "playHint": "Starts a match vs the bot at {{level}}.",
+      "alt": {
+        "portes": "Πόρτες",
+        "plakoto": "Πλακωτό",
+        "fevga": "Φεύγα",
+        "tavli": "Τάβλι"
+      }
     },
     "local": {
       "title": "Pass-and-play",
@@ -39,7 +51,7 @@
     },
     "friend": {
       "title": "Play a friend",
-      "subtitle": "Online",
+      "subtitle": "Online, with a link",
       "soon": "Coming soon: play friends online."
     },
     "ranked": {
@@ -102,9 +114,10 @@
     },
     "learn": {
       "title": "Learn to play",
-      "subtitle": "A one-minute lesson on the board: move, hit and bear off.",
+      "subtitle": "A one-minute lesson on the board",
       "start": "Start the lesson",
-      "dismiss": "Not now"
+      "dismiss": "Not now",
+      "startShort": "Start"
     },
     "reminder": {
       "guest": {

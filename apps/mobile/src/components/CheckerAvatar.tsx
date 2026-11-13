@@ -1,4 +1,4 @@
-import { fonts, withAlpha } from '@tavli/ui';
+import { fonts, withAlpha, type AvatarWood } from '@tavli/ui';
 import { Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -18,6 +18,8 @@ export interface CheckerAvatarProps {
   size?: CheckerAvatarSize;
   /** You: a brass ring. */
   you?: boolean;
+  /** A fixed wood in place of the one `playerKey` picks: Home's logo checker (#517). */
+  wood?: AvatarWood;
   testID?: string;
 }
 
@@ -31,10 +33,11 @@ export function CheckerAvatar({
   name = null,
   size = 40,
   you = false,
+  wood: fixedWood,
   testID,
 }: CheckerAvatarProps) {
   const { theme } = useUnistyles();
-  const wood = avatarWood(playerKey);
+  const wood = fixedWood ?? avatarWood(playerKey);
   const colors = theme.avatar[wood];
   const initials = name !== null && size >= MIN_INITIALS_SIZE ? initialsOf(name) : '';
   return (

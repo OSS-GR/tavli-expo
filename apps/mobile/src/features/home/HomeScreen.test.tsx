@@ -1,4 +1,5 @@
-import { act, render, screen, userEvent } from '@testing-library/react-native';
+import type { Difficulty } from '@tavli/contracts';
+import { act, render, screen, userEvent, within } from '@testing-library/react-native';
 import * as Reanimated from 'react-native-reanimated';
 
 import i18n from '@/i18n';
@@ -7,13 +8,25 @@ import { homeIntroDue, resetIntrosForTest } from '@/features/intro/introRuns';
 import { startBoard } from '@/features/rules/content';
 
 import { ContinueCard } from './ContinueCard';
-import { HomeScreen, inRows, levelList, type Cell } from './HomeScreen';
+import { HomeScreen, inRows, levelList, type Cell, type HomeScreenProps } from './HomeScreen';
+import { QUICK_START_GAMES } from './QuickStartHero';
 
-function setup(botLevels: readonly ('easy' | 'medium' | 'hard')[] = ['easy']) {
+function setup(
+  botLevels: readonly Difficulty[] = ['easy'],
+  quickStart: Partial<HomeScreenProps['quickStart']> = {},
+) {
   const props = {
     onNewGame: jest.fn(),
     onSettings: jest.fn(),
     onHowToPlay: jest.fn(),
+    onQuickStart: jest.fn(),
+    onBotLevel: jest.fn(),
+    quickStart: {
+      games: QUICK_START_GAMES,
+      last: 'portes',
+      level: botLevels[0] ?? 'easy',
+      ...quickStart,
+    } satisfies HomeScreenProps['quickStart'],
     botLevels,
   };
   return props;
@@ -25,7 +38,7 @@ describe('<HomeScreen />', () => {
     const props = setup();
     await render(<HomeScreen {...props} />);
 
-    await user.press(screen.getByRole('button', { name: /^Play vs bot/ }));
+    await user.press(screen.getByRole('button', { name: 'Play vs bot' }));
     expect(props.onNewGame).toHaveBeenLastCalledWith('bot');
     await user.press(screen.getByRole('button', { name: /^Pass-and-play/ }));
     expect(props.onNewGame).toHaveBeenLastCalledWith('local');
@@ -92,12 +105,14 @@ describe('<HomeScreen />', () => {
     expect(homeIntroDue()).toBe(false);
   });
 
-  it('lists the bot levels under "Play vs bot" (#182)', async () => {
-    const { rerender } = await render(<HomeScreen {...setup(['easy'])} />);
+  it('lists the bot levels on the "Play vs bot" tile next to a saved game (#182)', async () => {
+    const { Text } = jest.requireActual('react-native');
+    const save = <Text>Continue game</Text>;
+    const { rerender } = await render(<HomeScreen {...setup(['easy'])} continueCard={save} />);
     expect(screen.getByRole('button', { name: 'Play vs bot, Easy' })).toBeOnTheScreen();
-    await rerender(<HomeScreen {...setup(['easy', 'medium'])} />);
+    await rerender(<HomeScreen {...setup(['easy', 'medium'])} continueCard={save} />);
     expect(screen.getByText('Easy or Medium')).toBeOnTheScreen();
-    await rerender(<HomeScreen {...setup(['easy', 'medium', 'hard'])} />);
+    await rerender(<HomeScreen {...setup(['easy', 'medium', 'hard'])} continueCard={save} />);
     expect(screen.getByText('Easy, Medium or Hard')).toBeOnTheScreen();
     expect(
       screen.getByRole('button', { name: 'Play vs bot, Easy, Medium or Hard' }),
@@ -121,7 +136,7 @@ describe('<HomeScreen />', () => {
     const onPlayFriend = jest.fn();
     await render(<HomeScreen {...setup()} onPlayFriend={onPlayFriend} />);
 
-    const friend = screen.getByRole('button', { name: 'Play a friend, Online' });
+    const friend = screen.getByRole('button', { name: 'Play a friend, Online, with a link' });
     expect(friend).toBeEnabled();
     await user.press(friend);
     expect(onPlayFriend).toHaveBeenCalledTimes(1);
@@ -133,7 +148,9 @@ describe('<HomeScreen />', () => {
     const props = setup();
     await render(<HomeScreen {...props} />);
 
-    const friend = screen.getByRole('button', { name: 'Play a friend, Online, Coming soon' });
+    const friend = screen.getByRole('button', {
+      name: 'Play a friend, Online, with a link, Coming soon',
+    });
     expect(friend).toBeDisabled();
     await user.press(friend);
     expect(screen.getByTestId('toast')).toHaveTextContent('Coming soon: play friends online.');
@@ -147,9 +164,11 @@ describe('<HomeScreen />', () => {
     const onJoinWithCode = jest.fn();
     await render(<HomeScreen {...setup()} onJoinWithCode={onJoinWithCode} />);
 
-    await user.press(
-      screen.getByRole('button', { name: 'Join with a code, Got a code from a friend?' }),
-    );
+    // One row in the links list now (#517); the line is its hint.
+    const join = screen.getByRole('button', { name: 'Join with a code' });
+    expect(join.props.accessibilityHint).toBe('Got a code from a friend?');
+    expect(within(screen.getByTestId('home-links')).getByTestId('home-join')).toBeTruthy();
+    await user.press(join);
     expect(onJoinWithCode).toHaveBeenCalledTimes(1);
   });
 
@@ -213,8 +232,8 @@ describe('<HomeScreen />', () => {
       await render(<HomeScreen {...setup()} />);
       expect(screen.getByText('Παίξε με τον υπολογιστή')).toBeOnTheScreen();
       expect(screen.getByText('Δύο παίκτες, ένα κινητό')).toBeOnTheScreen();
-      expect(screen.getByText('ΝΕΟ ΠΑΙΧΝΙΔΙ')).toBeOnTheScreen();
       expect(screen.getByText('Εύκολο')).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Παίξε Πόρτες' })).toBeOnTheScreen();
     } finally {
       await act(async () => {
         await i18n.changeLanguage('en');
@@ -273,12 +292,75 @@ describe('<HomeScreen />', () => {
 
     expect(screen.getAllByTestId('home-vs-bot')).toHaveLength(1);
     expect(screen.getByTestId('home-vs-bot-board', { includeHiddenElements: true })).toBeTruthy();
-    // The board is a picture only: screen readers hear the card's label.
+    // The board is a picture only: screen readers use the title.
     expect(screen.queryByTestId('home-vs-bot-board')).toBeNull();
-    expect(screen.getByText('Play now')).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'More ways to play' })).toBeOnTheScreen();
-    await user.press(screen.getByRole('button', { name: 'Play vs bot, Easy' }));
+    const title = screen.getByRole('button', { name: 'Play vs bot' });
+    expect(title.props.accessibilityHint).toBe(
+      'Opens New game: match length, level and house rules.',
+    );
+    await user.press(title);
     expect(props.onNewGame).toHaveBeenLastCalledWith('bot');
+  });
+
+  it('starts a game vs the bot with one tap on its button (#517)', async () => {
+    const user = userEvent.setup();
+    const props = setup(['easy', 'medium'], { last: 'fevga', level: 'medium' });
+    await render(<HomeScreen {...props} />);
+
+    for (const name of ['Portes', 'Plakoto', 'Fevga', 'Tavli']) {
+      expect(screen.getByRole('button', { name: `Play ${name}` }).props.accessibilityHint).toBe(
+        'Starts a match vs the bot at Medium.',
+      );
+    }
+    await user.press(screen.getByRole('button', { name: 'Play Plakoto' }));
+    expect(props.onQuickStart).toHaveBeenLastCalledWith('plakoto');
+    expect(props.onNewGame).not.toHaveBeenCalled();
+    // The Greek name sits under each one, as decoration.
+    expect(within(screen.getByTestId('home-quick-tavli')).getByText('Τάβλι')).toBeOnTheScreen();
+  });
+
+  it('makes the last game played the one brass button (#517)', async () => {
+    const { rerender } = await render(<HomeScreen {...setup(['easy'], { last: 'fevga' })} />);
+    const brass = () =>
+      QUICK_START_GAMES.filter(
+        (game) =>
+          within(screen.getByTestId(`home-quick-${game}`)).queryByTestId('home-quick-play-icon', {
+            includeHiddenElements: true,
+          }) !== null,
+      );
+    expect(brass()).toEqual(['fevga']);
+    // A last game with no button (Asodio) leaves the first one brass.
+    await rerender(<HomeScreen {...setup(['easy'], { last: 'asodio' })} />);
+    expect(brass()).toEqual(['portes']);
+    // Only the games the bot can play get a button.
+    await rerender(<HomeScreen {...setup(['easy'], { games: ['portes', 'tavli'] })} />);
+    expect(screen.queryByTestId('home-quick-plakoto')).toBeNull();
+    expect(screen.getByTestId('home-quick-tavli')).toBeTruthy();
+  });
+
+  it('picks the bot level from the chip (#517)', async () => {
+    const user = userEvent.setup();
+    const props = setup(['easy', 'medium', 'hard'], { level: 'easy' });
+    await render(<HomeScreen {...props} />);
+
+    await user.press(screen.getByRole('button', { name: 'Bot level: Easy' }));
+    await user.press(screen.getByRole('radio', { name: /^Hard/ }));
+    expect(props.onBotLevel).toHaveBeenLastCalledWith('hard');
+    expect(screen.queryByTestId('home-bot-level-picker')).toBeNull();
+  });
+
+  it('shows the one level as a plain label, with nothing to pick (#517)', async () => {
+    await render(<HomeScreen {...setup(['easy'])} />);
+    expect(screen.queryByRole('button', { name: 'Bot level: Easy' })).toBeNull();
+    expect(screen.getByLabelText('Bot level: Easy')).toBeOnTheScreen();
+  });
+
+  it('shows no quick start next to a saved game: a start would replace it (#517)', async () => {
+    const { Text } = jest.requireActual('react-native');
+    await render(<HomeScreen {...setup()} continueCard={<Text>Continue game</Text>} />);
+    expect(screen.queryByTestId('home-quick-start')).toBeNull();
+    expect(screen.queryByTestId('home-quick-portes')).toBeNull();
   });
 
   it('moves Play vs bot to a tile when the hero is the saved game (#342)', async () => {

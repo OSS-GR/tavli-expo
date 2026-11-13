@@ -18,6 +18,7 @@ export const kafeneioNight = {
     surfaceSelected: '#3E2219',
     surfaceRaised: '#2F1912',
     surfaceSunken: '#140A07',
+    surfaceWell: '#1B0D09',
     border: '#6A4630',
     edgeLight: '#4D2E21',
     separator: '#45281D',

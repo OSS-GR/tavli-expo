@@ -68,6 +68,9 @@ export function themeScreenTests(id: ThemeId): void {
           onNewGame={jest.fn()}
           onSettings={jest.fn()}
           onHowToPlay={jest.fn()}
+          onQuickStart={jest.fn()}
+          onBotLevel={jest.fn()}
+          quickStart={{ games: ['portes', 'plakoto', 'fevga'], last: 'portes', level: 'easy' }}
           botLevels={['easy', 'medium']}
         />,
       );
