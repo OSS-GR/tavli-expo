@@ -172,6 +172,32 @@ describe('<HomeScreen />', () => {
     expect(onJoinWithCode).toHaveBeenCalledTimes(1);
   });
 
+  it('opens Play ranked from its tile, next to Play a friend (#532)', async () => {
+    const user = userEvent.setup();
+    const onPlayRanked = jest.fn();
+    await render(
+      <HomeScreen
+        {...setup()}
+        onPlayFriend={jest.fn()}
+        onJoinWithCode={jest.fn()}
+        onPlayRanked={onPlayRanked}
+      />,
+    );
+
+    const tiles = screen
+      .getAllByRole('button')
+      .map((b) => b.props.testID as string | undefined)
+      .filter((id) => id === 'home-friend' || id === 'home-ranked' || id === 'home-join');
+    expect(tiles).toEqual(['home-friend', 'home-ranked', 'home-join']);
+    await user.press(screen.getByRole('button', { name: 'Play ranked, Find a player now' }));
+    expect(onPlayRanked).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no Play ranked tile with no matchmaking (#532)', async () => {
+    await render(<HomeScreen {...setup()} onPlayFriend={jest.fn()} />);
+    expect(screen.queryByTestId('home-ranked')).toBeNull();
+  });
+
   it('opens Friends and Leaderboards from their tiles when online play is on (#486)', async () => {
     const user = userEvent.setup();
     const onFriends = jest.fn();

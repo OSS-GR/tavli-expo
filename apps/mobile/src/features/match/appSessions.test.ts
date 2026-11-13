@@ -54,7 +54,7 @@ describe('game events for real matches (#61)', () => {
     matchSessions.start({
       ...localSetup,
       game: 'asodio',
-      rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+      rulesVersions: { asodio: 'asodio.aceyDeuceyAmerican' },
     });
     expect(tracked()[0]).toMatchObject({
       event: 'game_started',
@@ -78,12 +78,12 @@ describe('game events for real matches (#61)', () => {
     ]);
   });
 
-  it('a Tavli match sends the Plakoto version only for its Plakoto game (#247)', () => {
+  it('a Tavli match sends the preset of each game: federation for Plakoto (#247, #514)', () => {
     const { store } = matchSessions.start({
       ...localSetup,
       game: 'tavli',
       targetPoints: 7,
-      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' },
+      rulesVersions: { asodio: 'asodio.kafeneio' },
     });
     const { dispatch } = store.getState();
     for (let game = 0; game < 2; game += 1) {

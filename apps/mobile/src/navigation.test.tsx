@@ -3,7 +3,12 @@
  * board → menu → Home. (Tests must not live in `src/app`: every file there
  * is a route.)
  */
-import { INVITE_TIME_MS, type createRecordingAnalytics } from '@tavli/contracts';
+import {
+  INVITE_TIME_MS,
+  memoryAppleIdToken,
+  TERMS_VERSION,
+  type createRecordingAnalytics,
+} from '@tavli/contracts';
 import { createGameFlow, portes } from '@tavli/engine';
 import { MAX_OPEN_INVITES } from '@tavli/online';
 import { fireEvent, within } from '@testing-library/react-native';
@@ -21,6 +26,7 @@ import { lastSetupKey, saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
 import { SAVED_MATCH_KEY } from '@/features/match/savedMatch';
+import { MATCH_START_SECONDS } from '@/features/ranked/RankedScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 import { LESSON_SETS, LESSONS } from '@/features/tutorial/lessons';
@@ -32,7 +38,7 @@ import {
 } from '@/features/invites/friendInviteSetup';
 import { RELEASES } from '@/features/whats-new/releases';
 import { WHATS_NEW_STORAGE_KEY, whatsNewSeen } from '@/features/whats-new/seen';
-import { analytics, onlinePlayerId, onlineServer, storage } from '@/services';
+import { analytics, auth, onlinePlayerId, onlineServer, storage, usernames } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../test/clock';
 import { pressMakeInvite } from '../test/signIn';
@@ -332,10 +338,10 @@ describe('app navigation', () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
 
-    // No match yet: the empty state's Play opens New game.
+    // No match yet: the empty state's Play vs bot opens New game.
     await user.press(screen.getByRole('link', { name: 'History' }));
     expect(router.getPathname()).toBe('/history');
-    await user.press(screen.getByRole('button', { name: 'Play' }));
+    await user.press(screen.getByRole('button', { name: 'Play vs bot' }));
     expect(router.getPathname()).toBe('/new-game');
 
     await user.press(screen.getByRole('button', { name: 'Start game' }));
@@ -445,13 +451,12 @@ describe('app navigation', () => {
     expect(router.getPathname()).toBe('/rules/portes');
   });
 
-  it('opens the rules of the Plakoto game of a Tavli match in its version (#247)', async () => {
+  it('opens the plain Plakoto rules from the Plakoto game of a Tavli match (#247, #514)', async () => {
     const user = setupUser();
     const session = matchSessions.start({
       ...defaultSetup('local'),
       targetPoints: 3,
       game: 'tavli',
-      rulesVersions: { ...defaultSetup('local').rulesVersions, plakoto: 'plakoto.federation' },
     });
     const { dispatch } = session.store.getState();
     // Game 1 (Portes, its default rules) ends with a resign; game 2 is Plakoto.
@@ -466,8 +471,9 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
     await user.press(screen.getByRole('button', { name: 'How to play Plakoto' }));
     expect(router.getPathname()).toBe('/rules/plakoto');
-    expect(router.getSearchParams()).toMatchObject({ version: 'plakoto.federation' });
-    expect(screen.getByTestId('rules-section-version')).toBeOnTheScreen();
+    // Plakoto has one rules version, so the page has no version section.
+    expect(router.getSearchParams()).not.toHaveProperty('version');
+    expect(screen.queryByTestId('rules-section-version')).toBeNull();
   });
 
   it('opens the Plakoto rules page', async () => {
@@ -638,6 +644,23 @@ describe('tutorial (#128)', () => {
     await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
     expect(router.getPathname()).toBe('/tutorial');
     expect(router.getSearchParams()).toEqual({ from: 'rules' });
+  });
+
+  it('opens from the empty History, which goes back there on Skip (#521)', async () => {
+    const user = setupUser();
+    await act(async () => consentStore.setState({ status: 'granted' }));
+    recorded.sent.length = 0;
+    const router = await renderRouter('./src/app', { initialUrl: '/history' });
+    await user.press(screen.getByRole('button', { name: 'Learn to play first' }));
+    expect(router.getPathname()).toBe('/tutorial');
+    expect(router.getSearchParams()).toEqual({ from: 'history' });
+    expect(recorded.sent.filter((e) => e.type === 'track')).toContainEqual({
+      type: 'track',
+      event: 'tutorial_started',
+      props: { source: 'history', game: 'portes' },
+    });
+    await user.press(screen.getByRole('button', { name: 'Skip' }));
+    expect(router.getPathname()).toBe('/history');
   });
 
   it('"Not now" on Home hides the card for good', async () => {
@@ -1234,12 +1257,12 @@ describe('play a friend online (#281)', () => {
 });
 
 describe('join with a code (#333)', () => {
-  /** Home → Join with a code → type `text` → Continue. */
+  /** Home → Join with a code → type `text` → Join the game. */
   async function typeCode(user: ReturnType<typeof setupUser>, text: string) {
     await user.press(await screen.findByRole('button', { name: 'Join with a code' }));
     expect(await screen.findByRole('header', { name: 'Join with a code' })).toBeOnTheScreen();
     await user.type(screen.getByTestId('join-code-input'), text);
-    await user.press(screen.getByRole('button', { name: 'Continue' }));
+    await user.press(screen.getByRole('button', { name: 'Join the game' }));
   }
 
   it('opens the typed code as an invite: the free account first, then Accept opens the game', async () => {
@@ -1360,6 +1383,19 @@ describe('your online games on Home (#297)', () => {
     expect(screen.getAllByTestId(/^online-game-/)).toHaveLength(4);
     await user.press(screen.getByTestId(`online-game-${ids[0]}`));
     expect(router.getPathname()).toBe(`/game/${ids[0]}`);
+  });
+
+  it('"See all" with no game shows the empty state: Play a friend and Join with a code (#521)', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    rememberOnlineAccount();
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/online-games' });
+    expect(await screen.findByRole('header', { name: 'No online games' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Play a friend' }));
+    expect(router.getPathname()).toBe('/friend');
+    await act(async () => appRouter.back());
+    await user.press(screen.getByRole('button', { name: 'Join with a code' }));
+    expect(router.getPathname()).toBe('/join');
   });
 
   it('"See all" with no session says it did not load, and makes no account', async () => {
@@ -1661,6 +1697,49 @@ describe('leaderboards (#407)', () => {
     await user.press(await screen.findByTestId('settings-friends'));
     await user.press(await screen.findByRole('button', { name: 'Leaderboards' }));
     expect(router.getPathname()).toBe('/ratings');
+  });
+});
+
+describe('play ranked (#532)', () => {
+  it('a guest opens Play ranked from Home and sees the save step, not the search', async () => {
+    onlineFake.authStore.session = { id: 'g', isGuest: true };
+    rememberOnlineAccount();
+    const seek = jest.spyOn(onlineFake.matchmaking, 'seek');
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByTestId('home-ranked'));
+    expect(router.getPathname()).toBe('/ranked');
+    expect(await screen.findByTestId('ranked-gate')).toBeOnTheScreen();
+    expect(screen.queryByTestId('ranked-find')).toBeNull();
+    expect(seek).not.toHaveBeenCalled();
+  });
+
+  it('a saved player finds a match and lands in the game', async () => {
+    const nonce = await auth!.keyNonce();
+    await auth!.signInWithKey({
+      provider: 'apple',
+      idToken: memoryAppleIdToken('apple-1', nonce),
+      nonce,
+    });
+    rememberOnlineAccount();
+    await usernames!.setMine({ name: 'Maria', acceptTerms: TERMS_VERSION, ageChecked: true });
+    const server = onlineFake.server();
+    server.markSaved('nikos');
+    await server.matchmakingFor('nikos').seek({ game: 'portes' });
+
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/ranked' });
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    expect(await screen.findByTestId('ranked-matched')).toBeOnTheScreen();
+    const seek = await onlineFake.matchmaking.mySeek();
+    if (seek.kind !== 'matched') throw new Error('no match');
+    for (let i = 0; i < MATCH_START_SECONDS; i++) {
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+    }
+    await waitFor(() => expect(router.getPathname()).toBe(`/game/${seek.gameId}`));
   });
 });
 

@@ -25,6 +25,7 @@ export const FEEDBACK_EVENTS = [
   'turnStart',
   'gameWin',
   'matchWin',
+  'clockTick',
 ] as const satisfies readonly FeedbackEvent[];
 export const SOUND_KEYS: readonly SoundKey[] = FEEDBACK_EVENTS;
 export const HAPTIC_KEYS: readonly HapticKey[] = FEEDBACK_EVENTS;

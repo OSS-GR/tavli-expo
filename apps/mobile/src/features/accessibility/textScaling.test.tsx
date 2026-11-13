@@ -104,8 +104,8 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     });
   });
 
-  /** The tutorial up to the Plakoto mother card. */
-  async function tutorialMotherCard() {
+  /** The tutorial up to the end of the Plakoto mother lesson (its long done text). */
+  async function tutorialMotherDone() {
     await renderWithRoot(
       <TutorialScreen
         game="plakoto"
@@ -125,11 +125,11 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       }
       await playLessonByTaps(i, 'plakoto');
     }
-    expect(screen.getByTestId('tutorial-mother-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('tutorial-success')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   }
 
-  it('Tutorial: the Plakoto mother card (#149)', tutorialMotherCard);
+  it('Tutorial: the end of the Plakoto mother lesson (#149, #514)', tutorialMotherDone);
 
   it('First launch: the board step (#350)', async () => {
     await renderWithRoot(<WelcomeBoardScreen onBack={jest.fn()} onContinue={jest.fn()} />);
@@ -203,27 +203,24 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(problems()).toEqual([]);
   });
 
-  it.each(['plakoto', 'asodio', 'tavli'] as const)(
-    'New game with the rules version of %s (#241, #247)',
-    async (game) => {
-      await renderWithRoot(
-        <NewGameScreen
-          mode="local"
-          initial={{
-            ...defaultSetup('local'),
-            game,
-            rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyAmerican' },
-          }}
-          botLevels={{ portes: [], plakoto: [], fevga: [], tavli: [], asodio: [] }}
-          onBack={jest.fn()}
-          onStart={jest.fn()}
-        />,
-      );
-      expect(screen.getByTestId('new-game-rules-version')).toBeOnTheScreen();
-      expect(screen.getByTestId('new-game-rules-version-hint')).toBeOnTheScreen();
-      expect(problems()).toEqual([]);
-    },
-  );
+  it('New game with the rules version of Asodio (#241)', async () => {
+    await renderWithRoot(
+      <NewGameScreen
+        mode="local"
+        initial={{
+          ...defaultSetup('local'),
+          game: 'asodio',
+          rulesVersions: { asodio: 'asodio.aceyDeuceyAmerican' },
+        }}
+        botLevels={{ portes: [], plakoto: [], fevga: [], tavli: [], asodio: [] }}
+        onBack={jest.fn()}
+        onStart={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId('new-game-rules-version')).toBeOnTheScreen();
+    expect(screen.getByTestId('new-game-rules-version-hint')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
 
   /** The game screen in the tall or the classic layout (#184). */
   async function pickLayout(boardLayout: BoardLayoutMode) {
@@ -469,8 +466,8 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       gameScreenCards,
     );
     it('the game menu and the resign dialog', gameMenu);
-    it('the tutorial: the Plakoto mother card', async () => {
-      await tutorialMotherCard();
+    it('the tutorial: the end of the Plakoto mother lesson', async () => {
+      await tutorialMotherDone();
       // The lesson column scrolls as a whole, and Next sits under the dice
       // as wide as the column, so a long label or a large font has room.
       const side = screen.getByTestId('tutorial-side');
@@ -562,14 +559,24 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       expect(await screen.findByTestId('confirm-button')).toBeOnTheScreen();
       expect(problems()).toEqual([]);
 
-      // You run out of time: the game-end sheet.
+      // Your last 10 seconds: the turn clock ring, the red seat and its warning (#530).
       await act(async () => {
-        jest.advanceTimersByTime(60_000 + 1000);
+        jest.advanceTimersByTime(50_000);
+      });
+      expect(screen.getByTestId('strip-bottom-time')).toBeOnTheScreen();
+      expect(screen.getByTestId('strip-bottom').props.accessibilityLabel).toMatch(
+        new RegExp(i18n.t('online.clock.lastSeconds')),
+      );
+      expect(problems()).toEqual([]);
+
+      // You run out of time: the "Time ran out" card.
+      await act(async () => {
+        jest.advanceTimersByTime(10_000 + 1000);
         server.runDueTimeouts();
       });
-      expect(await screen.findByTestId('game-end-card')).toBeOnTheScreen();
+      expect(await screen.findByTestId('time-ran-out-card')).toBeOnTheScreen();
       expect(problems()).toEqual([]);
-      await user.press(screen.getByTestId('next-game-button'));
+      await user.press(screen.getByTestId('time-ran-out-button'));
       await unmount();
 
       // Match end of an online match: no Rematch, names "You" and "Opponent".
@@ -659,7 +666,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       fireEvent.changeText(screen.getByTestId('join-code-input'), 'ABCD234');
     });
     await act(async () => {
-      fireEvent.press(screen.getByTestId('join-continue'));
+      fireEvent(screen.getByTestId('join-code-input'), 'submitEditing');
     });
     expect(screen.getByTestId('join-problem')).toBeOnTheScreen();
     expect(problems()).toEqual([]);

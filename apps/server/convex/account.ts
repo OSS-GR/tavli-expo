@@ -14,7 +14,8 @@
  *    the caller's sign-in key claims (`authKeys`, #397); moves the
  *    caller's Apple tokens to the revoke queue, and schedules the revoke
  *    (`appleTokens.ts`, #398); ends the caller's friendships, both rows
- *    (`deleteFriendsOf`, #406);
+ *    (`deleteFriendsOf`, #406); deletes the caller's Play ranked seek
+ *    (`deleteSeeksOf`, #531);
  * 4. deletes the Better Auth user, its sessions and its accounts, with
  *    Better Auth's own delete (`internalAdapter.deleteUser`) on the
  *    component's tables;
@@ -44,6 +45,7 @@ import { existingPlayer } from './caller';
 import { deleteFriendsOf } from './friends';
 import { resignAs } from './games';
 import { openInvitesOf } from './invites';
+import { deleteSeeksOf } from './matchmaking';
 import { gameOnDelete } from './model/account';
 import { deletePlayerNameOf } from './playerNames';
 import { deleteRatingOf } from './ratings';
@@ -140,6 +142,10 @@ export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promi
   // `deleteRatedPairs`, below, in pages.
   await deleteRatingOf(ctx, callerId);
 
+  // The Play ranked seek (#531): one row at most, so no match can start
+  // with the caller from now on.
+  await deleteSeeksOf(ctx, callerId);
+
   // The sign-in key claims (#397), so the Apple id is free again.
   await deleteKeysOf(ctx, callerId);
 
@@ -179,8 +185,9 @@ export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promi
 
   // The other active games, after this transaction. No new game can
   // start with the caller from now on: a game starts only from
-  // `acceptInvite`, the caller's open invites are gone (above), and the
-  // caller can no longer accept one (`existingPlayer` finds no user).
+  // `acceptInvite` or a Play ranked match, the caller's open invites and
+  // seek are gone (above), and the caller can no longer accept an invite
+  // or seek again (`existingPlayer` / the saved check finds no user).
   // So the pages only shrink the set of active games. Until they run,
   // a game can stay active for a moment; its turn timer (`checkTimeout`)
   // still works, as it reads no user.

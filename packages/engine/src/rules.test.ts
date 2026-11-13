@@ -67,7 +67,8 @@ describe('presets', () => {
     expect(validateRules(preset)).toEqual(preset);
     expect(preset.presetId).toBe(id);
     // portes is version 2: its rotation became Portes only (#24).
-    expect(preset.version).toBe(id === 'portes' ? 2 : 1);
+    // tavli is version 2: its Plakoto game plays federation (#514).
+    expect(preset.version).toBe(id === 'portes' || id === 'tavli' ? 2 : 1);
     expect(Object.isFrozen(preset)).toBe(true);
     expect(Object.isFrozen(preset.match.rotation)).toBe(true);
     for (const group of RULE_GROUPS) expect(Object.isFrozen(preset[group])).toBe(true);
@@ -110,7 +111,7 @@ describe('presets', () => {
   it('tavli differs from portes only in the rotation', () => {
     const { presetId: a, version: v1, match: m1, ...portes } = getPreset('portes');
     const { presetId: b, version: v2, match: m2, ...tavli } = getPreset('tavli');
-    expect([a, b, v1, v2]).toEqual(['portes', 'tavli', 2, 1]);
+    expect([a, b, v1, v2]).toEqual(['portes', 'tavli', 2, 2]);
     expect(tavli).toEqual(portes);
     expect(m1.rotation).toEqual(['portes']);
     expect(m2).toEqual({ ...m1, rotation: ['portes', 'plakoto', 'fevga'] });
@@ -135,7 +136,10 @@ describe('owner decisions (docs/open-questions.md, "Answered")', () => {
     expect(r.match.rematchStarter).toBe('lastGameWinner');
   });
 
-  it('Plakoto mother: offer to concede', () => {
+  it('Plakoto mother: the federation rule (owner, 2026-11-13, #514)', () => {
+    expect(DEFAULT_PRESET_BY_GAME.plakoto).toBe('plakoto.federation');
+    expect(getPreset(DEFAULT_PRESET_BY_GAME.plakoto).mother.motherRule).toBe('federation');
+    // The old default stays, so old games still replay.
     expect(getPreset('plakoto').mother.motherRule).toBe('offerConcede');
   });
 

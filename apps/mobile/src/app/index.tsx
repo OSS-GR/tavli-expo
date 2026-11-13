@@ -18,6 +18,7 @@ import {
   FRIEND_HREF,
   FRIENDS_HREF,
   JOIN_HREF,
+  RANKED_HREF,
   ONLINE_GAMES_HREF,
   RATINGS_HREF,
   WHATS_NEW_HREF,
@@ -37,7 +38,16 @@ import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
 import { whatsNewSeen } from '@/features/whats-new/seen';
-import { auth, botLevels, friends, games, invites, ratings, storage } from '@/services';
+import {
+  auth,
+  botLevels,
+  friends,
+  games,
+  invites,
+  matchmaking,
+  ratings,
+  storage,
+} from '@/services';
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -205,6 +215,7 @@ export default function HomeRoute() {
       // Online play needs the server: a build without one shows "Coming soon".
       onPlayFriend={invites === undefined ? undefined : () => router.push(FRIEND_HREF)}
       onJoinWithCode={invites === undefined ? undefined : () => router.push(JOIN_HREF)}
+      onPlayRanked={matchmaking === undefined ? undefined : () => router.push(RANKED_HREF)}
       // Friends and Leaderboards (#486): the screens say what a guest or
       // a phone with no account can do, so the tiles show to everyone.
       onFriends={auth && friends ? () => router.push(FRIENDS_HREF) : undefined}

@@ -19,7 +19,14 @@ import i18n from '@/i18n';
 import { botLevels, botRunner } from '@/services';
 
 import { gameEnd, onlineBoardStore } from './boardStore';
-import { clockText, clockTickMs, clockUrgent } from './clock';
+import {
+  clockText,
+  clockTickMs,
+  clockUrgent,
+  inLastSeconds,
+  lastSeconds,
+  turnShareLeft,
+} from './clock';
 import {
   DEV_BOT_ID,
   DEV_TICK_MS,
@@ -280,6 +287,39 @@ describe('clockText', () => {
     await i18n.changeLanguage('el');
     expect(clockText(5 * 60 * 60_000, null, i18n.t)).toBe('5 ώρες');
     expect(clockText(1000, 1, i18n.t)).toBe('0:01');
+  });
+});
+
+describe('the turn clock ring (#530)', () => {
+  it('stays red from 10 seconds down to 0 and past it', () => {
+    expect(inLastSeconds(10_001, 1)).toBe(false);
+    expect(inLastSeconds(10_000, 1)).toBe(true);
+    expect(inLastSeconds(0, 1)).toBe(true);
+    expect(inLastSeconds(-5, 2)).toBe(true);
+    // No time limit: never.
+    expect(inLastSeconds(0, null)).toBe(false);
+  });
+
+  it('counts the last 10 seconds of a timed turn only', () => {
+    expect(lastSeconds(10_001, 1)).toBeNull();
+    expect(lastSeconds(10_000, 1)).toBe(10);
+    expect(lastSeconds(9_001, 1)).toBe(10);
+    expect(lastSeconds(9_000, 1)).toBe(9);
+    expect(lastSeconds(1, 2)).toBe(1);
+    expect(lastSeconds(0, 1)).toBeNull();
+    expect(lastSeconds(-5, 1)).toBeNull();
+    // A turn with no time limit has no last seconds.
+    expect(lastSeconds(5_000, null)).toBeNull();
+  });
+
+  it('gives the share of the turn left, from 1 to 0', () => {
+    expect(turnShareLeft(60_000, 1)).toBe(1);
+    expect(turnShareLeft(30_000, 1)).toBe(0.5);
+    expect(turnShareLeft(60_000, 2)).toBe(0.5);
+    expect(turnShareLeft(0, 1)).toBe(0);
+    expect(turnShareLeft(-1, 1)).toBe(0);
+    // A late view of the deadline never draws more than a full ring.
+    expect(turnShareLeft(90_000, 1)).toBe(1);
   });
 });
 

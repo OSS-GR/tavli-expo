@@ -481,7 +481,7 @@ describe('rotation and missing variants', () => {
   it('gameRules: other games use their default preset with the match flags', () => {
     const own = createMatch({ rules: rules({ match: { rotation: ['portes', 'plakoto'] } }) });
     expect(gameRules(own, 'portes')).toBe(own.rules);
-    expect(gameRules(own, 'plakoto').presetId).toBe('plakoto');
+    expect(gameRules(own, 'plakoto').presetId).toBe('plakoto.federation');
     // tavli is a match preset: every game uses its own default preset.
     const match = createMatch({ rules: TAVLI, targetPoints: 5 });
     const portesRules = gameRules(match, 'portes');
@@ -489,8 +489,8 @@ describe('rotation and missing variants', () => {
     expect(portesRules.match).toEqual(match.rules.match);
     expect(startNextGame(match, 'white').rules).toEqual(portesRules);
     const plakoto = gameRules(match, 'plakoto');
-    expect(plakoto.presetId).toBe('plakoto');
-    expect(plakoto.mother.motherRule).toBe('offerConcede');
+    expect(plakoto.presetId).toBe('plakoto.federation');
+    expect(plakoto.mother.motherRule).toBe('federation');
     expect(plakoto.match).toEqual(match.rules.match);
     expect(plakoto.match.targetPoints).toBe(5);
     expect(gameRules(match, 'fevga').movement.direction).toBe('parallel');
@@ -502,6 +502,20 @@ describe('rotation and missing variants', () => {
     expect(gameRules(federation, 'plakoto').mother.motherRule).toBe('federation');
     expect(gameRules(federation, 'portes').presetId).toBe('portes');
     expect(gameRules(federation, 'fevga').presetId).toBe('fevga');
+  });
+
+  it('gameRules: a version 1 tavli match keeps the old Plakoto rules (#514)', () => {
+    const old = createMatch({ rules: { ...TAVLI, version: 1 }, targetPoints: 5 });
+    const plakoto = gameRules(old, 'plakoto');
+    expect(plakoto.presetId).toBe('plakoto');
+    expect(plakoto.mother.motherRule).toBe('offerConcede');
+    expect(plakoto.match).toEqual(old.rules.match);
+    // The other games are the same in both versions.
+    expect(gameRules(old, 'portes').presetId).toBe('portes');
+    expect(gameRules(old, 'fevga').presetId).toBe('fevga');
+    // A match read back from storage keeps its version.
+    const read = parseMatch(serializeMatch(old));
+    expect(gameRules(read, 'plakoto').mother.motherRule).toBe('offerConcede');
   });
 });
 

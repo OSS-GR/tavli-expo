@@ -14,10 +14,10 @@
  *
  * House rules (#207, a first part of Kafeneio mode #58): the opening roll
  * (`match.openingRoll` in the engine). The hint under it says who starts
- * and how. Plakoto and Asodio also get the rules version (#241): the
- * engine preset of the match (`RULES_VERSIONS`). Its hint says what
- * changes. A Tavli match shows the version of its Plakoto game, "Rules
- * version (Plakoto)" (#247). Portes and Fevga have one preset: no version.
+ * and how. Asodio also gets the rules version (#241): the engine preset
+ * of the match (`RULES_VERSIONS`). Its hint says what changes. The other
+ * games have one preset: no version. Plakoto plays the federation rules
+ * only (owner, 2026-11-13, #514).
  * Both groups have a "Standard" option, so each radio names its group for
  * screen readers (#243), for example "Opening roll: Standard".
  */
@@ -135,14 +135,11 @@ export function NewGameScreen({
       ? t('newGame.houseRules.chosenStarterRollsHintBot')
       : t(`newGame.houseRules.${openingRoll}Hint`);
 
-  // The rules version (#241): only for a game with more than one preset.
-  // A Tavli match picks the version of its Plakoto game (#247).
+  // The rules version (#241): only for a game with more than one preset
+  // (Asodio). Plakoto plays the federation rules only (#514).
   const versionGame = versionedGameOf(game);
   const version = versionGame === null ? null : rulesVersions[versionGame];
-  const versionLabel =
-    game === 'tavli'
-      ? t('newGame.houseRules.rulesVersionPlakoto')
-      : t('newGame.houseRules.rulesVersion');
+  const versionLabel = t('newGame.houseRules.rulesVersion');
   const versionOptions: SegmentOption<RulesVersion>[] =
     versionGame === null
       ? []
@@ -343,7 +340,7 @@ export function NewGameScreen({
               />
               <Text style={styles.hint}>{openingHint}</Text>
             </View>
-            {/* The rules version (#241): Plakoto and Asodio, and Tavli's Plakoto game (#247). */}
+            {/* The rules version (#241): Asodio only. */}
             {version !== null ? (
               <View style={styles.rulePart}>
                 <Text style={styles.subLabel}>{versionLabel}</Text>

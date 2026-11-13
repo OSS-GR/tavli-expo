@@ -1,5 +1,5 @@
 /** Links and route params of the app shell (wireframes, "Route map"). Pure. */
-import type { TutorialGame, TutorialSource } from '@tavli/contracts';
+import type { RankedGame, TutorialGame, TutorialSource } from '@tavli/contracts';
 import type { PresetId } from '@tavli/engine';
 
 import {
@@ -34,7 +34,8 @@ export function firstGameHref(game: TutorialGame = 'portes') {
 }
 
 /**
- * The tutorial, opened from Home, a rules page or Settings (#128).
+ * The tutorial, opened from Home, a rules page, Settings (#128) or the
+ * empty History (#521).
  * `game` picks the lesson set (#149, #159); Portes, the default, has no param.
  */
 export function tutorialHref(from: TutorialSource, game: TutorialGame = 'portes') {
@@ -60,6 +61,14 @@ export function inviteHref(code: string) {
 
 /** Play a friend online (#281): pick the game, then make an invite. */
 export const FRIEND_HREF = '/friend';
+
+/** Play ranked (#532): a new player close to your rating, two minutes a turn. */
+export const RANKED_HREF = '/ranked';
+
+/** Play ranked with a game picked: New player at the end of a ranked match. */
+export function rankedHref(game: RankedGame) {
+  return { pathname: '/ranked', params: { game } } as const;
+}
 
 /** Join with a code (#333): type the code of a friend's invite. */
 export const JOIN_HREF = '/join';
@@ -107,9 +116,8 @@ export function reviewHref(id: string) {
 /**
  * The rules page of a game (`/rules/portes`, …). `preset` is the engine
  * preset in play or chosen: a rules version of `variant` that is not the
- * default (#241) adds `version` (`/rules/plakoto?version=plakoto.federation`).
- * Another game's version adds nothing: the Tavli page of a match whose
- * Plakoto game plays Federation (#247) is the plain Tavli page.
+ * default (#241) adds `version` (`/rules/asodio?version=asodio.aceyDeuceyGreek`).
+ * Another game's version adds nothing.
  */
 export function rulesHref(variant: string, preset?: PresetId) {
   const other = preset === undefined ? null : otherVersion(preset);
@@ -152,7 +160,7 @@ export function parseTutorialGame(value: Param): TutorialGame {
   return TUTORIAL_GAMES.find((g) => g === game) ?? 'portes';
 }
 
-const TUTORIAL_SOURCES: readonly TutorialSource[] = ['home', 'rules', 'settings'];
+const TUTORIAL_SOURCES: readonly TutorialSource[] = ['home', 'rules', 'settings', 'history'];
 
 /** The `from` param of the tutorial. Anything else counts as Home. */
 export function parseTutorialSource(value: Param): TutorialSource {

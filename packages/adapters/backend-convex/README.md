@@ -43,6 +43,13 @@ Version: `convex` 1.49.0, a peer dependency (the app installs it). Keep it on th
 - **Errors.** A `ConvexError` with `FriendsErrorData` rejects with `{ code, message }` (`toFriendsError`), `NOT_SIGNED_IN` and `NOT_SAVED` too. Any other error stays as it is.
 - `apps/server/convex/convexFriends.test.ts` checks the names and types against `api` and runs `friendsContract()` through the adapter.
 
+### Play ranked (#531)
+
+- **`createConvexMatchmaking({ client })`** needs `mutation`, `query` and `onUpdate` (`ConvexMatchmakingClient`). `seek` runs `matchmaking:seek` with `{ game }`, `cancel` runs `cancelSeek`, and `mySeek` and `lookingCounts` run their queries once.
+- **`watchMySeek`** watches the `mySeek` query (`onUpdate`): a copy of each new seek, never inside the call and never after the stop function, like `watchMyGames`.
+- **Errors.** A `ConvexError` with `MatchmakingErrorData` rejects with `{ code, message }` (`toMatchmakingError`): `NOT_SIGNED_IN`, `NOT_SAVED` or `BAD_REQUEST`. Any other error stays as it is.
+- `apps/server/convex/convexMatchmaking.test.ts` checks the names and types against `api` and runs `matchmakingContract()` through the adapter.
+
 ### Update needed (#390)
 
 - **`createConvexAppUpdates({ client })`** needs only `query` (`ConvexAppUpdatesClient`).

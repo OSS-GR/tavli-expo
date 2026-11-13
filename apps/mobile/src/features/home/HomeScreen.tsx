@@ -84,6 +84,11 @@ export interface HomeScreenProps {
    * with an online server).
    */
   onJoinWithCode?: () => void;
+  /**
+   * Opens Play ranked (#532). The tile shows only with it (a build with
+   * online play); the online tiles then come first.
+   */
+  onPlayRanked?: () => void;
   /** Opens Friends (#406). The tile shows only with it (a build with online play). */
   onFriends?: () => void;
   /** Opens the Leaderboards (#407). The tile shows only with it. */
@@ -120,6 +125,7 @@ export function HomeScreen({
   onHistory,
   onPlayFriend,
   onJoinWithCode,
+  onPlayRanked,
   onFriends,
   onRatings,
   botLevels,
@@ -152,6 +158,35 @@ export function HomeScreen({
   const levels = levelList(botLevels, t);
   const hasSave = continueCard != null;
   const modesTitle = hasSave ? t('home.newGame') : t('home.moreModes');
+
+  const localTile = (
+    <ModeTile
+      testID="home-local"
+      icon="users"
+      title={t('home.local.title')}
+      subtitle={t('home.local.subtitle')}
+      onPress={() => onNewGame('local')}
+    />
+  );
+  const friendTile = onPlayFriend ? (
+    <ModeTile
+      testID="home-friend"
+      icon="globe"
+      title={t('home.friend.title')}
+      subtitle={t('home.friend.subtitle')}
+      onPress={onPlayFriend}
+    />
+  ) : (
+    <ModeTile
+      testID="home-friend"
+      kind="locked"
+      icon="globe"
+      title={t('home.friend.title')}
+      subtitle={t('home.friend.subtitle')}
+      chip={t('common.comingSoon')}
+      onPress={() => showToast(t('home.friend.soon'))}
+    />
+  );
 
   return (
     <View style={styles.screen}>
@@ -211,36 +246,20 @@ export function HomeScreen({
               onPress={() => onNewGame('bot')}
             />
           ) : null}
-          <View style={styles.cell}>
-            {onPlayFriend ? (
+          {/* Play ranked (#532, Figma 81:2): the two online tiles first. */}
+          <View style={styles.cell}>{friendTile}</View>
+          {onPlayRanked ? (
+            <View style={styles.cell}>
               <ModeTile
-                testID="home-friend"
-                icon="globe"
-                title={t('home.friend.title')}
-                subtitle={t('home.friend.subtitle')}
-                onPress={onPlayFriend}
+                testID="home-ranked"
+                icon="trophy"
+                title={t('home.ranked.title')}
+                subtitle={t('home.ranked.subtitle')}
+                onPress={onPlayRanked}
               />
-            ) : (
-              <ModeTile
-                testID="home-friend"
-                kind="locked"
-                icon="globe"
-                title={t('home.friend.title')}
-                subtitle={t('home.friend.subtitle')}
-                chip={t('common.comingSoon')}
-                onPress={() => showToast(t('home.friend.soon'))}
-              />
-            )}
-          </View>
-          <View style={styles.cell}>
-            <ModeTile
-              testID="home-local"
-              icon="users"
-              title={t('home.local.title')}
-              subtitle={t('home.local.subtitle')}
-              onPress={() => onNewGame('local')}
-            />
-          </View>
+            </View>
+          ) : null}
+          <View style={styles.cell}>{localTile}</View>
           {onFriends ? (
             <View style={styles.cell}>
               <ModeTile

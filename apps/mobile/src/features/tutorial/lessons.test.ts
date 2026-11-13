@@ -1,5 +1,6 @@
 import {
   DEFAULT_PRESET_BY_GAME,
+  applyGameAction,
   currentBoard,
   formatMove,
   getPreset,
@@ -187,13 +188,18 @@ describe('Plakoto lessons (#149)', () => {
     expect(currentBoard(end).points[15]?.pinned).toBe('white');
   });
 
-  it('3: pins the mother on point 1; the mother question comes after the turn', () => {
+  it('3: pins the mother on point 1; the pin wins 2 points (federation, #514)', () => {
     expect(offered('mother', startLesson(lesson('mother')))).toEqual(['5/1*']);
     const { flow } = playThrough('mother');
     expect(currentBoard(flow).points[0]).toEqual({ white: 1, black: 1, pinned: 'black' });
-    // The rest of the roll could still be played: the lesson is done with the pin.
-    expect(flow.phase).toBe('moving');
-    expect(flow.state.rules.mother.motherRule).toBe('offerConcede');
+    expect(flow.state.rules.mother.motherRule).toBe('federation');
+    // White has nothing on its own point 24, so the pin wins at once.
+    expect(currentBoard(flow).points[23]?.white).toBe(0);
+    // The lesson is done with the pin. In a game, Confirm then ends it: White wins 2.
+    expect(flow.phase).toBe('awaiting-confirm');
+    const end = applyGameAction(flow, { type: 'confirm', player: 'white' });
+    expect(end.phase).toBe('game-over');
+    expect(end.result).toMatchObject({ winner: 'white', points: 2 });
   });
 
   it('4: bears off the last two checkers', () => {
