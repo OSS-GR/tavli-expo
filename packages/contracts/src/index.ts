@@ -247,6 +247,7 @@ export {
   type GameResultKind,
   type MatchGame,
   type OpeningRollRule,
+  type RankedSearchEnd,
   type ThemeKind,
   type TutorialGame,
   type TutorialSource,

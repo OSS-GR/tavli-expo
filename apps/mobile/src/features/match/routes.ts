@@ -1,5 +1,5 @@
 /** Links and route params of the app shell (wireframes, "Route map"). Pure. */
-import type { TutorialGame, TutorialSource } from '@tavli/contracts';
+import type { RankedGame, TutorialGame, TutorialSource } from '@tavli/contracts';
 import type { PresetId } from '@tavli/engine';
 
 import {
@@ -61,6 +61,14 @@ export function inviteHref(code: string) {
 
 /** Play a friend online (#281): pick the game, then make an invite. */
 export const FRIEND_HREF = '/friend';
+
+/** Play ranked (#532): a new player close to your rating, two minutes a turn. */
+export const RANKED_HREF = '/ranked';
+
+/** Play ranked with a game picked: New player at the end of a ranked match. */
+export function rankedHref(game: RankedGame) {
+  return { pathname: '/ranked', params: { game } } as const;
+}
 
 /** Join with a code (#333): type the code of a friend's invite. */
 export const JOIN_HREF = '/join';

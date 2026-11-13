@@ -90,6 +90,33 @@ export function afterRatedMatch(
   };
 }
 
+/** What a rated match is worth to one player: points won on a win, lost on a loss. */
+export interface MatchStakes {
+  readonly win: number;
+  readonly lose: number;
+}
+
+/**
+ * What a rated match of `length` points against a player rated `other` is
+ * worth to `me` (Play ranked, #532: "Win +13 · lose −11"). The same math
+ * as `afterRatedMatch` with my own factor, rounded to whole points. The
+ * phone knows only the shown ratings, so it is a close guess.
+ */
+export function matchStakes(
+  me: Pick<RatingRecord, 'rating' | 'experience'>,
+  other: number,
+  length: number,
+): MatchStakes {
+  const points = Math.max(1, length);
+  const factor = experienceFactor(me.experience);
+  const step = (winner: number, loser: number) =>
+    4 * Math.sqrt(points) * (1 - winChance(winner, loser, points)) * factor;
+  return {
+    win: Math.round(step(me.rating, other)),
+    lose: Math.round(step(other, me.rating)),
+  };
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The UTC day of `ms`: whole days since 1970-01-01. */

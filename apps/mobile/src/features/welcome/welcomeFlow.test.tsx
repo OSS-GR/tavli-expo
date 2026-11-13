@@ -86,6 +86,7 @@ const routes = {
   'friends/invite/[id]': stub('friend invite'),
   'add/[token]': stub('friend link'),
   ratings: stub('leaderboards'),
+  ranked: stub('play ranked'),
   'whats-new': stub("what's new"),
 };
 

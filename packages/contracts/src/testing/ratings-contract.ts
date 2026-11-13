@@ -167,7 +167,7 @@ export function ratingsContract(): readonly RatingsContractCheck[] {
         const ratings = subject.ratingsFor('alice');
         same(
           await ratings.mine(),
-          { rating: START_RATING, matches: 0, shown: true, listed: false },
+          { rating: START_RATING, matches: 0, experience: 0, shown: true, listed: false },
           'mine',
         );
         const board = await ratings.friendsBoard();
@@ -195,6 +195,8 @@ export function ratingsContract(): readonly RatingsContractCheck[] {
         const alice = await subject.ratingsFor('alice').mine();
         // Two new players, 3 points: 5 · 4·√3 · 0.5 = 17.32.
         same([bob.rating, bob.matches], [START_RATING + 17, 1], "bob's rating");
+        // Experience is the points played: one match to 3.
+        same(bob.experience, 3, "bob's experience");
         same([alice.rating, alice.matches], [START_RATING - 17, 1], "alice's rating");
         same((await subject.ratingsFor('carol').mine()).matches, 0, "carol's matches");
       },
@@ -209,6 +211,7 @@ export function ratingsContract(): readonly RatingsContractCheck[] {
           {
             rating: START_RATING,
             matches: 0,
+            experience: 0,
             shown: true,
             listed: false,
           },
