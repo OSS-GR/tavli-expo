@@ -44,6 +44,7 @@ export {
   matchedPlayers,
   matchedSeek,
   mayPair,
+  PAIR_CHECKS_PER_RUN,
   pickPairs,
   planSeek,
   waitingSeek,

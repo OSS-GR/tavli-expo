@@ -161,10 +161,19 @@ export function candidatePairs<Seek extends SeekRecord>(
 }
 
 /**
+ * How many pairs one matching run asks `allowed` about at most. Each ask
+ * reads the blocks and the pair count on Convex, so this keeps one run
+ * well under a transaction's read limit. The pairs it leaves wait for
+ * the next run (the next seek, or a waiting seek's tick).
+ */
+export const PAIR_CHECKS_PER_RUN = 300;
+
+/**
  * The pairs to match now, best first (`candidatePairs`): each player in
  * one pair at most, and only pairs `allowed` says yes to (the servers
  * pass `mayPair` on their own blocks and pair counts). `allowed` runs
- * only for pairs that could still be taken, in order.
+ * only for pairs that could still be taken, in order, and at most
+ * `PAIR_CHECKS_PER_RUN` times.
  */
 export async function pickPairs<Seek extends SeekRecord>(
   seeks: readonly Seek[],
@@ -173,8 +182,11 @@ export async function pickPairs<Seek extends SeekRecord>(
 ): Promise<(readonly [Seek, Seek])[]> {
   const taken = new Set<string>();
   const picked: (readonly [Seek, Seek])[] = [];
+  let checks = 0;
   for (const [a, b] of candidatePairs(seeks, now)) {
     if (taken.has(a.playerId) || taken.has(b.playerId)) continue;
+    if (checks >= PAIR_CHECKS_PER_RUN) break;
+    checks += 1;
     if (!(await allowed(a, b))) continue;
     taken.add(a.playerId);
     taken.add(b.playerId);

@@ -73,7 +73,13 @@ import { rankedGame } from './schema';
 /** How often the matching of a waiting seek runs again while its range grows. */
 export const MATCH_TICK_MS = 5 * 1000;
 
-/** How many waiting seeks of one game the matching reads at most, oldest first. */
+/**
+ * How many waiting seeks of one game the matching reads at most, oldest
+ * first. With more players waiting for one game, the newer seeks join
+ * the matching only as older ones leave (matched, cancelled or expired).
+ * Fine at our scale; raise it (with `PAIR_CHECKS_PER_RUN` in mind) or
+ * read by rating band when one game has more players waiting.
+ */
 export const MATCH_READ = 100;
 
 /** How many waiting seeks of one game `lookingCounts` reads at most. */

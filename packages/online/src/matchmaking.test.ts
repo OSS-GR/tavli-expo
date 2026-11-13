@@ -19,6 +19,7 @@ import {
   isSeekExpired,
   matchedPlayers,
   mayPair,
+  PAIR_CHECKS_PER_RUN,
   pickPairs,
   planSeek,
 } from './matchmaking';
@@ -159,6 +160,20 @@ describe('picking the pairs', () => {
     // a–d, a–e and d–e are all 0 apart: the pair with the oldest seek (a) first.
     const pairs = await pickPairs([e, d, a], T0 + 4000, () => true);
     expect(pairs.map(([x, y]) => [x.playerId, y.playerId])).toEqual([['a', 'd']]);
+  });
+
+  it('asks about at most PAIR_CHECKS_PER_RUN pairs in one run', async () => {
+    // 40 players at one rating: 780 pairs, none allowed.
+    const seeks = Array.from({ length: 40 }, (_, i) => seek(`p${i}`, 1500, T0 + i));
+    let asked = 0;
+    const none = await pickPairs(seeks, T0 + 40, () => {
+      asked += 1;
+      return false;
+    });
+    expect(none).toEqual([]);
+    expect(asked).toBe(PAIR_CHECKS_PER_RUN);
+    // Pairs it may take are still found within the cap.
+    expect(await pickPairs(seeks, T0 + 40, () => true)).toHaveLength(20);
   });
 
   it('skips a pair the server does not allow, and tries the next', async () => {
