@@ -1,4 +1,4 @@
-import { AVATAR_WOODS, avatarWood, initialsOf } from './avatar';
+import { AVATAR_WOODS, avatarWood, initialsOf, sideWood } from './avatar';
 
 describe('avatarWood', () => {
   it('gives the same player the same wood every time', () => {
@@ -8,6 +8,13 @@ describe('avatarWood', () => {
   it('uses every wood over many players', () => {
     const woods = new Set(Array.from({ length: 200 }, (_, i) => avatarWood(`player-${i}`)));
     expect([...woods].sort()).toEqual([...AVATAR_WOODS].sort());
+  });
+});
+
+describe('sideWood', () => {
+  it('gives White the light wood and Black the dark wood, as on the board', () => {
+    expect(sideWood('white')).toBe('bone');
+    expect(sideWood('black')).toBe('ebony');
   });
 });
 

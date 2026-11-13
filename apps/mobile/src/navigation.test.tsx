@@ -149,7 +149,7 @@ describe('app navigation', () => {
     ).toBeOnTheScreen();
 
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
-    await user.press(screen.getByRole('button', { name: /^Exit to home/ }));
+    await user.press(screen.getByRole('button', { name: /^Exit to Home/ }));
     expect(router.getPathname()).toBe('/');
 
     // The match is saved: Home offers to continue it.
@@ -160,7 +160,7 @@ describe('app navigation', () => {
 
     // A new game asks first, because it ends the saved one.
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
-    await user.press(screen.getByRole('button', { name: /^Exit to home/ }));
+    await user.press(screen.getByRole('button', { name: /^Exit to Home/ }));
     await user.press(screen.getByRole('button', { name: /^Pass-and-play/ }));
     await user.press(screen.getByRole('button', { name: 'Start game' }));
     expect(screen.getByText('Start a new game?')).toBeOnTheScreen();
@@ -326,7 +326,9 @@ describe('app navigation', () => {
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     const resignMatchFromMenu = async () => {
       await user.press(screen.getByRole('button', { name: 'Game menu' }));
-      await user.press(screen.getByRole('button', { name: 'Resign match, Bot wins the match' }));
+      await user.press(
+        screen.getByRole('button', { name: 'Resign the match, Bot wins the match' }),
+      );
       await user.press(screen.getByRole('button', { name: 'Resign' }));
     };
 
@@ -348,7 +350,7 @@ describe('app navigation', () => {
       jest.advanceTimersByTime(10_000);
     });
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
-    await user.press(screen.getByRole('button', { name: 'Resign game, Bot wins this game' }));
+    await user.press(screen.getByRole('button', { name: 'Resign this game, Bot wins 2 points' }));
     await user.press(screen.getByRole('button', { name: 'Resign' }));
     const card = screen.getByTestId('game-end-card');
     expect(
@@ -357,7 +359,7 @@ describe('app navigation', () => {
     expect(within(card).getByText('You 0 – 2 Bot')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: /^Next game/ }));
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
-    await user.press(screen.getByRole('button', { name: 'Resign match, Bot wins the match' }));
+    await user.press(screen.getByRole('button', { name: 'Resign the match, Bot wins the match' }));
     // The dialog says that the game in play counts, with the score after it.
     expect(
       screen.getByText('Bot wins the match. The game in play counts: Bot wins 2 points.'),
@@ -890,7 +892,7 @@ describe('online games (#255)', () => {
     expect(matchSessions.current()).toBeNull();
 
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
-    await user.press(screen.getByRole('button', { name: /^Resign match/ }));
+    await user.press(screen.getByRole('button', { name: /^Resign the match/ }));
     await user.press(screen.getByRole('button', { name: 'Resign' }));
     await act(async () => {
       jest.advanceTimersByTime(MATCH_END_DELAY_MS);

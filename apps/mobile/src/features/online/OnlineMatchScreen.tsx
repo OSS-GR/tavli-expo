@@ -339,19 +339,18 @@ function OnlineBoard({
           game: variantName(latest.game.state.variant, t),
         })
       : undefined;
-  const score = t('game.end.score', {
-    white: name('white'),
-    black: name('black'),
-    whiteScore: flow.match.score.white,
-    blackScore: flow.match.score.black,
-  });
 
   let content = null;
   if (overlay.kind === 'menu') {
     content = (
       <GameMenu
         gameLabel={gameLabel}
-        summary={t('online.summary', { game, score })}
+        about={t('online.label', { game })}
+        score={{
+          names: { white: name('white'), black: name('black') },
+          score: flow.match.score,
+          target: flow.match.targetPoints,
+        }}
         resignGameHint={null}
         resignMatchHint={
           finished ? null : t('game.menu.resignMatchHint', { name: name(opponent(side)) })
@@ -431,7 +430,7 @@ function OnlineBoard({
           if (!held) close();
         }}
         closeLabel={t('game.menu.resume')}
-        look={overlay.kind === 'menu' ? 'sheet' : 'dialog'}
+        look={overlay.kind === 'menu' ? 'raised' : 'dialog'}
         // The game screen turns with the phone (#185); its menu and dialog too.
         turns>
         {content}
