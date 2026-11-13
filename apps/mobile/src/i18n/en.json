@@ -1013,6 +1013,7 @@
     "title": "Join with a code",
     "intro": "Type the code from your friend's invite.",
     "label": "Invite code",
+    "fieldHint": "A code has {{length}} letters and digits.",
     "continue": "Join the game",
     "problem": {
       "short": "The code is too short. A code has {{length}} characters.",
@@ -1024,7 +1025,7 @@
   "onlineGames": {
     "empty": {
       "title": "No online games",
-      "body": "Invite a friend and play at your own pace. Each turn can wait up to a day."
+      "body": "Invite a friend and play live or at your own pace."
     }
   },
   "notifications": {

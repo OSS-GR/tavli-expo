@@ -24,7 +24,9 @@
  * - Keyboard: it opens with the screen, and the slots and the button stay
  *   above it (`KeyboardAvoidingView` on iOS; Android resizes the window).
  *   With a screen reader on, it does not open by itself: the reader
- *   starts at the title, and a tap on the field opens it.
+ *   starts at the title, and a tap on the field opens it. Screen readers
+ *   hear the code length as the field's hint. A pasted link with no code
+ *   says why at once.
  *   The keyboard's Go key checks the text, also before 8 characters.
  * - Focus moves to the title when the screen opens. Large fonts scroll and
  *   the slots grow (the two groups may stack): no text has a line limit.
@@ -72,7 +74,8 @@ export function JoinCodeScreen({ onCode, onBack }: JoinCodeScreenProps) {
   const titleRef = useFocusOnShow();
   const screenReader = useScreenReaderAnswer();
   const length = INVITE_CODE_LENGTH;
-  const slots = codeSlots(text);
+  // Code points, so a pasted emoji takes one slot, not two.
+  const slots = [...codeSlots(text)];
 
   const problemText = problem === null ? null : t(`join.problem.${problem}`, { length });
 
@@ -122,42 +125,48 @@ export function JoinCodeScreen({ onCode, onBack }: JoinCodeScreenProps) {
                 </View>
               ))}
             </View>
-            <TextInput
-              // Mounted again once the screen reader answer is in, so
-              // `autoFocus` follows it.
-              key={screenReader === undefined ? 'asking' : 'answered'}
-              testID="join-code-input"
-              style={styles.input}
-              value={text}
-              onChangeText={(next) => {
-                // A typed key past the last slot does nothing.
-                const keyAtEnd = next.length === text.length + 1 && next.startsWith(text);
-                if (keyAtEnd && slots.length >= length && codeSlots(next).length > length) return;
-                // A pasted link or message keeps only its code.
-                const typed = readTypedCode(next);
-                setText(
-                  typed.kind === 'code' && typed.code.length < next.length ? typed.code : next,
-                );
-                // A new text gets a new check.
-                setProblem(null);
-              }}
-              onSubmitEditing={submit}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              accessibilityLabel={t('join.label')}
-              autoFocus={screenReader === false}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              autoComplete="off"
-              spellCheck={false}
-              importantForAutofill="no"
-              caretHidden
-              selectionColor="transparent"
-              // Latin letters on iOS, even when the phone uses a Greek keyboard.
-              keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'default'}
-              returnKeyType="go"
-              submitBehavior="blurAndSubmit"
-            />
+            {/* The field waits for the screen reader answer (a few ms), so
+                `autoFocus` follows it and the field never mounts twice. */}
+            {screenReader === undefined ? null : (
+              <TextInput
+                testID="join-code-input"
+                style={styles.input}
+                value={text}
+                onChangeText={(next) => {
+                  // A typed key past the last slot does nothing, also with
+                  // the caret moved inside the text.
+                  const oneKey = [...next].length === [...text].length + 1;
+                  if (oneKey && slots.length >= length && [...codeSlots(next)].length > length) {
+                    return;
+                  }
+                  // A pasted link or message keeps only its code.
+                  const typed = readTypedCode(next);
+                  setText(
+                    typed.kind === 'code' && typed.code.length < next.length ? typed.code : next,
+                  );
+                  // A new text gets a new check. A pasted link with no code
+                  // leaves the slots empty, so it says why at once.
+                  setProblem(typed.kind === 'problem' && typed.problem === 'link' ? 'link' : null);
+                }}
+                onSubmitEditing={submit}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                accessibilityLabel={t('join.label')}
+                accessibilityHint={t('join.fieldHint', { length })}
+                autoFocus={!screenReader}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                autoComplete="off"
+                spellCheck={false}
+                importantForAutofill="no"
+                caretHidden
+                selectionColor="transparent"
+                // Latin letters on iOS, even when the phone uses a Greek keyboard.
+                keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'default'}
+                returnKeyType="go"
+                submitBehavior="blurAndSubmit"
+              />
+            )}
           </View>
           <FieldProblem text={problemText} testID="join-problem" />
           <ActionButton

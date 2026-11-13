@@ -79,8 +79,30 @@ describe('JoinCodeScreen', () => {
     await user.type(field(), 'abcd23456');
     expect(field().props.value).toBe('abcd2345');
     expect(tiles()).toEqual(['A', 'B', 'C', 'D', '2', '3', '4', '5']);
+    await fireEvent.changeText(field(), '');
     await fireEvent.changeText(field(), 'ABCD23456');
     expect(field().props.value).toBe('ABCD23456');
+  });
+
+  it('stops a 9th key typed inside the text too', async () => {
+    await open();
+    await fireEvent.changeText(field(), 'ABCD2345');
+    await fireEvent.changeText(field(), 'ABCDX2345');
+    expect(field().props.value).toBe('ABCD2345');
+  });
+
+  it('says at once that a pasted link has no code', async () => {
+    await open();
+    await fireEvent.changeText(field(), 'https://tavlaki.com/i/');
+    expect(tiles()).toEqual([]);
+    expect(screen.getByTestId('join-problem')).toHaveTextContent(
+      'This link has no invite code. Check the link, or type the code.',
+    );
+  });
+
+  it('tells screen readers how long a code is', async () => {
+    await open();
+    expect(field().props.accessibilityHint).toBe('A code has 8 letters and digits.');
   });
 
   it('opens the keyboard by itself with no screen reader', async () => {
@@ -138,6 +160,7 @@ describe('JoinCodeScreen', () => {
       'This is not a code. A code has only Latin letters and digits, with no 0, O, 1, I or L.',
     );
 
+    await fireEvent.changeText(field(), '');
     await fireEvent.changeText(field(), 'ABCD23456');
     await fireEvent(field(), 'submitEditing');
     expect(screen.getByTestId('join-problem')).toHaveTextContent(
