@@ -22,7 +22,7 @@ import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { RoundButton } from '@/components/RoundButton';
@@ -139,6 +139,8 @@ export function HomeScreen({
   hour,
 }: HomeScreenProps) {
   const { t } = useTranslation();
+  const { rt } = useUnistyles();
+  const perRow = rt.fontScale > ONE_COLUMN_FONT_SCALE ? 1 : 2;
   const [toast, showToast] = useToast();
   useEffect(() => {
     if (notice !== null) showToast(notice);
@@ -187,6 +189,56 @@ export function HomeScreen({
       onPress={() => showToast(t('home.friend.soon'))}
     />
   );
+
+  // Plain rows of two (one with a large font), never a wrapping row: iOS
+  // measured the tiles of a wrapping row at no width and drew them very
+  // tall, with the links below on top of them (build 33).
+  // Order (Figma 81:2): Play a friend, Play ranked, Pass-and-play, Friends,
+  // Leaderboards.
+  const gridTiles: Cell[] = [{ key: 'friend', node: friendTile }];
+  if (onPlayRanked) {
+    gridTiles.push({
+      key: 'ranked',
+      node: (
+        <ModeTile
+          testID="home-ranked"
+          icon="trophy"
+          title={t('home.ranked.title')}
+          subtitle={t('home.ranked.subtitle')}
+          onPress={onPlayRanked}
+        />
+      ),
+    });
+  }
+  gridTiles.push({ key: 'local', node: localTile });
+  if (onFriends) {
+    gridTiles.push({
+      key: 'friends',
+      node: (
+        <ModeTile
+          testID="home-friends"
+          icon="handshake"
+          title={t('home.friends.title')}
+          subtitle={t('home.friends.subtitle')}
+          onPress={onFriends}
+        />
+      ),
+    });
+  }
+  if (onRatings) {
+    gridTiles.push({
+      key: 'ratings',
+      node: (
+        <ModeTile
+          testID="home-ratings"
+          icon="trophy"
+          title={t('home.ratings.title')}
+          subtitle={t('home.ratings.subtitle')}
+          onPress={onRatings}
+        />
+      ),
+    });
+  }
 
   return (
     <View style={styles.screen}>
@@ -246,42 +298,7 @@ export function HomeScreen({
               onPress={() => onNewGame('bot')}
             />
           ) : null}
-          {/* Play ranked (#532, Figma 81:2): the two online tiles first. */}
-          <View style={styles.cell}>{friendTile}</View>
-          {onPlayRanked ? (
-            <View style={styles.cell}>
-              <ModeTile
-                testID="home-ranked"
-                icon="trophy"
-                title={t('home.ranked.title')}
-                subtitle={t('home.ranked.subtitle')}
-                onPress={onPlayRanked}
-              />
-            </View>
-          ) : null}
-          <View style={styles.cell}>{localTile}</View>
-          {onFriends ? (
-            <View style={styles.cell}>
-              <ModeTile
-                testID="home-friends"
-                icon="handshake"
-                title={t('home.friends.title')}
-                subtitle={t('home.friends.subtitle')}
-                onPress={onFriends}
-              />
-            </View>
-          ) : null}
-          {onRatings ? (
-            <View style={styles.cell}>
-              <ModeTile
-                testID="home-ratings"
-                icon="trophy"
-                title={t('home.ratings.title')}
-                subtitle={t('home.ratings.subtitle')}
-                onPress={onRatings}
-              />
-            </View>
-          ) : null}
+          <CellRows cells={gridTiles} perRow={perRow} />
         </View>
 
         {/* The other links in one list (Figma). Screen readers hear How to
@@ -320,6 +337,50 @@ export function HomeScreen({
       <Toast text={toast} />
     </View>
   );
+}
+
+export interface Cell {
+  key: string;
+  node: ReactNode;
+  /** Takes a whole row. */
+  wide?: boolean;
+}
+
+/** The cells in rows (`inRows`); the cells of a row share its width and height. */
+function CellRows({ cells, perRow }: { cells: readonly Cell[]; perRow: number }) {
+  return inRows(cells, perRow).map((row) => (
+    <View key={row.map((cell) => cell.key).join()} style={styles.row}>
+      {row.map((cell) => (
+        <View key={cell.key} style={styles.cell}>
+          {cell.node}
+        </View>
+      ))}
+    </View>
+  ));
+}
+
+/**
+ * Cells in rows of `perRow`; a wide cell gets a row of its own. A lone
+ * cell in the last row fills it too (`styles.cell` is `flex: 1`).
+ */
+export function inRows(cells: readonly Cell[], perRow: number): Cell[][] {
+  const rows: Cell[][] = [];
+  let row: Cell[] = [];
+  for (const cell of cells) {
+    if (cell.wide) {
+      if (row.length > 0) rows.push(row);
+      rows.push([cell]);
+      row = [];
+      continue;
+    }
+    row.push(cell);
+    if (row.length === perRow) {
+      rows.push(row);
+      row = [];
+    }
+  }
+  if (row.length > 0) rows.push(row);
+  return rows;
 }
 
 /**
@@ -386,14 +447,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.textDim,
   },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    gap: theme.space.md,
   },
-  // Two tiles a row; one a row with a large font. Equal heights in a row.
+  // Two cells a row (one with a large font, `inRows`); the cells of a row
+  // share its width and its height.
+  row: {
+    flexDirection: 'row',
+    gap: theme.space.md,
+  },
   cell: {
-    flexGrow: 1,
-    flexBasis: rt.fontScale > ONE_COLUMN_FONT_SCALE ? '100%' : 0,
-    minWidth: 140,
+    flex: 1,
   },
 }));

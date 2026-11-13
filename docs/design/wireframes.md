@@ -189,6 +189,7 @@ Not drawn (#350).
   - **Learn to play** row (#128, #517): a cap icon, title, one line, a small **Start** button and a close button (×, "Not now"). Shows until the tutorial is finished or dismissed.
   - Mode tiles (`ModeTile.tsx`: a tray, a bare brass icon, the title in Piazzolla) under a section title: "New game" with a saved game (then **Play vs bot** is a wide tile first), else "More ways to play". No tile is brass.
     - **Play a friend** ("Online, with a link") and **Pass-and-play** ("2 players, 1 phone"), then **Friends** and **Leaderboards**, two in a row. With a font scale above 1.3 each takes a row.
+    - The tiles sit in plain rows (`inRows` and `CellRows` in `HomeScreen.tsx`): two a row, one a row above font scale 1.3. A wide cell takes a row of its own, and a lone cell in the last row fills it. The cells of a row share its height, so two tiles side by side always match (a wrapping row could not do that, #539).
     - **Play a friend** without an online server: dashed tile with a "Coming soon" chip.
   - One links list (`SectionCard`, bare icons, chevrons): **Join with a code** (with online play), **How to play** (opens `/rules/portes`) and **History**. Screen readers hear How to play and History as links.
   - Icons are Lucide line icons (ISC) drawn with Skia (`components/Icon.tsx`, `components/icons.ts`).

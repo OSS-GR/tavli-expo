@@ -8,7 +8,7 @@ import { homeIntroDue, resetIntrosForTest } from '@/features/intro/introRuns';
 import { startBoard } from '@/features/rules/content';
 
 import { ContinueCard } from './ContinueCard';
-import { HomeScreen, levelList, type HomeScreenProps } from './HomeScreen';
+import { HomeScreen, inRows, levelList, type Cell, type HomeScreenProps } from './HomeScreen';
 import { QUICK_START_GAMES } from './QuickStartHero';
 
 function setup(
@@ -404,5 +404,24 @@ describe('<HomeScreen />', () => {
   it('shows a notice once, for example a broken save', async () => {
     await render(<HomeScreen {...setup()} notice="Your saved game could not be opened." />);
     expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');
+  });
+});
+
+describe('inRows', () => {
+  const cell = (key: string, wide = false): Cell => ({ key, node: null, wide });
+  const keys = (rows: Cell[][]) => rows.map((row) => row.map((c) => c.key));
+
+  it('puts two cells a row, and a wide cell in a row of its own', () => {
+    const cells = [cell('a'), cell('b'), cell('c'), cell('join', true), cell('d')];
+    expect(keys(inRows(cells, 2))).toEqual([['a', 'b'], ['c'], ['join'], ['d']]);
+  });
+
+  it('puts one cell a row with a large font', () => {
+    expect(keys(inRows([cell('a'), cell('b')], 1))).toEqual([['a'], ['b']]);
+  });
+
+  it('gives no empty row', () => {
+    expect(inRows([], 2)).toEqual([]);
+    expect(keys(inRows([cell('wide', true)], 2))).toEqual([['wide']]);
   });
 });
