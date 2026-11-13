@@ -60,12 +60,10 @@ export function isGameChoice(value: unknown): value is GameChoice {
 /**
  * The rules versions (#241, a part of Kafeneio mode #58): the engine
  * presets a game can start from, the default (`DEFAULT_PRESET_BY_GAME`)
- * first. Only Plakoto and Asodio have more than one. The Plakoto game of a
- * Tavli match plays the Plakoto version too (#247); its Portes and Fevga
- * games have one preset.
+ * first. Only Asodio has more than one. Plakoto plays the federation rules
+ * only (owner, 2026-11-13, #514), so a Tavli match has no choice either.
  */
 export const RULES_VERSIONS = {
-  plakoto: ['plakoto', 'plakoto.federation'],
   asodio: ['asodio.kafeneio', 'asodio.aceyDeuceyGreek', 'asodio.aceyDeuceyAmerican'],
 } as const satisfies { readonly [G in GameChoice]?: readonly [PresetId, ...PresetId[]] };
 
@@ -80,22 +78,32 @@ export type RulesVersion<G extends VersionedGame = VersionedGame> =
 export type RulesVersions = { readonly [G in VersionedGame]: RulesVersion<G> };
 
 export const DEFAULT_RULES_VERSIONS: RulesVersions = {
-  plakoto: RULES_VERSIONS.plakoto[0],
   asodio: RULES_VERSIONS.asodio[0],
 };
 
 export function isVersionedGame(game: unknown): game is VersionedGame {
-  return game === 'plakoto' || game === 'asodio';
+  return game === 'asodio';
 }
 
 /**
- * The game whose rules version a match of `game` plays: the game itself
- * for Plakoto and Asodio, Plakoto for a Tavli match (its Plakoto game,
- * #247), else `null` (Portes and Fevga have one preset).
+ * The game whose rules version a match of `game` plays: Asodio for an
+ * Asodio match, else `null` (the other games have one preset).
  */
 export function versionedGameOf(game: GameChoice): VersionedGame | null {
-  if (game === 'tavli') return 'plakoto';
   return isVersionedGame(game) ? game : null;
+}
+
+/**
+ * Presets that matches of `game` played before #514, when Plakoto had a
+ * rules version choice: the old Plakoto default (`plakoto`, resign or play
+ * on), and a Tavli match with the federation Plakoto (#247). A saved match
+ * of such a preset still loads and plays on with its own rules, and
+ * history still reads its record. No new match starts with one.
+ */
+export function legacyPresets(game: GameChoice): readonly PresetId[] {
+  if (game === 'plakoto') return ['plakoto'];
+  if (game === 'tavli') return ['plakoto.federation'];
+  return [];
 }
 
 /** True when `value` is a rules version of `game`. */
@@ -106,13 +114,14 @@ export function isRulesVersion<G extends VersionedGame>(
   return (RULES_VERSIONS[game] as readonly unknown[]).includes(value);
 }
 
-/** Any saved value as rules versions: a missing or wrong one is the default (#241). */
+/**
+ * Any saved value as rules versions: a missing or wrong one is the default
+ * (#241). A Plakoto version from before #514 is dropped.
+ */
 export function sanitizeVersions(raw: unknown): RulesVersions {
   const input = isRecord(raw) ? raw : {};
-  const plakoto = input['plakoto'];
   const asodio = input['asodio'];
   return {
-    plakoto: isRulesVersion('plakoto', plakoto) ? plakoto : DEFAULT_RULES_VERSIONS.plakoto,
     asodio: isRulesVersion('asodio', asodio) ? asodio : DEFAULT_RULES_VERSIONS.asodio,
   };
 }
@@ -128,16 +137,13 @@ const GAME_PRESETS: { readonly [G in GameChoice]: PresetId } = {
 
 /**
  * The engine preset of a match of `game`: its chosen rules version, if it
- * has a choice. A Tavli match (#247) is the `tavli` preset with the default
- * Plakoto, else the chosen Plakoto version with the Tavli rotation: the
- * engine plays that preset in the Plakoto game only, and the default
- * presets in Portes and Fevga (`gameRules`, `docs/rules/tavli-match.md`).
+ * has a choice. A Tavli match is the `tavli` preset: each game plays its
+ * default preset (`gameRules`, `docs/rules/tavli-match.md`).
  */
 export function gamePreset(
   game: GameChoice,
   versions: RulesVersions = DEFAULT_RULES_VERSIONS,
 ): PresetId {
-  if (game === 'tavli') return otherVersion(versions.plakoto) ?? GAME_PRESETS.tavli;
   return isVersionedGame(game) ? versions[game] : GAME_PRESETS[game];
 }
 
@@ -194,8 +200,6 @@ export function otherVersion(presetId: PresetId): OtherVersion | null {
  * engine id has a dot, and a dot nests keys in i18next.
  */
 export const VERSION_KEYS = {
-  plakoto: 'plakoto',
-  'plakoto.federation': 'plakotoFederation',
   'asodio.kafeneio': 'asodioKafeneio',
   'asodio.aceyDeuceyGreek': 'asodioGreek',
   'asodio.aceyDeuceyAmerican': 'asodioAmerican',
@@ -239,8 +243,7 @@ export function isOpeningRollRule(value: unknown): value is OpeningRollRule {
  * we set `match.rotation` to the game ("single game" in `tavli-match.md`).
  * Tavli keeps its rotation Portes → Plakoto → Fevga. `openingRoll` is the
  * house rule (#207); the preset's own value (the federation rule) is the
- * default. `versions` picks the preset of Plakoto and Asodio (#241), and
- * of the Plakoto game of a Tavli match (#247, `gamePreset`).
+ * default. `versions` picks the preset of Asodio (#241, `gamePreset`).
  */
 export function gameRuleSet(
   game: GameChoice,
@@ -329,9 +332,9 @@ export interface MatchSetup {
   /** The house rule for the opening roll (#207). Default: the federation rule. */
   readonly openingRoll: OpeningRollRule;
   /**
-   * The rules version of Plakoto and Asodio (#241). Each game keeps its
-   * own, so the last choice of one game stays when another is picked; only
-   * the one of `game` is played. Default: `DEFAULT_PRESET_BY_GAME`.
+   * The rules version of Asodio (#241). It stays when another game is
+   * picked; only an Asodio match plays it. Default: `DEFAULT_PRESET_BY_GAME`.
+   * Plakoto had one too before #514; `sanitizeSetup` drops it.
    */
   readonly rulesVersions: RulesVersions;
 }

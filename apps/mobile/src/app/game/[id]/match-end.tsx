@@ -14,14 +14,18 @@ import { matchSessions } from '@/features/match/appSessions';
 import { MatchEndScreen } from '@/features/match/MatchEndScreen';
 import { MissingGame } from '@/features/match/MissingGame';
 import {
+  friendInviteHref,
   gameHref,
   isLocalGameId,
   newGameHref,
   parseIdParam,
+  rankedHref,
+  RATINGS_HREF,
   reviewHref,
 } from '@/features/match/routes';
 import { OnlineConnect } from '@/features/online/OnlineConnect';
 import { OnlineMatchEnd } from '@/features/online/OnlineMatchEnd';
+import { friends, ratings } from '@/services';
 
 /** Back to Home: pops to it, or opens it when this was the first screen. */
 function goHome() {
@@ -41,6 +45,11 @@ export default function MatchEndRoute() {
             safety={safety}
             me={me}
             onHome={goHome}
+            {...(ratings === undefined ? {} : { ratings })}
+            {...(friends === undefined ? {} : { friends })}
+            onLeaderboards={() => router.push(RATINGS_HREF)}
+            onNewPlayer={(game) => router.replace(rankedHref(game))}
+            onPlayAgain={(playerId) => router.replace(friendInviteHref(playerId))}
           />
         )}
       </OnlineConnect>

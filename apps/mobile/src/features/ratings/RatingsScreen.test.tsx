@@ -246,7 +246,13 @@ describe('How ratings work', () => {
 });
 
 describe('boardStatus', () => {
-  const mine = { rating: 1500, matches: MIN_BOARD_MATCHES, shown: true, listed: true };
+  const mine = {
+    rating: 1500,
+    matches: MIN_BOARD_MATCHES,
+    experience: 3 * MIN_BOARD_MATCHES,
+    shown: true,
+    listed: true,
+  };
   it('names why the global board does or does not show the player', () => {
     expect(boardStatus(mine)).toBe('listed');
     expect(boardStatus({ ...mine, shown: false })).toBe('hidden');

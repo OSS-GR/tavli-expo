@@ -112,6 +112,8 @@ function RootStack() {
           {/* Play a friend online (#281): the setup, then the waiting screen. */}
           <Stack.Screen name="friend/index" />
           <Stack.Screen name="friend/[code]" />
+          {/* Play ranked (#532): the setup, the search and the match found. */}
+          <Stack.Screen name="ranked" />
           {/* Join with a code (#333): opens the invite route above. */}
           <Stack.Screen name="join" />
           {/* Friends (#406): the list, Add a friend, a friend invite, a friend link. */}

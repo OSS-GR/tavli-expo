@@ -4,6 +4,7 @@ import {
   VARIANT_REGISTRY,
   createBoard,
   createSeededRng,
+  getPreset,
   getVariant,
   opponent,
   plakoto,
@@ -211,8 +212,9 @@ describe('training (dev only)', () => {
 
   it('plays on when the Plakoto mother question waits', () => {
     // White pins Black's lone mother (on White's 1) with a 3 from White's 4.
+    // The old `plakoto` preset asks; the default (federation, #514) does not.
     const before = {
-      ...plakoto.initialState({ startingPlayer: 'white' }),
+      ...plakoto.initialState({ startingPlayer: 'white', rules: getPreset('plakoto') }),
       board: createBoard(
         {
           white: { points: { 24: 5, 13: 5, 8: 3, 4: 2 } },

@@ -3,6 +3,7 @@ import {
   MATCH_FLOW_SCHEMA_VERSION,
   VARIANT_REGISTRY,
   createSeededRng,
+  getPreset,
   getVariant,
   type Dice,
 } from '@tavli/engine';
@@ -409,7 +410,7 @@ describe('the opening roll house rule in the save (#207)', () => {
 });
 
 describe('the rules version in the save (#241)', () => {
-  const versions = { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' } as const;
+  const versions = { asodio: 'asodio.aceyDeuceyGreek' } as const;
 
   it.each([
     ['plakoto', 'plakoto.federation'],
@@ -433,12 +434,9 @@ describe('the rules version in the save (#241)', () => {
       const result = parseSavedMatch(JSON.stringify(old), LEVELS);
       expect(result.kind).toBe('ok');
       if (result.kind !== 'ok') return;
-      expect(result.saved.setup.rulesVersions).toEqual({
-        plakoto: 'plakoto',
-        asodio: 'asodio.kafeneio',
-      });
+      expect(result.saved.setup.rulesVersions).toEqual({ asodio: 'asodio.kafeneio' });
       expect(result.saved.flow.match.rules.presetId).toBe(
-        game === 'plakoto' ? 'plakoto' : 'asodio.kafeneio',
+        game === 'plakoto' ? 'plakoto.federation' : 'asodio.kafeneio',
       );
     }
   });
@@ -452,7 +450,7 @@ describe('the rules version in the save (#241)', () => {
     const bad = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
     bad.setup.rulesVersions = { ...versions, asodio: 'asodio.aceyDeuceyAmerican' };
     expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
-    // The version of another game does not matter: only `game` is played.
+    // A Plakoto version from before #514 does not matter: it is dropped.
     const fine = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
     fine.setup.rulesVersions = { ...versions, plakoto: 'plakoto' };
     expect(parseSavedMatch(JSON.stringify(fine), LEVELS).kind).toBe('ok');
@@ -477,10 +475,7 @@ describe('rules saved with a retired flag (Q27)', () => {
   });
 });
 
-describe('the Plakoto version of a Tavli match in the save (#247)', () => {
-  const federation = { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' } as const;
-  const tavli: MatchSetup = { ...defaultSetup('local'), game: 'tavli', rulesVersions: federation };
-
+describe('saves from before #514, when Plakoto had a rules version', () => {
   /** Ends the game in play with a resign, then starts the next one. */
   function nextGame(s: MatchSession) {
     if (flowOf(s).game.phase === 'opening-roll') openGame(s);
@@ -488,49 +483,59 @@ describe('the Plakoto version of a Tavli match in the save (#247)', () => {
     s.store.getState().dispatch({ type: 'nextGame' });
   }
 
-  it('resumes in the middle: Portes plays its default, Plakoto plakoto.federation', () => {
+  it('resumes an old Plakoto save in the old rules: the mother question', () => {
     const storage = createMemoryStorage();
-    const s = registry(storage).start({ ...tavli, targetPoints: 7 });
-    expect(flowOf(s).match.rules.presetId).toBe('plakoto.federation');
-    expect(flowOf(s).game.state.rules.presetId).toBe('portes');
+    const s = registry(storage).start({ ...defaultSetup('local'), game: 'plakoto' });
     openGame(s);
+    const old = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    // Before #514 the default Plakoto match started from the `plakoto` preset.
+    expect(old.log[0].type).toBe('start');
+    old.log[0].rules = { ...getPreset('plakoto'), match: old.log[0].rules.match };
+    old.setup.rulesVersions = { plakoto: 'plakoto', asodio: 'asodio.kafeneio' };
+    const result = parseSavedMatch(JSON.stringify(old), LEVELS);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.saved.setup.rulesVersions).toEqual(DEFAULT_RULES_VERSIONS);
+    expect(result.saved.flow.match.rules.presetId).toBe('plakoto');
+    expect(result.saved.flow.game.state.rules.mother.motherRule).toBe('offerConcede');
+  });
 
-    // A restart in the Portes game keeps the version for the Plakoto game.
-    let restored = registry(storage).get(s.id)!;
-    expect(restored.setup.rulesVersions).toEqual(federation);
+  it('resumes an old Tavli save whose Plakoto game plays federation (#247)', () => {
+    const storage = createMemoryStorage();
+    const s = registry(storage).start({ ...defaultSetup('local'), game: 'tavli', targetPoints: 7 });
+    openGame(s);
+    const old = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
+    // Before #514 such a match started from the federation preset with the Tavli rotation.
+    expect(old.log[0].type).toBe('start');
+    old.log[0].rules = { ...getPreset('plakoto.federation'), match: old.log[0].rules.match };
+    old.setup.rulesVersions = { plakoto: 'plakoto.federation', asodio: 'asodio.kafeneio' };
+    storage.setString(SAVED_MATCH_KEY, JSON.stringify(old));
+
+    const restored = registry(storage).get(s.id)!;
+    expect(restored.setup.rulesVersions).toEqual(DEFAULT_RULES_VERSIONS);
+    expect(flowOf(restored).match.rules.presetId).toBe('plakoto.federation');
     expect(flowOf(restored).game.state.rules.presetId).toBe('portes');
     nextGame(restored);
     expect(flowOf(restored).game.state.variant).toBe('plakoto');
-    expect(flowOf(restored).game.state.rules.presetId).toBe('plakoto.federation');
-
-    // And a restart in the Plakoto game.
-    restored = registry(storage).get(s.id)!;
-    expect(flowOf(restored).game.state.rules.presetId).toBe('plakoto.federation');
     expect(flowOf(restored).game.state.rules.mother.motherRule).toBe('federation');
     nextGame(restored);
     expect(flowOf(restored).game.state.rules.presetId).toBe('fevga');
   });
 
-  it('loads a Tavli save from before #247 with the default Plakoto', () => {
-    // Before #247 a Tavli match always played `tavli`, whatever the setup said.
-    const s = registry(createMemoryStorage()).start(tavli);
-    const old = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
-    const standard = registry(createMemoryStorage()).start({
-      ...tavli,
-      rulesVersions: DEFAULT_RULES_VERSIONS,
-    });
-    old.log = flowOf(standard).log;
-    const result = parseSavedMatch(JSON.stringify(old), LEVELS);
-    expect(result.kind).toBe('ok');
-    if (result.kind !== 'ok') return;
-    expect(result.saved.flow.match.rules.presetId).toBe('tavli');
-    expect(result.saved.setup.rulesVersions).toEqual(DEFAULT_RULES_VERSIONS);
+  it('a new Tavli match is the tavli preset: its Plakoto game plays federation', () => {
+    const storage = createMemoryStorage();
+    const s = registry(storage).start({ ...defaultSetup('local'), game: 'tavli', targetPoints: 7 });
+    expect(flowOf(s).match.rules.presetId).toBe('tavli');
+    nextGame(s);
+    const restored = registry(storage).get(s.id)!;
+    expect(flowOf(restored).game.state.variant).toBe('plakoto');
+    expect(flowOf(restored).game.state.rules.presetId).toBe('plakoto.federation');
   });
 
-  it('drops a Tavli save whose log plays another Plakoto version than the setup', () => {
-    const s = registry(createMemoryStorage()).start(tavli);
+  it('drops a save whose preset belongs to another game', () => {
+    const s = registry(createMemoryStorage()).start({ ...defaultSetup('local'), game: 'tavli' });
     const bad = JSON.parse(serializeSavedMatch(s.id, s.setup, flowOf(s), 42));
-    bad.setup.rulesVersions = DEFAULT_RULES_VERSIONS;
+    bad.setup.game = 'plakoto';
     expect(parseSavedMatch(JSON.stringify(bad), LEVELS).kind).toBe('broken');
   });
 });

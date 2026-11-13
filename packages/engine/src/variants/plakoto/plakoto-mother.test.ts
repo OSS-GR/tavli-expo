@@ -202,7 +202,7 @@ describe('Plakoto in a match', () => {
     const after1 = recordGameResult(match, { winner: 'black', points: 1, reason: 'borneOff' });
     const state = startNextGame(after1, 'black');
     expect(state.variant).toBe('plakoto');
-    expect(state.rules.mother.motherRule).toBe('offerConcede');
+    expect(state.rules.mother.motherRule).toBe('federation');
     expect(formatPlakoto(state.board)).toBe('w: 24x15 ; b: 24x15');
   });
 

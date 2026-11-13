@@ -14,9 +14,14 @@
  * (`app/game/[id]/match-end.tsx`) starts the rematch and navigates.
  *
  * An online match (#255) passes `online` instead of `setup`: its seats
- * and label. It has no Rematch and no Change settings.
+ * and label. It has no Rematch and no Change settings. A ranked match lost
+ * on two time outs in a row says so (`endReason`, #530). A ranked match
+ * (#532) adds its rating change (`extra`) and its own buttons (`actions`)
+ * above Home.
  */
+import type { OnlineMatchEndReason } from '@tavli/contracts';
 import { createRematch, opponent, type Match, type PerPlayer, type PlayerId } from '@tavli/engine';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -46,6 +51,16 @@ export interface OnlineMatchEnd {
   readonly label: string;
   /** Report or block the other player (#435). Without it there is no button. */
   readonly onReportOrBlock?: () => void;
+  /**
+   * Why the match ended, from the server (#529). With `timeouts-in-a-row`
+   * the screen says that `match.resignedBy` missed two turns in a row
+   * (#530), not that they resigned.
+   */
+  readonly endReason?: OnlineMatchEndReason | null;
+  /** A ranked match (#532): the rating change, under the games. */
+  readonly extra?: ReactNode;
+  /** A ranked match (#532): its buttons, above Home. */
+  readonly actions?: ReactNode;
 }
 
 interface LocalMatchEnd {
@@ -120,16 +135,21 @@ export function MatchEndScreen({
   // score as it was (docs/rules/tavli-match.md, "Resigning"), so the screen
   // says who resigned the match (#181).
   const timedOut = timedOutBy(match);
+  const missedTwo = online?.endReason === 'timeouts-in-a-row' ? match.resignedBy : null;
   const reason =
-    match.resignedBy !== null
-      ? seats[match.resignedBy].you
-        ? t('game.end.resignedMatch_you')
-        : t('game.end.resignedMatch', { name: name(match.resignedBy) })
-      : timedOut !== null
-        ? seats[timedOut].you
-          ? t('game.end.timeout_you')
-          : t('game.end.timeout', { name: name(timedOut) })
-        : null;
+    missedTwo !== null
+      ? seats[missedTwo].you
+        ? t('game.end.missedTwo_you')
+        : t('game.end.missedTwo', { name: name(missedTwo) })
+      : match.resignedBy !== null
+        ? seats[match.resignedBy].you
+          ? t('game.end.resignedMatch_you')
+          : t('game.end.resignedMatch', { name: name(match.resignedBy) })
+        : timedOut !== null
+          ? seats[timedOut].you
+            ? t('game.end.timeout_you')
+            : t('game.end.timeout', { name: name(timedOut) })
+          : null;
   const scoreLine = t('game.end.score', {
     white: name('white'),
     black: name('black'),
@@ -276,6 +296,7 @@ export function MatchEndScreen({
             })}
           </CardFrame>
         ) : null}
+        {online?.extra}
         {/* Pushes the buttons down on a tall screen; with a large font all of it scrolls. */}
         <View style={styles.spacer} />
         <View style={styles.actions}>
@@ -297,6 +318,8 @@ export function MatchEndScreen({
               </Text>
             </View>
           ) : null}
+          {/* A ranked match's own buttons (#532), above Review and Home. */}
+          {online?.actions}
           {onReview ? (
             <View style={styles.pair}>
               <ActionButton

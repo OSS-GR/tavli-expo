@@ -10,7 +10,7 @@
  */
 
 import type { GameTransportErrorData, OnlineGameStatus } from '@tavli/contracts';
-import { isTurnTimeMinutes } from '@tavli/contracts';
+import { RANKED_TURN_TIME_MINUTES, isTurnTimeMinutes } from '@tavli/contracts';
 import type { FlowEvent, MatchFlow, MoveInput, PerPlayer, PlayerId } from '@tavli/engine';
 
 import { OnlineGameError, checkDraft, deadlineAfter, isTimedOut, sideOf } from './online-game';
@@ -60,6 +60,20 @@ export function checkNewGame(callerId: string, players: PerPlayer<string>): void
 export function checkTurnTimeMinutes(turnTimeMinutes: number | null): void {
   if (!isTurnTimeMinutes(turnTimeMinutes)) {
     throw new OnlineGameError('BAD_REQUEST', 'turn time minutes must be an integer of 1 or more');
+  }
+}
+
+/**
+ * Checks the turn time of a new ranked game (ADR-0009, #529): every Play
+ * ranked game has `RANKED_TURN_TIME_MINUTES`. A friend game may have any
+ * valid turn time (`checkTurnTimeMinutes`).
+ */
+export function checkRankedGame(ranked: boolean, turnTimeMinutes: number | null): void {
+  if (ranked && turnTimeMinutes !== RANKED_TURN_TIME_MINUTES) {
+    throw new OnlineGameError(
+      'BAD_REQUEST',
+      `a ranked game has ${RANKED_TURN_TIME_MINUTES} minutes per turn`,
+    );
   }
 }
 

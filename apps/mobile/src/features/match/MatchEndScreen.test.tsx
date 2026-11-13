@@ -1,3 +1,4 @@
+import type { OnlineMatchEndReason } from '@tavli/contracts';
 import {
   createMatch,
   getPreset,
@@ -13,6 +14,7 @@ import { themes } from '@tavli/ui';
 import { AccessibilityInfo } from 'react-native';
 import * as Reanimated from 'react-native-reanimated';
 
+import { onlineSeats } from '@/features/online/seats';
 import i18n from '@/i18n';
 
 import { MatchEndScreen } from './MatchEndScreen';
@@ -263,6 +265,64 @@ describe('<MatchEndScreen />', () => {
     await show(localSetup, resignMatch(playedMatch([['black', 1, 'timeout']]), 'black')).view;
     expect(screen.getByText('Player 2 resigned the match.')).toBeOnTheScreen();
     expect(screen.queryByText(/ran out of time/)).toBeNull();
+  });
+
+  describe('a ranked match lost on two time outs in a row (#530)', () => {
+    /** Black ran out of time twice in a row; the server ended the match as their resign. */
+    const missedTwo = () =>
+      resignMatch(
+        playedMatch([
+          ['black', 1, 'timeout'],
+          ['white', 1, 'timeout'],
+        ]),
+        'black',
+      );
+    function showOnline(me: PlayerId, endReason: OnlineMatchEndReason | null) {
+      return renderWithRoot(
+        <MatchEndScreen
+          online={{
+            seats: onlineSeats(me, i18n.t, { kind: 'username', name: 'nikos_k' }),
+            me,
+            label: 'Portes · online',
+            endReason,
+          }}
+          match={missedTwo()}
+          onHome={jest.fn()}
+        />,
+      );
+    }
+
+    it('tells the winner that the other player missed two turns in a row', async () => {
+      await showOnline('white', 'timeouts-in-a-row');
+      expect(screen.getByRole('header', { name: 'You won the match!' })).toBeOnTheScreen();
+      expect(screen.getByText('nikos_k missed two turns in a row.')).toBeOnTheScreen();
+      expect(screen.queryByText(/resigned/)).toBeNull();
+    });
+
+    it('tells the loser that they missed two turns in a row', async () => {
+      await showOnline('black', 'timeouts-in-a-row');
+      expect(screen.getByRole('header', { name: 'nikos_k wins the match!' })).toBeOnTheScreen();
+      expect(screen.getByText('You missed two turns in a row.')).toBeOnTheScreen();
+    });
+
+    it('a plain resign of the match still says resigned', async () => {
+      await showOnline('white', 'resigned');
+      expect(screen.getByText('nikos_k resigned the match.')).toBeOnTheScreen();
+    });
+
+    it('says it in Greek', async () => {
+      await act(async () => {
+        await i18n.changeLanguage('el');
+      });
+      try {
+        await showOnline('black', 'timeouts-in-a-row');
+        expect(screen.getByText('Έχασες δύο σειρές στη σειρά.')).toBeOnTheScreen();
+      } finally {
+        await act(async () => {
+          await i18n.changeLanguage('en');
+        });
+      }
+    });
   });
 
   it('says a loss on time in Greek', async () => {

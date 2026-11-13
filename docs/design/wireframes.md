@@ -224,7 +224,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - **Bot level:** **Easy / Medium / Hard**. A level the bot cannot play in the chosen game shows locked, with "coming soon" under it. Helper text explains the selected level.
   - Info box "Who starts? Each player rolls one die. High die starts." Since #207 the **House rules** part (below) replaces it: its hint says who starts under the chosen rule.
   - **House rules** (#207, both modes): **Opening roll**: **Standard** (default, the federation rule: the starter plays the two opening dice) / **Roll again** (the starter rolls both dice again) / **Choose** (the players pick who starts). Helper text explains the selected rule.
-  - **Rules version** (#241, Plakoto and Asodio only, under Opening roll): Plakoto **Standard** (default) / **Federation**; Asodio **Standard** (default, the kafeneio rules) / **Greek** / **American** (Acey-Deucey). Helper text says what the selected version changes. Tavli shows the Plakoto choice for its Plakoto game, titled **Rules version (Plakoto)** («Παραλλαγή (Πλακωτό)», #247). Portes and Fevga show no version.
+  - **Rules version** (#241, Asodio only, under Opening roll): **Standard** (default, the kafeneio rules) / **Greek** / **American** (Acey-Deucey). Helper text says what the selected version changes. Portes, Plakoto, Fevga and Tavli show no version: Plakoto plays the federation rules only (owner, 2026-11-13, #514).
   - Both groups have a **Standard** option, so a screen reader hears the group with each option: "Opening roll: Standard", "Rules version: Standard" («Πρώτη ζαριά: Κανονικά», «Παραλλαγή: Κανονική») (#243). The visible text stays short.
   - **Start game** (main button, bottom).
 - **States:**
@@ -351,7 +351,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 <img src="wireframes/17-dialog-mother-pinned.png" width="300" alt="Plakoto: mother pinned dialog">
 
-- Needed for `motherRule="offerConcede"` (`docs/rules/plakoto.md`).
+- Needed for `motherRule="offerConcede"` (`docs/rules/plakoto.md`). Since #514 only old games use it: new games play the federation rule.
 - Shows to the player whose mother (last checker on their start point) gets pinned.
 - Title "Your mother is pinned", a small pinned-checker picture, and a plain explanation.
 - Two buttons with equal weight: **Resign (lose 2)** and **Play on**. The dialog cannot be dismissed without a choice.

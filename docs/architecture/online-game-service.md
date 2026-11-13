@@ -8,7 +8,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 
 | Path | What it holds |
 |---|---|
-| `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `drafts`, `invites`, `pushTokens`, `authKeys`, `usedKeyNonces`, `appleTokens`, `appleRevokes`, `playerNames`, `blocks`, `reports`, `friends`, `friendRequests`, `friendLinks` and `friendSearches` |
+| `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `drafts`, `invites`, `pushTokens`, `authKeys`, `usedKeyNonces`, `appleTokens`, `appleRevokes`, `playerNames`, `blocks`, `reports`, `friends`, `friendRequests`, `friendLinks`, `friendSearches`, `ratings`, `ratedPairs` and `seeks` |
 | `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
 | `apps/server/convex/playerNames.ts` | [Guest names and usernames](#playernames) (#400, #405): `ensureGuestNumber`, `nameRowOf`, `nameOf`, `namesOfPlayers`, `deletePlayerNameOf` |
 | `packages/online/src/names.ts` | The pure part of guest names: `pickGuestNumber(rng)` (fair, 1000–9999), `nameFrom` (the username first), `namesOf`, `NO_NAMES` |
@@ -19,6 +19,9 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `packages/contracts/src/safety.ts` | The `Safety` port, `REPORT_REASONS`, the caps, the error codes; contract checks `safetyContract()` in `@tavli/contracts/testing` |
 | `apps/server/convex/friends.ts` | [Friends](#friends-406): the public friend functions, `deleteFriendsOf` and `deleteFriendRows` (internal, the account delete) |
 | `apps/server/convex/ratings.ts` | [Ratings](#ratings-407): the public rating functions, `rateMatch` (called from `save`), `deleteRatingOf` and `deleteRatedPairs` (internal, the account delete) |
+| `apps/server/convex/matchmaking.ts` | [Play ranked](#play-ranked-531) (#531): the public `seek`, `cancelSeek`, `mySeek` and `lookingCounts`, the internal jobs `matchGame`, `matchTick`, `expireSeek` and `forgetSeek`, and `deleteSeeksOf` (the account delete, the guest move) |
+| `packages/online/src/matchmaking.ts` | The pure rules of matching, run by both servers: `checkRankedChoice`, `planSeek`, `inRange`, `mayPair`, `candidatePairs`, `pickPairs`, `matchedPlayers`, `countLooking` |
+| `packages/contracts/src/matchmaking.ts` | The `Matchmaking` port, `MySeek`, `RANKED_GAMES`, the range and time constants, `seekRange`, the error codes; contract checks `matchmakingContract()` in `@tavli/contracts/testing` |
 | `apps/server/convex/friendEdges.ts` | The friend rows that `safety.ts` and `games.ts` read or change: `endFriendship`, `metAsFriends`, `recordFriendMatch`. It imports no function file, so there is no import cycle |
 | `packages/online/src/friends.ts` | The pure checks of friends: `planRequest` (the caps, the wait, the order of the checks), `friendStatusOf`, `checkSearchCap`, `newFriendToken`, `recordOf`, `recordAfter`, `recentOpponents` |
 | `packages/contracts/src/friends.ts` | The `Friends` port, the caps, the error codes, `normalizeFriendToken`; contract checks `friendsContract()` in `@tavli/contracts/testing` |
@@ -52,7 +55,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `apps/server/convex/_generated/` | Convex codegen output, committed (see [Codegen](#codegen-without-a-deployment)) |
 | `apps/server/convex/tsconfig.json` | The typecheck that `convex deploy` runs before it pushes |
 | `.github/workflows/deploy-server.yml` | The deploy (see [Deploy](#deploy)) |
-| `packages/contracts/src/game-transport.ts` | The `GameTransport` port, the `OnlineGameView` and `GameSummary` types, `turnDeadlineMs`, `ASYNC_TURN_TIME_MS` and `MAX_LISTED_GAMES` |
+| `packages/contracts/src/game-transport.ts` | The `GameTransport` port, the `OnlineGameView` and `GameSummary` types, `turnDeadlineMs`, `ASYNC_TURN_TIME_MS`, `MAX_LISTED_GAMES`, and the Play ranked constants (`RANKED_TURN_TIME_MINUTES`, `RANKED_TIMEOUTS_TO_LOSE`, `ONLINE_MATCH_END_REASONS`, #529) |
 | `packages/contracts/src/online-data.ts` | The `OnlineData` port: `deleteMyData()` ([In the app](#in-the-app), #315) |
 | `packages/contracts/src/auth.ts` | The `AuthProvider` port, `AuthUser`, the auth error codes and the in-memory provider |
 | `packages/adapters/auth-better-auth` | `AuthProvider` on the Better Auth Expo client (its `README.md`) |
@@ -72,10 +75,11 @@ Engine data is stored as **JSON text**. So Convex field rules never limit the en
 | `players` | `{ white, black }` strings | Player ids: the Better Auth user id of each player ([Sign-in](#sign-in)) |
 | `choice` | `portes` · `plakoto` · `fevga` · `asodio` · `tavli` | What the players picked. `tavli` = the Portes → Plakoto → Fevga rotation. |
 | `turnTimeMinutes` | number · null | Turn time in minutes, or `null` for the 24-hour default ([Turn timers](#turn-timers)) (#183). |
+| `ranked` | boolean (optional) | A Play ranked game (#529, ADR-0009): always `RANKED_TURN_TIME_MINUTES` (2), and two time outs in a row lose the match ([Turn timers](#turn-timers)). Optional because rows from before #529 have none: a missing field reads as `false` (a friend game). |
 | `targetPoints` | number | Match length |
 | `rules` | JSON text | The match `RuleSet` (`serializeRules`) |
 | `variant` | string | The variant of the current game |
-| `flow` | JSON text | The engine `MatchFlow` **without its log** (match, score, current game), and `previousGame`: the game before the current one, as it ended (#299). `StoredFlow` in `@tavli/online`; a step saves it with `storeStep`, never with `storeFlow` alone. Games saved before #299 have no `previousGame` and still load. |
+| `flow` | JSON text | The engine `MatchFlow` **without its log** (match, score, current game), and `previousGame`: the game before the current one, as it ended (#299). `StoredFlow` in `@tavli/online`; a step saves it with `storeStep`, never with `storeFlow` alone. Games saved before #299 have no `previousGame` and still load. It also holds `timeoutsInARow` (#529): each side's time outs since their last played turn, left out while both are 0. |
 | `status` | `active` · `finished` | |
 | `winner` | `white` · `black` · `null` | The match winner |
 | `version` | number | Starts at 1. Goes up by one on every change. |
@@ -254,6 +258,19 @@ One row per saved player with a rated match or a "Show me" change (#407). No row
 
 One row per pair of players (`a` < `b`, `pairOf`): the rated matches of their last UTC `day` (`count`). A match past `RATED_MATCHES_PER_PAIR_PER_DAY` (3) that day is not rated. Index `by_pair` (`a`, `b`) and `by_b` (the account delete).
 
+### `seeks`
+
+One row per saved player who asked for a [Play ranked](#play-ranked-531) match (#531). A guest never has one.
+
+| Field | Notes |
+|---|---|
+| `playerId` | Better Auth user id. Index `by_player`. |
+| `game` | One of `RANKED_GAMES`: `portes`, `plakoto`, `fevga` or `tavli`. |
+| `rating` | The player's rating when they asked (`ratings` row, or `START_RATING`), as kept (not rounded). |
+| `createdAt` | When they asked. The range grows from here; a waiting seek ends at `createdAt + SEEK_TTL_MS` (5 minutes). |
+| `status` | `waiting` or `matched`. Index `by_game` (`status`, `game`, `createdAt`): the matching reads the live waiting seeks of one game, oldest first. |
+| `gameId`, `matchedAt` | Set by a match: the ranked game, and when. The row goes `MATCHED_SEEK_KEEP_MS` (10 minutes) later, so both phones can read the game id. |
+
 ## Block and report
 
 Issue #320, App Store guideline 1.2: usernames are content that players write, so a player can block and report another. The pure checks are in `packages/online/src/safety.ts`; both servers run them. The app screens (#435) are in `apps/mobile/src/features/safety/`: see [Block and report](app-shell.md#block-and-report-435).
@@ -294,6 +311,22 @@ Issue #407, ADR-0008 item 9. Saved players get one rating from their online matc
 - **Callers.** Every public function needs a saved caller who exists (`NOT_SIGNED_IN`, `NOT_SAVED`).
 - **The account delete** deletes the caller's row at once (off the boards) and schedules `deleteRatedPairs` for the pair counts, in pages of `RATED_PAIR_DELETE_PAGE`.
 - **The adapter** is `createConvexRatings` (`RATING_FUNCTIONS` in `backend-convex`), checked against `api` and run through `ratingsContract()` in `convex/convexRatings.test.ts`.
+- **Never** send ids, names or ratings to analytics or the logs.
+
+## Play ranked (#531)
+
+Issue #531, ADR-0009. A saved player asks for a ranked match of one game; the server matches two players with close ratings and starts a ranked game between them. The rules are in `packages/online/src/matchmaking.ts`; the in-memory server runs them too (`matchmakingFor(id)`, `runMatching()`). Never copy them into `convex/matchmaking.ts`. The port is `Matchmaking` (`packages/contracts/src/matchmaking.ts`), the contract checks `matchmakingContract()`. The app screens come in #532.
+
+- **The port.** `seek({ game })`, `cancel()`, `mySeek()`, `watchMySeek(onUpdate, onError)` and `lookingCounts()`. `MySeek` is `{ kind: 'none' }`, `{ kind: 'waiting', game, since, rating }` or `{ kind: 'matched', game, gameId, me, opponent }` (each a `SeekPlayer`: `name` and the shown `rating`). The waiting seek gives `since`, not the range: the app works the range out with `seekRange(since, now)`, so a cached query never shows an old range. "Nobody yet" is `NOBODY_YET_MS` after `since`. `lookingCounts` gives, per game, how many other players wait: never who.
+- **Who.** Saved accounts only (`NOT_SAVED` for a guest, `NOT_SIGNED_IN` with no session or a gone user). Only `RANKED_GAMES` (`BAD_REQUEST` for any other game, Asodio too).
+- **One seek per player.** A waiting seek of the same game stays as it is (`planSeek` → `keep`, the same `since`). Another game, or a matched seek, is replaced. `cancelSeek` deletes a waiting row only: a matched one stays, so a cancel that lands just after a match still shows the match on the phone (#532).
+- **The range.** A seek takes partners within `seekRange(createdAt, now)`: `SEEK_RANGE_START` (±50) growing in a straight line to `SEEK_RANGE_MAX` (±400) over `SEEK_RANGE_GROW_MS` (60 s). Two seeks fit when the rating gap is within **both** ranges (`inRange`), so a new seek never gets a far partner just because the other waited long.
+- **The pairs.** `candidatePairs` sorts the fitting pairs by the rating gap, then the older seek first. `pickPairs` takes them greedily, each seek once, and asks `mayPair` for each: no block either way (`blocks`) and the pair under `RATED_MATCHES_PER_PAIR_PER_DAY` that UTC day (`planRatedMatch` on the `ratedPairs` row). So every matched game is rated. There is never a fake player.
+- **A match.** In the same mutation: `insertGame` with `RANKED_TURN_TIME_MINUTES` (2), `RANKED_TARGET_POINTS` (3) and `ranked: true` (the older seek plays White, `matchedPlayers`; the opening roll decides who moves first), then both rows turn `matched` with the `gameId`. The turn pushes and the turn timer follow from `insertGame`, as for any game: the newer seek is its caller, so White (the older seek, who may have left the app) gets the push for the opening die. `mySeek` reads both names and ratings live from the game's players, so no other id is stored; the opponent's name goes through `nameSeenBy`, so a player the caller blocks shows no name.
+- **The matching job.** No cron. `seek` runs `matchSeeks` for its game at once, then schedules `matchTick` every `MATCH_TICK_MS` (5 s) while the seek waits and its range still grows (under 60 s old). After that the range is fixed, so only a new seek can make a new pair, and it runs the matching itself. With no seek, nothing runs. `matchGame` (internal) runs one game's matching by hand (tests, the dashboard). The matching reads at most `MATCH_READ` (100) live waiting seeks of a game, oldest first: with more waiting, newer seeks join only as older ones leave. One run asks about at most `PAIR_CHECKS_PER_RUN` (300) pairs (`pickPairs`, each ask reads two blocks and the pair count), so a run with many blocked or capped pairs stays under Convex's read limit; the pairs it leaves wait for the next run.
+- **The end of a seek.** `expireSeek` deletes a waiting seek at `createdAt + SEEK_TTL_MS` (5 minutes); `mySeek` and the matching treat it as gone from that moment, also before the job runs. `forgetSeek` deletes a matched seek `MATCHED_SEEK_KEEP_MS` (10 minutes) after the match; the game goes on. A job whose row was replaced or cancelled finds nothing and does nothing.
+- **The account delete** deletes the caller's seek at once (`deleteSeeksOf`), so no match can start with a deleted player. A guest cannot seek, so the [guest move](#move-a-guest-into-an-account) has nothing to move; `startGuestMove` deletes any row of the guest anyway.
+- **The adapter** is `createConvexMatchmaking` (`MATCH_FUNCTIONS` in `backend-convex`; `watchMySeek` watches the `mySeek` query), checked against `api` and run through `matchmakingContract()` in `convex/convexMatchmaking.test.ts`.
 - **Never** send ids, names or ratings to analytics or the logs.
 
 ## Rules of a game choice
@@ -390,7 +423,10 @@ Owner answers Q3 and Q15: both **timed** (one minute or more) and **untimed** (s
 - **The log.** The `timeout` event is a row in `moves` with actor `server`, so `replay` still rebuilds the game.
 - **Points.** A time out is always worth **1 point** (owner answer Q30, #378), in every game and preset: also when the late player has borne off no checker, where a resign would give a diplo (Acey-Deucey American: 15). A resign keeps its own score. The score is in the saved match, so the app shows the server's points, old builds too. Games timed out before #378 keep the points they were saved with (2 for a diplo); the server never replays a stored log, so they stay as they are.
 - **Resign** (the match) ignores the timer: a resign is allowed at any time.
-- **Time outs per player** are not stored: `match.games` has every game with `reason: 'timeout'` and its winner.
+- **Time outs in a row** (#529, ADR-0009). The stored flow keeps each side's time outs since their last played turn (`timeoutsInARow`; `loadStored` reads a missing value as 0 for both). `storeStep` counts them with `timeoutsAfter(before, next)`: each `timeout` event of the step adds 1 for its player, and the step's `playedBy` (a confirmed turn, a pass, an answer that ends the turn, or the player's own opening die) sets that side back to 0. A roll the player can still move is not a played turn. The rule is in [tavli-match.md, "Play ranked: time outs in a row"](../rules/tavli-match.md), edge cases 32 to 38.
+- **Play ranked.** In a game with `ranked: true`, a time out whose player already has one time out in a row (`losesRankedMatch`, `RANKED_TIMEOUTS_TO_LOSE` = 2) also ends the match: `timeOut(flow, rng, { ranked, timeoutsInARow })` plays the engine's `resignMatch` for the late player right after the `timeout`. The game is over then, so the resign adds no points. Both are server rows in `moves`, so the log still replays. Both servers call `timeOut` with the same options (`applyTimeout` in `games.ts`, the in-memory server); never copy the check into `games.ts`. The save that ends the match rates it like any other (`rateMatch`), and pushes "game over" to both players. A friend game passes `ranked: false` and keeps the rule above: a time out only loses the game.
+- **Why the match ended.** `OnlineGameView.matchEndReason` (`matchEndReason` in `@tavli/online`) is `null` while the match runs, else `points`, `resigned` or `timeouts-in-a-row` (`ONLINE_MATCH_END_REASONS` in contracts). It is derived from the match and the counts: in a ranked match, a match resigned by a player with 2 time outs in a row ended on time. No other way takes a count to 2 there.
+- **A ranked game** always has `RANKED_TURN_TIME_MINUTES` (2) per turn: `insertGame` and the in-memory `createGame` check it (`checkRankedGame`). [Play ranked](#play-ranked-531) matching (#531) starts ranked games through `insertGame` with `ranked: true`; so does the internal `createGame` (tests).
 
 ### Errors
 
@@ -406,14 +442,14 @@ A rejected call throws a `ConvexError` whose `data` is `{ code, message }` (`Gam
 
 ## The client view
 
-`getGame` returns `OnlineGameView` (`packages/contracts`): `gameId`, `version`, `status`, `choice`, `turnTimeMinutes`, `turnDeadline` (epoch ms on the server clock, `null` when finished; a phone shows the time left from it), `players`, `match` (rules, score, finished games), `game` (the engine `MatchFlow` of the current game), `previousGame` (the game before `game`, as it ended, #299; `null` in the first game), `waitingFor` (the side to move or answer), `prompt`, `draft` (the mover's turn so far, or `null`, #374) and `names` (each side's [guest name](#playernames) or `null`, #400). `game.played` is always empty, because turns are saved whole; the phone plays `draft.moves` on top for the other player. `previousGame` stays the same until the next game ends; a match that ends keeps its last game in `game`. The phone replays the turn in `previousGame.lastTurn`, so the other player's winning turn flies before the game-end sheet (see "Between games" in `board-screen.md`).
+`getGame` returns `OnlineGameView` (`packages/contracts`): `gameId`, `version`, `status`, `choice`, `turnTimeMinutes`, `ranked` (a Play ranked game, #529), `matchEndReason` (why a finished match ended, or `null`, #529; see [Turn timers](#turn-timers)), `turnDeadline` (epoch ms on the server clock, `null` when finished; a phone shows the time left from it), `players`, `match` (rules, score, finished games), `game` (the engine `MatchFlow` of the current game), `previousGame` (the game before `game`, as it ended, #299; `null` in the first game), `waitingFor` (the side to move or answer), `prompt`, `draft` (the mover's turn so far, or `null`, #374) and `names` (each side's [guest name](#playernames) or `null`, #400). `game.played` is always empty, because turns are saved whole; the phone plays `draft.moves` on top for the other player. `previousGame` stays the same until the next game ends; a match that ends keeps its last game in `game`. The phone replays the turn in `previousGame.lastTurn`, so the other player's winning turn flies before the game-end sheet (see "Between games" in `board-screen.md`).
 
 ## My games
 
 `listMyGames({ status })` (#296) lists the caller's own games, so the app can show them on Home and the player can go back to a game.
 
 - **Who.** The caller comes from `signedInPlayer(ctx)`; the query takes no player id. It never lists another player's game.
-- **What.** Each game is a `GameSummary` (`packages/contracts`): `gameId`, `status`, `choice`, `presetId`, `variant` (the game being played now), `targetPoints`, `turnTimeMinutes`, `mySide`, `waitingFor`, `myTurn`, `score`, `winner`, `updatedAt`, `turnDeadline`, `opponentId` (the other player's id, as in the view's `players`: the app reports or blocks from a list row, #435) and `opponentName` (the other player's [guest name](#playernames) or `null`, #400). It tells nothing else about the other player but their side (the other side). The Convex query reads one name per opponent, after it picks the games. Open the game (`subscribe`) for the rest.
+- **What.** Each game is a `GameSummary` (`packages/contracts`): `gameId`, `status`, `choice`, `presetId`, `variant` (the game being played now), `targetPoints`, `turnTimeMinutes`, `ranked` (#529), `mySide`, `waitingFor`, `myTurn`, `score`, `winner`, `updatedAt`, `turnDeadline`, `opponentId` (the other player's id, as in the view's `players`: the app reports or blocks from a list row, #435) and `opponentName` (the other player's [guest name](#playernames) or `null`, #400). It tells nothing else about the other player but their side (the other side). The Convex query reads one name per opponent, after it picks the games. Open the game (`subscribe`) for the rest.
 - **One source.** `summarizeGame` in `@tavli/online` builds the summary from the same `toView` input, so a list and an open game never disagree. The Convex query and the in-memory server both use it, and both sort with `latestGames` (newest `updatedAt` first; at the same time, the larger game id first).
 - **The indexes.** The query reads the newest `MAX_LISTED_GAMES` of the caller's games on each side (`by_white` and `by_black`, equal on player and `status`, `order('desc')`), then keeps the newest `MAX_LISTED_GAMES` of both. So it reads at most 100 rows. A game saved before #296 has no `updatedAt`: the index puts it last, and its summary uses `_creationTime`.
 - **A call, or a live list.** The port's `listMyGames` is a promise; the Convex adapter runs the query once (`client.query`). `watchMyGames({ status }, onList, onError)` (#297) watches the same query: the first list comes on a later tick, then a new list after each change, until the stop function. Each list is a copy. No new server function: Convex reruns the query after each save. Home uses the watch (see "Your online games" in [App shell](app-shell.md)).
@@ -471,7 +507,7 @@ Issue #397, ADR-0008. A key is a way to sign in to one account: Apple, or an ema
 Issue #403, ADR-0008. A guest saves with an Apple ID whose account exists already (made on another phone). The key proves the person owns both, so the server offers to move the guest there.
 
 - **The offer:** when the session user of `/key/save` is a guest with no key and the key's owner is a saved account, the `409 KEY_BELONGS_TO_OTHER` body also has `move: { ticket, activeGames, openInvites }`. The counts come from `guestMoveCounts` (`guestMove.ts`; active games stop at `GUEST_COUNT_CAP`). The ticket (`model/moveTicket.ts`) is base64url JSON `{ source, target, expiresAt }` plus an HMAC-SHA256 with `BETTER_AUTH_SECRET` (its own purpose text, so a key nonce is never a ticket), good for 10 minutes. The server stores nothing, and it never takes a user id from the app. A saved account gets no offer.
-- **The move:** `POST /key/move` `{ ticket }` (session). The ticket must be good and its `source` the session user, else `400 BAD_TICKET`. Then `startGuestMove` runs in one mutation: it checks again that `source` is a guest with no key claim and `target` a saved account (else `BAD_TICKET`, nothing changes), moves the push tokens (the account keeps the newest 5), deletes the guest's name row, and deletes the Better Auth guest with its sessions (`internalAdapter.deleteUser`). The route then makes a session for the account and sets its cookie (as Better Auth's own sign-ins do). The guest is gone, so a ticket works once. The mutation and the session are two steps: if the session fails (the account went, or a database error), the move still runs, the call gives `BAD_TICKET` and the phone is signed out. The player signs in again with the key (`signInWithKey`) and finds everything moved.
+- **The move:** `POST /key/move` `{ ticket }` (session). The ticket must be good and its `source` the session user, else `400 BAD_TICKET`. Then `startGuestMove` runs in one mutation: it checks again that `source` is a guest with no key claim and `target` a saved account (else `BAD_TICKET`, nothing changes), moves the push tokens (the account keeps the newest 5), deletes the guest's name row and any Play ranked seek (a guest cannot seek, #531), and deletes the Better Auth guest with its sessions (`internalAdapter.deleteUser`). The route then makes a session for the account and sets its cookie (as Better Auth's own sign-ins do). The guest is gone, so a ticket works once. The mutation and the session are two steps: if the session fails (the account went, or a database error), the move still runs, the call gives `BAD_TICKET` and the phone is signed out. The player signs in again with the key (`signInWithKey`) and finds everything moved.
 - **The pages after it** (scheduled, so no transaction comes near Convex's write limit):
   - `moveGuestGames` (`GUEST_GAME_PAGE` games per run, one run per side, `paginate` on `by_white` / `by_black`): each game becomes the account's: `players`, `match.players` in the flow, then its log (`moveGuestMoves`, `GUEST_MOVES_PAGE` rows per run: `actor` and the `start` event). No version bump: the game did not change, so the other player's call on its way still fits. A game between the guest and the account cannot become the account's (a player cannot play themself): the guest resigns it if it runs (`resignAs`), and it keeps the guest's id, like a deleted player's game (`guestGameMove` in `@tavli/online`).
   - `moveGuestInvites` (`GUEST_ROW_PAGE`): `from` (the `by_from` index) and `answeredBy` (the `by_answered` index). An invite between the guest and the account is deleted, so no invite is sent by and answered by one player.
@@ -734,6 +770,8 @@ One transaction. If any step throws, nothing is deleted. Five steps go on after 
 9. **Friends** (#406): the call deletes every friendship of the caller at once (`deleteFriendsOf`: both rows each, at most `MAX_FRIENDS`), so the friends see it gone. Then `deleteFriendRows` deletes, up to `FRIEND_DELETE_PAGE` (200) rows a run, what is left: friend rows, requests from and to the caller, the friend link, the search times and the invites sent to the caller (`invites.by_to`). It runs again while its page was full.
 
 10. **Ratings** (#407): the matches resigned in step 2 are never rated (`resignAs(…, false)`). The call deletes the caller's `ratings` row at once, so they leave the boards. Then `deleteRatedPairs` deletes the caller's `ratedPairs` rows, up to `RATED_PAIR_DELETE_PAGE` (200) a run, and runs again while its page was full.
+
+11. **Play ranked** (#531): the call deletes the caller's seek at once (`deleteSeeksOf`), so no new match can start with the caller. A game a match already started is an active game: step 2 resigns it.
 
 Push tokens stay in the main transaction: they are capped (`MAX_PUSH_TOKENS_PER_PLAYER`, 5).
 

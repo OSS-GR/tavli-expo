@@ -1,12 +1,12 @@
 /**
  * `GameTransport` (#253), `Invites` (#281), `PushTokens` (#285),
  * `OnlineData` (#315), `AppUpdates` (#390), `Usernames` (#405), `Safety`
- * (#320), `Friends` (#406) and `Ratings` (#407) adapters backed by Convex
- * (ADR-0004).
+ * (#320), `Friends` (#406), `Ratings` (#407) and `Matchmaking` (#531)
+ * adapters backed by Convex (ADR-0004).
  *
  * They call the functions in `apps/server/convex/games.ts`, `invites.ts`,
  * `push.ts`, `account.ts`, `appUpdate.ts`, `usernames.ts`, `safety.ts`,
- * `friends.ts` and `ratings.ts`. The server reads the caller from the sign-in token
+ * `friends.ts`, `ratings.ts` and `matchmaking.ts`. The server reads the caller from the sign-in token
  * (`AuthProvider`). See README.md.
  */
 export {
@@ -31,6 +31,8 @@ export {
   GAME_FUNCTIONS,
   INVITE_FUNCTION_NAMES,
   INVITE_FUNCTIONS,
+  MATCH_FUNCTION_NAMES,
+  MATCH_FUNCTIONS,
   PUSH_FUNCTION_NAMES,
   PUSH_FUNCTIONS,
   RATING_FUNCTION_NAMES,
@@ -45,6 +47,7 @@ export {
   type FriendRequestResult,
   type GameFunctions,
   type InviteFunctions,
+  type MatchFunctions,
   type NewInviteArgs,
   type PushFunctions,
   type RatingFunctions,
@@ -59,6 +62,12 @@ export {
   type ConvexFriendsClient,
   type ConvexFriendsOptions,
 } from './friends';
+export {
+  createConvexMatchmaking,
+  toMatchmakingError,
+  type ConvexMatchmakingClient,
+  type ConvexMatchmakingOptions,
+} from './matchmaking';
 export {
   createConvexRatings,
   toRatingsError,
