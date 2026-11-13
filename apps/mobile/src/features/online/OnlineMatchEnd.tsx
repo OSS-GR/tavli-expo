@@ -74,6 +74,7 @@ function OnlineMatchEndView({
           seats: onlineSeats(side, t, view.names[other]),
           me: side,
           label: t('online.label', { game: t(`games.${view.choice}`) }),
+          endReason: view.matchEndReason,
           ...(safety ? { onReportOrBlock: () => setReporting(player) } : {}),
         }}
         match={view.match}

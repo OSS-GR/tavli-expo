@@ -10,8 +10,15 @@
  * - The other player's status line is quiet ("Easy · Portes", "Online ·
  *   Portes"), or empty.
  * - Asodio adds a short note: the checkers still to enter, or "Army frozen".
- * - Online, the time left shows as a clock line ("4:54 to roll"). Under
+ * - Online, the time left shows as a clock line ("23 h to roll"). Under
  *   30 s it turns the problem color.
+ * - A timed online turn (#530, Figma "14 Play ranked") shows a ring around
+ *   the checker of the player to move instead: it empties over the turn,
+ *   with the time left as a numeral on the right ("1:24"). In the last 10
+ *   seconds the ring and the time turn the problem color; on your seat the
+ *   edge does too, and the status line says "Play now, or you lose this
+ *   game". A seat of a timed game keeps the ring's room, so it does not
+ *   move when the turn passes.
  * - A long name or a large font wraps the lines; the seat then grows. There
  *   is no pip count (#238).
  *
@@ -27,6 +34,8 @@ import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { Icon } from '@/components/Icon';
 import { surfaceStyle } from '@/components/Surface';
 
+import { TurnRing } from './TurnRing';
+
 const NBSP = ' ';
 /**
  * A note such as "12 to enter" never breaks in the middle. When a long name
@@ -36,10 +45,18 @@ const keepTogether = (part: string) => part.replace(/ /g, NBSP);
 
 /** The time left on the seat of the player the server waits for (online). */
 export interface SeatClock {
-  /** "4:54 to roll", "0:28 to move", "2 h to move". */
+  /** "4:54 to roll", "0:28 to move", "2 h to move". Screen readers hear it. */
   readonly text: string;
-  /** Under 30 s: the line turns the problem color. */
+  /** The problem color: under 30 s (a line), the last 10 s (a ring). */
   readonly urgent: boolean;
+  /**
+   * A timed turn (#530): the share of the turn left (1 to 0) and the time
+   * as a clock ("1:24"). It draws the ring and the numeral in place of the
+   * clock line. `null` or left out: the clock line.
+   */
+  readonly ring?: { readonly left: number; readonly time: string } | null;
+  /** Your last seconds (#530): "Play now, or you lose this game", in place of the status line. */
+  readonly warning?: string | null;
 }
 
 export interface PlayerStripProps {
@@ -59,6 +76,8 @@ export interface PlayerStripProps {
   note?: string | null;
   /** The time left (online). `null`: none. */
   clock?: SeatClock | null;
+  /** A timed online game (#530): the seat keeps room for the turn ring. */
+  timed?: boolean;
   score: number;
   target: number;
   active: boolean;
@@ -77,6 +96,7 @@ export function PlayerStrip({
   turnDetail = null,
   note = null,
   clock = null,
+  timed = false,
   score,
   target,
   active,
@@ -93,6 +113,7 @@ export function PlayerStrip({
     name,
     active ? null : status,
     note,
+    clock?.warning ?? null,
     clock?.text ?? null,
     t('game.strip.scoreLabel', { score, target }),
     active ? turn : null,
@@ -100,11 +121,12 @@ export function PlayerStrip({
     .filter((part) => part !== null)
     .join(', ');
 
-  const line = (active ? [turn, turnDetail, note] : [status, note]).filter(
-    (part): part is string => part !== null,
-  );
+  const warning = clock?.warning ?? null;
+  const line = (
+    warning !== null ? [warning] : active ? [turn, turnDetail, note] : [status, note]
+  ).filter((part): part is string => part !== null);
   const size = stacked ? 24 : 32;
-  const piece =
+  const checkerPiece =
     avatar !== null ? (
       <CheckerAvatar playerKey={avatar.key} name={avatar.name} size={size} />
     ) : (
@@ -115,6 +137,27 @@ export function PlayerStrip({
         ]}
       />
     );
+  const ring = clock?.ring ?? null;
+  const urgentColor = clock?.urgent === true;
+  const piece =
+    timed || ring !== null ? (
+      <TurnRing
+        testID={testID ? `${testID}-ring` : undefined}
+        size={size}
+        ring={
+          ring === null
+            ? null
+            : {
+                left: ring.left,
+                color: urgentColor ? theme.colors.problem : theme.colors.turn,
+                track: theme.colors.surfaceSunken,
+              }
+        }>
+        {checkerPiece}
+      </TurnRing>
+    ) : (
+      checkerPiece
+    );
   const scoreView = (
     <View style={styles.scoreBox}>
       <Text style={styles.score(stacked)}>{score}</Text>
@@ -123,7 +166,7 @@ export function PlayerStrip({
   );
   const statusLine =
     line.length === 0 ? null : (
-      <Text style={styles.status(active)}>
+      <Text style={warning !== null ? styles.warning : styles.status(active)}>
         {line.map((part, index) => (index === 0 ? part : `${NBSP}· ${keepTogether(part)}`))}
       </Text>
     );
@@ -133,18 +176,31 @@ export function PlayerStrip({
       ? theme.colors.turnText
       : theme.colors.textDim;
   const clockLine =
-    clock === null ? null : (
+    clock === null || ring !== null ? null : (
       <View testID={testID ? `${testID}-clock` : undefined} style={styles.clockRow}>
         <Icon name="clock" color={clockColor} size={14} />
         <Text style={[styles.clock, { color: clockColor }]}>{clock.text}</Text>
       </View>
     );
+  // A timed turn: the time left as a numeral, gold, or the problem color.
+  const timeView =
+    ring === null ? null : (
+      <Text
+        testID={testID ? `${testID}-time` : undefined}
+        style={[
+          styles.time(stacked),
+          { color: urgentColor ? theme.colors.problem : theme.colors.turnText },
+        ]}>
+        {ring.time}
+      </Text>
+    );
+  const edge = warning !== null ? styles.lastSeconds : null;
 
   if (stacked) {
     return (
       <View
         testID={testID}
-        style={[styles.plate, styles.stacked, active && styles.active]}
+        style={[styles.plate, styles.stacked, active && styles.active, edge]}
         accessible
         accessibilityLabel={label}
         accessibilityState={{ selected: active }}>
@@ -155,13 +211,14 @@ export function PlayerStrip({
         <Text style={styles.name}>{name}</Text>
         {statusLine}
         {clockLine}
+        {timeView}
       </View>
     );
   }
   return (
     <View
       testID={testID}
-      style={[styles.plate, styles.row, active && styles.active]}
+      style={[styles.plate, styles.row, active && styles.active, edge]}
       accessible
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}>
@@ -171,6 +228,7 @@ export function PlayerStrip({
         {statusLine}
         {clockLine}
       </View>
+      {timeView}
       {scoreView}
     </View>
   );
@@ -189,6 +247,11 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 2,
     borderColor: theme.colors.accent,
     backgroundColor: theme.colors.surfaceRaised,
+  },
+  // Your last seconds of a timed turn (#530): the problem color.
+  lastSeconds: {
+    borderWidth: 2,
+    borderColor: theme.colors.problem,
   },
   row: {
     flexDirection: 'row',
@@ -228,6 +291,17 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.footnote,
     fontWeight: active ? '600' : '400',
     color: active ? theme.colors.turnText : theme.colors.textDim,
+  }),
+  warning: {
+    ...theme.type.footnote,
+    fontWeight: '600',
+    color: theme.colors.problem,
+  },
+  time: (stacked: boolean) => ({
+    ...theme.type.numeral,
+    fontSize: stacked ? 18 : 22,
+    lineHeight: stacked ? 22 : 26,
+    fontVariant: ['tabular-nums' as const],
   }),
   clockRow: {
     flexDirection: 'row',

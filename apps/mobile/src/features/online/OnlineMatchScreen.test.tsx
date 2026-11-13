@@ -10,7 +10,7 @@ import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { closedOut, guestNumberOf, lastBearOff } from '@tavli/online/testing';
 import { getLayout, getTheme } from '@tavli/themes';
 import { themes } from '@tavli/ui';
-import { act, fireEvent, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 import * as Reanimated from 'react-native-reanimated';
 
@@ -37,7 +37,7 @@ import { center } from '../../../test/boardPlay';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
-import { countNodes, type JsonNode } from '../../../test/tree';
+import { countNodes, findAllNodes, type JsonNode } from '../../../test/tree';
 
 const SIZE = { width: 375, height: 500 };
 const geo = fitBoardWithShadow(getLayout(getTheme('walnut-kafeneio'), 'portrait-rotated'), SIZE);
@@ -103,6 +103,8 @@ async function openGame(
   playOpening = true,
   /** The `Safety` port for the menu's Report or block (#435). None: no such row. */
   safetyOf?: (server: MemoryGameServer) => Safety,
+  /** A Play ranked game (#529): two time outs in a row lose the match. */
+  options: { readonly ranked?: boolean } = {},
 ): Promise<Game> {
   const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
   const gameId = server.createGame(
@@ -111,6 +113,7 @@ async function openGame(
     choice,
     targetPoints,
     turnTimeMinutes,
+    options,
   );
   prepare?.(server, gameId);
   bot = startOnlineBot({
@@ -451,11 +454,12 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       const user = setupUser();
       const game = await winGameOne(user);
       expect(view(game).turnDeadline).not.toBeNull();
-      // The time left of game 2 shows on the strip of the player it waits for.
-      const strip = view(game).waitingFor === 'white' ? 'strip-bottom' : 'strip-top';
-      expect(screen.getByTestId(strip, { includeHiddenElements: true })).toHaveTextContent(
-        /\d:\d\d to (roll|move)/,
-      );
+      // The time left of game 2 shows on the strip of the player it waits
+      // for: you won game 1, so you start game 2.
+      expect(view(game).waitingFor).toBe('white');
+      expect(
+        screen.getByTestId('strip-bottom-time', { includeHiddenElements: true }),
+      ).toHaveTextContent(/^\d:\d\d$/);
 
       // Nobody plays game 2 while the sheet is open: the server ends it.
       sounds.played.length = 0;
@@ -464,14 +468,20 @@ describe('<OnlineMatchScreen /> (#255)', () => {
         game.server.runDueTimeouts();
       });
       expect(view(game).match.games).toHaveLength(2);
-      expect(view(game).match.games[1]).toEqual(expect.objectContaining({ reason: 'timeout' }));
-      // The sheet now tells about game 2; still no dice under it.
-      expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/Next: game 3/);
+      expect(view(game).match.games[1]).toEqual(
+        expect.objectContaining({ winner: 'black', reason: 'timeout' }),
+      );
+      // Your time ran out in game 2: its card replaces the sheet (#530);
+      // still no dice under it.
+      expect(await screen.findByTestId('time-ran-out-card')).toHaveTextContent(
+        new RegExp(`${botName(game)} wins this game`),
+      );
+      expect(screen.queryByTestId('game-end-card')).toBeNull();
       expect(screen.queryByTestId('board-dice')).toBeNull();
       expect(sounds.played.filter((s) => s === 'diceRoll' || s === 'diceLand')).toEqual([]);
 
-      await user.press(screen.getByTestId('next-game-button'));
-      expect(screen.queryByTestId('game-end-card')).toBeNull();
+      await user.press(screen.getByTestId('time-ran-out-button'));
+      expect(screen.queryByTestId('time-ran-out-card')).toBeNull();
       // Game 3 waits for the bot's roll (#355); its dice tumble once it rolls.
       await wait(ONLINE_BOT_ROLL_MS);
       expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
@@ -490,7 +500,8 @@ describe('<OnlineMatchScreen /> (#255)', () => {
         game.server.runDueTimeouts();
       });
       expect(view(game).match.games).toHaveLength(2);
-      expect(await screen.findByTestId('game-end-card')).toHaveTextContent(/Next: game 3 · Fevga/);
+      // It was your turn (you won game 1): the "Time ran out" card shows over game 2 (#530).
+      expect(await screen.findByTestId('time-ran-out-card')).toBeOnTheScreen();
       expect(gameLabel()).toHaveTextContent('Game 2 · Plakoto');
     });
   });
@@ -830,8 +841,11 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     expect(screen.getByTestId('strip-top')).toHaveTextContent(
       new RegExp(`Waiting for ${botName(game)}`, 'i'),
     );
-    // A clock, never "60 s" (#499).
-    expect(screen.getByTestId('strip-top')).toHaveTextContent(/\d:\d\d to roll/);
+    // A clock, never "60 s" (#499), next to a ring on the bot's seat (#530).
+    expect(screen.getByTestId('strip-top-time')).toHaveTextContent(/^\d:\d\d$/);
+    expect(screen.getByTestId('strip-top').props.accessibilityLabel).toMatch(/\d:\d\d to roll/);
+    expect(screen.getByTestId('strip-top-ring', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId('strip-bottom-ring', { includeHiddenElements: true })).toBeNull();
     expect(screen.queryByTestId('confirm-button')).toBeNull();
     expect(screen.queryByTestId('undo-button')).toBeNull();
     // The bot's turn has no Roll button: the bot rolls on its own phone (#355).
@@ -845,39 +859,155 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     expect(view(game).waitingFor).toBe('black');
   });
 
-  it('ends the game when your time runs out, and the next game starts', async () => {
-    const user = setupUser();
-    const game = await openGame('portes', 1, 5);
-    await untilYourTurn(game);
-    expect(screen.getByTestId('strip-bottom')).toHaveTextContent(/\d:\d\d to (roll|move)/);
-    const clockText = () => within(screen.getByTestId('strip-bottom-clock')).getByText(/to/);
-    expect(clockText()).toHaveStyle({ color: themes['walnut-kafeneio'].colors.turnText });
-    // Under 30 s the clock turns the problem color.
-    await act(async () => {
-      jest.advanceTimersByTime(35_000);
-    });
-    expect(clockText()).toHaveStyle({ color: themes['walnut-kafeneio'].colors.problem });
+  describe('the turn clock (#530)', () => {
+    const colors = themes['walnut-kafeneio'].colors;
+    /** The arc of the ring on `strip` (the time left), from the mocked Skia tree. */
+    const arc = (strip: string) => {
+      const [ring] = findAllNodes(
+        screen.toJSON() as JsonNode,
+        (node) => node.props.testID === `${strip}-ring`,
+      );
+      if (ring === undefined) return null;
+      return findAllNodes(ring, (node) => node.type === 'Path' && 'start' in node.props)[0] ?? null;
+    };
+    const timeText = () => screen.getByTestId('strip-bottom-time', { includeHiddenElements: true });
+    const ticks = () => sounds.played.filter((s) => s === 'clockTick').length;
+    /** Moves the clock 1 s at a time until your last seconds show. */
+    async function untilLastSeconds() {
+      for (let i = 0; i < 200; i++) {
+        if (screen.queryByText('Play now, or you lose this game') !== null) return;
+        await wait(1000);
+      }
+      throw new Error('the last seconds never came');
+    }
+    /** Your time runs out: the server ends the game. */
+    async function runOut(game: Game, turnMs: number) {
+      await act(async () => {
+        jest.advanceTimersByTime(turnMs + 1000);
+        game.server.runDueTimeouts();
+      });
+    }
 
-    // You wait too long. The server ends the game (the in-memory server
-    // runs its timers when asked).
-    await act(async () => {
-      jest.advanceTimersByTime(60_000 + 1000);
-      game.server.runDueTimeouts();
-    });
-    expect(view(game).match.games).toEqual([
-      expect.objectContaining({ winner: 'black', reason: 'timeout' }),
-    ]);
-    const sheet = await screen.findByTestId('game-end-card');
-    expect(sheet).toHaveTextContent(new RegExp(`${botName(game)} wins the game`));
-    expect(sheet).toHaveTextContent(/You ran out of time/);
-    expect(sheet).toHaveTextContent(/Next: game 2 · Portes/);
-    expect(view(game).status).toBe('active');
+    it('rings your seat, turns red in the last 10 seconds, then ends the game', async () => {
+      const announce = jest
+        .spyOn(AccessibilityInfo, 'announceForAccessibility')
+        .mockImplementation(() => {});
+      const user = setupUser();
+      const game = await openGame('portes', 1, 5);
+      await untilYourTurn(game);
 
-    // The button closes the sheet: the next game is on the board.
-    await user.press(screen.getByTestId('next-game-button'));
-    expect(screen.queryByTestId('game-end-card')).toBeNull();
-    expect(screen.getByTestId('game-board', { includeHiddenElements: true })).toBeOnTheScreen();
-    expect(game.onMatchOver).not.toHaveBeenCalled();
+      // A gold ring on your seat, with the time left as a clock. The bot's
+      // seat has no ring, and no clock line shows.
+      expect(timeText()).toHaveTextContent(/^[01]:\d\d$/);
+      expect(timeText()).toHaveStyle({ color: colors.turnText });
+      expect(arc('strip-bottom')?.props.color).toBe(colors.turn);
+      expect(arc('strip-top')).toBeNull();
+      expect(screen.queryByTestId('strip-bottom-clock')).toBeNull();
+      expect(screen.getByTestId('strip-bottom').props.accessibilityLabel).toMatch(
+        /[01]:\d\d to move/,
+      );
+      // The ring empties as the time runs.
+      const before = Number(arc('strip-bottom')?.props.start);
+      await wait(5000);
+      expect(Number(arc('strip-bottom')?.props.start)).toBeGreaterThan(before);
+      // Still gold under 30 s: only the last 10 s are red.
+      expect(screen.queryByText('Play now, or you lose this game')).toBeNull();
+
+      sounds.played.length = 0;
+      haptics.calls.length = 0;
+      announce.mockClear();
+      await untilLastSeconds();
+      expect(timeText()).toHaveTextContent('0:10');
+      expect(timeText()).toHaveStyle({ color: colors.problem });
+      expect(arc('strip-bottom')?.props.color).toBe(colors.problem);
+      expect(screen.getByTestId('strip-bottom')).toHaveStyle({ borderColor: colors.problem });
+      expect(screen.getByTestId('strip-bottom').props.accessibilityLabel).toMatch(
+        /Play now, or you lose this game/,
+      );
+      // Screen readers hear it once, not every second.
+      expect(announce.mock.calls.map(([text]) => text)).toEqual([
+        '10 seconds left. Play now, or you lose this game.',
+      ]);
+      // A soft tick and a light haptic each second: 10, 9, … 1.
+      for (let second = 9; second >= 1; second--) await wait(1000);
+      expect(timeText()).toHaveTextContent('0:01');
+      expect(ticks()).toBe(10);
+      expect(haptics.calls.filter((h) => h === 'light')).toHaveLength(10);
+      expect(announce).toHaveBeenCalledTimes(1);
+
+      // You wait too long. The server ends the game (the in-memory server
+      // runs its timers when asked).
+      await runOut(game, 0);
+      expect(view(game).match.games).toEqual([
+        expect.objectContaining({ winner: 'black', reason: 'timeout' }),
+      ]);
+      expect(ticks()).toBe(10);
+      const card = await screen.findByTestId('time-ran-out-card');
+      expect(card).toHaveTextContent(/TIME RAN OUT/);
+      expect(card).toHaveTextContent(new RegExp(`${botName(game)} wins this game`));
+      expect(card).toHaveTextContent('1 point. The next game starts now.', { exact: false });
+      // A friend game: no word of losing the match.
+      expect(card).not.toHaveTextContent(/lose the match/);
+      // In place of the game-end sheet; the board under it is hidden from
+      // screen readers, and the card is read once.
+      expect(screen.queryByTestId('game-end-card')).toBeNull();
+      expect(screen.queryByTestId('game-board')).toBeNull();
+      expect(
+        screen.getByRole('header', { name: `Time ran out. ${botName(game)} wins this game` }),
+      ).toBeOnTheScreen();
+      expect(view(game).status).toBe('active');
+
+      // "I am here" closes the card: the next game is on the board.
+      await user.press(screen.getByTestId('time-ran-out-button'));
+      expect(screen.queryByTestId('time-ran-out-card')).toBeNull();
+      expect(screen.getByTestId('game-board')).toBeOnTheScreen();
+      expect(game.onMatchOver).not.toHaveBeenCalled();
+      announce.mockRestore();
+    });
+
+    it('warns in a ranked game, and two time outs in a row end the match', async () => {
+      const user = setupUser();
+      const game = await openGame(
+        'portes',
+        2,
+        5,
+        BOT_THINK_MS,
+        undefined,
+        undefined,
+        true,
+        undefined,
+        {
+          ranked: true,
+        },
+      );
+      await untilYourTurn(game, { roll: false });
+      expect(timeText()).toHaveTextContent(/^[12]:\d\d$/);
+      await runOut(game, 2 * 60_000);
+      const card = await screen.findByTestId('time-ran-out-card');
+      expect(card).toHaveTextContent(
+        '1 point. The next game starts now. Miss your next turn too and you lose the match.',
+        { exact: false },
+      );
+      await user.press(screen.getByTestId('time-ran-out-button'));
+
+      // Your next turn runs out too: the server ends the match.
+      await untilYourTurn(game, { roll: false });
+      await runOut(game, 2 * 60_000);
+      expect(view(game).status).toBe('finished');
+      expect(view(game).matchEndReason).toBe('timeouts-in-a-row');
+      await wait(2000);
+      expect(game.onMatchOver).toHaveBeenCalled();
+    });
+
+    it('keeps the clock line and no ring for a game with no turn time', async () => {
+      const game = await openGame('portes', null, 5);
+      await untilYourTurn(game);
+      expect(screen.getByTestId('strip-bottom-clock')).toHaveTextContent(/\d+ h to move/);
+      expect(screen.queryByTestId('strip-bottom-time')).toBeNull();
+      expect(arc('strip-bottom')).toBeNull();
+      expect(arc('strip-top')).toBeNull();
+      expect(view(game).turnTimeMinutes).toBeNull();
+    });
   });
 
   it('reads the same notice again when it comes back', async () => {

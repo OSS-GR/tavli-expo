@@ -14,6 +14,14 @@
  *   (live: seconds; async: hours). In the opening it shows on yours while
  *   your die is not in: at the deadline the side that did not roll loses
  *   the game, when the other side rolled.
+ * - A game with a turn time (#530) draws it as a ring around that
+ *   player's avatar, with the time left as a numeral. Your last 10 seconds
+ *   are red, tick once a second (sound and haptic) and are read once to
+ *   screen readers. A game with no turn time (24 h) keeps the clock line.
+ * - Your time ran out in a game that ended while the screen was open: the
+ *   "Time ran out" card shows in place of its game-end sheet, with "I am
+ *   here" (#530). In a ranked game it warns that the next time out in a
+ *   row loses the match.
  * - A game that ends while the screen is open shows its game-end sheet
  *   over the end of that game (the board store holds it, #286); its
  *   button closes it, and then the next game shows.
@@ -41,6 +49,7 @@ import {
   type OnlineEndedGame,
   type OnlineNoticeCard,
   type OnlineSide,
+  type OnlineTimedOutCard,
 } from '@/features/game/GameScreen';
 import { GameMenu } from '@/features/match/GameMenu';
 import { MissingGame } from '@/features/match/MissingGame';
@@ -49,7 +58,7 @@ import { currentGameLabel, variantName } from '@/features/match/summary';
 import { ReportOrBlock, safetyName, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { onlineBoardStore, type OnlineBoardStore } from './boardStore';
-import { clockText, clockTickMs, clockUrgent } from './clock';
+import { clockText, clockTickMs, clockUrgent, lastSeconds, turnShareLeft } from './clock';
 import { useOnlineStore, type OnlineNotice, type OnlineStore } from './onlineStore';
 import { playerNameText } from './playerName';
 import { onlineSeats } from './seats';
@@ -211,11 +220,27 @@ function OnlineBoard({
   // before the screen opened are not held.
   const games = flow.match.games;
   const last = games.at(-1);
+  // Your time ran out in that game (#530): a card says so, not the sheet.
+  const timedOut: OnlineTimedOutCard | null =
+    last !== undefined && last.reason === 'timeout' && last.winner === opponentSide
+      ? {
+          eyebrow: t('online.timeRanOut.eyebrow'),
+          title: t('online.timeRanOut.title', { name: name(opponentSide) }),
+          text: [
+            t('online.timeRanOut.points', { count: last.points }),
+            view.ranked ? t('online.timeRanOut.ranked') : null,
+          ]
+            .filter((part) => part !== null)
+            .join(' '),
+          button: t('online.timeRanOut.here'),
+        }
+      : null;
   const ended: OnlineEndedGame | null =
     !finished && flow.game.phase === 'game-over' && last !== undefined
       ? {
           record: last,
           key: `${matchKey}:end:${games.length}`,
+          timedOut,
           onClose: () => {
             // The next game shows: its dice tumble, and its turn is read.
             board.release();
@@ -246,6 +271,11 @@ function OnlineBoard({
   // last tick would show more than a whole turn.
   const left = timeLeft(view, clockNow, clockOffset);
   const shown = left === null ? null : Math.min(left, turnDeadlineMs(view.turnTimeMinutes));
+  const minutes = view.turnTimeMinutes;
+  const timed = minutes !== null;
+  // The clock is on your seat, in your last 10 seconds (#530).
+  const final =
+    clockSide === side && shown !== null && !finished ? lastSeconds(shown, minutes) : null;
   const online: OnlineSide = {
     me: side,
     version: view.version,
@@ -267,10 +297,25 @@ function OnlineBoard({
               view.game.phase === 'awaiting-roll' || view.game.phase === 'opening-roll'
                 ? 'online.clock.toRoll'
                 : 'online.clock.toMove',
-              { time: clockText(shown, view.turnTimeMinutes, t) },
+              { time: clockText(shown, minutes, t) },
             ),
-            urgent: clockUrgent(shown),
+            // A ring turns red for the last 10 s, a clock line under 30 s.
+            urgent: timed ? lastSeconds(shown, minutes) !== null : clockUrgent(shown),
+            ring: timed
+              ? { left: turnShareLeft(shown, minutes), time: clockText(shown, minutes, t) }
+              : null,
+            warning: final === null ? null : t('online.clock.lastSeconds'),
+            tick: final,
+            alert:
+              final === null
+                ? null
+                : {
+                    // One line per turn: the deadline names it.
+                    key: `${matchKey}:lastSeconds:${view.turnDeadline}`,
+                    text: t('online.clock.lastSecondsAlert'),
+                  },
           },
+    timed,
     ended,
     notice: noticeCard,
   };

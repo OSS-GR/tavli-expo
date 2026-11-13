@@ -324,7 +324,9 @@ export type FeedbackEvent =
   | 'invalidMove'
   | 'turnStart'
   | 'gameWin'
-  | 'matchWin';
+  | 'matchWin'
+  /** Each of your last 10 seconds of a timed online turn (#530). */
+  | 'clockTick';
 
 export type SoundKey = FeedbackEvent;
 export type HapticKey = FeedbackEvent;
