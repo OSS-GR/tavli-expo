@@ -1,94 +1,80 @@
 /**
- * The top row of the welcome steps (#362): the round back button, the app
- * logo with its name in the middle (as on Home), and the step ("Step 2 of
- * 3") on the right. Both sides take the same share of the row, so the logo
- * stays in the middle. The logo and the name only decorate: screen readers
- * skip them, and each step's own title is its header.
+ * The top row of the welcome steps (#362, Figma frame 12): the step bars in
+ * the middle (one bar per step, brass up to this one) and the round back
+ * button on the left. Screen readers hear the bars as one item, "Step 2 of
+ * 3". The first step has no back button; the row keeps its height, so the
+ * bars stay in the same place on every step.
  */
 import { useTranslation } from 'react-i18next';
-import { Image, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { RoundButton } from '@/components/RoundButton';
 
-const LOGO = require('../../../assets/home/logo.webp') as number;
-
 export interface WelcomeTopProps {
+  /** This step, from 1. */
+  step: number;
+  /** How many steps this player has (2 or 3). */
+  total: number;
   /** Goes back. Without it the left side is empty (the first step). */
   onBack?: () => void;
   /** The back button's test id. */
   backTestID?: string;
-  /** The step text on the right. */
-  step?: string;
 }
 
-export function WelcomeTop({ onBack, backTestID, step }: WelcomeTopProps) {
+export function WelcomeTop({ step, total, onBack, backTestID }: WelcomeTopProps) {
   const { t } = useTranslation();
+  const bars = Array.from({ length: total }, (_, index) => index < step);
   return (
     <View style={styles.row}>
-      <View style={styles.side}>
-        {onBack ? (
+      <View
+        testID="welcome-steps"
+        style={styles.bars}
+        accessible
+        accessibilityLabel={t('welcome.privacy.step', { step, total })}>
+        {bars.map((done, index) => (
+          <View key={index} style={styles.bar(done)} />
+        ))}
+      </View>
+      {onBack ? (
+        <View style={styles.back}>
           <RoundButton
             testID={backTestID}
             icon="chevronLeft"
             accessibilityLabel={t('common.back')}
             onPress={onBack}
           />
-        ) : null}
-      </View>
-      <View
-        style={styles.brand}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants">
-        <Image source={LOGO} style={styles.logo} accessible={false} />
-        <Text style={styles.appName}>{t('home.title')}</Text>
-      </View>
-      <View style={[styles.side, styles.right]}>
-        {step ? <Text style={styles.step}>{step}</Text> : null}
-      </View>
+        </View>
+      ) : null}
     </View>
   );
 }
 
+const BAR_WIDTH = 28;
+const BAR_HEIGHT = 4;
+
 const styles = StyleSheet.create((theme) => ({
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.sm,
-    paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.sm,
-    paddingBottom: theme.space.sm,
-  },
-  side: {
-    flex: 1,
     minHeight: theme.touch.minTarget,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    paddingHorizontal: theme.space.lg,
   },
-  right: {
-    alignItems: 'flex-end',
-  },
-  brand: {
+  bars: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.sm,
+    alignSelf: 'center',
+    gap: 6,
+    // A taller box than the bars, so the one item is easy to find by touch.
+    paddingVertical: theme.space.sm,
   },
-  // As on Home (#342).
-  logo: {
-    width: 32,
-    height: 32,
-    borderRadius: theme.radii.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  appName: {
-    ...theme.type.bodyStrong,
-    color: theme.colors.text,
-    letterSpacing: 0.3,
-  },
-  step: {
-    ...theme.type.caption,
-    color: theme.colors.textDim,
-    textAlign: 'right',
+  bar: (done: boolean) => ({
+    width: BAR_WIDTH,
+    height: BAR_HEIGHT,
+    borderRadius: BAR_HEIGHT / 2,
+    backgroundColor: done ? theme.colors.accent : theme.colors.edgeLight,
+  }),
+  back: {
+    position: 'absolute',
+    left: theme.space.lg,
+    top: 0,
   },
 }));

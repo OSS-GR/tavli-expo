@@ -331,6 +331,10 @@ export const ICONS = {
       'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2',
     ],
   },
+  // The welcome consent step (Figma frame 12): what we never collect.
+  x: {
+    strokes: ['M18 6 6 18', 'm6 6 12 12'],
+  },
 } as const satisfies Record<string, IconShape>;
 
 export type IconName = keyof typeof ICONS;
