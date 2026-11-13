@@ -29,7 +29,7 @@ import { EngineError } from '../../errors';
 import type { Move, Turn } from '../../move';
 import { PLAYERS, opponent } from '../../player';
 import type { PlayerId } from '../../player';
-import { getPreset } from '../../presets';
+import { DEFAULT_PRESET_BY_GAME, getPreset } from '../../presets';
 import type { RuleSet } from '../../rules';
 import { validateRules } from '../../rules-validate';
 import { GAME_STATE_SCHEMA_VERSION } from '../../state';
@@ -337,7 +337,7 @@ export const plakoto: Variant = {
   id: 'plakoto',
   direction: DIRECTION,
 
-  initialState({ startingPlayer, rules = getPreset('plakoto') }) {
+  initialState({ startingPlayer, rules = getPreset(DEFAULT_PRESET_BY_GAME.plakoto) }) {
     const checked = checkPlakotoRules(validateRules(rules));
     return {
       schemaVersion: GAME_STATE_SCHEMA_VERSION,

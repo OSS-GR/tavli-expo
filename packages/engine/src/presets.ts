@@ -147,10 +147,15 @@ const PRESETS: { readonly [P in PresetId]: RuleSet } = {
   }),
 };
 
-/** The preset each standard game uses when nothing else is chosen. */
+/**
+ * The preset each standard game uses when nothing else is chosen. Plakoto
+ * plays the federation rules (owner, 2026-11-13, #514). The `plakoto` preset
+ * (`offerConcede`) stays, so games, saves and history made with it still
+ * read and replay.
+ */
 export const DEFAULT_PRESET_BY_GAME: { readonly [G in StandardVariantId]: PresetId } = {
   portes: 'portes',
-  plakoto: 'plakoto',
+  plakoto: 'plakoto.federation',
   fevga: 'fevga',
   asodio: 'asodio.kafeneio',
 };

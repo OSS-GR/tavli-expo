@@ -618,7 +618,7 @@ describe('<MatchScreen /> Acey-Deucey American scoring (#245)', () => {
     game: 'asodio',
     targetPoints: 7,
     names: mode === 'local' ? { white: 'Maria', black: 'Nikos' } : { white: '', black: '' },
-    rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+    rulesVersions: { asodio: 'asodio.aceyDeuceyAmerican' },
   });
 
   /** `toMove` is to roll on `layout` (each side in its own numbering). */

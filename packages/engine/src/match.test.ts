@@ -481,7 +481,7 @@ describe('rotation and missing variants', () => {
   it('gameRules: other games use their default preset with the match flags', () => {
     const own = createMatch({ rules: rules({ match: { rotation: ['portes', 'plakoto'] } }) });
     expect(gameRules(own, 'portes')).toBe(own.rules);
-    expect(gameRules(own, 'plakoto').presetId).toBe('plakoto');
+    expect(gameRules(own, 'plakoto').presetId).toBe('plakoto.federation');
     // tavli is a match preset: every game uses its own default preset.
     const match = createMatch({ rules: TAVLI, targetPoints: 5 });
     const portesRules = gameRules(match, 'portes');
@@ -489,8 +489,8 @@ describe('rotation and missing variants', () => {
     expect(portesRules.match).toEqual(match.rules.match);
     expect(startNextGame(match, 'white').rules).toEqual(portesRules);
     const plakoto = gameRules(match, 'plakoto');
-    expect(plakoto.presetId).toBe('plakoto');
-    expect(plakoto.mother.motherRule).toBe('offerConcede');
+    expect(plakoto.presetId).toBe('plakoto.federation');
+    expect(plakoto.mother.motherRule).toBe('federation');
     expect(plakoto.match).toEqual(match.rules.match);
     expect(plakoto.match.targetPoints).toBe(5);
     expect(gameRules(match, 'fevga').movement.direction).toBe('parallel');

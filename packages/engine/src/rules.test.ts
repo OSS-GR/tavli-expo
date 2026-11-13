@@ -135,7 +135,10 @@ describe('owner decisions (docs/open-questions.md, "Answered")', () => {
     expect(r.match.rematchStarter).toBe('lastGameWinner');
   });
 
-  it('Plakoto mother: offer to concede', () => {
+  it('Plakoto mother: the federation rule (owner, 2026-11-13, #514)', () => {
+    expect(DEFAULT_PRESET_BY_GAME.plakoto).toBe('plakoto.federation');
+    expect(getPreset(DEFAULT_PRESET_BY_GAME.plakoto).mother.motherRule).toBe('federation');
+    // The old default stays, so old games still replay.
     expect(getPreset('plakoto').mother.motherRule).toBe('offerConcede');
   });
 

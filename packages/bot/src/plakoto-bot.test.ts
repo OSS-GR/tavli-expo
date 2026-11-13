@@ -231,10 +231,15 @@ describe('the mother question (offerConcede)', () => {
 });
 
 describe('plakoto simulation', () => {
+  // The old `plakoto` preset asks the mother question. The default (#514,
+  // federation) asks nothing, so these tests name the old preset.
+  const concede = getPreset('plakoto');
+
   it('plays whole games with questions answered, and no illegal turn', { timeout: 30_000 }, () => {
     const answers: string[] = [];
     const result = simulate({
       variant: plakoto,
+      rules: concede,
       bots: [
         { bot, difficulty: 'random' },
         { bot, difficulty: 'easy' },
@@ -258,6 +263,7 @@ describe('plakoto simulation', () => {
       const outcome = playGame(
         {
           variant: plakoto,
+          rules: concede,
           bots: [
             { bot: movesOnly, difficulty: 'random' },
             { bot: movesOnly, difficulty: 'random' },

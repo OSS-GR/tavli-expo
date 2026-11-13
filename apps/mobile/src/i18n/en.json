@@ -419,7 +419,6 @@
     "onPhone": "Saved only on this phone: your last {{max}} matches.",
     "openingRoll": "Opening roll: {{rule}}",
     "rulesVersion": "Rules version: {{version}}",
-    "rulesVersionPlakoto": "Rules version (Plakoto): {{version}}",
     "result": {
       "won": "Won",
       "lost": "Lost",
@@ -929,6 +928,10 @@
       "grabAChair": {
         "title": "Grab a chair",
         "body": "A short scene at the kafeneio: the table slides in, then the other chair, then the tavli board drops onto the table and your chair is pulled in. It plays beside the greeting on Home and when a match opens (tap to skip it there). With Reduce Motion it stays still."
+      },
+      "plakotoFederation": {
+        "title": "Plakoto plays the federation rules",
+        "body": "Every new Plakoto game, alone or in a Tavli match, uses the federation mother rule: pin the other mother and you win 2 points once your own point 24 is empty. The rules version choice is gone. See the Plakoto rules page."
       }
     }
   },
@@ -1406,14 +1409,9 @@
       "chosenStarterRollsHint": "You choose who starts. That player rolls both dice.",
       "chosenStarterRollsHintBot": "You choose who starts: you or the bot. That player rolls both dice.",
       "rulesVersion": "Rules version",
-      "rulesVersionPlakoto": "Rules version (Plakoto)",
       "optionLabel": "{{group}}: {{option}}"
     },
     "rulesVersion": {
-      "plakoto": "Standard",
-      "plakotoHint": "If your mother is pinned, you choose: resign (2 points) or play on.",
-      "plakotoFederation": "Federation",
-      "plakotoFederationHint": "Federation rules: pin the mother and win 2 points once your own point 24 is empty. Both mothers pinned: a draw.",
       "asodioKafeneio": "Standard",
       "asodioKafeneioHint": "Kafeneio rules: all 15 enter first, the army moves quarter by quarter, and you pin, not hit.",
       "asodioGreek": "Greek",
@@ -1491,7 +1489,7 @@
       "bearOff": "You cannot bear off while any of your checkers is pinned, even one inside your home.",
       "mother": {
         "title": "The mother (μάνα)",
-        "body": "Your mother is your last checker on point 24, once all the others have left.\nIf the other player pins your mother, you choose at the end of their turn: resign or play on.\nResign: the other player wins 2 points (diplo) and the game ends.\nPlay on: the game goes on as normal. You are not asked again in this game.\nYour mother is free again only when the other player's checkers leave it. Until then you cannot bear off.\nIf both mothers are pinned at the same time, the game is a draw. Nobody gets points, and the next game starts again with one die each.\nKeep 2 or more checkers on point 24, and nobody can pin your mother."
+        "body": "Your mother is your last checker on point 24, once all the others have left.\nIf you pin the other player's mother, you win 2 points (diplo) as soon as none of your checkers is left on your own point 24. Until then the game goes on, and your own mother can still be pinned.\nA pinned mother is free again only when the other player's checkers leave it. Until then that player cannot bear off.\nIf both mothers are pinned at the same time, the game is a draw. Nobody gets points, and the next game starts again with one die each.\nThese are the federation rules (ΕΟΠΤ).\nKeep 2 or more checkers on point 24, and nobody can pin your mother."
       }
     },
     "fevga": {
@@ -1544,10 +1542,6 @@
       "body": "A Tavli match plays three games in turn: Portes, then Plakoto, then Fevga, and then Portes again.\nEach game gives 1 or 2 points, as its own rules say. A Plakoto game can also end in a draw (both mothers pinned): nobody gets points, and the match goes on with the next game.\nThe first player to reach the match points wins."
     },
     "versions": {
-      "plakotoFederation": {
-        "title": "This game: federation rules",
-        "body": "This game plays the federation rules (ΕΟΠΤ). Only the mother rule is different from the page below.\nIf you pin the other player's mother, you win 2 points (diplo) as soon as none of your checkers is left on your own point 24. Until then the game goes on, and your own mother can still be pinned.\nIf both mothers are pinned at the same time, the game is a draw.\nNobody is asked to resign or play on."
-      },
       "asodioGreek": {
         "title": "This game: Greek rules",
         "body": "This game plays Acey-Deucey with the Greek rules. They change the page below:\nYou hit, you do not pin. A lone checker that is hit goes out, to the middle of the board. It enters again in your starting quarter, but only with a 1-2 or a double.\nThe board still opens only with a 1-2 or a double. After that, checkers on the board may move before all 15 are in, and no quarter freezes.\nAfter a 1-2 you play the 1 and the 2, then choose any double and play it, then roll again.\nAfter a double that you play in full, you roll again too.\nYou cannot bear off while a checker is still outside the board."
@@ -1642,7 +1636,7 @@
         "title": "The mother (μάνα)",
         "body": "A player's mother is their last checker on their start point, point 24. Your opponent's mother sits alone on your point 1. Pin it with the lit checker.",
         "hint": "Move the lit checker 4 points, onto point 1.",
-        "done": "You pinned the mother! Now your opponent must choose.",
+        "done": "You pinned the mother! None of your checkers is left on your own point 24, so this pin wins the game: 2 points (diplo). With a checker still on your 24, the game would go on until it leaves.",
         "board": "Board. Your checker on point 5 is lit. Your opponent's last checker sits alone on its start, your point 1. Dice 4 and 3."
       },
       "plakotoBearOff": {
@@ -1737,12 +1731,6 @@
         "endBody": "Now play a game of Asodio against the Easy bot. The rules page has the rest.",
         "play": "Play Asodio"
       }
-    },
-    "motherCard": {
-      "title": "Your opponent's mother is pinned",
-      "body": "At the end of your turn, they see this card. If your mother is pinned, you get the same choice.",
-      "resigned": "Resign: you win 2 points and the game ends.",
-      "playedOn": "Play on: the game goes on. Their mother stays pinned until you leave it, and they cannot bear off."
     }
   },
   "review": {
