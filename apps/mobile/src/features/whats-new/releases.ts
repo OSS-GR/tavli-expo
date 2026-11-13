@@ -3,9 +3,10 @@
  *
  * Add an entry when a feature lands, in the release of the next store
  * build (add a release at the top when there is none yet). Each entry
- * needs a title and a body in `en.json` and `el.json`, under
- * `whatsNew.entries.<id>`. The body says what the feature is and where to
- * find it, in one or two plain sentences. List only built features: never
+ * needs a `title`, a `body` and a `where` in `en.json` and `el.json`,
+ * under `whatsNew.entries.<id>` (a test checks all three). The body says
+ * what the feature is in one or two plain sentences; `where` says where
+ * to find it. List only built features: never
  * "coming soon".
  *
  * A new release at the top puts a dot on Home's What's new button for

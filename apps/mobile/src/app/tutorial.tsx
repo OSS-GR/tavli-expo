@@ -1,5 +1,5 @@
 /**
- * The tutorial: `/tutorial?from=home|rules|settings&game=portes|plakoto|fevga|asodio`.
+ * The tutorial: `/tutorial?from=home|rules|settings|history&game=portes|plakoto|fevga|asodio`.
  * `game` picks the lesson set (#149, #159); the default is Portes, the
  * first-run tutorial (#128). Saves "done" or "dismissed" for that set and
  * sends the tutorial events.

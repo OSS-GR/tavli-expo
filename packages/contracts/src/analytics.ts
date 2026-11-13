@@ -50,8 +50,11 @@ export type ThemeKind = 'app' | 'board';
  */
 export type GameResultKind = 'mono' | 'diplo' | 'resign' | 'draw' | 'timeout';
 
-/** Where the tutorial was opened: the Home card, a rules page, or Settings. */
-export type TutorialSource = 'home' | 'rules' | 'settings';
+/**
+ * Where the tutorial was opened: the Home card, a rules page, Settings, or
+ * the empty History (#521).
+ */
+export type TutorialSource = 'home' | 'rules' | 'settings' | 'history';
 
 /**
  * Which lesson set of the tutorial: Portes (the first-run tutorial),

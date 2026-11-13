@@ -647,7 +647,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       fireEvent.changeText(screen.getByTestId('join-code-input'), 'ABCD234');
     });
     await act(async () => {
-      fireEvent.press(screen.getByTestId('join-continue'));
+      fireEvent(screen.getByTestId('join-code-input'), 'submitEditing');
     });
     expect(screen.getByTestId('join-problem')).toBeOnTheScreen();
     expect(problems()).toEqual([]);

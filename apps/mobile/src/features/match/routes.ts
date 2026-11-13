@@ -34,7 +34,8 @@ export function firstGameHref(game: TutorialGame = 'portes') {
 }
 
 /**
- * The tutorial, opened from Home, a rules page or Settings (#128).
+ * The tutorial, opened from Home, a rules page, Settings (#128) or the
+ * empty History (#521).
  * `game` picks the lesson set (#149, #159); Portes, the default, has no param.
  */
 export function tutorialHref(from: TutorialSource, game: TutorialGame = 'portes') {
@@ -152,7 +153,7 @@ export function parseTutorialGame(value: Param): TutorialGame {
   return TUTORIAL_GAMES.find((g) => g === game) ?? 'portes';
 }
 
-const TUTORIAL_SOURCES: readonly TutorialSource[] = ['home', 'rules', 'settings'];
+const TUTORIAL_SOURCES: readonly TutorialSource[] = ['home', 'rules', 'settings', 'history'];
 
 /** The `from` param of the tutorial. Anything else counts as Home. */
 export function parseTutorialSource(value: Param): TutorialSource {
