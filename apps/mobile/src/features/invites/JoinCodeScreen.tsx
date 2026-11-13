@@ -18,8 +18,13 @@
  *   (`/invite/<CODE>`). That screen does the rest, as for a link: the free
  *   account only from the sign-in choices, then the invite and Accept.
  *   This screen makes no account and calls no server.
+ * - Typing stops at 8 characters: the slots show no more, so a 9th key
+ *   does nothing. A paste may be longer (a link or a message); a long
+ *   paste with no code says why after the tap.
  * - Keyboard: it opens with the screen, and the slots and the button stay
  *   above it (`KeyboardAvoidingView` on iOS; Android resizes the window).
+ *   With a screen reader on, it does not open by itself: the reader
+ *   starts at the title, and a tap on the field opens it.
  *   The keyboard's Go key checks the text, also before 8 characters.
  * - Focus moves to the title when the screen opens. Large fonts scroll and
  *   the slots grow (the two groups may stack): no text has a line limit.
@@ -27,9 +32,17 @@
  * Navigation stays in the route (`app/join.tsx`).
  */
 import { INVITE_CODE_LENGTH } from '@tavli/contracts';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -42,6 +55,8 @@ import { codeSlots, readTypedCode, type TypedCodeProblem } from './typedCode';
 
 /** The space between two slots of a group, in points (the Figma pass). */
 const SLOT_GAP = 5;
+/** The narrowest slot: 8 slots and the gaps fit one row on a 375 pt phone. */
+const SLOT_WIDTH = 36;
 
 export interface JoinCodeScreenProps {
   /** A code that passed the phone's check, in capital letters: open its invite. */
@@ -55,6 +70,7 @@ export function JoinCodeScreen({ onCode, onBack }: JoinCodeScreenProps) {
   const [problem, setProblem] = useState<TypedCodeProblem | null>(null);
   const [focused, setFocused] = useState(false);
   const titleRef = useFocusOnShow();
+  const screenReader = useScreenReaderAnswer();
   const length = INVITE_CODE_LENGTH;
   const slots = codeSlots(text);
 
@@ -107,10 +123,16 @@ export function JoinCodeScreen({ onCode, onBack }: JoinCodeScreenProps) {
               ))}
             </View>
             <TextInput
+              // Mounted again once the screen reader answer is in, so
+              // `autoFocus` follows it.
+              key={screenReader === undefined ? 'asking' : 'answered'}
               testID="join-code-input"
               style={styles.input}
               value={text}
               onChangeText={(next) => {
+                // A typed key past the last slot does nothing.
+                const keyAtEnd = next.length === text.length + 1 && next.startsWith(text);
+                if (keyAtEnd && slots.length >= length && codeSlots(next).length > length) return;
                 // A pasted link or message keeps only its code.
                 const typed = readTypedCode(next);
                 setText(
@@ -123,7 +145,7 @@ export function JoinCodeScreen({ onCode, onBack }: JoinCodeScreenProps) {
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               accessibilityLabel={t('join.label')}
-              autoFocus
+              autoFocus={screenReader === false}
               autoCapitalize="characters"
               autoCorrect={false}
               autoComplete="off"
@@ -148,6 +170,25 @@ export function JoinCodeScreen({ onCode, onBack }: JoinCodeScreenProps) {
       </KeyboardAvoidingView>
     </Screen>
   );
+}
+
+/** Is a screen reader on? `undefined` until the phone answers. */
+function useScreenReaderAnswer(): boolean | undefined {
+  const [on, setOn] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    AccessibilityInfo.isScreenReaderEnabled()
+      .then((answer) => {
+        if (live) setOn(answer);
+      })
+      .catch(() => {
+        if (live) setOn(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return on;
 }
 
 /** One slot: a bone tile with its character, an empty well, or the well with the cursor. */
@@ -198,7 +239,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: SLOT_GAP,
   },
   tile: {
-    minWidth: 38,
+    minWidth: SLOT_WIDTH,
     minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
@@ -215,7 +256,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.onAccent,
   },
   well: {
-    minWidth: 38,
+    minWidth: SLOT_WIDTH,
     minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',

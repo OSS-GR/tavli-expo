@@ -4,7 +4,7 @@
  * key, a pasted link, the screen reader announcement and Greek. The route and the invite after it
  * are in `navigation.test.tsx`.
  */
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
 import i18n from '@/i18n';
@@ -15,6 +15,10 @@ import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 
 runOnFakeTimers();
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 afterAll(async () => {
   await i18n.changeLanguage('en');
@@ -67,6 +71,30 @@ describe('JoinCodeScreen', () => {
     expect(props.onCode).toHaveBeenCalledTimes(1);
     expect(props.onCode).toHaveBeenCalledWith('ABCD2345');
     expect(screen.queryByTestId('join-problem')).toBeNull();
+  });
+
+  it('stops typing at 8 characters, but takes a longer paste', async () => {
+    const user = setupUser();
+    await open();
+    await user.type(field(), 'abcd23456');
+    expect(field().props.value).toBe('abcd2345');
+    expect(tiles()).toEqual(['A', 'B', 'C', 'D', '2', '3', '4', '5']);
+    await fireEvent.changeText(field(), 'ABCD23456');
+    expect(field().props.value).toBe('ABCD23456');
+  });
+
+  it('opens the keyboard by itself with no screen reader', async () => {
+    jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
+    await open();
+    await waitFor(() => expect(field().props.autoFocus).toBe(true));
+  });
+
+  it('leaves the keyboard closed with a screen reader: it starts at the title', async () => {
+    const reader = jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(true);
+    await open();
+    await waitFor(() => expect(reader).toHaveBeenCalled());
+    await act(async () => {});
+    expect(field().props.autoFocus).toBe(false);
   });
 
   it("opens the code with the keyboard's Go key", async () => {

@@ -73,6 +73,11 @@ describe('codeSlots (#521)', () => {
     expect(codeSlots('Join me: tavlaki://invite/abcd2345')).toBe('ABCD2345');
   });
 
+  it('shows nothing for a link with no code', () => {
+    expect(codeSlots('https://tavlaki.com/i/')).toBe('');
+    expect(codeSlots('tavlaki://invite/nope')).toBe('');
+  });
+
   it('shows a text that is no code as typed, so a long one fills every slot', () => {
     expect(codeSlots('ABCD234O')).toBe('ABCD234O');
     expect(codeSlots('ABCD23456')).toBe('ABCD23456');

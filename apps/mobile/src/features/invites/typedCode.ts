@@ -87,11 +87,13 @@ function compactText(text: string): string {
 
 /**
  * What the code slots of "Join with a code" show (#521): the code of a
- * link or a message, else the typed characters in capital letters, with
- * no spaces or dashes. It checks nothing: `readTypedCode` does.
+ * link or a message, nothing for a link with no code, else the typed
+ * characters in capital letters, with no spaces or dashes. It checks
+ * nothing: `readTypedCode` does.
  */
 export function codeSlots(text: string): string {
   const typed = readTypedCode(text);
   if (typed.kind === 'code') return typed.code;
+  if (typed.kind === 'problem' && typed.problem === 'link') return '';
   return compactText(text.trim()).toUpperCase();
 }

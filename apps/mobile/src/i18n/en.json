@@ -81,8 +81,7 @@
       "failed": "Your online games did not load. Check the connection.",
       "stale": "This list may be out of date. Check the connection.",
       "retry": "Try again",
-      "seeAll": "See all ({{count}})",
-      "empty": "No online games right now. Play a friend to start one."
+      "seeAll": "See all ({{count}})"
     },
     "invites": {
       "title": "Your invites",
