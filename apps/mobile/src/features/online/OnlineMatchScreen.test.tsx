@@ -926,7 +926,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       );
       // Screen readers hear it once, not every second.
       expect(announce.mock.calls.map(([text]) => text)).toEqual([
-        '10 seconds left. Play now, or you lose this game.',
+        'Your time is almost up. Play now, or you lose this game.',
       ]);
       // A soft tick and a light haptic each second: 10, 9, … 1.
       for (let second = 9; second >= 1; second--) await wait(1000);

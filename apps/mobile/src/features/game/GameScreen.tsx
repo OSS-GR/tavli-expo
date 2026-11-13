@@ -439,10 +439,12 @@ export function GameScreen({
   const feedback = useGameFeedback(store, theme, humans, eventsOf);
   // Online, your last seconds of a timed turn (#530): a soft tick and a
   // light haptic each second, and one line for screen readers.
+  // One tick per new second shown: a new `feedback` plays none.
   const clockTick = online?.clock?.tick ?? null;
+  const playTick = useEffectEvent(() => feedback.event('clockTick'));
   useEffect(() => {
-    if (clockTick !== null) feedback.event('clockTick');
-  }, [clockTick, feedback]);
+    if (clockTick !== null) playTick();
+  }, [clockTick]);
   const clockAlert = online?.clock?.alert ?? null;
   useAnnouncement(clockAlert?.text ?? null, clockAlert?.key);
 

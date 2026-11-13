@@ -6,16 +6,11 @@
  * minutes in the last hour ("40 min").
  *
  * A timed turn also shows a ring around the avatar of the player to move
- * (#530): `turnShareLeft` empties it, and the last 10 seconds
- * (`lastSeconds`) turn it the problem color.
+ * (#530): `turnShareLeft` empties it, and on your own seat the last 10
+ * seconds (`inLastSeconds`) turn it the problem color.
  */
-import { ASYNC_TURN_TIME_MS } from '@tavli/contracts';
+import { turnDeadlineMs } from '@tavli/contracts';
 import type { TFunction } from 'i18next';
-
-/** The milliseconds of a turn for `turnTimeMinutes` (null gives 24h). */
-export function turnTimeMs(turnTimeMinutes: number | null): number {
-  return turnTimeMinutes === null ? ASYNC_TURN_TIME_MS : turnTimeMinutes * 60_000;
-}
 
 /** Short label for a turn time limit: "24 h", "1 min", "5 min". */
 export function formatTimeLimit(turnTimeMinutes: number | null, t: TFunction): string {
@@ -70,7 +65,12 @@ export function lastSeconds(ms: number, turnTimeMinutes: number | null): number 
   return seconds >= 1 && seconds <= LAST_SECONDS ? seconds : null;
 }
 
+/** A timed turn is in its last 10 seconds, down to 0 and past it (the ring stays red). */
+export function inLastSeconds(ms: number, turnTimeMinutes: number | null): boolean {
+  return turnTimeMinutes !== null && ms <= LAST_SECONDS * SECOND;
+}
+
 /** The share of the turn left, from 1 (a new turn) to 0, for the turn ring (#530). */
 export function turnShareLeft(ms: number, turnTimeMinutes: number | null): number {
-  return Math.min(1, Math.max(0, ms / turnTimeMs(turnTimeMinutes)));
+  return Math.min(1, Math.max(0, ms / turnDeadlineMs(turnTimeMinutes)));
 }

@@ -19,7 +19,14 @@ import i18n from '@/i18n';
 import { botLevels, botRunner } from '@/services';
 
 import { gameEnd, onlineBoardStore } from './boardStore';
-import { clockText, clockTickMs, clockUrgent, lastSeconds, turnShareLeft } from './clock';
+import {
+  clockText,
+  clockTickMs,
+  clockUrgent,
+  inLastSeconds,
+  lastSeconds,
+  turnShareLeft,
+} from './clock';
 import {
   DEV_BOT_ID,
   DEV_TICK_MS,
@@ -284,6 +291,15 @@ describe('clockText', () => {
 });
 
 describe('the turn clock ring (#530)', () => {
+  it('stays red from 10 seconds down to 0 and past it', () => {
+    expect(inLastSeconds(10_001, 1)).toBe(false);
+    expect(inLastSeconds(10_000, 1)).toBe(true);
+    expect(inLastSeconds(0, 1)).toBe(true);
+    expect(inLastSeconds(-5, 2)).toBe(true);
+    // No time limit: never.
+    expect(inLastSeconds(0, null)).toBe(false);
+  });
+
   it('counts the last 10 seconds of a timed turn only', () => {
     expect(lastSeconds(10_001, 1)).toBeNull();
     expect(lastSeconds(10_000, 1)).toBe(10);

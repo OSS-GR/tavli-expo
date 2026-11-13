@@ -523,7 +523,7 @@
       "toRoll": "{{time}} to roll",
       "toMove": "{{time}} to move",
       "lastSeconds": "Play now, or you lose this game",
-      "lastSecondsAlert": "10 seconds left. Play now, or you lose this game."
+      "lastSecondsAlert": "Your time is almost up. Play now, or you lose this game."
     },
     "timeLimitNone": "None",
     "timeLimit_one": "1 min",

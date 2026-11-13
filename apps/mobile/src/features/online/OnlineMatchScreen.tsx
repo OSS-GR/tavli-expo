@@ -58,7 +58,14 @@ import { currentGameLabel, variantName } from '@/features/match/summary';
 import { ReportOrBlock, safetyName, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { onlineBoardStore, type OnlineBoardStore } from './boardStore';
-import { clockText, clockTickMs, clockUrgent, lastSeconds, turnShareLeft } from './clock';
+import {
+  clockText,
+  clockTickMs,
+  clockUrgent,
+  inLastSeconds,
+  lastSeconds,
+  turnShareLeft,
+} from './clock';
 import { useOnlineStore, type OnlineNotice, type OnlineStore } from './onlineStore';
 import { playerNameText } from './playerName';
 import { onlineSeats } from './seats';
@@ -274,8 +281,8 @@ function OnlineBoard({
   const minutes = view.turnTimeMinutes;
   const timed = minutes !== null;
   // The clock is on your seat, in your last 10 seconds (#530).
-  const final =
-    clockSide === side && shown !== null && !finished ? lastSeconds(shown, minutes) : null;
+  const mine = clockSide === side && shown !== null && !finished;
+  const final = mine ? lastSeconds(shown, minutes) : null;
   const online: OnlineSide = {
     me: side,
     version: view.version,
@@ -299,8 +306,9 @@ function OnlineBoard({
                 : 'online.clock.toMove',
               { time: clockText(shown, minutes, t) },
             ),
-            // A ring turns red for the last 10 s, a clock line under 30 s.
-            urgent: timed ? lastSeconds(shown, minutes) !== null : clockUrgent(shown),
+            // A ring turns red in your own last 10 s (the other player's
+            // stays gold), a clock line under 30 s.
+            urgent: timed ? mine && inLastSeconds(shown, minutes) : clockUrgent(shown),
             ring: timed
               ? { left: turnShareLeft(shown, minutes), time: clockText(shown, minutes, t) }
               : null,

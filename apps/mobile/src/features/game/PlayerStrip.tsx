@@ -47,7 +47,7 @@ const keepTogether = (part: string) => part.replace(/ /g, NBSP);
 export interface SeatClock {
   /** "4:54 to roll", "0:28 to move", "2 h to move". Screen readers hear it. */
   readonly text: string;
-  /** The problem color: under 30 s (a line), the last 10 s (a ring). */
+  /** The problem color: under 30 s (a line), your own last 10 s (a ring). */
   readonly urgent: boolean;
   /**
    * A timed turn (#530): the share of the turn left (1 to 0) and the time
