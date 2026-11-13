@@ -3,39 +3,62 @@
  * who lost the invite link (iOS drops it through an App Store or TestFlight
  * install) types the code from the share message.
  *
- * - One text field: capital letters, no autocorrect. A pasted link or the
- *   whole share message works too (`readTypedCode`).
- * - The phone checks the text first: a bad code says why and makes no
- *   server call. A good code goes to the route (`onCode`), which opens the
- *   invite screen (`/invite/<CODE>`). That screen does the rest, as for a
- *   link: the free account only from the sign-in choices, then the invite
- *   and Accept. This screen makes no account and calls no server.
- * - Keyboard: the field and Continue stay above the keyboard
- *   (`KeyboardAvoidingView` on iOS; Android resizes the window). The
- *   keyboard's Go key is Continue.
- * - A problem line is read to screen readers (`useAnnouncement`; iOS
- *   VoiceOver does not read `accessibilityRole="alert"`). Focus moves to
- *   the title when the screen opens. Large fonts scroll: no text has a line
- *   limit.
- * - Look: the Home style, like Play a friend (`FriendSetupScreen`).
+ * - Look (#521, the Figma pass): 8 code slots in two groups of 4, like the
+ *   code on the invite. A typed character turns its slot into a bone tile;
+ *   the next slot shows a brass cursor. "Join the game" stays muted until
+ *   8 characters are in.
+ * - One text field lies over the slots, with clear text: a tap on the
+ *   slots focuses it, and a long press pastes. Capital letters, no
+ *   autocorrect. A pasted link or the whole share message works too
+ *   (`readTypedCode`): the field then holds only its code. Screen readers
+ *   hear the field; the slots only show what it holds (`codeSlots`).
+ * - The phone checks the text first: a bad code says why under the slots
+ *   (`FieldProblem`, read out) and makes no server call. A good code goes
+ *   to the route (`onCode`), which opens the invite screen
+ *   (`/invite/<CODE>`). That screen does the rest, as for a link: the free
+ *   account only from the sign-in choices, then the invite and Accept.
+ *   This screen makes no account and calls no server.
+ * - Typing stops at 8 characters: the slots show no more, so a 9th key
+ *   does nothing. A paste may be longer (a link or a message); a long
+ *   paste with no code says why after the tap.
+ * - Keyboard: it opens with the screen, and the slots and the button stay
+ *   above it (`KeyboardAvoidingView` on iOS; Android resizes the window).
+ *   With a screen reader on, it does not open by itself: the reader
+ *   starts at the title, and a tap on the field opens it. Screen readers
+ *   hear the code length as the field's hint. A pasted link with no code
+ *   says why at once.
+ *   The keyboard's Go key checks the text, also before 8 characters.
+ * - Focus moves to the title when the screen opens. Large fonts scroll and
+ *   the slots grow (the two groups may stack): no text has a line limit.
  *
  * Navigation stays in the route (`app/join.tsx`).
  */
 import { INVITE_CODE_LENGTH } from '@tavli/contracts';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import {
+  AccessibilityInfo,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
-import { Icon } from '@/components/Icon';
+import { FieldProblem } from '@/components/Problem';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { SectionCard } from '@/components/SectionCard';
 import { useFocusOnShow } from '@/features/accessibility/focus';
-import { useAnnouncement } from '@/features/game/useAnnouncement';
 
-import { readTypedCode, type TypedCodeProblem } from './typedCode';
+import { codeSlots, readTypedCode, type TypedCodeProblem } from './typedCode';
+
+/** The space between two slots of a group, in points (the Figma pass). */
+const SLOT_GAP = 5;
+/** The narrowest slot: 8 slots and the gaps fit one row on a 375 pt phone. */
+const SLOT_WIDTH = 36;
 
 export interface JoinCodeScreenProps {
   /** A code that passed the phone's check, in capital letters: open its invite. */
@@ -45,14 +68,16 @@ export interface JoinCodeScreenProps {
 
 export function JoinCodeScreen({ onCode, onBack }: JoinCodeScreenProps) {
   const { t } = useTranslation();
-  const { theme } = useUnistyles();
   const [text, setText] = useState('');
   const [problem, setProblem] = useState<TypedCodeProblem | null>(null);
+  const [focused, setFocused] = useState(false);
   const titleRef = useFocusOnShow();
+  const screenReader = useScreenReaderAnswer();
   const length = INVITE_CODE_LENGTH;
+  // Code points, so a pasted emoji takes one slot, not two.
+  const slots = [...codeSlots(text)];
 
   const problemText = problem === null ? null : t(`join.problem.${problem}`, { length });
-  useAnnouncement(problemText);
 
   const submit = () => {
     const typed = readTypedCode(text);
@@ -81,54 +106,115 @@ export function JoinCodeScreen({ onCode, onBack }: JoinCodeScreenProps) {
           style={styles.body}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled">
-          <View style={styles.hero}>
-            <View style={styles.heroBadge}>
-              <Icon name="keyboard" size={26} color={theme.colors.accent} />
+          <Text style={styles.intro}>{t('join.intro')}</Text>
+          <View style={styles.slotsBox}>
+            <View
+              testID="join-code-slots"
+              style={styles.slots}
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden>
+              {[0, length / 2].map((start) => (
+                <View key={start} style={styles.group}>
+                  {Array.from({ length: length / 2 }, (_, i) => start + i).map((index) => (
+                    <Slot
+                      key={index}
+                      char={slots[index]}
+                      cursor={focused && index === Math.min(slots.length, length - 1)}
+                    />
+                  ))}
+                </View>
+              ))}
             </View>
-            <Text style={styles.intro}>{t('join.intro', { length })}</Text>
+            {/* The field waits for the screen reader answer (a few ms), so
+                `autoFocus` follows it and the field never mounts twice. */}
+            {screenReader === undefined ? null : (
+              <TextInput
+                testID="join-code-input"
+                style={styles.input}
+                value={text}
+                onChangeText={(next) => {
+                  // A typed key past the last slot does nothing, also with
+                  // the caret moved inside the text.
+                  const oneKey = [...next].length === [...text].length + 1;
+                  if (oneKey && slots.length >= length && [...codeSlots(next)].length > length) {
+                    return;
+                  }
+                  // A pasted link or message keeps only its code.
+                  const typed = readTypedCode(next);
+                  setText(
+                    typed.kind === 'code' && typed.code.length < next.length ? typed.code : next,
+                  );
+                  // A new text gets a new check. A pasted link with no code
+                  // leaves the slots empty, so it says why at once.
+                  setProblem(typed.kind === 'problem' && typed.problem === 'link' ? 'link' : null);
+                }}
+                onSubmitEditing={submit}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                accessibilityLabel={t('join.label')}
+                accessibilityHint={t('join.fieldHint', { length })}
+                autoFocus={!screenReader}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                autoComplete="off"
+                spellCheck={false}
+                importantForAutofill="no"
+                caretHidden
+                selectionColor="transparent"
+                // Latin letters on iOS, even when the phone uses a Greek keyboard.
+                keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'default'}
+                returnKeyType="go"
+                submitBehavior="blurAndSubmit"
+              />
+            )}
           </View>
-          <SectionCard title={t('join.label')} padded>
-            <TextInput
-              testID="join-code-input"
-              style={[styles.input, problem !== null && styles.inputProblem]}
-              value={text}
-              onChangeText={(next) => {
-                setText(next);
-                // A new text gets a new check.
-                setProblem(null);
-              }}
-              onSubmitEditing={submit}
-              placeholder={t('join.placeholder')}
-              placeholderTextColor={theme.colors.textDim}
-              accessibilityLabel={t('join.label')}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              autoComplete="off"
-              spellCheck={false}
-              importantForAutofill="no"
-              // Latin letters on iOS, even when the phone uses a Greek keyboard.
-              keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'default'}
-              returnKeyType="go"
-              submitBehavior="blurAndSubmit"
-            />
-            <Text style={styles.hint}>{t('join.hint')}</Text>
-          </SectionCard>
-        </ScrollView>
-        <View style={styles.footer}>
-          {problemText !== null ? (
-            <Text testID="join-problem" style={styles.problem}>
-              {problemText}
-            </Text>
-          ) : null}
+          <FieldProblem text={problemText} testID="join-problem" />
           <ActionButton
             testID="join-continue"
             label={t('join.continue')}
-            disabled={text.trim() === ''}
+            disabled={slots.length < length}
             onPress={submit}
           />
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
+  );
+}
+
+/** Is a screen reader on? `undefined` until the phone answers. */
+function useScreenReaderAnswer(): boolean | undefined {
+  const [on, setOn] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    AccessibilityInfo.isScreenReaderEnabled()
+      .then((answer) => {
+        if (live) setOn(answer);
+      })
+      .catch(() => {
+        if (live) setOn(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return on;
+}
+
+/** One slot: a bone tile with its character, an empty well, or the well with the cursor. */
+function Slot({ char, cursor }: { char: string | undefined; cursor: boolean }) {
+  if (char !== undefined) {
+    return (
+      <View style={styles.tile}>
+        <Text testID="join-code-tile" style={styles.tileText}>
+          {char}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.well, cursor && styles.wellActive]}>
+      {cursor ? <View style={styles.cursor} /> : null}
+    </View>
   );
 }
 
@@ -139,64 +225,75 @@ const styles = StyleSheet.create((theme, rt) => ({
   content: {
     gap: theme.space.lg,
     paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.sm,
-    paddingBottom: theme.space.lg,
-  },
-  hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.md,
-    padding: theme.space.lg,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.surface,
-    backgroundImage: `linear-gradient(160deg, ${theme.colors.surfaceSelected} 0%, ${theme.colors.surface} 70%)`,
-    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
-  },
-  heroBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radii.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.backgroundDeep,
+    paddingTop: theme.space.xxs,
+    paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
   },
   intro: {
-    ...theme.type.body,
-    flex: 1,
-    color: theme.colors.text,
-  },
-  input: {
-    // A typed field stays in the system font: 1, l and I, and 0 and O, must look apart.
-    ...theme.type.headline,
-    fontSize: 20,
-    lineHeight: 26,
-    minHeight: theme.touch.button,
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.sm,
-    borderRadius: theme.radii.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.backgroundDeep,
-    color: theme.colors.text,
-    letterSpacing: 2,
-  },
-  inputProblem: {
-    borderColor: theme.colors.accent,
-  },
-  hint: {
-    ...theme.type.caption,
+    ...theme.type.callout,
+    paddingHorizontal: theme.space.xs,
     color: theme.colors.textDim,
   },
-  problem: {
-    ...theme.type.body,
-    color: theme.colors.text,
+  slotsBox: {
+    paddingVertical: theme.space.xxs,
   },
-  footer: {
-    gap: theme.space.sm,
-    paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.sm,
-    paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
+  // Two groups of four; with a large font the second group goes under the first.
+  slots: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: theme.space.md,
+  },
+  group: {
+    flexDirection: 'row',
+    gap: SLOT_GAP,
+  },
+  tile: {
+    minWidth: SLOT_WIDTH,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.space.xxs,
+    borderRadius: theme.radii.md,
+    backgroundColor: theme.dice.face,
+    backgroundImage: `linear-gradient(180deg, ${theme.dice.face} 0%, ${theme.avatar.bone.face} 100%)`,
+    boxShadow: `0px 2px 0px ${theme.dice.side}`,
+  },
+  tileText: {
+    fontFamily: theme.type.numeral.fontFamily,
+    fontSize: 26,
+    lineHeight: 32,
+    color: theme.colors.onAccent,
+  },
+  well: {
+    minWidth: SLOT_WIDTH,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radii.md,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceSunken,
+    backgroundColor: theme.colors.surfaceSunken,
+    boxShadow: 'inset 0px 2px 4px rgba(0, 0, 0, 0.55)',
+  },
+  wellActive: {
+    borderColor: theme.colors.accent,
+  },
+  cursor: {
+    width: 2,
+    height: 26,
+    borderRadius: 1,
+    backgroundColor: theme.colors.accentLight,
+  },
+  // The field lies over the slots with clear text, so a tap or a long
+  // press (paste) on the slots reaches it.
+  input: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    ...theme.type.body,
+    color: 'transparent',
+    backgroundColor: 'transparent',
   },
 }));

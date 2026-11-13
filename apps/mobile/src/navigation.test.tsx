@@ -287,10 +287,10 @@ describe('app navigation', () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
 
-    // No match yet: the empty state's Play opens New game.
+    // No match yet: the empty state's Play vs bot opens New game.
     await user.press(screen.getByRole('link', { name: 'History' }));
     expect(router.getPathname()).toBe('/history');
-    await user.press(screen.getByRole('button', { name: 'Play' }));
+    await user.press(screen.getByRole('button', { name: 'Play vs bot' }));
     expect(router.getPathname()).toBe('/new-game');
 
     await user.press(screen.getByRole('button', { name: 'Start game' }));
@@ -593,6 +593,23 @@ describe('tutorial (#128)', () => {
     await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
     expect(router.getPathname()).toBe('/tutorial');
     expect(router.getSearchParams()).toEqual({ from: 'rules' });
+  });
+
+  it('opens from the empty History, which goes back there on Skip (#521)', async () => {
+    const user = setupUser();
+    await act(async () => consentStore.setState({ status: 'granted' }));
+    recorded.sent.length = 0;
+    const router = await renderRouter('./src/app', { initialUrl: '/history' });
+    await user.press(screen.getByRole('button', { name: 'Learn to play first' }));
+    expect(router.getPathname()).toBe('/tutorial');
+    expect(router.getSearchParams()).toEqual({ from: 'history' });
+    expect(recorded.sent.filter((e) => e.type === 'track')).toContainEqual({
+      type: 'track',
+      event: 'tutorial_started',
+      props: { source: 'history', game: 'portes' },
+    });
+    await user.press(screen.getByRole('button', { name: 'Skip' }));
+    expect(router.getPathname()).toBe('/history');
   });
 
   it('"Not now" on Home hides the card for good', async () => {
@@ -1181,14 +1198,14 @@ describe('play a friend online (#281)', () => {
 });
 
 describe('join with a code (#333)', () => {
-  /** Home → Join with a code → type `text` → Continue. */
+  /** Home → Join with a code → type `text` → Join the game. */
   async function typeCode(user: ReturnType<typeof setupUser>, text: string) {
     await user.press(
       await screen.findByRole('button', { name: 'Join with a code, Got a code from a friend?' }),
     );
     expect(await screen.findByRole('header', { name: 'Join with a code' })).toBeOnTheScreen();
     await user.type(screen.getByTestId('join-code-input'), text);
-    await user.press(screen.getByRole('button', { name: 'Continue' }));
+    await user.press(screen.getByRole('button', { name: 'Join the game' }));
   }
 
   it('opens the typed code as an invite: the free account first, then Accept opens the game', async () => {
@@ -1307,6 +1324,19 @@ describe('your online games on Home (#297)', () => {
     expect(screen.getAllByTestId(/^online-game-/)).toHaveLength(4);
     await user.press(screen.getByTestId(`online-game-${ids[0]}`));
     expect(router.getPathname()).toBe(`/game/${ids[0]}`);
+  });
+
+  it('"See all" with no game shows the empty state: Play a friend and Join with a code (#521)', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    rememberOnlineAccount();
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/online-games' });
+    expect(await screen.findByRole('header', { name: 'No online games' })).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Play a friend' }));
+    expect(router.getPathname()).toBe('/friend');
+    await act(async () => appRouter.back());
+    await user.press(screen.getByRole('button', { name: 'Join with a code' }));
+    expect(router.getPathname()).toBe('/join');
   });
 
   it('"See all" with no session says it did not load, and makes no account', async () => {

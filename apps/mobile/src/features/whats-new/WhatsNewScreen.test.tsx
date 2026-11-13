@@ -56,6 +56,19 @@ describe('<WhatsNewScreen />', () => {
     expect(older.queryByText('Friends')).toBeNull();
   });
 
+  it('marks only the newest release New, and says where to find each entry (#521)', async () => {
+    await render(<WhatsNewScreen onBack={jest.fn()} releases={TWO} />);
+    expect(screen.getAllByTestId('whats-new-newest')).toHaveLength(1);
+    expect(screen.getByTestId('whats-new-newest')).toHaveTextContent('New');
+
+    const friends = within(screen.getByTestId('whats-new-entry-friends'));
+    expect(friends.getByText('Home › Friends')).toBeOnTheScreen();
+    // Screen readers hear a comma, not "›".
+    expect(friends.getByLabelText('Find it: Home, Friends')).toBeOnTheScreen();
+    const home = within(screen.getByTestId('whats-new-entry-home'));
+    expect(home.getByLabelText('Find it: Home')).toBeOnTheScreen();
+  });
+
   it('shows the app list by default, and every entry once', async () => {
     await render(<WhatsNewScreen onBack={jest.fn()} />);
     for (const release of RELEASES) {
@@ -84,6 +97,8 @@ describe('<WhatsNewScreen />', () => {
     expect(screen.getByRole('header', { name: 'Τι νέο υπάρχει' })).toBeOnTheScreen();
     expect(screen.getByText('Φίλοι')).toBeOnTheScreen();
     expect(screen.getByText(el.whatsNew.entries.home.body)).toBeOnTheScreen();
+    expect(screen.getByTestId('whats-new-newest')).toHaveTextContent('Νέο');
+    expect(screen.getByLabelText('Πού θα το βρεις: Αρχική, Φίλοι')).toBeOnTheScreen();
     expect(screen.queryByText('Friends')).toBeNull();
   });
 
@@ -116,7 +131,7 @@ describe("What's new content (#471)", () => {
     }
   });
 
-  it('has a title and a body in English and Greek for each entry, and no entry without a release', () => {
+  it('has a title, a body and where to find it in English and Greek for each entry, and no entry without a release', () => {
     const ids = RELEASES.flatMap((release) => release.entries.map((entry) => entry.id)).sort();
     expect(Object.keys(en.whatsNew.entries).sort()).toEqual(ids);
     for (const strings of [en, el]) {
@@ -124,6 +139,7 @@ describe("What's new content (#471)", () => {
         const entry = strings.whatsNew.entries[id];
         expect(entry.title.trim()).not.toBe('');
         expect(entry.body.trim()).not.toBe('');
+        expect(entry.where.trim()).not.toBe('');
       }
     }
   });

@@ -159,7 +159,7 @@ To change a wood grade, run `tools/walnut-kafeneio/prepare_textures.py` or `tool
 
 ### Sounds
 
-`sounds` maps each game event (`checkerPlace`, `checkerHit`, `bearOff`, `diceRoll`, `diceLand`, `invalidMove`, `turnStart`, `gameWin`, `matchWin`, …) to one file, a list of takes, or `null` (silent). Files live in `<id>/sounds/`, kebab-case, `.m4a` (mono AAC) or `.mp3`. The app plays the takes in turn. The tests check that every file exists, is audio, is under 48 KB, and that all sounds of a theme stay under 500 KB.
+`sounds` maps each game event (`checkerPlace`, `checkerHit`, `bearOff`, `diceRoll`, `diceLand`, `invalidMove`, `turnStart`, `gameWin`, `matchWin`, `clockTick`, …) to one file, a list of takes, or `null` (silent). Files live in `<id>/sounds/`, kebab-case, `.m4a` (mono AAC) or `.mp3`. The app plays the takes in turn. The tests check that every file exists, is audio, is under 48 KB, and that all sounds of a theme stay under 500 KB.
 
 Olive Inlay and Kafeneio Night use the same sound files as Walnut Kafeneio (a copy in `olive-inlay/sounds/` and `kafeneio-night/sounds/`, about 54 KB each): all boards are wood on wood.
 

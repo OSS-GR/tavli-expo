@@ -152,7 +152,8 @@ async function writeRating(
   else await ctx.db.patch(row._id, fields);
 }
 
-async function pairRow(ctx: QueryCtx, a: string, b: string) {
+/** The pair count row of `a` and `b` (any order), or `null`. */
+export async function pairRow(ctx: QueryCtx, a: string, b: string) {
   const [first, second] = pairOf(a, b);
   return await ctx.db
     .query('ratedPairs')
