@@ -1,4 +1,6 @@
 import { createMemoryStorage } from '@tavli/contracts';
+import { listThemeIds } from '@tavli/themes';
+import { themeForBoard } from '@tavli/ui';
 
 import {
   createSettingsStore,
@@ -31,7 +33,8 @@ describe('settings store', () => {
     expect(state.homeBoardSide).toBe('right');
     // The move list follows the screen reader until the player picks On or Off.
     expect(state.moveList).toBe('auto');
-    expect(state.theme).toBe('walnut-kafeneio');
+    // App colors match the board (#528).
+    expect(state.theme).toBe('match-board');
   });
 
   it('saves every change at once, with a version', () => {
@@ -269,6 +272,39 @@ describe('botSpeed (#172)', () => {
   it('falls back to Normal for a bad value', () => {
     expect(sanitizeSettings({ botSpeed: 'turbo' }).botSpeed).toBe('normal');
     expect(sanitizeSettings({ botSpeed: 2 }).botSpeed).toBe('normal');
+  });
+});
+
+describe('app colors (#528)', () => {
+  function storeWith(version: number, theme: string, boardTheme = 'olive-inlay') {
+    const storage = createMemoryStorage({
+      [SETTINGS_STORAGE_KEY]: JSON.stringify({
+        version,
+        state: { ...DEFAULT_SETTINGS, theme, boardTheme },
+      }),
+    });
+    return createSettingsStore(storage);
+  }
+
+  it('reads Walnut from before #528 as Match the board', () => {
+    // Walnut was the only app theme, so nobody picked it on purpose.
+    expect(storeWith(1, 'walnut-kafeneio').getState().theme).toBe('match-board');
+  });
+
+  it('keeps Walnut when the player picked it after #528', () => {
+    expect(storeWith(2, 'walnut-kafeneio').getState().theme).toBe('walnut-kafeneio');
+  });
+
+  it('keeps Match the board and each theme', () => {
+    for (const theme of ['match-board', 'olive-inlay', 'kafeneio-night']) {
+      expect(storeWith(SETTINGS_VERSION, theme).getState().theme).toBe(theme);
+    }
+  });
+
+  it('has app colors made for every bundled board', () => {
+    for (const board of listThemeIds()) {
+      expect(themeForBoard(board)).toBe(board);
+    }
   });
 });
 
