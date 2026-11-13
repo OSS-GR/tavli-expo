@@ -259,9 +259,9 @@ export const SCENE_PATHS = {
     fill: 'M98 104 L142 104 L136 99 L104 99 Z',
   },
   table: {
+    /** The far legs: drawn before the top, so the top hides their upper part. */
+    backLegs: ['M72 58 V132', 'M168 58 V132'],
     strokes: [
-      'M72 58 V132',
-      'M168 58 V132',
       'M66 56 L174 56 L186 80 L54 80 Z',
       'M54 80 V85 H186 V80',
       'M58 85 V150',
