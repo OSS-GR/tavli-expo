@@ -1,8 +1,8 @@
 /**
  * A banner card on Home (#342): an icon, a title, a line and two
- * buttons. The "Learn to play" card (#128) and the reminder card (#404)
- * use it. No text has a line limit: large fonts wrap. The reminder is the
- * raised card that leads Home; the lesson card is a tray (#496).
+ * buttons. The reminder card (#404) uses it. No text has a line limit:
+ * large fonts wrap. Since the Figma pass (#517) "Learn to play" is a quiet
+ * row of its own (`LearnCard`).
  */
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';

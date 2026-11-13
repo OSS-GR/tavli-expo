@@ -11,7 +11,9 @@ import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
 import { ReminderCard } from '@/features/home/ReminderCard';
+import { QUICK_START_GAMES } from '@/features/home/QuickStartHero';
 import { matchSessions } from '@/features/match/appSessions';
+import { loadLastSetup, saveLastSetup } from '@/features/match/lastSetup';
 import {
   FRIEND_HREF,
   FRIENDS_HREF,
@@ -27,6 +29,7 @@ import {
   tutorialHref,
 } from '@/features/match/routes';
 import type { SavedMatch } from '@/features/match/savedMatch';
+import { isGameOpen, sanitizeSetup, type MatchSetup } from '@/features/match/setup';
 import { continueSummary } from '@/features/match/summary';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 import { reminders } from '@/features/reminders/reminders';
@@ -34,7 +37,7 @@ import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
 import { whatsNewSeen } from '@/features/whats-new/seen';
-import { auth, botLevels, friends, games, invites, ratings } from '@/services';
+import { auth, botLevels, friends, games, invites, ratings, storage } from '@/services';
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -61,6 +64,12 @@ export default function HomeRoute() {
   const [onlineAccount, setOnlineAccount] = useState(hasOnlineAccount);
   // What's new (#471): the dot and the heartbeat until the page opens.
   const [whatsNewFresh, setWhatsNewFresh] = useState(() => whatsNewSeen.due());
+  // The last choices vs the bot (#517): the quick start card starts a
+  // match with them, so one tap plays the game with the last length,
+  // level and house rules.
+  const [botSetup, setBotSetup] = useState<MatchSetup>(() =>
+    loadLastSetup(storage, 'bot', botLevels),
+  );
   const focused = useIsFocused();
   // Read them again each time Home shows (back from a game or an invite).
   useFocusEffect(
@@ -71,6 +80,7 @@ export default function HomeRoute() {
       setSlot(readSlot());
       setOnlineAccount(hasOnlineAccount());
       setWhatsNewFresh(whatsNewSeen.due());
+      setBotSetup(loadLastSetup(storage, 'bot', botLevels));
     }, []),
   );
   const { saved } = slot;
@@ -169,6 +179,23 @@ export default function HomeRoute() {
         ) : null
       }
       onNewGame={(mode) => router.push(newGameHref(mode))}
+      quickStart={{
+        games: QUICK_START_GAMES.filter((game) => isGameOpen(game, 'bot', botLevels)),
+        last: botSetup.game,
+        level: botSetup.botLevel,
+      }}
+      onBotLevel={(botLevel) => {
+        const next = { ...botSetup, botLevel };
+        saveLastSetup(storage, next);
+        setBotSetup(next);
+      }}
+      onQuickStart={(game) => {
+        // The game's own levels decide: a level it lacks becomes its easiest.
+        const setup = sanitizeSetup({ ...botSetup, game }, 'bot', botLevels);
+        saveLastSetup(storage, setup);
+        const session = matchSessions.start(setup);
+        router.push(gameHref(session.id));
+      }}
       onSettings={() => router.push('/settings')}
       onWhatsNew={() => router.push(WHATS_NEW_HREF)}
       whatsNewFresh={whatsNewFresh}

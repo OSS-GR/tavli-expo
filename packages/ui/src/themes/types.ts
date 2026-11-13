@@ -18,6 +18,11 @@ export interface UiColors {
   surfaceRaised: string;
   /** Sunk into the page: inputs, tracks and a disabled second button (#491). Opaque. */
   surfaceSunken: string;
+  /**
+   * A chip or tile set into a raised card: between `surfaceSunken` and
+   * `surface` (Home's level chip and game tiles, #517). Opaque.
+   */
+  surfaceWell: string;
   /** Outlines of cards, segments and secondary buttons. */
   border: string;
   /** The lit top edge of a tray or raised card (#493). Opaque. */

@@ -17,7 +17,7 @@ import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
 import { rememberOnlineAccount } from '@/features/online/accountHint';
 import { DEV_BOT_ID, DEV_TICK_MS, devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
-import { saveLastSetup } from '@/features/match/lastSetup';
+import { lastSetupKey, saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
 import { SAVED_MATCH_KEY } from '@/features/match/savedMatch';
@@ -160,6 +160,51 @@ describe('app navigation', () => {
     expect(screen.getByText('Start a new game?')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Start new' }));
     expect(matchSessions.current()?.setup.mode).toBe('local');
+  });
+
+  it('starts a game vs the bot from its quick start button, with the last choices (#517)', async () => {
+    // Later tests count on the choices the earlier ones left: put them back.
+    const before = storage.getString(lastSetupKey('bot'));
+    saveLastSetup(storage, { ...defaultSetup('bot'), targetPoints: 3 });
+    try {
+      const user = setupUser();
+      const router = await renderRouter('./src/app', { initialUrl: '/' });
+
+      // The chip saves the level for the next start too.
+      await user.press(screen.getByRole('button', { name: 'Bot level: Easy' }));
+      await user.press(screen.getByRole('radio', { name: /^Medium/ }));
+      expect(JSON.parse(storage.getString(lastSetupKey('bot')) ?? '{}').botLevel).toBe('medium');
+
+      await user.press(screen.getByRole('button', { name: 'Play Fevga' }));
+      const session = matchSessions.current()!;
+      expect(session.setup).toMatchObject({
+        mode: 'bot',
+        game: 'fevga',
+        botLevel: 'medium',
+        targetPoints: 3,
+      });
+      expect(router.getPathname()).toBe(`/game/${session.id}`);
+
+      // Back on Home with no save, Fevga is the brass button now.
+      await act(async () => {
+        matchSessions.end(session.id);
+        appRouter.back();
+      });
+      expect(router.getPathname()).toBe('/');
+      expect(
+        within(screen.getByTestId('home-quick-fevga')).getByTestId('home-quick-play-icon', {
+          includeHiddenElements: true,
+        }),
+      ).toBeTruthy();
+      expect(
+        within(screen.getByTestId('home-quick-portes')).queryByTestId('home-quick-play-icon', {
+          includeHiddenElements: true,
+        }),
+      ).toBeNull();
+    } finally {
+      if (before === undefined) storage.remove(lastSetupKey('bot'));
+      else storage.setString(lastSetupKey('bot'), before);
+    }
   });
 
   it('opens match end when the match is over, then rematch, change settings or home', async () => {
@@ -1058,7 +1103,9 @@ describe('play a friend online (#281)', () => {
 
   /** Home → Play a friend → Make an invite. Returns the code of the waiting screen. */
   async function makeInvite(user: ReturnType<typeof setupUser>, router: Router) {
-    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(
+      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
+    );
     expect(router.getPathname()).toBe('/friend');
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
@@ -1071,7 +1118,9 @@ describe('play a friend online (#281)', () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     expect(onlineFake.authStore.guests).toBe(0);
-    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(
+      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
+    );
     await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
     await user.press(screen.getByRole('radio', { name: '1' }));
     await pressMakeInvite(user);
@@ -1138,7 +1187,9 @@ describe('play a friend online (#281)', () => {
       .spyOn(onlineFake.invites, 'createInvite')
       .mockRejectedValueOnce(new Error('offline'));
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(
+      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
+    );
     await pressMakeInvite(user);
     expect(
       await screen.findByText('The invite was not made. Check the connection and try again.'),
@@ -1173,7 +1224,9 @@ describe('play a friend online (#281)', () => {
   it('Back from the setup goes Home, and makes no account', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(
+      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
+    );
     await user.press(screen.getByRole('button', { name: 'Back' }));
     expect(router.getPathname()).toBe('/');
     expect(onlineFake.authStore.guests).toBe(0);
@@ -1183,9 +1236,7 @@ describe('play a friend online (#281)', () => {
 describe('join with a code (#333)', () => {
   /** Home → Join with a code → type `text` → Continue. */
   async function typeCode(user: ReturnType<typeof setupUser>, text: string) {
-    await user.press(
-      await screen.findByRole('button', { name: 'Join with a code, Got a code from a friend?' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Join with a code' }));
     expect(await screen.findByRole('header', { name: 'Join with a code' })).toBeOnTheScreen();
     await user.type(screen.getByTestId('join-code-input'), text);
     await user.press(screen.getByRole('button', { name: 'Continue' }));
@@ -1272,7 +1323,9 @@ describe('your online games on Home (#297)', () => {
   it('after an invite, Home lists the game; a tap opens it', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(
+      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
+    );
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     const code = router.getPathname().split('/').at(-1)!;
@@ -1338,7 +1391,9 @@ describe('save reminders on Home (#404)', () => {
   it('asks a guest to save the account a day after the first guest sign-in', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(
+      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
+    );
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     await act(async () => appRouter.back());
@@ -1357,7 +1412,9 @@ describe('save reminders on Home (#404)', () => {
   it("puts a guest's online wins on the card (#463)", async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(
+      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
+    );
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     await act(async () => appRouter.back());
@@ -1385,7 +1442,9 @@ describe('save reminders on Home (#404)', () => {
   it('asks a player who said Not now on the sign-in sheet to play a friend', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(
+      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
+    );
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     await user.press(await screen.findByRole('button', { name: 'Not now' }));
     expect(onlineFake.authStore.guests).toBe(0);
@@ -1404,7 +1463,9 @@ describe('your invites on Home (#314)', () => {
 
   /** Home → Play a friend → Make an invite → Back to Home. Returns the code. */
   async function inviteThenHome(user: ReturnType<typeof setupUser>, router: Router) {
-    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
+    await user.press(
+      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
+    );
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     const code = router.getPathname().split('/').at(-1)!;

@@ -1,51 +1,71 @@
 /**
- * Home (wireframe 3, redesigned in #342): start or continue a game in one
- * or two taps.
+ * Home (wireframe 3, redesigned in #342, Figma pass in #517): start or
+ * continue a game in one or two taps.
  *
- * Top to bottom: the logo, What's new (#471) and Settings, a greeting with
- * the kafeneio table scene (#509; it plays the first time Home shows in an
- * app run), then a big hero card
- * with a board picture. The hero is the saved game ("Continue game") or,
- * with no save, "Play vs bot". Then the reminder card (#404, when one is
- * due), your online games and invites, the friend invites to you
- * (#486), the "Learn to play" banner, the other play modes as tiles
- * ("Join with a code" under "Play a friend" when online play is on, #333;
- * then Friends and Leaderboards, #486), and How to play and History as
- * pills.
+ * Top to bottom: a small ivory checker and the name, What's new (#471)
+ * and Settings, a greeting with the kafeneio table scene (#509; it plays
+ * the first time Home shows in an app run), then the card that leads Home.
+ * With a save it is the saved game ("Continue game", a big board). With no
+ * save it is Play vs bot with quick start (`QuickStartHero`, Figma option
+ * G): a small board, the level chip and one button per game. Then the
+ * reminder card (#404, when one is due), your online games and invites,
+ * the friend invites to you (#486), the "Learn to play" row, the other
+ * play modes as tiles (Play a friend, Pass-and-play, then Friends and
+ * Leaderboards, #486), and one list with Join with a code (#333, when
+ * online play is on), How to play and History.
+ *
+ * One brass button per view (Figma notes): the Continue card's, or the
+ * last game played on the quick start card.
  */
 import type { Difficulty } from '@tavli/contracts';
-import { displayCaps } from '@tavli/ui';
 import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { ScrollView, Text, View } from 'react-native';
+import { StyleSheet } from 'react-native-unistyles';
 
-import { Icon } from '@/components/Icon';
-import type { IconName } from '@/components/icons';
+import { CheckerAvatar } from '@/components/CheckerAvatar';
+import { RoundButton } from '@/components/RoundButton';
 import { screenBackground } from '@/components/Screen';
+import { SectionCard, SectionRow } from '@/components/SectionCard';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Toast, useToast } from '@/components/Toast';
 import { homeIntroDue, markHomeIntroPlayed } from '@/features/intro/introRuns';
 import { TableScene } from '@/features/intro/TableScene';
-import type { MatchMode } from '@/features/match/setup';
+import type { GameChoice, MatchMode } from '@/features/match/setup';
 import { rulesDirection, startBoard } from '@/features/rules/content';
 import { WhatsNewButton } from '@/features/whats-new/WhatsNewButton';
 
 import { greetingFor } from './greeting';
-import { HomeHero, type HeroBoard } from './HomeHero';
+import type { HeroBoard } from './HomeHero';
 import { ModeTile } from './ModeTile';
-
-const LOGO = require('../../../assets/home/logo.webp') as number;
+import { QuickStartHero, type QuickStartGame } from './QuickStartHero';
 
 /** The table scene's width beside the greeting (Figma: 144×108). */
 const SCENE_WIDTH = 144;
 
-/** Above this font scale the mode tiles and the pills take a row each. */
+/** What the quick start card shows (#517). */
+export interface QuickStartChoice {
+  /** The game buttons, in order: the games the bot can play. */
+  readonly games: readonly QuickStartGame[];
+  /** The last game played vs the bot: the brass button. */
+  readonly last: GameChoice;
+  /** The level the buttons start at. */
+  readonly level: Difficulty;
+}
+
+/** Above this font scale the mode tiles take a row each. */
 const ONE_COLUMN_FONT_SCALE = 1.3;
 
 export interface HomeScreenProps {
+  /** Opens New game in this mode (the full form). */
   onNewGame: (mode: MatchMode) => void;
+  /** The quick start card's choices (#517). */
+  quickStart: QuickStartChoice;
+  /** A game button on the quick start card: start that game vs the bot now. */
+  onQuickStart: (game: QuickStartGame) => void;
+  /** A level picked on the quick start card's chip. */
+  onBotLevel: (level: Difficulty) => void;
   onSettings: () => void;
   /** Opens What's new (#471). The button shows only with it. */
   onWhatsNew?: () => void;
@@ -60,7 +80,7 @@ export interface HomeScreenProps {
    */
   onPlayFriend?: () => void;
   /**
-   * Opens "Join with a code" (#333). The tile shows only with it (a build
+   * Opens "Join with a code" (#333). The row shows only with it (a build
    * with an online server).
    */
   onJoinWithCode?: () => void;
@@ -68,9 +88,9 @@ export interface HomeScreenProps {
   onFriends?: () => void;
   /** Opens the Leaderboards (#407). The tile shows only with it. */
   onRatings?: () => void;
-  /** The bot levels this build can play, easiest first (the "Play vs bot" subtitle). */
+  /** The bot levels this build can play, easiest first (the chip's choices). */
   botLevels: readonly Difficulty[];
-  /** The "Continue game" card, when a saved game exists (#36). It takes the hero's place. */
+  /** The "Continue game" card, when a saved game exists (#36). It takes the lead card's place. */
   continueCard?: ReactNode;
   /** The reminder card (#404): save a guest account, or play online. */
   reminderCard?: ReactNode;
@@ -80,7 +100,7 @@ export interface HomeScreenProps {
   invites?: ReactNode;
   /** "Invites from friends" (#486), when this phone has an online account. */
   friendInvites?: ReactNode;
-  /** The "Learn to play" card, until the tutorial is done or dismissed (#128). */
+  /** The "Learn to play" row, until the tutorial is done or dismissed (#128). */
   learnCard?: ReactNode;
   /** A one-time message, for example "Your saved game could not be opened." */
   notice?: string | null;
@@ -90,6 +110,9 @@ export interface HomeScreenProps {
 
 export function HomeScreen({
   onNewGame,
+  quickStart,
+  onQuickStart,
+  onBotLevel,
   onSettings,
   onWhatsNew,
   whatsNewFresh = false,
@@ -110,7 +133,6 @@ export function HomeScreen({
   hour,
 }: HomeScreenProps) {
   const { t } = useTranslation();
-  const { theme } = useUnistyles();
   const [toast, showToast] = useToast();
   useEffect(() => {
     if (notice !== null) showToast(notice);
@@ -128,7 +150,6 @@ export function HomeScreen({
   const greeting = t(`home.greeting.${greetingFor(hour ?? new Date().getHours())}`);
   const vsBotTitle = t('home.vsBot.title');
   const levels = levelList(botLevels, t);
-  const vsBotLabel = [vsBotTitle, levels].filter(Boolean).join(', ');
   const hasSave = continueCard != null;
   const modesTitle = hasSave ? t('home.newGame') : t('home.moreModes');
 
@@ -137,25 +158,19 @@ export function HomeScreen({
       <ScrollView contentContainerStyle={styles.content} bounces={false}>
         <View style={styles.header}>
           <View style={styles.topRow}>
-            <Image
-              source={LOGO}
-              style={styles.logo}
-              accessible={false}
-              importantForAccessibility="no"
-            />
-            <Text style={styles.appName} accessibilityRole="header">
-              {t('home.title')}
-            </Text>
+            <View style={styles.brand}>
+              <CheckerAvatar playerKey="home" wood="bone" size={24} />
+              <Text style={styles.appName} accessibilityRole="header">
+                {t('home.title')}
+              </Text>
+            </View>
             {onWhatsNew ? <WhatsNewButton fresh={whatsNewFresh} onPress={onWhatsNew} /> : null}
-            <Pressable
+            <RoundButton
               testID="home-settings"
-              accessibilityRole="button"
+              icon="settings"
               accessibilityLabel={t('home.openSettings')}
-              hitSlop={8}
               onPress={onSettings}
-              style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}>
-              <Icon name="settings" size={22} color={theme.colors.text} />
-            </Pressable>
+            />
           </View>
           <View style={styles.welcome}>
             <View style={styles.welcomeText}>
@@ -167,15 +182,15 @@ export function HomeScreen({
         </View>
 
         {continueCard ?? (
-          <HomeHero
-            testID="home-vs-bot"
-            eyebrow={displayCaps(t('home.newGame'))}
-            title={vsBotTitle}
-            {...(levels ? { lines: [levels] } : {})}
-            action={t('home.playNow')}
-            accessibilityLabel={vsBotLabel}
+          <QuickStartHero
             board={startPosition}
-            onPress={() => onNewGame('bot')}
+            games={quickStart.games}
+            last={quickStart.last}
+            level={quickStart.level}
+            levels={botLevels}
+            onMore={() => onNewGame('bot')}
+            onStart={onQuickStart}
+            onLevel={onBotLevel}
           />
         )}
         {reminderCard}
@@ -189,7 +204,6 @@ export function HomeScreen({
           {hasSave ? (
             <ModeTile
               testID="home-vs-bot"
-              kind="primary"
               wide
               icon="bot"
               title={vsBotTitle}
@@ -197,15 +211,6 @@ export function HomeScreen({
               onPress={() => onNewGame('bot')}
             />
           ) : null}
-          <View style={styles.cell}>
-            <ModeTile
-              testID="home-local"
-              icon="users"
-              title={t('home.local.title')}
-              subtitle={t('home.local.subtitle')}
-              onPress={() => onNewGame('local')}
-            />
-          </View>
           <View style={styles.cell}>
             {onPlayFriend ? (
               <ModeTile
@@ -227,16 +232,15 @@ export function HomeScreen({
               />
             )}
           </View>
-          {onJoinWithCode ? (
+          <View style={styles.cell}>
             <ModeTile
-              testID="home-join"
-              wide
-              icon="keyboard"
-              title={t('home.join.title')}
-              subtitle={t('home.join.subtitle')}
-              onPress={onJoinWithCode}
+              testID="home-local"
+              icon="users"
+              title={t('home.local.title')}
+              subtitle={t('home.local.subtitle')}
+              onPress={() => onNewGame('local')}
             />
-          ) : null}
+          </View>
           {onFriends ? (
             <View style={styles.cell}>
               <ModeTile
@@ -261,48 +265,41 @@ export function HomeScreen({
           ) : null}
         </View>
 
-        <View style={styles.footer}>
-          <FooterLink
+        {/* The other links in one list (Figma). Screen readers hear How to
+            play and History as links, as before #342. */}
+        <SectionCard testID="home-links">
+          {onJoinWithCode ? (
+            <SectionRow
+              testID="home-join"
+              icon="keyboard"
+              iconLook="bare"
+              label={t('home.join.title')}
+              accessibilityHint={t('home.join.subtitle')}
+              onPress={onJoinWithCode}
+            />
+          ) : null}
+          <SectionRow
             testID="home-how-to-play"
             icon="book"
+            iconLook="bare"
             label={t('home.howToPlay')}
+            accessibilityRole="link"
             onPress={onHowToPlay}
           />
           {onHistory ? (
-            <FooterLink
+            <SectionRow
               testID="home-history"
               icon="history"
+              iconLook="bare"
               label={t('home.history')}
+              accessibilityRole="link"
               onPress={onHistory}
             />
           ) : null}
-        </View>
+        </SectionCard>
       </ScrollView>
       <Toast text={toast} />
     </View>
-  );
-}
-
-interface FooterLinkProps {
-  testID: string;
-  icon: IconName;
-  label: string;
-  onPress: () => void;
-}
-
-/** A pill at the bottom of Home. Screen readers hear a link, as before #342. */
-function FooterLink({ testID, icon, label, onPress }: FooterLinkProps) {
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="link"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [styles.pill, pressed && styles.pressed]}>
-      <Icon name={icon} size={18} color={theme.colors.textDim} />
-      <Text style={styles.pillText}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -326,10 +323,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   content: {
     flexGrow: 1,
-    gap: theme.space.lg,
+    gap: theme.space.xl,
     paddingHorizontal: theme.space.lg,
-    paddingTop: rt.insets.top + theme.space.sm,
-    paddingBottom: rt.insets.bottom + theme.space.xl,
+    paddingTop: rt.insets.top + theme.space.xs,
+    paddingBottom: rt.insets.bottom + theme.space.xxxl,
   },
   header: {
     gap: theme.space.xs,
@@ -338,34 +335,18 @@ const styles = StyleSheet.create((theme, rt) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space.sm,
-    paddingBottom: theme.space.md,
+    paddingBottom: theme.space.sm,
   },
-  logo: {
-    width: 32,
-    height: 32,
-    borderRadius: theme.radii.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+  brand: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.sm,
   },
   appName: {
-    ...theme.type.bodyStrong,
-    flex: 1,
+    ...theme.type.title3,
+    flexShrink: 1,
     color: theme.colors.text,
-    letterSpacing: 0.3,
-  },
-  roundButton: {
-    width: theme.touch.minTarget,
-    height: theme.touch.minTarget,
-    borderRadius: theme.touch.minTarget / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.97 }],
   },
   welcome: {
     flexDirection: 'row',
@@ -382,44 +363,18 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
   },
   tagline: {
-    ...theme.type.body,
+    ...theme.type.callout,
     color: theme.colors.textDim,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.space.md,
+    gap: 10,
   },
   // Two tiles a row; one a row with a large font. Equal heights in a row.
   cell: {
     flexGrow: 1,
     flexBasis: rt.fontScale > ONE_COLUMN_FONT_SCALE ? '100%' : 0,
     minWidth: 140,
-  },
-  footer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space.md,
-  },
-  pill: {
-    flexGrow: 1,
-    flexBasis: rt.fontScale > ONE_COLUMN_FONT_SCALE ? '100%' : 0,
-    minWidth: 140,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.space.sm,
-    minHeight: theme.touch.button,
-    paddingHorizontal: theme.space.lg,
-    paddingVertical: theme.space.sm,
-    borderRadius: theme.radii.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  pillText: {
-    ...theme.type.bodyStrong,
-    color: theme.colors.text,
-    flexShrink: 1,
   },
 }));

@@ -42,6 +42,7 @@ import { HomeInvites } from '@/features/home/HomeInvites';
 import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
 import { LearnCard } from '@/features/home/LearnCard';
+import { QUICK_START_GAMES } from '@/features/home/QuickStartHero';
 import { FriendSetupScreen } from '@/features/invites/FriendSetupScreen';
 import { InviteScreen } from '@/features/invites/InviteScreen';
 import { InviteWaitScreen } from '@/features/invites/InviteWaitScreen';
@@ -149,6 +150,9 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     await renderWithRoot(
       <HomeScreen
         onNewGame={jest.fn()}
+        quickStart={{ games: QUICK_START_GAMES, last: 'portes', level: 'easy' }}
+        onQuickStart={jest.fn()}
+        onBotLevel={jest.fn()}
         onSettings={jest.fn()}
         onHowToPlay={jest.fn()}
         onHistory={jest.fn()}
@@ -165,6 +169,24 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       />,
     );
     expect(screen.getByTestId('home-join')).toBeOnTheScreen();
+    expect(problems()).toEqual([]);
+  });
+
+  it('Home: the quick start card with no saved game (#517)', async () => {
+    await renderWithRoot(
+      <HomeScreen
+        onNewGame={jest.fn()}
+        quickStart={{ games: QUICK_START_GAMES, last: 'portes', level: 'easy' }}
+        onQuickStart={jest.fn()}
+        onBotLevel={jest.fn()}
+        onSettings={jest.fn()}
+        onHowToPlay={jest.fn()}
+        botLevels={['easy', 'medium']}
+        learnCard={<LearnCard onStart={jest.fn()} onDismiss={jest.fn()} />}
+      />,
+    );
+    expect(screen.getByTestId('home-quick-tavli')).toBeOnTheScreen();
+    expect(screen.getByTestId('home-bot-level')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   });
 
@@ -655,6 +677,9 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     const home = await renderWithRoot(
       <HomeScreen
         onNewGame={jest.fn()}
+        quickStart={{ games: QUICK_START_GAMES, last: 'portes', level: 'easy' }}
+        onQuickStart={jest.fn()}
+        onBotLevel={jest.fn()}
         onSettings={jest.fn()}
         onHowToPlay={jest.fn()}
         botLevels={['easy']}
@@ -702,6 +727,9 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     await renderWithRoot(
       <HomeScreen
         onNewGame={jest.fn()}
+        quickStart={{ games: QUICK_START_GAMES, last: 'portes', level: 'easy' }}
+        onQuickStart={jest.fn()}
+        onBotLevel={jest.fn()}
         onSettings={jest.fn()}
         onHowToPlay={jest.fn()}
         botLevels={['easy']}

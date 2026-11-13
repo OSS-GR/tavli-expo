@@ -22,6 +22,7 @@ describe('typography', () => {
       'title1',
       'title2',
       'title3',
+      'title4',
       'sectionHeader',
       'numeral',
     ]);

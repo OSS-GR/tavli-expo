@@ -20,6 +20,7 @@ export const walnutKafeneio = {
     // From the Figma polish pass (#491): one step up and one step down from `surface`.
     surfaceRaised: '#3A2819',
     surfaceSunken: '#1A110A',
+    surfaceWell: '#24180F',
     border: '#6A4E35',
     edgeLight: '#5A4330',
     separator: '#4E3927',

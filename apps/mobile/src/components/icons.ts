@@ -325,6 +325,9 @@ export const ICONS = {
   chevronDown: {
     strokes: ['m6 9 6 6 6-6'],
   },
+  x: {
+    strokes: ['M18 6 6 18', 'm6 6 12 12'],
+  },
   clipboard: {
     strokes: [
       roundRect(8, 2, 8, 4, 1),
