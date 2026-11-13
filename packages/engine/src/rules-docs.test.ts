@@ -20,6 +20,8 @@ import asodioTests from './variants/asodio/asodio.test.ts?raw';
 import fevgaTests from './variants/fevga/fevga.test.ts?raw';
 import portesTests from './variants/portes/portes.test.ts?raw';
 import raceTests from './race.test.ts?raw';
+// Play ranked cases (#529) are tested in @tavli/online, where the rule lives.
+import rankedTests from '../../online/src/ranked.test.ts?raw';
 import { PRESET_IDS, RULE_GROUPS, RULE_SCHEMA } from './rules';
 import type { PresetId, RuleSet } from './rules';
 import { section, tableRows } from './testing/markdown';
@@ -208,7 +210,7 @@ const EDGE_CASE_TESTS: readonly {
   {
     name: 'tavli-match.md',
     doc: matchDoc,
-    tests: [matchTests, matchFlowTests, gameFlowTests, portesTests, raceTests],
+    tests: [matchTests, matchFlowTests, gameFlowTests, portesTests, raceTests, rankedTests],
   },
   { name: 'fevga.md', doc: fevgaDoc, tests: [fevgaTests] },
   { name: 'asodio.md', doc: asodioDoc, tests: [asodioTests], extra: ['### Presets'] },
