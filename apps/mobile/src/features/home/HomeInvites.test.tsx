@@ -208,7 +208,8 @@ describe('<HomeInvites />', () => {
   });
 
   it('a session that does not load shows the note, keeps the flag and makes no guest', async () => {
-    // Better Auth's ready() gives null with no network too: no sign-out.
+    // No network: the session does not load, and that is no sign-out.
+    onlineFake.authStore.offline = true;
     rememberOnlineAccount();
     newInvite();
     await show();
@@ -216,6 +217,15 @@ describe('<HomeInvites />', () => {
     expect(screen.queryAllByTestId(/^home-invite-/)).toEqual([]);
     expect(onlineFake.authStore.guests).toBe(0);
     expect(hasOnlineAccount()).toBe(true);
+  });
+
+  it('a session that ended on the server shows no invites and no note, and forgets the flag', async () => {
+    rememberOnlineAccount();
+    await show();
+    expect(screen.queryByTestId('home-invites-failed')).toBeNull();
+    expect(screen.queryAllByTestId(/^home-invite-/)).toEqual([]);
+    expect(hasOnlineAccount()).toBe(false);
+    expect(onlineFake.authStore.guests).toBe(0);
   });
 
   it('a list that does not load shows a note, and Try again loads it', async () => {

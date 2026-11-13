@@ -1346,7 +1346,8 @@ describe('your online games on Home (#297)', () => {
   });
 
   it('"See all" with no session says it did not load, and makes no account', async () => {
-    // ready() gives null: maybe no network, so the list offers Try again.
+    // No network: the session does not load, so the list offers Try again.
+    onlineFake.authStore.offline = true;
     await renderRouter('./src/app', { initialUrl: '/online-games' });
     expect(
       await screen.findByText('Your online games did not load. Check the connection.'),

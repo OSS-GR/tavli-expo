@@ -280,7 +280,8 @@ describe('<OnlineHistory />', () => {
   });
 
   it('says it did not load when the session does not load, and keeps the note', async () => {
-    // Better Auth's ready() gives null with no network too: no sign-out.
+    // No network: the session does not load, and that is no sign-out.
+    onlineFake.authStore.offline = true;
     rememberOnlineAccount();
     await show();
     expect(
