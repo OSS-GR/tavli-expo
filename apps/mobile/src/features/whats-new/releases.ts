@@ -29,7 +29,8 @@ export type WhatsNewEntryId =
   | 'quickInvites'
   | 'newLook'
   | 'grabAChair'
-  | 'plakotoFederation';
+  | 'plakotoFederation'
+  | 'matchingColors';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -47,7 +48,10 @@ export interface WhatsNewRelease {
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
     date: '2026-11-13',
-    entries: [{ id: 'plakotoFederation', icon: 'book' }],
+    entries: [
+      { id: 'matchingColors', icon: 'palette' },
+      { id: 'plakotoFederation', icon: 'book' },
+    ],
   },
   {
     date: '2026-11-12',

@@ -184,7 +184,14 @@
     },
     "theme": {
       "label": "App colors",
-      "hint": "The colors of menus and screens. More later."
+      "hint": "Match the board picks the colors made for each board. Pick one to keep it with any board.",
+      "matchBoard": "Match the board",
+      "matchBoardHint": {
+        "dark": "{{theme}} colors, dark",
+        "light": "{{theme}} colors, light"
+      },
+      "dark": "Dark",
+      "light": "Light"
     },
     "boardTheme": {
       "label": "Board",
@@ -453,7 +460,9 @@
     "en": "English"
   },
   "themes": {
-    "walnut-kafeneio": "Walnut kafeneio"
+    "walnut-kafeneio": "Walnut Kafeneio",
+    "olive-inlay": "Olive Inlay",
+    "kafeneio-night": "Kafeneio Night"
   },
   "dev": {
     "board": {
@@ -932,6 +941,10 @@
       "plakotoFederation": {
         "title": "Plakoto plays the federation rules",
         "body": "Every new Plakoto game, alone or in a Tavli match, uses the federation mother rule: pin the other mother and you win 2 points once your own point 24 is empty. The rules version choice is gone. See the Plakoto rules page."
+      },
+      "matchingColors": {
+        "title": "App colors that match the board",
+        "body": "Two new color themes: Olive Inlay, the first light one, and Kafeneio Night. The app colors now match the board you pick. To keep one look with any board, pick it in Settings → Board & look → App colors."
       }
     }
   },

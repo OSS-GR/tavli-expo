@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { contrastRatio } from './contrast';
+import { contrastRatio, luminance } from './contrast';
 import { displayCaps } from './text';
-import { DEFAULT_THEME_ID, isThemeId, THEME_IDS, themes } from './themes';
+import {
+  DEFAULT_THEME_ID,
+  isThemeChoice,
+  isThemeId,
+  MATCH_BOARD,
+  resolveThemeId,
+  THEME_CHOICES,
+  THEME_IDS,
+  themeForBoard,
+  themes,
+} from './themes';
 import { spacing, touch } from './tokens';
 
 const HEX = /^#[0-9A-F]{6}$/i;
@@ -79,6 +89,20 @@ describe('themes', () => {
         // disabled controls be fainter, but locked labels still carry meaning.
         ['textDisabled', 'background'],
         ['textDisabled', 'surface'],
+        // Matching color themes (#528): the light theme turns these around,
+        // so every theme checks them.
+        ['textDim', 'surfaceRaised'],
+        ['text', 'backgroundLamp'], // the top of every screen
+        ['textDim', 'backgroundLamp'],
+        ['text', 'backgroundFloor'], // the bottom of every screen
+        ['textDim', 'backgroundFloor'],
+        ['turnText', 'background'], // "Your turn", the turn pill text
+        ['turnText', 'surface'],
+        ['turnText', 'surfaceRaised'],
+        ['turnText', 'backgroundDeep'],
+        ['problem', 'surfaceRaised'],
+        ['accent', 'surfaceRaised'], // brass or mahogany text buttons
+        ['accentLight', 'surfaceSelected'],
       ] as const)('keeps %s on %s readable (WCAG AA, 4.5:1)', (fg, bg) => {
         expect(contrastRatio(theme.colors[fg], theme.colors[bg])).toBeGreaterThanOrEqual(4.5);
       });
@@ -104,6 +128,19 @@ describe('themes', () => {
         // Disabled buttons still read as buttons (#491). WCAG exempts their text.
         expect(contrastRatio(colors.onAccentMuted, colors.accentMuted)).toBeGreaterThanOrEqual(3);
         expect(contrastRatio(colors.textFaint, colors.surfaceSunken)).toBeGreaterThanOrEqual(3);
+        // Icons and rings (#528): the picked option's check, chevrons, the turn ring.
+        expect(contrastRatio(colors.accent, colors.surfaceSelected)).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(colors.accent, colors.surfaceRaised)).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(colors.textFaint, colors.surface)).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(colors.textDim, colors.surfaceSunken)).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(colors.turn, colors.background)).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(colors.turn, colors.surface)).toBeGreaterThanOrEqual(3);
+      });
+
+      // The status bar and native parts follow `scheme` (#528).
+      it('says light or dark to match its background', () => {
+        const light = luminance(theme.colors.background) > 0.5;
+        expect(theme.scheme).toBe(light ? 'light' : 'dark');
       });
 
       it('keeps the checkers apart (3:1)', () => {
@@ -111,6 +148,40 @@ describe('themes', () => {
       });
     });
   }
+});
+
+describe('app colors choice (#528)', () => {
+  it('lists Match the board first, then every theme', () => {
+    expect(THEME_CHOICES).toEqual([MATCH_BOARD, ...THEME_IDS]);
+    expect(isThemeChoice(MATCH_BOARD)).toBe(true);
+    expect(isThemeChoice('olive-inlay')).toBe(true);
+    expect(isThemeChoice('neon')).toBe(false);
+    expect(isThemeChoice(undefined)).toBe(false);
+  });
+
+  it('has app colors for each bundled board', () => {
+    expect(themeForBoard('walnut-kafeneio')).toBe('walnut-kafeneio');
+    expect(themeForBoard('olive-inlay')).toBe('olive-inlay');
+    expect(themeForBoard('kafeneio-night')).toBe('kafeneio-night');
+  });
+
+  it('falls back to the default for a board with no colors of its own', () => {
+    expect(themeForBoard('some-new-board')).toBe(DEFAULT_THEME_ID);
+    expect(themeForBoard('toString')).toBe(DEFAULT_THEME_ID);
+  });
+
+  it('follows the board with Match the board', () => {
+    expect(resolveThemeId(MATCH_BOARD, 'olive-inlay')).toBe('olive-inlay');
+    expect(resolveThemeId(MATCH_BOARD, 'kafeneio-night')).toBe('kafeneio-night');
+    expect(resolveThemeId(MATCH_BOARD, 'walnut-kafeneio')).toBe('walnut-kafeneio');
+  });
+
+  it('keeps a picked theme with any board', () => {
+    for (const board of ['walnut-kafeneio', 'olive-inlay', 'kafeneio-night']) {
+      expect(resolveThemeId('kafeneio-night', board)).toBe('kafeneio-night');
+      expect(resolveThemeId('olive-inlay', board)).toBe('olive-inlay');
+    }
+  });
 });
 
 describe('tokens', () => {

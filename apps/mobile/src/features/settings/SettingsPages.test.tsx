@@ -265,7 +265,48 @@ describe('Settings → Board & look', () => {
   it('keeps the app colors next to the board', async () => {
     await render(<BoardLookSettings />);
     const list = within(screen.getByTestId('settings-theme'));
-    expect(list.getByRole('radio', { name: 'Walnut kafeneio' })).toBeChecked();
+    expect(screen.getByTestId('settings-theme')).toHaveAccessibleName('App colors');
+    // Match the board first and picked, then each theme (#528).
+    expect(list.getAllByRole('radio').map((r) => r.props.accessibilityLabel)).toEqual([
+      'Match the board',
+      'Walnut Kafeneio',
+      'Olive Inlay',
+      'Kafeneio Night',
+    ]);
+    expect(list.getByRole('radio', { name: 'Match the board' })).toBeChecked();
+  });
+
+  it('matches the app colors to the board, or keeps a picked theme (#528)', async () => {
+    const user = userEvent.setup();
+    await render(<BoardLookSettings />);
+    const list = () => within(screen.getByTestId('settings-theme'));
+    const strip = () => within(screen.getByTestId('settings-board-theme'));
+    expect(screen.getByText('Walnut Kafeneio colors, dark')).toBeOnTheScreen();
+
+    // Match the board: the Olive Inlay board brings its light colors.
+    await user.press(strip().getByRole('radio', { name: 'Olive Inlay' }));
+    expect(settingsStore.getState().theme).toBe('match-board');
+    expect(screen.getByText('Olive Inlay colors, light')).toBeOnTheScreen();
+
+    // A picked theme stays with any board.
+    await user.press(list().getByRole('radio', { name: 'Kafeneio Night' }));
+    expect(settingsStore.getState().theme).toBe('kafeneio-night');
+    expect(list().getByRole('radio', { name: 'Kafeneio Night' })).toBeChecked();
+    expect(list().getByRole('radio', { name: 'Match the board' })).not.toBeChecked();
+    await user.press(strip().getByRole('radio', { name: 'Walnut Kafeneio' }));
+    expect(settingsStore.getState().theme).toBe('kafeneio-night');
+    expect(settingsStore.getState().boardTheme).toBe('walnut-kafeneio');
+  });
+
+  it('names the app colors in Greek (#528)', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    await render(<BoardLookSettings />);
+    const list = within(screen.getByTestId('settings-theme'));
+    expect(list.getByRole('radio', { name: 'Όπως το ταμπλό' })).toBeChecked();
+    expect(list.getByRole('radio', { name: 'Ελιά με ένθετα' })).toBeOnTheScreen();
+    expect(screen.getByText('Χρώματα: Καρυδιά Καφενείου, σκούρα')).toBeOnTheScreen();
   });
 });
 
