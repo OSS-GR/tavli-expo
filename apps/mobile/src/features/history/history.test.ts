@@ -1301,6 +1301,7 @@ describe('online history texts (#313)', () => {
     variant: 'plakoto',
     targetPoints: 5,
     turnTimeMinutes: null,
+    ranked: false,
     mySide: 'black',
     waitingFor: null,
     myTurn: false,

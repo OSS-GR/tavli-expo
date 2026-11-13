@@ -537,14 +537,24 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       expect(await screen.findByTestId('confirm-button')).toBeOnTheScreen();
       expect(problems()).toEqual([]);
 
-      // You run out of time: the game-end sheet.
+      // Your last 10 seconds: the turn clock ring, the red seat and its warning (#530).
       await act(async () => {
-        jest.advanceTimersByTime(60_000 + 1000);
+        jest.advanceTimersByTime(50_000);
+      });
+      expect(screen.getByTestId('strip-bottom-time')).toBeOnTheScreen();
+      expect(screen.getByTestId('strip-bottom').props.accessibilityLabel).toMatch(
+        new RegExp(i18n.t('online.clock.lastSeconds')),
+      );
+      expect(problems()).toEqual([]);
+
+      // You run out of time: the "Time ran out" card.
+      await act(async () => {
+        jest.advanceTimersByTime(10_000 + 1000);
         server.runDueTimeouts();
       });
-      expect(await screen.findByTestId('game-end-card')).toBeOnTheScreen();
+      expect(await screen.findByTestId('time-ran-out-card')).toBeOnTheScreen();
       expect(problems()).toEqual([]);
-      await user.press(screen.getByTestId('next-game-button'));
+      await user.press(screen.getByTestId('time-ran-out-button'));
       await unmount();
 
       // Match end of an online match: no Rematch, names "You" and "Opponent".
@@ -634,7 +644,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
       fireEvent.changeText(screen.getByTestId('join-code-input'), 'ABCD234');
     });
     await act(async () => {
-      fireEvent.press(screen.getByTestId('join-continue'));
+      fireEvent(screen.getByTestId('join-code-input'), 'submitEditing');
     });
     expect(screen.getByTestId('join-problem')).toBeOnTheScreen();
     expect(problems()).toEqual([]);

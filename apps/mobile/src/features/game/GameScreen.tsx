@@ -260,6 +260,39 @@ export interface OnlineEndedGame {
   readonly key: string;
   /** The sheet's button: it closes the sheet, and the next game shows. */
   readonly onClose: () => void;
+  /**
+   * Your time ran out in this game (#530): a card over the board in place
+   * of the game-end sheet ("Time ran out", "I am here"). Its button is
+   * `onClose` too. `null` or left out: the sheet.
+   */
+  readonly timedOut?: OnlineTimedOutCard | null;
+}
+
+/** The texts of the "Time ran out" card (#530). */
+export interface OnlineTimedOutCard {
+  /** "Time ran out", shown in caps. */
+  readonly eyebrow: string;
+  /** "Nikos wins this game". */
+  readonly title: string;
+  /** "1 point. The next game starts now. …". */
+  readonly text: string;
+  /** "I am here". */
+  readonly button: string;
+}
+
+/** The clock on the seat of the player the server waits for (online). */
+export interface OnlineClock extends SeatClock {
+  readonly player: PlayerId;
+  /**
+   * Your last seconds of a timed turn (#530): the seconds left, 10 down to
+   * 1. Each new value plays a soft tick and a light haptic. `null` otherwise.
+   */
+  readonly tick: number | null;
+  /**
+   * Read once to screen readers when your last seconds start (#530). The
+   * key names the turn for the whole app run. `null` otherwise.
+   */
+  readonly alert: { readonly key: string; readonly text: string } | null;
 }
 
 /** A card over the board, such as "Your time ran out" (online, #255). */
@@ -282,7 +315,9 @@ export interface OnlineSide {
   /** The text in place of the buttons while the board is locked: "Waiting for Opponent…". */
   readonly status: string;
   /** The time left on the seat of the player the server waits for: "0:42 to move". */
-  readonly clock: (SeatClock & { readonly player: PlayerId }) | null;
+  readonly clock: OnlineClock | null;
+  /** The game has a turn time (#530): the seats keep room for the turn ring. */
+  readonly timed: boolean;
   /** The game-end sheet of the game that just ended. */
   readonly ended: OnlineEndedGame | null;
   readonly notice: OnlineNoticeCard | null;
@@ -402,6 +437,16 @@ export function GameScreen({
   );
   const eventsOf = useMemo(() => (me === null ? storeEvents : onlineStoreEvents(me)), [me]);
   const feedback = useGameFeedback(store, theme, humans, eventsOf);
+  // Online, your last seconds of a timed turn (#530): a soft tick and a
+  // light haptic each second, and one line for screen readers.
+  // One tick per new second shown: a new `feedback` plays none.
+  const clockTick = online?.clock?.tick ?? null;
+  const playTick = useEffectEvent(() => feedback.event('clockTick'));
+  useEffect(() => {
+    if (clockTick !== null) playTick();
+  }, [clockTick]);
+  const clockAlert = online?.clock?.alert ?? null;
+  useAnnouncement(clockAlert?.text ?? null, clockAlert?.key);
 
   // "No legal moves": the flow has passed the turn already; the card says why.
   const pass = passNotice(flow);
@@ -1422,25 +1467,28 @@ export function GameScreen({
   // shows the game that ended (`online.ended`), from its record. While the
   // turn that ended it flies (`landingWait`, #299), no sheet shows yet.
   const ended = landingWait ? null : (online?.ended ?? null);
-  const ending = landingWait
-    ? null
-    : ended !== null
-      ? {
-          result: ended.record,
-          // The record has no board: a resign reads as a plain resign.
-          off: { white: 1, black: 1 },
-          // The record's own game: the board may show another game now.
-          method: recordScoring(match, ended.record),
-          key: ended.key,
-        }
-      : gameOver && game.result !== null
+  // Your time ran out (#530): a card over the board says so, not the sheet.
+  const timedOut = ended?.timedOut ?? null;
+  const ending =
+    landingWait || timedOut !== null
+      ? null
+      : ended !== null
         ? {
-            result: game.result,
-            off: game.state.board.off,
-            method: rules.scoring.method,
-            key: `${matchKey}:end:${gameKey}`,
+            result: ended.record,
+            // The record has no board: a resign reads as a plain resign.
+            off: { white: 1, black: 1 },
+            // The record's own game: the board may show another game now.
+            method: recordScoring(match, ended.record),
+            key: ended.key,
           }
-        : null;
+        : gameOver && game.result !== null
+          ? {
+              result: game.result,
+              off: game.state.board.off,
+              method: rules.scoring.method,
+              key: `${matchKey}:end:${gameKey}`,
+            }
+          : null;
   let endSheet = null;
   if (ending !== null) {
     const { result } = ending;
@@ -1531,7 +1579,28 @@ export function GameScreen({
   const over = gameOver || matchOver || (online?.ended ?? null) !== null;
   const notice = online?.notice ?? null;
   let card = null;
-  if (!over && notice !== null) {
+  if (ended !== null && timedOut !== null) {
+    // Online (#530): "Time ran out", over the end of the game you lost on time.
+    card = (
+      <GameCard
+        key={ended.key}
+        testID="time-ran-out-card"
+        announceKey={ended.key}
+        eyebrow={timedOut.eyebrow}
+        title={timedOut.title}
+        lines={[timedOut.text]}
+        centered>
+        <ActionButton
+          testID="time-ran-out-button"
+          label={timedOut.button}
+          onPress={() => {
+            setFlights([]);
+            ended.onClose();
+          }}
+        />
+      </GameCard>
+    );
+  } else if (!over && notice !== null) {
     // Online (#255): "Your time ran out", "The game changed", ….
     card = (
       <GameCard
@@ -1881,6 +1950,7 @@ export function GameScreen({
       turnDetail={turnDetail}
       note={asodioNote(player)}
       clock={seatClock(player)}
+      timed={online?.timed ?? false}
       score={match.score[player]}
       target={match.targetPoints}
       active={playing && active === player}

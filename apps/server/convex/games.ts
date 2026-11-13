@@ -3,7 +3,8 @@
  * question, resign, and watch a game. A game between two people starts
  * from an accepted invite (`invites.ts`); `createGame` is internal (#274).
  * Turn timers (#133): each turn has a deadline; when it passes, the player
- * the server waits for loses the game.
+ * the server waits for loses the game. In a Play ranked game (#529), their
+ * second time out in a row loses the match (`timeOut` in `@tavli/online`).
  *
  * Each mutation is one Convex transaction: load the game, check the call,
  * run the engine (`@tavli/online`), and save with a version bump. If
@@ -61,6 +62,7 @@ import {
   callTimedOut,
   checkCall,
   checkNewGame,
+  checkRankedGame,
   checkTurnTimeMinutes,
   checkViewer,
   createOnlineMatch,
@@ -263,15 +265,25 @@ async function save(
   return version;
 }
 
-/** The player the server waits for loses the current game. Saves it; returns the new version. */
+/**
+ * The player the server waits for loses the current game. In a ranked
+ * game their second time out in a row loses the match (#529); `save`
+ * rates it like any finished match. Saves it; returns the new version.
+ */
 async function applyTimeout(
   ctx: MutationCtx,
   game: Doc<'games'>,
   before: LoadedFlow,
   now: number,
 ): Promise<number> {
-  const next = guarded(() => timeOut(before.flow, createCryptoRng()));
+  const options = { ranked: isRanked(game), timeoutsInARow: before.timeoutsInARow };
+  const next = guarded(() => timeOut(before.flow, createCryptoRng(), options));
   return await save(ctx, game, SERVER_ACTOR, before, next, now);
+}
+
+/** True for a Play ranked game (#529). A game saved before #529 has no field: a friend game. */
+function isRanked(game: Pick<Doc<'games'>, 'ranked'>): boolean {
+  return game.ranked === true;
 }
 
 /**
@@ -330,6 +342,11 @@ export interface NewGame {
   readonly choice: Infer<typeof gameChoice>;
   readonly targetPoints: number;
   readonly turnTimeMinutes: number | null;
+  /**
+   * A Play ranked game (#529, ADR-0009). Default false. Only the ranked
+   * queue sets it (a later issue); it needs `RANKED_TURN_TIME_MINUTES`.
+   */
+  readonly ranked?: boolean;
 }
 
 /**
@@ -342,10 +359,12 @@ export interface NewGame {
  */
 export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'games'>> {
   const { callerId, choice, targetPoints, turnTimeMinutes } = game;
+  const ranked = game.ranked === true;
   const players = { white: game.players.white, black: game.players.black };
   guarded(() => {
     checkNewGame(callerId, players);
     checkTurnTimeMinutes(turnTimeMinutes);
+    checkRankedGame(ranked, turnTimeMinutes);
   });
   const flow = guarded(() =>
     createOnlineMatch({ choice, targetPoints, players }, createCryptoRng()),
@@ -359,6 +378,7 @@ export async function insertGame(ctx: MutationCtx, game: NewGame): Promise<Id<'g
     players,
     choice,
     turnTimeMinutes,
+    ranked,
     targetPoints,
     rules: serializeRules(flow.match.rules),
     // A new match: no game ended before it.
@@ -400,6 +420,8 @@ export const createGame = internalMutation({
     targetPoints: v.number(),
     /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
     turnTimeMinutes: gameTurnTimeMinutes,
+    /** A Play ranked game (#529); default false. */
+    ranked: v.optional(v.boolean()),
   },
   returns: v.id('games'),
   handler: async (ctx, args) => await insertGame(ctx, args),
@@ -580,6 +602,7 @@ function gameInput(game: Doc<'games'>) {
     version: game.version,
     choice: game.choice,
     turnTimeMinutes: game.turnTimeMinutes,
+    ranked: isRanked(game),
     turnDeadline: game.turnDeadline,
     players: game.players,
   };
@@ -599,11 +622,11 @@ export const getGame = query({
     const loaded = await ctx.db.get(gameId);
     const game = guarded(() => checkViewer(loaded, callerId));
     if (game === null) return null;
-    const { flow, previousGame } = loadStored(game.flow);
+    const { flow, previousGame, timeoutsInARow } = loadStored(game.flow);
     const draft = savedDraft(await draftRow(ctx, game._id));
     // A side the caller blocks shows no name (#320).
     const names = await playerNamesSeenBy(ctx, callerId, game.players);
-    return toView({ ...gameInput(game), flow, previousGame, draft, names });
+    return toView({ ...gameInput(game), flow, previousGame, timeoutsInARow, draft, names });
   },
 });
 

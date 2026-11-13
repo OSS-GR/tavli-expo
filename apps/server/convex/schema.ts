@@ -11,9 +11,17 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
-import { INVITE_STATUSES, ONLINE_GAME_CHOICES, REPORT_REASONS } from '@tavli/contracts';
+import {
+  INVITE_STATUSES,
+  ONLINE_GAME_CHOICES,
+  RANKED_GAMES,
+  REPORT_REASONS,
+} from '@tavli/contracts';
 
 export const gameChoice = v.union(...ONLINE_GAME_CHOICES.map((choice) => v.literal(choice)));
+
+/** A game a player may seek for Play ranked (#531). */
+export const rankedGame = v.union(...RANKED_GAMES.map((game) => v.literal(game)));
 
 /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
 export const gameTurnTimeMinutes = v.union(v.number(), v.null());
@@ -41,6 +49,13 @@ export default defineSchema({
      * (#183).
      */
     turnTimeMinutes: gameTurnTimeMinutes,
+    /**
+     * A Play ranked game (#529, ADR-0009): two time outs in a row by the
+     * same player lose the match. Optional only because games saved
+     * before #529 have none: read a missing value as `false` (a friend
+     * game).
+     */
+    ranked: v.optional(v.boolean()),
     /** Match length in points. */
     targetPoints: v.number(),
     /** The match `RuleSet`, JSON text (`serializeRules`). */
@@ -48,9 +63,10 @@ export default defineSchema({
     /** The variant of the current game. */
     variant: v.string(),
     /**
-     * The engine `MatchFlow` without its log, and the game before the
-     * current one as it ended (#299): `StoredFlow` of `@tavli/online`,
-     * JSON text. The log is in `moves`.
+     * The engine `MatchFlow` without its log, the game before the
+     * current one as it ended (#299), and each side's time outs in a row
+     * (#529): `StoredFlow` of `@tavli/online`, JSON text. The log is in
+     * `moves`.
      */
     flow: v.string(),
     status: gameStatus,
@@ -292,6 +308,30 @@ export default defineSchema({
   })
     .index('by_player', ['playerId'])
     .index('by_board', ['boardable', 'rating']),
+
+  /**
+   * Play ranked seeks (#531, `matchmaking.ts`): one row per player who
+   * asked for a ranked match. A waiting row ends `SEEK_TTL_MS` after
+   * `createdAt` (`expireSeek`); a match turns both rows `matched` with
+   * the game, and they go `MATCHED_SEEK_KEEP_MS` later (`forgetSeek`).
+   * Holds the game, the rating and the time: nothing else about the
+   * player.
+   */
+  seeks: defineTable({
+    playerId: v.string(),
+    game: rankedGame,
+    /** The player's rating when they asked, as kept (not rounded). */
+    rating: v.number(),
+    /** When they asked, epoch ms (server clock). */
+    createdAt: v.number(),
+    status: v.union(v.literal('waiting'), v.literal('matched')),
+    /** The game of a matched seek. */
+    gameId: v.optional(v.id('games')),
+    /** When it matched, epoch ms. */
+    matchedAt: v.optional(v.number()),
+  })
+    .index('by_player', ['playerId'])
+    .index('by_game', ['status', 'game', 'createdAt']),
 
   /**
    * Rated matches of a pair of players on one UTC day (#407,

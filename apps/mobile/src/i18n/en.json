@@ -81,8 +81,7 @@
       "failed": "Your online games did not load. Check the connection.",
       "stale": "This list may be out of date. Check the connection.",
       "retry": "Try again",
-      "seeAll": "See all ({{count}})",
-      "empty": "No online games right now. Play a friend to start one."
+      "seeAll": "See all ({{count}})"
     },
     "invites": {
       "title": "Your invites",
@@ -419,8 +418,9 @@
   "history": {
     "title": "History",
     "emptyTitle": "No matches yet",
-    "empty": "Finish a match vs the bot or in pass-and-play, and it shows here.",
-    "play": "Play",
+    "empty": "Finished matches and your stats show up here.",
+    "play": "Play vs bot",
+    "learn": "Learn to play first",
     "stats": "Stats",
     "matches": "Matches",
     "onPhone": "Saved only on this phone: your last {{max}} matches.",
@@ -529,7 +529,9 @@
       "hours_one": "{{count}} h",
       "hours_other": "{{count}} h",
       "toRoll": "{{time}} to roll",
-      "toMove": "{{time}} to move"
+      "toMove": "{{time}} to move",
+      "lastSeconds": "Play now, or you lose this game",
+      "lastSecondsAlert": "Your time is almost up. Play now, or you lose this game."
     },
     "timeLimitNone": "None",
     "timeLimit_one": "1 min",
@@ -548,6 +550,14 @@
       "rollFailed": "Your roll did not reach the server. Check the connection, then roll again.",
       "refusedTitle": "Not accepted",
       "refused": "The server did not accept your turn. Your moves were taken back."
+    },
+    "timeRanOut": {
+      "eyebrow": "Time ran out",
+      "title": "{{name}} wins this game",
+      "points_one": "{{count}} point. The next game starts now.",
+      "points_other": "{{count}} points. The next game starts now.",
+      "ranked": "Miss your next turn too and you lose the match.",
+      "here": "I am here"
     },
     "seatDetail": "Online"
   },
@@ -884,67 +894,89 @@
   },
   "whatsNew": {
     "title": "What's new",
-    "intro": "What each update of Tavlaki added, newest first, and where to find it.",
+    "intro": "What each update added, and where to find it.",
+    "new": "New",
+    "where": "Find it: {{where}}",
     "entries": {
+      "turnClock": {
+        "title": "A turn clock",
+        "body": "In an online game with a turn time, a ring around the avatar of the player to move empties as the time runs, with the time left next to it. In your last 10 seconds it turns red and the phone ticks.",
+        "where": "Home › Play a friend › Time limit"
+      },
       "signIn": {
         "title": "Sign in with Apple or email",
-        "body": "Sign in with Apple on an iPhone, or with a code we send to your email. Playing as a guest? Save your account in Settings → Account to keep your online games on a new phone."
+        "body": "Keep your online games on a new phone. Sign in with Apple on an iPhone, or with a code we send to your email.",
+        "where": "Settings › Account"
       },
       "usernames": {
         "title": "Usernames",
-        "body": "With a saved account you can pick a username. Other players see it in place of your guest name. Pick one in Settings → Account."
+        "body": "Pick a name other players see in place of your guest name.",
+        "where": "Settings › Account"
       },
       "friends": {
         "title": "Friends",
-        "body": "Add friends with your link, a QR code or their username, then invite them to a game. You need a saved account. Find it on Home under Friends."
+        "body": "Add friends with a link, a QR code or a username, then invite them to a game.",
+        "where": "Home › Friends"
       },
       "leaderboards": {
         "title": "Leaderboards",
-        "body": "Online matches between saved accounts change your rating. See where you stand among your friends and all players: Home → Leaderboards."
+        "body": "Online matches between saved accounts change your rating. See where you stand among your friends and all players.",
+        "where": "Home › Leaderboards"
       },
       "reportBlock": {
         "title": "Report or block a player",
-        "body": "If another player bothers you, tap Report or block in the game menu, at the end of a match or in your friends list. After a block, no new game starts between you."
+        "body": "If another player bothers you, report or block them. After a block, no new game starts between you.",
+        "where": "Game menu › Report or block"
       },
       "fastForward": {
         "title": "Fast forward a race",
-        "body": "Against the bot, when the checkers can no longer meet, tap Fast forward and the bot plays the race out for both sides. You can turn the offer off in Settings."
+        "body": "Against the bot, when the checkers can no longer meet, the bot plays the race out for both sides.",
+        "where": "Game vs bot › Fast forward"
       },
       "home": {
         "title": "A new Home",
-        "body": "Your saved game, or a quick game against the bot, sits at the top. Every other way to play is right below it."
+        "body": "Your saved game, or a quick game against the bot, sits at the top. Every other way to play is right below it.",
+        "where": "Home"
       },
       "playFriend": {
         "title": "Play a friend online",
-        "body": "Tap Play a friend on Home, make an invite and send the link. Your friend plays on their own phone."
+        "body": "Make an invite and send the link. Your friend plays on their own phone.",
+        "where": "Home › Play a friend"
       },
       "joinCode": {
         "title": "Join with a code",
-        "body": "Got an invite code from a friend? Tap Join with a code on Home and type it in."
+        "body": "Got an invite code from a friend? Type it in to join the game.",
+        "where": "Home › Join with a code"
       },
       "turnPushes": {
         "title": "Turn notifications",
-        "body": "In an online game, the app can tell you when it is your turn. Turn them on in Settings → Turn notifications."
+        "body": "In an online game, the app can tell you when it is your turn.",
+        "where": "Settings › Turn notifications"
       },
       "quickInvites": {
         "title": "Quicker friend invites",
-        "body": "Play a friend now lists your friends: tap one to send the invite. On Friends, Invite sends your last game setup again after a short check, or tap Change to pick another."
+        "body": "Play a friend lists your friends. Tap one to send the invite.",
+        "where": "Home › Play a friend"
       },
       "newLook": {
         "title": "A new look",
-        "body": "Warm, lamp-lit screens, new fonts and checker avatars with initials. The game seats, Friends, Leaderboards and Settings have a new design. Settings now has a page for each group."
+        "body": "Warm, lamp-lit screens, new fonts and checker avatars with initials. Settings now has a page for each group.",
+        "where": "Every screen"
       },
       "grabAChair": {
         "title": "Grab a chair",
-        "body": "A short scene at the kafeneio: the table slides in, then the other chair, then the tavli board drops onto the table and your chair is pulled in. It plays beside the greeting on Home and when a match opens (tap to skip it there). With Reduce Motion it stays still."
+        "body": "A short scene at the kafeneio: the table, the chairs, then the tavli board. Tap to skip it. With Reduce Motion it stays still.",
+        "where": "Home, and when a match opens"
       },
       "plakotoFederation": {
         "title": "Plakoto plays the federation rules",
-        "body": "Every new Plakoto game, alone or in a Tavli match, uses the federation mother rule: pin the other mother and you win 2 points once your own point 24 is empty. The rules version choice is gone. See the Plakoto rules page."
+        "body": "Every new Plakoto game, alone or in a Tavli match, uses the federation mother rule: pin the other mother and you win 2 points once your own point 24 is empty. The rules version choice is gone. See the Plakoto rules page.",
+        "where": "Home › How to play › Plakoto"
       },
       "matchingColors": {
         "title": "App colors that match the board",
-        "body": "Two new color themes: Olive Inlay, the first light one, and Kafeneio Night. The app colors now match the board you pick. To keep one look with any board, pick it in Settings → Board & look → App colors."
+        "body": "Two new color themes: Olive Inlay, the first light one, and Kafeneio Night. The app colors now match the board you pick, or keep one look with any board.",
+        "where": "Settings › Board & look › App colors"
       }
     }
   },
@@ -1012,16 +1044,21 @@
   },
   "join": {
     "title": "Join with a code",
-    "intro": "Type the code from your friend's invite. It has {{length}} letters and digits. You can also paste the whole message or the link.",
+    "intro": "Type the code from your friend's invite.",
     "label": "Invite code",
-    "placeholder": "For example ABCD2345",
-    "hint": "Letters and digits. A code has no 0, O, 1, I or L.",
-    "continue": "Continue",
+    "fieldHint": "A code has {{length}} letters and digits.",
+    "continue": "Join the game",
     "problem": {
       "short": "The code is too short. A code has {{length}} characters.",
       "long": "The code is too long. A code has {{length}} characters.",
       "characters": "This is not a code. A code has only Latin letters and digits, with no 0, O, 1, I or L.",
       "link": "This link has no invite code. Check the link, or type the code."
+    }
+  },
+  "onlineGames": {
+    "empty": {
+      "title": "No online games",
+      "body": "Invite a friend and play live or at your own pace."
     }
   },
   "notifications": {
@@ -1208,6 +1245,8 @@
       "resignedPerCheckerYou_other": "You resigned and did not bear off {{count}} checkers: 1 point each.",
       "resignedMatch": "{{name}} resigned the match.",
       "resignedMatch_you": "You resigned the match.",
+      "missedTwo": "{{name}} missed two turns in a row.",
+      "missedTwo_you": "You missed two turns in a row.",
       "home": "Home",
       "changeSettings": "Change settings",
       "matchLabel": "Match",
