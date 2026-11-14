@@ -6,7 +6,8 @@ import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api } from './_generated/api';
+import { api, components } from './_generated/api';
+import { SESSION_EXPIRES_IN_S } from './auth';
 import schema from './schema';
 import { modules } from './test.setup';
 
@@ -68,5 +69,28 @@ describe('Better Auth routes', () => {
       turnTimeMinutes: 1,
     });
     expect((await guest.query(api.invites.getInvite, { code }))?.from).toBe(body.user.id);
+  });
+
+  it('a session lasts a year, not the 7 days of Better Auth', async () => {
+    const t = setup();
+    const before = Date.now();
+    const signIn = await t.fetch('/api/auth/sign-in/anonymous', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'tavlaki://' },
+      body: '{}',
+    });
+    const body = (await signIn.json()) as { user: { id: string } };
+    const sessions = (await t.run(
+      async (ctx) =>
+        await ctx.runQuery(components.betterAuth.adapter.findMany, {
+          model: 'session',
+          where: [{ field: 'userId', value: body.user.id }],
+          paginationOpts: { cursor: null, numItems: 10 },
+        }),
+    )) as { page: { expiresAt: number }[] };
+    expect(sessions.page).toHaveLength(1);
+    const lasts = sessions.page[0]!.expiresAt - before;
+    expect(lasts).toBeGreaterThanOrEqual(SESSION_EXPIRES_IN_S * 1000 - 60_000);
+    expect(lasts).toBeLessThanOrEqual(SESSION_EXPIRES_IN_S * 1000 + 60_000);
   });
 });

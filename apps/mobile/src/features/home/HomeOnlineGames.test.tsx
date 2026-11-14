@@ -76,7 +76,8 @@ function rowIds(): string[] {
 
 describe('<HomeOnlineGames />', () => {
   it('keeps the account note when the session does not load, and makes no guest', async () => {
-    // Better Auth's ready() gives null with no network too: no sign-out.
+    // No network: the session does not load, and that is no sign-out.
+    onlineFake.authStore.offline = true;
     rememberOnlineAccount();
     const gameId = await newGame();
     const user = setupUser();
@@ -87,6 +88,7 @@ describe('<HomeOnlineGames />', () => {
     expect(onlineFake.authStore.guests).toBe(0);
     expect(hasOnlineAccount()).toBe(true);
     // The network is back: Try again loads the session and the list.
+    onlineFake.authStore.offline = false;
     signIn();
     await user.press(screen.getByRole('button', { name: 'Try again' }));
     await flush();
@@ -97,6 +99,18 @@ describe('<HomeOnlineGames />', () => {
     });
     await flush();
     expect(screen.queryByTestId('home-online-games')).toBeNull();
+    expect(hasOnlineAccount()).toBe(false);
+    expect(onlineFake.authStore.guests).toBe(0);
+  });
+
+  it('a session that ended on the server signs out: no Try again, and the note goes', async () => {
+    // The phone had an account, but the server has no session for it now
+    // (it ended unused). Try again could never load it.
+    rememberOnlineAccount();
+    await newGame();
+    await show();
+    expect(screen.queryByTestId('home-online-games')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
     expect(hasOnlineAccount()).toBe(false);
     expect(onlineFake.authStore.guests).toBe(0);
   });

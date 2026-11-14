@@ -422,6 +422,34 @@ describe('fromBetterAuthClient', () => {
     expect(server.guests).toBe(1);
   });
 
+  it('loadSession rejects with NETWORK while it cannot reach the server, then loads', async () => {
+    const server = createServer();
+    const first = subject(server);
+    const user = await first.auth.signInAsGuest();
+    server.failures.set('getSession', 'throw');
+    const again = first.restart();
+    expect(await rejection(again.loadSession())).toMatchObject({ code: 'NETWORK' });
+    server.failures.set('getSession', { message: 'offline' });
+    expect(await rejection(again.loadSession())).toMatchObject({ code: 'NETWORK' });
+    server.failures.set('getSession', { status: 500, message: 'boom' });
+    expect(await rejection(again.loadSession())).toMatchObject({ code: 'NETWORK' });
+    server.failures.delete('getSession');
+    expect(await again.loadSession()).toEqual(user);
+  });
+
+  it('loadSession gives null when the session ended on the server', async () => {
+    const server = createServer();
+    const first = subject(server);
+    await first.auth.signInAsGuest();
+    server.sessions.clear();
+    const again = first.restart();
+    expect(await again.loadSession()).toBeNull();
+    // Loaded once: the next call asks nothing more.
+    const calls = server.calls.length;
+    expect(await again.loadSession()).toBeNull();
+    expect(server.calls).toHaveLength(calls);
+  });
+
   it('a guest sign-in never replaces a session it could not load', async () => {
     const server = createServer();
     const first = subject(server);
