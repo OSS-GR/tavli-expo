@@ -249,7 +249,9 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: 'center',
     color: theme.colors.textDim,
   },
-  gameTray: surfaceStyle(theme, 'tray'),
+  gameTray: {
+    ...surfaceStyle(theme, 'tray'),
+  },
   clip: {
     borderRadius: theme.radii.tray,
     overflow: 'hidden',
