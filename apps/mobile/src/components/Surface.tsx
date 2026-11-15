@@ -68,5 +68,7 @@ export function Surface({ tier, children, style, testID }: SurfaceProps) {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  surface: (tier: SurfaceTier) => surfaceStyle(theme, tier),
+  // An object written here, not a bare call: the Unistyles Babel plugin
+  // only tags inline objects for a theme change (see `styleShapes.test.ts`).
+  surface: (tier: SurfaceTier) => ({ ...surfaceStyle(theme, tier) }),
 }));

@@ -1548,6 +1548,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           return {
             rating: shownRating(row.rating),
             matches: row.matches,
+            experience: row.experience,
             shown: row.shown,
             listed: isBoardable(row) && usernameOf(id) !== null,
           };
@@ -1705,7 +1706,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       cancel: () =>
         call(() => {
           const id = saved();
-          if (seeks.delete(id)) notifySeeks();
+          // A matched seek stays, like the Convex `cancelSeek`.
+          if (seeks.get(id)?.status === 'waiting' && seeks.delete(id)) notifySeeks();
         }),
       mySeek: () => call(() => seekViewOf(saved())),
       watchMySeek(onUpdate, onError) {

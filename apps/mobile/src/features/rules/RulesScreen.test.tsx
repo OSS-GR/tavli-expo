@@ -83,9 +83,9 @@ describe('rules texts', () => {
   });
 
   it('uses every rules key on some page', () => {
-    const versions = (
-      ['plakoto.federation', 'asodio.aceyDeuceyGreek', 'asodio.aceyDeuceyAmerican'] as const
-    ).map(versionSection);
+    const versions = (['asodio.aceyDeuceyGreek', 'asodio.aceyDeuceyAmerican'] as const).map(
+      versionSection,
+    );
     const used = new Set<string>(
       [
         ...RULES_GAMES.flatMap((game) => RULES_PAGES[game]),
@@ -119,13 +119,14 @@ describe('content', () => {
   });
 
   it('reads the version param (#241): only a rules version of the game that is not its default', () => {
-    expect(parseRulesVersion('plakoto', 'plakoto.federation')).toBe('plakoto.federation');
     expect(parseRulesVersion('asodio', ['asodio.aceyDeuceyGreek'])).toBe('asodio.aceyDeuceyGreek');
     expect(parseRulesVersion('asodio', 'asodio.aceyDeuceyAmerican')).toBe(
       'asodio.aceyDeuceyAmerican',
     );
-    // The default version, another game's version, a game with one preset, junk.
+    // The default version, another game's version, a game with one preset
+    // (Plakoto too, #514: an old link with a version opens the plain page), junk.
     expect(parseRulesVersion('plakoto', 'plakoto')).toBeNull();
+    expect(parseRulesVersion('plakoto', 'plakoto.federation')).toBeNull();
     expect(parseRulesVersion('asodio', 'asodio.kafeneio')).toBeNull();
     expect(parseRulesVersion('asodio', 'plakoto.federation')).toBeNull();
     expect(parseRulesVersion('portes', 'plakoto.federation')).toBeNull();
@@ -189,7 +190,6 @@ describe('<RulesScreen />', () => {
   );
 
   it.each([
-    ['plakoto', 'plakoto.federation', 'This game: federation rules'],
     ['asodio', 'asodio.aceyDeuceyGreek', 'This game: Greek rules'],
     ['asodio', 'asodio.aceyDeuceyAmerican', 'This game: American rules'],
   ] as const)(
@@ -236,7 +236,6 @@ describe('<RulesScreen />', () => {
 
   it('keeps mono and diplo on the other pages (#245)', () => {
     for (const game of RULES_GAMES) expect(rulesPage(game)).toBe(RULES_PAGES[game]);
-    expect(rulesPage('plakoto', 'plakoto.federation')).toBe(RULES_PAGES.plakoto);
     expect(rulesPage('asodio', 'asodio.aceyDeuceyGreek')).toBe(RULES_PAGES.asodio);
     const american = rulesPage('asodio', 'asodio.aceyDeuceyAmerican');
     expect(american.map((s) => s.id)).toEqual(RULES_PAGES.asodio.map((s) => s.id));
@@ -294,14 +293,16 @@ describe('<RulesScreen />', () => {
     expect(screen.queryByText(tr('rules.picture.caption'))).toBeNull();
   });
 
-  it('explains the owner mother rule in Plakoto', async () => {
+  it('explains the federation mother rule in Plakoto (#514)', async () => {
     await show('plakoto').view;
-    const mother = screen.getByTestId('rules-section-mother');
+    const mother = within(screen.getByTestId('rules-section-mother'));
     expect(
-      within(mother).getByText(
-        'If the other player pins your mother, you choose at the end of their turn: resign or play on.',
+      mother.getByText(
+        "If you pin the other player's mother, you win 2 points (diplo) as soon as none of your checkers is left on your own point 24. Until then the game goes on, and your own mother can still be pinned.",
       ),
     ).toBeOnTheScreen();
+    expect(mother.getByText('These are the federation rules (ΕΟΠΤ).')).toBeOnTheScreen();
+    expect(mother.queryByText(/resign or play on/)).toBeNull();
   });
 
   it('shows Greek with tavli words', async () => {

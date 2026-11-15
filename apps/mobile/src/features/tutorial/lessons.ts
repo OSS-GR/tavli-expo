@@ -10,8 +10,8 @@
  * the lesson.
  *
  * Each lesson plays in its game's default preset (`lessonRules`), so the
- * rules are the ones of a real game: Plakoto with the mother question
- * (`offerConcede`), Fevga with the runner rule and the six-in-a-row bans,
+ * rules are the ones of a real game: Plakoto with the federation mother
+ * rule (#514), Fevga with the runner rule and the six-in-a-row bans,
  * Asodio in the owner version (`asodio.kafeneio`: the loading lock, the
  * quarter lock, pins).
  *
@@ -193,7 +193,8 @@ export const PLAKOTO_LESSONS: readonly Lesson[] = [
   },
   {
     // 3. The mother: Black's last checker sits alone on its start (White's 1).
-    //    Pin it: 5 → 1 with the 4. The app then asks Black "resign or play on".
+    //    Pin it: 5 → 1 with the 4. White has nothing left on its own 24, so
+    //    the pin wins 2 points at once (the federation rule, #514).
     id: 'mother',
     game: 'plakoto',
     board: plakotoBoard(

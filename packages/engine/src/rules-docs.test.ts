@@ -90,7 +90,9 @@ const DOCS: readonly {
     name: 'plakoto.md',
     doc: plakotoDoc,
     presets: ['plakoto', 'plakoto.federation'],
-    except: { 'plakoto.federation': ['motherRule'] },
+    // The table's default is the federation rule (owner, 2026-11-13, #514).
+    // The old preset `plakoto` keeps `offerConcede` for old games.
+    except: { plakoto: ['motherRule'] },
   },
   { name: 'fevga.md', doc: fevgaDoc, presets: ['fevga'] },
   { name: 'asodio.md', doc: asodioDoc, presets: ['asodio.kafeneio'] },

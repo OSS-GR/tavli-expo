@@ -3,7 +3,12 @@
  * board → menu → Home. (Tests must not live in `src/app`: every file there
  * is a route.)
  */
-import { INVITE_TIME_MS, type createRecordingAnalytics } from '@tavli/contracts';
+import {
+  INVITE_TIME_MS,
+  memoryAppleIdToken,
+  TERMS_VERSION,
+  type createRecordingAnalytics,
+} from '@tavli/contracts';
 import { createGameFlow, portes } from '@tavli/engine';
 import { MAX_OPEN_INVITES } from '@tavli/online';
 import { fireEvent, within } from '@testing-library/react-native';
@@ -21,6 +26,7 @@ import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
 import { SAVED_MATCH_KEY } from '@/features/match/savedMatch';
+import { MATCH_START_SECONDS } from '@/features/ranked/RankedScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 import { LESSON_SETS, LESSONS } from '@/features/tutorial/lessons';
@@ -32,7 +38,7 @@ import {
 } from '@/features/invites/friendInviteSetup';
 import { RELEASES } from '@/features/whats-new/releases';
 import { WHATS_NEW_STORAGE_KEY, whatsNewSeen } from '@/features/whats-new/seen';
-import { analytics, onlinePlayerId, onlineServer, storage } from '@/services';
+import { analytics, auth, onlinePlayerId, onlineServer, storage, usernames } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../test/clock';
 import { pressMakeInvite } from '../test/signIn';
@@ -400,13 +406,12 @@ describe('app navigation', () => {
     expect(router.getPathname()).toBe('/rules/portes');
   });
 
-  it('opens the rules of the Plakoto game of a Tavli match in its version (#247)', async () => {
+  it('opens the plain Plakoto rules from the Plakoto game of a Tavli match (#247, #514)', async () => {
     const user = setupUser();
     const session = matchSessions.start({
       ...defaultSetup('local'),
       targetPoints: 3,
       game: 'tavli',
-      rulesVersions: { ...defaultSetup('local').rulesVersions, plakoto: 'plakoto.federation' },
     });
     const { dispatch } = session.store.getState();
     // Game 1 (Portes, its default rules) ends with a resign; game 2 is Plakoto.
@@ -421,8 +426,9 @@ describe('app navigation', () => {
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
     await user.press(screen.getByRole('button', { name: 'How to play Plakoto' }));
     expect(router.getPathname()).toBe('/rules/plakoto');
-    expect(router.getSearchParams()).toMatchObject({ version: 'plakoto.federation' });
-    expect(screen.getByTestId('rules-section-version')).toBeOnTheScreen();
+    // Plakoto has one rules version, so the page has no version section.
+    expect(router.getSearchParams()).not.toHaveProperty('version');
+    expect(screen.queryByTestId('rules-section-version')).toBeNull();
   });
 
   it('opens the Plakoto rules page', async () => {
@@ -1340,7 +1346,8 @@ describe('your online games on Home (#297)', () => {
   });
 
   it('"See all" with no session says it did not load, and makes no account', async () => {
-    // ready() gives null: maybe no network, so the list offers Try again.
+    // No network: the session does not load, so the list offers Try again.
+    onlineFake.authStore.offline = true;
     await renderRouter('./src/app', { initialUrl: '/online-games' });
     expect(
       await screen.findByText('Your online games did not load. Check the connection.'),
@@ -1630,6 +1637,49 @@ describe('leaderboards (#407)', () => {
     await user.press(await screen.findByTestId('settings-friends'));
     await user.press(await screen.findByRole('button', { name: 'Leaderboards' }));
     expect(router.getPathname()).toBe('/ratings');
+  });
+});
+
+describe('play ranked (#532)', () => {
+  it('a guest opens Play ranked from Home and sees the save step, not the search', async () => {
+    onlineFake.authStore.session = { id: 'g', isGuest: true };
+    rememberOnlineAccount();
+    const seek = jest.spyOn(onlineFake.matchmaking, 'seek');
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(await screen.findByTestId('home-ranked'));
+    expect(router.getPathname()).toBe('/ranked');
+    expect(await screen.findByTestId('ranked-gate')).toBeOnTheScreen();
+    expect(screen.queryByTestId('ranked-find')).toBeNull();
+    expect(seek).not.toHaveBeenCalled();
+  });
+
+  it('a saved player finds a match and lands in the game', async () => {
+    const nonce = await auth!.keyNonce();
+    await auth!.signInWithKey({
+      provider: 'apple',
+      idToken: memoryAppleIdToken('apple-1', nonce),
+      nonce,
+    });
+    rememberOnlineAccount();
+    await usernames!.setMine({ name: 'Maria', acceptTerms: TERMS_VERSION, ageChecked: true });
+    const server = onlineFake.server();
+    server.markSaved('nikos');
+    await server.matchmakingFor('nikos').seek({ game: 'portes' });
+
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/ranked' });
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    expect(await screen.findByTestId('ranked-matched')).toBeOnTheScreen();
+    const seek = await onlineFake.matchmaking.mySeek();
+    if (seek.kind !== 'matched') throw new Error('no match');
+    for (let i = 0; i < MATCH_START_SECONDS; i++) {
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+    }
+    await waitFor(() => expect(router.getPathname()).toBe(`/game/${seek.gameId}`));
   });
 });
 

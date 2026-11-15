@@ -65,6 +65,7 @@ export const RATED_PAIR_DELETE_PAGE = 200;
 const myRatingValue = v.object({
   rating: v.number(),
   matches: v.number(),
+  experience: v.number(),
   shown: v.boolean(),
   listed: v.boolean(),
 });
@@ -227,6 +228,7 @@ export const myRating = query({
     return {
       rating: shownRating(record.rating),
       matches: record.matches,
+      experience: record.experience,
       shown: record.shown,
       listed: isBoardable(record) && (await usernameOf(ctx, playerId)) !== null,
     };

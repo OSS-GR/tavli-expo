@@ -306,6 +306,17 @@ export function matchmakingContract(): readonly MatchmakingContractCheck[] {
       },
     },
     {
+      name: 'keeps a matched seek on a cancel: the match still shows (#532)',
+      run: async (subject) => {
+        await seek(subject, 'alice');
+        await seek(subject, 'bob');
+        const game = await gameIdOf(subject, 'alice');
+        await subject.matchmakingFor('alice').cancel();
+        same(await kindOf(subject, 'alice'), 'matched', 'after the cancel');
+        same(await gameIdOf(subject, 'alice'), game, 'the same game');
+      },
+    },
+    {
       name: 'never matches two players where one blocks the other',
       run: async (subject) => {
         await meet(subject, 'alice', 'bob');

@@ -1,8 +1,9 @@
 /**
  * Settings → Board & look (#501, Figma "08 Settings"): a big preview of
- * the board as picked, a row of the board themes, Board layout, Your home,
- * Pass-and-play view, and the app colors. Every pick saves at once and
- * shows in the preview.
+ * the board as picked, a row of the board themes, the app colors right
+ * under them (they follow the board by default), Board layout, Your home
+ * and Pass-and-play view. Every pick saves at once and shows in the
+ * preview.
  *
  * App colors (#528, Figma "13 Matching color themes"): Match the board (the
  * default) takes the colors made for the picked board; a theme keeps its
@@ -103,7 +104,23 @@ export function BoardLookSettings({ onBack }: { onBack?: () => void }) {
       <View style={styles.group}>
         <SectionHeader title={t('settings.boardTheme.label')} />
         <BoardThemeStrip testID="settings-board-theme" />
-        <BlockHint>{t('settings.boardTheme.hint')}</BlockHint>
+        <BlockHint>
+          {appTheme === MATCH_BOARD
+            ? t('settings.boardTheme.hintMatched')
+            : t('settings.boardTheme.hint')}
+        </BlockHint>
+      </View>
+
+      <View style={styles.group}>
+        <SectionHeader title={t('settings.theme.label')} />
+        <OptionList
+          testID="settings-theme"
+          label={t('settings.theme.label')}
+          options={themeOptions}
+          value={appTheme}
+          onChange={(value) => setSetting('theme', value)}
+        />
+        <BlockHint>{t('settings.theme.hint')}</BlockHint>
       </View>
 
       <SectionCard title={t('settings.boardLayout.label')} padded>
@@ -158,18 +175,6 @@ export function BoardLookSettings({ onBack }: { onBack?: () => void }) {
           right={<SettingsChip label={t('settings.soon')} />}
         />
       </SectionCard>
-
-      <View style={styles.group}>
-        <SectionHeader title={t('settings.theme.label')} />
-        <OptionList
-          testID="settings-theme"
-          label={t('settings.theme.label')}
-          options={themeOptions}
-          value={appTheme}
-          onChange={(value) => setSetting('theme', value)}
-        />
-        <BlockHint>{t('settings.theme.hint')}</BlockHint>
-      </View>
     </SettingsPage>
   );
 }

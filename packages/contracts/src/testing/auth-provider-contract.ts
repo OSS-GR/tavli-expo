@@ -169,6 +169,7 @@ export function authProviderContract(): AuthProviderContractCheck[] {
       name: 'starts signed out: no user and no token',
       run: async ({ auth }) => {
         same(await auth.ready(), null, 'ready()');
+        same(await auth.loadSession(), null, 'loadSession()');
         same(auth.currentUser(), null, 'currentUser()');
         same(await auth.getToken(), null, 'getToken()');
       },
@@ -239,6 +240,7 @@ export function authProviderContract(): AuthProviderContractCheck[] {
         await subject.auth.ready();
         const user = await subject.auth.signInAsGuest();
         const again = subject.restart();
+        same(await again.loadSession(), user, 'loadSession() after a restart');
         same(await again.ready(), user, 'ready() after a restart');
         same(again.currentUser(), user, 'currentUser() after a restart');
         const token = await tokenOf(again, 'getToken() after a restart');
@@ -253,6 +255,7 @@ export function authProviderContract(): AuthProviderContractCheck[] {
         await subject.auth.signOut();
         const again = subject.restart();
         same(await again.ready(), null, 'ready() after a restart');
+        same(await again.loadSession(), null, 'loadSession() after a restart');
         same(again.currentUser(), null, 'currentUser() after a restart');
       },
     },

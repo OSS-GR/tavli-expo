@@ -1,31 +1,33 @@
 /**
- * The board screen (wireframe 6): the player strips, the board with the
+ * The board screen (wireframe 6): the player seats, the board with the
  * dice on it, the cards over it (opening roll, no legal moves, the mother
  * question, the Acey-Deucey "choose a double" after a 1-2), the
- * game-end sheet (wireframe 8) and one row of big buttons (Roll, or Undo ·
- * Confirm). Match end is its own screen (wireframe 9): this screen calls
- * `onMatchOver`.
+ * game-end sheet (wireframe 8) and the round turn buttons (Roll, or Undo ·
+ * Confirm; Figma "18 Game · Portrait and landscape"). Match end is its own
+ * screen (wireframe 9): this screen calls `onMatchOver`.
  *
  * Two portrait layouts (#184, Settings → Board → Board layout):
  * - `tall` (default): the board on its side, as large as the screen allows.
- *   One-line strips above and below it, the menu in the top strip, the
- *   game label in the menu.
- * - `classic`: the board as on a table, as wide as the screen, with its
- *   strips right above and below it, centred on the screen. The menu and
- *   the game label sit at the top.
- * Both keep the buttons at the bottom, in thumb reach. The board layout
+ *   The game label is in the menu.
+ * - `classic`: the board as on a table, as wide as the screen, centred in
+ *   the space left. The game label sits under the seats.
+ * Both put the menu and the two seats side by side at the top (yours on
+ * the left, the score once between them), and the round buttons under the
+ * board, in thumb reach: the main circle in the middle of the screen, Undo
+ * (or Fast forward) left of it, the hint right of it. The board layout
  * comes from one place (`boardLayout`), so touches and flights follow it.
  *
  * Landscape (#185): when the phone lies on its side, the whole screen turns
  * with it (`useScreenLayout`). The classic board sits in the middle and
- * fills the height. The left column holds the menu, the two players and
- * Undo (under the left thumb); the right column the game label, the dice
- * and Roll or Confirm (under the right thumb). The right column lies over
- * the right edge of the board layer, so the dice box stays inside that
- * layer; the column keeps an empty slot where the dice lie. Turning the
- * phone keeps everything: the views keep their place in the tree, so the
- * board (and a selected checker), the dice canvas and an open card stay
- * mounted. Until the board has measured its new space, the dice hide.
+ * fills the height, between two rails (`rails`): the left one holds what
+ * the portrait top row holds (the menu, the other seat, the score, your
+ * seat); the right one the round buttons in the portrait order, top to
+ * bottom (Undo, the main circle under the right thumb, the hint). The dice
+ * lie on the board, as in
+ * portrait. There is no game label (the menu has it). Turning the phone
+ * keeps everything: the views keep their place in the tree, so the board
+ * (and a selected checker), the dice canvas and an open card stay mounted.
+ * Until the board has measured its new space, the dice hide.
  *
  * Screen readers (#153): while a card covers the board, they skip the
  * board; while the game-end sheet or a menu covers the screen, they skip
@@ -115,9 +117,10 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { Icon } from '@/components/Icon';
 import { MoveList } from '@/features/accessibility/MoveList';
 import { useMoveListShown } from '@/features/accessibility/screenReader';
 import { markMatchIntroPlayed, matchIntroDue } from '@/features/intro/introRuns';
@@ -132,7 +135,7 @@ import {
   opensGate,
   toEnterCount,
 } from '@/features/board/asodio';
-import { boardDiceBox, columnDiceBox, settleTargets } from '@/features/board/boardDice';
+import { boardDiceBox, settleTargets } from '@/features/board/boardDice';
 import { pinnedCheckers, sideOf, toneOf, type BoardView } from '@/features/board/boardModel';
 import { flowPaths } from '@/features/board/combined';
 import { BOARD_GESTURES, SWIPE_AREA } from '@/features/board/interaction';
@@ -173,6 +176,13 @@ import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
 import { isChoosingStarter, nextOpeningRoller, openingDiceInPlay, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
 import { PlayerStrip, type SeatClock } from './PlayerStrip';
+import {
+  RAIL_LABEL_LINE,
+  RAIL_LANDSCAPE_SECONDARY,
+  RAIL_PRIMARY,
+  RAIL_SECONDARY,
+  RailButton,
+} from './RailButton';
 import { diceWereChosen, diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
 import { isStrongWin, passNotice, recordScoring, winType, type WinType } from './turnNotices';
@@ -354,8 +364,8 @@ export interface GameScreenProps {
   onMatchOver?: () => void;
   /**
    * The game on the board: "Game 2 · Plakoto" (#109). The classic layout
-   * shows it at the top, landscape in the right column; the tall one leaves
-   * it to the menu (#184).
+   * shows it under the seats; the tall one and landscape leave it to the
+   * menu (#184).
    */
   gameLabel?: string;
   /** The game after this one, on the game-end sheet: "Next: game 3 · Fevga" (#109). */
@@ -405,7 +415,9 @@ export function GameScreen({
   const offerFastForward = useSettings((s) => s.offerFastForward);
   const setSetting = useSettings((s) => s.setSetting);
   const showMoveList = useMoveListShown();
-  const { layout, column, spaceKey } = useScreenLayout();
+  const { layout, rails, spaceKey } = useScreenLayout();
+  // The app's colors (the board theme is `theme`).
+  const { theme: ui } = useUnistyles();
   const landscape = layout === 'landscape';
   const classic = layout === 'classic';
   const tall = layout === 'tall';
@@ -631,6 +643,15 @@ export function GameScreen({
   const othersTurn = botsTurn || fastForwarding || remoteStatus !== null;
   // After the card, Fast forward stays next to Roll for the rest of the race.
   const canFastForward = raceReady && !showRaceCard;
+  // A long Fast forward label (Greek) wraps to two lines under its circle.
+  // For the rest of the race the portrait row keeps that room, so the board
+  // does not shrink and grow back on every roll.
+  const [fastForwardLines, setFastForwardLines] = useState(1);
+  const raceOn = useMemo(
+    () => fastForwardSeat !== null && view.matchPhase === 'playing' && isRace(game.state),
+    [fastForwardSeat, view.matchPhase, game.state],
+  );
+  const raceRoom = !landscape && raceOn && fastForwardLines > 1;
 
   // One checker with several dice (#180): the "2+3" targets, from the engine.
   const paths = useMemo(() => (othersTurn ? [] : flowPaths(game)), [game, othersTurn]);
@@ -1313,57 +1334,58 @@ export function GameScreen({
   // for in place of Roll. While your roll is on its way, Roll waits.
   const openingWait = online !== undefined && roller === null ? online.status : null;
 
-  // The dice lie on the board (#184), in the theme's dice area; in
-  // landscape in the right column (#185). The main button (Roll, Confirm or
-  // the bot's box) sits under the right thumb; Undo under the left one in
-  // landscape, next to Confirm in portrait.
+  // The dice lie on the board (#184), in the theme's dice area, in every
+  // layout. The turn buttons are round (Figma "18 Game · Portrait and
+  // landscape"): the main circle (Roll, Confirm) under the right thumb on
+  // the right rail in landscape, in the middle under the board in portrait;
+  // Undo (or Fast forward) next to it; the hint on the other side. While
+  // the bot, the other player online or fast forward plays, a short status
+  // text takes the buttons' place.
   let showDice = false;
   let undoButton = null;
   let hintButton = null;
   let mainButton = null;
+  let status: { readonly testID: string; readonly text: string } | null = null;
+  // Portrait: "or swipe the board" sits left of Roll, in Undo's place.
+  let rollAside: string | null = null;
+  // Undo, Fast forward and the hint have one size. In portrait every circle
+  // sits in a box as tall as the main one, so the three share a center line.
+  const sideSize = landscape ? RAIL_LANDSCAPE_SECONDARY : RAIL_SECONDARY;
+  const circleBox = landscape ? undefined : RAIL_PRIMARY;
   if (phase === 'opening-roll') {
     mainButton = null;
   } else if (remoteStatus !== null) {
     // Online: the server waits for the other player (or has your turn on its way).
     showDice = dice.length > 0;
-    mainButton = (
-      <View testID="online-wait" style={[styles.botBox, landscape && styles.botBoxSide]}>
-        <Text style={styles.botText}>{remoteStatus}</Text>
-      </View>
-    );
+    status = { testID: 'online-wait', text: remoteStatus };
   } else if (fastForwarding) {
     // Fast forward: the bot plays both sides. Stop gives you the board back.
     showDice = dice.length > 0;
-    undoButton = (
-      <View testID="fast-forward-status" style={[styles.botBox, landscape && styles.botBoxSide]}>
-        <Text style={styles.botText}>{t('game.fastForward.playing')}</Text>
-      </View>
-    );
+    status = { testID: 'fast-forward-status', text: t('game.fastForward.playing') };
     mainButton = (
-      <ActionButton
+      <RailButton
         testID="fast-forward-stop-button"
         label={t('game.fastForward.stop')}
         accessibilityLabel={t('game.fastForward.stopLabel')}
         kind="secondary"
+        icon="square"
+        circleBox={circleBox}
         onPress={() => setFastForwardKey(null)}
-        compact={landscape}
       />
     );
   } else if (botsTurn && !showPass && view.matchPhase === 'playing') {
     const rolled = game.state.dice;
     showDice = dice.length > 0;
-    mainButton = (
-      // No live region: the roll and the bot's moves are announced (`turnAnnouncement`).
-      <View testID="bot-turn" style={[styles.botBox, landscape && styles.botBoxSide]}>
-        <Text style={styles.botText}>
-          {rolled !== null && phase !== 'awaiting-roll'
-            ? diceWereChosen(flow, rolled)
-              ? t('game.bot.choseMoving', { dice: rolled.join('-') })
-              : t('game.bot.moving', { dice: rolled.join('-') })
-            : t('game.bot.waiting')}
-        </Text>
-      </View>
-    );
+    // No live region: the roll and the bot's moves are announced (`turnAnnouncement`).
+    status = {
+      testID: 'bot-turn',
+      text:
+        rolled !== null && phase !== 'awaiting-roll'
+          ? diceWereChosen(flow, rolled)
+            ? t('game.bot.choseMoving', { dice: rolled.join('-') })
+            : t('game.bot.moving', { dice: rolled.join('-') })
+          : t('game.bot.waiting'),
+    };
   } else if (
     phase === 'awaiting-roll' &&
     !showPass &&
@@ -1372,93 +1394,102 @@ export function GameScreen({
     !showRaceCard &&
     (online === undefined || onlineRoll)
   ) {
-    // In a race vs the bot, Fast forward sits next to Roll.
+    // In a race vs the bot, Fast forward takes Undo's place next to Roll.
     undoButton = canFastForward ? (
-      <ActionButton
+      <RailButton
         testID="fast-forward-button"
         label={t('game.fastForward.button')}
         accessibilityLabel={t('game.fastForward.label')}
         kind="secondary"
         icon="fastForward"
+        size={sideSize}
+        circleBox={circleBox}
+        onLabelLines={setFastForwardLines}
         onPress={() => setFastForwardKey(raceKey)}
-        compact={landscape}
       />
     ) : null;
+    if (!landscape && !canFastForward) rollAside = t('game.roll.orSwipeBoard');
     // While the `rerollBoth` result shows (#207), Roll waits for it to close.
     mainButton = (
-      <ActionButton
+      <RailButton
         testID="roll-button"
         label={t('game.roll.dice')}
         subtitle={t('game.roll.orSwipeBoard')}
+        subtitleBeside={!landscape}
         icon="dices"
+        circleBox={circleBox}
         onPress={() => roll()}
-        grow={!landscape}
-        compact={landscape}
       />
     );
   } else if (phase === 'moving' || phase === 'awaiting-confirm' || showPass || passWaits) {
     showDice = true;
     hintButton = hintProps ? (
-      <ActionButton
+      <RailButton
         testID="hint-button"
         label={hintProps.label}
         accessibilityLabel={hintProps.accessibilityLabel}
         kind="secondary"
-        // A 52 pt square with a lightbulb; the word shows with a large font (#499).
         icon="lightbulb"
+        size={sideSize}
+        circleBox={circleBox}
         iconOnly
         busy={hintProps.busy}
         onPress={hintProps.onPress}
-        compact
       />
     ) : null;
     undoButton = (
-      <ActionButton
+      <RailButton
         testID="undo-button"
         label={t('game.controls.undoLabel')}
         kind="secondary"
         icon="undo"
+        size={sideSize}
+        circleBox={circleBox}
         disabled={!view.canUndo || showPass || passWaits}
         onPress={undo}
-        grow={!landscape}
-        compact={landscape}
       />
     );
     mainButton = (
-      <ActionButton
+      <RailButton
         testID="confirm-button"
         label={t('game.controls.confirm')}
         icon="check"
+        circleBox={circleBox}
         disabled={!view.canConfirm || showPass || passWaits}
         onPress={confirm}
-        grow={!landscape}
-        compact={landscape}
       />
     );
   }
+  // The hint keeps its place when it cannot be used yet (a dim circle), so
+  // the buttons never move between the roll and the move.
+  const hintSlot =
+    hintButton ??
+    (analyzer !== undefined && showHints ? (
+      <View
+        style={styles.hintPlaceholder(sideSize, circleBox ?? sideSize)}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants">
+        <View style={styles.hintPlaceholderCircle(sideSize)}>
+          <Icon name="lightbulb" color={ui.colors.textFaint} size={Math.round(sideSize * 0.4)} />
+        </View>
+      </View>
+    ) : null);
+  const statusText =
+    status !== null ? (
+      <Text testID={status.testID} style={styles.statusText(landscape)}>
+        {status.text}
+      </Text>
+    ) : null;
   // The dice stay mounted while the board measures its new space (so a roll
   // does not start again), but hide until they have their new place.
   const placeGeo = freshGeo ?? boardGeo?.geo ?? null;
-  const diceBox =
-    showDice && placeGeo !== null
-      ? landscape
-        ? columnDiceBox(placeGeo, column, dice.length)
-        : boardDiceBox(placeGeo, dice.length)
-      : null;
+  const diceBox = showDice && placeGeo !== null ? boardDiceBox(placeGeo, dice.length) : null;
   const diceHidden = freshGeo === null || throwPlaying;
-  // The hand-over of the throw (#183): in portrait the dice row lies on the
-  // board, inside the canvas, so the thrown dice can glide into it. In
-  // landscape the row sits in the right column, outside the canvas, and the
-  // row takes over where the dice stopped.
+  // The hand-over of the throw (#183): the dice row lies on the board,
+  // inside the canvas, so the thrown dice glide into it.
   const settle =
-    diceBox !== null && placeGeo !== null && !landscape
+    diceBox !== null
       ? settleTargets(diceBox, dice.length, theme.layouts['portrait-rotated'].dice.tilt)
-      : null;
-  // Landscape: the right column keeps this slot free for the dice (two, or
-  // four for a double), also before a roll, so its buttons never move.
-  const diceSlot =
-    landscape && freshGeo !== null
-      ? columnDiceBox(freshGeo, column, dice.length === 4 ? 4 : 2)
       : null;
 
   // Game end (wireframe 8): a sheet over the final board. Match end is
@@ -1874,29 +1905,13 @@ export function GameScreen({
     const clock = online?.clock ?? null;
     return clock !== null && clock.player === player ? clock : null;
   };
-  // The quiet status line of a bot or an online opponent: "Easy · Portes" (#499).
+  // The quiet status line of a bot or an online opponent: "Easy", "Online"
+  // (#499). The game name sits under the score, in every layout.
   const variant = game.state.variant;
   const gameName = (STANDARD_VARIANT_IDS as readonly string[]).includes(variant)
     ? t(`games.${variant as StandardVariantId}`)
     : null;
-  const seatStatus = (player: PlayerId): string | null => {
-    const detail = seats[player].detail;
-    if (detail === undefined) return null;
-    return gameName === null ? detail : `${detail} · ${gameName}`;
-  };
-  // After the turn words on the active seat: "6-6, 3 moves left".
-  const turnDetail = (() => {
-    if (dice.length === 0 || showPass || passWaits) return null;
-    if (phase !== 'moving' && phase !== 'awaiting-confirm') return null;
-    const values = dice.map((die) => die.value);
-    const double = values.length === 4 && values.every((value) => value === values[0]);
-    const rolledText = double ? `${values[0]}-${values[0]}` : values.join('-');
-    const count = dice.filter((die) => !die.used).length;
-    return count === 0
-      ? t('game.strip.diceDone', { dice: rolledText })
-      : t('game.strip.diceLeft', { dice: rolledText, count });
-  })();
-
+  const seatStatus = (player: PlayerId): string | null => seats[player].detail ?? null;
   // The screen reader hears the board's pinned checkers (Plakoto, Asodio),
   // the checkers to enter and the frozen ones (Asodio).
   const asodioLines = BOTH_SIDES.flatMap((player) => {
@@ -1938,16 +1953,19 @@ export function GameScreen({
 
   const playing = phase !== 'opening-roll' && view.matchPhase === 'playing';
   const top = other(viewer);
+  // Your seat is `strip-bottom` and the other one `strip-top` in every
+  // layout: in portrait they sit side by side (yours on the left), in
+  // landscape at the top and the bottom of the left rail.
   const strip = (player: PlayerId, testID: string) => (
     <PlayerStrip
       testID={testID}
       stacked={landscape}
+      mirrored={!landscape && player === top}
       name={seats[player].label}
       turnLabel={seats[player].turnLabel}
       checker={theme.checkers[toneOf(player)]}
       avatar={seats[player].avatar ?? null}
       status={seatStatus(player)}
-      turnDetail={turnDetail}
       note={asodioNote(player)}
       clock={seatClock(player)}
       timed={online?.timed ?? false}
@@ -2000,7 +2018,7 @@ export function GameScreen({
   const boardLayer = (
     <View
       testID="game-board-layer"
-      style={styles.boardLayer(landscape ? column : 0)}
+      style={styles.boardLayer}
       collapsable={false}
       importantForAccessibility={hideBoard ? 'no-hide-descendants' : 'auto'}
       accessibilityElementsHidden={hideBoard}>
@@ -2048,9 +2066,8 @@ export function GameScreen({
         }
       />
       {diceBox ? (
-        // The dice lie on the board, in the theme's dice area (#184); in
-        // landscape in the layer's right part, in the slot the right column
-        // keeps free (#185). Touches go through. The dice canvas keeps its
+        // The dice lie on the board, in the theme's dice area (#184), in
+        // every layout. Touches go through. The dice canvas keeps its
         // own native view (`DiceRow`, #173), and this box is a native view
         // too (`pointerEvents`), always in the board layer, so turning the
         // phone does not move it.
@@ -2083,18 +2100,14 @@ export function GameScreen({
   const hints = (
     <>
       {gateToMove !== null ? (
-        <View
-          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
-          pointerEvents="none">
+        <View style={styles.hintRow} pointerEvents="none">
           <Text testID="loading-lock-hint" style={styles.hint} accessibilityLiveRegion="polite">
             {gateToMove === 'doubleOnly' ? t('game.asodio.lockedDouble') : t('game.asodio.locked')}
           </Text>
         </View>
       ) : null}
       {confirmHint ? (
-        <View
-          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
-          pointerEvents="none">
+        <View style={styles.hintRow} pointerEvents="none">
           <Text testID="confirm-hint" style={styles.hint}>
             {t('game.controls.allUsed')}
           </Text>
@@ -2102,9 +2115,7 @@ export function GameScreen({
       ) : null}
       {showDoublesHint ? (
         // The roll announcement already says it is a double, so screen readers skip this.
-        <View
-          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
-          pointerEvents="none">
+        <View style={styles.hintRow} pointerEvents="none">
           <Text
             testID="doubles-hint"
             style={styles.hint}
@@ -2116,9 +2127,7 @@ export function GameScreen({
       ) : null}
       {shownHint !== null ? (
         // Read out once when it shows (`useAnnouncement`); it stays for a second look.
-        <View
-          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
-          pointerEvents="none">
+        <View style={styles.hintRow} pointerEvents="none">
           <Text testID="hint-text" style={styles.hint}>
             {hintShortText(t, shownHint)}
           </Text>
@@ -2126,18 +2135,14 @@ export function GameScreen({
       ) : null}
       {onlineLine !== null && !confirmHint ? (
         // Online: who starts, or why nothing moved. The turn announcement reads it.
-        <View
-          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
-          pointerEvents="none">
+        <View style={styles.hintRow} pointerEvents="none">
           <Text testID="online-line" style={styles.hint}>
             {onlineLine}
           </Text>
         </View>
       ) : null}
       {botNote !== null ? (
-        <View
-          style={[styles.hintRow, landscape && styles.besideColumn(column)]}
-          pointerEvents="none">
+        <View style={styles.hintRow} pointerEvents="none">
           <Text testID="bot-answer-note" style={styles.hint} accessibilityLiveRegion="polite">
             {botNote}
           </Text>
@@ -2150,14 +2155,14 @@ export function GameScreen({
     // Scrolls when a small phone or a large font makes the card taller than its space.
     <ScrollView
       testID="game-card-overlay"
-      style={[styles.overlay, landscape && styles.besideColumn(column)]}
+      style={styles.overlay}
       contentContainerStyle={styles.overlayContent}>
       {card}
     </ScrollView>
   ) : null;
 
   const gameLabelText = gameLabel ? (
-    <Text testID="game-label" style={[styles.gameLabel, landscape && styles.gameLabelSide]}>
+    <Text testID="game-label" style={styles.gameLabel}>
       {gameLabel}
     </Text>
   ) : null;
@@ -2172,75 +2177,113 @@ export function GameScreen({
       />
     ) : null;
 
-  // Before the board: the top row in portrait, the left column in landscape.
+  // The score once, between the seats: "0 – 0", "first to 3", the game.
+  // Screen readers hear the score on each seat.
+  const scoreBlock = (
+    <View
+      testID="game-score"
+      style={styles.score}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <Text style={styles.scoreText}>{`${match.score[viewer]} – ${match.score[top]}`}</Text>
+      <Text style={styles.scoreTarget}>
+        {t('game.strip.firstTo', { target: match.targetPoints })}
+      </Text>
+      {/* Classic shows the game label under the seats row already. */}
+      {gameName !== null && !classic ? (
+        <Text testID="game-score-name" style={styles.scoreTarget}>
+          {gameName}
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  // Before the board: the seats row in portrait, the left rail in landscape.
+  // Both hold the same parts: the menu, the seats and the score between them.
   let lead = null;
   if (landscape) {
+    // The left rail (Figma "18"): the menu at the top, then the other seat,
+    // the score and your seat, as the portrait row stood on its end.
     lead = (
-      // Scrolls when a large font makes the column taller than the screen.
       <ScrollView
         testID="game-left"
-        style={styles.side(column)}
-        contentContainerStyle={styles.sideContent}
+        style={styles.rail(rails.left)}
+        contentContainerStyle={styles.railContent}
         alwaysBounceVertical={false}>
-        <View style={styles.sideGroup}>
-          {menuButton}
+        {menuButton}
+        <View style={styles.railSeats}>
           {strip(top, 'strip-top')}
-        </View>
-        <View style={styles.sideGroup}>
+          {scoreBlock}
           {strip(viewer, 'strip-bottom')}
-          {hintButton}
-          {undoButton}
         </View>
       </ScrollView>
     );
-  } else if (classic) {
-    // Classic (#184): the menu and the game label at the top.
-    lead =
-      menuButton !== null || gameLabelText !== null ? (
+  } else {
+    // Portrait: the menu, then both seats side by side with the score once
+    // between them.
+    lead = (
+      <View style={styles.lead}>
         <View style={styles.topRow}>
           {menuButton}
-          {gameLabelText}
-          {/* Keeps the label in the middle of the screen. */}
-          {menuButton !== null ? <View style={styles.menuSpacer} /> : null}
+          {strip(viewer, 'strip-bottom')}
+          {scoreBlock}
+          {strip(top, 'strip-top')}
         </View>
-      ) : null;
-  } else {
-    // Tall (#184): the menu inside the top strip.
-    lead = (
-      <View style={styles.topRow}>
-        {menuButton}
-        <View style={styles.topStrip}>{strip(top, 'strip-top')}</View>
+        {/* Classic (#184) has room for the game label; tall leaves it to the menu. */}
+        {classic ? gameLabelText : null}
       </View>
     );
   }
 
-  // After the board: the buttons row in portrait, the right column in landscape.
-  // The right column lies over the board layer's right part (the layer keeps
-  // it free, `boardLayer`). Its top and bottom scroll on their own, around an
-  // empty slot where the dice lie, so no text ever covers the dice.
+  // After the board: the round buttons, under it in portrait, on the right
+  // rail in landscape, in the same order: Undo (or Fast forward), the main
+  // circle, the hint. Both keep their size in every state, so the board
+  // never moves. In portrait the main circle sits in the middle of the screen.
   const trail = landscape ? (
-    <View testID="game-right" style={styles.rightColumn(column)} collapsable={false}>
-      <ScrollView
-        testID="game-right-top"
-        style={diceSlot ? { height: diceSlot.top, flexGrow: 0 } : styles.rightPart}
-        contentContainerStyle={styles.rightTop}
-        alwaysBounceVertical={false}>
-        {gameLabelText}
-      </ScrollView>
-      <View testID="game-dice-slot" style={{ height: diceSlot?.height ?? 0 }} />
-      <ScrollView
-        testID="game-right-bottom"
-        style={styles.rightPart}
-        contentContainerStyle={styles.rightBottom}
-        alwaysBounceVertical={false}>
-        {mainButton}
-      </ScrollView>
-    </View>
+    // Scrolls when a large font makes the rail taller than the screen.
+    <ScrollView
+      testID="game-right"
+      style={styles.rail(rails.right)}
+      contentContainerStyle={styles.railButtons}
+      alwaysBounceVertical={false}>
+      {undoButton ?? <View style={styles.railSlot} />}
+      {statusText}
+      {mainButton ?? (statusText === null ? <View style={styles.mainSpacer} /> : null)}
+      {hintSlot ?? <View style={styles.railSlot} />}
+    </ScrollView>
   ) : (
-    <View style={styles.controls}>
-      {hintButton}
-      {undoButton}
-      {mainButton}
+    <View
+      testID="game-controls"
+      style={[
+        styles.controls,
+        (status === null || mainButton !== null) && styles.controlsTop,
+        raceRoom && styles.controlsRaceRoom,
+      ]}>
+      {status !== null && mainButton === null ? (
+        statusText
+      ) : (
+        <>
+          <View style={styles.controlSide('end')}>
+            {undoButton !== null ? (
+              <View style={styles.sideSlot}>{undoButton}</View>
+            ) : (
+              (statusText ??
+              (rollAside !== null ? (
+                <Text
+                  style={styles.rollAside}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no">
+                  {rollAside}
+                </Text>
+              ) : null))
+            )}
+          </View>
+          {mainButton ?? <View style={styles.mainSpacer} />}
+          <View style={styles.controlSide('start')}>
+            {hintSlot !== null ? <View style={styles.sideSlot}>{hintSlot}</View> : null}
+          </View>
+        </>
+      )}
     </View>
   );
 
@@ -2258,20 +2301,17 @@ export function GameScreen({
         importantForAccessibility={hideScreen ? 'no-hide-descendants' : 'auto'}
         accessibilityElementsHidden={hideScreen}>
         {lead}
-        {/* Classic: the board with its strips, centred in the space that is
-            left; a card covers that whole space, so it has room. Tall: the
-            board as large as it gets. Landscape: the board between the
-            columns; the layer reaches under the right column for the dice.
-            The swipe area around the board (#183) covers this region (not in
-            landscape, and not while a card is up): on the board the board's
-            own pan (it needs less movement) always wins the race, so
-            checkers still drag. */}
+        {/* Classic: the board, centred in the space that is left; a card
+            covers that whole space, so it has room. Tall: the board as
+            large as it gets. Landscape: the board between the rails. The
+            swipe area around the board (#183) covers this region (not
+            while a card is up): on the board the board's own pan (it needs
+            less movement) always wins the race, so checkers still drag. */}
         <GestureDetector gesture={swipeArea}>
           <View
             testID="game-middle"
             style={tall ? styles.boardArea : styles.middle}
             collapsable={false}>
-            {classic ? strip(top, 'strip-top') : null}
             <View
               testID="game-board-frame"
               style={
@@ -2286,15 +2326,11 @@ export function GameScreen({
               }}>
               {boardLayer}
             </View>
-            {classic ? strip(viewer, 'strip-bottom') : null}
-            {landscape && moveList ? (
-              <View style={styles.besideColumnFlow(column)}>{moveList}</View>
-            ) : null}
+            {landscape ? moveList : null}
             {hints}
             {cardOverlay}
           </View>
         </GestureDetector>
-        {tall ? strip(viewer, 'strip-bottom') : null}
         {landscape ? null : moveList}
         {trail}
       </View>
@@ -2302,6 +2338,12 @@ export function GameScreen({
     </View>
   );
 }
+
+/**
+ * The width of the place for Undo (or Fast forward) and the hint in the
+ * portrait row: each circle's center sits 74 pt from the main circle's.
+ */
+const SIDE_SLOT = 76;
 
 /** The menu circle beside the top seat; this slop makes its target 44 pt. */
 const MENU_SIZE = 40;
@@ -2317,35 +2359,71 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingLeft: landscape ? Math.max(rt.insets.left, theme.space.xs) : 0,
     paddingRight: landscape ? Math.max(rt.insets.right, theme.space.xs) : 0,
   }),
-  // In landscape the columns touch the board layer: the dice box is placed
-  // right after it (`columnDiceBox`). The board's shadow room is the gap.
   content: (landscape: boolean) => ({
     flex: 1,
     flexDirection: landscape ? 'row' : 'column',
-    gap: landscape ? 0 : theme.space.xs,
+    gap: landscape ? theme.space.xxs : theme.space.xs,
   }),
-  // A side column in landscape (#185).
-  side: (width: number) => ({
+  // A rail in landscape (Figma "18"): as wide as `rails` says.
+  rail: (width: number) => ({
     width,
     flexGrow: 0,
   }),
-  sideContent: {
+  // The left rail: the menu at the top, then the other seat, the score and
+  // your seat, spread over the height.
+  railContent: {
     flexGrow: 1,
+    alignItems: 'center',
+    gap: theme.space.sm,
+    paddingVertical: theme.space.xs,
+  },
+  railSeats: {
+    flexGrow: 1,
+    alignSelf: 'stretch',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: theme.space.sm,
-    paddingHorizontal: theme.space.xs,
-    paddingVertical: theme.space.xxs,
   },
-  sideGroup: {
+  // The right rail: Undo, the main circle, the hint, spread over the height.
+  railButtons: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'space-around',
     gap: theme.space.sm,
+    paddingVertical: theme.space.xs,
   },
+  // An empty place for Undo or the hint, so the main circle stays put.
+  railSlot: {
+    height: RAIL_LANDSCAPE_SECONDARY,
+  },
+  lead: {
+    gap: theme.space.xxs,
+  },
+  // The menu, your seat, the score, the other seat. The seats stretch to
+  // the same height.
   topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: theme.space.sm,
+    alignItems: 'stretch',
+    gap: theme.space.xs,
+    paddingHorizontal: theme.space.sm,
   },
-  topStrip: {
-    flex: 1,
+  score: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 40,
+  },
+  scoreText: {
+    ...theme.type.numeral,
+    fontSize: 17,
+    lineHeight: 21,
+    color: theme.colors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  scoreTarget: {
+    ...theme.type.footnote,
+    fontSize: 11,
+    lineHeight: 14,
+    color: theme.colors.textDim,
   },
   gameLabel: {
     ...theme.type.caption,
@@ -2353,11 +2431,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.textDim,
     textAlign: 'center',
   },
-  gameLabelSide: {
-    flex: 0,
-    paddingTop: theme.space.xs,
-  },
   menuButton: {
+    alignSelf: 'center',
     width: MENU_SIZE,
     height: MENU_SIZE,
     borderRadius: MENU_SIZE / 2,
@@ -2366,9 +2441,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-  },
-  menuSpacer: {
-    width: MENU_SIZE + theme.space.sm,
   },
   menuIcon: {
     fontSize: 20,
@@ -2393,41 +2465,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     aspectRatio: ratio,
     flexShrink: 1,
   }),
-  // Landscape: the layer also spans the right column (`right`), so the dice
-  // box in that part stays inside it; the board itself keeps clear of it.
-  boardLayer: (right: number) => ({
+  boardLayer: {
     flex: 1,
-    paddingRight: right,
-  }),
+  },
   diceHidden: {
     opacity: 0,
-  },
-  // Landscape: keeps a view over the board clear of the right column.
-  besideColumn: (column: number) => ({
-    right: column,
-  }),
-  besideColumnFlow: (column: number) => ({
-    marginRight: column,
-  }),
-  rightColumn: (width: number) => ({
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width,
-  }),
-  rightPart: {
-    flex: 1,
-  },
-  rightTop: {
-    paddingHorizontal: theme.space.xs,
-    paddingTop: theme.space.xxs,
-  },
-  rightBottom: {
-    flexGrow: 1,
-    justifyContent: 'flex-end',
-    paddingHorizontal: theme.space.xs,
-    paddingBottom: theme.space.xxs,
   },
   boardDice: {
     position: 'absolute',
@@ -2466,36 +2508,72 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.text,
     backgroundColor: theme.colors.backgroundDeep,
   },
-  // One row of big buttons in thumb reach (#184): Roll, or Undo · Confirm.
+  // The round buttons in thumb reach (Figma "18"): Undo, the main circle in
+  // the middle of the screen, the hint. As tall in every state, so the
+  // board above never moves.
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.sm,
-    minHeight: theme.touch.button + theme.space.sm,
+    justifyContent: 'center',
+    gap: theme.space.xs,
+    minHeight: RAIL_PRIMARY + 24,
     paddingHorizontal: theme.space.md,
   },
-  botBox: {
+  // With buttons the row lines up their tops: each circle sits in a box as
+  // tall as the main circle (`circleBox`), so the circles share a center line.
+  controlsTop: {
+    alignItems: 'flex-start',
+  },
+  // A text in a side (the bot's turn, "or swipe the board") is centered on
+  // the circles' line.
+  controlSide: (align: 'start' | 'end') => ({
     flex: 1,
-    flexDirection: 'row',
+    minHeight: RAIL_PRIMARY,
+    justifyContent: 'center',
+    alignItems: align === 'start' ? 'flex-start' : 'flex-end',
+  }),
+  mainSpacer: {
+    width: RAIL_PRIMARY,
+  },
+  // Two label lines under the side circle (see `raceRoom`).
+  controlsRaceRoom: {
+    minHeight: RAIL_PRIMARY + theme.space.xs + 2 * RAIL_LABEL_LINE,
+  },
+  // Undo (or Fast forward) and the hint each get the same width, so a long
+  // label (Greek «Γρήγορη προώθηση») wraps under its circle and never pushes
+  // the circle away from the main one.
+  sideSlot: {
+    width: SIDE_SLOT,
     alignItems: 'center',
-    gap: theme.space.md,
-    minHeight: theme.touch.button,
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xs,
-    borderRadius: theme.radii.lg,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: theme.colors.border,
   },
-  // The bot's box in the right column: as tall as its text, not the column.
-  botBoxSide: {
-    flex: 0,
-    paddingHorizontal: theme.space.sm,
-  },
-  botText: {
-    ...theme.type.body,
-    flex: 1,
-    textAlign: 'center',
+  rollAside: {
+    ...theme.type.footnote,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'right',
     color: theme.colors.textDim,
   },
+  hintPlaceholder: (size: number, box: number) => ({
+    height: Math.max(size, box),
+    justifyContent: 'center',
+  }),
+  hintPlaceholderCircle: (size: number) => ({
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceSunken,
+  }),
+  // What the bot, the other player or fast forward does, in the buttons' place.
+  statusText: (landscape: boolean) => ({
+    ...theme.type.footnote,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'center',
+    color: theme.colors.turnText,
+    paddingHorizontal: landscape ? 0 : theme.space.md,
+  }),
 }));

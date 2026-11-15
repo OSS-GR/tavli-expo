@@ -48,6 +48,12 @@ export interface MyRating {
   readonly rating: number;
   /** Rated matches so far. */
   readonly matches: number;
+  /**
+   * The points of the rated matches so far (the sum of their lengths).
+   * A new rating moves faster below 400 (`experienceFactor` in
+   * `@tavli/online`): Play ranked shows what a match is worth (#532).
+   */
+  readonly experience: number;
   /** "Show me on the global board" (on by default). */
   readonly shown: boolean;
   /**

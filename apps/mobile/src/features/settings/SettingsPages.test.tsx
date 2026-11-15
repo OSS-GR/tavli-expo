@@ -281,12 +281,18 @@ describe('Settings → Board & look', () => {
     await render(<BoardLookSettings />);
     const list = () => within(screen.getByTestId('settings-theme'));
     const strip = () => within(screen.getByTestId('settings-board-theme'));
-    expect(screen.getByText('Walnut Kafeneio colors, dark')).toBeOnTheScreen();
+    expect(screen.getByText('Default. Now: Walnut Kafeneio colors, dark')).toBeOnTheScreen();
+    // The board hint says the app colors follow it, and the list sits right under it.
+    expect(
+      screen.getByText(
+        'The game, the tutorial and the rules use this board. The app colors change with it (App colors, below).',
+      ),
+    ).toBeOnTheScreen();
 
     // Match the board: the Olive Inlay board brings its light colors.
     await user.press(strip().getByRole('radio', { name: 'Olive Inlay' }));
     expect(settingsStore.getState().theme).toBe('match-board');
-    expect(screen.getByText('Olive Inlay colors, light')).toBeOnTheScreen();
+    expect(screen.getByText('Default. Now: Olive Inlay colors, light')).toBeOnTheScreen();
 
     // A picked theme stays with any board.
     await user.press(list().getByRole('radio', { name: 'Kafeneio Night' }));
@@ -296,6 +302,9 @@ describe('Settings → Board & look', () => {
     await user.press(strip().getByRole('radio', { name: 'Walnut Kafeneio' }));
     expect(settingsStore.getState().theme).toBe('kafeneio-night');
     expect(settingsStore.getState().boardTheme).toBe('walnut-kafeneio');
+    expect(
+      screen.getByText('The game, the tutorial and the rules use this board.'),
+    ).toBeOnTheScreen();
   });
 
   it('names the app colors in Greek (#528)', async () => {
@@ -306,7 +315,7 @@ describe('Settings → Board & look', () => {
     const list = within(screen.getByTestId('settings-theme'));
     expect(list.getByRole('radio', { name: 'Όπως το ταμπλό' })).toBeChecked();
     expect(list.getByRole('radio', { name: 'Ελιά με ένθετα' })).toBeOnTheScreen();
-    expect(screen.getByText('Χρώματα: Καρυδιά Καφενείου, σκούρα')).toBeOnTheScreen();
+    expect(screen.getByText('Αρχική επιλογή. Τώρα: Καρυδιά Καφενείου, σκούρα')).toBeOnTheScreen();
   });
 });
 

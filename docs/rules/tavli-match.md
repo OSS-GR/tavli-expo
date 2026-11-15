@@ -167,12 +167,15 @@ is skipped.
   fine (e.g. 4 + 2 = 6 in a 5-point match wins).
 - There is no Crawford rule (there is no cube).
 - The match always starts with Portes (default).
-- **Rules version of one game (app, #247):** a rotation can start from the
+- **Presets of the games:** the `tavli` preset plays the default preset of
+  every game, and every game keeps the match flags of the match (`gameRules`
+  in `packages/engine/src/match.ts`). Plakoto's default is
+  `plakoto.federation` (owner, 2026-11-13, #514), so a Tavli match plays the
+  federation mother rule. The engine still lets a rotation start from the
   preset of one of its games, for example `plakoto.federation` with the
-  rotation Portes → Plakoto → Fevga. Then only that game plays that preset;
-  the other games play their default presets. Every game keeps the match
-  flags of the match (`gameRules` in `packages/engine/src/match.ts`). The
-  `tavli` preset plays the default preset of every game.
+  rotation Portes → Plakoto → Fevga (#247): then only that game plays that
+  preset. The app no longer starts such a match; old saves and history
+  records may still hold one.
 
 ## Resigning (app rule)
 
@@ -183,7 +186,7 @@ scores. These are the app rules (owner, #63, #181 and 2026-11-09).
   is worth now: diplo (2 points) if the resigning player has borne off no
   checker, else mono (1 point). With `backgammonScores3` (Portes, off by
   default) a backgammon position gives 3. A variant may score it in its own
-  way (Plakoto `offerConcede`: 2). With `scoring="perChecker"` (Acey-Deucey
+  way (Plakoto's old `offerConcede` preset: 2). With `scoring="perChecker"` (Acey-Deucey
   American) the opponent gets 1 point per checker the resigning player has
   not borne off, as at the end of the game (`pointsForLoss` in the engine,
   #245). The points count in the match like any

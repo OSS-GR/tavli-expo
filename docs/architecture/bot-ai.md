@@ -135,7 +135,7 @@ A position score = weighted sum of features. Weights start hand-picked, then get
 
 ### 4.5 Variant questions (Plakoto "resign or play on", Asodio "choose a double")
 
-Some variants ask a player a question between turns (`Variant.prompt`, phase `awaiting-answer`). Plakoto does: with `motherRule: "offerConcede"` the pinned player chooses `resign` (the opponent wins 2 points) or `playOn`. The bot answers with the same 1-ply pipeline as a turn: apply each choice with the engine (`answerPrompt`), score the result (true points if the game ends, else the evaluator), then the level's softmax picks.
+Some variants ask a player a question between turns (`Variant.prompt`, phase `awaiting-answer`). Plakoto does: with `motherRule: "offerConcede"` (the old preset `plakoto`, old games only since #514) the pinned player chooses `resign` (the opponent wins 2 points) or `playOn`. The bot answers with the same 1-ply pipeline as a turn: apply each choice with the engine (`answerPrompt`), score the result (true points if the game ends, else the evaluator), then the level's softmax picks.
 
 - Resigning loses 2 points, the most a Plakoto game can lose, so "play on" is never worse. The evaluator puts a pinned mother close to −2 (measured: the pinned side scores −1.84 per game when it plays on; the evaluator says −1.78). So medium plays on, and easy (more noise) resigns some near-lost games, like a human who gives up.
 - Asodio, Acey-Deucey presets only: after a 1-2 the player chooses a double (`chooseDouble`, choices `1`–`6`). The answer sets the dice of the same player's next turn, so each choice is scored as the best turn with that double (1-ply), not as a position before a roll. The owner version asks nothing (A3).
@@ -391,7 +391,7 @@ Tests the bot package must have:
 
 - Asodio: deadlock draws are common even between bots (30% of medium-vs-medium games, see 4.1 and Q28 in `docs/open-questions.md`). Most come from the two armies crossing in the middle of the board, where each side's new quarter is the other side's rear quarter. If playtests confirm it, a rules change (not a bot change) is the fix.
 - Portes scoring: does our Portes count backgammon (triple)? It changes the net outputs.
-- Plakoto: the mother rule is settled (`offerConcede`, owner, 2026-10-26; see `docs/rules/plakoto.md`). Open: should the bot resign a hopeless pinned mother at medium too, to save the human time? Today only easy sometimes does.
+- Plakoto: the mother rule is settled (`federation`, owner, 2026-11-13, #514; see `docs/rules/plakoto.md`). The old `offerConcede` preset still runs for old games. Open: should the bot resign a hopeless pinned mother at medium too, to save the human time? Today only easy sometimes does.
 
 ## 10. Sources
 

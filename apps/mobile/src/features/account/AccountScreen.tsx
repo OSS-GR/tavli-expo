@@ -239,7 +239,7 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
 }
 
 /** Apple's own button, full width. Shown only where Apple's sheet works. */
-function AppleButton({ testID, onPress }: { testID: string; onPress: () => void }) {
+export function AppleButton({ testID, onPress }: { testID: string; onPress: () => void }) {
   const { theme } = useUnistyles();
   return (
     <AppleSignInButton
@@ -449,7 +449,7 @@ function Saved({
  * The move offer (#403). Keep is the main button: it changes nothing.
  * Its own component, so each opening focuses the title again.
  */
-function MoveDialog({
+export function MoveDialog({
   title,
   activeGames,
   openInvites,

@@ -22,6 +22,7 @@ import type { PresetId } from '@tavli/engine';
 
 import type { Difficulty } from './bot-runner';
 import { isAnonymousInstallId } from './install-id';
+import type { RankedGame } from './matchmaking';
 
 /** How a game is played. `online` is for online play (MVP2): no screen sends it yet. */
 export type GameMode = 'bot' | 'local' | 'online';
@@ -160,7 +161,26 @@ export interface AnalyticsEvents {
   online_sign_in: {
     method: 'apple' | 'email' | 'guest';
   };
+  /**
+   * Play ranked (#532): Find a player started a search. Only the game:
+   * never a rating, a name or an id.
+   */
+  ranked_search_started: { game: RankedGame };
+  /**
+   * Play ranked (#532): a search ended. `how`: `matched` (a player sat
+   * down), `cancelled` (Cancel or Back), `otherGame` (Try another game),
+   * `bot` (Play the bot instead) or `expired` (the server ended it after
+   * five minutes). `waitSec`: whole seconds since the search started.
+   */
+  ranked_search_ended: {
+    game: RankedGame;
+    how: RankedSearchEnd;
+    waitSec: number;
+  };
 }
+
+/** How a Play ranked search ended (`ranked_search_ended`, #532). */
+export type RankedSearchEnd = 'matched' | 'cancelled' | 'otherGame' | 'bot' | 'expired';
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
 
@@ -198,6 +218,8 @@ export const ANALYTICS_EVENTS = [
   'invite_created',
   'push_permission_answered',
   'online_sign_in',
+  'ranked_search_started',
+  'ranked_search_ended',
 ] as const satisfies readonly AnalyticsEventName[];
 
 type MissingEvent = Exclude<AnalyticsEventName, (typeof ANALYTICS_EVENTS)[number]>;

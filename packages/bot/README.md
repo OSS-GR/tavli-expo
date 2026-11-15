@@ -46,7 +46,8 @@ interface Evaluation {
   empty `moves`. If `state.dice` is set, it must equal `dice`.
 - `chooseAnswer` answers the question a state waits for (`Variant.prompt`,
   phase `awaiting-answer` in the turn flow): today only Plakoto "resign or
-  play on" after a mother is pinned (`motherRule: "offerConcede"`). It
+  play on" after a mother is pinned (`motherRule: "offerConcede"`, the old
+  `plakoto` preset). It
   returns one of `prompt.choices` (`'resign'` or `'playOn'`) for
   `prompt.player`; pass it to the flow as the `answer` action. See "The
   mother question" below. It also answers the Asodio `chooseDouble`
@@ -861,7 +862,8 @@ Plakoto bears off by the shared rules, so the numbers are the same.
 
 ### The mother question
 
-With `motherRule: "offerConcede"` (the app default), the pinned player is
+With `motherRule: "offerConcede"` (the old preset `plakoto`; the app plays
+`plakoto.federation` since #514, so only old games ask), the pinned player is
 asked "resign or play on" (`awaiting-answer`). `chooseAnswer` scores both
 choices: `resign` = −2 points (the game ends), `playOn` = the evaluation
 of the position. Then the level's softmax picks, like a turn.

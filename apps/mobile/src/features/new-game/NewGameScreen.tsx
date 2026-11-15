@@ -6,7 +6,8 @@
  * Look (#357): the shared `Screen`, `ScreenHeader` and `SectionCard`
  * parts. The games are cards, two per row, Tavli on a whole row; the
  * chosen card has a brass border, a lighter fill and a small brass check.
- * The book button on each card opens its rules without choosing it.
+ * The Rules button on each card (a book and "Rules") opens its rules
+ * without choosing the game.
  *
  * Game (#109): Portes, Plakoto, Fevga or Tavli (all three in rotation).
  * A game shows locked ("Coming soon") when the engine does not have it, or
@@ -14,10 +15,10 @@
  *
  * House rules (#207, a first part of Kafeneio mode #58): the opening roll
  * (`match.openingRoll` in the engine). The hint under it says who starts
- * and how. Plakoto and Asodio also get the rules version (#241): the
- * engine preset of the match (`RULES_VERSIONS`). Its hint says what
- * changes. A Tavli match shows the version of its Plakoto game, "Rules
- * version (Plakoto)" (#247). Portes and Fevga have one preset: no version.
+ * and how. Asodio also gets the rules version (#241): the engine preset
+ * of the match (`RULES_VERSIONS`). Its hint says what changes. The other
+ * games have one preset: no version. Plakoto plays the federation rules
+ * only (owner, 2026-11-13, #514).
  * Both groups have a "Standard" option, so each radio names its group for
  * screen readers (#243), for example "Opening roll: Standard".
  */
@@ -82,7 +83,7 @@ export interface NewGameScreenProps {
   /** A saved game exists: Start asks first, because it ends that game (wireframe 4). */
   hasSavedGame?: boolean;
   /**
-   * Opens the rules of a game (the info button on its card). `preset` is
+   * Opens the rules of a game (the Rules button on its card). `preset` is
    * the game's chosen rules version (#241), so the page can name it.
    */
   onRules?: (game: GameChoice, preset: PresetId) => void;
@@ -135,14 +136,11 @@ export function NewGameScreen({
       ? t('newGame.houseRules.chosenStarterRollsHintBot')
       : t(`newGame.houseRules.${openingRoll}Hint`);
 
-  // The rules version (#241): only for a game with more than one preset.
-  // A Tavli match picks the version of its Plakoto game (#247).
+  // The rules version (#241): only for a game with more than one preset
+  // (Asodio). Plakoto plays the federation rules only (#514).
   const versionGame = versionedGameOf(game);
   const version = versionGame === null ? null : rulesVersions[versionGame];
-  const versionLabel =
-    game === 'tavli'
-      ? t('newGame.houseRules.rulesVersionPlakoto')
-      : t('newGame.houseRules.rulesVersion');
+  const versionLabel = t('newGame.houseRules.rulesVersion');
   const versionOptions: SegmentOption<RulesVersion>[] =
     versionGame === null
       ? []
@@ -219,8 +217,11 @@ export function NewGameScreen({
             accessibilityRole="button"
             accessibilityLabel={t(`rules.title.${choice}`)}
             onPress={() => onRules(choice, gamePreset(choice, rulesVersions))}
-            style={({ pressed }) => [styles.rulesButton, pressed && styles.pressed]}>
-            <Icon name="book" size={20} color={theme.colors.accent} />
+            // 34 pt tall, so the slop makes the 44 pt target.
+            hitSlop={{ top: 5, bottom: 5 }}
+            style={({ pressed }) => [styles.rulesButton, pressed && styles.rulesPressed]}>
+            <Icon name="book" size={16} color={theme.colors.accent} />
+            <Text style={styles.rulesLabel}>{t('newGame.rulesButton')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -343,7 +344,7 @@ export function NewGameScreen({
               />
               <Text style={styles.hint}>{openingHint}</Text>
             </View>
-            {/* The rules version (#241): Plakoto and Asodio, and Tavli's Plakoto game (#247). */}
+            {/* The rules version (#241): Asodio only. */}
             {version !== null ? (
               <View style={styles.rulePart}>
                 <Text style={styles.subLabel}>{versionLabel}</Text>
@@ -426,8 +427,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   gameCard: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
     borderRadius: theme.radii.lg,
     // The same border width either way, so the text does not move.
     borderWidth: 2,
@@ -439,14 +439,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundImage: `linear-gradient(160deg, ${theme.colors.surfaceSelected} 0%, ${theme.colors.surface} 80%)`,
   },
   gameChoice: {
-    flex: 1,
-    alignSelf: 'stretch',
-    justifyContent: 'center',
+    flexGrow: 1,
     gap: theme.space.xxs,
-    minHeight: 64,
-    paddingVertical: theme.space.sm,
-    paddingLeft: theme.space.md,
-    paddingRight: theme.space.xs,
+    paddingTop: theme.space.sm,
+    paddingBottom: theme.space.xs,
+    paddingHorizontal: theme.space.md,
   },
   gameNameLine: {
     flexDirection: 'row',
@@ -472,12 +469,26 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.accent,
   },
   rulesButton: {
-    minWidth: theme.touch.minTarget,
-    minHeight: theme.touch.minTarget,
-    marginRight: theme.space.xxs,
+    minHeight: 34,
+    alignSelf: 'flex-start',
+    marginLeft: theme.space.md - 4,
+    marginBottom: theme.space.sm,
+    paddingHorizontal: theme.space.sm,
+    flexDirection: 'row',
+    gap: theme.space.xxs + 2,
     borderRadius: theme.touch.minTarget / 2,
+    borderWidth: 1,
+    borderColor: theme.colors.accentLine,
+    backgroundColor: theme.colors.accentWash,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rulesLabel: {
+    ...theme.type.caption,
+    color: theme.colors.accent,
+  },
+  rulesPressed: {
+    backgroundColor: theme.colors.accentMuted,
   },
   chips: {
     flexDirection: 'row',

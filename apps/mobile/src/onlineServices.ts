@@ -105,6 +105,7 @@ export function once<T>(make: () => T): () => T {
 export function lazyAuthProvider(get: () => AuthProvider): AuthProvider {
   return {
     ready: () => get().ready(),
+    loadSession: () => get().loadSession(),
     currentUser: () => get().currentUser(),
     signInAsGuest: () => get().signInAsGuest(),
     keyNonce: () => get().keyNonce(),

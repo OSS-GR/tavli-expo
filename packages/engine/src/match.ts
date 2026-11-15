@@ -170,11 +170,15 @@ function presetGame(rules: RuleSet): string {
  * The rules for one game of the match. The game of `match.rules` (its
  * preset) uses those rules. Another game in the rotation uses its default
  * preset (`DEFAULT_PRESET_BY_GAME`) with the match flags of `match.rules`.
- * With the `tavli` preset, every game uses its default preset.
+ * With the `tavli` preset, every game uses its default preset, except
+ * that a version 1 `tavli` match (made before #514) keeps the old `plakoto`
+ * preset for its Plakoto game, so old saves and games replay the same.
  */
 export function gameRules(match: Match, variant: StandardVariantId): RuleSet {
   if (presetGame(match.rules) === variant) return match.rules;
-  const preset = getPreset(DEFAULT_PRESET_BY_GAME[variant]);
+  const oldTavli =
+    match.rules.presetId === 'tavli' && match.rules.version === 1 && variant === 'plakoto';
+  const preset = getPreset(oldTavli ? 'plakoto' : DEFAULT_PRESET_BY_GAME[variant]);
   return validateRules({ ...preset, match: match.rules.match });
 }
 

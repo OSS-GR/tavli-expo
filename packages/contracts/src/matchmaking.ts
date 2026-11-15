@@ -153,7 +153,11 @@ export interface Matchmaking {
    * after. `BAD_REQUEST` for a game not in `RANKED_GAMES`.
    */
   seek(request: SeekRequest): Promise<void>;
-  /** Ends the caller's seek, waiting or matched (the game goes on). No seek: nothing happens. */
+  /**
+   * Ends the caller's waiting seek. A matched seek stays (the game is on),
+   * so a cancel that lands just after a match still shows the match
+   * (#532). No seek: nothing happens.
+   */
   cancel(): Promise<void>;
   /** The caller's seek now. */
   mySeek(): Promise<MySeek>;

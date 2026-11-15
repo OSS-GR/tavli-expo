@@ -162,9 +162,18 @@ export function isAuthErrorData(value: unknown): value is AuthErrorData {
 export interface AuthProvider {
   /**
    * Resolves once the provider has loaded a saved session (at app start),
-   * with the user or `null`. Call it before `currentUser`.
+   * with the user or `null`. Call it before `currentUser`. It never
+   * rejects: `null` may also mean it could not reach the server. To tell
+   * an ended session from no network, use `loadSession()`.
    */
   ready(): Promise<AuthUser | null>;
+  /**
+   * Like `ready()`, but sure: `null` means the server has no session for
+   * this phone (there was none, it ended, or the user signed out). When
+   * the last load did not reach the server, it asks again, and rejects
+   * with `NETWORK` when it still cannot. `ready()` gives `null` then too.
+   */
+  loadSession(): Promise<AuthUser | null>;
   /** The signed-in user, or `null`. */
   currentUser(): AuthUser | null;
   /**
@@ -289,6 +298,8 @@ export interface MemoryAuthStore {
   emailCodes: Record<string, { code: string; tries: number }>;
   /** Kinds of key that are off on this "server" (#462): their calls give `KEY_OFF`. */
   offKeys: AuthKeyProvider[];
+  /** No network: `loadSession()` rejects with `NETWORK` (`ready()` still answers). */
+  offline: boolean;
 }
 
 /**
@@ -314,6 +325,7 @@ export function createMemoryAuthStore(): MemoryAuthStore {
     sentEmailCodes: [],
     emailCodes: {},
     offKeys: [],
+    offline: false,
   };
 }
 
@@ -387,6 +399,11 @@ export function createMemoryAuthProvider(
 
   return {
     ready: () => Promise.resolve(store.session === null ? null : { ...store.session }),
+    async loadSession() {
+      await Promise.resolve();
+      if (store.offline) throw authError('NETWORK', 'could not load the session');
+      return store.session === null ? null : { ...store.session };
+    },
     currentUser: () => (store.session === null ? null : { ...store.session }),
     async signInAsGuest() {
       await Promise.resolve();

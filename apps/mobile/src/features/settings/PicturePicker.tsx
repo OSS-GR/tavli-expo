@@ -126,7 +126,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.space.md,
     paddingBottom: theme.space.xs,
   },
-  list: (inCard: boolean) => (inCard ? {} : { gap: theme.space.sm }),
+  list: (inCard: boolean) => ({ gap: inCard ? 0 : theme.space.sm }),
   tile: (selected: boolean) => ({
     minHeight: theme.touch.row,
     flexDirection: 'row',

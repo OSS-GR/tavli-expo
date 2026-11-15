@@ -179,8 +179,8 @@ interface RuleSet {
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `portes`                    | Portes. Hits, bar, mono 1 / diplo 2. A Portes-only match (`rotation: ['portes']`).                                                               |
 | `tavli`                     | A Tavli match: Portes → Plakoto → Fevga (federation rotation). Each game uses its own default preset with these match flags.                     |
-| `plakoto`                   | Plakoto. Pins. Mother rule `offerConcede` (owner).                                                                                               |
-| `plakoto.federation`        | Plakoto with the ΕΟΠΤ mother rule (`motherRule: 'federation'`).                                                                                  |
+| `plakoto`                   | Plakoto. Pins. Mother rule `offerConcede`. The old default: kept so old games still replay.                                                      |
+| `plakoto.federation`        | Plakoto with the ΕΟΠΤ mother rule (`motherRule: 'federation'`). The default (owner, 2026-11-13, #514).                                           |
 | `fevga`                     | Fevga. Parallel, runner rule (`passMother`), prime rules P1/P2/P3.                                                                               |
 | `asodio.kafeneio`           | The owner's Asodio (default): load all 15 first, quarter lock, pins, no extra rolls (A1–A5).                                                     |
 | `asodio.aceyDeuceyGreek`    | Greek folk Acey-Deucey: hits; a 1-2 gives a chosen double and a new roll; doubles give a new roll; hit checkers need a 1-2 or a double to enter. |
@@ -471,12 +471,12 @@ Code: `src/variants/plakoto/`. Rules: `docs/rules/plakoto.md` and
 Code: `mother.ts`. A player's mother is pinned when their lone checker on
 own 24 has opponent checkers on top. The result is read from the board.
 
-| `motherRule`             | One mother pinned                                                         | Both mothers pinned |
-| ------------------------ | ------------------------------------------------------------------------- | ------------------- |
-| `offerConcede` (default) | The pinned player is asked "resign or play on" (`Variant.prompt`).        | Draw, 0 points      |
-| `federation`             | The pinner wins 2 (`motherPinned`) once the pinner has nothing on own 24. | Draw, 0 points      |
-| `instant`                | The pinner wins 2 at once.                                                | Cannot happen       |
-| `none`                   | Nothing special.                                                          | Draw, 0 points      |
+| `motherRule`           | One mother pinned                                                         | Both mothers pinned |
+| ---------------------- | ------------------------------------------------------------------------- | ------------------- |
+| `offerConcede`         | The pinned player is asked "resign or play on" (`Variant.prompt`).        | Draw, 0 points      |
+| `federation` (default) | The pinner wins 2 (`motherPinned`) once the pinner has nothing on own 24. | Draw, 0 points      |
+| `instant`              | The pinner wins 2 at once.                                                | Cannot happen       |
+| `none`                 | Nothing special.                                                          | Draw, 0 points      |
 
 - `motherCheckTiming: "afterEachMove"` (default): the board is checked
   after every single move. When the game ends (a federation or instant

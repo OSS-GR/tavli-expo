@@ -9,6 +9,7 @@ import {
   type PlayerId,
 } from '@tavli/engine';
 import { getLayout, getTheme } from '@tavli/themes';
+import { themes } from '@tavli/ui';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { AccessibilityInfo } from 'react-native';
@@ -186,7 +187,7 @@ describe('<GameScreen /> strips without a pip count (#238)', () => {
     ['portrait', 'el', PORTRAIT_SE, 'Ann, 0 από 3 βαθμούς, Σειρά σου', 'Bob, 0 από 3 βαθμούς'],
     ['landscape', 'el', LANDSCAPE_SE, 'Ann, 0 από 3 βαθμούς, Σειρά σου', 'Bob, 0 από 3 βαθμούς'],
   ] as const)(
-    '%s, %s: only the name, the score and the turn',
+    '%s, %s: only the name and the turn; the score between the seats',
     async (layout, language, window, you, them) => {
       await setWindow(window);
       await act(async () => {
@@ -196,9 +197,16 @@ describe('<GameScreen /> strips without a pip count (#238)', () => {
       const bottom = screen.getByTestId('strip-bottom');
       const upper = screen.getByTestId('strip-top');
       if (layout === 'landscape') {
-        // The stacked strips of the left column.
-        expect(within(screen.getByTestId('game-left')).getByTestId('strip-top')).toBe(upper);
+        // The stacked seats of the left rail, with the score between them.
+        const rail = within(screen.getByTestId('game-left'));
+        expect(rail.getByTestId('strip-top')).toBe(upper);
+        expect(rail.getByTestId('game-score', { includeHiddenElements: true })).toBeTruthy();
       }
+      // The score once between the seats, not on them, and the game under it.
+      expect(screen.getByTestId('game-score', { includeHiddenElements: true })).toHaveTextContent(
+        language === 'en' ? '0 – 0first to 3Portes' : '0 – 0στους 3Πόρτες',
+      );
+      expect(bottom).not.toHaveTextContent(/of 3|από 3/);
       expect(bottom).toHaveAccessibleName(you);
       expect(upper).toHaveAccessibleName(them);
       for (const strip of [bottom, upper]) {
@@ -206,11 +214,14 @@ describe('<GameScreen /> strips without a pip count (#238)', () => {
         expect(strip).not.toHaveTextContent(/pip|πόντ|167/i);
       }
       // Portes has no note: the other seat has no status line, and yours
-      // says only the turn and the roll (#499).
+      // says only the turn, with no dice text (#499, Figma "18").
       expect(upper).not.toHaveTextContent(/·/);
-      expect(bottom).toHaveTextContent(
-        language === 'en' ? /Your turn · 6-1, 2 moves left/ : /Σειρά σου · 6-1, μένουν 2 κινήσεις/,
-      );
+      expect(bottom).toHaveTextContent(language === 'en' ? /Your turn$/ : /Σειρά σου$/);
+      expect(bottom).not.toHaveTextContent(/6-1/);
+      // No plate: a brass ring around the checker marks the seat to move.
+      const accent = themes['walnut-kafeneio'].colors.accent;
+      expect(screen.getByTestId('strip-bottom-halo')).toHaveStyle({ borderColor: accent });
+      expect(screen.getByTestId('strip-top-halo')).toHaveStyle({ borderColor: 'transparent' });
     },
   );
 });
