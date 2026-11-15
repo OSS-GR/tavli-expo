@@ -150,7 +150,7 @@ describe('first launch', () => {
 
     expect(screen).toHavePathname('/welcome/language');
     expect(screen.getByText('Choose your language')).toBeOnTheScreen();
-    expect(screen.getByText('Διαλέξτε γλώσσα')).toBeOnTheScreen();
+    expect(screen.getByText('Διάλεξε γλώσσα')).toBeOnTheScreen();
     // The phone language (English in tests) is picked and marked.
     expect(screen.getByRole('radio', { name: 'English' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Ελληνικά' })).not.toBeChecked();

@@ -510,6 +510,6 @@ describe('the chosen game (#109)', () => {
     s.store.getState().dispatch({ type: 'nextGame' });
     expect(currentGameLabel(s.store.getState().flow, t)).toBe('Game 2 · Plakoto');
     expect(variantName('fevga', i18n.getFixedT('el'))).toBe('Φεύγα');
-    expect(variantName('asodio', i18n.getFixedT('el'))).toBe('Ασόδιο');
+    expect(variantName('asodio', i18n.getFixedT('el'))).toBe('Ασόδυο');
   });
 });
