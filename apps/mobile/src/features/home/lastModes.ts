@@ -48,8 +48,12 @@ export function parseModes(text: string | undefined): PlayMode[] {
 }
 
 export interface LastModes {
-  /** Notes a match that starts now. */
-  record(mode: PlayMode): void;
+  /**
+   * Notes a match that starts now. With a `once` key (a game id), the same
+   * key counts once per app run: a screen that finds the same match again
+   * does not count it twice. The key is kept in memory only, never saved.
+   */
+  record(mode: PlayMode, once?: string): void;
   /** The saved modes, newest first. */
   modes(): PlayMode[];
   /** `isRankedRegular` of the saved modes. */
@@ -64,9 +68,14 @@ export function createLastModes(storage: Storage): LastModes {
       return [];
     }
   };
+  const counted = new Set<string>();
   return {
     modes,
-    record: (mode) => {
+    record: (mode, once) => {
+      if (once !== undefined) {
+        if (counted.has(once)) return;
+        counted.add(once);
+      }
       const next = [mode, ...modes()].slice(0, LAST_MODES_KEPT);
       try {
         storage.setString(LAST_MODES_STORAGE_KEY, JSON.stringify(next));

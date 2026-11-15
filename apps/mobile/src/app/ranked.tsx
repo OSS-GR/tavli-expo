@@ -57,7 +57,7 @@ export default function RankedRoute() {
       {...(game !== undefined && isRankedGame(game) ? { initialGame: game } : {})}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       onGame={(gameId) => {
-        lastModes.record('ranked');
+        lastModes.record('ranked', gameId);
         router.replace(gameHref(gameId));
       }}
       onBot={() => router.replace(newGameHref('bot'))}

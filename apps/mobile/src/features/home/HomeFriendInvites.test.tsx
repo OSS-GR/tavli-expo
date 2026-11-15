@@ -145,4 +145,47 @@ describe('<HomeFriendInvites />', () => {
     await flush();
     expect(screen.queryByTestId('home-friend-invites')).toBeNull();
   });
+
+  it('a sign-out clears the list at once', async () => {
+    signInSaved();
+    await befriendAnn();
+    const code = await annInvites();
+    await show();
+    expect(screen.getByTestId(`home-friend-invite-${code}`)).toBeOnTheScreen();
+    await act(async () => auth!.signOut());
+    await flush();
+    expect(screen.queryByTestId('home-friend-invites')).toBeNull();
+  });
+
+  it('turned off, it forgets the list', async () => {
+    signInSaved();
+    await befriendAnn();
+    const code = await annInvites();
+    const onOpen = jest.fn();
+    const view = await render(
+      <Off auth={auth!} friends={onlineFake.friends} on={true} onOpen={onOpen} />,
+    );
+    await flush();
+    expect(screen.getByTestId(`home-friend-invite-${code}`)).toBeOnTheScreen();
+    await view.rerender(
+      <Off auth={auth!} friends={onlineFake.friends} on={false} onOpen={onOpen} />,
+    );
+    expect(screen.queryByTestId('home-friend-invites')).toBeNull();
+  });
 });
+
+/** The list with its `auth` taken away when `on` turns off (a sign-out on Home). */
+function Off({
+  auth: signIn,
+  friends: list,
+  on,
+  onOpen,
+}: {
+  auth: AuthProvider;
+  friends: Friends;
+  on: boolean;
+  onOpen: (code: string) => void;
+}) {
+  const invites = useFriendInvites(on ? signIn : undefined, list, true);
+  return <HomeFriendInvites invites={invites} onOpen={onOpen} />;
+}

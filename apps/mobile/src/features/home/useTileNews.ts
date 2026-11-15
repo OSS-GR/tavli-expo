@@ -30,7 +30,9 @@ export async function loadTileNews(
   ratings: Ratings | undefined,
   friends: Friends | undefined,
 ): Promise<TileNews> {
-  const user = await auth.ready();
+  // `loadSession()`, not `ready()`: a rejection is no network and keeps
+  // what shows; `null` is a real sign-out (#297).
+  const user = await auth.loadSession();
   if (user === null || user.isGuest) return NO_TILE_NEWS;
   const [mine, requests] = await Promise.allSettled([
     ratings ? ratings.mine() : Promise.reject(new Error('no ratings')),
@@ -66,6 +68,13 @@ export function useTileNews({
   // Only the newest load may set the news.
   const loads = useRef(0);
   const active = enabled && auth !== undefined && (ratings !== undefined || friends !== undefined);
+  // Turned off (a sign-out): forget the news, so the next user never sees
+  // the last one's rating.
+  const [wasActive, setWasActive] = useState(active);
+  if (wasActive !== active) {
+    setWasActive(active);
+    if (!active) setNews(NO_TILE_NEWS);
+  }
 
   useEffect(() => {
     if (!focused) return;

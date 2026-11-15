@@ -28,39 +28,68 @@ import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { SectionHeader } from '@/components/SectionHeader';
 import { playerNameText } from '@/features/online/playerName';
 
-/** The open friend invites to the signed-in player, or none. */
-async function loadInvites(auth: AuthProvider, friends: Friends): Promise<readonly InviteView[]> {
-  const user = await auth.ready();
-  if (user === null || user.isGuest) return [];
+/** The invites shown, and the user they belong to. */
+interface Loaded {
+  readonly user: string | null;
+  readonly list: readonly InviteView[];
+}
+
+/**
+ * The open friend invites to the signed-in player, or none. It reads the
+ * session with `loadSession()`: a rejection is no network, so the load
+ * fails and the list stays; `null` is a real sign-out (#297).
+ */
+async function loadInvites(auth: AuthProvider, friends: Friends): Promise<Loaded> {
+  const user = await auth.loadSession();
+  if (user === null || user.isGuest) return { user: user?.id ?? null, list: NONE };
   try {
     const list = await friends.listFriendInvites();
-    return list.filter((invite) => invite.status === 'open');
+    return { user: user.id, list: list.filter((invite) => invite.status === 'open') };
   } catch (error) {
     // Not a saved account, or the session is gone: nothing to show.
     if (
       isFriendsErrorData(error) &&
       (error.code === 'NOT_SAVED' || error.code === 'NOT_SIGNED_IN')
     ) {
-      return [];
+      return { user: user.id, list: NONE };
     }
     throw error;
   }
 }
 
 const NONE: readonly InviteView[] = [];
+const EMPTY: Loaded = { user: null, list: NONE };
 
 /**
  * The open friend invites to the signed-in player, loaded each time
- * `focused` turns on. With no `auth` or `friends` there are none.
+ * `focused` turns on. With no `auth` or `friends` there are none. A
+ * sign-out or another user clears the list at once: one player's invites
+ * never show for another.
  */
 export function useFriendInvites(
   auth: AuthProvider | undefined,
   friends: Friends | undefined,
   focused: boolean,
 ): readonly InviteView[] {
-  const [list, setList] = useState<readonly InviteView[]>(NONE);
+  const enabled = auth !== undefined && friends !== undefined;
+  const [loaded, setLoaded] = useState<Loaded>(EMPTY);
+  // Turned off (a sign-out): forget the list before the next user loads.
+  const [wasEnabled, setWasEnabled] = useState(enabled);
+  if (wasEnabled !== enabled) {
+    setWasEnabled(enabled);
+    if (!enabled) setLoaded(EMPTY);
+  }
   // Only the newest load may set the list.
   const loads = useRef(0);
+
+  // Another user signs in: their list is not this one.
+  useEffect(() => {
+    if (auth === undefined) return;
+    return auth.onChange((user) => {
+      const id = user?.id ?? null;
+      setLoaded((last) => (last.user === id ? last : { user: id, list: NONE }));
+    });
+  }, [auth]);
 
   useEffect(() => {
     if (!focused || auth === undefined || friends === undefined) return;
@@ -68,9 +97,9 @@ export function useFriendInvites(
     const n = loads.current;
     loadInvites(auth, friends).then(
       (next) => {
-        if (n === loads.current) setList(next);
+        if (n === loads.current) setLoaded(next);
       },
-      // A failed load keeps what shows.
+      // A failed load (no network) keeps what shows.
       () => {},
     );
     return () => {
@@ -79,7 +108,7 @@ export function useFriendInvites(
     };
   }, [auth, friends, focused]);
 
-  return auth === undefined || friends === undefined ? NONE : list;
+  return enabled ? loaded.list : NONE;
 }
 
 export interface HomeFriendInvitesProps {

@@ -3,7 +3,7 @@ import type { AuthProvider, Friends, FriendRequests, MyRating, Ratings } from '@
 import { loadTileNews, NO_TILE_NEWS } from './useTileNews';
 
 function authAs(user: { id: string; isGuest: boolean } | null): AuthProvider {
-  return { ready: jest.fn(async () => user) } as unknown as AuthProvider;
+  return { loadSession: jest.fn(async () => user) } as unknown as AuthProvider;
 }
 
 function ratingsWith(mine: () => Promise<MyRating>): Ratings {

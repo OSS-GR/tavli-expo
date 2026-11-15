@@ -42,6 +42,16 @@ describe('createLastModes', () => {
     expect(storage.getString(LAST_MODES_STORAGE_KEY)).toBe('["friend","ranked","ranked"]');
   });
 
+  it('counts a match once per key', () => {
+    const modes = createLastModes(createMemoryStorage());
+    modes.record('bot');
+    modes.record('ranked', 'g1');
+    modes.record('ranked', 'g1');
+    expect(modes.modes()).toEqual(['ranked', 'bot']);
+    modes.record('ranked', 'g2');
+    expect(modes.modes()).toEqual(['ranked', 'ranked', 'bot']);
+  });
+
   it('shrugs off a storage error', () => {
     const broken: Storage = {
       getString: () => {

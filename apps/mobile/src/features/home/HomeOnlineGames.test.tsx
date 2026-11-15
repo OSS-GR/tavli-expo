@@ -366,6 +366,24 @@ describe('<HomeOnlineGames />', () => {
     expect(hasOnlineAccount()).toBe(false);
   });
 
+  it('turned off and on again, it never shows the last list', async () => {
+    signIn();
+    rememberOnlineAccount();
+    const gameId = await newGame();
+    const props = { games: games!, onOpen: jest.fn(), onSeeAll: jest.fn() };
+    const view = await render(<Switchable on auth={auth!} {...props} />);
+    await flush();
+    expect(screen.getByTestId(`online-game-${gameId}`)).toBeOnTheScreen();
+    await view.rerender(<Switchable on={false} auth={auth!} {...props} />);
+    expect(screen.queryByTestId('home-online-games')).toBeNull();
+    // Another user, with no games: the old row never shows, not even before the load.
+    onlineFake.authStore.session = { id: 'guest-2', isGuest: true };
+    await view.rerender(<Switchable on auth={auth!} {...props} />);
+    expect(screen.queryByTestId(`online-game-${gameId}`)).toBeNull();
+    await flush();
+    expect(screen.queryByTestId(`online-game-${gameId}`)).toBeNull();
+  });
+
   it('shows Greek', async () => {
     signIn();
     let gameId = await newGame();
@@ -385,3 +403,9 @@ describe('<HomeOnlineGames />', () => {
     });
   });
 });
+
+/** `Shown` with its `auth` taken away while `on` is off (a sign-out on Home). */
+function Switchable({ on, auth: signIn, ...rest }: ShownProps & { on: boolean }) {
+  const { state, retry } = useMyOnlineGames(on ? signIn : undefined, rest.games);
+  return <HomeOnlineGames state={state} retry={retry} focused {...rest} />;
+}
