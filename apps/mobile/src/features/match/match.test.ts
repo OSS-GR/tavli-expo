@@ -34,6 +34,7 @@ import {
   gameRuleSet,
   isGameBuilt,
   isGameOpen,
+  legacyPresets,
   otherVersion,
   sanitizeSetup,
   versionedGameOf,
@@ -56,7 +57,7 @@ describe('match setup', () => {
       botLevel: 'easy',
       names: { white: '', black: '' },
       openingRoll: 'useOpeningDice',
-      rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.kafeneio' },
+      rulesVersions: { asodio: 'asodio.kafeneio' },
     });
   });
 
@@ -90,41 +91,33 @@ describe('match setup', () => {
   it('the first game after the tutorial uses the default rules version of its game (#241)', () => {
     const last: MatchSetup = {
       ...defaultSetup('bot'),
-      rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' },
+      rulesVersions: { asodio: 'asodio.aceyDeuceyGreek' },
     };
-    // The lessons' game gets its default; the other game keeps the last choice.
-    expect(firstGameSetup(last, undefined, 'plakoto').rulesVersions).toEqual({
-      plakoto: 'plakoto',
-      asodio: 'asodio.aceyDeuceyGreek',
-    });
+    // The lessons' game gets its default; another game keeps the last choice.
+    expect(firstGameSetup(last, undefined, 'plakoto').rulesVersions).toEqual(last.rulesVersions);
     expect(firstGameSetup(last, undefined, 'asodio').rulesVersions).toEqual({
-      plakoto: 'plakoto.federation',
       asodio: 'asodio.kafeneio',
     });
     expect(firstGameSetup(last, undefined, 'portes').rulesVersions).toEqual(last.rulesVersions);
   });
 
-  it('offers a rules version only for Plakoto and Asodio, the default first (#241)', () => {
-    expect(Object.keys(RULES_VERSIONS)).toEqual(['plakoto', 'asodio']);
-    expect(RULES_VERSIONS.plakoto).toEqual(['plakoto', 'plakoto.federation']);
+  it('offers a rules version only for Asodio, the default first (#241, #514)', () => {
+    expect(Object.keys(RULES_VERSIONS)).toEqual(['asodio']);
     expect(RULES_VERSIONS.asodio).toEqual([
       'asodio.kafeneio',
       'asodio.aceyDeuceyGreek',
       'asodio.aceyDeuceyAmerican',
     ]);
-    expect(DEFAULT_RULES_VERSIONS).toEqual({
-      plakoto: DEFAULT_PRESET_BY_GAME.plakoto,
-      asodio: DEFAULT_PRESET_BY_GAME.asodio,
-    });
+    expect(DEFAULT_RULES_VERSIONS).toEqual({ asodio: DEFAULT_PRESET_BY_GAME.asodio });
     // Each version is an engine preset of its game.
     for (const [game, versions] of Object.entries(RULES_VERSIONS)) {
       for (const id of versions) expect(getPreset(id).match.rotation).toContain(game);
     }
     expect(otherVersion('plakoto')).toBeNull();
+    expect(otherVersion('plakoto.federation')).toBeNull();
     expect(otherVersion('asodio.kafeneio')).toBeNull();
     expect(otherVersion('tavli')).toBeNull();
     expect(otherVersion('portes')).toBeNull();
-    expect(otherVersion('plakoto.federation')).toBe('plakoto.federation');
     expect(otherVersion('asodio.aceyDeuceyAmerican')).toBe('asodio.aceyDeuceyAmerican');
   });
 
@@ -134,30 +127,30 @@ describe('match setup', () => {
     expect(sanitizeSetup({ game: 'asodio' }, 'local').rulesVersions).toEqual(
       DEFAULT_RULES_VERSIONS,
     );
+    // A last choice from before #514 has a Plakoto version: it is dropped.
     expect(
-      sanitizeSetup(
-        { rulesVersions: { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyAmerican' } },
-        'bot',
-      ).rulesVersions,
-    ).toEqual({ plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyAmerican' });
-    // A version of another game, or junk, is the default; the other one stays.
+      sanitizeSetup({ rulesVersions: { asodio: 'asodio.aceyDeuceyAmerican' } }, 'bot')
+        .rulesVersions,
+    ).toEqual({ asodio: 'asodio.aceyDeuceyAmerican' });
     expect(
-      sanitizeSetup(
-        { rulesVersions: { plakoto: 'asodio.aceyDeuceyGreek', asodio: 'asodio.aceyDeuceyGreek' } },
-        'bot',
-      ).rulesVersions,
-    ).toEqual({ plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyGreek' });
+      sanitizeSetup({ game: 'plakoto', rulesVersions: { asodio: 'asodio.kafeneio' } }, 'bot'),
+    ).toEqual({ ...defaultSetup('bot'), game: 'plakoto' });
+    // A version of another game, or junk, is the default.
+    expect(
+      sanitizeSetup({ rulesVersions: { asodio: 'plakoto.federation' } }, 'bot').rulesVersions,
+    ).toEqual(DEFAULT_RULES_VERSIONS);
     expect(sanitizeSetup({ rulesVersions: 'federation' }, 'bot').rulesVersions).toEqual(
       DEFAULT_RULES_VERSIONS,
     );
   });
 
-  it('plays the chosen rules version of Plakoto and Asodio, and the default elsewhere (#241)', () => {
-    const versions = { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' } as const;
-    const federation = gameRuleSet('plakoto', 'useOpeningDice', versions);
-    expect(federation.presetId).toBe('plakoto.federation');
-    expect(federation.mother.motherRule).toBe('federation');
-    expect(federation.match.rotation).toEqual(['plakoto']);
+  it('plays the chosen rules version of Asodio, and the default elsewhere (#241)', () => {
+    const versions = { asodio: 'asodio.aceyDeuceyGreek' } as const;
+    // Plakoto plays the federation rules only (#514).
+    const plakoto = gameRuleSet('plakoto', 'useOpeningDice', versions);
+    expect(plakoto.presetId).toBe('plakoto.federation');
+    expect(plakoto.mother.motherRule).toBe('federation');
+    expect(plakoto.match.rotation).toEqual(['plakoto']);
     const greek = gameRuleSet('asodio', 'rerollBoth', versions);
     expect(greek.presetId).toBe('asodio.aceyDeuceyGreek');
     expect(greek.specialRolls.aceDeuceChoosesDouble).toBe(true);
@@ -171,13 +164,13 @@ describe('match setup', () => {
     for (const game of ['portes', 'fevga'] as const) {
       expect(gameRuleSet(game, 'useOpeningDice', versions).presetId).toBe(gamePreset(game));
     }
-    expect(gameRuleSet('plakoto').presetId).toBe('plakoto');
+    expect(gameRuleSet('plakoto').presetId).toBe('plakoto.federation');
     expect(gameRuleSet('asodio').presetId).toBe('asodio.kafeneio');
   });
 
-  it('a Tavli match plays the Plakoto version in its Plakoto game only (#247)', () => {
-    expect(versionedGameOf('tavli')).toBe('plakoto');
-    expect(versionedGameOf('plakoto')).toBe('plakoto');
+  it('a Tavli match is the tavli preset; its Plakoto game plays federation (#247, #514)', () => {
+    expect(versionedGameOf('tavli')).toBeNull();
+    expect(versionedGameOf('plakoto')).toBeNull();
     expect(versionedGameOf('asodio')).toBe('asodio');
     expect(versionedGameOf('portes')).toBeNull();
     expect(versionedGameOf('fevga')).toBeNull();
@@ -189,10 +182,8 @@ describe('match setup', () => {
     const asodio = { ...DEFAULT_RULES_VERSIONS, asodio: 'asodio.aceyDeuceyGreek' } as const;
     expect(gameRuleSet('tavli', 'useOpeningDice', asodio)).toEqual(getPreset('tavli'));
 
-    const versions = { ...DEFAULT_RULES_VERSIONS, plakoto: 'plakoto.federation' } as const;
-    expect(gamePreset('tavli', versions)).toBe('plakoto.federation');
-    const rules = gameRuleSet('tavli', 'rerollBoth', versions);
-    expect(rules.presetId).toBe('plakoto.federation');
+    const rules = gameRuleSet('tavli', 'rerollBoth');
+    expect(rules.presetId).toBe('tavli');
     expect(rules.match.rotation).toEqual(['portes', 'plakoto', 'fevga']);
     expect(rules.match.openingRoll).toBe('rerollBoth');
     // The engine plays the preset in the Plakoto game, the defaults elsewhere.
@@ -203,31 +194,36 @@ describe('match setup', () => {
   });
 
   it('reads the rules versions back from a match preset (#247)', () => {
-    const base = { plakoto: 'plakoto.federation', asodio: 'asodio.aceyDeuceyGreek' } as const;
-    expect(versionsOfPreset('tavli', 'plakoto.federation')).toEqual({
-      ...DEFAULT_RULES_VERSIONS,
-      plakoto: 'plakoto.federation',
-    });
-    // `tavli` is the standard Plakoto; the Asodio version stays.
-    expect(versionsOfPreset('tavli', 'tavli', base)).toEqual({ ...base, plakoto: 'plakoto' });
-    expect(versionsOfPreset('plakoto', 'plakoto', base)).toEqual({ ...base, plakoto: 'plakoto' });
+    const base = { asodio: 'asodio.aceyDeuceyGreek' } as const;
     expect(versionsOfPreset('asodio', 'asodio.kafeneio', base)).toEqual({
-      ...base,
       asodio: 'asodio.kafeneio',
     });
-    // Another game's preset, or junk, changes nothing.
-    expect(versionsOfPreset('tavli', 'asodio.aceyDeuceyAmerican', base)).toBe(base);
-    expect(versionsOfPreset('plakoto', 'portes', base)).toBe(base);
-    expect(versionsOfPreset('portes', 'plakoto.federation', base)).toBe(base);
+    expect(versionsOfPreset('asodio', 'asodio.aceyDeuceyAmerican', base)).toEqual({
+      asodio: 'asodio.aceyDeuceyAmerican',
+    });
+    // A game with no choice, another game's preset, or junk, changes nothing.
+    expect(versionsOfPreset('tavli', 'plakoto.federation', base)).toBe(base);
+    expect(versionsOfPreset('plakoto', 'plakoto', base)).toBe(base);
+    expect(versionsOfPreset('asodio', 'portes', base)).toBe(base);
     expect(versionsOfPreset('fevga', 42, base)).toBe(base);
     // Each match preset reads back to itself.
     for (const game of GAME_CHOICES) {
-      for (const plakoto of RULES_VERSIONS.plakoto) {
-        for (const asodio of RULES_VERSIONS.asodio) {
-          const preset = gamePreset(game, { plakoto, asodio });
-          expect(gamePreset(game, versionsOfPreset(game, preset))).toBe(preset);
-        }
+      for (const asodio of RULES_VERSIONS.asodio) {
+        const preset = gamePreset(game, { asodio });
+        expect(gamePreset(game, versionsOfPreset(game, preset))).toBe(preset);
       }
+    }
+  });
+
+  it('knows the presets of matches from before #514', () => {
+    expect(legacyPresets('plakoto')).toEqual(['plakoto']);
+    expect(legacyPresets('tavli')).toEqual(['plakoto.federation']);
+    for (const game of ['portes', 'fevga', 'asodio'] as const) {
+      expect(legacyPresets(game)).toEqual([]);
+    }
+    // No new match starts with one.
+    for (const game of GAME_CHOICES) {
+      expect(legacyPresets(game)).not.toContain(gamePreset(game));
     }
   });
 
@@ -310,16 +306,18 @@ describe('routes', () => {
       params: { variant: 'portes' },
     });
     // A rules version that is not the default names itself (#241).
-    expect(rulesHref('plakoto', 'plakoto.federation')).toEqual({
+    expect(rulesHref('asodio', 'asodio.aceyDeuceyGreek')).toEqual({
       pathname: '/rules/[variant]',
-      params: { variant: 'plakoto', version: 'plakoto.federation' },
+      params: { variant: 'asodio', version: 'asodio.aceyDeuceyGreek' },
     });
+    // Plakoto has one version (#514): an old preset names nothing.
+    expect(rulesHref('plakoto', 'plakoto')).toEqual(rulesHref('plakoto'));
+    expect(rulesHref('plakoto', 'plakoto.federation')).toEqual(rulesHref('plakoto'));
     expect(rulesHref('asodio', 'asodio.kafeneio')).toEqual({
       pathname: '/rules/[variant]',
       params: { variant: 'asodio' },
     });
     expect(rulesHref('portes', 'portes')).toEqual(rulesHref('portes'));
-    // The Plakoto game of a Tavli match names its version; the Tavli page does not (#247).
     expect(rulesHref('tavli', 'plakoto.federation')).toEqual(rulesHref('tavli'));
     expect(rulesHref('asodio', 'plakoto.federation')).toEqual(rulesHref('asodio'));
   });
@@ -444,7 +442,8 @@ describe('the chosen game (#109)', () => {
     expect(isGameBuilt('portes', noAsodio)).toBe(true);
     for (const game of ['portes', 'plakoto', 'fevga', 'asodio'] as const) {
       const rules = gameRuleSet(game);
-      expect(rules.presetId).toBe(game === 'asodio' ? 'asodio.kafeneio' : game);
+      expect(rules.presetId).toBe(gamePreset(game));
+      expect(rules.presetId).toBe(DEFAULT_PRESET_BY_GAME[game]);
       // A one-game match plays only that game.
       expect(rules.match.rotation).toEqual([game]);
       expect(gameRotation(game)).toEqual([game]);

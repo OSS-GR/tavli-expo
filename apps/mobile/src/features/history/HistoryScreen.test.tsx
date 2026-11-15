@@ -59,15 +59,28 @@ afterEach(async () => {
 });
 
 describe('<HistoryScreen />', () => {
-  it('shows an empty state with a Play button', async () => {
+  it('shows an empty state with the medallion, Play vs bot and Learn to play first (#521)', async () => {
     const user = userEvent.setup();
     const onPlay = jest.fn();
-    await render(<HistoryScreen records={[]} onPlay={onPlay} />);
+    const onLearn = jest.fn();
+    await render(<HistoryScreen records={[]} onPlay={onPlay} onLearn={onLearn} />);
 
     expect(screen.getByRole('header', { name: 'No matches yet' })).toBeOnTheScreen();
-    await user.press(screen.getByRole('button', { name: 'Play' }));
+    expect(screen.getByText('Finished matches and your stats show up here.')).toBeOnTheScreen();
+    expect(
+      screen.getByTestId('history-medallion', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Play vs bot' }));
     expect(onPlay).toHaveBeenCalled();
+    await user.press(screen.getByRole('button', { name: 'Learn to play first' }));
+    expect(onLearn).toHaveBeenCalled();
     expect(screen.queryByRole('header', { name: 'Stats' })).toBeNull();
+  });
+
+  it('shows no Learn to play first without its handler', async () => {
+    await render(<HistoryScreen records={[]} onPlay={jest.fn()} />);
+    expect(screen.getByRole('button', { name: 'Play vs bot' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Learn to play first' })).toBeNull();
   });
 
   it('lists the matches newest first, one label per row', async () => {
@@ -115,24 +128,13 @@ describe('<HistoryScreen />', () => {
   });
 
   it('shows the rules version in the row and its label (#241)', async () => {
-    const records = [rec({ id: 'b', game: 'plakoto', preset: 'plakoto.federation' })];
+    const records = [rec({ id: 'b', game: 'asodio', preset: 'asodio.aceyDeuceyGreek' })];
     await render(<HistoryScreen records={records} onPlay={jest.fn()} />);
 
-    const score = 'You 3 – 1 Bot · first to 3 · Rules version: Federation';
+    const score = 'You 3 – 1 Bot · first to 3 · Rules version: Greek';
     expect(screen.getByText(score)).toBeOnTheScreen();
     expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
-      `Plakoto · vs Bot (Easy), ${score}, Won, Oct 27, 2026`,
-    );
-  });
-
-  it('shows the Plakoto version of a Tavli match in the row and its label (#247)', async () => {
-    const records = [rec({ id: 'b', game: 'tavli', preset: 'plakoto.federation' })];
-    await render(<HistoryScreen records={records} onPlay={jest.fn()} />);
-
-    const score = 'You 3 – 1 Bot · first to 3 · Rules version (Plakoto): Federation';
-    expect(screen.getByText(score)).toBeOnTheScreen();
-    expect(screen.getByTestId('history-row-0')).toHaveAccessibleName(
-      `Tavli · vs Bot (Easy), ${score}, Won, Oct 27, 2026`,
+      `Asodio · vs Bot (Easy), ${score}, Won, Oct 27, 2026`,
     );
   });
 

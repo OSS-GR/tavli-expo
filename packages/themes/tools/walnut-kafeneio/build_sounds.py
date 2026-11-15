@@ -18,6 +18,10 @@ iOS and Android, and Metro bundles .m4a as an asset by default.
 Levels: every clip is peak-normalized to its own target (PEAK_DB). Board
 sounds sit near -3 dBFS. Quiet cues (turn start, dice land, invalid move) sit
 lower, so a game never sounds busy.
+
+The clock tick (#530) is made here from numbers, with no source file: a short,
+soft wooden tick. Run `python3 -I build_sounds.py --tick <out.m4a>` to write
+only that sound (no download needed).
 """
 
 import hashlib
@@ -95,6 +99,7 @@ PEAK_DB = {
     "turn-start": -10.0,
     "game-win": -10.0,
     "match-win": -9.0,
+    "clock-tick": -16.0,
 }
 
 
@@ -251,7 +256,30 @@ def build(load):
     steel_up = load("steel-10", "lowpass=f=6000", rate=1.5)
     run = mix((pizzi, 0, 0), (steel, 0, -14), (pizzi_up, 500, -1), (steel_up, 500, -9))
     sounds["match-win"] = cut(run, 0, 1500, 1, 350)
+
+    # Clock tick (#530): each of your last 10 seconds of a timed turn. Very quiet.
+    sounds["clock-tick"] = synth_tick()
     return sounds
+
+
+def synth_tick():
+    """A soft wooden tick (#530): two damped tones and a short click, 70 ms.
+
+    Made from numbers only (fixed seed), so it needs no source file.
+    """
+    n = int(SR * 0.07)
+    t = np.arange(n) / SR
+    body = np.sin(2 * np.pi * 1650 * t) * np.exp(-t / 0.012)
+    ring = 0.35 * np.sin(2 * np.pi * 2900 * t) * np.exp(-t / 0.006)
+    rng = np.random.default_rng(530)
+    click = rng.standard_normal(n) * np.exp(-t / 0.0015) * 0.4
+    x = body + ring + click
+    # A 1 ms fade in and a 20 ms fade out, so the edges never click.
+    fade_in = min(n, int(SR * 0.001))
+    x[:fade_in] *= np.linspace(0, 1, fade_in)
+    fade_out = int(SR * 0.02)
+    x[-fade_out:] *= np.linspace(1, 0, fade_out)
+    return x
 
 
 def normalize(x, peak_db):
@@ -280,6 +308,10 @@ def write_m4a(x, path, tmp):
 def main(argv):
     if len(argv) == 3 and argv[1] == "--download":
         download(argv[2])
+        return
+    if len(argv) == 3 and argv[1] == "--tick":
+        with tempfile.TemporaryDirectory() as tmp:
+            write_m4a(normalize(synth_tick(), PEAK_DB["clock-tick"]), argv[2], tmp)
         return
     if len(argv) != 2:
         sys.exit(__doc__)

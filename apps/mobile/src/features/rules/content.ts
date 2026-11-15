@@ -119,7 +119,7 @@ export const RULES_PAGES: { readonly [G in RulesGame]: readonly RulesSection[] }
     dice,
     { id: 'moves', title: 'rules.plakoto.moves.title', body: ['rules.plakoto.moves.body'] },
     { id: 'pinning', title: 'rules.plakoto.pinning.title', body: ['rules.plakoto.pinning.body'] },
-    // Owner rule (`motherRule: "offerConcede"`): resign or play on.
+    // Owner rule (`motherRule: "federation"`, #514): the pin wins 2 points.
     { id: 'mother', title: 'rules.plakoto.mother.title', body: ['rules.plakoto.mother.body'] },
     bearOff('rules.plakoto.bearOff'),
     scoring,

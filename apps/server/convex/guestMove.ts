@@ -56,6 +56,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import { authComponent, createAuth } from './auth';
 import { resignAs } from './games';
 import { openInvitesOf } from './invites';
+import { deleteSeeksOf } from './matchmaking';
 import { tokensOverCap } from './model/push';
 import { deletePlayerNameOf } from './playerNames';
 
@@ -148,6 +149,10 @@ export const startGuestMove = internalMutation({
 
     // The guest number goes with the guest: the account keeps its own name.
     await deletePlayerNameOf(ctx, source);
+
+    // Play ranked (#531) is for saved accounts only, so a guest has no
+    // seek to move. Delete any row anyway, so none can outlive the guest.
+    await deleteSeeksOf(ctx, source);
 
     // Better Auth's own delete: the guest's sessions, then the user.
     const { internalAdapter } = await createAuth(ctx).$context;

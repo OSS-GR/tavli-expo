@@ -7,18 +7,18 @@ import betterAuthTest from '@convex-dev/better-auth/test';
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
-import { ASYNC_TURN_TIME_MS, MAX_LISTED_GAMES } from '@tavli/contracts';
+import { ASYNC_TURN_TIME_MS, MAX_LISTED_GAMES, RANKED_TURN_TIME_MINUTES } from '@tavli/contracts';
 import type { GameTransportErrorCode, OnlineGameChoice, OnlineGameView } from '@tavli/contracts';
 import { createSeededRng, replay } from '@tavli/engine';
-import type { FlowEvent, PlayerId } from '@tavli/engine';
-import { loadFlow, storeFlow } from '@tavli/online';
+import type { FlowEvent, PerPlayer, PlayerId } from '@tavli/engine';
+import { NEW_RATING, loadFlow, storeFlow } from '@tavli/online';
 import { closedOut, motherPin } from '@tavli/online/testing';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { createGame as createGameFunction } from './games';
 import schema from './schema';
-import { modules, openGame, pickTurn } from './test.setup';
+import { authUsers, modules, openGame, pickTurn } from './test.setup';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -182,6 +182,7 @@ describe('createGame', () => {
       'eventCount',
       'flow',
       'players',
+      'ranked',
       'rules',
       'status',
       'targetPoints',
@@ -1019,5 +1020,206 @@ describe('turn timers (#133)', () => {
     const after = await view(t, gameId);
     expect(after.version).toBe(v.version);
     expect(after.match).toEqual(v.match);
+  });
+});
+
+describe('Play ranked: two time outs in a row lose the match (#529, ADR-0009)', () => {
+  const RANKED_MS = RANKED_TURN_TIME_MINUTES * 60_000;
+
+  /** Moves the clock and runs the checks that are due. */
+  async function wait(t: Tester, ms: number) {
+    vi.advanceTimersByTime(ms);
+    await t.finishInProgressScheduledFunctions();
+  }
+
+  async function newGame(
+    t: Tester,
+    { ranked = true, players = PLAYERS }: { ranked?: boolean; players?: PerPlayer<string> } = {},
+  ): Promise<Id<'games'>> {
+    const gameId = await t.mutation(internal.games.createGame, {
+      callerId: players.white,
+      players,
+      choice: 'portes',
+      targetPoints: 5,
+      turnTimeMinutes: RANKED_TURN_TIME_MINUTES,
+      ranked,
+    });
+    await openGame(t, gameId, players);
+    return gameId;
+  }
+
+  async function viewAs(t: Tester, id: string, gameId: Id<'games'>): Promise<OnlineGameView> {
+    const game = await as(t, id).query(api.games.getGame, { gameId });
+    if (game === null) throw new Error('no game');
+    return game;
+  }
+
+  /** White plays in time (rolls, moves or passes) until the server waits for Black. */
+  async function untilBlack(t: Tester, gameId: Id<'games'>, players = PLAYERS) {
+    for (let i = 0; i < 50; i++) {
+      const v = await viewAs(t, players.white, gameId);
+      if (v.waitingFor !== 'white') break;
+      const white = as(t, players.white);
+      if (v.game.phase === 'awaiting-roll') {
+        await white.mutation(api.games.rollDice, { gameId, expectedVersion: v.version });
+      } else {
+        await white.mutation(api.games.makeMove, {
+          gameId,
+          expectedVersion: v.version,
+          moves: pickTurn(v.game, createSeededRng(v.version)),
+        });
+      }
+    }
+    expect((await viewAs(t, players.white, gameId)).waitingFor).toBe('black');
+  }
+
+  /** Black's turn time runs out. Returns the view after the scheduled check. */
+  async function blackTimesOut(t: Tester, gameId: Id<'games'>, players = PLAYERS) {
+    await untilBlack(t, gameId, players);
+    await wait(t, RANKED_MS);
+    return await viewAs(t, players.white, gameId);
+  }
+
+  it('a ranked game says so in the view and in the list', async () => {
+    const t = setup();
+    const ranked = await newGame(t);
+    const friend = await newGame(t, { ranked: false });
+    expect((await view(t, ranked)).ranked).toBe(true);
+    expect((await view(t, friend)).ranked).toBe(false);
+    const list = await as(t, BOB).query(api.games.listMyGames, { status: 'active' });
+    expect(list.find((row) => row.gameId === ranked)?.ranked).toBe(true);
+    expect(list.find((row) => row.gameId === friend)?.ranked).toBe(false);
+  });
+
+  it(`a ranked game needs ${RANKED_TURN_TIME_MINUTES} minutes per turn`, async () => {
+    const t = setup();
+    for (const turnTimeMinutes of [1, 3, null]) {
+      await rejectsWith(
+        t.mutation(internal.games.createGame, {
+          callerId: ALICE,
+          players: PLAYERS,
+          choice: 'portes',
+          targetPoints: 5,
+          turnTimeMinutes,
+          ranked: true,
+        }),
+        'BAD_REQUEST',
+      );
+    }
+  });
+
+  it('a game saved before #529 has no ranked field: it is a friend game', async () => {
+    const t = setup();
+    const gameId = await newGame(t);
+    await t.run(async (ctx) => ctx.db.patch(gameId, { ranked: undefined }));
+    expect((await t.run(async (ctx) => ctx.db.get(gameId)))?.ranked).toBeUndefined();
+    expect((await view(t, gameId)).ranked).toBe(false);
+    await blackTimesOut(t, gameId);
+    const v = await blackTimesOut(t, gameId);
+    expect(v.status).toBe('active');
+    expect(v.matchEndReason).toBeNull();
+  });
+
+  it('two time outs in a row end the match; the log replays and no clock runs', async () => {
+    const t = setup();
+    const gameId = await newGame(t);
+    const first = await blackTimesOut(t, gameId);
+    expect(first.status).toBe('active');
+    expect(first.matchEndReason).toBeNull();
+    expect(first.match.score).toEqual({ white: 1, black: 0 });
+    const second = await blackTimesOut(t, gameId);
+    expect(second).toMatchObject({
+      status: 'finished',
+      waitingFor: null,
+      turnDeadline: null,
+      matchEndReason: 'timeouts-in-a-row',
+    });
+    expect(second.match).toMatchObject({
+      status: 'finished',
+      winner: 'white',
+      resignedBy: 'black',
+      score: { white: 2, black: 0 },
+    });
+    // Black sees the same reason.
+    expect((await viewAs(t, BOB, gameId)).matchEndReason).toBe('timeouts-in-a-row');
+    const doc = await t.run(async (ctx) => ctx.db.get(gameId));
+    expect(doc).toMatchObject({ status: 'finished', winner: 'white', turnDeadline: null });
+    // The server played both steps, and the log replays.
+    const log = await events(t, gameId);
+    expect(log.slice(-2)).toEqual([
+      { type: 'timeout', player: 'black' },
+      { type: 'resignMatch', player: 'black' },
+    ]);
+    expect(replay(log).match).toEqual(second.match);
+    // Nothing is scheduled any more.
+    await wait(t, 10 * RANKED_MS);
+    expect((await view(t, gameId)).version).toBe(second.version);
+  });
+
+  it('a late call that finds the second time out ends the match too', async () => {
+    const t = setup();
+    const gameId = await newGame(t);
+    await blackTimesOut(t, gameId);
+    await untilBlack(t, gameId);
+    const before = await viewAs(t, BOB, gameId);
+    // The clock reaches the deadline before the scheduled check runs.
+    vi.setSystemTime(Date.now() + RANKED_MS);
+    const late = await as(t, BOB).mutation(api.games.rollDice, {
+      gameId,
+      expectedVersion: before.version,
+    });
+    expect(late).toMatchObject({ ok: false, error: { code: 'TIMED_OUT' } });
+    const v = await view(t, gameId);
+    expect(v.status).toBe('finished');
+    expect(v.matchEndReason).toBe('timeouts-in-a-row');
+  });
+
+  it('a turn played between two time outs keeps the match going', async () => {
+    const t = setup();
+    const gameId = await newGame(t);
+    await blackTimesOut(t, gameId);
+    // Black plays one turn in time: a roll, then the moves (or a pass).
+    await untilBlack(t, gameId);
+    const bob = as(t, BOB);
+    let v = await viewAs(t, BOB, gameId);
+    await bob.mutation(api.games.rollDice, { gameId, expectedVersion: v.version });
+    v = await viewAs(t, BOB, gameId);
+    if (v.waitingFor === 'black' && v.game.phase === 'moving') {
+      await bob.mutation(api.games.makeMove, {
+        gameId,
+        expectedVersion: v.version,
+        moves: pickTurn(v.game, createSeededRng(v.version)),
+      });
+    }
+    const after = await blackTimesOut(t, gameId);
+    expect(after.status).toBe('active');
+    expect(after.match.resignedBy).toBeNull();
+    expect(after.matchEndReason).toBeNull();
+  });
+
+  it("a friend game keeps today's rule: only the games are lost", async () => {
+    const t = setup();
+    const gameId = await newGame(t, { ranked: false });
+    await blackTimesOut(t, gameId);
+    const v = await blackTimesOut(t, gameId);
+    expect(v.status).toBe('active');
+    expect(v.match.score).toEqual({ white: 2, black: 0 });
+    expect(v.matchEndReason).toBeNull();
+  });
+
+  it('the match lost on time is rated as a full loss', async () => {
+    const t = setup();
+    const [white = '', black = ''] = await authUsers(t, 2, true);
+    const players = { white, black };
+    const gameId = await newGame(t, { players });
+    await blackTimesOut(t, gameId, players);
+    const v = await blackTimesOut(t, gameId, players);
+    expect(v.matchEndReason).toBe('timeouts-in-a-row');
+    const winner = await as(t, white).query(api.ratings.myRating, {});
+    const loser = await as(t, black).query(api.ratings.myRating, {});
+    expect(winner.matches).toBe(1);
+    expect(loser.matches).toBe(1);
+    expect(winner.rating).toBeGreaterThan(NEW_RATING.rating);
+    expect(loser.rating).toBeLessThan(NEW_RATING.rating);
   });
 });

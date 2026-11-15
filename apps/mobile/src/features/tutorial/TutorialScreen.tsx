@@ -10,8 +10,8 @@
  * **Next**. **Skip** is always there. The end card offers the first game.
  * With the move list on (a screen reader, or Settings), each lesson can
  * be played from its buttons too; they offer only the lesson's moves.
- * The Plakoto mother lesson ends with the "resign or play on" card
- * (`MotherLessonCard`) over the board. In Asodio the board marks the
+ * The Plakoto mother lesson ends with the pin that wins 2 points (the
+ * federation rule, #514): its done text says why. In Asodio the board marks the
  * checkers the quarter lock freezes, as in a real game.
  *
  * Landscape (#185): the screen turns with the phone. The lesson text, the
@@ -67,7 +67,6 @@ import {
   type LessonId,
   type TutorialGame,
 } from './lessons';
-import { MotherLessonCard } from './MotherLessonCard';
 
 /** One shake of the lesson text: left, right, left, back. */
 const SHAKE = [-8, 8, -5, 0] as const;
@@ -244,8 +243,6 @@ export function TutorialScreen({
   }
 
   const dice = diceView(lesson.dice, remainingDice(flow));
-  // Plakoto: the "resign or play on" card after the mother is pinned.
-  const motherCard = done && lesson.id === 'mother';
   const legal = lessonMoves(lesson, flow);
   const board = currentBoard(flow);
   // Asodio: the frozen checkers look darker. Other games have no marks.
@@ -340,14 +337,9 @@ export function TutorialScreen({
       )}
 
       <View style={styles.boardArea} collapsable={false}>
-        {/* While the mother card covers the board, screen readers skip the board.
-            It never flattens (`collapsable={false}`), so the board canvas keeps
-            its native parent when those props change (#173). */}
-        <View
-          style={styles.boardLayer}
-          collapsable={false}
-          importantForAccessibility={motherCard ? 'no-hide-descendants' : 'auto'}
-          accessibilityElementsHidden={motherCard}>
+        {/* It never flattens (`collapsable={false}`), so the board canvas keeps
+            its native parent (#173). */}
+        <View style={styles.boardLayer} collapsable={false}>
           <InteractiveBoard
             testID="tutorial-board"
             accessibilityLabel={t(`tutorial.lessons.${lesson.id}.board`)}
@@ -371,15 +363,6 @@ export function TutorialScreen({
             cue
           />
         </View>
-        {motherCard ? (
-          // Scrolls when a small phone or a large font makes the card taller than the board.
-          <ScrollView
-            testID="tutorial-mother-overlay"
-            style={styles.overlay}
-            contentContainerStyle={styles.overlayContent}>
-            <MotherLessonCard />
-          </ScrollView>
-        ) : null}
       </View>
 
       {landscape ? null : moveList}
@@ -475,14 +458,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   boardLayer: {
     flex: 1,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  overlayContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingVertical: theme.space.sm,
   },
   controls: (landscape: boolean) => ({
     flexDirection: landscape ? 'column' : 'row',

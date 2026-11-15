@@ -19,6 +19,7 @@ import { onlineFake } from '../test/onlineFake';
 import {
   createOnlineServices,
   lazyFriends,
+  lazyMatchmaking,
   lazyRatings,
   once,
   type OnlineAdapters,
@@ -35,6 +36,7 @@ import {
   safety as servicesSafety,
   friends as servicesFriends,
   ratings as servicesRatings,
+  matchmaking as servicesMatchmaking,
 } from './services';
 
 const SERVER = {
@@ -139,6 +141,14 @@ function memoryAdapters() {
         const user = auth.currentUser();
         if (user !== null && !user.isGuest) server.markSaved(user.id);
         return server.ratingsFor(user?.id ?? null);
+      });
+    },
+    createMatchmaking: ({ auth }) => {
+      made.push('matchmaking');
+      return lazyMatchmaking(() => {
+        const user = auth.currentUser();
+        if (user !== null && !user.isGuest) server.markSaved(user.id);
+        return server.matchmakingFor(user?.id ?? null);
       });
     },
   };
@@ -363,6 +373,19 @@ describe('createOnlineServices', () => {
     expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
   });
 
+  it('runs Play ranked matching on the same client, as the signed-in user (#531)', async () => {
+    const { adapters, made } = memoryAdapters();
+    const online = createOnlineServices(SERVER, adapters)!;
+    await expect(online.matchmaking.mySeek()).rejects.toMatchObject({ code: 'NOT_SIGNED_IN' });
+    expect(made).toEqual([`auth ${SERVER.siteUrl}`, `client ${SERVER.url}`, 'matchmaking']);
+    // A guest cannot play ranked: it needs a saved account.
+    await online.auth.signInAsGuest();
+    await expect(online.matchmaking.seek({ game: 'portes' })).rejects.toMatchObject({
+      code: 'NOT_SAVED',
+    });
+    expect(made.filter((entry) => entry.startsWith('client'))).toHaveLength(1);
+  });
+
   it('passes every sign-in call through', async () => {
     const { adapters } = memoryAdapters();
     const online = createOnlineServices(SERVER, adapters)!;
@@ -393,6 +416,7 @@ describe('the Jest fake of @/services', () => {
     expect(servicesSafety).toBe(onlineFake.safety);
     expect(servicesFriends).toBe(onlineFake.friends);
     expect(servicesRatings).toBe(onlineFake.ratings);
+    expect(servicesMatchmaking).toBe(onlineFake.matchmaking);
   });
 
   it('saves push tokens as the signed-in guest, and refuses them while nobody is signed in', async () => {

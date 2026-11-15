@@ -193,7 +193,7 @@ const styles = StyleSheet.create((theme) => ({
   section: {
     gap: theme.space.sm,
   },
-  frame: surfaceStyle(theme, 'tray'),
+  frame: { ...surfaceStyle(theme, 'tray') },
   clip: {
     borderRadius: theme.radii.tray,
     overflow: 'hidden',

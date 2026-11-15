@@ -81,7 +81,7 @@ describe('isAnonymousInstallId', () => {
 });
 
 describe('event names', () => {
-  it('lists the event plan (issues #61, #128, #163, #209, #215)', () => {
+  it('lists the event plan (issues #61, #128, #163, #209, #215, #532)', () => {
     expect(ANALYTICS_EVENTS).toEqual([
       'app_opened',
       'game_started',
@@ -100,6 +100,8 @@ describe('event names', () => {
       'invite_created',
       'push_permission_answered',
       'online_sign_in',
+      'ranked_search_started',
+      'ranked_search_ended',
     ]);
   });
 

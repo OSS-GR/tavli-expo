@@ -65,6 +65,7 @@ export const RATED_PAIR_DELETE_PAGE = 200;
 const myRatingValue = v.object({
   rating: v.number(),
   matches: v.number(),
+  experience: v.number(),
   shown: v.boolean(),
   listed: v.boolean(),
 });
@@ -152,7 +153,8 @@ async function writeRating(
   else await ctx.db.patch(row._id, fields);
 }
 
-async function pairRow(ctx: QueryCtx, a: string, b: string) {
+/** The pair count row of `a` and `b` (any order), or `null`. */
+export async function pairRow(ctx: QueryCtx, a: string, b: string) {
   const [first, second] = pairOf(a, b);
   return await ctx.db
     .query('ratedPairs')
@@ -226,6 +228,7 @@ export const myRating = query({
     return {
       rating: shownRating(record.rating),
       matches: record.matches,
+      experience: record.experience,
       shown: record.shown,
       listed: isBoardable(record) && (await usernameOf(ctx, playerId)) !== null,
     };

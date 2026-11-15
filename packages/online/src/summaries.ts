@@ -10,11 +10,14 @@
 import { MAX_LISTED_GAMES } from '@tavli/contracts';
 import type { GameSummary } from '@tavli/contracts';
 
-import { OnlineGameError, sideOf, toView } from './online-game';
+import { NO_TIMEOUTS, OnlineGameError, sideOf, toView } from './online-game';
 import type { ViewInput } from './online-game';
 
-/** A summary drops `previousGame`, so its input has none (no need to read it). */
-export interface SummaryInput extends Omit<ViewInput, 'previousGame'> {
+/**
+ * A summary drops `previousGame` and the end reason, so its input has
+ * neither (no need to read them).
+ */
+export interface SummaryInput extends Omit<ViewInput, 'previousGame' | 'timeoutsInARow'> {
   /** The last saved change, in epoch milliseconds (server clock). */
   readonly updatedAt: number;
 }
@@ -29,7 +32,7 @@ export function summarizeGame(input: SummaryInput, playerId: string): GameSummar
   if (mySide === null) {
     throw new OnlineGameError('NOT_A_PLAYER', 'you are not a player of this game');
   }
-  const view = toView({ ...input, previousGame: null });
+  const view = toView({ ...input, previousGame: null, timeoutsInARow: NO_TIMEOUTS });
   return {
     gameId: view.gameId,
     status: view.status,
@@ -38,6 +41,7 @@ export function summarizeGame(input: SummaryInput, playerId: string): GameSummar
     variant: view.game.state.variant,
     targetPoints: view.match.targetPoints,
     turnTimeMinutes: view.turnTimeMinutes,
+    ranked: view.ranked,
     mySide,
     waitingFor: view.waitingFor,
     myTurn: view.waitingFor === mySide,

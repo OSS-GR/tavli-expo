@@ -274,6 +274,10 @@ export const ICONS = {
   undo: {
     strokes: ['M9 14 4 9l5-5', 'M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11'],
   },
+  // Stop (fast forward, #185).
+  square: {
+    strokes: [roundRect(3, 3, 18, 18, 2)],
+  },
   dices: {
     strokes: [
       roundRect(2, 10, 12, 12, 2),

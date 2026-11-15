@@ -45,7 +45,6 @@ describe('gameScoring', () => {
       expect(gameScoring(game)).toBe('tavli');
     }
     const versions = defaultSetup('local').rulesVersions;
-    expect(gameScoring('plakoto', { ...versions, plakoto: 'plakoto.federation' })).toBe('tavli');
     expect(gameScoring('asodio', { ...versions, asodio: 'asodio.aceyDeuceyGreek' })).toBe('tavli');
     expect(gameScoring('asodio', { ...versions, asodio: 'asodio.aceyDeuceyAmerican' })).toBe(
       'perChecker',
@@ -92,7 +91,7 @@ describe('<NewGameScreen /> match length hint (#245)', () => {
         ...defaultSetup('local'),
         game: 'asodio',
         targetPoints: 7,
-        rulesVersions: { plakoto: 'plakoto', asodio: 'asodio.aceyDeuceyAmerican' },
+        rulesVersions: { asodio: 'asodio.aceyDeuceyAmerican' },
       }),
     );
     expect(lengthHint()).toHaveTextContent('First to 7 points. 1 point per checker left.');

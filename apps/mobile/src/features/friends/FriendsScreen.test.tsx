@@ -109,7 +109,7 @@ describe('<FriendsScreen />', () => {
     signInSaved();
     const mine = jest
       .fn()
-      .mockResolvedValue({ rating: 1490, matches: 1, shown: true, listed: false });
+      .mockResolvedValue({ rating: 1490, matches: 1, experience: 3, shown: true, listed: false });
     const props = await show(onlineFake.friends, { ...onlineFake.ratings, mine });
     // The empty state shows no rating, so it asks for none.
     expect(mine).not.toHaveBeenCalled();
@@ -142,7 +142,7 @@ describe('<FriendsScreen />', () => {
     await befriend('ann');
     const mine = jest
       .fn()
-      .mockResolvedValue({ rating: 1490, matches: 1, shown: true, listed: false });
+      .mockResolvedValue({ rating: 1490, matches: 1, experience: 3, shown: true, listed: false });
     const ratings = { ...onlineFake.ratings, mine };
     const props = await show(onlineFake.friends, ratings);
     expect(screen.getByTestId('friends-rating-chip')).toHaveTextContent('1490');
@@ -156,7 +156,7 @@ describe('<FriendsScreen />', () => {
     await befriend('ann');
     const mine = jest
       .fn()
-      .mockResolvedValue({ rating: 1500, matches: 0, shown: true, listed: false });
+      .mockResolvedValue({ rating: 1500, matches: 0, experience: 0, shown: true, listed: false });
     await show(onlineFake.friends, { ...onlineFake.ratings, mine });
     expect(screen.getByRole('button', { name: 'Leaderboards' })).toBeOnTheScreen();
     expect(screen.queryByTestId('friends-rating-chip')).toBeNull();

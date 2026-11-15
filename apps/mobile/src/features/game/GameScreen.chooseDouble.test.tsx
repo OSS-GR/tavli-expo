@@ -264,7 +264,7 @@ describe('<GameScreen /> the "choose a double" card (#205)', () => {
       await resetWindow();
     });
 
-    it('sits beside the right column; a large font gives two buttons a row', async () => {
+    it('lies on the board, between the rails; a large font gives two buttons a row', async () => {
       await setWindow({ ...LANDSCAPE_SE, fontScale: 2 });
       const store = aceyDeucey('white');
       await show(store);
@@ -272,10 +272,12 @@ describe('<GameScreen /> the "choose a double" card (#205)', () => {
       expect(screen.getByTestId('game-right', hidden)).toBeTruthy();
       expect(screen.getByTestId('choose-double-card')).toBeOnTheScreen();
       expectBoardHidden();
-      // The card scrolls beside the right column, never under it.
+      // The card scrolls over the board, in the space between the rails.
       const overlay = screen.getByTestId('game-card-overlay');
       expect(overlay.type).toBe('RCTScrollView');
-      expect(StyleSheet.flatten(overlay.props.style).right).toBeGreaterThan(0);
+      expect(
+        within(screen.getByTestId('game-middle', hidden)).getByTestId('game-card-overlay'),
+      ).toBe(overlay);
       const style = StyleSheet.flatten(screen.getByTestId('choose-double-1').props.style);
       expect(style.width).toBe('47%');
       await press('choose-double-2');

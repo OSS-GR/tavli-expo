@@ -228,7 +228,7 @@ export interface PrimeRules {
 /** Plakoto's mother (μάνα) rule. */
 export interface MotherRules {
   /**
-   * `plakoto.md` flag `motherRule` (default `"offerConcede"`, owner):
+   * `plakoto.md` flag `motherRule` (app default `"federation"`, owner, #514):
    * `"offerConcede"` = the pinned player resigns (2 points) or plays on;
    * `"federation"` = ΕΟΠΤ 3.3.iii; `"instant"` = 2 points at once, no draw;
    * `"none"` = no special result. Games without a mother use `"none"`.

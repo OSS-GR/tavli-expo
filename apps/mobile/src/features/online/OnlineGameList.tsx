@@ -24,8 +24,6 @@ interface OnlineGameListBase {
   limit?: number;
   onSeeAll?: () => void;
   onRetry: () => void;
-  /** The text of an empty list. Without it an empty list shows nothing. */
-  emptyText?: string;
 }
 
 /**
@@ -46,7 +44,6 @@ export function OnlineGameList({
   renderRows,
   onSeeAll,
   onRetry,
-  emptyText,
 }: OnlineGameListProps) {
   const { t } = useTranslation();
   if (state.status === 'signedOut') return null;
@@ -73,19 +70,13 @@ export function OnlineGameList({
     );
   }
   const { games, offset } = state;
-  const empty =
-    games.length === 0 && emptyText !== undefined ? (
-      <Text testID="online-games-empty" style={styles.note}>
-        {emptyText}
-      </Text>
-    ) : null;
-  // No game and no failure: only the empty text. After a failure the
-  // stale note shows even with no game: the list may be out of date.
-  if (games.length === 0 && !state.failed) return empty;
+  // No game and no failure: nothing (a screen shows its own empty
+  // state). After a failure the stale note shows even with no game: the
+  // list may be out of date.
+  if (games.length === 0 && !state.failed) return null;
   const shown = limit === undefined ? games : games.slice(0, limit);
   return (
     <View style={styles.list}>
-      {empty}
       {renderRows !== undefined
         ? renderRows(shown)
         : shown.map((game) => (

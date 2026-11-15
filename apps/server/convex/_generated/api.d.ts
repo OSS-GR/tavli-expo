@@ -23,6 +23,7 @@ import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as keyPlugin from "../keyPlugin.js";
 import type * as mail from "../mail.js";
+import type * as matchmaking from "../matchmaking.js";
 import type * as model_account from "../model/account.js";
 import type * as model_appUpdate from "../model/appUpdate.js";
 import type * as model_appleIdToken from "../model/appleIdToken.js";
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   invites: typeof invites;
   keyPlugin: typeof keyPlugin;
   mail: typeof mail;
+  matchmaking: typeof matchmaking;
   "model/account": typeof model_account;
   "model/appUpdate": typeof model_appUpdate;
   "model/appleIdToken": typeof model_appleIdToken;

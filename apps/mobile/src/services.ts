@@ -20,6 +20,7 @@ import {
   createConvexRatings,
   createConvexGameTransport,
   createConvexInvites,
+  createConvexMatchmaking,
   createConvexOnlineData,
   createConvexPushTokens,
   createConvexSafety,
@@ -40,6 +41,7 @@ import {
   type Ratings,
   type GameTransport,
   type Invites,
+  type Matchmaking,
   type OnlineData,
   type PushNotifications,
   type PushTokens,
@@ -180,6 +182,7 @@ const online = createOnlineServices(convexServer(), {
   createSafety: (client) => createConvexSafety({ client }),
   createFriends: (client) => createConvexFriends({ client }),
   createRatings: (client) => createConvexRatings({ client }),
+  createMatchmaking: (client) => createConvexMatchmaking({ client }),
   createNotifications: () =>
     createExpoPushNotifications({
       platform: Platform.OS === 'android' ? 'android' : 'ios',
@@ -269,6 +272,14 @@ export const friends: Friends | undefined = online?.friends;
  * `NOT_SAVED`.
  */
 export const ratings: Ratings | undefined = online?.ratings;
+
+/**
+ * Play ranked matching of saved accounts (#531), on the same client as
+ * `games`. A seek waits on the server until the matching job pairs it; a
+ * match starts a ranked game. No screen uses it yet (#532). A guest gets
+ * `NOT_SAVED`.
+ */
+export const matchmaking: Matchmaking | undefined = online?.matchmaking;
 
 /**
  * This build (#390): the phone system, the store build number and the app

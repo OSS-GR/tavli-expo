@@ -2,11 +2,18 @@
  * Registers the design system themes (from @tavli/ui) with Unistyles.
  * Imported first by `index.ts`, before any `StyleSheet.create` runs.
  *
- * Today there is one theme, "walnut-kafeneio". To add one, add it to `themes`
- * in `packages/ui/src/themes`. It shows up here and in Settings by itself.
- * `initialTheme` reads the saved choice, so a new theme works on next launch.
+ * There is one app theme per board theme (#528): Walnut Kafeneio and Kafeneio
+ * Night (dark) and Olive Inlay (light). The shown theme comes from two
+ * settings: `theme` (Match the board, or one theme) and `boardTheme`.
+ * `resolveThemeId` turns them into one theme id, at start (`initialTheme`)
+ * and each time either setting changes. The app never follows the phone's
+ * light or dark mode (owner, 2026-11-13): the player picks. The status bar
+ * follows the theme's `scheme` (`app/_layout.tsx`).
+ *
+ * To add a theme, add it to `themes` in `packages/ui/src/themes`. It shows up
+ * here and in Settings by itself.
  */
-import { DEFAULT_THEME_ID, themes } from '@tavli/ui';
+import { resolveThemeId, themes, type ThemeId } from '@tavli/ui';
 import { StyleSheet, UnistylesRuntime } from 'react-native-unistyles';
 
 import { settingsStore } from '@/features/settings/store';
@@ -33,22 +40,32 @@ StyleSheet.configure({
   themes,
   breakpoints,
   settings: {
-    // One theme for now, so the system light/dark switch does not apply.
-    initialTheme: () => settingsStore.getState().theme ?? DEFAULT_THEME_ID,
+    // The player picks the colors: no `adaptiveThemes`, so the phone's
+    // light or dark mode does not switch them.
+    initialTheme: () => shownThemeId(),
   },
 });
 
-function applyRootBackground(): void {
-  // Avoids a white flash behind screens and during transitions.
-  UnistylesRuntime.setRootViewBackgroundColor(UnistylesRuntime.getTheme().colors.background);
+/** The theme the settings ask for now. */
+function shownThemeId(): ThemeId {
+  const { theme, boardTheme } = settingsStore.getState();
+  return resolveThemeId(theme, boardTheme);
 }
 
-applyRootBackground();
+function applyRootBackground(id: ThemeId): void {
+  // Avoids a flash of the wrong color behind screens and during transitions
+  // (a light one under Olive Inlay, a dark one under the others).
+  UnistylesRuntime.setRootViewBackgroundColor(themes[id].colors.background);
+}
 
-// Switch the theme when the user picks another one in Settings.
+applyRootBackground(shownThemeId());
+
+// Switch the theme when the player picks other app colors, or another board
+// while the app colors match the board.
 settingsStore.subscribe((state, previous) => {
-  if (state.theme !== previous.theme) {
-    UnistylesRuntime.setTheme(state.theme);
-    applyRootBackground();
+  const next = resolveThemeId(state.theme, state.boardTheme);
+  if (next !== resolveThemeId(previous.theme, previous.boardTheme)) {
+    UnistylesRuntime.setTheme(next);
+    applyRootBackground(next);
   }
 });

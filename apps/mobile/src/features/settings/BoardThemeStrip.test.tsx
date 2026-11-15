@@ -51,9 +51,11 @@ describe('Settings → Board & look → Board', () => {
     expect(within(screen.getByTestId('settings-board-theme')).getAllByRole('radio')).toHaveLength(
       3,
     );
-    const walnutRow = screen.getByRole('radio', { name: 'Walnut Kafeneio' });
-    const oliveRow = screen.getByRole('radio', { name: 'Olive Inlay' });
-    const nightRow = screen.getByRole('radio', { name: 'Kafeneio Night' });
+    // The app colors below name the same themes (#528), so look in the strip.
+    const strip = () => within(screen.getByTestId('settings-board-theme'));
+    const walnutRow = strip().getByRole('radio', { name: 'Walnut Kafeneio' });
+    const oliveRow = strip().getByRole('radio', { name: 'Olive Inlay' });
+    const nightRow = strip().getByRole('radio', { name: 'Kafeneio Night' });
     expect(walnutRow).toBeChecked();
     expect(oliveRow).not.toBeChecked();
     expect(nightRow).not.toBeChecked();
@@ -69,14 +71,14 @@ describe('Settings → Board & look → Board', () => {
 
     await user.press(oliveRow);
     expect(settingsStore.getState().boardTheme).toBe('olive-inlay');
-    expect(screen.getByRole('radio', { name: 'Olive Inlay' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Walnut Kafeneio' })).not.toBeChecked();
+    expect(strip().getByRole('radio', { name: 'Olive Inlay' })).toBeChecked();
+    expect(strip().getByRole('radio', { name: 'Walnut Kafeneio' })).not.toBeChecked();
 
     await user.press(nightRow);
     expect(settingsStore.getState().boardTheme).toBe('kafeneio-night');
-    expect(screen.getByRole('radio', { name: 'Kafeneio Night' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Olive Inlay' })).not.toBeChecked();
-    // The app colors are a separate setting.
+    expect(strip().getByRole('radio', { name: 'Kafeneio Night' })).toBeChecked();
+    expect(strip().getByRole('radio', { name: 'Olive Inlay' })).not.toBeChecked();
+    // The app colors are a separate setting: Match the board only links them (#528).
     expect(settingsStore.getState().theme).toBe(DEFAULT_SETTINGS.theme);
   });
 
@@ -87,8 +89,9 @@ describe('Settings → Board & look → Board', () => {
     await render(<BoardLookSettings />);
 
     expect(screen.getByRole('header', { name: 'Ταμπλό' })).toBeOnTheScreen();
-    expect(screen.getByRole('radio', { name: olive.name.el })).toBeOnTheScreen();
-    expect(screen.getByRole('radio', { name: walnut.name.el })).toBeOnTheScreen();
-    expect(screen.getByRole('radio', { name: night.name.el })).toBeOnTheScreen();
+    const strip = within(screen.getByTestId('settings-board-theme'));
+    expect(strip.getByRole('radio', { name: olive.name.el })).toBeOnTheScreen();
+    expect(strip.getByRole('radio', { name: walnut.name.el })).toBeOnTheScreen();
+    expect(strip.getByRole('radio', { name: night.name.el })).toBeOnTheScreen();
   });
 });
