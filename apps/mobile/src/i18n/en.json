@@ -1114,6 +1114,11 @@
         "title": "What to play next",
         "body": "The top of Home shows your next step: an online game where it is your turn, an invite from a friend, your saved game, or a quick game. Your games are listed together below it.",
         "where": "Home"
+      },
+      "gameLayout": {
+        "title": "A roomier game screen",
+        "body": "Both players sit together above the board, and the buttons are round and centered under it. Turn the phone and the board keeps its size.",
+        "where": "Any game"
       }
     }
   },
@@ -1283,10 +1288,7 @@
       "turnOf": "{{name}}’s turn",
       "toEnter": "{{count}} to enter",
       "frozen": "Army frozen",
-      "of": "of {{target}}",
-      "diceLeft_one": "{{dice}}, {{count}} move left",
-      "diceLeft_other": "{{dice}}, {{count}} moves left",
-      "diceDone": "{{dice}}, all played"
+      "firstTo": "first to {{target}}"
     },
     "hint": {
       "button": "Hint",

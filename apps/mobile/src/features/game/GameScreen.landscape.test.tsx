@@ -1,7 +1,8 @@
 /**
- * Landscape (#185): the game screen turns with the phone. The classic board
- * sits between two side columns (menu, players and Undo on the left; the
- * game label, the dice and Roll or Confirm on the right). The window size
+ * Landscape (#185, Figma "18 Game · Portrait and landscape"): the game
+ * screen turns with the phone. The classic board fills the height between
+ * two rails (the menu and the hint on the left; the other seat, Undo, Roll
+ * or Confirm and your seat on the right). The dice lie on the board. The window size
  * picks the layout, and turning the phone mid-turn keeps the game, a
  * selected checker, the dice and an open card.
  */
@@ -18,14 +19,14 @@ import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { boardLayout } from '@/features/board/BoardCanvas';
-import { boardDiceBox, columnDiceBox, type BoardDiceBox } from '@/features/board/boardDice';
+import { boardDiceBox, type BoardDiceBox } from '@/features/board/boardDice';
 import {
   fitBoardWithShadow,
   slotRect,
   stackPosition,
   type BoardGeometry,
 } from '@/features/board/geometry';
-import { SIDE_COLUMN, sideColumnWidth } from '@/features/board/screenLayout';
+import { LEFT_RAIL, RIGHT_RAIL, railWidths } from '@/features/board/screenLayout';
 import { DEFAULT_SETTINGS, type HomeBoardSide } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
@@ -40,8 +41,8 @@ import { renderWithRoot } from '../../../test/render';
 import { LANDSCAPE_SE, PORTRAIT_SE, resetWindow, setWindow } from '../../../test/window';
 
 const theme = getTheme('walnut-kafeneio');
-/** The board's space in landscape on an iPhone SE: between the two side columns. */
-const LANDSCAPE_SPACE = { width: 667 - 2 * 4 - 2 * SIDE_COLUMN, height: 360 };
+/** The board's space in landscape on an iPhone SE: between the two rails (and their 2 pt gaps). */
+const LANDSCAPE_SPACE = { width: 667 - 2 * 4 - LEFT_RAIL - RIGHT_RAIL - 2 * 2, height: 360 };
 /** The tall board's space in portrait. */
 const TALL_SPACE = { width: 375, height: 500 };
 const PAN = 'game-board-pan';
@@ -129,14 +130,19 @@ describe('<GameScreen /> in landscape (#185)', () => {
       await whiteToMove61();
       const left = screen.getByTestId('game-left');
       const right = screen.getByTestId('game-right');
-      // Left column: the menu, the other player, you, and Undo under the left thumb.
+      // Left rail, as the portrait top row: the menu, the other player, the
+      // score, you.
       expect(within(left).getByTestId('menu-button')).toBeOnTheScreen();
       expect(within(left).getByTestId('strip-top')).toBeOnTheScreen();
+      expect(within(left).getByTestId('game-score', hidden)).toBeTruthy();
       expect(within(left).getByTestId('strip-bottom')).toBeOnTheScreen();
-      expect(within(left).getByTestId('undo-button')).toBeOnTheScreen();
-      // Right column: the game label and Confirm under the right thumb.
-      expect(within(right).getByTestId('game-label')).toHaveTextContent('Game 1 · Portes');
+      expect(within(left).queryByTestId('undo-button')).toBeNull();
+      // Right rail, as the portrait buttons: Undo, Confirm under the right thumb.
+      expect(within(right).getByTestId('undo-button')).toBeOnTheScreen();
       expect(within(right).getByTestId('confirm-button')).toBeOnTheScreen();
+      expect(within(right).queryByTestId('strip-top')).toBeNull();
+      // No game label in landscape: the menu has it.
+      expect(screen.queryByTestId('game-label')).toBeNull();
       // The board sits between them, alone.
       const middle = screen.getByTestId('game-middle');
       expect(within(middle).queryByTestId('strip-top')).toBeNull();
@@ -182,74 +188,67 @@ describe('<GameScreen /> in landscape (#185)', () => {
   );
 
   it.each([1, 2])(
-    'keeps a free slot for the dice in the right column (font scale %s)',
+    'lays out the rails: seats and score left, Undo and Confirm right (font scale %s)',
     async (fontScale) => {
       await setWindow({ ...LANDSCAPE_SE, fontScale });
-      const column = sideColumnWidth(fontScale);
-      const space = { width: 667 - 2 * 4 - 2 * column, height: 360 };
+      const rails = railWidths(fontScale);
+      const space = { width: 667 - 2 * 4 - rails.left - rails.right - 2 * 2, height: 360 };
       const store = createGameStore({
         players: { white: 'Maria Papadopoulou', black: 'Bob' },
         rng: createSeededRng(5),
       });
       store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 6 });
       store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 1 });
-      await renderWithRoot(
-        <GameScreen
-          store={store}
-          onOpenMenu={() => {}}
-          gameLabel="Game 2 of the match · Plakoto, first to 5 points"
-        />,
-      );
+      await renderWithRoot(<GameScreen store={store} onOpenMenu={() => {}} />);
       await layoutBoard(space);
       await press('opening-overlay');
       const geo = fitBoardWithShadow(boardLayout(theme, 'classic'), space);
-      const box = columnDiceBox(geo, column, 2);
       const flat = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style);
 
-      // The board layer reaches under the right column, so the dice box lies inside it.
-      expect(flat('game-board-layer')).toMatchObject({ paddingRight: column });
-      expect(box.left).toBeGreaterThanOrEqual(space.width);
-      expect(box.left + box.width).toBeLessThanOrEqual(space.width + column);
+      // The rails are as wide as the font asks; both scroll with a large font.
+      expect(flat('game-left')).toMatchObject({ width: rails.left });
+      expect(flat('game-right')).toMatchObject({ width: rails.right });
+      expect(screen.getByTestId('game-left').type).toBe('RCTScrollView');
+      expect(screen.getByTestId('game-right').type).toBe('RCTScrollView');
+      // The dice lie on the board, inside it.
+      const box = boardDiceBox(geo, 2);
+      expect(box.left + box.width).toBeLessThanOrEqual(space.width);
       expect(flat('board-dice')).toMatchObject({ left: box.left, top: box.top });
+      expect(flat('game-board-layer').paddingRight).toBeUndefined();
 
-      // The right column: its top part ends where the dice start, then an
-      // empty slot as tall as the dice, then the buttons. Both parts scroll,
-      // so a large font never pushes text over the dice.
+      // Top to bottom on the left: the menu, then the other seat, the score
+      // and your seat. On the right: Undo, Confirm, and the hint's place.
       const right = screen.getByTestId('game-right');
-      expect(flat('game-right')).toMatchObject({ position: 'absolute', right: 0, width: column });
-      const parts = right.children.map((c) => (typeof c === 'string' ? c : c.props.testID));
-      expect(parts).toEqual(['game-right-top', 'game-dice-slot', 'game-right-bottom']);
-      expect(screen.getByTestId('game-right-top').type).toBe('RCTScrollView');
-      expect(screen.getByTestId('game-right-bottom').type).toBe('RCTScrollView');
-      expect(flat('game-right-top')).toMatchObject({ height: box.top });
-      expect(flat('game-dice-slot')).toMatchObject({ height: box.height });
-      expect(
-        within(screen.getByTestId('game-right-top')).getByTestId('game-label'),
-      ).toBeOnTheScreen();
-      expect(
-        within(screen.getByTestId('game-right-bottom')).getByTestId('confirm-button'),
-      ).toBeOnTheScreen();
-      expect(within(screen.getByTestId('game-dice-slot')).queryAllByText(/./)).toHaveLength(0);
-      // The slot keeps its place before the roll too: Roll does not move.
+      type Node = typeof right;
+      const ids = (node: Node) =>
+        node.children.map((c: Node | string) =>
+          typeof c === 'string' ? c : (c.props.testID as unknown),
+        );
+      const leftContent = screen.getByTestId('game-left').children[0] as Node;
+      expect(ids(leftContent)).toEqual(['menu-button', undefined]);
+      expect(ids(leftContent.children[1] as Node)).toEqual([
+        'strip-top',
+        'game-score',
+        'strip-bottom',
+      ]);
+      expect(ids(right.children[0] as Node)).toEqual(['undo-button', 'confirm-button', undefined]);
+      // Roll takes Confirm's place after the turn; Undo is gone before the roll.
       await tapMove(geo, 8, 3, 7);
       await tapMove(geo, 13, 5, 7);
       await press('confirm-button');
-      expect(
-        within(screen.getByTestId('game-right-bottom')).getByTestId('roll-button'),
-      ).toBeOnTheScreen();
-      expect(flat('game-dice-slot')).toMatchObject({ height: box.height });
-      expect(flat('game-right-top')).toMatchObject({ height: box.top });
+      expect(within(right).getByTestId('roll-button')).toBeOnTheScreen();
+      expect(within(right).queryByTestId('undo-button')).toBeNull();
     },
   );
 
-  it('puts the dice in the right column, next to the board, in the board layer', async () => {
+  it('puts the dice on the board, in its dice area, as in portrait', async () => {
     const store = await whiteToMove61();
     const box = screen.getByTestId('board-dice');
-    const want = columnDiceBox(landscapeGeo(), SIDE_COLUMN, 2);
+    const want = boardDiceBox(landscapeGeo(), 2);
     expect(box.props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ left: want.left, top: want.top })]),
     );
-    expect(want.left).toBeGreaterThanOrEqual(LANDSCAPE_SPACE.width);
+    expect(want.left + want.width).toBeLessThanOrEqual(LANDSCAPE_SPACE.width);
     expect(box.props.pointerEvents).toBe('none');
     const layer = screen.getByTestId('game-board-layer');
     expect(within(layer).getByLabelText('Dice 6-1, 2 left to play')).toBeOnTheScreen();
@@ -316,10 +315,9 @@ describe('<GameScreen /> turning the phone mid-turn (#185)', () => {
     await setWindow(LANDSCAPE_SE);
     expect(screen.getByTestId('dice-row')).toBe(dice);
     expect(styleOf().opacity).toBe(0);
-    // The first render after the board's layout puts them in the right column.
+    // The first render after the board's layout puts them on the landscape board.
     await layoutBoard(LANDSCAPE_SPACE);
-    const want = columnDiceBox(landscapeGeo(), SIDE_COLUMN, 2);
-    expect(styleOf()).toMatchObject({ left: want.left, top: want.top });
+    expect(styleOf()).toMatchObject(boardDiceBoxAt(landscapeGeo()));
     expect(styleOf().opacity).toBeUndefined();
     expect(screen.getByTestId('dice-row')).toBe(dice);
 
@@ -329,7 +327,7 @@ describe('<GameScreen /> turning the phone mid-turn (#185)', () => {
     expect(styleOf().opacity).toBe(0);
     await layoutBoard(narrow);
     const geo = fitBoardWithShadow(boardLayout(theme, 'classic'), narrow);
-    expect(styleOf()).toMatchObject(pick(columnDiceBox(geo, SIDE_COLUMN, 2)));
+    expect(styleOf()).toMatchObject(boardDiceBoxAt(geo));
     expect(styleOf().opacity).toBeUndefined();
 
     // Back upright: on the tall board again, in its dice area.
@@ -343,12 +341,17 @@ describe('<GameScreen /> turning the phone mid-turn (#185)', () => {
   it('keeps the classic layout setting for portrait', async () => {
     await setSettings({ boardLayout: 'classic' });
     await whiteToMove61({ width: 375, height: 229 });
-    expect(screen.getByTestId('game-middle')).toBeOnTheScreen();
-    expect(within(screen.getByTestId('game-middle')).getByTestId('strip-top')).toBeOnTheScreen();
+    // Classic portrait: the seats on top, the game label under them, the board alone.
+    expect(within(screen.getByTestId('game-middle')).queryByTestId('strip-top')).toBeNull();
+    expect(screen.getByTestId('game-label')).toHaveTextContent('Game 1 · Portes');
     await setWindow(LANDSCAPE_SE);
     expect(within(screen.getByTestId('game-left')).getByTestId('strip-top')).toBeOnTheScreen();
+    expect(screen.queryByTestId('game-label')).toBeNull();
     await setWindow(PORTRAIT_SE);
-    expect(within(screen.getByTestId('game-middle')).getByTestId('strip-top')).toBeOnTheScreen();
+    expect(screen.getByTestId('game-label')).toBeOnTheScreen();
+    expect(
+      within(screen.getByTestId('game-controls')).getByTestId('confirm-button'),
+    ).toBeOnTheScreen();
   });
 
   it('keeps an open opening card with its tie', async () => {

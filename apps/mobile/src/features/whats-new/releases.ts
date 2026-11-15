@@ -34,7 +34,8 @@ export type WhatsNewEntryId =
   | 'matchingColors'
   | 'turnClock'
   | 'playRanked'
-  | 'homeHero';
+  | 'homeHero'
+  | 'gameLayout';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -52,7 +53,10 @@ export interface WhatsNewRelease {
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
     date: '2026-11-15',
-    entries: [{ id: 'homeHero', icon: 'house' }],
+    entries: [
+      { id: 'homeHero', icon: 'house' },
+      { id: 'gameLayout', icon: 'smartphone' },
+    ],
   },
   {
     date: '2026-11-13',
