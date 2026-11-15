@@ -1,29 +1,31 @@
 /**
- * A player's seat above or below the board (#499, Figma: game parts).
- * Both players get the same plate: the checker they play (or a checker
- * avatar with initials for a named online opponent), the name, a status
- * line and the match score as a numeral with a small "of 3".
+ * A player's seat (#499, Figma: game parts; layout: Figma "18 Game ·
+ * Portrait and landscape"). Both players get the same seat, with no plate:
+ * the checker they play (or a checker avatar with initials for a named
+ * online opponent), the name and a status line. The seat has no score: the
+ * screen shows it once between the two seats; screen readers still hear it
+ * on each seat.
  *
- * - The player to move gets a brass edge and a gold status line ("Your
- *   turn · 6-6, 3 moves left"), so color is never the only cue: the words
- *   say it too. There is no ALL-CAPS pill.
- * - The other player's status line is quiet ("Easy · Portes", "Online ·
- *   Portes"), or empty.
+ * In portrait the two seats sit side by side above the board; `mirrored`
+ * puts the checker on the right, for the seat on the right. In landscape
+ * (`stacked`) they sit on the left rail, one part per line, centred.
+ *
+ * - The player to move gets a brass ring around the checker and a gold
+ *   status line ("Your turn"), so color is never the only cue: the words
+ *   say it too. There is no ALL-CAPS pill, and no dice text: the dice on
+ *   the board say it.
+ * - The other player's status line is quiet ("Easy", "Online"), or empty.
  * - Asodio adds a short note: the checkers still to enter, or "Army frozen".
  * - Online, the time left shows as a clock line ("23 h to roll"). Under
  *   30 s it turns the problem color.
- * - A timed online turn (#530, Figma "14 Play ranked") shows a ring around
- *   the checker of the player to move instead: it empties over the turn,
- *   with the time left as a numeral on the right ("1:24"). In the last 10
- *   seconds the ring and the time turn the problem color; on your seat the
- *   edge does too, and the status line says "Play now, or you lose this
- *   game". A seat of a timed game keeps the ring's room, so it does not
- *   move when the turn passes.
+ * - A timed online turn (#530, Figma "14 Play ranked") shows the turn ring
+ *   around the checker of the player to move instead: it empties over the
+ *   turn, with the time left as a numeral ("1:24"). In the last 10 seconds
+ *   the ring and the time turn the problem color, and on your seat the
+ *   status line says "Play now, or you lose this game". A seat of a timed
+ *   game keeps the ring's room, so it does not move when the turn passes.
  * - A long name or a large font wraps the lines; the seat then grows. There
  *   is no pip count (#238).
- *
- * `stacked` (landscape, #185): a small card for a side column, one part per
- * line: the checker and the score, the name, the status, the clock.
  */
 import type { CheckerStyle } from '@tavli/themes';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +34,6 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { Icon } from '@/components/Icon';
-import { surfaceStyle } from '@/components/Surface';
 
 import { TurnRing } from './TurnRing';
 
@@ -70,8 +71,6 @@ export interface PlayerStripProps {
   avatar?: { readonly key: string; readonly name: string } | null;
   /** The quiet status line while not active: "Easy · Portes". `null`: none. */
   status?: string | null;
-  /** After the turn words while active: "6-6, 3 moves left". `null`: none. */
-  turnDetail?: string | null;
   /** A short note, e.g. "12 to enter" (Asodio). `null`: none. */
   note?: string | null;
   /** The time left (online). `null`: none. */
@@ -83,8 +82,10 @@ export interface PlayerStripProps {
   active: boolean;
   /** The turn words while active. Default: "Your turn". */
   turnLabel?: string;
-  /** One part per line, for the narrow side columns in landscape (#185). */
+  /** One part per line, centred, for the left rail in landscape (#185). */
   stacked?: boolean;
+  /** The seat on the right of the portrait row: the checker on the right. */
+  mirrored?: boolean;
   testID?: string;
 }
 
@@ -93,7 +94,6 @@ export function PlayerStrip({
   checker,
   avatar = null,
   status = null,
-  turnDetail = null,
   note = null,
   clock = null,
   timed = false,
@@ -102,13 +102,14 @@ export function PlayerStrip({
   active,
   turnLabel,
   stacked = false,
+  mirrored = false,
   testID,
 }: PlayerStripProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
   const turn = turnLabel ?? t('game.strip.turn');
   // Screen readers hear the name, the notes, the score, then the turn. The
-  // dice have their own label, so the turn detail stays out.
+  // seat shows no score, but its label still says it.
   const label = [
     name,
     active ? null : status,
@@ -122,10 +123,10 @@ export function PlayerStrip({
     .join(', ');
 
   const warning = clock?.warning ?? null;
-  const line = (
-    warning !== null ? [warning] : active ? [turn, turnDetail, note] : [status, note]
-  ).filter((part): part is string => part !== null);
-  const size = stacked ? 24 : 32;
+  const line = (warning !== null ? [warning] : active ? [turn, note] : [status, note]).filter(
+    (part): part is string => part !== null,
+  );
+  const size = 24;
   const checkerPiece =
     avatar !== null ? (
       <CheckerAvatar playerKey={avatar.key} name={avatar.name} size={size} />
@@ -158,15 +159,13 @@ export function PlayerStrip({
     ) : (
       checkerPiece
     );
-  const scoreView = (
-    <View style={styles.scoreBox}>
-      <Text style={styles.score(stacked)}>{score}</Text>
-      <Text style={styles.target}>{t('game.strip.of', { target })}</Text>
-    </View>
-  );
   const statusLine =
     line.length === 0 ? null : (
-      <Text style={warning !== null ? styles.warning : styles.status(active)}>
+      <Text
+        style={[
+          warning !== null ? styles.warning : styles.status(active),
+          stacked ? styles.centredText : mirrored && styles.mirroredText,
+        ]}>
         {line.map((part, index) => (index === 0 ? part : `${NBSP}· ${keepTogether(part)}`))}
       </Text>
     );
@@ -177,7 +176,9 @@ export function PlayerStrip({
       : theme.colors.textDim;
   const clockLine =
     clock === null || ring !== null ? null : (
-      <View testID={testID ? `${testID}-clock` : undefined} style={styles.clockRow}>
+      <View
+        testID={testID ? `${testID}-clock` : undefined}
+        style={[styles.clockRow, mirrored && styles.mirroredClock, stacked && styles.centredClock]}>
         <Icon name="clock" color={clockColor} size={14} />
         <Text style={[styles.clock, { color: clockColor }]}>{clock.text}</Text>
       </View>
@@ -188,27 +189,39 @@ export function PlayerStrip({
       <Text
         testID={testID ? `${testID}-time` : undefined}
         style={[
-          styles.time(stacked),
+          styles.time,
           { color: urgentColor ? theme.colors.problem : theme.colors.turnText },
         ]}>
         {ring.time}
       </Text>
     );
-  const edge = warning !== null ? styles.lastSeconds : null;
+  // A timed turn draws its own ring; otherwise a brass one marks the turn.
+  const halo =
+    timed || ring !== null ? 'none' : warning !== null ? 'urgent' : active ? 'turn' : 'off';
+  const marked =
+    halo === 'none' ? (
+      piece
+    ) : (
+      <View testID={testID ? `${testID}-halo` : undefined} style={styles.halo(halo)}>
+        {piece}
+      </View>
+    );
+  const nameView = (
+    <Text style={[styles.name, stacked ? styles.centredText : mirrored && styles.mirroredText]}>
+      {name}
+    </Text>
+  );
 
   if (stacked) {
     return (
       <View
         testID={testID}
-        style={[styles.plate, styles.stacked, active && styles.active, edge]}
+        style={styles.stacked}
         accessible
         accessibilityLabel={label}
         accessibilityState={{ selected: active }}>
-        <View style={styles.stackedTop}>
-          {piece}
-          {scoreView}
-        </View>
-        <Text style={styles.name}>{name}</Text>
+        {marked}
+        {nameView}
         {statusLine}
         {clockLine}
         {timeView}
@@ -218,60 +231,62 @@ export function PlayerStrip({
   return (
     <View
       testID={testID}
-      style={[styles.plate, styles.row, active && styles.active, edge]}
+      style={[styles.row, mirrored && styles.mirrored]}
       accessible
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}>
-      {piece}
+      {marked}
       <View style={styles.texts}>
-        <Text style={styles.name}>{name}</Text>
+        {nameView}
         {statusLine}
         {clockLine}
       </View>
       {timeView}
-      {scoreView}
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  // The shared tray (#496), with a thin edge so the brass one replaces it.
-  plate: {
-    ...surfaceStyle(theme, 'tray'),
-    marginHorizontal: theme.space.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  // Your turn: a brass edge.
-  active: {
-    borderWidth: 2,
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.surfaceRaised,
-  },
-  // Your last seconds of a timed turn (#530): the problem color.
-  lastSeconds: {
-    borderWidth: 2,
-    borderColor: theme.colors.problem,
-  },
+  // The portrait seat: small, so two fit side by side with Greek names.
   row: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.md,
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xs,
+    gap: theme.space.xs,
   },
+  mirrored: {
+    flexDirection: 'row-reverse',
+  },
+  mirroredText: {
+    textAlign: 'right',
+  },
+  mirroredClock: {
+    flexDirection: 'row-reverse',
+  },
+  // The landscape seat: one part per line, centred on the rail.
   stacked: {
-    marginHorizontal: 0,
-    gap: theme.space.xxs,
-    paddingHorizontal: theme.space.sm,
-    paddingVertical: theme.space.xs,
-  },
-  stackedTop: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.space.sm,
+    gap: 2,
   },
+  centredText: {
+    textAlign: 'center',
+  },
+  centredClock: {
+    justifyContent: 'center',
+  },
+  // The ring around the checker: brass for the turn, the problem color in
+  // your last seconds, and its room kept when off.
+  halo: (kind: 'turn' | 'urgent' | 'off') => ({
+    padding: 2,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor:
+      kind === 'turn'
+        ? theme.colors.accent
+        : kind === 'urgent'
+          ? theme.colors.problem
+          : 'transparent',
+  }),
   checker: (size: number) => ({
     width: size,
     height: size,
@@ -283,8 +298,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   name: {
     ...theme.type.bodyStrong,
-    fontSize: 16,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 17,
     color: theme.colors.text,
   },
   status: (active: boolean) => ({
@@ -297,12 +312,12 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: '600',
     color: theme.colors.problem,
   },
-  time: (stacked: boolean) => ({
+  time: {
     ...theme.type.numeral,
-    fontSize: stacked ? 18 : 22,
-    lineHeight: stacked ? 22 : 26,
-    fontVariant: ['tabular-nums' as const],
-  }),
+    fontSize: 18,
+    lineHeight: 22,
+    fontVariant: ['tabular-nums'],
+  },
   clockRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -313,20 +328,5 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
     flexShrink: 1,
-  },
-  scoreBox: {
-    alignItems: 'flex-end',
-  },
-  score: (stacked: boolean) => ({
-    ...theme.type.numeral,
-    fontSize: stacked ? 20 : 24,
-    lineHeight: stacked ? 24 : 28,
-    color: theme.colors.text,
-  }),
-  target: {
-    ...theme.type.footnote,
-    fontSize: 12,
-    lineHeight: 15,
-    color: theme.colors.textDim,
   },
 }));

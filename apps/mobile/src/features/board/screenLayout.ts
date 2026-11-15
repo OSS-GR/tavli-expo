@@ -36,24 +36,34 @@ export function boardModeOf(layout: ScreenLayout): BoardLayoutMode {
 }
 
 /**
- * The width of each side column in landscape, in points, at the normal
- * font size. The longest label there is Greek "Επιβεβαίωση" (Confirm),
- * about 100 pt at 17 pt; a compact button around it needs about 112 pt.
+ * The two rails in landscape (#185, Figma "18 Game · Portrait and
+ * landscape"), in points at the normal font size. The left rail holds what
+ * the portrait top row holds (the menu, the two seats and the score); the
+ * right rail the round buttons (Undo, Roll or Confirm, the hint) under the
+ * right thumb. The board gets the rest of the width. The longest seat name
+ * is Greek "Υπολογιστής" (the bot), about 80 pt at 13 pt; the longest
+ * button label is Greek "Επιβεβαίωση" (Confirm), about 75 pt at 12 pt.
  */
-export const SIDE_COLUMN = 128;
-/** With a large font the columns grow up to this factor; the board gets smaller. */
-const MAX_COLUMN_GROWTH = 1.35;
+export const LEFT_RAIL = 84;
+export const RIGHT_RAIL = 84;
+/** With a large font the rails grow up to this factor; the board gets smaller. */
+const MAX_RAIL_GROWTH = 1.35;
 
-/** The side column width for a system font scale. */
-export function sideColumnWidth(fontScale: number): number {
-  const growth = Math.min(MAX_COLUMN_GROWTH, Math.max(1, fontScale));
-  return Math.round(SIDE_COLUMN * growth);
+export interface Rails {
+  readonly left: number;
+  readonly right: number;
+}
+
+/** The rail widths for a system font scale. */
+export function railWidths(fontScale: number): Rails {
+  const growth = Math.min(MAX_RAIL_GROWTH, Math.max(1, fontScale));
+  return { left: Math.round(LEFT_RAIL * growth), right: Math.round(RIGHT_RAIL * growth) };
 }
 
 export interface ScreenLayoutInfo {
   readonly layout: ScreenLayout;
-  /** The side column width in landscape (see `sideColumnWidth`). */
-  readonly column: number;
+  /** The rail widths in landscape (see `railWidths`). */
+  readonly rails: Rails;
   /**
    * Names the board's space: it changes when the phone turns or the window
    * (or the font size) changes. The board measures again for a new key.
@@ -76,7 +86,7 @@ export function useScreenLayout(): ScreenLayoutInfo {
   const layout = screenLayoutFor(window, mode);
   return {
     layout,
-    column: sideColumnWidth(window.fontScale),
+    rails: railWidths(window.fontScale),
     spaceKey: spaceKeyFor(layout, window),
   };
 }
