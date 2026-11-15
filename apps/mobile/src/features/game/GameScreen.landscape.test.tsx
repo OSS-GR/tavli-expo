@@ -231,7 +231,8 @@ describe('<GameScreen /> in landscape (#185)', () => {
         'game-score',
         'strip-bottom',
       ]);
-      expect(ids(right.children[0] as Node)).toEqual(['undo-button', 'confirm-button', undefined]);
+      expect(ids(right.children[0] as Node)).toEqual(['undo-button', 'rail-main', undefined]);
+      expect(within(screen.getByTestId('rail-main')).getByTestId('confirm-button')).toBeTruthy();
       // Roll takes Confirm's place after the turn; Undo is gone before the roll.
       await tapMove(geo, 8, 3, 7);
       await tapMove(geo, 13, 5, 7);
@@ -240,10 +241,12 @@ describe('<GameScreen /> in landscape (#185)', () => {
       expect(within(right).queryByTestId('undo-button')).toBeNull();
       // Empty places keep their room, so Roll sits where Confirm sat.
       const places = right.children[0] as Node;
-      expect(ids(places)).toEqual([undefined, 'roll-button', undefined]);
+      expect(ids(places)).toEqual([undefined, 'rail-main', undefined]);
       expect(StyleSheet.flatten((places.children[0] as Node).props.style).height).toBeGreaterThan(
         0,
       );
+      expect(within(screen.getByTestId('rail-main')).getByTestId('roll-button')).toBeTruthy();
+      expect(flat('rail-main').minHeight).toBeGreaterThan(64);
     },
   );
 

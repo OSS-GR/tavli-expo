@@ -119,7 +119,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-import { ActionButton, ICON_ONLY_LABEL_SCALE } from '@/components/ActionButton';
+import { ActionButton } from '@/components/ActionButton';
 import { Icon } from '@/components/Icon';
 import { MoveList } from '@/features/accessibility/MoveList';
 import { useMoveListShown } from '@/features/accessibility/screenReader';
@@ -181,7 +181,9 @@ import {
   RAIL_LANDSCAPE_SECONDARY,
   RAIL_PRIMARY,
   RAIL_SECONDARY,
+  RAIL_SUBTITLE_LINE,
   RailButton,
+  iconLabelShown,
 } from './RailButton';
 import { diceWereChosen, diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
@@ -1432,7 +1434,7 @@ export function GameScreen({
         size={sideSize}
         circleBox={circleBox}
         // A large font shows the word under the circle too (#499).
-        iconOnly={windowSize.fontScale < ICON_ONLY_LABEL_SCALE}
+        iconOnly
         busy={hintProps.busy}
         onPress={hintProps.onPress}
       />
@@ -1466,11 +1468,13 @@ export function GameScreen({
     hintButton ??
     (analyzer !== undefined && showHints ? (
       <View
-        style={styles.hintPlaceholder(sideSize, circleBox ?? sideSize)}
+        style={styles.hintPlaceholder(iconLabelShown(windowSize.fontScale))}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants">
-        <View style={styles.hintPlaceholderCircle(sideSize)}>
-          <Icon name="lightbulb" color={ui.colors.textFaint} size={Math.round(sideSize * 0.4)} />
+        <View style={styles.hintPlaceholderBox(Math.max(sideSize, circleBox ?? sideSize))}>
+          <View style={styles.hintPlaceholderCircle(sideSize)}>
+            <Icon name="lightbulb" color={ui.colors.textFaint} size={Math.round(sideSize * 0.4)} />
+          </View>
         </View>
       </View>
     ) : null);
@@ -2248,8 +2252,12 @@ export function GameScreen({
       contentContainerStyle={styles.railButtons}
       alwaysBounceVertical={false}>
       {undoButton ?? <View style={styles.railSlot(true)} />}
-      {statusText}
-      {mainButton ?? <View style={styles.railMainSpacer} />}
+      {/* The main place is as tall as Roll with its subtitle in every state,
+          and the status text sits in it, so Undo and the hint never move. */}
+      <View testID="rail-main" style={styles.railMain}>
+        {statusText}
+        {mainButton}
+      </View>
       {hintSlot ?? <View style={styles.railSlot(false)} />}
     </ScrollView>
   ) : (
@@ -2413,11 +2421,14 @@ const styles = StyleSheet.create((theme, rt) => ({
   railSlot: (label: boolean) => ({
     height: RAIL_LANDSCAPE_SECONDARY + (label ? theme.space.xs + RAIL_LABEL_LINE : 0),
   }),
-  // The main circle's place on the rail when it is not there (no roll yet,
-  // the bot's turn): as tall as Confirm with its label, so nothing jumps.
-  railMainSpacer: {
-    width: RAIL_PRIMARY,
-    height: RAIL_PRIMARY + theme.space.xs + RAIL_LABEL_LINE,
+  // The main circle's place on the rail, also when it is empty (the bot's
+  // turn): as tall as Roll (circle, label, subtitle), so nothing jumps.
+  railMain: {
+    minWidth: RAIL_PRIMARY,
+    minHeight: RAIL_PRIMARY + 2 * theme.space.xs + RAIL_LABEL_LINE + RAIL_SUBTITLE_LINE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.space.sm,
   },
   lead: {
     gap: theme.space.xxs,
@@ -2576,8 +2587,12 @@ const styles = StyleSheet.create((theme, rt) => ({
     textAlign: 'right',
     color: theme.colors.textDim,
   },
-  hintPlaceholder: (size: number, box: number) => ({
-    height: Math.max(size, box),
+  // With a large font the hint shows its label, so its place keeps that line too.
+  hintPlaceholder: (label: boolean) => ({
+    paddingBottom: label ? theme.space.xs + RAIL_LABEL_LINE : 0,
+  }),
+  hintPlaceholderBox: (height: number) => ({
+    height,
     justifyContent: 'center',
   }),
   hintPlaceholderCircle: (size: number) => ({

@@ -6,16 +6,17 @@
  * - `primary`: the big brass circle (Roll, Confirm).
  * - `secondary`: a smaller dark circle with a brass line (Undo, Fast
  *   forward, Stop).
- * - `iconOnly`: no label under the circle (the hint); screen readers still
- *   hear the label.
+ * - `iconOnly`: no label under the circle (the hint), except with a large
+ *   font (`iconLabelShown`, #499); screen readers always hear the label.
  *
  * The label wraps for Greek and a large font; the circle keeps its size.
  * Screen readers hear the label (and the subtitle) as one button. A busy
  * button shows a spinner in place of its icon and does nothing.
  */
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
+import { ICON_ONLY_LABEL_SCALE } from '@/components/ActionButton';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/icons';
 
@@ -31,7 +32,7 @@ export interface RailButtonProps {
   icon: IconName;
   /** The circle's size; the default follows `kind`. */
   size?: number;
-  /** Shows no label under the circle (screen readers still hear it). */
+  /** Shows no label under the circle, except with a large font (screen readers still hear it). */
   iconOnly?: boolean;
   /**
    * The height of the box the circle sits in, centered. A row of buttons of
@@ -57,6 +58,16 @@ export const RAIL_SECONDARY = 52;
 export const RAIL_LANDSCAPE_SECONDARY = 48;
 /** The line height of a label under a circle. */
 export const RAIL_LABEL_LINE = 16;
+/** The line height of a subtitle under a label. */
+export const RAIL_SUBTITLE_LINE = 14;
+
+/**
+ * Whether an `iconOnly` button shows its label anyway: with a large font,
+ * as `ActionButton` does, so a low-vision player sees the word.
+ */
+export function iconLabelShown(fontScale: number): boolean {
+  return fontScale >= ICON_ONLY_LABEL_SCALE;
+}
 
 export function RailButton({
   label,
@@ -75,6 +86,8 @@ export function RailButton({
   accessibilityLabel = label,
 }: RailButtonProps) {
   const { theme } = useUnistyles();
+  const { fontScale } = useWindowDimensions();
+  const noLabel = iconOnly && !iconLabelShown(fontScale);
   const primary = kind === 'primary';
   const inactive = disabled || busy;
   const iconColor = primary
@@ -110,7 +123,7 @@ export function RailButton({
             </View>
           </View>
           {/* No line limit: with Greek or a large font the text wraps, never cut. */}
-          {iconOnly ? null : (
+          {noLabel ? null : (
             <Text
               style={[styles.label, disabled && styles.labelDisabled]}
               onTextLayout={
@@ -119,7 +132,7 @@ export function RailButton({
               {label}
             </Text>
           )}
-          {subtitle && !iconOnly && !subtitleBeside ? (
+          {subtitle && !noLabel && !subtitleBeside ? (
             <Text style={styles.subtitle}>{subtitle}</Text>
           ) : null}
         </>
@@ -185,7 +198,7 @@ const styles = StyleSheet.create((theme) => ({
   subtitle: {
     ...theme.type.footnote,
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: RAIL_SUBTITLE_LINE,
     textAlign: 'center',
     color: theme.colors.textDim,
   },
