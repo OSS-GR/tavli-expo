@@ -20,6 +20,7 @@
 import { normalizeInviteCode, type InviteView } from '@tavli/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 
+import { lastModes } from '@/features/home/lastModes';
 import { inviteAccepted } from '@/features/invites/acceptedInvite';
 import { InviteAccountGate } from '@/features/invites/InviteAccountGate';
 import { InviteScreen } from '@/features/invites/InviteScreen';
@@ -36,6 +37,7 @@ function goHome() {
 function accepted(gameId: string) {
   // Listeners such as the dev invite's bot start now.
   inviteAccepted(gameId);
+  lastModes.record('friend');
   router.replace(gameHref(gameId));
 }
 

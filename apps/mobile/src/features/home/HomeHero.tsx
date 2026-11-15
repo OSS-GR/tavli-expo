@@ -1,11 +1,13 @@
 /**
- * The big card at the top of Home (#342): a board picture over a short text
- * and a brass call to action. Home shows the saved game here ("Continue
- * game", with its board as it was left), or else "Play vs bot" over the
- * start position. The whole card is one button; the picture is hidden from
+ * The big card at the top of Home (#342): a board picture over a short text,
+ * with a brass call to action on its right (#517: no empty half under the
+ * text; with a large font the button wraps under it). Home shows your most
+ * important game here (`heroPick.ts`, #517): an online game, a friend's
+ * invite, the saved game ("Continue game"), Play ranked, or "Play vs bot"
+ * over the start position. The whole card is one button; the picture is hidden from
  * screen readers, so the card's label says it all.
  */
-import type { BoardState, Direction } from '@tavli/engine';
+import type { BoardState, Direction, PlayerId } from '@tavli/engine';
 import { withAlpha } from '@tavli/ui';
 import { Text, View, Pressable } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -14,10 +16,12 @@ import { Icon } from '@/components/Icon';
 import { boardLayout, useBoardTheme, useHomeBoardSide } from '@/features/board/BoardCanvas';
 import { StaticBoard } from '@/features/board/StaticBoard';
 
-/** A position to draw, White at the bottom. */
+/** A position to draw. */
 export interface HeroBoard {
   readonly board: BoardState;
   readonly direction: Direction;
+  /** The side at the bottom (default White): your side in an online game. */
+  readonly viewer?: PlayerId;
 }
 
 export interface HomeHeroProps {
@@ -68,7 +72,7 @@ export function HomeHero({
           <View style={styles.board(aspectRatio)}>
             <StaticBoard
               board={board.board}
-              view={{ viewer: 'white', direction: board.direction }}
+              view={{ viewer: board.viewer ?? 'white', direction: board.direction }}
               layout="classic"
               testID={testID ? `${testID}-board` : undefined}
             />
@@ -76,13 +80,15 @@ export function HomeHero({
         </View>
       ) : null}
       <View style={styles.body}>
-        <Text style={styles.eyebrow}>{eyebrow}</Text>
-        <Text style={styles.title}>{title}</Text>
-        {lines.map((line) => (
-          <Text key={line} style={styles.line}>
-            {line}
-          </Text>
-        ))}
+        <View style={styles.texts}>
+          <Text style={styles.eyebrow}>{eyebrow}</Text>
+          <Text style={styles.title}>{title}</Text>
+          {lines.map((line) => (
+            <Text key={line} style={styles.line}>
+              {line}
+            </Text>
+          ))}
+        </View>
         <View style={styles.action}>
           <Icon name="play" size={16} color={theme.colors.onAccent} />
           <Text style={styles.actionText}>{action}</Text>
@@ -91,6 +97,9 @@ export function HomeHero({
     </Pressable>
   );
 }
+
+/** Above this text size the button goes under the text. */
+const SIDE_BY_SIDE_MAX_FONT_SCALE = 1.3;
 
 const styles = StyleSheet.create((theme, rt) => ({
   card: {
@@ -125,10 +134,20 @@ const styles = StyleSheet.create((theme, rt) => ({
     maxWidth: (rt.screen.height * 0.24 - theme.space.xl) * aspectRatio,
     aspectRatio,
   }),
+  // The text and the button side by side. With a large font the button
+  // goes under the text, so neither is squeezed.
   body: {
-    gap: theme.space.xs,
+    ...(rt.fontScale > SIDE_BY_SIDE_MAX_FONT_SCALE
+      ? { flexDirection: 'column' as const, alignItems: 'flex-start' as const }
+      : { flexDirection: 'row' as const, alignItems: 'center' as const }),
+    gap: theme.space.md,
     paddingHorizontal: theme.space.sm,
     paddingBottom: theme.space.sm,
+  },
+  texts: {
+    flexShrink: 1,
+    flexGrow: 1,
+    gap: theme.space.xs,
   },
   eyebrow: {
     ...theme.type.section,
@@ -143,13 +162,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.textDim,
   },
   action: {
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space.sm,
     minHeight: theme.touch.minTarget,
-    marginTop: theme.space.sm,
-    paddingHorizontal: theme.space.xl,
+    paddingHorizontal: theme.space.lg,
     borderRadius: theme.radii.pill,
     backgroundColor: theme.colors.accent,
     boxShadow: `0px 4px 14px ${withAlpha(theme.colors.accent, 0.33)}`,

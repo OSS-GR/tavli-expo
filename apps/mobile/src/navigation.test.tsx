@@ -22,7 +22,8 @@ import { historyStore } from '@/features/history/store';
 import { matchSessions } from '@/features/match/appSessions';
 import { rememberOnlineAccount } from '@/features/online/accountHint';
 import { DEV_BOT_ID, DEV_TICK_MS, devGameRunning, stopAnyDevGame } from '@/features/online/devGame';
-import { lastSetupKey, saveLastSetup } from '@/features/match/lastSetup';
+import { lastModes } from '@/features/home/lastModes';
+import { saveLastSetup } from '@/features/match/lastSetup';
 import { defaultSetup } from '@/features/match/setup';
 import { consentStore } from '@/features/privacy/consentStore';
 import { SAVED_MATCH_KEY } from '@/features/match/savedMatch';
@@ -166,51 +167,6 @@ describe('app navigation', () => {
     expect(screen.getByText('Start a new game?')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Start new' }));
     expect(matchSessions.current()?.setup.mode).toBe('local');
-  });
-
-  it('starts a game vs the bot from its quick start button, with the last choices (#517)', async () => {
-    // Later tests count on the choices the earlier ones left: put them back.
-    const before = storage.getString(lastSetupKey('bot'));
-    saveLastSetup(storage, { ...defaultSetup('bot'), targetPoints: 3 });
-    try {
-      const user = setupUser();
-      const router = await renderRouter('./src/app', { initialUrl: '/' });
-
-      // The chip saves the level for the next start too.
-      await user.press(screen.getByRole('button', { name: 'Bot level: Easy' }));
-      await user.press(screen.getByRole('radio', { name: /^Medium/ }));
-      expect(JSON.parse(storage.getString(lastSetupKey('bot')) ?? '{}').botLevel).toBe('medium');
-
-      await user.press(screen.getByRole('button', { name: 'Play Fevga' }));
-      const session = matchSessions.current()!;
-      expect(session.setup).toMatchObject({
-        mode: 'bot',
-        game: 'fevga',
-        botLevel: 'medium',
-        targetPoints: 3,
-      });
-      expect(router.getPathname()).toBe(`/game/${session.id}`);
-
-      // Back on Home with no save, Fevga is the brass button now.
-      await act(async () => {
-        matchSessions.end(session.id);
-        appRouter.back();
-      });
-      expect(router.getPathname()).toBe('/');
-      expect(
-        within(screen.getByTestId('home-quick-fevga')).getByTestId('home-quick-play-icon', {
-          includeHiddenElements: true,
-        }),
-      ).toBeTruthy();
-      expect(
-        within(screen.getByTestId('home-quick-portes')).queryByTestId('home-quick-play-icon', {
-          includeHiddenElements: true,
-        }),
-      ).toBeNull();
-    } finally {
-      if (before === undefined) storage.remove(lastSetupKey('bot'));
-      else storage.setString(lastSetupKey('bot'), before);
-    }
   });
 
   it('opens match end when the match is over, then rematch, change settings or home', async () => {
@@ -1126,9 +1082,7 @@ describe('play a friend online (#281)', () => {
 
   /** Home → Play a friend → Make an invite. Returns the code of the waiting screen. */
   async function makeInvite(user: ReturnType<typeof setupUser>, router: Router) {
-    await user.press(
-      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     expect(router.getPathname()).toBe('/friend');
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
@@ -1141,9 +1095,7 @@ describe('play a friend online (#281)', () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
     expect(onlineFake.authStore.guests).toBe(0);
-    await user.press(
-      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await user.press(screen.getByRole('radio', { name: /^Asodio/ }));
     await user.press(screen.getByRole('radio', { name: '1' }));
     await pressMakeInvite(user);
@@ -1210,9 +1162,7 @@ describe('play a friend online (#281)', () => {
       .spyOn(onlineFake.invites, 'createInvite')
       .mockRejectedValueOnce(new Error('offline'));
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(
-      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await pressMakeInvite(user);
     expect(
       await screen.findByText('The invite was not made. Check the connection and try again.'),
@@ -1247,9 +1197,7 @@ describe('play a friend online (#281)', () => {
   it('Back from the setup goes Home, and makes no account', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(
-      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await user.press(screen.getByRole('button', { name: 'Back' }));
     expect(router.getPathname()).toBe('/');
     expect(onlineFake.authStore.guests).toBe(0);
@@ -1346,9 +1294,7 @@ describe('your online games on Home (#297)', () => {
   it('after an invite, Home lists the game; a tap opens it', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(
-      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     const code = router.getPathname().split('/').at(-1)!;
@@ -1360,11 +1306,14 @@ describe('your online games on Home (#297)', () => {
     expect(router.getPathname()).toBe(`/game/${gameId}`);
     await act(async () => appRouter.back());
     expect(router.getPathname()).toBe('/');
-    const row = await screen.findByTestId(`online-game-${gameId}`);
-    expect(row).toHaveAccessibleName(
+    // The only game is the hero (#517), not a row under it.
+    const hero = await screen.findByTestId('home-hero-game');
+    expect(hero).toHaveAccessibleName(
       new RegExp(`^Portes vs Guest ${onlineFake.guestNumber('bob')}, `),
     );
-    await user.press(row);
+    expect(screen.queryByTestId(`online-game-${gameId}`)).toBeNull();
+    expect(screen.queryByTestId('home-vs-bot-board', { includeHiddenElements: true })).toBeNull();
+    await user.press(hero);
     expect(router.getPathname()).toBe(`/game/${gameId}`);
     expect(
       await screen.findByTestId('game-board', { includeHiddenElements: true }),
@@ -1374,13 +1323,16 @@ describe('your online games on Home (#297)', () => {
   it('"See all" lists every game, and a tap opens one', async () => {
     onlineFake.authStore.session = { id: ME, isGuest: true };
     rememberOnlineAccount();
-    const ids = [newGame(), newGame(), newGame(), newGame()];
+    const ids = [newGame(), newGame(), newGame(), newGame(), newGame()];
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(await screen.findByRole('link', { name: 'See all (4)' }));
+    // One game in the hero, three rows: "See all" counts all five (#517).
+    expect(await screen.findByTestId('home-hero-game')).toBeOnTheScreen();
+    expect(await screen.findAllByTestId(/^online-game-/)).toHaveLength(3);
+    await user.press(await screen.findByRole('link', { name: 'See all (5)' }));
     expect(router.getPathname()).toBe('/online-games');
     expect(await screen.findByTestId(`online-game-${ids[0]}`)).toBeOnTheScreen();
-    expect(screen.getAllByTestId(/^online-game-/)).toHaveLength(4);
+    expect(screen.getAllByTestId(/^online-game-/)).toHaveLength(5);
     await user.press(screen.getByTestId(`online-game-${ids[0]}`));
     expect(router.getPathname()).toBe(`/game/${ids[0]}`);
   });
@@ -1428,9 +1380,7 @@ describe('save reminders on Home (#404)', () => {
   it('asks a guest to save the account a day after the first guest sign-in', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(
-      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     await act(async () => appRouter.back());
@@ -1449,9 +1399,7 @@ describe('save reminders on Home (#404)', () => {
   it("puts a guest's online wins on the card (#463)", async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(
-      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     await act(async () => appRouter.back());
@@ -1479,9 +1427,7 @@ describe('save reminders on Home (#404)', () => {
   it('asks a player who said Not now on the sign-in sheet to play a friend', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(
-      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await user.press(screen.getByRole('button', { name: 'Make an invite' }));
     await user.press(await screen.findByRole('button', { name: 'Not now' }));
     expect(onlineFake.authStore.guests).toBe(0);
@@ -1500,9 +1446,7 @@ describe('your invites on Home (#314)', () => {
 
   /** Home → Play a friend → Make an invite → Back to Home. Returns the code. */
   async function inviteThenHome(user: ReturnType<typeof setupUser>, router: Router) {
-    await user.press(
-      await screen.findByRole('button', { name: 'Play a friend, Online, with a link' }),
-    );
+    await user.press(await screen.findByRole('button', { name: 'Play a friend, Online' }));
     await pressMakeInvite(user);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     const code = router.getPathname().split('/').at(-1)!;
@@ -1553,7 +1497,9 @@ describe('your invites on Home (#314)', () => {
     await act(async () => {
       gameId = await onlineFake.invitesFor('bob').acceptInvite(code);
     });
-    expect(await screen.findByTestId(`online-game-${gameId}`)).toBeOnTheScreen();
+    // The game is the hero now (#517).
+    expect(await screen.findByTestId('home-hero-game')).toBeOnTheScreen();
+    expect(gameId).not.toBe('');
     expect(screen.queryByTestId('home-invites')).toBeNull();
   });
 });
@@ -1701,6 +1647,43 @@ describe('leaderboards (#407)', () => {
   });
 });
 
+describe("Home's tile news (#517)", () => {
+  it('a saved account sees its rating on Play ranked and a friend request on Friends', async () => {
+    onlineFake.authStore.session = { id: 'me', isGuest: false };
+    rememberOnlineAccount();
+    const server = onlineFake.server();
+    server.markSaved('me');
+    server.markSaved('p2');
+    // A rated match: p2 resigns, so I win.
+    const gameId = server.createGame('me', { white: 'me', black: 'p2' }, 'portes', 3, null);
+    await server.transportFor('p2').resign(gameId);
+    await server.friendsFor('p2').sendRequest('me');
+    const { rating } = await server.ratingsFor('me').mine();
+    expect(rating).toBeGreaterThan(1500);
+
+    await renderRouter('./src/app', { initialUrl: '/' });
+    expect(
+      await screen.findByRole('button', {
+        name: `Play ranked, Rating ${rating} · Find a player now`,
+      }),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Friends, 1 friend request' })).toBeOnTheScreen();
+  });
+
+  it('a guest sees the plain lines, and Home asks for no rating', async () => {
+    onlineFake.authStore.session = { id: 'guest-1', isGuest: true };
+    rememberOnlineAccount();
+    const mine = jest.spyOn(onlineFake.ratings, 'mine');
+    await renderRouter('./src/app', { initialUrl: '/' });
+    expect(
+      await screen.findByRole('button', { name: 'Play ranked, Find a player now' }),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Friends, Add and invite' })).toBeOnTheScreen();
+    expect(mine).not.toHaveBeenCalled();
+    mine.mockRestore();
+  });
+});
+
 describe('play ranked (#532)', () => {
   it('a guest opens Play ranked from Home and sees the save step, not the search', async () => {
     onlineFake.authStore.session = { id: 'g', isGuest: true };
@@ -1741,6 +1724,72 @@ describe('play ranked (#532)', () => {
       });
     }
     await waitFor(() => expect(router.getPathname()).toBe(`/game/${seek.gameId}`));
+    // Home's hero (#517) counts the ranked match.
+    expect(lastModes.modes()).toEqual(['ranked']);
+  });
+});
+
+describe("Home's hero (#517)", () => {
+  const ME = 'guest-1';
+
+  /** A saved bot game on the phone. */
+  function saveBotGame(): string {
+    const session = matchSessions.start({ ...defaultSetup('bot'), targetPoints: 3 });
+    const { dispatch } = session.store.getState();
+    dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+    dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+    return session.id;
+  }
+
+  it('a saved game is the hero with no online game', async () => {
+    saveBotGame();
+    await renderRouter('./src/app', { initialUrl: '/' });
+    expect(await screen.findByTestId('home-continue')).toBeOnTheScreen();
+    expect(screen.queryByTestId('home-saved-game')).toBeNull();
+    // Never "New game" over a Continue card: always More ways to play.
+    expect(screen.getByRole('header', { name: 'More ways to play' })).toBeOnTheScreen();
+    expect(screen.queryByRole('header', { name: 'New game' })).toBeNull();
+  });
+
+  it('an online game beats the saved game, which moves to Your games', async () => {
+    const savedId = saveBotGame();
+    onlineFake.authStore.session = { id: ME, isGuest: true };
+    rememberOnlineAccount();
+    const gameId = onlineFake
+      .server()
+      .createGame(ME, { white: ME, black: 'bob' }, 'portes', 3, null);
+    await act(async () => {
+      await onlineFake.openGame(gameId);
+    });
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    expect(await screen.findByTestId('home-hero-game')).toBeOnTheScreen();
+    expect(screen.queryByTestId('home-continue')).toBeNull();
+    expect(screen.getByRole('header', { name: 'Your games' })).toBeOnTheScreen();
+    // Play vs bot leads More ways to play.
+    expect(screen.getByTestId('home-vs-bot')).toBeOnTheScreen();
+    await user.press(screen.getByTestId('home-saved-game'));
+    expect(router.getPathname()).toBe(`/game/${savedId}`);
+  });
+
+  it('offers Play ranked to a ranked regular, in place of its tile', async () => {
+    lastModes.record('bot');
+    lastModes.record('ranked');
+    lastModes.record('ranked');
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    expect(await screen.findByTestId('home-hero-ranked')).toBeOnTheScreen();
+    expect(screen.queryByTestId('home-ranked')).toBeNull();
+    expect(screen.getByTestId('home-vs-bot')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: /^Play ranked, Find a player/ }));
+    expect(router.getPathname()).toBe('/ranked');
+  });
+
+  it('notes the mode of a match started from New game', async () => {
+    const user = setupUser();
+    await renderRouter('./src/app', { initialUrl: '/new-game?mode=local' });
+    await user.press(await screen.findByRole('button', { name: 'Start game' }));
+    expect(lastModes.modes()).toEqual(['local']);
   });
 });
 

@@ -33,7 +33,8 @@ export type WhatsNewEntryId =
   | 'plakotoFederation'
   | 'matchingColors'
   | 'turnClock'
-  | 'playRanked';
+  | 'playRanked'
+  | 'homeHero';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -49,6 +50,10 @@ export interface WhatsNewRelease {
 
 /** Every release, newest first. */
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    date: '2026-11-15',
+    entries: [{ id: 'homeHero', icon: 'house' }],
+  },
   {
     date: '2026-11-13',
     entries: [

@@ -22,6 +22,8 @@ interface OnlineGameListBase {
   now: number;
   /** At most this many rows. More rows show "See all" (with `onSeeAll`). Default: every row. */
   limit?: number;
+  /** The count on "See all": more than the list when Home's hero holds a game (#517). */
+  total?: number;
   onSeeAll?: () => void;
   onRetry: () => void;
 }
@@ -40,6 +42,7 @@ export function OnlineGameList({
   state,
   now,
   limit,
+  total,
   onOpen,
   renderRows,
   onSeeAll,
@@ -95,7 +98,9 @@ export function OnlineGameList({
           onPress={onSeeAll}
           hitSlop={8}
           style={({ pressed }) => [styles.link, pressed && styles.pressed]}>
-          <Text style={styles.linkText}>{t('home.online.seeAll', { count: games.length })}</Text>
+          <Text style={styles.linkText}>
+            {t('home.online.seeAll', { count: total ?? games.length })}
+          </Text>
         </Pressable>
       ) : null}
       {state.failed ? (

@@ -27,23 +27,11 @@
     },
     "newGame": "New game",
     "moreModes": "More ways to play",
+    "playNow": "Play now",
     "vsBot": {
       "title": "Play vs bot",
       "levels": "{{first}} or {{last}}",
       "levelsSeparator": ", "
-    },
-    "quickStart": {
-      "moreHint": "Opens New game: match length, level and house rules.",
-      "level": "Bot level: {{level}}",
-      "levelHint": "Changes the level for the game buttons.",
-      "play": "Play {{game}}",
-      "playHint": "Starts a match vs the bot at {{level}}.",
-      "alt": {
-        "portes": "Πόρτες",
-        "plakoto": "Πλακωτό",
-        "fevga": "Φεύγα",
-        "tavli": "Τάβλι"
-      }
     },
     "local": {
       "title": "Pass-and-play",
@@ -51,12 +39,14 @@
     },
     "friend": {
       "title": "Play a friend",
-      "subtitle": "Online, with a link",
+      "subtitle": "Online",
       "soon": "Coming soon: play friends online."
     },
     "ranked": {
       "title": "Play ranked",
-      "subtitle": "Find a player now"
+      "subtitle": "Find a player now",
+      "rated": "Rating {{rating}} · Find a player now",
+      "unrated": "Not rated yet · Find a player now"
     },
     "join": {
       "title": "Join with a code",
@@ -64,7 +54,9 @@
     },
     "friends": {
       "title": "Friends",
-      "subtitle": "Add and invite"
+      "subtitle": "Add and invite",
+      "requests_one": "{{count}} friend request",
+      "requests_other": "{{count}} friend requests"
     },
     "ratings": {
       "title": "Leaderboards",
@@ -99,6 +91,21 @@
       "retry": "Try again",
       "seeAll": "See all ({{count}})"
     },
+    "games": {
+      "title": "Your games",
+      "saved": "Saved game · Continue"
+    },
+    "hero": {
+      "play": "Play",
+      "open": "Open",
+      "score": "You {{me}}–{{friend}} · first to {{target}}",
+      "invite": "Invite to you",
+      "seeInvite": "See invite",
+      "rankedRated": "Play ranked · Rating {{rating}}",
+      "findPlayer": "Find a player",
+      "rankedLine": "Rated games · {{minutes}} min turns",
+      "find": "Find"
+    },
     "invites": {
       "title": "Your invites",
       "invite": "Invite",
@@ -114,10 +121,9 @@
     },
     "learn": {
       "title": "Learn to play",
-      "subtitle": "A one-minute lesson on the board",
+      "subtitle": "A one-minute lesson on the board: move, hit and bear off.",
       "start": "Start the lesson",
-      "dismiss": "Not now",
-      "startShort": "Start"
+      "dismiss": "Not now"
     },
     "reminder": {
       "guest": {
@@ -1103,6 +1109,11 @@
         "title": "Play ranked",
         "body": "Play a new player close to your rating, live, with two minutes a turn. Each match changes your rating.",
         "where": "Home › Play ranked"
+      },
+      "homeHero": {
+        "title": "What to play next",
+        "body": "The top of Home shows your next step: an online game where it is your turn, an invite from a friend, your saved game, or a quick game. Your games are listed together below it.",
+        "where": "Home"
       }
     }
   },

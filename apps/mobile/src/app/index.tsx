@@ -1,19 +1,27 @@
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { anyGameLevels } from '@/features/bot/levels';
 import { ContinueCard } from '@/features/home/ContinueCard';
 import { GuestReminderCard } from '@/features/home/GuestReminderCard';
-import { HomeFriendInvites } from '@/features/home/HomeFriendInvites';
+import { HomeFriendInvites, useFriendInvites } from '@/features/home/HomeFriendInvites';
+import {
+  InviteHero,
+  OnlineGameHero,
+  RankedHero,
+  SavedGameRow,
+} from '@/features/home/HomeHeroCards';
 import { HomeInvites } from '@/features/home/HomeInvites';
 import { HomeOnlineGames } from '@/features/home/HomeOnlineGames';
 import { HomeScreen } from '@/features/home/HomeScreen';
+import { heroGameId, pickHero } from '@/features/home/heroPick';
+import { lastModes } from '@/features/home/lastModes';
 import { LearnCard } from '@/features/home/LearnCard';
 import { ReminderCard } from '@/features/home/ReminderCard';
-import { QUICK_START_GAMES } from '@/features/home/QuickStartHero';
+import { useTileNews } from '@/features/home/useTileNews';
+import { INVITE_TICK_MS } from '@/features/invites/myInvites';
 import { matchSessions } from '@/features/match/appSessions';
-import { loadLastSetup, saveLastSetup } from '@/features/match/lastSetup';
 import {
   FRIEND_HREF,
   FRIENDS_HREF,
@@ -30,24 +38,18 @@ import {
   tutorialHref,
 } from '@/features/match/routes';
 import type { SavedMatch } from '@/features/match/savedMatch';
-import { isGameOpen, sanitizeSetup, type MatchSetup } from '@/features/match/setup';
 import { continueSummary } from '@/features/match/summary';
 import { hasOnlineAccount } from '@/features/online/accountHint';
+import { listTickMs, useMyOnlineGames, usePhoneClock } from '@/features/online/myGames';
 import { reminders } from '@/features/reminders/reminders';
 import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
 import { whatsNewSeen } from '@/features/whats-new/seen';
-import {
-  auth,
-  botLevels,
-  friends,
-  games,
-  invites,
-  matchmaking,
-  ratings,
-  storage,
-} from '@/services';
+import { auth, botLevels, friends, games, invites, matchmaking, ratings } from '@/services';
+
+/** How often the invite hero's time left updates. */
+const INVITE_HERO_TICK_MS = INVITE_TICK_MS;
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -74,12 +76,8 @@ export default function HomeRoute() {
   const [onlineAccount, setOnlineAccount] = useState(hasOnlineAccount);
   // What's new (#471): the dot and the heartbeat until the page opens.
   const [whatsNewFresh, setWhatsNewFresh] = useState(() => whatsNewSeen.due());
-  // The last choices vs the bot (#517): the quick start card starts a
-  // match with them, so one tap plays the game with the last length,
-  // level and house rules.
-  const [botSetup, setBotSetup] = useState<MatchSetup>(() =>
-    loadLastSetup(storage, 'bot', botLevels),
-  );
+  // Play ranked in the hero for a ranked regular (#517).
+  const [rankedRegular, setRankedRegular] = useState(() => lastModes.rankedRegular());
   const focused = useIsFocused();
   // Read them again each time Home shows (back from a game or an invite).
   useFocusEffect(
@@ -90,7 +88,7 @@ export default function HomeRoute() {
       setSlot(readSlot());
       setOnlineAccount(hasOnlineAccount());
       setWhatsNewFresh(whatsNewSeen.due());
-      setBotSetup(loadLastSetup(storage, 'bot', botLevels));
+      setRankedRegular(lastModes.rankedRegular());
     }, []),
   );
   const { saved } = slot;
@@ -103,24 +101,81 @@ export default function HomeRoute() {
     auth: invites === undefined ? undefined : auth,
   });
   const { card } = reminder;
+  // Your rating on Play ranked and the friend requests on Friends (#517).
+  const news = useTileNews({ auth, ratings, friends, enabled: onlineAccount, focused });
+  // Your games and the friend invites to you (#297, #486), for the hero
+  // and the lists under it (#517). None on a phone with no online account.
+  const online = useMyOnlineGames(onlineAccount ? auth : undefined, games);
+  const friendInvites = useFriendInvites(onlineAccount ? auth : undefined, friends, focused);
+  const onlineList = online.state.status === 'loaded' ? online.state.games : [];
+  const offset = online.state.status === 'loaded' ? online.state.offset : 0;
+  const pick = pickHero({
+    games: onlineList,
+    friendInvites,
+    hasSave: saved !== null,
+    rankedRegular: rankedRegular && matchmaking !== undefined,
+  });
+  const inHero = heroGameId(pick);
+  const heroGame = pick.kind === 'turn' || pick.kind === 'waiting' ? pick.game : null;
+  // The hero's clock and the invite's ticks while Home is in view.
+  const heroNow = usePhoneClock(
+    heroGame !== null
+      ? listTickMs([heroGame])
+      : pick.kind === 'invite'
+        ? INVITE_HERO_TICK_MS
+        : null,
+    focused,
+  );
+  const savedSummary = saved ? continueSummary(saved, t, slot.now) : null;
+  const openSaved = saved ? () => router.push(gameHref(saved.id)) : () => {};
+
+  let hero: ReactNode = null;
+  if (heroGame !== null && games !== undefined) {
+    hero = (
+      <OnlineGameHero
+        games={games}
+        game={heroGame}
+        now={heroNow}
+        offset={offset}
+        onPress={() => router.push(gameHref(heroGame.gameId))}
+      />
+    );
+  } else if (pick.kind === 'invite') {
+    const { code } = pick.invite;
+    hero = (
+      <InviteHero
+        invite={pick.invite}
+        now={heroNow}
+        onPress={() => router.push(inviteHref(code))}
+      />
+    );
+  } else if (pick.kind === 'saved' && saved && savedSummary) {
+    hero = (
+      <ContinueCard
+        summary={savedSummary}
+        board={{
+          board: saved.flow.game.state.board,
+          direction: saved.flow.game.state.rules.movement.direction,
+        }}
+        onPress={openSaved}
+      />
+    );
+  } else if (pick.kind === 'ranked') {
+    hero = <RankedHero rating={news.rating} onPress={() => router.push(RANKED_HREF)} />;
+  }
+  // The saved game is in "Your games" when the hero is another game.
+  const savedRow =
+    saved && savedSummary && pick.kind !== 'saved' ? (
+      <SavedGameRow summary={savedSummary} vsBot={saved.setup.mode === 'bot'} onPress={openSaved} />
+    ) : null;
 
   return (
     <HomeScreen
       botLevels={anyGameLevels(botLevels)}
       hour={new Date(slot.now).getHours()}
       notice={slot.broken ? t('home.continue.broken') : null}
-      continueCard={
-        saved ? (
-          <ContinueCard
-            summary={continueSummary(saved, t, slot.now)}
-            board={{
-              board: saved.flow.game.state.board,
-              direction: saved.flow.game.state.rules.movement.direction,
-            }}
-            onPress={() => router.push(gameHref(saved.id))}
-          />
-        ) : null
-      }
+      hero={hero}
+      heroRanked={pick.kind === 'ranked'}
       reminderCard={
         card ? (
           card.kind === 'guest' && auth !== undefined && games !== undefined ? (
@@ -150,15 +205,15 @@ export default function HomeRoute() {
         ) : null
       }
       onlineGames={
-        onlineAccount && auth !== undefined && games !== undefined ? (
-          <HomeOnlineGames
-            auth={auth}
-            games={games}
-            focused={focused}
-            onOpen={(gameId) => router.push(gameHref(gameId))}
-            onSeeAll={() => router.push(ONLINE_GAMES_HREF)}
-          />
-        ) : null
+        <HomeOnlineGames
+          state={online.state}
+          retry={online.retry}
+          heroGameId={inHero}
+          saved={savedRow}
+          focused={focused}
+          onOpen={(gameId) => router.push(gameHref(gameId))}
+          onSeeAll={() => router.push(ONLINE_GAMES_HREF)}
+        />
       }
       invites={
         onlineAccount && auth !== undefined && invites !== undefined ? (
@@ -171,14 +226,14 @@ export default function HomeRoute() {
         ) : null
       }
       friendInvites={
-        onlineAccount && auth !== undefined && friends !== undefined ? (
-          <HomeFriendInvites
-            auth={auth}
-            friends={friends}
-            focused={focused}
-            onOpen={(code) => router.push(inviteHref(code))}
-          />
-        ) : null
+        <HomeFriendInvites
+          invites={
+            pick.kind === 'invite'
+              ? friendInvites.filter((invite) => invite.code !== pick.invite.code)
+              : friendInvites
+          }
+          onOpen={(code) => router.push(inviteHref(code))}
+        />
       }
       learnCard={
         showLearn ? (
@@ -189,24 +244,6 @@ export default function HomeRoute() {
         ) : null
       }
       onNewGame={(mode) => router.push(newGameHref(mode))}
-      quickStart={{
-        games: QUICK_START_GAMES.filter((game) => isGameOpen(game, 'bot', botLevels)),
-        last: botSetup.game,
-        level: botSetup.botLevel,
-      }}
-      onBotLevel={(botLevel) => {
-        // Cleaned like a start: a level the last game lacks becomes its easiest.
-        const next = sanitizeSetup({ ...botSetup, botLevel }, 'bot', botLevels);
-        saveLastSetup(storage, next);
-        setBotSetup(next);
-      }}
-      onQuickStart={(game) => {
-        // The game's own levels decide: a level it lacks becomes its easiest.
-        const setup = sanitizeSetup({ ...botSetup, game }, 'bot', botLevels);
-        saveLastSetup(storage, setup);
-        const session = matchSessions.start(setup);
-        router.push(gameHref(session.id));
-      }}
       onSettings={() => router.push('/settings')}
       onWhatsNew={() => router.push(WHATS_NEW_HREF)}
       whatsNewFresh={whatsNewFresh}
@@ -220,6 +257,8 @@ export default function HomeRoute() {
       // a phone with no account can do, so the tiles show to everyone.
       onFriends={auth && friends ? () => router.push(FRIENDS_HREF) : undefined}
       onRatings={auth && ratings ? () => router.push(RATINGS_HREF) : undefined}
+      {...(news.rating === undefined ? {} : { rankedRating: news.rating })}
+      friendRequests={news.friendRequests}
     />
   );
 }

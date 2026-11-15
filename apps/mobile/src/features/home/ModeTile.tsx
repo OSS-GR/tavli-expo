@@ -1,33 +1,33 @@
 /**
- * A play mode on Home (#342): an icon, a title and a short line. `wide`
- * tiles fill the row (icon left, chevron right); the others share it two by
- * two and fall back to one per row with a large font (`cell` in
- * `HomeScreen`). A locked tile keeps its full target, so a tap can still
- * say "Coming soon".
- *
- * The Figma pass (#517): a tray with the brass line icon on it (no dark
- * badge) and the title in Piazzolla. Brass fill is for the one main button
- * of Home, so no tile has it.
+ * A play mode on Home (#342): an icon, a title and a short line, side by
+ * side (#517: compact, so no tile has an empty half). `wide` tiles fill the
+ * row and get a chevron; the others share it two by two and fall back to
+ * one per row with a large font (`inRows` in `HomeScreen`). A locked tile
+ * keeps its full target, so a tap can still say "Coming soon".
  */
 import { Pressable, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/icons';
-import { surfaceStyle } from '@/components/Surface';
 
-/** `open`: a tray. `locked`: dashed, with a chip. */
-export type ModeTileKind = 'open' | 'locked';
+/** `primary`: brass. `secondary`: walnut. `locked`: dashed, with a chip. */
+export type ModeTileKind = 'primary' | 'secondary' | 'locked';
 
 export interface ModeTileProps {
   title: string;
   subtitle?: string;
   icon: IconName;
   kind?: ModeTileKind;
-  /** Fills the row, with the icon on the left. */
+  /** Fills the row, with a chevron on the right. */
   wide?: boolean;
+  /** The line is news to act on (a friend request): brass. */
+  highlight?: boolean;
   /** The chip of a locked tile, for example "Coming soon". */
   chip?: string;
+  /** `link` for a page to read (How to play, History). Default: `button`. */
+  accessibilityRole?: 'button' | 'link';
+  accessibilityHint?: string;
   onPress: () => void;
   testID?: string;
 }
@@ -36,77 +36,156 @@ export function ModeTile({
   title,
   subtitle,
   icon,
-  kind = 'open',
+  kind = 'secondary',
   wide = false,
   chip,
+  highlight = false,
+  accessibilityRole = 'button',
+  accessibilityHint,
   onPress,
   testID,
 }: ModeTileProps) {
   const { theme } = useUnistyles();
   const locked = kind === 'locked';
   const label = [title, subtitle, locked ? chip : undefined].filter(Boolean).join(', ');
+  const iconColor =
+    kind === 'primary'
+      ? theme.colors.accent
+      : locked
+        ? theme.colors.textDisabled
+        : theme.colors.turnText;
   return (
     <Pressable
       testID={testID}
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
       accessibilityLabel={label}
+      {...(accessibilityHint ? { accessibilityHint } : {})}
       accessibilityState={{ disabled: locked }}
       onPress={onPress}
-      style={({ pressed }) => [styles.tile(locked, wide), pressed && styles.pressed]}>
-      <Icon
-        name={icon}
-        size={28}
-        color={locked ? theme.colors.textDisabled : theme.colors.accentLight}
-      />
-      <View style={styles.texts(wide)}>
-        <Text style={styles.title(locked)}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle(locked)}>{subtitle}</Text> : null}
+      style={({ pressed }) => [styles.tile(kind, wide), pressed && styles.pressed]}>
+      <View style={styles.badge(kind)}>
+        <Icon name={icon} size={BADGE_ICON} color={iconColor} />
+      </View>
+      <View style={styles.texts}>
+        <Text style={styles.title(kind, wide)}>{title}</Text>
+        {subtitle ? (
+          <Text style={[styles.subtitle(kind, wide), highlight && styles.highlight]}>
+            {subtitle}
+          </Text>
+        ) : null}
         {locked && chip ? (
           <View style={styles.chip}>
             <Text style={styles.chipText}>{chip}</Text>
           </View>
         ) : null}
       </View>
-      {wide && !locked ? <Icon name="chevronRight" size={20} color={theme.colors.textDim} /> : null}
+      {wide && !locked ? (
+        <Icon
+          name="chevronRight"
+          size={20}
+          color={kind === 'primary' ? theme.colors.onAccent : theme.colors.textDim}
+        />
+      ) : null}
     </Pressable>
   );
+}
+
+/** The icon badge and its icon, in points. Home's banner uses them too. */
+export const BADGE = 32;
+export const BADGE_ICON = 18;
+
+interface TileTheme {
+  colors: { border: string; surface: string; surfaceSelected: string };
+  radii: { xl: number };
+}
+
+/**
+ * The walnut tile: edge, fill, corners and shadow. Every card in Home's
+ * lower half uses it (#517), so the tiles, the lesson banner and the links
+ * look alike.
+ */
+export function tileSurface(theme: TileTheme) {
+  return {
+    borderRadius: theme.radii.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    backgroundImage: `linear-gradient(160deg, ${theme.colors.surfaceSelected} 0%, ${theme.colors.surface} 70%)`,
+    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
+  };
 }
 
 const styles = StyleSheet.create((theme) => ({
   // A wide tile fills its row; a narrow one fills its cell's height, so two
   // tiles side by side match.
-  tile: (locked: boolean, wide: boolean) => ({
-    ...(locked
+  tile: (kind: ModeTileKind, wide: boolean) => ({
+    ...(kind === 'secondary' ? tileSurface(theme) : {}),
+    ...(wide ? { width: '100%' as const } : { flexGrow: 1 }),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wide ? theme.space.md : theme.space.sm,
+    paddingVertical: theme.space.md,
+    paddingHorizontal: theme.space.md,
+    ...(kind === 'primary'
       ? {
-          borderRadius: theme.radii.tray,
+          borderRadius: theme.radii.xl,
+          borderWidth: 1,
+          borderColor: theme.colors.accent,
+          backgroundColor: theme.colors.accent,
+          boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
+        }
+      : {}),
+    ...(kind === 'locked'
+      ? {
+          borderRadius: theme.radii.xl,
           borderWidth: 2,
           borderStyle: 'dashed' as const,
           borderColor: theme.colors.border,
+          backgroundColor: 'transparent',
         }
-      : surfaceStyle(theme, 'tray')),
-    ...(wide ? { width: '100%' as const } : { flexGrow: 1, minHeight: 118 }),
-    flexDirection: wide ? 'row' : 'column',
-    alignItems: wide ? 'center' : 'flex-start',
-    gap: wide ? theme.space.md : 10,
-    padding: theme.space.lg,
+      : {}),
   }),
   pressed: {
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
-  texts: (wide: boolean) => ({
-    flex: wide ? 1 : undefined,
-    alignSelf: wide ? undefined : 'stretch',
+  badge: (kind: ModeTileKind) => ({
+    width: BADGE,
+    height: BADGE,
+    borderRadius: theme.radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: kind === 'primary' ? theme.colors.onAccent : theme.colors.backgroundDeep,
+  }),
+  texts: {
+    flex: 1,
+    minWidth: 0,
     gap: theme.space.xxs,
+  },
+  // Two tiles share a row, so their text is a step smaller than a wide
+  // tile's: "Pass-and-play" fits on one line next to the badge.
+  title: (kind: ModeTileKind, wide: boolean) => ({
+    ...(wide ? theme.type.bodyStrong : { ...theme.type.callout, fontWeight: '600' as const }),
+    color:
+      kind === 'primary'
+        ? theme.colors.onAccent
+        : kind === 'locked'
+          ? theme.colors.textDisabled
+          : theme.colors.text,
   }),
-  title: (locked: boolean) => ({
-    ...theme.type.title3,
-    color: locked ? theme.colors.textDisabled : theme.colors.text,
+  subtitle: (kind: ModeTileKind, wide: boolean) => ({
+    ...(wide ? theme.type.caption : theme.type.footnote),
+    color:
+      kind === 'primary'
+        ? theme.colors.onAccent
+        : kind === 'locked'
+          ? theme.colors.textDisabled
+          : theme.colors.textDim,
   }),
-  subtitle: (locked: boolean) => ({
-    ...theme.type.footnote,
-    color: locked ? theme.colors.textDisabled : theme.colors.textDim,
-  }),
+  highlight: {
+    color: theme.colors.accentLight,
+    fontWeight: '600',
+  },
   chip: {
     alignSelf: 'flex-start',
     marginTop: theme.space.xs,
