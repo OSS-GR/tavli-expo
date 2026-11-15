@@ -66,6 +66,16 @@ export const APPLE_BUNDLE_IDS = ['com.tavlaki', 'com.tavlaki.dev', 'com.tavlaki.
  *   (`keyPlugin.ts`, #397): `/link-social` never checks that a key is
  *   free, and `/unlink-account` does not know our last-key rule.
  */
+/**
+ * How long a session lasts with no use, in seconds: a year. Each day the
+ * app uses it, the server moves the end a year on (`SESSION_UPDATE_AGE_S`).
+ * Better Auth's default is 7 days: a guest with no key who did not play
+ * for a week lost the account for good, and Home said only "did not load".
+ */
+export const SESSION_EXPIRES_IN_S = 365 * 24 * 60 * 60;
+/** How old a session gets before a use moves its end on, in seconds. */
+export const SESSION_UPDATE_AGE_S = 24 * 60 * 60;
+
 const DISABLED_PATHS = ['/delete-anonymous-user', '/link-social', '/unlink-account'];
 
 let appleKeys: JWTVerifyGetKey | null = null;
@@ -178,6 +188,7 @@ export function createAuth(ctx: AuthCtx) {
     trustedOrigins: APP_ORIGINS,
     disabledPaths: DISABLED_PATHS,
     database: authComponent.adapter(ctx),
+    session: { expiresIn: SESSION_EXPIRES_IN_S, updateAge: SESSION_UPDATE_AGE_S },
     account: {
       // A key never joins a user just because the emails match.
       accountLinking: { disableImplicitLinking: true },

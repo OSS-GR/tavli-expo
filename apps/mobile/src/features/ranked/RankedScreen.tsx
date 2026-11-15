@@ -74,7 +74,7 @@ import { UsernameForm } from '@/features/online/UsernameForm';
 import { termsUrl } from '@/features/online/usernameStep';
 import { ReportOrBlock, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
-import { RankedTable, type TablePlayer } from './RankedTable';
+import { RankedTable } from './RankedTable';
 import { agreeRankedRules, hasAgreedRankedRules } from './rankedRules';
 import {
   RankedFooterNote,
@@ -229,11 +229,7 @@ function RankedGate({
   return (
     <>
       <View testID="ranked-gate" style={styles.gate}>
-        <RankedTable
-          width={Math.min(width - 64, 240)}
-          me={{ key: 'me', name: null }}
-          opponent={null}
-        />
+        <RankedTable width={Math.min(width - 64, 240)} opponent={null} />
         <Text style={styles.gateTitle} accessibilityRole="header">
           {t('ranked.gate.title')}
         </Text>
@@ -470,7 +466,6 @@ function RankedSaved({
   useAnnouncement(said);
 
   const meKey = `me:${username ?? ''}`;
-  const me: TablePlayer = { key: meKey, name: username };
 
   const find = () => {
     if (!hasAgreedRankedRules()) {
@@ -536,7 +531,6 @@ function RankedSaved({
               onGame={setGame}
               rating={mine?.rating ?? null}
               tableWidth={Math.min(tableWidth, 240)}
-              me={me}
             />
           </>
         ) : state.kind === 'searching' && range !== null ? (
@@ -563,7 +557,6 @@ function RankedSaved({
               waitedMs={waited}
               range={range}
               tableWidth={tableWidth}
-              me={me}
             />
           )
         ) : state.kind === 'matched' ? (

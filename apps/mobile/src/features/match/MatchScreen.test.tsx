@@ -95,9 +95,13 @@ describe('<MatchScreen /> vs bot', () => {
     await show(s).view;
 
     expect(within(screen.getByTestId('strip-bottom')).getByText('You')).toBeOnTheScreen();
-    // The bot's seat: its name, then the level and the game (#499).
+    // The bot's seat: its name, then the level (#499). In portrait the game
+    // name sits under the score, between the seats.
     expect(within(screen.getByTestId('strip-top')).getByText('Bot')).toBeOnTheScreen();
-    expect(within(screen.getByTestId('strip-top')).getByText('Easy · Portes')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('strip-top')).getByText('Easy')).toBeOnTheScreen();
+    expect(
+      screen.getByTestId('game-score-name', { includeHiddenElements: true }),
+    ).toHaveTextContent('Portes');
     await user.press(button('Roll to start, or swipe the board'));
     const opening = game(s).opening;
     expect(opening?.ties.length || (opening?.white !== null && opening?.black !== null)).toBe(true);

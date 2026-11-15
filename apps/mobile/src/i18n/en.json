@@ -1089,6 +1089,11 @@
         "title": "Play ranked",
         "body": "Play a new player close to your rating, live, with two minutes a turn. Each match changes your rating.",
         "where": "Home › Play ranked"
+      },
+      "gameLayout": {
+        "title": "A roomier game screen",
+        "body": "Both players sit together above the board, and the buttons are round and centered under it. Turn the phone and the board keeps its size.",
+        "where": "Any game"
       }
     }
   },
@@ -1258,10 +1263,7 @@
       "turnOf": "{{name}}’s turn",
       "toEnter": "{{count}} to enter",
       "frozen": "Army frozen",
-      "of": "of {{target}}",
-      "diceLeft_one": "{{dice}}, {{count}} move left",
-      "diceLeft_other": "{{dice}}, {{count}} moves left",
-      "diceDone": "{{dice}}, all played"
+      "firstTo": "first to {{target}}"
     },
     "hint": {
       "button": "Hint",

@@ -920,7 +920,6 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(timeText()).toHaveTextContent('0:10');
       expect(timeText()).toHaveStyle({ color: colors.problem });
       expect(arc('strip-bottom')?.props.color).toBe(colors.problem);
-      expect(screen.getByTestId('strip-bottom')).toHaveStyle({ borderColor: colors.problem });
       expect(screen.getByTestId('strip-bottom').props.accessibilityLabel).toMatch(
         /Play now, or you lose this game/,
       );

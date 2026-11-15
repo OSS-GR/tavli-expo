@@ -94,26 +94,32 @@ afterEach(async () => {
 });
 
 describe('<GameScreen /> board layouts (#184)', () => {
-  it('starts with the tall board: the menu in the top strip, the game label in the menu', async () => {
+  it('starts with the tall board: both seats on top, the game label in the menu', async () => {
     expect(DEFAULT_SETTINGS.boardLayout).toBe('tall');
     await show(newStore('portes', 3), 'tall', 'Game 1 · Portes');
     expect(screen.queryByTestId('game-label')).toBeNull();
-    // The strips sit above and below the board area, not in it.
+    // The seats sit above the board area, not in it, and none below it.
     const middle = screen.getByTestId('game-middle');
     expect(within(middle).queryByTestId('strip-top')).toBeNull();
     expect(within(middle).queryByTestId('strip-bottom')).toBeNull();
-    // The menu button and the top strip share one row.
-    const menu = screen.getByTestId('menu-button');
-    expect(menu.parent).toBe(screen.getByTestId('strip-top').parent?.parent);
+    // One row: the menu, your seat, the score, the other seat (Figma "18").
+    const row = screen.getByTestId('menu-button').parent;
+    const ids = row?.children.map((c) => (typeof c === 'string' ? c : c.props.testID));
+    expect(ids).toEqual(['menu-button', 'strip-bottom', 'game-score', 'strip-top']);
+    // The round buttons sit under the board, after it.
+    const content = screen.getByTestId('game-content').children;
+    expect(content.indexOf(screen.getByTestId('game-controls'))).toBeGreaterThan(
+      content.findIndex((c) => typeof c !== 'string' && within(c).queryByTestId('game-middle')),
+    );
   });
 
-  it('shows the classic board in the middle, with its strips and the game label', async () => {
+  it('shows the classic board in the middle, alone, with the game label on top', async () => {
     await setSettings({ boardLayout: 'classic' });
     await show(newStore('portes', 3), 'classic', 'Game 1 · Portes');
     expect(screen.getByTestId('game-label')).toHaveTextContent('Game 1 · Portes');
     const middle = screen.getByTestId('game-middle');
-    expect(within(middle).getByTestId('strip-top')).toBeOnTheScreen();
-    expect(within(middle).getByTestId('strip-bottom')).toBeOnTheScreen();
+    expect(within(middle).queryByTestId('strip-top')).toBeNull();
+    expect(within(middle).queryByTestId('strip-bottom')).toBeNull();
     expect(within(middle).getByTestId('game-board', hidden)).toBeTruthy();
     // The buttons stay at the bottom, under the middle.
     expect(within(middle).queryByRole('button', { name: /^Roll/ })).toBeNull();
@@ -191,7 +197,7 @@ describe('<GameScreen /> board layouts (#184)', () => {
     await act(async () => {
       settingsStore.getState().setSetting('boardLayout', 'classic');
     });
-    expect(within(screen.getByTestId('game-middle')).getByTestId('strip-top')).toBeOnTheScreen();
+    expect(screen.getByTestId('game-board-frame').props.style).toMatchObject({ width: '100%' });
     // The new board measures its space again.
     await act(async () => {
       fireEvent(screen.getByTestId('game-board', hidden), 'layout', {
