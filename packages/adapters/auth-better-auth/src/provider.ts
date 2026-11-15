@@ -254,6 +254,12 @@ export function fromBetterAuthClient(
   let loading: Promise<AuthUser | null> | null = null;
   /** The session load failed on the network: a guest sign-in must not replace a saved session. */
   let loadFailed = false;
+  /**
+   * Whether the last session load got an answer from the server: `true`
+   * with a session or a plain "none", `false` when it failed, `null`
+   * while it runs.
+   */
+  let answered: boolean | null = null;
   let signingIn: Promise<AuthUser> | null = null;
   let fetching: Promise<string | null> | null = null;
   /** Goes up each time the user changes, so a token fetched for an old user is dropped. */
@@ -277,20 +283,35 @@ export function fromBetterAuthClient(
   }
 
   function ready(): Promise<AuthUser | null> {
-    loading ??= client.getSession(NO_THROW).then(
-      ({ data, error }) => {
-        if (data?.user) set(toUser(data.user));
-        // No HTTP status: the server was not reached. The next call loads again.
-        else if (error !== null && typeof error.status !== 'number') failLoad();
-        else loadFailed = false;
-        return copy(user);
-      },
-      () => {
-        failLoad();
-        return copy(user);
-      },
-    );
+    if (loading === null) {
+      answered = null;
+      loading = client.getSession(NO_THROW).then(
+        ({ data, error }) => {
+          if (data?.user) set(toUser(data.user));
+          // No HTTP status: the server was not reached. The next call loads again.
+          else if (error !== null && typeof error.status !== 'number') failLoad();
+          else loadFailed = false;
+          answered = Boolean(data?.user) || error === null;
+          return copy(user);
+        },
+        () => {
+          failLoad();
+          answered = false;
+          return copy(user);
+        },
+      );
+    }
     return loading.then(() => copy(user));
+  }
+
+  async function loadSession(): Promise<AuthUser | null> {
+    // The last load got no answer: ask again.
+    if (answered === false) loading = null;
+    const found = await ready();
+    if (found === null && answered !== true) {
+      throw authError(null, 'could not load the session');
+    }
+    return found;
   }
 
   function failLoad(): void {
@@ -438,6 +459,7 @@ export function fromBetterAuthClient(
 
   return {
     ready,
+    loadSession,
     currentUser: () => copy(user),
     signInAsGuest() {
       // Two taps at once make one guest, not two: the second finds the first's user.

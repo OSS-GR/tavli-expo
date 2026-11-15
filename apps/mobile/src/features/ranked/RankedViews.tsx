@@ -36,18 +36,10 @@ export function waitText(ms: number): string {
 }
 
 /** The table, its width taken from the screen. */
-function Table({
-  width,
-  me,
-  opponent,
-}: {
-  width: number;
-  me: TablePlayer;
-  opponent: TablePlayer | null;
-}) {
+function Table({ width, opponent }: { width: number; opponent: TablePlayer | null }) {
   return (
     <View style={styles.table}>
-      <RankedTable testID="ranked-table" width={width} me={me} opponent={opponent} />
+      <RankedTable testID="ranked-table" width={width} opponent={opponent} />
     </View>
   );
 }
@@ -58,10 +50,9 @@ export interface RankedSetupProps {
   /** Your rating, or `null` while it loads. */
   rating: number | null;
   tableWidth: number;
-  me: TablePlayer;
 }
 
-export function RankedSetup({ game, onGame, rating, tableWidth, me }: RankedSetupProps) {
+export function RankedSetup({ game, onGame, rating, tableWidth }: RankedSetupProps) {
   const { t } = useTranslation();
   const options: readonly SegmentOption<RankedGame>[] = RANKED_GAMES.map((value) => ({
     value,
@@ -70,7 +61,7 @@ export function RankedSetup({ game, onGame, rating, tableWidth, me }: RankedSetu
   return (
     <>
       <View testID="ranked-setup" style={styles.hero}>
-        <Table width={tableWidth} me={me} opponent={null} />
+        <Table width={tableWidth} opponent={null} />
         <Text style={styles.heroTitle} accessibilityRole="header">
           {t('ranked.setup.title')}
         </Text>
@@ -118,14 +109,13 @@ export interface RankedSearchingProps {
   waitedMs: number;
   range: RatingRange;
   tableWidth: number;
-  me: TablePlayer;
 }
 
-export function RankedSearching({ game, waitedMs, range, tableWidth, me }: RankedSearchingProps) {
+export function RankedSearching({ game, waitedMs, range, tableWidth }: RankedSearchingProps) {
   const { t } = useTranslation();
   return (
     <View testID="ranked-searching" style={styles.stack}>
-      <Table width={tableWidth} me={me} opponent={null} />
+      <Table width={tableWidth} opponent={null} />
       <View style={styles.centered}>
         <Text style={styles.title} accessibilityRole="header">
           {t('ranked.searching.title')}
@@ -254,11 +244,7 @@ export function RankedMatched({
   const opponentKey = `opponent:${name}`;
   return (
     <View testID="ranked-matched" style={styles.stack}>
-      <Table
-        width={tableWidth}
-        me={{ key: meKey, name: myName }}
-        opponent={{ key: opponentKey, name }}
-      />
+      <Table width={tableWidth} opponent={{ key: opponentKey }} />
       <View style={styles.centered}>
         <Text style={styles.kicker}>{t('ranked.matched.kicker')}</Text>
         <Text testID="ranked-opponent-name" style={styles.title} accessibilityRole="header">
