@@ -66,6 +66,32 @@ export function isTurnTimeMinutes(turnTimeMinutes: number | null): boolean {
 export type OnlineGameStatus = 'active' | 'finished';
 
 /**
+ * The turn time of every Play ranked game, in minutes (ADR-0009): one
+ * clock for the roll and the moves together. There is no other choice.
+ */
+export const RANKED_TURN_TIME_MINUTES = 2;
+
+/**
+ * In a ranked match, this many time outs in a row by the same player
+ * lose them the whole match (ADR-0009, #529). A turn they play resets
+ * the count. Friend games never end this way.
+ */
+export const RANKED_TIMEOUTS_TO_LOSE = 2;
+
+/**
+ * Why a finished match ended (#529):
+ * - `points`: a player reached the match length (a time out that takes
+ *   the other player there counts too).
+ * - `resigned`: a player resigned the match (`match.resignedBy`).
+ * - `timeouts-in-a-row`: in a ranked match, `match.resignedBy` ran out of
+ *   time `RANKED_TIMEOUTS_TO_LOSE` turns in a row. The server ends the
+ *   match as a resign of theirs, so the score is the same as a resign.
+ */
+export const ONLINE_MATCH_END_REASONS = ['points', 'resigned', 'timeouts-in-a-row'] as const;
+
+export type OnlineMatchEndReason = (typeof ONLINE_MATCH_END_REASONS)[number];
+
+/**
  * What a client may see of one online game. It never holds dice that are
  * not rolled yet: the server rolls each roll when its player asks
  * (`rollDice`, #355).
@@ -84,6 +110,11 @@ export interface OnlineGameView {
    * (the async behaviour, #183).
    */
   readonly turnTimeMinutes: number | null;
+  /**
+   * True for a Play ranked game (ADR-0009, #529): two time outs in a row
+   * by the same player lose the match. False for a friend game.
+   */
+  readonly ranked: boolean;
   /**
    * When the turn of `waitingFor` runs out, in epoch milliseconds (server
    * clock). Then `waitingFor` loses the current game. `null` when finished.
@@ -120,6 +151,12 @@ export interface OnlineGameView {
   readonly previousGame: GameFlow | null;
   /** The side the server waits for (to roll, to move, or to answer). `null` when finished. */
   readonly waitingFor: PlayerId | null;
+  /**
+   * Why the match ended (#529), `null` while it runs. With
+   * `timeouts-in-a-row` the app says that `match.resignedBy` missed two
+   * turns in a row, not that they resigned.
+   */
+  readonly matchEndReason: OnlineMatchEndReason | null;
   /** The question `waitingFor` must answer, else `null`. */
   readonly prompt: VariantPrompt | null;
   /**
@@ -170,6 +207,8 @@ export interface GameSummary {
   readonly targetPoints: number;
   /** A per-turn time limit in minutes, or `null` for the 24-hour default (#183). */
   readonly turnTimeMinutes: number | null;
+  /** True for a Play ranked game (#529), as in the view. */
+  readonly ranked: boolean;
   /** The caller's side. The other player has the other side. */
   readonly mySide: PlayerId;
   /** The side the server waits for, as in the view. `null` when finished. */

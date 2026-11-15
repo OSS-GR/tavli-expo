@@ -21,10 +21,10 @@ import type { ComponentProps } from 'react';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
 
 import { boardLayout } from '@/features/board/BoardCanvas';
-import { boardDiceBox, columnDiceBox } from '@/features/board/boardDice';
+import { boardDiceBox } from '@/features/board/boardDice';
 import { DOUBLE_SPLIT_AT_MS, USED_OPACITY, doublePlaces } from '@/features/board/diceMotion';
 import { boxRatioWithShadow, fitBoardWithShadow } from '@/features/board/geometry';
-import { SIDE_COLUMN } from '@/features/board/screenLayout';
+import { LEFT_RAIL, RIGHT_RAIL } from '@/features/board/screenLayout';
 import { DOUBLE_LABEL_MS } from '@/features/board/useDoubleReveal';
 import { BOT_TIMING } from '@/features/bot/botSpeed';
 import { DEFAULT_SETTINGS, type BoardLayoutMode } from '@/features/settings/settings';
@@ -49,7 +49,7 @@ const SPACE: Readonly<Record<BoardLayoutMode, { width: number; height: number }>
 };
 const SIZE = SPACE.tall;
 /** The board's space in landscape on an iPhone SE: between the two side columns. */
-const LANDSCAPE_SPACE = { width: 667 - 2 * 4 - 2 * SIDE_COLUMN, height: 360 };
+const LANDSCAPE_SPACE = { width: 667 - 2 * 4 - LEFT_RAIL - RIGHT_RAIL - 2 * 2, height: 360 };
 
 /** Rolls 4 on every die: each roll is 4-4. */
 const fours: Rng = { nextUint32: () => 3 };
@@ -407,7 +407,7 @@ describe('<GameScreen /> doubles (#177)', () => {
       await resetWindow();
     });
 
-    it('splits in the right column: the box and the slot do not move, the canvas stays', async () => {
+    it('splits on the board: the box does not move, the canvas stays', async () => {
       const store = newStore();
       toRoll(store, 'white');
       await show(store, {}, LANDSCAPE_SPACE);
@@ -416,16 +416,13 @@ describe('<GameScreen /> doubles (#177)', () => {
       await act(async () => {
         store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 5] });
       });
-      const want = columnDiceBox(geo, SIDE_COLUMN, 4);
-      const two = columnDiceBox(geo, SIDE_COLUMN, 2);
-      // The two rolled dice are the size of any roll, and the box fits the column.
+      const want = boardDiceBox(geo, 4);
+      const two = boardDiceBox(geo, 2);
+      // The two rolled dice are the size of any roll, and the box lies on the board.
       expect(want.pairSize).toBe(two.size);
       expect(doublePlaces(want.size, want.pairSize).width).toBe(want.width);
-      expect(want.left).toBeGreaterThanOrEqual(LANDSCAPE_SPACE.width);
-      expect(want.left + want.width).toBeLessThanOrEqual(LANDSCAPE_SPACE.width + SIDE_COLUMN);
+      expect(want.left + want.width).toBeLessThanOrEqual(LANDSCAPE_SPACE.width);
       expect(flat('board-dice')).toMatchObject({ left: want.left, top: want.top });
-      // The right column keeps a slot as tall as the four dice.
-      expect(flat('game-dice-slot')).toMatchObject({ height: want.height });
       expect(diceDrawn()).toBe(2);
       const canvas = screen.getByTestId('dice-row');
       const parent = nativeParent(canvas);
@@ -435,7 +432,6 @@ describe('<GameScreen /> doubles (#177)', () => {
       expect(diceDrawn()).toBe(4);
       expect(doublesHint()).toBeOnTheScreen();
       expect(flat('board-dice')).toMatchObject({ left: want.left, top: want.top });
-      expect(flat('game-dice-slot')).toMatchObject({ height: want.height });
       expect(screen.getByTestId('dice-row') === canvas).toBe(true);
       expect(nativeParent(screen.getByTestId('dice-row')) === parent).toBe(true);
       expect(nativePath(screen.getByTestId('dice-row'))).toBe(path);

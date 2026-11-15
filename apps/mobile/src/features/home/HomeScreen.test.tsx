@@ -7,7 +7,7 @@ import { homeIntroDue, resetIntrosForTest } from '@/features/intro/introRuns';
 import { startBoard } from '@/features/rules/content';
 
 import { ContinueCard } from './ContinueCard';
-import { HomeScreen, levelList } from './HomeScreen';
+import { HomeScreen, inRows, levelList, type Cell } from './HomeScreen';
 
 function setup(botLevels: readonly ('easy' | 'medium' | 'hard')[] = ['easy']) {
   const props = {
@@ -153,6 +153,32 @@ describe('<HomeScreen />', () => {
     expect(onJoinWithCode).toHaveBeenCalledTimes(1);
   });
 
+  it('opens Play ranked from its tile, next to Play a friend (#532)', async () => {
+    const user = userEvent.setup();
+    const onPlayRanked = jest.fn();
+    await render(
+      <HomeScreen
+        {...setup()}
+        onPlayFriend={jest.fn()}
+        onJoinWithCode={jest.fn()}
+        onPlayRanked={onPlayRanked}
+      />,
+    );
+
+    const tiles = screen
+      .getAllByRole('button')
+      .map((b) => b.props.testID as string | undefined)
+      .filter((id) => id === 'home-friend' || id === 'home-ranked' || id === 'home-join');
+    expect(tiles).toEqual(['home-friend', 'home-ranked', 'home-join']);
+    await user.press(screen.getByRole('button', { name: 'Play ranked, Find a player now' }));
+    expect(onPlayRanked).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no Play ranked tile with no matchmaking (#532)', async () => {
+    await render(<HomeScreen {...setup()} onPlayFriend={jest.fn()} />);
+    expect(screen.queryByTestId('home-ranked')).toBeNull();
+  });
+
   it('opens Friends and Leaderboards from their tiles when online play is on (#486)', async () => {
     const user = userEvent.setup();
     const onFriends = jest.fn();
@@ -296,5 +322,24 @@ describe('<HomeScreen />', () => {
   it('shows a notice once, for example a broken save', async () => {
     await render(<HomeScreen {...setup()} notice="Your saved game could not be opened." />);
     expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');
+  });
+});
+
+describe('inRows', () => {
+  const cell = (key: string, wide = false): Cell => ({ key, node: null, wide });
+  const keys = (rows: Cell[][]) => rows.map((row) => row.map((c) => c.key));
+
+  it('puts two cells a row, and a wide cell in a row of its own', () => {
+    const cells = [cell('a'), cell('b'), cell('c'), cell('join', true), cell('d')];
+    expect(keys(inRows(cells, 2))).toEqual([['a', 'b'], ['c'], ['join'], ['d']]);
+  });
+
+  it('puts one cell a row with a large font', () => {
+    expect(keys(inRows([cell('a'), cell('b')], 1))).toEqual([['a'], ['b']]);
+  });
+
+  it('gives no empty row', () => {
+    expect(inRows([], 2)).toEqual([]);
+    expect(keys(inRows([cell('wide', true)], 2))).toEqual([['wide']]);
   });
 });

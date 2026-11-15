@@ -5,7 +5,7 @@
  */
 
 import type { OnlineGameView } from '@tavli/contracts';
-import { VARIANT_REGISTRY, createBoard, getVariant, plakoto } from '@tavli/engine';
+import { VARIANT_REGISTRY, createBoard, getPreset, getVariant, plakoto } from '@tavli/engine';
 import type { GameFlow, GameState, MatchFlow, MoveInput, PlayerId, Rng } from '@tavli/engine';
 
 import type { MemoryGameServer } from './memory-server';
@@ -114,6 +114,10 @@ export interface MotherPin {
  * `plakoto-mother.test.ts`), 6-6 has no move. Then White passes, and a
  * test that expects White to move fails once in 36 runs.
  *
+ * The game plays the old `plakoto` preset (`offerConcede`): new games play
+ * the federation rule, which asks nothing (#514), but games started before
+ * still ask, so the servers keep the question.
+ *
  * A test saves the returned flow on the server (on Convex: patch
  * `games.flow` with `storeFlow`), then sends `pin` as Black's turn.
  */
@@ -129,6 +133,7 @@ export function motherPin(flow: MatchFlow): MotherPin {
     dice: [5, 2],
     turnNumber: 9,
     variantData: null,
+    rules: { ...getPreset('plakoto'), match: flow.game.state.rules.match },
   };
   const game: GameFlow = {
     ...flow.game,

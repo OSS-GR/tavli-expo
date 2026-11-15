@@ -694,7 +694,8 @@
     "invalidMove": "sounds/invalid-move.m4a",
     "turnStart": "sounds/turn-start.m4a",
     "gameWin": "sounds/game-win.m4a",
-    "matchWin": "sounds/match-win.m4a"
+    "matchWin": "sounds/match-win.m4a",
+    "clockTick": "sounds/clock-tick.m4a"
   },
   "haptics": {
     "checkerPickUp": "selection",
@@ -704,7 +705,8 @@
     "diceLand": "light",
     "invalidMove": "warning",
     "gameWin": "success",
-    "matchWin": "success"
+    "matchWin": "success",
+    "clockTick": "light"
   },
   "accessibility": {
     "checkerContrast": 9.18,

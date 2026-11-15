@@ -9,6 +9,7 @@ import { createSeededRng, getPreset, matchPhase, replay } from '@tavli/engine';
 import type { FlowEvent, MatchFlow, PlayerId, Rng } from '@tavli/engine';
 
 import {
+  NO_TIMEOUTS,
   OnlineGameError,
   answerPrompt,
   checkDraft,
@@ -39,9 +40,11 @@ const VIEW = {
   gameId: 'g',
   version: 1,
   turnTimeMinutes: 1,
+  ranked: false,
   turnDeadline: 1000,
   players: PLAYERS,
   previousGame: null,
+  timeoutsInARow: { white: 0, black: 0 },
   names: { white: { kind: 'guest', number: '4821' }, black: null },
 } as const;
 
@@ -427,7 +430,7 @@ describe('rollDice (#355)', () => {
     const { flow, rng, roller } = awaitingRoll();
     const other = roller === 'white' ? 'black' : 'white';
     expect(code(() => rollDice(flow, other, rng))).toBe('NOT_YOUR_TURN');
-    const rolled = untilMoving({ flow, previousGame: null }, rng).flow;
+    const rolled = untilMoving({ flow, previousGame: null, timeoutsInARow: NO_TIMEOUTS }, rng).flow;
     const mover = rolled.game.state.toMove;
     expect(code(() => rollDice(rolled, mover, rng))).toBe('ILLEGAL_ACTION');
     expect(code(() => rollDice(rolled, mover === 'white' ? 'black' : 'white', rng))).toBe(
@@ -596,7 +599,11 @@ describe('stored flow', () => {
       match: flow.match,
       game: flow.game,
     });
-    expect(loadStored(old)).toEqual({ flow: loaded.flow, previousGame: null });
+    expect(loadStored(old)).toEqual({
+      flow: loaded.flow,
+      previousGame: null,
+      timeoutsInARow: NO_TIMEOUTS,
+    });
   });
 
   it('plays on a flow saved with the retired quarterGathering flag (Q27)', () => {

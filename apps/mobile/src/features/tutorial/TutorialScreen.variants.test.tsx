@@ -1,6 +1,6 @@
 /**
  * The Plakoto and Fevga (#149) and Asodio (#159) lessons on the screen:
- * taps, the move list, the mother card, the Asodio hints.
+ * taps, the move list, the mother lesson, the Asodio hints.
  */
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 
@@ -145,37 +145,21 @@ describe('<TutorialScreen game="plakoto|fevga|asodio" />', () => {
     );
   });
 
-  it('ends the mother lesson with the "resign or play on" card', async () => {
+  it('ends the mother lesson with the federation win: no card over the board (#514)', async () => {
     await open('plakoto');
     for (let i = 0; i < 2; i++) {
       await playLessonByTaps(i, 'plakoto');
       await press('tutorial-next');
     }
-    expect(screen.queryByTestId('tutorial-mother-card')).not.toBeOnTheScreen();
     await playLessonByTaps(2, 'plakoto');
 
-    const card = within(screen.getByTestId('tutorial-mother-card'));
-    expect(
-      card.getByRole('header', { name: "Your opponent's mother is pinned" }),
-    ).toBeOnTheScreen();
-    // The same two answers as the game's mother card.
-    await act(async () => {
-      fireEvent.press(card.getByRole('button', { name: 'Resign (lose 2)' }));
-    });
-    expect(card.getByText('Resign: you win 2 points and the game ends.')).toBeOnTheScreen();
-    await act(async () => {
-      fireEvent.press(card.getByRole('button', { name: 'Play on' }));
-    });
-    expect(card.getByText(/^Play on: the game goes on\./)).toBeOnTheScreen();
-
-    // The card scrolls when it is taller than the board, and screen readers skip the board under it.
-    expect(screen.getByTestId('tutorial-mother-overlay').type).toBe('RCTScrollView');
-    expect(screen.queryByTestId('tutorial-board')).not.toBeOnTheScreen();
-    expect(screen.getByTestId('tutorial-board', { includeHiddenElements: true })).toBeOnTheScreen();
-
-    // Next leaves the card behind, and the board is back for screen readers.
+    expect(screen.getByTestId('tutorial-success')).toHaveTextContent(
+      /^You pinned the mother! None of your checkers is left on your own point 24, so this pin wins the game: 2 points \(diplo\)\./,
+    );
+    // The board stays in view and open to screen readers.
+    expect(screen.getByTestId('tutorial-board')).toBeOnTheScreen();
+    expect(screen.queryByText(/resign/i)).toBeNull();
     await press('tutorial-next');
-    expect(screen.queryByTestId('tutorial-mother-card')).not.toBeOnTheScreen();
     expect(screen.getByTestId('tutorial-board')).toBeOnTheScreen();
   });
 

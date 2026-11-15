@@ -1,7 +1,7 @@
 /**
  * References to the Convex functions in `apps/server/convex/games.ts`,
  * `invites.ts`, `push.ts`, `account.ts`, `appUpdate.ts`, `usernames.ts`,
- * `safety.ts` and `friends.ts`, by name. The adapter does not import the generated `api`
+ * `safety.ts`, `friends.ts`, `ratings.ts` and `matchmaking.ts`, by name. The adapter does not import the generated `api`
  * of `apps/server`: that would pull the server code (and Better Auth) into
  * the app's type check, and `apps/server` already depends on this package
  * for its tests.
@@ -15,7 +15,8 @@
  * `convex/convexUsernames.test.ts` for the usernames,
  * `convex/convexSafety.test.ts` for block and report,
  * `convex/convexFriends.test.ts` for the friends,
- * `convex/convexRatings.test.ts` for the ratings), so a rename
+ * `convex/convexRatings.test.ts` for the ratings,
+ * `convex/convexMatchmaking.test.ts` for Play ranked), so a rename
  * there fails a test.
  */
 import { makeFunctionReference } from 'convex/server';
@@ -33,7 +34,9 @@ import type {
   GameSummary,
   GameTransportErrorData,
   InviteView,
+  LookingCounts,
   MyRating,
+  MySeek,
   MyUsername,
   NewInvite,
   OnlineGameStatus,
@@ -362,4 +365,28 @@ export const RATING_FUNCTIONS: RatingFunctions = {
   friendsBoard: makeFunctionReference(RATING_FUNCTION_NAMES.friendsBoard),
   globalBoard: makeFunctionReference(RATING_FUNCTION_NAMES.globalBoard),
   setShowOnBoard: makeFunctionReference(RATING_FUNCTION_NAMES.setShowOnBoard),
+};
+
+type MatchQuery<Result> = FunctionReference<'query', 'public', Record<string, never>, Result>;
+
+/** The functions in `apps/server/convex/matchmaking.ts` (#531). */
+export interface MatchFunctions {
+  readonly seek: FunctionReference<'mutation', 'public', { game: string }, null>;
+  readonly cancelSeek: FunctionReference<'mutation', 'public', Record<string, never>, null>;
+  readonly mySeek: MatchQuery<MySeek>;
+  readonly lookingCounts: MatchQuery<LookingCounts>;
+}
+
+export const MATCH_FUNCTION_NAMES = {
+  seek: 'matchmaking:seek',
+  cancelSeek: 'matchmaking:cancelSeek',
+  mySeek: 'matchmaking:mySeek',
+  lookingCounts: 'matchmaking:lookingCounts',
+} as const satisfies { readonly [K in keyof MatchFunctions]: string };
+
+export const MATCH_FUNCTIONS: MatchFunctions = {
+  seek: makeFunctionReference(MATCH_FUNCTION_NAMES.seek),
+  cancelSeek: makeFunctionReference(MATCH_FUNCTION_NAMES.cancelSeek),
+  mySeek: makeFunctionReference(MATCH_FUNCTION_NAMES.mySeek),
+  lookingCounts: makeFunctionReference(MATCH_FUNCTION_NAMES.lookingCounts),
 };

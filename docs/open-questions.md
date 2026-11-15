@@ -13,7 +13,7 @@
 | # | Answer (2026-10-26) | Where it went |
 |---|---------------------|---------------|
 | Q2 | Has an **Expo** account (connected to the Expo MCP server), an **iPhone**, a **Mac**, a Windows PC, and a Linux server. Has a Google account but **no Google Play Console** yet and **no Android phone** (use the Android emulator). No Apple Developer Program yet. | #3 |
-| Q4 (c) | **Plakoto mother:** pinning the mother means the game is lost. The pinned player can **resign (lose 2)** or **play on**. | `docs/rules/plakoto.md` → `motherRule="offerConcede"` |
+| Q4 (c) | **Plakoto mother:** the federation rule. Pinning the mother wins 2 points once the pinner has no checker left on their own point 24; both mothers pinned is a draw. The owner changed this on 2026-11-13 (#514); before, the pinned player could **resign (lose 2)** or **play on** (`offerConcede`, now the old preset `plakoto`). | `docs/rules/plakoto.md` → `motherRule="federation"` |
 | Q4 (starter) | Roll once to pick who starts. In the same session vs the same person, the **winner of the last game starts**. | `docs/rules/tavli-match.md` → `rematchStarter` |
 | Q5 | Owner plays the Greek folk Asodio: load all 15 checkers first (1-2 or a double unlocks), move **quarter by quarter**, and **pin** instead of hit. Cheat sheet saved in `docs/rules/sources/`. | `docs/rules/asodio.md` → preset `kafeneio` |
 | Q6 | **Traditional wooden style only.** No modern flat theme. | ADR-0005, #13 |

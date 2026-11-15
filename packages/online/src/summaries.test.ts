@@ -6,7 +6,7 @@ import { MAX_LISTED_GAMES, guestName } from '@tavli/contracts';
 import type { GameSummary } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 
-import { OnlineGameError, createOnlineMatch, resign, toView } from './online-game';
+import { NO_TIMEOUTS, OnlineGameError, createOnlineMatch, resign, toView } from './online-game';
 import { latestGames, newestFirst, summarizeGame } from './summaries';
 import type { SummaryInput } from './summaries';
 
@@ -19,6 +19,7 @@ function input(choice: 'portes' | 'tavli' = 'portes'): SummaryInput {
     version: 4,
     choice,
     turnTimeMinutes: null,
+    ranked: false,
     turnDeadline: 5000,
     players: PLAYERS,
     names: { white: guestName('1111'), black: guestName('2222') },
@@ -34,7 +35,7 @@ function summary(gameId: string, updatedAt: number): GameSummary {
 describe('summarizeGame', () => {
   it('holds the facts of the view, for the side of the player', () => {
     const game = input('tavli');
-    const view = toView({ ...game, previousGame: null });
+    const view = toView({ ...game, previousGame: null, timeoutsInARow: NO_TIMEOUTS });
     const mover = view.waitingFor;
     for (const [playerId, side] of [
       ['alice', 'white'],
@@ -48,6 +49,7 @@ describe('summarizeGame', () => {
         variant: 'portes',
         targetPoints: 3,
         turnTimeMinutes: null,
+        ranked: false,
         mySide: side,
         waitingFor: mover,
         myTurn: mover === side,
@@ -73,6 +75,11 @@ describe('summarizeGame', () => {
       turnDeadline: null,
     });
     expect(finished.score).toEqual(flow.match.score);
+  });
+
+  it('says whether the game is ranked (#529)', () => {
+    expect(summarizeGame({ ...input(), ranked: true }, 'alice').ranked).toBe(true);
+    expect(summarizeGame(input(), 'bob').ranked).toBe(false);
   });
 
   it('tells nothing about the other player but their id, side and name', () => {

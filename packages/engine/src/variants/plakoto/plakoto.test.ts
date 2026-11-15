@@ -307,14 +307,14 @@ describe('plakoto.md edge cases', () => {
 });
 
 describe('Plakoto variant', () => {
-  it('is in the registry and starts from the plakoto preset', () => {
+  it('is in the registry and starts from the federation preset (#514)', () => {
     expect(getVariant(VARIANT_REGISTRY, 'plakoto')).toBe(plakoto);
     expect(PLAKOTO_START).toEqual({ points: { 24: 15 } });
     const start = plakoto.initialState({ startingPlayer: 'black' });
-    expect(start.rules).toEqual(getPreset('plakoto'));
+    expect(start.rules).toEqual(getPreset('plakoto.federation'));
     expect(start.toMove).toBe('black');
-    const federation = plakoto.initialState({ startingPlayer: 'white', rules: FEDERATION });
-    expect(federation.rules.mother.motherRule).toBe('federation');
+    const concede = plakoto.initialState({ startingPlayer: 'white', rules: getPreset('plakoto') });
+    expect(concede.rules.mother.motherRule).toBe('offerConcede');
   });
 
   it('rejects flags of other games and the unbuilt replay option', () => {

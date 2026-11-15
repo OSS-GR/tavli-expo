@@ -8,6 +8,7 @@ Version: `convex` 1.49.0, a peer dependency (the app installs it). Keep it on th
 
 - **No player id in the calls.** The Convex client sends the sign-in token (`setAuth`), and the server reads the caller from it (`identity.subject`, #131). Online play needs a signed-in user (a guest is enough). The update policy is the one call that needs no sign-in (see below).
 - **Sign-in changes.** Convex asks for a token on `setAuth`, and again only when the server refuses one; a first `null` (nobody signed in yet) leaves the client signed out for good. So `createConvexClient` calls `setAuth` again on each `auth.onChange` (#281): a guest made after the client opened is signed in at once.
+- **A failed token refresh.** Convex refreshes the token before it ends. When that one fetch gives `null` (the phone was asleep or offline, or the fetch failed), the client reports "not signed in" and never asks again, so every query fails with `NOT_SIGNED_IN` until the app restarts. So while `auth.currentUser()` has a user, `createConvexClient` calls `setAuth` again after a wait: `REAUTH_FIRST_WAIT_MS` (1 s), then twice as long each time, at most `REAUTH_MAX_WAIT_MS` (30 s). A sign-in that works, or an `auth.onChange`, starts the wait over. A live `watchMyGames` keeps its subscription, so the list comes back by itself.
 - **`subscribe`** watches the `getGame` query. Each result goes to `onView`. A `null` result (no such game) goes to `onError` as `NOT_FOUND`. Neither is ever called inside `subscribe`, or after its stop function: each result waits one microtask.
 - **`listMyGames({ status })`** (#296) runs the `listMyGames` query once (`client.query`) and resolves with a copy of the list: the caller's games with that status, newest change first, at most 50. It is a call, not a live list: call it again to see changes.
 - **`watchMyGames({ status }, onList, onError)`** (#297) is the live list: it watches the same query (`client.onUpdate`). Each list is a copy and waits one microtask, so nothing arrives inside the call or after the stop function. Errors map like the calls.
@@ -42,6 +43,13 @@ Version: `convex` 1.49.0, a peer dependency (the app installs it). Keep it on th
 - **`requestByUsername`** gets a failed request as a value (`{ ok: false, code, message }`), so the server keeps the search in its count, and rejects with `{ code, message }`.
 - **Errors.** A `ConvexError` with `FriendsErrorData` rejects with `{ code, message }` (`toFriendsError`), `NOT_SIGNED_IN` and `NOT_SAVED` too. Any other error stays as it is.
 - `apps/server/convex/convexFriends.test.ts` checks the names and types against `api` and runs `friendsContract()` through the adapter.
+
+### Play ranked (#531)
+
+- **`createConvexMatchmaking({ client })`** needs `mutation`, `query` and `onUpdate` (`ConvexMatchmakingClient`). `seek` runs `matchmaking:seek` with `{ game }`, `cancel` runs `cancelSeek`, and `mySeek` and `lookingCounts` run their queries once.
+- **`watchMySeek`** watches the `mySeek` query (`onUpdate`): a copy of each new seek, never inside the call and never after the stop function, like `watchMyGames`.
+- **Errors.** A `ConvexError` with `MatchmakingErrorData` rejects with `{ code, message }` (`toMatchmakingError`): `NOT_SIGNED_IN`, `NOT_SAVED` or `BAD_REQUEST`. Any other error stays as it is.
+- `apps/server/convex/convexMatchmaking.test.ts` checks the names and types against `api` and runs `matchmakingContract()` through the adapter.
 
 ### Update needed (#390)
 

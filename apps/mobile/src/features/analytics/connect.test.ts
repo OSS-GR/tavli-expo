@@ -122,18 +122,18 @@ describe('connectAnalytics', () => {
     settings.getState().setSetting('autoConfirmMoves', true);
     settings.getState().setSetting('language', 'el');
     settings.getState().setSetting('language', 'el'); // No change: no event.
-    settings.getState().setSetting('theme', 'walnut-kafeneio'); // Same as default: no event.
+    settings.getState().setSetting('theme', 'match-board'); // Same as default: no event.
 
     expect(analytics.sent).toEqual([
       { type: 'track', event: 'settings_changed', props: { key: 'autoConfirmMoves' } },
       { type: 'track', event: 'settings_changed', props: { key: 'language' } },
     ]);
 
-    settings.setState({ theme: 'other-theme' as never });
+    settings.getState().setSetting('theme', 'olive-inlay');
     expect(analytics.sent.at(-1)).toEqual({
       type: 'track',
       event: 'theme_changed',
-      props: { kind: 'app', theme: 'other-theme' },
+      props: { kind: 'app', theme: 'olive-inlay' },
     });
   });
 

@@ -56,6 +56,7 @@ export const MIN_GAP_MS: Readonly<Record<FeedbackEvent, number>> = {
   turnStart: 500,
   gameWin: 1500,
   matchWin: 1500,
+  clockTick: 500,
 };
 
 export interface GameFeedback {

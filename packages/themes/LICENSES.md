@@ -123,3 +123,4 @@ Mono AAC (`.m4a`), 44.1 kHz, 64 kbit/s. About 54 KB in total (the limit is 500 K
 | `turn-start.m4a`         | `turnStart`    | Part of `dice-grab-1`, very quiet                                                      | CC0 1.0 |
 | `game-win.m4a`           | `gameWin`      | `jingles_PIZZI10` with a little `jingles_STEEL10`                                      | CC0 1.0 |
 | `match-win.m4a`          | `matchWin`     | The same, then both again a fifth higher                                               | CC0 1.0 |
+| `clock-tick.m4a`         | `clockTick`    | Made from numbers in `build_sounds.py` (`synth_tick`), no source file (#530)           | CC0 1.0 |

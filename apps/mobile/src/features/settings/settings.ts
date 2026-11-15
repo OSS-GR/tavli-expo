@@ -12,7 +12,7 @@
  */
 import type { Storage } from '@tavli/contracts';
 import { DEFAULT_THEME_ID as DEFAULT_BOARD_THEME_ID, hasTheme } from '@tavli/themes';
-import { DEFAULT_THEME_ID, isThemeId, type ThemeId } from '@tavli/ui';
+import { isThemeChoice, MATCH_BOARD, type ThemeChoice } from '@tavli/ui';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { createStore } from 'zustand/vanilla';
 
@@ -82,8 +82,12 @@ export interface Settings {
   moveList: MoveListMode;
   /** How fast the bot plays its turn (#172, timings in `features/bot/botSpeed.ts`). */
   botSpeed: BotSpeed;
-  /** The app colors (`@tavli/ui`). */
-  theme: ThemeId;
+  /**
+   * The app colors (`@tavli/ui`, #528): `match-board` (the default) takes the
+   * colors made for `boardTheme`; a theme id keeps that theme with any board.
+   * `resolveThemeId` turns the two into the theme the app shows.
+   */
+  theme: ThemeChoice;
   /** The board theme (`@tavli/themes`): the game, the tutorial and the rules pictures use it. */
   boardTheme: string;
 }
@@ -100,12 +104,12 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   boardLayout: 'tall',
   moveList: 'auto',
   botSpeed: 'normal',
-  theme: DEFAULT_THEME_ID,
+  theme: MATCH_BOARD,
   boardTheme: DEFAULT_BOARD_THEME_ID,
 };
 
 /** Raise this when the saved shape changes, and add a step to `migrateSettings`. */
-export const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 2;
 
 /** Storage key. The saved value is `{ state, version }` JSON (Zustand persist). */
 export const SETTINGS_STORAGE_KEY = 'settings';
@@ -154,7 +158,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     moveList: oneOf(MOVE_LIST_MODES, input['moveList'], d.moveList),
     // Saves from before #172 have no bot speed: they load as Normal.
     botSpeed: oneOf(BOT_SPEEDS, input['botSpeed'], d.botSpeed),
-    theme: isThemeId(input['theme']) ? input['theme'] : d.theme,
+    theme: isThemeChoice(input['theme']) ? input['theme'] : d.theme,
     boardTheme:
       typeof input['boardTheme'] === 'string' && hasTheme(input['boardTheme'])
         ? input['boardTheme']
@@ -163,17 +167,21 @@ export function sanitizeSettings(raw: unknown): Settings {
 }
 
 /**
- * Upgrades saved settings from an older `version`.
- * Version 1 is the first one, so there are no steps yet. Add them like this:
+ * Upgrades saved settings from an older `version`. Add a step like this:
  *
- *   if (version < 2) { state = { ...state, newField: state.oldField }; }
+ *   if (version < 3) { state = { ...state, newField: state.oldField }; }
  *
  * A save from a newer app version (after a downgrade) is sanitized as well.
  */
 export function migrateSettings(persisted: unknown, version: number): Settings {
-  const state: unknown = persisted;
+  let state: unknown = persisted;
   if (version < 1) {
     // Nothing was saved before version 1.
+  }
+  if (version < 2 && isRecord(state) && state['theme'] === 'walnut-kafeneio') {
+    // Version 2 (#528): Walnut was the only app theme, so nobody picked it.
+    // It now reads as Match the board; a Walnut board looks the same.
+    state = { ...state, theme: MATCH_BOARD };
   }
   return sanitizeSettings(state);
 }

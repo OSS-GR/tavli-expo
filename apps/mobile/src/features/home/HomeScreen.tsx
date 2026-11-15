@@ -64,6 +64,11 @@ export interface HomeScreenProps {
    * with an online server).
    */
   onJoinWithCode?: () => void;
+  /**
+   * Opens Play ranked (#532). The tile shows only with it (a build with
+   * online play); the online tiles then come first.
+   */
+  onPlayRanked?: () => void;
   /** Opens Friends (#406). The tile shows only with it (a build with online play). */
   onFriends?: () => void;
   /** Opens the Leaderboards (#407). The tile shows only with it. */
@@ -97,6 +102,7 @@ export function HomeScreen({
   onHistory,
   onPlayFriend,
   onJoinWithCode,
+  onPlayRanked,
   onFriends,
   onRatings,
   botLevels,
@@ -110,7 +116,8 @@ export function HomeScreen({
   hour,
 }: HomeScreenProps) {
   const { t } = useTranslation();
-  const { theme } = useUnistyles();
+  const { theme, rt } = useUnistyles();
+  const perRow = rt.fontScale > ONE_COLUMN_FONT_SCALE ? 1 : 2;
   const [toast, showToast] = useToast();
   useEffect(() => {
     if (notice !== null) showToast(notice);
@@ -131,6 +138,128 @@ export function HomeScreen({
   const vsBotLabel = [vsBotTitle, levels].filter(Boolean).join(', ');
   const hasSave = continueCard != null;
   const modesTitle = hasSave ? t('home.newGame') : t('home.moreModes');
+
+  const localTile = (
+    <ModeTile
+      testID="home-local"
+      icon="users"
+      title={t('home.local.title')}
+      subtitle={t('home.local.subtitle')}
+      onPress={() => onNewGame('local')}
+    />
+  );
+  const friendTile = onPlayFriend ? (
+    <ModeTile
+      testID="home-friend"
+      icon="globe"
+      title={t('home.friend.title')}
+      subtitle={t('home.friend.subtitle')}
+      onPress={onPlayFriend}
+    />
+  ) : (
+    <ModeTile
+      testID="home-friend"
+      kind="locked"
+      icon="globe"
+      title={t('home.friend.title')}
+      subtitle={t('home.friend.subtitle')}
+      chip={t('common.comingSoon')}
+      onPress={() => showToast(t('home.friend.soon'))}
+    />
+  );
+  // With Play ranked it sits in the grid; without, it spans the row.
+  const joinTile = onJoinWithCode ? (
+    <ModeTile
+      testID="home-join"
+      wide={!onPlayRanked}
+      icon="keyboard"
+      title={t('home.join.title')}
+      subtitle={t('home.join.subtitle')}
+      onPress={onJoinWithCode}
+    />
+  ) : null;
+
+  // Plain rows of two (one with a large font), never a wrapping row: iOS
+  // measured the tiles of a wrapping row at no width and drew them very
+  // tall, with the links below on top of them (build 33).
+  const gridTiles: Cell[] = [];
+  if (onPlayRanked) {
+    // Play ranked (#532, Figma 81:2): the two online tiles first.
+    gridTiles.push({ key: 'friend', node: friendTile });
+    gridTiles.push({
+      key: 'ranked',
+      node: (
+        <ModeTile
+          testID="home-ranked"
+          icon="trophy"
+          title={t('home.ranked.title')}
+          subtitle={t('home.ranked.subtitle')}
+          onPress={onPlayRanked}
+        />
+      ),
+    });
+    gridTiles.push({ key: 'local', node: localTile });
+    if (joinTile) gridTiles.push({ key: 'join', node: joinTile });
+  } else {
+    gridTiles.push({ key: 'local', node: localTile });
+    gridTiles.push({ key: 'friend', node: friendTile });
+    // Without Play ranked, Join spans its own row.
+    if (joinTile) gridTiles.push({ key: 'join', node: joinTile, wide: true });
+  }
+  if (onFriends) {
+    gridTiles.push({
+      key: 'friends',
+      node: (
+        <ModeTile
+          testID="home-friends"
+          icon="handshake"
+          title={t('home.friends.title')}
+          subtitle={t('home.friends.subtitle')}
+          onPress={onFriends}
+        />
+      ),
+    });
+  }
+  if (onRatings) {
+    gridTiles.push({
+      key: 'ratings',
+      node: (
+        <ModeTile
+          testID="home-ratings"
+          icon="trophy"
+          title={t('home.ratings.title')}
+          subtitle={t('home.ratings.subtitle')}
+          onPress={onRatings}
+        />
+      ),
+    });
+  }
+  const footerLinks: Cell[] = [
+    {
+      key: 'how-to-play',
+      node: (
+        <FooterLink
+          testID="home-how-to-play"
+          icon="book"
+          label={t('home.howToPlay')}
+          onPress={onHowToPlay}
+        />
+      ),
+    },
+  ];
+  if (onHistory) {
+    footerLinks.push({
+      key: 'history',
+      node: (
+        <FooterLink
+          testID="home-history"
+          icon="history"
+          label={t('home.history')}
+          onPress={onHistory}
+        />
+      ),
+    });
+  }
 
   return (
     <View style={styles.screen}>
@@ -197,90 +326,60 @@ export function HomeScreen({
               onPress={() => onNewGame('bot')}
             />
           ) : null}
-          <View style={styles.cell}>
-            <ModeTile
-              testID="home-local"
-              icon="users"
-              title={t('home.local.title')}
-              subtitle={t('home.local.subtitle')}
-              onPress={() => onNewGame('local')}
-            />
-          </View>
-          <View style={styles.cell}>
-            {onPlayFriend ? (
-              <ModeTile
-                testID="home-friend"
-                icon="globe"
-                title={t('home.friend.title')}
-                subtitle={t('home.friend.subtitle')}
-                onPress={onPlayFriend}
-              />
-            ) : (
-              <ModeTile
-                testID="home-friend"
-                kind="locked"
-                icon="globe"
-                title={t('home.friend.title')}
-                subtitle={t('home.friend.subtitle')}
-                chip={t('common.comingSoon')}
-                onPress={() => showToast(t('home.friend.soon'))}
-              />
-            )}
-          </View>
-          {onJoinWithCode ? (
-            <ModeTile
-              testID="home-join"
-              wide
-              icon="keyboard"
-              title={t('home.join.title')}
-              subtitle={t('home.join.subtitle')}
-              onPress={onJoinWithCode}
-            />
-          ) : null}
-          {onFriends ? (
-            <View style={styles.cell}>
-              <ModeTile
-                testID="home-friends"
-                icon="handshake"
-                title={t('home.friends.title')}
-                subtitle={t('home.friends.subtitle')}
-                onPress={onFriends}
-              />
-            </View>
-          ) : null}
-          {onRatings ? (
-            <View style={styles.cell}>
-              <ModeTile
-                testID="home-ratings"
-                icon="trophy"
-                title={t('home.ratings.title')}
-                subtitle={t('home.ratings.subtitle')}
-                onPress={onRatings}
-              />
-            </View>
-          ) : null}
+          <CellRows cells={gridTiles} perRow={perRow} />
         </View>
 
-        <View style={styles.footer}>
-          <FooterLink
-            testID="home-how-to-play"
-            icon="book"
-            label={t('home.howToPlay')}
-            onPress={onHowToPlay}
-          />
-          {onHistory ? (
-            <FooterLink
-              testID="home-history"
-              icon="history"
-              label={t('home.history')}
-              onPress={onHistory}
-            />
-          ) : null}
+        <View style={styles.grid}>
+          <CellRows cells={footerLinks} perRow={perRow} />
         </View>
       </ScrollView>
       <Toast text={toast} />
     </View>
   );
+}
+
+export interface Cell {
+  key: string;
+  node: ReactNode;
+  /** Takes a whole row. */
+  wide?: boolean;
+}
+
+/** The cells in rows (`inRows`); the cells of a row share its width and height. */
+function CellRows({ cells, perRow }: { cells: readonly Cell[]; perRow: number }) {
+  return inRows(cells, perRow).map((row) => (
+    <View key={row.map((cell) => cell.key).join()} style={styles.row}>
+      {row.map((cell) => (
+        <View key={cell.key} style={styles.cell}>
+          {cell.node}
+        </View>
+      ))}
+    </View>
+  ));
+}
+
+/**
+ * Cells in rows of `perRow`; a wide cell gets a row of its own. A lone
+ * cell in the last row fills it too (`styles.cell` is `flex: 1`).
+ */
+export function inRows(cells: readonly Cell[], perRow: number): Cell[][] {
+  const rows: Cell[][] = [];
+  let row: Cell[] = [];
+  for (const cell of cells) {
+    if (cell.wide) {
+      if (row.length > 0) rows.push(row);
+      rows.push([cell]);
+      row = [];
+      continue;
+    }
+    row.push(cell);
+    if (row.length === perRow) {
+      rows.push(row);
+      row = [];
+    }
+  }
+  if (row.length > 0) rows.push(row);
+  return rows;
 }
 
 interface FooterLinkProps {
@@ -386,25 +485,19 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.textDim,
   },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: theme.space.md,
   },
-  // Two tiles a row; one a row with a large font. Equal heights in a row.
+  // Two cells a row (one with a large font, `inRows`); the cells of a row
+  // share its width and its height.
+  row: {
+    flexDirection: 'row',
+    gap: theme.space.md,
+  },
   cell: {
-    flexGrow: 1,
-    flexBasis: rt.fontScale > ONE_COLUMN_FONT_SCALE ? '100%' : 0,
-    minWidth: 140,
-  },
-  footer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space.md,
+    flex: 1,
   },
   pill: {
     flexGrow: 1,
-    flexBasis: rt.fontScale > ONE_COLUMN_FONT_SCALE ? '100%' : 0,
-    minWidth: 140,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

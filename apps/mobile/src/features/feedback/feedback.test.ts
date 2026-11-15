@@ -57,6 +57,7 @@ describe('createGameFeedback: one place for sound and haptic', () => {
       ['turnStart', 'turnStart', null],
       ['gameWin', 'gameWin', 'success'],
       ['matchWin', 'matchWin', 'success'],
+      ['clockTick', 'clockTick', 'light'],
     ]);
   });
 

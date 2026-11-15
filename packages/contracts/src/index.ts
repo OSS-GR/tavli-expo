@@ -48,6 +48,9 @@ export {
   GAME_TRANSPORT_ERROR_CODES,
   MAX_LISTED_GAMES,
   ONLINE_GAME_CHOICES,
+  ONLINE_MATCH_END_REASONS,
+  RANKED_TIMEOUTS_TO_LOSE,
+  RANKED_TURN_TIME_MINUTES,
   isGameTransportErrorData,
   isOnlineGameChoice,
   isTurnTimeMinutes,
@@ -62,6 +65,7 @@ export type {
   OnlineGameChoice,
   OnlineGameStatus,
   OnlineGameView,
+  OnlineMatchEndReason,
   RollDiceRequest,
   SendAnswerRequest,
   SendTurnRequest,
@@ -243,6 +247,7 @@ export {
   type GameResultKind,
   type MatchGame,
   type OpeningRollRule,
+  type RankedSearchEnd,
   type ThemeKind,
   type TutorialGame,
   type TutorialSource,
@@ -258,3 +263,27 @@ export {
   withRanks,
 } from './ratings';
 export type { BoardRow, MyRating, Ratings, RatingsErrorCode, RatingsErrorData } from './ratings';
+export {
+  MATCHED_SEEK_KEEP_MS,
+  MATCHMAKING_ERROR_CODES,
+  NOBODY_YET_MS,
+  RANKED_GAMES,
+  RANKED_TARGET_POINTS,
+  SEEK_RANGE_GROW_MS,
+  SEEK_RANGE_MAX,
+  SEEK_RANGE_START,
+  SEEK_TTL_MS,
+  isMatchmakingErrorData,
+  isRankedGame,
+  seekRange,
+} from './matchmaking';
+export type {
+  LookingCounts,
+  Matchmaking,
+  MatchmakingErrorCode,
+  MatchmakingErrorData,
+  MySeek,
+  RankedGame,
+  SeekPlayer,
+  SeekRequest,
+} from './matchmaking';

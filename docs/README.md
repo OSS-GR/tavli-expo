@@ -79,5 +79,6 @@
 | [0006](decisions/0006-bot.md) | Own TypeScript bot, TD self-play for hard level | Accepted |
 | [0007](decisions/0007-online-game-turn-timer.md) | `turnTimeMinutes` replaces the live/async pace | Accepted |
 | [0008](decisions/0008-accounts.md) | Sign-in methods and account rules: guests stay, Apple, Google and email code to save | Accepted |
+| [0009](decisions/0009-play-ranked.md) | Play ranked: 2-minute turns, two time outs in a row lose the match | Accepted |
 
 New ADRs: copy [0000-template.md](decisions/0000-template.md).

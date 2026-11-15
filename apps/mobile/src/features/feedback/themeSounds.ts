@@ -22,6 +22,7 @@ export const THEME_SOUNDS: Readonly<Record<string, Readonly<Record<string, numbe
     'sounds/turn-start.m4a': require('@tavli/themes/walnut-kafeneio/sounds/turn-start.m4a'),
     'sounds/game-win.m4a': require('@tavli/themes/walnut-kafeneio/sounds/game-win.m4a'),
     'sounds/match-win.m4a': require('@tavli/themes/walnut-kafeneio/sounds/match-win.m4a'),
+    'sounds/clock-tick.m4a': require('@tavli/themes/walnut-kafeneio/sounds/clock-tick.m4a'),
   },
   'olive-inlay': {
     'sounds/checker-place-1.m4a': require('@tavli/themes/olive-inlay/sounds/checker-place-1.m4a'),
@@ -36,6 +37,7 @@ export const THEME_SOUNDS: Readonly<Record<string, Readonly<Record<string, numbe
     'sounds/turn-start.m4a': require('@tavli/themes/olive-inlay/sounds/turn-start.m4a'),
     'sounds/game-win.m4a': require('@tavli/themes/olive-inlay/sounds/game-win.m4a'),
     'sounds/match-win.m4a': require('@tavli/themes/olive-inlay/sounds/match-win.m4a'),
+    'sounds/clock-tick.m4a': require('@tavli/themes/olive-inlay/sounds/clock-tick.m4a'),
   },
   'kafeneio-night': {
     'sounds/checker-place-1.m4a': require('@tavli/themes/kafeneio-night/sounds/checker-place-1.m4a'),
@@ -50,5 +52,6 @@ export const THEME_SOUNDS: Readonly<Record<string, Readonly<Record<string, numbe
     'sounds/turn-start.m4a': require('@tavli/themes/kafeneio-night/sounds/turn-start.m4a'),
     'sounds/game-win.m4a': require('@tavli/themes/kafeneio-night/sounds/game-win.m4a'),
     'sounds/match-win.m4a': require('@tavli/themes/kafeneio-night/sounds/match-win.m4a'),
+    'sounds/clock-tick.m4a': require('@tavli/themes/kafeneio-night/sounds/clock-tick.m4a'),
   },
 };

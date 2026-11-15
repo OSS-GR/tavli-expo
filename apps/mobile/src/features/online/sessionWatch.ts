@@ -2,7 +2,7 @@
  * A live list of the saved session (#297, #314): "Your online games" and
  * "Your invites" on Home.
  *
- * The hook reads the session (`auth.ready()`) and follows sign-in and
+ * The hook reads the session (`auth.loadSession()`) and follows sign-in and
  * sign-out (`auth.onChange`). It never makes an account: with no saved
  * session it shows nothing. Never send the user id to analytics.
  */
@@ -25,8 +25,7 @@ export type SessionWatchState<Loaded extends object> =
   | (Loaded & { readonly status: 'loaded'; readonly failed: boolean })
   /**
    * The session or the first list did not load. `retry` tries again. A
-   * session that `ready()` gives as `null` counts as this too: Better Auth
-   * gives `null` when it cannot reach the server, so that is no sign-out.
+   * session that could not load (`loadSession()` rejects) is no sign-out.
    */
   | { readonly status: 'failed' };
 
@@ -45,10 +44,14 @@ export type StartSessionWatch<Value> = (
  * into the loaded state with `toLoaded`. A failure after a list came
  * keeps that list (`failed: true`); `retry` starts the watch again.
  *
- * Only `onChange(null)` is a sign-out: it shows `signedOut` and forgets
- * the account note (`forgetOnlineAccount`). `ready()` giving `null` may
- * only mean no network (Better Auth's `ready()` never rejects), so it
- * shows `failed` and keeps the note; `retry` loads the session again.
+ * `onChange(null)` is a sign-out. So is `loadSession()` giving `null`:
+ * the server has no session for this phone (it ended, for example after
+ * a year unused). Both show `signedOut` and forget the account note
+ * (`forgetOnlineAccount`). Then the next online step asks for a sign-in,
+ * and Home shows no Try again that can never work.
+ *
+ * With no network, `loadSession()` rejects. That shows `failed` and
+ * keeps the note; `retry` loads the session again.
  *
  * `start` and `toLoaded` restart the watch when they change: keep them
  * stable (`useCallback`).
@@ -100,14 +103,16 @@ export function useSessionWatch<Value, Loaded extends object>(
       }, fail);
     };
 
-    /** No session from `ready()`: maybe no network, so no sign-out. */
+    /** The server's answer: a `null` session is a sign-out. */
     const loaded = (user: AuthUser | null) => {
-      if (user !== null) follow(user);
-      else if (current === undefined) fail();
+      if (user !== null || current === undefined) follow(user);
     };
 
     const unsubscribe = auth.onChange(follow);
-    auth.ready().then(loaded, fail);
+    // A rejection is no answer (no network): the note stays.
+    auth.loadSession().then(loaded, () => {
+      if (current === undefined) fail();
+    });
     return () => {
       live = false;
       unsubscribe();

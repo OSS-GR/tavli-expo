@@ -189,6 +189,7 @@ Not drawn (#350).
   - **Learn to play** banner (#128): a brass-tinted card with an icon, title, one line, **Start the lesson** (filled pill) and **Not now** (text). Shows until the tutorial is finished or dismissed.
   - Mode tiles (`ModeTile.tsx`) under a section title: "New game" with a saved game (then **Play vs bot** is a wide brass tile first), else "More ways to play".
     - **Pass-and-play** (subtitle "2 players, 1 phone") and **Play a friend** ("Online"), two in a row. With a font scale above 1.3 each takes a row.
+    - The tiles and the pills below sit in plain rows (`inRows` and `CellRows` in `HomeScreen.tsx`): two a row, one a row above font scale 1.3. A wide tile (Play vs bot, Join with a code) takes a row of its own, and a lone cell in the last row fills it. The cells of a row share its height, so two tiles side by side always match (a wrapping row could not do that, #539).
     - **Play a friend** without an online server: dashed tile with a "Coming soon" chip.
   - **How to play** (opens `/rules/portes`) and **History** as two pills with icons. Screen readers hear links.
   - Icons are Lucide line icons (ISC) drawn with Skia (`components/Icon.tsx`, `components/icons.ts`).
@@ -224,7 +225,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - **Bot level:** **Easy / Medium / Hard**. A level the bot cannot play in the chosen game shows locked, with "coming soon" under it. Helper text explains the selected level.
   - Info box "Who starts? Each player rolls one die. High die starts." Since #207 the **House rules** part (below) replaces it: its hint says who starts under the chosen rule.
   - **House rules** (#207, both modes): **Opening roll**: **Standard** (default, the federation rule: the starter plays the two opening dice) / **Roll again** (the starter rolls both dice again) / **Choose** (the players pick who starts). Helper text explains the selected rule.
-  - **Rules version** (#241, Plakoto and Asodio only, under Opening roll): Plakoto **Standard** (default) / **Federation**; Asodio **Standard** (default, the kafeneio rules) / **Greek** / **American** (Acey-Deucey). Helper text says what the selected version changes. Tavli shows the Plakoto choice for its Plakoto game, titled **Rules version (Plakoto)** («Παραλλαγή (Πλακωτό)», #247). Portes and Fevga show no version.
+  - **Rules version** (#241, Asodio only, under Opening roll): **Standard** (default, the kafeneio rules) / **Greek** / **American** (Acey-Deucey). Helper text says what the selected version changes. Portes, Plakoto, Fevga and Tavli show no version: Plakoto plays the federation rules only (owner, 2026-11-13, #514).
   - Both groups have a **Standard** option, so a screen reader hears the group with each option: "Opening roll: Standard", "Rules version: Standard" («Πρώτη ζαριά: Κανονικά», «Παραλλαγή: Κανονική») (#243). The visible text stays short.
   - **Start game** (main button, bottom).
 - **States:**
@@ -351,7 +352,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 
 <img src="wireframes/17-dialog-mother-pinned.png" width="300" alt="Plakoto: mother pinned dialog">
 
-- Needed for `motherRule="offerConcede"` (`docs/rules/plakoto.md`).
+- Needed for `motherRule="offerConcede"` (`docs/rules/plakoto.md`). Since #514 only old games use it: new games play the federation rule.
 - Shows to the player whose mother (last checker on their start point) gets pinned.
 - Title "Your mother is pinned", a small pinned-checker picture, and a plain explanation.
 - Two buttons with equal weight: **Resign (lose 2)** and **Play on**. The dialog cannot be dismissed without a choice.
