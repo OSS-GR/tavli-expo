@@ -1,9 +1,10 @@
 import {
-  SIDE_COLUMN,
+  LEFT_RAIL,
+  RIGHT_RAIL,
   boardModeOf,
   isLandscapeWindow,
+  railWidths,
   screenLayoutFor,
-  sideColumnWidth,
 } from './screenLayout';
 
 describe('screenLayoutFor (#185)', () => {
@@ -36,21 +37,29 @@ describe('screenLayoutFor (#185)', () => {
   });
 });
 
-describe('sideColumnWidth (#185)', () => {
-  it('is SIDE_COLUMN at the normal font size, and never narrower', () => {
-    expect(sideColumnWidth(1)).toBe(SIDE_COLUMN);
-    expect(sideColumnWidth(0.85)).toBe(SIDE_COLUMN);
+describe('railWidths (#185)', () => {
+  it('is LEFT_RAIL and RIGHT_RAIL at the normal font size, and never narrower', () => {
+    expect(railWidths(1)).toEqual({ left: LEFT_RAIL, right: RIGHT_RAIL });
+    expect(railWidths(0.85)).toEqual({ left: LEFT_RAIL, right: RIGHT_RAIL });
   });
 
   it('grows with a large font, up to a limit', () => {
-    expect(sideColumnWidth(1.2)).toBeGreaterThan(SIDE_COLUMN);
-    expect(sideColumnWidth(3)).toBe(sideColumnWidth(1.35));
-    expect(sideColumnWidth(3)).toBeLessThan(SIDE_COLUMN * 1.5);
+    expect(railWidths(1.2).right).toBeGreaterThan(RIGHT_RAIL);
+    expect(railWidths(1.2).left).toBeGreaterThan(LEFT_RAIL);
+    expect(railWidths(3)).toEqual(railWidths(1.35));
+    expect(railWidths(3).right).toBeLessThan(RIGHT_RAIL * 1.5);
   });
 
-  it('fits the longest label: Greek "Επιβεβαίωση" in a compact button', () => {
-    // About 100 pt at 17 pt; the compact button adds 4 pt padding and a 2 pt
-    // border on each side; the column adds 4 pt on each side.
-    expect(SIDE_COLUMN - 2 * 4 - 2 * (4 + 2)).toBeGreaterThanOrEqual(104);
+  it('leaves the board most of an iPhone 17 Pro on its side', () => {
+    // 874 pt wide, 62 pt safe edges on each side: the board keeps the rest.
+    const board = 874 - 2 * 62 - LEFT_RAIL - RIGHT_RAIL;
+    expect(board).toBeGreaterThanOrEqual(580);
+  });
+
+  it('fits the longest seat name and button label in Greek', () => {
+    // "Υπολογιστής" (the bot) at 13 pt, about 80 pt.
+    expect(LEFT_RAIL).toBeGreaterThanOrEqual(80);
+    // "Επιβεβαίωση" (Confirm) at 12 pt, about 75 pt.
+    expect(RIGHT_RAIL).toBeGreaterThanOrEqual(75);
   });
 });
