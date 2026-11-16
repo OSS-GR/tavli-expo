@@ -75,6 +75,9 @@ export function RankedSetup({ game, onGame, rating, tableWidth }: RankedSetupPro
         value={game}
         onChange={onGame}
       />
+      <Text testID="ranked-game-line" style={styles.gameLine}>
+        {t(`games.${game}Subtitle`)}
+      </Text>
       <SectionCard>
         <SectionRow
           testID="ranked-clock"
@@ -320,6 +323,11 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.callout,
     color: theme.colors.textDim,
     textAlign: 'center',
+  },
+  gameLine: {
+    ...theme.type.callout,
+    color: theme.colors.textDim,
+    paddingHorizontal: theme.space.xs,
   },
   table: {
     alignItems: 'center',

@@ -18,7 +18,9 @@ import { fitBoardWithShadow, slotRect, stackPosition } from '@/features/board/ge
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';
+import { storage } from '@/services';
 
+import { CONFIRM_HINT_KEY, CONFIRM_HINT_TURNS, reloadConfirmHintForTest } from './confirmHint';
 import { createGameStore, type GameStore } from './gameStore';
 import { BOT_PASS_NOTICE_MS, GameScreen, MATCH_END_DELAY_MS, type BotSeat } from './GameScreen';
 import type { Seat } from './seats';
@@ -128,6 +130,62 @@ describe('<GameScreen /> undo and confirm', () => {
     await touch(PAN, [top(8, 3), point(7)]);
     expect(phase(store)).toBe('awaiting-roll');
     expect(store.getState().flow.game.state.toMove).toBe('black');
+  });
+});
+
+describe('<GameScreen /> "All dice used" note (#575)', () => {
+  const hint = () => screen.queryByTestId('confirm-hint');
+  const saved = () => storage.getString(CONFIRM_HINT_KEY);
+
+  it('counts each turn it shows, once, and keeps it for that turn', async () => {
+    const user = setupUser();
+    await annMoves61();
+    await touch(PAN, [top(13, 5), point(7)]);
+    await touch(PAN, [top(8, 3), point(7)]);
+    expect(hint()).toBeOnTheScreen();
+    expect(saved()).toBe('1');
+    await user.press(button('Undo'));
+    expect(hint()).toBeNull();
+    await touch(PAN, [top(8, 3), point(7)]);
+    expect(hint()).toBeOnTheScreen();
+    expect(saved()).toBe('1');
+  });
+
+  it('stays on the turn that reached the limit', async () => {
+    const user = setupUser();
+    storage.setString(CONFIRM_HINT_KEY, String(CONFIRM_HINT_TURNS - 1));
+    reloadConfirmHintForTest();
+    await annMoves61();
+    await touch(PAN, [top(13, 5), point(7)]);
+    await touch(PAN, [top(8, 3), point(7)]);
+    expect(hint()).toBeOnTheScreen();
+    expect(saved()).toBe(String(CONFIRM_HINT_TURNS));
+    await user.press(button('Undo'));
+    await touch(PAN, [top(8, 3), point(7)]);
+    expect(hint()).toBeOnTheScreen();
+  });
+
+  it('shows no more after the limit, also in a new app run', async () => {
+    storage.setString(CONFIRM_HINT_KEY, String(CONFIRM_HINT_TURNS));
+    reloadConfirmHintForTest();
+    await annMoves61();
+    await touch(PAN, [top(13, 5), point(7)]);
+    await touch(PAN, [top(8, 3), point(7)]);
+    expect(button('Confirm')).toBeEnabled();
+    expect(hint()).toBeNull();
+    // Screen readers still hear that no die is left.
+    expect(screen.getByLabelText(/0 left to play/)).toBeOnTheScreen();
+    expect(saved()).toBe(String(CONFIRM_HINT_TURNS));
+  });
+
+  it('counts a bad saved value as done', async () => {
+    storage.setString(CONFIRM_HINT_KEY, 'oops');
+    reloadConfirmHintForTest();
+    await annMoves61();
+    await touch(PAN, [top(13, 5), point(7)]);
+    await touch(PAN, [top(8, 3), point(7)]);
+    expect(button('Confirm')).toBeEnabled();
+    expect(hint()).toBeNull();
   });
 });
 

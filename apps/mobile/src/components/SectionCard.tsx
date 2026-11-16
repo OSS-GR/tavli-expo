@@ -84,6 +84,11 @@ export function SectionCard({ title, children, padded = false, testID }: Section
 
 export interface SectionRowProps {
   label: string;
+  /**
+   * A small dim note after the label, on the same line: how to say a game's
+   * name in English (How to play, #574). Screen readers skip it.
+   */
+  labelNote?: string;
   /** One short line under the label. It may wrap. */
   hint?: string;
   /** More under the hint, for example a progress line (How to play, #571). */
@@ -126,6 +131,7 @@ export interface SectionRowProps {
 
 export function SectionRow({
   label,
+  labelNote,
   hint,
   below,
   value,
@@ -157,7 +163,10 @@ export function SectionRow({
         )
       ) : null}
       <View style={styles.texts}>
-        <Text style={[styles.label, { color: colors.label }]}>{label}</Text>
+        <Text style={[styles.label, { color: colors.label }]}>
+          {label}
+          {labelNote ? <Text style={styles.labelNote}>{` · ${labelNote}`}</Text> : null}
+        </Text>
         {hint ? <Text style={[styles.hint, { color: colors.hint }]}>{hint}</Text> : null}
         {below}
       </View>
@@ -294,6 +303,10 @@ const styles = StyleSheet.create((theme) => ({
   label: {
     ...theme.type.bodyStrong,
     color: theme.colors.text,
+  },
+  labelNote: {
+    ...theme.type.caption,
+    color: theme.colors.textDim,
   },
   hint: {
     ...theme.type.caption,

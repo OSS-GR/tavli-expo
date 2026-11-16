@@ -302,10 +302,14 @@ export const ICONS = {
       'm22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65',
     ],
   },
-  chartPie: {
+  // Asodio's ace-two (#574): two dice side by side, one pip and two. Our own paths.
+  diceAceTwo: {
     strokes: [
-      'M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z',
-      'M21.21 15.89A10 10 0 1 1 8 2.83',
+      roundRect(1.5, 7, 10, 10, 2),
+      'M6.5 12h.01',
+      roundRect(12.5, 7, 10, 10, 2),
+      'M15.5 10h.01',
+      'M19.5 14h.01',
     ],
   },
   dices: {

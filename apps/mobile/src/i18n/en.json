@@ -14,7 +14,7 @@
   },
   "home": {
     "title": "Tavlaki",
-    "tagline": "Welcome to the kafeneio. Grab a chair.",
+    "tagline": "Welcome to the kafeneio (kah-feh-NEE-oh), the Greek café. Grab a chair.",
     "greeting": {
       "morning": "Good morning",
       "afternoon": "Good afternoon",
@@ -1573,15 +1573,15 @@
   },
   "games": {
     "portes": "Portes",
-    "portesSubtitle": "Πόρτες · Greek backgammon",
+    "portesSubtitle": "Classic backgammon",
     "plakoto": "Plakoto",
-    "plakotoSubtitle": "Πλακωτό · pin, do not hit",
+    "plakotoSubtitle": "Pin, do not hit",
     "fevga": "Fevga",
-    "fevgaSubtitle": "Φεύγα · a race with no hitting",
+    "fevgaSubtitle": "A race with no hitting",
     "tavli": "Tavli",
-    "tavliSubtitle": "Τάβλι · all three in turn: Portes, Plakoto, Fevga",
+    "tavliSubtitle": "All three in turn: Portes, Plakoto, Fevga",
     "asodio": "Asodio",
-    "asodioSubtitle": "Ασόδιο · enter all checkers first"
+    "asodioSubtitle": "All checkers enter first"
   },
   "bot": {
     "levels": {
@@ -1787,13 +1787,7 @@
       "none": "{{total}} lessons",
       "some": "{{learnt}} of {{total}} lessons",
       "done": "Lessons done",
-      "blurb": {
-        "tavli": "Portes, Plakoto and Fevga in turn",
-        "portes": "Hit and block with doors",
-        "plakoto": "Pin, do not hit",
-        "fevga": "A race: no hitting, no pinning",
-        "asodio": "One army, quarter by quarter"
-      }
+      "say": "say {{sound}}"
     }
   },
   "time": {

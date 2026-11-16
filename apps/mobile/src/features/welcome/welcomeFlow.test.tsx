@@ -185,7 +185,9 @@ describe('first launch', () => {
     expect(storage.getString(WELCOME_BOARD_STORAGE_KEY)).toBe('done');
     // Continue alone keeps the board as it was.
     expect(settingsStore.getState()).toMatchObject(DEFAULT_SETTINGS);
-    expect(screen.getByText('Welcome to the kafeneio. Grab a chair.')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Welcome to the kafeneio (kah-feh-NEE-oh), the Greek café. Grab a chair.'),
+    ).toBeOnTheScreen();
     expect(consentStore.getState().status).toBe('granted');
     expect(recorded.isOptedIn()).toBe(true);
     expect(recorded.sent.map((s) => s.type)).toContain('identify');
@@ -385,7 +387,7 @@ describe('first launch', () => {
       expect(tourStore.getState().status).toBe('done');
       expect(createTourStore(storage).getState().status).toBe('done');
       // Home shows again with no tour over it.
-      expect(screen.getByText('Welcome to the kafeneio. Grab a chair.')).toBeOnTheScreen();
+      expect(screen.getByTestId('home-whats-new')).toBeOnTheScreen();
     });
 
     it('never opens by itself for a player from before the tour', async () => {

@@ -1,7 +1,9 @@
 /**
  * How to play (#571, Figma frame 20): one place for the lessons and the
  * rules of every game. A row for the Tavli match, then one per game, each
- * with a short line and, for a game, its lesson progress. A row opens the
+ * with the game's plain line (`games.<id>Subtitle`, #574) and, for a game,
+ * its lesson progress. In English each name also says how to say it
+ * ("say POR-tes"); in Greek it does not. A row opens the
  * game's page (`RulesScreen`): the lessons on top, the rules below.
  *
  * Home's How to play link and Settings → Help open it (`/rules`). Rules in
@@ -22,12 +24,21 @@ import type { LessonProgress } from '@/features/tutorial/progress';
 import { RULES_GAMES, rulesTitleKey, type RulesVariant } from './content';
 import { LessonDots, hubProgressText } from './LessonsCard';
 
-/** One icon per game: Portes' doors, Plakoto's pin, Fevga's race, Asodio's quarters. */
+/** One icon per game: Portes' doors, Plakoto's pin, Fevga's race, Asodio's ace-two. */
 const GAME_ICONS: Record<TutorialGame, IconName> = {
   portes: 'doorOpen',
   plakoto: 'layers',
   fevga: 'fastForward',
-  asodio: 'chartPie',
+  asodio: 'diceAceTwo',
+};
+
+/** How to say each name, for English speakers (#574). */
+const SOUNDS: Record<RulesVariant, string> = {
+  tavli: 'TAV-lee',
+  portes: 'POR-tes',
+  plakoto: 'plah-koh-TOH',
+  fevga: 'FEV-gah',
+  asodio: 'ah-SOH-dee-oh',
 };
 
 export interface HowToPlayScreenProps {
@@ -41,7 +52,10 @@ export interface HowToPlayScreenProps {
 }
 
 export function HowToPlayScreen({ progress, onOpen, onBack, onTour }: HowToPlayScreenProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // A Greek reader needs no help to say a Greek name.
+  const say = (variant: RulesVariant) =>
+    i18n.resolvedLanguage === 'el' ? undefined : t('rules.hub.say', { sound: SOUNDS[variant] });
   return (
     <Screen>
       <ScreenHeader
@@ -59,7 +73,8 @@ export function HowToPlayScreen({ progress, onOpen, onBack, onTour }: HowToPlayS
             testID="how-to-play-tavli"
             icon="dices"
             label={t('rules.hub.tavli')}
-            hint={t('rules.hub.blurb.tavli')}
+            labelNote={say('tavli')}
+            hint={t('games.tavliSubtitle')}
             onPress={() => onOpen('tavli')}
           />
           {RULES_GAMES.map((game) => (
@@ -68,9 +83,10 @@ export function HowToPlayScreen({ progress, onOpen, onBack, onTour }: HowToPlayS
               testID={`how-to-play-${game}`}
               icon={GAME_ICONS[game]}
               label={t(`games.${game}`)}
-              hint={t(`rules.hub.blurb.${game}`)}
+              labelNote={say(game)}
+              hint={t(`games.${game}Subtitle`)}
               below={<LessonDots count={LESSON_SETS[game].length} progress={progress[game]} />}
-              accessibilityLabel={`${t(rulesTitleKey(game))}, ${t(`rules.hub.blurb.${game}`)}, ${hubProgressText(t, LESSON_SETS[game].length, progress[game])}`}
+              accessibilityLabel={`${t(rulesTitleKey(game))}, ${t(`games.${game}Subtitle`)}, ${hubProgressText(t, LESSON_SETS[game].length, progress[game])}`}
               onPress={() => onOpen(game)}
             />
           ))}
