@@ -1,8 +1,8 @@
 # Age rating
 
-> The answers for the App Store age rating and the Google Play content rating (IARC). Issue #137. Last review: 2026-11-09 (#320, block and report).
+> The answers for the App Store age rating and the Google Play content rating (IARC). Issue #137. Last review: 2026-11-16 (#531, Play ranked; #406, friends; #407, ratings).
 
-Tavlaki is a board game. It has dice, but no betting, no real money, no prizes, no purchases, no ads and no chat. Online play is only with a friend you invite (#281). Players with a saved account pick a **username** that other players see (#405): that is user-generated content. The answers below should give **4+** on the App Store and **PEGI 3 / ESRB Everyone** on Google Play.
+Tavlaki is a board game. It has dice, but no betting, no real money, no prizes, no purchases, no ads and no chat. Online play is with a friend you invite (#281) or, for a saved account, with a stranger of a similar rating in **Play ranked** (#531). Players with a saved account pick a **username** that other players see (#405), and friends and leaderboards show usernames and ratings (#406, #407): that is user-generated content, and Play ranked means players meet people they do not know. Players can only play moves: there is no chat, no free text, no pictures and no voice. The answers below should give **4+** or **9+** on the App Store and **PEGI 3 / ESRB Everyone** on Google Play (see "Expected result").
 
 **Owner:** the stores change the wording of these questions now and then. The lists follow Apple's questionnaire from 2025 and the IARC questionnaire as we know them. Answer the real form with the facts here.
 
@@ -25,8 +25,8 @@ So: **Simulated gambling: None. Gambling (real money): No. Contests: None. Loot 
 | In-app controls | Parental controls | No |
 | In-app controls | Age assurance | No (the username step has a self-declared age box only: "I am 16 or older", or 13 by region; **Owner:** check that Apple does not count it) |
 | Capabilities | Unrestricted web access | No (the app only opens the privacy policy page in the browser) |
-| Capabilities | User-generated content | **Yes**: usernames (#405). Other players see them in games, invites and lists. Pass-and-play names stay on the phone. |
-| Capabilities | Messaging and chat | No |
+| Capabilities | User-generated content | **Yes**: usernames (#405). Other players see them in games, invites, friends lists, the leaderboards and Play ranked, where players meet strangers (#531). Pass-and-play names stay on the phone. |
+| Capabilities | Messaging and chat | No (players only play moves; no chat, free text, pictures or voice. A report takes a reason from a list, with no free text) |
 | Capabilities | Advertising | No |
 | Mature themes | Profanity or crude humor | None |
 | Mature themes | Horror or fear themes | None |
@@ -41,7 +41,7 @@ So: **Simulated gambling: None. Gambling (real money): No. Contests: None. Loot 
 | Chance-based activities | Gambling (real money) | No |
 | Chance-based activities | Loot boxes | No |
 
-Expected result: **4+**. **Owner:** the "User-generated content" answer may raise it; accept what the form gives. Do not put the app in the Kids category: it is not made for children (see the privacy policy, "Children").
+Expected result: **4+** or **9+**. The "User-generated content" answer and meeting strangers in Play ranked may raise it, even with no chat. **Owner:** answer the facts and accept what the form gives; do not lower an answer to get a lower rating. If the form asks whether users can talk to strangers, the answer is No: they only see a username and a rating and play moves. Do not put the app in the Kids category: it is not made for children (see the privacy policy, "Children").
 
 ## Google Play (App content → Content rating, IARC)
 
@@ -56,7 +56,7 @@ Category: **Game** (a board game).
 | Controlled substances (alcohol, tobacco, drugs) | No |
 | Gambling: does the app simulate gambling? | No (see "Dice and chance") |
 | Gambling: does the app offer real-money gambling? | No |
-| Users can interact or exchange content (chat, online play, sharing) | **Yes**: online games with a friend (#281) and usernames that other players see (#405). No chat. |
+| Users can interact or exchange content (chat, online play, sharing) | **Yes**: online games with a friend (#281) and with strangers in Play ranked (#531), and usernames that other players see (#405). No chat. |
 | Shares the user's current location | No |
 | In-app purchases or digital goods | No |
 | Random items or loot boxes bought with money | No |
@@ -80,8 +80,9 @@ Usernames are user content, so both stores ask for these. What we have:
 - **A filter**: the name rules and the block and reserved lists (`packages/online/src/usernames.ts`), on the phone and on the server.
 - **Block and report** (#320, server): a player can block or report a player they met (a game, or an invite they answered). A report has a reason from a list (name, cheating, harassment, other) and blocks too. The blocker no longer sees the name, and no new game between the two starts from an invite. Reports land in the `reports` table (`apps/server/convex/safety.ts`). In the app (#435), **Report or block** sits where the other player's name shows: the online game menu, the end of an online match and History's Online section; Settings → Blocked players lists the blocks with Unblock. Reports can also go by email to the contact address in the terms.
 - **Action on reports**: the owner reads `reports` in the Convex dashboard, renames or clears a name with `clearUsername` (`apps/server/convex/usernames.ts`), and then deletes the report row. **Owner:** Apple 1.2 asks that you act on reports in a timely way; check the table often.
-- **Contact**: the address in the terms and on the store page.
+- **Fair play in Play ranked**: the terms forbid help from another program; ranked games show no hints. A report can give the reason "cheating".
+- **Contact**: the address in the terms and on the store page. It must work: reports by email go there.
 
 ## When to redo the ratings
 
-Friends, a public lobby or chat change the answers to "Users can interact" (Google) and "Messaging and chat" (Apple). Purchases (for example themes) change the in-app purchase answers. Redo both forms before that release.
+Friends (#406) and Play ranked (#531) are in these answers now. Chat, free text, pictures or voice would change "Messaging and chat" (Apple) and "Users can interact" (Google). Purchases (for example themes) change the in-app purchase answers. Redo both forms before that release.
