@@ -229,7 +229,7 @@ describe('<NewGameScreen /> game picker (#109)', () => {
     }
     expect(
       screen.getByRole('radio', {
-        name: 'Tavli, Τάβλι · all three in turn: Portes, Plakoto, Fevga',
+        name: 'Tavli, All three in turn: Portes, Plakoto, Fevga',
       }),
     ).toBeOnTheScreen();
     // Asodio is on the board since #124.

@@ -1300,7 +1300,11 @@ describe('your online games on Home (#297)', () => {
     newGame();
     const ready = jest.spyOn(onlineFake.auth, 'ready');
     await renderRouter('./src/app', { initialUrl: '/' });
-    expect(await screen.findByText('Welcome to the kafeneio. Grab a chair.')).toBeOnTheScreen();
+    expect(
+      await screen.findByText(
+        'Welcome to the kafeneio (kah-feh-NEE-oh), the Greek café. Grab a chair.',
+      ),
+    ).toBeOnTheScreen();
     expect(ready).not.toHaveBeenCalled();
     expect(screen.queryByTestId('home-online-games')).toBeNull();
     ready.mockRestore();
@@ -1477,7 +1481,11 @@ describe('your invites on Home (#314)', () => {
       .createInvite({ choice: 'portes', targetPoints: 3, turnTimeMinutes: 1 });
     const watch = jest.spyOn(onlineFake.invites, 'watchMyInvites');
     await renderRouter('./src/app', { initialUrl: '/' });
-    expect(await screen.findByText('Welcome to the kafeneio. Grab a chair.')).toBeOnTheScreen();
+    expect(
+      await screen.findByText(
+        'Welcome to the kafeneio (kah-feh-NEE-oh), the Greek café. Grab a chair.',
+      ),
+    ).toBeOnTheScreen();
     expect(watch).not.toHaveBeenCalled();
     expect(screen.queryByTestId('home-invites')).toBeNull();
     watch.mockRestore();

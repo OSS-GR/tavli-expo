@@ -156,6 +156,8 @@ describe('<RankedScreen /> with a saved account', () => {
     expect(screen.getByRole('radio', { name: 'Portes' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: 'Tavli' })).toBeOnTheScreen();
     expect(screen.queryByRole('radio', { name: 'Asodio' })).toBeNull();
+    // The picked game's plain line (#574).
+    expect(screen.getByTestId('ranked-game-line')).toHaveTextContent('Classic backgammon');
     expect(screen.getByText('2 minutes a turn')).toBeOnTheScreen();
     expect(screen.getByText('2:00')).toBeOnTheScreen();
     expect(screen.getByText('Your rating 1500 · no hints')).toBeOnTheScreen();

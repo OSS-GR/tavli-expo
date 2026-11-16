@@ -614,6 +614,8 @@ describe('<MatchScreen /> the chosen game (#109)', () => {
     await show(s).view;
     await user.press(button('Game menu'));
     expect(screen.getByTestId('menu-game-label')).toHaveTextContent('Game 1 · Fevga');
+    // The game's plain line under the title (#574).
+    expect(screen.getByTestId('menu-game-line')).toHaveTextContent('A race with no hitting');
     expect(button('How to play Fevga')).toBeOnTheScreen();
   });
 });
