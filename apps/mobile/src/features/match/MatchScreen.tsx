@@ -28,7 +28,7 @@ import { canResignGame, previewResign, resignMatchText, resigningPlayer } from '
 import { seatsFor } from './seats';
 import type { MatchSession } from './sessions';
 import { BOT_SIDE } from './setup';
-import { currentGameLabel, nextGameLabel, variantName } from './summary';
+import { currentGameLabel, currentGameLine, nextGameLabel, variantName } from './summary';
 
 export interface MatchScreenProps {
   session: MatchSession;
@@ -97,6 +97,7 @@ export function MatchScreen({
   // The game on the board: the chosen game, or this game of the Tavli rotation.
   const playing = variantName(flow.game.state.variant, t);
   const gameLabel = currentGameLabel(flow, t);
+  const gameLine = currentGameLine(flow, t);
   const nextLabel =
     flow.game.phase === 'game-over' && flow.match.status !== 'finished'
       ? nextGameLabel(flow.match, t)
@@ -116,6 +117,7 @@ export function MatchScreen({
     content = (
       <GameMenu
         gameLabel={gameLabel}
+        {...(gameLine ? { gameLine } : {})}
         about={about}
         score={{
           names: { white: name('white'), black: name('black') },

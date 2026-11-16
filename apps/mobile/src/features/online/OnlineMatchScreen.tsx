@@ -54,7 +54,7 @@ import {
 import { GameMenu } from '@/features/match/GameMenu';
 import { MissingGame } from '@/features/match/MissingGame';
 import { resignMatchText } from '@/features/match/resign';
-import { currentGameLabel, variantName } from '@/features/match/summary';
+import { currentGameLabel, currentGameLine, variantName } from '@/features/match/summary';
 import { ReportOrBlock, safetyName, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { onlineBoardStore, type OnlineBoardStore } from './boardStore';
@@ -331,6 +331,7 @@ function OnlineBoard({
   const game = t(`games.${view.choice}`);
   const playing = variantName(flow.game.state.variant, t);
   const gameLabel = currentGameLabel(flow, t);
+  const gameLine = currentGameLine(flow, t);
   // The server has started the next game already: the sheet names it.
   const nextLabel =
     ended !== null
@@ -345,6 +346,7 @@ function OnlineBoard({
     content = (
       <GameMenu
         gameLabel={gameLabel}
+        {...(gameLine ? { gameLine } : {})}
         about={t('online.label', { game })}
         score={{
           names: { white: name('white'), black: name('black') },

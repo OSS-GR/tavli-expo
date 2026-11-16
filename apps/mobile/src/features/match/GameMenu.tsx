@@ -38,6 +38,8 @@ export interface GameMenuProps {
    * title (#515). Without it the title is "Game menu".
    */
   gameLabel?: string;
+  /** The game's plain line under the title: "Pin, do not hit" (#574). */
+  gameLine?: string;
   /**
    * The match, for screen readers: "Portes · vs Bot (Easy)". The score
    * line reads it first, then the score and the target from `score`.
@@ -89,6 +91,11 @@ export function GameMenu(props: GameMenuProps) {
             accessibilityRole="header">
             {props.gameLabel ?? t('game.menu.title')}
           </Text>
+          {props.gameLine ? (
+            <Text testID="menu-game-line" style={styles.gameLine}>
+              {props.gameLine}
+            </Text>
+          ) : null}
           <ScoreLine about={props.about} score={props.score} />
         </View>
         <RoundButton
@@ -237,6 +244,10 @@ const styles = StyleSheet.create((theme) => ({
   title: {
     ...theme.type.title2,
     color: theme.colors.text,
+  },
+  gameLine: {
+    ...theme.type.callout,
+    color: theme.colors.textDim,
   },
   scoreLine: {
     flexDirection: 'row',
