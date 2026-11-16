@@ -95,6 +95,8 @@ function RootStack() {
           <Stack.Screen name="rules/[variant]" options={{ headerShown: true }} />
           {/* The tutorial board: no swipe back either (Skip is on screen). */}
           <Stack.Screen name="tutorial" options={{ gestureEnabled: false, ...TURNS_WITH_PHONE }} />
+          {/* The app tour (#573): no swipe back (Skip is on screen, and the move page drags). */}
+          <Stack.Screen name="tour" options={{ gestureEnabled: false }} />
           {/* No swipe back on the board: it would fight the checker drag. */}
           <Stack.Screen
             name="game/[id]/index"

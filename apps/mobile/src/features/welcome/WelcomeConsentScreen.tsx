@@ -10,6 +10,7 @@ import { Screen } from '@/components/Screen';
 import { CardFrame, RowDivider } from '@/components/SectionCard';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
+import { tourStore } from '@/features/tour/tourStore';
 import { whatsNewSeen } from '@/features/whats-new/seen';
 
 import { useBoardStep } from './boardStepStore';
@@ -46,6 +47,8 @@ export function WelcomeConsentScreen({ onBack, onAnswered }: WelcomeConsentScree
     beginBoardStep();
     // A new player has seen every release of What's new (#471).
     whatsNewSeen.begin();
+    // A new player gets the app tour on Home after the welcome flow (#573).
+    tourStore.getState().begin();
     setConsent(granted);
     onAnswered?.();
   };
