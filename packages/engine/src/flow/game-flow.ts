@@ -490,7 +490,11 @@ export function remainingDice(flow: GameFlow): readonly DieValue[] {
  *   loses the 5 at once. When the plays differ in which die they leave,
  *   none is lost yet.
  *
- * It reads the variant's `legalTurns`; it adds no rule.
+ * It reads the variant's `legalTurns` from the start of the turn; it adds
+ * no rule. The moves already played need no filter: every legal play uses
+ * the same number of dice, and `played` begins one of them. So a double
+ * loses the same count after any move (#12 checks it), and a plain roll
+ * with one die left is either still moving (that die plays) or complete.
  */
 export function lostDice(flow: GameFlow, ctx: FlowContext = {}): readonly DieValue[] {
   const left = remainingDice(flow);
