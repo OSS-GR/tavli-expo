@@ -264,7 +264,7 @@ describe('<GameScreen /> opening roll house rule (#207)', () => {
       await render(<GameScreen store={store} />);
       await rollDie(store, 'white', 6);
       await rollDie(store, 'black', 3);
-      expect(message()).toHaveTextContent('Ξεκινά: Μαρία (6-3). Ξαναρίχνει τα ζάρια.');
+      expect(message()).toHaveTextContent('Μαρία ξεκινά (6-3) και ξαναρίχνει.');
     });
   });
 
@@ -352,9 +352,7 @@ describe('<GameScreen /> opening roll house rule (#207)', () => {
       const store = newStore('chosenStarterRolls', { white: 'Μαρία', black: 'Νίκος' });
       await render(<GameScreen store={store} />);
       expect(card().getByRole('header', { name: 'Ποιος ξεκινά;' })).toBeOnTheScreen();
-      expect(
-        card().getByText('Διαλέξτε ποιος ξεκινά. Αυτός ρίχνει και τα δύο ζάρια.'),
-      ).toBeOnTheScreen();
+      expect(card().getByText('Όποιος ξεκινήσει ρίχνει και τα δύο ζάρια.')).toBeOnTheScreen();
       expect(card().getByRole('button', { name: 'Ξεκινά: Μαρία' })).toBeOnTheScreen();
       expect(card().getByRole('button', { name: 'Ξεκινά: Νίκος' })).toBeOnTheScreen();
     });

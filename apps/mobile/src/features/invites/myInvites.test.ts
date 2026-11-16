@@ -77,10 +77,10 @@ describe('inviteRowText', () => {
     try {
       const text = inviteRowText(invite('ABCD2345', { choice: 'plakoto' }), i18n.t, NOW, 0);
       expect(text).toEqual({
-        title: 'Πλακωτό · έως 3 βαθμούς',
+        title: 'Πλακωτό · στους 3 πόντους',
         line: '1 λεπτό · Λήγει σε 23 ώρες',
         code: 'Κωδικός ABCD2345',
-        label: 'Πρόσκληση, Πλακωτό, έως 3 βαθμούς, 1 λεπτό, Λήγει σε 23 ώρες',
+        label: 'Πρόσκληση, Πλακωτό, στους 3 πόντους, 1 λεπτό, Λήγει σε 23 ώρες',
       });
       const due = invite('A', { expiresAt: NOW });
       expect(inviteRowText(due, i18n.t, NOW, 0).line).toBe('1 λεπτό · Λήγει τώρα');

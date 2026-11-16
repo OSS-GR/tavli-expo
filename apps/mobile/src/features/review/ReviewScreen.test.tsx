@@ -189,11 +189,13 @@ describe('<ReviewScreen />', () => {
     expect(screen.getByText('Ελέγχω τις κινήσεις…')).toBeOnTheScreen();
     const card = await screen.findByTestId('review-mistake-1');
     expect(screen.getByRole('header', { name: 'Παρτίδα 1 · Πόρτες' })).toBeOnTheScreen();
-    expect(screen.getByText('Τα μεγαλύτερα λάθη σου, πρώτα το μεγαλύτερο.')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Τα μεγαλύτερα λάθη σου, ξεκινώντας από το χειρότερο.'),
+    ).toBeOnTheScreen();
     expect(within(card).getByText('Μεγάλο λάθος')).toBeOnTheScreen();
-    expect(within(card).getByText('Γύρος 5 · ζάρια 6-5')).toBeOnTheScreen();
+    expect(within(card).getByText('Γύρος 5 · ζαριά 6-5')).toBeOnTheScreen();
     expect(within(card).getByText('Έπαιξες: 8 → 2, 8 → 3 · χτύπημα')).toBeOnTheScreen();
-    expect(within(card).getByText('Καλύτερο: 24 → 18 → 13 · χτύπημα')).toBeOnTheScreen();
+    expect(within(card).getByText('Καλύτερη: 24 → 18 → 13 · χτύπημα')).toBeOnTheScreen();
   });
 });
 

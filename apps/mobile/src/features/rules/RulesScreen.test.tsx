@@ -209,10 +209,10 @@ describe('<RulesScreen />', () => {
 
   it.each([
     ['en', 'asodio.aceyDeuceyAmerican', /^You win 1 point for each checker the other player/],
-    ['el', 'asodio.aceyDeuceyAmerican', /^Κερδίζεις 1 βαθμό για κάθε πούλι/],
+    ['el', 'asodio.aceyDeuceyAmerican', /^Κερδίζεις 1 πόντο για κάθε πούλι/],
     ['en', 'asodio.aceyDeuceyGreek', /^Mono \(μονό\): you win 1 point/],
     ['en', null, /^Mono \(μονό\): you win 1 point/],
-    ['el', null, /^Μονό: κερδίζεις 1 βαθμό/],
+    ['el', null, /^Μονό: κερδίζεις 1 πόντο/],
   ] as const)(
     'the %s Asodio Points section in %s follows its scoring (#245)',
     async (language, version, first) => {
@@ -221,12 +221,14 @@ describe('<RulesScreen />', () => {
       });
       await render(<RulesScreen variant="asodio" version={version} onOpenRules={jest.fn()} />);
       const box = within(screen.getByTestId('rules-section-scoring'));
-      expect(box.getByRole('header')).toHaveTextContent(language === 'el' ? 'Βαθμοί' : 'Points');
+      expect(box.getByRole('header')).toHaveTextContent(language === 'el' ? 'Πόντοι' : 'Points');
       expect(box.getByText(first)).toBeOnTheScreen();
       if (version === 'asodio.aceyDeuceyAmerican') {
         expect(box.queryByText(/^(Mono|Μονό|Diplo|Διπλό)/)).toBeNull();
         expect(
-          box.getByText(language === 'el' ? /^Με παραίτηση μετράει το ίδιο/ : /^A resign counts/),
+          box.getByText(
+            language === 'el' ? /^Το ίδιο μετράει και η παραίτηση/ : /^A resign counts/,
+          ),
         ).toBeOnTheScreen();
       } else {
         expect(box.getByText(/^(Diplo|Διπλό)/)).toBeOnTheScreen();
@@ -312,8 +314,8 @@ describe('<RulesScreen />', () => {
     await show('plakoto').view;
     expect(screen.getByRole('header', { name: 'Η μάνα' })).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Μάζεμα' })).toBeOnTheScreen();
-    expect(screen.getByRole('header', { name: 'Βαθμοί' })).toBeOnTheScreen();
-    expect(screen.getByRole('image', { name: 'Το ταμπλό στην αρχή: Πλακωτό' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Πόντοι' })).toBeOnTheScreen();
+    expect(screen.getByRole('image', { name: 'Πλακωτό: το στήσιμο στο ταμπλό' })).toBeOnTheScreen();
   });
 
   it('links to the three games from the Tavli page', async () => {

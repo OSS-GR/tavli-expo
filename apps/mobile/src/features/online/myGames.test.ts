@@ -93,7 +93,7 @@ describe('gameRowText', () => {
     });
     expect(gameRowText(named, el, NOW, 0)).toMatchObject({
       title: 'Πόρτες · Επισκέπτης 4821',
-      turn: 'Περιμένουμε: Επισκέπτης 4821',
+      turn: 'Παίζει: Επισκέπτης 4821',
     });
   });
 
@@ -114,9 +114,9 @@ describe('gameRowText', () => {
       title: 'Πλακωτό με φίλο',
       turn: 'Σειρά σου',
       score: '3–1',
-      time: 'Χρόνος: 23 ώρες',
-      label: 'Πλακωτό με φίλο, Σειρά σου, 3 προς 1, Χρόνος: 23 ώρες',
+      time: 'Μένουν 23 ώρες',
+      label: 'Πλακωτό με φίλο, Σειρά σου, 3 προς 1, Μένουν 23 ώρες',
     });
-    expect(gameRowText(summary('a', waiting), el, NOW, 0).turn).toBe('Περιμένουμε τον φίλο σου');
+    expect(gameRowText(summary('a', waiting), el, NOW, 0).turn).toBe('Παίζει ο φίλος σου');
   });
 });

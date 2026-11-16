@@ -395,7 +395,7 @@ describe('<HomeOnlineGames />', () => {
     expect(screen.getByRole('header', { name: 'Τα παιχνίδια σου' })).toBeOnTheScreen();
     expect(
       screen.getByRole('button', {
-        name: `Πόρτες · Επισκέπτης ${onlineFake.guestNumber(FRIEND)}, Σειρά σου, 0 προς 0, Χρόνος: 24 ώρες`,
+        name: `Πόρτες · Επισκέπτης ${onlineFake.guestNumber(FRIEND)}, Σειρά σου, 0 προς 0, Μένουν 24 ώρες`,
       }),
     ).toBeOnTheScreen();
     await act(async () => {

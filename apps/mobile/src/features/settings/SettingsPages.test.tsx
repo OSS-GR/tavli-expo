@@ -257,7 +257,7 @@ describe('Settings → Board & look', () => {
     expect(within(group).getByRole('radio', { name: 'Κλασικό' })).toBeOnTheScreen();
     expect(
       screen.getByText(
-        'Μόνο για το παιχνίδι. Το μάθημα και οι κανόνες δείχνουν πάντα το ψηλό ταμπλό.',
+        'Ισχύει μόνο για το παιχνίδι. Στο μάθημα και στους κανόνες το ταμπλό είναι πάντα ψηλό.',
       ),
     ).toBeOnTheScreen();
   });
@@ -315,7 +315,7 @@ describe('Settings → Board & look', () => {
     const list = within(screen.getByTestId('settings-theme'));
     expect(list.getByRole('radio', { name: 'Όπως το ταμπλό' })).toBeChecked();
     expect(list.getByRole('radio', { name: 'Ελιά με ένθετα' })).toBeOnTheScreen();
-    expect(screen.getByText('Αρχική επιλογή. Τώρα: Καρυδιά Καφενείου, σκούρα')).toBeOnTheScreen();
+    expect(screen.getByText('Προεπιλογή. Τώρα: Καρυδιά Καφενείου, σκούρα')).toBeOnTheScreen();
   });
 });
 
