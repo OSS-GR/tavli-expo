@@ -106,20 +106,20 @@ describe('<NewGameScreen /> match length hint (#245)', () => {
       await render(show());
       await user.press(screen.getByRole('radio', { name: '3' }));
       expect(lengthHint()).toHaveTextContent(
-        'Νικά όποιος φτάσει τους 3 βαθμούς. Μονό = 1, διπλό = 2.',
+        'Νικά όποιος φτάσει πρώτος τους 3 πόντους. Μονό = 1, διπλό = 2.',
       );
-      await user.press(screen.getByRole('radio', { name: /^Ασόδιο/ }));
+      await user.press(screen.getByRole('radio', { name: /^Ασόδυο/ }));
       await user.press(version('Αμερικάνικη'));
       expect(lengthHint()).toHaveTextContent(
-        'Νικά όποιος φτάσει τους 3 βαθμούς. 1 βαθμός για κάθε πούλι που μένει.',
+        'Νικά όποιος φτάσει πρώτος τους 3 πόντους. 1 πόντος για κάθε πούλι που μένει αμάζευτο.',
       );
       await user.press(screen.getByRole('radio', { name: '1' }));
       expect(lengthHint()).toHaveTextContent(
-        'Νικά όποιος φτάσει τον 1 βαθμό. 1 βαθμός για κάθε πούλι που μένει.',
+        'Νικά όποιος φτάσει πρώτος τον 1 πόντο. 1 πόντος για κάθε πούλι που μένει αμάζευτο.',
       );
       await user.press(version('Ελληνική'));
       expect(lengthHint()).toHaveTextContent(
-        'Νικά όποιος φτάσει τον 1 βαθμό. Μονό = 1, διπλό = 2.',
+        'Νικά όποιος φτάσει πρώτος τον 1 πόντο. Μονό = 1, διπλό = 2.',
       );
     } finally {
       await act(async () => {

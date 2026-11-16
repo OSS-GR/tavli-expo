@@ -789,14 +789,14 @@ describe('<MatchScreen /> Acey-Deucey American scoring (#245)', () => {
       await user.press(button(/^Παραίτηση από την παρτίδα/));
       expect(
         within(screen.getByTestId('resign-game-dialog')).getByText(
-          'Nikos: κερδίζει 1 βαθμό, γιατί Maria: έχει ακόμα 1 πούλι να μαζέψει.',
+          'Nikos κερδίζει 1 πόντο, γιατί Maria έχει ακόμα 1 πούλι αμάζευτο.',
         ),
       ).toBeOnTheScreen();
       await user.press(button('Παραίτηση'));
       const card = within(screen.getByTestId('game-end-card'));
-      expect(card.getByText('+1 βαθμός')).toBeOnTheScreen();
+      expect(card.getByText('+1 πόντος')).toBeOnTheScreen();
       expect(
-        card.getByText('Maria: παραιτήθηκε χωρίς να μαζέψει 1 πούλι, 1 βαθμός.'),
+        card.getByText('Maria παραιτήθηκε και άφησε 1 πούλι αμάζευτο: 1 πόντος.'),
       ).toBeOnTheScreen();
     } finally {
       await act(async () => {

@@ -222,7 +222,7 @@ describe('<GameScreen /> the "choose a double" card (#205)', () => {
     names.forEach((name, i) => {
       expect(within(card.getByTestId(`choose-double-${i + 1}`)).getByText(name)).toBeOnTheScreen();
       expect(
-        card.getByRole('button', { name: `${name}: τέσσερις κινήσεις του ${i + 1}` }),
+        card.getByRole('button', { name: `${name}: τέσσερις φορές το ${i + 1}` }),
       ).toBeOnTheScreen();
     });
     expect(said()).toContain('Έφερες ασόδυο (1-2) Διάλεξε ποιες διπλές θα παίξεις:');
@@ -341,7 +341,7 @@ describe('<GameScreen /> a chosen double with no move passes (#205)', () => {
     await whitePlaysAceDeuce(store, ['24/23', '24/22']);
     await press('choose-double-6');
     const card = within(screen.getByTestId('pass-card'));
-    expect(card.getByText('Διάλεξες 6-6. Κανένα πούλι δεν μπορεί να κινηθεί.')).toBeOnTheScreen();
+    expect(card.getByText('Διάλεξες 6-6 και δεν έχεις κίνηση.')).toBeOnTheScreen();
   });
 
   it('a rolled pass still says "rolled"', async () => {
