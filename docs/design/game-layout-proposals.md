@@ -8,7 +8,8 @@
 - Both layouts: one-line strips (36 pt), the dice on the board (in the theme's dice area, at least 32 pt so they are easy to read), one row of two big buttons (Undo · Confirm, or one Roll) at the bottom. Every text stays upright.
 - Tall: the menu sits in the top strip and the game label moves into the menu. Classic: the menu and the game label sit at the top; the strips hug the board.
 - How it is built: [Board screen → Board layouts](../architecture/board-screen.md#board-layouts-184).
-- **Landscape (#185): built as drawn below.** Only the game screen and the tutorial board turn with the phone; every other screen stays upright. The classic board sits in the middle; the left column holds the menu, both players and Undo, the right column the game label, the dice and Roll or Confirm. Changes from the picture: the columns are 128 pt (not 96 pt), so Greek "Επιβεβαίωση" fits on one line; the board is then a little smaller (checker 25 pt on the SE, 35 pt on the Pro Max). The strips show the color and the score on the first line, then the pill and the name (no pip count since #238). How it is built: [Board screen → Landscape](../architecture/board-screen.md#landscape-185).
+- **Landscape (#185): first built as drawn below.** Only the game screen and the tutorial board turn with the phone; every other screen stays upright. The classic board sits in the middle.
+- **Since #547 (Figma "18") the landscape sides are rails, not the columns drawn below.** Two 84 pt rails: the left one holds the menu, the other seat, the score and your seat; the right one the round buttons (Undo, Roll or Confirm, the hint). The dice sit on the board, and the seats have no score of their own. The 128 pt columns, the pills and the dice column in the pictures are gone. How it is built: [Board screen → Landscape](../architecture/board-screen.md#landscape-185).
 
 ## How to read the pictures
 

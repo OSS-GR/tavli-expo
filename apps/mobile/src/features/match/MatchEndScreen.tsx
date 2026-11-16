@@ -1,8 +1,14 @@
 /**
- * Match end (wireframe 9, restyled after the "Match end" wireframe in
- * #361): a brass hero card with who won the match (a trophy badge for a win
- * by a person), the final score and the match, one row per game in a card,
- * then Rematch (the main button), Review, Change settings and Home.
+ * Match end (wireframe 9, restyled in the Figma polish pass, #515): who
+ * won the match, a 52 pt final score with each side's checker, a short
+ * list of the games, then Rematch (the one brass button), Review and Home
+ * side by side, and Change settings as a text button.
+ *
+ * - A win by a person shows the trophy medallion (`EmptyMedallion`,
+ *   `small`) inside the `Celebration` confetti. With Reduce motion the
+ *   medallion shows with no confetti. Nobody's win shows no medallion.
+ * - Each game row: the game, the winner's checker, the winner (with Mono
+ *   or Diplo) and the points; your points are brass.
  *
  * It shows a finished match and never changes it. The route
  * (`app/game/[id]/match-end.tsx`) starts the rematch and navigates.
@@ -18,10 +24,12 @@ import { createRematch, opponent, type Match, type PerPlayer, type PlayerId } fr
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Text, View } from 'react-native';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { StyleSheet } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
-import { Icon } from '@/components/Icon';
+import { sideWood } from '@/components/avatar';
+import { CheckerAvatar } from '@/components/CheckerAvatar';
+import { EmptyMedallion } from '@/components/EmptyMedallion';
 import { Screen } from '@/components/Screen';
 import { CardFrame, RowDivider } from '@/components/SectionCard';
 import { Celebration } from '@/features/game/Celebration';
@@ -84,8 +92,9 @@ export type MatchEndScreenProps = (LocalMatchEnd | OnlineEnd) & {
 };
 
 /**
- * The chip of a game row: Mono or Diplo. A Tavli backgammon (3 points) and
- * a per-checker win (Acey-Deucey American, #245) show only their points.
+ * The word after a game row's winner: Mono or Diplo. A Tavli backgammon
+ * (3 points) and a per-checker win (Acey-Deucey American, #245) show only
+ * their points.
  */
 function winChipKey(type: WinType): 'matchEnd.mono' | 'matchEnd.diplo' | null {
   switch (type) {
@@ -110,7 +119,6 @@ export function MatchEndScreen({
   announceKey,
 }: MatchEndScreenProps) {
   const { t } = useTranslation();
-  const { theme } = useUnistyles();
   const seats = online !== undefined ? online.seats : seatsFor(setup, t);
   const name = (player: PlayerId) => seats[player].name;
   const winner = match.winner ?? 'white';
@@ -152,6 +160,9 @@ export function MatchEndScreen({
     online !== undefined ? online.label : matchLabel(setup, t),
     t('home.continue.target', { target: match.targetPoints }),
   ].join(' · ');
+  // One game in the whole match: the line above names it, so a row says
+  // only "Game 2". A Tavli rotation names each game: "Game 2 · Plakoto".
+  const oneGame = match.rules.match.rotation.length === 1;
 
   // The rematch starter comes from the engine (owner rule: the last winner).
   const starter = createRematch(match).nextStarter;
@@ -171,9 +182,26 @@ export function MatchEndScreen({
 
   // One text, so it reads "3 – 1"; the winner's number is brass.
   const sideScore = (player: PlayerId) => (
-    <Text style={player === winner ? styles.winnerScore : undefined}>{match.score[player]}</Text>
+    <Text style={styles.sideScore(player === winner)}>{match.score[player]}</Text>
+  );
+  const side = (player: PlayerId) => (
+    <View style={styles.side}>
+      <CheckerAvatar wood={sideWood(player)} size={SCORE_CHECKER} name={null} />
+      <Text style={styles.sideName(player === winner)}>{name(player)}</Text>
+    </View>
   );
   const rematchLabel = t('game.end.rematch');
+  // Home shares a row with Review (`grow`), or stands alone at full width.
+  const home = (grow: boolean) => (
+    <ActionButton
+      testID="end-home-button"
+      label={t('game.end.home')}
+      icon="house"
+      kind="secondary"
+      grow={grow}
+      onPress={onHome}
+    />
+  );
 
   return (
     <Screen testID="match-end-screen">
@@ -183,35 +211,29 @@ export function MatchEndScreen({
             <Celebration
               testID="match-celebration"
               kind="match"
-              // A win by a person gets the trophy badge (#361).
-              icon={
-                <View testID="match-trophy" style={styles.badge}>
-                  <Icon name="trophy" size={TROPHY_SIZE} color={theme.colors.turnText} />
-                </View>
-              }
+              // A win by a person gets the trophy medallion (#361, #515).
+              icon={<EmptyMedallion testID="match-trophy" icon="trophy" size="small" />}
             />
           ) : null}
-          <Text style={styles.title} accessibilityRole="header">
-            {title}
-          </Text>
-          {reason ? <Text style={styles.reason}>{reason}</Text> : null}
+          <View style={styles.titles}>
+            <Text style={styles.title} accessibilityRole="header">
+              {title}
+            </Text>
+            <Text style={styles.about}>{about}</Text>
+            {reason ? <Text style={styles.reason}>{reason}</Text> : null}
+          </View>
           <View
             testID="final-score"
-            style={styles.scoreBox}
+            style={styles.scoreRow}
             accessible
             accessibilityLabel={t('matchEnd.finalScore', { score: scoreLine })}>
+            {side('white')}
             <Text style={styles.bigScore}>
               {sideScore('white')}
-              {' – '}
+              <Text style={styles.dash}>{' – '}</Text>
               {sideScore('black')}
             </Text>
-            <View style={styles.scoreNames}>
-              <Text style={styles.scoreName}>{name('white')}</Text>
-              <Text style={styles.scoreName}>{name('black')}</Text>
-            </View>
-          </View>
-          <View style={styles.aboutChip}>
-            <Text style={styles.about}>{about}</Text>
+            {side('black')}
           </View>
         </View>
         {match.games.length > 0 ? (
@@ -219,6 +241,7 @@ export function MatchEndScreen({
             {match.games.map((record, i) => {
               // Each game names its variant (#109): "Game 2 · Plakoto".
               const game = t('game.round', { number: i + 1, game: variantName(record.variant, t) });
+              const shortGame = oneGame ? t('matchEnd.game', { number: i + 1 }) : game;
               // A game lost on time says so (#170): "Bot won on time".
               const onTime = record.reason === 'timeout';
               const result =
@@ -234,6 +257,7 @@ export function MatchEndScreen({
                 record.winner === null ? 'points' : winType(record, match.rules.scoring.method);
               const chipKey = winChipKey(type);
               const chip = chipKey === null ? null : t(chipKey);
+              const yours = record.winner !== null && seats[record.winner].you;
               return (
                 <View key={i}>
                   {i > 0 ? <RowDivider /> : null}
@@ -249,16 +273,21 @@ export function MatchEndScreen({
                     ]
                       .filter(Boolean)
                       .join(', ')}>
-                    <View style={styles.rowTexts}>
-                      <Text style={styles.rowGame}>{game}</Text>
-                      <Text style={styles.rowResult}>{result}</Text>
-                    </View>
-                    {chip ? (
-                      <View style={styles.chip(type === 'diplo')}>
-                        <Text style={styles.chipText(type === 'diplo')}>{chip}</Text>
-                      </View>
-                    ) : null}
-                    <Text style={styles.rowPoints}>
+                    <Text style={styles.rowGame}>{shortGame}</Text>
+                    {record.winner === null ? (
+                      <View style={styles.noChecker} />
+                    ) : (
+                      <CheckerAvatar
+                        wood={sideWood(record.winner)}
+                        size={ROW_CHECKER}
+                        name={null}
+                      />
+                    )}
+                    <Text style={styles.rowResult}>
+                      {result}
+                      {chip ? <Text style={styles.rowChip}>{` · ${chip}`}</Text> : null}
+                    </Text>
+                    <Text style={styles.rowPoints(yours)}>
                       {t('matchEnd.points', { count: record.points })}
                     </Text>
                   </View>
@@ -276,6 +305,7 @@ export function MatchEndScreen({
               <ActionButton
                 testID="rematch-button"
                 label={rematchLabel}
+                icon="rotateCcw"
                 // The hint sits under the button; screen readers hear both.
                 accessibilityLabel={`${rematchLabel}, ${rematchHint}`}
                 onPress={onRematch}
@@ -288,35 +318,31 @@ export function MatchEndScreen({
               </Text>
             </View>
           ) : null}
-          {onReview || onChangeSettings ? (
-            <View style={styles.pair}>
-              {onReview ? (
-                <ActionButton
-                  testID="review-button"
-                  label={t('game.end.review')}
-                  kind="secondary"
-                  grow
-                  onPress={onReview}
-                />
-              ) : null}
-              {onChangeSettings ? (
-                <ActionButton
-                  testID="change-settings-button"
-                  label={t('game.end.changeSettings')}
-                  kind="secondary"
-                  grow
-                  onPress={onChangeSettings}
-                />
-              ) : null}
-            </View>
-          ) : null}
+          {/* A ranked match's own buttons (#532), above Review and Home. */}
           {online?.actions}
-          <ActionButton
-            testID="end-home-button"
-            label={t('game.end.home')}
-            kind="secondary"
-            onPress={onHome}
-          />
+          {onReview ? (
+            <View style={styles.pair}>
+              <ActionButton
+                testID="review-button"
+                label={t('game.end.review')}
+                icon="chart"
+                kind="secondary"
+                grow
+                onPress={onReview}
+              />
+              {home(true)}
+            </View>
+          ) : (
+            home(false)
+          )}
+          {onChangeSettings ? (
+            <ActionButton
+              testID="change-settings-button"
+              label={t('game.end.changeSettings')}
+              kind="text"
+              onPress={onChangeSettings}
+            />
+          ) : null}
           {online?.onReportOrBlock ? (
             <ActionButton
               testID="end-report-block"
@@ -332,10 +358,10 @@ export function MatchEndScreen({
   );
 }
 
-/** The trophy in its round badge, with a brass ring (#361). */
-const TROPHY_SIZE = 32;
-const BADGE_RING = 8;
-const BADGE = 64 + 2 * BADGE_RING;
+/** The checker beside each side's score (Figma: 30 pt; the nearest avatar size). */
+const SCORE_CHECKER = 32;
+/** The winner's checker in a game row. */
+const ROW_CHECKER = 18;
 
 const styles = StyleSheet.create((theme, rt) => ({
   content: {
@@ -347,121 +373,92 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   hero: {
     alignItems: 'center',
-    gap: theme.space.sm,
-    paddingHorizontal: theme.space.lg,
-    paddingVertical: theme.space.xl,
-    borderRadius: theme.radii.xl + 4,
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.surface,
-    // Brass light from the top, fading into the card.
-    backgroundImage: `radial-gradient(120% 90% at 50% 0%, ${theme.colors.accentWash} 0%, ${theme.colors.surface} 100%)`,
-    boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.4)',
+    gap: theme.space.lg,
   },
-  badge: {
-    width: BADGE,
-    height: BADGE,
-    borderRadius: BADGE / 2,
-    borderWidth: BADGE_RING,
-    borderColor: theme.colors.accentWash,
+  titles: {
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.backgroundDeep,
+    gap: theme.space.xxs,
   },
   title: {
     ...theme.type.title1,
     color: theme.colors.text,
     textAlign: 'center',
   },
-  reason: {
-    ...theme.type.body,
+  about: {
+    ...theme.type.callout,
     color: theme.colors.textDim,
     textAlign: 'center',
   },
-  scoreBox: {
-    alignItems: 'center',
+  reason: {
+    ...theme.type.callout,
+    color: theme.colors.textDim,
+    textAlign: 'center',
   },
+  scoreRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.space.lg,
+  },
+  side: {
+    alignItems: 'center',
+    gap: theme.space.xs,
+    flexShrink: 1,
+  },
+  sideName: (strong: boolean) => ({
+    ...theme.type.footnote,
+    color: strong ? theme.colors.text : theme.colors.textDim,
+    textAlign: 'center',
+  }),
   bigScore: {
     ...theme.type.numeral,
     fontSize: 52,
     lineHeight: 60,
-    color: theme.colors.text,
     textAlign: 'center',
   },
-  winnerScore: {
-    color: theme.colors.turnText,
-  },
-  scoreNames: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    columnGap: theme.space.xxxl,
-  },
-  scoreName: {
-    ...theme.type.caption,
+  sideScore: (winner: boolean) => ({
+    color: winner ? theme.colors.turnText : theme.colors.textDim,
+  }),
+  dash: {
+    ...theme.type.title1,
     color: theme.colors.textDim,
-    textAlign: 'center',
-  },
-  aboutChip: {
-    marginTop: theme.space.xs,
-    minHeight: 28,
-    justifyContent: 'center',
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xxs,
-    borderRadius: theme.radii.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.separator,
-    backgroundColor: theme.colors.backgroundDeep,
-  },
-  about: {
-    ...theme.type.caption,
-    fontWeight: '600',
-    color: theme.colors.textDim,
-    textAlign: 'center',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space.md,
-    minHeight: theme.touch.button,
+    minHeight: theme.touch.minTarget,
     paddingHorizontal: theme.space.lg,
     paddingVertical: theme.space.sm,
   },
-  rowTexts: {
-    flex: 1,
-    gap: theme.space.xxs,
-  },
   rowGame: {
-    ...theme.type.caption,
+    ...theme.type.footnote,
+    // It gives way to the result (which grows) but keeps what it needs:
+    // a long Greek label wraps only when the row has no room left.
+    flexShrink: 1,
+    minWidth: 56,
     color: theme.colors.textDim,
   },
+  noChecker: {
+    width: ROW_CHECKER,
+  },
   rowResult: {
-    ...theme.type.bodyStrong,
+    ...theme.type.callout,
+    flex: 1,
     color: theme.colors.text,
   },
-  chip: (strong: boolean) => ({
-    minHeight: 28,
-    justifyContent: 'center',
-    paddingHorizontal: theme.space.md,
-    paddingVertical: theme.space.xxs,
-    borderRadius: theme.radii.pill,
-    borderWidth: 1,
-    borderColor: strong ? theme.colors.accent : theme.colors.separator,
-    backgroundColor: strong ? theme.colors.accent : theme.colors.backgroundDeep,
-  }),
-  chipText: (strong: boolean) => ({
-    ...theme.type.caption,
-    fontWeight: '700',
-    color: strong ? theme.colors.onAccent : theme.colors.textDim,
-  }),
-  rowPoints: {
-    ...theme.type.bodyStrong,
-    fontWeight: '700',
+  rowChip: {
+    color: theme.colors.textDim,
+  },
+  rowPoints: (yours: boolean) => ({
+    ...theme.type.numeral,
+    fontSize: 17,
+    lineHeight: 22,
     minWidth: 28,
     textAlign: 'right',
-    color: theme.colors.text,
-    fontVariant: ['tabular-nums'],
-  },
+    color: yours ? theme.colors.turnText : theme.colors.textDim,
+  }),
   spacer: {
     flexGrow: 1,
   },

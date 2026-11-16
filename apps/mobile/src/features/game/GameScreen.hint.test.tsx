@@ -30,6 +30,7 @@ import {
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
+import { ICON_ONLY_LABEL_SCALE } from '@/components/ActionButton';
 import { moveChoices, moveLabel } from '@/features/accessibility/moveChoices';
 import { BOT_TIMING } from '@/features/bot/botSpeed';
 import { checkerRuns } from '@/features/board/hintMarks';
@@ -52,6 +53,7 @@ import type { Seat } from './seats';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
 import { countNodes, type JsonNode } from '../../../test/tree';
+import { PORTRAIT_SE, resetWindow, setWindow } from '../../../test/window';
 
 const SIZE = { width: 375, height: 500 };
 const analyzer = createAnalyzer();
@@ -71,8 +73,9 @@ beforeEach(async () => {
   });
 });
 
-afterEach(() => {
+afterEach(async () => {
   announce.mockRestore();
+  await resetWindow();
 });
 
 async function setSettings(patch: Partial<Settings>) {
@@ -183,6 +186,16 @@ describe('<GameScreen /> Hint button (#209)', () => {
     await roll(store, [6, 5]);
     expect(hintButton()).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Hint' })).toBeOnTheScreen();
+  });
+
+  it('shows its label under the circle only with a large font', async () => {
+    // Jest's own window has a font scale of 2: start from a normal font.
+    await setWindow(PORTRAIT_SE);
+    const store = await show();
+    await roll(store, [6, 5]);
+    expect(within(hintButton()!).queryByText('Hint')).toBeNull();
+    await setWindow({ ...PORTRAIT_SE, fontScale: ICON_ONLY_LABEL_SCALE });
+    expect(within(hintButton()!).getByText('Hint')).toBeOnTheScreen();
   });
 
   it('hides when every turn of the list ends on the same board', async () => {
