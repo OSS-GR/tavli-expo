@@ -1128,6 +1128,11 @@
         "body": "Both players sit together above the board, and the buttons are round and centered under it. Turn the phone and the board keeps its size.",
         "where": "Any game"
       },
+      "lostDice": {
+        "title": "Dice you can't play",
+        "body": "When the rules leave a die with no move, it fades and gets a line through it. You see at once that it can't be played.",
+        "where": "Any game"
+      },
       "howToPlay": {
         "title": "How to play, in one place",
         "body": "Every game has one page: its short lessons on the board on top, then the rules. The lessons you finished are kept, so Continue picks up where you stopped.",

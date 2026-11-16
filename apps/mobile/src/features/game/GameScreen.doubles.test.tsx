@@ -92,8 +92,15 @@ function diceGroups(): JsonNode[] {
   return findAllNodes(canvas, (n) => n.type === 'Group' && n.props.transform !== undefined);
 }
 const diceDrawn = () => diceGroups().length;
-/** The opacity of each die, in grid order. */
-const diceOpacity = () => diceGroups().map((g) => (g.props.opacity as { value: number }).value);
+/**
+ * The opacity of each die, in grid order: its first inner group holds the
+ * body and the faces (the slash of a lost die sits beside it, #579).
+ */
+const diceOpacity = () =>
+  diceGroups().map((g) => {
+    const fade = (g.children ?? []).find((c): c is JsonNode => typeof c !== 'string');
+    return (fade?.props.opacity as { value: number }).value;
+  });
 
 const doublesHint = () => screen.queryByText('Doubles!');
 

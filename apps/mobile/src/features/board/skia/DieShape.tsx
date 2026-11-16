@@ -125,7 +125,13 @@ export function DieSlash({ style, size }: { style: DiceStyle; size: number }) {
   const width = Math.max(2, size * 0.07);
   return (
     <Group>
-      <Path path={path} style="stroke" strokeWidth={width * 2.2} strokeCap="round" color={style.face} />
+      <Path
+        path={path}
+        style="stroke"
+        strokeWidth={width * 2.2}
+        strokeCap="round"
+        color={style.face}
+      />
       <Path path={path} style="stroke" strokeWidth={width} strokeCap="round" color={style.pip} />
     </Group>
   );

@@ -862,7 +862,8 @@ Actions (`player` is the player who acts):
   them in to play dice rolled elsewhere (the server, a replay).
 - Helpers for the UI, all computed: `legalNextMoves(flow)` (single moves
   grouped by source, each with `to`, `die` and `capture`),
-  `remainingDice(flow)`, `canConfirm(flow)`, `canUndo(flow)`,
+  `remainingDice(flow)`, `lostDice(flow)` (the dice left that no legal
+  turn can play, #579), `canConfirm(flow)`, `canUndo(flow)`,
   `currentBoard(flow)` (the board with the played moves, via
   `applyMoveToBoard`) and `currentPrompt(flow)`.
 - Variant questions: after every turn the flow calls `Variant.prompt`. If
