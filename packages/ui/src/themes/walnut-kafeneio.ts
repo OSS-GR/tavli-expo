@@ -45,6 +45,11 @@ export const walnutKafeneio = {
     problemPressed: '#45211B',
     turn: '#F2C14E',
     turnText: '#F6D27A',
+    // The invite code's bone tiles (#516), from the Figma pass.
+    tileFace: '#E4D7BA',
+    tileFaceLight: '#F3EBD8',
+    tileEdge: '#B9A27A',
+    tileText: '#2A1C12',
     switchTrackOff: '#5A4330',
     switchThumb: '#F1E6CF',
   },

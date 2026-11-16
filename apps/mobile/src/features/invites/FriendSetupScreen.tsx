@@ -1,10 +1,11 @@
 /**
  * Play a friend online (#281): pick the game, the match length and a turn
- * time limit, then "Make an invite". The route then opens the waiting screen
- * (`InviteWaitScreen`) with the code and the link.
+ * time limit, then "Make an invite link". The route then opens the waiting
+ * screen (`InviteWaitScreen`) with the code.
  *
- * - An online game needs an account on our server. The screen says so.
- *   "Make an invite" uses the saved session when there is one; else it
+ * - An online game needs an account on our server. A phone that never
+ *   signed in (`hasOnlineAccount`) says so in one sentence. "Make an
+ *   invite link" uses the saved session when there is one; else it
  *   opens the sign-in sheet (#401, `SignInSheet`: Apple, Continue as a
  *   guest, Not now), and makes the invite right after the sign-in. Not
  *   now closes the sheet, makes nothing and starts the reminders on Home
@@ -18,13 +19,16 @@
  *   VoiceOver does not read `accessibilityRole="alert"`).
  * - Screen readers: focus moves to the title when the screen opens.
  * - Large fonts scroll: no text has a line limit.
- * - Look (#358): the Home style. The intro sits on a brass-edged card,
- *   the pickers in `SectionCard`s, and "Make an invite" stays at the
- *   bottom while the list fades out under it.
+ * - Look (#516, the Figma pass, node `17:17`): it fits one 874 pt screen
+ *   with no scroll. The Who row, then the game list (`GameChoiceList`),
+ *   Match length and Time limit as one-line rows (`SettingLine`, the
+ *   `tray` look of `SegmentedControl`) and one summary line. No intro and
+ *   no info card. The button stays at the bottom while the list fades out
+ *   under it; it scrolls only with large text.
  *
  * - Friend invite (#406, `friend`): the same setup, but the invite goes
- *   to one friend (`Friends.inviteFriend`), who gets a push. The title
- *   and the intro say so.
+ *   to one friend (`Friends.inviteFriend`), who gets a push. The title,
+ *   one plain intro sentence and the button ("Send the invite") say so.
  *   It needs a saved account, so it checks the account when it opens
  *   (and on each new `visit`, after Settings → Account) and again on
  *   Make an invite. Only the newest check counts. With no note of an
@@ -40,12 +44,14 @@
  *
  * - Your friends (#488, `friends`): a phone with a note of an online
  *   account (`hasOnlineAccount`) loads the saved account's friends when
- *   the screen opens. With friends, a short list (`pickFriends`: name and
- *   record) sits above Make an invite. A tap sends a friend invite at once
+ *   the screen opens. With friends, the Who row (`WhoRow`, #516) sits at
+ *   the top: "Anyone" (it makes the open link, like the button), up to
+ *   `FRIENDS_SHOWN` friends as checkers (`pickFriends`), and Add
+ *   (`onAddFriend`); "All friends" opens Friends. A tap on a friend sends a friend invite at once
  *   with the picks on the screen (the owner's call: the picks are right
  *   above). The friend gets a push and needs no link, so the screen stays
  *   and says "Invite sent to NAME" (#507, `onFriendInvited`); no waiting
- *   screen opens. That friend's row turns off for the visit, so a second
+ *   screen opens. That friend's tile turns off for the visit, so a second
  *   tap sends no second invite. A guest, nobody signed in, no
  *   friends or a failed load: no list, and the screen is as before. The
  *   list never makes an account and never opens the sign-in sheet. A tap
@@ -80,13 +86,11 @@ import { ActionButton } from '@/components/ActionButton';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { RowIcon, SectionCard, SectionRow } from '@/components/SectionCard';
-import { OptionList, type ListOption } from '@/components/settings/OptionList';
+import { SectionHeader } from '@/components/SectionHeader';
 import { SegmentedControl, type SegmentOption } from '@/components/settings/SegmentedControl';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { friendsProblem, type FriendsProblem } from '@/features/friends/friendsData';
-import { FRIENDS_SHOWN, pickFriends } from '@/features/friends/pickFriends';
-import { recordText } from '@/features/friends/record';
+import { pickFriends } from '@/features/friends/pickFriends';
 import { MATCH_LENGTHS, type MatchLength } from '@/features/match/setup';
 import { onlineAccountReady } from '@/features/online/account';
 import { hasOnlineAccount } from '@/features/online/accountHint';
@@ -100,6 +104,7 @@ import {
   saveFriendInviteSetup,
   TURN_TIME_LIMITS,
 } from './friendInviteSetup';
+import { GameChoiceList, SettingLine, WhoRow } from './FriendSetupParts';
 import { sendInviteCreated } from './inviteAnalytics';
 
 export interface FriendSetupScreenProps {
@@ -136,8 +141,10 @@ export interface FriendSetupScreenProps {
    * Not used with `friend`.
    */
   friends?: Friends;
-  /** Opens the Friends screen, when there are more friends than the list shows. */
+  /** Opens the Friends screen ("All friends" over the Who row). */
   onFriends?: () => void;
+  /** Opens Add a friend (the Add tile of the Who row). */
+  onAddFriend?: () => void;
 }
 
 /** Why a friend invite cannot be made from this account. */
@@ -148,12 +155,8 @@ type Problem =
   | { readonly kind: 'account' | 'make' | 'tooMany' }
   | { readonly kind: 'friends'; readonly problem: FriendsProblem };
 
-/** The friends Play a friend shows (#488). */
-interface FriendList {
-  readonly shown: readonly Friend[];
-  /** More friends than `shown`. */
-  readonly more: boolean;
-}
+/** The friends Play a friend shows (#488): up to `FRIENDS_SHOWN`. */
+type FriendList = readonly Friend[];
 
 export function FriendSetupScreen({
   auth,
@@ -167,6 +170,7 @@ export function FriendSetupScreen({
   visit = 0,
   friends,
   onFriends,
+  onAddFriend,
   onFriendInvited,
 }: FriendSetupScreenProps) {
   const { t } = useTranslation();
@@ -236,9 +240,7 @@ export function FriendSetupScreen({
       .then(
         (list) => {
           if (!live) return;
-          setFriendList(
-            list === null ? null : { shown: pickFriends(list), more: list.length > FRIENDS_SHOWN },
-          );
+          setFriendList(list === null ? null : pickFriends(list));
         },
         // A failed load shows no list: Make an invite still works.
         () => {
@@ -409,11 +411,15 @@ export function FriendSetupScreen({
     if (sentText !== null) AccessibilityInfo.announceForAccessibility(sentText);
   }, [sent, sentText]);
 
-  const gameOptions: ListOption<OnlineGameChoice>[] = ONLINE_GAME_CHOICES.map((game) => ({
-    value: game,
-    label: t(`games.${game}`),
-    hint: t(`games.${game}Subtitle`),
-  }));
+  // The account sentence is for a phone that never signed in: the sign-in
+  // sheet comes on Make an invite. A friend invite needs a saved account
+  // and says so itself.
+  const [showAccount] = useState(() => friend === undefined && !hasOnlineAccount());
+  const summary = t('friend.summary', {
+    length: t('invite.open.lengthValue', { count: targetPoints }),
+    time: timeLimitHint,
+  });
+  const whoFriends = friendList !== null && friendList.length > 0 ? friendList : null;
 
   return (
     <Screen testID="friend-setup">
@@ -425,80 +431,72 @@ export function FriendSetupScreen({
         testID="friend-back"
       />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          <View style={styles.heroBadge}>
-            <Icon name="globe" size={26} color={theme.colors.accent} />
+        {friend !== undefined ? (
+          <Text style={styles.intro}>{t('friends.invite.intro')}</Text>
+        ) : null}
+        {whoFriends !== null ? (
+          <View style={styles.section}>
+            <SectionHeader
+              title={t('friend.who')}
+              {...(onFriends === undefined
+                ? {}
+                : {
+                    action: {
+                      label: t('friend.allFriends'),
+                      onPress: onFriends,
+                      testID: 'friend-all-friends',
+                    },
+                  })}
+            />
+            <WhoRow
+              testID="friend-friends"
+              friends={whoFriends}
+              invited={invited}
+              busy={busy}
+              onAnyone={() => void make()}
+              onFriend={(f) => void make({ to: f })}
+              {...(onAddFriend === undefined ? {} : { onAdd: onAddFriend })}
+            />
           </View>
-          <Text style={styles.intro}>
-            {friend === undefined ? t('friend.intro') : t('friends.invite.intro')}
-          </Text>
-        </View>
-        <SectionCard title={t('friend.game')}>
-          <OptionList
+        ) : null}
+        <View style={styles.section}>
+          <SectionHeader title={t('friend.game')} />
+          <GameChoiceList
             testID="friend-game"
             label={t('friend.game')}
-            options={gameOptions}
+            options={ONLINE_GAME_CHOICES}
             value={choice}
             onChange={setChoice}
           />
-        </SectionCard>
-        <SectionCard title={t('friend.length')} padded>
+        </View>
+        <SettingLine label={t('friend.length')}>
           <SegmentedControl
             testID="friend-length"
+            look="tray"
             label={t('friend.length')}
             options={lengthOptions}
             value={`${targetPoints}`}
             onChange={(value) => setTargetPoints(Number(value) as MatchLength)}
           />
-          <Text style={styles.hint}>{t('invite.open.lengthValue', { count: targetPoints })}</Text>
-        </SectionCard>
-        <SectionCard title={t('friend.timeLimit')} padded>
+        </SettingLine>
+        <SettingLine label={t('friend.timeLimit')}>
           <SegmentedControl
             testID="friend-time-limit"
+            look="tray"
             label={t('friend.timeLimit')}
             options={timeLimitOptions}
             value={`${turnTimeMinutes}`}
             onChange={(value) => setTurnTimeMinutes(value === 'null' ? null : Number(value))}
           />
-          <Text style={styles.hint}>{timeLimitHint}</Text>
-        </SectionCard>
-        {friendList !== null && friendList.shown.length > 0 ? (
-          <SectionCard title={t('friend.friendsTitle')} testID="friend-friends">
-            {friendList.shown.map((f) => {
-              const name = playerNameText(f.name, t) ?? t('friends.unnamed');
-              const done = invited.has(f.playerId);
-              return (
-                <SectionRow
-                  key={f.playerId}
-                  testID={`friend-pick-${f.playerId}`}
-                  icon="user"
-                  label={name}
-                  hint={done ? t('friend.invited') : (recordText(f.record, t) ?? undefined)}
-                  accessibilityLabel={
-                    done ? t('friend.invitedTo', { name }) : t('friend.sendTo', { name })
-                  }
-                  disabled={busy || done}
-                  onPress={() => void make({ to: f })}
-                />
-              );
-            })}
-            {friendList.more && onFriends !== undefined ? (
-              <SectionRow
-                testID="friend-all-friends"
-                icon="users"
-                label={t('friend.allFriends')}
-                disabled={busy}
-                onPress={onFriends}
-              />
-            ) : null}
-          </SectionCard>
-        ) : null}
-        <View style={styles.note}>
-          <RowIcon name="shield" />
-          <Text testID="friend-account" style={styles.noteText}>
+        </SettingLine>
+        <Text testID="friend-summary" style={styles.summary}>
+          {summary}
+        </Text>
+        {showAccount ? (
+          <Text testID="friend-account" style={styles.summary}>
             {t('friend.account')}
           </Text>
-        </View>
+        ) : null}
       </ScrollView>
       <View style={styles.footer}>
         {/* The list fades out under the button. */}
@@ -531,7 +529,8 @@ export function FriendSetupScreen({
         ) : (
           <ActionButton
             testID="friend-make"
-            label={t('friend.make')}
+            icon={friend === undefined ? 'link' : 'send'}
+            label={friend === undefined ? t('friend.make') : t('friends.invite.send')}
             disabled={busy}
             onPress={() => void make()}
           />
@@ -565,51 +564,26 @@ const styles = StyleSheet.create((theme, rt) => ({
     flex: 1,
   },
   content: {
-    gap: theme.space.lg,
+    gap: 14,
     paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.sm,
+    paddingTop: theme.space.xs,
     // Room for the fade over the last line.
     paddingBottom: FADE,
   },
-  hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.md,
-    padding: theme.space.lg,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.surface,
-    backgroundImage: `linear-gradient(160deg, ${theme.colors.surfaceSelected} 0%, ${theme.colors.surface} 70%)`,
-    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
-  },
-  heroBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radii.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.backgroundDeep,
+  section: {
+    gap: 14,
   },
   intro: {
-    ...theme.type.body,
-    flex: 1,
-    color: theme.colors.text,
+    ...theme.type.callout,
+    color: theme.colors.textDim,
+  },
+  summary: {
+    ...theme.type.footnote,
+    paddingHorizontal: theme.space.xs,
+    color: theme.colors.textDim,
   },
   hint: {
     ...theme.type.caption,
-    color: theme.colors.textDim,
-  },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: theme.space.md,
-    paddingHorizontal: theme.space.xs,
-    paddingTop: theme.space.xs,
-  },
-  noteText: {
-    ...theme.type.caption,
-    flex: 1,
     color: theme.colors.textDim,
   },
   problem: {
@@ -631,7 +605,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.space.lg,
     paddingTop: theme.space.sm,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.backgroundFloor,
   },
   fade: {
     position: 'absolute',
@@ -639,6 +613,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     right: 0,
     top: -FADE,
     height: FADE,
-    backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0)} 0%, ${theme.colors.background} 100%)`,
+    backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.backgroundFloor, 0)} 0%, ${theme.colors.backgroundFloor} 100%)`,
   },
 }));

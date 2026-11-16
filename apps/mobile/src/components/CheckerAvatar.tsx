@@ -3,9 +3,11 @@ import { Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { avatarWood, initialsOf } from './avatar';
+import { Icon } from './Icon';
+import type { IconName } from './icons';
 
 /** The sizes from the Figma pass (Patterns → Checker avatars). */
-export type CheckerAvatarSize = 18 | 24 | 32 | 40 | 56 | 72;
+export type CheckerAvatarSize = 18 | 24 | 32 | 40 | 50 | 56 | 72;
 
 /** Initials show from this size up; smaller avatars are a plain checker. */
 const MIN_INITIALS_SIZE = 32;
@@ -23,6 +25,8 @@ export type CheckerAvatarProps = WoodSource & {
   size?: CheckerAvatarSize;
   /** You: a brass ring. */
   you?: boolean;
+  /** A line icon in place of the initials, for a checker that is no player ("Anyone"). */
+  icon?: IconName;
   testID?: string;
 };
 
@@ -37,12 +41,14 @@ export function CheckerAvatar({
   name = null,
   size = 40,
   you = false,
+  icon,
   testID,
 }: CheckerAvatarProps) {
   const { theme } = useUnistyles();
   const wood = fixedWood ?? avatarWood(playerKey ?? '');
   const colors = theme.avatar[wood];
-  const initials = name !== null && size >= MIN_INITIALS_SIZE ? initialsOf(name) : '';
+  const initials =
+    icon === undefined && name !== null && size >= MIN_INITIALS_SIZE ? initialsOf(name) : '';
   return (
     <View
       testID={testID}
@@ -58,7 +64,9 @@ export function CheckerAvatar({
           borderWidth: you ? 2 : 1,
         },
       ]}>
-      {initials ? (
+      {icon !== undefined ? (
+        <Icon name={icon} size={Math.round(size * 0.4)} color={colors.text} />
+      ) : initials ? (
         // The checker keeps its size with a large system font: the initials do not scale.
         <Text allowFontScaling={false} style={[styles.initials(size), { color: colors.text }]}>
           {initials}

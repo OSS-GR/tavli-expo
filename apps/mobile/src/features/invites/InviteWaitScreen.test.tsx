@@ -1,7 +1,7 @@
 /**
  * The waiting screen of the inviter (#281) on its own in-memory server:
- * the code and link, Share, Cancel, the friend's answer seen live, the
- * expiry, errors, screen readers and Greek.
+ * the code tiles, the game, the time left, Close, Share, Cancel, the
+ * friend's answer seen live, the expiry, errors, screen readers and Greek.
  */
 import { INVITE_TIME_MS, type Invites } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
@@ -67,20 +67,63 @@ async function flush() {
 }
 
 describe('InviteWaitScreen', () => {
-  it('shows the code and the link while it waits, and reads them once', async () => {
+  it('shows the code and the game while it waits, and reads them once (#516)', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const { code, mine } = setup();
     await openWait(code, mine);
     expect(await screen.findByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     expect(screen.getByTestId('invite-wait-code')).toHaveTextContent(code);
-    expect(screen.getByTestId('invite-wait-link')).toHaveTextContent(`tavlaki://invite/${code}`);
-    expect(screen.getByText('Waiting for your friend…')).toBeOnTheScreen();
+    expect(screen.getByText('Waiting for your friend')).toBeOnTheScreen();
+    // The link is in the share message only (#516).
+    expect(screen.queryByText(`tavlaki://invite/${code}`)).toBeNull();
     // The code is spelled out for a screen reader.
-    expect(screen.getByLabelText(`Code: ${[...code].join(' ')}`)).toBeOnTheScreen();
+    expect(screen.getByLabelText(`Invite code: ${[...code].join(' ')}`)).toBeOnTheScreen();
     expect(announce).toHaveBeenLastCalledWith(
-      'Send the invite Send this link to a friend. The game starts when they accept.',
+      'Send the invite Portes · first to 3. The game starts when your friend accepts.',
     );
     announce.mockRestore();
+  });
+
+  it('shows the time the invite has left, then "expiring now" (#516)', async () => {
+    jest.setSystemTime(START);
+    const { code, mine } = setup();
+    await openWait(code, mine);
+    await screen.findByRole('header', { name: 'Send the invite' });
+    expect(screen.getByTestId('invite-wait-left')).toHaveTextContent(
+      'Open for 24 h. You can leave: the invite stays on Home.',
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(INVITE_TIME_MS - 30 * 60_000);
+    });
+    expect(screen.getByTestId('invite-wait-left')).toHaveTextContent(
+      'Open for 30 min. You can leave: the invite stays on Home.',
+    );
+    // The phone clock says the time is up before the server does.
+    await act(async () => {
+      jest.advanceTimersByTime(30 * 60_000);
+    });
+    expect(screen.getByTestId('invite-wait-left')).toHaveTextContent('The invite is expiring now.');
+    expect(screen.getByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
+  });
+
+  it('a phone clock behind the server still shows the whole day (#516)', async () => {
+    // The phone is an hour behind the server that made the invite.
+    jest.setSystemTime(START - 60 * 60_000);
+    const { code, mine } = setup();
+    await openWait(code, mine);
+    await screen.findByRole('header', { name: 'Send the invite' });
+    expect(screen.getByTestId('invite-wait-left')).toHaveTextContent(/^Open for 24 h\./);
+  });
+
+  it('Close goes Home and leaves the invite open (#516)', async () => {
+    const user = setupUser();
+    const { code, mine, server } = setup();
+    const { onHome } = await openWait(code, mine);
+    const close = await screen.findByRole('button', { name: 'Close' });
+    expect(close.props.accessibilityHint).toBe('The invite stays open. You find it on Home.');
+    await user.press(close);
+    expect(onHome).toHaveBeenCalledTimes(1);
+    expect(server.getInvite(code)?.status).toBe('open');
   });
 
   it('Share opens the share sheet with the link and the code to type (#333)', async () => {
@@ -90,7 +133,7 @@ describe('InviteWaitScreen', () => {
       .mockResolvedValue({ action: Share.sharedAction, activityType: undefined });
     const { code, mine, server } = setup();
     await openWait(code, mine);
-    await user.press(await screen.findByRole('button', { name: 'Share the invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Share invite' }));
     expect(share).toHaveBeenCalledTimes(1);
     expect(share).toHaveBeenCalledWith({
       message: `Play tavli with me on Tavlaki. Open this link to join: tavlaki://invite/${code}\nOr open Tavlaki, tap Join with a code and enter ${code}.`,
@@ -109,7 +152,7 @@ describe('InviteWaitScreen', () => {
     const share = jest.spyOn(Share, 'share').mockRejectedValue(new Error('no share sheet'));
     const { code, mine } = setup();
     await openWait(code, mine);
-    await user.press(await screen.findByRole('button', { name: 'Share the invite' }));
+    await user.press(await screen.findByRole('button', { name: 'Share invite' }));
     await flush();
     expect(screen.getByRole('header', { name: 'Send the invite' })).toBeOnTheScreen();
     share.mockRestore();
@@ -411,7 +454,6 @@ describe('InviteWaitScreen', () => {
     const { code, mine } = setup();
     const first = await openWait(code, mine);
     await screen.findByRole('header', { name: 'Send the invite' });
-    expect(screen.getByLabelText(`Link: tavlaki://invite/${code}`)).toBeOnTheScreen();
     expect(screen.getByTestId('invite-wait-dot', { includeHiddenElements: true })).toBeTruthy();
     expect(repeat).toHaveBeenCalledWith(expect.anything(), -1, true);
     await first.unmount();
