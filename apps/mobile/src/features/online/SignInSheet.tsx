@@ -15,8 +15,6 @@
 import type { Analytics, AppleSheet, AuthProvider, AuthUser } from '@tavli/contracts';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
 
 import { Sheet } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
@@ -54,27 +52,20 @@ export function SignInSheet({
       closeLabel={t('signIn.notNow')}
       ownCloseButton
       testID="sign-in-sheet">
-      <View style={styles.content}>
-        <SignInHeader
-          title={t('signIn.title')}
-          body={t('signIn.body')}
-          titleRef={titleRef}
-          onClose={onClose}
-        />
-        <SignInChoices
-          auth={auth}
-          onSignedIn={onSignedIn}
-          {...(appleSheet === undefined ? {} : { appleSheet })}
-          {...(analytics === undefined ? {} : { analytics })}
-        />
-      </View>
+      <SignInChoices
+        auth={auth}
+        onSignedIn={onSignedIn}
+        header={
+          <SignInHeader
+            title={t('signIn.title')}
+            body={t('signIn.body')}
+            titleRef={titleRef}
+            onClose={onClose}
+          />
+        }
+        {...(appleSheet === undefined ? {} : { appleSheet })}
+        {...(analytics === undefined ? {} : { analytics })}
+      />
     </Sheet>
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  content: {
-    // 18 pt between the header and the choices (Figma frame 09).
-    gap: theme.space.lg + theme.space.xxs,
-  },
-}));

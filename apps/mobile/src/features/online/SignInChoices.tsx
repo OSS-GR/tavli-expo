@@ -4,8 +4,10 @@
  * gives, then Apple's white button, Continue with email and Continue as a
  * guest (a text button), then one footnote with a link to the privacy
  * policy. The invite card (`InviteAccountGate`) and the sheet of Play a
- * friend (`SignInSheet`) show them under a `SignInHeader`, whose close
- * button is **Not now** (it signs in nothing).
+ * friend (`SignInSheet`) pass a `SignInHeader` as `header`, whose close
+ * button is **Not now** (it signs in nothing). The header shows only with
+ * the choices: the email step, the username step and the problem box have
+ * their own way on, so a player who signed in never skips `finishStep`.
  *
  * - Apple's own button shows only where Apple's sheet works (iPhone).
  *   Apple on Android needs a browser flow on the server: later. There
@@ -24,7 +26,7 @@
  *   limit, so large fonts wrap.
  */
 import type { Analytics, AppleSheet, AuthProvider, AuthUser, Usernames } from '@tavli/contracts';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -58,6 +60,8 @@ export const SIGN_IN_BENEFITS: readonly { readonly id: SignInBenefit; readonly i
 export interface SignInChoicesProps {
   auth: AuthProvider;
   onSignedIn: (user: AuthUser) => void;
+  /** The title and close button above the choices (`SignInHeader`); only with the choices. */
+  header?: ReactNode;
   /** For tests. Default: the app's. */
   appleSheet?: AppleSheet;
   /** For tests. Default: the app's analytics. */
@@ -69,6 +73,7 @@ export interface SignInChoicesProps {
 export function SignInChoices({
   auth,
   onSignedIn,
+  header,
   appleSheet = appAppleSheet,
   analytics = appAnalytics,
   usernames = appUsernames,
@@ -121,6 +126,7 @@ export function SignInChoices({
   }
   return (
     <View testID="sign-in-choices" style={styles.choices}>
+      {header}
       <View testID="sign-in-benefits" style={styles.benefits}>
         {SIGN_IN_BENEFITS.map(({ id, icon }) => (
           <View key={id} style={styles.benefit}>

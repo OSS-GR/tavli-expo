@@ -16,7 +16,7 @@ import {
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { screen, within } from '@testing-library/react-native';
-import { AccessibilityInfo, Linking } from 'react-native';
+import { AccessibilityInfo, Linking, Text } from 'react-native';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
@@ -55,6 +55,7 @@ async function open(usernames: Usernames | undefined) {
     <SignInChoices
       auth={auth}
       onSignedIn={onSignedIn}
+      header={<Text testID="sign-in-header">Play online</Text>}
       appleSheet={createMemoryAppleSheet()}
       analytics={analytics}
       usernames={usernames}
@@ -62,6 +63,26 @@ async function open(usernames: Usernames | undefined) {
   );
   return { onSignedIn };
 }
+
+describe('the header (#519)', () => {
+  it('shows only with the choices, never on the username or email step', async () => {
+    const user = setupUser();
+    const { onSignedIn } = await open(savedUsernames());
+    expect(screen.getByTestId('sign-in-header')).toBeOnTheScreen();
+
+    await user.press(screen.getByTestId('sign-in-email'));
+    expect(screen.queryByTestId('sign-in-header')).toBeNull();
+    await user.press(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByTestId('sign-in-header')).toBeOnTheScreen();
+
+    // Signed in with Apple: the username step has its own way on, so no
+    // close button can skip handing the user on.
+    await user.press(screen.getByRole('button', { name: 'Continue with Apple' }));
+    expect(await screen.findByTestId('username-form')).toBeOnTheScreen();
+    expect(screen.queryByTestId('sign-in-header')).toBeNull();
+    expect(onSignedIn).not.toHaveBeenCalled();
+  });
+});
 
 describe('the username step after a sign-in', () => {
   it('asks a new saved account for a name, the terms and the age, then goes on', async () => {

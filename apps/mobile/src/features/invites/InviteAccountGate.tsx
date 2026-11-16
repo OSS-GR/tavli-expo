@@ -70,12 +70,15 @@ function SignedInGate({
         <Loading />
       ) : (
         <AccountCard onClose={onHome}>
-          <SignInChoices
-            auth={auth}
-            onSignedIn={signedIn}
-            {...(appleSheet === undefined ? {} : { appleSheet })}
-            {...(analytics === undefined ? {} : { analytics })}
-          />
+          {(header) => (
+            <SignInChoices
+              auth={auth}
+              onSignedIn={signedIn}
+              header={header}
+              {...(appleSheet === undefined ? {} : { appleSheet })}
+              {...(analytics === undefined ? {} : { analytics })}
+            />
+          )}
         </AccountCard>
       )}
     </Frame>
@@ -106,8 +109,17 @@ function Loading() {
   );
 }
 
-/** The invite card over the sign-in choices (`children`). Its close button goes Home. */
-function AccountCard({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+/**
+ * The invite card around the sign-in choices. `children` gets its header
+ * (title and a close button that goes Home), shown only with the choices.
+ */
+function AccountCard({
+  children,
+  onClose,
+}: {
+  children: (header: ReactNode) => ReactNode;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
   const title = t('invite.account.title');
@@ -115,8 +127,7 @@ function AccountCard({ children, onClose }: { children: ReactNode; onClose: () =
   useAnnouncement(`${title} ${body}`);
   return (
     <View testID="invite-account" style={styles.card}>
-      <SignInHeader title={title} body={body} titleRef={titleRef} onClose={onClose} />
-      <View style={styles.actions}>{children}</View>
+      {children(<SignInHeader title={title} body={body} titleRef={titleRef} onClose={onClose} />)}
     </View>
   );
 }
