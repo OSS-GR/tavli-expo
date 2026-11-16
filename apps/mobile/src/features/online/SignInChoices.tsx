@@ -151,8 +151,8 @@ export function SignInChoices({
         {appleAvailable ? (
           <AppleSignInButton
             testID="sign-in-apple"
-            // The app has one set of colors, and it is dark: Apple's white button.
-            dark
+            // Apple's white button on a dark theme, black on a light one (#563).
+            dark={theme.scheme === 'dark'}
             cornerRadius={theme.radii.lg}
             style={styles.apple}
             onPress={() => choose('apple')}

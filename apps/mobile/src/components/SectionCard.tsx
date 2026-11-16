@@ -92,9 +92,11 @@ export interface SectionRowProps {
   icon?: IconName;
   /**
    * `badge` (default): the icon in a small dark badge. `bare`: the brass
-   * icon alone, as in the Settings index (#501).
+   * icon alone, as in the Settings index (#501). `mark`: a brand mark on
+   * its brand's tile, black on white on a dark theme and white on black on
+   * a light one (Apple's logo on the Apple sign-in row, #563).
    */
-  iconLook?: 'badge' | 'bare';
+  iconLook?: 'badge' | 'bare' | 'mark';
   /** Makes the row one button, with a chevron on the right. */
   onPress?: () => void;
   /** Other content on the right, in place of `value`. */
@@ -141,7 +143,9 @@ export function SectionRow({
   const content = (
     <>
       {icon ? (
-        iconLook === 'bare' ? (
+        iconLook === 'mark' ? (
+          <MarkTile name={icon} light={theme.scheme === 'light'} />
+        ) : iconLook === 'bare' ? (
           <View style={styles.bareIcon}>
             <Icon name={icon} size={20} color={colors.icon} />
           </View>
@@ -221,6 +225,21 @@ export function RowIcon({ name, color }: { name: IconName; color?: string }) {
     </View>
   );
 }
+
+/**
+ * A brand mark on the brand's own tile (#563). Apple's colors, not the
+ * theme's: Apple asks for its logo in black or white only.
+ */
+function MarkTile({ name, light }: { name: IconName; light: boolean }) {
+  return (
+    <View style={[styles.badge, { backgroundColor: light ? MARK_BLACK : MARK_WHITE }]}>
+      <Icon name={name} size={20} color={light ? MARK_WHITE : MARK_BLACK} />
+    </View>
+  );
+}
+
+const MARK_WHITE = '#FFFFFF';
+const MARK_BLACK = '#000000';
 
 const BADGE = 36;
 
