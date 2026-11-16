@@ -30,9 +30,9 @@ Tavlaki is a Greek backgammon (tavli) app for iPhone and Android. This policy sa
 
 ## Who is responsible
 
-Tavlaki is made by **[owner's full name]**, an individual developer in Greece. Under the EU General Data Protection Regulation (GDPR), we are the "controller" for the data on this page.
+Tavlaki is made by **Orestis Stefanis**, an individual developer in New York, USA. We are the "controller" for the data on this page: we decide what data the app uses and why. For players in the EU and the EEA, the EU General Data Protection Regulation (GDPR) applies.
 
-Contact: **privacy@tavlaki.com** <!-- OWNER: confirm this address works before publishing. -->
+Contact: **privacy@tavlaki.com** <!-- OWNER: confirm this address works before publishing. --> <!-- OWNER: a lawyer checks GDPR Article 27: a controller outside the EU that serves players in the EU may need a representative in the EU. Article 27(2) has an exception for processing that is occasional and low risk; we do not claim it here. Also check the line on our own access from the USA under "Services that process the data". -->
 
 ## What stays on your phone
 
@@ -199,6 +199,8 @@ We use five services. They process the data for us, under their data processing 
 
 Sentry, PostHog, Convex and Expo are based in the USA. Their staff or sub-processors may reach the data from outside the EU. Their data processing terms set safeguards for such transfers, such as the EU Standard Contractual Clauses. AhaSend is based in the Netherlands and keeps the data in the EU. <!-- OWNER: accept the five vendors' data processing terms (DPA) and check this line. -->
 
+We, the developer, work from the USA. When we look at the data to run online play, to answer a request or to act on a report, we reach it from the USA. The data stays with the services above, in the places the table says. For players in the EU and the EEA, the GDPR still applies, and we protect the data as this policy says.
+
 ## Why we may use the data (legal basis)
 
 - **Usage data:** your consent (GDPR Article 6(1)(a)). You can withdraw it at any time in Settings. Withdrawing does not undo what was lawful before.
@@ -220,9 +222,11 @@ Under the GDPR you have the right to:
 - **restrict** or **object** to how we use it;
 - **withdraw consent** at any time (the switch in Settings);
 - get your data in a portable form;
-- **complain** to a data protection authority. In Greece this is the Hellenic Data Protection Authority ([www.dpa.gr](https://www.dpa.gr)).
+- **complain** to the data protection authority of the EU or EEA country where you live, where you work, or where the problem happened. In Greece, for example, this is the Hellenic Data Protection Authority ([www.dpa.gr](https://www.dpa.gr)).
 
 To ask, write to **privacy@tavlaki.com**. We answer within one month.
+
+If you live outside the EU and the EEA, you can ask us the same things, and we answer the same way. We do not sell your personal data, and we do not share it for ads.
 
 Please note: we do not know who you are. The app does not show the install id or the user id yet, so we may not be able to find your data. Tell us your phone model and roughly when you used the app, and we will do our best. For online games, also send an invite code you made or accepted, or your guest name or username (in **Settings → Account**), or the email of your sign-in (Apple or email code): it leads us to your user id, and then to your invites and games. Usage data and crash reports age out under the times in the table above. Deleting the app deletes the install id, the sign-in cookie and everything on your phone, but not your invites and games on the server: to delete those, tap **Delete my account** in **Settings → Account** before you delete the app, or write to us. A push token of a deleted app stops working, and the server deletes it when Expo says so.
 
@@ -230,7 +234,7 @@ Please note: we do not know who you are. The app does not show the install id or
 
 Tavlaki is not aimed at children under 13.
 
-In Greece, a child under 15 can give consent for an app like this only with a parent's or guardian's permission (Greek Law 4624/2019, Article 21). Other EU countries use an age between 13 and 16. If you are under that age, please ask a parent before you tap **Allow usage data**. The app works fully if you tap **Don't allow**.
+For players in Greece: a child under 15 can give consent for an app like this only with a parent's or guardian's permission (Greek Law 4624/2019, Article 21). Other EU countries use an age between 13 and 16. If you are under that age, please ask a parent before you tap **Allow usage data**. The app works fully if you tap **Don't allow**.
 
 To pick a username, you confirm that you are at least 16 (13 outside the EU and the EEA, and in the EU and EEA countries that set 13). The app picks the age from your phone's region. If the phone gives no region, it asks for 16.
 

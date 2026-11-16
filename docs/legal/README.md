@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Last review: 2026-11-13 (#531 Play ranked matching; #407 ratings and leaderboards; #320 block and report on the server, #435 how to report in the app, #403 moving a guest into an account, #399 the email code and AhaSend, #404 the reminder times on the phone, #406 friends on the server).
+> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Terms review: 2026-11-16 (#586: the licence, the Apple EULA points, fair play and ranked, what we may do and the appeal, ratings, liability, law and disputes; the developer is in New York, USA: New York law with the consumer's home-country protection, Apple's standard EULA). Last review of the policy: 2026-11-13 (#531 Play ranked matching; #407 ratings and leaderboards; #320 block and report on the server, #435 how to report in the app, #403 moving a guest into an account, #399 the email code and AhaSend, #404 the reminder times on the phone, #406 friends on the server).
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy and the terms before they go live.
 
@@ -31,7 +31,7 @@ The app opens `https://tavlaki.com/privacy` (`PRIVACY_POLICY_URL` in `apps/mobil
 
 ## Rules
 
-- **Terms of use:** the same rules: change all four terms files together. The version date at the top is `TERMS_VERSION` (`packages/contracts/src/username.ts`). Raise both only when players must accept the terms again: the app then asks each saved player before their next username change, and the server refuses a change without it (`TERMS_NEEDED`).
+- **Terms of use:** the same rules: change all four terms files together. The version date at the top is `TERMS_VERSION` (`packages/contracts/src/username.ts`). Raise both only when players must accept the terms again: the app then asks each saved player before their next username change, and the server refuses a change without it (`TERMS_NEEDED`). A text change that does not raise `TERMS_VERSION` keeps the version date and changes the "text last changed" date next to it, in all four files.
 - **Change all four files together.** Edit the English Markdown first, then the Greek Markdown, then both HTML pages. Change the "Last updated" date in all four.
 - The policy describes what the code does. When a PR changes what data leaves the phone (a new event, a new vendor, a new id), it updates this policy in the same PR. The event list must match [`docs/architecture/analytics-events.md`](../architecture/analytics-events.md). The same PR also updates the store privacy answers ([`docs/store/app-privacy.md`](../store/app-privacy.md), [`docs/store/play-data-safety.md`](../store/play-data-safety.md)) and the iOS privacy manifest in `apps/mobile/app.json`.
 - The HTML pages are plain HTML with inline CSS. No JavaScript, no fonts or images from other sites, no cookies. Keep it that way: the policy says so. The homepages show local images only (`site/img/`).
@@ -75,7 +75,7 @@ Do not add analytics, cookies or outside fonts to the site. The invite pages car
 ## Before you publish (owner checklist)
 
 - [ ] Publish only after PR #89 (`feat/61-analytics`) is merged. The policy describes the consent screen and the one privacy switch from that PR. On `main` before #89, crash reports always carry the install id.
-- [ ] Put your full name (or a company name) in "Who is responsible", in both languages.
+- [x] Put your full name in "Who is responsible", in both languages (Orestis Stefanis, 2026-11-16).
 - [ ] Make `privacy@tavlaki.com` work (or change it in all four files).
 - [ ] Sentry: check that the organization uses the **EU** data region (Frankfurt). Sentry sets it when the organization is made, and it cannot change later. If it is the US region, change the table in the policy.
 - [ ] Sentry: turn on **Prevent Storing of IP Addresses** (see `packages/adapters/crash-sentry/README.md`).
@@ -102,10 +102,15 @@ The policy's "Delete your account" section (all four files) and the store answer
 
 ## Before you publish the terms (owner checklist, #405)
 
-- [ ] Put your full name (or a company name) in "Who we are", in both languages.
-- [ ] Have a lawyer check the terms: the age rule and country list, "The app as it is", the Apple section and "Law" (the `OWNER` comments).
+- [x] Put your full name in "Who we are", in all four files (2026-11-16). The terms name no postal address: we keep Apple's standard EULA, so Apple asks for none there.
+- [ ] Have a lawyer check the terms: the age rule and country list, "The app as it is", "Our liability", the Apple section and "Law and disputes" (the `OWNER` comments).
+- [ ] The terms say you must be 16 (or 13) to pick a username **or to play ranked**, but the app asks the age only at the username step. Decide whether Play ranked should ask too.
+- [ ] The terms promise to tell a player why we took a step against their account, and to look again when they write within 6 months. Answer those emails, and keep a short note of each step and its reason.
+- [x] Raise `TERMS_VERSION` for the #586 rewrite (owner, 2026-11-16: `2026-11-16`; players accept again at their next username change).
 - [ ] Publish `site/terms/` and `site/el/terms/` with the privacy pages, before the build with usernames goes to the stores.
-- [ ] Add the terms URL to App Store Connect (License Agreement: a custom EULA, or keep Apple's standard one and link the terms in the description) and to the Play listing.
+- [ ] App Store Connect: keep Apple's standard License Agreement (no custom EULA) and link the terms URL in the app description. Add the terms URL to the Play listing too.
+- [ ] App Store EU trader status (Digital Services Act): App Store Connect asks every developer whether they are a "trader" in the EU. A free app with no purchases and no ads can usually say "not a trader". If you say "trader", Apple shows your address, phone number and email on the EU App Store pages. Have the lawyer confirm the answer.
+- [ ] GDPR Article 27: as a controller outside the EU with players in the EU, check with the lawyer whether you need a representative in the EU (Article 27(2) has an exception for occasional, low-risk processing; the policy does not claim it).
 
 ## Ideas for later (app changes, not part of #90)
 
