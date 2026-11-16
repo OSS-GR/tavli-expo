@@ -25,7 +25,7 @@ English: [tavlaki.com/terms](https://tavlaki.com/terms)
 
 ## Ποιοι είμαστε
 
-Το Ταβλάκι το φτιάχνει **Orestis Stefanis**, ιδιώτης στη Νέα Υόρκη των ΗΠΑ («εμείς»).
+Το Ταβλάκι το φτιάχνει ο **Ορέστης Στεφανής**, ιδιώτης στη Νέα Υόρκη των ΗΠΑ («εμείς»).
 
 Email: **privacy@tavlaki.com**
 
