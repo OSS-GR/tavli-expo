@@ -1,9 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { Linking, ScrollView, Text, View } from 'react-native';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { EmptyMedallion } from '@/components/EmptyMedallion';
+import { Icon } from '@/components/Icon';
+import type { IconName } from '@/components/icons';
 import { Screen } from '@/components/Screen';
+import { CardFrame, RowDivider } from '@/components/SectionCard';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
 import { whatsNewSeen } from '@/features/whats-new/seen';
@@ -18,14 +22,15 @@ export interface WelcomeConsentScreenProps {
 }
 
 /**
- * First launch, step 2 (wireframe 02): ask before any usage data is sent
- * (GDPR, #61). "Allow" and "Don't allow" look the same: refusing is as easy
- * as accepting. "Don't allow" stops usage data and crash reports (the one
- * switch, `features/privacy`). Closing the app without an answer sends no
- * usage data, only anonymous crash reports, and this screen shows again on
- * the next launch. The first answer makes the board step due (#350), so
- * the route opens it next. Without a board step, the answer itself leaves
- * this screen: the root layout's guard opens Home.
+ * First launch, step 2 (Figma frame 12): ask before any usage data is sent
+ * (GDPR, #61). Two rows say what we collect and what we never collect.
+ * "Allow" and "Don't allow" look the same: refusing is as easy as
+ * accepting, and no brass nudges the choice. "Don't allow" stops usage data
+ * and crash reports (the one switch, `features/privacy`). Closing the app
+ * without an answer sends no usage data, only anonymous crash reports, and
+ * this screen shows again on the next launch. The first answer makes the
+ * board step due (#350), so the route opens it next. Without a board step,
+ * the answer itself leaves this screen: the root layout's guard opens Home.
  */
 export function WelcomeConsentScreen({ onBack, onAnswered }: WelcomeConsentScreenProps) {
   const { t } = useTranslation();
@@ -45,46 +50,42 @@ export function WelcomeConsentScreen({ onBack, onAnswered }: WelcomeConsentScree
     onAnswered?.();
   };
 
-  const collect = [
-    t('welcome.privacy.collect.modes'),
-    t('welcome.privacy.collect.games'),
-    t('welcome.privacy.collect.settings'),
-    t('welcome.privacy.collect.crashes'),
-  ];
-
   return (
     <Screen testID="welcome-consent">
-      <WelcomeTop
-        onBack={onBack}
-        backTestID="welcome-consent-back"
-        step={t('welcome.privacy.step', { step: 2, total })}
-      />
+      <WelcomeTop step={2} total={total} onBack={onBack} backTestID="welcome-consent-back" />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        <View style={styles.picture} importantForAccessibility="no-hide-descendants">
-          <View style={styles.bar(0.4)} />
-          <View style={styles.bar(0.7)} />
-          <View style={styles.bar(1)} />
+        <EmptyMedallion icon="chart" size="large" />
+        <View style={styles.heading}>
+          <Text style={styles.title} accessibilityRole="header">
+            {t('welcome.privacy.title')}
+          </Text>
+          <Text style={styles.intro}>{t('welcome.privacy.intro')}</Text>
         </View>
-        <Text style={styles.title} accessibilityRole="header">
-          {t('welcome.privacy.title')}
-        </Text>
-        <Text style={styles.text}>{t('welcome.privacy.intro')}</Text>
-        <View style={styles.list}>
-          {collect.map((item) => (
-            <Text key={item} style={styles.text}>
-              {`•  ${item}`}
-            </Text>
-          ))}
+        <CardFrame testID="welcome-consent-data">
+          <DataRow
+            icon="check"
+            title={t('welcome.privacy.collect.title')}
+            body={t('welcome.privacy.collect.body')}
+          />
+          <RowDivider />
+          <DataRow
+            icon="x"
+            never
+            title={t('welcome.privacy.never.title')}
+            body={t('welcome.privacy.never.body')}
+          />
+        </CardFrame>
+        <View style={styles.policy}>
+          <ActionButton
+            testID="welcome-consent-policy"
+            kind="text"
+            size="small"
+            icon="shield"
+            label={t('welcome.privacy.policy')}
+            onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
+          />
         </View>
-        <Text style={styles.text}>{t('welcome.privacy.never')}</Text>
-        <Pressable
-          testID="welcome-consent-policy"
-          accessibilityRole="link"
-          onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
-          style={({ pressed }) => [styles.policy, pressed && styles.pressed]}>
-          <Text style={styles.policyText}>{`${t('welcome.privacy.policy')} ›`}</Text>
-        </Pressable>
       </ScrollView>
 
       {/* Same kind for both: no nudge. */}
@@ -101,70 +102,102 @@ export function WelcomeConsentScreen({ onBack, onAnswered }: WelcomeConsentScree
           label={t('welcome.privacy.deny')}
           onPress={() => answer(false)}
         />
+        <Text style={styles.note}>{t('welcome.privacy.denyNote')}</Text>
       </View>
     </Screen>
   );
 }
 
+interface DataRowProps {
+  icon: IconName;
+  title: string;
+  body: string;
+  /** What we never collect: a coral cross in place of the brass check. */
+  never?: boolean;
+}
+
+/** One row of the data card. Screen readers read it as one item. */
+function DataRow({ icon, title, body, never = false }: DataRowProps) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.row} accessible accessibilityLabel={`${title}. ${body}`}>
+      <View style={styles.rowIcon}>
+        <Icon name={icon} size={22} color={never ? theme.colors.problem : theme.colors.accent} />
+      </View>
+      <View style={styles.rowText}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        <Text style={styles.rowBody}>{body}</Text>
+      </View>
+    </View>
+  );
+}
+
+const ROW_ICON = 30;
+
 const styles = StyleSheet.create((theme, rt) => ({
-  pressed: {
-    opacity: 0.7,
-  },
   body: {
     flex: 1,
   },
   bodyContent: {
-    paddingHorizontal: theme.space.xl,
-    paddingVertical: theme.space.lg,
-    gap: theme.space.md,
+    gap: 20,
+    paddingHorizontal: theme.space.lg,
+    paddingTop: theme.space.sm,
+    paddingBottom: theme.space.lg,
   },
-  picture: {
-    alignSelf: 'center',
-    width: 96,
-    height: 88,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.3)',
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: theme.space.xs,
-    paddingBottom: theme.space.md,
-    marginBottom: theme.space.sm,
+  heading: {
+    gap: 6,
   },
-  bar: (height: number) => ({
-    width: 12,
-    height: 48 * height,
-    borderRadius: 2,
-    backgroundColor: theme.colors.accent,
-  }),
   title: {
     ...theme.type.title1,
     color: theme.colors.text,
+    textAlign: 'center',
   },
-  text: {
-    ...theme.type.body,
+  intro: {
+    ...theme.type.callout,
     color: theme.colors.textDim,
+    textAlign: 'center',
+    paddingHorizontal: theme.space.lg,
   },
-  list: {
-    gap: theme.space.xxs,
+  row: {
+    minHeight: theme.touch.row,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.space.md,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: 14,
   },
-  policy: {
-    alignSelf: 'flex-start',
-    minHeight: theme.touch.minTarget,
+  rowIcon: {
+    width: ROW_ICON,
+    height: ROW_ICON,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  policyText: {
-    ...theme.type.bodyStrong,
+  rowText: {
+    flex: 1,
+    gap: 3,
+  },
+  rowTitle: {
+    ...theme.type.headline,
     color: theme.colors.text,
-    textDecorationLine: 'underline',
+  },
+  rowBody: {
+    ...theme.type.footnote,
+    color: theme.colors.textDim,
+  },
+  // A real button, centered under the card.
+  policy: {
+    alignItems: 'center',
   },
   buttons: {
-    gap: theme.space.sm,
-    paddingHorizontal: theme.space.xl,
+    gap: 10,
+    paddingHorizontal: theme.space.lg,
     paddingTop: theme.space.sm,
-    paddingBottom: rt.insets.bottom + theme.space.lg,
+    paddingBottom: rt.insets.bottom + theme.space.sm,
+  },
+  note: {
+    ...theme.type.footnote,
+    color: theme.colors.textDim,
+    textAlign: 'center',
+    paddingTop: theme.space.xs,
   },
 }));

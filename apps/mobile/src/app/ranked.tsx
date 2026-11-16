@@ -9,6 +9,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
 import { useVisit } from '@/features/friends/useVisit';
+import { lastModes } from '@/features/home/lastModes';
 import { gameHref, newGameHref } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { hasOnlineAccount } from '@/features/online/accountHint';
@@ -55,7 +56,10 @@ export default function RankedRoute() {
       visit={visit}
       {...(game !== undefined && isRankedGame(game) ? { initialGame: game } : {})}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-      onGame={(gameId) => router.replace(gameHref(gameId))}
+      onGame={(gameId) => {
+        lastModes.record('ranked', gameId);
+        router.replace(gameHref(gameId));
+      }}
       onBot={() => router.replace(newGameHref('bot'))}
     />
   );

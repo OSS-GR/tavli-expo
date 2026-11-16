@@ -102,15 +102,17 @@ export function gameRowText(
  * account. A failure after a list came keeps that list (`failed: true`);
  * `retry` starts the watch again. Only a sign-out forgets the account
  * note; a `null` from `ready()` shows `failed` (see `useSessionWatch`).
+ * With no `auth` or `games` it watches nothing (`signedOut`).
  */
 export function useMyOnlineGames(
-  auth: AuthProvider,
-  games: GameTransport,
+  auth: AuthProvider | undefined,
+  games: GameTransport | undefined,
   status: OnlineGameStatus = 'active',
   now: () => number = Date.now,
 ): { readonly state: MyGamesState; readonly retry: () => void } {
   const start = useCallback<StartSessionWatch<readonly GameSummary[]>>(
-    (onList, onError) => games.watchMyGames({ status }, onList, onError),
+    (onList, onError) =>
+      games === undefined ? () => {} : games.watchMyGames({ status }, onList, onError),
     [games, status],
   );
   const toLoaded = useCallback(
@@ -120,7 +122,7 @@ export function useMyOnlineGames(
     }),
     [now],
   );
-  return useSessionWatch(auth, start, toLoaded);
+  return useSessionWatch(games === undefined ? undefined : auth, start, toLoaded);
 }
 
 /**

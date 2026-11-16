@@ -157,8 +157,8 @@ describe('first launch', () => {
 
     await user.press(screen.getByRole('button', { name: 'Continue' }));
     expect(screen).toHavePathname('/welcome/privacy');
-    expect(screen.getByText('Step 2 of 3')).toBeOnTheScreen();
-    expect(screen.getByRole('header', { name: 'Help us make Tavlaki better' })).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 2 of 3')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Help make Tavlaki better' })).toBeOnTheScreen();
 
     // Nothing was sent while the user had not answered.
     expect(recorded.sent).toEqual([]);
@@ -167,7 +167,7 @@ describe('first launch', () => {
 
     // The board step (#350): the defaults are picked.
     expect(screen).toHavePathname('/welcome/board');
-    expect(screen.getByText('Step 3 of 3')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 3 of 3')).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'Set up your board' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: 'Walnut Kafeneio' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Bottom right' })).toBeChecked();
@@ -266,7 +266,7 @@ describe('first launch', () => {
 
     // The next launch starts at the board step, also from a deep link.
     await openApp('/game/local-abc');
-    expect(screen.getByText('Step 3 of 3')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 3 of 3')).toBeOnTheScreen();
     await keepBoard(user);
     expect(screen).toHavePathname('/');
     expect(router.canGoBack()).toBe(false);
@@ -280,7 +280,7 @@ describe('first launch', () => {
     });
     await openApp();
     await user.press(screen.getByRole('button', { name: 'Continue' }));
-    expect(screen.getByText('Step 2 of 2')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 2 of 2')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Allow usage data' }));
     expect(screen).toHavePathname('/');
     expect(router.canGoBack()).toBe(false);
@@ -348,7 +348,7 @@ describe('first launch', () => {
     expect(await screen.findByRole('button', { name: 'Συνέχεια' })).toBeOnTheScreen();
 
     await user.press(screen.getByRole('button', { name: 'Συνέχεια' }));
-    expect(screen.getByText('Βήμα 2 από 3')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Βήμα 2 από 3')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Πίσω' }));
     expect(screen).toHavePathname('/welcome/language');
 
