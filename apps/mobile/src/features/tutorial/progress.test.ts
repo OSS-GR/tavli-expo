@@ -195,9 +195,10 @@ describe('tutorial analytics', () => {
 });
 
 describe('lessons learnt (#571)', () => {
-  it('saves the highest lesson learnt, keeps the status, and loads it again', () => {
+  it('saves the lessons learnt in a row, keeps the status, and loads it again', () => {
     const storage = createMemoryStorage();
     const store = createTutorialStore(storage);
+    store.getState().learn('fevga', 1);
     store.getState().learn('fevga', 2);
     store.getState().learn('fevga', 1);
     expect(store.getState().learnt.fevga).toBe(2);
@@ -211,6 +212,12 @@ describe('lessons learnt (#571)', () => {
     const again = createTutorialStore(storage).getState();
     expect(again.learnt).toEqual({ portes: 0, plakoto: 0, fevga: 2, asodio: 0 });
     expect(statusOf(again, 'fevga')).toBe('dismissed');
+  });
+
+  it('counts a lesson only right after the ones before it', () => {
+    const store = createTutorialStore(createMemoryStorage());
+    store.getState().learn('plakoto', 3);
+    expect(store.getState().learnt.plakoto).toBe(0);
   });
 
   it.each(['{"status":"new","learnt":-1}', '{"status":"new","learnt":1.5}', '{"learnt":"2"}'])(

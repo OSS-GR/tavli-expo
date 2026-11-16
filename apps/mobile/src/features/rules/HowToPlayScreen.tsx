@@ -59,7 +59,7 @@ export function HowToPlayScreen({ progress, onOpen, onBack }: HowToPlayScreenPro
               label={t(`games.${game}`)}
               hint={t(`rules.hub.blurb.${game}`)}
               below={<LessonDots count={LESSON_SETS[game].length} progress={progress[game]} />}
-              accessibilityLabel={`${t(rulesTitleKey(game))}, ${hubProgressText(t, LESSON_SETS[game].length, progress[game])}`}
+              accessibilityLabel={`${t(rulesTitleKey(game))}, ${t(`rules.hub.blurb.${game}`)}, ${hubProgressText(t, LESSON_SETS[game].length, progress[game])}`}
               onPress={() => onOpen(game)}
             />
           ))}

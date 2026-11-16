@@ -1804,7 +1804,7 @@
     "title": "Learn to play",
     "progress": "Lesson {{step}} of {{count}}",
     "skip": "Skip",
-    "skipHint": "Leave the lesson. You can open it again from Settings.",
+    "skipHint": "Leave the lesson. You can open it again from How to play.",
     "next": "Next",
     "lessons": {
       "move": {
@@ -1950,21 +1950,21 @@
     "games": {
       "plakoto": {
         "title": "Learn Plakoto",
-        "skipHint": "Leave the lesson. You can open it again from Settings or the Plakoto rules page.",
+        "skipHint": "Leave the lesson. You can open it again from How to play.",
         "endTitle": "You know Plakoto!",
         "endBody": "Now play a game of Plakoto against the Easy bot. The rules page has the rest.",
         "play": "Play Plakoto"
       },
       "fevga": {
         "title": "Learn Fevga",
-        "skipHint": "Leave the lesson. You can open it again from Settings or the Fevga rules page.",
+        "skipHint": "Leave the lesson. You can open it again from How to play.",
         "endTitle": "You know Fevga!",
         "endBody": "Now play a game of Fevga against the Easy bot. The rules page has the rest.",
         "play": "Play Fevga"
       },
       "asodio": {
         "title": "Learn Asodio",
-        "skipHint": "Leave the lesson. You can open it again from Settings or the Asodio rules page.",
+        "skipHint": "Leave the lesson. You can open it again from How to play.",
         "endTitle": "You know Asodio!",
         "endBody": "Now play a game of Asodio against the Easy bot. The rules page has the rest.",
         "play": "Play Asodio"

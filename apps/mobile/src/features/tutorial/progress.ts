@@ -141,7 +141,10 @@ export function createTutorialStore(storage: Storage) {
       },
       learn: (game, step) => {
         const which = gameOf(game);
-        if (step > get().learnt[which]) save(which, statusOf(get(), which), step);
+        const learnt = get().learnt[which];
+        // Only the next lesson in a row counts: a lesson opened out of order
+        // does not mark the ones before it learnt.
+        if (step === learnt + 1) save(which, statusOf(get(), which), step);
       },
       dismiss: (game) => {
         const which = gameOf(game);

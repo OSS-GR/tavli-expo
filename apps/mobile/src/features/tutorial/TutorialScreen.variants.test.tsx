@@ -167,7 +167,7 @@ describe('<TutorialScreen game="plakoto|fevga|asodio" />', () => {
     const props = await open('fevga');
     expect(screen.getByRole('button', { name: 'Skip' })).toHaveProp(
       'accessibilityHint',
-      'Leave the lesson. You can open it again from Settings or the Fevga rules page.',
+      'Leave the lesson. You can open it again from How to play.',
     );
     await press('tutorial-skip');
     expect(props.onSkip).toHaveBeenLastCalledWith(1, 'sameWay');
