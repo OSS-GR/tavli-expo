@@ -32,7 +32,6 @@ export interface EmptyMedallionProps {
 
 export function EmptyMedallion({ icon, size = 'regular', testID }: EmptyMedallionProps) {
   const { theme } = useUnistyles();
-  const sizes = SIZES[size];
   return (
     <View
       testID={testID}
