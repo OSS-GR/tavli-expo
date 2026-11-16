@@ -265,10 +265,6 @@
       "confirmBody": "This deletes the list and the stats of your past matches on this phone. You cannot undo it.",
       "confirm": "Clear"
     },
-    "account": {
-      "label": "Account",
-      "hint": "Sign-in, username and your online data"
-    },
     "friends": {
       "label": "Friends",
       "hint": "Add friends and invite them to a game"
@@ -314,7 +310,6 @@
       "offline": "No online account",
       "unknown": "Your account",
       "phoneOnly": "On this phone only",
-      "saved": "Saved account",
       "hint": "Opens your account"
     },
     "versionBuild": "Tavlaki {{version}} ({{build}})"
@@ -348,20 +343,15 @@
       "phoneHint": "Bot games, history and settings"
     },
     "saved": {
-      "name": "You play as {{name}}",
-      "noName": "You have no username yet. Other players see your guest name.",
-      "kept": "Your account is saved: sign in with it to open it on another phone. Your games against the bot, your history and your settings stay on this phone.",
       "username": "Username",
       "usernameNone": "Pick one",
       "keys": "Ways to sign in",
-      "lastKey": "An account keeps at least one way to sign in.",
       "remove": "Remove",
       "removeLabel": "Remove {{provider}}",
       "add": "Add {{provider}}",
       "signOut": "Sign out",
-      "signOutHint": "Your account stays. Sign in again to come back.",
       "delete": "Delete my account",
-      "deleteHint": "Your account, username and online games on our server."
+      "footnote": "Bot games, history and settings stay on this phone. Sign out keeps your account; delete removes it from our server."
     },
     "provider": {
       "apple": "Sign in with Apple",
@@ -444,6 +434,16 @@
       "savedName": "Your username and your ways to sign in are removed.",
       "kept": "Finished games stay for the other players, with no name. Your games and history on this phone stay too. You cannot undo it.",
       "confirm": "Delete"
+    },
+    "signedIn": {
+      "email": "Signed in with email",
+      "apple": "Signed in with Apple",
+      "both": "Signed in with Apple and email",
+      "none": "Signed in"
+    },
+    "keyName": {
+      "apple": "Apple",
+      "email": "Email"
     }
   },
   "history": {

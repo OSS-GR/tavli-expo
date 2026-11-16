@@ -22,7 +22,7 @@
  *   account, deletes the guest and signs in there; Keep closes the offer
  *   and the guest stays as it is. A saved account gets no offer, only
  *   `keyTaken`.
- * - An account keeps at least one key: Remove is off for the last one,
+ * - An account keeps at least one key: the last one has no Remove (#561),
  *   and the server says `LAST_KEY` too.
  * - Sign out (`signOutOfOnline`, the push token first) and Delete
  *   (`deleteOnlineData`) end in `offline`, with a note that says so.
@@ -86,10 +86,15 @@ export type AccountState =
    * (the player id) only picks the wood of the avatar.
    */
   | { readonly kind: 'guest'; readonly id: string; readonly guestNumber: string | null }
-  /** A saved account (it has a key). */
+  /**
+   * A saved account (it has a key). `id` picks the avatar's wood;
+   * `guestNumber` names it until it has a username.
+   */
   | {
       readonly kind: 'saved';
+      readonly id: string;
       readonly username: string | null;
+      readonly guestNumber: string | null;
       readonly keys: readonly AuthKey[];
     };
 
@@ -226,7 +231,16 @@ async function loadAccount(
       mine,
     };
   }
-  return { state: { kind: 'saved', username: mine.name, keys: await auth.listKeys() }, mine };
+  return {
+    state: {
+      kind: 'saved',
+      id: user.id,
+      username: mine.name,
+      guestNumber: mine.guestNumber ?? null,
+      keys: await auth.listKeys(),
+    },
+    mine,
+  };
 }
 
 function problemOf(error: unknown): AccountProblem {

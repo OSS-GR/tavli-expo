@@ -8,11 +8,13 @@
  * - Else it reads the session (`auth.ready()`) and the name
  *   (`Usernames.mine`), like Account does: a guest shows "Guest 4821" and
  *   "On this phone only" (a guest has no key, so the account lives on
- *   this phone), a saved account its username and "Saved account".
+ *   this phone), a saved account its username and how it signs in
+ *   ("Signed in with email", #561, `signInLine`). When the keys do not
+ *   load, it says "Signed in".
  * - While it loads, or when the server does not answer, it shows "Your
  *   account": Account itself says more. It never signs in or out.
  */
-import type { AuthProvider, Usernames } from '@tavli/contracts';
+import type { AuthKeyProvider, AuthProvider, Usernames } from '@tavli/contracts';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
@@ -21,6 +23,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { Icon } from '@/components/Icon';
 import { surfaceStyle } from '@/components/Surface';
+import { signInIcon, signInLine } from '@/features/account/signInLine';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 
 import { SettingsChip } from './SettingsChip';
@@ -31,7 +34,13 @@ export type AccountSummary =
   /** Loading, or the server did not answer. */
   | { readonly kind: 'unknown' }
   | { readonly kind: 'guest'; readonly id: string; readonly number: string | null }
-  | { readonly kind: 'saved'; readonly id: string; readonly name: string | null };
+  | {
+      readonly kind: 'saved';
+      readonly id: string;
+      readonly name: string | null;
+      /** The ways to sign in; `null` when they did not load. */
+      readonly keys: readonly AuthKeyProvider[] | null;
+    };
 
 async function loadSummary(auth: AuthProvider, usernames: Usernames): Promise<AccountSummary> {
   const user = await auth.ready();
@@ -40,7 +49,11 @@ async function loadSummary(auth: AuthProvider, usernames: Usernames): Promise<Ac
   if (user.isGuest || !mine.saved) {
     return { kind: 'guest', id: user.id, number: mine.guestNumber ?? null };
   }
-  return { kind: 'saved', id: user.id, name: mine.name };
+  const keys = await auth.listKeys().then(
+    (list) => list.map((key) => key.provider),
+    () => null,
+  );
+  return { kind: 'saved', id: user.id, name: mine.name, keys };
 }
 
 /** The summary. `visit` changes each time Settings shows again, so a new name shows. */
@@ -95,7 +108,7 @@ export function AccountCard({ auth, usernames, visit, onPress }: AccountCardProp
     summary.kind === 'offline' || summary.kind === 'guest'
       ? t('settings.accountCard.phoneOnly')
       : summary.kind === 'saved'
-        ? t('settings.accountCard.saved')
+        ? t(`account.signedIn.${signInLine(summary.keys)}`)
         : null;
   // The avatar's wood follows the player id; with no account, a fixed one.
   const playerKey = summary.kind === 'guest' || summary.kind === 'saved' ? summary.id : 'offline';
@@ -118,7 +131,7 @@ export function AccountCard({ auth, usernames, visit, onPress }: AccountCardProp
         {where === null ? null : (
           <SettingsChip
             testID="settings-account-where"
-            icon={summary.kind === 'saved' ? 'check' : 'smartphone'}
+            icon={summary.kind === 'saved' ? signInIcon(signInLine(summary.keys)) : 'smartphone'}
             label={where}
           />
         )}

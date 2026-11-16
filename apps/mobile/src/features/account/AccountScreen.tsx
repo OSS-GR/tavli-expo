@@ -20,8 +20,11 @@
  * - After a guest's save, a key sign-in or a move, a saved account with
  *   no username sees the username step (`UsernameForm`, #483) in place
  *   of the cards, under the note; Save or Not now shows them again.
- * - Saved: the username (to Settings → Username), the ways to sign in
- *   (never remove the last), Sign out and Delete my account.
+ * - Saved (Figma frame 19, #561): a hero like the guest's (checker,
+ *   username, "Signed in with email"), the username (to Settings →
+ *   Username), the ways to sign in (the small Remove only when there are
+ *   two: the last one has no button and says why), Sign out and Delete my
+ *   account, then one footnote: what stays on this phone.
  * - A failed action opens the problem popup (`ProblemCard`, #462): what
  *   went wrong, what to do, OK. It shares one `Sheet` with the move
  *   dialog, so Keep my guest account turns the dialog into the problem
@@ -62,6 +65,7 @@ import { EmailCodeForm } from '@/features/online/EmailCodeForm';
 import { UsernameForm } from '@/features/online/UsernameForm';
 import { AppleSignInButton } from '@/services';
 
+import { signInIcon, signInLine } from './signInLine';
 import { addableKeys, useAccount, type Account, type AccountDeps } from './useAccount';
 
 export interface AccountScreenProps {
@@ -182,7 +186,9 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
               ) : (
                 <Saved
                   account={account}
+                  id={state.id}
                   username={state.username}
+                  guestNumber={state.guestNumber}
                   keys={state.keys.map((key) => key.provider)}
                   onUsername={onUsername}
                   onAddEmail={() => setEmailStep('add')}
@@ -406,7 +412,9 @@ function Guest({
 
 function Saved({
   account,
+  id,
   username,
+  guestNumber,
   keys,
   onUsername,
   onAddEmail,
@@ -414,7 +422,9 @@ function Saved({
   onDelete,
 }: {
   account: Account;
+  id: string;
   username: string | null;
+  guestNumber: string | null;
   keys: readonly AuthKeyProvider[];
   onUsername: () => void;
   onAddEmail: () => void;
@@ -422,24 +432,37 @@ function Saved({
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
+  const { theme } = useUnistyles();
   const busy = account.busy !== null;
   const lastKey = keys.length <= 1;
+  // With no username yet, the guest name the others see.
+  const shown =
+    username ??
+    (guestNumber === null
+      ? t('account.guest.anonymous')
+      : t('online.guestName', { number: guestNumber }));
+  const line = signInLine(keys);
+  const signedIn = t(`account.signedIn.${line}`);
   const addable = addableKeys(
     keys.map((provider) => ({ provider })),
     account.appleAvailable,
   );
   return (
     <>
-      <SectionCard padded testID="account-saved">
-        <View style={styles.block}>
-          <Text testID="account-name" style={styles.lead}>
-            {username === null
-              ? t('account.saved.noName')
-              : t('account.saved.name', { name: username })}
-          </Text>
-          <Text style={styles.line}>{t('account.saved.kept')}</Text>
+      <View
+        testID="account-saved"
+        style={styles.hero}
+        accessible
+        accessibilityLabel={`${shown}. ${signedIn}.`}>
+        <CheckerAvatar testID="account-avatar" playerKey={id} name={shown} size={72} />
+        <Text testID="account-name" style={styles.heroName}>
+          {shown}
+        </Text>
+        <View testID="account-signed-in" style={styles.chip}>
+          <Icon name={signInIcon(line)} size={13} color={theme.colors.textDim} />
+          <Text style={styles.chipText}>{signedIn}</Text>
         </View>
-      </SectionCard>
+      </View>
       <SectionCard>
         <SectionRow
           testID="account-username"
@@ -456,19 +479,22 @@ function Saved({
             <SectionRow
               key={provider}
               testID={`account-key-${provider}`}
-              icon="keyRound"
-              label={name}
-              {...(lastKey ? { hint: t('account.saved.lastKey') } : {})}
+              icon={provider === 'email' ? 'mail' : 'keyRound'}
+              label={t(`account.keyName.${provider}`)}
+              // The last way to sign in has no Remove and no line: a second
+              // way (Apple) brings Remove to both rows (#561).
               right={
-                <ActionButton
-                  testID={`account-key-${provider}-remove`}
-                  kind="secondary"
-                  compact
-                  disabled={lastKey || busy}
-                  label={t('account.saved.remove')}
-                  accessibilityLabel={t('account.saved.removeLabel', { provider: name })}
-                  onPress={() => account.removeKey(provider)}
-                />
+                lastKey ? undefined : (
+                  <ActionButton
+                    testID={`account-key-${provider}-remove`}
+                    kind="secondary"
+                    size="small"
+                    disabled={busy}
+                    label={t('account.saved.remove')}
+                    accessibilityLabel={t('account.saved.removeLabel', { provider: name })}
+                    onPress={() => account.removeKey(provider)}
+                  />
+                )
               }
             />
           );
@@ -489,7 +515,6 @@ function Saved({
           testID="account-sign-out"
           icon="logOut"
           label={t('account.saved.signOut')}
-          hint={t('account.saved.signOutHint')}
           disabled={busy}
           onPress={onSignOut}
         />
@@ -497,11 +522,13 @@ function Saved({
           testID="account-delete"
           icon="trash"
           label={t('account.saved.delete')}
-          hint={t('account.saved.deleteHint')}
           disabled={busy}
           onPress={onDelete}
         />
       </SectionCard>
+      <Text testID="account-footnote" style={styles.footnote}>
+        {t('account.saved.footnote')}
+      </Text>
     </>
   );
 }
@@ -613,6 +640,12 @@ const styles = StyleSheet.create((theme) => ({
   line: {
     ...theme.type.body,
     color: theme.colors.text,
+  },
+  // Under the last card (Figma frame 19).
+  footnote: {
+    ...theme.type.footnote,
+    color: theme.colors.textFaint,
+    paddingHorizontal: theme.space.xs,
   },
   note: {
     ...theme.type.caption,
