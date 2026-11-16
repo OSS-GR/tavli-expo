@@ -162,7 +162,7 @@ describe('the code email', () => {
       expect(mail.text).toContain(String(EMAIL_CODE_TTL_MS / MINUTE));
     }
     expect(emailCodeMail('012345', 'en').subject).toBe('Your Tavlaki sign-in code');
-    expect(emailCodeMail('012345', 'el').subject).toBe('Ο κωδικός σύνδεσης στο Tavlaki');
+    expect(emailCodeMail('012345', 'el').subject).toBe('Ο κωδικός σύνδεσής σου στο Tavlaki');
   });
 
   it('runs out after the code time', () => {

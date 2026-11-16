@@ -72,9 +72,9 @@ describe('moveLabel', () => {
 
   it('speaks Greek', async () => {
     await i18n.changeLanguage('el');
-    expect(moveLabel(t, m(13, 8, 5, 'hit'))).toBe('Πούλι από το σημείο 13 στο σημείο 8, χτυπάει');
-    expect(moveLabel(t, m('outside', 22, 3))).toBe('Μπαίνει στο σημείο 22');
-    expect(moveLabel(t, m(6, 'off', 6))).toBe('Μάζεμα από το σημείο 6');
+    expect(moveLabel(t, m(13, 8, 5, 'hit'))).toBe('Πούλι από τη θέση 13 στη θέση 8 και χτυπάει');
+    expect(moveLabel(t, m('outside', 22, 3))).toBe('Μπαίνει στη θέση 22');
+    expect(moveLabel(t, m(6, 'off', 6))).toBe('Μάζεμα από τη θέση 6');
   });
 });
 
@@ -175,7 +175,7 @@ describe('listChoices', () => {
   it('speaks Greek', async () => {
     await i18n.changeLanguage('el');
     expect(choiceLabel(t, [m(13, 10, 3), m(10, 5, 5)])).toBe(
-      'Πούλι από το σημείο 13 στο σημείο 10, μετά στο σημείο 5',
+      'Πούλι από τη θέση 13 στη θέση 10, μετά στη θέση 5',
     );
     expect(choiceShortLabel(t, [m(5, 3, 2), m(3, 'off', 3)])).toBe('5 → 3 → Μάζεμα');
   });

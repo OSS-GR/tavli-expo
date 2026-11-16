@@ -274,7 +274,9 @@ describe('<MatchEndScreen />', () => {
       });
       try {
         await showOnline('black', 'timeouts-in-a-row');
-        expect(screen.getByText('Έχασες δύο σειρές στη σειρά.')).toBeOnTheScreen();
+        expect(
+          screen.getByText('Δεν πρόλαβες να παίξεις δύο συνεχόμενες φορές.'),
+        ).toBeOnTheScreen();
       } finally {
         await act(async () => {
           await i18n.changeLanguage('en');
@@ -292,7 +294,7 @@ describe('<MatchEndScreen />', () => {
       expect(screen.getByText('Τελείωσε ο χρόνος σου.')).toBeOnTheScreen();
       expect(
         screen.getByLabelText(
-          'Παρτίδα 1 · Πόρτες, Υπολογιστής: κέρδισε λόγω χρόνου, Διπλό, 2 βαθμοί',
+          'Παρτίδα 1 · Πόρτες, Υπολογιστής κέρδισε λόγω χρόνου, Διπλό, 2 πόντοι',
         ),
       ).toBeOnTheScreen();
     } finally {
@@ -351,7 +353,7 @@ describe('<MatchEndScreen />', () => {
       ).view;
       expect(screen.getByText('Κέρδισες το ματς!')).toBeOnTheScreen();
       expect(
-        screen.getByLabelText('Παρτίδα 1 · Πόρτες, Κέρδισες, Διπλό, 2 βαθμοί'),
+        screen.getByLabelText('Παρτίδα 1 · Πόρτες, Κέρδισες, Διπλό, 2 πόντοι'),
       ).toBeOnTheScreen();
       expect(screen.getByRole('button', { name: /^Ρεβάνς/ })).toBeOnTheScreen();
     } finally {

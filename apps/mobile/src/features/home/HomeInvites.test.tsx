@@ -294,9 +294,9 @@ describe('<HomeInvites />', () => {
     await show();
     expect(screen.getByRole('header', { name: 'Οι προσκλήσεις σου' })).toBeOnTheScreen();
     const row = screen.getByRole('button', {
-      name: 'Πρόσκληση, Πόρτες, έως 1 βαθμό, Χωρίς, Λήγει σε 24 ώρες',
+      name: 'Πρόσκληση, Πόρτες, στον 1 πόντο, Χωρίς, Λήγει σε 24 ώρες',
     });
-    expect(within(row).getByText('Πόρτες · έως 1 βαθμό')).toBeOnTheScreen();
+    expect(within(row).getByText('Πόρτες · στον 1 πόντο')).toBeOnTheScreen();
     expect(within(row).getByText(`Κωδικός ${code}`)).toBeOnTheScreen();
     await act(async () => {
       jest.setSystemTime(Date.now() + INVITE_TIME_MS);

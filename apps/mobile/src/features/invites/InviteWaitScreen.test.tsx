@@ -432,7 +432,7 @@ describe('InviteWaitScreen', () => {
     const { code, mine } = setup();
     await openWait(code, mine);
     expect(await screen.findByRole('header', { name: 'Στείλε την πρόσκληση' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Μοιράσου την πρόσκληση' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Κοινοποίηση πρόσκλησης' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Ακύρωσε την πρόσκληση' })).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');

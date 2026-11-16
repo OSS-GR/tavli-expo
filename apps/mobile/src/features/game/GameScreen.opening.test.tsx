@@ -256,13 +256,13 @@ describe('<GameScreen /> opening roll (#176)', () => {
       card().getByRole('button', { name: 'Μαρία: ρίξε, ή σύρε στο ταμπλό' }),
     ).toBeOnTheScreen();
     await rollDie(store, 'white', 4);
-    expect(message()).toHaveTextContent('Μαρία: έφερε 4.');
+    expect(message()).toHaveTextContent('Μαρία έφερε 4.');
     await rollDie(store, 'black', 4);
-    expect(message()).toHaveTextContent('Ισοπαλία: και οι δύο έφεραν 4. Ρίξτε ξανά.');
+    expect(message()).toHaveTextContent('Ίσα! Φέρατε και οι δύο 4. Ξαναρίξτε.');
     await wait(OPENING_TIE_WAIT_MS);
     await rollDie(store, 'white', 6);
     await rollDie(store, 'black', 3);
-    expect(message()).toHaveTextContent('Ξεκινά: Μαρία, με 6-3.');
+    expect(message()).toHaveTextContent('Μαρία ξεκινά με 6-3.');
     expect(card().getByRole('header', { name: 'Ξεκινά: Μαρία' })).toBeOnTheScreen();
     expect(card().getByRole('button', { name: 'Παίξε' })).toBeOnTheScreen();
   });

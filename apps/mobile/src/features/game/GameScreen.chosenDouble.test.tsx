@@ -151,7 +151,7 @@ describe('<GameScreen /> a chosen double is read as chosen (#202)', () => {
     await show(store, { seats });
     const send = await whitePlaysAceDeuce(store);
     await send({ type: 'answer', player: 'white', choice: '5' });
-    expect(announce).toHaveBeenCalledWith('Διάλεξες πεντάρες: τέσσερις κινήσεις του 5.');
+    expect(announce).toHaveBeenCalledWith('Διάλεξες πεντάρες: παίζεις τέσσερις φορές το 5.');
     // The 1-2 was rolled ("Έφερες 1-2."); the double was not.
     expect(said().filter((t) => /Έφερες πεντάρες/.test(t))).toHaveLength(0);
   });

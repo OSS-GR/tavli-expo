@@ -405,14 +405,14 @@ describe('InviteScreen', () => {
     const { server } = setup();
     const code = server.createInvite(FRIEND, 'portes', 3, null);
     await openInvite(code, server.invitesFor(ME));
-    expect(await screen.findByRole('header', { name: 'Πρόσκληση για παιχνίδι' })).toBeOnTheScreen();
+    expect(await screen.findByRole('header', { name: 'Πρόσκληση σε παιχνίδι' })).toBeOnTheScreen();
     expect(
       screen.getByText(
         `Επισκέπτης ${guestNumberOf(server, FRIEND)} σε προσκάλεσε να παίξετε Πόρτες online.`,
       ),
     ).toBeOnTheScreen();
     expect(screen.getByText('Πόρτες')).toBeOnTheScreen();
-    expect(screen.getByText('Νικά όποιος φτάσει τους 3 βαθμούς')).toBeOnTheScreen();
+    expect(screen.getByText('Στους 3 πόντους')).toBeOnTheScreen();
     expect(screen.getByText('Χωρίς')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Αποδοχή' })).toBeOnTheScreen();
     await act(async () => {

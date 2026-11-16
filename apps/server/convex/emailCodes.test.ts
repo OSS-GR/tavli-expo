@@ -105,7 +105,7 @@ describe('asking for a code', () => {
     expect(reply).toEqual({ status: 200, body: { sent: true, ticket: expect.any(String) } });
     expect(mail.sent).toHaveLength(1);
     expect(mail.sent[0]!.to).toBe(ANN);
-    expect(mail.sent[0]!.subject).toBe('Ο κωδικός σύνδεσης στο Tavlaki');
+    expect(mail.sent[0]!.subject).toBe('Ο κωδικός σύνδεσής σου στο Tavlaki');
     const code = codeIn(ANN);
     const { codes, sends } = await tables(t);
     expect(codes).toHaveLength(1);

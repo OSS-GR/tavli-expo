@@ -244,7 +244,7 @@ describe('<SettingsScreen /> index', () => {
     await render(<SettingsScreen onLearnToPlay={jest.fn()} />);
     await user.press(screen.getByRole('button', { name: 'Μάθε να παίζεις' }));
     const picker = within(screen.getByTestId('tutorial-picker'));
-    for (const name of ['Πόρτες', 'Πλακωτό', 'Φεύγα', 'Ασόδιο', 'Άκυρο']) {
+    for (const name of ['Πόρτες', 'Πλακωτό', 'Φεύγα', 'Ασόδυο', 'Άκυρο']) {
       expect(picker.getByRole('button', { name })).toBeOnTheScreen();
     }
     await act(async () => {

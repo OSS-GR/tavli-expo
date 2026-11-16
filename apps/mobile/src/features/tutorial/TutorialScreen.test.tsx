@@ -236,7 +236,7 @@ describe('<TutorialScreen />', () => {
     await open();
     expect(screen.getByTestId('tutorial-progress')).toHaveTextContent('Μάθημα 1 από 7');
     expect(screen.getByRole('button', { name: 'Παράλειψη' })).toBeOnTheScreen();
-    expect(screen.getByRole('header', { name: 'Κίνησε ένα πούλι' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Παίξε ένα πούλι' })).toBeOnTheScreen();
   });
 });
 

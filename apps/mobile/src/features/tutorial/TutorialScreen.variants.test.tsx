@@ -209,7 +209,7 @@ describe('<TutorialScreen game="plakoto|fevga|asodio" />', () => {
       await i18n.changeLanguage('el');
     });
     await open('fevga');
-    expect(screen.getByRole('header', { name: 'Μάθε τη φεύγα' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Μάθε τη Φεύγα' })).toBeOnTheScreen();
     expect(screen.getByTestId('tutorial-progress')).toHaveTextContent('Μάθημα 1 από 4');
     expect(screen.getByRole('header', { name: 'Προς την ίδια φορά' })).toBeOnTheScreen();
   });
