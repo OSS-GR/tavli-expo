@@ -1,6 +1,7 @@
 // Runs in each test file after the test framework is set up
 // (`setupFilesAfterEnv` in jest.config.js).
 
+import { forgetAccountForTest } from '../src/features/account/accountMemory';
 import { takeInviteSent } from '../src/features/friends/inviteSent';
 import { resetRaceOffersForTest } from '../src/features/game/raceOffer';
 import { forgetLastModesForTest } from '../src/features/home/lastModes';
@@ -36,6 +37,8 @@ beforeEach(() => {
 // no note of an online account on the phone (#297).
 beforeEach(() => {
   resetOnlineFake();
+  // The last loaded account (#567) is per app run.
+  forgetAccountForTest();
   forgetDevGamesForTest();
   forgetOnlineAccount();
   // Turn notifications (#285): a new instance on the reset fakes, and no tap opened yet.

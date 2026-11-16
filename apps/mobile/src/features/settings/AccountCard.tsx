@@ -11,8 +11,10 @@
  *   this phone), a saved account its username and how it signs in
  *   ("Signed in with email", #561, `signInLine`). When the keys do not
  *   load, it says "Signed in".
- * - While it loads, or when the server does not answer, it shows "Your
- *   account": Account itself says more. It never signs in or out.
+ * - Before it loads it shows the last account this app run loaded
+ *   (`accountMemory.ts`, #567), and it fills that memory, so Account shows
+ *   at once too. With none, or when the server does not answer, it shows
+ *   "Your account": Account itself says more. It never signs in or out.
  */
 import type { AuthKeyProvider, AuthProvider, Usernames } from '@tavli/contracts';
 import { useEffect, useState } from 'react';
@@ -23,6 +25,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { Icon } from '@/components/Icon';
 import { surfaceStyle } from '@/components/Surface';
+import { knownAccount, rememberAccount } from '@/features/account/accountMemory';
 import { signInIcon, signInLine } from '@/features/account/signInLine';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 
@@ -46,14 +49,33 @@ async function loadSummary(auth: AuthProvider, usernames: Usernames): Promise<Ac
   const user = await auth.ready();
   if (user === null) return { kind: 'offline' };
   const mine = await usernames.mine();
+  const guestNumber = mine.guestNumber ?? null;
   if (user.isGuest || !mine.saved) {
-    return { kind: 'guest', id: user.id, number: mine.guestNumber ?? null };
+    // Account shows it at once when it opens (#567).
+    rememberAccount({ kind: 'guest', id: user.id, guestNumber });
+    return { kind: 'guest', id: user.id, number: guestNumber };
   }
   const keys = await auth.listKeys().then(
-    (list) => list.map((key) => key.provider),
+    (list) => {
+      rememberAccount({ kind: 'saved', id: user.id, username: mine.name, guestNumber, keys: list });
+      return list.map((key) => key.provider);
+    },
     () => null,
   );
   return { kind: 'saved', id: user.id, name: mine.name, keys };
+}
+
+/** What the card shows before it loads: the last loaded account (#567). */
+function knownSummary(auth: AuthProvider): AccountSummary {
+  const known = knownAccount(auth);
+  if (known === null) return { kind: 'unknown' };
+  if (known.kind === 'guest') return { kind: 'guest', id: known.id, number: known.guestNumber };
+  return {
+    kind: 'saved',
+    id: known.id,
+    name: known.username,
+    keys: known.keys.map((key) => key.provider),
+  };
 }
 
 /** The summary. `visit` changes each time Settings shows again, so a new name shows. */
@@ -64,7 +86,7 @@ export function useAccountSummary(
 ): AccountSummary {
   // Read the note on each render: a sign-out on Account clears it.
   const used = hasOnlineAccount();
-  const [summary, setSummary] = useState<AccountSummary>({ kind: 'unknown' });
+  const [summary, setSummary] = useState<AccountSummary>(() => knownSummary(auth));
   useEffect(() => {
     if (!used) return;
     let on = true;

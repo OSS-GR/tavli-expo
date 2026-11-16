@@ -72,6 +72,8 @@ import { appleCredential, signInWithApple, signInWithEmail } from '@/features/on
 import { needsUsernameStep } from '@/features/online/usernameStep';
 import { reminders } from '@/features/reminders/reminders';
 
+import { knownAccount, rememberAccount } from './accountMemory';
+
 export type AccountState =
   /** No account on this phone: nothing was asked of the server. */
   | { readonly kind: 'offline' }
@@ -260,9 +262,14 @@ function problemOf(error: unknown): AccountProblem {
  * shows again (the route's focus), so a new username shows.
  */
 export function useAccount(deps: AccountDeps, visit = 0): Account {
-  const [state, setState] = useState<AccountState>(() =>
-    hasOnlineAccount() ? { kind: 'loading' } : { kind: 'offline' },
+  // The last loaded account shows at once; the load below refreshes it (#567).
+  const [state, setState] = useState<AccountState>(
+    () =>
+      knownAccount(deps.auth) ?? (hasOnlineAccount() ? { kind: 'loading' } : { kind: 'offline' }),
   );
+  useEffect(() => {
+    rememberAccount(state);
+  }, [state]);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busy, setBusy] = useState<AccountAction | null>(null);
   const [problem, setProblem] = useState<AccountProblem | null>(null);
@@ -320,8 +327,13 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
           if (!live.current || latest.current !== me) return;
           latest.current = { askName: false };
           // An open step stays with what was typed. Only Try again asks
-          // again, not a later load.
-          setState({ kind: 'failed', askName: asks });
+          // again, not a later load. A quiet refresh that fails keeps the
+          // account it shows (#567); a load that asks for a name says so.
+          setState((now) =>
+            !asks && (now.kind === 'guest' || now.kind === 'saved')
+              ? now
+              : { kind: 'failed', askName: asks },
+          );
         },
       );
     },
