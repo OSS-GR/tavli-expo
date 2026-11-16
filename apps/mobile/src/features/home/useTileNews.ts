@@ -7,9 +7,11 @@
  *   played online makes no server call. It never makes an account.
  * - It loads each time Home comes into view (`focused`). Only the newest
  *   load may set the news.
- * - A guest, nobody signed in, or a load that fails gives no news: the
- *   tiles keep their own lines, with no spinner and no error. Ratings and
- *   friends need a saved account (`NOT_SAVED`).
+ * - A guest or nobody signed in gives no news: the tiles keep their own
+ *   lines, with no spinner and no error. Ratings and friends need a saved
+ *   account (`NOT_SAVED`).
+ * - A part whose call fails keeps what it showed: the rating and the
+ *   request count load and fail on their own (`applyTileNews`).
  * - Never send the rating or the count to analytics or the logs.
  */
 import type { AuthProvider, Friends, Ratings } from '@tavli/contracts';
@@ -24,16 +26,27 @@ export interface TileNews {
 
 export const NO_TILE_NEWS: TileNews = { friendRequests: 0 };
 
+/**
+ * One load's answer: each part that loaded, or `null` when there is no saved
+ * account (no news at all). A part that failed is left out.
+ */
+export type TileNewsUpdate = Partial<TileNews> | null;
+
+/** The news after a load: a part left out of the update keeps its old value. */
+export function applyTileNews(news: TileNews, update: TileNewsUpdate): TileNews {
+  return update === null ? NO_TILE_NEWS : { ...news, ...update };
+}
+
 /** Loads the news once. Each part that fails is left out. */
 export async function loadTileNews(
   auth: AuthProvider,
   ratings: Ratings | undefined,
   friends: Friends | undefined,
-): Promise<TileNews> {
+): Promise<TileNewsUpdate> {
   // `loadSession()`, not `ready()`: a rejection is no network and keeps
   // what shows; `null` is a real sign-out (#297).
   const user = await auth.loadSession();
-  if (user === null || user.isGuest) return NO_TILE_NEWS;
+  if (user === null || user.isGuest) return null;
   const [mine, requests] = await Promise.allSettled([
     ratings ? ratings.mine() : Promise.reject(new Error('no ratings')),
     friends ? friends.listRequests() : Promise.reject(new Error('no friends')),
@@ -42,7 +55,7 @@ export async function loadTileNews(
     ...(mine.status === 'fulfilled'
       ? { rating: mine.value.matches > 0 ? mine.value.rating : null }
       : {}),
-    friendRequests: requests.status === 'fulfilled' ? requests.value.incoming.length : 0,
+    ...(requests.status === 'fulfilled' ? { friendRequests: requests.value.incoming.length } : {}),
   };
 }
 
@@ -82,8 +95,8 @@ export function useTileNews({
     const n = loads.current;
     if (!active || auth === undefined) return;
     loadTileNews(auth, ratings, friends).then(
-      (next) => {
-        if (n === loads.current) setNews(next);
+      (update) => {
+        if (n === loads.current) setNews((news) => applyTileNews(news, update));
       },
       // The session did not load (no network): keep what shows.
       () => {},
