@@ -17,11 +17,13 @@ import {
   getPreset,
   legalNextMoves,
   matchPhase,
+  lostDiceWithReason,
   remainingDice,
   type BoardState,
   type DieValue,
   type GameFlow,
   type GamePhase,
+  type LostDice,
   type MatchAction,
   type MatchFlow,
   type MatchPhase,
@@ -172,6 +174,11 @@ export interface DieView {
   readonly value: DieValue;
   /** Played this turn (or the turn passed): drawn faded. */
   readonly used: boolean;
+  /**
+   * Not played, and no legal turn can play it (#579, the engine's
+   * `lostDice`): drawn faded with a slash.
+   */
+  readonly lost?: boolean;
 }
 
 export interface TurnView {
@@ -187,24 +194,35 @@ export interface TurnView {
   readonly dice: readonly DieView[];
   readonly canConfirm: boolean;
   readonly canUndo: boolean;
+  /** The dice no legal turn can play, and why (#579); `null` when none. */
+  readonly lost: LostDice | null;
 }
 
 /**
  * Marks the dice of a roll that the played moves used. The dice still left
- * are matched from the end, so a double fades from the first die on.
+ * are matched from the end, so a double fades from the first die on. Of
+ * the dice left, those in `lost` can no longer be played (#579).
  */
 export function diceView(
   roll: readonly [DieValue, DieValue],
   left: readonly DieValue[],
+  lost: readonly DieValue[] = [],
 ): DieView[] {
   const pool = [...left];
+  const lostPool = [...lost];
   const dice = diceMoves(roll);
   const out: DieView[] = [];
   for (let k = dice.length - 1; k >= 0; k--) {
     const value = dice[k] as DieValue;
     const i = pool.indexOf(value);
-    if (i >= 0) pool.splice(i, 1);
-    out.unshift({ value, used: i < 0 });
+    if (i < 0) {
+      out.unshift({ value, used: true });
+      continue;
+    }
+    pool.splice(i, 1);
+    const j = lostPool.indexOf(value);
+    if (j >= 0) lostPool.splice(j, 1);
+    out.unshift(j >= 0 ? { value, used: false, lost: true } : { value, used: false });
   }
   return out;
 }
@@ -214,6 +232,7 @@ export function turnView(flow: MatchFlow): TurnView {
   const board = currentBoard(game);
   const roll = game.state.dice;
   const rolled = roll !== null && (game.phase === 'moving' || game.phase === 'awaiting-confirm');
+  const lost = rolled ? lostDiceWithReason(game) : null;
   return {
     game,
     phase: game.phase,
@@ -221,8 +240,9 @@ export function turnView(flow: MatchFlow): TurnView {
     toMove: game.state.toMove,
     board,
     legal: legalNextMoves(game),
-    dice: rolled ? diceView(roll, remainingDice(game)) : [],
+    dice: rolled ? diceView(roll, remainingDice(game), lost?.dice) : [],
     canConfirm: canConfirm(game),
     canUndo: canUndo(game),
+    lost,
   };
 }

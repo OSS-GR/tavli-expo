@@ -479,6 +479,97 @@ export function remainingDice(flow: GameFlow): readonly DieValue[] {
   return left;
 }
 
+/**
+ * The dice of this turn that can no longer be played (#579), so the board
+ * can show them as lost. Empty outside `moving` and `awaiting-confirm`.
+ *
+ * - Once the turn is complete (`awaiting-confirm`), every die left is lost.
+ * - While moving, a die is lost when no legal play of this roll uses it
+ *   (the "use as much of the roll as possible" rules): a double with only
+ *   two legal moves loses two dice, and 6-5 where only the 6 may be played
+ *   loses the 5 at once. When the plays differ in which die they leave,
+ *   none is lost yet.
+ *
+ * It reads the variant's `legalTurns` from the start of the turn; it adds
+ * no rule. The moves already played need no filter: every legal play uses
+ * the same number of dice, and `played` begins one of them. So a double
+ * loses the same count after any move (#12 checks it), and a plain roll
+ * with one die left is either still moving (that die plays) or complete.
+ */
+export function lostDice(flow: GameFlow, ctx: FlowContext = {}): readonly DieValue[] {
+  const left = remainingDice(flow);
+  if (left.length === 0) return [];
+  if (flow.phase === 'awaiting-confirm') return left;
+  const dice = flow.state.dice;
+  if (dice === null) return [];
+  const all = diceMoves(dice);
+  let lost: DieValue[] | null = null;
+  for (const turn of variantOf(flow, ctx).legalTurns(flow.state, dice)) {
+    const unused = [...all];
+    for (const move of turn.moves) {
+      const i = unused.indexOf(move.die);
+      if (i >= 0) unused.splice(i, 1);
+    }
+    lost = lost === null ? unused : common(lost, unused);
+    if (lost.length === 0) return [];
+  }
+  return common(lost ?? [], left);
+}
+
+/** Why dice are lost (#579): the app names the reason under the board. */
+export type LostDiceReason =
+  /** A double with fewer legal moves than four. */
+  | 'double'
+  /** Only one die can be played, and the rules make it the higher one. */
+  | 'higherDie'
+  /** No checker can move that number. */
+  | 'blocked';
+
+export interface LostDice {
+  readonly dice: readonly DieValue[];
+  readonly reason: LostDiceReason;
+}
+
+/**
+ * `lostDice` with the reason, or `null` when no die is lost. The reason
+ * comes from `legalTurns` only: a plain roll's die is lost to the higher
+ * die rule when the same turn with `higherDieRule` off has a play that
+ * uses it. Otherwise no checker could move it.
+ */
+export function lostDiceWithReason(flow: GameFlow, ctx: FlowContext = {}): LostDice | null {
+  const dice = lostDice(flow, ctx);
+  const roll = flow.state.dice;
+  if (dice.length === 0 || roll === null) return null;
+  if (roll[0] === roll[1]) return { dice, reason: 'double' };
+  const rules = flow.state.rules;
+  if (dice.length === 1 && rules.movement.higherDieRule) {
+    const free = {
+      ...flow.state,
+      rules: { ...rules, movement: { ...rules.movement, higherDieRule: false } },
+    };
+    const value = dice[0];
+    const playable = variantOf(flow, ctx)
+      .legalTurns(free, roll)
+      .some((turn) => turn.moves.some((move) => move.die === value));
+    if (playable) return { dice, reason: 'higherDie' };
+  }
+  return { dice, reason: 'blocked' };
+}
+
+/** The dice in both lists, each as often as it is in both. */
+function common(a: readonly DieValue[], b: readonly DieValue[]): DieValue[] {
+  const pool = [...b];
+  const out: DieValue[] = [];
+  for (const value of a) {
+    const i = pool.indexOf(value);
+    if (i >= 0) {
+      pool.splice(i, 1);
+      out.push(value);
+    }
+  }
+  return out;
+}
+
 /** True when the played moves form a full legal play. */
 export function canConfirm(flow: GameFlow): boolean {
   return flow.phase === 'awaiting-confirm';

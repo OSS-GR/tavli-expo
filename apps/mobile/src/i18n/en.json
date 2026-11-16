@@ -1128,6 +1128,11 @@
         "body": "Both players sit together above the board, and the buttons are round and centered under it. Turn the phone and the board keeps its size.",
         "where": "Any game"
       },
+      "lostDice": {
+        "title": "Dice you can't play",
+        "body": "When the rules leave a die with no move, it fades and gets a line through it. On your first turns, a note under the board says why.",
+        "where": "Any game"
+      },
       "howToPlay": {
         "title": "How to play, in one place",
         "body": "Every game has one page: its short lessons on the board on top, then the rules. The lessons you finished are kept, so Continue picks up where you stopped.",
@@ -1283,7 +1288,21 @@
       "openingYours": "Roll your die"
     },
     "dice": {
-      "label": "Dice {{values}}, {{left}} left to play"
+      "label": "Dice {{values}}, {{left}} left to play",
+      "lost_one": "The {{value}} can't be played",
+      "lost_other": "{{count}} dice can't be played"
+    },
+    "lostNote": {
+      "die": "The {{value}} can't be played",
+      "double1": "One {{value}} can't be played",
+      "double2": "Two {{value}}s can't be played",
+      "double3": "Three {{value}}s can't be played",
+      "confirm": "{{lost}}. Confirm or undo.",
+      "reason": {
+        "higherDie": "Only one die moves, so it must be the {{high}}.",
+        "blocked": "No checker can move {{value}} now.",
+        "double": "No more moves of {{value}}."
+      }
     },
     "doubles": {
       "name": {

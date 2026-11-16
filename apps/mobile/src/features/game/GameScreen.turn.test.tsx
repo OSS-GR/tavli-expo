@@ -20,7 +20,12 @@ import { settingsStore } from '@/features/settings/store';
 import i18n from '@/i18n';
 import { storage } from '@/services';
 
-import { CONFIRM_HINT_KEY, CONFIRM_HINT_TURNS, reloadConfirmHintForTest } from './confirmHint';
+import {
+  CONFIRM_HINT_KEY,
+  CONFIRM_HINT_TURNS,
+  reloadConfirmHintForTest,
+  turnNoteKey,
+} from './confirmHint';
 import { createGameStore, type GameStore } from './gameStore';
 import { BOT_PASS_NOTICE_MS, GameScreen, MATCH_END_DELAY_MS, type BotSeat } from './GameScreen';
 import type { Seat } from './seats';
@@ -186,6 +191,64 @@ describe('<GameScreen /> "All dice used" note (#575)', () => {
     await touch(PAN, [top(8, 3), point(7)]);
     expect(button('Confirm')).toBeEnabled();
     expect(hint()).toBeNull();
+  });
+});
+
+describe('<GameScreen /> a die you cannot play (#579)', () => {
+  const note = () => screen.queryByTestId('lost-dice-hint');
+  // tavli-match.md #10: White may play the 6 or the 5, not both: the 6 wins.
+  const higherDie = createBoard(
+    { white: { points: { 13: 14, 10: 1 } }, black: { points: { 18: 2, 17: 2, 24: 11 } } },
+    'contrary',
+  );
+  // tavli-match.md #9: no checker can move 6, only the 5 plays.
+  const blockedSix = createBoard(
+    { white: { points: { 13: 15 } }, black: { points: { 18: 2, 23: 2, 24: 11 } } },
+    'contrary',
+  );
+
+  async function rolled(board: BoardState, dice: [5 | 6, 5 | 6]) {
+    const store = newStore();
+    setPosition(store, board);
+    await show(store);
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice });
+    });
+    return store;
+  }
+
+  it('names the higher die rule at once, then asks for Confirm in place of "All dice used"', async () => {
+    await rolled(higherDie, [6, 5]);
+    expect(note()).toHaveTextContent(
+      "The 5 can't be played\nOnly one die moves, so it must be the 6.",
+    );
+    // Screen readers hear it from the dice label (the note is hidden from them).
+    expect(
+      screen.getByLabelText(
+        "Dice 6-5, 1 left to play. The 5 can't be played. Only one die moves, so it must be the 6.",
+      ),
+    ).toBeOnTheScreen();
+    await touch(PAN, [top(10, 1), point(4)]);
+    expect(button('Confirm')).toBeEnabled();
+    expect(note()).toHaveTextContent(/^The 5 can't be played\. Confirm or undo\./);
+    expect(screen.queryByTestId('confirm-hint')).toBeNull();
+    expect(storage.getString(turnNoteKey('lost.higherDie'))).toBe('1');
+    expect(storage.getString(CONFIRM_HINT_KEY)).toBeUndefined();
+  });
+
+  it('says when no checker can move a die', async () => {
+    await rolled(blockedSix, [6, 5]);
+    expect(note()).toHaveTextContent("The 6 can't be played\nNo checker can move 6 now.");
+  });
+
+  it('counts each reason on its own, and stops after the limit', async () => {
+    storage.setString(turnNoteKey('lost.higherDie'), String(CONFIRM_HINT_TURNS));
+    reloadConfirmHintForTest();
+    await rolled(higherDie, [6, 5]);
+    expect(note()).toBeNull();
+    // The dice still say it, with the reason.
+    expect(screen.getByLabelText(/The 5 can't be played\. Only one die moves/)).toBeOnTheScreen();
+    expect(storage.getString(turnNoteKey('lost.blocked'))).toBeUndefined();
   });
 });
 

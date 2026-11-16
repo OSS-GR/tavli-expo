@@ -21,6 +21,8 @@ import {
   currentBoard,
   currentPrompt,
   legalNextMoves,
+  lostDice,
+  lostDiceWithReason,
   remainingDice,
 } from './game-flow';
 import type { FlowContext, GameAction, GameFlow, MoveInput } from './game-flow';
@@ -494,5 +496,92 @@ describe('variant prompts (hook for Plakoto "resign or play on")', () => {
       phase: 'game-over',
       result: { winner: 'white', points: 2, reason: 'resigned' },
     });
+  });
+});
+
+describe('lostDice (#579)', () => {
+  it('loses nothing when the whole roll can be played', () => {
+    const flow = applyGameAction(
+      at('w: 24x2 13x5 8x3 6x5 ; b: 24x2 13x5 8x3 6x5'),
+      roll('white', [3, 1]),
+    );
+    expect(lostDice(flow)).toEqual([]);
+    expect(lostDice(applyGameAction(flow, move('8/5')))).toEqual([]);
+  });
+
+  it('tavli-match.md #10: only the 6 may be played, so the 5 is lost at once', () => {
+    const flow = applyGameAction(at('w: 13x14 10 ; b: 18x2 17x2 24x11'), roll('white', [6, 5]));
+    expect(lostDice(flow)).toEqual([5]);
+    const played = applyGameAction(flow, move('10/4'));
+    expect(played.phase).toBe('awaiting-confirm');
+    expect(lostDice(played)).toEqual([5]);
+    // Undo brings the turn back to its start: the 5 is still lost.
+    expect(lostDice(applyGameAction(played, { type: 'undo', player: 'white' }))).toEqual([5]);
+  });
+
+  it('with either die playable, none is lost until a die is played', () => {
+    const flow = applyGameAction(
+      at('w: 13x14 10 ; b: 18x2 17x2 24x11', { movement: { higherDieRule: false } }),
+      roll('white', [6, 5]),
+    );
+    expect(lostDice(flow)).toEqual([]);
+    expect(lostDice(applyGameAction(flow, move('10/5')))).toEqual([6]);
+    expect(lostDice(applyGameAction(flow, move('10/4')))).toEqual([5]);
+  });
+
+  it('tavli-match.md #9: only the 5 can be played, so the 6 is lost', () => {
+    const flow = applyGameAction(at('w: 13x15 ; b: 18x2 23x2 24x11'), roll('white', [6, 5]));
+    expect(lostDice(flow)).toEqual([6]);
+  });
+
+  it('tavli-match.md #12: a double with two legal threes loses the other two', () => {
+    const flow = applyGameAction(at('w: 13x14 9 ; b: 15x2 24x13'), roll('white', [3, 3]));
+    expect(lostDice(flow)).toEqual([3, 3]);
+    const one = applyGameAction(flow, move('9/6'));
+    expect(one.phase).toBe('moving');
+    expect(lostDice(one)).toEqual([3, 3]);
+    expect(lostDice(applyGameAction(one, move('6/3')))).toEqual([3, 3]);
+  });
+
+  it('is empty before the roll', () => {
+    expect(lostDice(at('w: 13x15 ; b: 24x15'))).toEqual([]);
+  });
+});
+
+describe('lostDiceWithReason (#579)', () => {
+  it('gives null when no die is lost', () => {
+    const flow = applyGameAction(
+      at('w: 24x2 13x5 8x3 6x5 ; b: 24x2 13x5 8x3 6x5'),
+      roll('white', [3, 1]),
+    );
+    expect(lostDiceWithReason(flow)).toBeNull();
+  });
+
+  it('tavli-match.md #10: the 5 is lost to the higher die rule', () => {
+    const flow = applyGameAction(at('w: 13x14 10 ; b: 18x2 17x2 24x11'), roll('white', [6, 5]));
+    expect(lostDiceWithReason(flow)).toEqual({ dice: [5], reason: 'higherDie' });
+    const played = applyGameAction(flow, move('10/4'));
+    expect(lostDiceWithReason(played)).toEqual({ dice: [5], reason: 'higherDie' });
+  });
+
+  it('with the higher die rule off, a die left after the other is blocked', () => {
+    const flow = applyGameAction(
+      at('w: 13x14 10 ; b: 18x2 17x2 24x11', { movement: { higherDieRule: false } }),
+      roll('white', [6, 5]),
+    );
+    expect(lostDiceWithReason(applyGameAction(flow, move('10/4')))).toEqual({
+      dice: [5],
+      reason: 'blocked',
+    });
+  });
+
+  it('tavli-match.md #9: the 6 has no move, so it is blocked', () => {
+    const flow = applyGameAction(at('w: 13x15 ; b: 18x2 23x2 24x11'), roll('white', [6, 5]));
+    expect(lostDiceWithReason(flow)).toEqual({ dice: [6], reason: 'blocked' });
+  });
+
+  it('tavli-match.md #12: a double names the double', () => {
+    const flow = applyGameAction(at('w: 13x14 9 ; b: 15x2 24x13'), roll('white', [3, 3]));
+    expect(lostDiceWithReason(flow)).toEqual({ dice: [3, 3], reason: 'double' });
   });
 });

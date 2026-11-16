@@ -22,6 +22,19 @@ function drawnDice() {
     },
   );
 }
+/** How many dice show their slash (#579): the slash group is fully opaque. */
+function shownSlashes() {
+  const tree = screen.toJSON() as JsonNode | JsonNode[] | null;
+  const isSlash = (n: JsonNode) =>
+    n.type === 'Group' &&
+    findAllNodes(n, (c) => c.type === 'Path' && c.props.strokeCap === 'round').length === 2 &&
+    !findAllNodes(n, (c) => c.type === 'Group' && c !== n && c.props.transform !== undefined)
+      .length;
+  return findAllNodes(tree, isSlash).filter(
+    (n) => (n.props.opacity as { value?: number } | undefined)?.value === 1,
+  ).length;
+}
+
 const dice: DieView[] = [
   { value: 5, used: false },
   { value: 2, used: true },
@@ -45,6 +58,44 @@ describe('DiceRow', () => {
   it('says the values and how many dice are left', async () => {
     await render(<Covered hidden={false} />);
     expect(screen.getByTestId('dice')).toHaveAccessibleName('Dice 5-2, 1 left to play');
+  });
+
+  it('says which die cannot be played, and counts it out of the dice left (#579)', async () => {
+    await render(
+      <DiceRow
+        testID="dice"
+        theme={theme}
+        dice={[
+          { value: 6, used: true },
+          { value: 2, used: false, lost: true },
+        ]}
+        rollKey={null}
+      />,
+    );
+    expect(screen.getByTestId('dice')).toHaveAccessibleName(
+      "Dice 6-2, 0 left to play. The 2 can't be played",
+    );
+  });
+
+  it('counts the lost dice of a double', async () => {
+    await render(
+      <DiceRow
+        testID="dice"
+        theme={theme}
+        dice={[
+          { value: 3, used: true },
+          { value: 3, used: true },
+          { value: 3, used: false, lost: true },
+          { value: 3, used: false, lost: true },
+        ]}
+        rollKey={null}
+      />,
+    );
+    expect(screen.getByTestId('dice')).toHaveAccessibleName(
+      "Dice 3-3-3-3, 0 left to play. 2 dice can't be played",
+    );
+    // Each lost die shows a slash over its face; the used dice keep theirs hidden.
+    expect(shownSlashes()).toBe(2);
   });
 
   // On iOS a Skia canvas that moves to another native parent loses its drawing (#173).

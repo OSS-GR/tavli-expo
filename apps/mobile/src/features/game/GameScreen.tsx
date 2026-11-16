@@ -167,7 +167,8 @@ import {
   stateHasChosenDouble,
   turnAnnouncement,
 } from './announcements';
-import { useConfirmHint } from './confirmHint';
+import { useConfirmHint, useTurnNote } from './confirmHint';
+import { lostLine, lostReason } from './lostNote';
 import { DoubleChoices } from './DoubleChoices';
 import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
@@ -1992,10 +1993,29 @@ export function GameScreen({
   const hideBoard = card !== null;
   // "All dice used" shows only on the first few turns (#575). A turn under
   // the menu or the game-end sheet does not count.
+  // A die you cannot play (#579) gets its own note in place of "All dice
+  // used", with the reason, on the first few turns of each reason.
+  const lost = view.lost;
+  const lostRoll = view.game.state.dice;
+  const noteFree = !blocked && !othersTurn && !hideScreen;
   const confirmHint = useConfirmHint(
-    view.canConfirm && !blocked && !othersTurn && !hideScreen,
+    view.canConfirm && lost === null && noteFree,
     `${matchKey}:${turnKey}`,
   );
+  const lostHint = useTurnNote(
+    lost === null ? null : `lost.${lost.reason}`,
+    lost !== null && noteFree,
+    `${matchKey}:${turnKey}`,
+  );
+  const lostNote =
+    lostHint && lost !== null && lostRoll !== null
+      ? {
+          line: view.canConfirm
+            ? t('game.lostNote.confirm', { lost: lostLine(t, lost) })
+            : lostLine(t, lost),
+          reason: lostReason(t, lost, lostRoll),
+        }
+      : null;
   // "Doubles!" for a moment after the split. Another note over the board wins.
   // The value of the double names it: Greek says «Εξάρες!» for 6-6.
   const doubleValue = dice.length === 4 ? dice[0]?.value : undefined;
@@ -2004,6 +2024,7 @@ export function GameScreen({
     doubleValue !== undefined &&
     !blocked &&
     !confirmHint &&
+    lostNote === null &&
     botNote === null &&
     gateToMove === null &&
     shownHint === null &&
@@ -2100,6 +2121,11 @@ export function GameScreen({
             onLanded={onDiceLanded}
             size={diceBox.size}
             pairSize={diceBox.pairSize}
+            lostReason={
+              dice === view.dice && lost !== null && lostRoll !== null
+                ? lostReason(t, lost, lostRoll)
+                : undefined
+            }
           />
         </View>
       ) : null}
@@ -2123,6 +2149,20 @@ export function GameScreen({
           </Text>
         </View>
       ) : null}
+      {lostNote !== null ? (
+        // The dice label already reads both lines, so screen readers skip this.
+        <View style={styles.hintRow} pointerEvents="none">
+          <Text
+            testID="lost-dice-hint"
+            style={[styles.hint, styles.hintTwoLines]}
+            accessible={false}
+            importantForAccessibility="no">
+            {lostNote.line}
+            {'\n'}
+            <Text style={styles.hintReason}>{lostNote.reason}</Text>
+          </Text>
+        </View>
+      ) : null}
       {showDoublesHint ? (
         // The roll announcement already says it is a double, so screen readers skip this.
         <View style={styles.hintRow} pointerEvents="none">
@@ -2143,7 +2183,7 @@ export function GameScreen({
           </Text>
         </View>
       ) : null}
-      {onlineLine !== null && !confirmHint ? (
+      {onlineLine !== null && !confirmHint && lostNote === null ? (
         // Online: who starts, or why nothing moved. The turn announcement reads it.
         <View style={styles.hintRow} pointerEvents="none">
           <Text testID="online-line" style={styles.hint}>
@@ -2547,6 +2587,13 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderRadius: theme.radii.pill,
     color: theme.colors.text,
     backgroundColor: theme.colors.backgroundDeep,
+  },
+  hintTwoLines: {
+    borderRadius: theme.radii.lg,
+    textAlign: 'center',
+  },
+  hintReason: {
+    ...theme.type.body,
   },
   // The round buttons in thumb reach (Figma "18"): Undo, the main circle in
   // the middle of the screen, the hint. As tall in every state, so the

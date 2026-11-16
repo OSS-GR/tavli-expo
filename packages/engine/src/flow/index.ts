@@ -8,6 +8,8 @@ export {
   currentBoard,
   currentPrompt,
   legalNextMoves,
+  lostDice,
+  lostDiceWithReason,
   remainingDice,
 } from './game-flow';
 export type {
@@ -16,6 +18,8 @@ export type {
   GameAction,
   GameFlow,
   GamePhase,
+  LostDice,
+  LostDiceReason,
   MoveInput,
   OpeningRoll,
   SourceMoves,
