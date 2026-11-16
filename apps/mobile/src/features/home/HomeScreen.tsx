@@ -4,14 +4,16 @@
  *
  * Top to bottom: the logo, What's new (#471) and Settings, a greeting with
  * the kafeneio table scene (#509; it plays the first time Home shows in an
- * app run), then a big hero card
- * with a board picture. The hero is the saved game ("Continue game") or,
- * with no save, "Play vs bot". Then the reminder card (#404, when one is
- * due), your online games and invites, the friend invites to you
- * (#486), the "Learn to play" banner, the other play modes as tiles
- * ("Join with a code" under "Play a friend" when online play is on, #333;
- * then Friends and Leaderboards, #486), and How to play and History as
- * pills.
+ * app run), then a big hero card with a board picture: your most
+ * important game (`heroPick.ts`, #517), or "Play vs bot". Then the "Learn
+ * to play" banner, the reminder card (#404, when one is due), "Your
+ * games" (the saved game and the online games not in the hero), your
+ * invites, the friend invites to you (#486), "More ways to play" (Play vs
+ * bot first when it is not the hero, then Play ranked on a row of its own
+ * with your rating, Play a friend, Pass-and-play, Friends with the
+ * requests waiting, and Leaderboards, #486, #517), and one list in the
+ * tiles' look (#517) with Join with a code (#333, when online play is
+ * on), How to play and History.
  */
 import type { Difficulty } from '@tavli/contracts';
 import { displayCaps } from '@tavli/ui';
@@ -22,7 +24,6 @@ import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { Icon } from '@/components/Icon';
-import type { IconName } from '@/components/icons';
 import { screenBackground } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Toast, useToast } from '@/components/Toast';
@@ -34,6 +35,7 @@ import { WhatsNewButton } from '@/features/whats-new/WhatsNewButton';
 
 import { greetingFor } from './greeting';
 import { HomeHero, type HeroBoard } from './HomeHero';
+import { HomeLinks, type HomeLink } from './HomeLinks';
 import { ModeTile } from './ModeTile';
 
 const LOGO = require('../../../assets/home/logo.webp') as number;
@@ -41,7 +43,7 @@ const LOGO = require('../../../assets/home/logo.webp') as number;
 /** The table scene's width beside the greeting (Figma: 144×108). */
 const SCENE_WIDTH = 144;
 
-/** Above this font scale the mode tiles and the pills take a row each. */
+/** Above this font scale the mode tiles take a row each. */
 const ONE_COLUMN_FONT_SCALE = 1.3;
 
 export interface HomeScreenProps {
@@ -60,26 +62,39 @@ export interface HomeScreenProps {
    */
   onPlayFriend?: () => void;
   /**
-   * Opens "Join with a code" (#333). The tile shows only with it (a build
+   * Opens "Join with a code" (#333). The row shows only with it (a build
    * with an online server).
    */
   onJoinWithCode?: () => void;
   /**
    * Opens Play ranked (#532). The tile shows only with it (a build with
-   * online play); the online tiles then come first.
+   * online play), next to Play a friend.
    */
   onPlayRanked?: () => void;
   /** Opens Friends (#406). The tile shows only with it (a build with online play). */
   onFriends?: () => void;
   /** Opens the Leaderboards (#407). The tile shows only with it. */
   onRatings?: () => void;
+  /**
+   * The player's rating on the Play ranked tile (#517): a number, `null`
+   * before the first rated match, `undefined` to show the plain line.
+   */
+  rankedRating?: number | null;
+  /** Friend requests waiting for an answer, on the Friends tile (#517). */
+  friendRequests?: number;
   /** The bot levels this build can play, easiest first (the "Play vs bot" subtitle). */
   botLevels: readonly Difficulty[];
-  /** The "Continue game" card, when a saved game exists (#36). It takes the hero's place. */
-  continueCard?: ReactNode;
+  /**
+   * The hero card (#517, `heroPick.ts`): an online game, a friend's
+   * invite, the saved game or Play ranked. Without it the hero is Play vs
+   * bot; with it Play vs bot leads "More ways to play".
+   */
+  hero?: ReactNode;
+  /** The hero is Play ranked: no Play ranked tile. */
+  heroRanked?: boolean;
   /** The reminder card (#404): save a guest account, or play online. */
   reminderCard?: ReactNode;
-  /** "Your online games" (#297), when this phone has an online account. */
+  /** "Your games" (#297, #517): the saved game and the online games not in the hero. */
   onlineGames?: ReactNode;
   /** "Your invites" (#314), when this phone has an online account. */
   invites?: ReactNode;
@@ -105,8 +120,11 @@ export function HomeScreen({
   onPlayRanked,
   onFriends,
   onRatings,
+  rankedRating,
+  friendRequests = 0,
   botLevels,
-  continueCard,
+  hero,
+  heroRanked = false,
   reminderCard,
   onlineGames,
   invites,
@@ -136,8 +154,8 @@ export function HomeScreen({
   const vsBotTitle = t('home.vsBot.title');
   const levels = levelList(botLevels, t);
   const vsBotLabel = [vsBotTitle, levels].filter(Boolean).join(', ');
-  const hasSave = continueCard != null;
-  const modesTitle = hasSave ? t('home.newGame') : t('home.moreModes');
+  // Something else is the hero: Play vs bot leads the tiles.
+  const botTile = hero != null;
 
   const localTile = (
     <ModeTile
@@ -167,45 +185,37 @@ export function HomeScreen({
       onPress={() => showToast(t('home.friend.soon'))}
     />
   );
-  // With Play ranked it sits in the grid; without, it spans the row.
-  const joinTile = onJoinWithCode ? (
-    <ModeTile
-      testID="home-join"
-      wide={!onPlayRanked}
-      icon="keyboard"
-      title={t('home.join.title')}
-      subtitle={t('home.join.subtitle')}
-      onPress={onJoinWithCode}
-    />
-  ) : null;
 
   // Plain rows of two (one with a large font), never a wrapping row: iOS
   // measured the tiles of a wrapping row at no width and drew them very
   // tall, with the links below on top of them (build 33).
+  // Order (#517): Play ranked on a row of its own with your rating, then
+  // Play a friend | Pass-and-play, then Friends | Leaderboards.
+  const rankedLine =
+    rankedRating === undefined
+      ? t('home.ranked.subtitle')
+      : rankedRating === null
+        ? t('home.ranked.unrated')
+        : t('home.ranked.rated', { rating: rankedRating });
   const gridTiles: Cell[] = [];
-  if (onPlayRanked) {
-    // Play ranked (#532, Figma 81:2): the two online tiles first.
-    gridTiles.push({ key: 'friend', node: friendTile });
+  if (onPlayRanked && !heroRanked) {
     gridTiles.push({
       key: 'ranked',
+      wide: true,
       node: (
         <ModeTile
           testID="home-ranked"
+          wide
           icon="trophy"
           title={t('home.ranked.title')}
-          subtitle={t('home.ranked.subtitle')}
+          subtitle={rankedLine}
           onPress={onPlayRanked}
         />
       ),
     });
-    gridTiles.push({ key: 'local', node: localTile });
-    if (joinTile) gridTiles.push({ key: 'join', node: joinTile });
-  } else {
-    gridTiles.push({ key: 'local', node: localTile });
-    gridTiles.push({ key: 'friend', node: friendTile });
-    // Without Play ranked, Join spans its own row.
-    if (joinTile) gridTiles.push({ key: 'join', node: joinTile, wide: true });
   }
+  gridTiles.push({ key: 'friend', node: friendTile });
+  gridTiles.push({ key: 'local', node: localTile });
   if (onFriends) {
     gridTiles.push({
       key: 'friends',
@@ -214,7 +224,12 @@ export function HomeScreen({
           testID="home-friends"
           icon="handshake"
           title={t('home.friends.title')}
-          subtitle={t('home.friends.subtitle')}
+          subtitle={
+            friendRequests > 0
+              ? t('home.friends.requests', { count: friendRequests })
+              : t('home.friends.subtitle')
+          }
+          highlight={friendRequests > 0}
           onPress={onFriends}
         />
       ),
@@ -234,33 +249,32 @@ export function HomeScreen({
       ),
     });
   }
-  const footerLinks: Cell[] = [
-    {
-      key: 'how-to-play',
-      node: (
-        <FooterLink
-          testID="home-how-to-play"
-          icon="book"
-          label={t('home.howToPlay')}
-          onPress={onHowToPlay}
-        />
-      ),
-    },
-  ];
-  if (onHistory) {
-    footerLinks.push({
-      key: 'history',
-      node: (
-        <FooterLink
-          testID="home-history"
-          icon="history"
-          label={t('home.history')}
-          onPress={onHistory}
-        />
-      ),
+  const links: HomeLink[] = [];
+  if (onJoinWithCode) {
+    links.push({
+      testID: 'home-join',
+      icon: 'keyboard',
+      label: t('home.join.title'),
+      accessibilityHint: t('home.join.subtitle'),
+      onPress: onJoinWithCode,
     });
   }
-
+  links.push({
+    testID: 'home-how-to-play',
+    icon: 'book',
+    label: t('home.howToPlay'),
+    accessibilityRole: 'link',
+    onPress: onHowToPlay,
+  });
+  if (onHistory) {
+    links.push({
+      testID: 'home-history',
+      icon: 'history',
+      label: t('home.history'),
+      accessibilityRole: 'link',
+      onPress: onHistory,
+    });
+  }
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} bounces={false}>
@@ -295,7 +309,7 @@ export function HomeScreen({
           </View>
         </View>
 
-        {continueCard ?? (
+        {hero ?? (
           <HomeHero
             testID="home-vs-bot"
             eyebrow={displayCaps(t('home.newGame'))}
@@ -307,15 +321,15 @@ export function HomeScreen({
             onPress={() => onNewGame('bot')}
           />
         )}
+        {learnCard}
         {reminderCard}
         {onlineGames}
         {invites}
         {friendInvites}
-        {learnCard}
 
-        <SectionHeader title={modesTitle} />
+        <SectionHeader title={t('home.moreModes')} />
         <View style={styles.grid}>
-          {hasSave ? (
+          {botTile ? (
             <ModeTile
               testID="home-vs-bot"
               kind="primary"
@@ -329,9 +343,9 @@ export function HomeScreen({
           <CellRows cells={gridTiles} perRow={perRow} />
         </View>
 
-        <View style={styles.grid}>
-          <CellRows cells={footerLinks} perRow={perRow} />
-        </View>
+        {/* The other links in one list in the tiles' look (#517). Screen
+            readers hear How to play and History as links, as before #342. */}
+        <HomeLinks testID="home-links" links={links} />
       </ScrollView>
       <Toast text={toast} />
     </View>
@@ -380,29 +394,6 @@ export function inRows(cells: readonly Cell[], perRow: number): Cell[][] {
   }
   if (row.length > 0) rows.push(row);
   return rows;
-}
-
-interface FooterLinkProps {
-  testID: string;
-  icon: IconName;
-  label: string;
-  onPress: () => void;
-}
-
-/** A pill at the bottom of Home. Screen readers hear a link, as before #342. */
-function FooterLink({ testID, icon, label, onPress }: FooterLinkProps) {
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="link"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [styles.pill, pressed && styles.pressed]}>
-      <Icon name={icon} size={18} color={theme.colors.textDim} />
-      <Text style={styles.pillText}>{label}</Text>
-    </Pressable>
-  );
 }
 
 /**
@@ -495,24 +486,5 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   cell: {
     flex: 1,
-  },
-  pill: {
-    flexGrow: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.space.sm,
-    minHeight: theme.touch.button,
-    paddingHorizontal: theme.space.lg,
-    paddingVertical: theme.space.sm,
-    borderRadius: theme.radii.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  pillText: {
-    ...theme.type.bodyStrong,
-    color: theme.colors.text,
-    flexShrink: 1,
   },
 }));

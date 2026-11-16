@@ -3,6 +3,7 @@
 
 import { takeInviteSent } from '../src/features/friends/inviteSent';
 import { resetRaceOffersForTest } from '../src/features/game/raceOffer';
+import { forgetLastModesForTest } from '../src/features/home/lastModes';
 import { resetIntrosForTest } from '../src/features/intro/introRuns';
 import { resetAnnouncements } from '../src/features/game/useAnnouncement';
 import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPushes';
@@ -49,4 +50,6 @@ beforeEach(() => {
   // Play ranked (#532): the rules sheet not seen, no match start noted.
   forgetRankedRulesForTest();
   forgetRankedStartsForTest();
+  // Home's hero (#517): no match mode noted.
+  forgetLastModesForTest();
 });

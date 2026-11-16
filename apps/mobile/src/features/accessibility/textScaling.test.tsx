@@ -29,7 +29,13 @@ import {
   type BoardState,
   type Match,
 } from '@tavli/engine';
-import { createMemoryAuthProvider, createMemoryAuthStore, INVITE_TIME_MS } from '@tavli/contracts';
+import {
+  createMemoryAuthProvider,
+  createMemoryAuthStore,
+  INVITE_TIME_MS,
+  type AuthProvider,
+  type GameTransport,
+} from '@tavli/contracts';
 import { createMemoryGameServer } from '@tavli/online';
 import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
@@ -54,6 +60,7 @@ import { createSessionRegistry } from '@/features/match/sessions';
 import { defaultSetup } from '@/features/match/setup';
 import { NewGameScreen } from '@/features/new-game/NewGameScreen';
 import { rememberOnlineAccount } from '@/features/online/accountHint';
+import { useMyOnlineGames } from '@/features/online/myGames';
 import { MyGamesScreen } from '@/features/online/MyGamesScreen';
 import { startOnlineBot } from '@/features/online/onlineBot';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
@@ -155,7 +162,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
         onPlayFriend={jest.fn()}
         onJoinWithCode={jest.fn()}
         botLevels={['easy', 'medium']}
-        continueCard={
+        hero={
           <ContinueCard
             summary={{ game: 'Portes · vs Bot (Easy)', status: 'You 1 – 0 Bot · first to 3' }}
             onPress={jest.fn()}
@@ -665,15 +672,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
         onSettings={jest.fn()}
         onHowToPlay={jest.fn()}
         botLevels={['easy']}
-        onlineGames={
-          <HomeOnlineGames
-            auth={auth}
-            games={games}
-            focused
-            onOpen={jest.fn()}
-            onSeeAll={jest.fn()}
-          />
-        }
+        onlineGames={<ShownOnlineGames auth={auth} games={games} />}
       />,
     );
     expect(await screen.findByTestId('online-games-see-all')).toBeOnTheScreen();
@@ -828,6 +827,14 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(problems()).toEqual([]);
   });
 });
+
+/** "Your games" loaded as Home's route loads it. */
+function ShownOnlineGames({ auth, games }: { auth: AuthProvider; games: GameTransport }) {
+  const { state, retry } = useMyOnlineGames(auth, games);
+  return (
+    <HomeOnlineGames state={state} retry={retry} focused onOpen={jest.fn()} onSeeAll={jest.fn()} />
+  );
+}
 
 describe('textScalingProblems', () => {
   it('finds cut text, fixed heights and text that does not scale', async () => {

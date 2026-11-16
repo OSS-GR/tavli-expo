@@ -1,10 +1,12 @@
 /**
- * "Your online games" on Home (#297): the first few active online games
- * of the saved session, "Your turn" first, live from the server. It shows
- * nothing after a sign-out, or with no active game and no failure. "See
- * all" opens the whole list.
+ * "Your games" on Home (#297, #517): the games in progress that are not
+ * in the hero. The saved game on this phone comes first (`saved`), then
+ * the first few active online games of the saved session, "Your turn"
+ * first, live from the server (`useMyOnlineGames`, in the route). It
+ * shows nothing with no game and no failure. "See all" opens the whole
+ * online list.
  */
-import type { AuthProvider, GameTransport } from '@tavli/contracts';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -14,35 +16,55 @@ import { OnlineGameList } from '@/features/online/OnlineGameList';
 import {
   HOME_GAME_ROWS,
   listTickMs,
-  useMyOnlineGames,
   usePhoneClock,
+  type MyGamesState,
 } from '@/features/online/myGames';
 
 export interface HomeOnlineGamesProps {
-  auth: AuthProvider;
-  games: GameTransport;
+  /** The online games (`useMyOnlineGames`). */
+  state: MyGamesState;
+  retry: () => void;
+  /** The online game in the hero: left out of the list. */
+  heroGameId?: string | null;
+  /** The saved game's row (`SavedGameRow`), when the hero is not the saved game. */
+  saved?: ReactNode;
   /** Home is in view: the clocks tick only then. */
   focused: boolean;
   onOpen: (gameId: string) => void;
   onSeeAll: () => void;
 }
 
-export function HomeOnlineGames({ auth, games, focused, onOpen, onSeeAll }: HomeOnlineGamesProps) {
+export function HomeOnlineGames({
+  state,
+  retry,
+  heroGameId = null,
+  saved = null,
+  focused,
+  onOpen,
+  onSeeAll,
+}: HomeOnlineGamesProps) {
   const { t } = useTranslation();
-  const { state, retry } = useMyOnlineGames(auth, games);
-  const shown = state.status === 'loaded' ? state.games.slice(0, HOME_GAME_ROWS) : [];
+  const listed: MyGamesState =
+    state.status === 'loaded' && heroGameId !== null
+      ? { ...state, games: state.games.filter((game) => game.gameId !== heroGameId) }
+      : state;
+  const shown = listed.status === 'loaded' ? listed.games.slice(0, HOME_GAME_ROWS) : [];
   const now = usePhoneClock(listTickMs(shown), focused);
-  if (state.status === 'signedOut') return null;
-  // No active game: no card, unless the list may be out of date.
-  if (state.status === 'loaded' && state.games.length === 0 && !state.failed) return null;
-  const title = t('home.online.title');
+  // No online game to list (and no failure): only the saved row, if any.
+  const noOnline =
+    listed.status === 'signedOut' ||
+    (listed.status === 'loaded' && listed.games.length === 0 && !listed.failed);
+  if (noOnline && saved === null) return null;
+  const title = t('home.games.title');
   return (
     <View testID="home-online-games" style={styles.section}>
       <SectionHeader title={title} />
+      {saved}
       <OnlineGameList
-        state={state}
+        state={listed}
         now={now}
         limit={HOME_GAME_ROWS}
+        {...(state.status === 'loaded' ? { total: state.games.length } : {})}
         onOpen={onOpen}
         onSeeAll={onSeeAll}
         onRetry={retry}

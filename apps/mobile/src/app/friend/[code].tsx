@@ -11,6 +11,7 @@
 import { normalizeInviteCode, type AuthProvider, type Invites } from '@tavli/contracts';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 
+import { lastModes } from '@/features/home/lastModes';
 import { InviteWaitScreen } from '@/features/invites/InviteWaitScreen';
 import { FRIEND_HREF, gameHref, parseIdParam } from '@/features/match/routes';
 import { useTurnPushOffering } from '@/features/notifications/appTurnPushes';
@@ -51,7 +52,10 @@ function SignedInWait({
       code={code}
       me={me}
       invites={invites}
-      onGame={(gameId) => router.replace(gameHref(gameId))}
+      onGame={(gameId) => {
+        lastModes.record('friend');
+        router.replace(gameHref(gameId));
+      }}
       onNewInvite={() => router.replace(FRIEND_HREF)}
       onHome={goHome}
       covered={covered}

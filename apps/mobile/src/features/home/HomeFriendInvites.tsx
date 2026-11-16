@@ -3,16 +3,19 @@
  * the signed-in player (`Friends.listFriendInvites`, #406). A tap opens
  * the invite (`/invite/<code>`), where the player accepts or declines.
  *
- * - Home renders it only on a phone that has an online account
+ * `useFriendInvites` loads them; Home (#517) puts the one that ends first
+ * in the hero and the rest here (`HomeFriendInvites`).
+ *
+ * - Home loads them only on a phone that has an online account
  *   (`hasOnlineAccount()`), so a phone that never played online makes no
- *   server call. It never makes an account: with nobody signed in it
- *   shows nothing.
+ *   server call. It never makes an account: with nobody signed in there
+ *   is no invite.
  * - It loads each time Home comes into view (`focused`). Only the newest
  *   load may set the list.
- * - It shows nothing while it loads, with no invite, for a guest (friends
- *   need a saved account: `NOT_SAVED`) and after a sign-out. A load that
- *   fails for another reason keeps the list it had: the invite screen
- *   loads each invite again.
+ * - There is no invite while it loads, for a guest (friends need a saved
+ *   account: `NOT_SAVED`) and after a sign-out. A load that fails for
+ *   another reason keeps the list it had: the invite screen loads each
+ *   invite again.
  */
 import type { AuthProvider, Friends, InviteView } from '@tavli/contracts';
 import { isFriendsErrorData } from '@tavli/contracts';
@@ -25,49 +28,78 @@ import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { SectionHeader } from '@/components/SectionHeader';
 import { playerNameText } from '@/features/online/playerName';
 
-export interface HomeFriendInvitesProps {
-  auth: AuthProvider;
-  friends: Friends;
-  /** Home is in view: each new view loads the list again. */
-  focused: boolean;
-  /** Opens the invite. */
-  onOpen: (code: string) => void;
+/** The invites shown, and the user they belong to. */
+interface Loaded {
+  readonly user: string | null;
+  readonly list: readonly InviteView[];
 }
 
-/** The open friend invites to the signed-in player, or none. */
-async function loadInvites(auth: AuthProvider, friends: Friends): Promise<readonly InviteView[]> {
-  const user = await auth.ready();
-  if (user === null || user.isGuest) return [];
+/**
+ * The open friend invites to the signed-in player, or none. It reads the
+ * session with `loadSession()`: a rejection is no network, so the load
+ * fails and the list stays; `null` is a real sign-out (#297).
+ */
+async function loadInvites(auth: AuthProvider, friends: Friends): Promise<Loaded> {
+  const user = await auth.loadSession();
+  if (user === null || user.isGuest) return { user: user?.id ?? null, list: NONE };
   try {
     const list = await friends.listFriendInvites();
-    return list.filter((invite) => invite.status === 'open');
+    return { user: user.id, list: list.filter((invite) => invite.status === 'open') };
   } catch (error) {
     // Not a saved account, or the session is gone: nothing to show.
     if (
       isFriendsErrorData(error) &&
       (error.code === 'NOT_SAVED' || error.code === 'NOT_SIGNED_IN')
     ) {
-      return [];
+      return { user: user.id, list: NONE };
     }
     throw error;
   }
 }
 
-export function HomeFriendInvites({ auth, friends, focused, onOpen }: HomeFriendInvitesProps) {
-  const { t } = useTranslation();
-  const [list, setList] = useState<readonly InviteView[]>([]);
+const NONE: readonly InviteView[] = [];
+const EMPTY: Loaded = { user: null, list: NONE };
+
+/**
+ * The open friend invites to the signed-in player, loaded each time
+ * `focused` turns on. With no `auth` or `friends` there are none. A
+ * sign-out or another user clears the list at once: one player's invites
+ * never show for another.
+ */
+export function useFriendInvites(
+  auth: AuthProvider | undefined,
+  friends: Friends | undefined,
+  focused: boolean,
+): readonly InviteView[] {
+  const enabled = auth !== undefined && friends !== undefined;
+  const [loaded, setLoaded] = useState<Loaded>(EMPTY);
+  // Turned off (a sign-out): forget the list before the next user loads.
+  const [wasEnabled, setWasEnabled] = useState(enabled);
+  if (wasEnabled !== enabled) {
+    setWasEnabled(enabled);
+    if (!enabled) setLoaded(EMPTY);
+  }
   // Only the newest load may set the list.
   const loads = useRef(0);
 
+  // Another user signs in: their list is not this one.
   useEffect(() => {
-    if (!focused) return;
+    if (auth === undefined) return;
+    return auth.onChange((user) => {
+      const id = user?.id ?? null;
+      setLoaded((last) => (last.user === id ? last : { user: id, list: NONE }));
+    });
+  }, [auth]);
+
+  useEffect(() => {
+    if (!focused || auth === undefined || friends === undefined) return;
     loads.current += 1;
     const n = loads.current;
     loadInvites(auth, friends).then(
       (next) => {
-        if (n === loads.current) setList(next);
+        if (n === loads.current) setLoaded(next);
       },
-      // A failed load keeps what shows.
+      // A failed load (no network) keeps what shows.
       () => {},
     );
     return () => {
@@ -76,6 +108,18 @@ export function HomeFriendInvites({ auth, friends, focused, onOpen }: HomeFriend
     };
   }, [auth, friends, focused]);
 
+  return enabled ? loaded.list : NONE;
+}
+
+export interface HomeFriendInvitesProps {
+  /** The invites to list (the hero's one left out). */
+  invites: readonly InviteView[];
+  /** Opens the invite. */
+  onOpen: (code: string) => void;
+}
+
+export function HomeFriendInvites({ invites: list, onOpen }: HomeFriendInvitesProps) {
+  const { t } = useTranslation();
   if (list.length === 0) return null;
   const title = t('friends.invites.title');
   return (
