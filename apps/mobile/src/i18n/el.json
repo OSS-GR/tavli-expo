@@ -54,7 +54,7 @@
     },
     "friends": {
       "title": "Φίλοι",
-      "subtitle": "Προσκαλέστε",
+      "subtitle": "Βρες φίλους",
       "requests_one": "{{count}} αίτημα φιλίας",
       "requests_other": "{{count}} αιτήματα φιλίας"
     },
