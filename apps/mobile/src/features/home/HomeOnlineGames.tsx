@@ -3,7 +3,8 @@
  * in the hero. The saved game on this phone comes first (`saved`), then
  * the first few active online games of the saved session, "Your turn"
  * first, live from the server (`useMyOnlineGames`, in the route). It
- * shows nothing with no game and no failure. "See all" opens the whole
+ * shows nothing with no game and no failure, and nothing while the list
+ * loads (#569). "See all" opens the whole
  * online list.
  */
 import type { ReactNode } from 'react';
@@ -51,8 +52,11 @@ export function HomeOnlineGames({
   const shown = listed.status === 'loaded' ? listed.games.slice(0, HOME_GAME_ROWS) : [];
   const now = usePhoneClock(listTickMs(shown), focused);
   // No online game to list (and no failure): only the saved row, if any.
+  // While the list loads Home shows nothing for it: a line that comes and
+  // goes moves the whole screen (#569). The games come in when they load.
   const noOnline =
     listed.status === 'signedOut' ||
+    listed.status === 'loading' ||
     (listed.status === 'loaded' && listed.games.length === 0 && !listed.failed);
   if (noOnline && saved === null) return null;
   const title = t('home.games.title');
@@ -60,15 +64,17 @@ export function HomeOnlineGames({
     <View testID="home-online-games" style={styles.section}>
       <SectionHeader title={title} />
       {saved}
-      <OnlineGameList
-        state={listed}
-        now={now}
-        limit={HOME_GAME_ROWS}
-        {...(state.status === 'loaded' ? { total: state.games.length } : {})}
-        onOpen={onOpen}
-        onSeeAll={onSeeAll}
-        onRetry={retry}
-      />
+      {noOnline ? null : (
+        <OnlineGameList
+          state={listed}
+          now={now}
+          limit={HOME_GAME_ROWS}
+          {...(state.status === 'loaded' ? { total: state.games.length } : {})}
+          onOpen={onOpen}
+          onSeeAll={onSeeAll}
+          onRetry={retry}
+        />
+      )}
     </View>
   );
 }
