@@ -21,18 +21,18 @@ Every file in `textures/` is a graded, resized copy of a CC0 texture from [Poly 
 
 The grade (target color and contrast) is in `src/prepare_textures.py`. Source files are the 2K diffuse JPGs.
 
-| File in `textures/` | Poly Haven asset | Author(s) |
-|---------------------|------------------|-----------|
-| `a-field-olive.jpg` | [Smoked Walnut Veneer](https://polyhaven.com/a/smoked_walnut_veneer) | Jenelle van Heerden |
-| `a-frame-olive-streak.jpg` | [Smoked Walnut Veneer](https://polyhaven.com/a/smoked_walnut_veneer) | Jenelle van Heerden |
-| `a-point-wenge.jpg` | [Flamed Black Veneer](https://polyhaven.com/a/flamed_black_veneer) | Jenelle van Heerden |
-| `a-point-mahogany.jpg` | [Sapele Veneer](https://polyhaven.com/a/sapele_veneer) | Jenelle van Heerden |
-| `a-checker-maple.jpg` | [White Maple Veneer](https://polyhaven.com/a/white_maple_veneer) | Jenelle van Heerden |
-| `a-checker-walnut.jpg` | [European Walnut Veneer 04](https://polyhaven.com/a/european_walnut_veneer_04) | Jenelle van Heerden |
-| `b-field-walnut.jpg` | [Walnut Veneer 02](https://polyhaven.com/a/walnut_veneer_02) | Jenelle van Heerden |
-| `b-frame-worn-walnut.jpg` | [Wood Table Worn](https://polyhaven.com/a/wood_table_worn) | Dimitrios Savva, Rico Cilliers |
-| `b-point-ebony.jpg` | [Flamed Black Veneer](https://polyhaven.com/a/flamed_black_veneer) | Jenelle van Heerden |
-| `b-point-bone.jpg` | [White Maple Veneer](https://polyhaven.com/a/white_maple_veneer) | Jenelle van Heerden |
+| File in `textures/`        | Poly Haven asset                                                               | Author(s)                      |
+| -------------------------- | ------------------------------------------------------------------------------ | ------------------------------ |
+| `a-field-olive.jpg`        | [Smoked Walnut Veneer](https://polyhaven.com/a/smoked_walnut_veneer)           | Jenelle van Heerden            |
+| `a-frame-olive-streak.jpg` | [Smoked Walnut Veneer](https://polyhaven.com/a/smoked_walnut_veneer)           | Jenelle van Heerden            |
+| `a-point-wenge.jpg`        | [Flamed Black Veneer](https://polyhaven.com/a/flamed_black_veneer)             | Jenelle van Heerden            |
+| `a-point-mahogany.jpg`     | [Sapele Veneer](https://polyhaven.com/a/sapele_veneer)                         | Jenelle van Heerden            |
+| `a-checker-maple.jpg`      | [White Maple Veneer](https://polyhaven.com/a/white_maple_veneer)               | Jenelle van Heerden            |
+| `a-checker-walnut.jpg`     | [European Walnut Veneer 04](https://polyhaven.com/a/european_walnut_veneer_04) | Jenelle van Heerden            |
+| `b-field-walnut.jpg`       | [Walnut Veneer 02](https://polyhaven.com/a/walnut_veneer_02)                   | Jenelle van Heerden            |
+| `b-frame-worn-walnut.jpg`  | [Wood Table Worn](https://polyhaven.com/a/wood_table_worn)                     | Dimitrios Savva, Rico Cilliers |
+| `b-point-ebony.jpg`        | [Flamed Black Veneer](https://polyhaven.com/a/flamed_black_veneer)             | Jenelle van Heerden            |
+| `b-point-bone.jpg`         | [White Maple Veneer](https://polyhaven.com/a/white_maple_veneer)               | Jenelle van Heerden            |
 
 ## Fonts used in the renders
 
@@ -49,7 +49,7 @@ The photos and pages in `mood-board.md` are **links only**. We did not download 
 
 ## App icons (ISC)
 
-The line icons in the app (`apps/mobile/src/components/icons.ts`, #342) are path data copied from [Lucide](https://lucide.dev) v0.460.0: settings, bot, users, globe, book-open, history, play, graduation-cap, chevron-right, chevron-left and check; for the Settings rows (#360) check-check, lightbulb, fast-forward, flip-vertical-2, gauge, volume-2, vibrate, languages, image, smartphone, house, palette, list, trash-2, bell, chart-column and shield; for Play a friend (#358) link; for the match end (#361) trophy; for Join with a code (#333) keyboard; for block and report (#435) flag and user-x; for Settings → Account (#402) user, log-out and key-round; for error popups (#462) circle-alert; for What's new (#471) sparkles; for Friends on Home (#486) handshake; for the game dock and the turn clock (#499) clock, undo-2 and dices; for Leaderboards (#502) lock, circle-help and swords; for Friends and Add a friend (#503) user-plus, send, ellipsis, info, search, share, message-circle, rotate-ccw, chevron-down and clipboard; for the game rails (#185) square; for the game menu (#515), the welcome consent step (#520) and the invite wait screen (#516) x; for the sign-in sheet and Settings → Account (#519) mail. License: [ISC](https://github.com/lucide-icons/lucide/blob/main/LICENSE). Circles and rectangles are rewritten as paths; the play triangle is redrawn. No package is installed.
+The line icons in the app (`apps/mobile/src/components/icons.ts`, #342) are path data copied from [Lucide](https://lucide.dev) v0.460.0: settings, bot, users, globe, book-open, history, play, graduation-cap, chevron-right, chevron-left and check; for the Settings rows (#360) check-check, lightbulb, fast-forward, flip-vertical-2, gauge, volume-2, vibrate, languages, image, smartphone, house, palette, list, trash-2, bell, chart-column and shield; for Play a friend (#358) link; for the match end (#361) trophy; for Join with a code (#333) keyboard; for block and report (#435) flag and user-x; for Settings → Account (#402) user, log-out and key-round; for error popups (#462) circle-alert; for What's new (#471) sparkles; for Friends on Home (#486) handshake; for the game dock and the turn clock (#499) clock, undo-2 and dices; for Leaderboards (#502) lock, circle-help and swords; for Friends and Add a friend (#503) user-plus, send, ellipsis, info, search, share, message-circle, rotate-ccw, chevron-down and clipboard; for the game rails (#185) square; for the game menu (#515), the welcome consent step (#520) and the invite wait screen (#516) x; for the sign-in sheet and Settings → Account (#519) mail; for the How to play hub (#571) door-open, layers and chart-pie. License: [ISC](https://github.com/lucide-icons/lucide/blob/main/LICENSE). Circles and rectangles are rewritten as paths; the play triangle is redrawn. No package is installed.
 
 > ISC License. Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022. Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies. THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 

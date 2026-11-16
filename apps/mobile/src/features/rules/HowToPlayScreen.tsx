@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
+import type { IconName } from '@/components/icons';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionCard, SectionRow } from '@/components/SectionCard';
@@ -20,6 +21,14 @@ import type { LessonProgress } from '@/features/tutorial/progress';
 
 import { RULES_GAMES, rulesTitleKey, type RulesVariant } from './content';
 import { LessonDots, hubProgressText } from './LessonsCard';
+
+/** One icon per game: Portes' doors, Plakoto's pin, Fevga's race, Asodio's quarters. */
+const GAME_ICONS: Record<TutorialGame, IconName> = {
+  portes: 'doorOpen',
+  plakoto: 'layers',
+  fevga: 'fastForward',
+  asodio: 'chartPie',
+};
 
 export interface HowToPlayScreenProps {
   /** The lesson progress of each game. */
@@ -55,7 +64,7 @@ export function HowToPlayScreen({ progress, onOpen, onBack }: HowToPlayScreenPro
             <SectionRow
               key={game}
               testID={`how-to-play-${game}`}
-              icon="square"
+              icon={GAME_ICONS[game]}
               label={t(`games.${game}`)}
               hint={t(`rules.hub.blurb.${game}`)}
               below={<LessonDots count={LESSON_SETS[game].length} progress={progress[game]} />}
