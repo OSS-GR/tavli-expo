@@ -77,6 +77,11 @@ export type AuthKeyCredential = AppleKeyCredential | EmailKeyCredential;
 /** A sign-in key of the signed-in account. Plain JSON. */
 export interface AuthKey {
   readonly provider: AuthKeyProvider;
+  /**
+   * An email key's address, as the key holds it (normalized). Only the
+   * signed-in owner reads it (#565). Never log it or send it to analytics.
+   */
+  readonly email?: string;
 }
 
 /** Why a sign-in call failed. */
@@ -394,7 +399,12 @@ export function createMemoryAuthProvider(
   function keysOf(userId: string): AuthKey[] {
     return Object.entries(store.keys)
       .filter(([, owner]) => owner === userId)
-      .map(([key]) => ({ provider: key.slice(0, key.indexOf(':')) as AuthKeyProvider }));
+      .map(([key]): AuthKey => {
+        const colon = key.indexOf(':');
+        const provider = key.slice(0, colon) as AuthKeyProvider;
+        // An email key carries its address (#565).
+        return provider === 'email' ? { provider, email: key.slice(colon + 1) } : { provider };
+      });
   }
 
   return {

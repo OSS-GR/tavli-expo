@@ -179,7 +179,14 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
     const keysOf = () => [...server.keys].filter(([, owner]) => owner === id).map(([key]) => key);
     const providerOf = (key: string) => key.split(':')[0]!;
     if (path === '/key/list') {
-      return ok({ keys: keysOf().map((key) => ({ provider: providerOf(key) })) });
+      // Like the server: an email key gives its address (#565).
+      return ok({
+        keys: keysOf().map((key) =>
+          providerOf(key) === 'email'
+            ? { provider: 'email', email: key.slice('email:'.length) }
+            : { provider: providerOf(key) },
+        ),
+      });
     }
     if (path === '/key/save') {
       let key: string;

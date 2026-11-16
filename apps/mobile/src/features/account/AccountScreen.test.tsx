@@ -747,7 +747,10 @@ describe('<AccountScreen /> with a saved account', () => {
     expect(await screen.findByRole('header', { name: 'Add Email code' })).toBeOnTheScreen();
     await enterEmailCode(user, onlineFake.authStore, 'maria@example.com');
     expect(await screen.findByText('Your account is saved.')).toBeOnTheScreen();
-    expect(await screen.findByTestId('account-key-email')).toBeOnTheScreen();
+    // The row names the address that signs in (#565).
+    expect(await screen.findByTestId('account-key-email')).toHaveTextContent(
+      /Email.*maria@example\.com/,
+    );
     expect(onlineFake.authStore.keys).toEqual({
       'apple:apple-1': 'user-1',
       'email:maria@example.com': 'user-1',

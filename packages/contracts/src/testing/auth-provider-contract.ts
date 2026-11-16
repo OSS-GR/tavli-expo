@@ -477,7 +477,12 @@ export function authProviderContract(): AuthProviderContractCheck[] {
           first.id,
           'the token subject',
         );
-        same(await auth.listKeys(), [{ provider: 'email' }], 'listKeys()');
+        // The key gives its owner the normalized address (#565).
+        same(
+          await auth.listKeys(),
+          [{ provider: 'email', email: 'eleni@example.com' }],
+          'listKeys()',
+        );
         same(await subject.restart().ready(), first, 'ready() after a restart');
         await auth.signOut();
         const second = await auth.signInWithKey(await emailKey(subject, 'eleni@example.com'));

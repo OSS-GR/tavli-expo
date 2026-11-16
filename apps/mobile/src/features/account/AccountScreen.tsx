@@ -35,7 +35,7 @@
  *
  * Navigation stays in the route (`app/account.tsx`).
  */
-import type { AuthKeyProvider, EmailKeyCredential } from '@tavli/contracts';
+import type { AuthKey, EmailKeyCredential } from '@tavli/contracts';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -189,7 +189,7 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
                   id={state.id}
                   username={state.username}
                   guestNumber={state.guestNumber}
-                  keys={state.keys.map((key) => key.provider)}
+                  keys={state.keys}
                   onUsername={onUsername}
                   onAddEmail={() => setEmailStep('add')}
                   onSignOut={() => setDialog('signOut')}
@@ -425,7 +425,7 @@ function Saved({
   id: string;
   username: string | null;
   guestNumber: string | null;
-  keys: readonly AuthKeyProvider[];
+  keys: readonly AuthKey[];
   onUsername: () => void;
   onAddEmail: () => void;
   onSignOut: () => void;
@@ -441,12 +441,9 @@ function Saved({
     (guestNumber === null
       ? t('account.guest.anonymous')
       : t('online.guestName', { number: guestNumber }));
-  const line = signInLine(keys);
+  const line = signInLine(keys.map((key) => key.provider));
   const signedIn = t(`account.signedIn.${line}`);
-  const addable = addableKeys(
-    keys.map((provider) => ({ provider })),
-    account.appleAvailable,
-  );
+  const addable = addableKeys(keys, account.appleAvailable);
   return (
     <>
       <View
@@ -473,7 +470,7 @@ function Saved({
         />
       </SectionCard>
       <SectionCard title={t('account.saved.keys')} testID="account-keys">
-        {keys.map((provider) => {
+        {keys.map(({ provider, email }) => {
           const name = t(`account.provider.${provider}`);
           return (
             <SectionRow
@@ -481,6 +478,8 @@ function Saved({
               testID={`account-key-${provider}`}
               icon={provider === 'email' ? 'mail' : 'keyRound'}
               label={t(`account.keyName.${provider}`)}
+              // The address that signs in, as iOS shows an Apple ID (#565).
+              {...(email === undefined ? {} : { hint: email })}
               // The last way to sign in has no Remove and no line: a second
               // way (Apple) brings Remove to both rows (#561).
               right={

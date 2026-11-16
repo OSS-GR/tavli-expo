@@ -373,7 +373,10 @@ describe('signing in with a code', () => {
     const row = await userRow(t, user.id);
     expect(row?.email).toBe(ANN);
     expect(row?.emailVerified).toBe(true);
-    expect((await call(t, phone, 'key/list')).body['keys']).toEqual([{ provider: 'email' }]);
+    // The list gives the owner the address the key holds (#565).
+    expect((await call(t, phone, 'key/list')).body['keys']).toEqual([
+      { provider: 'email', email: ANN },
+    ]);
     const { claims, codes } = await tables(t);
     expect(claims.map((claim) => [claim.providerId, claim.accountId, claim.userId])).toEqual([
       ['email', ANN, user.id],
@@ -490,7 +493,7 @@ describe('saving an email key', () => {
     expect(removed.body['code']).toBe('LAST_KEY');
     expect((await saveApple(t, apple, phone, 'apple-ann')).status).toBe(200);
     expect((await call(t, phone, 'key/list')).body['keys']).toEqual([
-      { provider: 'email' },
+      { provider: 'email', email: ANN },
       { provider: 'apple' },
     ]);
     removed = await call(t, phone, 'key/remove', { provider: 'email' });
