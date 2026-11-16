@@ -199,7 +199,7 @@ describe('JoinCodeScreen', () => {
     await fireEvent.changeText(greekField, 'ABCD');
     await fireEvent(greekField, 'submitEditing');
     expect(screen.getByTestId('join-problem')).toHaveTextContent(
-      'Ο κωδικός είναι πολύ μικρός. Ένας κωδικός έχει 8 χαρακτήρες.',
+      'Ο κωδικός είναι πολύ σύντομος. Πρέπει να έχει 8 χαρακτήρες.',
     );
     // A Greek keyboard: Α, Β, Ε, Κ are read as Latin letters.
     await fireEvent.changeText(greekField, 'ΑΒΕΚ2345');

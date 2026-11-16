@@ -361,7 +361,7 @@ describe('<GameScreen /> doubles (#177)', () => {
     expect(screen.queryByText(label)).toBeNull();
     await tick(DOUBLE_SPLIT_AT_MS);
     expect(screen.getByTestId('doubles-hint')).toHaveTextContent(label);
-    expect(announce).toHaveBeenCalledWith(`Έφερες ${name}: τέσσερις κινήσεις του ${value}.`);
+    expect(announce).toHaveBeenCalledWith(`Έφερες ${name}: παίζεις τέσσερις φορές το ${value}.`);
     expect(announce.mock.calls.filter(([t]) => /διπλ/i.test(String(t)))).toHaveLength(0);
   });
 

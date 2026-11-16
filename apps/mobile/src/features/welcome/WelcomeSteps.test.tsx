@@ -66,12 +66,12 @@ describe('WelcomeLanguageScreen', () => {
     await renderWithRoot(<WelcomeLanguageScreen onContinue={jest.fn()} />);
 
     expect(screen.getByLabelText('Βήμα 1 από 3')).toBeOnTheScreen();
-    expect(screen.getByRole('header', { name: 'Διαλέξτε γλώσσα' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Διάλεξε γλώσσα' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: 'Ελληνικά' })).toBeChecked();
     // Greek is not the phone's language here, and its name in Greek reads the same.
     expect(screen.getByRole('radio', { name: 'Ελληνικά' }).props.accessibilityHint).toBeUndefined();
     expect(screen.getByRole('radio', { name: 'English' }).props.accessibilityHint).toBe(
-      'Η γλώσσα του κινητού σας',
+      'Η γλώσσα του κινητού σου',
     );
   });
 });
@@ -121,10 +121,10 @@ describe('WelcomeConsentScreen', () => {
     await renderWithRoot(<WelcomeConsentScreen onBack={jest.fn()} />);
     expect(screen.getByLabelText('Βήμα 2 από 3')).toBeOnTheScreen();
     expect(
-      screen.getByRole('header', { name: 'Βοηθήστε να γίνει το Ταβλάκι καλύτερο' }),
+      screen.getByRole('header', { name: 'Βοήθησέ μας να κάνουμε το Ταβλάκι καλύτερο' }),
     ).toBeOnTheScreen();
     expect(
-      screen.getByRole('button', { name: 'Διαβάστε την πολιτική απορρήτου' }),
+      screen.getByRole('button', { name: 'Διάβασε την πολιτική απορρήτου' }),
     ).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Να επιτρέπεται' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Να μην επιτρέπεται' })).toBeOnTheScreen();

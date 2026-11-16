@@ -143,7 +143,7 @@ describe('<GameScreen /> game end on time (#170)', () => {
       startAt(store);
       await renderWithRoot(<GameScreen store={store} />);
       await timeOut(store);
-      expect(screen.getByText('Ann: τελείωσε ο χρόνος.')).toBeOnTheScreen();
+      expect(screen.getByText('Ann έμεινε χωρίς χρόνο.')).toBeOnTheScreen();
     } finally {
       await act(async () => {
         await i18n.changeLanguage('en');

@@ -146,7 +146,7 @@ describe('WelcomeBoardScreen', () => {
       await i18n.changeLanguage('el');
     });
     await renderScreen();
-    expect(screen.getByRole('header', { name: 'Στήστε το ταμπλό σας' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Στήσε το ταμπλό σου' })).toBeOnTheScreen();
     expect(screen.getByLabelText('Βήμα 3 από 3')).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: getTheme('walnut-kafeneio').name.el })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Κάτω δεξιά' })).toBeChecked();
