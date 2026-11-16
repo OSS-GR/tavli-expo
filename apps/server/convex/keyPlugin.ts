@@ -649,7 +649,7 @@ export function keyPlugin(options: KeyPluginOptions) {
           // An email key also gives its address (the normalized one the key
           // holds), so Account can show which address signs in (#565). Only
           // the account's own session reads it; never log it.
-          const keys = accounts.flatMap((account) => {
+          const keys = accounts.flatMap((account): { provider: string; email?: string }[] => {
             const provider = account.providerId;
             if (!isKeyProviderId(provider)) return [];
             return provider === 'email' ? [{ provider, email: account.accountId }] : [{ provider }];
