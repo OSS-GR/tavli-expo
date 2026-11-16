@@ -295,6 +295,7 @@ describe('Settings → account card (#501)', () => {
 
     const card = within(screen.getByTestId('settings-account-card'));
     expect(await card.findByText('Lemoni')).toBeOnTheScreen();
-    expect(card.getByText('Saved account')).toBeOnTheScreen();
+    // How it signs in, not "Saved account" (#561).
+    expect(card.getByText('Signed in with Apple')).toBeOnTheScreen();
   });
 });

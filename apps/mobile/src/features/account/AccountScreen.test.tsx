@@ -160,7 +160,7 @@ describe('<AccountScreen /> offline', () => {
     await user.press(await screen.findByTestId('account-apple'));
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toEqual({ id: 'user-1', isGuest: false });
-    expect(screen.getByText('Maria')).toBeOnTheScreen();
+    expect(screen.getByTestId('account-name')).toHaveTextContent('Maria');
     expect(screen.queryByTestId('account-username-step')).toBeNull();
   });
 
@@ -316,9 +316,15 @@ describe('<AccountScreen /> as a guest', () => {
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: false });
     expect(onlineFake.authStore.keys).toEqual({ 'apple:apple-1': 'guest-1' });
-    // The one key: Remove is off.
-    expect(screen.getByRole('button', { name: 'Remove Sign in with Apple' })).toBeDisabled();
-    expect(screen.getByText('An account keeps at least one way to sign in.')).toBeOnTheScreen();
+    // The one key has no Remove, and says why (#561).
+    expect(screen.queryByTestId('account-key-apple-remove')).toBeNull();
+    expect(
+      screen.getByText('Your only way to sign in, so it cannot be removed.'),
+    ).toBeOnTheScreen();
+    // With no username yet, the guest name it had.
+    expect(screen.getByTestId('account-saved')).toHaveAccessibleName(
+      /^Guest \d{4}\. Signed in with Apple\.$/,
+    );
   });
 
   it('asks for a username after the save, under the note; Save shows the name (#483)', async () => {
@@ -339,7 +345,7 @@ describe('<AccountScreen /> as a guest', () => {
     expect(screen.queryByTestId('account-username-step')).toBeNull();
     expect(onlineFake.server().nameOf('guest-1')).toEqual({ kind: 'username', name: 'Nikos' });
     // The card takes the new name from the save: no reload.
-    expect(screen.getByText('Nikos')).toBeOnTheScreen();
+    expect(screen.getByTestId('account-name')).toHaveTextContent('Nikos');
     expect(mine).not.toHaveBeenCalled();
   });
 
@@ -469,9 +475,9 @@ describe('<AccountScreen /> as a guest', () => {
     await user.press(screen.getByRole('switch', { name: 'I accept the terms of use' }));
     await user.press(screen.getByRole('switch', { name: 'I am 16 or older' }));
     await user.press(screen.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByText('Nikos')).toBeOnTheScreen();
+    expect(await screen.findByTestId('account-name')).toHaveTextContent('Nikos');
     await act(async () => answer());
-    expect(screen.getByText('Nikos')).toBeOnTheScreen();
+    expect(screen.getByTestId('account-name')).toHaveTextContent('Nikos');
     expect(screen.queryByText('Pick one')).toBeNull();
   });
 
@@ -508,7 +514,8 @@ describe('<AccountScreen /> as a guest', () => {
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: false });
     expect(onlineFake.authStore.keys).toEqual({ 'email:kostas@example.com': 'guest-1' });
-    expect(screen.getByRole('button', { name: 'Remove Email code' })).toBeDisabled();
+    expect(screen.queryByTestId('account-key-email-remove')).toBeNull();
+    expect(screen.getByTestId('account-signed-in')).toHaveTextContent('Signed in with email');
     // A save is no new sign-in.
     expect(analytics.sent).toEqual([]);
   });
@@ -664,17 +671,23 @@ describe('<AccountScreen /> with a saved account', () => {
     const user = setupUser();
     await saved('Maria');
     const { onUsername } = await open();
-    expect(await screen.findByText('You play as Maria')).toBeOnTheScreen();
+    expect(await screen.findByTestId('account-name')).toHaveTextContent('Maria');
+    expect(screen.getByTestId('account-saved')).toHaveAccessibleName(
+      'Maria. Signed in with Apple.',
+    );
+    // What stays on this phone, once, under the actions (#561).
+    expect(screen.getByTestId('account-footnote')).toHaveTextContent(
+      'Bot games, history and settings stay on this phone.',
+      { exact: false },
+    );
     await user.press(screen.getByRole('button', { name: /Username/ }));
     expect(onUsername).toHaveBeenCalledTimes(1);
   });
 
-  it('with no username yet says so', async () => {
+  it('with no username yet shows the guest name and Pick one', async () => {
     await saved();
     await open();
-    expect(
-      await screen.findByText('You have no username yet. Other players see your guest name.'),
-    ).toBeOnTheScreen();
+    expect(await screen.findByTestId('account-name')).toHaveTextContent(/^Guest/);
     expect(screen.getByText('Pick one')).toBeOnTheScreen();
   });
 
@@ -693,7 +706,7 @@ describe('<AccountScreen /> with a saved account', () => {
     expect(onlineFake.authStore.keys).toEqual({ 'apple:apple-1': 'user-1' });
     // Apple brings the same account back, with its name.
     await user.press(screen.getByTestId('account-apple'));
-    expect(await screen.findByText('You play as Maria')).toBeOnTheScreen();
+    expect(await screen.findByTestId('account-name')).toHaveTextContent('Maria');
   });
 
   it('the delete dialog names the username and the ways to sign in', async () => {
