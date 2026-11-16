@@ -57,6 +57,19 @@ export function parseTutorialStart(value: Param, count: number): number {
 /** How to play (#571): the hub with every game's lessons and rules. */
 export const HOW_TO_PLAY_HREF = '/rules';
 
+/** Where the app tour (#573) was opened from: Home (the first run), How to play or Settings. */
+export type TourSource = 'home' | 'rules' | 'settings';
+
+/** The app tour (#573). */
+export function tourHref(from: TourSource) {
+  return { pathname: '/tour', params: { from } } as const;
+}
+
+/** Reads the tour's `from`. Anything else is Home. */
+export function parseTourSource(value: string | undefined): TourSource {
+  return value === 'rules' || value === 'settings' ? value : 'home';
+}
+
 /** A local match id (`local-…`). Any other id names an online game (#255). */
 export function isLocalGameId(id: string): boolean {
   return id.startsWith('local-');

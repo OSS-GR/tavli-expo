@@ -36,6 +36,7 @@ import {
   inviteWaitHref,
   newGameHref,
   HOW_TO_PLAY_HREF,
+  tourHref,
   tutorialHref,
 } from '@/features/match/routes';
 import type { SavedMatch } from '@/features/match/savedMatch';
@@ -44,6 +45,7 @@ import { hasOnlineAccount } from '@/features/online/accountHint';
 import { listTickMs, useMyOnlineGames, usePhoneClock } from '@/features/online/myGames';
 import { reminders } from '@/features/reminders/reminders';
 import { useReminderCard } from '@/features/reminders/useReminderCard';
+import { tourStore } from '@/features/tour/tourStore';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
 import { whatsNewSeen } from '@/features/whats-new/seen';
@@ -96,6 +98,10 @@ export default function HomeRoute() {
       setOnlineAccount(hasOnlineAccount());
       setWhatsNewFresh(whatsNewSeen.due());
       setRankedRegular(lastModes.rankedRegular());
+      // The app tour (#573), once, after the welcome flow of a new install.
+      // An invite link or a push tap on the first launch goes first: the
+      // tour opens when Home shows after it.
+      if (tourStore.getState().status === 'due') router.push(tourHref('home'));
     }, []),
   );
   const { saved } = slot;

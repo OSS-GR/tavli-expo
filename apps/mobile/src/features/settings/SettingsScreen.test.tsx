@@ -41,6 +41,7 @@ function allProps(): Required<Omit<SettingsScreenProps, 'turnPushes' | 'visit'>>
     onBack: jest.fn(),
     onPage: jest.fn(),
     onHowToPlay: jest.fn(),
+    onTour: jest.fn(),
     onHistory: jest.fn(),
     onWhatsNew: jest.fn(),
     onAccount: jest.fn(),

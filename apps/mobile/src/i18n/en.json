@@ -1132,6 +1132,11 @@
         "title": "How to play, in one place",
         "body": "Every game has one page: its short lessons on the board on top, then the rules. The lessons you finished are kept, so Continue picks up where you stopped.",
         "where": "Home › How to play, or Settings › Help"
+      },
+      "appTour": {
+        "title": "A tour of the app",
+        "body": "A short tour: how to roll, how to move your checkers and where everything is. You try rolling and moving on the real board.",
+        "where": "Home › How to play › App tour, or Settings › Help"
       }
     }
   },
@@ -2114,6 +2119,87 @@
     "ratings": {
       "title": "A rating and leaderboards",
       "text": "Matches against other saved players count. See your friends and the top players."
+    }
+  },
+  "tour": {
+    "title": "App tour",
+    "skip": "Skip",
+    "skipHint": "Closes the tour. You can open it again from How to play.",
+    "step": "Step {{step}} of {{total}}",
+    "next": "Next",
+    "showMe": "Show me",
+    "stepDone": "Done: {{step}}",
+    "welcome": {
+      "title": "Welcome to the kafeneio",
+      "body": "A short tour: how to roll, how to move your checkers, and where to find everything. It takes about a minute.",
+      "start": "Start the tour",
+      "notNow": "Not now"
+    },
+    "roll": {
+      "title": "Roll the dice",
+      "body": "There are two ways to roll. Try both.",
+      "stepTap": "Tap Roll",
+      "stepSwipe": "Swipe across the board",
+      "rolled": "You rolled {{a}} and {{b}}.",
+      "done": "Nice. Roll whichever way you like.",
+      "board": "The board. Swipe across it to roll the dice."
+    },
+    "move": {
+      "title": "Move your checkers",
+      "body": "Your dice are 4 and 2: one move for each die. Try both ways.",
+      "stepTap": "Tap a checker, then tap where it goes",
+      "stepDrag": "Drag a checker to its place",
+      "stepConfirm": "Tap Confirm to end your turn",
+      "tapHint": "Tap this time: tap a checker, then tap a lit point.",
+      "dragHint": "Drag this time: hold a checker and slide it to a lit point.",
+      "confirmed": "That's it. Before you confirm, Undo takes a move back.",
+      "screenReader": "With a screen reader, play from the move list under the board.",
+      "board": "The board at the start of a game. Your dice are 4 and 2."
+    },
+    "home": {
+      "title": "This is Home",
+      "body": "Everything starts here.",
+      "hero": "Your next game: one to continue, your turn online, or a game against the computer.",
+      "games": "Your games and the invites to you.",
+      "modes": "More ways to play.",
+      "top": "Settings and What's new, at the top."
+    },
+    "local": {
+      "title": "Play on this phone",
+      "body": "No account and no internet needed.",
+      "vsBot": "Pick a game and a level. The computer plays the other side.",
+      "pass": "Two players, one phone. Pass it over after each turn."
+    },
+    "friend": {
+      "title": "Play a friend",
+      "body": "Online, with someone you know.",
+      "invite": "Make an invite and send the link. Play live, or a move whenever you have time.",
+      "join": "Got a code from a friend? Type it in."
+    },
+    "account": {
+      "title": "Save your account for more",
+      "body": "Play online as a guest, or save your account with Apple or your email to get these too.",
+      "ranked": "Find a player at your level. Each win moves your rating.",
+      "friends": "Add friends and invite them in one tap.",
+      "ratings": "Your rating, your friends' and everyone's."
+    },
+    "help": {
+      "title": "Any time you need it",
+      "body": "You can open this tour again from How to play or Settings.",
+      "howToPlay": "The rules and the lessons of each game.",
+      "history": "Your past matches and your stats.",
+      "settings": "Board, sounds, language and more.",
+      "whatsNew": "What each update brings.",
+      "lesson": "Start the first lesson",
+      "home": "Go to Home",
+      "done": "Done"
+    },
+    "mock": {
+      "label": "A sketch of Home with four numbered parts."
+    },
+    "row": {
+      "label": "App tour",
+      "hint": "How to roll, how to move, and where everything is"
     }
   }
 }
