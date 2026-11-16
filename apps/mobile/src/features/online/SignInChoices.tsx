@@ -26,7 +26,7 @@
  *   limit, so large fonts wrap.
  */
 import type { Analytics, AppleSheet, AuthProvider, AuthUser, Usernames } from '@tavli/contracts';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -62,6 +62,12 @@ export interface SignInChoicesProps {
   onSignedIn: (user: AuthUser) => void;
   /** The title and close button above the choices (`SignInHeader`); only with the choices. */
   header?: ReactNode;
+  /**
+   * Called with `true` while the header shows (the choices) and `false`
+   * on the other steps, so a sheet can keep its dimmed part as the
+   * screen reader's close button where no header is drawn.
+   */
+  onHeaderShown?: (shown: boolean) => void;
   /** For tests. Default: the app's. */
   appleSheet?: AppleSheet;
   /** For tests. Default: the app's analytics. */
@@ -74,6 +80,7 @@ export function SignInChoices({
   auth,
   onSignedIn,
   header,
+  onHeaderShown,
   appleSheet = appAppleSheet,
   analytics = appAnalytics,
   usernames = appUsernames,
@@ -89,6 +96,11 @@ export function SignInChoices({
       onSignedIn,
       usernames,
     });
+  const headerShown =
+    !(step !== null && usernames !== undefined) && failed === null && !withEmailForm;
+  useEffect(() => {
+    onHeaderShown?.(headerShown);
+  }, [onHeaderShown, headerShown]);
   if (step !== null && usernames !== undefined) {
     return (
       <UsernameForm

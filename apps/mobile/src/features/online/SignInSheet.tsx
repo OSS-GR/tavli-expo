@@ -9,11 +9,15 @@
  * to its title. Show it only while it is needed (mount it then), so the
  * focus moves each time it opens.
  *
+ * The close button is in the header, which shows only with the choices:
+ * on the email, username and problem steps the dimmed part is the screen
+ * reader's close button again (`ownCloseButton` follows the header).
+ *
  * Each time it opens it tells the reminders (#404, `sheetShown`): it is
  * an ask too, so Home shows no card the same day.
  */
 import type { Analytics, AppleSheet, AuthProvider, AuthUser } from '@tavli/contracts';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Sheet } from '@/components/Sheet';
@@ -42,6 +46,9 @@ export function SignInSheet({
 }: SignInSheetProps) {
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
+  // The header's close button shows only with the choices. On the other
+  // steps the dimmed part stays the screen reader's close button.
+  const [headerShown, setHeaderShown] = useState(true);
   useEffect(() => {
     reminders.sheetShown();
   }, []);
@@ -50,11 +57,12 @@ export function SignInSheet({
       visible
       onClose={onClose}
       closeLabel={t('signIn.notNow')}
-      ownCloseButton
+      ownCloseButton={headerShown}
       testID="sign-in-sheet">
       <SignInChoices
         auth={auth}
         onSignedIn={onSignedIn}
+        onHeaderShown={setHeaderShown}
         header={
           <SignInHeader
             title={t('signIn.title')}
