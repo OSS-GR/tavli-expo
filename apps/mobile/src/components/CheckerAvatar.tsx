@@ -1,4 +1,4 @@
-import { fonts, withAlpha } from '@tavli/ui';
+import { fonts, withAlpha, type AvatarWood } from '@tavli/ui';
 import { Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -10,16 +10,21 @@ export type CheckerAvatarSize = 18 | 24 | 32 | 40 | 56 | 72;
 /** Initials show from this size up; smaller avatars are a plain checker. */
 const MIN_INITIALS_SIZE = 32;
 
-export interface CheckerAvatarProps {
-  /** The player's id: it picks the wood, so it stays the same on every phone. */
-  playerKey: string;
+/**
+ * Where the wood comes from: a player's id (`playerKey`), so it stays the
+ * same on every phone, or a fixed `wood` (a side's checker, `sideWood`).
+ */
+type WoodSource =
+  { playerKey: string; wood?: undefined } | { wood: AvatarWood; playerKey?: undefined };
+
+export type CheckerAvatarProps = WoodSource & {
   /** The name the initials come from. With none the checker is plain. */
   name?: string | null;
   size?: CheckerAvatarSize;
   /** You: a brass ring. */
   you?: boolean;
   testID?: string;
-}
+};
 
 /**
  * A player as a checker seen from above (#495): the board's own woods,
@@ -28,13 +33,14 @@ export interface CheckerAvatarProps {
  */
 export function CheckerAvatar({
   playerKey,
+  wood: fixedWood,
   name = null,
   size = 40,
   you = false,
   testID,
 }: CheckerAvatarProps) {
   const { theme } = useUnistyles();
-  const wood = avatarWood(playerKey);
+  const wood = fixedWood ?? avatarWood(playerKey ?? '');
   const colors = theme.avatar[wood];
   const initials = name !== null && size >= MIN_INITIALS_SIZE ? initialsOf(name) : '';
   return (
