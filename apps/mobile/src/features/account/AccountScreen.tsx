@@ -256,8 +256,8 @@ export function AppleButton({ testID, onPress }: { testID: string; onPress: () =
   return (
     <AppleSignInButton
       testID={testID}
-      // The app has one set of colors, and it is dark.
-      dark
+      // White on a dark theme, black on a light one (#563).
+      dark={theme.scheme === 'dark'}
       cornerRadius={theme.radii.lg}
       style={styles.apple}
       onPress={onPress}
@@ -476,7 +476,9 @@ function Saved({
             <SectionRow
               key={provider}
               testID={`account-key-${provider}`}
-              icon={provider === 'email' ? 'mail' : 'keyRound'}
+              icon={provider === 'email' ? 'mail' : 'apple'}
+              // Apple's logo on Apple's own tile, so the row reads as Apple (#563).
+              {...(provider === 'apple' ? { iconLook: 'mark' as const } : {})}
               label={t(`account.keyName.${provider}`)}
               // The address that signs in, as iOS shows an Apple ID (#565).
               {...(email === undefined ? {} : { hint: email })}
@@ -498,17 +500,25 @@ function Saved({
             />
           );
         })}
-        {addable.map((provider) => (
+        {addable.includes('email') ? (
           <SectionRow
-            key={provider}
-            testID={`account-add-${provider}`}
-            icon="keyRound"
-            label={t('account.saved.add', { provider: t(`account.provider.${provider}`) })}
+            testID="account-add-email"
+            icon="mail"
+            label={t('account.saved.add', { provider: t('account.provider.email') })}
             disabled={busy}
-            onPress={provider === 'email' ? onAddEmail : account.saveWithApple}
+            onPress={onAddEmail}
           />
-        ))}
+        ) : null}
       </SectionCard>
+      {addable.includes('apple') ? (
+        // Apple's own button, as on the sign-in sheet (#563, Figma frame 21).
+        <AppleButton
+          testID="account-add-apple"
+          onPress={() => {
+            if (!busy) account.saveWithApple();
+          }}
+        />
+      ) : null}
       <SectionCard>
         <SectionRow
           testID="account-sign-out"

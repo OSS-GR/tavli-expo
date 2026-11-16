@@ -735,8 +735,18 @@ describe('<AccountScreen /> with a saved account', () => {
     await saved();
     const noKeys: AuthProvider = { ...auth!, listKeys: () => Promise.resolve([]) };
     await open({ auth: noKeys });
-    expect(await screen.findByRole('button', { name: 'Add Sign in with Apple' })).toBeOnTheScreen();
+    // Apple's own button, not a row (#563); email stays a row.
+    const apple = await screen.findByTestId('account-add-apple');
+    expect(apple).toHaveTextContent('Continue with Apple');
+    expect(screen.queryByRole('button', { name: 'Add Sign in with Apple' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add Email code' })).toBeOnTheScreen();
+  });
+
+  it('shows no Apple button once the account has Apple (#563)', async () => {
+    await saved();
+    await open();
+    expect(await screen.findByTestId('account-key-apple')).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-add-apple')).toBeNull();
   });
 
   it('adds an email key to a saved account (#433)', async () => {
