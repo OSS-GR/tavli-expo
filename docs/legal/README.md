@@ -1,6 +1,6 @@
 # Legal pages
 
-> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Last review: 2026-11-13 (#531 Play ranked matching; #407 ratings and leaderboards; #320 block and report on the server, #435 how to report in the app, #403 moving a guest into an account, #399 the email code and AhaSend, #404 the reminder times on the phone, #406 friends on the server).
+> The privacy policy for the app and the stores (issue #90), and the terms of use (#405). Terms review: 2026-11-16 (#586: the licence, the Apple EULA points, fair play and ranked, what we may do and the appeal, ratings, liability, law and disputes). Last review of the policy: 2026-11-13 (#531 Play ranked matching; #407 ratings and leaderboards; #320 block and report on the server, #435 how to report in the app, #403 moving a guest into an account, #399 the email code and AhaSend, #404 the reminder times on the phone, #406 friends on the server).
 
 **This is not legal advice.** The owner should have a lawyer or a GDPR expert check the policy and the terms before they go live.
 
@@ -31,7 +31,7 @@ The app opens `https://tavlaki.com/privacy` (`PRIVACY_POLICY_URL` in `apps/mobil
 
 ## Rules
 
-- **Terms of use:** the same rules: change all four terms files together. The version date at the top is `TERMS_VERSION` (`packages/contracts/src/username.ts`). Raise both only when players must accept the terms again: the app then asks each saved player before their next username change, and the server refuses a change without it (`TERMS_NEEDED`).
+- **Terms of use:** the same rules: change all four terms files together. The version date at the top is `TERMS_VERSION` (`packages/contracts/src/username.ts`). Raise both only when players must accept the terms again: the app then asks each saved player before their next username change, and the server refuses a change without it (`TERMS_NEEDED`). A text change that does not raise `TERMS_VERSION` keeps the version date and changes the "text last changed" date next to it, in all four files.
 - **Change all four files together.** Edit the English Markdown first, then the Greek Markdown, then both HTML pages. Change the "Last updated" date in all four.
 - The policy describes what the code does. When a PR changes what data leaves the phone (a new event, a new vendor, a new id), it updates this policy in the same PR. The event list must match [`docs/architecture/analytics-events.md`](../architecture/analytics-events.md). The same PR also updates the store privacy answers ([`docs/store/app-privacy.md`](../store/app-privacy.md), [`docs/store/play-data-safety.md`](../store/play-data-safety.md)) and the iOS privacy manifest in `apps/mobile/app.json`.
 - The HTML pages are plain HTML with inline CSS. No JavaScript, no fonts or images from other sites, no cookies. Keep it that way: the policy says so. The homepages show local images only (`site/img/`).
@@ -102,8 +102,11 @@ The policy's "Delete your account" section (all four files) and the store answer
 
 ## Before you publish the terms (owner checklist, #405)
 
-- [ ] Put your full name (or a company name) in "Who we are", in both languages.
-- [ ] Have a lawyer check the terms: the age rule and country list, "The app as it is", the Apple section and "Law" (the `OWNER` comments).
+- [ ] Put your full name (or a company name) and a postal address in "Who we are", in all four files (Apple asks for the developer's name and address; Greek law asks an online service to show who runs it). Add a VAT number if you have one.
+- [ ] Have a lawyer check the terms: the age rule and country list, "The app as it is", "Our liability", the Apple section and "Law and disputes" (the `OWNER` comments).
+- [ ] The terms say you must be 16 (or 13) to pick a username **or to play ranked**, but the app asks the age only at the username step. Decide whether Play ranked should ask too.
+- [ ] The terms promise to tell a player why we took a step against their account, and to look again when they write within 6 months. Answer those emails, and keep a short note of each step and its reason.
+- [ ] Decide whether the terms changes need a new `TERMS_VERSION` (players accept again at their next username change).
 - [ ] Publish `site/terms/` and `site/el/terms/` with the privacy pages, before the build with usernames goes to the stores.
 - [ ] Add the terms URL to App Store Connect (License Agreement: a custom EULA, or keep Apple's standard one and link the terms in the description) and to the Play listing.
 
