@@ -54,7 +54,7 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 2. Point `tavlaki.com` at the host. Both `https://tavlaki.com/privacy` and `https://tavlaki.com/el/privacy` must open the pages. Cloudflare serves `privacy/index.html` at `/privacy/` and redirects `/privacy` there.
 3. Use HTTPS. Do not add analytics or cookies to the site.
 4. Put `https://tavlaki.com/privacy` in App Store Connect (App Privacy → Privacy Policy URL) and in the Google Play Console (App content → Privacy policy).
-5. Put `https://tavlaki.com` in App Store Connect as the Support URL and the Marketing URL (Greek localization: `https://tavlaki.com/el/`). The homepage shows `support@tavlaki.com`: make that address work.
+5. Put `https://tavlaki.com` in App Store Connect as the Support URL and the Marketing URL (Greek localization: `https://tavlaki.com/el/`). The homepage shows `support@tavlaki.com` (a Proton Mail mailbox since 2026-11-09, see "Mail" in `docs/process/running-the-app.md`).
 
 ## Invite links (#332)
 

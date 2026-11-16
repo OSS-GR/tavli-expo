@@ -274,7 +274,7 @@ Apple lets you download a key only once. If it is lost or leaks: make a new key 
 
 The server mails sign-in codes through [AhaSend](https://ahasend.com) (AhaSend B.V., Amsterdam; data stays in the EU; free plan: 1,000 mails a month, no card). The owner does these steps once; never put a key in the repo, an issue or a chat.
 
-Our mail setup (done 2026-11-09): `tavlaki.com` and `oss.house` use Cloudflare DNS, and Proton Mail holds their mailboxes (`support@` and `privacy@tavlaki.com`). AhaSend sends only from the subdomain `mail.tavlaki.com`, so the codes never touch Proton's records or the reputation of our own mail.
+Our mail setup (done 2026-11-09): `tavlaki.com` and `oss.house` use Cloudflare DNS, and Proton Mail holds their mailboxes (`support@` and `privacy@tavlaki.com`). `support@` is the one contact address in the app's legal pages and the store listings; `privacy@` stays open, so mail from old pages still arrives. AhaSend sends only from the subdomain `mail.tavlaki.com`, so the codes never touch Proton's records or the reputation of our own mail.
 
 1. Sign up at AhaSend and accept the data processing agreement (<https://ahasend.com/dpa>). AhaSend refuses free addresses such as Gmail; the account uses an `oss.house` address.
 2. Add the sending domain `mail.tavlaki.com` (a subdomain, as AhaSend advises). In Cloudflare (`tavlaki.com` → DNS), add the records AhaSend shows; the Name field takes only the part before `.tavlaki.com`:
