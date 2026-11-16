@@ -44,7 +44,9 @@
     },
     "ranked": {
       "title": "Play ranked",
-      "subtitle": "Find a player now"
+      "subtitle": "Find a player now",
+      "rated": "Rating {{rating}} · Find a player now",
+      "unrated": "Not rated yet · Find a player now"
     },
     "join": {
       "title": "Join with a code",
@@ -52,7 +54,9 @@
     },
     "friends": {
       "title": "Friends",
-      "subtitle": "Add and invite"
+      "subtitle": "Add and invite",
+      "requests_one": "{{count}} friend request",
+      "requests_other": "{{count}} friend requests"
     },
     "ratings": {
       "title": "Leaderboards",
@@ -86,6 +90,21 @@
       "stale": "This list may be out of date. Check the connection.",
       "retry": "Try again",
       "seeAll": "See all ({{count}})"
+    },
+    "games": {
+      "title": "Your games",
+      "saved": "Saved game · Continue"
+    },
+    "hero": {
+      "play": "Play",
+      "open": "Open",
+      "score": "You {{me}}–{{friend}} · first to {{target}}",
+      "invite": "Invite to you",
+      "seeInvite": "See invite",
+      "rankedRated": "Play ranked · Rating {{rating}}",
+      "findPlayer": "Find a player",
+      "rankedLine": "Rated games · {{minutes}} min turns",
+      "find": "Find"
     },
     "invites": {
       "title": "Your invites",
@@ -1095,6 +1114,11 @@
         "title": "Play ranked",
         "body": "Play a new player close to your rating, live, with two minutes a turn. Each match changes your rating.",
         "where": "Home › Play ranked"
+      },
+      "homeHero": {
+        "title": "What to play next",
+        "body": "The top of Home shows your next step: an online game where it is your turn, an invite from a friend, your saved game, or a quick game. Your games are listed together below it.",
+        "where": "Home"
       },
       "gameLayout": {
         "title": "A roomier game screen",

@@ -34,6 +34,7 @@ export type WhatsNewEntryId =
   | 'matchingColors'
   | 'turnClock'
   | 'playRanked'
+  | 'homeHero'
   | 'gameLayout';
 
 export interface WhatsNewEntry {
@@ -51,9 +52,15 @@ export interface WhatsNewRelease {
 /** Every release, newest first. */
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
+    date: '2026-11-15',
+    entries: [
+      { id: 'homeHero', icon: 'house' },
+      { id: 'gameLayout', icon: 'smartphone' },
+    ],
+  },
+  {
     date: '2026-11-13',
     entries: [
-      { id: 'gameLayout', icon: 'smartphone' },
       { id: 'playRanked', icon: 'trophy' },
       { id: 'turnClock', icon: 'clock' },
       { id: 'matchingColors', icon: 'palette' },

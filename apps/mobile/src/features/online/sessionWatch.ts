@@ -55,16 +55,27 @@ export type StartSessionWatch<Value> = (
  *
  * `start` and `toLoaded` restart the watch when they change: keep them
  * stable (`useCallback`).
+ *
+ * With no `auth` (no online play, or Home on a phone that never signed
+ * in) it watches nothing and shows `signedOut`.
  */
 export function useSessionWatch<Value, Loaded extends object>(
-  auth: AuthProvider,
+  auth: AuthProvider | undefined,
   start: StartSessionWatch<Value>,
   toLoaded: (value: Value) => Loaded,
 ): { readonly state: SessionWatchState<Loaded>; readonly retry: () => void } {
   const [state, setState] = useState<SessionWatchState<Loaded>>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  // A watch that stops (no `auth`, e.g. after a sign-out) forgets its list,
+  // so the next user never sees the last one's, not even for one frame.
+  const [watched, setWatched] = useState(auth);
+  if (watched !== auth) {
+    setWatched(auth);
+    setState({ status: 'loading' });
+  }
 
   useEffect(() => {
+    if (auth === undefined) return;
     let live = true;
     /** The user the watch is for: `undefined` before the session loads. */
     let current: string | null | undefined;
@@ -125,5 +136,7 @@ export function useSessionWatch<Value, Loaded extends object>(
     setAttempt((n) => n + 1);
   }, []);
 
-  return { state, retry };
+  return { state: auth === undefined ? SIGNED_OUT : state, retry };
 }
+
+const SIGNED_OUT = { status: 'signedOut' } as const;

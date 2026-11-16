@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
+import { lastModes } from '@/features/home/lastModes';
 import { matchSessions } from '@/features/match/appSessions';
 import { loadLastSetup, saveLastSetup } from '@/features/match/lastSetup';
 import { gameHref, parseFirstGameParam, parseModeParam, rulesHref } from '@/features/match/routes';
@@ -31,6 +32,8 @@ export default function NewGameRoute() {
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       onStart={(setup) => {
         saveLastSetup(storage, setup);
+        // Home's hero (#517) offers Play ranked to a ranked regular.
+        lastModes.record(setup.mode);
         const session = matchSessions.start(setup);
         // Replace: "back" from the board goes Home, not to this form.
         router.replace(gameHref(session.id));

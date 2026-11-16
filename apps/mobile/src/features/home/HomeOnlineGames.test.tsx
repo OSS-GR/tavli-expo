@@ -1,14 +1,17 @@
 /**
- * "Your online games" on Home (#297), on the Jest online fake: one
- * in-memory server, and `auth` / `games` as the signed-in user.
+ * "Your games" on Home (#297, #517), on the Jest online fake: one
+ * in-memory server, and `auth` / `games` as the signed-in user. The route
+ * loads the list (`useMyOnlineGames`); `Shown` does the same here.
  */
-import type { GameTransport, OnlineGameView } from '@tavli/contracts';
+import type { AuthProvider, GameTransport, OnlineGameView } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { pickTurn } from '@tavli/online/testing';
 import { act, render, screen, within } from '@testing-library/react-native';
+import type { ReactNode } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { hasOnlineAccount, rememberOnlineAccount } from '@/features/online/accountHint';
+import { useMyOnlineGames } from '@/features/online/myGames';
 import i18n from '@/i18n';
 import { auth, games } from '@/services';
 
@@ -59,9 +62,29 @@ async function flush(): Promise<void> {
   });
 }
 
-async function show(transport: GameTransport = games!, onOpen = jest.fn(), onSeeAll = jest.fn()) {
+interface ShownProps {
+  auth: AuthProvider;
+  games: GameTransport;
+  heroGameId?: string | null;
+  saved?: ReactNode;
+  onOpen: (gameId: string) => void;
+  onSeeAll: () => void;
+}
+
+/** The list as Home shows it, loaded as the route does. */
+function Shown({ auth: signIn, games: transport, ...rest }: ShownProps) {
+  const { state, retry } = useMyOnlineGames(signIn, transport);
+  return <HomeOnlineGames state={state} retry={retry} focused {...rest} />;
+}
+
+async function show(
+  transport: GameTransport = games!,
+  onOpen = jest.fn(),
+  onSeeAll = jest.fn(),
+  extra: Pick<ShownProps, 'heroGameId' | 'saved'> = {},
+) {
   await render(
-    <HomeOnlineGames auth={auth!} games={transport} focused onOpen={onOpen} onSeeAll={onSeeAll} />,
+    <Shown auth={auth!} games={transport} onOpen={onOpen} onSeeAll={onSeeAll} {...extra} />,
   );
   await flush();
   return { onOpen, onSeeAll };
@@ -160,7 +183,7 @@ describe('<HomeOnlineGames />', () => {
     expect(newest.filter((id) => !myTurn(id)).length).toBeGreaterThan(0);
     const user = setupUser();
     const { onSeeAll } = await show();
-    expect(screen.getByRole('header', { name: 'Your online games' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Your games' })).toBeOnTheScreen();
     expect(rowIds()).toEqual(expected.slice(0, 3));
     await user.press(screen.getByRole('link', { name: 'See all (5)' }));
     expect(onSeeAll).toHaveBeenCalledTimes(1);
@@ -343,6 +366,24 @@ describe('<HomeOnlineGames />', () => {
     expect(hasOnlineAccount()).toBe(false);
   });
 
+  it('turned off and on again, it never shows the last list', async () => {
+    signIn();
+    rememberOnlineAccount();
+    const gameId = await newGame();
+    const props = { games: games!, onOpen: jest.fn(), onSeeAll: jest.fn() };
+    const view = await render(<Switchable on auth={auth!} {...props} />);
+    await flush();
+    expect(screen.getByTestId(`online-game-${gameId}`)).toBeOnTheScreen();
+    await view.rerender(<Switchable on={false} auth={auth!} {...props} />);
+    expect(screen.queryByTestId('home-online-games')).toBeNull();
+    // Another user, with no games: the old row never shows, not even before the load.
+    onlineFake.authStore.session = { id: 'guest-2', isGuest: true };
+    await view.rerender(<Switchable on auth={auth!} {...props} />);
+    expect(screen.queryByTestId(`online-game-${gameId}`)).toBeNull();
+    await flush();
+    expect(screen.queryByTestId(`online-game-${gameId}`)).toBeNull();
+  });
+
   it('shows Greek', async () => {
     signIn();
     let gameId = await newGame();
@@ -351,7 +392,7 @@ describe('<HomeOnlineGames />', () => {
       await i18n.changeLanguage('el');
     });
     await show();
-    expect(screen.getByRole('header', { name: 'Τα online παιχνίδια σου' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Τα παιχνίδια σου' })).toBeOnTheScreen();
     expect(
       screen.getByRole('button', {
         name: `Πόρτες · Επισκέπτης ${onlineFake.guestNumber(FRIEND)}, Σειρά σου, 0 προς 0, Μένουν 24 ώρες`,
@@ -362,3 +403,9 @@ describe('<HomeOnlineGames />', () => {
     });
   });
 });
+
+/** `Shown` with its `auth` taken away while `on` is off (a sign-out on Home). */
+function Switchable({ on, auth: signIn, ...rest }: ShownProps & { on: boolean }) {
+  const { state, retry } = useMyOnlineGames(on ? signIn : undefined, rest.games);
+  return <HomeOnlineGames state={state} retry={retry} focused {...rest} />;
+}

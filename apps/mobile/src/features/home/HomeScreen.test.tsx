@@ -1,4 +1,4 @@
-import { act, render, screen, userEvent } from '@testing-library/react-native';
+import { act, render, screen, userEvent, within } from '@testing-library/react-native';
 import * as Reanimated from 'react-native-reanimated';
 
 import i18n from '@/i18n';
@@ -147,13 +147,15 @@ describe('<HomeScreen />', () => {
     const onJoinWithCode = jest.fn();
     await render(<HomeScreen {...setup()} onJoinWithCode={onJoinWithCode} />);
 
-    await user.press(
-      screen.getByRole('button', { name: 'Join with a code, Got a code from a friend?' }),
-    );
+    // One row in the links list (#517); the line is its hint.
+    const join = screen.getByRole('button', { name: 'Join with a code' });
+    expect(join.props.accessibilityHint).toBe('Got a code from a friend?');
+    expect(within(screen.getByTestId('home-links')).getByTestId('home-join')).toBeTruthy();
+    await user.press(join);
     expect(onJoinWithCode).toHaveBeenCalledTimes(1);
   });
 
-  it('opens Play ranked from its tile, next to Play a friend (#532)', async () => {
+  it('puts Play ranked on a row of its own first, then the other tiles (#517)', async () => {
     const user = userEvent.setup();
     const onPlayRanked = jest.fn();
     await render(
@@ -162,16 +164,55 @@ describe('<HomeScreen />', () => {
         onPlayFriend={jest.fn()}
         onJoinWithCode={jest.fn()}
         onPlayRanked={onPlayRanked}
+        onFriends={jest.fn()}
+        onRatings={jest.fn()}
       />,
     );
 
     const tiles = screen
       .getAllByRole('button')
       .map((b) => b.props.testID as string | undefined)
-      .filter((id) => id === 'home-friend' || id === 'home-ranked' || id === 'home-join');
-    expect(tiles).toEqual(['home-friend', 'home-ranked', 'home-join']);
+      .filter((id) => id?.startsWith('home-') && id !== 'home-vs-bot');
+    // Play ranked, then Play a friend | Pass-and-play, Friends |
+    // Leaderboards, then the links list.
+    expect(tiles).toEqual([
+      'home-settings',
+      'home-ranked',
+      'home-friend',
+      'home-local',
+      'home-friends',
+      'home-ratings',
+      'home-join',
+    ]);
     await user.press(screen.getByRole('button', { name: 'Play ranked, Find a player now' }));
     expect(onPlayRanked).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows your rating on the Play ranked tile (#517)', async () => {
+    const props = { ...setup(), onPlayRanked: jest.fn() };
+    const { rerender } = await render(<HomeScreen {...props} rankedRating={1532} />);
+    expect(
+      screen.getByRole('button', { name: 'Play ranked, Rating 1532 · Find a player now' }),
+    ).toBeOnTheScreen();
+    await rerender(<HomeScreen {...props} rankedRating={null} />);
+    expect(
+      screen.getByRole('button', { name: 'Play ranked, Not rated yet · Find a player now' }),
+    ).toBeOnTheScreen();
+    // No news (a guest, no account, a failed load): the plain line.
+    await rerender(<HomeScreen {...props} />);
+    expect(
+      screen.getByRole('button', { name: 'Play ranked, Find a player now' }),
+    ).toBeOnTheScreen();
+  });
+
+  it('shows the friend requests waiting on the Friends tile (#517)', async () => {
+    const props = { ...setup(), onFriends: jest.fn() };
+    const { rerender } = await render(<HomeScreen {...props} friendRequests={0} />);
+    expect(screen.getByRole('button', { name: 'Friends, Add and invite' })).toBeOnTheScreen();
+    await rerender(<HomeScreen {...props} friendRequests={1} />);
+    expect(screen.getByRole('button', { name: 'Friends, 1 friend request' })).toBeOnTheScreen();
+    await rerender(<HomeScreen {...props} friendRequests={3} />);
+    expect(screen.getByRole('button', { name: 'Friends, 3 friend requests' })).toBeOnTheScreen();
   });
 
   it('shows no Play ranked tile with no matchmaking (#532)', async () => {
@@ -201,7 +242,7 @@ describe('<HomeScreen />', () => {
     const { rerender } = await render(<HomeScreen {...setup()} />);
     expect(screen.queryByText('Continue game')).toBeNull();
     const { Text } = jest.requireActual('react-native');
-    await rerender(<HomeScreen {...setup()} continueCard={<Text>Continue game</Text>} />);
+    await rerender(<HomeScreen {...setup()} hero={<Text>Continue game</Text>} />);
     expect(screen.getByText('Continue game')).toBeOnTheScreen();
   });
 
@@ -228,7 +269,7 @@ describe('<HomeScreen />', () => {
     await render(
       <HomeScreen
         {...setup()}
-        continueCard={
+        hero={
           <ContinueCard
             summary={{
               game: 'Portes · vs Bot (Easy)',
@@ -288,7 +329,7 @@ describe('<HomeScreen />', () => {
     await render(
       <HomeScreen
         {...props}
-        continueCard={
+        hero={
           <ContinueCard
             summary={{ game: 'Portes · vs Bot (Easy)', status: 'You 0 – 0 Bot' }}
             board={{ board: startBoard('portes'), direction: 'contrary' }}
@@ -301,12 +342,50 @@ describe('<HomeScreen />', () => {
     expect(screen.getByTestId('home-continue-board', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByTestId('home-vs-bot-board', { includeHiddenElements: true })).toBeNull();
     expect(screen.getAllByTestId('home-vs-bot')).toHaveLength(1);
-    expect(screen.getByRole('header', { name: 'New game' })).toBeOnTheScreen();
+    // Never "New game" over a Continue card (#517): always More ways to play.
+    expect(screen.queryByRole('header', { name: 'New game' })).toBeNull();
+    expect(screen.getByRole('header', { name: 'More ways to play' })).toBeOnTheScreen();
     expect(screen.getByText('Continue')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Play vs bot, Easy' }));
     expect(props.onNewGame).toHaveBeenLastCalledWith('bot');
     await user.press(screen.getByRole('button', { name: /^Continue game, Portes/ }));
     expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the Play ranked tile while Play ranked is the hero (#517)', async () => {
+    const { Text } = jest.requireActual('react-native');
+    const onPlayRanked = jest.fn();
+    const { rerender } = await render(<HomeScreen {...setup()} onPlayRanked={onPlayRanked} />);
+    expect(screen.getByTestId('home-ranked')).toBeOnTheScreen();
+    await rerender(
+      <HomeScreen
+        {...setup()}
+        onPlayRanked={onPlayRanked}
+        hero={<Text>Find a player</Text>}
+        heroRanked
+      />,
+    );
+    expect(screen.queryByTestId('home-ranked')).toBeNull();
+    // Play vs bot leads the tiles.
+    expect(screen.getAllByTestId('home-vs-bot')).toHaveLength(1);
+  });
+
+  it('puts Learn to play right under the hero (#517)', async () => {
+    const { Text } = jest.requireActual('react-native');
+    await render(
+      <HomeScreen
+        {...setup()}
+        learnCard={<Text testID="learn">Learn</Text>}
+        reminderCard={<Text testID="reminder">Reminder</Text>}
+        onlineGames={<Text testID="games">Games</Text>}
+      />,
+    );
+    // Top to bottom in the rendered tree.
+    const tree = JSON.stringify(screen.toJSON());
+    const at = (text: string) => tree.indexOf(text);
+    const order = ['Play now', 'Learn', 'Reminder', 'Games'].sort((x, y) => at(x) - at(y));
+    expect(at('Learn')).toBeGreaterThan(-1);
+    expect(order).toEqual(['Play now', 'Learn', 'Reminder', 'Games']);
   });
 
   it('draws no board on the Continue card without a position', async () => {

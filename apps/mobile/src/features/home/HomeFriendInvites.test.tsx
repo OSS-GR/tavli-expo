@@ -2,7 +2,7 @@
  * "Invites from friends" on Home (#486), on the Jest online fake: one
  * in-memory server, and `auth` / `friends` as the signed-in user.
  */
-import type { Friends } from '@tavli/contracts';
+import type { AuthProvider, Friends } from '@tavli/contracts';
 import { act, render, screen } from '@testing-library/react-native';
 
 import { auth } from '@/services';
@@ -10,7 +10,7 @@ import { auth } from '@/services';
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { onlineFake } from '../../../test/onlineFake';
 
-import { HomeFriendInvites } from './HomeFriendInvites';
+import { HomeFriendInvites, useFriendInvites } from './HomeFriendInvites';
 
 runOnFakeTimers();
 
@@ -46,16 +46,27 @@ async function annInvites(points = 5): Promise<string> {
     .inviteFriend(ME, { choice: 'plakoto', targetPoints: points, turnTimeMinutes: null });
 }
 
+interface ShownProps {
+  auth: AuthProvider;
+  friends: Friends;
+  focused: boolean;
+  onOpen: (code: string) => void;
+}
+
+/** The list as Home shows it, loaded as the route does. */
+function Shown({ auth: signIn, friends: list, focused, onOpen }: ShownProps) {
+  const invites = useFriendInvites(signIn, list, focused);
+  return <HomeFriendInvites invites={invites} onOpen={onOpen} />;
+}
+
 async function show(friends: Friends = onlineFake.friends, focused = true) {
   const onOpen = jest.fn();
   const view = await render(
-    <HomeFriendInvites auth={auth!} friends={friends} focused={focused} onOpen={onOpen} />,
+    <Shown auth={auth!} friends={friends} focused={focused} onOpen={onOpen} />,
   );
   await flush();
   const focus = async (next: boolean) => {
-    await view.rerender(
-      <HomeFriendInvites auth={auth!} friends={friends} focused={next} onOpen={onOpen} />,
-    );
+    await view.rerender(<Shown auth={auth!} friends={friends} focused={next} onOpen={onOpen} />);
     await flush();
   };
   return { onOpen, focus };
@@ -134,4 +145,47 @@ describe('<HomeFriendInvites />', () => {
     await flush();
     expect(screen.queryByTestId('home-friend-invites')).toBeNull();
   });
+
+  it('a sign-out clears the list at once', async () => {
+    signInSaved();
+    await befriendAnn();
+    const code = await annInvites();
+    await show();
+    expect(screen.getByTestId(`home-friend-invite-${code}`)).toBeOnTheScreen();
+    await act(async () => auth!.signOut());
+    await flush();
+    expect(screen.queryByTestId('home-friend-invites')).toBeNull();
+  });
+
+  it('turned off, it forgets the list', async () => {
+    signInSaved();
+    await befriendAnn();
+    const code = await annInvites();
+    const onOpen = jest.fn();
+    const view = await render(
+      <Off auth={auth!} friends={onlineFake.friends} on={true} onOpen={onOpen} />,
+    );
+    await flush();
+    expect(screen.getByTestId(`home-friend-invite-${code}`)).toBeOnTheScreen();
+    await view.rerender(
+      <Off auth={auth!} friends={onlineFake.friends} on={false} onOpen={onOpen} />,
+    );
+    expect(screen.queryByTestId('home-friend-invites')).toBeNull();
+  });
 });
+
+/** The list with its `auth` taken away when `on` turns off (a sign-out on Home). */
+function Off({
+  auth: signIn,
+  friends: list,
+  on,
+  onOpen,
+}: {
+  auth: AuthProvider;
+  friends: Friends;
+  on: boolean;
+  onOpen: (code: string) => void;
+}) {
+  const invites = useFriendInvites(on ? signIn : undefined, list, true);
+  return <HomeFriendInvites invites={invites} onOpen={onOpen} />;
+}
