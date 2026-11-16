@@ -842,7 +842,7 @@ describe('<AccountScreen /> loading', () => {
     });
     await open();
     expect(
-      await screen.findByRole('button', { name: /Διαγραφή του λογαριασμού επισκέπτη μου/ }),
+      await screen.findByRole('button', { name: /Διαγραφή λογαριασμού επισκέπτη/ }),
     ).toBeOnTheScreen();
     expect(
       screen.getByLabelText(/^Παίζεις ως Επισκέπτης \d{4} Μόνο σε αυτό το κινητό\.$/),

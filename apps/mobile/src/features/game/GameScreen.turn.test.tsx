@@ -184,8 +184,8 @@ describe('<GameScreen /> strips without a pip count (#238)', () => {
   it.each([
     ['portrait', 'en', PORTRAIT_SE, 'Ann, 0 of 3 points, Your turn', 'Bob, 0 of 3 points'],
     ['landscape', 'en', LANDSCAPE_SE, 'Ann, 0 of 3 points, Your turn', 'Bob, 0 of 3 points'],
-    ['portrait', 'el', PORTRAIT_SE, 'Ann, 0 από 3 βαθμούς, Σειρά σου', 'Bob, 0 από 3 βαθμούς'],
-    ['landscape', 'el', LANDSCAPE_SE, 'Ann, 0 από 3 βαθμούς, Σειρά σου', 'Bob, 0 από 3 βαθμούς'],
+    ['portrait', 'el', PORTRAIT_SE, 'Ann, 0 από 3 πόντους, Σειρά σου', 'Bob, 0 από 3 πόντους'],
+    ['landscape', 'el', LANDSCAPE_SE, 'Ann, 0 από 3 πόντους, Σειρά σου', 'Bob, 0 από 3 πόντους'],
   ] as const)(
     '%s, %s: only the name and the turn; the score between the seats',
     async (layout, language, window, you, them) => {

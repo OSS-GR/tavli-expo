@@ -98,7 +98,7 @@ describe('turnAnnouncement', () => {
     await i18n.changeLanguage('el');
     const { dispatch, announce } = afterFirstTurn();
     dispatch({ type: 'roll', player: 'black', dice: [value, value] });
-    expect(announce()?.text).toBe(`Bot: έφερε ${name}: τέσσερις κινήσεις του ${value}.`);
+    expect(announce()?.text).toBe(`Bot έφερε ${name}: παίζει τέσσερις φορές το ${value}.`);
   });
 
   it('pass-and-play: reads every turn, so the next player hears it', () => {
@@ -227,10 +227,10 @@ describe('turnAnnouncement: a chosen double (#202)', () => {
     await i18n.changeLanguage('el');
     const you = afterAceDeuce('white');
     you.dispatch({ type: 'answer', player: 'white', choice: '4' });
-    expect(you.announce()?.text).toBe('Διάλεξες τεσσάρες: τέσσερις κινήσεις του 4.');
+    expect(you.announce()?.text).toBe('Διάλεξες τεσσάρες: παίζεις τέσσερις φορές το 4.');
     const bot = afterAceDeuce('black');
     bot.dispatch({ type: 'answer', player: 'black', choice: '4' });
-    expect(bot.announce()?.text).toMatch(/ Bot: διάλεξε τεσσάρες: τέσσερις κινήσεις του 4\.$/);
+    expect(bot.announce()?.text).toMatch(/ Bot διάλεξε τεσσάρες: παίζει τέσσερις φορές το 4\.$/);
   });
 
   it.each([
@@ -244,7 +244,7 @@ describe('turnAnnouncement: a chosen double (#202)', () => {
     await i18n.changeLanguage('el');
     const { dispatch, announce } = afterAceDeuce('white');
     dispatch({ type: 'answer', player: 'white', choice: value });
-    expect(announce()?.text).toBe(`Διάλεξες ${name}: τέσσερις κινήσεις του ${value}.`);
+    expect(announce()?.text).toBe(`Διάλεξες ${name}: παίζεις τέσσερις φορές το ${value}.`);
   });
 });
 

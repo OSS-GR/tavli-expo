@@ -326,7 +326,7 @@ describe('the email code step', () => {
     expect(screen.getByRole('button', { name: 'Στείλε νέο κωδικό' })).toBeDisabled();
     await user.type(screen.getByTestId('email-code-input'), '999999');
     expect(
-      await screen.findByText('Ο κωδικός είναι λάθος. Δες το email και δοκίμασε ξανά.'),
+      await screen.findByText('Ο κωδικός δεν είναι σωστός. Κοίτα ξανά το email και δοκίμασε πάλι.'),
     ).toBeOnTheScreen();
   });
 });

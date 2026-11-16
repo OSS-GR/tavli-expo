@@ -387,7 +387,7 @@ Advice: start on **EAS Free**. Build dev clients rarely (only when native deps c
 - **Do** keep translations as JSON in `apps/mobile/src/i18n/{el,en}.json`. Use keys like `game.roll_dice`.
 - **Do** use i18next plural forms. Greek has `one` and `other` forms, like English, but word forms change. Do not build sentences by joining strings.
 - **Do** support per-app language on iOS and Android (Expo docs: newer OSes let users pick an app language in system settings). Also offer an in-app switch.
-- **Do** keep game names as proper nouns: Πόρτες (Portes), Πλακωτό (Plakoto), Φεύγα (Fevga), Ασόδιο (Asodio).
+- **Do** keep game names as proper nouns: Πόρτες (Portes), Πλακωτό (Plakoto), Φεύγα (Fevga), Ασόδυο (Asodio).
 - **Do** test long Greek strings. Greek words are often longer than English ones. Allow text to wrap.
 - **Do** format numbers and dates with `Intl` (Hermes supports it).
 - Lingui (6.x) is a fine smaller alternative with compile-time extraction. Pick one and keep it.
