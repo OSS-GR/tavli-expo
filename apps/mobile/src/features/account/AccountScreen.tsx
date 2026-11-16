@@ -391,7 +391,9 @@ function Guest({
         <SectionRow
           testID="account-delete"
           icon="trash"
+          iconLook="bare"
           tone="danger"
+          chevron={false}
           label={t('account.guest.delete')}
           hint={t('account.guest.deleteHint')}
           disabled={account.busy !== null}

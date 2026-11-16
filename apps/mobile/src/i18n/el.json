@@ -550,7 +550,6 @@
     "timeLimit_other": "{{count}} λεπτά",
     "loading": "Φόρτωση παιχνιδιού…",
     "label": "{{game}} · online",
-    "summary": "{{game}} · online · {{score}}",
     "exitHint": "Το παιχνίδι συνεχίζεται και ο χρόνος τρέχει",
     "notice": {
       "timedOutTitle": "Τελείωσε ο χρόνος σου",
@@ -1415,10 +1414,10 @@
     "menu": {
       "open": "Μενού παιχνιδιού",
       "title": "Μενού παιχνιδιού",
-      "summaryBot": "{{game}} · με τον υπολογιστή ({{level}}) · {{score}}",
-      "summaryLocal": "{{game}} · δύο παίκτες · {{score}}",
+      "close": "Κλείσιμο μενού",
       "resignGame": "Παραίτηση από την παρτίδα",
-      "resignGameHint": "{{name}} κερδίζει την παρτίδα",
+      "resignGamePoints_one": "{{name}} κερδίζει {{count}} πόντο",
+      "resignGamePoints_other": "{{name}} κερδίζει {{count}} πόντους",
       "resignMatch": "Παραίτηση από το ματς",
       "resignMatchHint": "{{name}} κερδίζει το ματς",
       "rules": "Κανόνες: {{game}}",
@@ -1515,6 +1514,7 @@
   },
   "matchEnd": {
     "finalScore": "Τελικό σκορ: {{score}}",
+    "game": "Παρτίδα {{number}}",
     "won": "{{name}} κέρδισε",
     "won_you": "Κέρδισες",
     "wonOnTime": "{{name}} κέρδισε λόγω χρόνου",

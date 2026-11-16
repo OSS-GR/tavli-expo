@@ -111,10 +111,12 @@ export interface SectionRowProps {
   /** A button row that cannot be pressed now: dim label, read as disabled. */
   disabled?: boolean;
   /**
-   * `danger`: a risky action that sits alone (Delete my guest account,
-   * #519): the label and a bare icon in the problem color, no chevron.
+   * `danger`: the label and the icon in the problem coral, for a risky
+   * action (Resign this game, #515). Default `normal`.
    */
   tone?: 'normal' | 'danger';
+  /** A button row's chevron. Off for a risky action that sits alone (Delete my guest account, #519). */
+  chevron?: boolean;
   testID?: string;
 }
 
@@ -131,35 +133,28 @@ export function SectionRow({
   accessibilityRole = 'button',
   disabled = false,
   tone = 'normal',
+  chevron = true,
   testID,
 }: SectionRowProps) {
   const { theme } = useUnistyles();
-  const danger = tone === 'danger';
+  const colors = rowColors(theme.colors, tone, disabled);
   const content = (
     <>
       {icon ? (
-        iconLook === 'bare' || danger ? (
+        iconLook === 'bare' ? (
           <View style={styles.bareIcon}>
-            <Icon
-              name={icon}
-              size={20}
-              color={danger ? theme.colors.problem : theme.colors.accent}
-            />
+            <Icon name={icon} size={20} color={colors.icon} />
           </View>
         ) : (
-          <RowIcon name={icon} />
+          <RowIcon name={icon} color={colors.icon} />
         )
       ) : null}
       <View style={styles.texts}>
-        <Text style={[styles.label, danger && styles.danger, disabled && styles.disabled]}>
-          {label}
-        </Text>
-        {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+        <Text style={[styles.label, { color: colors.label }]}>{label}</Text>
+        {hint ? <Text style={[styles.hint, { color: colors.hint }]}>{hint}</Text> : null}
       </View>
       {right ?? (value ? <Text style={styles.value}>{value}</Text> : null)}
-      {onPress && !danger ? (
-        <Icon name="chevronRight" size={18} color={theme.colors.textDim} />
-      ) : null}
+      {onPress && chevron ? <Icon name="chevronRight" size={18} color={colors.chevron} /> : null}
     </>
   );
   if (!onPress) {
@@ -192,12 +187,37 @@ export function SectionRow({
   );
 }
 
-/** The small dark badge with a brass icon at the start of a row. */
-export function RowIcon({ name }: { name: IconName }) {
+type ThemeColors = ReturnType<typeof useUnistyles>['theme']['colors'];
+
+/**
+ * A row's colors, decided in one place (#515). A disabled row is all
+ * `textDisabled`, a risky one too, so it loses its coral. A `danger` row
+ * has a coral icon and label; its hint and chevron stay dim, as in Figma.
+ */
+function rowColors(
+  colors: ThemeColors,
+  tone: 'normal' | 'danger',
+  disabled: boolean,
+): { icon: string; label: string; hint: string; chevron: string } {
+  if (disabled) {
+    const dim = colors.textDisabled;
+    return { icon: dim, label: dim, hint: dim, chevron: dim };
+  }
+  const lead = tone === 'danger' ? colors.problem : null;
+  return {
+    icon: lead ?? colors.accent,
+    label: lead ?? colors.text,
+    hint: colors.textDim,
+    chevron: colors.textDim,
+  };
+}
+
+/** The small dark badge with a brass icon (or `color`) at the start of a row. */
+export function RowIcon({ name, color }: { name: IconName; color?: string }) {
   const { theme } = useUnistyles();
   return (
     <View style={styles.badge}>
-      <Icon name={name} size={20} color={theme.colors.accent} />
+      <Icon name={name} size={20} color={color ?? theme.colors.accent} />
     </View>
   );
 }
@@ -251,12 +271,6 @@ const styles = StyleSheet.create((theme) => ({
   label: {
     ...theme.type.bodyStrong,
     color: theme.colors.text,
-  },
-  danger: {
-    color: theme.colors.problem,
-  },
-  disabled: {
-    color: theme.colors.textDisabled,
   },
   hint: {
     ...theme.type.caption,
