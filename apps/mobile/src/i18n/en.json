@@ -35,7 +35,7 @@
     },
     "local": {
       "title": "Pass-and-play",
-      "subtitle": "2 players, 1 phone"
+      "subtitle": "2 players, 1 device"
     },
     "friend": {
       "title": "Play a friend",
@@ -54,7 +54,7 @@
     },
     "friends": {
       "title": "Friends",
-      "subtitle": "Add and invite",
+      "subtitle": "Find friends",
       "requests_one": "{{count}} friend request",
       "requests_other": "{{count}} friend requests"
     },

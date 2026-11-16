@@ -208,7 +208,7 @@ describe('<HomeScreen />', () => {
   it('shows the friend requests waiting on the Friends tile (#517)', async () => {
     const props = { ...setup(), onFriends: jest.fn() };
     const { rerender } = await render(<HomeScreen {...props} friendRequests={0} />);
-    expect(screen.getByRole('button', { name: 'Friends, Add and invite' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Friends, Find friends' })).toBeOnTheScreen();
     await rerender(<HomeScreen {...props} friendRequests={1} />);
     expect(screen.getByRole('button', { name: 'Friends, 1 friend request' })).toBeOnTheScreen();
     await rerender(<HomeScreen {...props} friendRequests={3} />);
@@ -226,7 +226,7 @@ describe('<HomeScreen />', () => {
     const onRatings = jest.fn();
     await render(<HomeScreen {...setup()} onFriends={onFriends} onRatings={onRatings} />);
 
-    await user.press(screen.getByRole('button', { name: 'Friends, Add and invite' }));
+    await user.press(screen.getByRole('button', { name: 'Friends, Find friends' }));
     expect(onFriends).toHaveBeenCalledTimes(1);
     await user.press(screen.getByRole('button', { name: 'Leaderboards, Your rating' }));
     expect(onRatings).toHaveBeenCalledTimes(1);
