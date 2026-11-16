@@ -35,7 +35,7 @@ import {
   inviteHref,
   inviteWaitHref,
   newGameHref,
-  rulesHref,
+  HOW_TO_PLAY_HREF,
   tutorialHref,
 } from '@/features/match/routes';
 import type { SavedMatch } from '@/features/match/savedMatch';
@@ -255,7 +255,7 @@ export default function HomeRoute() {
       onSettings={() => router.push('/settings')}
       onWhatsNew={() => router.push(WHATS_NEW_HREF)}
       whatsNewFresh={whatsNewFresh}
-      onHowToPlay={() => router.push(rulesHref('portes'))}
+      onHowToPlay={() => router.push(HOW_TO_PLAY_HREF)}
       onHistory={() => router.push('/history')}
       // Online play needs the server: a build without one shows "Coming soon".
       onPlayFriend={invites === undefined ? undefined : () => router.push(FRIEND_HREF)}

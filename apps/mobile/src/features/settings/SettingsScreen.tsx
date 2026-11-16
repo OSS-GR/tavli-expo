@@ -1,4 +1,4 @@
-import type { AuthProvider, TutorialGame, Usernames } from '@tavli/contracts';
+import type { AuthProvider, Usernames } from '@tavli/contracts';
 import { getTheme } from '@tavli/themes';
 import Constants from 'expo-constants';
 import { useState } from 'react';
@@ -13,7 +13,6 @@ import type { TurnPushes } from '@/features/notifications/turnPushes';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 import { PRIVACY_POLICY_URL } from '@/features/privacy/consent';
 import { useConsent } from '@/features/privacy/consentStore';
-import { TutorialSettings } from '@/features/tutorial/TutorialSettings';
 import { whatsNewSeen } from '@/features/whats-new/seen';
 import { appBuild } from '@/services';
 
@@ -40,12 +39,7 @@ export interface SettingsScreenProps {
   onBack?: () => void;
   /** Opens a sub-page of Settings. */
   onPage?: (page: SettingsPageId) => void;
-  /**
-   * Opens the lessons of a game (#128, #159): "Learn to play" lets the
-   * player pick Portes, Plakoto, Fevga or Asodio.
-   */
-  onLearnToPlay?: (game: TutorialGame) => void;
-  /** Opens How to play (the rules pages). */
+  /** Opens How to play: every game's lessons and rules (#571). */
   onHowToPlay?: () => void;
   /** Opens the match history (#142). The History rows show only with it. */
   onHistory?: () => void;
@@ -83,7 +77,6 @@ export interface SettingsScreenProps {
 export function SettingsScreen({
   onBack,
   onPage,
-  onLearnToPlay,
   onHowToPlay,
   onHistory,
   onWhatsNew,
@@ -215,15 +208,15 @@ export function SettingsScreen({
         </SectionCard>
       ) : null}
 
-      {onLearnToPlay || onHowToPlay || onWhatsNew ? (
+      {onHowToPlay || onWhatsNew ? (
         <SectionCard title={t('settings.sections.help')}>
-          {onLearnToPlay ? <TutorialSettings onOpen={onLearnToPlay} /> : null}
           {onHowToPlay ? (
             <SectionRow
               testID="settings-how-to-play"
               icon="book"
               iconLook="bare"
               label={t('settings.howToPlay')}
+              hint={t('settings.howToPlayHint')}
               onPress={onHowToPlay}
             />
           ) : null}

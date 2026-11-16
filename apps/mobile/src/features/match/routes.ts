@@ -37,12 +37,25 @@ export function firstGameHref(game: TutorialGame = 'portes') {
  * The tutorial, opened from Home, a rules page, Settings (#128) or the
  * empty History (#521).
  * `game` picks the lesson set (#149, #159); Portes, the default, has no param.
+ * `start` (0-based, #571) opens a later lesson: Continue on How to play.
  */
-export function tutorialHref(from: TutorialSource, game: TutorialGame = 'portes') {
-  return game === 'portes'
-    ? ({ pathname: '/tutorial', params: { from } } as const)
-    : ({ pathname: '/tutorial', params: { from, game } } as const);
+export function tutorialHref(from: TutorialSource, game: TutorialGame = 'portes', start = 0) {
+  const params = {
+    from,
+    ...(game === 'portes' ? {} : { game }),
+    ...(start > 0 ? { start: String(start) } : {}),
+  };
+  return { pathname: '/tutorial', params } as const;
 }
+
+/** The first lesson to show: the `start` param, or 0 when it is missing or out of range. */
+export function parseTutorialStart(value: Param, count: number): number {
+  const n = Number(first(value));
+  return Number.isInteger(n) && n > 0 && n < count ? n : 0;
+}
+
+/** How to play (#571): the hub with every game's lessons and rules. */
+export const HOW_TO_PLAY_HREF = '/rules';
 
 /** A local match id (`local-…`). Any other id names an online game (#255). */
 export function isLocalGameId(id: string): boolean {

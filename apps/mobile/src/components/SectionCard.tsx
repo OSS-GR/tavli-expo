@@ -86,6 +86,8 @@ export interface SectionRowProps {
   label: string;
   /** One short line under the label. It may wrap. */
   hint?: string;
+  /** More under the hint, for example a progress line (How to play, #571). */
+  below?: ReactNode;
   /** A short value on the right, for example "Normal". */
   value?: string;
   /** A Lucide icon on the left: in a small dark badge, or bare (`iconLook`). */
@@ -125,6 +127,7 @@ export interface SectionRowProps {
 export function SectionRow({
   label,
   hint,
+  below,
   value,
   icon,
   iconLook = 'badge',
@@ -156,6 +159,7 @@ export function SectionRow({
       <View style={styles.texts}>
         <Text style={[styles.label, { color: colors.label }]}>{label}</Text>
         {hint ? <Text style={[styles.hint, { color: colors.hint }]}>{hint}</Text> : null}
+        {below}
       </View>
       {right ?? (value ? <Text style={styles.value}>{value}</Text> : null)}
       {onPress && chevron ? <Icon name="chevronRight" size={18} color={colors.chevron} /> : null}

@@ -3,6 +3,8 @@ import { createMemoryStorage, createRecordingAnalytics, type Analytics } from '@
 import {
   TUTORIAL_STORAGE_KEY,
   createTutorialStore,
+  lessonsLearnt,
+  lessonsOffer,
   offersTutorial,
   statusOf,
   tutorialStorageKey,
@@ -189,5 +191,51 @@ describe('tutorial analytics', () => {
     expect(() => run(analytics)).not.toThrow();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe('lessons learnt (#571)', () => {
+  it('saves the lessons learnt in a row, keeps the status, and loads it again', () => {
+    const storage = createMemoryStorage();
+    const store = createTutorialStore(storage);
+    store.getState().learn('fevga', 1);
+    store.getState().learn('fevga', 2);
+    store.getState().learn('fevga', 1);
+    expect(store.getState().learnt.fevga).toBe(2);
+    expect(statusOf(store.getState(), 'fevga')).toBe('new');
+    expect(JSON.parse(storage.getString('tutorial.fevga') ?? '')).toEqual({
+      version: 1,
+      status: 'new',
+      learnt: 2,
+    });
+    store.getState().dismiss('fevga');
+    const again = createTutorialStore(storage).getState();
+    expect(again.learnt).toEqual({ portes: 0, plakoto: 0, fevga: 2, asodio: 0 });
+    expect(statusOf(again, 'fevga')).toBe('dismissed');
+  });
+
+  it('counts a lesson only right after the ones before it', () => {
+    const store = createTutorialStore(createMemoryStorage());
+    store.getState().learn('plakoto', 3);
+    expect(store.getState().learnt.plakoto).toBe(0);
+  });
+
+  it.each(['{"status":"new","learnt":-1}', '{"status":"new","learnt":1.5}', '{"learnt":"2"}'])(
+    'loads a bad count (%s) as 0',
+    (raw) => {
+      const storage = createMemoryStorage();
+      storage.setString(TUTORIAL_STORAGE_KEY, raw);
+      expect(createTutorialStore(storage).getState().learnt.portes).toBe(0);
+    },
+  );
+
+  it('offers Start, Continue at the next lesson, or Play again', () => {
+    expect(lessonsOffer('new', 0, 4)).toEqual({ kind: 'start' });
+    expect(lessonsOffer('dismissed', 0, 4)).toEqual({ kind: 'start' });
+    expect(lessonsOffer('new', 1, 4)).toEqual({ kind: 'continue', next: 1 });
+    expect(lessonsOffer('new', 4, 4)).toEqual({ kind: 'again' });
+    expect(lessonsOffer('done', 2, 4)).toEqual({ kind: 'again' });
+    expect(lessonsLearnt('done', 0, 4)).toBe(4);
+    expect(lessonsLearnt('new', 9, 4)).toBe(4);
   });
 });

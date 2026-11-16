@@ -252,11 +252,6 @@
     },
     "privacyPolicy": "Privacy policy",
     "version": "Tavlaki {{version}}",
-    "learnToPlay": "Learn to play",
-    "learnToPlayPicker": {
-      "title": "Learn to play",
-      "body": "Pick a game. Each one has a few short lessons on the board."
-    },
     "history": {
       "open": "Match history",
       "clear": "Clear history",
@@ -305,6 +300,7 @@
       "title": "Usage data"
     },
     "howToPlay": "How to play",
+    "howToPlayHint": "Lessons and rules for each game",
     "soon": "Soon",
     "accountCard": {
       "offline": "No online account",
@@ -1131,6 +1127,11 @@
         "title": "A roomier game screen",
         "body": "Both players sit together above the board, and the buttons are round and centered under it. Turn the phone and the board keeps its size.",
         "where": "Any game"
+      },
+      "howToPlay": {
+        "title": "How to play, in one place",
+        "body": "Every game has one page: its short lessons on the board on top, then the rules. The lessons you finished are kept, so Continue picks up where you stopped.",
+        "where": "Home › How to play, or Settings › Help"
       }
     }
   },
@@ -1765,6 +1766,29 @@
         "title": "This game: American rules",
         "body": "This game plays Acey-Deucey with the American rules. They change the page below:\nYou hit, you do not pin. A lone checker that is hit goes out, to the middle of the board, and enters again in your starting quarter.\nThe board is open from the start: any roll can enter checkers. Checkers on the board may move before all 15 are in, and no quarter freezes.\nAfter a 1-2 you play the 1 and the 2, then choose any double and play it, then roll again.\nThe winner gets 1 point for each checker the loser has not borne off.\nYou cannot bear off while a checker is still outside the board."
       }
+    },
+    "sectionTitle": "Rules",
+    "lessons": {
+      "none": "{{total}} short lessons on the board",
+      "someDone": "{{total}} short lessons on the board · {{learnt}} done",
+      "allDone": "{{total}} short lessons on the board · all done",
+      "start": "Start the lessons",
+      "continue": "Continue the lessons",
+      "again": "Play the lessons again"
+    },
+    "hub": {
+      "title": "How to play",
+      "tavli": "A Tavli match",
+      "none": "{{total}} lessons",
+      "some": "{{learnt}} of {{total}} lessons",
+      "done": "Lessons done",
+      "blurb": {
+        "tavli": "Portes, Plakoto and Fevga in turn",
+        "portes": "Hit and block with doors",
+        "plakoto": "Pin, do not hit",
+        "fevga": "A race: no hitting, no pinning",
+        "asodio": "One army, quarter by quarter"
+      }
     }
   },
   "time": {
@@ -1780,9 +1804,8 @@
     "title": "Learn to play",
     "progress": "Lesson {{step}} of {{count}}",
     "skip": "Skip",
-    "skipHint": "Leave the lesson. You can open it again from Settings.",
+    "skipHint": "Leave the lesson. You can open it again from How to play.",
     "next": "Next",
-    "openFromRules": "Learn to play on the board",
     "lessons": {
       "move": {
         "title": "Move a checker",
@@ -1927,21 +1950,21 @@
     "games": {
       "plakoto": {
         "title": "Learn Plakoto",
-        "skipHint": "Leave the lesson. You can open it again from Settings or the Plakoto rules page.",
+        "skipHint": "Leave the lesson. You can open it again from How to play.",
         "endTitle": "You know Plakoto!",
         "endBody": "Now play a game of Plakoto against the Easy bot. The rules page has the rest.",
         "play": "Play Plakoto"
       },
       "fevga": {
         "title": "Learn Fevga",
-        "skipHint": "Leave the lesson. You can open it again from Settings or the Fevga rules page.",
+        "skipHint": "Leave the lesson. You can open it again from How to play.",
         "endTitle": "You know Fevga!",
         "endBody": "Now play a game of Fevga against the Easy bot. The rules page has the rest.",
         "play": "Play Fevga"
       },
       "asodio": {
         "title": "Learn Asodio",
-        "skipHint": "Leave the lesson. You can open it again from Settings or the Asodio rules page.",
+        "skipHint": "Leave the lesson. You can open it again from How to play.",
         "endTitle": "You know Asodio!",
         "endBody": "Now play a game of Asodio against the Easy bot. The rules page has the rest.",
         "play": "Play Asodio"

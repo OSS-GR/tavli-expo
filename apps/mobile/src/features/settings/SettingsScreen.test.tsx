@@ -40,7 +40,6 @@ function allProps(): Required<Omit<SettingsScreenProps, 'turnPushes' | 'visit'>>
   return {
     onBack: jest.fn(),
     onPage: jest.fn(),
-    onLearnToPlay: jest.fn(),
     onHowToPlay: jest.fn(),
     onHistory: jest.fn(),
     onWhatsNew: jest.fn(),
@@ -204,53 +203,13 @@ describe('<SettingsScreen /> index', () => {
     expect(screen.getByRole('button', { name: 'Δεδομένα χρήσης, Κλειστό' })).toBeOnTheScreen();
   });
 
-  it.each([
-    ['Portes', 'portes'],
-    ['Plakoto', 'plakoto'],
-    ['Fevga', 'fevga'],
-    ['Asodio', 'asodio'],
-  ] as const)('Help → Learn to play lets the player pick %s (#159)', async (label, game) => {
+  it('Help → How to play opens the hub (#571)', async () => {
     const user = userEvent.setup();
-    const onLearnToPlay = jest.fn();
-    await render(<SettingsScreen onLearnToPlay={onLearnToPlay} />);
-    expect(screen.queryByTestId('tutorial-picker')).not.toBeOnTheScreen();
-
-    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
-    const picker = within(screen.getByTestId('tutorial-picker'));
-    expect(picker.getByRole('header', { name: 'Learn to play' })).toBeOnTheScreen();
-    await user.press(picker.getByRole('button', { name: label }));
-
-    expect(onLearnToPlay).toHaveBeenCalledTimes(1);
-    expect(onLearnToPlay).toHaveBeenCalledWith(game);
-    expect(screen.queryByTestId('tutorial-picker')).not.toBeOnTheScreen();
-  });
-
-  it('closes the game picker with Cancel, and opens nothing', async () => {
-    const user = userEvent.setup();
-    const onLearnToPlay = jest.fn();
-    await render(<SettingsScreen onLearnToPlay={onLearnToPlay} />);
-    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
-    await user.press(
-      within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Cancel' }),
-    );
-    expect(screen.queryByTestId('tutorial-picker')).not.toBeOnTheScreen();
-    expect(onLearnToPlay).not.toHaveBeenCalled();
-  });
-
-  it('names the games in Greek in the picker', async () => {
-    const user = userEvent.setup();
-    await act(async () => {
-      settingsStore.setState({ language: 'el' });
-    });
-    await render(<SettingsScreen onLearnToPlay={jest.fn()} />);
-    await user.press(screen.getByRole('button', { name: 'Μάθε να παίζεις' }));
-    const picker = within(screen.getByTestId('tutorial-picker'));
-    for (const name of ['Πόρτες', 'Πλακωτό', 'Φεύγα', 'Ασόδυο', 'Άκυρο']) {
-      expect(picker.getByRole('button', { name })).toBeOnTheScreen();
-    }
-    await act(async () => {
-      settingsStore.setState({ language: 'system' });
-    });
+    const onHowToPlay = jest.fn();
+    await render(<SettingsScreen onHowToPlay={onHowToPlay} />);
+    expect(screen.queryByText('Learn to play')).not.toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'How to play' }));
+    expect(onHowToPlay).toHaveBeenCalledTimes(1);
   });
 });
 

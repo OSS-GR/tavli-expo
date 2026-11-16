@@ -3,6 +3,7 @@ import { checkersAt, totalCheckers } from '@tavli/engine';
 
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import { LESSON_SETS } from '@/features/tutorial/lessons';
 import i18n from '@/i18n';
 import el from '@/i18n/el.json';
 import en from '@/i18n/en.json';
@@ -102,10 +103,13 @@ describe('rules texts', () => {
       'rules.picture.label',
       'rules.picture.caption',
       'rules.picture.captionMirrored',
+      'rules.sectionTitle',
     ]) {
       used.add(key);
     }
-    expect(enRules.filter((key) => !used.has(key))).toEqual([]);
+    // The hub and the lessons card (#571) have their own groups and tests.
+    const own = (key: string) => key.startsWith('rules.hub.') || key.startsWith('rules.lessons.');
+    expect(enRules.filter((key) => !used.has(key) && !own(key))).toEqual([]);
   });
 });
 
@@ -176,18 +180,65 @@ describe('<RulesScreen />', () => {
   });
 
   it.each(['portes', 'plakoto', 'fevga', 'asodio'] as const)(
-    'offers the lessons of %s on its page (#128, #149, #159)',
+    'offers the lessons of %s on top of its page (#128, #149, #159, #571)',
     async (game) => {
-      const onLearnToPlay = jest.fn();
+      const onOpen = jest.fn();
       await render(
-        <RulesScreen variant={game} onOpenRules={jest.fn()} onLearnToPlay={onLearnToPlay} />,
+        <RulesScreen
+          variant={game}
+          onOpenRules={jest.fn()}
+          lessons={{ progress: () => ({ status: 'new', learnt: 0 }), onOpen }}
+        />,
       );
-      await userEvent
-        .setup()
-        .press(screen.getByRole('button', { name: 'Learn to play on the board' }));
-      expect(onLearnToPlay).toHaveBeenCalledWith(game);
+      const count = LESSON_SETS[game].length;
+      expect(screen.getByTestId('rules-lessons-line')).toHaveTextContent(
+        `${count} short lessons on the board`,
+      );
+      expect(screen.getByRole('header', { name: 'Rules' })).toBeOnTheScreen();
+      await userEvent.setup().press(screen.getByRole('button', { name: 'Start the lessons' }));
+      expect(onOpen).toHaveBeenCalledWith(game, 0);
     },
   );
+
+  it.each([
+    [
+      { status: 'new', learnt: 2 },
+      '7 short lessons on the board · 2 done',
+      'Continue the lessons',
+      2,
+    ],
+    [
+      { status: 'dismissed', learnt: 3 },
+      '7 short lessons on the board · 3 done',
+      'Continue the lessons',
+      3,
+    ],
+    [
+      { status: 'done', learnt: 0 },
+      '7 short lessons on the board · all done',
+      'Play the lessons again',
+      0,
+    ],
+    [
+      { status: 'new', learnt: 7 },
+      '7 short lessons on the board · all done',
+      'Play the lessons again',
+      0,
+    ],
+  ] as const)('with %o says "%s" and offers %s (#571)', async (progress, line, button, start) => {
+    expect(LESSON_SETS.portes).toHaveLength(7);
+    const onOpen = jest.fn();
+    await render(
+      <RulesScreen
+        variant="portes"
+        onOpenRules={jest.fn()}
+        lessons={{ progress: () => progress, onOpen }}
+      />,
+    );
+    expect(screen.getByTestId('rules-lessons-line')).toHaveTextContent(line);
+    await userEvent.setup().press(screen.getByRole('button', { name: button }));
+    expect(onOpen).toHaveBeenCalledWith('portes', start);
+  });
 
   it.each([
     ['asodio', 'asodio.aceyDeuceyGreek', 'This game: Greek rules'],
@@ -253,9 +304,13 @@ describe('<RulesScreen />', () => {
 
   it.each(['tavli'] as const)('has no lessons on the %s page', async (variant) => {
     await render(
-      <RulesScreen variant={variant} onOpenRules={jest.fn()} onLearnToPlay={jest.fn()} />,
+      <RulesScreen
+        variant={variant}
+        onOpenRules={jest.fn()}
+        lessons={{ progress: () => ({ status: 'new', learnt: 0 }), onOpen: jest.fn() }}
+      />,
     );
-    expect(screen.queryByTestId('rules-learn-to-play')).not.toBeOnTheScreen();
+    expect(screen.queryByTestId('rules-lessons')).not.toBeOnTheScreen();
   });
 
   it('has the sections the issue asks for', () => {
