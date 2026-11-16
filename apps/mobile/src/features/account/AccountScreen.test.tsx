@@ -102,20 +102,29 @@ async function dialogFrom(user: ReturnType<typeof setupUser>, row: string) {
   return within(screen.getByTestId('account-dialog'));
 }
 
-describe('Settings → Account row', () => {
-  it('shows in a build with online play, also on a phone that never played online', async () => {
+describe('Settings → Account', () => {
+  it('has only the card on top, no Account row under Online (#561)', async () => {
     const user = setupUser();
     const onAccount = jest.fn();
-    await renderWithRoot(<SettingsScreen onAccount={onAccount} onBlocked={jest.fn()} />);
+    await renderWithRoot(
+      <SettingsScreen
+        onAccount={onAccount}
+        account={{ auth: auth!, usernames: usernames! }}
+        onBlocked={jest.fn()}
+      />,
+    );
     expect(screen.queryByTestId('settings-blocked')).toBeNull();
-    await user.press(screen.getByRole('button', { name: 'Account' }));
+    expect(screen.queryByRole('button', { name: 'Account' })).toBeNull();
+    // Nothing else to show under Online on a phone that never played online.
+    expect(screen.queryByText('Online')).toBeNull();
+    await user.press(screen.getByTestId('settings-account-card'));
     expect(onAccount).toHaveBeenCalledTimes(1);
   });
 
   it('is hidden in a build with no online play, and no delete row is left in Privacy', async () => {
     rememberOnlineAccount();
     await renderWithRoot(<SettingsScreen />);
-    expect(screen.queryByTestId('settings-account')).toBeNull();
+    expect(screen.queryByTestId('settings-account-card')).toBeNull();
     expect(screen.queryByText(/Delete my online data/)).toBeNull();
   });
 });
@@ -316,11 +325,9 @@ describe('<AccountScreen /> as a guest', () => {
     expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
     expect(onlineFake.authStore.session).toEqual({ id: 'guest-1', isGuest: false });
     expect(onlineFake.authStore.keys).toEqual({ 'apple:apple-1': 'guest-1' });
-    // The one key has no Remove, and says why (#561).
+    // The one key has no Remove and no line about it (#561).
     expect(screen.queryByTestId('account-key-apple-remove')).toBeNull();
-    expect(
-      screen.getByText('Your only way to sign in, so it cannot be removed.'),
-    ).toBeOnTheScreen();
+    expect(screen.queryByText(/cannot be removed/)).toBeNull();
     // With no username yet, the guest name it had.
     expect(screen.getByTestId('account-saved')).toHaveAccessibleName(
       /^Guest \d{4}\. Signed in with Apple\.$/,

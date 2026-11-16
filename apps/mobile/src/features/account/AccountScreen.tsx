@@ -481,22 +481,21 @@ function Saved({
               testID={`account-key-${provider}`}
               icon={provider === 'email' ? 'mail' : 'keyRound'}
               label={t(`account.keyName.${provider}`)}
-              // The last way to sign in has no Remove, and says why.
-              {...(lastKey
-                ? { hint: t('account.saved.lastKey') }
-                : {
-                    right: (
-                      <ActionButton
-                        testID={`account-key-${provider}-remove`}
-                        kind="secondary"
-                        size="small"
-                        disabled={busy}
-                        label={t('account.saved.remove')}
-                        accessibilityLabel={t('account.saved.removeLabel', { provider: name })}
-                        onPress={() => account.removeKey(provider)}
-                      />
-                    ),
-                  })}
+              // The last way to sign in has no Remove and no line: a second
+              // way (Apple) brings Remove to both rows (#561).
+              right={
+                lastKey ? undefined : (
+                  <ActionButton
+                    testID={`account-key-${provider}-remove`}
+                    kind="secondary"
+                    size="small"
+                    disabled={busy}
+                    label={t('account.saved.remove')}
+                    accessibilityLabel={t('account.saved.removeLabel', { provider: name })}
+                    onPress={() => account.removeKey(provider)}
+                  />
+                )
+              }
             />
           );
         })}

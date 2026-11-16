@@ -69,6 +69,8 @@ describe('<SettingsScreen /> index', () => {
   });
 
   it('groups the rows: Play, Online, Help and Privacy, then the version', async () => {
+    // Online has rows only on a phone that played online (#561).
+    rememberOnlineAccount();
     await render(<SettingsScreen {...allProps()} />);
 
     for (const name of ['Play', 'Online', 'Help', 'Privacy']) {
@@ -138,8 +140,6 @@ describe('<SettingsScreen /> index', () => {
     expect(props.onHowToPlay).toHaveBeenCalledTimes(1);
     await user.press(screen.getByRole('button', { name: "What's new" }));
     expect(props.onWhatsNew).toHaveBeenCalledTimes(1);
-    await user.press(screen.getByRole('button', { name: 'Account' }));
-    expect(props.onAccount).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('link', { name: 'Privacy policy' })).toBeOnTheScreen();
   });
 
@@ -195,6 +195,7 @@ describe('<SettingsScreen /> index', () => {
     await act(async () => {
       await i18n.changeLanguage('el');
     });
+    rememberOnlineAccount();
     await render(<SettingsScreen {...allProps()} />);
     for (const name of ['Παιχνίδι', 'Online', 'Βοήθεια', 'Απόρρητο']) {
       expect(screen.getByRole('header', { name })).toBeOnTheScreen();

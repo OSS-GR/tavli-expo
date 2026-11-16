@@ -265,10 +265,6 @@
       "confirmBody": "This deletes the list and the stats of your past matches on this phone. You cannot undo it.",
       "confirm": "Clear"
     },
-    "account": {
-      "label": "Account",
-      "hint": "Sign-in, username and your online data"
-    },
     "friends": {
       "label": "Friends",
       "hint": "Add friends and invite them to a game"
@@ -350,7 +346,6 @@
       "username": "Username",
       "usernameNone": "Pick one",
       "keys": "Ways to sign in",
-      "lastKey": "Your only way to sign in, so it cannot be removed.",
       "remove": "Remove",
       "removeLabel": "Remove {{provider}}",
       "add": "Add {{provider}}",

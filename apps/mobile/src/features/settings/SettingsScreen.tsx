@@ -175,18 +175,10 @@ export function SettingsScreen({
         {onHistory ? <HistorySettings onOpen={onHistory} /> : null}
       </SectionCard>
 
-      {onAccount || turnPushes ? (
+      {/* The account card on top opens Account, so Online has no Account
+          row (#561); with no row left, no section. */}
+      {turnPushes || (usedOnline && (onFriends || onRatings || onBlocked)) ? (
         <SectionCard title={t('settings.sections.online')}>
-          {onAccount ? (
-            <SectionRow
-              testID="settings-account"
-              icon="user"
-              iconLook="bare"
-              label={t('settings.account.label')}
-              hint={t('settings.account.hint')}
-              onPress={onAccount}
-            />
-          ) : null}
           {onFriends && usedOnline ? (
             <SectionRow
               testID="settings-friends"
