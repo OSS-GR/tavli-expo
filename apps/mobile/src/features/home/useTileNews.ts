@@ -27,14 +27,30 @@ export interface TileNews {
 export const NO_TILE_NEWS: TileNews = { friendRequests: 0 };
 
 /**
- * One load's answer: each part that loaded, or `null` when there is no saved
- * account (no news at all). A part that failed is left out.
+ * One load's answer: whose news it is (`null`: nobody, or a guest) and each
+ * part that loaded. A part that failed is left out.
  */
-export type TileNewsUpdate = Partial<TileNews> | null;
+export interface TileNewsLoad {
+  readonly user: string | null;
+  readonly update: Partial<TileNews>;
+}
 
-/** The news after a load: a part left out of the update keeps its old value. */
-export function applyTileNews(news: TileNews, update: TileNewsUpdate): TileNews {
-  return update === null ? NO_TILE_NEWS : { ...news, ...update };
+/** The news on show and whose it is. */
+export interface ShownTileNews {
+  readonly user: string | null;
+  readonly news: TileNews;
+}
+
+export const NO_SHOWN_NEWS: ShownTileNews = { user: null, news: NO_TILE_NEWS };
+
+/**
+ * The news after a load. A part left out of the update keeps its old value,
+ * but only for the same user: another user starts from no news, so a failed
+ * call never shows the last user's rating.
+ */
+export function applyTileNews(shown: ShownTileNews, load: TileNewsLoad): ShownTileNews {
+  const base = load.user !== null && load.user === shown.user ? shown.news : NO_TILE_NEWS;
+  return { user: load.user, news: { ...base, ...load.update } };
 }
 
 /** Loads the news once. Each part that fails is left out. */
@@ -42,20 +58,25 @@ export async function loadTileNews(
   auth: AuthProvider,
   ratings: Ratings | undefined,
   friends: Friends | undefined,
-): Promise<TileNewsUpdate> {
+): Promise<TileNewsLoad> {
   // `loadSession()`, not `ready()`: a rejection is no network and keeps
   // what shows; `null` is a real sign-out (#297).
   const user = await auth.loadSession();
-  if (user === null || user.isGuest) return null;
+  if (user === null || user.isGuest) return { user: null, update: {} };
   const [mine, requests] = await Promise.allSettled([
     ratings ? ratings.mine() : Promise.reject(new Error('no ratings')),
     friends ? friends.listRequests() : Promise.reject(new Error('no friends')),
   ]);
   return {
-    ...(mine.status === 'fulfilled'
-      ? { rating: mine.value.matches > 0 ? mine.value.rating : null }
-      : {}),
-    ...(requests.status === 'fulfilled' ? { friendRequests: requests.value.incoming.length } : {}),
+    user: user.id,
+    update: {
+      ...(mine.status === 'fulfilled'
+        ? { rating: mine.value.matches > 0 ? mine.value.rating : null }
+        : {}),
+      ...(requests.status === 'fulfilled'
+        ? { friendRequests: requests.value.incoming.length }
+        : {}),
+    },
   };
 }
 
@@ -77,7 +98,7 @@ export function useTileNews({
   enabled,
   focused,
 }: TileNewsOptions): TileNews {
-  const [news, setNews] = useState<TileNews>(NO_TILE_NEWS);
+  const [shown, setShown] = useState<ShownTileNews>(NO_SHOWN_NEWS);
   // Only the newest load may set the news.
   const loads = useRef(0);
   const active = enabled && auth !== undefined && (ratings !== undefined || friends !== undefined);
@@ -86,8 +107,18 @@ export function useTileNews({
   const [wasActive, setWasActive] = useState(active);
   if (wasActive !== active) {
     setWasActive(active);
-    if (!active) setNews(NO_TILE_NEWS);
+    if (!active) setShown(NO_SHOWN_NEWS);
   }
+
+  // Another user signed in (also while Home is out of view): forget the
+  // last user's news at once.
+  useEffect(() => {
+    if (auth === undefined) return;
+    return auth.onChange((user) => {
+      const id = user?.id ?? null;
+      setShown((last) => (last.user === id ? last : NO_SHOWN_NEWS));
+    });
+  }, [auth]);
 
   useEffect(() => {
     if (!focused) return;
@@ -95,8 +126,8 @@ export function useTileNews({
     const n = loads.current;
     if (!active || auth === undefined) return;
     loadTileNews(auth, ratings, friends).then(
-      (update) => {
-        if (n === loads.current) setNews((news) => applyTileNews(news, update));
+      (load) => {
+        if (n === loads.current) setShown((last) => applyTileNews(last, load));
       },
       // The session did not load (no network): keep what shows.
       () => {},
@@ -108,5 +139,5 @@ export function useTileNews({
   }, [auth, ratings, friends, active, focused]);
 
   // With no online account (a sign-out on another screen), no news.
-  return active ? news : NO_TILE_NEWS;
+  return active ? shown.news : NO_TILE_NEWS;
 }

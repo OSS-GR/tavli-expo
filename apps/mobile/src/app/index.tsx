@@ -48,9 +48,6 @@ import { useTutorial } from '@/features/tutorial/store';
 import { whatsNewSeen } from '@/features/whats-new/seen';
 import { auth, botLevels, friends, games, invites, matchmaking, ratings } from '@/services';
 
-/** How often the invite hero's time left updates. */
-const INVITE_HERO_TICK_MS = INVITE_TICK_MS;
-
 interface SlotState {
   readonly saved: SavedMatch | null;
   readonly broken: boolean;
@@ -119,11 +116,7 @@ export default function HomeRoute() {
   const heroGame = pick.kind === 'turn' || pick.kind === 'waiting' ? pick.game : null;
   // The hero's clock and the invite's ticks while Home is in view.
   const heroNow = usePhoneClock(
-    heroGame !== null
-      ? listTickMs([heroGame])
-      : pick.kind === 'invite'
-        ? INVITE_HERO_TICK_MS
-        : null,
+    heroGame !== null ? listTickMs([heroGame]) : pick.kind === 'invite' ? INVITE_TICK_MS : null,
     focused,
   );
   const savedSummary = saved ? continueSummary(saved, t, slot.now) : null;
