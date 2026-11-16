@@ -5,6 +5,7 @@
  * medallion, one sentence and one action. It only decorates: screen
  * readers skip it.
  *
+ * `large` leads the welcome consent step (Figma frame 12, #520): 132 pt.
  * `small` is the trophy medallion of match end (#515): 96 pt, a 62 pt
  * ring and a 32 pt icon.
  */
@@ -14,12 +15,13 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Icon } from './Icon';
 import type { IconName } from './icons';
 
-export type MedallionSize = 'regular' | 'small';
+export type MedallionSize = 'regular' | 'small' | 'large';
 
 /** Face, ring and icon sizes in points. */
 const SIZES = {
   regular: { face: 110, ring: 72, icon: 36 },
   small: { face: 96, ring: 62, icon: 32 },
+  large: { face: 132, ring: 84, icon: 40 },
 } as const;
 
 export interface EmptyMedallionProps {
