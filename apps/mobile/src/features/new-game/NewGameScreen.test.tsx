@@ -441,7 +441,7 @@ describe('<NewGameScreen /> house rules (#207)', () => {
     try {
       const { ui } = show('bot');
       await render(ui);
-      expect(screen.getByRole('header', { name: 'Κανόνες καφενείου' })).toBeOnTheScreen();
+      expect(screen.getByRole('header', { name: 'Κανόνες παρέας' })).toBeOnTheScreen();
       expect(screen.getByText('Πρώτη ζαριά')).toBeOnTheScreen();
       for (const name of ['Κανονικά', 'Ξαναρίχνει', 'Διαλέγουμε']) {
         expect(screen.getByRole('radio', { name: `Πρώτη ζαριά: ${name}` })).toBeOnTheScreen();
@@ -568,7 +568,7 @@ describe('<NewGameScreen /> rules version (#241)', () => {
       await render(ui);
       await user.press(screen.getByRole('radio', { name: /^Πλακωτό/ }));
       expect(screen.queryByTestId('new-game-rules-version')).toBeNull();
-      await user.press(screen.getByRole('radio', { name: /^Ασόδιο/ }));
+      await user.press(screen.getByRole('radio', { name: /^Ασόδυο/ }));
       expect(screen.getByText('Παραλλαγή')).toBeOnTheScreen();
       expect(versions()).toHaveProp('accessibilityLabel', 'Παραλλαγή');
       for (const name of ['Κανονική', 'Ελληνική', 'Αμερικάνικη']) {
