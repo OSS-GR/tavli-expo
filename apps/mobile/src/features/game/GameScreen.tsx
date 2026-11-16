@@ -1990,8 +1990,12 @@ export function GameScreen({
   // dice went blank after the menu or Settings (#173).
   const hideScreen = covered || endSheet !== null;
   const hideBoard = card !== null;
-  // "All dice used" shows only on the first few turns (#575).
-  const confirmHint = useConfirmHint(view.canConfirm && !blocked && !othersTurn, turnKey);
+  // "All dice used" shows only on the first few turns (#575). A turn under
+  // the menu or the game-end sheet does not count.
+  const confirmHint = useConfirmHint(
+    view.canConfirm && !blocked && !othersTurn && !hideScreen,
+    `${matchKey}:${turnKey}`,
+  );
   // "Doubles!" for a moment after the split. Another note over the board wins.
   // The value of the double names it: Greek says «Εξάρες!» for 6-6.
   const doubleValue = dice.length === 4 ? dice[0]?.value : undefined;

@@ -177,6 +177,16 @@ describe('<GameScreen /> "All dice used" note (#575)', () => {
     expect(screen.getByLabelText(/0 left to play/)).toBeOnTheScreen();
     expect(saved()).toBe(String(CONFIRM_HINT_TURNS));
   });
+
+  it('counts a bad saved value as done', async () => {
+    storage.setString(CONFIRM_HINT_KEY, 'oops');
+    reloadConfirmHintForTest();
+    await annMoves61();
+    await touch(PAN, [top(13, 5), point(7)]);
+    await touch(PAN, [top(8, 3), point(7)]);
+    expect(button('Confirm')).toBeEnabled();
+    expect(hint()).toBeNull();
+  });
 });
 
 describe('<GameScreen /> turn indicator', () => {

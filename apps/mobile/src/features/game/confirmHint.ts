@@ -30,8 +30,11 @@ interface ConfirmHintState {
 
 function readCount(): number {
   try {
-    const count = Number(storage.getString(CONFIRM_HINT_KEY));
-    return Number.isInteger(count) && count > 0 ? count : 0;
+    const saved = storage.getString(CONFIRM_HINT_KEY);
+    if (saved === undefined) return 0;
+    // A bad value counts as done: the note is only a nudge.
+    const count = Number(saved);
+    return Number.isInteger(count) && count >= 0 ? count : CONFIRM_HINT_TURNS;
   } catch {
     return 0;
   }
@@ -55,7 +58,7 @@ function noteShown(turnKey: string): void {
 /**
  * True when the note shows: `wanted` (all dice played, Confirm is yours)
  * on one of the first turns, or on the turn that already shows it.
- * `turnKey` names the turn (game and turn number).
+ * `turnKey` names the turn for the app run (match, game and turn number).
  */
 export function useConfirmHint(wanted: boolean, turnKey: string): boolean {
   const count = useStore(confirmHintStore, (s) => s.count);
