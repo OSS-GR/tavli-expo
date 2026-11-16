@@ -18,7 +18,7 @@ describe('pickFriends', () => {
       friend('new', 0, 0, 9),
       friend('some', 1, 0, 3),
     ];
-    expect(pickFriends(list).map((f) => f.playerId)).toEqual(['many', 'some', 'new', 'old']);
+    expect(pickFriends(list, 4).map((f) => f.playerId)).toEqual(['many', 'some', 'new', 'old']);
     // The list it was given stays as it was.
     expect(list[0]!.playerId).toBe('old');
   });

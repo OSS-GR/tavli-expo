@@ -94,15 +94,17 @@ describe('FriendSetupScreen', () => {
   it('says an online game needs a free account, and makes no account until "Make an invite"', async () => {
     const parts = setup();
     await open(parts);
-    expect(screen.getByRole('header', { name: 'Play a friend online' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Play a friend' })).toBeOnTheScreen();
     expect(
       screen.getByText(
         'An online game needs a free account. When you make the invite, you pick how you sign in: you can play as a guest, with no name and no email.',
       ),
     ).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: /^Portes/ })).toBeChecked();
-    expect(screen.getByText('First to 1 point')).toBeOnTheScreen();
-    expect(screen.getByText('No time limit: 24 hours per turn')).toBeOnTheScreen();
+    // One summary line under the pickers (#516).
+    expect(screen.getByTestId('friend-summary')).toHaveTextContent(
+      'First to 1 point · No time limit: 24 hours per turn.',
+    );
     expect(parts.authStore.guests).toBe(0);
   });
 
@@ -112,10 +114,11 @@ describe('FriendSetupScreen', () => {
     const { onCreated } = await open(parts);
     await user.press(screen.getByRole('radio', { name: /^Plakoto/ }));
     await user.press(screen.getByRole('radio', { name: '5' }));
-    expect(screen.getByText('First to 5 points')).toBeOnTheScreen();
-    expect(screen.getByText('No time limit: 24 hours per turn')).toBeOnTheScreen();
+    expect(screen.getByTestId('friend-summary')).toHaveTextContent(
+      'First to 5 points · No time limit: 24 hours per turn.',
+    );
 
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     expect(await screen.findByRole('header', { name: 'Play online' })).toBeOnTheScreen();
     expect(parts.authStore.guests).toBe(0);
     expect(onCreated).not.toHaveBeenCalled();
@@ -143,14 +146,14 @@ describe('FriendSetupScreen', () => {
     expect(JSON.stringify(parts.analytics.sent)).not.toContain(code);
     expect(JSON.stringify(parts.analytics.sent)).not.toContain('guest-1');
     // The route opens the waiting screen: the button stays off until then.
-    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Make an invite link' })).toBeDisabled();
   });
 
   it('makes the guest once: the next invite uses the saved session', async () => {
     const user = setupUser();
     const parts = setup();
     const first = await open(parts);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await user.press(await screen.findByRole('button', { name: 'Continue as a guest' }));
     expect(first.onCreated).toHaveBeenCalledTimes(1);
     await first.unmount();
@@ -158,7 +161,7 @@ describe('FriendSetupScreen', () => {
     // The app starts again: a new provider on the same secure store.
     const auth = createMemoryAuthProvider(parts.authStore);
     const second = await open({ ...parts, auth });
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     // A saved session: no sheet.
     expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
     expect(second.onCreated).toHaveBeenCalledTimes(1);
@@ -175,7 +178,7 @@ describe('FriendSetupScreen', () => {
     };
     const createInvite = jest.spyOn(parts.invites, 'createInvite');
     const { onCreated } = await open({ ...parts, auth });
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await user.press(await screen.findByRole('button', { name: 'Continue as a guest' }));
     expect(screen.getByText('No connection')).toBeOnTheScreen();
     expect(createInvite).not.toHaveBeenCalled();
@@ -184,7 +187,7 @@ describe('FriendSetupScreen', () => {
     // OK shows the choices again.
     await user.press(screen.getByRole('button', { name: 'OK' }));
     await user.press(screen.getByRole('button', { name: 'Not now' }));
-    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Make an invite link' })).toBeEnabled();
   });
 
   it('says so when the saved session does not load, and makes no invite', async () => {
@@ -195,7 +198,7 @@ describe('FriendSetupScreen', () => {
       ready: () => Promise.reject({ code: 'NETWORK', message: 'offline' }),
     };
     const { onCreated } = await open({ ...parts, auth });
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     expect(
       screen.getByText('Your free account was not made. Check the connection and try again.'),
     ).toBeOnTheScreen();
@@ -208,21 +211,21 @@ describe('FriendSetupScreen', () => {
     const parts = setup();
     const createInvite = jest.spyOn(parts.invites, 'createInvite');
     const { onCreated } = await open(parts);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await user.press(await screen.findByRole('button', { name: 'Not now' }));
     expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
     expect(parts.authStore.session).toBeNull();
     expect(createInvite).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
     expect(parts.analytics.sent).toEqual([]);
-    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Make an invite link' })).toBeEnabled();
   });
 
   it('signs in with Apple, then makes the invite as that user', async () => {
     const user = setupUser();
     const parts = setup();
     const { onCreated } = await open(parts);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await user.press(await screen.findByRole('button', { name: 'Continue with Apple' }));
     expect(onCreated).toHaveBeenCalledTimes(1);
     expect(parts.server.getInvite(onCreated.mock.calls[0]![0])?.from).toBe('user-1');
@@ -240,7 +243,7 @@ describe('FriendSetupScreen', () => {
     const user = setupUser();
     const parts = setup();
     const { onCreated } = await open(parts);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await user.press(await screen.findByRole('button', { name: 'Continue with email' }));
     expect(screen.getByTestId('sign-in-sheet')).toBeOnTheScreen();
     await enterEmailCode(user, parts.authStore, 'eleni@example.com');
@@ -263,7 +266,7 @@ describe('FriendSetupScreen', () => {
       .mockRejectedValueOnce(new Error('offline'))
       .mockImplementation(real);
     const { onCreated } = await open({ ...parts, invites: { ...parts.invites, createInvite } });
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await user.press(await screen.findByRole('button', { name: 'Continue as a guest' }));
     expect(
       screen.getByText('The invite was not made. Check the connection and try again.'),
@@ -273,7 +276,7 @@ describe('FriendSetupScreen', () => {
       { type: 'track', event: 'online_sign_in', props: { method: 'guest' } },
     ]);
 
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     expect(onCreated).toHaveBeenCalledTimes(1);
     expect(
       screen.queryByText('The invite was not made. Check the connection and try again.'),
@@ -290,7 +293,7 @@ describe('FriendSetupScreen', () => {
       parts.server.createInvite('guest-1', 'portes', 1, 1);
     }
     const { onCreated } = await open(parts);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     expect(
       screen.getByText(
         'You have 10 open invites. Wait until a friend answers one, or until one expires, then make a new one.',
@@ -322,7 +325,7 @@ describe('FriendSetupScreen', () => {
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
     expect(screen.getByRole('header', { name: 'Invite a friend' })).toBeOnTheScreen();
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Send the invite' }));
     expect(invite).toHaveBeenCalledWith({
       choice: 'portes',
       targetPoints: 1,
@@ -340,7 +343,7 @@ describe('FriendSetupScreen', () => {
     const invite = jest.fn().mockRejectedValue({ code: 'TOO_MANY_INVITES', message: 'too many' });
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Send the invite' }));
     expect(screen.getByTestId('friend-problem')).toHaveTextContent(/You have 10 open invites/);
     expect(props.onCreated).not.toHaveBeenCalled();
   });
@@ -456,7 +459,7 @@ describe('FriendSetupScreen', () => {
           answer = () => resolve({ id: 'saved-1', isGuest: true });
         }),
     );
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Send the invite' }));
     expect(answer).not.toBeNull();
     // The player comes back to the screen: a newer check says saved.
     ready.mockImplementation(real);
@@ -478,7 +481,7 @@ describe('FriendSetupScreen', () => {
     const invite = jest.fn().mockRejectedValue({ code: 'NOT_SAVED', message: 'not saved' });
     const props = { onCreated: jest.fn<void, [string]>(), onBack: jest.fn() };
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Send the invite' }));
     expect(screen.getByTestId('friend-not-saved')).toHaveTextContent(
       /Friends need a saved account/,
     );
@@ -489,7 +492,7 @@ describe('FriendSetupScreen', () => {
     await parts.auth.signInAsGuest();
     const createInvite = jest.spyOn(parts.invites, 'createInvite');
     const { onCreated } = await open(parts);
-    const button = screen.getByRole('button', { name: 'Make an invite' });
+    const button = screen.getByRole('button', { name: 'Make an invite link' });
     // Two taps in the same frame: the second comes before a render.
     await act(async () => {
       fireEvent.press(button);
@@ -518,7 +521,7 @@ describe('FriendSetupScreen', () => {
       },
     };
     const view = await open({ ...parts, invites });
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await view.unmount();
     await act(async () => release());
     await act(async () => {
@@ -547,7 +550,7 @@ describe('FriendSetupScreen', () => {
     };
     const createInvite = jest.spyOn(parts.invites, 'createInvite');
     const view = await open({ ...parts, auth });
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await view.unmount();
     await act(async () => release());
     await act(async () => {
@@ -566,11 +569,11 @@ describe('FriendSetupScreen', () => {
       .mockRejectedValue(new Error('offline'));
     await open({ ...parts, invites: { ...parts.invites, createInvite } });
     const text = 'The invite was not made. Check the connection and try again.';
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     expect(announce).toHaveBeenLastCalledWith(text);
     // The same problem again is read again.
     announce.mockClear();
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     expect(announce).toHaveBeenCalledWith(text);
     expect(announce).toHaveBeenCalledTimes(1);
     announce.mockRestore();
@@ -579,7 +582,7 @@ describe('FriendSetupScreen', () => {
   it('screen readers: focus moves to the title', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent');
     await open(setup());
-    await screen.findByRole('header', { name: 'Play a friend online' });
+    await screen.findByRole('header', { name: 'Play a friend' });
     expect(focus).toHaveBeenCalledWith(expect.anything(), 'focus');
     focus.mockRestore();
   });
@@ -596,8 +599,8 @@ describe('FriendSetupScreen', () => {
       await i18n.changeLanguage('el');
     });
     await open(setup());
-    expect(screen.getByRole('header', { name: 'Παίξε με φίλο online' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Φτιάξε πρόσκληση' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Παίξε με φίλο' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Φτιάξε σύνδεσμο πρόσκλησης' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: 'Χωρίς' })).toBeOnTheScreen();
     await act(async () => {
       await i18n.changeLanguage('en');
@@ -631,7 +634,7 @@ describe('FriendSetupScreen: your friends (#488)', () => {
 
   async function show(
     parts: ReturnType<typeof savedMe>,
-    extra: { friends?: Friends; onFriends?: () => void } = {},
+    extra: { friends?: Friends; onFriends?: () => void; onAddFriend?: () => void } = {},
   ) {
     const props = {
       onCreated: jest.fn<void, [string]>(),
@@ -652,7 +655,7 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     expect(screen.getByTestId('friend-friends')).toBeOnTheScreen();
     expect(screen.getByText(nameOf(parts.server, 'ann'))).toBeOnTheScreen();
     expect(screen.queryByText(/lead|Even at/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Make an invite link' })).toBeOnTheScreen();
   });
 
   it('a tap on a friend sends a friend invite with the picks at once, saves them and stays (#507)', async () => {
@@ -679,7 +682,7 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     expect(announce).toHaveBeenCalledWith(`Invite sent to ${nameOf(parts.server, 'ann')}`);
     announce.mockRestore();
     // The buttons work again, but Ann's row is off: a second tap sends no second invite.
-    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Make an invite link' })).toBeEnabled();
     const row = screen.getByRole('button', {
       name: `Invite sent to ${nameOf(parts.server, 'ann')}`,
     });
@@ -707,29 +710,57 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     const parts = savedMe();
     await befriend(parts.server, 'ann');
     const props = await show(parts);
-    await user.press(screen.getByRole('button', { name: 'Make an invite' }));
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await flush();
     expect(props.onCreated).toHaveBeenCalledTimes(1);
     expect(loadFriendInviteSetup()).toBeNull();
   });
 
-  it('shows five friends, and All your friends when there are more', async () => {
+  it('shows three friends next to Anyone and Add, and All friends opens Friends (#516)', async () => {
     const user = setupUser();
     const parts = savedMe();
     for (const id of ['a1', 'a2', 'a3', 'a4', 'a5', 'a6']) await befriend(parts.server, id);
     const onFriends = jest.fn();
-    await show(parts, { onFriends });
+    const onAddFriend = jest.fn();
+    await show(parts, { onFriends, onAddFriend });
     const rows = screen.getAllByTestId(/^friend-pick-/);
-    expect(rows).toHaveLength(5);
-    await user.press(screen.getByRole('button', { name: 'All your friends' }));
+    expect(rows).toHaveLength(3);
+    await user.press(screen.getByRole('button', { name: 'All friends' }));
     expect(onFriends).toHaveBeenCalledTimes(1);
+    await user.press(screen.getByRole('button', { name: 'Add a friend' }));
+    expect(onAddFriend).toHaveBeenCalledTimes(1);
+  });
+
+  it('with no Add handler there is no Add tile', async () => {
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    await show(parts);
+    expect(screen.queryByTestId('friend-add')).toBeNull();
+  });
+
+  it('Anyone makes an open invite link, like Make an invite link (#516)', async () => {
+    const user = setupUser();
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    const props = await show(parts);
+    await user.press(screen.getByRole('button', { name: 'Anyone: make an invite link' }));
+    await flush();
+    expect(props.onCreated).toHaveBeenCalledTimes(1);
+    expect(props.onFriendInvited).not.toHaveBeenCalled();
+    expect(loadFriendInviteSetup()).toBeNull();
+  });
+
+  it('a phone that signed in before gets no account sentence (#516)', async () => {
+    const parts = savedMe();
+    await show(parts);
+    expect(screen.queryByTestId('friend-account')).toBeNull();
   });
 
   it('a saved account with no friends sees the screen as before', async () => {
     const parts = savedMe();
     await show(parts);
     expect(screen.queryByTestId('friend-friends')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Make an invite link' })).toBeOnTheScreen();
   });
 
   it('a guest sees no list, and the friends port is not asked', async () => {
@@ -765,7 +796,7 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     } as Friends;
     await show({ ...parts, friends });
     expect(screen.queryByTestId('friend-friends')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Make an invite' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Make an invite link' })).toBeEnabled();
   });
 
   it('a friend who is gone says so, and the list loads again without them', async () => {
@@ -810,8 +841,9 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     await renderWithRoot(<FriendSetupScreen {...parts} {...props} friend={{ invite }} />);
     await flush();
     expect(screen.getByRole('radio', { name: /^Asodio/ })).toBeChecked();
-    expect(screen.getByText('First to 5 points')).toBeOnTheScreen();
-    expect(screen.getByText('1 minute per turn')).toBeOnTheScreen();
+    expect(screen.getByTestId('friend-summary')).toHaveTextContent(
+      'First to 5 points · 1 minute per turn.',
+    );
     // The friend-invite screen shows no friends list.
     expect(screen.queryByTestId('friend-friends')).toBeNull();
   });

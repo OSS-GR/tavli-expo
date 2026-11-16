@@ -338,7 +338,7 @@ export const ICONS = {
   mail: {
     strokes: [roundRect(2, 4, 20, 16, 2), 'm22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7'],
   },
-  // Close the game menu (#515); what we never collect, on the consent step (#520).
+  // Close buttons: the game menu (#515), the welcome consent step (#520) and the invite wait screen (#516).
   x: {
     strokes: ['M18 6 6 18', 'm6 6 12 12'],
   },

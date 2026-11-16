@@ -60,6 +60,14 @@ export interface UiColors {
   turn: string;
   /** Turn text, for example "Σειρά σου". */
   turnText: string;
+  /** A bone tile that holds one character of an invite code (#516): its face. Opaque. */
+  tileFace: string;
+  /** The lit top of a bone tile's face (#516). Opaque. */
+  tileFaceLight: string;
+  /** The darker lip under a bone tile (#516). Opaque. */
+  tileEdge: string;
+  /** The character on a bone tile (#516). */
+  tileText: string;
   /** Switch track when off. */
   switchTrackOff: string;
   /** Switch thumb. */
