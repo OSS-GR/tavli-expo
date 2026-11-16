@@ -36,9 +36,11 @@ export interface HowToPlayScreenProps {
   /** Opens a game's page, or the Tavli match page. */
   onOpen: (variant: RulesVariant) => void;
   onBack?: () => void;
+  /** Opens the app tour (#573): a row under the games. */
+  onTour?: () => void;
 }
 
-export function HowToPlayScreen({ progress, onOpen, onBack }: HowToPlayScreenProps) {
+export function HowToPlayScreen({ progress, onOpen, onBack, onTour }: HowToPlayScreenProps) {
   const { t } = useTranslation();
   return (
     <Screen>
@@ -73,6 +75,17 @@ export function HowToPlayScreen({ progress, onOpen, onBack }: HowToPlayScreenPro
             />
           ))}
         </SectionCard>
+        {onTour ? (
+          <SectionCard>
+            <SectionRow
+              testID="how-to-play-tour"
+              icon="compass"
+              label={t('tour.row.label')}
+              hint={t('tour.row.hint')}
+              onPress={onTour}
+            />
+          </SectionCard>
+        ) : null}
       </ScrollView>
     </Screen>
   );

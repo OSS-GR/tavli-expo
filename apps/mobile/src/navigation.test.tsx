@@ -30,6 +30,7 @@ import { SAVED_MATCH_KEY } from '@/features/match/savedMatch';
 import { MATCH_START_SECONDS } from '@/features/ranked/RankedScreen';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import { tourStore } from '@/features/tour/tourStore';
 import { LESSON_SETS, LESSONS } from '@/features/tutorial/lessons';
 import { TUTORIAL_STORAGE_KEY, tutorialStorageKey } from '@/features/tutorial/progress';
 import { tutorialStore } from '@/features/tutorial/store';
@@ -1861,5 +1862,27 @@ describe("what's new (#471)", () => {
     await renderRouter('./src/app', { initialUrl: '/whats-new' });
     expect(screen.getByTestId('whats-new-screen')).toBeOnTheScreen();
     expect(whatsNewSeen.due()).toBe(false);
+  });
+});
+
+describe('the app tour (#573)', () => {
+  it('opens from Settings → Help, ends with Done and goes back to Settings', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/settings' });
+    await user.press(screen.getByTestId('settings-tour'));
+    expect(router.getPathname()).toBe('/tour');
+    expect(screen.getByTestId('tour-title-welcome')).toBeOnTheScreen();
+    await user.press(screen.getByTestId('tour-skip'));
+    expect(router.getPathname()).toBe('/settings');
+    expect(tourStore.getState().status).toBe('done');
+  });
+
+  it('opens from How to play, and Skip goes back there', async () => {
+    const user = setupUser();
+    const router = await renderRouter('./src/app', { initialUrl: '/rules' });
+    await user.press(screen.getByTestId('how-to-play-tour'));
+    expect(router.getPathname()).toBe('/tour');
+    await user.press(screen.getByTestId('tour-skip'));
+    expect(router.getPathname()).toBe('/rules');
   });
 });

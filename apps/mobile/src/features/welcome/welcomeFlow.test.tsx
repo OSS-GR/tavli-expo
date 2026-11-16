@@ -8,6 +8,7 @@ import RootLayout from '@/app/_layout';
 import ShareLinkRoute from '@/app/i/[code]';
 import HomeScreen from '@/app/index';
 import SettingsRoute from '@/app/settings';
+import TourRoute from '@/app/tour';
 import WelcomeBoardRoute from '@/app/welcome/board';
 import WelcomeLanguageRoute from '@/app/welcome/language';
 import WelcomePrivacyRoute from '@/app/welcome/privacy';
@@ -15,6 +16,8 @@ import { CONSENT_STORAGE_KEY, createConsentStore, needsWelcome } from '@/feature
 import { consentStore } from '@/features/privacy/consentStore';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import { TOUR_STORAGE_KEY, createTourStore } from '@/features/tour/tourStatus';
+import { resetTourForTest, tourStore } from '@/features/tour/tourStore';
 import { createBoardStepStore, WELCOME_BOARD_STORAGE_KEY } from '@/features/welcome/boardStep';
 import { boardStepStore } from '@/features/welcome/boardStepStore';
 import { RELEASES } from '@/features/whats-new/releases';
@@ -66,6 +69,8 @@ const routes = {
   'rules/[variant]': stub('rules'),
   'rules/index': stub('how to play'),
   tutorial: stub('tutorial'),
+  // The app tour (#573): the real route, Home opens it after the welcome flow.
+  tour: TourRoute,
   'game/[id]/index': stub('board'),
   'game/[id]/match-end': stub('match end'),
   'game/[id]/review': stub('review'),
@@ -357,6 +362,49 @@ describe('first launch', () => {
     await user.press(screen.getByRole('radio', { name: 'English' }));
     expect(settingsStore.getState().language).toBe('system');
     expect(await screen.findByRole('button', { name: 'Continue' })).toBeOnTheScreen();
+  });
+
+  describe('the app tour (#573)', () => {
+    beforeEach(async () => {
+      await act(async () => {
+        storage.remove(TOUR_STORAGE_KEY);
+        resetTourForTest('new');
+      });
+    });
+
+    it('opens over Home once after the welcome flow of a new install', async () => {
+      const user = userEvent.setup();
+      await openApp();
+      await passWelcome(user, "Don't allow");
+      expect(screen).toHavePathname('/tour');
+      expect(screen.getByTestId('tour-title-welcome')).toBeOnTheScreen();
+      expect(tourStore.getState().status).toBe('due');
+
+      await user.press(screen.getByTestId('tour-skip'));
+      expect(screen).toHavePathname('/');
+      expect(tourStore.getState().status).toBe('done');
+      expect(createTourStore(storage).getState().status).toBe('done');
+      // Home shows again with no tour over it.
+      expect(screen.getByText('Welcome to the kafeneio. Grab a chair.')).toBeOnTheScreen();
+    });
+
+    it('never opens by itself for a player from before the tour', async () => {
+      await updatedFromOldApp('granted');
+      await act(async () => {
+        tourStore.setState({ status: createTourStore(storage).getState().status });
+      });
+      await openApp();
+      expect(screen).toHavePathname('/');
+      expect(tourStore.getState().status).toBe('done');
+    });
+
+    it('lets an invite link go first: the tour waits for Home', async () => {
+      const user = userEvent.setup();
+      await openApp('/invite/abcd2345');
+      await passWelcome(user, "Don't allow");
+      expect(screen).toHavePathname('/invite/ABCD2345');
+      expect(tourStore.getState().status).toBe('due');
+    });
   });
 
   it('lists every route file, so the checks below cover new routes too', () => {

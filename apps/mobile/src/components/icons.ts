@@ -344,6 +344,12 @@ export const ICONS = {
   info: {
     strokes: [circle(12, 12, 10), 'M12 16v-4', 'M12 8h.01'],
   },
+  compass: {
+    strokes: [
+      circle(12, 12, 10),
+      'm16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z',
+    ],
+  },
   search: {
     strokes: [circle(11, 11, 8), 'm21 21-4.3-4.3'],
   },

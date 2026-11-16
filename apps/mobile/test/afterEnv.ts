@@ -14,6 +14,7 @@ import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
 import { forgetRankedRulesForTest } from '../src/features/ranked/rankedRules';
 import { forgetRankedStartsForTest } from '../src/features/ranked/rankedStarts';
 import { resetRemindersForTest } from '../src/features/reminders/reminders';
+import { resetTourForTest } from '../src/features/tour/tourStore';
 import { resetUpdateCheckForTest } from '../src/features/update/updateCheck';
 import { markWhatsNewSeenForTest } from '../src/features/whats-new/seen';
 
@@ -55,4 +56,6 @@ beforeEach(() => {
   forgetRankedStartsForTest();
   // Home's hero (#517): no match mode noted.
   forgetLastModesForTest();
+  // The app tour (#573): done, so Home never opens it. A test of it sets `new`.
+  resetTourForTest('done');
 });

@@ -6,7 +6,7 @@
 import { Stack, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { rulesHref } from '@/features/match/routes';
+import { rulesHref, tourHref } from '@/features/match/routes';
 import { HowToPlayScreen } from '@/features/rules/HowToPlayScreen';
 import { useLessonProgress } from '@/features/tutorial/store';
 
@@ -20,6 +20,7 @@ export default function HowToPlayRoute() {
         progress={progress}
         onOpen={(variant) => router.push(rulesHref(variant))}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+        onTour={() => router.push(tourHref('rules'))}
       />
     </>
   );

@@ -45,6 +45,8 @@ export interface SettingsScreenProps {
   onHistory?: () => void;
   /** Opens What's new (#471): a row in the Help group. */
   onWhatsNew?: () => void;
+  /** Opens the app tour (#573): a row in the Help group. */
+  onTour?: () => void;
   /**
    * Turn notifications (#285). Its row shows only with it: a build with no
    * online play has none.
@@ -80,6 +82,7 @@ export function SettingsScreen({
   onHowToPlay,
   onHistory,
   onWhatsNew,
+  onTour,
   turnPushes,
   onAccount,
   account,
@@ -208,7 +211,7 @@ export function SettingsScreen({
         </SectionCard>
       ) : null}
 
-      {onHowToPlay || onWhatsNew ? (
+      {onHowToPlay || onWhatsNew || onTour ? (
         <SectionCard title={t('settings.sections.help')}>
           {onHowToPlay ? (
             <SectionRow
@@ -218,6 +221,16 @@ export function SettingsScreen({
               label={t('settings.howToPlay')}
               hint={t('settings.howToPlayHint')}
               onPress={onHowToPlay}
+            />
+          ) : null}
+          {onTour ? (
+            <SectionRow
+              testID="settings-tour"
+              icon="compass"
+              iconLook="bare"
+              label={t('tour.row.label')}
+              hint={t('tour.row.hint')}
+              onPress={onTour}
             />
           ) : null}
           {onWhatsNew ? (

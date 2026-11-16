@@ -11,6 +11,7 @@ import {
   RATINGS_HREF,
   HOW_TO_PLAY_HREF,
   WHATS_NEW_HREF,
+  tourHref,
 } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
@@ -31,6 +32,7 @@ export default function SettingsRoute() {
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         onPage={(page) => router.push(`/settings/${page}`)}
         onHowToPlay={() => router.push(HOW_TO_PLAY_HREF)}
+        onTour={() => router.push(tourHref('settings'))}
         onHistory={() => router.push('/history')}
         onWhatsNew={() => router.push(WHATS_NEW_HREF)}
         turnPushes={pushes}
