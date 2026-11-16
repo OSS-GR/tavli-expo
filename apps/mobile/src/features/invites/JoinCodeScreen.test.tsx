@@ -193,7 +193,7 @@ describe('JoinCodeScreen', () => {
       await i18n.changeLanguage('el');
     });
     const props = await open();
-    expect(screen.getByRole('header', { name: 'Μπες με κωδικό' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Μπες σε παιχνίδι με κωδικό' })).toBeOnTheScreen();
     const greekField = field();
     expect(greekField.props.accessibilityLabel).toBe('Κωδικός πρόσκλησης');
     await fireEvent.changeText(greekField, 'ABCD');
