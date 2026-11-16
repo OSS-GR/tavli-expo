@@ -25,13 +25,11 @@ These terms are the agreement between you and us about Tavlaki, a free app for G
 
 ## Who we are
 
-Tavlaki is made by **[owner's full name]**, an individual developer in Greece ("we", "us").
-
-Address: **[postal address]**
+Tavlaki is made by **[owner's full name]**, an individual developer in New York, USA ("we", "us").
 
 Email: **privacy@tavlaki.com**
 
-<!-- OWNER: put your full name (or company name, as in the privacy policy) and a postal address where you get mail, in all four files. Apple asks for the developer's name and address in the terms, and Greek law (Presidential Decree 131/2003) asks an online service to show who runs it. If you have a VAT number, add it here too. -->
+<!-- OWNER: put your full name (or company name, as in the privacy policy) in all four files. -->
 
 This email is our contact point for players and for the authorities. You can write to us in Greek or in English.
 
@@ -156,11 +154,12 @@ Your username and your online games stay yours. You let us store them and show t
 
 ## Our liability
 
-- We are liable under the law for harm we cause **on purpose or by gross negligence**, and for harm to life, body or health. These terms do not limit that.
-- Your rights as a consumer stay as the law gives them, in Greece under Law 2251/1994 on consumer protection (with the EU rules on digital content, Directive (EU) 2019/770). These terms do not take away any of those rights.
-- For other harm, as far as the law allows, we are not liable for lost games, results, ratings or places on a board, or for harm that is only a further result of a problem (indirect harm), because the app is free and for fun.
+- We give you the app **"as is" and "as available"**. As far as the law allows, we give no promise or warranty beyond what these terms say, for example that the app fits a purpose or never has errors.
+- As far as the law allows, we are not liable for lost games, results, ratings or places on a board, or for harm that is only a further result of a problem (indirect harm). The app is free and for fun.
+- These terms never limit our liability for harm we cause **on purpose or by gross negligence**, or for harm to life, body or health.
+- If you are a consumer, you keep every right that the consumer law of your country gives you and that a contract cannot take away. In the EU and the EEA, this includes the rules on digital content (Directive (EU) 2019/770). Where such a law does not allow a part of this section, that part does not apply to you.
 
-<!-- OWNER: a lawyer checks this section and "The app as it is" (Greek consumer law, Law 2251/1994, Civil Code articles 332 and 334, and Directive (EU) 2019/770). -->
+<!-- OWNER: a lawyer checks this section and "The app as it is" (New York law, and the EU and EEA consumer rules that apply to players there). -->
 
 ## Ending
 
@@ -186,7 +185,7 @@ If you got Tavlaki from the App Store, these points also apply. They are the poi
 - **Contact.** Questions, complaints and claims about the app go to us: see "Who we are".
 - **Third-party beneficiaries.** Apple and its subsidiaries are third-party beneficiaries of these terms. When you accept these terms, Apple has the right (and is taken to have accepted the right) to enforce them against you as a third-party beneficiary.
 
-<!-- OWNER: a lawyer checks the Apple section. In App Store Connect, add these terms as a custom License Agreement (EULA), or keep Apple's standard EULA and link these terms in the app description. -->
+<!-- OWNER: a lawyer checks the Apple section. We keep Apple's standard EULA in App Store Connect (no custom EULA) and link these terms in the app description. -->
 
 ## Changes to these terms
 
@@ -196,11 +195,14 @@ If you got Tavlaki from the App Store, these points also apply. They are the poi
 
 ## Law and disputes
 
-- Greek law applies to these terms.
-- If you are a consumer living in another country, you keep the protection that the law of that country gives you and that a contract cannot take away.
-- You can go to court in Greece or in the country where you live. If we take you to court, we do it in the country where you live.
+- The law of the State of New York, USA, applies to these terms, without its rules on which country's law applies.
+- If you are a consumer and live in the EU or the EEA, or in another country with consumer laws that a contract cannot take away, you keep the protection of those laws.
+- **Consumers:** you can go to court in the country where you live. If we take you to court, we do it in the country where you live.
+- **Businesses:** a claim between us and a business goes to the courts of New York County, New York.
 - Please write to us first: most problems are easy to fix.
-- You can also go to a consumer body for an out-of-court solution: in Greece the Consumer Ombudsman (Συνήγορος του Καταναλωτή), or the consumer body of your country. The EU online dispute platform (ODR) closed in July 2025, so we do not link it.
+- You can also go to the consumer body of your country for an out-of-court solution (in Greece, for example, the Consumer Ombudsman, Συνήγορος του Καταναλωτή). The EU online dispute platform (ODR) closed in July 2025, so we do not link it.
+
+<!-- OWNER: a lawyer checks this section (New York law and courts, and the consumer rules of the EU and EEA countries). -->
 
 ## Other points
 
