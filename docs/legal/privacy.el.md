@@ -30,7 +30,7 @@ English: [tavlaki.com/privacy](https://tavlaki.com/privacy)
 
 ## Ποιος είναι υπεύθυνος
 
-Το Ταβλάκι το φτιάχνει **[ονοματεπώνυμο ιδιοκτήτη]**, ιδιώτης προγραμματιστής στη Νέα Υόρκη των ΗΠΑ. Είμαστε ο «υπεύθυνος επεξεργασίας» για τα δεδομένα αυτής της σελίδας: αποφασίζουμε ποια δεδομένα χρησιμοποιεί η εφαρμογή και γιατί. Για τους παίκτες στην ΕΕ και στον ΕΟΧ ισχύει ο Γενικός Κανονισμός για την Προστασία Δεδομένων (ΓΚΠΔ / GDPR).
+Το Ταβλάκι το φτιάχνει **Orestis Stefanis**, ιδιώτης στη Νέα Υόρκη των ΗΠΑ. Είμαστε ο «υπεύθυνος επεξεργασίας» για τα δεδομένα αυτής της σελίδας: αποφασίζουμε ποια δεδομένα χρησιμοποιεί η εφαρμογή και γιατί. Για τους παίκτες στην ΕΕ και στον ΕΟΧ ισχύει ο Γενικός Κανονισμός για την Προστασία Δεδομένων (ΓΚΠΔ / GDPR).
 
 Επικοινωνία: **privacy@tavlaki.com** <!-- OWNER: confirm this address works before publishing. --> <!-- OWNER: a lawyer checks GDPR Article 27: a controller outside the EU that serves players in the EU may need a representative in the EU. Article 27(2) has an exception for processing that is occasional and low risk; we do not claim it here. Also check the line on our own access from the USA under "Services that process the data". -->
 

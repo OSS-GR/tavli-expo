@@ -25,11 +25,10 @@ English: [tavlaki.com/terms](https://tavlaki.com/terms)
 
 ## Ποιοι είμαστε
 
-Το Ταβλάκι το φτιάχνει ο/η **[ονοματεπώνυμο του ιδιοκτήτη]**, ανεξάρτητος/η προγραμματιστής/τρια στη Νέα Υόρκη των ΗΠΑ («εμείς»).
+Το Ταβλάκι το φτιάχνει **Orestis Stefanis**, ιδιώτης στη Νέα Υόρκη των ΗΠΑ («εμείς»).
 
 Email: **privacy@tavlaki.com**
 
-<!-- OWNER: put your full name (or company name, as in the privacy policy) in all four files. -->
 
 Σε αυτό το email μάς βρίσκουν οι παίκτες και οι αρχές. Μπορείτε να μας γράψετε στα ελληνικά ή στα αγγλικά.
 

@@ -25,11 +25,10 @@ These terms are the agreement between you and us about Tavlaki, a free app for G
 
 ## Who we are
 
-Tavlaki is made by **[owner's full name]**, an individual developer in New York, USA ("we", "us").
+Tavlaki is made by **Orestis Stefanis**, an individual developer in New York, USA ("we", "us").
 
 Email: **privacy@tavlaki.com**
 
-<!-- OWNER: put your full name (or company name, as in the privacy policy) in all four files. -->
 
 This email is our contact point for players and for the authorities. You can write to us in Greek or in English.
 

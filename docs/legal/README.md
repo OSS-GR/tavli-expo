@@ -75,7 +75,7 @@ Do not add analytics, cookies or outside fonts to the site. The invite pages car
 ## Before you publish (owner checklist)
 
 - [ ] Publish only after PR #89 (`feat/61-analytics`) is merged. The policy describes the consent screen and the one privacy switch from that PR. On `main` before #89, crash reports always carry the install id.
-- [ ] Put your full name (or a company name) in "Who is responsible", in both languages.
+- [x] Put your full name in "Who is responsible", in both languages (Orestis Stefanis, 2026-11-16).
 - [ ] Make `privacy@tavlaki.com` work (or change it in all four files).
 - [ ] Sentry: check that the organization uses the **EU** data region (Frankfurt). Sentry sets it when the organization is made, and it cannot change later. If it is the US region, change the table in the policy.
 - [ ] Sentry: turn on **Prevent Storing of IP Addresses** (see `packages/adapters/crash-sentry/README.md`).
@@ -102,7 +102,7 @@ The policy's "Delete your account" section (all four files) and the store answer
 
 ## Before you publish the terms (owner checklist, #405)
 
-- [ ] Put your full name (or a company name) in "Who we are", in all four files. The terms name no postal address: we keep Apple's standard EULA, so Apple asks for none there.
+- [x] Put your full name in "Who we are", in all four files (2026-11-16). The terms name no postal address: we keep Apple's standard EULA, so Apple asks for none there.
 - [ ] Have a lawyer check the terms: the age rule and country list, "The app as it is", "Our liability", the Apple section and "Law and disputes" (the `OWNER` comments).
 - [ ] The terms say you must be 16 (or 13) to pick a username **or to play ranked**, but the app asks the age only at the username step. Decide whether Play ranked should ask too.
 - [ ] The terms promise to tell a player why we took a step against their account, and to look again when they write within 6 months. Answer those emails, and keep a short note of each step and its reason.
