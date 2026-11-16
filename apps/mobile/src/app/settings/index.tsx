@@ -9,9 +9,8 @@ import { useTranslation } from 'react-i18next';
 import {
   FRIENDS_HREF,
   RATINGS_HREF,
+  HOW_TO_PLAY_HREF,
   WHATS_NEW_HREF,
-  rulesHref,
-  tutorialHref,
 } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
@@ -31,8 +30,7 @@ export default function SettingsRoute() {
       <SettingsScreen
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         onPage={(page) => router.push(`/settings/${page}`)}
-        onLearnToPlay={(game) => router.push(tutorialHref('settings', game))}
-        onHowToPlay={() => router.push(rulesHref('portes'))}
+        onHowToPlay={() => router.push(HOW_TO_PLAY_HREF)}
         onHistory={() => router.push('/history')}
         onWhatsNew={() => router.push(WHATS_NEW_HREF)}
         turnPushes={pushes}

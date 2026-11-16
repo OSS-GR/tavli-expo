@@ -64,6 +64,7 @@ const routes = {
   'new-game': stub('new game'),
   history: stub('history'),
   'rules/[variant]': stub('rules'),
+  'rules/index': stub('how to play'),
   tutorial: stub('tutorial'),
   'game/[id]/index': stub('board'),
   'game/[id]/match-end': stub('match end'),

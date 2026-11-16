@@ -89,6 +89,7 @@ beforeEach(async () => {
     tutorialStore.setState({
       status: 'new',
       variants: { plakoto: 'new', fevga: 'new', asodio: 'new' },
+      learnt: { portes: 0, plakoto: 0, fevga: 0, asodio: 0 },
     }),
   );
   // Each test starts with no match and an empty save slot.
@@ -124,7 +125,7 @@ describe('app navigation', () => {
 
     await user.press(screen.getByRole('button', { name: 'Game menu' }));
     await user.press(screen.getByRole('button', { name: /^Settings/ }));
-    expect(orientationOf(screen.getByTestId('settings-learn-to-play'))).toBe('portrait_up');
+    expect(orientationOf(screen.getByTestId('settings-how-to-play'))).toBe('portrait_up');
     await act(async () => appRouter.push('/tutorial'));
     expect(orientationOf(screen.getByTestId('tutorial-board'))).toBe('default');
     await act(async () => appRouter.push('/history'));
@@ -557,7 +558,7 @@ describe('app navigation', () => {
 });
 
 describe('tutorial (#128)', () => {
-  it('is offered on Home, skipped, and opened again from Settings and the rules page', async () => {
+  it('is offered on Home, skipped, and opened again from How to play (#571)', async () => {
     const user = setupUser();
     // Usage data allowed: the tutorial events go out.
     await act(async () => consentStore.setState({ status: 'granted' }));
@@ -586,22 +587,36 @@ describe('tutorial (#128)', () => {
       },
     ]);
 
-    // Reopen from Settings → Help: pick the game first.
+    // Reopen from Settings → Help → How to play → Portes.
     await user.press(screen.getByRole('button', { name: 'Settings' }));
-    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
-    await user.press(
-      within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Portes' }),
-    );
-    expect(router.getPathname()).toBe('/tutorial');
-    expect(router.getSearchParams()).toEqual({ from: 'settings' });
-    await user.press(screen.getByRole('button', { name: 'Skip' }));
-    expect(router.getPathname()).toBe('/settings');
-
-    // Reopen from the Portes rules page.
-    await act(async () => appRouter.replace('/rules/portes'));
-    await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+    await user.press(screen.getByRole('button', { name: /^How to play/ }));
+    expect(router.getPathname()).toBe('/rules');
+    await user.press(screen.getByTestId('how-to-play-portes'));
+    expect(router.getPathname()).toBe('/rules/portes');
+    await user.press(screen.getByRole('button', { name: 'Start the lessons' }));
     expect(router.getPathname()).toBe('/tutorial');
     expect(router.getSearchParams()).toEqual({ from: 'rules' });
+    await user.press(screen.getByRole('button', { name: 'Skip' }));
+    expect(router.getPathname()).toBe('/rules/portes');
+  });
+
+  it('How to play shows the lessons learnt, and Continue opens the next one (#571)', async () => {
+    const user = setupUser();
+    await act(async () => tutorialStore.getState().learn('plakoto', 1));
+    const router = await renderRouter('./src/app', { initialUrl: '/' });
+    await user.press(screen.getByRole('link', { name: 'How to play' }));
+    expect(router.getPathname()).toBe('/rules');
+    expect(
+      within(screen.getByTestId('how-to-play-plakoto')).getByText('1 of 4 lessons'),
+    ).toBeOnTheScreen();
+    await user.press(screen.getByTestId('how-to-play-plakoto'));
+    expect(screen.getByTestId('rules-lessons-line')).toHaveTextContent(
+      '4 short lessons on the board · 1 done',
+    );
+    await user.press(screen.getByRole('button', { name: 'Continue the lessons' }));
+    expect(router.getPathname()).toBe('/tutorial');
+    expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'plakoto', start: '1' });
+    expect(screen.getByText('Lesson 2 of 4')).toBeOnTheScreen();
   });
 
   it('opens from the empty History, which goes back there on Skip (#521)', async () => {
@@ -660,7 +675,7 @@ describe('tutorial (#128)', () => {
     await act(async () => consentStore.setState({ status: 'granted' }));
     recorded.sent.length = 0;
     const router = await renderRouter('./src/app', { initialUrl: '/rules/plakoto' });
-    await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+    await user.press(screen.getByRole('button', { name: 'Start the lessons' }));
     expect(router.getPathname()).toBe('/tutorial');
     expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'plakoto' });
     expect(screen.getByRole('header', { name: 'Learn Plakoto' })).toBeOnTheScreen();
@@ -702,7 +717,7 @@ describe('tutorial (#128)', () => {
   it('opens the Fevga lessons from its rules page, and Skip saves only Fevga', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/rules/fevga' });
-    await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+    await user.press(screen.getByRole('button', { name: 'Start the lessons' }));
     expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'fevga' });
     expect(screen.getByText('Lesson 1 of 4')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Skip' }));
@@ -716,69 +731,67 @@ describe('tutorial (#128)', () => {
   });
 });
 
-describe('tutorial from Settings (#159)', () => {
+describe('lessons from How to play (#159, #571)', () => {
   const GAMES = [
-    ['portes', 'Portes', 'Learn to play', 7],
-    ['plakoto', 'Plakoto', 'Learn Plakoto', 4],
-    ['fevga', 'Fevga', 'Learn Fevga', 4],
-    ['asodio', 'Asodio', 'Learn Asodio', 4],
+    ['portes', 'Learn to play', 7],
+    ['plakoto', 'Learn Plakoto', 4],
+    ['fevga', 'Learn Fevga', 4],
+    ['asodio', 'Learn Asodio', 4],
   ] as const;
 
-  it.each(GAMES)('Settings → Help opens the %s lessons', async (game, label, title, count) => {
+  /** Settings → Help → How to play → the game → Start the lessons. */
+  async function startFromSettings(user: ReturnType<typeof setupUser>, game: string) {
+    await user.press(screen.getByRole('button', { name: /^How to play/ }));
+    await user.press(screen.getByTestId(`how-to-play-${game}`));
+    await user.press(screen.getByRole('button', { name: 'Start the lessons' }));
+  }
+
+  it('the hub lists the Tavli match and every game, in order', async () => {
+    await renderRouter('./src/app', { initialUrl: '/rules' });
+    expect(screen.getByRole('header', { name: 'How to play' })).toBeOnTheScreen();
+    expect(
+      ['tavli', 'portes', 'plakoto', 'fevga', 'asodio'].map((id) =>
+        screen.getByTestId(`how-to-play-${id}`),
+      ),
+    ).toHaveLength(5);
+  });
+
+  it.each(GAMES)('Settings → How to play opens the %s lessons', async (game, title, count) => {
     const user = setupUser();
     await act(async () => consentStore.setState({ status: 'granted' }));
     recorded.sent.length = 0;
     const router = await renderRouter('./src/app', { initialUrl: '/settings' });
 
-    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
-    const picker = within(screen.getByTestId('tutorial-picker'));
-    expect(picker.getByRole('header', { name: 'Learn to play' })).toBeOnTheScreen();
-    expect(picker.getAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual([
-      'Portes',
-      'Plakoto',
-      'Fevga',
-      'Asodio',
-      'Cancel',
-    ]);
-    await user.press(picker.getByRole('button', { name: label }));
-
+    await startFromSettings(user, game);
     expect(router.getPathname()).toBe('/tutorial');
     expect(router.getSearchParams()).toEqual(
-      game === 'portes' ? { from: 'settings' } : { from: 'settings', game },
+      game === 'portes' ? { from: 'rules' } : { from: 'rules', game },
     );
     expect(screen.getByRole('header', { name: title })).toBeOnTheScreen();
     expect(screen.getByText(`Lesson 1 of ${count}`)).toBeOnTheScreen();
     expect(recorded.sent.filter((e) => e.type === 'track')).toEqual([
-      { type: 'track', event: 'tutorial_started', props: { source: 'settings', game } },
+      { type: 'track', event: 'tutorial_started', props: { source: 'rules', game } },
     ]);
 
-    // Skip goes back to Settings and saves only that game.
+    // Skip goes back to the game's page and saves only that game.
     await user.press(screen.getByRole('button', { name: 'Skip' }));
-    expect(router.getPathname()).toBe('/settings');
+    expect(router.getPathname()).toBe(`/rules/${game}`);
     expect(storage.getString(tutorialStorageKey(game))).toContain('dismissed');
     for (const [other] of GAMES) {
       if (other !== game) expect(storage.getString(tutorialStorageKey(other))).toBeUndefined();
     }
   });
 
-  it('Cancel closes the picker and stays in Settings', async () => {
-    const user = setupUser();
-    const router = await renderRouter('./src/app', { initialUrl: '/settings' });
-    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
-    await user.press(
-      within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Cancel' }),
-    );
-    expect(screen.queryByTestId('tutorial-picker')).not.toBeOnTheScreen();
-    expect(router.getPathname()).toBe('/settings');
+  it('Settings has no Learn to play row any more', async () => {
+    await renderRouter('./src/app', { initialUrl: '/settings' });
+    expect(screen.queryByText('Learn to play')).not.toBeOnTheScreen();
+    expect(screen.getByTestId('settings-how-to-play')).toBeOnTheScreen();
   });
 
-  it('plays the Asodio lessons from Settings, saves them apart, then plays Asodio', async () => {
+  it('plays the Asodio lessons from How to play, saves them apart, then plays Asodio', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/settings' });
-    await user.press(screen.getByRole('button', { name: 'Learn to play' }));
-    await user.press(
-      within(screen.getByTestId('tutorial-picker')).getByRole('button', { name: 'Asodio' }),
-    );
+    await startFromSettings(user, 'asodio');
     await layoutTutorialBoard();
 
     for (const [i] of LESSON_SETS.asodio.entries()) {
@@ -805,7 +818,7 @@ describe('tutorial from Settings (#159)', () => {
   it('opens the Asodio lessons from its rules page', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/rules/asodio' });
-    await user.press(screen.getByRole('button', { name: 'Learn to play on the board' }));
+    await user.press(screen.getByRole('button', { name: 'Start the lessons' }));
     expect(router.getPathname()).toBe('/tutorial');
     expect(router.getSearchParams()).toEqual({ from: 'rules', game: 'asodio' });
     expect(screen.getByRole('header', { name: 'Learn Asodio' })).toBeOnTheScreen();

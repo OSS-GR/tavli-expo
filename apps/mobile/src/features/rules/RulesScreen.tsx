@@ -16,7 +16,10 @@ import { ActionButton } from '@/components/ActionButton';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { CardFrame } from '@/components/SectionCard';
+import { SectionHeader } from '@/components/SectionHeader';
 import { TUTORIAL_GAMES } from '@/features/match/routes';
+import { LESSON_SETS } from '@/features/tutorial/lessons';
+import type { LessonProgress } from '@/features/tutorial/progress';
 import type { OtherVersion } from '@/features/match/setup';
 
 import {
@@ -31,6 +34,7 @@ import {
   type RulesSection,
   type RulesVariant,
 } from './content';
+import { LessonsCard } from './LessonsCard';
 import { StartPicture } from './StartPicture';
 
 export interface RulesScreenProps {
@@ -44,10 +48,14 @@ export interface RulesScreenProps {
   /** Opens the page of one game (links on the Tavli page). */
   onOpenRules: (game: RulesGame) => void;
   /**
-   * Opens the lessons of a game: Portes (#128), Plakoto or Fevga (#149),
-   * Asodio (#159). Shown on those four pages, not on the Tavli page.
+   * The lessons of the game (#571): a card on top with the progress and
+   * Start, Continue or Play again. Portes (#128), Plakoto, Fevga (#149) and
+   * Asodio (#159) have lessons; the Tavli page has none.
    */
-  onLearnToPlay?: (game: TutorialGame) => void;
+  lessons?: {
+    readonly progress: (game: TutorialGame) => LessonProgress;
+    readonly onOpen: (game: TutorialGame, start: number) => void;
+  };
   /** Goes back. Without it the header has no back button. */
   onBack?: () => void;
 }
@@ -61,11 +69,11 @@ export function RulesScreen({
   variant,
   version = null,
   onOpenRules,
-  onLearnToPlay,
+  lessons,
   onBack,
 }: RulesScreenProps) {
   const { t } = useTranslation();
-  const lessons = tutorialGameOf(variant);
+  const lessonGame = tutorialGameOf(variant);
   return (
     <Screen>
       <ScreenHeader
@@ -78,13 +86,16 @@ export function RulesScreen({
         testID="rules-screen"
         style={styles.scroll}
         contentContainerStyle={styles.content}>
-        {lessons !== null && onLearnToPlay ? (
-          <ActionButton
-            testID="rules-learn-to-play"
-            kind="secondary"
-            label={t('tutorial.openFromRules')}
-            onPress={() => onLearnToPlay(lessons)}
-          />
+        {lessonGame !== null && lessons ? (
+          <>
+            <LessonsCard
+              game={lessonGame}
+              count={LESSON_SETS[lessonGame].length}
+              progress={lessons.progress(lessonGame)}
+              onOpen={lessons.onOpen}
+            />
+            <SectionHeader title={t('rules.sectionTitle')} />
+          </>
         ) : null}
         {isRulesGame(variant) && version !== null ? (
           <Section section={versionSection(version)} />

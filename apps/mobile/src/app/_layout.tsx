@@ -91,6 +91,7 @@ function RootStack() {
           <Stack.Screen name="username" />
           <Stack.Screen name="blocked" />
           <Stack.Screen name="history" />
+          <Stack.Screen name="rules/index" />
           <Stack.Screen name="rules/[variant]" options={{ headerShown: true }} />
           {/* The tutorial board: no swipe back either (Skip is on screen). */}
           <Stack.Screen name="tutorial" options={{ gestureEnabled: false, ...TURNS_WITH_PHONE }} />

@@ -35,7 +35,8 @@ export type WhatsNewEntryId =
   | 'turnClock'
   | 'playRanked'
   | 'homeHero'
-  | 'gameLayout';
+  | 'gameLayout'
+  | 'howToPlay';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -56,6 +57,7 @@ export const RELEASES: readonly WhatsNewRelease[] = [
     entries: [
       { id: 'homeHero', icon: 'house' },
       { id: 'gameLayout', icon: 'smartphone' },
+      { id: 'howToPlay', icon: 'book' },
     ],
   },
   {

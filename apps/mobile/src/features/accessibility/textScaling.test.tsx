@@ -71,7 +71,7 @@ import {
   DEFAULT_SETTINGS,
   type BoardLayoutMode,
 } from '@/features/settings/settings';
-import { SettingsScreen } from '@/features/settings/SettingsScreen';
+import { HowToPlayScreen } from '@/features/rules/HowToPlayScreen';
 import { settingsStore } from '@/features/settings/store';
 import { TutorialScreen } from '@/features/tutorial/TutorialScreen';
 import { WelcomeBoardScreen } from '@/features/welcome/WelcomeBoardScreen';
@@ -157,12 +157,19 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     expect(problems()).toEqual([]);
   });
 
-  it('Settings: the "Learn to play" game picker (#159)', async () => {
-    await renderWithRoot(<SettingsScreen onLearnToPlay={jest.fn()} />);
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('settings-learn-to-play'));
-    });
-    expect(screen.getByTestId('tutorial-picker')).toBeOnTheScreen();
+  it('How to play: the hub (#571)', async () => {
+    await renderWithRoot(
+      <HowToPlayScreen
+        progress={{
+          portes: { status: 'done', learnt: 0 },
+          plakoto: { status: 'new', learnt: 1 },
+          fevga: { status: 'new', learnt: 0 },
+          asodio: { status: 'dismissed', learnt: 0 },
+        }}
+        onOpen={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId('how-to-play-screen')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   });
 

@@ -73,6 +73,8 @@ const SHAKE = [-8, 8, -5, 0] as const;
 const SHAKE_STEP_MS = 50;
 
 export interface TutorialScreenProps {
+  /** The first lesson to show, 0-based (Continue, #571). Default: the first. */
+  start?: number;
   /** The lesson set. Default: Portes. */
   game?: TutorialGame;
   /** Lesson `step` (from 1) was learnt. */
@@ -112,6 +114,7 @@ function setTexts(game: TutorialGame) {
 
 export function TutorialScreen({
   game = 'portes',
+  start = 0,
   onLessonDone,
   onFinished,
   onSkip,
@@ -132,8 +135,9 @@ export function TutorialScreen({
   const direction = lessonDirection(game);
   const view: BoardView = useMemo(() => ({ viewer: 'white', direction }), [direction]);
 
-  const [index, setIndex] = useState(0);
-  const [flow, setFlow] = useState<GameFlow>(() => startLesson(lessons[0]!));
+  const first = start > 0 && start < lessons.length ? start : 0;
+  const [index, setIndex] = useState(first);
+  const [flow, setFlow] = useState<GameFlow>(() => startLesson(lessons[first]!));
   const [wrong, setWrong] = useState(0);
   const [flights, setFlights] = useState<readonly Flight[]>([]);
   const onFlightDone = useCallback(
