@@ -283,7 +283,7 @@ describe('app navigation', () => {
   it('Home opens Friends and Leaderboards (#486)', async () => {
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/' });
-    await user.press(screen.getByRole('button', { name: 'Friends, Add and invite' }));
+    await user.press(screen.getByRole('button', { name: 'Friends, Find friends' }));
     expect(router.getPathname()).toBe('/friends');
     await act(async () => appRouter.back());
     await user.press(screen.getByRole('button', { name: 'Leaderboards, Your rating' }));
@@ -1680,7 +1680,7 @@ describe("Home's tile news (#517)", () => {
     expect(
       await screen.findByRole('button', { name: 'Play ranked, Find a player now' }),
     ).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Friends, Add and invite' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Friends, Find friends' })).toBeOnTheScreen();
     expect(mine).not.toHaveBeenCalled();
     mine.mockRestore();
   });
