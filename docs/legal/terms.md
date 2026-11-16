@@ -105,7 +105,7 @@ When you play online, do not:
 ### Turn clocks
 
 - An online game with a time limit shows a clock for each turn. If your time runs out, you lose that game.
-- A ranked game gives **2 minutes** a turn. If your time runs out in **two games in a row** of the same match, you lose the match.
+- A ranked game gives **2 minutes** a turn. If your time runs out on **two of your turns in a row**, also across games of the same match, you lose the match. A turn you play sets the count back to 0.
 - A slow network, a flat battery or a late notification does not undo a result. If our server caused a wrong result, we may correct it.
 
 ## Reports and blocks
@@ -128,7 +128,7 @@ If an account or a username breaks these terms or the law, we may, depending on 
 
 We pick the smallest step that fixes the problem. We also look at what the player may say for themselves.
 
-**We tell you why.** When we take a step against your account or your name, we tell you which step, why and which rule, in the app or by email when we have your email. We may not be able to reach a guest account. We do not tell you when the law forbids it or when it would put someone at risk.
+**We tell you why.** When we take a step against your account or your name, we tell you which step, why and which rule, by email when we have your email. We may not be able to reach a guest account. We do not tell you when the law forbids it or when it would put someone at risk.
 
 **You can ask us to look again.** Write to **privacy@tavlaki.com** within 6 months, with your username or guest name and why you think we were wrong. A person (we) looks at it again and answers you. If we were wrong, we undo the step. You can also go to a consumer body or a court (see "Law and disputes").
 
