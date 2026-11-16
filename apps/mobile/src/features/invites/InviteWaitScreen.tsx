@@ -284,7 +284,7 @@ function Waiting({ code, view, cancelling, cancelFailed, onCancel, onClose }: Wa
         />
       </View>
       <View style={styles.head}>
-        <CheckerAvatar playerKey={code} wood="bone" size={32} />
+        <CheckerAvatar wood="bone" size={32} />
         <Text ref={titleRef} style={styles.pageTitle} accessibilityRole="header">
           {title}
         </Text>

@@ -64,7 +64,7 @@ export function WhoRow({ friends, invited, busy, onAnyone, onFriend, onAdd, test
         onPress={onAnyone}
         style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
         <View style={styles.ring}>
-          <CheckerAvatar playerKey="anyone" wood="ebony" icon="link" size={CHECKER} />
+          <CheckerAvatar wood="ebony" icon="link" size={CHECKER} />
         </View>
         <Text style={styles.anyone}>{t('friend.anyone')}</Text>
       </Pressable>

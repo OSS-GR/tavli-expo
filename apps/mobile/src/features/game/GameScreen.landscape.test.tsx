@@ -31,7 +31,7 @@ import { DEFAULT_SETTINGS, type HomeBoardSide } from '@/features/settings/settin
 import { settingsStore } from '@/features/settings/store';
 
 import { createGameStore, type GameStore } from './gameStore';
-import { GameScreen } from './GameScreen';
+import { GameScreen, scoreText } from './GameScreen';
 
 import { center, playToTheEnd, press } from '../../../test/boardPlay';
 import { runOnFakeTimers } from '../../../test/clock';
@@ -231,13 +231,22 @@ describe('<GameScreen /> in landscape (#185)', () => {
         'game-score',
         'strip-bottom',
       ]);
-      expect(ids(right.children[0] as Node)).toEqual(['undo-button', 'confirm-button', undefined]);
+      expect(ids(right.children[0] as Node)).toEqual(['undo-button', 'rail-main', undefined]);
+      expect(within(screen.getByTestId('rail-main')).getByTestId('confirm-button')).toBeTruthy();
       // Roll takes Confirm's place after the turn; Undo is gone before the roll.
       await tapMove(geo, 8, 3, 7);
       await tapMove(geo, 13, 5, 7);
       await press('confirm-button');
       expect(within(right).getByTestId('roll-button')).toBeOnTheScreen();
       expect(within(right).queryByTestId('undo-button')).toBeNull();
+      // Empty places keep their room, so Roll sits where Confirm sat.
+      const places = right.children[0] as Node;
+      expect(ids(places)).toEqual([undefined, 'rail-main', undefined]);
+      expect(StyleSheet.flatten((places.children[0] as Node).props.style).height).toBeGreaterThan(
+        0,
+      );
+      expect(within(screen.getByTestId('rail-main')).getByTestId('roll-button')).toBeTruthy();
+      expect(flat('rail-main').minHeight).toBeGreaterThan(64);
     },
   );
 
@@ -407,5 +416,16 @@ describe('<GameScreen /> turning the phone mid-turn (#185)', () => {
     expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
     await press('pass-ok-button');
     expect(screen.queryByTestId('pass-card')).toBeNull();
+  });
+});
+
+describe('scoreText', () => {
+  it('puts each number on the side of its seat', () => {
+    const score = { white: 2, black: 1 };
+    // Portrait: your seat is on the left.
+    expect(scoreText(score, 'white', false)).toBe('2 – 1');
+    // Landscape: the other seat sits above the score, yours below it.
+    expect(scoreText(score, 'white', true)).toBe('1 – 2');
+    expect(scoreText(score, 'black', true)).toBe('2 – 1');
   });
 });

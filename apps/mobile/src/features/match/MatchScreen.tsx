@@ -101,16 +101,11 @@ export function MatchScreen({
     flow.game.phase === 'game-over' && flow.match.status !== 'finished'
       ? nextGameLabel(flow.match, t)
       : undefined;
-  const score = t('game.end.score', {
-    white: name('white'),
-    black: name('black'),
-    whiteScore: flow.match.score.white,
-    blackScore: flow.match.score.black,
-  });
-  const summary =
+  // "Portes · vs Bot (Easy)": the menu adds the score and the target.
+  const about =
     setup.mode === 'bot'
-      ? t('game.menu.summaryBot', { game, level: t(`bot.levels.${setup.botLevel}`), score })
-      : t('game.menu.summaryLocal', { game, score });
+      ? t('home.continue.vsBot', { game, level: t(`bot.levels.${setup.botLevel}`) })
+      : t('home.continue.local', { game });
 
   const resigner = resigningPlayer(flow, setup.mode);
   const gameResignable = canResignGame(flow, resigner);
@@ -121,9 +116,20 @@ export function MatchScreen({
     content = (
       <GameMenu
         gameLabel={gameLabel}
-        summary={summary}
+        about={about}
+        score={{
+          names: { white: name('white'), black: name('black') },
+          score: flow.match.score,
+          target: flow.match.targetPoints,
+        }}
         resignGameHint={
-          gameResignable ? t('game.menu.resignGameHint', { name: name(opponent(resigner)) }) : null
+          gameResignable
+            ? t('game.menu.resignGamePoints', {
+                name: name(opponent(resigner)),
+                // What the engine would score now: mono, diplo or per checker.
+                count: previewResign(flow, resigner).result.points,
+              })
+            : null
         }
         resignMatchHint={
           resigner !== null
@@ -236,7 +242,7 @@ export function MatchScreen({
         visible={content !== null}
         onClose={close}
         closeLabel={t('game.menu.resume')}
-        look={overlay === 'menu' ? 'sheet' : 'dialog'}
+        look={overlay === 'menu' ? 'raised' : 'dialog'}
         // The game screen turns with the phone (#185); its menu and dialogs too.
         turns>
         {content}

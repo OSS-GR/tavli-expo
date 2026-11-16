@@ -181,7 +181,9 @@ import {
   RAIL_LANDSCAPE_SECONDARY,
   RAIL_PRIMARY,
   RAIL_SECONDARY,
+  RAIL_SUBTITLE_LINE,
   RailButton,
+  iconLabelShown,
 } from './RailButton';
 import { diceWereChosen, diceWereRolled } from './rolledDice';
 import { plainSeats, type Seat } from './seats';
@@ -599,14 +601,17 @@ export function GameScreen({
     onlineCovered;
   // Fast forward is offered on your roll, vs the bot, once the game is a race.
   const human = botPlayer === null ? null : other(botPlayer);
+  // The game is a race that Fast forward may play (vs the bot, in play).
+  const raceOn = useMemo(
+    () => fastForwardSeat !== null && view.matchPhase === 'playing' && isRace(game.state),
+    [fastForwardSeat, view.matchPhase, game.state],
+  );
   const raceReady =
-    fastForwardSeat !== null &&
+    raceOn &&
     !fastForwarding &&
-    view.matchPhase === 'playing' &&
     phase === 'awaiting-roll' &&
     view.toMove === human &&
-    !boardCovered &&
-    isRace(game.state);
+    !boardCovered;
   // The race card asks once per game, on your first roll of the race, until
   // you turn it off ("Don't ask again" or the setting).
   const raceAnswered = useRaceOfferAnswered(raceKey);
@@ -647,10 +652,6 @@ export function GameScreen({
   // For the rest of the race the portrait row keeps that room, so the board
   // does not shrink and grow back on every roll.
   const [fastForwardLines, setFastForwardLines] = useState(1);
-  const raceOn = useMemo(
-    () => fastForwardSeat !== null && view.matchPhase === 'playing' && isRace(game.state),
-    [fastForwardSeat, view.matchPhase, game.state],
-  );
   const raceRoom = !landscape && raceOn && fastForwardLines > 1;
 
   // One checker with several dice (#180): the "2+3" targets, from the engine.
@@ -1432,6 +1433,7 @@ export function GameScreen({
         icon="lightbulb"
         size={sideSize}
         circleBox={circleBox}
+        // A large font shows the word under the circle too (#499).
         iconOnly
         busy={hintProps.busy}
         onPress={hintProps.onPress}
@@ -1466,11 +1468,13 @@ export function GameScreen({
     hintButton ??
     (analyzer !== undefined && showHints ? (
       <View
-        style={styles.hintPlaceholder(sideSize, circleBox ?? sideSize)}
+        style={styles.hintPlaceholder(iconLabelShown(windowSize.fontScale))}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants">
-        <View style={styles.hintPlaceholderCircle(sideSize)}>
-          <Icon name="lightbulb" color={ui.colors.textFaint} size={Math.round(sideSize * 0.4)} />
+        <View style={styles.hintPlaceholderBox(Math.max(sideSize, circleBox ?? sideSize))}>
+          <View style={styles.hintPlaceholderCircle(sideSize)}>
+            <Icon name="lightbulb" color={ui.colors.textFaint} size={Math.round(sideSize * 0.4)} />
+          </View>
         </View>
       </View>
     ) : null);
@@ -2179,13 +2183,14 @@ export function GameScreen({
 
   // The score once, between the seats: "0 – 0", "first to 3", the game.
   // Screen readers hear the score on each seat.
+  const seatsScore = scoreText(match.score, viewer, landscape);
   const scoreBlock = (
     <View
       testID="game-score"
       style={styles.score}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
-      <Text style={styles.scoreText}>{`${match.score[viewer]} – ${match.score[top]}`}</Text>
+      <Text style={styles.scoreText}>{seatsScore}</Text>
       <Text style={styles.scoreTarget}>
         {t('game.strip.firstTo', { target: match.targetPoints })}
       </Text>
@@ -2246,10 +2251,14 @@ export function GameScreen({
       style={styles.rail(rails.right)}
       contentContainerStyle={styles.railButtons}
       alwaysBounceVertical={false}>
-      {undoButton ?? <View style={styles.railSlot} />}
-      {statusText}
-      {mainButton ?? (statusText === null ? <View style={styles.mainSpacer} /> : null)}
-      {hintSlot ?? <View style={styles.railSlot} />}
+      {undoButton ?? <View style={styles.railSlot(true)} />}
+      {/* The main place is as tall as Roll with its subtitle in every state,
+          and the status text sits in it, so Undo and the hint never move. */}
+      <View testID="rail-main" style={styles.railMain}>
+        {statusText}
+        {mainButton}
+      </View>
+      {hintSlot ?? <View style={styles.railSlot(false)} />}
     </ScrollView>
   ) : (
     <View
@@ -2349,6 +2358,21 @@ const SIDE_SLOT = 76;
 const MENU_SIZE = 40;
 const MENU_SLOP = (44 - MENU_SIZE) / 2;
 
+/**
+ * The score between the seats, each number on the side of its seat: yours
+ * first in portrait (your seat is on the left), the other seat's first on
+ * the landscape rail (it sits above the score).
+ */
+export function scoreText(
+  score: Readonly<Record<PlayerId, number>>,
+  viewer: PlayerId,
+  landscape: boolean,
+): string {
+  const mine = score[viewer];
+  const theirs = score[other(viewer)];
+  return landscape ? `${theirs} – ${mine}` : `${mine} – ${theirs}`;
+}
+
 const styles = StyleSheet.create((theme, rt) => ({
   // Landscape keeps the notch, the round corners and the home bar free.
   screen: (landscape: boolean) => ({
@@ -2392,9 +2416,19 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.space.sm,
     paddingVertical: theme.space.xs,
   },
-  // An empty place for Undo or the hint, so the main circle stays put.
-  railSlot: {
-    height: RAIL_LANDSCAPE_SECONDARY,
+  // An empty place for Undo (circle and label) or the hint (circle only),
+  // so the other buttons stay put.
+  railSlot: (label: boolean) => ({
+    height: RAIL_LANDSCAPE_SECONDARY + (label ? theme.space.xs + RAIL_LABEL_LINE : 0),
+  }),
+  // The main circle's place on the rail, also when it is empty (the bot's
+  // turn): as tall as Roll (circle, label, subtitle), so nothing jumps.
+  railMain: {
+    minWidth: RAIL_PRIMARY,
+    minHeight: RAIL_PRIMARY + 2 * theme.space.xs + RAIL_LABEL_LINE + RAIL_SUBTITLE_LINE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.space.sm,
   },
   lead: {
     gap: theme.space.xxs,
@@ -2540,7 +2574,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     minHeight: RAIL_PRIMARY + theme.space.xs + 2 * RAIL_LABEL_LINE,
   },
   // Undo (or Fast forward) and the hint each get the same width, so a long
-  // label (Greek «Γρήγορη προώθηση») wraps under its circle and never pushes
+  // label (Greek «Γρήγορο τέλος») wraps under its circle and never pushes
   // the circle away from the main one.
   sideSlot: {
     width: SIDE_SLOT,
@@ -2553,8 +2587,12 @@ const styles = StyleSheet.create((theme, rt) => ({
     textAlign: 'right',
     color: theme.colors.textDim,
   },
-  hintPlaceholder: (size: number, box: number) => ({
-    height: Math.max(size, box),
+  // With a large font the hint shows its label, so its place keeps that line too.
+  hintPlaceholder: (label: boolean) => ({
+    paddingBottom: label ? theme.space.xs + RAIL_LABEL_LINE : 0,
+  }),
+  hintPlaceholderBox: (height: number) => ({
+    height,
     justifyContent: 'center',
   }),
   hintPlaceholderCircle: (size: number) => ({
