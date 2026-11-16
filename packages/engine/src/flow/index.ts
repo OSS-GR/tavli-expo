@@ -8,6 +8,7 @@ export {
   currentBoard,
   currentPrompt,
   legalNextMoves,
+  lostDice,
   remainingDice,
 } from './game-flow';
 export type {

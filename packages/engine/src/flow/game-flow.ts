@@ -479,6 +479,53 @@ export function remainingDice(flow: GameFlow): readonly DieValue[] {
   return left;
 }
 
+/**
+ * The dice of this turn that can no longer be played (#579), so the board
+ * can show them as lost. Empty outside `moving` and `awaiting-confirm`.
+ *
+ * - Once the turn is complete (`awaiting-confirm`), every die left is lost.
+ * - While moving, a die is lost when no legal play of this roll uses it
+ *   (the "use as much of the roll as possible" rules): a double with only
+ *   two legal moves loses two dice, and 6-5 where only the 6 may be played
+ *   loses the 5 at once. When the plays differ in which die they leave,
+ *   none is lost yet.
+ *
+ * It reads the variant's `legalTurns`; it adds no rule.
+ */
+export function lostDice(flow: GameFlow, ctx: FlowContext = {}): readonly DieValue[] {
+  const left = remainingDice(flow);
+  if (left.length === 0) return [];
+  if (flow.phase === 'awaiting-confirm') return left;
+  const dice = flow.state.dice;
+  if (dice === null) return [];
+  const all = diceMoves(dice);
+  let lost: DieValue[] | null = null;
+  for (const turn of variantOf(flow, ctx).legalTurns(flow.state, dice)) {
+    const unused = [...all];
+    for (const move of turn.moves) {
+      const i = unused.indexOf(move.die);
+      if (i >= 0) unused.splice(i, 1);
+    }
+    lost = lost === null ? unused : common(lost, unused);
+    if (lost.length === 0) return [];
+  }
+  return common(lost ?? [], left);
+}
+
+/** The dice in both lists, each as often as it is in both. */
+function common(a: readonly DieValue[], b: readonly DieValue[]): DieValue[] {
+  const pool = [...b];
+  const out: DieValue[] = [];
+  for (const value of a) {
+    const i = pool.indexOf(value);
+    if (i >= 0) {
+      pool.splice(i, 1);
+      out.push(value);
+    }
+  }
+  return out;
+}
+
 /** True when the played moves form a full legal play. */
 export function canConfirm(flow: GameFlow): boolean {
   return flow.phase === 'awaiting-confirm';

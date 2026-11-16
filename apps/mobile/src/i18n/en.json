@@ -1278,7 +1278,9 @@
       "openingYours": "Roll your die"
     },
     "dice": {
-      "label": "Dice {{values}}, {{left}} left to play"
+      "label": "Dice {{values}}, {{left}} left to play",
+      "lost_one": "The {{value}} can't be played",
+      "lost_other": "{{count}} dice can't be played"
     },
     "doubles": {
       "name": {

@@ -159,6 +159,27 @@ describe('diceView', () => {
       { value: 3, used: false },
     ]);
   });
+
+  it('marks a die no legal turn can play (#579)', () => {
+    expect(diceView([6, 5], [6, 5], [5])).toEqual([
+      { value: 6, used: false },
+      { value: 5, used: false, lost: true },
+    ]);
+    // After 6: the 5 is left and lost.
+    expect(diceView([6, 5], [5], [5])).toEqual([
+      { value: 6, used: true },
+      { value: 5, used: false, lost: true },
+    ]);
+  });
+
+  it('marks only as many dice of a double as are lost', () => {
+    expect(diceView([3, 3], [3, 3], [3, 3])).toEqual([
+      { value: 3, used: true },
+      { value: 3, used: true },
+      { value: 3, used: false, lost: true },
+      { value: 3, used: false, lost: true },
+    ]);
+  });
 });
 
 describe('opening status', () => {

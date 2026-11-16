@@ -1,6 +1,7 @@
 /**
  * The dice (wireframes 6c–6f): two dice side by side,
- * or four smaller dice in a 2 x 2 grid for a double. Used dice fade.
+ * or four smaller dice in a 2 x 2 grid for a double. Used dice fade. A
+ * die no legal turn can play fades and gets a slash (#579).
  * The values always come from the engine flow.
  *
  * A double (#177) first shows the two rolled dice, like any roll. With
@@ -92,10 +93,15 @@ export function DiceRow({
   const lastRoller = double ? 1 : dice.length - 1;
 
   const tilt = theme.layouts['portrait-rotated'].dice.tilt;
-  const label = t('game.dice.label', {
+  const lost = dice.filter((d) => d.lost === true);
+  const rolled = t('game.dice.label', {
     values: dice.map((d) => String(d.value)).join('-'),
-    left: dice.filter((d) => !d.used).length,
+    left: dice.filter((d) => !d.used && d.lost !== true).length,
   });
+  const label =
+    lost.length === 0
+      ? rolled
+      : `${rolled}. ${t('game.dice.lost', { count: lost.length, value: lost[0]?.value })}`;
   return (
     // The canvas always sits in this native view (`collapsable={false}`), so
     // it never moves to another native parent when a view around it changes.
@@ -124,6 +130,7 @@ export function DiceRow({
               index={i}
               tilt={tilt[i % 2] ?? 0}
               used={d.used}
+              lost={d.lost === true}
               rollKey={rest ? null : slot.rolls ? rollKey : null}
               {...(slot.pairAt ? { pairAt: slot.pairAt, split } : {})}
               {...(!slot.rolls && slideIn ? { slideIn: true } : {})}

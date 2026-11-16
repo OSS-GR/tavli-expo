@@ -4,7 +4,14 @@
  * `DieBody` and `DiePips` draw around (0, 0), so a parent `Group` can move,
  * turn and scale the die (the roll animation does). `DieShape` is a still die.
  */
-import { BlurMask, Circle, Group, RadialGradient, RoundedRect } from '@shopify/react-native-skia';
+import {
+  BlurMask,
+  Circle,
+  Group,
+  Path,
+  RadialGradient,
+  RoundedRect,
+} from '@shopify/react-native-skia';
 import type { DiceStyle } from '@tavli/themes';
 
 import { radialProps, rgba } from '../paint';
@@ -102,6 +109,24 @@ export function DiePips({ style, size, value }: { style: DiceStyle; size: number
           color={value === 1 ? style.acePip : style.pip}
         />
       ))}
+    </Group>
+  );
+}
+
+/**
+ * The slash over a die you cannot play (#579, Figma 17 part 3): a pip-colored
+ * stroke from corner to corner of the face, on a face-colored halo so it
+ * reads on the faded die.
+ */
+export function DieSlash({ style, size }: { style: DiceStyle; size: number }) {
+  const face = faceBox(style, size);
+  const pad = face.width * 0.12;
+  const path = `M ${face.x + pad} ${face.y + face.height - pad} L ${face.x + face.width - pad} ${face.y + pad}`;
+  const width = Math.max(2, size * 0.07);
+  return (
+    <Group>
+      <Path path={path} style="stroke" strokeWidth={width * 2.2} strokeCap="round" color={style.face} />
+      <Path path={path} style="stroke" strokeWidth={width} strokeCap="round" color={style.pip} />
     </Group>
   );
 }

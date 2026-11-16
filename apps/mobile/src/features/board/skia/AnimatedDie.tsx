@@ -1,6 +1,7 @@
 /**
  * A die that tumbles and lands on `value` (Skia + Reanimated, UI thread).
- * A new `rollKey` starts a new roll. `used` fades the die.
+ * A new `rollKey` starts a new roll. `used` fades the die; `lost` fades it
+ * and draws a slash (a die you cannot play, #579).
  *
  * A die of a double can start in the pair (`pairAt`, big) and slide to its
  * place in the grid (`x`, `y`, `size`) when `split` turns on (#177).
@@ -28,7 +29,7 @@ import {
   type DicePlace,
 } from '../diceMotion';
 
-import { DieBody, DiePips } from './DieShape';
+import { DieBody, DiePips, DieSlash } from './DieShape';
 
 export interface AnimatedDieProps {
   style: DiceStyle;
@@ -40,6 +41,8 @@ export interface AnimatedDieProps {
   index: number;
   tilt: number;
   used: boolean;
+  /** The die cannot be played this turn (#579): faded, with a slash. */
+  lost?: boolean;
   /** Changes on every new roll. `null`: show the die at rest, no roll. */
   rollKey: string | null;
   /** Called on the JS thread when this die lands. */
@@ -85,6 +88,7 @@ export function AnimatedDie({
   index,
   tilt,
   used,
+  lost = false,
   rollKey,
   onLand,
   pairAt,
@@ -92,7 +96,9 @@ export function AnimatedDie({
   slideIn = false,
 }: AnimatedDieProps) {
   const progress = useSharedValue(1);
-  const fade = useSharedValue(used ? USED_OPACITY : 1);
+  const faded = used || lost;
+  const fade = useSharedValue(faded ? USED_OPACITY : 1);
+  const slash = useSharedValue(lost ? 1 : 0);
   // 0: in the pair, 1: at x, y, size.
   const moved = useSharedValue(pairAt !== undefined && (!split || slideIn) ? 0 : 1);
 
@@ -113,8 +119,12 @@ export function AnimatedDie({
   }, [rollKey]);
 
   useEffect(() => {
-    fade.set(withTiming(used ? USED_OPACITY : 1, { duration: FADE_MS }));
-  }, [used, fade]);
+    fade.set(withTiming(faded ? USED_OPACITY : 1, { duration: FADE_MS }));
+  }, [faded, fade]);
+
+  useEffect(() => {
+    slash.set(withTiming(lost ? 1 : 0, { duration: FADE_MS }));
+  }, [lost, slash]);
 
   useEffect(() => {
     if (split && moved.get() < 1) {
@@ -139,13 +149,23 @@ export function AnimatedDie({
   const face = useDerivedValue(() => tumbleFace(progress.get(), index, value));
   // A die that slides in stays hidden under its pair die until the split starts.
   const opacity = useDerivedValue(() => (slideIn && moved.get() === 0 ? 0 : fade.get()));
+  // The slash stays clear on the faded die; it hides while a roll tumbles.
+  const slashOpacity = useDerivedValue(() =>
+    slideIn && moved.get() === 0 ? 0 : progress.get() < 1 ? 0 : slash.get(),
+  );
 
   return (
-    <Group transform={transform} opacity={opacity}>
-      <DieBody style={style} size={drawSize} />
-      {FACES.map((k) => (
-        <Face key={k} face={face} k={k} style={style} size={drawSize} />
-      ))}
+    <Group transform={transform}>
+      <Group opacity={opacity}>
+        <DieBody style={style} size={drawSize} />
+        {FACES.map((k) => (
+          <Face key={k} face={face} k={k} style={style} size={drawSize} />
+        ))}
+      </Group>
+      {/* Outside the fade: the slash reads clearly on the faded die. */}
+      <Group opacity={slashOpacity}>
+        <DieSlash style={style} size={drawSize} />
+      </Group>
     </Group>
   );
 }

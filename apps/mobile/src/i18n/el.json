@@ -1278,7 +1278,9 @@
       "openingYours": "Ρίξε το ζάρι σου"
     },
     "dice": {
-      "label": "Ζάρια {{values}}· μένουν {{left}} να παιχτούν"
+      "label": "Ζάρια {{values}}· μένουν {{left}} να παιχτούν",
+      "lost_one": "Το {{value}} δεν παίζεται",
+      "lost_other": "{{count}} ζάρια δεν παίζονται"
     },
     "doubles": {
       "name": {
