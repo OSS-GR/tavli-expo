@@ -531,6 +531,31 @@ describe('fromBetterAuthClient', () => {
     expect(await rejection(auth.listKeys())).toMatchObject({ code: 'NETWORK' });
   });
 
+  it('keeps an email key with no address as a plain email key (#565)', async () => {
+    const server = createServer();
+    const client = createClient(server, { cookie: null });
+    const realFetch = client.$fetch.bind(client);
+    const odd: BetterAuthClient = {
+      ...client,
+      $fetch: (async (path: string, options?: object) => {
+        if (path !== '/key/list') return realFetch(path, options as never);
+        const keys = [
+          { provider: 'email' },
+          { provider: 'email', email: 42 },
+          { provider: 'apple' },
+        ];
+        return { data: { keys }, error: null };
+      }) as BetterAuthClient['$fetch'],
+    };
+    const auth = fromBetterAuthClient(odd, { now: () => server.clock });
+    await auth.signInAsGuest();
+    expect(await auth.listKeys()).toEqual([
+      { provider: 'email' },
+      { provider: 'email' },
+      { provider: 'apple' },
+    ]);
+  });
+
   it('maps the email code errors (#399): wrong and rate limits pass, a mail failure is NETWORK', async () => {
     const { auth, server } = subject();
     await auth.requestEmailCode('eleni@example.com', 'el');
