@@ -68,6 +68,12 @@ export function currentGameNumber(flow: MatchFlow): number {
   return flow.game.phase === 'game-over' ? games.length : games.length + 1;
 }
 
+/** The plain line of the game on the board (#574): "Pin, do not hit". */
+export function currentGameLine(flow: MatchFlow, t: TFunction): string | undefined {
+  const variant = flow.game.state.variant;
+  return isGameChoice(variant) ? t(`games.${variant}Subtitle`) : undefined;
+}
+
 /** The game on the board (#109): "Game 2 · Plakoto". */
 export function currentGameLabel(flow: MatchFlow, t: TFunction): string {
   return t('game.round', {
