@@ -3,12 +3,12 @@ Greek version of terms.md (issue #405, review in #586). Same content as the Engl
 Static page: site/el/terms. Change all four together (see README.md).
 Legal texts use εσείς (docs/design/greek-copy.md); the app's labels are quoted as the app shows them.
 This is a draft, not legal advice. Have a lawyer check it.
-OWNER: have a lawyer check it before it goes live. If you raise TERMS_VERSION, put the new date after "Έκδοση" and drop the "τελευταία αλλαγή" part.
+OWNER: have a lawyer check it before it goes live.
 -->
 
 # Όροι χρήσης του Ταβλάκι
 
-**Έκδοση:** 9 Νοεμβρίου 2026 (τελευταία αλλαγή του κειμένου: 16 Νοεμβρίου 2026)
+**Έκδοση:** 16 Νοεμβρίου 2026
 
 English: [tavlaki.com/terms](https://tavlaki.com/terms)
 

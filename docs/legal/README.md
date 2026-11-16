@@ -106,7 +106,7 @@ The policy's "Delete your account" section (all four files) and the store answer
 - [ ] Have a lawyer check the terms: the age rule and country list, "The app as it is", "Our liability", the Apple section and "Law and disputes" (the `OWNER` comments).
 - [ ] The terms say you must be 16 (or 13) to pick a username **or to play ranked**, but the app asks the age only at the username step. Decide whether Play ranked should ask too.
 - [ ] The terms promise to tell a player why we took a step against their account, and to look again when they write within 6 months. Answer those emails, and keep a short note of each step and its reason.
-- [ ] Decide whether the terms changes need a new `TERMS_VERSION` (players accept again at their next username change).
+- [x] Raise `TERMS_VERSION` for the #586 rewrite (owner, 2026-11-16: `2026-11-16`; players accept again at their next username change).
 - [ ] Publish `site/terms/` and `site/el/terms/` with the privacy pages, before the build with usernames goes to the stores.
 - [ ] Add the terms URL to App Store Connect (License Agreement: a custom EULA, or keep Apple's standard one and link the terms in the description) and to the Play listing.
 

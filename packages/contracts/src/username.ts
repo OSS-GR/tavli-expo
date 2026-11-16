@@ -35,7 +35,7 @@ export const USERNAME_CHANGE_MS = 30 * 24 * 60 * 60 * 1000;
  * the terms change so much that players must accept them again: the next
  * username change then asks again.
  */
-export const TERMS_VERSION = '2026-11-09';
+export const TERMS_VERSION = '2026-11-16';
 
 /** The signed-in player's username and what the username step still needs. */
 export interface MyUsername {

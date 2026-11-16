@@ -3,12 +3,12 @@ Source of truth for https://tavlaki.com/terms (issue #405, review in #586).
 Greek version: terms.el.md. Static pages: site/terms and site/el/terms. Change all four together (see README.md).
 The version date below is TERMS_VERSION in packages/contracts/src/username.ts. A change that players must accept again gets a new date in both places.
 This is a draft, not legal advice. Have a lawyer check it.
-OWNER: have a lawyer check it before it goes live. If you raise TERMS_VERSION, put the new date after "Version" and drop the "text last changed" part.
+OWNER: have a lawyer check it before it goes live.
 -->
 
 # Tavlaki terms of use
 
-**Version:** 9 November 2026 (text last changed 16 November 2026)
+**Version:** 16 November 2026
 
 Ελληνικά: [tavlaki.com/el/terms](https://tavlaki.com/el/terms)
 
