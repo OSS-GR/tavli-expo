@@ -16,6 +16,7 @@ import { signInForOnline } from '@/features/online/account';
 import { hasOnlineAccount, rememberOnlineAccount } from '@/features/online/accountHint';
 import { DELETE_TIME_LIMIT_MS } from '@/features/online/deleteData';
 import { reminders } from '@/features/reminders/reminders';
+import { AccountCard } from '@/features/settings/AccountCard';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import i18n from '@/i18n';
 import { appleSheet, auth, onlineData, usernames } from '@/services';
@@ -25,6 +26,7 @@ import { enterEmailCode } from '../../../test/emailCode';
 import { onlineFake } from '../../../test/onlineFake';
 import { renderWithRoot } from '../../../test/render';
 
+import { knownAccount, rememberAccount, renameKnownAccount, warmAccount } from './accountMemory';
 import { AccountScreen } from './AccountScreen';
 import { addableKeys, type AccountDeps } from './useAccount';
 
@@ -442,9 +444,11 @@ describe('<AccountScreen /> as a guest', () => {
       .mockRejectedValueOnce(new Error('offline'))
       .mockImplementation(() => mine());
     await user.press(screen.getByTestId('account-save-apple'));
-    // The screen shows again while the sheet is open, and that load fails.
+    // The screen shows again while the sheet is open, and that quiet load
+    // fails: the guest stays on the screen (#567).
     await act(async () => showAgain(1));
-    expect(await screen.findByTestId('account-failed')).toBeOnTheScreen();
+    expect(screen.getByTestId('account-guest')).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-failed')).toBeNull();
     await act(async () => release());
     expect(await screen.findByRole('header', { name: 'Pick a username' })).toBeOnTheScreen();
   });
@@ -460,9 +464,10 @@ describe('<AccountScreen /> as a guest', () => {
     await act(async () => showAgain(1));
     expect(screen.getByTestId('account-username-step')).toBeOnTheScreen();
     expect(screen.getByTestId('username-input')).toHaveProp('value', 'Nikos');
-    // Not now shows what the load found: Try again.
+    // Not now shows the account: a quiet load that fails keeps it (#567).
     await user.press(within(screen.getByTestId('account-username-step')).getByText('Not now'));
-    expect(screen.getByTestId('account-failed')).toBeOnTheScreen();
+    expect(screen.getByTestId('account-saved')).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-failed')).toBeNull();
   });
 
   it('an older load that lands after Save keeps the new name (#483)', async () => {
@@ -853,6 +858,128 @@ describe('<AccountScreen /> loading', () => {
     ).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByTestId('account-guest')).toBeOnTheScreen();
+  });
+
+  /** Holds `Usernames.mine` until the returned function runs. */
+  function holdMine(): () => void {
+    let answer: () => void = () => {};
+    const mine = usernames!.mine.bind(usernames);
+    jest
+      .spyOn(usernames!, 'mine')
+      .mockImplementation(() => new Promise((resolve) => (answer = () => resolve(mine()))));
+    return () => answer();
+  }
+
+  it('opens again with the last account at once, then loads it quietly (#567)', async () => {
+    await saved('maria');
+    await open();
+    expect(await screen.findByTestId('account-saved')).toBeOnTheScreen();
+    await act(async () => screen.unmount());
+    const answer = holdMine();
+    await open();
+    expect(screen.getByTestId('account-saved')).toBeOnTheScreen();
+    expect(screen.getByTestId('account-name')).toHaveTextContent('maria');
+    expect(screen.queryByText('Loading your account…')).toBeNull();
+    await act(async () => answer());
+    expect(screen.getByTestId('account-saved')).toBeOnTheScreen();
+  });
+
+  it('a quiet load that fails keeps the account it shows (#567)', async () => {
+    const number = await guest();
+    await open();
+    expect(await screen.findByTestId('account-guest')).toBeOnTheScreen();
+    await act(async () => screen.unmount());
+    jest.spyOn(usernames!, 'mine').mockRejectedValueOnce(new Error('offline'));
+    await open();
+    await act(async () => {});
+    expect(screen.getByText(`Guest ${number}`)).toBeOnTheScreen();
+    expect(screen.queryByTestId('account-failed')).toBeNull();
+  });
+
+  it('the Settings card loads the account, so Account shows it at once (#567)', async () => {
+    await saved('maria');
+    await renderWithRoot(
+      <AccountCard auth={auth!} usernames={usernames!} visit={0} onPress={() => {}} />,
+    );
+    expect(await screen.findByText('maria')).toBeOnTheScreen();
+    await act(async () => screen.unmount());
+    holdMine();
+    await open();
+    expect(screen.getByTestId('account-saved')).toBeOnTheScreen();
+    expect(screen.queryByText('Loading your account…')).toBeNull();
+  });
+
+  it('Home warms it once per app run, so the first Settings shows the account (#567)', async () => {
+    await saved('maria');
+    warmAccount(auth!, usernames!);
+    await act(async () => {});
+    holdMine();
+    await renderWithRoot(
+      <AccountCard auth={auth!} usernames={usernames!} visit={0} onPress={() => {}} />,
+    );
+    expect(screen.getByText('maria')).toBeOnTheScreen();
+    expect(screen.queryByText('Your account')).toBeNull();
+  });
+
+  it('a phone that never played online warms nothing and asks the server nothing (#567)', async () => {
+    const ready = jest.spyOn(auth!, 'ready');
+    warmAccount(auth!, usernames!);
+    await act(async () => {});
+    expect(ready).not.toHaveBeenCalled();
+    expect(knownAccount(auth!)).toBeNull();
+  });
+
+  it('never shows the last account to another user (#567)', async () => {
+    await saved('maria');
+    warmAccount(auth!, usernames!);
+    await act(async () => {});
+    expect(knownAccount(auth!)?.kind).toBe('saved');
+    // Another user signs in on this phone (no screen saw the sign-out).
+    await auth!.signOut();
+    await signInForOnline(auth!);
+    expect(knownAccount(auth!)).toBeNull();
+  });
+
+  it('a reload that fails after an action says so: the action changed the account (#567)', async () => {
+    const user = setupUser();
+    await saved('maria');
+    await open();
+    await screen.findByTestId('account-saved');
+    jest.spyOn(usernames!, 'mine').mockRejectedValueOnce(new Error('offline'));
+    await user.press(screen.getByTestId('account-add-email'));
+    await enterEmailCode(user, onlineFake.authStore, 'maria@example.com');
+    expect(await screen.findByTestId('account-failed')).toBeOnTheScreen();
+  });
+
+  it('a slow warm-up never writes over a newer load (#567)', async () => {
+    await saved('maria');
+    const answer = holdMine();
+    warmAccount(auth!, usernames!);
+    // A newer load lands first: a guest.
+    rememberAccount({ kind: 'guest', id: auth!.currentUser()!.id, guestNumber: null });
+    await act(async () => answer());
+    expect(knownAccount(auth!)?.kind).toBe('guest');
+  });
+
+  it('a username save shows the new name at once (#567)', async () => {
+    await saved('maria');
+    warmAccount(auth!, usernames!);
+    await act(async () => {});
+    renameKnownAccount('nikos');
+    expect(knownAccount(auth!)).toMatchObject({ kind: 'saved', username: 'nikos' });
+  });
+
+  it('shows no old account after a sign-out (#567)', async () => {
+    const user = setupUser();
+    await saved('maria');
+    await open();
+    await screen.findByTestId('account-saved');
+    const dialog = await dialogFrom(user, 'account-sign-out');
+    await user.press(dialog.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByText('You are signed out.')).toBeOnTheScreen();
+    await act(async () => screen.unmount());
+    await open();
+    expect(screen.getByTestId('account-offline')).toBeOnTheScreen();
   });
 
   it('a phone whose session is gone shows the offline state', async () => {

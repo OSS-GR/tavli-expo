@@ -26,6 +26,7 @@ import { Linking, Platform, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { renameKnownAccount } from '@/features/account/accountMemory';
 import { ToggleRow } from '@/components/settings/ToggleRow';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
@@ -117,6 +118,8 @@ export function UsernameForm({
       })
       .then(
         (next) => {
+          // Settings and Account show the new name at once (#567).
+          renameKnownAccount(next.name);
           if (!mounted.current) return;
           setBusy(false);
           onDone(next);

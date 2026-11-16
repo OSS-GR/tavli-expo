@@ -72,6 +72,8 @@ import { appleCredential, signInWithApple, signInWithEmail } from '@/features/on
 import { needsUsernameStep } from '@/features/online/usernameStep';
 import { reminders } from '@/features/reminders/reminders';
 
+import { knownAccount, rememberAccount } from './accountMemory';
+
 export type AccountState =
   /** No account on this phone: nothing was asked of the server. */
   | { readonly kind: 'offline' }
@@ -260,9 +262,14 @@ function problemOf(error: unknown): AccountProblem {
  * shows again (the route's focus), so a new username shows.
  */
 export function useAccount(deps: AccountDeps, visit = 0): Account {
-  const [state, setState] = useState<AccountState>(() =>
-    hasOnlineAccount() ? { kind: 'loading' } : { kind: 'offline' },
+  // The last loaded account shows at once; the load below refreshes it (#567).
+  const [state, setState] = useState<AccountState>(
+    () =>
+      knownAccount(deps.auth) ?? (hasOnlineAccount() ? { kind: 'loading' } : { kind: 'offline' }),
   );
+  useEffect(() => {
+    rememberAccount(state);
+  }, [state]);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busy, setBusy] = useState<AccountAction | null>(null);
   const [problem, setProblem] = useState<AccountProblem | null>(null);
@@ -301,9 +308,10 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
   /**
    * Loads the state. With `askName` (an action that may make a saved
    * account), a saved account with no username gets the username step.
+   * `quiet` (a visit): a failure keeps the account that shows (#567).
    */
   const load = useCallback(
-    (askName: boolean) => {
+    (askName: boolean, quiet = false) => {
       const asks = askName || latest.current.askName;
       const me = { askName: asks };
       latest.current = me;
@@ -320,8 +328,14 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
           if (!live.current || latest.current !== me) return;
           latest.current = { askName: false };
           // An open step stays with what was typed. Only Try again asks
-          // again, not a later load.
-          setState({ kind: 'failed', askName: asks });
+          // again, not a later load. A visit's quiet load that fails keeps
+          // the account it shows (#567); a load after an action says so,
+          // since the action changed what the server has.
+          setState((now) =>
+            quiet && !asks && (now.kind === 'guest' || now.kind === 'saved')
+              ? now
+              : { kind: 'failed', askName: asks },
+          );
         },
       );
     },
@@ -329,7 +343,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
   );
 
   useEffect(() => {
-    load(false);
+    load(false, true);
   }, [load, visit]);
 
   const reload = () => {

@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { anyGameLevels } from '@/features/bot/levels';
@@ -20,6 +20,7 @@ import { lastModes } from '@/features/home/lastModes';
 import { LearnCard } from '@/features/home/LearnCard';
 import { ReminderCard } from '@/features/home/ReminderCard';
 import { useTileNews } from '@/features/home/useTileNews';
+import { warmAccount } from '@/features/account/accountMemory';
 import { INVITE_TICK_MS } from '@/features/invites/myInvites';
 import { matchSessions } from '@/features/match/appSessions';
 import {
@@ -46,7 +47,16 @@ import { useReminderCard } from '@/features/reminders/useReminderCard';
 import { offersTutorial } from '@/features/tutorial/progress';
 import { useTutorial } from '@/features/tutorial/store';
 import { whatsNewSeen } from '@/features/whats-new/seen';
-import { auth, botLevels, friends, games, invites, matchmaking, ratings } from '@/services';
+import {
+  auth,
+  botLevels,
+  friends,
+  games,
+  invites,
+  matchmaking,
+  ratings,
+  usernames,
+} from '@/services';
 
 interface SlotState {
   readonly saved: SavedMatch | null;
@@ -100,6 +110,11 @@ export default function HomeRoute() {
   const { card } = reminder;
   // Your rating on Play ranked and the friend requests on Friends (#517).
   const news = useTileNews({ auth, ratings, friends, enabled: onlineAccount, focused });
+  // Load the account once per app run, so Settings shows it at once (#567).
+  useEffect(() => {
+    if (onlineAccount && auth !== undefined && usernames !== undefined)
+      warmAccount(auth, usernames);
+  }, [onlineAccount]);
   // Your games and the friend invites to you (#297, #486), for the hero
   // and the lists under it (#517). None on a phone with no online account.
   const online = useMyOnlineGames(onlineAccount ? auth : undefined, games);
