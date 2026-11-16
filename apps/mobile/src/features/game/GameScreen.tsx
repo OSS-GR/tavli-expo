@@ -2574,7 +2574,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     minHeight: RAIL_PRIMARY + theme.space.xs + 2 * RAIL_LABEL_LINE,
   },
   // Undo (or Fast forward) and the hint each get the same width, so a long
-  // label (Greek «Γρήγορη προώθηση») wraps under its circle and never pushes
+  // label (Greek «Γρήγορο τέλος») wraps under its circle and never pushes
   // the circle away from the main one.
   sideSlot: {
     width: SIDE_SLOT,

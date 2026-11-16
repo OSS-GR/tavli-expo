@@ -200,11 +200,11 @@ const TEXT: Readonly<Record<EmailCodeLanguage, MailText>> = {
       'If you did not ask for this code, you can ignore this email. Nobody can sign in without the code.',
   },
   el: {
-    subject: 'Ο κωδικός σύνδεσης στο Tavlaki',
+    subject: 'Ο κωδικός σύνδεσής σου στο Tavlaki',
     intro: 'Ο κωδικός σου για το Tavlaki είναι:',
     works: `Ισχύει για ${MINUTES} λεπτά. Γράψε τον στην εφαρμογή για να συνδεθείς.`,
     notYou:
-      'Αν δεν ζήτησες αυτόν τον κωδικό, αγνόησε αυτό το email. Κανείς δεν μπορεί να συνδεθεί χωρίς τον κωδικό.',
+      'Αν δεν ζήτησες εσύ αυτόν τον κωδικό, μπορείς να αγνοήσεις αυτό το email. Χωρίς τον κωδικό δεν μπορεί να συνδεθεί κανείς.',
   },
 };
 

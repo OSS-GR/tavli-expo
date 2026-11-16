@@ -268,7 +268,7 @@ describe('the review text', () => {
     try {
       const el = mistakeText(i18n.t, mistake!, null);
       expect(el.played).toMatch(/^Έπαιξες: /);
-      expect(el.best).toMatch(/^Καλύτερο: /);
+      expect(el.best).toMatch(/^Καλύτερη: /);
       expect(el.band).toMatch(/λάθος$/);
     } finally {
       await i18n.changeLanguage('en');

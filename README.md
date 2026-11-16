@@ -59,7 +59,7 @@ See [ADR-0002](docs/decisions/0002-modular-architecture.md) for the full plan.
 
 ### Add a UI string
 
-1. Add the key to `apps/mobile/src/i18n/en.json` **and** `el.json`. Write natural Greek, and leave room: Greek runs about 30% longer (short labels up to 100%).
+1. Add the key to `apps/mobile/src/i18n/en.json` **and** `el.json`. Write natural Greek in the app's voice (see [`docs/design/greek-copy.md`](docs/design/greek-copy.md): the words, the tone, names in sentences), and leave room: Greek runs about 30% longer (short labels up to 100%).
 2. Use it with `const { t } = useTranslation()` and `t('section.key')`. Keys are typed, so a typo fails `pnpm typecheck`.
 3. `pnpm test` checks that both files have the same keys and `{{placeholders}}`.
 
