@@ -1130,7 +1130,7 @@
       },
       "lostDice": {
         "title": "Dice you can't play",
-        "body": "When the rules leave a die with no move, it fades and gets a line through it. You see at once that it can't be played.",
+        "body": "When the rules leave a die with no move, it fades and gets a line through it. On your first turns, a note under the board says why.",
         "where": "Any game"
       },
       "howToPlay": {
@@ -1286,6 +1286,18 @@
       "label": "Dice {{values}}, {{left}} left to play",
       "lost_one": "The {{value}} can't be played",
       "lost_other": "{{count}} dice can't be played"
+    },
+    "lostNote": {
+      "die": "The {{value}} can't be played",
+      "double1": "One {{value}} can't be played",
+      "double2": "Two {{value}}s can't be played",
+      "double3": "Three {{value}}s can't be played",
+      "confirm": "{{lost}}. Confirm or undo.",
+      "reason": {
+        "higherDie": "Only one die moves, so it must be the {{high}}.",
+        "blocked": "No checker can move {{value}} now.",
+        "double": "No more moves of {{value}}."
+      }
     },
     "doubles": {
       "name": {

@@ -17,12 +17,13 @@ import {
   getPreset,
   legalNextMoves,
   matchPhase,
-  lostDice,
+  lostDiceWithReason,
   remainingDice,
   type BoardState,
   type DieValue,
   type GameFlow,
   type GamePhase,
+  type LostDice,
   type MatchAction,
   type MatchFlow,
   type MatchPhase,
@@ -193,6 +194,8 @@ export interface TurnView {
   readonly dice: readonly DieView[];
   readonly canConfirm: boolean;
   readonly canUndo: boolean;
+  /** The dice no legal turn can play, and why (#579); `null` when none. */
+  readonly lost: LostDice | null;
 }
 
 /**
@@ -229,6 +232,7 @@ export function turnView(flow: MatchFlow): TurnView {
   const board = currentBoard(game);
   const roll = game.state.dice;
   const rolled = roll !== null && (game.phase === 'moving' || game.phase === 'awaiting-confirm');
+  const lost = rolled ? lostDiceWithReason(game) : null;
   return {
     game,
     phase: game.phase,
@@ -236,8 +240,9 @@ export function turnView(flow: MatchFlow): TurnView {
     toMove: game.state.toMove,
     board,
     legal: legalNextMoves(game),
-    dice: rolled ? diceView(roll, remainingDice(game), lostDice(game)) : [],
+    dice: rolled ? diceView(roll, remainingDice(game), lost?.dice) : [],
     canConfirm: canConfirm(game),
     canUndo: canUndo(game),
+    lost,
   };
 }

@@ -516,6 +516,46 @@ export function lostDice(flow: GameFlow, ctx: FlowContext = {}): readonly DieVal
   return common(lost ?? [], left);
 }
 
+/** Why dice are lost (#579): the app names the reason under the board. */
+export type LostDiceReason =
+  /** A double with fewer legal moves than four. */
+  | 'double'
+  /** Only one die can be played, and the rules make it the higher one. */
+  | 'higherDie'
+  /** No checker can move that number. */
+  | 'blocked';
+
+export interface LostDice {
+  readonly dice: readonly DieValue[];
+  readonly reason: LostDiceReason;
+}
+
+/**
+ * `lostDice` with the reason, or `null` when no die is lost. The reason
+ * comes from `legalTurns` only: a plain roll's die is lost to the higher
+ * die rule when the same turn with `higherDieRule` off has a play that
+ * uses it. Otherwise no checker could move it.
+ */
+export function lostDiceWithReason(flow: GameFlow, ctx: FlowContext = {}): LostDice | null {
+  const dice = lostDice(flow, ctx);
+  const roll = flow.state.dice;
+  if (dice.length === 0 || roll === null) return null;
+  if (roll[0] === roll[1]) return { dice, reason: 'double' };
+  const rules = flow.state.rules;
+  if (dice.length === 1 && rules.movement.higherDieRule) {
+    const free = {
+      ...flow.state,
+      rules: { ...rules, movement: { ...rules.movement, higherDieRule: false } },
+    };
+    const value = dice[0];
+    const playable = variantOf(flow, ctx)
+      .legalTurns(free, roll)
+      .some((turn) => turn.moves.some((move) => move.die === value));
+    if (playable) return { dice, reason: 'higherDie' };
+  }
+  return { dice, reason: 'blocked' };
+}
+
 /** The dice in both lists, each as often as it is in both. */
 function common(a: readonly DieValue[], b: readonly DieValue[]): DieValue[] {
   const pool = [...b];

@@ -43,6 +43,8 @@ export interface DiceRowProps {
   size?: number;
   /** A double: the size of its two rolled dice before the split. Default `size`. */
   pairSize?: number;
+  /** Why the lost dice cannot be played (#579): read after the dice label. */
+  lostReason?: string;
   testID?: string;
 }
 
@@ -63,6 +65,7 @@ export function DiceRow({
   rest = false,
   size = DIE_SIZE,
   pairSize = size,
+  lostReason,
   testID,
 }: DiceRowProps) {
   const { t } = useTranslation();
@@ -101,7 +104,8 @@ export function DiceRow({
   const label =
     lost.length === 0
       ? rolled
-      : `${rolled}. ${t('game.dice.lost', { count: lost.length, value: lost[0]?.value })}`;
+      : `${rolled}. ${t('game.dice.lost', { count: lost.length, value: lost[0]?.value })}` +
+        (lostReason === undefined ? '' : `. ${lostReason}`);
   return (
     // The canvas always sits in this native view (`collapsable={false}`), so
     // it never moves to another native parent when a view around it changes.

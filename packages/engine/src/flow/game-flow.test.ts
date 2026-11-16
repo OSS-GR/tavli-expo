@@ -22,6 +22,7 @@ import {
   currentPrompt,
   legalNextMoves,
   lostDice,
+  lostDiceWithReason,
   remainingDice,
 } from './game-flow';
 import type { FlowContext, GameAction, GameFlow, MoveInput } from './game-flow';
@@ -544,5 +545,43 @@ describe('lostDice (#579)', () => {
 
   it('is empty before the roll', () => {
     expect(lostDice(at('w: 13x15 ; b: 24x15'))).toEqual([]);
+  });
+});
+
+describe('lostDiceWithReason (#579)', () => {
+  it('gives null when no die is lost', () => {
+    const flow = applyGameAction(
+      at('w: 24x2 13x5 8x3 6x5 ; b: 24x2 13x5 8x3 6x5'),
+      roll('white', [3, 1]),
+    );
+    expect(lostDiceWithReason(flow)).toBeNull();
+  });
+
+  it('tavli-match.md #10: the 5 is lost to the higher die rule', () => {
+    const flow = applyGameAction(at('w: 13x14 10 ; b: 18x2 17x2 24x11'), roll('white', [6, 5]));
+    expect(lostDiceWithReason(flow)).toEqual({ dice: [5], reason: 'higherDie' });
+    const played = applyGameAction(flow, move('10/4'));
+    expect(lostDiceWithReason(played)).toEqual({ dice: [5], reason: 'higherDie' });
+  });
+
+  it('with the higher die rule off, a die left after the other is blocked', () => {
+    const flow = applyGameAction(
+      at('w: 13x14 10 ; b: 18x2 17x2 24x11', { movement: { higherDieRule: false } }),
+      roll('white', [6, 5]),
+    );
+    expect(lostDiceWithReason(applyGameAction(flow, move('10/4')))).toEqual({
+      dice: [5],
+      reason: 'blocked',
+    });
+  });
+
+  it('tavli-match.md #9: the 6 has no move, so it is blocked', () => {
+    const flow = applyGameAction(at('w: 13x15 ; b: 18x2 23x2 24x11'), roll('white', [6, 5]));
+    expect(lostDiceWithReason(flow)).toEqual({ dice: [6], reason: 'blocked' });
+  });
+
+  it('tavli-match.md #12: a double names the double', () => {
+    const flow = applyGameAction(at('w: 13x14 9 ; b: 15x2 24x13'), roll('white', [3, 3]));
+    expect(lostDiceWithReason(flow)).toEqual({ dice: [3, 3], reason: 'double' });
   });
 });

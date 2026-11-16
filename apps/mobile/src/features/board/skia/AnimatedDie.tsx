@@ -21,6 +21,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import {
   DOUBLE_SPLIT_MS,
   FADE_MS,
+  LOST_OPACITY,
   ROLL_MS,
   ROLL_STAGGER_MS,
   USED_OPACITY,
@@ -96,8 +97,9 @@ export function AnimatedDie({
   slideIn = false,
 }: AnimatedDieProps) {
   const progress = useSharedValue(1);
-  const faded = used || lost;
-  const fade = useSharedValue(faded ? USED_OPACITY : 1);
+  // A lost die wins over used: it was never played.
+  const target = lost ? LOST_OPACITY : used ? USED_OPACITY : 1;
+  const fade = useSharedValue(target);
   const slash = useSharedValue(lost ? 1 : 0);
   // 0: in the pair, 1: at x, y, size.
   const moved = useSharedValue(pairAt !== undefined && (!split || slideIn) ? 0 : 1);
@@ -119,8 +121,8 @@ export function AnimatedDie({
   }, [rollKey]);
 
   useEffect(() => {
-    fade.set(withTiming(faded ? USED_OPACITY : 1, { duration: FADE_MS }));
-  }, [faded, fade]);
+    fade.set(withTiming(target, { duration: FADE_MS }));
+  }, [target, fade]);
 
   useEffect(() => {
     slash.set(withTiming(lost ? 1 : 0, { duration: FADE_MS }));

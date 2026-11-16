@@ -15,6 +15,11 @@ export const ROLL_STAGGER_MS = 90;
 export const FADE_MS = 220;
 /** Opacity of a used die. */
 export const USED_OPACITY = 0.35;
+/**
+ * Opacity of a die you cannot play (#579, Figma 17 v2): lighter than a
+ * used die, so the value and its slash still read.
+ */
+export const LOST_OPACITY = 0.7;
 /** Two dice land this long after the roll: the second die rolls `ROLL_STAGGER_MS` longer. */
 export const DICE_LAND_MS = ROLL_MS + ROLL_STAGGER_MS;
 
