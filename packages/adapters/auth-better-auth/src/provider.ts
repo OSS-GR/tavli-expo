@@ -521,13 +521,18 @@ export function fromBetterAuthClient(
     async listKeys() {
       await ready();
       if (user === null) return [];
-      const data = await fetchRoute<{ readonly keys?: readonly { readonly provider?: unknown }[] }>(
-        '/key/list',
-        'listing the keys failed',
-      );
+      const data = await fetchRoute<{
+        readonly keys?: readonly { readonly provider?: unknown; readonly email?: unknown }[];
+      }>('/key/list', 'listing the keys failed');
       const keys: AuthKey[] = [];
       for (const key of data.keys ?? []) {
-        if (isKeyProvider(key.provider)) keys.push({ provider: key.provider });
+        if (!isKeyProvider(key.provider)) continue;
+        // An email key carries its address (#565); no other key has one.
+        keys.push(
+          key.provider === 'email' && typeof key.email === 'string'
+            ? { provider: 'email', email: key.email }
+            : { provider: key.provider },
+        );
       }
       return keys;
     },

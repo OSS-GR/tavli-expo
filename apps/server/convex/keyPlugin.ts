@@ -22,7 +22,8 @@
  * - `POST /key/move`: the ticket of that offer. Moves the guest's games
  *   into the key's account (`guestMove.ts`), deletes the guest and signs
  *   the phone in to the account.
- * - `GET /key/list`: the signed-in user's keys.
+ * - `GET /key/list`: the signed-in user's keys; an email key with its
+ *   address (#565).
  * - `POST /key/remove`: removes a key, never the last one (`LAST_KEY`).
  * - `POST /key/apple-code`: the Apple sheet's `authorizationCode`, once
  *   after a sign-in or a save (#398). The server trades it at Apple and
@@ -645,10 +646,14 @@ export function keyPlugin(options: KeyPluginOptions) {
           const accounts = await ctx.context.internalAdapter.findAccounts(
             ctx.context.session.user.id,
           );
-          const keys = accounts
-            .map((account) => account.providerId)
-            .filter(isKeyProviderId)
-            .map((provider) => ({ provider }));
+          // An email key also gives its address (the normalized one the key
+          // holds), so Account can show which address signs in (#565). Only
+          // the account's own session reads it; never log it.
+          const keys = accounts.flatMap((account): { provider: string; email?: string }[] => {
+            const provider = account.providerId;
+            if (!isKeyProviderId(provider)) return [];
+            return provider === 'email' ? [{ provider, email: account.accountId }] : [{ provider }];
+          });
           return ctx.json({ keys });
         },
       ),

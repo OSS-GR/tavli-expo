@@ -179,7 +179,14 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
     const keysOf = () => [...server.keys].filter(([, owner]) => owner === id).map(([key]) => key);
     const providerOf = (key: string) => key.split(':')[0]!;
     if (path === '/key/list') {
-      return ok({ keys: keysOf().map((key) => ({ provider: providerOf(key) })) });
+      // Like the server: an email key gives its address (#565).
+      return ok({
+        keys: keysOf().map((key) =>
+          providerOf(key) === 'email'
+            ? { provider: 'email', email: key.slice('email:'.length) }
+            : { provider: providerOf(key) },
+        ),
+      });
     }
     if (path === '/key/save') {
       let key: string;
@@ -522,6 +529,31 @@ describe('fromBetterAuthClient', () => {
     expect(await rejection(auth.removeKey('apple'))).toMatchObject({ code: 'LAST_KEY' });
     server.failures.set('fetch /key/list', 'throw');
     expect(await rejection(auth.listKeys())).toMatchObject({ code: 'NETWORK' });
+  });
+
+  it('keeps an email key with no address as a plain email key (#565)', async () => {
+    const server = createServer();
+    const client = createClient(server, { cookie: null });
+    const realFetch = client.$fetch.bind(client);
+    const odd: BetterAuthClient = {
+      ...client,
+      $fetch: (async (path: string, options?: object) => {
+        if (path !== '/key/list') return realFetch(path, options as never);
+        const keys = [
+          { provider: 'email' },
+          { provider: 'email', email: 42 },
+          { provider: 'apple' },
+        ];
+        return { data: { keys }, error: null };
+      }) as BetterAuthClient['$fetch'],
+    };
+    const auth = fromBetterAuthClient(odd, { now: () => server.clock });
+    await auth.signInAsGuest();
+    expect(await auth.listKeys()).toEqual([
+      { provider: 'email' },
+      { provider: 'email' },
+      { provider: 'apple' },
+    ]);
   });
 
   it('maps the email code errors (#399): wrong and rate limits pass, a mail failure is NETWORK', async () => {
