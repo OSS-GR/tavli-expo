@@ -152,7 +152,7 @@ describe('universal links (#332)', () => {
     expect(page).toContain('<section lang="en">');
     expect(page).toContain('<section lang="el" id="el">');
     expect(page).toContain('Join with a code');
-    expect(page).toContain('Μπες με κωδικό');
+    expect(page).toContain('Μπες σε παιχνίδι με κωδικό');
   });
 });
 
@@ -160,7 +160,7 @@ describe('the homepage', () => {
   const TESTFLIGHT = 'https://testflight.apple.com/join/RTCQhMCc';
   const pages = [
     ['en', 'docs/legal/site/index.html', 'Join with a code'],
-    ['el', 'docs/legal/site/el/index.html', 'Μπες με κωδικό'],
+    ['el', 'docs/legal/site/el/index.html', 'Μπες σε παιχνίδι με κωδικό'],
   ] as const;
 
   it.each(pages)('the %s page runs no script and loads nothing from other sites', (lang, file) => {

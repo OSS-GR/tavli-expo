@@ -28,7 +28,7 @@ How the app speaks Greek (#549). Read this before you add or change a string in 
 | game, match | παρτίδα, ματς |
 | match points | πόντος, πόντοι («στους 5 πόντους»); never βαθμοί |
 | single, double win | μονό, διπλό |
-| rating, leaderboards | βαθμολογία, Κατατάξεις; ranked: «Ματς κατάταξης» |
+| rating, leaderboards | βαθμολογία, Κατατάξεις; ranked: «Παιχνίδι κατάταξης» (owner, 2026-11-16; not «Ματς») |
 | bot | υπολογιστής, never «μποτ» |
 | hint | υπόδειξη |
 | resign | παραίτηση, παραιτούμαι |
