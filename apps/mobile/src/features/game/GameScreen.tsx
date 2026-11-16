@@ -167,6 +167,7 @@ import {
   stateHasChosenDouble,
   turnAnnouncement,
 } from './announcements';
+import { useConfirmHint } from './confirmHint';
 import { DoubleChoices } from './DoubleChoices';
 import { GameCard } from './GameCard';
 import { GameEndSheet } from './GameEndSheet';
@@ -1989,8 +1990,9 @@ export function GameScreen({
   // dice went blank after the menu or Settings (#173).
   const hideScreen = covered || endSheet !== null;
   const hideBoard = card !== null;
+  // "All dice used" shows only on the first few turns (#575).
+  const confirmHint = useConfirmHint(view.canConfirm && !blocked && !othersTurn, turnKey);
   // "Doubles!" for a moment after the split. Another note over the board wins.
-  const confirmHint = view.canConfirm && !blocked && !othersTurn;
   // The value of the double names it: Greek says «Εξάρες!» for 6-6.
   const doubleValue = dice.length === 4 ? dice[0]?.value : undefined;
   const showDoublesHint =
