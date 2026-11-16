@@ -138,7 +138,7 @@ describe('<HomeOnlineGames />', () => {
     expect(onlineFake.authStore.guests).toBe(0);
   });
 
-  it('says it is loading until the first list comes', async () => {
+  it('shows nothing while the first list loads, then the games (#569)', async () => {
     signIn();
     await newGame();
     let answer: (() => void) | undefined;
@@ -153,7 +153,9 @@ describe('<HomeOnlineGames />', () => {
       },
     };
     await show(slow);
-    expect(screen.getByText('Loading your online games…')).toBeOnTheScreen();
+    // No section and no loading line that would come and go.
+    expect(screen.queryByTestId('home-online-games')).toBeNull();
+    expect(screen.queryByTestId('online-games-loading')).toBeNull();
     expect(rowIds()).toEqual([]);
     await act(async () => answer?.());
     await flush();
