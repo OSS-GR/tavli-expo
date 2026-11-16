@@ -76,7 +76,7 @@ Do not add analytics, cookies or outside fonts to the site. The invite pages car
 
 - [ ] Publish only after PR #89 (`feat/61-analytics`) is merged. The policy describes the consent screen and the one privacy switch from that PR. On `main` before #89, crash reports always carry the install id.
 - [x] Put your full name in "Who is responsible", in both languages (Orestis Stefanis, 2026-11-16).
-- [ ] Make `privacy@tavlaki.com` work (or change it in all four files).
+- [x] One contact address: `support@tavlaki.com` in the policy, the terms and the homepage (owner, 2026-11-16).
 - [ ] Sentry: check that the organization uses the **EU** data region (Frankfurt). Sentry sets it when the organization is made, and it cannot change later. If it is the US region, change the table in the policy.
 - [ ] Sentry: turn on **Prevent Storing of IP Addresses** (see `packages/adapters/crash-sentry/README.md`).
 - [ ] PostHog: use an **EU** project and turn on **Discard client IP data** (see `docs/architecture/analytics-events.md`).
