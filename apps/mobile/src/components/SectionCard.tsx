@@ -115,6 +115,8 @@ export interface SectionRowProps {
    * action (Resign this game, #515). Default `normal`.
    */
   tone?: 'normal' | 'danger';
+  /** A button row's chevron. Off for a risky action that sits alone (Delete my guest account, #519). */
+  chevron?: boolean;
   testID?: string;
 }
 
@@ -131,6 +133,7 @@ export function SectionRow({
   accessibilityRole = 'button',
   disabled = false,
   tone = 'normal',
+  chevron = true,
   testID,
 }: SectionRowProps) {
   const { theme } = useUnistyles();
@@ -151,7 +154,7 @@ export function SectionRow({
         {hint ? <Text style={[styles.hint, { color: colors.hint }]}>{hint}</Text> : null}
       </View>
       {right ?? (value ? <Text style={styles.value}>{value}</Text> : null)}
-      {onPress ? <Icon name="chevronRight" size={18} color={colors.chevron} /> : null}
+      {onPress && chevron ? <Icon name="chevronRight" size={18} color={colors.chevron} /> : null}
     </>
   );
   if (!onPress) {

@@ -1,27 +1,31 @@
 /**
- * The sign-in sheet (#401): "Play online", a line on why, and the sign-in
+ * The sign-in sheet (#401, look from Figma frame 09, #519): "Play online",
+ * one line under it and a close button (`SignInHeader`), then the sign-in
  * choices (`SignInChoices`). Play a friend shows it when "Make an invite"
- * finds no saved session. Not now, a tap on the dimmed part and the
- * Android back button close it and sign in nothing.
+ * finds no saved session. The close button (Not now), a tap on the dimmed
+ * part and the Android back button close it and sign in nothing.
  *
  * It is a `Sheet` (a `Modal`), so screen readers stay in it; focus moves
  * to its title. Show it only while it is needed (mount it then), so the
  * focus moves each time it opens.
  *
+ * The close button is in the header, which shows only with the choices:
+ * on the email, username and problem steps the dimmed part is the screen
+ * reader's close button again (`ownCloseButton` follows the header).
+ *
  * Each time it opens it tells the reminders (#404, `sheetShown`): it is
  * an ask too, so Home shows no card the same day.
  */
 import type { Analytics, AppleSheet, AuthProvider, AuthUser } from '@tavli/contracts';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Text } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
 
 import { Sheet } from '@/components/Sheet';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { reminders } from '@/features/reminders/reminders';
 
 import { SignInChoices } from './SignInChoices';
+import { SignInHeader } from './SignInHeader';
 
 export interface SignInSheetProps {
   auth: AuthProvider;
@@ -42,34 +46,34 @@ export function SignInSheet({
 }: SignInSheetProps) {
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
+  // The header's close button shows only with the choices. On the other
+  // steps the dimmed part stays the screen reader's close button.
+  const [headerShown, setHeaderShown] = useState(true);
   useEffect(() => {
     reminders.sheetShown();
   }, []);
   return (
-    <Sheet visible onClose={onClose} closeLabel={t('signIn.notNow')} testID="sign-in-sheet">
-      <Text ref={titleRef} style={styles.title} accessibilityRole="header">
-        {t('signIn.title')}
-      </Text>
-      <Text style={styles.body}>{t('signIn.body')}</Text>
+    <Sheet
+      visible
+      onClose={onClose}
+      closeLabel={t('signIn.notNow')}
+      ownCloseButton={headerShown}
+      testID="sign-in-sheet">
       <SignInChoices
         auth={auth}
         onSignedIn={onSignedIn}
-        onNotNow={onClose}
+        onHeaderShown={setHeaderShown}
+        header={
+          <SignInHeader
+            title={t('signIn.title')}
+            body={t('signIn.body')}
+            titleRef={titleRef}
+            onClose={onClose}
+          />
+        }
         {...(appleSheet === undefined ? {} : { appleSheet })}
         {...(analytics === undefined ? {} : { analytics })}
       />
     </Sheet>
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  title: {
-    ...theme.type.title2,
-    color: theme.colors.text,
-  },
-  body: {
-    ...theme.type.body,
-    color: theme.colors.textDim,
-    marginBottom: theme.space.sm,
-  },
-}));

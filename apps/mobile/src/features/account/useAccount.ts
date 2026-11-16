@@ -81,8 +81,11 @@ export type AccountState =
    * name when this load did (`askName`, #483).
    */
   | { readonly kind: 'failed'; readonly askName: boolean }
-  /** A guest: `guestNumber` is `null` until the first invite or game. */
-  | { readonly kind: 'guest'; readonly guestNumber: string | null }
+  /**
+   * A guest: `guestNumber` is `null` until the first invite or game. `id`
+   * (the player id) only picks the wood of the avatar.
+   */
+  | { readonly kind: 'guest'; readonly id: string; readonly guestNumber: string | null }
   /** A saved account (it has a key). */
   | {
       readonly kind: 'saved';
@@ -218,7 +221,10 @@ async function loadAccount(
   onlineAccountReady();
   if (user.isGuest || !mine.saved) {
     // A server from before #402 sends no `guestNumber`: show no number then.
-    return { state: { kind: 'guest', guestNumber: mine.guestNumber ?? null }, mine };
+    return {
+      state: { kind: 'guest', id: user.id, guestNumber: mine.guestNumber ?? null },
+      mine,
+    };
   }
   return { state: { kind: 'saved', username: mine.name, keys: await auth.listKeys() }, mine };
 }

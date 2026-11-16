@@ -5,8 +5,9 @@
  * - A saved session (this phone made or opened an invite before) shows
  *   the invite at once (`children`).
  * - Else a card says that an online game needs a free account, with the
- *   sign-in choices (#401, `SignInChoices`): Apple, Continue as a guest,
- *   and Not now (Home). Opening a link alone makes no account. The invite
+ *   sign-in choices (#401, `SignInChoices`): Apple, email, Continue as a
+ *   guest, and the close button of its header (`SignInHeader`, #519): Not
+ *   now goes Home. Opening a link alone makes no account. The invite
  *   code stays in the route, so the invite shows right after the sign-in.
  * - A build with no online server shows "Online play is off".
  * - Screen readers: each card moves focus to its title and is read once.
@@ -25,6 +26,7 @@ import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { useOnlineAccount } from '@/features/online/account';
 import { SignInChoices } from '@/features/online/SignInChoices';
+import { SignInHeader } from '@/features/online/SignInHeader';
 
 export interface InviteAccountGateProps {
   /** `undefined`: this build has no online server. */
@@ -67,14 +69,16 @@ function SignedInGate({
       {account.status === 'loading' ? (
         <Loading />
       ) : (
-        <AccountCard>
-          <SignInChoices
-            auth={auth}
-            onSignedIn={signedIn}
-            onNotNow={onHome}
-            {...(appleSheet === undefined ? {} : { appleSheet })}
-            {...(analytics === undefined ? {} : { analytics })}
-          />
+        <AccountCard onClose={onHome}>
+          {(header) => (
+            <SignInChoices
+              auth={auth}
+              onSignedIn={signedIn}
+              header={header}
+              {...(appleSheet === undefined ? {} : { appleSheet })}
+              {...(analytics === undefined ? {} : { analytics })}
+            />
+          )}
         </AccountCard>
       )}
     </Frame>
@@ -105,8 +109,17 @@ function Loading() {
   );
 }
 
-/** The invite card over the sign-in choices (`children`). */
-function AccountCard({ children }: { children: ReactNode }) {
+/**
+ * The invite card around the sign-in choices. `children` gets its header
+ * (title and a close button that goes Home), shown only with the choices.
+ */
+function AccountCard({
+  children,
+  onClose,
+}: {
+  children: (header: ReactNode) => ReactNode;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
   const title = t('invite.account.title');
@@ -114,11 +127,7 @@ function AccountCard({ children }: { children: ReactNode }) {
   useAnnouncement(`${title} ${body}`);
   return (
     <View testID="invite-account" style={styles.card}>
-      <Text ref={titleRef} style={styles.title} accessibilityRole="header">
-        {title}
-      </Text>
-      <Text style={styles.line}>{body}</Text>
-      <View style={styles.actions}>{children}</View>
+      {children(<SignInHeader title={title} body={body} titleRef={titleRef} onClose={onClose} />)}
     </View>
   );
 }
