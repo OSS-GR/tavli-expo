@@ -3,6 +3,7 @@
 
 import { forgetAccountForTest } from '../src/features/account/accountMemory';
 import { takeInviteSent } from '../src/features/friends/inviteSent';
+import { resetConfirmHintForTest } from '../src/features/game/confirmHint';
 import { resetRaceOffersForTest } from '../src/features/game/raceOffer';
 import { forgetLastModesForTest } from '../src/features/home/lastModes';
 import { resetIntrosForTest } from '../src/features/intro/introRuns';
@@ -25,6 +26,8 @@ import { resetOnlineFake } from './onlineFake';
 beforeEach(() => {
   resetAnnouncements();
   resetRaceOffersForTest();
+  // "All dice used" (#575): a phone that never showed the note.
+  resetConfirmHintForTest();
   // A friend invite sent from the full setup (#507): no note left for Friends.
   takeInviteSent();
   // The table scene (#509): Home rests on its last frame, and game start
