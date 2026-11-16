@@ -26,7 +26,7 @@ import { enterEmailCode } from '../../../test/emailCode';
 import { onlineFake } from '../../../test/onlineFake';
 import { renderWithRoot } from '../../../test/render';
 
-import { knownAccount, warmAccount } from './accountMemory';
+import { knownAccount, rememberAccount, renameKnownAccount, warmAccount } from './accountMemory';
 import { AccountScreen } from './AccountScreen';
 import { addableKeys, type AccountDeps } from './useAccount';
 
@@ -938,6 +938,35 @@ describe('<AccountScreen /> loading', () => {
     await auth!.signOut();
     await signInForOnline(auth!);
     expect(knownAccount(auth!)).toBeNull();
+  });
+
+  it('a reload that fails after an action says so: the action changed the account (#567)', async () => {
+    const user = setupUser();
+    await saved('maria');
+    await open();
+    await screen.findByTestId('account-saved');
+    jest.spyOn(usernames!, 'mine').mockRejectedValueOnce(new Error('offline'));
+    await user.press(screen.getByTestId('account-add-email'));
+    await enterEmailCode(user, onlineFake.authStore, 'maria@example.com');
+    expect(await screen.findByTestId('account-failed')).toBeOnTheScreen();
+  });
+
+  it('a slow warm-up never writes over a newer load (#567)', async () => {
+    await saved('maria');
+    const answer = holdMine();
+    warmAccount(auth!, usernames!);
+    // A newer load lands first: a guest.
+    rememberAccount({ kind: 'guest', id: auth!.currentUser()!.id, guestNumber: null });
+    await act(async () => answer());
+    expect(knownAccount(auth!)?.kind).toBe('guest');
+  });
+
+  it('a username save shows the new name at once (#567)', async () => {
+    await saved('maria');
+    warmAccount(auth!, usernames!);
+    await act(async () => {});
+    renameKnownAccount('nikos');
+    expect(knownAccount(auth!)).toMatchObject({ kind: 'saved', username: 'nikos' });
   });
 
   it('shows no old account after a sign-out (#567)', async () => {

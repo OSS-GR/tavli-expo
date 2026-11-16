@@ -308,9 +308,10 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
   /**
    * Loads the state. With `askName` (an action that may make a saved
    * account), a saved account with no username gets the username step.
+   * `quiet` (a visit): a failure keeps the account that shows (#567).
    */
   const load = useCallback(
-    (askName: boolean) => {
+    (askName: boolean, quiet = false) => {
       const asks = askName || latest.current.askName;
       const me = { askName: asks };
       latest.current = me;
@@ -327,10 +328,11 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
           if (!live.current || latest.current !== me) return;
           latest.current = { askName: false };
           // An open step stays with what was typed. Only Try again asks
-          // again, not a later load. A quiet refresh that fails keeps the
-          // account it shows (#567); a load that asks for a name says so.
+          // again, not a later load. A visit's quiet load that fails keeps
+          // the account it shows (#567); a load after an action says so,
+          // since the action changed what the server has.
           setState((now) =>
-            !asks && (now.kind === 'guest' || now.kind === 'saved')
+            quiet && !asks && (now.kind === 'guest' || now.kind === 'saved')
               ? now
               : { kind: 'failed', askName: asks },
           );
@@ -341,7 +343,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
   );
 
   useEffect(() => {
-    load(false);
+    load(false, true);
   }, [load, visit]);
 
   const reload = () => {

@@ -25,7 +25,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { Icon } from '@/components/Icon';
 import { surfaceStyle } from '@/components/Surface';
-import { knownAccount, rememberAccount } from '@/features/account/accountMemory';
+import { forgetAccount, knownAccount, rememberAccount } from '@/features/account/accountMemory';
 import { signInIcon, signInLine } from '@/features/account/signInLine';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 
@@ -47,7 +47,10 @@ export type AccountSummary =
 
 async function loadSummary(auth: AuthProvider, usernames: Usernames): Promise<AccountSummary> {
   const user = await auth.ready();
-  if (user === null) return { kind: 'offline' };
+  if (user === null) {
+    forgetAccount();
+    return { kind: 'offline' };
+  }
   const mine = await usernames.mine();
   const guestNumber = mine.guestNumber ?? null;
   if (user.isGuest || !mine.saved) {
@@ -60,7 +63,12 @@ async function loadSummary(auth: AuthProvider, usernames: Usernames): Promise<Ac
       rememberAccount({ kind: 'saved', id: user.id, username: mine.name, guestNumber, keys: list });
       return list.map((key) => key.provider);
     },
-    () => null,
+    () => {
+      // A saved account whose keys did not load: what is known may be an
+      // older guest, so Account loads it fresh (#567).
+      forgetAccount();
+      return null;
+    },
   );
   return { kind: 'saved', id: user.id, name: mine.name, keys };
 }
