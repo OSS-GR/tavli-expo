@@ -202,3 +202,59 @@ describe('the homepage', () => {
     expect(page).not.toContain('OWNER');
   });
 });
+
+describe('the delete account pages (#447)', () => {
+  type Strings = { account: { saved: { delete: string }; guest: { delete: string } } };
+  const strings = (lang: string) =>
+    JSON.parse(read(`apps/mobile/src/i18n/${lang}.json`)) as Strings;
+  const pages = [
+    ['en', 'docs/legal/site/delete/index.html'],
+    ['el', 'docs/legal/site/el/delete/index.html'],
+  ] as const;
+
+  it.each(pages)('the %s page names the buttons of the app', (lang, file) => {
+    const page = read(file);
+    expect(page).toContain(`<html lang="${lang}">`);
+    const { account } = strings(lang);
+    expect(page).toContain(`<strong>${account.saved.delete}</strong>`);
+    expect(page).toContain(`<strong>${account.guest.delete}</strong>`);
+    expect(page).toContain('href="mailto:support@tavlaki.com');
+  });
+
+  it.each(pages)('the %s page runs no script and loads nothing from other sites', (_l, file) => {
+    const page = read(file);
+    expect(page).not.toMatch(
+      /<script|<iframe|<form|<link rel="stylesheet"|@import|url\(\s*["']?https?:/i,
+    );
+    for (const [, src] of page.matchAll(/<img[^>]*\ssrc="([^"]+)"/g)) {
+      expect(src).toMatch(/^\/img\//);
+    }
+    const outside = [...page.matchAll(/https?:\/\/[^\s"'<>)]+/g)].map(([url]) => new URL(url).host);
+    expect(outside.filter((host) => host !== 'tavlaki.com')).toEqual([]);
+  });
+
+  it('starts with the same base CSS as the privacy page', () => {
+    const style = (file: string) => read(file).match(/<style>[\s\S]*?<\/style>/)?.[0];
+    const base = style('docs/legal/site/privacy/index.html');
+    expect(base).toBeDefined();
+    for (const [, file] of pages) expect(style(file)).toBe(base);
+  });
+
+  it.each([
+    [
+      'en',
+      '/delete/',
+      ['index.html', 'privacy/index.html', 'terms/index.html', 'support/index.html'],
+    ],
+    [
+      'el',
+      '/el/delete/',
+      ['el/index.html', 'el/privacy/index.html', 'el/terms/index.html', 'el/support/index.html'],
+    ],
+  ] as const)('every %s page footer links the delete page', (_lang, href, files) => {
+    for (const file of files) {
+      const footer = read(`docs/legal/site/${file}`).match(/<footer>[\s\S]*<\/footer>/)?.[0];
+      expect(footer).toContain(`href="${href}"`);
+    }
+  });
+});
