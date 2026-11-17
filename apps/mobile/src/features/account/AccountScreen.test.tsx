@@ -267,6 +267,7 @@ describe('<AccountScreen /> as a guest', () => {
     expect(kept.getByLabelText('On this phone: Bot games, history and settings')).toBeOnTheScreen();
     expect(screen.getByRole('header', { name: 'What we keep' })).toBeOnTheScreen();
     expect(screen.queryByTestId('account-sign-out')).toBeNull();
+    expect(screen.queryByTestId('account-sign-out-everywhere')).toBeNull();
   });
 
   it('shows the delete row alone, with what it does in one line (#519)', async () => {
@@ -719,6 +720,76 @@ describe('<AccountScreen /> with a saved account', () => {
     // Apple brings the same account back, with its name.
     await user.press(screen.getByTestId('account-apple'));
     expect(await screen.findByTestId('account-name')).toHaveTextContent('Maria');
+  });
+
+  it('signs out of all phones after a dialog, push token first; the account stays (#446)', async () => {
+    const user = setupUser();
+    await saved('Maria');
+    const order: string[] = [];
+    const pushes = {
+      unregister: async (then?: () => Promise<void>) => {
+        order.push('token');
+        await then?.();
+      },
+    };
+    const original = auth!.signOutEverywhere.bind(auth!);
+    const spied = jest.spyOn(auth!, 'signOutEverywhere').mockImplementation(async () => {
+      order.push('everywhere');
+      await original();
+    });
+    await open({ pushes });
+    await screen.findByTestId('account-saved');
+    expect(
+      within(screen.getByTestId('account-sign-out-everywhere')).getByText(
+        'For a lost or old phone',
+      ),
+    ).toBeOnTheScreen();
+    const dialog = await dialogFrom(user, 'account-sign-out-everywhere');
+    expect(dialog.getByRole('header', { name: 'Sign out of all phones?' })).toBeOnTheScreen();
+    expect(
+      dialog.getByText(
+        'This signs you out here and on every other phone, and they stop getting turn notifications.',
+      ),
+    ).toBeOnTheScreen();
+    await user.press(dialog.getByRole('button', { name: 'Sign out of all phones' }));
+    expect(await screen.findByText('You are signed out on every phone.')).toBeOnTheScreen();
+    expect(screen.getByTestId('account-offline')).toBeOnTheScreen();
+    // The phone's push token comes off first, while the session still works.
+    expect(order).toEqual(['token', 'everywhere']);
+    expect(spied).toHaveBeenCalledTimes(1);
+    expect(onlineFake.authStore.sessionsEnded).toEqual(['user-1']);
+    expect(auth!.currentUser()).toBeNull();
+    expect(hasOnlineAccount()).toBe(false);
+    expect(onlineFake.authStore.keys).toEqual({ 'apple:apple-1': 'user-1' });
+    // Apple brings the same account back, with its name.
+    await user.press(screen.getByTestId('account-apple'));
+    expect(await screen.findByTestId('account-name')).toHaveTextContent('Maria');
+  });
+
+  it('a failed sign-out of all phones keeps the account and says why (#446)', async () => {
+    const user = setupUser();
+    await saved();
+    await open();
+    await screen.findByTestId('account-saved');
+    onlineFake.authStore.offline = true;
+    let dialog = await dialogFrom(user, 'account-sign-out-everywhere');
+    await user.press(dialog.getByRole('button', { name: 'Sign out of all phones' }));
+    const problem = within(await screen.findByTestId('account-problem'));
+    expect(problem.getByText('No connection')).toBeOnTheScreen();
+    await user.press(problem.getByRole('button', { name: 'OK' }));
+    expect(auth!.currentUser()).not.toBeNull();
+    expect(hasOnlineAccount()).toBe(true);
+
+    onlineFake.authStore.offline = false;
+    jest
+      .spyOn(auth!, 'signOutEverywhere')
+      .mockRejectedValueOnce({ code: 'REJECTED', message: 'no' });
+    dialog = await dialogFrom(user, 'account-sign-out-everywhere');
+    await user.press(dialog.getByRole('button', { name: 'Sign out of all phones' }));
+    const other = within(await screen.findByTestId('account-problem'));
+    expect(other.getByText('Your phones are still signed in')).toBeOnTheScreen();
+    expect(other.queryByText(/Check the connection/)).toBeNull();
+    expect(auth!.currentUser()).not.toBeNull();
   });
 
   it('the delete dialog names the username and the ways to sign in', async () => {

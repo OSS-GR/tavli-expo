@@ -40,6 +40,7 @@ export type WhatsNewEntryId =
   | 'appTour'
   | 'lostDice'
   | 'support'
+  | 'signOutEverywhere'
   | 'downloadData';
 
 export interface WhatsNewEntry {
@@ -58,7 +59,10 @@ export interface WhatsNewRelease {
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
     date: '2026-11-18',
-    entries: [{ id: 'downloadData', icon: 'share' }],
+    entries: [
+      { id: 'signOutEverywhere', icon: 'logOut' },
+      { id: 'downloadData', icon: 'share' },
+    ],
   },
   {
     date: '2026-11-17',

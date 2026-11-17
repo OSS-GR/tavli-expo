@@ -172,6 +172,8 @@ Then the app signs out and deletes the sign-in cookie on your phone. If you play
 
 What stays: finished online games (with their moves) stay for the other player. They hold your old random user id, but no name and no email (your friend's app then shows no name for you), and once the account is gone that id leads to nobody. An invite a friend made and you answered stays with that friend. The games and the history on your phone stay too.
 
+Without the app (for example after you deleted it), write to **support@tavlaki.com** with your username or guest name. The page [tavlaki.com/delete](https://tavlaki.com/delete/) says what to send and how long it takes.
+
 ### Turn notifications (Expo)
 
 Only if you turn them on. After you make or accept an invite for an online game, the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Turn notifications**, and off in your phone's settings.

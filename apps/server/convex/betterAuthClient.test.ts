@@ -113,4 +113,22 @@ describe('the Better Auth adapter on the real client and routes', () => {
     expect(await failure(saveAs(other, 'apple-ann'))).toBe('KEY_BELONGS_TO_OTHER');
     expect(other.currentUser()?.isGuest).toBe(true);
   });
+
+  it('sign out of all phones ends the session of the other phone too (#446)', async () => {
+    const { t, auth } = subject();
+    const nonce = await auth.keyNonce();
+    const idToken = await appleToken(apple, { sub: 'apple-ann', nonce });
+    const user = await auth.signInWithKey({ provider: 'apple', idToken, nonce });
+    const other = fromBetterAuthClient(realClient(t, newPhone()));
+    const otherNonce = await other.keyNonce();
+    const otherToken = await appleToken(apple, { sub: 'apple-ann', nonce: otherNonce });
+    expect(
+      await other.signInWithKey({ provider: 'apple', idToken: otherToken, nonce: otherNonce }),
+    ).toEqual(user);
+
+    await auth.signOutEverywhere();
+    expect(auth.currentUser()).toBeNull();
+    expect(await other.getToken({ forceRefresh: true })).toBeNull();
+    expect(other.currentUser()).toBeNull();
+  });
 });
