@@ -128,9 +128,10 @@ export interface AnalyticsEvents {
   };
   /**
    * The game review (#215) opened after a game. Only which game was picked
-   * for the match: never the position, the dice, the moves or the mistakes.
+   * for the match, and whether it was an online game (#604): never the
+   * position, the dice, the moves, the mistakes or a game id.
    */
-  review_opened: { game: MatchGame };
+  review_opened: { game: MatchGame; online: boolean };
   /**
    * The player made an invite to play a friend online (#281). Only the
    * game, the match length and the turn time: never the code, a game id or a

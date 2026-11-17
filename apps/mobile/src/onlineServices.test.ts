@@ -72,6 +72,7 @@ function memoryAdapters() {
         setDraft: (request) => caller().setDraft(request),
         sendAnswer: (request) => caller().sendAnswer(request),
         resign: (gameId) => caller().resign(gameId),
+        gameRecord: (request) => caller().gameRecord(request),
         listMyGames: (request) => caller().listMyGames(request),
         watchMyGames: (request, onList, onError) => caller().watchMyGames(request, onList, onError),
       };

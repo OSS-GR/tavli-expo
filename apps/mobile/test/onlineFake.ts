@@ -202,6 +202,7 @@ const games: GameTransport = {
   setDraft: (request) => caller()?.setDraft(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   sendAnswer: (request) => caller()?.sendAnswer(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   resign: (gameId) => caller()?.resign(gameId) ?? Promise.reject({ ...NOT_SIGNED_IN }),
+  gameRecord: (request) => caller()?.gameRecord(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   listMyGames: (request) => caller()?.listMyGames(request) ?? Promise.reject({ ...NOT_SIGNED_IN }),
   // The user signed in when the watch starts, like a Convex watch on one token.
   watchMyGames(request, onList, onError) {

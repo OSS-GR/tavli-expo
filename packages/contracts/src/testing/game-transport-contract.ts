@@ -936,6 +936,94 @@ export function gameTransportContract(): GameTransportContractCheck[] {
       },
     },
     {
+      name: 'gameRecord gives a game that is over to both players, and refuses a game in play (#604)',
+      run: async (subject) => {
+        const { gameId, watchers, view } = await startGame(
+          subject,
+          await subject.createWinningTurn(),
+        );
+        // No help during play: the game on the board has no record yet.
+        await rejectsWith(
+          subject.transportFor('white').gameRecord({ gameId, gameNumber: 1 }),
+          'ILLEGAL_ACTION',
+          'the record of the game in play',
+        );
+        await subject.transportFor('white').sendTurn({
+          gameId,
+          expectedVersion: view.version,
+          moves: subject.legalTurn(view),
+        });
+        await viewAt(subject, watchers.white, view.version + 1);
+        const white = await subject.transportFor('white').gameRecord({ gameId, gameNumber: 1 });
+        const black = await subject.transportFor('black').gameRecord({ gameId, gameNumber: 1 });
+        same(white.side, 'white', 'White record: side');
+        same(black.side, 'black', 'Black record: side');
+        same(white.choice, view.choice, 'record.choice');
+        same(black.log, white.log, 'Black record: log');
+        const [start] = white.log;
+        if (start?.type !== 'start') throw new Error('a record starts with the start event');
+        // The sides, never a player id. (Convex sorts object keys: compare each.)
+        same(start.players.white, 'white', 'start.players.white');
+        same(start.players.black, 'black', 'start.players.black');
+        if (white.log.some((event) => event.type === 'nextGame')) {
+          throw new Error('the record of game 1 holds the start of game 2');
+        }
+        same(white.log.at(-1)?.type, 'confirm', 'the last event: the turn that won the game');
+        // Game 2 goes on: it has no record yet.
+        await rejectsWith(
+          subject.transportFor('black').gameRecord({ gameId, gameNumber: 2 }),
+          'ILLEGAL_ACTION',
+          'the record of the next game',
+        );
+        await rejectsWith(
+          subject.transportFor('white').gameRecord({ gameId, gameNumber: 0 }),
+          'BAD_REQUEST',
+          'game number 0',
+        );
+        await rejectsWith(
+          subject.transportFor('stranger').gameRecord({ gameId, gameNumber: 1 }),
+          'NOT_A_PLAYER',
+          'a stranger',
+        );
+        await rejectsWith(
+          subject
+            .transportFor('white')
+            .gameRecord({ gameId: await subject.missingGameId(), gameNumber: 1 }),
+          'NOT_FOUND',
+          'a missing game',
+        );
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
+      name: 'gameRecord gives the last game once the match is over (#604)',
+      run: async (subject) => {
+        const { gameId, watchers, view } = await startGame(
+          subject,
+          await subject.createGame(PORTES),
+        );
+        await subject.transportFor('black').resign(gameId);
+        await viewAt(subject, watchers.white, view.version + 1);
+        const record = await subject.transportFor('black').gameRecord({ gameId, gameNumber: 1 });
+        same(record.log[0]?.type, 'start', 'the first event');
+        const last = record.log.at(-1);
+        same(last?.type, 'resignMatch', 'the last event');
+        same(last?.type === 'resignMatch' ? last.player : null, 'black', 'the resigner');
+        // A record is a copy: changing it changes nothing on the server.
+        (record.log as unknown[]).length = 0;
+        const again = await subject.transportFor('white').gameRecord({ gameId, gameNumber: 1 });
+        same(again.log.at(-1)?.type, 'resignMatch', 'the record after a change to a copy');
+        await rejectsWith(
+          subject.transportFor('white').gameRecord({ gameId, gameNumber: 2 }),
+          'ILLEGAL_ACTION',
+          'a game the match never played',
+        );
+        watchers.white.stop();
+        watchers.black.stop();
+      },
+    },
+    {
       name: 'no view arrives after unsubscribe',
       run: async (subject) => {
         const gameId = await subject.createGame(PORTES);

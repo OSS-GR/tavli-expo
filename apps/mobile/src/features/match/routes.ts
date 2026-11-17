@@ -144,9 +144,23 @@ export function matchEndHref(id: string) {
   return { pathname: '/game/[id]/match-end', params: { id } } as const;
 }
 
-/** The review of the game that just ended in a local match (#215). */
-export function reviewHref(id: string) {
-  return { pathname: '/game/[id]/review', params: { id } } as const;
+/**
+ * The game review (#215). A local match reviews the game that just ended.
+ * An online game (#604) names the game of the match to review, from 1
+ * (`game`): the server sends that game's moves.
+ */
+export function reviewHref(id: string, game?: number) {
+  return {
+    pathname: '/game/[id]/review',
+    params: game === undefined ? { id } : { id, game: String(game) },
+  } as const;
+}
+
+/** The `game` param of an online review (#604): a whole number from 1, else `null`. */
+export function parseGameNumber(value: Param): number | null {
+  const text = first(value);
+  if (typeof text !== 'string' || !/^[1-9][0-9]{0,3}$/.test(text)) return null;
+  return Number(text);
 }
 
 /**

@@ -14,6 +14,7 @@
  */
 
 import type {
+  FlowEvent,
   GameFlow,
   Match,
   MoveInput,
@@ -312,6 +313,27 @@ export interface SendAnswerRequest {
   readonly choice: string;
 }
 
+/** One game of an online match, for the game review (#604). */
+export interface GameRecordRequest {
+  readonly gameId: string;
+  /** The game of the match, from 1 (`match.games` has the finished ones). */
+  readonly gameNumber: number;
+}
+
+/**
+ * A game of an online match that is over (#604): the match log from its
+ * `start` event to the end of that game. `replay(log)` rebuilds the match
+ * as it stood when that game ended, so the app can review it. The `start`
+ * event names the sides (`white`, `black`), never a player id.
+ */
+export interface GameRecord {
+  /** The game the players picked for the match, as in the view. */
+  readonly choice: OnlineGameChoice;
+  /** The caller's side. */
+  readonly side: PlayerId;
+  readonly log: readonly FlowEvent[];
+}
+
 /**
  * The port. The adapter knows who the caller is: the signed-in user
  * (`AuthProvider`). The calls do not carry a player id; the server reads
@@ -365,6 +387,15 @@ export interface GameTransport {
   sendAnswer(request: SendAnswerRequest): Promise<void>;
   /** Resigns the whole match: the opponent wins. Allowed at any time. */
   resign(gameId: string): Promise<void>;
+  /**
+   * The record of one game of the match (#604), for the game review. Only
+   * for a game that is over: an earlier game of a match that goes on, or
+   * the last game of a finished match. A game still in play rejects with
+   * `ILLEGAL_ACTION`, so the review never helps during play. Rejects with
+   * `NOT_FOUND` (no such match), `NOT_A_PLAYER` (only the two players may
+   * read it), `BAD_REQUEST` (a game number below 1) or `NOT_SIGNED_IN`.
+   */
+  gameRecord(request: GameRecordRequest): Promise<GameRecord>;
   /**
    * The caller's games with this `status` (#296), newest change first, at
    * most `MAX_LISTED_GAMES`. Never another player's game. A call, not a

@@ -1076,6 +1076,11 @@
     "new": "New",
     "where": "Find it: {{where}}",
     "entries": {
+      "onlineReview": {
+        "title": "Review your online games",
+        "body": "After an online game, Review shows your biggest mistakes and the best moves, as after a game vs the computer. It looks at your own turns only.",
+        "where": "Online game › end of the game › Review"
+      },
       "turnClock": {
         "title": "A turn clock",
         "body": "In an online game with a turn time, a ring around the avatar of the player to move empties as the time runs, with the time left next to it. In your last 10 seconds it turns red and the phone ticks.",
@@ -2050,11 +2055,16 @@
   "review": {
     "title": "Game review",
     "busy": "Looking at the moves…",
+    "loading": "Loading the game…",
     "wellPlayed": "Well played! No mistakes found.",
     "nothing": "No moves to review in this game.",
     "intro_you": "Your biggest mistakes, the biggest first.",
     "intro": "The biggest mistakes, the biggest first.",
     "failed": "This game cannot be reviewed.",
+    "problem": {
+      "title": "The review did not load",
+      "text": "Tap Review again in a moment."
+    },
     "turn": "Turn {{number}} · roll {{dice}}",
     "played_you": "You played: {{moves}}",
     "played": "{{name}} played: {{moves}}",

@@ -238,6 +238,64 @@ describe('a full Portes game between two players', () => {
   });
 });
 
+describe('gameRecord (#604)', () => {
+  it("gives each game that is over, and it replays to that game's end", async () => {
+    const t = setup();
+    const gameId = await createGame(t, 'portes', 3);
+    const picker = createSeededRng(7);
+    let v = await view(t, gameId);
+    // No help during play: the game on the board has no record.
+    await rejectsWith(
+      as(t, BOB).query(api.games.gameRecord, { gameId, gameNumber: 1 }),
+      'ILLEGAL_ACTION',
+    );
+    for (let turns = 0; v.status === 'active'; turns++) {
+      const side = v.waitingFor;
+      if (side === null) throw new Error('nobody to wait for');
+      const call = { gameId, expectedVersion: v.version };
+      await (v.game.phase === 'awaiting-roll'
+        ? as(t, idOf(side)).mutation(api.games.rollDice, call)
+        : as(t, idOf(side)).mutation(api.games.makeMove, {
+            ...call,
+            moves: pickTurn(v.game, picker),
+          }));
+      v = await view(t, gameId);
+      if (turns > 8000) throw new Error('the match does not end');
+    }
+    const games = v.match.games;
+    for (const [i, ended] of games.entries()) {
+      const record = await as(t, BOB).query(api.games.gameRecord, { gameId, gameNumber: i + 1 });
+      const flow = replay(record.log);
+      expect(flow.game.phase).toBe('game-over');
+      expect(flow.match.games).toEqual(games.slice(0, i + 1));
+      expect(flow.game.result?.winner).toBe(ended.winner);
+      // No player id in it.
+      expect(JSON.stringify(record)).not.toMatch(/alice|bob/);
+    }
+    await rejectsWith(
+      as(t, ALICE).query(api.games.gameRecord, { gameId, gameNumber: games.length + 1 }),
+      'ILLEGAL_ACTION',
+    );
+  });
+
+  it('answers only the two players, and only a signed-in caller', async () => {
+    const t = setup();
+    const gameId = await createGame(t);
+    await as(t, ALICE).mutation(api.games.resign, { gameId });
+    const record = await as(t, ALICE).query(api.games.gameRecord, { gameId, gameNumber: 1 });
+    expect(record.log.at(-1)).toEqual({ type: 'resignMatch', player: 'white' });
+    await rejectsWith(
+      as(t, 'eve').query(api.games.gameRecord, { gameId, gameNumber: 1 }),
+      'NOT_A_PLAYER',
+    );
+    await rejectsWith(t.query(api.games.gameRecord, { gameId, gameNumber: 1 }), 'NOT_SIGNED_IN');
+    await rejectsWith(
+      as(t, ALICE).query(api.games.gameRecord, { gameId, gameNumber: 0 }),
+      'BAD_REQUEST',
+    );
+  });
+});
+
 describe('makeMove', () => {
   it('rejects an illegal move and keeps the game as it was', async () => {
     const t = setup();

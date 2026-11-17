@@ -11,6 +11,7 @@ import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex
 
 import { isGameTransportErrorData } from '@tavli/contracts';
 import type {
+  GameRecord,
   GameSummary,
   GameTransport,
   GameTransportErrorData,
@@ -183,6 +184,14 @@ export function createConvexGameTransport(options: ConvexGameTransportOptions): 
 
     async resign(gameId) {
       await run(() => client.mutation(GAME_FUNCTIONS.resign, { gameId }));
+    },
+
+    async gameRecord({ gameId, gameNumber }) {
+      const record = await run(() =>
+        client.query(GAME_FUNCTIONS.gameRecord, { gameId, gameNumber }),
+      );
+      // The client may share a cached result; the caller gets its own copy.
+      return JSON.parse(JSON.stringify(record)) as GameRecord;
     },
 
     async listMyGames({ status }) {

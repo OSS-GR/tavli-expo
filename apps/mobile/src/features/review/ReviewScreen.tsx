@@ -8,8 +8,10 @@
  * turn.
  *
  * The route (`app/game/[id]/review.tsx`) opens it from the game-end sheet
- * and the match-end screen. It reads the game from the match log in
- * memory (`review.ts`); nothing is saved.
+ * and the match-end screen. A local match reads the game from the match
+ * log in memory (`review.ts`); an online game (#604, `online`) from the
+ * server's record of it (`OnlineReview.tsx`), and only your turns count.
+ * Nothing is saved.
  *
  * The Home style (#362): `Screen`, `ScreenHeader` and walnut cards.
  *
@@ -20,6 +22,7 @@
  * done.
  */
 import type { Analyzer } from '@tavli/bot';
+import type { MatchGame } from '@tavli/contracts';
 import { diceMoves, type MatchFlow, type PlayerId } from '@tavli/engine';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,8 +47,18 @@ import type { Mistake } from './review';
 import { mistakeText } from './reviewText';
 import { useGameReview } from './useGameReview';
 
-export interface ReviewScreenProps {
-  setup: MatchSetup;
+/**
+ * An online game (#604): only the viewer's turns are reviewed, and the
+ * texts say "you".
+ */
+export interface OnlineReviewOf {
+  /** The viewer's side. */
+  readonly me: PlayerId;
+  /** The game the players picked for the match. */
+  readonly game: MatchGame;
+}
+
+interface ReviewScreenBase {
   /** The match flow; its game is the one that just ended. */
   flow: MatchFlow;
   /** For tests: another Analyzer. */
@@ -56,6 +69,13 @@ export interface ReviewScreenProps {
   onBack?: () => void;
 }
 
+/** A local match (`setup`), or an online game (`online`). */
+export type ReviewScreenProps = ReviewScreenBase &
+  (
+    | { readonly setup: MatchSetup; readonly online?: undefined }
+    | { readonly online: OnlineReviewOf; readonly setup?: undefined }
+  );
+
 const BOTH_SIDES: readonly PlayerId[] = ['white', 'black'];
 /** Which turn a card's board marks. */
 type ShownTurn = 'played' | 'best';
@@ -64,19 +84,23 @@ const REVIEW_DIE_SIZE = 32;
 
 export function ReviewScreen({
   setup,
+  online,
   flow,
   analyzer = appAnalyzer,
   autoEvents,
   onBack,
 }: ReviewScreenProps) {
   const { t } = useTranslation();
-  const vsBot = setup.mode === 'bot';
-  // Vs the bot only the person's turns count; in pass-and-play both players'.
-  const players = useMemo(() => (vsBot ? [HUMAN_SIDE] : BOTH_SIDES), [vsBot]);
-  const review = useGameReview(flow, players, analyzer, setup.game, undefined, autoEvents);
-  const seats = seatsFor(setup, t);
+  // Only "you": vs the bot and online. In pass-and-play both players count.
+  const vsBot = online !== undefined || setup.mode === 'bot';
+  const mine = online === undefined ? HUMAN_SIDE : online.me;
+  // Vs the bot and online only your turns count; in pass-and-play both players'.
+  const players = useMemo(() => (vsBot ? [mine] : BOTH_SIDES), [vsBot, mine]);
+  const game = online === undefined ? setup.game : online.game;
+  const review = useGameReview(flow, players, analyzer, game, undefined, autoEvents);
+  const seats = setup === undefined ? null : seatsFor(setup, t);
 
-  const game = t('game.round', {
+  const round = t('game.round', {
     number: currentGameNumber(flow),
     game: variantName(flow.game.state.variant, t),
   });
@@ -107,7 +131,7 @@ export function ReviewScreen({
         style={styles.scroll}
         contentContainerStyle={styles.content}>
         <Text style={styles.title} accessibilityRole="header">
-          {game}
+          {round}
         </Text>
         {review.kind === 'busy' ? (
           <View testID="review-busy" style={styles.busy}>
@@ -125,7 +149,7 @@ export function ReviewScreen({
                 key={i}
                 testID={`review-mistake-${i + 1}`}
                 mistake={mistake}
-                name={vsBot ? null : seats[mistake.turn.player].name}
+                name={vsBot || seats === null ? null : seats[mistake.turn.player].name}
               />
             ))
           : null}

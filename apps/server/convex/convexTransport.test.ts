@@ -294,6 +294,7 @@ describe('function references', () => {
       setDraft: getFunctionName(api.games.setDraft),
       answer: getFunctionName(api.games.answer),
       resign: getFunctionName(api.games.resign),
+      gameRecord: getFunctionName(api.games.gameRecord),
       listMyGames: getFunctionName(api.games.listMyGames),
     });
     for (const key of Object.keys(GAME_FUNCTION_NAMES) as (keyof GameFunctions)[]) {
@@ -309,6 +310,7 @@ describe('function references', () => {
     expectType<Extends<WithGameId<GameFunctions['setDraft']>, FunctionArgs<Api['setDraft']>>>();
     expectType<Extends<WithGameId<GameFunctions['answer']>, FunctionArgs<Api['answer']>>>();
     expectType<Extends<WithGameId<GameFunctions['resign']>, FunctionArgs<Api['resign']>>>();
+    expectType<Extends<WithGameId<GameFunctions['gameRecord']>, FunctionArgs<Api['gameRecord']>>>();
     expectType<
       Extends<FunctionArgs<GameFunctions['listMyGames']>, FunctionArgs<Api['listMyGames']>>
     >();
@@ -329,6 +331,12 @@ describe('function references', () => {
     >();
     expectType<
       Extends<FunctionReturnType<Api['resign']>, FunctionReturnType<GameFunctions['resign']>>
+    >();
+    expectType<
+      Extends<
+        FunctionReturnType<Api['gameRecord']>,
+        FunctionReturnType<GameFunctions['gameRecord']>
+      >
     >();
     expectType<
       Extends<

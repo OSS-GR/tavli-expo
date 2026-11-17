@@ -1,10 +1,15 @@
 /**
  * The game review (#215): the biggest mistakes of the game that just
  * ended. The game-end sheet and the match-end screen open it with
- * `router.push`, so Back returns to them. The game comes from the match in
- * memory (its log): the review saves nothing. After an app restart a
- * finished match is gone: "This game could not be opened." with Home. A
- * game that is not over yet redirects to the board.
+ * `router.push`, so Back returns to them. The review saves nothing.
+ *
+ * - A local match comes from memory (its log). After an app restart a
+ *   finished match is gone: "This game could not be opened." with Home. A
+ *   game that is not over yet redirects to the board.
+ * - An online game (#604) names the game of the match (`game`, from 1):
+ *   `OnlineConnect` picks the server like the board route, and
+ *   `OnlineReview` loads that game's record from it. No `game`: "This game
+ *   could not be opened."
  */
 import { Redirect, Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -12,7 +17,9 @@ import { useTranslation } from 'react-i18next';
 
 import { matchSessions } from '@/features/match/appSessions';
 import { MissingGame } from '@/features/match/MissingGame';
-import { gameHref, parseIdParam } from '@/features/match/routes';
+import { gameHref, isLocalGameId, parseGameNumber, parseIdParam } from '@/features/match/routes';
+import { OnlineConnect } from '@/features/online/OnlineConnect';
+import { OnlineReview } from '@/features/review/OnlineReview';
 import { sendReviewOpened } from '@/features/review/reviewAnalytics';
 import { ReviewScreen } from '@/features/review/ReviewScreen';
 
@@ -21,10 +28,39 @@ function goHome() {
   router.dismissTo('/');
 }
 
+/** Back to the screen that opened the review, else Home. */
+function goBack() {
+  if (router.canGoBack()) router.back();
+  else goHome();
+}
+
 export default function ReviewRoute() {
-  const { t } = useTranslation();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; game?: string }>();
   const id = parseIdParam(params.id);
+  if (id !== null && !isLocalGameId(id)) {
+    return <OnlineReviewRoute id={id} gameNumber={parseGameNumber(params.game)} />;
+  }
+  return <LocalReview id={id} />;
+}
+
+function OnlineReviewRoute({ id, gameNumber }: { id: string; gameNumber: number | null }) {
+  const { t } = useTranslation();
+  if (gameNumber === null) return <MissingGame onHome={goHome} />;
+  return (
+    <>
+      {/* The screen draws its own header (#362). */}
+      <Stack.Screen options={{ title: t('review.title'), headerShown: false }} />
+      <OnlineConnect gameId={id} onHome={goHome}>
+        {({ transport }) => (
+          <OnlineReview gameId={id} gameNumber={gameNumber} transport={transport} onBack={goBack} />
+        )}
+      </OnlineConnect>
+    </>
+  );
+}
+
+function LocalReview({ id }: { id: string | null }) {
+  const { t } = useTranslation();
   // Read once: the review is of the game that just ended, even if the
   // match moves on under this screen.
   const [opened] = useState(() => {
@@ -46,7 +82,7 @@ export default function ReviewRoute() {
   const game = opened?.setup.game ?? null;
 
   useEffect(() => {
-    if (over && game !== null) sendReviewOpened(game);
+    if (over && game !== null) sendReviewOpened(game, false);
   }, [over, game]);
 
   if (opened === null) return <MissingGame onHome={goHome} />;
@@ -59,7 +95,7 @@ export default function ReviewRoute() {
         setup={opened.setup}
         flow={opened.flow}
         autoEvents={opened.autoEvents}
-        onBack={() => (router.canGoBack() ? router.back() : goHome())}
+        onBack={goBack}
       />
     </>
   );

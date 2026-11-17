@@ -28,8 +28,10 @@
  * - There is no game resign online: Resign match goes to the server.
  * - Report or block (#435): the menu opens the dialog for the other
  *   player (`features/safety`), in the same sheet.
- * - No Hint and no Review (there is no analyzer online), and nothing goes
- *   to the save slot or History: the server keeps the game.
+ * - The game-end sheet has Review (#604): the review screen asks the
+ *   server for the record of that game (`GameTransport.gameRecord`). There
+ *   is no Hint online, and nothing goes to the save slot or History: the
+ *   server keeps the game.
  *
  * Navigation stays in the route (`app/game/[id]/index.tsx`).
  */
@@ -92,6 +94,8 @@ export interface OnlineMatchScreenProps {
   onRules: (variant: string, preset: PresetId) => void;
   /** The match is over: open the match-end screen. */
   onMatchOver: () => void;
+  /** Review of a game that ended (#604), by its number in the match (from 1). */
+  onReview?: (gameNumber: number) => void;
   /** The phone clock. Default: `Date.now`. */
   now?: () => number;
 }
@@ -163,6 +167,7 @@ function OnlineBoard({
   onSettings,
   onRules,
   onMatchOver,
+  onReview,
   now = Date.now,
 }: OnlineMatchScreenProps & {
   store: OnlineStore;
@@ -423,6 +428,8 @@ function OnlineBoard({
         onOpenMenu={() => setOverlay({ kind: 'menu' })}
         onHome={onExit}
         onMatchOver={onMatchOver}
+        // The game that ended is the last one in the match so far.
+        {...(onReview && ended !== null ? { onReview: () => onReview(games.length) } : {})}
         gameLabel={gameLabel}
         {...(nextLabel ? { nextGameLabel: nextLabel } : {})}
       />

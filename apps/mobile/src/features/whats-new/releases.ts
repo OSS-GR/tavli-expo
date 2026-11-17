@@ -41,7 +41,8 @@ export type WhatsNewEntryId =
   | 'lostDice'
   | 'support'
   | 'signOutEverywhere'
-  | 'downloadData';
+  | 'downloadData'
+  | 'onlineReview';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -62,6 +63,7 @@ export const RELEASES: readonly WhatsNewRelease[] = [
     entries: [
       { id: 'signOutEverywhere', icon: 'logOut' },
       { id: 'downloadData', icon: 'share' },
+      { id: 'onlineReview', icon: 'chart' },
     ],
   },
   {
