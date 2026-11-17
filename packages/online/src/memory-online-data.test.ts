@@ -10,6 +10,7 @@ import type { OnlineDataContractSubject } from '@tavli/contracts/testing';
 import { createSeededRng } from '@tavli/engine';
 
 import { createMemoryGameServer } from './memory-server';
+import { markNamed } from './testing';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -98,7 +99,10 @@ describe('onlineDataFor(…).exportMyData (#445)', () => {
     const server = setup();
     // Ids that no other text in the copy holds.
     const [me, friend, other] = ['id-me-41f', 'id-friend-9c2', 'id-other-77d'] as const;
-    for (const id of [me, friend, other]) server.markSaved(id);
+    // Friends need a username (#599); names that hold no id.
+    await markNamed(server, me, 'Kafeneio');
+    await markNamed(server, friend, 'Portes');
+    server.markSaved(other);
     const gameId = await server
       .invitesFor(friend)
       .acceptInvite(await server.invitesFor(me).createInvite(GAME));
