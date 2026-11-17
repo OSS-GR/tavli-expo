@@ -22,7 +22,7 @@ Tavlaki is a Greek backgammon (tavli) app for iPhone and Android. This policy sa
 - With an account saved with Apple or an email code, you can **Play ranked**: the server matches you with another player who asked for the same game and has a similar rating. It keeps your request (the game, your rating and the time) only until the match, and at most 5 minutes.
 - You can **block** or **report** a player you met online. We keep a report until we have read it and deleted it.
 - You can **delete your account** and its online data in the app at any time: **Settings → Account → Delete my account**.
-- You can **download a copy of your online data** in the app at any time: **Settings → Account → Download my data**. It is one JSON file with your account, games, invites, friends, rating, blocks and reports, which you save or send on from the share sheet.
+- You can **download a copy of your online data** in the app at any time: **Settings → Account → Download my data**. It is a copy in JSON format with your account, games, invites, friends, rating, blocks and reports (with the other players' names as the app shows them to you), which you save or send on from the share sheet.
 - **Turn notifications** are off until you turn them on. The app offers them only after you make or accept an invite for an async game. If you turn them on, our server keeps your phone's push token, to tell you when it is your turn or your game is over.
 - On the first launch, the app asks if it may send **anonymous usage data**. You choose **Allow usage data** or **Don't allow**. You can change your answer any time in **Settings → Privacy**.
 - Until you answer, the app sends only anonymous **crash reports**. **Don't allow** turns off usage data **and** crash reports.
