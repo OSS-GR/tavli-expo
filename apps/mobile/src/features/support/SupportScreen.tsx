@@ -1,7 +1,7 @@
 /**
  * Support Tavlaki (#590, Figma frame 25 "Support Tavlaki: Ko-fi link, no
  * reward"). A card with the coffee medallion, a short text (free, no ads,
- * made by one person, you get nothing extra) and one main button,
+ * made by one person) and one main button,
  * **Support on Ko-fi**, that opens our page tavlaki.com/support (Greek:
  * /el/support) in the phone's browser, never in a web view. That page has
  * the Ko-fi button. Under the card, "Other ways to help": Rate Tavlaki and
@@ -62,7 +62,6 @@ export function SupportScreen({ onBack }: SupportScreenProps) {
             </View>
             <Text style={styles.lead}>{t('support.lead')}</Text>
             <Text style={styles.body}>{t('support.body')}</Text>
-            <Text style={styles.note}>{t('support.nothingExtra')}</Text>
             <View style={styles.button}>
               <ActionButton
                 testID="support-kofi-button"
@@ -139,10 +138,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   body: {
     ...theme.type.callout,
     color: theme.colors.text,
-  },
-  note: {
-    ...theme.type.callout,
-    color: theme.colors.textDim,
   },
   button: {
     paddingTop: theme.space.xs,
