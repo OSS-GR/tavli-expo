@@ -314,3 +314,38 @@ export const deleteSentInvites = internalMutation({
     return null;
   },
 });
+
+/**
+ * Sign out of all phones (#446): ends every session of `userId` and
+ * deletes every push token of it, in one transaction. Called only by the
+ * `/sign-out-everywhere` route (`keyPlugin.ts`), which checks the session
+ * and refuses a guest.
+ *
+ * The sessions go first, with Better Auth's own delete
+ * (`internalAdapter.deleteUserSessions`), then the push tokens, so no
+ * other phone gets a "your turn" push from now on. Both are in the same
+ * transaction, so a phone cannot add a token in between; after it,
+ * `registerPushToken` refuses a token whose session is gone
+ * (`existingPlayer`). The account, its keys, games and invites stay.
+ *
+ * Another phone's Convex token still works until it expires (15
+ * minutes): it can still read its lists and play its games, but it
+ * cannot make a row under the player's id (`existingPlayer`), and it
+ * gets no new token. See "Sign out of all phones" in
+ * `docs/architecture/online-game-service.md`.
+ */
+export const endSessionsOf = internalMutation({
+  args: { userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { userId }) => {
+    const { internalAdapter } = await createAuth(ctx).$context;
+    await internalAdapter.deleteUserSessions(userId);
+    // `MAX_PUSH_TOKENS_PER_PLAYER` caps them, so `.collect()` is fine.
+    const tokens = await ctx.db
+      .query('pushTokens')
+      .withIndex('by_player', (q) => q.eq('playerId', userId))
+      .collect();
+    for (const token of tokens) await ctx.db.delete(token._id);
+    return null;
+  },
+});

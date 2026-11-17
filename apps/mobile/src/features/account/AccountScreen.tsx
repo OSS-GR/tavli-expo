@@ -23,8 +23,9 @@
  * - Saved (Figma frame 19, #561): a hero like the guest's (checker,
  *   username, "Signed in with email"), the username (to Settings →
  *   Username), the ways to sign in (the small Remove only when there are
- *   two: the last one has no button and says why), Sign out and Delete my
- *   account, then one footnote: what stays on this phone.
+ *   two: the last one has no button and says why), Sign out, Sign out of
+ *   all phones (#446) and Delete my account, then one footnote: what
+ *   stays on this phone.
  * - A failed action opens the problem popup (`ProblemCard`, #462): what
  *   went wrong, what to do, OK. It shares one `Sheet` with the move
  *   dialog, so Keep my guest account turns the dialog into the problem
@@ -77,7 +78,7 @@ export interface AccountScreenProps {
   visit?: number;
 }
 
-type Dialog = 'signOut' | 'deleteGuest' | 'deleteSaved';
+type Dialog = 'signOut' | 'signOutEverywhere' | 'deleteGuest' | 'deleteSaved';
 
 /** What the email code step does with the code. */
 type EmailStep = 'signIn' | 'save' | 'add';
@@ -110,6 +111,7 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
     const was = dialog;
     setDialog(null);
     if (was === 'signOut') account.signOut();
+    else if (was === 'signOutEverywhere') account.signOutEverywhere();
     else account.deleteAccount();
   };
 
@@ -193,6 +195,7 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
                   onUsername={onUsername}
                   onAddEmail={() => setEmailStep('add')}
                   onSignOut={() => setDialog('signOut')}
+                  onSignOutEverywhere={() => setDialog('signOutEverywhere')}
                   onDelete={() => setDialog('deleteSaved')}
                 />
               )}
@@ -419,6 +422,7 @@ function Saved({
   onUsername,
   onAddEmail,
   onSignOut,
+  onSignOutEverywhere,
   onDelete,
 }: {
   account: Account;
@@ -429,6 +433,7 @@ function Saved({
   onUsername: () => void;
   onAddEmail: () => void;
   onSignOut: () => void;
+  onSignOutEverywhere: () => void;
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
@@ -528,6 +533,14 @@ function Saved({
           onPress={onSignOut}
         />
         <SectionRow
+          testID="account-sign-out-everywhere"
+          icon="smartphone"
+          label={t('account.saved.signOutEverywhere')}
+          hint={t('account.saved.signOutEverywhereHint')}
+          disabled={busy}
+          onPress={onSignOutEverywhere}
+        />
+        <SectionRow
           testID="account-delete"
           icon="trash"
           label={t('account.saved.delete')}
@@ -601,6 +614,24 @@ function AccountDialog({
         title={t('account.signOutDialog.title')}
         lines={[t('account.signOutDialog.comeBack'), t('account.signOutDialog.kept')]}
         confirmLabel={t('account.signOutDialog.confirm')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
+    );
+  }
+  if (dialog === 'signOutEverywhere') {
+    return (
+      <ConfirmDialog
+        testID="account-dialog"
+        titleRef={titleRef}
+        title={t('account.signOutEverywhereDialog.title')}
+        lines={[
+          t('account.signOutEverywhereDialog.everywhere'),
+          t('account.signOutEverywhereDialog.comeBack'),
+          t('account.signOutEverywhereDialog.kept'),
+        ]}
+        confirmLabel={t('account.signOutEverywhereDialog.confirm')}
         cancelLabel={t('common.cancel')}
         onConfirm={onConfirm}
         onCancel={onCancel}

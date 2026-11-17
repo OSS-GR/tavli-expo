@@ -245,6 +245,16 @@ export interface AuthProvider {
    */
   signOut(): Promise<void>;
   /**
+   * Sign out of all phones (#446): ends every session of the signed-in
+   * saved account, on this phone and on every other one, then signs out
+   * here. The server also drops the account's push tokens. The account
+   * and its keys stay: the player signs in again with a key. Rejects with
+   * `REJECTED` when nobody or a guest is signed in (a guest with no
+   * session could never sign in again), and with `NETWORK` when the
+   * server could not be reached; the user then stays signed in.
+   */
+  signOutEverywhere(): Promise<void>;
+  /**
    * A token for the backend client (Convex `setAuth`), or `null` when
    * nobody is signed in. `forceRefresh` asks for a new token even if the
    * saved one is still valid (the backend client does this when the
@@ -303,8 +313,13 @@ export interface MemoryAuthStore {
   emailCodes: Record<string, { code: string; tries: number }>;
   /** Kinds of key that are off on this "server" (#462): their calls give `KEY_OFF`. */
   offKeys: AuthKeyProvider[];
-  /** No network: `loadSession()` rejects with `NETWORK` (`ready()` still answers). */
+  /**
+   * No network: `loadSession()` and `signOutEverywhere()` reject with
+   * `NETWORK` (`ready()` still answers).
+   */
   offline: boolean;
+  /** The users whose sessions `signOutEverywhere()` ended, oldest first (#446). */
+  sessionsEnded: string[];
 }
 
 /**
@@ -331,6 +346,7 @@ export function createMemoryAuthStore(): MemoryAuthStore {
     emailCodes: {},
     offKeys: [],
     offline: false,
+    sessionsEnded: [],
   };
 }
 
@@ -518,6 +534,16 @@ export function createMemoryAuthProvider(
     async signOut() {
       await Promise.resolve();
       if (store.session === null) return;
+      store.session = null;
+      changed(null);
+    },
+    async signOutEverywhere() {
+      await Promise.resolve();
+      const user = store.session;
+      if (user === null) throw authError('REJECTED', 'sign in first');
+      if (user.isGuest) throw authError('REJECTED', 'a guest has no sign-out on every phone');
+      if (store.offline) throw authError('NETWORK', 'could not reach the server');
+      store.sessionsEnded.push(user.id);
       store.session = null;
       changed(null);
     },

@@ -39,7 +39,8 @@ export type WhatsNewEntryId =
   | 'howToPlay'
   | 'appTour'
   | 'lostDice'
-  | 'support';
+  | 'support'
+  | 'signOutEverywhere';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -55,6 +56,10 @@ export interface WhatsNewRelease {
 
 /** Every release, newest first. */
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    date: '2026-11-18',
+    entries: [{ id: 'signOutEverywhere', icon: 'logOut' }],
+  },
   {
     date: '2026-11-17',
     entries: [{ id: 'support', icon: 'heart' }],

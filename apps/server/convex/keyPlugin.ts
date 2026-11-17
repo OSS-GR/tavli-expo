@@ -43,9 +43,10 @@ import {
   createAuthEndpoint,
   createAuthMiddleware,
   getSessionFromCtx,
+  sensitiveSessionMiddleware,
   sessionMiddleware,
 } from 'better-auth/api';
-import { setSessionCookie } from 'better-auth/cookies';
+import { deleteSessionCookie, setSessionCookie } from 'better-auth/cookies';
 import { setTokenUtil } from 'better-auth/oauth2';
 
 import { isEmailCode, isEmailCodeLanguage, normalizeEmail } from '@tavli/contracts';
@@ -148,6 +149,7 @@ export const KEY_ERROR_CODES = {
   WRONG_CODE: 'the code is wrong',
   CODE_EXPIRED: 'the code ran out or was used; ask for a new one',
   SIGNED_IN: 'sign out first; a signed-in user adds the key with /key/save',
+  GUEST: 'a guest has no sign-out on every phone; save the account first',
 } as const;
 
 export type KeyErrorCode = keyof typeof KEY_ERROR_CODES;
@@ -332,6 +334,11 @@ export interface KeyPluginOptions {
   readonly cancelEmailCode: (
     rows: Omit<Extract<EmailCodeStart, { ok: true }>, 'ok'>,
   ) => Promise<void>;
+  /**
+   * Ends every session of `userId` and deletes its push tokens, in one
+   * transaction (`endSessionsOf` in `account.ts`, #446).
+   */
+  readonly endSessions: (userId: string) => Promise<void>;
   /** Checks a code and counts a wrong try (`useEmailCode` in `emailCodes.ts`). */
   readonly useEmailCode: (use: {
     ticket: string;
@@ -711,6 +718,21 @@ export function keyPlugin(options: KeyPluginOptions) {
           // The key went while Apple traded the code.
           if (!saved) throw keyError('BAD_REQUEST', 'NO_KEY');
           return ctx.json({ saved: true });
+        },
+      ),
+
+      signOutEverywhere: createAuthEndpoint(
+        '/sign-out-everywhere',
+        // The session from the table, never from a cookie cache.
+        { method: 'POST', use: [sensitiveSessionMiddleware] },
+        async (ctx) => {
+          const { user } = ctx.context.session;
+          // A guest with no session left could never come back.
+          if (isAnonymousUser(user)) throw keyError('BAD_REQUEST', 'GUEST');
+          await options.endSessions(user.id);
+          // This phone's cookie goes too, as after `/sign-out`.
+          deleteSessionCookie(ctx);
+          return ctx.json({ status: true });
         },
       ),
     },

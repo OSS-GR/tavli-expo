@@ -572,6 +572,38 @@ export function authProviderContract(): AuthProviderContractCheck[] {
       },
     },
     {
+      name: 'sign out of all phones ends the saved session here; the key signs in again to the same account',
+      run: async (subject) => {
+        const { auth } = subject;
+        await auth.ready();
+        const seen: (AuthUser | null)[] = [];
+        const stop = auth.onChange((user) => seen.push(user));
+        const user = await auth.signInWithKey(await apple(subject, 'apple-a'));
+        await auth.signOutEverywhere();
+        same(auth.currentUser(), null, 'currentUser() after signOutEverywhere()');
+        same(await auth.getToken(), null, 'getToken() after signOutEverywhere()');
+        await waitUntil(subject, () => seen[seen.length - 1] === null, 'the sign-out change');
+        stop();
+        const again = subject.restart();
+        same(await again.loadSession(), null, 'loadSession() after a restart');
+        // Signing out here again does nothing.
+        await auth.signOut();
+        const back = await auth.signInWithKey(await apple(subject, 'apple-a'));
+        same(back, user, 'signInWithKey() after signOutEverywhere()');
+      },
+    },
+    {
+      name: 'sign out of all phones is REJECTED for a guest and with nobody signed in',
+      run: async ({ auth }) => {
+        await auth.ready();
+        await rejectsWith(auth.signOutEverywhere(), 'REJECTED', 'nobody signed in');
+        const guest = await auth.signInAsGuest();
+        await rejectsWith(auth.signOutEverywhere(), 'REJECTED', 'a guest');
+        same(auth.currentUser(), guest, 'currentUser() after the refusal');
+        same(await auth.loadSession(), guest, 'loadSession() after the refusal');
+      },
+    },
+    {
       name: 'a restart keeps a saved account',
       run: async (subject) => {
         await subject.auth.ready();
