@@ -193,20 +193,20 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.72.1
-        version: 8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+        specifier: ^8.72.2
+        version: 8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       vitest:
-        specifier: ^5.0.5
-        version: 5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))
+        specifier: ^5.1.0
+        version: 5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))
 
   apps/mobile:
     dependencies:
       '@better-auth/expo':
         specifier: 1.7.18
-        version: 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.3(expo@58.0.25))
+        version: 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.3(expo@58.0.25))
       '@convex-dev/better-auth':
         specifier: 0.13.0
-        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       '@sentry/react-native':
         specifier: ~8.28.0
         version: 8.28.0(8a1cec10a363dfa45c6c94dbeef3d481)
@@ -260,7 +260,7 @@ importers:
         version: link:../../packages/ui
       better-auth:
         specifier: 1.7.18
-        version: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
+        version: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
       convex:
         specifier: 1.49.0
         version: 1.49.0(react@19.3.0)
@@ -402,10 +402,10 @@ importers:
     dependencies:
       '@better-auth/expo':
         specifier: 1.7.18
-        version: 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.2(expo@58.0.25))
+        version: 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.2(expo@58.0.25))
       '@convex-dev/better-auth':
         specifier: 0.13.0
-        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       '@tavli/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -423,7 +423,7 @@ importers:
         version: link:../../packages/adapters/push-expo
       better-auth:
         specifier: 1.7.18
-        version: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
+        version: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
       convex:
         specifier: 1.49.0
         version: 1.49.0(react@19.3.0)
@@ -494,13 +494,13 @@ importers:
     devDependencies:
       '@better-auth/expo':
         specifier: 1.7.18
-        version: 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.2(expo@58.0.25))
+        version: 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.2(expo@58.0.25))
       '@convex-dev/better-auth':
         specifier: 0.13.0
-        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+        version: 0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       better-auth:
         specifier: 1.7.18
-        version: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
+        version: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
       convex:
         specifier: 1.49.0
         version: 1.49.0(react@19.3.0)
@@ -2694,11 +2694,11 @@ packages:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
       typescript: '>=4.8.4 <6.1.0'
 
-  '@typescript-eslint/eslint-plugin@8.72.1':
-    resolution: {integrity: sha512-5CokTWXpmbylfFabsbvHC0CAw3XLaGnoa+nFJX5FR592h/LoZsENUE6p/rg5xvkKrFEXz6pYmgI29AgXc2N3BQ==}
+  '@typescript-eslint/eslint-plugin@8.72.2':
+    resolution: {integrity: sha512-222PKFXKihmFpi/pS5njoBgdAqsPhj2/GBmFbrNw8Tq8gEG9Sv+kSlKFy4u2q+mJv9ZzJgM2Gkv/bUzRZwZw5g==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
-      '@typescript-eslint/parser': ^8.72.1
+      '@typescript-eslint/parser': ^8.72.2
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
       typescript: '>=4.8.4 <6.1.0'
 
@@ -2709,8 +2709,8 @@ packages:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
       typescript: '>=4.8.4 <6.1.0'
 
-  '@typescript-eslint/parser@8.72.1':
-    resolution: {integrity: sha512-ZGwZP4OCfyA0AQTpEAMWz+rtX01DRhQWW5hB0ucKDEIX5U7jdmPSaMx94rQfaPAQzIYz2BimOgKOJtjfpRFQ9g==}
+  '@typescript-eslint/parser@8.72.2':
+    resolution: {integrity: sha512-llP+T1YuJOLlxEciP6OyQGtz5SMxyn+9LA2BvZw5RmToGVa1y4beEDVQL6Gje7T5WFYh19WREjDCN9Ev4gm5AA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
@@ -2722,8 +2722,8 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4 <6.1.0'
 
-  '@typescript-eslint/project-service@8.72.1':
-    resolution: {integrity: sha512-fAuVMkwdO/huI8nyo/WKnNKf6Gag93S56Rh3Ts5mGcavwSdaN8tRg1gCeIGX8PF+nzp1BjGfO4gHhGzW1J6jTg==}
+  '@typescript-eslint/project-service@8.72.2':
+    resolution: {integrity: sha512-6y5dLTZdHhI8Eh3yIQ/bfQhRKwn5e+TpJj64o18Cngc0iW/BCrVvrr6zGYqXPnYH31u6YXAYiFh0+qxX5mybJw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       typescript: '>=4.8.4 <6.1.0'
@@ -2732,8 +2732,8 @@ packages:
     resolution: {integrity: sha512-JewPyJOYcXBSAS7PIgufscHOwZqhTGyBRiQJhhuDln66tMchxvvt7nJ90JKKIoOelmdHA3kAQbm9cEUHc4JSEA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@typescript-eslint/scope-manager@8.72.1':
-    resolution: {integrity: sha512-lC/t6eMCZZQAAKZEYGL6RDVSuFehpdmMT6h+nJIjIa6oylN/PwDgDVtEIbB7O9xFfZYtZAYLoLlDNWKJhtF+uQ==}
+  '@typescript-eslint/scope-manager@8.72.2':
+    resolution: {integrity: sha512-iIoMJ6/8c1/QpFNyFjU0d1YzPco4MsZjQw0k3V+vfzNWAFmUmvhlyMoYEoYYDQZXc+J6Gi1X5XcxlzW2taIIGQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   '@typescript-eslint/tsconfig-utils@8.72.0':
@@ -2742,8 +2742,8 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4 <6.1.0'
 
-  '@typescript-eslint/tsconfig-utils@8.72.1':
-    resolution: {integrity: sha512-e4D5R5vpeAEPBxT2BAzsFQL3sbwyeeeo5+aczgNSRK1V734jE7pTqaGFU+fXapWEQwnZbpFaTn32+Z8DwS6OTg==}
+  '@typescript-eslint/tsconfig-utils@8.72.2':
+    resolution: {integrity: sha512-+h3iCgZXuTNtoLXcnnjP12ZUHLMqoUcIHPfQrFEXTUqvb9dF8QK9b5nv5VtSo5fLkdHuks8ehbTzZj3rImAm9w==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       typescript: '>=4.8.4 <6.1.0'
@@ -2755,8 +2755,8 @@ packages:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
       typescript: '>=4.8.4 <6.1.0'
 
-  '@typescript-eslint/type-utils@8.72.1':
-    resolution: {integrity: sha512-iY2wlmyrXJmx4yxUGP3aYCFF3cA/6ShddOKmLU2dx7LnEykbAM8WThlxZEfd1NddqceF6eJmZUayxx9oKIYNlg==}
+  '@typescript-eslint/type-utils@8.72.2':
+    resolution: {integrity: sha512-STfkR38qIdhfkLpgtXnUjAzsNy4xouqiBO0lrVc/Wpk9Kem5/aHXUx1J8dGC16zpdYN1+yc2ILQ28er1kXX7ag==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
@@ -2766,8 +2766,8 @@ packages:
     resolution: {integrity: sha512-Adfoy59kxNEjT5E5fnyrp7GpHYuWs8ONbdohu4ez6IU46qDq8LltG90tLmkucZB2uhYL8mqBjtXqGd8yhfjXqQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@typescript-eslint/types@8.72.1':
-    resolution: {integrity: sha512-LmE5IhQet1BWOWEXqBrVtBPsMAOQ6Nzk35d+WLh3mk4EUF33sqlfxjio1MdYeSvKSG5skactKKuixBIKXhL4Rw==}
+  '@typescript-eslint/types@8.72.2':
+    resolution: {integrity: sha512-Xfn37OLZx03+PCU7qWx9DTv2FCRh1E6fk2+wONeNY15HXIwtcwuveaSwVpGAUptkNmPQegRxW5JyRel9T7wrog==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   '@typescript-eslint/typescript-estree@8.72.0':
@@ -2776,8 +2776,8 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4 <6.1.0'
 
-  '@typescript-eslint/typescript-estree@8.72.1':
-    resolution: {integrity: sha512-DAlUoUV93hIvrtIQLwCbmZQYVZwOMhiHJrOVUUIWicFZaIYjTRqlY3I/NZevfkLmSqkNHRu2qYDcq9lrn16oOQ==}
+  '@typescript-eslint/typescript-estree@8.72.2':
+    resolution: {integrity: sha512-pQEGqIK/cqEvKivVWaFLYpe7XYejFxfuAOi4mu1oAWFvIo36aRHI9esRFTUxcIy/z8N482RJyH+LpZB0ZIU7Ow==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       typescript: '>=4.8.4 <6.1.0'
@@ -2789,8 +2789,8 @@ packages:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
       typescript: '>=4.8.4 <6.1.0'
 
-  '@typescript-eslint/utils@8.72.1':
-    resolution: {integrity: sha512-5v5liypurJBFHCBNqh/RjsymAD+VWcE0djuGY/BUqp5fC3Qn+luWDEksjuTtWjPn6i5zQlUtkZCRG/CYG0yCkA==}
+  '@typescript-eslint/utils@8.72.2':
+    resolution: {integrity: sha512-hv3eRYbpPbbpezuax1EfGrzpa3C4ySgNZkPUkLOWOAjU8HsOKowEDAr8C7nsNl1C+SBSKDpvno6VKHnlhvp9iA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
@@ -2800,8 +2800,8 @@ packages:
     resolution: {integrity: sha512-E2mroviasaWecDzTGiGMtuEguuLVOeRggnrIn93CJuxYJzQBHbyymlT08aVQydbBal5538o+JkBKXh2sRuCyIA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@typescript-eslint/visitor-keys@8.72.1':
-    resolution: {integrity: sha512-SB8xqipSzZHUePCCLNeYxqnxq83X61/qzNhjQGbTfjxGZIeOEP7tBgWYX05Tcd6CgE02WdTJnh5b8kMZJ/+bnQ==}
+  '@typescript-eslint/visitor-keys@8.72.2':
+    resolution: {integrity: sha512-NAGrjn0Pitjqzq/GkgMC4kBYm233PQ8GffyQ9+kTA3AlNQYEzOf25EIM02BAHZv5FRJSpHpJk+OGUxVkOB93GQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   '@ungap/structured-clone@1.4.0':
@@ -2927,8 +2927,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@vitest/mocker@5.0.5':
-    resolution: {integrity: sha512-xLL3lkDegJZw+MGoGaCCsFayDZthGgpAtr3Vziyfc4p7xH89K7KRPcRBBh/kEYm0Aqkt5DtTmkYpBtRV/FrHZg==}
+  '@vitest/mocker@5.1.0':
+    resolution: {integrity: sha512-5umB9/jlWcqVS6fsrFmv5Gdnpu6wAUio/lEOwAmvB7v+lFo/IW2B9FhAD0p19GCULTgMzLCdUmuCDCnAzWgppQ==}
     peerDependencies:
       msw: ^2.4.9 || ^3.0.0
       vite: ^6.0.0 || ^7.0.0 || ^8.0.0
@@ -2938,8 +2938,8 @@ packages:
       vite:
         optional: true
 
-  '@vitest/spy@5.0.5':
-    resolution: {integrity: sha512-lwJRExuH417257Q5wv9QYugN9IMJkoxcrKrYxGPQkBzl7wlNpTUxD/5yNX4ESKVUIShKPgkGchYPFMWOOk0wzw==}
+  '@vitest/spy@5.1.0':
+    resolution: {integrity: sha512-2DPO5OMHWKrBngC+fCmTQqemNF0gidRhp3lxbBmRhW+M1XJrfgPpqNqWVevXtn2f2ufD5ZaR1B6B641aAlcX5A==}
 
   '@webgpu/types@0.1.21':
     resolution: {integrity: sha512-pUrWq3V5PiSGFLeLxoGqReTZmiiXwY3jRkIG5sLLKjyqNxrwm/04b4nw7LSmGWJcKk59XOM/YRTUwOzo4MMlow==}
@@ -6204,8 +6204,8 @@ packages:
     resolution: {integrity: sha512-phPGCwqr2+Qo0fwniCE8e4pKnGu/yFb5nD5Y8bf0EEeiI5GklnACYA9GFy/DrAeRrKHXvHn+1SUsOWgJp6RO+g==}
     engines: {node: '>= 0.4'}
 
-  typescript-eslint@8.72.1:
-    resolution: {integrity: sha512-3Li9FfPmQp45nxEtFD1ZCrYFI3cYK5kpyNtmm1H7lMagm8u9sy6PTjy3ytwQZs7KNukOyKFHAZ6z6GjYFeaeXw==}
+  typescript-eslint@8.72.2:
+    resolution: {integrity: sha512-c/+AKMW1KB81r28Sp0AAdcyXj5dzNmAsZFcsrxKbZTKmcBK2xIwBR31dcSYSDu3bKmzXe8GKrSxO+eDQ401Uzg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
@@ -6328,20 +6328,20 @@ packages:
       yaml:
         optional: true
 
-  vitest@5.0.5:
-    resolution: {integrity: sha512-cPODOMF8YnkiiYtDdHo6n4wWmBrOBBbOIYH2d33M4l3CdNn72h+qMmO6uXffUN6A5AZFXNND/d+krS9mgkXRfg==}
+  vitest@5.1.0:
+    resolution: {integrity: sha512-MzmNFnrwa8v8lF1bLxw3UJ4EREwVOVb75VqJZmUDRjJ6EluK/x9th7qTbaeDk41WxE1GxWqmTXcdsfobfH5sOA==}
     engines: {node: ^22.12.0 || ^24.0.0 || >=26.0.0}
     hasBin: true
     peerDependencies:
       '@edge-runtime/vm': '*'
       '@opentelemetry/api': ^1.9.0
       '@types/node': ^22.0.0 || >=24.0.0
-      '@vitest/browser-playwright': 5.0.5
-      '@vitest/browser-preview': 5.0.5
+      '@vitest/browser-playwright': 5.1.0
+      '@vitest/browser-preview': 5.1.0
       '@vitest/browser-webdriverio': ^5.0.0-beta.5 || >=5.0.0
-      '@vitest/coverage-istanbul': 5.0.5
-      '@vitest/coverage-v8': 5.0.5
-      '@vitest/ui': 5.0.5
+      '@vitest/coverage-istanbul': 5.1.0
+      '@vitest/coverage-v8': 5.1.0
+      '@vitest/ui': 5.1.0
       happy-dom: '*'
       jsdom: '*'
       vite: ^6.4.0 || ^7.0.0 || ^8.0.0
@@ -7150,11 +7150,11 @@ snapshots:
       '@better-auth/core': 1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5)
       '@better-auth/utils': 0.5.1
 
-  '@better-auth/expo@1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.2(expo@58.0.25))':
+  '@better-auth/expo@1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.2(expo@58.0.25))':
     dependencies:
       '@better-auth/core': 1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5)
       '@better-fetch/fetch': 1.3.3
-      better-auth: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
+      better-auth: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
       better-call: 1.4.5(zod@4.6.7)
       zod: 4.6.7
     optionalDependencies:
@@ -7163,11 +7163,11 @@ snapshots:
       expo-network: 58.0.5(expo@58.0.25)(react@19.3.0)
       expo-secure-store: 58.0.2(expo@58.0.25)
 
-  '@better-auth/expo@1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.3(expo@58.0.25))':
+  '@better-auth/expo@1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(expo-constants@58.0.16)(expo-linking@58.0.17)(expo-network@58.0.5(expo@58.0.25)(react@19.3.0))(expo-secure-store@58.0.3(expo@58.0.25))':
     dependencies:
       '@better-auth/core': 1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5)
       '@better-fetch/fetch': 1.3.3
-      better-auth: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
+      better-auth: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
       better-call: 1.4.5(zod@4.6.7)
       zod: 4.6.7
     optionalDependencies:
@@ -7210,10 +7210,10 @@ snapshots:
 
   '@better-fetch/fetch@1.3.3': {}
 
-  '@convex-dev/better-auth@0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
+  '@convex-dev/better-auth@0.13.0(@standard-schema/spec@1.1.0)(better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))))(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
     dependencies:
       '@better-fetch/fetch': 1.3.3
-      better-auth: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
+      better-auth: 1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)))
       common-tags: 1.8.2
       convex: 1.49.0(react@19.3.0)
       convex-helpers: 0.1.129(@standard-schema/spec@1.1.0)(convex@1.49.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)(zod@4.6.7)
@@ -8879,14 +8879,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/eslint-plugin@8.72.1(@typescript-eslint/parser@8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
+  '@typescript-eslint/eslint-plugin@8.72.2(@typescript-eslint/parser@8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
-      '@typescript-eslint/scope-manager': 8.72.1
-      '@typescript-eslint/type-utils': 8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
-      '@typescript-eslint/utils': 8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
-      '@typescript-eslint/visitor-keys': 8.72.1
+      '@typescript-eslint/parser': 8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/scope-manager': 8.72.2
+      '@typescript-eslint/type-utils': 8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/visitor-keys': 8.72.2
       eslint: 9.39.5(supports-color@8.1.1)
       ignore: 7.0.14
       natural-compare: 1.4.0
@@ -8907,12 +8907,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/parser@8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
+  '@typescript-eslint/parser@8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/scope-manager': 8.72.1
-      '@typescript-eslint/types': 8.72.1
-      '@typescript-eslint/typescript-estree': 8.72.1(supports-color@8.1.1)(typescript@6.0.3)
-      '@typescript-eslint/visitor-keys': 8.72.1
+      '@typescript-eslint/scope-manager': 8.72.2
+      '@typescript-eslint/types': 8.72.2
+      '@typescript-eslint/typescript-estree': 8.72.2(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/visitor-keys': 8.72.2
       debug: 4.4.3(supports-color@8.1.1)
       eslint: 9.39.5(supports-color@8.1.1)
       typescript: 6.0.3
@@ -8928,10 +8928,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/project-service@8.72.1(supports-color@8.1.1)(typescript@6.0.3)':
+  '@typescript-eslint/project-service@8.72.2(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.72.1(typescript@6.0.3)
-      '@typescript-eslint/types': 8.72.1
+      '@typescript-eslint/tsconfig-utils': 8.72.2(typescript@6.0.3)
+      '@typescript-eslint/types': 8.72.2
       debug: 4.4.3(supports-color@8.1.1)
       typescript: 6.0.3
     transitivePeerDependencies:
@@ -8942,16 +8942,16 @@ snapshots:
       '@typescript-eslint/types': 8.72.0
       '@typescript-eslint/visitor-keys': 8.72.0
 
-  '@typescript-eslint/scope-manager@8.72.1':
+  '@typescript-eslint/scope-manager@8.72.2':
     dependencies:
-      '@typescript-eslint/types': 8.72.1
-      '@typescript-eslint/visitor-keys': 8.72.1
+      '@typescript-eslint/types': 8.72.2
+      '@typescript-eslint/visitor-keys': 8.72.2
 
   '@typescript-eslint/tsconfig-utils@8.72.0(typescript@6.0.3)':
     dependencies:
       typescript: 6.0.3
 
-  '@typescript-eslint/tsconfig-utils@8.72.1(typescript@6.0.3)':
+  '@typescript-eslint/tsconfig-utils@8.72.2(typescript@6.0.3)':
     dependencies:
       typescript: 6.0.3
 
@@ -8967,11 +8967,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/type-utils@8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
+  '@typescript-eslint/type-utils@8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/types': 8.72.1
-      '@typescript-eslint/typescript-estree': 8.72.1(supports-color@8.1.1)(typescript@6.0.3)
-      '@typescript-eslint/utils': 8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/types': 8.72.2
+      '@typescript-eslint/typescript-estree': 8.72.2(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       debug: 4.4.3(supports-color@8.1.1)
       eslint: 9.39.5(supports-color@8.1.1)
       ts-api-utils: 2.5.0(typescript@6.0.3)
@@ -8981,7 +8981,7 @@ snapshots:
 
   '@typescript-eslint/types@8.72.0': {}
 
-  '@typescript-eslint/types@8.72.1': {}
+  '@typescript-eslint/types@8.72.2': {}
 
   '@typescript-eslint/typescript-estree@8.72.0(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
@@ -8998,12 +8998,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/typescript-estree@8.72.1(supports-color@8.1.1)(typescript@6.0.3)':
+  '@typescript-eslint/typescript-estree@8.72.2(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/project-service': 8.72.1(supports-color@8.1.1)(typescript@6.0.3)
-      '@typescript-eslint/tsconfig-utils': 8.72.1(typescript@6.0.3)
-      '@typescript-eslint/types': 8.72.1
-      '@typescript-eslint/visitor-keys': 8.72.1
+      '@typescript-eslint/project-service': 8.72.2(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/tsconfig-utils': 8.72.2(typescript@6.0.3)
+      '@typescript-eslint/types': 8.72.2
+      '@typescript-eslint/visitor-keys': 8.72.2
       debug: 4.4.3(supports-color@8.1.1)
       minimatch: 11.0.6
       semver: 7.8.5
@@ -9024,12 +9024,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/utils@8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
+  '@typescript-eslint/utils@8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/eslint-utils': 4.10.1(eslint@9.39.5(supports-color@8.1.1))
-      '@typescript-eslint/scope-manager': 8.72.1
-      '@typescript-eslint/types': 8.72.1
-      '@typescript-eslint/typescript-estree': 8.72.1(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/scope-manager': 8.72.2
+      '@typescript-eslint/types': 8.72.2
+      '@typescript-eslint/typescript-estree': 8.72.2(supports-color@8.1.1)(typescript@6.0.3)
       eslint: 9.39.5(supports-color@8.1.1)
       typescript: 6.0.3
     transitivePeerDependencies:
@@ -9040,9 +9040,9 @@ snapshots:
       '@typescript-eslint/types': 8.72.0
       eslint-visitor-keys: 5.0.1
 
-  '@typescript-eslint/visitor-keys@8.72.1':
+  '@typescript-eslint/visitor-keys@8.72.2':
     dependencies:
-      '@typescript-eslint/types': 8.72.1
+      '@typescript-eslint/types': 8.72.2
       eslint-visitor-keys: 5.0.1
 
   '@ungap/structured-clone@1.4.0': {}
@@ -9117,16 +9117,16 @@ snapshots:
   '@unrs/resolver-binding-win32-x64-msvc@1.12.2':
     optional: true
 
-  '@vitest/mocker@5.0.5(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))':
+  '@vitest/mocker@5.1.0(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
-      '@vitest/spy': 5.0.5
+      '@vitest/spy': 5.1.0
       estree-walker: 3.0.3
       magic-string: 1.4.3
     optionalDependencies:
       vite: 8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)
 
-  '@vitest/spy@5.0.5': {}
+  '@vitest/spy@5.1.0': {}
 
   '@webgpu/types@0.1.21': {}
 
@@ -9531,7 +9531,7 @@ snapshots:
 
   baseline-browser-mapping@2.11.32: {}
 
-  better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))):
+  better-auth@1.7.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))):
     dependencies:
       '@better-auth/core': 1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5)
       '@better-auth/drizzle-adapter': 1.7.18(@better-auth/core@1.7.18(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.5(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.5.1)
@@ -9553,7 +9553,7 @@ snapshots:
     optionalDependencies:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
-      vitest: 5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))
+      vitest: 5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
@@ -13018,12 +13018,12 @@ snapshots:
       possible-typed-array-names: 1.1.0
       reflect.getprototypeof: 1.0.10
 
-  typescript-eslint@8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3):
+  typescript-eslint@8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.72.1(@typescript-eslint/parser@8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
-      '@typescript-eslint/parser': 8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
-      '@typescript-eslint/typescript-estree': 8.72.1(supports-color@8.1.1)(typescript@6.0.3)
-      '@typescript-eslint/utils': 8.72.1(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/eslint-plugin': 8.72.2(@typescript-eslint/parser@8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/parser': 8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/typescript-estree': 8.72.2(supports-color@8.1.1)(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.72.2(eslint@9.39.5(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       eslint: 9.39.5(supports-color@8.1.1)
       typescript: 6.0.3
     transitivePeerDependencies:
@@ -13125,10 +13125,10 @@ snapshots:
       fsevents: 2.3.3
       terser: 5.51.2
 
-  vitest@5.0.5(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)):
+  vitest@5.1.0(@edge-runtime/vm@5.0.0)(@types/node@26.6.6)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.5(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))
+      '@vitest/mocker': 5.1.0(vite@8.3.5(@types/node@26.6.6)(esbuild@0.27.0)(terser@5.51.2))
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
