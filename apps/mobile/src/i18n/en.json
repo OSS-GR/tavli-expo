@@ -1149,7 +1149,7 @@
       },
       "lostDice": {
         "title": "Dice you can't play",
-        "body": "When the rules leave a die with no move, it fades and gets a line through it. On your first turns, a note under the board says why.",
+        "body": "When the rules leave a die with no move, it fades and gets a line through it. When only one die can move and it must be the higher one, a note under the board says so on your first turns.",
         "where": "Any game"
       },
       "howToPlay": {

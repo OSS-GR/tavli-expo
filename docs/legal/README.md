@@ -22,6 +22,8 @@
 | [terms.el.md](terms.el.md) | Greek terms of use. Same content as the English one. |
 | [site/terms/index.html](site/terms/index.html) | English static page, served at `https://tavlaki.com/terms` |
 | [site/el/terms/index.html](site/el/terms/index.html) | Greek static page, served at `https://tavlaki.com/el/terms` |
+| [site/delete/index.html](site/delete/index.html) | Delete your account (#447), served at `https://tavlaki.com/delete/`: the web page Google Play asks for. How to delete in the app, how to ask by email without it, what is deleted, what is kept, and how long it takes. It follows the policy's "Delete your account" and `deleteAccountOf` (`apps/server/convex/account.ts`) |
+| [site/el/delete/index.html](site/el/delete/index.html) | The Greek page, served at `https://tavlaki.com/el/delete/`. Copy every change from the English page |
 | [site/.well-known/apple-app-site-association](site/.well-known/apple-app-site-association) | iOS universal links (#332): `https://tavlaki.com/i/<code>` opens the app. JSON with no file extension |
 | [site/i/index.html](site/i/index.html) | The invite fallback page (#332), served for every `https://tavlaki.com/i/<code>`. English and Greek on one page |
 | [site/_redirects](site/_redirects) | Host rule (Cloudflare Workers static assets, Pages, Netlify): rewrite `/i/*` to the fallback page |
@@ -39,7 +41,8 @@ The app opens `https://tavlaki.com/privacy` (`PRIVACY_POLICY_URL` in `apps/mobil
 - The policy describes what the code does. When a PR changes what data leaves the phone (a new event, a new vendor, a new id), it updates this policy in the same PR. The event list must match [`docs/architecture/analytics-events.md`](../architecture/analytics-events.md). The same PR also updates the store privacy answers ([`docs/store/app-privacy.md`](../store/app-privacy.md), [`docs/store/play-data-safety.md`](../store/play-data-safety.md)) and the iOS privacy manifest in `apps/mobile/app.json`.
 - The HTML pages are plain HTML with inline CSS. No JavaScript, no fonts or images from other sites, no cookies. Keep it that way: the policy says so. The homepages and the Support pages show local images only (`site/img/`); never load an image from Ko-fi's servers.
 - **The homepages:** change `site/index.html` first, then copy the change to `site/el/index.html` (text and style). The **Get Tavlaki** buttons on both homepages and on the invite page link the TestFlight public link. After the App Store launch, change all four buttons to `https://apps.apple.com/app/id6828172932` and drop the beta notes. `link.test.ts` checks the link and the no-script rule.
-- **The look (#591):** every page uses the app's Walnut Kafeneio colors and Home look (Figma frame 26, node `177:2`). The site has no light mode. Each page starts its inline CSS with the same base block (the colors, the header with the icon and a language button, the main button, the tiles, the footer): change it on all nine pages together. After the base, each page has its own part: the homepages share one, the four privacy and terms pages share one, the two Support pages share one.
+- **The look (#591):** every page uses the app's Walnut Kafeneio colors and Home look (Figma frame 26, node `177:2`). The site has no light mode. Each page starts its inline CSS with the same base block (the colors, the header with the icon and a language button, the main button, the tiles, the footer): change it on all eleven pages together. After the base, each page has its own part: the homepages share one, the six privacy, terms and delete pages share one, the two Support pages share one. The footer of every page but the invite page lists the other pages: a new page goes in all of them.
+- **The delete pages (#447):** they say what `deleteAccountOf` deletes and keeps, and the in-app button names (`account.saved.delete` and `account.guest.delete` in `en.json` and `el.json`; `link.test.ts` checks them). A change to the delete, to those names or to the policy's answer time ("within one month") updates both pages in the same PR.
 - `<!-- OWNER: ... -->` comments in the Markdown mark things the owner must confirm. They are left out of the HTML.
 
 ## How to make the HTML from the Markdown
@@ -58,7 +61,8 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 2. Point `tavlaki.com` at the host. Both `https://tavlaki.com/privacy` and `https://tavlaki.com/el/privacy` must open the pages. Cloudflare serves `privacy/index.html` at `/privacy/` and redirects `/privacy` there.
 3. Use HTTPS. Do not add analytics or cookies to the site.
 4. Put `https://tavlaki.com/privacy` in App Store Connect (App Privacy → Privacy Policy URL) and in the Google Play Console (App content → Privacy policy).
-5. Put `https://tavlaki.com` in App Store Connect as the Support URL and the Marketing URL (Greek localization: `https://tavlaki.com/el/`). The homepage shows `support@tavlaki.com` (a Proton Mail mailbox since 2026-11-09, see "Mail" in `docs/process/running-the-app.md`).
+5. Put `https://tavlaki.com/delete/` in the Google Play Console (App content → Data safety → the account deletion URL, see [`docs/store/play-data-safety.md`](../store/play-data-safety.md)) and link it from the Play store listing description (Greek listing: `https://tavlaki.com/el/delete/`).
+6. Put `https://tavlaki.com` in App Store Connect as the Support URL and the Marketing URL (Greek localization: `https://tavlaki.com/el/`). The homepage shows `support@tavlaki.com` (a Proton Mail mailbox since 2026-11-09, see "Mail" in `docs/process/running-the-app.md`).
 
 ## Invite links (#332)
 
@@ -102,7 +106,14 @@ A saved account may add friends: by a friend link (a random token, not the user 
 
 Settings → Account (#402) shows the account: the guest name or the username, the ways to sign in, Sign out (saved accounts only) and **Delete my account** (a guest sees **Delete my guest account**). Until #402 the row was "Delete my online data" in Settings → Privacy. The delete row shows when the phone is signed in. The server call is `deleteMyAccount` (#302): it deletes, for the signed-in user, the sign-in user, its sessions and linked accounts (Better Auth), every invite the user sent, every push token, and the guest name and username with the terms and age record (#400, #405). It resigns the user's running games, so the other player wins. It **keeps** finished games and their move logs for the other player. They hold the user's random user id, but no name (the guest name is gone) and no email, and once the sign-in user is gone the id names nobody. Invites someone else sent that the user answered stay with their sender. The app then signs out, so the next invite makes a new guest. See "Delete an account" in [`docs/architecture/online-game-service.md`](../architecture/online-game-service.md#delete-an-account).
 
-The policy's "Delete your account" section (all four files) and the store answers describe it. A change to what the delete removes or keeps updates them in the same PR.
+The policy's "Delete your account" section (all four files), the delete pages (`site/delete/`, `site/el/delete/`, #447) and the store answers describe it. A change to what the delete removes or keeps updates them in the same PR.
+
+The delete pages also promise a delete by email to `support@tavlaki.com` within one month (the policy's answer time). To act on one (#447), in the Convex dashboard of the **prod** deployment:
+
+1. **Functions** → `account:findAccountForOwner` → **Run function**, with `{ "username": "…" }` or `{ "guestName": "Guest 4821" }`. It returns only `[{ userId, saved }]`. A username gives one account at most. A guest name is not unique and can give many: then use the email's other details (an invite code they made: **Data** → `invites`, filter `code`, read `from`; the sign-in email of a saved account: the Better Auth component's `user` table) to pick one. If you cannot tell which account is theirs, ask them, and do not delete.
+2. If the email comes from an address that is not the account's sign-in email, you may ask them to confirm first (the pages say so).
+3. **Functions** → `account:deleteAccountForOwner` → **Run function**, with `{ "userId": "…" }`. It runs the same delete as the app (the later pages run by themselves). A wrong id or a second run throws and deletes nothing.
+4. Answer the email. Keep no copy of the user id or the name in your notes after that.
 
 ## Before you publish the terms (owner checklist, #405)
 
