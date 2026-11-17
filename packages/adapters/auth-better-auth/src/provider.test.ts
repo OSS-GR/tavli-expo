@@ -238,6 +238,14 @@ function createClient(server: FakeServer, phone: { cookie: string | null }): Bet
       });
       return ok({ saved: true });
     }
+    if (path === '/sign-out-everywhere') {
+      if (server.anonymous.has(id)) return refused(400, 'GUEST');
+      // Every session of the user ends, this phone's too (#446).
+      for (const [session, owner] of server.sessions) {
+        if (owner === id) server.sessions.delete(session);
+      }
+      return ok({ status: true });
+    }
     if (path === '/key/remove') {
       const keys = keysOf();
       const target = keys.find((key) => providerOf(key) === body?.['provider']);
@@ -415,6 +423,34 @@ describe('fromBetterAuthClient', () => {
     expect(await rejection(auth.signOut())).toMatchObject({ code: 'NETWORK' });
     expect(auth.currentUser()).toEqual(user);
     expect(await restart().ready()).toEqual(user);
+  });
+
+  it('sign out of all phones ends the other phone too; a network failure keeps the user', async () => {
+    const server = createServer();
+    const here = subject(server);
+    const user = await here.auth.signInWithKey(await appleCredential(here.auth, 'apple-a'));
+    const there = subject(server);
+    expect(await there.auth.signInWithKey(await appleCredential(there.auth, 'apple-a'))).toEqual(
+      user,
+    );
+
+    server.failures.set('fetch /sign-out-everywhere', 'throw');
+    expect(await rejection(here.auth.signOutEverywhere())).toMatchObject({ code: 'NETWORK' });
+    expect(here.auth.currentUser()).toEqual(user);
+
+    await here.auth.signOutEverywhere();
+    expect(here.auth.currentUser()).toBeNull();
+    expect(here.phone.cookie).toBeNull();
+    // The other phone finds its session gone at the next token.
+    expect(await there.auth.getToken()).toBeNull();
+    expect(there.auth.currentUser()).toBeNull();
+  });
+
+  it('sign out of all phones asks the server nothing for a guest', async () => {
+    const { auth, server } = subject();
+    await auth.signInAsGuest();
+    expect(await rejection(auth.signOutEverywhere())).toMatchObject({ code: 'REJECTED' });
+    expect(server.calls).not.toContain('fetch /sign-out-everywhere');
   });
 
   it('a failed session load counts as signed out; the next call loads again', async () => {

@@ -9,6 +9,7 @@
  * token sign-in (`/sign-in/social`). The nonce, the email code (#399:
  * `/key/email-code`, `/key/email-sign-in`), the save, the list and the
  * remove are our own routes (`/key/*`, `apps/server/convex/keyPlugin.ts`).
+ * Sign out of all phones (#446) is our `/sign-out-everywhere` there too.
  */
 import { AUTH_KEY_PROVIDERS, normalizeEmail } from '@tavli/contracts';
 import type {
@@ -551,6 +552,24 @@ export function fromBetterAuthClient(
       }
       // On a failure the user stays signed in, here and in the saved session.
       if (result.error !== null) throw authError(result.error, 'sign-out failed');
+      set(null);
+    },
+    async signOutEverywhere() {
+      const signedInUser = await signedIn('sign out of all phones');
+      if (signedInUser.isGuest) {
+        throw {
+          code: 'REJECTED',
+          message: 'a guest has no sign-out on every phone',
+        } satisfies AuthErrorData;
+      }
+      await fetchRoute('/sign-out-everywhere', 'sign-out of all phones failed', {});
+      // The server ended this session too. The client's own sign-out
+      // clears the saved cookie; when it fails, the cookie is dead anyway.
+      try {
+        await client.signOut(NO_THROW);
+      } catch {
+        // No network now: the next session load finds no session.
+      }
       set(null);
     },
     async getToken(request) {

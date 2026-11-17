@@ -116,6 +116,7 @@ export function lazyAuthProvider(get: () => AuthProvider): AuthProvider {
     listKeys: () => get().listKeys(),
     removeKey: (provider) => get().removeKey(provider),
     signOut: () => get().signOut(),
+    signOutEverywhere: () => get().signOutEverywhere(),
     getToken: (options) => get().getToken(options),
     onChange: (listener) => get().onChange(listener),
   };

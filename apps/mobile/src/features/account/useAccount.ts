@@ -26,6 +26,10 @@
  *   and the server says `LAST_KEY` too.
  * - Sign out (`signOutOfOnline`, the push token first) and Delete
  *   (`deleteOnlineData`) end in `offline`, with a note that says so.
+ * - Sign out of all phones (#446, a saved account only): the same
+ *   `signOutOfOnline`, with `signOutEverywhere` as its step before the
+ *   sign-out here. The server ends every session of the account and
+ *   drops its push tokens; the account and its keys stay.
  * - One action at a time. A closed Apple sheet is no problem. After an
  *   action the screen loads again quietly: the cards stay until the new
  *   state is in.
@@ -100,7 +104,8 @@ export type AccountState =
       readonly keys: readonly AuthKey[];
     };
 
-export type AccountAction = 'signIn' | 'save' | 'move' | 'removeKey' | 'signOut' | 'delete';
+export type AccountAction =
+  'signIn' | 'save' | 'move' | 'removeKey' | 'signOut' | 'signOutEverywhere' | 'delete';
 
 /** Why the last action failed. */
 export type AccountProblem =
@@ -113,6 +118,8 @@ export type AccountProblem =
   /** The last key: an account keeps at least one. */
   | 'lastKey'
   | 'deleteFailed'
+  /** Sign out of all phones failed, and not for the network (#446). */
+  | 'signOutEverywhereFailed'
   /** Apple is off on the server (`KEY_OFF`, #462): no Services ID yet. */
   | 'appleOff'
   /** The server could not be reached. */
@@ -121,7 +128,7 @@ export type AccountProblem =
   | 'other';
 
 /** What just happened, said once on the screen. */
-export type AccountNote = 'signedOut' | 'deleted' | 'saved' | 'moved';
+export type AccountNote = 'signedOut' | 'signedOutEverywhere' | 'deleted' | 'saved' | 'moved';
 
 export interface AccountDeps {
   readonly auth: AuthProvider;
@@ -180,6 +187,8 @@ export interface Account {
   readonly dismissProblem: () => void;
   readonly removeKey: (provider: AuthKeyProvider) => void;
   readonly signOut: () => void;
+  /** A saved account: ends its sessions on every phone, this one too (#446). */
+  readonly signOutEverywhere: () => void;
   readonly deleteAccount: () => void;
 }
 
@@ -255,6 +264,15 @@ function problemOf(error: unknown): AccountProblem {
     if (error.code === 'NETWORK') return 'network';
   }
   return 'other';
+}
+
+/** The problem of a failed `action`. */
+function problemFor(action: AccountAction, error: unknown): AccountProblem {
+  if (action === 'delete') return 'deleteFailed';
+  const problem = problemOf(error);
+  // Only the network has its own text here; any other answer says it did not work.
+  if (action === 'signOutEverywhere' && problem !== 'network') return 'signOutEverywhereFailed';
+  return problem;
 }
 
 /**
@@ -371,7 +389,7 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
         acting.current = false;
         if (!live.current) return;
         setBusy(null);
-        setProblem(action === 'delete' ? 'deleteFailed' : problemOf(error));
+        setProblem(problemFor(action, error));
         setSaid((n) => n + 1);
       },
     );
@@ -534,6 +552,12 @@ export function useAccount(deps: AccountDeps, visit = 0): Account {
         'signOut',
         () => signOutOfOnline(deps.auth, deps.pushes),
         () => done('signedOut'),
+      ),
+    signOutEverywhere: () =>
+      run(
+        'signOutEverywhere',
+        () => signOutOfOnline(deps.auth, deps.pushes, () => deps.auth.signOutEverywhere()),
+        () => done('signedOutEverywhere'),
       ),
     deleteAccount: () =>
       run(
