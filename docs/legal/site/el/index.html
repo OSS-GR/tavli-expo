@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ταβλάκι: ελληνικό τάβλι για iPhone</title>
-<meta name="description" content="Πόρτες, Πλακωτό, Φεύγα και Ασόδιο σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.">
-<meta name="theme-color" content="#3B2A1D">
+<meta name="description" content="Πόρτες, Πλακωτό, Φεύγα και Ασόδυο σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.">
+<meta name="theme-color" content="#4A3423">
 <meta name="color-scheme" content="dark">
 <meta property="og:title" content="Ταβλάκι: ελληνικό τάβλι για iPhone">
-<meta property="og:description" content="Πόρτες, Πλακωτό, Φεύγα και Ασόδιο σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.">
+<meta property="og:description" content="Πόρτες, Πλακωτό, Φεύγα και Ασόδυο σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.">
 <meta property="og:image" content="https://tavlaki.com/img/board-1280.webp">
 <meta property="og:url" content="https://tavlaki.com/el/">
 <link rel="icon" type="image/png" href="/favicon.png">
@@ -16,241 +16,276 @@
 <link rel="alternate" hreflang="en" href="https://tavlaki.com/">
 <link rel="alternate" hreflang="el" href="https://tavlaki.com/el/">
 <style>
-/* The Greek homepage. The English page (../index.html) is the source: copy
-   every change of the style and the text from there. */
+/* Site base (#591): the app's Walnut Kafeneio colors
+   (packages/ui/src/themes/walnut-kafeneio.ts) and its Home look: the lamp
+   to floor gradient, the tiles, the main button and the Settings trays.
+   Every page has the same base block: change it on all of them. No
+   JavaScript, no fonts or images from other sites, no cookies. */
 :root {
-  --walnut: #3B2A1D; --walnut-deep: #2E1F15; --line: #6A4E35;
-  --ivory: #F1E6CF; --ivory-dim: #BFA987;
-  --brass: #C89B45; --brass-light: #E0B867; --on-brass: #22160C;
-  --point-dark: #2B1F19; --point-light: #CFB98E; --field: #8A6038;
+  --lamp: #4A3423; --bg: #3B2A1D; --floor: #1A110A;
+  --surface: #2E1F15; --selected: #4A3423; --raised: #3A2819; --sunken: #1A110A; --deep: #120C07;
+  --border: #6A4E35; --sep: #4E3927;
+  --text: #F1E6CF; --dim: #BFA987; --faint: #8C7A62;
+  --accent: #C89B45; --accent-light: #E0B867; --on-accent: #22160C;
+  --accent-line: #83632F; --accent-wash: #503A20; --brass: #F3D58A;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
-  --space: clamp(3.5rem, 8vw, 6rem);
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--walnut); color: var(--ivory); font: 17px/1.6 var(--sans); }
-a { color: var(--brass-light); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
-a:hover { color: var(--ivory); }
-a:focus-visible, .get:focus-visible { outline: 3px solid var(--brass-light); outline-offset: 3px; border-radius: 4px; }
-h1, h2, h3 { font-family: var(--serif); font-weight: 600; color: var(--ivory); text-wrap: balance; }
+html { -webkit-text-size-adjust: 100%; background: var(--floor); }
+body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, var(--lamp) 0, var(--bg) 32rem, var(--bg) 60%, var(--floor) 100%); color: var(--text); font: 17px/1.6 var(--sans); }
+a { color: var(--accent-light); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--text); }
+a:focus-visible { outline: 3px solid var(--accent-light); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 400; color: var(--text); text-wrap: balance; }
 p { margin: 0 0 1rem; text-wrap: pretty; }
 img { display: block; max-width: 100%; height: auto; }
-.wrap { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
-@media (min-width: 40rem) { .wrap { padding: 0 2rem; } }
+svg { flex: none; }
+.wrap { max-width: 72rem; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+@media (min-width: 40rem) { .wrap { padding-left: 2rem; padding-right: 2rem; } }
 
-/* Header: the icon, the name and the other language. */
-.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
-.brand { display: flex; align-items: center; gap: 0.75rem; color: var(--ivory); text-decoration: none; font: 600 1.35rem/1 var(--serif); }
-.brand img { width: 44px; height: 44px; border-radius: 10px; }
-.brand:hover { color: var(--ivory); }
+/* Header: the icon and name, then a round language button. */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4.25rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.brand { display: flex; align-items: center; gap: 0.65rem; color: var(--text); text-decoration: none; font: 1.35rem/1 var(--serif); }
+.brand img { width: 40px; height: 40px; border-radius: 11px; }
+.brand:hover { color: var(--text); }
+.nav { display: flex; align-items: center; gap: 0.5rem 1.5rem; }
+.nav .wide-only { display: none; color: var(--dim); text-decoration: none; }
+.nav .wide-only:hover { color: var(--text); }
+@media (min-width: 56rem) { .nav .wide-only { display: inline; } }
+.pill { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 44px; padding: 0 1rem; border: 1px solid var(--border); border-radius: 22px; background: var(--raised); color: var(--text); font-size: 0.95rem; text-decoration: none; }
+.pill:hover { border-color: var(--accent-line); color: var(--text); }
 
-/* The points: the edge of a tavli board, the page's frame. */
-.points { display: block; width: 100%; height: 40px; }
+/* The main button: the app's ActionButton (radius 14, gold gradient, a
+   light top edge). The second button: raised wood with a gold line. */
+.btn { display: flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 54px; padding: 0 1.75rem; border-radius: 14px; font-weight: 600; font-size: 1.1rem; text-decoration: none; text-align: center; }
+.primary { background: linear-gradient(160deg, var(--accent-light) 0%, var(--accent) 70%); color: var(--on-accent); box-shadow: inset 0 1px 0 var(--brass), 0 8px 18px rgba(0, 0, 0, 0.45); }
+.primary:hover { background: var(--accent-light); color: var(--on-accent); }
+.secondary { min-height: 48px; font-size: 1rem; background: var(--raised); border: 1px solid var(--accent-line); color: var(--accent-light); }
+.secondary:hover { border-color: var(--accent); color: var(--text); }
+.btn.small { min-height: 44px; padding: 0 1.1rem; font-size: 0.95rem; }
+.note { color: var(--dim); font-size: 0.9rem; line-height: 1.5; }
 
-/* Hero */
-.hero { display: grid; gap: 2rem; padding-top: 2.5rem; padding-bottom: 1rem; align-items: center; }
-.hero h1 { font-size: clamp(2.3rem, 6.5vw, 3.9rem); line-height: 1.06; letter-spacing: -0.015em; margin: 0 0 1.25rem; }
+/* Tiles: the Home tiles (radius 20, raised gradient). */
+.tile { border: 1px solid var(--border); border-radius: 20px; background: linear-gradient(160deg, var(--selected) 0%, var(--surface) 70%); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
+.eyebrow { margin: 0 0 0.6rem; color: var(--accent-light); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* Footer */
+footer { margin-top: 3rem; }
+footer .wrap { padding-top: 1.5rem; padding-bottom: 2.5rem; border-top: 1px solid var(--sep); color: var(--dim); font-size: 0.9rem; text-align: center; }
+footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.25rem; margin-bottom: 0.75rem; font-size: 0.95rem; }
+/* The homepage. Copy any change to the Greek page (el/index.html). */
+.hero { display: grid; gap: 1.75rem; padding-top: 1.5rem; padding-bottom: 0.5rem; align-items: center; }
+.hero-text { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.app-icon { width: 88px; height: 88px; margin-bottom: 1.1rem; border-radius: 22px; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45); }
+.hero h1 { font-size: clamp(2rem, 6.5vw, 3.6rem); line-height: 1.1; letter-spacing: -0.01em; margin: 0 0 0.9rem; }
 .hero h1 span { display: block; }
-.lead { font-size: 1.2rem; line-height: 1.55; max-width: 32rem; }
-.get { display: inline-block; margin: 0.75rem 0 1rem; padding: 0.9rem 1.9rem; border-radius: 999px; background: linear-gradient(var(--brass-light), var(--brass)); color: var(--on-brass); font-weight: 700; font-size: 1.05rem; text-decoration: none; box-shadow: 0 2px 0 #83632F, 0 8px 24px rgba(0, 0, 0, 0.35); }
-.get:hover { background: var(--brass-light); color: var(--on-brass); }
-.note { color: var(--ivory-dim); font-size: 0.95rem; max-width: 30rem; }
+.lead { color: var(--dim); font-size: 1.1rem; line-height: 1.55; max-width: 32rem; }
+.hero .btn { width: 100%; max-width: 22rem; margin-top: 0.5rem; }
+.hero .note { margin: 0.9rem 0 0; max-width: 26rem; }
+.board { padding: 8px; }
+.board img { border-radius: 14px; }
 @media (min-width: 56rem) {
-  .hero { grid-template-columns: 5fr 7fr; gap: 3rem; padding-top: 4rem; }
+  .hero { grid-template-columns: 5fr 7fr; gap: 3.5rem; padding-top: 3rem; }
+  .hero-text { align-items: flex-start; text-align: left; }
+  .lead { font-size: 1.2rem; }
 }
 
 /* Sections */
-section { padding: var(--space) 0; }
-section h2 { font-size: clamp(1.75rem, 3.6vw, 2.4rem); line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 0.75rem; }
-.intro { color: var(--ivory-dim); font-size: 1.1rem; max-width: 36rem; margin-bottom: 2.25rem; }
+section { padding-top: 2.75rem; scroll-margin-top: 1rem; }
+section h2 { font-size: clamp(1.5rem, 3.4vw, 2rem); line-height: 1.2; margin: 0 0.25rem 0.4rem; }
+.intro { color: var(--dim); margin: 0 0.25rem 1.1rem; max-width: 36rem; }
 
-/* The four games: a picture of each game's board, with its name in both languages. */
-.games { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem 1.75rem; }
-.games h3 { font-size: 1.4rem; line-height: 1.25; margin: 0 0 0.35rem; }
-.games h3 span { font-style: italic; font-weight: 400; font-size: 1.05rem; color: var(--ivory-dim); margin-left: 0.35rem; }
-.games p { color: var(--ivory-dim); margin: 0; }
-.games img { margin: 0 0 1rem; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
-/* On a phone, a smaller picture beside the text. */
-@media (max-width: 35.99rem) {
-  .games { gap: 1.75rem; }
-  .games li { display: grid; grid-template-columns: 9rem 1fr; gap: 0 1rem; align-items: start; }
-  .games img { grid-row: span 2; margin: 0.3rem 0 0; }
-  .games h3 { font-size: 1.25rem; }
-  .games h3 span { display: block; margin: 0; font-size: 1rem; }
-  .games p { font-size: 0.95rem; }
-}
-@media (min-width: 36rem) { .games { grid-template-columns: 1fr 1fr; } }
-@media (min-width: 64rem) { .games { grid-template-columns: repeat(4, 1fr); } }
-.match { margin: 2.75rem 0 0; padding-top: 1.5rem; border-top: 1px solid var(--line); font: 1.2rem/1.5 var(--serif); }
+/* The four games: one tile each, with the board picture on top. */
+.games { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.games li { padding: 8px 8px 0.9rem; }
+.games img { margin-bottom: 0.65rem; border-radius: 12px; }
+.games h3 { margin: 0 0.25rem; font-size: 1.15rem; line-height: 1.25; }
+.games h3 span { display: block; font-family: var(--sans); font-size: 0.8rem; color: var(--accent-light); }
+.games p { margin: 0.35rem 0.25rem 0; color: var(--dim); font-size: 0.9rem; line-height: 1.45; }
+@media (min-width: 64rem) { .games { grid-template-columns: repeat(4, 1fr); gap: 1rem; } .games p { font-size: 0.95rem; } }
+.match { margin-top: 0.75rem; padding: 1rem 1.25rem; }
+.match h3 { margin: 0 0 0.2rem; font-size: 1.2rem; }
+.match p { margin: 0; color: var(--dim); }
 
-/* Ways to play: on the darker wood of the board's frame, split like its bar. */
-.band { background: var(--walnut-deep); }
-.ways { display: grid; gap: 2.25rem; margin-top: 2.25rem; }
-.ways h3 { font-size: 1.35rem; line-height: 1.3; margin: 0 0 0.5rem; }
-.ways p { color: var(--ivory-dim); margin: 0; }
+/* Lists: the Settings trays, each row with an icon badge. */
+.tray { list-style: none; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.tray li + li { border-top: 1px solid var(--sep); }
+.row { display: flex; align-items: center; gap: 0.85rem; min-height: 64px; padding: 0.85rem 1rem; color: var(--text); text-decoration: none; }
+a.row:hover { background: var(--raised); color: var(--text); }
+a.row:focus-visible { outline-offset: -3px; border-radius: 16px; }
+.badge { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: none; border-radius: 10px; background: var(--deep); color: var(--accent-light); }
+.row-text { flex: 1; min-width: 0; }
+.row-text strong { display: block; font-weight: 600; }
+.row-text span { display: block; margin-top: 0.15rem; color: var(--dim); font-size: 0.92rem; line-height: 1.45; }
+.row-text b { color: var(--text); font-weight: 600; }
+.chev { color: var(--faint); }
 @media (min-width: 56rem) {
-  .ways { grid-template-columns: repeat(3, 1fr); gap: 0; }
-  .ways > div { padding: 0 2rem; border-left: 1px solid var(--line); }
-  .ways > div:first-child { padding-left: 0; border-left: 0; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.5rem; }
 }
 
-/* Learn as you play: the heading beside the list, each item marked with a checker. */
-.learn { display: grid; gap: 1rem 3rem; }
-@media (min-width: 56rem) { .learn { grid-template-columns: 5fr 7fr; } }
-.checkers { list-style: none; margin: 0; padding: 0; }
-.checkers li { position: relative; padding: 1rem 0 1rem 2.6rem; border-top: 1px solid var(--line); }
-.checkers li:last-child { border-bottom: 1px solid var(--line); }
-.checkers li::before { content: ""; position: absolute; left: 0; top: 1.05rem; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: radial-gradient(circle, #ECE2CB 0 44%, #D8CBAE 45% 52%, #ECE2CB 53%); box-shadow: inset 0 0 0 1px #6E5A3C, 0 1px 3px rgba(0, 0, 0, 0.5); }
-.checkers li:nth-child(even)::before { background: radial-gradient(circle, #1E1A17 0 44%, #3A332D 45% 52%, #1E1A17 53%); box-shadow: inset 0 0 0 1px #8C8279, 0 1px 3px rgba(0, 0, 0, 0.5); }
+/* Support Tavlaki: the gold banner. */
+.support { display: grid; gap: 1rem; margin-top: 2.75rem; padding: 1.25rem; border-color: var(--accent-line); background: linear-gradient(160deg, var(--accent-wash) 0%, var(--surface) 75%); }
+.support-head { display: flex; align-items: center; gap: 0.75rem; }
+.support .badge { background: var(--accent-wash); }
+.support h2 { margin: 0; font-size: 1.35rem; }
+.support p { margin: 0; color: var(--dim); }
+@media (min-width: 56rem) {
+  .support { grid-template-columns: auto 1fr auto; align-items: center; gap: 1.25rem; padding: 1.5rem 1.75rem; }
+  .support-head { display: contents; }
+  .support h2 { grid-column: 2; grid-row: 1; align-self: end; }
+  .support p { grid-column: 2; grid-row: 2; }
+  .support .badge { grid-row: 1 / span 2; }
+  .support .btn { grid-column: 3; grid-row: 1 / span 2; }
+}
 
-/* Privacy and Help side by side on wide screens. */
-.pair-sec { padding-top: 0; }
-.pair { display: grid; gap: 3rem; }
-.pair > div { max-width: 34rem; }
-.pair h2 { font-size: clamp(1.5rem, 3vw, 1.9rem); margin-bottom: 1rem; }
-.pair p { color: var(--ivory-dim); }
-.pair strong { color: var(--ivory); }
-@media (min-width: 56rem) { .pair { grid-template-columns: 1fr 1fr; gap: 4rem; } }
-
-/* The last word, before the footer. */
-.close { text-align: center; padding-bottom: calc(var(--space) * 0.8); }
-.close h2 { font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.1; margin: 0 0 0.5rem; }
-.close p { color: var(--ivory-dim); font-size: 1.15rem; margin: 0 0 0.5rem; }
-.close .note { margin: 0 auto; }
-
-/* Footer: the other edge of the board, points up. */
-footer { background: var(--walnut-deep); }
-footer .wrap { padding-top: 1.75rem; padding-bottom: 2.5rem; color: var(--ivory-dim); font-size: 0.95rem; }
-footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 1rem; }
+/* The last word. */
+.close { display: flex; flex-direction: column; align-items: center; padding-top: 3.25rem; text-align: center; }
+.rule { width: 56px; height: 2px; margin-bottom: 1.25rem; border-radius: 1px; background: var(--accent); }
+.close h2 { margin: 0 0 0.4rem; font-size: clamp(2rem, 6vw, 2.8rem); line-height: 1.1; color: var(--accent-light); }
+.close p { color: var(--dim); margin: 0 0 1.25rem; }
+.close .btn { width: 100%; max-width: 22rem; }
+.close .note { margin: 0.75rem 0 0; }
 </style>
 </head>
 <body>
+<!-- Icons are Lucide (ISC), the app's icon set (docs/design/style/LICENSES.md), inline. Same layout as the English page (../index.html). -->
 <header class="wrap top">
-  <a class="brand" href="/el/"><img src="/img/icon-192.webp" alt="" width="44" height="44">Ταβλάκι</a>
-  <a href="/" lang="en" hreflang="en">English</a>
+  <a class="brand" href="/el/"><img src="/img/icon-192.webp" alt="" width="40" height="40">Ταβλάκι</a>
+  <nav class="nav" aria-label="Ιστότοπος">
+    <a class="wide-only" href="#games">Παιχνίδια</a>
+    <a class="wide-only" href="#ways">Τρόποι παιχνιδιού</a>
+    <a class="wide-only" href="/el/support/">Στήριξη</a>
+    <a class="pill" href="/" lang="en" hreflang="en">English</a>
+  </nav>
 </header>
-
-<svg class="points" aria-hidden="true" focusable="false">
-  <defs>
-    <pattern id="points-down" width="64" height="40" patternUnits="userSpaceOnUse">
-      <rect width="64" height="40" fill="#8A6038"/>
-      <polygon points="0,0 16,40 32,0" fill="#CFB98E"/>
-      <polygon points="32,0 48,40 64,0" fill="#2B1F19"/>
-    </pattern>
-  </defs>
-  <rect width="100%" height="40" fill="url(#points-down)"/>
-</svg>
 
 <main>
 <div class="wrap hero">
-  <div>
+  <div class="hero-text">
+    <img class="app-icon" src="/img/icon-192.webp" alt="" width="88" height="88">
+    <p class="eyebrow">Ελληνικό τάβλι για iPhone</p>
     <h1><span>Καλώς ήρθες στο καφενείο.</span> <span>Τράβα μια καρέκλα.</span></h1>
-    <p class="lead">Το Ταβλάκι είναι ελληνικό τάβλι για iPhone: Πόρτες, Πλακωτό, Φεύγα και Ασόδιο, σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.</p>
+    <p class="lead">Το Ταβλάκι είναι ελληνικό τάβλι για iPhone: Πόρτες, Πλακωτό, Φεύγα και Ασόδυο, σε ξύλινο ταμπλό. Παίξε με τον υπολογιστή, με φίλο στο ίδιο κινητό ή με φίλο online.</p>
     <!-- After the App Store launch, link https://apps.apple.com/app/id6828172932 in both buttons here and on the English page, and drop the beta notes. -->
-    <a class="get" href="https://testflight.apple.com/join/RTCQhMCc" rel="noreferrer">Κατέβασε το Ταβλάκι</a>
+    <a class="btn primary" href="https://testflight.apple.com/join/RTCQhMCc" rel="noreferrer">Κατέβασε το Ταβλάκι</a>
     <p class="note">Δωρεάν. Το Ταβλάκι είναι σε δοκιμαστική έκδοση στο TestFlight, την εφαρμογή της Apple για δοκιμαστικές εκδόσεις. Το Android έρχεται αργότερα.</p>
   </div>
-  <img src="/img/board-1280.webp" srcset="/img/board-720.webp 720w, /img/board-1280.webp 1280w" sizes="(min-width: 56rem) 42rem, 100vw" width="1280" height="960" alt="Παρτίδα Πόρτες στο Ταβλάκι. Ένα άσπρο πούλι είναι σηκωμένο και φαίνεται η θέση όπου μπορεί να πάει. Κάτω από το ταμπλό, τα ζάρια δείχνουν 6 και 3.">
+  <div class="tile board">
+    <img src="/img/board-1280.webp" srcset="/img/board-720.webp 720w, /img/board-1280.webp 1280w" sizes="(min-width: 56rem) 42rem, 100vw" width="1280" height="960" alt="Παρτίδα Πόρτες στο Ταβλάκι. Ένα άσπρο πούλι είναι σηκωμένο και φαίνεται η θέση όπου μπορεί να πάει. Κάτω από το ταμπλό, τα ζάρια δείχνουν 6 και 3.">
+  </div>
 </div>
 
-<section>
-  <div class="wrap">
-    <h2>Τα τέσσερα ελληνικά παιχνίδια</h2>
-    <p class="intro">Ίδιο ταμπλό, ίδια 15 πούλια ο καθένας, τέσσερις τρόποι να τα παίξεις.</p>
-    <ul class="games">
-      <li>
-        <img src="/img/game-portes.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Πόρτες: ένα άσπρο πούλι που χτυπήθηκε περιμένει στη μέση του ταμπλό.">
-        <h3>Πόρτες</h3>
-        <p>Το κλασικό. Χτύπα τα ακάλυπτα πούλια και φτιάξε τις πόρτες σου.</p>
-      </li>
-      <li>
-        <img src="/img/game-plakoto.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Πλακωτό: δύο άσπρα πούλια είναι πλακωμένα κάτω από μαύρα.">
-        <h3>Πλακωτό</h3>
-        <p>Δεν χτυπάς, πλακώνεις. Αν πλακώσεις τη «μάνα» του αντιπάλου, το τελευταίο πούλι στην αφετηρία του, εκείνος διαλέγει: παραιτείται και χάνει 2 βαθμούς ή συνεχίζει.</p>
-      </li>
-      <li>
-        <img src="/img/game-fevga.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Φεύγα: κάθε παίκτης κρατά θέσεις στον δρόμο του άλλου.">
-        <h3>Φεύγα</h3>
-        <p>Ούτε χτύπημα ούτε πλάκωμα. Ένα πούλι κρατά τη θέση, οπότε κλείνεις τον δρόμο του αντιπάλου πιάνοντας θέσεις μπροστά του.</p>
-      </li>
-      <li>
-        <img src="/img/game-asodio.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Ασόδιο: τα πούλια που δεν έχουν μπει ακόμα περιμένουν στη μέση του ταμπλό.">
-        <h3>Ασόδιο</h3>
-        <p>Φέρε ασόδυο (1-2) ή διπλές για να ανοίξει το ταμπλό, βάλε μέσα και τα 15 πούλια και προχώρα σαν ένας στρατός.</p>
-      </li>
-    </ul>
-    <p class="match">Ή παίξε ολόκληρο Τάβλι: Πόρτες, Πλακωτό και Φεύγα με τη σειρά, στους 1, 3, 5 ή 7 βαθμούς.</p>
+<section class="wrap" id="games">
+  <h2>Τα τέσσερα ελληνικά παιχνίδια</h2>
+  <p class="intro">Ίδιο ταμπλό, ίδια 15 πούλια ο καθένας, τέσσερις τρόποι να τα παίξεις.</p>
+  <ul class="games">
+    <li class="tile">
+      <img src="/img/game-portes.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Πόρτες: ένα άσπρο πούλι που χτυπήθηκε περιμένει στη μέση του ταμπλό.">
+      <h3>Πόρτες</h3>
+      <p>Το κλασικό. Χτύπα τα ακάλυπτα πούλια και φτιάξε τις πόρτες σου.</p>
+    </li>
+    <li class="tile">
+      <img src="/img/game-plakoto.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Πλακωτό: δύο άσπρα πούλια είναι πλακωμένα κάτω από μαύρα.">
+      <h3>Πλακωτό</h3>
+      <p>Δεν χτυπάς, πλακώνεις. Αν πλακώσεις τη «μάνα» του αντιπάλου, το τελευταίο πούλι στην αφετηρία του, συνήθως κερδίζεις 2 πόντους.</p>
+    </li>
+    <li class="tile">
+      <img src="/img/game-fevga.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Φεύγα: κάθε παίκτης κρατά θέσεις στον δρόμο του άλλου.">
+      <h3>Φεύγα</h3>
+      <p>Ούτε χτύπημα ούτε πλάκωμα. Ένα πούλι κρατά τη θέση, οπότε κλείνεις τον δρόμο του αντιπάλου πιάνοντας θέσεις μπροστά του.</p>
+    </li>
+    <li class="tile">
+      <img src="/img/game-asodio.webp" width="800" height="488" loading="lazy" alt="Παρτίδα Ασόδυο: τα πούλια που δεν έχουν μπει ακόμα περιμένουν στη μέση του ταμπλό.">
+      <h3>Ασόδυο</h3>
+      <p>Φέρε ασόδυο (1-2) ή διπλές για να ανοίξει το ταμπλό, βάλε μέσα και τα 15 πούλια και προχώρα σαν ένας στρατός.</p>
+    </li>
+  </ul>
+  <div class="tile match">
+    <h3>Ή ολόκληρο Τάβλι</h3>
+    <p>Πόρτες, Πλακωτό και Φεύγα με τη σειρά, στους 1, 3, 5 ή 7 πόντους.</p>
   </div>
 </section>
 
-<section class="band">
-  <div class="wrap">
-    <h2>Τρεις τρόποι να παίξεις</h2>
-    <div class="ways">
-      <div>
-        <h3>Με τον υπολογιστή</h3>
-        <p>Εύκολο, Μέτριο ή Δύσκολο, σε κάθε παιχνίδι. Ο υπολογιστής παίζει μέσα στο κινητό σου, οπότε δεν χρειάζεσαι internet.</p>
-      </div>
-      <div>
-        <h3>Δύο παίκτες, ένα κινητό</h3>
-        <p>Παίζετε με τη σειρά στο ίδιο κινητό. Το ταμπλό γυρίζει προς τον παίκτη που έχει σειρά.</p>
-      </div>
-      <div>
-        <h3>Με φίλο online</h3>
-        <p>Στείλε έναν σύνδεσμο πρόσκλησης ή έναν κωδικό και παίξτε με τον ρυθμό σας: η εφαρμογή σού λέει πότε είναι η σειρά σου. Πρόσθεσε φίλους και ανέβα στις κατατάξεις. Συνδέσου με Apple ή με κωδικό στο email σου, ή ξεκίνα ως επισκέπτης.</p>
-      </div>
-    </div>
-  </div>
+<div class="wrap pair">
+<section id="ways">
+  <h2>Τρεις τρόποι να παίξεις</h2>
+  <ul class="tray">
+    <li><div class="row">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></span>
+      <span class="row-text"><strong>Με τον υπολογιστή</strong><span>Εύκολο, Μέτριο ή Δύσκολο, σε κάθε παιχνίδι. Ο υπολογιστής παίζει μέσα στο κινητό σου, οπότε δεν χρειάζεσαι internet.</span></span>
+    </div></li>
+    <li><div class="row">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+      <span class="row-text"><strong>Δύο παίκτες, ένα κινητό</strong><span>Παίζετε με τη σειρά στο ίδιο κινητό. Το ταμπλό γυρίζει προς τον παίκτη που έχει σειρά.</span></span>
+    </div></li>
+    <li><div class="row">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span>
+      <span class="row-text"><strong>Με φίλο online</strong><span>Στείλε έναν σύνδεσμο πρόσκλησης ή έναν κωδικό και παίξτε με τον ρυθμό σας: η εφαρμογή σού λέει πότε είναι η σειρά σου. Πρόσθεσε φίλους και ανέβα στις κατατάξεις. Συνδέσου με Apple ή με κωδικό στο email σου, ή ξεκίνα ως επισκέπτης.</span></span>
+    </div></li>
+  </ul>
 </section>
 
-<section>
-  <div class="wrap learn">
-    <div>
-      <h2>Μαθαίνεις παίζοντας</h2>
-      <p class="intro">Πρώτη φορά στο τάβλι ή σε κάποιο από τα παιχνίδια; Η εφαρμογή σού μαθαίνει πάνω στο ταμπλό.</p>
-    </div>
-    <ul class="checkers">
-      <li>Ένα μάθημα ενός λεπτού στο κανονικό ταμπλό σού μαθαίνει τις Πόρτες, και κάθε παιχνίδι έχει τη σελίδα «Πώς παίζεται».</li>
-      <li>Ζήτα υπόδειξη όταν κολλήσεις, και δες ξανά μια παρτίδα με την ανάλυση.</li>
-      <li>Ελληνικά και αγγλικά. Το παιχνίδι αποθηκεύεται μόνο του, οπότε συνεχίζεις όποτε θέλεις.</li>
-    </ul>
-  </div>
+<section id="learn">
+  <h2>Μαθαίνεις παίζοντας</h2>
+  <ul class="tray">
+    <li><div class="row">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></span>
+      <span class="row-text"><strong>Μαθήματα και «Πώς παίζεται»</strong><span>Σύντομα μαθήματα στο κανονικό ταμπλό για κάθε παιχνίδι, και η σελίδα «Πώς παίζεται» για το καθένα.</span></span>
+    </div></li>
+    <li><div class="row">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg></span>
+      <span class="row-text"><strong>Υποδείξεις και ανάλυση</strong><span>Ζήτα υπόδειξη όταν κολλήσεις, και δες ξανά μια παρτίδα με την ανάλυση.</span></span>
+    </div></li>
+    <li><div class="row">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg></span>
+      <span class="row-text"><strong>Ελληνικά και αγγλικά</strong><span>Το παιχνίδι αποθηκεύεται μόνο του, οπότε συνεχίζεις όποτε θέλεις.</span></span>
+    </div></li>
+  </ul>
 </section>
+</div>
 
-<section class="pair-sec">
-  <div class="wrap pair">
-    <div>
-      <h2>Απόρρητο</h2>
-      <p>Χωρίς διαφημίσεις. Τα παιχνίδια στο κινητό σου δεν θέλουν λογαριασμό. Εσύ αποφασίζεις αν η εφαρμογή θα στέλνει ανώνυμα δεδομένα χρήσης, και αλλάζεις γνώμη όποτε θέλεις στις Ρυθμίσεις. Για το online παιχνίδι κρατάμε μόνο ό,τι χρειάζεται για να τρέχουν τα παιχνίδια σου: διάβασε την <a href="/el/privacy/">πολιτική απορρήτου</a>.</p>
+<div class="wrap">
+  <div class="tile support">
+    <div class="support-head">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span>
+      <h2>Στήριξε το Ταβλάκι</h2>
     </div>
-    <div>
-      <h2>Βοήθεια</h2>
-      <p>Ερώτηση, πρόβλημα ή ιδέα; Γράψε στο <a href="mailto:support@tavlaki.com">support@tavlaki.com</a>.</p>
-      <p>Σου έστειλε κωδικό ένας φίλος; Άνοιξε το Ταβλάκι και πάτα <strong>Μπες σε παιχνίδι με κωδικό</strong>.</p>
-    </div>
+    <p>Το Ταβλάκι είναι δωρεάν, χωρίς διαφημίσεις, και το φτιάχνει ένας άνθρωπος. Αν σου αρέσει, μπορείς να με κεράσεις έναν καφέ στο Ko-fi.</p>
+    <a class="btn secondary" href="/el/support/">Στήριξε το Ταβλάκι <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg></a>
   </div>
+</div>
+
+<section class="wrap" id="help">
+  <h2>Απόρρητο και βοήθεια</h2>
+  <ul class="tray">
+    <li><a class="row" href="/el/privacy/">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></span>
+      <span class="row-text"><strong>Πολιτική απορρήτου</strong><span>Χωρίς διαφημίσεις. Τα παιχνίδια στο κινητό σου δεν θέλουν λογαριασμό. Εσύ αποφασίζεις αν η εφαρμογή θα στέλνει ανώνυμα δεδομένα χρήσης, και αλλάζεις γνώμη όποτε θέλεις στις Ρυθμίσεις. Για το online παιχνίδι κρατάμε μόνο ό,τι χρειάζεται για να τρέχουν τα παιχνίδια σου.</span></span>
+      <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+    </a></li>
+    <li><a class="row" href="mailto:support@tavlaki.com">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
+      <span class="row-text"><strong>Βοήθεια</strong><span>Ερώτηση, πρόβλημα ή ιδέα; Γράψε στο support@tavlaki.com.</span></span>
+      <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+    </a></li>
+    <li><div class="row">
+      <span class="badge" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg></span>
+      <span class="row-text"><strong>Σου έστειλε κωδικό ένας φίλος;</strong><span>Άνοιξε το Ταβλάκι και πάτα <b>Μπες σε παιχνίδι με κωδικό</b>.</span></span>
+    </div></li>
+  </ul>
 </section>
 
 <div class="wrap close">
+  <div class="rule"></div>
   <h2>Καλή παρτίδα.</h2>
   <p>Κατέβασε το Ταβλάκι και στήσε το ταμπλό.</p>
-  <a class="get" href="https://testflight.apple.com/join/RTCQhMCc" rel="noreferrer">Κατέβασε το Ταβλάκι</a>
+  <a class="btn primary" href="https://testflight.apple.com/join/RTCQhMCc" rel="noreferrer">Κατέβασε το Ταβλάκι</a>
   <p class="note">Δωρεάν, στο TestFlight για αρχή.</p>
 </div>
 </main>
 
 <footer>
-  <svg class="points" aria-hidden="true" focusable="false">
-    <defs>
-      <pattern id="points-up" width="64" height="40" patternUnits="userSpaceOnUse">
-        <rect width="64" height="40" fill="#8A6038"/>
-        <polygon points="0,40 16,0 32,40" fill="#2B1F19"/>
-        <polygon points="32,40 48,0 64,40" fill="#CFB98E"/>
-      </pattern>
-    </defs>
-    <rect width="100%" height="40" fill="url(#points-up)"/>
-  </svg>
   <div class="wrap">
     <nav aria-label="Σελίδες">
       <a href="/el/privacy/">Πολιτική απορρήτου</a>

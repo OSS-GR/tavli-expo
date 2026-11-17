@@ -43,7 +43,9 @@ describe('the Support pages on tavlaki.com (#590)', () => {
     (lang, url, button) => {
       const page = read(fileOf(url));
       expect(page).toContain(`<html lang="${lang}">`);
-      const link = page.match(new RegExp(`<a class="(?:kofi|get)" href="${KOFI}"[\\s\\S]*?</a>`));
+      const link = page.match(
+        new RegExp(`<a class="(?:kofi|btn primary)" href="${KOFI}"[\\s\\S]*?</a>`),
+      );
       expect(link?.[0]).toContain(button);
     },
   );
