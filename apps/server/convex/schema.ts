@@ -197,7 +197,9 @@ export default defineSchema({
     termsAcceptedAt: v.optional(v.number()),
   })
     .index('by_player', ['playerId'])
-    .index('by_username_key', ['usernameKey']),
+    .index('by_username_key', ['usernameKey'])
+    // The owner's lookup for an email delete request (#447, `findAccountForOwner`).
+    .index('by_guest_number', ['guestNumber']),
 
   /**
    * Blocks (#320, `safety.ts`): `blockerId` no longer sees the name of

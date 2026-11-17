@@ -26,7 +26,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `packages/online/src/friends.ts` | The pure checks of friends: `planRequest` (the caps, the wait, the order of the checks), `friendStatusOf`, `checkSearchCap`, `newFriendToken`, `recordOf`, `recordAfter`, `recentOpponents` |
 | `packages/contracts/src/friends.ts` | The `Friends` port, the caps, the error codes, `normalizeFriendToken`; contract checks `friendsContract()` in `@tavli/contracts/testing` |
 | `packages/contracts/src/username.ts` | The `Usernames` port, `MyUsername`, the error codes, `TERMS_VERSION`; contract checks `usernamesContract()` in `@tavli/contracts/testing` |
-| `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315) |
+| `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315). The owner's internal `findAccountForOwner` and `deleteAccountForOwner` ([A delete request by email](#a-delete-request-by-email), #447) |
 | `apps/server/convex/appUpdate.ts` | `updatePolicy`: the lowest app build the server works with, from the deployment's env vars ([Update needed](#update-needed), #390). The one public function with no sign-in |
 | `apps/server/convex/model/appUpdate.ts` | The pure part: `appUpdatePolicy(env, platform)` reads the env vars |
 | `packages/contracts/src/app-update.ts` | The `AppUpdates` port, `AppUpdatePolicy` and the in-memory fake |
@@ -787,6 +787,15 @@ Issue #309. For a moment after the call, a game of the deleted player can still 
 - **The old token** is valid for up to 15 more minutes, and `makeMove`, `answer` and `resign` take any signed-in caller (`signedInPlayer`). So in that moment it could still play in a game that is not resigned yet. That saves nothing new about the player: the game already holds the id.
 
 The pure part, what happens to each game (`gameOnDelete`: `resign`, `keep` or `skip`), is in `convex/model/account.ts`.
+
+### A delete request by email
+
+Issue #447. The delete pages (`tavlaki.com/delete/`, for Google Play) promise a delete by email to `support@tavlaki.com`. The owner has two internal functions in `convex/account.ts`, run from the Convex dashboard; no client can call them:
+
+- `findAccountForOwner({ username })` or `({ guestName })`: the accounts with that username (by `usernameKey`, the uniqueness key, through `by_username_key`) or that guest number ("Guest 4821", "Επισκέπτης 4821" or "4821", through `by_guest_number`; not unique, so up to `OWNER_LOOKUP_LIMIT` (50) accounts). It returns only `{ userId, saved }` for each, and skips a name row whose Better Auth user is gone.
+- `deleteAccountForOwner({ userId })`: checks the Better Auth user exists (else it throws and deletes nothing), then runs `deleteAccountOf`, the same steps and pages as `deleteMyAccount`.
+
+A guest number fits many accounts: the owner deletes one only when the email's other details (an invite code, the sign-in email) point to it. See "Delete my account" in [`docs/legal/README.md`](../legal/README.md#delete-my-account-315-402) for the steps.
 
 ### In the app
 

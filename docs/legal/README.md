@@ -108,7 +108,12 @@ Settings → Account (#402) shows the account: the guest name or the username, t
 
 The policy's "Delete your account" section (all four files), the delete pages (`site/delete/`, `site/el/delete/`, #447) and the store answers describe it. A change to what the delete removes or keeps updates them in the same PR.
 
-The delete pages also promise a delete by email to `support@tavlaki.com` within one month (the policy's answer time). **Owner:** there is no internal function yet that runs `deleteAccountOf` for a user id you found from the email (the username, guest name, invite code or sign-in email): only the app's `deleteMyAccount` and Apple's `account-delete` notice call it. Add one (an `internalMutation` you run from the Convex dashboard) before the Play listing goes live, or the email path means deleting rows by hand.
+The delete pages also promise a delete by email to `support@tavlaki.com` within one month (the policy's answer time). To act on one (#447), in the Convex dashboard of the **prod** deployment:
+
+1. **Functions** → `account:findAccountForOwner` → **Run function**, with `{ "username": "…" }` or `{ "guestName": "Guest 4821" }`. It returns only `[{ userId, saved }]`. A username gives one account at most. A guest name is not unique and can give many: then use the email's other details (an invite code they made: **Data** → `invites`, filter `code`, read `from`; the sign-in email of a saved account: the Better Auth component's `user` table) to pick one. If you cannot tell which account is theirs, ask them, and do not delete.
+2. If the email comes from an address that is not the account's sign-in email, you may ask them to confirm first (the pages say so).
+3. **Functions** → `account:deleteAccountForOwner` → **Run function**, with `{ "userId": "…" }`. It runs the same delete as the app (the later pages run by themselves). A wrong id or a second run throws and deletes nothing.
+4. Answer the email. Keep no copy of the user id or the name in your notes after that.
 
 ## Before you publish the terms (owner checklist, #405)
 
