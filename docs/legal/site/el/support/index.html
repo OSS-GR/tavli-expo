@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Στήριξε το Ταβλάκι</title>
 <meta name="description" content="Το Ταβλάκι είναι δωρεάν, χωρίς διαφημίσεις, και το φτιάχνει ένας άνθρωπος. Αν σου αρέσει, μπορείς να με κεράσεις έναν καφέ στο Ko-fi.">
-<meta name="theme-color" content="#3B2A1D">
+<meta name="theme-color" content="#4A3423">
 <meta name="color-scheme" content="dark">
 <meta property="og:title" content="Στήριξε το Ταβλάκι">
 <meta property="og:description" content="Το Ταβλάκι είναι δωρεάν, χωρίς διαφημίσεις, και το φτιάχνει ένας άνθρωπος. Αν σου αρέσει, μπορείς να με κεράσεις έναν καφέ στο Ko-fi.">
@@ -16,74 +16,91 @@
 <link rel="alternate" hreflang="en" href="https://tavlaki.com/support/">
 <link rel="alternate" hreflang="el" href="https://tavlaki.com/el/support/">
 <style>
-/* The Greek Support page (#590). The English page (../../support/index.html)
-   is the source: copy every change of the style and the text from there. */
+/* Site base (#591): the app's Walnut Kafeneio colors
+   (packages/ui/src/themes/walnut-kafeneio.ts) and its Home look: the lamp
+   to floor gradient, the tiles, the main button and the Settings trays.
+   Every page has the same base block: change it on all of them. No
+   JavaScript, no fonts or images from other sites, no cookies. */
 :root {
-  --walnut: #3B2A1D; --walnut-deep: #2E1F15; --line: #6A4E35;
-  --ivory: #F1E6CF; --ivory-dim: #BFA987;
-  --brass: #C89B45; --brass-light: #E0B867; --on-brass: #22160C;
+  --lamp: #4A3423; --bg: #3B2A1D; --floor: #1A110A;
+  --surface: #2E1F15; --selected: #4A3423; --raised: #3A2819; --sunken: #1A110A; --deep: #120C07;
+  --border: #6A4E35; --sep: #4E3927;
+  --text: #F1E6CF; --dim: #BFA987; --faint: #8C7A62;
+  --accent: #C89B45; --accent-light: #E0B867; --on-accent: #22160C;
+  --accent-line: #83632F; --accent-wash: #503A20; --brass: #F3D58A;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--walnut); color: var(--ivory); font: 17px/1.6 var(--sans); }
-a { color: var(--brass-light); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
-a:hover { color: var(--ivory); }
-a:focus-visible, .get:focus-visible { outline: 3px solid var(--brass-light); outline-offset: 3px; border-radius: 4px; }
-h1 { font-family: var(--serif); font-weight: 600; color: var(--ivory); text-wrap: balance; }
+html { -webkit-text-size-adjust: 100%; background: var(--floor); }
+body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, var(--lamp) 0, var(--bg) 32rem, var(--bg) 60%, var(--floor) 100%); color: var(--text); font: 17px/1.6 var(--sans); }
+a { color: var(--accent-light); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--text); }
+a:focus-visible { outline: 3px solid var(--accent-light); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 400; color: var(--text); text-wrap: balance; }
 p { margin: 0 0 1rem; text-wrap: pretty; }
-.wrap { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
-@media (min-width: 40rem) { .wrap { padding: 0 2rem; } }
+img { display: block; max-width: 100%; height: auto; }
+svg { flex: none; }
+.wrap { max-width: 72rem; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+@media (min-width: 40rem) { .wrap { padding-left: 2rem; padding-right: 2rem; } }
 
-.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
-.brand { display: flex; align-items: center; gap: 0.75rem; color: var(--ivory); text-decoration: none; font: 600 1.35rem/1 var(--serif); }
-.brand img { width: 44px; height: 44px; border-radius: 10px; }
-.brand:hover { color: var(--ivory); }
-.points { display: block; width: 100%; height: 40px; }
+/* Header: the icon and name, then a round language button. */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4.25rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.brand { display: flex; align-items: center; gap: 0.65rem; color: var(--text); text-decoration: none; font: 1.35rem/1 var(--serif); }
+.brand img { width: 40px; height: 40px; border-radius: 11px; }
+.brand:hover { color: var(--text); }
+.nav { display: flex; align-items: center; gap: 0.5rem 1.5rem; }
+.nav .wide-only { display: none; color: var(--dim); text-decoration: none; }
+.nav .wide-only:hover { color: var(--text); }
+@media (min-width: 56rem) { .nav .wide-only { display: inline; } }
+.pill { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 44px; padding: 0 1rem; border: 1px solid var(--border); border-radius: 22px; background: var(--raised); color: var(--text); font-size: 0.95rem; text-decoration: none; }
+.pill:hover { border-color: var(--accent-line); color: var(--text); }
 
-/* The card: one text and one button. */
-main { padding: clamp(2.5rem, 7vw, 5rem) 0; }
-.card { max-width: 34rem; margin: 0 auto; padding: 2rem 1.5rem; border: 1px solid var(--line); border-radius: 20px; background: var(--walnut-deep); text-align: center; }
+/* The main button: the app's ActionButton (radius 14, gold gradient, a
+   light top edge). The second button: raised wood with a gold line. */
+.btn { display: flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 54px; padding: 0 1.75rem; border-radius: 14px; font-weight: 600; font-size: 1.1rem; text-decoration: none; text-align: center; }
+.primary { background: linear-gradient(160deg, var(--accent-light) 0%, var(--accent) 70%); color: var(--on-accent); box-shadow: inset 0 1px 0 var(--brass), 0 8px 18px rgba(0, 0, 0, 0.45); }
+.primary:hover { background: var(--accent-light); color: var(--on-accent); }
+.secondary { min-height: 48px; font-size: 1rem; background: var(--raised); border: 1px solid var(--accent-line); color: var(--accent-light); }
+.secondary:hover { border-color: var(--accent); color: var(--text); }
+.btn.small { min-height: 44px; padding: 0 1.1rem; font-size: 0.95rem; }
+.note { color: var(--dim); font-size: 0.9rem; line-height: 1.5; }
+
+/* Tiles: the Home tiles (radius 20, raised gradient). */
+.tile { border: 1px solid var(--border); border-radius: 20px; background: linear-gradient(160deg, var(--selected) 0%, var(--surface) 70%); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
+.eyebrow { margin: 0 0 0.6rem; color: var(--accent-light); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* Footer */
+footer { margin-top: 3rem; }
+footer .wrap { padding-top: 1.5rem; padding-bottom: 2.5rem; border-top: 1px solid var(--sep); color: var(--dim); font-size: 0.9rem; text-align: center; }
+footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.25rem; margin-bottom: 0.75rem; font-size: 0.95rem; }
+/* Support Tavlaki (#590). The app's Support screen opens this page; the
+   Ko-fi button is a plain link, so the Ko-fi page can change without a new
+   build. Copy any change to the other language's page. */
+main { padding-top: clamp(1.5rem, 6vw, 4rem); }
+.card { max-width: 34rem; margin: 0 auto; padding: 2rem 1.5rem; border-color: var(--accent-line); background: linear-gradient(160deg, var(--accent-wash) 0%, var(--surface) 75%); text-align: center; }
 @media (min-width: 40rem) { .card { padding: 2.5rem; } }
-.cup { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; margin: 0 auto 1.25rem; border: 2px solid var(--brass); border-radius: 50%; color: var(--brass-light); }
-.card h1 { font-size: clamp(2rem, 6vw, 2.8rem); line-height: 1.1; letter-spacing: -0.01em; margin: 0 0 1.25rem; }
-.card .lead { font-size: 1.15rem; }
-.get { display: inline-block; margin: 0.75rem 0 1.5rem; padding: 0.9rem 1.9rem; border-radius: 999px; background: linear-gradient(var(--brass-light), var(--brass)); color: var(--on-brass); font-weight: 700; font-size: 1.05rem; text-decoration: none; box-shadow: 0 2px 0 #83632F, 0 8px 24px rgba(0, 0, 0, 0.35); }
-.get:hover { background: var(--brass-light); color: var(--on-brass); }
-.top .get { margin: 0; padding: 0.55rem 1.2rem; font-size: 0.95rem; }
+.cup { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; margin: 0 auto 1.25rem; border-radius: 18px; background: var(--deep); color: var(--accent-light); }
+.card h1 { font-size: clamp(2rem, 6vw, 2.6rem); line-height: 1.1; margin: 0 0 1rem; }
+.card .lead { font-size: 1.15rem; color: var(--text); }
+.card p { color: var(--dim); }
+.card .lead { color: var(--text); }
 /* Ko-fi's button image (English page) and our own button with Ko-fi's cup (Greek page). */
-.kofi { display: inline-block; margin: 0.75rem 0 1.5rem; border-radius: 8px; }
-.kofi:focus-visible { outline: 3px solid var(--brass-light); outline-offset: 4px; }
+.kofi { display: inline-block; margin: 0.5rem 0 1.5rem; border-radius: 8px; }
 .kofi img { display: block; width: 245px; max-width: 100%; height: auto; }
-.get .cup-icon { display: inline-block; width: 20px; height: auto; margin-right: 0.5rem; vertical-align: -0.2em; }
-.note { color: var(--ivory-dim); font-size: 0.95rem; }
+.card .btn { margin: 0.5rem 0 1.5rem; }
+.cup-icon { width: 20px; height: auto; }
 .note:last-child { margin-bottom: 0; }
-
-footer { background: var(--walnut-deep); }
-footer .wrap { padding-top: 1.75rem; padding-bottom: 2.5rem; color: var(--ivory-dim); font-size: 0.95rem; }
-footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 1rem; }
 </style>
 </head>
 <body>
 <header class="wrap top">
-  <a class="brand" href="/el/"><img src="/img/icon-192.webp" alt="" width="44" height="44">Ταβλάκι</a>
-  <a class="get" href="https://testflight.apple.com/join/RTCQhMCc" rel="noreferrer">Κατέβασε το Ταβλάκι</a>
+  <a class="brand" href="/el/"><img src="/img/icon-192.webp" alt="" width="40" height="40">Ταβλάκι</a>
+  <a class="pill" href="/support/" lang="en" hreflang="en">English</a>
 </header>
 
-<svg class="points" aria-hidden="true" focusable="false">
-  <defs>
-    <pattern id="points-down" width="64" height="40" patternUnits="userSpaceOnUse">
-      <rect width="64" height="40" fill="#8A6038"/>
-      <polygon points="0,0 16,40 32,0" fill="#CFB98E"/>
-      <polygon points="32,0 48,40 64,0" fill="#2B1F19"/>
-    </pattern>
-  </defs>
-  <rect width="100%" height="40" fill="url(#points-down)"/>
-</svg>
-
 <main class="wrap">
-  <div class="card">
+  <div class="tile card">
     <div class="cup" aria-hidden="true">
       <!-- Lucide "coffee" (ISC), όπως στην εφαρμογή. -->
       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false">
@@ -96,23 +113,13 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 
     <p>Αν σου αρέσει, μπορείς να με κεράσεις έναν καφέ στο Ko-fi. Έτσι το Ταβλάκι συνεχίζει και μεγαλώνει.</p>
     <!-- Ko-fi's own button image has English text, so the Greek page has
          our button with Ko-fi's cup (img/kofi/, never recolor or crop it). -->
-    <a class="get" href="https://ko-fi.com/orestisstefanis" rel="noreferrer"><img class="cup-icon" src="/img/kofi/kofi_symbol.svg" alt="" width="20" height="16">Κέρασέ με έναν καφέ στο Ko-fi <span aria-hidden="true">↗</span></a>
+    <a class="btn primary" href="https://ko-fi.com/orestisstefanis" rel="noreferrer"><img class="cup-icon" src="/img/kofi/kofi_symbol.svg" alt="" width="20" height="16">Κέρασέ με έναν καφέ στο Ko-fi <span aria-hidden="true">↗</span></a>
     <p class="note">Δεν παίρνεις τίποτα παραπάνω στην εφαρμογή. Όλοι παίζουν το ίδιο παιχνίδι.</p>
     <p class="note">Η πληρωμή γίνεται στο Ko-fi, μέσω Stripe ή PayPal. Δεν βλέπουμε ποτέ τα στοιχεία της κάρτας σου. Το Ko-fi έχει τη δική του πολιτική απορρήτου· η δική μας είναι <a href="/el/privacy/">εδώ</a>.</p>
   </div>
 </main>
 
 <footer>
-  <svg class="points" aria-hidden="true" focusable="false">
-    <defs>
-      <pattern id="points-up" width="64" height="40" patternUnits="userSpaceOnUse">
-        <rect width="64" height="40" fill="#8A6038"/>
-        <polygon points="0,40 16,0 32,40" fill="#2B1F19"/>
-        <polygon points="32,40 48,0 64,40" fill="#CFB98E"/>
-      </pattern>
-    </defs>
-    <rect width="100%" height="40" fill="url(#points-up)"/>
-  </svg>
   <div class="wrap">
     <nav aria-label="Σελίδες">
       <a href="/el/">Ταβλάκι</a>

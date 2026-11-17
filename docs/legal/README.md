@@ -14,7 +14,7 @@
 | [site/el/index.html](site/el/index.html) | The Greek homepage, served at `https://tavlaki.com/el/`. Same content and style as the English one: copy every change |
 | [site/img/](site/img/) | The homepage pictures: the hero board and one board per game (`game-*.webp`), all renders of the app's own board (`BoardScene`, headless, as in `apps/mobile/tools/screenshots/`), and the app icon. Also `site/favicon.png` and `site/apple-touch-icon.png` |
 | [site/support/index.html](site/support/index.html) | Support Tavlaki (#590), served at `https://tavlaki.com/support/`: the app's Support screen opens it (`supportPageUrl`, `apps/mobile/src/features/support/links.ts`). Ko-fi's own button image links `https://ko-fi.com/orestisstefanis` |
-| [site/el/support/index.html](site/el/support/index.html) | The Greek Support page, served at `https://tavlaki.com/el/support/`. Ko-fi's button has English text, so this page has our own button with Ko-fi's cup. Copy every other change from the English page |
+| [site/el/support/index.html](site/el/support/index.html) | The Greek Support page, served at `https://tavlaki.com/el/support/`. Ko-fi's button has English text, so this page has our own button (`btn primary`) with Ko-fi's cup. Copy every other change from the English page |
 | [site/img/kofi/](site/img/kofi/) | Ko-fi's brand assets (the "Support me on Ko-fi" button in beige, and the cup symbol), from Ko-fi's brand kit. Use them as Ko-fi gives them: never recolor or crop them. They are used only on the website, never in the app (App Review) |
 | [site/privacy/index.html](site/privacy/index.html) | English static page, served at `https://tavlaki.com/privacy` |
 | [site/el/privacy/index.html](site/el/privacy/index.html) | Greek static page, served at `https://tavlaki.com/el/privacy` |
@@ -39,6 +39,7 @@ The app opens `https://tavlaki.com/privacy` (`PRIVACY_POLICY_URL` in `apps/mobil
 - The policy describes what the code does. When a PR changes what data leaves the phone (a new event, a new vendor, a new id), it updates this policy in the same PR. The event list must match [`docs/architecture/analytics-events.md`](../architecture/analytics-events.md). The same PR also updates the store privacy answers ([`docs/store/app-privacy.md`](../store/app-privacy.md), [`docs/store/play-data-safety.md`](../store/play-data-safety.md)) and the iOS privacy manifest in `apps/mobile/app.json`.
 - The HTML pages are plain HTML with inline CSS. No JavaScript, no fonts or images from other sites, no cookies. Keep it that way: the policy says so. The homepages and the Support pages show local images only (`site/img/`); never load an image from Ko-fi's servers.
 - **The homepages:** change `site/index.html` first, then copy the change to `site/el/index.html` (text and style). The **Get Tavlaki** buttons on both homepages and on the invite page link the TestFlight public link. After the App Store launch, change all four buttons to `https://apps.apple.com/app/id6828172932` and drop the beta notes. `link.test.ts` checks the link and the no-script rule.
+- **The look (#591):** every page uses the app's Walnut Kafeneio colors and Home look (Figma frame 26, node `177:2`). The site has no light mode. Each page starts its inline CSS with the same base block (the colors, the header with the icon and a language button, the main button, the tiles, the footer): change it on all nine pages together. After the base, each page has its own part: the homepages share one, the four privacy and terms pages share one, the two Support pages share one.
 - `<!-- OWNER: ... -->` comments in the Markdown mark things the owner must confirm. They are left out of the HTML.
 
 ## How to make the HTML from the Markdown
@@ -49,7 +50,7 @@ Any Markdown-to-HTML tool works. With [pandoc](https://pandoc.org):
 pandoc -f gfm -t html --wrap=none docs/legal/privacy.md
 ```
 
-Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<div class="table">…</div>` (it scrolls on small screens). Paste the output between `<main>` and `<footer>` in the HTML page. Keep the `<head>`, the inline CSS and the footer as they are.
+Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<div class="table">…</div>` (it scrolls on small screens). Paste the output inside `<main class="wrap">`, after the `<header>` and before `</main>`. Keep the `<head>`, the inline CSS, the header and the footer as they are.
 
 ## How to publish
 

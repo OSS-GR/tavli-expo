@@ -5,33 +5,96 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Πολιτική απορρήτου του Ταβλάκι</title>
 <link rel="icon" href="data:,">
+<meta name="theme-color" content="#4A3423">
+<meta name="color-scheme" content="dark">
 <link rel="alternate" hreflang="en" href="https://tavlaki.com/privacy">
 <link rel="alternate" hreflang="el" href="https://tavlaki.com/el/privacy">
 <style>
-:root { color-scheme: light dark; --bg: #fbf7f0; --fg: #2b2118; --muted: #6b5b4d; --line: #e2d6c4; --link: #8a3b12; --head: #f1e8da; }
-@media (prefers-color-scheme: dark) { :root { --bg: #1c1712; --fg: #efe6da; --muted: #b9a996; --line: #3d3329; --link: #f0a46c; --head: #2a221b; } }
+/* Site base (#591): the app's Walnut Kafeneio colors
+   (packages/ui/src/themes/walnut-kafeneio.ts) and its Home look: the lamp
+   to floor gradient, the tiles, the main button and the Settings trays.
+   Every page has the same base block: change it on all of them. No
+   JavaScript, no fonts or images from other sites, no cookies. */
+:root {
+  --lamp: #4A3423; --bg: #3B2A1D; --floor: #1A110A;
+  --surface: #2E1F15; --selected: #4A3423; --raised: #3A2819; --sunken: #1A110A; --deep: #120C07;
+  --border: #6A4E35; --sep: #4E3927;
+  --text: #F1E6CF; --dim: #BFA987; --faint: #8C7A62;
+  --accent: #C89B45; --accent-light: #E0B867; --on-accent: #22160C;
+  --accent-line: #83632F; --accent-wash: #503A20; --brass: #F3D58A;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+}
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif; }
-main { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
-h1 { font-size: 1.75rem; line-height: 1.25; margin: 0.5rem 0 1rem; }
-h2 { font-size: 1.3rem; line-height: 1.3; margin: 2.25rem 0 0.75rem; padding-top: 1rem; border-top: 1px solid var(--line); }
-h3 { font-size: 1.1rem; margin: 1.75rem 0 0.5rem; }
-p, ul { margin: 0 0 1rem; }
-ul { padding-left: 1.25rem; }
-li { margin: 0.25rem 0; }
-a { color: var(--link); overflow-wrap: anywhere; }
+html { -webkit-text-size-adjust: 100%; background: var(--floor); }
+body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, var(--lamp) 0, var(--bg) 32rem, var(--bg) 60%, var(--floor) 100%); color: var(--text); font: 17px/1.6 var(--sans); }
+a { color: var(--accent-light); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--text); }
+a:focus-visible { outline: 3px solid var(--accent-light); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 400; color: var(--text); text-wrap: balance; }
+p { margin: 0 0 1rem; text-wrap: pretty; }
+img { display: block; max-width: 100%; height: auto; }
+svg { flex: none; }
+.wrap { max-width: 72rem; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+@media (min-width: 40rem) { .wrap { padding-left: 2rem; padding-right: 2rem; } }
+
+/* Header: the icon and name, then a round language button. */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4.25rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.brand { display: flex; align-items: center; gap: 0.65rem; color: var(--text); text-decoration: none; font: 1.35rem/1 var(--serif); }
+.brand img { width: 40px; height: 40px; border-radius: 11px; }
+.brand:hover { color: var(--text); }
+.nav { display: flex; align-items: center; gap: 0.5rem 1.5rem; }
+.nav .wide-only { display: none; color: var(--dim); text-decoration: none; }
+.nav .wide-only:hover { color: var(--text); }
+@media (min-width: 56rem) { .nav .wide-only { display: inline; } }
+.pill { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 44px; padding: 0 1rem; border: 1px solid var(--border); border-radius: 22px; background: var(--raised); color: var(--text); font-size: 0.95rem; text-decoration: none; }
+.pill:hover { border-color: var(--accent-line); color: var(--text); }
+
+/* The main button: the app's ActionButton (radius 14, gold gradient, a
+   light top edge). The second button: raised wood with a gold line. */
+.btn { display: flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 54px; padding: 0 1.75rem; border-radius: 14px; font-weight: 600; font-size: 1.1rem; text-decoration: none; text-align: center; }
+.primary { background: linear-gradient(160deg, var(--accent-light) 0%, var(--accent) 70%); color: var(--on-accent); box-shadow: inset 0 1px 0 var(--brass), 0 8px 18px rgba(0, 0, 0, 0.45); }
+.primary:hover { background: var(--accent-light); color: var(--on-accent); }
+.secondary { min-height: 48px; font-size: 1rem; background: var(--raised); border: 1px solid var(--accent-line); color: var(--accent-light); }
+.secondary:hover { border-color: var(--accent); color: var(--text); }
+.btn.small { min-height: 44px; padding: 0 1.1rem; font-size: 0.95rem; }
+.note { color: var(--dim); font-size: 0.9rem; line-height: 1.5; }
+
+/* Tiles: the Home tiles (radius 20, raised gradient). */
+.tile { border: 1px solid var(--border); border-radius: 20px; background: linear-gradient(160deg, var(--selected) 0%, var(--surface) 70%); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
+.eyebrow { margin: 0 0 0.6rem; color: var(--accent-light); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* Footer */
+footer { margin-top: 3rem; }
+footer .wrap { padding-top: 1.5rem; padding-bottom: 2.5rem; border-top: 1px solid var(--sep); color: var(--dim); font-size: 0.9rem; text-align: center; }
+footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.25rem; margin-bottom: 0.75rem; font-size: 0.95rem; }
+/* The privacy policy and the terms (all four pages share this block). */
+main.wrap { max-width: 44rem; padding-bottom: 1rem; }
+h1 { font-size: clamp(1.9rem, 6vw, 2.5rem); line-height: 1.15; margin: 1rem 0 1rem; }
+h2 { font-size: 1.45rem; line-height: 1.3; margin: 2.5rem 0 0.75rem; padding-top: 1.25rem; border-top: 1px solid var(--sep); color: var(--accent-light); }
+h3 { font-size: 1.2rem; margin: 1.75rem 0 0.5rem; }
+p, ul, ol { margin: 0 0 1rem; }
+ul, ol { padding-left: 1.25rem; }
+li { margin: 0.3rem 0; }
+li::marker { color: var(--accent); }
+strong { color: var(--text); font-weight: 600; }
+main a { overflow-wrap: anywhere; }
 code { font: 0.95em ui-monospace, Menlo, Consolas, monospace; }
-.table { overflow-x: auto; margin: 0 0 1rem; }
+.table { overflow-x: auto; margin: 0 0 1rem; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
 table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
-th, td { border: 1px solid var(--line); padding: 0.5rem; text-align: left; vertical-align: top; }
-th { background: var(--head); }
-footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
+th, td { padding: 0.6rem 0.75rem; text-align: left; vertical-align: top; }
+td { border-top: 1px solid var(--sep); }
+th + th, td + td { border-left: 1px solid var(--sep); }
+th { background: var(--raised); color: var(--accent-light); font-weight: 600; }
 </style>
 </head>
 <body>
 <!-- Made from docs/legal/privacy.el.md. Edit the Markdown first, then this file. -->
-<main>
+<header class="wrap top">
+  <a class="brand" href="/el/"><img src="/img/icon-192.webp" alt="" width="40" height="40">Ταβλάκι</a>
+  <a class="pill" href="/privacy/" lang="en" hreflang="en">English</a>
+</header>
+<main class="wrap">
 <h1 id="πολιτική-απορρήτου-του-ταβλάκι">Πολιτική απορρήτου του Ταβλάκι</h1>
 <p><strong>Τελευταία ενημέρωση:</strong> 16 Νοεμβρίου 2026</p>
 <p>English: <a href="https://tavlaki.com/privacy">tavlaki.com/privacy</a></p>
@@ -372,7 +435,17 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 2.5rem; }
 <p>Αν αλλάξουμε αυτή την πολιτική, αλλάζουμε την ημερομηνία στην αρχή. Αν μια αλλαγή αφορά το τι συλλέγουμε, θα σας το πούμε μέσα στην εφαρμογή και θα σας ρωτήσουμε ξανά όπου το απαιτεί ο νόμος.</p>
 <h2 id="επικοινωνία">Επικοινωνία</h2>
 <p><strong><a href="mailto:privacy@tavlaki.com">privacy@tavlaki.com</a></strong></p>
-<footer>Αυτή η σελίδα δεν βάζει cookies και δεν φορτώνει τίποτα από άλλους ιστότοπους.</footer>
 </main>
+<footer>
+  <div class="wrap">
+    <nav aria-label="Σελίδες">
+      <a href="/el/">Ταβλάκι</a>
+      <a href="/el/terms/">Όροι χρήσης</a>
+      <a href="/el/support/">Στήριξε το Ταβλάκι</a>
+      <a href="mailto:support@tavlaki.com">support@tavlaki.com</a>
+    </nav>
+    <p>Αυτή η σελίδα δεν βάζει cookies, δεν τρέχει scripts και δεν φορτώνει τίποτα από άλλους ιστότοπους.</p>
+  </div>
+</footer>
 </body>
 </html>
