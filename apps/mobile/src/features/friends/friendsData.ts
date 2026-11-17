@@ -146,10 +146,12 @@ export function useFriendsData<T>(
         if (user.isGuest) return { kind: 'guest' };
         const mine = usernames?.mine().catch(() => null) ?? Promise.resolve(null);
         const loaded = load();
+        // Mark the load handled at once: it may fail while `mine` still waits.
+        // `await loaded` below still throws its error.
+        loaded.catch(() => undefined);
         const known = await mine;
         if (known !== null && needsUsernameStep(known)) {
           // The gate shows: the load's answer (or its USERNAME_NEEDED) no longer matters.
-          loaded.catch(() => undefined);
           return { kind: 'username', mine: known };
         }
         return { kind: 'ready', data: await loaded, visit };
