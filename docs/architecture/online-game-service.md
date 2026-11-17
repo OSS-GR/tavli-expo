@@ -810,6 +810,32 @@ Both delete routes are **off**, so no client can delete a user without steps 2�
 - No sign-in, or no Better Auth user for the token: `NOT_SIGNED_IN`.
 - After the delete, the old token is valid for up to 15 more minutes. The calls that save the caller's id (`createInvite`, `acceptInvite`, `declineInvite`, `registerPushToken`) check the user (`existingPlayer`) and get `NOT_SIGNED_IN` (#306), so no row is saved under the deleted id. The other calls still pass `signedInPlayer`, but save nothing: once the game pages ran, the caller has no active game and no invite that is still open (see [Games after the call](#games-after-the-call)). See [Who calls](#who-calls).
 
+## Download my data
+
+Issue #445 (GDPR access and portability). The public action `exportMyData` in `convex/myData.ts` gives the signed-in caller a copy of what this server keeps about them, as plain JSON (`MyData`, `packages/contracts/src/my-data.ts`, `format: 'tavlaki-my-data'`, `version: 1`). It takes no arguments: the caller comes from `signedInPlayer(ctx)`, and a token whose Better Auth user is gone gets `NOT_SIGNED_IN`. The app shares it from Settings → Account → **Download my data** ([App shell](app-shell.md#settings--account-402)).
+
+### What it holds
+
+- **account:** `guest` or `saved`, when it was made, the guest number, the username and when it last changed, the sign-in keys (the kind and when it was added; an email key also has its address, which Account shows the caller too), the terms version and when it was accepted, when the age check was answered.
+- **rating** (the `ratings` row, or `null`), **rankedSearch** (the `seeks` row, or `null`).
+- **friends:** each friend's name as the caller sees it, since when, and the wins and losses between the two.
+- **games:** every game of the caller, active and finished: id, status, game choice, preset, target, turn time, ranked, the caller's side, the score, the winner, when it started and last changed, and the other player's name as the caller sees it (`playerNamesSeenBy`, so a blocked player is `null`). No moves: the log of a long match is large, and the game id leads to it if a player asks us.
+- **invites** the caller sent: code, choice, target, turn time, status (`inviteStatus`), whether it went to a friend, the times and the game id.
+- **blocks** and **reports** the caller made: the name as the caller sees it (a report: the username at that time and the reason) and the time.
+- **pushTokens:** only the platform and the time. Never the token.
+
+Never another player's id, a token, a code, a hash or a secret. Every list is newest first, and every missing value is `null`. Left out on purpose: friend requests, the friend link token and the friend search times (working data of the Friends screens, not a record about the player), the Apple tokens, the email code rows and the sessions.
+
+### How it reads
+
+An action, so it can read the tables with no cap in pages: the capped parts (account, keys, name row, rating, friends, blocks, push tokens, seek) are one internal query, `exportHead`; games (`exportGamesPage`, `MY_DATA_GAMES_PAGE` = 50 per page, `by_white` then `by_black`), invites (`exportInvitesPage`) and reports (`exportReportsPage`, both `MY_DATA_ROWS_PAGE` = 200) are paged internal queries. The pages run one after another, so a game that changes during the copy may show either state. The shape and the order come from `makeMyData` and its helpers in `@tavli/online` (`my-data.ts`), which the in-memory server's `onlineDataFor(id).exportMyData()` runs too.
+
+**A new table or field that holds a player's data goes in the copy too**, next to `deleteAccountOf` and the guest move.
+
+### The port
+
+`OnlineData.exportMyData()` (contracts). On Convex: `createConvexOnlineData` calls the action named in `MY_DATA_FUNCTIONS` (`backend-convex/src/functions.ts`); `convex/convexOnlineData.test.ts` checks the name and types against `api` and runs `onlineDataContract` through the adapter. Server tests: `convex/myData.test.ts` (the contents with no other ids, an expired invite, paging past one page, `NOT_SIGNED_IN`).
+
 ## Update needed
 
 Issue #390. A server deploy can break older app builds (#380). The owner then sets the lowest build that still works, and an older build shows the "Update needed" screen with one button, **Update** (TestFlight on iOS, Google Play on Android). The app side is in [App shell → Update needed](app-shell.md#update-needed-390).

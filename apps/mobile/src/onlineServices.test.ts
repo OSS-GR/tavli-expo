@@ -94,6 +94,7 @@ function memoryAdapters() {
       made.push('onlineData');
       return {
         deleteMyData: () => server.onlineDataFor(auth.currentUser()?.id ?? 'nobody').deleteMyData(),
+        exportMyData: () => server.onlineDataFor(auth.currentUser()?.id ?? 'nobody').exportMyData(),
       };
     },
     createPushTokens: ({ auth }) => {

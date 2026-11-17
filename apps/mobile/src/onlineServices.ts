@@ -161,6 +161,7 @@ export function lazyPushTokens(get: () => PushTokens): PushTokens {
 export function lazyOnlineData(get: () => OnlineData): OnlineData {
   return {
     deleteMyData: () => get().deleteMyData(),
+    exportMyData: () => get().exportMyData(),
   };
 }
 
