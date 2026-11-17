@@ -1537,8 +1537,16 @@ export function GameScreen({
             }
           : null;
   // Support Tavlaki (#590): a local game that ended here counts once; the
-  // last game of a match counts on the match-end screen instead.
-  const localEnd = supportAsk !== undefined && ended === null && gameOver && game.result !== null;
+  // last game of a match counts on the match-end screen instead. It counts
+  // only once the end sheet shows (`ending`), so the count and the card
+  // always go together: nothing counts while the sheet waits (today only
+  // an online turn flies first, and online screens pass no `supportAsk`).
+  const localEnd =
+    supportAsk !== undefined &&
+    ending !== null &&
+    ended === null &&
+    gameOver &&
+    game.result !== null;
   const ask = useSupportAsk(localEnd ? `${matchKey}:end:${gameKey}` : null, {
     games: 1,
     won: localEnd && isHumanWin(game.result?.winner, humans),

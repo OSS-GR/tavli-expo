@@ -16,12 +16,11 @@ import type { Storage } from '@tavli/contracts';
 import { useEffect, useEffectEvent } from 'react';
 import { create } from 'zustand';
 
-import { DAY_MS } from '@/features/reminders/schedule';
 import { reminders as appReminders, type Reminders } from '@/features/reminders/reminders';
 import { storage as appStorage } from '@/services';
 
 import * as schedule from './schedule';
-import type { SupportAskState } from './schedule';
+import { DAY_MS, type SupportAskState } from './schedule';
 import {
   sendSupportAskAnswered,
   sendSupportAskShown,

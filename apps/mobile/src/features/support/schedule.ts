@@ -21,7 +21,9 @@
  * server, never in analytics.
  */
 
-export const DAY_MS = 24 * 60 * 60 * 1000;
+import { DAY_MS } from '@/features/reminders/schedule';
+
+export { DAY_MS };
 
 /** The first ask comes after this many finished games. */
 export const FIRST_ASK_GAMES = 2;
