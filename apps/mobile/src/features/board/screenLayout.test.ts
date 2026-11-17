@@ -1,5 +1,9 @@
+import el from '@/i18n/el.json';
+import en from '@/i18n/en.json';
+
 import {
   LEFT_RAIL,
+  RAIL_WIDTHS,
   RIGHT_RAIL,
   boardModeOf,
   isLandscapeWindow,
@@ -52,14 +56,54 @@ describe('railWidths (#185)', () => {
 
   it('leaves the board most of an iPhone 17 Pro on its side', () => {
     // 874 pt wide, 62 pt safe edges on each side: the board keeps the rest.
-    const board = 874 - 2 * 62 - LEFT_RAIL - RIGHT_RAIL;
-    expect(board).toBeGreaterThanOrEqual(580);
+    expect(874 - 2 * 62 - LEFT_RAIL - RIGHT_RAIL).toBeGreaterThanOrEqual(620);
+    const greek = RAIL_WIDTHS.el;
+    expect(874 - 2 * 62 - greek.left - greek.right).toBeGreaterThanOrEqual(580);
   });
 
-  it('fits the longest seat name and button label in Greek', () => {
-    // "Υπολογιστής" (the bot) at 13 pt, about 80 pt.
-    expect(LEFT_RAIL).toBeGreaterThanOrEqual(80);
-    // "Επιβεβαίωση" (Confirm) at 12 pt, about 75 pt.
-    expect(RIGHT_RAIL).toBeGreaterThanOrEqual(75);
+  it('is wider in Greek, and grows the same way with the font', () => {
+    expect(railWidths(1, 'el')).toEqual(RAIL_WIDTHS.el);
+    expect(railWidths(1, 'en')).toEqual(RAIL_WIDTHS.en);
+    expect(railWidths(3, 'el')).toEqual(railWidths(1.35, 'el'));
+    expect(railWidths(1.2, 'el').left).toBeGreaterThan(RAIL_WIDTHS.el.left);
+  });
+
+  it('fits the longest one-word label of each rail, measured at the normal font size', () => {
+    // Measured in the system font (see RAIL_WIDTHS): "Opponent" (13 pt) is
+    // about 63 pt, "Υπολογιστής" (13 pt) about 82 pt, "Επιβεβαίωση" (12 pt)
+    // about 78 pt.
+    expect(RAIL_WIDTHS.en.left).toBeGreaterThanOrEqual(63);
+    expect(RAIL_WIDTHS.en.right).toBeGreaterThanOrEqual(63);
+    expect(RAIL_WIDTHS.el.left).toBeGreaterThanOrEqual(82);
+    expect(RAIL_WIDTHS.el.right).toBeGreaterThanOrEqual(78);
+  });
+
+  it('has no rail word longer than the measured ones', () => {
+    // A longer word needs a new measure and maybe a wider rail.
+    const left = ['game.bot.name', 'game.you', 'online.opponent', 'online.guestName'];
+    const right = [
+      'game.controls.undoLabel',
+      'game.controls.confirm',
+      'game.hint.button',
+      'game.hint.busy',
+      'game.fastForward.button',
+      'game.fastForward.stop',
+      'game.roll.dice',
+    ];
+    const text = (strings: object, key: string): string => {
+      const value = key
+        .split('.')
+        .reduce<unknown>((at, part) => (at as Record<string, unknown>)[part], strings);
+      expect(typeof value).toBe('string');
+      return String(value).replace(/\{\{[^}]*\}\}/g, '');
+    };
+    const longest = (strings: object, keys: readonly string[]): number =>
+      Math.max(
+        ...keys.flatMap((key) => text(strings, key).split(/\s+/)).map((word) => [...word].length),
+      );
+    expect(longest(en, left)).toBeLessThanOrEqual([...'Opponent'].length);
+    expect(longest(en, right)).toBeLessThanOrEqual([...'Thinking…'].length);
+    expect(longest(el, left)).toBeLessThanOrEqual([...'Υπολογιστής'].length);
+    expect(longest(el, right)).toBeLessThanOrEqual([...'Επιβεβαίωση'].length);
   });
 });
