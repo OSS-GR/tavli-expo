@@ -128,6 +128,8 @@ function RootStack() {
           <Stack.Screen name="ratings" />
           {/* What's new (#471). */}
           <Stack.Screen name="whats-new" />
+          {/* Support Tavlaki (#590): Settings → Help and the ask card. */}
+          <Stack.Screen name="support" />
           {/* Your online games (#297): "See all" on Home. */}
           <Stack.Screen name="online-games" options={{ headerShown: true }} />
         </Stack.Protected>

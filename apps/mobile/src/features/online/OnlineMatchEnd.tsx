@@ -52,6 +52,11 @@ export interface OnlineMatchEndProps {
   onNewPlayer?: (game: RankedGame) => void;
   /** A friend invite to the other player. */
   onPlayAgain?: (playerId: string) => void;
+  /**
+   * Support Tavlaki (#590): opens the Support screen from the ask card,
+   * which may show at the end of a Play ranked match (never a friend game).
+   */
+  onSupport?: () => void;
 }
 
 export function OnlineMatchEnd(props: OnlineMatchEndProps) {
@@ -84,6 +89,7 @@ function OnlineMatchEndView({
   onLeaderboards,
   onNewPlayer,
   onPlayAgain,
+  onSupport,
 }: OnlineMatchEndProps & { store: OnlineStore }) {
   const { t } = useTranslation();
   const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
@@ -137,6 +143,16 @@ function OnlineMatchEndView({
         // The result is read once per app run (#216).
         announceKey={`online:${gameId}`}
         onHome={onHome}
+        // Support Tavlaki (#590): a ranked match counts all its games.
+        {...(ranked && onSupport
+          ? {
+              supportAsk: {
+                key: `online:${gameId}:support`,
+                games: view.match.games.length,
+                onSupport,
+              },
+            }
+          : {})}
       />
       {safety ? (
         <ReportOrBlockSheet player={reporting} safety={safety} onClose={() => setReporting(null)} />

@@ -248,6 +248,8 @@ export {
   type MatchGame,
   type OpeningRollRule,
   type RankedSearchEnd,
+  type SupportAskAnswer,
+  type SupportSource,
   type ThemeKind,
   type TutorialGame,
   type TutorialSource,

@@ -85,7 +85,9 @@
     "install": {
       "exclude": [
         "expo",
-        "expo-dev-client"
+        "expo-dev-client",
+        "expo-router",
+        "jest-expo"
       ]
     }
   }

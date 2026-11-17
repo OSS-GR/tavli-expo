@@ -11,6 +11,7 @@ import {
   RATINGS_HREF,
   HOW_TO_PLAY_HREF,
   WHATS_NEW_HREF,
+  supportHref,
   tourHref,
 } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
@@ -35,6 +36,7 @@ export default function SettingsRoute() {
         onTour={() => router.push(tourHref('settings'))}
         onHistory={() => router.push('/history')}
         onWhatsNew={() => router.push(WHATS_NEW_HREF)}
+        onSupport={() => router.push(supportHref('settings'))}
         turnPushes={pushes}
         onAccount={auth && usernames && onlineData ? () => router.push('/account') : undefined}
         account={auth && usernames ? { auth, usernames } : undefined}

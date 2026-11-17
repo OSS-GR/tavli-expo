@@ -177,7 +177,24 @@ export interface AnalyticsEvents {
     how: RankedSearchEnd;
     waitSec: number;
   };
+  /**
+   * Support Tavlaki (#590): the Support screen opened, from the Settings
+   * row (`settings`) or the ask card (`ask`). Never an id or an amount.
+   */
+  support_opened: { from: SupportSource };
+  /** Support on Ko-fi opened tavlaki.com/support in the browser (#590). */
+  support_link_opened: Record<string, never>;
+  /** The ask card showed on an end screen (#590). */
+  support_ask_shown: Record<string, never>;
+  /** The ask card was answered (#590): Support Tavlaki, Not now or Don't ask again. */
+  support_ask_answered: { answer: SupportAskAnswer };
 }
+
+/** Where the Support screen opened from (`support_opened`, #590). */
+export type SupportSource = 'settings' | 'ask';
+
+/** An answer to the support ask card (`support_ask_answered`, #590). */
+export type SupportAskAnswer = 'support' | 'not_now' | 'never';
 
 /** How a Play ranked search ended (`ranked_search_ended`, #532). */
 export type RankedSearchEnd = 'matched' | 'cancelled' | 'otherGame' | 'bot' | 'expired';
@@ -220,6 +237,10 @@ export const ANALYTICS_EVENTS = [
   'online_sign_in',
   'ranked_search_started',
   'ranked_search_ended',
+  'support_opened',
+  'support_link_opened',
+  'support_ask_shown',
+  'support_ask_answered',
 ] as const satisfies readonly AnalyticsEventName[];
 
 type MissingEvent = Exclude<AnalyticsEventName, (typeof ANALYTICS_EVENTS)[number]>;
