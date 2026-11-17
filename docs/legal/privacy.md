@@ -6,7 +6,7 @@ This is not legal advice. The owner should have a lawyer or a GDPR expert check 
 
 # Tavlaki privacy policy
 
-**Last updated:** 16 November 2026
+**Last updated:** 17 November 2026
 
 Ελληνικά: [tavlaki.com/el/privacy](https://tavlaki.com/el/privacy)
 
@@ -256,7 +256,7 @@ These features are planned. They are **not** in the app today. We will update th
 
 Tavlaki is free. If you want to support it, **Settings → Help → Support Tavlaki** opens our page `tavlaki.com/support` in your browser, and that page links to Ko-fi. Ko-fi (Ko-fi Labs Limited, UK) is a third-party service with its own terms and privacy policy. It is not one of the services above: we do not send it any data, and the app never opens it by itself.
 
-If you give something, you pay on Ko-fi, through PayPal or Stripe. Ko-fi shows us the name you give there, your email address and your message, if you write one. PayPal or Stripe may also show us your legal name and, for a card payment, the name of your bank and part of the card's billing address. We never see your card number. We use these details only to keep a record of the payment and to answer you, and we never put them in the app. Supporting gives nothing extra in the app, and it is not linked to your account or your install id.
+If you give something, you pay on Ko-fi, through PayPal or Stripe. Ko-fi shows us the name you give there, your email address and your message, if you write one. PayPal or Stripe may also show us your legal name and, for a card payment, the name of your bank and part of the card's billing address. We never see your card number. We use these details only to keep a record of the payment and to answer you, and we never put them in the app. Supporting is not linked to your account or your install id.
 
 ## This website
 
