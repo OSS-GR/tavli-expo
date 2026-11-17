@@ -319,6 +319,25 @@
     "loading": "Loading your account…",
     "failed": "Could not load your account. Check the connection and try again.",
     "retry": "Try again",
+    "download": {
+      "label": "Download my data",
+      "hint": "A copy of what our server keeps about you",
+      "busy": "Getting your data…",
+      "problem": {
+        "network": {
+          "title": "No connection",
+          "text": "Our server did not answer. Check the connection and try again."
+        },
+        "signedOut": {
+          "title": "This account is gone",
+          "text": "Our server no longer has this account, so it keeps no data of yours."
+        },
+        "other": {
+          "title": "Your data did not download",
+          "text": "Try again in a moment."
+        }
+      }
+    },
     "offline": {
       "intro": "You are not signed in. You play on this phone only.",
       "kept": "Kept on this phone: your games against the bot, your history and your settings.",
@@ -350,6 +369,8 @@
       "removeLabel": "Remove {{provider}}",
       "add": "Add {{provider}}",
       "signOut": "Sign out",
+      "signOutEverywhere": "Sign out of all phones",
+      "signOutEverywhereHint": "For a lost or old phone",
       "delete": "Delete my account",
       "footnote": "Bot games, history and settings stay on this phone. Sign out keeps your account; delete removes it from our server."
     },
@@ -363,6 +384,7 @@
       "move": "Moving your games…",
       "removeKey": "Removing…",
       "signOut": "Signing out…",
+      "signOutEverywhere": "Signing out of all phones…",
       "delete": "Deleting your account…"
     },
     "problem": {
@@ -386,6 +408,10 @@
         "title": "Your account was not deleted",
         "text": "Check the connection and try again."
       },
+      "signOutEverywhereFailed": {
+        "title": "Your phones are still signed in",
+        "text": "We could not sign you out of all phones. Try again."
+      },
       "appleOff": {
         "title": "Sign in with Apple is not ready",
         "text": "It is off on our server for now. Try email, or try again later."
@@ -402,6 +428,7 @@
     "note": {
       "saved": "Your account is saved.",
       "signedOut": "You are signed out.",
+      "signedOutEverywhere": "You are signed out on every phone.",
       "deleted": "Your account is deleted. The next Play a friend starts fresh.",
       "moved": "Your games are in your account now."
     },
@@ -410,6 +437,13 @@
       "comeBack": "To play online on this phone again, sign in again.",
       "kept": "Your online games and your username stay with your account.",
       "confirm": "Sign out"
+    },
+    "signOutEverywhereDialog": {
+      "title": "Sign out of all phones?",
+      "everywhere": "This signs you out here and on every other phone, and they stop getting turn notifications.",
+      "comeBack": "To play online again on a phone, sign in there with your Apple ID or email.",
+      "kept": "Your online games and your username stay with your account.",
+      "confirm": "Sign out of all phones"
     },
     "moveDialog": {
       "title": "This Apple ID has an account already",
@@ -1139,7 +1173,7 @@
       },
       "lostDice": {
         "title": "Dice you can't play",
-        "body": "When the rules leave a die with no move, it fades and gets a line through it. On your first turns, a note under the board says why.",
+        "body": "When the rules leave a die with no move, it fades and gets a line through it. When only one die can move and it must be the higher one, a note under the board says so on your first turns.",
         "where": "Any game"
       },
       "howToPlay": {
@@ -1152,10 +1186,20 @@
         "body": "A short tour: how to roll, how to move your checkers and where everything is. You try rolling and moving on the real board.",
         "where": "Home › How to play › App tour, or Settings › Help"
       },
+      "downloadData": {
+        "title": "Download my data",
+        "body": "Get a copy of what our server keeps about your online account: your name, games, invites, friends and more. Save it or send it on from the share sheet.",
+        "where": "Settings › Account"
+      },
       "support": {
         "title": "Support Tavlaki",
         "body": "Tavlaki is free, with no ads. If you enjoy it, you can buy me a coffee on Ko-fi.",
         "where": "Settings › Help › Support Tavlaki"
+      },
+      "signOutEverywhere": {
+        "title": "Sign out of all phones",
+        "body": "Lost a phone? Sign out of your account on every phone at once. Your games and username stay; sign in again with your Apple ID or email.",
+        "where": "Settings › Account › Sign out of all phones"
       }
     }
   },

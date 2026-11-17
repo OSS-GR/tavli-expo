@@ -22,6 +22,7 @@ Tavlaki is a Greek backgammon (tavli) app for iPhone and Android. This policy sa
 - With an account saved with Apple or an email code, you can **Play ranked**: the server matches you with another player who asked for the same game and has a similar rating. It keeps your request (the game, your rating and the time) only until the match, and at most 5 minutes.
 - You can **block** or **report** a player you met online. We keep a report until we have read it and deleted it.
 - You can **delete your account** and its online data in the app at any time: **Settings → Account → Delete my account**.
+- You can **download a copy of your online data** in the app at any time: **Settings → Account → Download my data**. It is a copy in JSON format with your account, games, invites, friends, rating, blocks and reports (with the other players' names as the app shows them to you), which you save or send on from the share sheet.
 - **Turn notifications** are off until you turn them on. The app offers them only after you make or accept an invite for an async game. If you turn them on, our server keeps your phone's push token, to tell you when it is your turn or your game is over.
 - On the first launch, the app asks if it may send **anonymous usage data**. You choose **Allow usage data** or **Don't allow**. You can change your answer any time in **Settings → Privacy**.
 - Until you answer, the app sends only anonymous **crash reports**. **Don't allow** turns off usage data **and** crash reports.
@@ -171,6 +172,8 @@ Then the app signs out and deletes the sign-in cookie on your phone. If you play
 
 What stays: finished online games (with their moves) stay for the other player. They hold your old random user id, but no name and no email (your friend's app then shows no name for you), and once the account is gone that id leads to nobody. An invite a friend made and you answered stays with that friend. The games and the history on your phone stay too.
 
+Without the app (for example after you deleted it), write to **support@tavlaki.com** with your username or guest name. The page [tavlaki.com/delete](https://tavlaki.com/delete/) says what to send and how long it takes.
+
 ### Turn notifications (Expo)
 
 Only if you turn them on. After you make or accept an invite for an online game, the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Turn notifications**, and off in your phone's settings.
@@ -226,7 +229,7 @@ Under the GDPR you have the right to:
 - have it **corrected** or **deleted**;
 - **restrict** or **object** to how we use it;
 - **withdraw consent** at any time (the switch in Settings);
-- get your data in a portable form;
+- get your data in a portable form (your online data: **Settings → Account → Download my data**);
 - **complain** to the data protection authority of the EU or EEA country where you live, where you work, or where the problem happened. In Greece, for example, this is the Hellenic Data Protection Authority ([www.dpa.gr](https://www.dpa.gr)).
 
 To ask, write to **support@tavlaki.com**. We answer within one month.

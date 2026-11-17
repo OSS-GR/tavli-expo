@@ -546,6 +546,27 @@ describe('lostDice (#579)', () => {
   it('is empty before the roll', () => {
     expect(lostDice(at('w: 13x15 ; b: 24x15'))).toEqual([]);
   });
+
+  it('tavli-match.md #39: a double that bears off the last checkers loses nothing', () => {
+    const flow = applyGameAction(at('w: 6x2 ; b: 24x15'), roll('white', [6, 6]));
+    expect(lostDice(flow)).toEqual([]);
+    const one = applyGameAction(flow, move('6/0'));
+    expect(one.phase).toBe('moving');
+    expect(lostDice(one)).toEqual([]);
+    const done = applyGameAction(one, move('6/0'));
+    expect(done.phase).toBe('awaiting-confirm');
+    expect(lostDice(done)).toEqual([]);
+    expect(lostDiceWithReason(done)).toBeNull();
+    expect(applyGameAction(done, { type: 'confirm', player: 'white' }).phase).toBe('game-over');
+  });
+
+  it('tavli-match.md #39: the last checker off with one die leaves the other die unlost', () => {
+    const flow = applyGameAction(at('w: 1 ; b: 12x15'), roll('white', [6, 5]));
+    expect(lostDice(flow)).toEqual([]);
+    const done = applyGameAction(flow, move('1/0:6'));
+    expect(done.phase).toBe('awaiting-confirm');
+    expect(lostDiceWithReason(done)).toBeNull();
+  });
 });
 
 describe('lostDiceWithReason (#579)', () => {

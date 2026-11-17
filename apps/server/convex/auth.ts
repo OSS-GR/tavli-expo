@@ -65,6 +65,11 @@ export const APPLE_BUNDLE_IDS = ['com.tavlaki', 'com.tavlaki.dev', 'com.tavlaki.
  * - Keys change only through `/key/save` and `/key/remove`
  *   (`keyPlugin.ts`, #397): `/link-social` never checks that a key is
  *   free, and `/unlink-account` does not know our last-key rule.
+ * - Sessions end only through `/sign-out` (this phone) and our
+ *   `/sign-out-everywhere` (`keyPlugin.ts`, #446). `/revoke-sessions`,
+ *   `/revoke-other-sessions` and `/revoke-session` keep the push tokens
+ *   (another phone would still get pushes) and let a guest end the only
+ *   session of an account it can never sign in to again.
  */
 /**
  * How long a session lasts with no use, in seconds: a year. Each day the
@@ -76,7 +81,14 @@ export const SESSION_EXPIRES_IN_S = 365 * 24 * 60 * 60;
 /** How old a session gets before a use moves its end on, in seconds. */
 export const SESSION_UPDATE_AGE_S = 24 * 60 * 60;
 
-const DISABLED_PATHS = ['/delete-anonymous-user', '/link-social', '/unlink-account'];
+const DISABLED_PATHS = [
+  '/delete-anonymous-user',
+  '/link-social',
+  '/unlink-account',
+  '/revoke-sessions',
+  '/revoke-other-sessions',
+  '/revoke-session',
+];
 
 let appleKeys: JWTVerifyGetKey | null = null;
 
@@ -268,6 +280,9 @@ export function createAuth(ctx: AuthCtx) {
         },
         useEmailCode: async (use) =>
           await actionCtx(ctx).runMutation(internal.emailCodes.useEmailCode, use),
+        endSessions: async (userId) => {
+          await actionCtx(ctx).runMutation(internal.account.endSessionsOf, { userId });
+        },
       }),
     ],
   });

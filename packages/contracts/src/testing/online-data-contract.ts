@@ -6,8 +6,8 @@
  *     it(check.name, () => check.run(makeSubject()));
  *   }
  *
- * Make a new subject for each check: two players with an account on one
- * server, and no game or invite yet. A check rejects with an `Error` when
+ * Make a new subject for each check: two players with a guest account on
+ * one server, and no game or invite yet. A check rejects with an `Error` when
  * the adapter breaks the contract. The checks read what the server keeps
  * through the `Invites` and `GameTransport` ports of the same server.
  */
@@ -15,6 +15,7 @@ import { isGameTransportErrorData } from '../game-transport';
 import type { GameSummary, GameTransport } from '../game-transport';
 import { isInviteErrorData } from '../invite';
 import type { Invites, NewInvite } from '../invite';
+import { MY_DATA_FORMAT, MY_DATA_VERSION } from '../my-data';
 import type { OnlineData } from '../online-data';
 
 /**
@@ -62,6 +63,13 @@ async function failsWith(call: Promise<unknown>, code: string, what: string): Pr
     throw new Error(`${what}: expected ${code}, got ${JSON.stringify(reason)}`);
   }
   same(JSON.parse(JSON.stringify(reason)), reason, `${what}: the error is plain JSON`);
+}
+
+/** `data` survives a JSON round trip unchanged: plain data, no `undefined`, no class. */
+function plainJson(data: unknown, what: string): void {
+  same(JSON.parse(JSON.stringify(data)), data, `${what}: plain JSON`);
+  const text = JSON.stringify(data);
+  if (text.includes('undefined')) throw new Error(`${what}: holds undefined`);
 }
 
 /** Starts a match between the two players: `me` invites, `friend` accepts. */
@@ -158,6 +166,76 @@ export function onlineDataContract(): OnlineDataContractCheck[] {
         const me = subject.invitesFor('me');
         await failsWith(me.createInvite(GAME), 'NOT_SIGNED_IN', 'make an invite');
         await failsWith(me.acceptInvite(code), 'NOT_SIGNED_IN', 'accept an invite');
+      },
+    },
+    {
+      name: 'the copy: with nobody signed in, it fails NOT_SIGNED_IN as plain data',
+      run: async ({ dataFor }) => {
+        await failsWith(dataFor(null).exportMyData(), 'NOT_SIGNED_IN', 'the copy');
+      },
+    },
+    {
+      name: 'the copy: after the delete, it fails NOT_SIGNED_IN',
+      run: async ({ dataFor }) => {
+        await dataFor('me').deleteMyData();
+        await failsWith(dataFor('me').exportMyData(), 'NOT_SIGNED_IN', 'the copy');
+      },
+    },
+    {
+      name: 'the copy of a new guest: plain JSON, the format, and empty lists',
+      run: async ({ dataFor }) => {
+        const data = await dataFor('me').exportMyData();
+        plainJson(data, 'the copy');
+        same(data.format, MY_DATA_FORMAT, 'the format');
+        same(data.version, MY_DATA_VERSION, 'the version');
+        same(data.account.kind, 'guest', 'the account kind');
+        same(data.account.username, null, 'the username');
+        same(data.rating, null, 'the rating');
+        same(data.rankedSearch, null, 'the ranked search');
+        for (const list of ['friends', 'games', 'invites', 'blocks', 'reports'] as const) {
+          same(data[list], [], list);
+        }
+      },
+    },
+    {
+      name: 'the copy holds my game, my invites and my guest number, never the other id',
+      run: async (subject) => {
+        const gameId = await startMatch(subject);
+        const open = await subject.invitesFor('me').createInvite(GAME);
+        const [mine] = await subject.gamesFor('me').listMyGames({ status: 'active' });
+        if (mine === undefined) throw new Error('my match is not in my list');
+        const seen = await friendSummary(subject, 'active', gameId);
+        if (seen?.opponentName?.kind !== 'guest') throw new Error('no guest name for me');
+
+        const data = await subject.dataFor('me').exportMyData();
+        plainJson(data, 'the copy');
+        same(data.account.guestNumber, seen.opponentName.number, 'my guest number');
+        same(
+          data.games.map((game) => [game.gameId, game.status, game.mySide, game.opponentName]),
+          [[gameId, 'active', mine.mySide, mine.opponentName]],
+          'the games',
+        );
+        same(
+          data.invites.map((invite) => [invite.status, invite.gameId]).sort(),
+          [
+            ['accepted', gameId],
+            ['open', null],
+          ],
+          'the invites',
+        );
+        if (!data.invites.some((invite) => invite.code === open)) {
+          throw new Error('the open invite is not in the copy');
+        }
+        if (JSON.stringify(data).includes(mine.opponentId)) {
+          throw new Error("the copy holds the other player's id");
+        }
+      },
+    },
+    {
+      name: "the copy leaves out the friend's invites",
+      run: async (subject) => {
+        await subject.invitesFor('friend').createInvite(GAME);
+        same((await subject.dataFor('me').exportMyData()).invites, [], 'my invites');
       },
     },
   ];

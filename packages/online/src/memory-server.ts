@@ -27,7 +27,8 @@
  *   deletes the invites they sent, and marks the id deleted. A deleted
  *   id then gets `NOT_SIGNED_IN` where Convex checks that the account
  *   exists (`existingPlayer`): make, accept or decline an invite, and
- *   delete again.
+ *   delete again. `exportMyData()` (#445) gives the copy of `MyData`
+ *   with `makeMyData`, like the Convex `exportMyData`.
  * - Guest names (#400): like the Convex server, a player gets a guest
  *   number when they first make an invite or start a game, and keeps it.
  *   Views, lists and invites carry the names; a deleted player has none.
@@ -86,6 +87,7 @@ import type {
   Invites,
   Matchmaking,
   MatchmakingErrorData,
+  MyData,
   MySeek,
   OnlineData,
   OnlineGameChoice,
@@ -216,6 +218,7 @@ import {
   reportWindowStart,
 } from './safety';
 import { latestGames, summarizeGame } from './summaries';
+import { makeMyData, myDataAccount, myDataGame, myDataInvite, myDataRating } from './my-data';
 import {
   guestGameMove,
   renamePlayerInEvent,
@@ -1225,6 +1228,65 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     if (seeks.delete(playerId)) notifySeeks();
   }
 
+  /**
+   * Download my data (#445), like the Convex `exportMyData`: the same
+   * shape (`makeMyData`), from what this server keeps. It keeps no
+   * accounts, sign-in keys, push tokens or creation times, so those are
+   * `null` or empty here.
+   */
+  async function exportData(playerId: string): Promise<MyData> {
+    await nextTick();
+    if (deletedPlayers.has(playerId)) {
+      const data: GameTransportErrorData = {
+        code: 'NOT_SIGNED_IN',
+        message: 'this account does not exist',
+      };
+      throw data;
+    }
+    const at = now();
+    const seek = seeks.get(playerId);
+    return copy(
+      makeMyData({
+        madeAt: at,
+        account: myDataAccount({
+          saved: isSaved(playerId),
+          createdAt: null,
+          names: nameRecords.get(playerId) ?? null,
+          keys: [],
+        }),
+        rating: myDataRating(ratings.get(playerId) ?? null),
+        friends: [...(friendEdges.get(playerId) ?? new Map<string, number>())].map(
+          ([friendId, since]) => ({
+            name: nameOf(friendId),
+            since,
+            ...recordBetween(playerId, friendId),
+          }),
+        ),
+        games: [...myGames(playerId, 'active'), ...myGames(playerId, 'finished')].map((summary) =>
+          myDataGame(summary, null),
+        ),
+        invites: [...invites.values()]
+          .filter((invite) => invite.from === playerId)
+          .map((invite) => myDataInvite(invite, null, at)),
+        blocks: [...(blocks.get(playerId) ?? new Map<string, number>())].map(
+          ([blockedId, blockedAt]) => ({ name: nameOf(blockedId), blockedAt }),
+        ),
+        reports: reports
+          .filter((report) => report.reporterId === playerId)
+          .map((report) => ({
+            reason: report.reason,
+            username: report.username,
+            reportedAt: report.createdAt,
+          })),
+        pushTokens: [],
+        rankedSearch:
+          seek === undefined
+            ? null
+            : { game: seek.game, status: seek.status, since: seek.createdAt },
+      }),
+    );
+  }
+
   /** The two players met (#320, `checkMet`): a game, or an invite one answered from the other. */
   function met(callerId: string, playerId: string): boolean {
     if (deletedPlayers.has(playerId)) return false;
@@ -2052,7 +2114,10 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
 
     createInvite: makeInvite,
 
-    onlineDataFor: (playerId) => ({ deleteMyData: () => deleteData(playerId) }),
+    onlineDataFor: (playerId) => ({
+      deleteMyData: () => deleteData(playerId),
+      exportMyData: () => exportData(playerId),
+    }),
 
     cancelInvite: cancel,
 

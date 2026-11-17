@@ -26,7 +26,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `packages/online/src/friends.ts` | The pure checks of friends: `planRequest` (the caps, the wait, the order of the checks), `friendStatusOf`, `checkSearchCap`, `newFriendToken`, `recordOf`, `recordAfter`, `recentOpponents` |
 | `packages/contracts/src/friends.ts` | The `Friends` port, the caps, the error codes, `normalizeFriendToken`; contract checks `friendsContract()` in `@tavli/contracts/testing` |
 | `packages/contracts/src/username.ts` | The `Usernames` port, `MyUsername`, the error codes, `TERMS_VERSION`; contract checks `usernamesContract()` in `@tavli/contracts/testing` |
-| `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315) |
+| `apps/server/convex/account.ts` | `deleteMyAccount` ([Delete an account](#delete-an-account)); the app calls it through the `OnlineData` port ([In the app](#in-the-app), #315). The owner's internal `findAccountForOwner` and `deleteAccountForOwner` ([A delete request by email](#a-delete-request-by-email), #447) |
 | `apps/server/convex/appUpdate.ts` | `updatePolicy`: the lowest app build the server works with, from the deployment's env vars ([Update needed](#update-needed), #390). The one public function with no sign-in |
 | `apps/server/convex/model/appUpdate.ts` | The pure part: `appUpdatePolicy(env, platform)` reads the env vars |
 | `packages/contracts/src/app-update.ts` | The `AppUpdates` port, `AppUpdatePolicy` and the in-memory fake |
@@ -500,7 +500,7 @@ Issue #397, ADR-0008. A key is a way to sign in to one account: Apple, or an ema
 - **One owner per key:** Better Auth writes rows one call at a time, and its `account` table has no unique index. So before Better Auth makes an `account` row for a key, `databaseHooks.account.create.before` calls `claimKey` (the `authKeys` table, one mutation): the first user to claim an Apple id owns it, and a later claim by another user fails with `KEY_BELONGS_TO_OTHER`. `/key/remove` calls `releaseKey`, and `deleteMyAccount` calls `deleteKeysOf`, so a deleted account frees its Apple id. A claim with no `account` row behind it is stale after `CLAIM_GRACE_MS` (1 minute; the account write failed, or a remove stopped halfway) and goes to the next user who claims the key, so a failed write never locks an Apple id out. `claimKey` also refuses a user who holds a live claim on another key of the same provider (`PROVIDER_TAKEN`): `/key/save` checks that first, but two saves of two Apple ids on one account at the same moment would both pass that check.
 - **How `/key/save` reads the token:** it runs the provider's `verifyIdToken` option (our `verifyKeyIdToken` in `auth.ts`; Better Auth's own sign-in runs that option before its built-in check), and takes the account id from the provider's `accountSubject` (Apple: `sub`), as Better Auth's sign-in does. Since Better Auth 1.7, `getUserInfo` gives no id. A provider with no `verifyIdToken` option is refused.
 - **Why a token was refused (#462):** the phone only hears `401 INVALID_TOKEN` (or `503 KEY_OFF`), so the server logs the failed check: `apple key refused` with a `reason` (`logKeyRefusal` in `keyPlugin.ts`). The nonce gives `no-nonce`, `nonce-not-ours`, `nonce-expired` or `nonce-used`; the token (`checkAppleIdToken`) gives `bad-token`, `unknown-key`, `keys-unreachable`, `bad-signature`, `wrong-issuer`, `wrong-audience`, `expired`, `too-old`, `bad-time`, `bad-claim`, `token-has-no-nonce`, `nonce-mismatch` or `no-subject`; `/key/save` adds `apple-off`, `no-user-info` and `no-account-id`, `no-session` (with `cookie`: whether the phone sent one at all) when the session check fails, and `save-refused` with the error `code` for every other refusal, also those with no reason of their own (a bad body, `PROVIDER_TAKEN`); both name the key kind (`provider`), since an email save logs there too. A move offer (#403) is no refusal and logs nothing. A `wrong-audience` line also names the token's bundle id (plain id text only). The log never holds the token, the nonce, Apple's id or an email (`authKeys.test.ts` checks). Read it in the Convex dashboard → Logs.
-- **Turned off on purpose:** `/link-social` (it does not check that a key is free) and `/unlink-account` (it does not know the last-key rule), next to `/delete-anonymous-user`. Implicit linking by email is off (`disableImplicitLinking`), and a later sign-in never deletes a guest (`disableDeleteAnonymousUser`): only `deleteMyAccount` deletes. Apple's name and photo are never kept (`mapProfileToUser`); the username comes in #405.
+- **Turned off on purpose:** `/link-social` (it does not check that a key is free) and `/unlink-account` (it does not know the last-key rule), next to `/delete-anonymous-user` and the `/revoke-*` session routes ([Sign out of all phones](#sign-out-of-all-phones-446)). Implicit linking by email is off (`disableImplicitLinking`), and a later sign-in never deletes a guest (`disableDeleteAnonymousUser`): only `deleteMyAccount` deletes. Apple's name and photo are never kept (`mapProfileToUser`); the username comes in #405.
 - **The app** (#401): Sign in with Apple on iPhone, from the sign-in choices ([App shell → Play a friend](app-shell.md#play-a-friend-281)). After `signInWithKey` or `saveKey` the Better Auth adapter sends the sheet's `authorizationCode` to `/key/apple-code` once, best effort, with the bundle id as `clientId` (`appleClientId`, iOS only).
 - **Not yet:** the Apple web flow (Apple on Android) needs a client secret made from the `.p8` key and a callback route: a follow-up issue.
 - **Tests:** `convex/authKeys.test.ts` signs in over HTTP with a fake Apple (`convex/test.apple.ts`): `useFakeApple(await fakeApple())` swaps Apple's keys with `setAppleKeys` and sets the env vars; `stopFakeApple()` in `afterEach`. Tests never reach Apple. `convex/betterAuthClient.test.ts` runs the `authProviderContract()` checks on the [Better Auth adapter](../../packages/adapters/auth-better-auth/README.md) with Better Auth's real client (no Expo plugin): `phoneFetch(t, phone)` sends its requests to convex-test with the app's origin and keeps the cookies, so the client's paths, bodies and error codes are checked against the real routes.
@@ -521,6 +521,17 @@ Issue #403, ADR-0008. A guest saves with an Apple ID whose account exists alread
 - **The port:** `AuthErrorData.move` (`GuestMoveOffer`) and `AuthProvider.moveGuest(offer)`, which signs in to the account. The in-memory provider takes the in-memory server's `guestMoveCounts` and `moveGuest` (`createMemoryAuthProvider(store, guestMoves)`).
 - **Tests:** `convex/guestMove.test.ts` (games stay playable, the guest is gone, pages, refusals, the account deleted halfway), `convex/model/moveTicket.test.ts`, `packages/online/src/guest-move.test.ts`, and the contract checks on the real routes (`convex/betterAuthClient.test.ts`).
 
+### Sign out of all phones (#446)
+
+A saved account ends its sessions on every phone at once, for a lost phone (Settings → Account → **Sign out of all phones**).
+
+- **The route:** our `POST /sign-out-everywhere` (`keyPlugin.ts`, the session from the table: `sensitiveSessionMiddleware`). A guest gets `400 GUEST`: with no key it could never sign in again, and the app shows a guest no Sign out. With no session: `401`.
+- **What it does:** `endSessionsOf` (`account.ts`), one internal mutation: Better Auth's `internalAdapter.deleteUserSessions` (every session of the user, this phone's too), then every `pushTokens` row of the user, so no other phone gets a "your turn" or a friend invite push. Then the route clears this phone's cookie. The account, its keys, games, invites, name and rating stay. Nothing is logged.
+- **Better Auth's own routes are off** (`DISABLED_PATHS` in `auth.ts`): `/revoke-sessions`, `/revoke-other-sessions` and `/revoke-session` keep the push tokens and let a guest end its own account.
+- **The other phones:** their next `/convex/token` gets `401`, and the adapter signs them out (`set(null)`). A Convex token they hold still works until it runs out (`jwtExpirationSeconds`, 15 minutes by default in `@convex-dev/better-auth`): for that time they can still read their lists and play their games (`signedInPlayer`), but no call that saves the id in a new row works: `existingPlayer` also checks that the token's session (`sessionId`) still exists (`NOT_SIGNED_IN`). So such a phone cannot add a push token back. A test identity with no `sessionId` skips that check.
+- **The port:** `AuthProvider.signOutEverywhere()`; the app runs it as the `before` step of `signOutOfOnline`, so this phone's push token comes off first ([App shell → Settings → Account](app-shell.md#settings--account-402)).
+- **Tests:** `convex/signOutEverywhere.test.ts` (two phones, push tokens, a guest, no session, the Better Auth routes off), the contract checks and a two-phone check on the real client (`convex/betterAuthClient.test.ts`).
+
 ### Apple tokens and the revoke
 
 Issue #398. Apple asks an app with Sign in with Apple to revoke the person's token when they delete their account in the app.
@@ -538,7 +549,7 @@ Every public function in `games.ts`, `invites.ts`, `push.ts` and `account.ts` ge
 - **The player id is `identity.subject`.** It is the Better Auth user id (the token's `sub`). It stays the same for a user across sessions and token refreshes. We do not use `tokenIdentifier` (issuer + subject): the issuer is the site URL, and a new site URL (a custom domain) would change every player id. There is one issuer. If a second one is ever added, move to `tokenIdentifier` and migrate the stored ids.
 - **No identity:** `NOT_SIGNED_IN`. The code is in both `GAME_TRANSPORT_ERROR_CODES` and `INVITE_ERROR_CODES`, so every call can throw it.
 - **A subject no player may have** (empty, or `server`, the log's `SERVER_ACTOR`): `BAD_REQUEST`.
-- **A deleted account** (#306): a token stays valid until it expires (15 minutes), also after `deleteMyAccount` deleted its user. The calls that save the caller's id in a row use `existingPlayer(ctx)`: `signedInPlayer`, then a read of the Better Auth user (`authComponent.getAnyUserById`). No user: `NOT_SIGNED_IN`. These calls are `createInvite`, `acceptInvite`, `declineInvite`, `registerPushToken` and `deleteMyAccount`. A new call that saves the caller's id must use it too.
+- **A deleted account** (#306): a token stays valid until it expires (15 minutes), also after `deleteMyAccount` deleted its user. The calls that save the caller's id in a row use `existingPlayer(ctx)`: `signedInPlayer`, then a read of the Better Auth user (`authComponent.getAnyUserById`). No user: `NOT_SIGNED_IN`. A token whose session ended (Sign out of all phones, #446) gets `NOT_SIGNED_IN` there too: `existingPlayer` also reads the token's `sessionId` session. These calls are `createInvite`, `acceptInvite`, `declineInvite`, `registerPushToken` and `deleteMyAccount`. A new call that saves the caller's id must use it too.
   - **Cost:** one read of the component per call (a lookup by id). Only these calls pay it, and they are rare (an invite, an answer, a phone's token).
   - **Why not in every call:** queries run again on each change, and game calls are the busy ones; both would pay the read. They do not need it: after a delete the caller has no active game (each one was resigned), so a game call can only fail, and queries save nothing. It would also make every test use real Better Auth users.
   - **Tests:** a test that calls one of these functions signs in as a real Better Auth user. `authUsers(t, count)` in `convex/test.setup.ts` makes them (with `betterAuthTest.register(t)`); a made-up subject such as `'alice'` gets `NOT_SIGNED_IN` there.
@@ -790,6 +801,15 @@ Issue #309. For a moment after the call, a game of the deleted player can still 
 
 The pure part, what happens to each game (`gameOnDelete`: `resign`, `keep` or `skip`), is in `convex/model/account.ts`.
 
+### A delete request by email
+
+Issue #447. The delete pages (`tavlaki.com/delete/`, for Google Play) promise a delete by email to `support@tavlaki.com`. The owner has two internal functions in `convex/account.ts`, run from the Convex dashboard; no client can call them:
+
+- `findAccountForOwner({ username })` or `({ guestName })`: the accounts with that username (by `usernameKey`, the uniqueness key, through `by_username_key`) or that guest number ("Guest 4821", "Επισκέπτης 4821" or "4821", through `by_guest_number`; not unique, so up to `OWNER_LOOKUP_LIMIT` (50) accounts). It returns only `{ userId, saved }` for each, and skips a name row whose Better Auth user is gone.
+- `deleteAccountForOwner({ userId })`: checks the Better Auth user exists (else it throws and deletes nothing), then runs `deleteAccountOf`, the same steps and pages as `deleteMyAccount`.
+
+A guest number fits many accounts: the owner deletes one only when the email's other details (an invite code, the sign-in email) point to it. See "Delete my account" in [`docs/legal/README.md`](../legal/README.md#delete-my-account-315-402) for the steps.
+
 ### In the app
 
 Issue #315, then #402. Settings → Account says **Delete my account** (a guest: **Delete my guest account**, [App shell](app-shell.md#settings--account-402)). The port is `OnlineData` (`packages/contracts/src/online-data.ts`, one call: `deleteMyData()`; contract checks `onlineDataContract` in `@tavli/contracts/testing`). On Convex it is `createConvexOnlineData` (`@tavli/backend-convex`, `src/onlineData.ts`): it calls `deleteMyAccount`, named in `ACCOUNT_FUNCTIONS` (`src/functions.ts`). `convex/convexOnlineData.test.ts` checks that name against `api` and runs the contract checks through the adapter on the real function. The in-memory server has `onlineDataFor(playerId)` with the same steps (resign, cancel the open invites, forget the player) for the app's Jest tests and dev games.
@@ -811,6 +831,32 @@ Both delete routes are **off**, so no client can delete a user without steps 2�
 
 - No sign-in, or no Better Auth user for the token: `NOT_SIGNED_IN`.
 - After the delete, the old token is valid for up to 15 more minutes. The calls that save the caller's id (`createInvite`, `acceptInvite`, `declineInvite`, `registerPushToken`) check the user (`existingPlayer`) and get `NOT_SIGNED_IN` (#306), so no row is saved under the deleted id. The other calls still pass `signedInPlayer`, but save nothing: once the game pages ran, the caller has no active game and no invite that is still open (see [Games after the call](#games-after-the-call)). See [Who calls](#who-calls).
+
+## Download my data
+
+Issue #445 (GDPR access and portability). The public action `exportMyData` in `convex/myData.ts` gives the signed-in caller a copy of what this server keeps about them, as plain JSON (`MyData`, `packages/contracts/src/my-data.ts`, `format: 'tavlaki-my-data'`, `version: 1`). It takes no arguments: the caller comes from `signedInPlayer(ctx)`, and a token whose Better Auth user is gone gets `NOT_SIGNED_IN`. The app shares it from Settings → Account → **Download my data** ([App shell](app-shell.md#settings--account-402)).
+
+### What it holds
+
+- **account:** `guest` or `saved`, when it was made, the guest number, the username and when it last changed, the sign-in keys (the kind and when it was added; an email key also has its address, which Account shows the caller too), the terms version and when it was accepted, when the age check was answered.
+- **rating** (the `ratings` row, or `null`), **rankedSearch** (the `seeks` row, or `null`).
+- **friends:** each friend's name as the caller sees it, since when, and the wins and losses between the two.
+- **games:** every game of the caller, active and finished: id, status, game choice, preset, target, turn time, ranked, the caller's side, the score, the winner, when it started and last changed, and the other player's name as the caller sees it (`playerNamesSeenBy`, so a blocked player is `null`). No moves: the log of a long match is large, and the game id leads to it if a player asks us.
+- **invites** the caller sent: code, choice, target, turn time, status (`inviteStatus`), whether it went to a friend, the times and the game id.
+- **blocks** and **reports** the caller made: the name as the caller sees it (a report: the username at that time and the reason) and the time.
+- **pushTokens:** only the platform and the time. Never the token.
+
+Never another player's id, a token, a code, a hash or a secret. Every list is newest first, and every missing value is `null`. Left out on purpose: friend requests, the friend link token and the friend search times (working data of the Friends screens, not a record about the player), the Apple tokens, the email code rows and the sessions.
+
+### How it reads
+
+An action, so it can read the tables with no cap in pages: the capped parts (account, keys, name row, rating, friends, blocks, push tokens, seek) are one internal query, `exportHead`; games (`exportGamesPage`, `MY_DATA_GAMES_PAGE` = 50 per page, `by_white` then `by_black`), invites (`exportInvitesPage`) and reports (`exportReportsPage`, both `MY_DATA_ROWS_PAGE` = 200) are paged internal queries. The pages run one after another, so a game that changes during the copy may show either state. The shape and the order come from `makeMyData` and its helpers in `@tavli/online` (`my-data.ts`), which the in-memory server's `onlineDataFor(id).exportMyData()` runs too.
+
+**A new table or field that holds a player's data goes in the copy too**, next to `deleteAccountOf` and the guest move.
+
+### The port
+
+`OnlineData.exportMyData()` (contracts). On Convex: `createConvexOnlineData` calls the action named in `MY_DATA_FUNCTIONS` (`backend-convex/src/functions.ts`); `convex/convexOnlineData.test.ts` checks the name and types against `api` and runs `onlineDataContract` through the adapter. Server tests: `convex/myData.test.ts` (the contents with no other ids, an expired invite, paging past one page, `NOT_SIGNED_IN`).
 
 ## Update needed
 

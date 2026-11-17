@@ -33,6 +33,7 @@ import type * as model_emailCode from "../model/emailCode.js";
 import type * as model_keyNonce from "../model/keyNonce.js";
 import type * as model_moveTicket from "../model/moveTicket.js";
 import type * as model_push from "../model/push.js";
+import type * as myData from "../myData.js";
 import type * as playerNames from "../playerNames.js";
 import type * as push from "../push.js";
 import type * as ratings from "../ratings.js";
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   "model/keyNonce": typeof model_keyNonce;
   "model/moveTicket": typeof model_moveTicket;
   "model/push": typeof model_push;
+  myData: typeof myData;
   playerNames: typeof playerNames;
   push: typeof push;
   ratings: typeof ratings;

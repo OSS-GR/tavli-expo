@@ -361,6 +361,11 @@ The engine check is `isRace` (`packages/engine/src/race.ts`).
 38. Play ranked, match to 2: the second time out in a row gives the other
     player the second point → the match ends on points, not as a resigned
     match.
+39. Doubles 6-6 with the last two checkers on point 6: the player bears off
+    both and the game is over. The two moves of 6 left are not lost: a turn
+    that ends the game loses no dice (the app shows no slash and no note).
+    The same holds for 6-5 with the last checker on point 1: the 6 bears it
+    off, and the 5 is not lost.
 
 ## House-rule variants (flags)
 

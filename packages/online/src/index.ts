@@ -191,6 +191,7 @@ export {
   type GuestGameMove,
 } from './guest-move';
 export { latestGames, newestFirst, summarizeGame } from './summaries';
+export { makeMyData, myDataAccount, myDataGame, myDataInvite, myDataRating } from './my-data';
 export type { SummaryInput } from './summaries';
 export { createMemoryGameServer } from './memory-server';
 export type {

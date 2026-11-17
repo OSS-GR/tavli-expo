@@ -31,15 +31,22 @@
  * second call gets `NOT_SIGNED_IN`, and so do the calls that make rows
  * under the caller's id. See "Delete an account" in
  * `docs/architecture/online-game-service.md`.
+ *
+ * A delete request by email (#447) uses the owner's internal tools, run
+ * from the Convex dashboard: `findAccountForOwner` (the user id from a
+ * username or a guest name) and `deleteAccountForOwner` (the same steps
+ * for that id). Never make them public.
  */
 
 import { v } from 'convex/values';
 
+import { usernameKey } from '@tavli/online';
+
 import { internal } from './_generated/api';
-import { internalMutation, mutation } from './_generated/server';
+import { internalMutation, internalQuery, mutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { revokeAppleTokensOf } from './appleTokens';
-import { createAuth } from './auth';
+import { authComponent, createAuth } from './auth';
 import { deleteKeysOf } from './authKeys';
 import { existingPlayer } from './caller';
 import { deleteFriendsOf } from './friends';
@@ -109,8 +116,82 @@ export const deleteMyAccount = mutation({
 });
 
 /**
+ * The owner's tool for a delete request by email (#447): runs the same
+ * steps as `deleteMyAccount` (`deleteAccountOf`, with the same pages
+ * after the call) for `userId`. Internal: run it from the Convex
+ * dashboard (Functions → `account:deleteAccountForOwner` → Run). Find the
+ * id first with `findAccountForOwner`. Throws when the account does not
+ * exist (a second run, or a wrong id), and deletes nothing then.
+ */
+export const deleteAccountForOwner = internalMutation({
+  args: { userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { userId }) => {
+    if ((await authComponent.getAnyUserById(ctx, userId)) === null) {
+      throw new Error('no account has this user id');
+    }
+    await deleteAccountOf(ctx, userId);
+    return null;
+  },
+});
+
+/** At most this many accounts from one guest number lookup (#447). */
+export const OWNER_LOOKUP_LIMIT = 50;
+
+/**
+ * The four digits of a guest name as the person writes it: "Guest 4821",
+ * "Επισκέπτης 4821" or "4821". `null` when there are not exactly four.
+ */
+export function guestNumberIn(text: string): string | null {
+  const digits = text.match(/\d+/g) ?? [];
+  const only = digits.length === 1 ? digits[0] : undefined;
+  return only !== undefined && /^[1-9]\d{3}$/.test(only) ? only : null;
+}
+
+/**
+ * The owner's lookup for a delete request by email (#447): the accounts
+ * with this `username` (the same key as the uniqueness check, so case,
+ * accents and look-alikes match) or this guest name (not unique: up to
+ * `OWNER_LOOKUP_LIMIT` accounts). Give exactly one. Returns only each
+ * user id and whether the account is saved (not a guest), nothing else.
+ * Internal: run it from the Convex dashboard. Never log what it returns.
+ */
+export const findAccountForOwner = internalQuery({
+  args: { username: v.optional(v.string()), guestName: v.optional(v.string()) },
+  returns: v.array(v.object({ userId: v.string(), saved: v.boolean() })),
+  handler: async (ctx, { username, guestName }) => {
+    if ((username === undefined) === (guestName === undefined)) {
+      throw new Error('give a username or a guest name, not both');
+    }
+    let rows;
+    if (username !== undefined) {
+      const key = usernameKey(username);
+      rows = await ctx.db
+        .query('playerNames')
+        .withIndex('by_username_key', (q) => q.eq('usernameKey', key))
+        .take(OWNER_LOOKUP_LIMIT);
+    } else {
+      const number = guestNumberIn(guestName ?? '');
+      if (number === null) throw new Error('a guest name has four digits, like "Guest 4821"');
+      rows = await ctx.db
+        .query('playerNames')
+        .withIndex('by_guest_number', (q) => q.eq('guestNumber', number))
+        .take(OWNER_LOOKUP_LIMIT);
+    }
+    const found: { userId: string; saved: boolean }[] = [];
+    for (const row of rows) {
+      const user = await authComponent.getAnyUserById(ctx, row.playerId);
+      if (user === null) continue;
+      found.push({ userId: row.playerId, saved: user.isAnonymous !== true });
+    }
+    return found;
+  },
+});
+
+/**
  * The steps of `deleteMyAccount` for `callerId`, a user who exists. Also
- * run when Apple says the person's last key ended (`endAppleKey`).
+ * run when Apple says the person's last key ended (`endAppleKey`) and by
+ * the owner's `deleteAccountForOwner` (#447).
  */
 export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promise<void> {
   // Finished games stay as they are (`keep`); only active ones change.
@@ -230,6 +311,41 @@ export const deleteSentInvites = internalMutation({
     if (page.length === INVITE_DELETE_PAGE) {
       await ctx.scheduler.runAfter(0, internal.account.deleteSentInvites, { from });
     }
+    return null;
+  },
+});
+
+/**
+ * Sign out of all phones (#446): ends every session of `userId` and
+ * deletes every push token of it, in one transaction. Called only by the
+ * `/sign-out-everywhere` route (`keyPlugin.ts`), which checks the session
+ * and refuses a guest.
+ *
+ * The sessions go first, with Better Auth's own delete
+ * (`internalAdapter.deleteUserSessions`), then the push tokens, so no
+ * other phone gets a "your turn" push from now on. Both are in the same
+ * transaction, so a phone cannot add a token in between; after it,
+ * `registerPushToken` refuses a token whose session is gone
+ * (`existingPlayer`). The account, its keys, games and invites stay.
+ *
+ * Another phone's Convex token still works until it expires (15
+ * minutes): it can still read its lists and play its games, but it
+ * cannot make a row under the player's id (`existingPlayer`), and it
+ * gets no new token. See "Sign out of all phones" in
+ * `docs/architecture/online-game-service.md`.
+ */
+export const endSessionsOf = internalMutation({
+  args: { userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { userId }) => {
+    const { internalAdapter } = await createAuth(ctx).$context;
+    await internalAdapter.deleteUserSessions(userId);
+    // `MAX_PUSH_TOKENS_PER_PLAYER` caps them, so `.collect()` is fine.
+    const tokens = await ctx.db
+      .query('pushTokens')
+      .withIndex('by_player', (q) => q.eq('playerId', userId))
+      .collect();
+    for (const token of tokens) await ctx.db.delete(token._id);
     return null;
   },
 });

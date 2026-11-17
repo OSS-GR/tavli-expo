@@ -2018,27 +2018,30 @@ export function GameScreen({
   const hideBoard = card !== null;
   // "All dice used" shows only on the first few turns (#575). A turn under
   // the menu or the game-end sheet does not count.
-  // A die you cannot play (#579) gets its own note in place of "All dice
-  // used", with the reason, on the first few turns of each reason.
+  // A die lost to the higher die rule (#579) gets its own note in place of
+  // "All dice used", with the reason, on the first few turns. A blocked die
+  // or the rest of a double gets no note (#596): the slashed die says it,
+  // and "All dice used" shows as on any other turn that can be confirmed.
   const lost = view.lost;
   const lostRoll = view.game.state.dice;
   const noteFree = !blocked && !othersTurn && !hideScreen;
+  const noted = lost !== null && lost.reason === 'higherDie' ? lost : null;
   const confirmHint = useConfirmHint(
-    view.canConfirm && lost === null && noteFree,
+    view.canConfirm && noted === null && noteFree,
     `${matchKey}:${turnKey}`,
   );
   const lostHint = useTurnNote(
-    lost === null ? null : `lost.${lost.reason}`,
-    lost !== null && noteFree,
+    noted === null ? null : 'lost.higherDie',
+    noted !== null && noteFree,
     `${matchKey}:${turnKey}`,
   );
   const lostNote =
-    lostHint && lost !== null && lostRoll !== null
+    lostHint && noted !== null && lostRoll !== null
       ? {
           line: view.canConfirm
-            ? t('game.lostNote.confirm', { lost: lostLine(t, lost) })
-            : lostLine(t, lost),
-          reason: lostReason(t, lost, lostRoll),
+            ? t('game.lostNote.confirm', { lost: lostLine(t, noted) })
+            : lostLine(t, noted),
+          reason: lostReason(t, noted, lostRoll),
         }
       : null;
   // "Doubles!" for a moment after the split. Another note over the board wins.

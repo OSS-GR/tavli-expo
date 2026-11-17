@@ -217,6 +217,10 @@ const onlineData: OnlineData = {
     const user = auth.currentUser();
     return user === null ? notSignedIn() : server.onlineDataFor(user.id).deleteMyData();
   },
+  exportMyData() {
+    const user = auth.currentUser();
+    return user === null ? notSignedIn() : server.onlineDataFor(user.id).exportMyData();
+  },
 };
 
 /** Usernames on the server, as the user signed in to `auth` at that moment. */
