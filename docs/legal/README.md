@@ -15,7 +15,7 @@
 | [site/img/](site/img/) | The homepage pictures: the hero board and one board per game (`game-*.webp`), all renders of the app's own board (`BoardScene`, headless, as in `apps/mobile/tools/screenshots/`), and the app icon. Also `site/favicon.png` and `site/apple-touch-icon.png` |
 | [site/support/index.html](site/support/index.html) | Support Tavlaki (#590), served at `https://tavlaki.com/support/`: the app's Support screen opens it (`supportPageUrl`, `apps/mobile/src/features/support/links.ts`). Ko-fi's own button image links `https://ko-fi.com/orestisstefanis` |
 | [site/el/support/index.html](site/el/support/index.html) | The Greek Support page, served at `https://tavlaki.com/el/support/`. Ko-fi's button has English text, so this page has our own button with Ko-fi's cup. Copy every other change from the English page |
-| [site/img/kofi/](site/img/kofi/) | Ko-fi's brand assets (the "Support me on Ko-fi" button, beige and dark, and the cup symbol), from Ko-fi's brand kit. Use them as Ko-fi gives them: never recolor or crop them. They are used only on the website, never in the app (App Review) |
+| [site/img/kofi/](site/img/kofi/) | Ko-fi's brand assets (the "Support me on Ko-fi" button in beige, and the cup symbol), from Ko-fi's brand kit. Use them as Ko-fi gives them: never recolor or crop them. They are used only on the website, never in the app (App Review) |
 | [site/privacy/index.html](site/privacy/index.html) | English static page, served at `https://tavlaki.com/privacy` |
 | [site/el/privacy/index.html](site/el/privacy/index.html) | Greek static page, served at `https://tavlaki.com/el/privacy` |
 | [terms.md](terms.md) | English terms of use (#405). **Source of truth.** A draft for the lawyer check. |

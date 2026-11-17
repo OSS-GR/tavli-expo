@@ -54,7 +54,6 @@ describe('the Support pages on tavlaki.com (#590)', () => {
       [...page.matchAll(/(?:src|srcset)="([^"]+)"/g)].map(([, src]) => src ?? ''),
     );
     expect(images.filter((src) => src.includes('kofi'))).toEqual([
-      '/img/kofi/support_me_on_kofi_dark.png',
       '/img/kofi/support_me_on_kofi_beige.png',
       '/img/kofi/kofi_symbol.svg',
     ]);
