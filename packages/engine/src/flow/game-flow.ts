@@ -484,6 +484,10 @@ export function remainingDice(flow: GameFlow): readonly DieValue[] {
  * can show them as lost. Empty outside `moving` and `awaiting-confirm`.
  *
  * - Once the turn is complete (`awaiting-confirm`), every die left is lost.
+ * - A turn that ends the game loses nothing (#596, tavli-match.md #39): the
+ *   dice left after the last checker is off are not lost, the game is
+ *   simply over. While moving, no die is lost when some legal play of this
+ *   roll ends the game.
  * - While moving, a die is lost when no legal play of this roll uses it
  *   (the "use as much of the roll as possible" rules): a double with only
  *   two legal moves loses two dice, and 6-5 where only the 6 may be played
@@ -499,21 +503,33 @@ export function remainingDice(flow: GameFlow): readonly DieValue[] {
 export function lostDice(flow: GameFlow, ctx: FlowContext = {}): readonly DieValue[] {
   const left = remainingDice(flow);
   if (left.length === 0) return [];
-  if (flow.phase === 'awaiting-confirm') return left;
   const dice = flow.state.dice;
   if (dice === null) return [];
+  const variant = variantOf(flow, ctx);
+  if (flow.phase === 'awaiting-confirm') {
+    return endsGame(flow.state, variant, flow.played) ? [] : left;
+  }
   const all = diceMoves(dice);
   let lost: DieValue[] | null = null;
-  for (const turn of variantOf(flow, ctx).legalTurns(flow.state, dice)) {
+  for (const turn of variant.legalTurns(flow.state, dice)) {
     const unused = [...all];
     for (const move of turn.moves) {
       const i = unused.indexOf(move.die);
       if (i >= 0) unused.splice(i, 1);
     }
+    // Only a play that leaves dice can end the game early: check those.
+    if (unused.length > 0 && endsGame(flow.state, variant, turn.moves)) return [];
     lost = lost === null ? unused : common(lost, unused);
     if (lost.length === 0) return [];
   }
   return common(lost ?? [], left);
+}
+
+/** True when playing `moves` as the whole turn ends the game. */
+function endsGame(state: GameState, variant: Variant, moves: readonly Move[]): boolean {
+  if (state.dice === null) return false;
+  const next = variant.applyTurn(state, { player: state.toMove, dice: state.dice, moves });
+  return variant.result(next) !== null;
 }
 
 /** Why dice are lost (#579): the app names the reason under the board. */

@@ -240,7 +240,15 @@ export function turnView(flow: MatchFlow): TurnView {
     toMove: game.state.toMove,
     board,
     legal: legalNextMoves(game),
-    dice: rolled ? diceView(roll, remainingDice(game), lost?.dice) : [],
+    // A complete turn that ends the game loses no dice (#596): the dice left
+    // are drawn spent, with no slash, so the label says "0 left to play".
+    dice: rolled
+      ? diceView(
+          roll,
+          game.phase === 'awaiting-confirm' ? (lost?.dice ?? []) : remainingDice(game),
+          lost?.dice,
+        )
+      : [],
     canConfirm: canConfirm(game),
     canUndo: canUndo(game),
     lost,

@@ -11,11 +11,12 @@
  * Screen readers lose nothing: the dice label says "0 left to play" and
  * Confirm is enabled. The note itself was never announced.
  *
- * The note for a die you cannot play (#579) works the same way, with its
- * own count per reason (`lostDiceNote.<reason>`): a player who learnt the
- * higher die rule still gets the first notes of a blocked die.
+ * The note for a die lost to the higher die rule (#579) works the same
+ * way, with its own count (`lostDiceNote.higherDie`). A blocked die or the
+ * rest of a double has no note (#596): the slashed die says it. Older
+ * builds also saved `lostDiceNote.blocked` and `lostDiceNote.double`;
+ * nothing reads them now.
  */
-import type { LostDiceReason } from '@tavli/engine';
 import { useEffect } from 'react';
 import { createStore, useStore } from 'zustand';
 
@@ -26,10 +27,10 @@ export const CONFIRM_HINT_KEY = 'confirmHintTurns';
 /** Turns that show each note. */
 export const CONFIRM_HINT_TURNS = 3;
 
-/** The notes that count their turns: "All dice used", and one per lost-die reason. */
-export type TurnNote = 'confirm' | `lost.${LostDiceReason}`;
+/** The notes that count their turns: "All dice used", and the higher die rule. */
+export type TurnNote = 'confirm' | 'lost.higherDie';
 
-const NOTES: readonly TurnNote[] = ['confirm', 'lost.higherDie', 'lost.blocked', 'lost.double'];
+const NOTES: readonly TurnNote[] = ['confirm', 'lost.higherDie'];
 
 /** The storage key of a note's count. */
 export function turnNoteKey(note: TurnNote): string {
