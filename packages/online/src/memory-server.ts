@@ -203,7 +203,7 @@ import {
   toView,
 } from './online-game';
 import type { LoadedFlow, SavedDraft, SteppedFlow } from './online-game';
-import { gameRecordLog } from './game-record';
+import { checkRecordCall, gameRecordLog } from './game-record';
 import { nameFrom, namesOf, pickGuestNumber } from './names';
 import type { NameRecord } from './names';
 import { myUsernameOf, planUsername, usernameKey } from './usernames';
@@ -927,6 +927,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           if (game === null) throw new OnlineGameError('NOT_FOUND', 'no such game');
           const side = sideOf(game.players, playerId);
           if (side === null) throw new OnlineGameError('NOT_A_PLAYER', 'not a player');
+          // A game not over is refused before the log is read.
+          checkRecordCall(gameNumber, loadFlow(game.flow));
           // Rows are JSON text, so the record is a copy.
           const events = game.events.map((row) => (JSON.parse(row) as LoggedEvent).event);
           const log = gameRecordLog(events, gameNumber, game.status === 'finished');
