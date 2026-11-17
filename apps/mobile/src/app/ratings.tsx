@@ -6,15 +6,17 @@ import { Redirect, router } from 'expo-router';
 
 import { useVisit } from '@/features/friends/useVisit';
 import { RatingsScreen } from '@/features/ratings/RatingsScreen';
-import { auth, ratings } from '@/services';
+import { auth, ratings, usernames } from '@/services';
 
 export default function RatingsRoute() {
   // Counts the times the screen shows, so it loads again on the way back.
   const visit = useVisit();
-  if (auth === undefined || ratings === undefined) return <Redirect href="/settings" />;
+  if (auth === undefined || ratings === undefined || usernames === undefined)
+    return <Redirect href="/settings" />;
   return (
     <RatingsScreen
       auth={auth}
+      usernames={usernames}
       ratings={ratings}
       visit={visit}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/settings'))}

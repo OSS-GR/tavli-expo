@@ -4,6 +4,7 @@
  * both use them.
  */
 
+import { TERMS_VERSION } from '@tavli/contracts';
 import type { OnlineGameView } from '@tavli/contracts';
 import { VARIANT_REGISTRY, createBoard, getPreset, getVariant, plakoto } from '@tavli/engine';
 import type { GameFlow, GameState, MatchFlow, MoveInput, PlayerId, Rng } from '@tavli/engine';
@@ -232,4 +233,20 @@ export function guestNumberOf(server: MemoryGameServer, playerId: string): strin
   const name = server.nameOf(playerId);
   if (name?.kind !== 'guest') throw new Error(`${playerId} has no guest name`);
   return name.number;
+}
+
+/**
+ * Marks `playerId` saved on `server` and gives them a username (`name`,
+ * default `U_<id>`), with the terms and the age box. Friends and Play
+ * ranked need both (#599). Resolves once the name is set.
+ */
+export async function markNamed(
+  server: MemoryGameServer,
+  playerId: string,
+  name = `U_${playerId}`,
+): Promise<void> {
+  server.markSaved(playerId);
+  await server
+    .usernamesFor(playerId, true)
+    .setMine({ name, acceptTerms: TERMS_VERSION, ageChecked: true });
 }

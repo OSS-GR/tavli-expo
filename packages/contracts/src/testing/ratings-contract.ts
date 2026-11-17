@@ -286,6 +286,9 @@ export function ratingsContract(): readonly RatingsContractCheck[] {
     {
       name: 'shows the caller and their rated friends on the friends board, best first',
       run: async (subject) => {
+        // Friend calls need a username (#599).
+        await setUsername(subject, 'alice', 'AliceFriend');
+        await setUsername(subject, 'bob', 'BobFriend');
         const token = await subject.friendsFor('bob').myFriendLink();
         await subject.friendsFor('alice').requestByLink(token);
         await subject.friendsFor('bob').acceptRequest(subject.idOf('alice'));

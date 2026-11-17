@@ -49,6 +49,7 @@ import type {
   NewInvite,
   Ratings,
   Safety,
+  Usernames,
 } from '@tavli/contracts';
 import { fonts } from '@tavli/ui';
 import { useLocales } from 'expo-localization';
@@ -96,6 +97,8 @@ export interface FriendsScreenProps {
   /** Counts the times the screen shows (the route): each new one loads again. */
   visit?: number;
   auth: AuthProvider;
+  /** Saves a username at the username gate (#599). */
+  usernames: Usernames;
   friends: Friends;
   /** Report or block. `undefined`: the friend sheet has no such row. */
   safety?: Safety;
@@ -134,6 +137,7 @@ let problemCount = 0;
 
 export function FriendsScreen({
   auth,
+  usernames,
   friends,
   safety,
   ratings,
@@ -157,7 +161,7 @@ export function FriendsScreen({
     ]);
     return { friends: list, requests, invites: invites.filter((i) => i.status === 'open') };
   }, [friends]);
-  const { state, reload, retry, sessionLost } = useFriendsData(auth, load, visit);
+  const { state, reload, retry, sessionLost } = useFriendsData(auth, load, visit, usernames);
   // The player whose call is on its way.
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
@@ -294,7 +298,15 @@ export function FriendsScreen({
 
   let body: ReactNode;
   if (state.kind !== 'ready') {
-    body = <NotReady state={state} onRetry={retry} onAccount={onAccount} testID="friends" />;
+    body = (
+      <NotReady
+        state={state}
+        onRetry={retry}
+        onAccount={onAccount}
+        usernames={usernames}
+        testID="friends"
+      />
+    );
   } else {
     const { invites, requests, friends: list } = state.data;
     body = !listShown ? (

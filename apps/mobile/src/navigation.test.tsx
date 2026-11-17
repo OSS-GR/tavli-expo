@@ -3,6 +3,7 @@
  * board → menu → Home. (Tests must not live in `src/app`: every file there
  * is a route.)
  */
+import { markNamed } from '@tavli/online/testing';
 import {
   INVITE_TIME_MS,
   memoryAppleIdToken,
@@ -1574,6 +1575,8 @@ describe('online matches in History (#313)', () => {
 describe('friends (#406)', () => {
   it('Settings → Friends → Add a friend shows my friend link', async () => {
     onlineFake.authStore.session = { id: 'me', isGuest: false };
+    // Friends need a username (#599).
+    await markNamed(onlineFake.server(), 'me');
     rememberOnlineAccount();
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/settings' });
@@ -1587,17 +1590,17 @@ describe('friends (#406)', () => {
     );
   });
 
-  /** Me (saved) and `id` become friends, with names from a game. */
+  /** Me (saved) and `id` become friends, each with a username (#599). */
   async function befriendMe(id: string): Promise<string> {
     onlineFake.authStore.session = { id: 'me', isGuest: false };
     rememberOnlineAccount();
     const server = onlineFake.server();
-    server.markSaved('me');
-    server.markSaved(id);
+    await markNamed(server, 'me');
+    await markNamed(server, id);
     server.createGame('me', { white: 'me', black: id }, 'portes', 3, null);
     await server.friendsFor(id).sendRequest('me');
     await server.friendsFor('me').acceptRequest(id);
-    return `Guest ${onlineFake.guestNumber(id)}`;
+    return `U_${id}`;
   }
 
   it('Friends → Invite → Send sends the last setup and stays on Friends (#488, #507)', async () => {
@@ -1647,7 +1650,8 @@ describe('friends (#406)', () => {
 
   it('a friend link opens its screen', async () => {
     const server = onlineFake.server();
-    server.markSaved('ann');
+    await markNamed(server, 'ann');
+    await markNamed(server, 'me');
     const token = await server.friendsFor('ann').myFriendLink();
     onlineFake.authStore.session = { id: 'me', isGuest: false };
     await renderRouter('./src/app', { initialUrl: `/add/${token.toLowerCase()}` });
@@ -1658,6 +1662,7 @@ describe('friends (#406)', () => {
 describe('leaderboards (#407)', () => {
   it('Settings → Leaderboards shows my rating; Friends opens it too', async () => {
     onlineFake.authStore.session = { id: 'me', isGuest: false };
+    await markNamed(onlineFake.server(), 'me');
     rememberOnlineAccount();
     const user = setupUser();
     const router = await renderRouter('./src/app', { initialUrl: '/settings' });
@@ -1677,7 +1682,7 @@ describe("Home's tile news (#517)", () => {
     rememberOnlineAccount();
     const server = onlineFake.server();
     server.markSaved('me');
-    server.markSaved('p2');
+    await markNamed(server, 'p2');
     // A rated match: p2 resigns, so I win.
     const gameId = server.createGame('me', { white: 'me', black: 'p2' }, 'portes', 3, null);
     await server.transportFor('p2').resign(gameId);
@@ -1732,7 +1737,7 @@ describe('play ranked (#532)', () => {
     rememberOnlineAccount();
     await usernames!.setMine({ name: 'Maria', acceptTerms: TERMS_VERSION, ageChecked: true });
     const server = onlineFake.server();
-    server.markSaved('nikos');
+    await markNamed(server, 'nikos');
     await server.matchmakingFor('nikos').seek({ game: 'portes' });
 
     const user = setupUser();

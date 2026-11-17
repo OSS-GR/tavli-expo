@@ -8,11 +8,20 @@
  *   button to save the account: friends need a saved account.
  * - A link that does not work (a wrong or reset token, a deleted
  *   account, or a block) reads the same.
+ * - A saved account with no username sees the username gate in place of
+ *   Ask (#599): the server answers `USERNAME_NEEDED` to the ask.
  * - Focus moves to the title. Large fonts scroll.
  *
  * Navigation stays in the route (`app/add/[token].tsx`).
  */
-import type { AuthProvider, FoundPlayer, FriendStatus, Friends } from '@tavli/contracts';
+import type {
+  AuthProvider,
+  FoundPlayer,
+  FriendStatus,
+  Friends,
+  MyUsername,
+  Usernames,
+} from '@tavli/contracts';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, Text } from 'react-native';
@@ -25,6 +34,8 @@ import { useFocusOnShow } from '@/features/accessibility/focus';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { AccountBenefits } from '@/features/online/AccountBenefits';
 import { playerNameText } from '@/features/online/playerName';
+import { UsernameGate } from '@/features/online/UsernameGate';
+import { needsUsernameStep } from '@/features/online/usernameStep';
 
 import { friendsProblem, type FriendsProblem } from './friendsData';
 import { friendsStyles as styles, useProblemText } from './FriendsParts';
@@ -34,6 +45,8 @@ export interface FriendLinkScreenProps {
   token: string | null;
   auth: AuthProvider;
   friends: Friends;
+  /** For the username gate (#599). `undefined`: no gate before Ask. */
+  usernames?: Usernames;
   onBack: () => void;
   /** Opens the friends list. */
   onFriends: () => void;
@@ -46,12 +59,19 @@ type State =
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
   | { readonly kind: 'notFound' }
-  | { readonly kind: 'found'; readonly player: FoundPlayer; readonly guest: boolean };
+  | {
+      readonly kind: 'found';
+      readonly player: FoundPlayer;
+      readonly guest: boolean;
+      /** Set: a saved account with no username, so the gate shows (`null`: not read yet). */
+      readonly gate?: MyUsername | null;
+    };
 
 export function FriendLinkScreen({
   token,
   auth,
   friends,
+  usernames,
   onBack,
   onFriends,
   onAccount,
@@ -78,9 +98,13 @@ export function FriendLinkScreen({
       .ready()
       .then(async (user): Promise<State> => {
         if (user === null) return { kind: 'signedOut' };
-        const player = await friends.openFriendLink(token);
-        return player === null
-          ? { kind: 'notFound' }
+        const [player, mine] = await Promise.all([
+          friends.openFriendLink(token),
+          user.isGuest || usernames === undefined ? null : usernames.mine().catch(() => null),
+        ]);
+        if (player === null) return { kind: 'notFound' };
+        return mine !== null && needsUsernameStep(mine)
+          ? { kind: 'found', player, guest: user.isGuest, gate: mine }
           : { kind: 'found', player, guest: user.isGuest };
       })
       .then(
@@ -94,7 +118,7 @@ export function FriendLinkScreen({
           );
         },
       );
-  }, [auth, friends, token, attempt]);
+  }, [auth, friends, usernames, token, attempt]);
 
   const problemText = useProblemText(problem);
   // Read each time it shows (iOS VoiceOver does not read `accessibilityRole="alert"`).
@@ -115,6 +139,8 @@ export function FriendLinkScreen({
         setBusy(false);
         const next = friendsProblem(error);
         if (next === 'notFound') setState({ kind: 'notFound' });
+        else if (next === 'usernameNeeded' && usernames !== undefined)
+          setState({ ...state, gate: null });
         else setProblem(next);
       },
     );
@@ -188,6 +214,19 @@ export function FriendLinkScreen({
                   onPress={onAccount}
                 />
               </>
+            ) : (state.player.status === 'none' || state.player.status === 'received') &&
+              state.gate !== undefined &&
+              usernames !== undefined ? (
+              <UsernameGate
+                testID="friend-link-username-gate"
+                usernames={usernames}
+                feature="friends"
+                mine={state.gate}
+                onDone={() => {
+                  const { gate: _gate, ...found } = state;
+                  setState(found);
+                }}
+              />
             ) : state.player.status === 'none' || state.player.status === 'received' ? (
               <>
                 {state.player.status === 'received' ? (

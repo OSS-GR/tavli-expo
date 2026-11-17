@@ -4,14 +4,27 @@
  * The screens ask who is signed in (`auth.ready()`) first and make no
  * account: with nobody signed in they say so. A guest gets `NOT_SAVED`
  * from the server: friends need a saved account (ADR-0008).
+ *
+ * A saved account with no username gets the username gate (#599): the
+ * screen reads `Usernames.mine` next to its own load, and a call that
+ * answers `USERNAME_NEEDED` shows the gate too.
  */
-import { isFriendsErrorData, type AuthProvider } from '@tavli/contracts';
+import {
+  isFriendsErrorData,
+  type AuthProvider,
+  type MyUsername,
+  type Usernames,
+} from '@tavli/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { needsUsernameStep } from '@/features/online/usernameStep';
 
 export type FriendsLoad<T> =
   | { readonly kind: 'loading' }
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'guest' }
+  /** A saved account with no username (#599). `mine`: `null` when a call said so. */
+  | { readonly kind: 'username'; readonly mine: MyUsername | null }
   | { readonly kind: 'failed' }
   | {
       readonly kind: 'ready';
@@ -29,6 +42,7 @@ export type FriendsLoad<T> =
 export type FriendsProblem =
   | 'signedOut'
   | 'notSaved'
+  | 'usernameNeeded'
   | 'notFound'
   | 'blocked'
   | 'notFriends'
@@ -42,6 +56,7 @@ export type FriendsProblem =
 const PROBLEMS = {
   NOT_SIGNED_IN: 'signedOut',
   NOT_SAVED: 'notSaved',
+  USERNAME_NEEDED: 'usernameNeeded',
   NOT_FOUND: 'notFound',
   BLOCKED: 'blocked',
   NOT_FRIENDS: 'notFriends',
@@ -58,14 +73,21 @@ export function friendsProblem(error: unknown): FriendsProblem {
   return isFriendsErrorData(error) ? PROBLEMS[error.code] : 'failed';
 }
 
-/** The state a call's error leaves: a guest, nobody signed in, or `null` (another problem). */
-function lostState(error: unknown): { readonly kind: 'guest' | 'signedOut' } | null {
-  const problem = friendsProblem(error);
-  return problem === 'notSaved'
-    ? { kind: 'guest' }
-    : problem === 'signedOut'
-      ? { kind: 'signedOut' }
-      : null;
+/**
+ * The state a call's error leaves: a guest, nobody signed in, no username
+ * (the gate), or `null` (another problem).
+ */
+function lostState(error: unknown): FriendsLoad<never> | null {
+  switch (friendsProblem(error)) {
+    case 'notSaved':
+      return { kind: 'guest' };
+    case 'signedOut':
+      return { kind: 'signedOut' };
+    case 'usernameNeeded':
+      return { kind: 'username', mine: null };
+    default:
+      return null;
+  }
 }
 
 /**
@@ -88,8 +110,16 @@ function lostState(error: unknown): { readonly kind: 'guest' | 'signedOut' } | n
  * - `replace` shows what a call just answered (a new friend link): the
  *   data counts as current, then it loads again. A load that started
  *   before it is dropped, so it never brings the old data back.
+ * - With `usernames`, a saved account with no username gets the
+ *   `username` state in place of the data (#599). A failed `mine()` does
+ *   not stop the load: the server still answers `USERNAME_NEEDED`.
  */
-export function useFriendsData<T>(auth: AuthProvider, load: () => Promise<T>, visit = 0) {
+export function useFriendsData<T>(
+  auth: AuthProvider,
+  load: () => Promise<T>,
+  visit = 0,
+  usernames?: Usernames,
+) {
   const [state, setState] = useState<FriendsLoad<T>>({ kind: 'loading' });
   const live = useRef(true);
   const latest = useRef(0);
@@ -114,12 +144,22 @@ export function useFriendsData<T>(auth: AuthProvider, load: () => Promise<T>, vi
       .then(async (user): Promise<FriendsLoad<T>> => {
         if (user === null) return { kind: 'signedOut' };
         if (user.isGuest) return { kind: 'guest' };
-        return { kind: 'ready', data: await load(), visit };
+        const mine = usernames?.mine().catch(() => null) ?? Promise.resolve(null);
+        const loaded = load();
+        // Mark the load handled at once: it may fail while `mine` still waits.
+        // `await loaded` below still throws its error.
+        loaded.catch(() => undefined);
+        const known = await mine;
+        if (known !== null && needsUsernameStep(known)) {
+          // The gate shows: the load's answer (or its USERNAME_NEEDED) no longer matters.
+          return { kind: 'username', mine: known };
+        }
+        return { kind: 'ready', data: await loaded, visit };
       })
       .then(settle, (error: unknown) => {
         settle(lostState(error) ?? { kind: 'failed' });
       });
-  }, [auth, load, visit]);
+  }, [auth, load, visit, usernames]);
 
   // A new visit makes a new `reload`: load again.
   useEffect(() => {
@@ -145,8 +185,9 @@ export function useFriendsData<T>(auth: AuthProvider, load: () => Promise<T>, vi
   );
 
   /**
-   * A call failed: when it says the session is gone (`NOT_SIGNED_IN`) or
-   * the account is a guest (`NOT_SAVED`), show that, as a reload would.
+   * A call failed: when it says the session is gone (`NOT_SIGNED_IN`),
+   * the account is a guest (`NOT_SAVED`) or has no username
+   * (`USERNAME_NEEDED`), show that, as a reload would.
    * True then; the screen shows no problem line for it.
    */
   const sessionLost = useCallback((error: unknown): boolean => {

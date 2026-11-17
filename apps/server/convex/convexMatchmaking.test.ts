@@ -20,6 +20,7 @@ import {
   createConvexMatchmaking,
   createConvexOnlineData,
   createConvexSafety,
+  createConvexUsernames,
 } from '@tavli/backend-convex';
 import type { MatchFunctions } from '@tavli/backend-convex';
 import {
@@ -41,7 +42,7 @@ import { setPushProvider } from './push';
 import schema from './schema';
 import { convexTestNetwork } from './test.network';
 import type { Tester } from './test.network';
-import { authUsers, modules } from './test.setup';
+import { authUsers, modules, nameUsers } from './test.setup';
 
 // The players, made by `setup()`.
 let ALICE = '';
@@ -49,11 +50,13 @@ let BOB = '';
 let CAROL = '';
 let GUEST = '';
 
-async function setup() {
+/** `named`: alice, bob and carol get a username (friends and seeks need one, #599). */
+async function setup(named = true) {
   const t = convexTest(schema, modules);
   betterAuthTest.register(t);
   [ALICE = '', BOB = '', CAROL = ''] = await authUsers(t, 3, true);
   [GUEST = ''] = await authUsers(t, 1);
+  if (named) await nameUsers(t, [ALICE, BOB, CAROL]);
   return t;
 }
 
@@ -83,7 +86,7 @@ async function passTime(t: Tester, ms: number) {
 }
 
 async function contractSubject(): Promise<MatchmakingContractSubject> {
-  const t = await setup();
+  const t = await setup(false);
   const network = convexTestNetwork(t);
   const ids = { alice: ALICE, bob: BOB, carol: CAROL, guest: GUEST } as const;
   const clientOf = (player: MatchmakingContractPlayer) => network.clientFor(ids[player]);
@@ -97,6 +100,7 @@ async function contractSubject(): Promise<MatchmakingContractSubject> {
     invitesFor: (player) => createConvexInvites({ client: clientOf(player) }),
     safetyFor: (player) => createConvexSafety({ client: clientOf(player) }),
     onlineDataFor: (player) => createConvexOnlineData({ client: clientOf(player) }),
+    usernamesFor: (player) => createConvexUsernames({ client: clientOf(player) }),
     setRating: async (player, rating) => {
       const playerId = ids[player];
       await t.run(async (ctx) => {

@@ -17,7 +17,7 @@ import {
 } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, MAX_OPEN_INVITES, type MemoryGameServer } from '@tavli/online';
-import { guestNumberOf } from '@tavli/online/testing';
+import { markNamed } from '@tavli/online/testing';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
@@ -622,15 +622,19 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     return { ...parts, friends };
   }
 
-  /** `id` and I meet in a game (so each of us has a name), then become friends. */
+  /**
+   * `id` and I meet in a game, then become friends. Friends need a
+   * username (#599), so each of us gets one (`U_<id>`).
+   */
   async function befriend(server: MemoryGameServer, id: string): Promise<void> {
-    server.markSaved(id);
+    if (server.nameOf(ME)?.kind !== 'username') await markNamed(server, ME);
+    await markNamed(server, id);
     server.createGame(ME, { white: ME, black: id }, 'portes', 3, null);
     await server.friendsFor(id).sendRequest(ME);
     await server.friendsFor(ME).acceptRequest(id);
   }
 
-  const nameOf = (server: MemoryGameServer, id: string) => `Guest ${guestNumberOf(server, id)}`;
+  const nameOf = (_server: MemoryGameServer, id: string) => `U_${id}`;
 
   async function show(
     parts: ReturnType<typeof savedMe>,

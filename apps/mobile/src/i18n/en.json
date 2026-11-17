@@ -796,6 +796,7 @@
     "problem": {
       "signedOut": "You are not signed in any more. Open Account to sign in.",
       "notSaved": "Friends need a saved account.",
+      "usernameNeeded": "Pick a username first, in Settings → Account.",
       "notFound": "That player cannot be found.",
       "blocked": "You blocked this player. Unblock them in Settings → Blocked players first.",
       "notFriends": "You are not friends any more.",
@@ -1041,6 +1042,10 @@
       "notSaved": {
         "title": "Save your account first",
         "text": "Ranked games need a saved account. Save it in Settings › Account."
+      },
+      "usernameNeeded": {
+        "title": "Pick a username first",
+        "text": "Ranked games need a username. Pick one in Settings › Account."
       },
       "notSignedIn": {
         "title": "You are signed out",
@@ -2102,6 +2107,12 @@
     },
     "guestOnly": "A username needs a saved account. Save yours in Settings → Account. Guests play as “Guest” and a number.",
     "loading": "Loading…"
+  },
+  "usernameGate": {
+    "title": "Pick a username first",
+    "friends": "Friends find you by your username and see it in each game. Pick one to add friends and invite them.",
+    "ranked": "In ranked games the other player sees your username, and the leaderboards show it. Pick one to play ranked.",
+    "ratings": "The leaderboards show each player by username. Pick one to open them."
   },
   "safety": {
     "action": "Report or block",

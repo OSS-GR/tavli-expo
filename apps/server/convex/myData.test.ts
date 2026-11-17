@@ -14,7 +14,7 @@ import type { Id } from './_generated/dataModel';
 import { MY_DATA_GAMES_PAGE, MY_DATA_ROWS_PAGE } from './myData';
 import { setPushProvider } from './push';
 import schema from './schema';
-import { authUsers, modules } from './test.setup';
+import { authUsers, modules, nameUsers } from './test.setup';
 
 type Tester = ReturnType<typeof setup>;
 
@@ -98,6 +98,8 @@ describe('exportMyData', () => {
     // A one-point match the friend resigns: a rated win for me.
     const won = await startMatch(t, me, friend);
     await as(t, friend).mutation(api.games.resign, { gameId: won });
+    // Friends need a username (#599).
+    await nameUsers(t, [friend]);
     await as(t, me).mutation(api.friends.sendFriendRequest, { playerId: friend });
     await as(t, friend).mutation(api.friends.acceptFriendRequest, { playerId: me });
     // A game with the other player, then a report (which blocks too).
@@ -109,7 +111,7 @@ describe('exportMyData', () => {
         .query('playerNames')
         .withIndex('by_player', (q) => q.eq('playerId', friend))
         .first();
-      return { kind: 'guest', number: row?.guestNumber };
+      return { kind: 'username', name: row?.username };
     });
 
     const data = await as(t, me).action(api.myData.exportMyData, {});

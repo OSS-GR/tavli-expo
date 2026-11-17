@@ -22,7 +22,8 @@
  *   runs is gone, so the job does nothing.
  *
  * Every public function reads the caller from the sign-in and needs a
- * saved account that exists. The account delete (`deleteAccountOf`)
+ * saved account that exists; `seek` needs a username too
+ * (`USERNAME_NEEDED`, #599). The account delete (`deleteAccountOf`)
  * deletes the caller's seek (`deleteSeeksOf`), so no match can start with
  * a deleted player. Never send ids, names or ratings to analytics or the
  * logs.
@@ -44,6 +45,7 @@ import {
   NEW_RATING,
   checkRankedChoice,
   checkSeekSaved,
+  checkSeekUsername,
   countLooking,
   isMatchedSeekDone,
   isSeekExpired,
@@ -65,6 +67,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import { authComponent } from './auth';
 import { signedInPlayer } from './caller';
 import { insertGame } from './games';
+import { hasUsername } from './playerNames';
 import { pairRow, ratingRow } from './ratings';
 import { blocks, nameSeenBy } from './safety';
 import { rankedGame } from './schema';
@@ -239,6 +242,9 @@ export const seek = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const playerId = await savedCaller(ctx);
+    // The other player sees the name: a seek needs a username (#599).
+    const named = await hasUsername(ctx, playerId);
+    guarded(() => checkSeekUsername(named));
     const game = guarded(() => checkRankedChoice(args.game));
     const now = Date.now();
     const row = await seekRow(ctx, playerId);

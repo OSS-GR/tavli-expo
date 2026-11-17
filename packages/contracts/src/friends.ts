@@ -26,7 +26,9 @@
  * players who ask each other become friends at once.
  *
  * Friends need a saved account (ADR-0008 item 5): a guest gets
- * `NOT_SAVED`, and nobody can ask a guest. A block (#320, `Safety`) ends
+ * `NOT_SAVED`, and nobody can ask a guest. The calls that reach another
+ * player need a username too (owner, 2026-11-17, #599): a saved account
+ * with none gets `USERNAME_NEEDED`. A block (#320, `Safety`) ends
  * the friendship and deletes the requests between the two, and hides
  * each from the other in search, recent players and friend links.
  *
@@ -157,6 +159,12 @@ export const FRIENDS_ERROR_CODES = [
   'NOT_SIGNED_IN',
   /** The caller is a guest: friends need a saved account (ADR-0008). */
   'NOT_SAVED',
+  /**
+   * A saved account with no username (#599): the calls that reach another
+   * player (search, the friend link, a request, accept, a friend invite)
+   * need one. The lists, Decline, Cancel and Remove do not.
+   */
+  'USERNAME_NEEDED',
   /** Bad arguments, for example the caller's own id or link. */
   'BAD_REQUEST',
   /**
@@ -204,7 +212,10 @@ export function isFriendsErrorData(value: unknown): value is FriendsErrorData {
 /**
  * The friends port. Every call rejects with `FriendsErrorData`:
  * `NOT_SIGNED_IN` with nobody signed in, `NOT_SAVED` for a guest (except
- * `openFriendLink`, which any signed-in player may call).
+ * `openFriendLink`, which any signed-in player may call), and
+ * `USERNAME_NEEDED` for a saved account with no username on `findPlayer`,
+ * `myFriendLink`, `resetFriendLink`, `requestByLink`, `requestByUsername`,
+ * `sendRequest`, `acceptRequest` and `inviteFriend` (#599).
  */
 export interface Friends {
   /** The caller's friends, newest friendship first. */
