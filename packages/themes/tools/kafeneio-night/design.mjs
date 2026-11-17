@@ -14,7 +14,7 @@
 // shares one geometry contract (same points, bar, trays, checker size). Only
 // the art differs.
 
-import { round, toLandscape } from '../lib/geometry.mjs';
+import { round } from '../lib/geometry.mjs';
 import {
   f2,
   framePieces,
@@ -27,7 +27,9 @@ import {
 } from '../lib/svg.mjs';
 import {
   layoutBlock as baseLayoutBlock,
+  landscapeGeometry as baseLandscapeGeometry,
   portraitGeometry as basePortraitGeometry,
+  wideGeometry as baseWideGeometry,
   SIZES,
 } from '../walnut-kafeneio/design.mjs';
 
@@ -63,8 +65,7 @@ const C = {
 };
 
 export function geometries() {
-  const portrait = basePortraitGeometry();
-  return [portrait, toLandscape(portrait)];
+  return [basePortraitGeometry(), baseLandscapeGeometry(), baseWideGeometry()];
 }
 
 /** The `layouts.<id>` block of theme.json: the shared layout, a low lamp and brass seams on the points. */

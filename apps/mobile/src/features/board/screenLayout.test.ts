@@ -35,8 +35,8 @@ describe('screenLayoutFor (#185)', () => {
     expect(screenLayoutFor({ width: 500, height: 500 }, 'tall')).toBe('tall');
   });
 
-  it('draws the classic board in landscape', () => {
-    expect(boardModeOf('landscape')).toBe('classic');
+  it('draws the wide board in landscape (#611)', () => {
+    expect(boardModeOf('landscape')).toBe('wide');
     expect(boardModeOf('classic')).toBe('classic');
     expect(boardModeOf('tall')).toBe('tall');
   });

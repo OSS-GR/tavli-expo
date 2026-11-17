@@ -348,7 +348,7 @@ export function TutorialScreen({
             testID="tutorial-board"
             accessibilityLabel={t(`tutorial.lessons.${lesson.id}.board`)}
             theme={theme}
-            layout={landscape ? 'classic' : 'tall'}
+            layout={landscape ? 'wide' : 'tall'}
             spaceKey={spaceKey}
             board={board}
             view={view}

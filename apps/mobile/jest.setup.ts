@@ -98,6 +98,9 @@ jest.mock('react-native-worklets', () => ({
 // (`touch()` in test/gestureHandlerMock.tsx).
 jest.mock('react-native-gesture-handler', () => jest.requireActual('./test/gestureHandlerMock'));
 
+// The interface orientation, which a test can turn (#611, the island side).
+jest.mock('expo-screen-orientation', () => jest.requireActual('./test/screenOrientationMock'));
+
 // React Native's Jest setup makes `performance.now` a `jest.fn`. React calls
 // it several times per render, and a mock keeps every call. A test that
 // plays a whole game renders thousands of times, so the list grows to

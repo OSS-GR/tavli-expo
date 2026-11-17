@@ -418,7 +418,7 @@ describe('<GameScreen /> doubles (#177)', () => {
       const store = newStore();
       toRoll(store, 'white');
       await show(store, {}, LANDSCAPE_SPACE);
-      const geo = fitBoardWithShadow(boardLayout(theme, 'classic', 'right'), LANDSCAPE_SPACE);
+      const geo = fitBoardWithShadow(boardLayout(theme, 'wide', 'right'), LANDSCAPE_SPACE);
       const flat = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style);
       await act(async () => {
         store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 5] });

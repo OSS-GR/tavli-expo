@@ -41,7 +41,7 @@ import {
 } from '@/features/board/BoardCanvas';
 import { layoutBoard, type BoardMarks, type BoardView } from '@/features/board/boardModel';
 import { fitBoardWithShadow } from '@/features/board/geometry';
-import { boardModeOf, useScreenLayout } from '@/features/board/screenLayout';
+import { boardModeOf, useScreenLayout, type BoardShape } from '@/features/board/screenLayout';
 import { BOARD_GESTURES } from '@/features/board/interaction';
 import {
   createGameFeedback,
@@ -49,7 +49,6 @@ import {
   type GameFeedback,
 } from '@/features/feedback/feedback';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
-import type { BoardLayoutMode } from '@/features/settings/settings';
 
 import { boardThrowBox, throwBar, throwDieSize } from './throwField';
 import {
@@ -75,7 +74,7 @@ export interface DiceThrowBoardProps {
   /** Draw with this theme instead of the one in Settings. */
   theme?: ThemeManifest;
   /** The tall or the classic board. Default: the one picked in Settings (#184). */
-  layout?: BoardLayoutMode;
+  layout?: BoardShape;
   /** Sound and haptics. Default: the theme's, through `createGameFeedback`. */
   feedback?: GameFeedback;
   /** More controls under the Roll row. A swipe that starts on them throws too. */
@@ -114,7 +113,7 @@ export function DiceThrowBoard({
   const picked = useBoardTheme();
   const theme = themeProp ?? picked;
   const homeSide = useHomeBoardSide();
-  // The Board layout setting; landscape draws the classic board (#185).
+  // The Board layout setting; landscape draws the wide board (#185, #611).
   const pickedLayout = boardModeOf(useScreenLayout().layout);
   const layout = layoutProp ?? pickedLayout;
   const [size, onLayout] = useBoardSpace();

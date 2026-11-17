@@ -7,7 +7,7 @@
 // Points, checkers and dice are vector shapes. The renderer draws them from
 // theme.json.
 
-import { normRect, rect, rng, round, toLandscape } from '../lib/geometry.mjs';
+import { imageKey, normRect, rect, rng, round, toLandscape } from '../lib/geometry.mjs';
 import {
   f2,
   framePieces,
@@ -24,23 +24,19 @@ export const THEME_ID = 'walnut-kafeneio';
 // Portrait board (turned 90°), 377 x 630 pt: a 393 pt wide phone minus 8 pt
 // on each side. See the "Orientation" section of the concept README.
 const W = 377;
-const H = 630;
+const LENGTH = 630;
+// The wide landscape board (`landscape-wide`, for a phone on its side) is
+// 10% longer: 693 x 377 pt. The extra length all goes to the points (#611);
+// height, frame, bar, trays and checkers keep their sizes in pt.
+export const WIDE_LENGTH = 693;
 const FRAME = 13;
 const BAR = 34;
 const RAIL = 9;
 const TRAY = 46;
-const PITCH = (H - 2 * FRAME - BAR - RAIL - TRAY) / 12; // 42.9 pt per point
 const IX0 = FRAME;
 const IX1 = W - FRAME;
 const CX = W / 2;
 const TOP0 = FRAME;
-const BAR0 = TOP0 + 6 * PITCH;
-const BAR1 = BAR0 + BAR;
-const SEAM = BAR0 + BAR / 2;
-const BOT0 = BAR1;
-const BOT1 = BOT0 + 6 * PITCH;
-const TRAY0 = BOT1 + RAIL;
-const TRAY1 = H - FRAME;
 const POINT_LEN = 156;
 const CHECKER_D = 40;
 
@@ -48,7 +44,6 @@ const CHECKER_D = 40;
 export const SIZES = {
   pointLength: POINT_LEN,
   pointDepth: CX - IX0,
-  pointBreadth: PITCH,
   pointBaseInset: 0.2,
   seamWidth: 0.6,
   checkerRadius: CHECKER_D / 2,
@@ -62,7 +57,15 @@ export const SIZES = {
 };
 
 /** The portrait board: every shape the art and the layout need. */
-export function portraitGeometry() {
+export function portraitGeometry(H = LENGTH) {
+  const PITCH = (H - 2 * FRAME - BAR - RAIL - TRAY) / 12; // 42.9 pt per point (48.2 wide)
+  const BAR0 = TOP0 + 6 * PITCH;
+  const BAR1 = BAR0 + BAR;
+  const SEAM = BAR0 + BAR / 2;
+  const BOT0 = BAR1;
+  const BOT1 = BOT0 + 6 * PITCH;
+  const TRAY0 = BOT1 + RAIL;
+  const TRAY1 = H - FRAME;
   const points = [];
   for (let p = 1; p <= 24; p++) {
     // Left column, top to bottom: 12..7 | bar | 6..1. Right: 13..18 | bar | 19..24.
@@ -216,10 +219,12 @@ export function portraitGeometry() {
 export function layoutBlock(g) {
   const W = g.width;
   const H = g.height;
+  // One point's breadth (its pitch), in pt: longer in landscape.
+  const breadth = g.orientation === 'portrait' ? g.points[0].rect.h : g.points[0].rect.w;
   const n = (r) => normRect(r, W, H);
   const wu = (v) => round(v / W); // width units
   const slot = (s) => ({ rect: n(s.rect), base: s.base });
-  const key = g.orientation === 'portrait' ? 'Portrait' : 'Landscape';
+  const key = imageKey(g.art ?? g.orientation);
   return {
     orientation: g.orientation,
     aspectRatio: round(W / H),
@@ -232,7 +237,7 @@ export function layoutBlock(g) {
     points: g.points.map((p) => ({ index: p.index, rect: n(p.rect), base: p.base, tone: p.tone })),
     pointShape: {
       depth: round(SIZES.pointLength / SIZES.pointDepth),
-      baseInset: round(SIZES.pointBaseInset / SIZES.pointBreadth),
+      baseInset: round(SIZES.pointBaseInset / breadth),
       seam: { color: '{board.seam}', opacity: 0.7, width: wu(SIZES.seamWidth) },
       tileSize: wu(SIZES.pointTile),
       tileRotation: g.pointTileRotation,
@@ -288,9 +293,22 @@ export const BUILD = {
   tileQuality: 0.82,
 };
 
+/** The classic landscape board: the portrait board, turned. */
+export function landscapeGeometry() {
+  return toLandscape(portraitGeometry());
+}
+
+/** The wide landscape board (#611): a longer portrait board, turned. */
+export function wideGeometry() {
+  return {
+    ...toLandscape(portraitGeometry(WIDE_LENGTH)),
+    id: 'landscape-wide',
+    art: 'landscape-wide',
+  };
+}
+
 export function geometries() {
-  const portrait = portraitGeometry();
-  return [portrait, toLandscape(portrait)];
+  return [portraitGeometry(), landscapeGeometry(), wideGeometry()];
 }
 
 // ------------------------------------------------------------------ SVG ---

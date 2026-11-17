@@ -15,10 +15,11 @@
 
 import {
   layoutBlock as baseLayoutBlock,
+  landscapeGeometry as baseLandscapeGeometry,
   portraitGeometry as basePortraitGeometry,
+  wideGeometry as baseWideGeometry,
   SIZES,
 } from '../walnut-kafeneio/design.mjs';
-import { toLandscape } from '../lib/geometry.mjs';
 import {
   f2,
   framePieces,
@@ -53,8 +54,7 @@ const INLAY = {
 };
 
 export function geometries() {
-  const portrait = basePortraitGeometry();
-  return [portrait, toLandscape(portrait)];
+  return [basePortraitGeometry(), baseLandscapeGeometry(), baseWideGeometry()];
 }
 
 /** The `layouts.<id>` block of theme.json. Same as Walnut Kafeneio, with daylight instead of a lamp. */

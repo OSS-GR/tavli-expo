@@ -21,6 +21,7 @@ import { resetUpdateCheckForTest } from '../src/features/update/updateCheck';
 import { markWhatsNewSeenForTest } from '../src/features/whats-new/seen';
 
 import { resetOnlineFake } from './onlineFake';
+import { Orientation, setOrientation } from './screenOrientationMock';
 
 // `useAnnouncement` reads a keyed game event once per app run (#216). In
 // tests one file is one app run, so each test starts with nothing read.
@@ -35,6 +36,8 @@ beforeEach(() => {
   // The table scene (#509): Home rests on its last frame, and game start
   // plays no intro (a test of it turns it on), so tests tap the opening card.
   resetIntrosForTest();
+  // The phone starts upright (#611, the island side).
+  setOrientation(Orientation.PORTRAIT_UP);
 });
 
 // Online play (`auth`, `games`, `onlineServer` of `@/services`): each test
