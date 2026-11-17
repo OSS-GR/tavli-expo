@@ -20,6 +20,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { imageKey } from './lib/geometry.mjs';
 import { launch, renderPng, svgPage, toWebp } from './lib/render.mjs';
 
 const THEMES = ['walnut-kafeneio', 'olive-inlay', 'kafeneio-night'];
@@ -29,7 +30,6 @@ const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO = path.resolve(PKG, '..', '..');
 
 const fileName = (base, scale) => (scale === 1 ? `${base}.webp` : `${base}@${scale}x.webp`);
-const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 async function formatJson(file, text) {
   const req = createRequire(path.join(REPO, 'package.json'));
@@ -66,13 +66,15 @@ async function buildTheme(browser, id) {
   for (const g of design.geometries()) {
     layouts[g.id] = design.layoutBlock(g);
     for (const layer of BUILD.layers) {
-      const base = `${layer.kind}-${g.orientation}`;
+      // `art` names a second art of one orientation (`landscape-wide`, #611).
+      const art = g.art ?? g.orientation;
+      const base = `${layer.kind}-${art}`;
       const html = svgPage(layer.svg(g, tex));
       for (const s of SCALES) {
         const png = await renderPng(browser, html, g.width, g.height, s);
         save(fileName(base, s), await toWebp(browser, png, 'image/png', layer.quality));
       }
-      images[`${layer.kind}${cap(g.orientation)}`] = {
+      images[`${layer.kind}${imageKey(art)}`] = {
         file: `${base}.webp`,
         scales: SCALES,
         width: g.width,

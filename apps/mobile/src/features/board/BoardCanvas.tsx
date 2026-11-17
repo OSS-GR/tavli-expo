@@ -16,15 +16,17 @@ import {
   mirrorLayout,
   DEFAULT_THEME_ID,
   type BoardLayout,
+  type LayoutId,
   type ThemeManifest,
 } from '@tavli/themes';
 import { useCallback, useState, type ReactNode } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 
-import type { BoardLayoutMode, HomeBoardSide } from '@/features/settings/settings';
+import type { HomeBoardSide } from '@/features/settings/settings';
 import { useSettings } from '@/features/settings/store';
 
 import type { BoardPicture } from './boardModel';
+import type { BoardShape } from './screenLayout';
 import { checkerRadius, type BoardGeometry } from './geometry';
 import { BoardScene, type BoardHighlights } from './skia/BoardScene';
 import { useBoardImages, useNumberFont } from './useBoardAssets';
@@ -62,18 +64,26 @@ function forSide(layout: BoardLayout, side: HomeBoardSide): BoardLayout {
  *   its side. Your home is at the bottom left of the screen.
  * - `classic`: the theme's landscape layout, the board as on a table seen
  *   from your seat. Your home is at the bottom right, as on a real board.
+ * - `wide`: the classic board 10% longer (`landscape-wide`), for a phone on
+ *   its side (#611): the extra width goes to the points.
  *
  * With `left` the layout is mirrored left to right (`mirrorLayout`): every
  * point, bar half and tray moves to the other side. The tall art fits both
  * ways; the classic art has its trays on one side, so it is mirrored too
  * (`artMirrored`).
  */
+const LAYOUT_OF: Readonly<Record<BoardShape, LayoutId>> = {
+  tall: 'portrait-rotated',
+  classic: 'landscape',
+  wide: 'landscape-wide',
+};
+
 export function boardLayout(
   theme: ThemeManifest,
-  mode: BoardLayoutMode = 'tall',
+  mode: BoardShape = 'tall',
   side: HomeBoardSide = 'right',
 ): BoardLayout {
-  return forSide(getLayout(theme, mode === 'classic' ? 'landscape' : 'portrait-rotated'), side);
+  return forSide(getLayout(theme, LAYOUT_OF[mode]), side);
 }
 
 /** The tall (portrait) layout of a theme for a home board side. See `boardLayout`. */

@@ -49,7 +49,7 @@ const PAN = 'game-board-pan';
 const hidden = { includeHiddenElements: true };
 
 const landscapeGeo = (side: HomeBoardSide = 'right') =>
-  fitBoardWithShadow(boardLayout(theme, 'classic', side), LANDSCAPE_SPACE);
+  fitBoardWithShadow(boardLayout(theme, 'wide', side), LANDSCAPE_SPACE);
 const tallGeo = () => fitBoardWithShadow(boardLayout(theme, 'tall'), TALL_SPACE);
 
 async function setSettings(settings: Partial<typeof DEFAULT_SETTINGS>) {
@@ -202,7 +202,7 @@ describe('<GameScreen /> in landscape (#185)', () => {
       await renderWithRoot(<GameScreen store={store} onOpenMenu={() => {}} />);
       await layoutBoard(space);
       await press('opening-overlay');
-      const geo = fitBoardWithShadow(boardLayout(theme, 'classic'), space);
+      const geo = fitBoardWithShadow(boardLayout(theme, 'wide'), space);
       const flat = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style);
 
       // The rails are as wide as the font asks; both scroll with a large font.
@@ -335,7 +335,7 @@ describe('<GameScreen /> turning the phone mid-turn (#185)', () => {
     await setWindow({ width: LANDSCAPE_SE.width - 40, height: LANDSCAPE_SE.height - 20 });
     expect(styleOf().opacity).toBe(0);
     await layoutBoard(narrow);
-    const geo = fitBoardWithShadow(boardLayout(theme, 'classic'), narrow);
+    const geo = fitBoardWithShadow(boardLayout(theme, 'wide'), narrow);
     expect(styleOf()).toMatchObject(boardDiceBoxAt(geo));
     expect(styleOf().opacity).toBeUndefined();
 

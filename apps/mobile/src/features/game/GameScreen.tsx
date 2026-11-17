@@ -150,6 +150,7 @@ import {
 } from '@/features/board/flights';
 import { boxRatioWithShadow, type BoardGeometry } from '@/features/board/geometry';
 import { InteractiveBoard } from '@/features/board/InteractiveBoard';
+import { sideMargins, useIslandSide, type IslandSide } from '@/features/board/islandSide';
 import { boardModeOf, useScreenLayout } from '@/features/board/screenLayout';
 import { useDoubleReveal } from '@/features/board/useDoubleReveal';
 import { FAST_FORWARD_TIMING, startBotTurn, type BotTiming } from '@/features/bot/botTurn';
@@ -433,6 +434,8 @@ export function GameScreen({
   // The app's colors (the board theme is `theme`).
   const { theme: ui } = useUnistyles();
   const landscape = layout === 'landscape';
+  // On its side the wide board takes the margin away from the island (#611).
+  const island = useIslandSide();
   const classic = layout === 'classic';
   const tall = layout === 'tall';
 
@@ -847,8 +850,10 @@ export function GameScreen({
   // needs more movement than the board's own pan, so on the board that one
   // always activates first and wins: checkers still drag there. In landscape
   // the move list scrolls in this region, and a card may cover the board:
-  // there the pan stays off (it can never activate), so it never takes
-  // their touches.
+  // there the pan is off (`enabled: false`), so it never takes their
+  // touches. Never turn it off with a huge `minDistance`: on iOS a pan that
+  // stays began stops the board's tap from ending, so a tap on a checker
+  // did nothing in landscape (#611).
   //
   // Where the finger went down picks the side the dice come in from, and
   // that needs the board's points: the frame sits between the strips in the
@@ -858,7 +863,8 @@ export function GameScreen({
   const boardFrameX = useSharedValue(0);
   const boardFrameY = useSharedValue(0);
   const swipeArea = usePanGesture({
-    minDistance: landscape || blocked ? Number.MAX_SAFE_INTEGER : SWIPE_AREA.minDistance,
+    enabled: !landscape && !blocked,
+    minDistance: SWIPE_AREA.minDistance,
     testID: 'game-swipe-area',
     onBegin: (e) => {
       'worklet';
@@ -2376,7 +2382,7 @@ export function GameScreen({
   // the board never flatten (`collapsable={false}`), so the canvases keep
   // their native parent too (#173).
   return (
-    <View style={styles.screen(landscape)}>
+    <View style={styles.screen(landscape, island)}>
       <View
         testID="game-content"
         style={styles.content(landscape)}
@@ -2460,14 +2466,16 @@ export function scoreText(
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
-  // Landscape keeps the notch, the round corners and the home bar free.
-  screen: (landscape: boolean) => ({
+  // Landscape keeps the island, the round corners and the home bar free.
+  // iOS gives the same inset on both sides; the side away from the island
+  // needs less (`sideMargins`), and the wide board gets the rest (#611).
+  screen: (landscape: boolean, island: IslandSide | null) => ({
     flex: 1,
     paddingTop: theme.space.xs,
     backgroundColor: theme.colors.background,
     paddingBottom: Math.max(rt.insets.bottom, landscape ? theme.space.xs : theme.space.sm),
-    paddingLeft: landscape ? Math.max(rt.insets.left, theme.space.xs) : 0,
-    paddingRight: landscape ? Math.max(rt.insets.right, theme.space.xs) : 0,
+    paddingLeft: landscape ? sideMargins(rt.insets, island, theme.space.xs).left : 0,
+    paddingRight: landscape ? sideMargins(rt.insets, island, theme.space.xs).right : 0,
   }),
   content: (landscape: boolean) => ({
     flex: 1,

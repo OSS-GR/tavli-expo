@@ -218,8 +218,12 @@ export interface BoardLayout {
   artMirrored?: boolean;
 }
 
-/** The two layouts every theme has. */
-export type LayoutId = 'portrait-rotated' | 'landscape';
+/**
+ * The layouts every theme has. `landscape-wide` is the landscape board made
+ * 10% longer, for a phone on its side (#611); `landscape` (the classic
+ * board) stays for the upright screens.
+ */
+export type LayoutId = 'portrait-rotated' | 'landscape' | 'landscape-wide';
 
 // --------------------------------------------------------------- styles ---
 

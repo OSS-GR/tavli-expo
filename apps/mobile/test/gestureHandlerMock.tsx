@@ -22,6 +22,7 @@
  *   one of them run: the first to activate cancels the others, like a race
  *   (`shouldHandlerBeCancelledBy` in `GestureHandlerOrchestrator.kt`). A
  *   finger outside the inner view reaches only the outer gestures.
+ * - `enabled: false`: the gesture takes no part in a touch at all.
  *
  * Give every gesture a `testID`: the mock finds gestures by it.
  */
@@ -40,6 +41,7 @@ interface EndEvent extends GestureEvent {
 
 interface Callbacks {
   testID?: string;
+  enabled?: boolean;
   onBegin?: (e: GestureEvent) => void;
   onActivate?: (e: GestureEvent) => void;
   onUpdate?: (e: GestureEvent) => void;
@@ -143,7 +145,9 @@ export async function touch(
 ): Promise<void> {
   if (!latest.has(testID)) throw new Error(`No gesture with testID ${testID}`);
   const ids = new Set([...(races.get(testID) ?? [testID]), ...(around.get(testID) ?? [])]);
-  const gestures = [...ids].flatMap((id) => latest.get(id) ?? []);
+  const gestures = [...ids]
+    .flatMap((id) => latest.get(id) ?? [])
+    .filter((g) => g.config.enabled !== false);
   const [first, ...rest] = path;
   if (first === undefined) throw new Error('A touch needs a point');
   const last = rest[rest.length - 1] ?? first;

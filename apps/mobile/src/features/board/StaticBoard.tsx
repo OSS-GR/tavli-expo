@@ -9,7 +9,9 @@ import type { ThemeManifest } from '@tavli/themes';
 import { View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
-import type { BoardLayoutMode, HomeBoardSide } from '@/features/settings/settings';
+import type { HomeBoardSide } from '@/features/settings/settings';
+
+import type { BoardShape } from './screenLayout';
 
 import {
   BoardCanvas,
@@ -38,7 +40,7 @@ export interface StaticBoardProps {
   /** Draw with this home board side instead of the one picked in Settings (the side picker). */
   homeSide?: HomeBoardSide;
   /** The tall board on its side (default) or the classic wide board (the layout picker, #184). */
-  layout?: BoardLayoutMode;
+  layout?: BoardShape;
   /**
    * Mark this turn as the Hint does: a ring on each checker that moves and
    * a target ring with its ghost where it lands (#230, the game review).

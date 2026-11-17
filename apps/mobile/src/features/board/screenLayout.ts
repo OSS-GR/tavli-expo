@@ -18,6 +18,12 @@ import { useSettings } from '@/features/settings/store';
 /** `tall` and `classic`: portrait (#184). `landscape`: the phone lies on its side (#185). */
 export type ScreenLayout = BoardLayoutMode | 'landscape';
 
+/**
+ * The board a screen draws: the Board layout setting (`tall`, `classic`),
+ * or `wide`, the classic board 10% longer, for a phone on its side (#611).
+ */
+export type BoardShape = BoardLayoutMode | 'wide';
+
 export interface WindowSize {
   readonly width: number;
   readonly height: number;
@@ -33,9 +39,9 @@ export function screenLayoutFor(window: WindowSize, mode: BoardLayoutMode): Scre
   return isLandscapeWindow(window) ? 'landscape' : mode;
 }
 
-/** The board a screen layout draws: landscape uses the classic wide board. */
-export function boardModeOf(layout: ScreenLayout): BoardLayoutMode {
-  return layout === 'landscape' ? 'classic' : layout;
+/** The board a screen layout draws: landscape uses the wide board (#611). */
+export function boardModeOf(layout: ScreenLayout): BoardShape {
+  return layout === 'landscape' ? 'wide' : layout;
 }
 
 /**

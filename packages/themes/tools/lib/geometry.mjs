@@ -88,3 +88,14 @@ export function normRect(r, W, H) {
 }
 
 export { round };
+
+/**
+ * The art name of a geometry (`portrait`, `landscape`, `landscape-wide`) as
+ * the end of an image key: `Portrait`, `Landscape`, `LandscapeWide`.
+ */
+export function imageKey(art) {
+  return art
+    .split('-')
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join('');
+}

@@ -1081,6 +1081,11 @@
         "body": "After an online game, Review shows your biggest mistakes and the best moves, as after a game vs the computer. It looks at your own turns only.",
         "where": "Online game › end of the game › Review"
       },
+      "widerBoard": {
+        "title": "A wider board on its side",
+        "body": "Turn your phone on its side and the board is 10% wider. The points get the extra room, so the checkers are easier to tell apart and to drag.",
+        "where": "Any game › turn the phone"
+      },
       "turnClock": {
         "title": "A turn clock",
         "body": "In an online game with a turn time, a ring around the avatar of the player to move empties as the time runs, with the time left next to it. In your last 10 seconds it turns red and the phone ticks.",

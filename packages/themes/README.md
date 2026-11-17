@@ -74,7 +74,7 @@ Multiply normalized values by the drawn board size: `x * boardWidth`, `y * board
 | `license`               | Short license notes and the file with the full list (`LICENSES.md`)                      |
 | `palette`               | Color tokens (from `docs/design/style/palette.md`). Other fields use them as `{token}`.  |
 | `images`                | Every image: file name, scales, @1x size                                                 |
-| `layouts`               | Board geometry for `portrait-rotated` (default) and `landscape`                          |
+| `layouts`               | Board geometry for `portrait-rotated` (default), `landscape` and `landscape-wide`        |
 | `points`                | Dark and light point woods: fallback color and texture tile                              |
 | `checkers`              | Light and dark checker styles (fill, rim, highlight, ring, dish, grooves), shadow, badge |
 | `highlights`            | Selected checker ring and legal target ring                                              |
@@ -96,7 +96,8 @@ Point numbers are from the view of the player at the **bottom** of the screen. T
 | Layout                       | Board        | Your home    | Trays       | Use                                    |
 | ---------------------------- | ------------ | ------------ | ----------- | -------------------------------------- |
 | `portrait-rotated` (default) | 377 × 630 pt | bottom-left  | bottom edge | Phone in portrait (wireframe option B) |
-| `landscape`                  | 630 × 377 pt | bottom-right | right edge  | Tablets, face-to-face play             |
+| `landscape`                  | 630 × 377 pt | bottom-right | right edge  | The classic board, phone upright       |
+| `landscape-wide`             | 693 × 377 pt | bottom-right | right edge  | Phone on its side (#611): wider points |
 
 Portrait order: the left column holds 12 → 7, the bar, then 6 → 1. The right column holds 13 → 18, the bar, then 19 → 24.
 

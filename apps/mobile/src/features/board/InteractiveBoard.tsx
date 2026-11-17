@@ -48,11 +48,10 @@ import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { StyleSheet } from 'react-native-unistyles';
 
-import type { BoardLayoutMode } from '@/features/settings/settings';
-
 import { BoardCanvas, boardLayout, useHomeBoardSide, type Size } from './BoardCanvas';
 import { layoutBoard, type BoardMarks, type BoardView } from './boardModel';
 import type { MovePath } from './combined';
+import type { BoardShape } from './screenLayout';
 import type { Flight } from './flights';
 import { fitBoardWithShadow, type BoardGeometry } from './geometry';
 import { hintHighlights } from './hintMarks';
@@ -78,7 +77,7 @@ export interface InteractiveBoardProps {
    * The tall board on its side (default: the tutorial) or the classic wide
    * board (the game screen with Settings → Board layout → Classic, #184).
    */
-  layout?: BoardLayoutMode;
+  layout?: BoardShape;
   /**
    * Names the space the board gets: it changes when the phone turns or the
    * window changes size (#185). After a change the board waits for its new
@@ -219,7 +218,7 @@ export function InteractiveBoard({
   const [measured, setMeasured] = useState<{
     size: Size;
     key: string;
-    mode: BoardLayoutMode;
+    mode: BoardShape;
   } | null>(null);
   const keep = (width: number, height: number) =>
     setMeasured((old) =>

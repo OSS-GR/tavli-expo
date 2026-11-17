@@ -446,32 +446,53 @@ for (const id of listThemeIds()) {
       expect(getPoint(l, 24).rect.x).toBeLessThan(0.5);
     });
 
-    it('landscape: your home is bottom-right, trays on the right edge', () => {
-      const l = theme.layouts.landscape;
-      expect(l.orientation).toBe('landscape');
-      expect(l.aspectRatio).toBeGreaterThan(1);
-      for (const r of home('landscape')) {
-        expect(r.x).toBeGreaterThan(l.bar.rect.x);
-        expect(r.y).toBeGreaterThanOrEqual(0.5 - EPS);
-        expect(l.trays.player.rect.x).toBeGreaterThanOrEqual(r.x + r.w - EPS);
-      }
-      expect(l.trays.player.rect.y).toBeGreaterThan(l.trays.opponent.rect.y);
-      expect(getPoint(l, 1).rect.x).toBeGreaterThan(getPoint(l, 6).rect.x);
-    });
+    for (const id of ['landscape', 'landscape-wide'] as const) {
+      it(`${id}: your home is bottom-right, trays on the right edge`, () => {
+        const l = theme.layouts[id];
+        expect(l.orientation).toBe('landscape');
+        expect(l.aspectRatio).toBeGreaterThan(1);
+        for (const r of home(id)) {
+          expect(r.x).toBeGreaterThan(l.bar.rect.x);
+          expect(r.y).toBeGreaterThanOrEqual(0.5 - EPS);
+          expect(l.trays.player.rect.x).toBeGreaterThanOrEqual(r.x + r.w - EPS);
+        }
+        expect(l.trays.player.rect.y).toBeGreaterThan(l.trays.opponent.rect.y);
+        expect(getPoint(l, 1).rect.x).toBeGreaterThan(getPoint(l, 6).rect.x);
+      });
 
-    // The classic board (#184) with Settings → Your home on the bottom left.
-    // Its trays sit on one side, so the art is mirrored with the slots.
-    it('landscape, mirrored: your home is bottom-left, trays on the left edge, art mirrored', () => {
-      const l = mirrorLayout(theme.layouts.landscape);
-      expect(isMirrorSymmetric(theme.layouts.landscape)).toBe(false);
-      expect(l.artMirrored).toBe(true);
-      for (const n of [1, 2, 3, 4, 5, 6]) {
-        const r = getPoint(l, n).rect;
-        expect(r.x + r.w).toBeLessThan(l.bar.rect.x + EPS);
-        expect(r.y).toBeGreaterThanOrEqual(0.5 - EPS);
-        expect(l.trays.player.rect.x + l.trays.player.rect.w).toBeLessThanOrEqual(r.x + EPS);
-      }
-      expect(getPoint(l, 1).rect.x).toBeLessThan(getPoint(l, 6).rect.x);
+      // The classic board (#184) with Settings → Your home on the bottom left.
+      // Its trays sit on one side, so the art is mirrored with the slots.
+      it(`${id}, mirrored: your home is bottom-left, trays on the left edge, art mirrored`, () => {
+        const l = mirrorLayout(theme.layouts[id]);
+        expect(isMirrorSymmetric(theme.layouts[id])).toBe(false);
+        expect(l.artMirrored).toBe(true);
+        for (const n of [1, 2, 3, 4, 5, 6]) {
+          const r = getPoint(l, n).rect;
+          expect(r.x + r.w).toBeLessThan(l.bar.rect.x + EPS);
+          expect(r.y).toBeGreaterThanOrEqual(0.5 - EPS);
+          expect(l.trays.player.rect.x + l.trays.player.rect.w).toBeLessThanOrEqual(r.x + EPS);
+        }
+        expect(getPoint(l, 1).rect.x).toBeLessThan(getPoint(l, 6).rect.x);
+      });
+    }
+
+    // The board on a phone on its side (#611): 10% longer, the same height,
+    // and the checkers, bar and trays keep their size; the points get wider.
+    it('landscape-wide: 10% longer than landscape, same checkers', () => {
+      const classic = theme.layouts.landscape;
+      const wide = theme.layouts['landscape-wide'];
+      expect(wide.referenceSize.height).toBe(classic.referenceSize.height);
+      expect(wide.referenceSize.width / classic.referenceSize.width).toBeCloseTo(1.1, 2);
+      const pt = (l: typeof wide, v: number) => v * l.referenceSize.width;
+      expect(pt(wide, wide.checker.radius)).toBeCloseTo(pt(classic, classic.checker.radius), 1);
+      expect(pt(wide, wide.bar.rect.w)).toBeCloseTo(pt(classic, classic.bar.rect.w), 1);
+      expect(pt(wide, wide.trays.player.rect.w)).toBeCloseTo(
+        pt(classic, classic.trays.player.rect.w),
+        1,
+      );
+      expect(pt(wide, getPoint(wide, 1).rect.w)).toBeGreaterThan(
+        pt(classic, getPoint(classic, 1).rect.w) * 1.1,
+      );
     });
   });
 }
