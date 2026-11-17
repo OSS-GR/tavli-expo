@@ -183,6 +183,20 @@ export {
 } from './apple-sheet';
 export type { AppleSheet, AppleSheetProof, MemoryAppleSheet } from './apple-sheet';
 export type { OnlineData } from './online-data';
+export { MY_DATA_FORMAT, MY_DATA_VERSION } from './my-data';
+export type {
+  MyData,
+  MyDataAccount,
+  MyDataBlock,
+  MyDataFriend,
+  MyDataGame,
+  MyDataInvite,
+  MyDataKey,
+  MyDataPushToken,
+  MyDataRankedSearch,
+  MyDataRating,
+  MyDataReport,
+} from './my-data';
 export { APP_PLATFORMS, NO_UPDATE_POLICY, createMemoryAppUpdates } from './app-update';
 export type { AppPlatform, AppUpdatePolicy, AppUpdates, MemoryAppUpdates } from './app-update';
 export { PUSH_ERROR_CODES, createRecordingPushProvider, isPushErrorCode } from './push';

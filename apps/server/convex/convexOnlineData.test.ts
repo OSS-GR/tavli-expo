@@ -18,8 +18,10 @@ import {
   createConvexGameTransport,
   createConvexInvites,
   createConvexOnlineData,
+  MY_DATA_FUNCTIONS,
+  MY_DATA_FUNCTION_NAMES,
 } from '@tavli/backend-convex';
-import type { AccountFunctions } from '@tavli/backend-convex';
+import type { AccountFunctions, MyDataFunctions } from '@tavli/backend-convex';
 import { createRecordingPushProvider } from '@tavli/contracts';
 import { onlineDataContract } from '@tavli/contracts/testing';
 import type { OnlineDataContractSubject } from '@tavli/contracts/testing';
@@ -126,5 +128,26 @@ describe('function references', () => {
     // A wrong type fails: the checks above are not always true.
     // @ts-expect-error -- a number is not what the delete returns.
     expectType<Extends<number, FunctionReturnType<Fns['deleteMyAccount']>>>();
+  });
+
+  it('the adapter names the copy action of the server api (#445)', () => {
+    expect(MY_DATA_FUNCTION_NAMES).toEqual({
+      exportMyData: getFunctionName(api.myData.exportMyData),
+    });
+    expect(getFunctionName(MY_DATA_FUNCTIONS.exportMyData)).toBe(
+      getFunctionName(api.myData.exportMyData),
+    );
+  });
+
+  it('the copy action takes the adapter arguments and returns MyData', () => {
+    type Api = typeof api.myData;
+    type Fns = MyDataFunctions;
+    expectType<Extends<FunctionArgs<Fns['exportMyData']>, FunctionArgs<Api['exportMyData']>>>();
+    expectType<
+      Extends<FunctionReturnType<Api['exportMyData']>, FunctionReturnType<Fns['exportMyData']>>
+    >();
+    expectType<
+      Extends<FunctionReturnType<Fns['exportMyData']>, FunctionReturnType<Api['exportMyData']>>
+    >();
   });
 });

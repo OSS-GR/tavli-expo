@@ -7,7 +7,12 @@ import { ConvexError } from 'convex/values';
 import { getFunctionName } from 'convex/server';
 import { describe, expect, it } from 'vitest';
 
-import { ACCOUNT_FUNCTIONS, ACCOUNT_FUNCTION_NAMES } from './functions';
+import {
+  ACCOUNT_FUNCTIONS,
+  ACCOUNT_FUNCTION_NAMES,
+  MY_DATA_FUNCTIONS,
+  MY_DATA_FUNCTION_NAMES,
+} from './functions';
 import { createConvexOnlineData } from './onlineData';
 import type { ConvexOnlineDataClient } from './onlineData';
 
@@ -15,6 +20,10 @@ function fakeClient(answer: () => Promise<unknown> = () => Promise.resolve(null)
   const calls: { name: string; args: unknown }[] = [];
   const client: ConvexOnlineDataClient = {
     mutation: (fn, args) => {
+      calls.push({ name: getFunctionName(fn), args });
+      return answer() as never;
+    },
+    action: (fn, args) => {
       calls.push({ name: getFunctionName(fn), args });
       return answer() as never;
     },
@@ -45,6 +54,24 @@ describe('createConvexOnlineData', () => {
       );
     expect(reason).toEqual(data);
     expect(reason).not.toBeInstanceOf(Error);
+  });
+
+  it('names the copy action (#445)', () => {
+    expect(MY_DATA_FUNCTION_NAMES).toEqual({ exportMyData: 'myData:exportMyData' });
+    expect(getFunctionName(MY_DATA_FUNCTIONS.exportMyData)).toBe('myData:exportMyData');
+  });
+
+  it('runs the exportMyData action with no arguments, and gives its result', async () => {
+    const copy = { format: 'tavlaki-my-data' };
+    const { client, calls } = fakeClient(() => Promise.resolve(copy));
+    await expect(createConvexOnlineData({ client }).exportMyData()).resolves.toBe(copy);
+    expect(calls).toEqual([{ name: 'myData:exportMyData', args: {} }]);
+  });
+
+  it('rejects the copy with the server error data', async () => {
+    const data = { code: 'NOT_SIGNED_IN', message: 'this account does not exist' };
+    const { client } = fakeClient(() => Promise.reject(new ConvexError(data)));
+    await expect(createConvexOnlineData({ client }).exportMyData()).rejects.toEqual(data);
   });
 
   it('keeps any other error as it is', async () => {

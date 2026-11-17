@@ -26,6 +26,9 @@
  *   two: the last one has no button and says why), Sign out, Sign out of
  *   all phones (#446) and Delete my account, then one footnote: what
  *   stays on this phone.
+ * - Download my data (#445, `DownloadMyData.tsx`): its own card, for a
+ *   guest above Delete, for a saved account above Sign out. It shares
+ *   the server's copy as JSON and shows its own problem popup.
  * - A failed action opens the problem popup (`ProblemCard`, #462): what
  *   went wrong, what to do, OK. It shares one `Sheet` with the move
  *   dialog, so Keep my guest account turns the dialog into the problem
@@ -37,7 +40,7 @@
  * Navigation stays in the route (`app/account.tsx`).
  */
 import type { AuthKey, EmailKeyCredential } from '@tavli/contracts';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -66,6 +69,7 @@ import { EmailCodeForm } from '@/features/online/EmailCodeForm';
 import { UsernameForm } from '@/features/online/UsernameForm';
 import { AppleSignInButton } from '@/services';
 
+import { DownloadMyData } from './DownloadMyData';
 import { signInIcon, signInLine } from './signInLine';
 import { addableKeys, useAccount, type Account, type AccountDeps } from './useAccount';
 
@@ -180,6 +184,9 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
               ) : state.kind === 'guest' ? (
                 <Guest
                   account={account}
+                  download={
+                    <DownloadMyData data={deps.data} disabled={busy !== null} iconLook="bare" />
+                  }
                   id={state.id}
                   guestNumber={state.guestNumber}
                   onEmail={() => setEmailStep('save')}
@@ -188,6 +195,7 @@ export function AccountScreen({ deps, onBack, onUsername, visit = 0 }: AccountSc
               ) : (
                 <Saved
                   account={account}
+                  download={<DownloadMyData data={deps.data} disabled={busy !== null} />}
                   id={state.id}
                   username={state.username}
                   guestNumber={state.guestNumber}
@@ -304,12 +312,15 @@ function Offline({ account, onEmail }: { account: Account; onEmail: () => void }
  */
 function Guest({
   account,
+  download,
   id,
   guestNumber,
   onEmail,
   onDelete,
 }: {
   account: Account;
+  /** Download my data (#445). */
+  download: ReactNode;
   id: string;
   guestNumber: string | null;
   onEmail: () => void;
@@ -396,6 +407,7 @@ function Guest({
           accessibilityLabel={`${phone}: ${phoneHint}`}
         />
       </SectionCard>
+      {download}
       <SectionCard>
         <SectionRow
           testID="account-delete"
@@ -415,6 +427,7 @@ function Guest({
 
 function Saved({
   account,
+  download,
   id,
   username,
   guestNumber,
@@ -426,6 +439,8 @@ function Saved({
   onDelete,
 }: {
   account: Account;
+  /** Download my data (#445). */
+  download: ReactNode;
   id: string;
   username: string | null;
   guestNumber: string | null;
@@ -524,6 +539,7 @@ function Saved({
           }}
         />
       ) : null}
+      {download}
       <SectionCard>
         <SectionRow
           testID="account-sign-out"

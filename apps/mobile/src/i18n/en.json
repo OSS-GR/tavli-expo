@@ -319,6 +319,25 @@
     "loading": "Loading your account…",
     "failed": "Could not load your account. Check the connection and try again.",
     "retry": "Try again",
+    "download": {
+      "label": "Download my data",
+      "hint": "A copy of what our server keeps about you",
+      "busy": "Getting your data…",
+      "problem": {
+        "network": {
+          "title": "No connection",
+          "text": "Our server did not answer. Check the connection and try again."
+        },
+        "signedOut": {
+          "title": "This account is gone",
+          "text": "Our server no longer has this account, so it keeps no data of yours."
+        },
+        "other": {
+          "title": "Your data did not download",
+          "text": "Try again in a moment."
+        }
+      }
+    },
     "offline": {
       "intro": "You are not signed in. You play on this phone only.",
       "kept": "Kept on this phone: your games against the bot, your history and your settings.",
@@ -1161,6 +1180,11 @@
         "title": "A tour of the app",
         "body": "A short tour: how to roll, how to move your checkers and where everything is. You try rolling and moving on the real board.",
         "where": "Home › How to play › App tour, or Settings › Help"
+      },
+      "downloadData": {
+        "title": "Download my data",
+        "body": "Get a copy of what our server keeps about your online account: your name, games, invites, friends and more. Save it or send it on from the share sheet.",
+        "where": "Settings › Account"
       },
       "support": {
         "title": "Support Tavlaki",

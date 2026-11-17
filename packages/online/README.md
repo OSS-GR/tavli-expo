@@ -98,6 +98,11 @@ await alice.sendTurn({ gameId, expectedVersion: view.version, moves });
   invite the player sent. The id then counts as deleted: making,
   accepting or declining an invite, and a second delete, get
   `NOT_SIGNED_IN`, as on Convex (`existingPlayer`).
+- **Download my data** (#445): `exportMyData()` on the same port gives
+  the player's copy (`MyData`), built by `makeMyData` and its helpers
+  (`src/my-data.ts`), which the Convex `exportMyData` runs too. The
+  memory server keeps no account times, keys or push tokens, so those
+  are `null` or empty there.
 - `setFlowForTest(gameId, flow)`, tests only: replaces the stored flow,
   like a Convex test that patches `games.flow`. Call it before anyone
   subscribes.

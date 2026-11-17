@@ -35,6 +35,7 @@ import type {
   GameTransportErrorData,
   InviteView,
   LookingCounts,
+  MyData,
   MyRating,
   MySeek,
   MyUsername,
@@ -190,6 +191,20 @@ export const ACCOUNT_FUNCTION_NAMES = {
 
 export const ACCOUNT_FUNCTIONS: AccountFunctions = {
   deleteMyAccount: makeFunctionReference(ACCOUNT_FUNCTION_NAMES.deleteMyAccount),
+};
+
+/** Download my data in `apps/server/convex/myData.ts` (#445): an action. */
+export interface MyDataFunctions {
+  readonly exportMyData: FunctionReference<'action', 'public', Record<string, never>, MyData>;
+}
+
+/** The Convex function names (`module:function`) of the copy. */
+export const MY_DATA_FUNCTION_NAMES = {
+  exportMyData: 'myData:exportMyData',
+} as const satisfies { readonly [K in keyof MyDataFunctions]: string };
+
+export const MY_DATA_FUNCTIONS: MyDataFunctions = {
+  exportMyData: makeFunctionReference(MY_DATA_FUNCTION_NAMES.exportMyData),
 };
 
 /** The update policy in `apps/server/convex/appUpdate.ts` (#390). It needs no sign-in. */
