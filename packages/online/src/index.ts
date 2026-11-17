@@ -55,7 +55,7 @@ export {
   type SeekRecord,
   type SeekState,
 } from './matchmaking';
-export { checkGameNumber, gameRecordLog } from './game-record';
+export { checkGameNumber, checkRecordCall, gameRecordLog, gamesOver } from './game-record';
 export { NO_NAMES, nameFrom, namesOf, pickGuestNumber, type NameRecord } from './names';
 export {
   checkUsername,

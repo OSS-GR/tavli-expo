@@ -91,11 +91,11 @@ export function ReviewScreen({
   onBack,
 }: ReviewScreenProps) {
   const { t } = useTranslation();
-  // Only "you": vs the bot and online. In pass-and-play both players count.
-  const vsBot = online !== undefined || setup.mode === 'bot';
+  // Only your turns count vs the bot and online; in pass-and-play both
+  // players' do. Not named for the bot: it holds for online games too.
+  const onlyMine = online !== undefined || setup.mode === 'bot';
   const mine = online === undefined ? HUMAN_SIDE : online.me;
-  // Vs the bot and online only your turns count; in pass-and-play both players'.
-  const players = useMemo(() => (vsBot ? [mine] : BOTH_SIDES), [vsBot, mine]);
+  const players = useMemo(() => (onlyMine ? [mine] : BOTH_SIDES), [onlyMine, mine]);
   const game = online === undefined ? setup.game : online.game;
   const review = useGameReview(flow, players, analyzer, game, undefined, autoEvents);
   const seats = setup === undefined ? null : seatsFor(setup, t);
@@ -112,7 +112,7 @@ export function ReviewScreen({
         ? t('review.nothing')
         : review.mistakes.length === 0
           ? t('review.wellPlayed')
-          : vsBot
+          : onlyMine
             ? t('review.intro_you')
             : t('review.intro');
   }
@@ -149,7 +149,7 @@ export function ReviewScreen({
                 key={i}
                 testID={`review-mistake-${i + 1}`}
                 mistake={mistake}
-                name={vsBot || seats === null ? null : seats[mistake.turn.player].name}
+                name={onlyMine || seats === null ? null : seats[mistake.turn.player].name}
               />
             ))
           : null}

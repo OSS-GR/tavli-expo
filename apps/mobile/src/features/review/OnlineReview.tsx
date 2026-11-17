@@ -8,12 +8,13 @@
  *
  * While the record loads, a spinner with "Loading the game…". A failed
  * load (no network, an old server, a game not over) shows a problem
- * dialog; OK goes back. Nothing is saved.
+ * dialog: Try again loads it again, OK goes back. Nothing is saved, and
+ * the log line names no game.
  */
 import type { Analyzer } from '@tavli/bot';
 import type { GameTransport, MatchGame } from '@tavli/contracts';
 import { replay, type MatchFlow, type PlayerId } from '@tavli/engine';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -63,26 +64,43 @@ export function OnlineReview({
 }: OnlineReviewProps) {
   const { t } = useTranslation();
   const [loaded, setLoaded] = useState<Loaded>(LOADING);
+  // Try again counts up, so the load runs again.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
     transport
       .gameRecord({ gameId, gameNumber })
       .then((record) => {
-        const flow = replayed(record.log);
-        if (flow === null) throw new Error('the record is not of a game that is over');
         if (!active) return;
-        setLoaded({ kind: 'ready', flow, me: record.side, game: record.choice });
-        sendReviewOpened(record.choice, true);
+        const flow = replayed(record.log);
+        setLoaded(
+          flow === null
+            ? { kind: 'failed' }
+            : { kind: 'ready', flow, me: record.side, game: record.choice },
+        );
       })
-      .catch((error: unknown) => {
-        console.warn('could not load the game to review', error);
+      .catch(() => {
+        // A fixed text only: the error may hold the game id.
+        console.warn('could not load the game to review');
         if (active) setLoaded({ kind: 'failed' });
       });
     return () => {
       active = false;
     };
-  }, [transport, gameId, gameNumber]);
+  }, [transport, gameId, gameNumber, attempt]);
+
+  // Sent once the record is in, and not again when the load runs again
+  // (a new transport): the game stays the same.
+  const readyGame = loaded.kind === 'ready' ? loaded.game : null;
+  useEffect(() => {
+    if (readyGame !== null) sendReviewOpened(readyGame, true);
+  }, [readyGame]);
+
+  const retry = useCallback(() => {
+    setLoaded(LOADING);
+    setAttempt((n) => n + 1);
+  }, []);
 
   const online = useMemo(
     () => (loaded.kind === 'ready' ? { me: loaded.me, game: loaded.game } : null),
@@ -122,6 +140,7 @@ export function OnlineReview({
         }
         okLabel={t('problem.ok')}
         onOk={onBack}
+        retry={{ label: t('review.problem.retry'), onPress: retry }}
       />
     </Screen>
   );

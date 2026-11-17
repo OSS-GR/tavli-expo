@@ -3,7 +3,8 @@
  * it has the warning icon, the problem colors and its own box.
  *
  * - `ProblemDialog`: a failed action (a sign-in, a save, a delete) on a
- *   screen. A popup with a title, what to do next and OK.
+ *   screen. A popup with a title, what to do next and OK. A failed load
+ *   may also offer Try again (`retry`).
  * - `ProblemCard`: the same box inside a sheet that is open already. It
  *   takes the sheet's place until OK: iOS does not show a second Modal
  *   over an open one, or right as one closes.
@@ -33,6 +34,12 @@ export interface ProblemText {
   readonly text: string;
 }
 
+/** A button that tries the failed action again, above OK. */
+export interface ProblemRetry {
+  readonly label: string;
+  readonly onPress: () => void;
+}
+
 /** What a screen reader hears: the title, then the text. */
 export function problemSpeech(problem: ProblemText): string {
   return `${problem.title}. ${problem.text}`;
@@ -43,10 +50,18 @@ export interface ProblemCardProps {
   /** The OK button's label. */
   okLabel: string;
   onOk: () => void;
+  /** Try again: the main button, with OK under it. */
+  retry?: ProblemRetry;
   testID?: string;
 }
 
-export function ProblemCard({ problem, okLabel, onOk, testID = 'problem' }: ProblemCardProps) {
+export function ProblemCard({
+  problem,
+  okLabel,
+  onOk,
+  retry,
+  testID = 'problem',
+}: ProblemCardProps) {
   const { theme } = useUnistyles();
   const titleRef = useFocusOnShow();
   useAnnouncement(problemSpeech(problem));
@@ -59,7 +74,15 @@ export function ProblemCard({ problem, okLabel, onOk, testID = 'problem' }: Prob
         </Text>
       </View>
       <Text style={styles.text}>{problem.text}</Text>
-      <ActionButton testID={`${testID}-ok`} label={okLabel} onPress={onOk} />
+      {retry !== undefined ? (
+        <ActionButton testID={`${testID}-retry`} label={retry.label} onPress={retry.onPress} />
+      ) : null}
+      <ActionButton
+        testID={`${testID}-ok`}
+        label={okLabel}
+        onPress={onOk}
+        kind={retry === undefined ? 'primary' : 'secondary'}
+      />
     </View>
   );
 }
@@ -69,6 +92,8 @@ export interface ProblemDialogProps {
   problem: ProblemText | null;
   okLabel: string;
   onOk: () => void;
+  /** Try again: the main button, with OK under it. */
+  retry?: ProblemRetry;
   testID?: string;
 }
 
@@ -76,7 +101,13 @@ export interface ProblemDialogProps {
  * A popup for a failed action on a screen with no sheet open: the problem
  * card alone, with no sheet box around it (`bare`, #480).
  */
-export function ProblemDialog({ problem, okLabel, onOk, testID = 'problem' }: ProblemDialogProps) {
+export function ProblemDialog({
+  problem,
+  okLabel,
+  onOk,
+  retry,
+  testID = 'problem',
+}: ProblemDialogProps) {
   return (
     <Sheet
       visible={problem !== null}
@@ -85,7 +116,13 @@ export function ProblemDialog({ problem, okLabel, onOk, testID = 'problem' }: Pr
       look="bare"
       testID={`${testID}-sheet`}>
       {problem !== null ? (
-        <ProblemCard problem={problem} okLabel={okLabel} onOk={onOk} testID={testID} />
+        <ProblemCard
+          problem={problem}
+          okLabel={okLabel}
+          onOk={onOk}
+          {...(retry !== undefined ? { retry } : {})}
+          testID={testID}
+        />
       ) : null}
     </Sheet>
   );

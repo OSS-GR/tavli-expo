@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { createSeededRng, replay } from '@tavli/engine';
-import type { FlowEvent, PlayerId } from '@tavli/engine';
+import type { FlowEvent, MatchFlow, PlayerId } from '@tavli/engine';
 
-import { gameRecordLog } from './game-record';
+import { checkRecordCall, gameRecordLog, gamesOver } from './game-record';
 import { createMemoryGameServer } from './memory-server';
 import type { MemoryGameServer } from './memory-server';
 import { OnlineGameError } from './online-game';
@@ -66,6 +66,35 @@ describe('gameRecordLog (#604)', () => {
   });
 });
 
+/** A stored flow with `recorded` games in the match, its status and the phase of its game. */
+function flowWith(recorded: number, status: 'in-progress' | 'finished', phase: string): MatchFlow {
+  return {
+    match: { games: Array.from({ length: recorded }, () => ({})), status },
+    game: { phase },
+  } as unknown as MatchFlow;
+}
+
+describe('checkRecordCall (#604)', () => {
+  it('counts the games that are over', () => {
+    expect(gamesOver(flowWith(0, 'in-progress', 'opening-roll'))).toBe(0);
+    expect(gamesOver(flowWith(2, 'in-progress', 'moving'))).toBe(2);
+    expect(gamesOver(flowWith(2, 'in-progress', 'game-over'))).toBe(2);
+    expect(gamesOver(flowWith(3, 'finished', 'game-over'))).toBe(3);
+    // Resigned in the opening roll: nothing scored, but that game is over too.
+    expect(gamesOver(flowWith(2, 'finished', 'opening-roll'))).toBe(3);
+  });
+
+  it('refuses a game not over, before the log is read', () => {
+    const flow = flowWith(2, 'in-progress', 'moving');
+    expect(codeOf(() => checkRecordCall(1, flow))).toBeNull();
+    expect(codeOf(() => checkRecordCall(2, flow))).toBeNull();
+    expect(codeOf(() => checkRecordCall(3, flow))).toBe('ILLEGAL_ACTION');
+    expect(codeOf(() => checkRecordCall(1e9, flow))).toBe('ILLEGAL_ACTION');
+    expect(codeOf(() => checkRecordCall(0, flow))).toBe('BAD_REQUEST');
+    expect(codeOf(() => checkRecordCall(Number.POSITIVE_INFINITY, flow))).toBe('BAD_REQUEST');
+  });
+});
+
 /** Plays the game the server waits for until the match is over, with random turns. */
 async function playOut(server: MemoryGameServer, gameId: string, seed: number): Promise<void> {
   const rng = createSeededRng(seed);
@@ -110,6 +139,18 @@ describe('the record on the in-memory server (#604)', () => {
       expect(flow.game.result?.winner).toBe(ended.winner);
       // No player id in it.
       expect(JSON.stringify(record)).not.toMatch(/alice|bob/);
+    }
+    const past = server.transportFor('alice').gameRecord({ gameId, gameNumber: games.length + 1 });
+    await expect(past).rejects.toMatchObject({ code: 'ILLEGAL_ACTION' });
+  });
+
+  it('refuses the game in play and a game not played yet', async () => {
+    const server = createMemoryGameServer({ rng: createSeededRng(5), now: () => 0 });
+    const gameId = server.createGame('alice', { white: 'alice', black: 'bob' }, 'portes', 3, null);
+    await openMemoryGame(server, gameId);
+    for (const gameNumber of [1, 2, 1000]) {
+      const record = server.transportFor('alice').gameRecord({ gameId, gameNumber });
+      await expect(record).rejects.toMatchObject({ code: 'ILLEGAL_ACTION' });
     }
   });
 });

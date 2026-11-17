@@ -65,6 +65,7 @@ import {
   checkGameNumber,
   checkNewGame,
   checkRankedGame,
+  checkRecordCall,
   checkTurnTimeMinutes,
   checkViewer,
   createOnlineMatch,
@@ -642,8 +643,8 @@ export const getGame = query({
 /**
  * The record of one game of the match (#604), for the game review: the
  * log from `start` to the end of that game. Only the two players may read
- * it, and only for a game that is over (`gameRecordOf` in `@tavli/online`
- * holds the checks;
+ * it, and only for a game that is over (`checkRecordCall` and
+ * `gameRecordLog` in `@tavli/online` hold the checks;
  * the in-memory server runs them too). It reads the
  * `moves` rows in order and stops at the end of that game. The record
  * carries no player id.
@@ -656,6 +657,8 @@ export const gameRecord = query({
     const loaded = await ctx.db.get(gameId);
     const game = guarded(() => checkViewer(loaded, callerId));
     if (game === null) reject(new OnlineGameError('NOT_FOUND', 'no game with this id'));
+    // A game that is not over is refused before any `moves` row is read.
+    guarded(() => checkRecordCall(gameNumber, loadStored(game.flow).flow));
     const events: FlowEvent[] = [];
     // The `nextGame` events read so far: game `gameNumber` ended at the
     // last one of them, so the rest of the log is not needed.

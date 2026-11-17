@@ -15,7 +15,7 @@
  * The `start` event names the sides, never a player id: a record never
  * carries another player's id.
  */
-import type { FlowEvent } from '@tavli/engine';
+import type { FlowEvent, MatchFlow } from '@tavli/engine';
 
 import { OnlineGameError } from './online-game';
 
@@ -29,6 +29,31 @@ const SIDE_NAMES = { white: 'white', black: 'black' } as const;
 export function checkGameNumber(gameNumber: number): void {
   if (!Number.isSafeInteger(gameNumber) || gameNumber < 1) {
     throw new OnlineGameError('BAD_REQUEST', 'the game number is a whole number from 1');
+  }
+}
+
+/**
+ * The games of the match that are over, so have a record: every game the
+ * match recorded (a game that ends goes into `match.games` at once), and
+ * also the last game of a match resigned during its opening roll (nothing
+ * was scored, but the match is over).
+ */
+export function gamesOver(flow: MatchFlow): number {
+  const recorded = flow.match.games.length;
+  if (flow.match.status !== 'finished') return recorded;
+  return flow.game.phase === 'game-over' ? recorded : recorded + 1;
+}
+
+/**
+ * Checks the game number of a record call against the stored match
+ * `flow`, before the server reads the log: a whole number from 1
+ * (`BAD_REQUEST`), of a game that is over (`ILLEGAL_ACTION`). So a number
+ * past the games played never makes a server read every stored move.
+ */
+export function checkRecordCall(gameNumber: number, flow: MatchFlow): void {
+  checkGameNumber(gameNumber);
+  if (gameNumber > gamesOver(flow)) {
+    throw new OnlineGameError('ILLEGAL_ACTION', 'this game is not over');
   }
 }
 

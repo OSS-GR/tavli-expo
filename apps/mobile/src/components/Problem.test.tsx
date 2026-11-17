@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react-native';
+import { screen, userEvent } from '@testing-library/react-native';
 import { StyleSheet, Text } from 'react-native';
 
 import { renderWithRoot } from '../../test/render';
@@ -30,6 +30,32 @@ describe('<ProblemDialog /> (#480)', () => {
       borderWidth: undefined,
       overflow: 'visible',
     });
+  });
+});
+
+describe('<ProblemDialog /> retry', () => {
+  it('offers Try again above OK, and each button calls its own handler', async () => {
+    const onOk = jest.fn();
+    const onRetry = jest.fn();
+    const user = userEvent.setup();
+    await renderWithRoot(
+      <ProblemDialog
+        problem={problem}
+        okLabel="OK"
+        onOk={onOk}
+        retry={{ label: 'Try again', onPress: onRetry }}
+      />,
+    );
+    await user.press(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onOk).not.toHaveBeenCalled();
+    await user.press(screen.getByRole('button', { name: 'OK' }));
+    expect(onOk).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows OK alone with no retry', async () => {
+    await renderWithRoot(<ProblemDialog problem={problem} okLabel="OK" onOk={jest.fn()} />);
+    expect(screen.queryByTestId('problem-retry')).toBeNull();
   });
 });
 

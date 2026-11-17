@@ -2063,7 +2063,8 @@
     "failed": "This game cannot be reviewed.",
     "problem": {
       "title": "The review did not load",
-      "text": "Tap Review again in a moment."
+      "text": "Try again in a moment.",
+      "retry": "Try again"
     },
     "turn": "Turn {{number}} · roll {{dice}}",
     "played_you": "You played: {{moves}}",

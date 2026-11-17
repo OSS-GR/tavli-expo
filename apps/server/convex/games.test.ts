@@ -294,6 +294,25 @@ describe('gameRecord (#604)', () => {
       'BAD_REQUEST',
     );
   });
+
+  it('refuses a game that is not over before it reads the log', async () => {
+    const t = setup();
+    const gameId = await createGame(t);
+    // A broken row would throw if the query read it.
+    await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query('moves')
+        .withIndex('by_game', (q) => q.eq('gameId', gameId))
+        .collect();
+      for (const row of rows) await ctx.db.patch(row._id, { event: 'not json' });
+    });
+    for (const gameNumber of [1, 2, 1000]) {
+      await rejectsWith(
+        as(t, ALICE).query(api.games.gameRecord, { gameId, gameNumber }),
+        'ILLEGAL_ACTION',
+      );
+    }
+  });
 });
 
 describe('makeMove', () => {
