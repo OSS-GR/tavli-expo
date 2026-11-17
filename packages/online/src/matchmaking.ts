@@ -6,8 +6,9 @@
  * `convex/`.
  *
  * The order of the checks of a seek: the caller is signed in and exists
- * (`NOT_SIGNED_IN`), has a saved account (`NOT_SAVED`), then the game is
- * a ranked game (`BAD_REQUEST`). Then `planSeek` says what happens to the
+ * (`NOT_SIGNED_IN`), has a saved account (`NOT_SAVED`), has a username
+ * (`USERNAME_NEEDED`, `seek` only: #599), then the game is a ranked game
+ * (`BAD_REQUEST`). Then `planSeek` says what happens to the
  * caller's seek, and the server runs the matching of that game at once.
  *
  * The matching (`pickPairs`): every pair of live seeks of one game whose
@@ -54,6 +55,17 @@ export class MatchmakingError extends Error {
 /** Play ranked needs a saved account (ADR-0008, ADR-0009). */
 export function checkSeekSaved(saved: boolean): void {
   if (!saved) throw new MatchmakingError('NOT_SAVED', 'save your account to play ranked');
+}
+
+/**
+ * A seek needs a username (owner, 2026-11-17, #599): the other player
+ * sees it. `cancel`, `mySeek` and `lookingCounts` need only a saved
+ * account. Check `checkSeekSaved` first.
+ */
+export function checkSeekUsername(hasUsername: boolean): void {
+  if (!hasUsername) {
+    throw new MatchmakingError('USERNAME_NEEDED', 'pick a username to play ranked');
+  }
 }
 
 /** The game of a seek: one of `RANKED_GAMES`. */

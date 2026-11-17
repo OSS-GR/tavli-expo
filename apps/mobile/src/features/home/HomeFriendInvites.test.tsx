@@ -8,6 +8,8 @@ import { act, render, screen } from '@testing-library/react-native';
 import { auth } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { markNamed } from '@tavli/online/testing';
+
 import { onlineFake } from '../../../test/onlineFake';
 
 import { HomeFriendInvites, useFriendInvites } from './HomeFriendInvites';
@@ -32,7 +34,9 @@ function signInSaved(): void {
 /** Ann and I are friends (we met in a game, she asked, I accepted). */
 async function befriendAnn(): Promise<void> {
   const server = onlineFake.server();
-  server.markSaved(ANN);
+  // Friends need a username (#599).
+  await markNamed(server, ME);
+  await markNamed(server, ANN);
   server.createGame(ME, { white: ME, black: ANN }, 'portes', 3, null);
   await server.friendsFor(ANN).sendRequest(ME);
   await server.friendsFor(ME).acceptRequest(ANN);
@@ -72,7 +76,7 @@ async function show(friends: Friends = onlineFake.friends, focused = true) {
   return { onOpen, focus };
 }
 
-const annName = () => `Guest ${onlineFake.guestNumber(ANN)}`;
+const annName = () => `U_${ANN}`;
 
 describe('<HomeFriendInvites />', () => {
   it('lists the friend invites to me; a row reads as one item and a tap opens it', async () => {

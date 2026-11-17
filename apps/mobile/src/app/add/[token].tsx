@@ -8,7 +8,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { FriendLinkScreen } from '@/features/friends/FriendLinkScreen';
 import { friendTokenFromLink } from '@/features/friends/friendLink';
 import { FRIENDS_HREF, parseIdParam } from '@/features/match/routes';
-import { auth, friends } from '@/services';
+import { auth, friends, usernames } from '@/services';
 
 export default function FriendLinkRoute() {
   const params = useLocalSearchParams<{ token?: string }>();
@@ -20,6 +20,7 @@ export default function FriendLinkRoute() {
       key={token ?? ''}
       token={token}
       auth={auth}
+      {...(usernames === undefined ? {} : { usernames })}
       friends={friends}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       onFriends={() => router.replace(FRIENDS_HREF)}

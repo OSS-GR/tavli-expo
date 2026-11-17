@@ -8,7 +8,8 @@
  *
  * Make a new subject for each check: three players with saved accounts
  * (`alice`, `bob`, `carol`) and one guest, on one server, with no seek,
- * no rated match and no block. The server clock stays in one UTC day for
+ * no rated match, no block and no username. Each check picks the
+ * usernames first (a seek needs one, #599), except where it says. The server clock stays in one UTC day for
  * the whole check (it moves at most a few minutes). A check rejects with
  * an `Error` when the adapter breaks the contract. The checks never wait
  * on a real clock: `advance` moves the server clock.
@@ -27,6 +28,8 @@ import type { Matchmaking, MatchmakingErrorCode, MySeek, RankedGame } from '../m
 import type { OnlineData } from '../online-data';
 import { RATED_MATCHES_PER_PAIR_PER_DAY, START_RATING } from '../ratings';
 import type { Safety } from '../safety';
+import { TERMS_VERSION } from '../username';
+import type { Usernames } from '../username';
 
 /** Three saved players and a guest. */
 export type MatchmakingContractPlayer = 'alice' | 'bob' | 'carol' | 'guest';
@@ -40,6 +43,7 @@ export interface MatchmakingContractSubject {
   readonly invitesFor: (player: MatchmakingContractPlayer) => Invites;
   readonly safetyFor: (player: MatchmakingContractPlayer) => Safety;
   readonly onlineDataFor: (player: MatchmakingContractPlayer) => OnlineData;
+  readonly usernamesFor: (player: MatchmakingContractPlayer) => Usernames;
   /** Sets the player's rating, as kept (a test hook: the servers write it only after a match). */
   readonly setRating: (player: MatchmakingContractPlayer, rating: number) => Promise<void>;
   /** Moves the server clock by `ms`, and runs what was due by then. Never a real wait. */
@@ -161,8 +165,56 @@ async function meet(
   await subject.runMatching();
 }
 
+type Named = Exclude<MatchmakingContractPlayer, 'guest'>;
+
+/** The usernames a check gives the saved players before it runs (#599). */
+const USERNAMES: Readonly<Record<Named, string>> = {
+  alice: 'Alice_Ranked',
+  bob: 'Bob_Ranked',
+  carol: 'Carol_Ranked',
+};
+
+async function setUsername(subject: MatchmakingContractSubject, player: Named): Promise<void> {
+  await subject
+    .usernamesFor(player)
+    .setMine({ name: USERNAMES[player], acceptTerms: TERMS_VERSION, ageChecked: true });
+}
+
+interface CheckSpec extends MatchmakingContractCheck {
+  /** The players who get their username first. Default: all three. */
+  readonly named?: readonly Named[];
+}
+
 export function matchmakingContract(): readonly MatchmakingContractCheck[] {
+  return checks().map(({ name, run, named = ['alice', 'bob', 'carol'] }) => ({
+    name,
+    run: async (subject: MatchmakingContractSubject) => {
+      for (const player of named) await setUsername(subject, player);
+      await run(subject);
+    },
+  }));
+}
+
+function checks(): readonly CheckSpec[] {
   return [
+    {
+      name: 'refuses a seek from a saved player with no username; the reads stay open',
+      named: ['bob'],
+      run: async (subject) => {
+        const alice = subject.matchmakingFor('alice');
+        await failsWith(alice.seek({ game: 'portes' }), 'USERNAME_NEEDED', 'seek with no username');
+        same(await alice.mySeek(), { kind: 'none' }, 'mySeek with no username');
+        await alice.cancel();
+        same(
+          await alice.lookingCounts(),
+          { portes: 0, plakoto: 0, fevga: 0, tavli: 0 },
+          'lookingCounts with no username',
+        );
+        await setUsername(subject, 'alice');
+        await alice.seek({ game: 'portes' });
+        same(await kindOf(subject, 'alice'), 'waiting', 'a seek after the pick');
+      },
+    },
     {
       name: 'refuses every call with nobody signed in, and a guest',
       run: async (subject) => {

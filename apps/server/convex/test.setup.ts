@@ -4,12 +4,15 @@
 import type { TestConvex } from 'convex-test';
 import type { GenericSchema, SchemaDefinition } from 'convex/server';
 
+import { TERMS_VERSION } from '@tavli/contracts';
 import type { OnlineGameView } from '@tavli/contracts';
 import type { PerPlayer } from '@tavli/engine';
+import { usernameKey } from '@tavli/online';
 import { rollOpenings } from '@tavli/online/testing';
 
 import { api, components } from './_generated/api';
 import type { Id } from './_generated/dataModel';
+import schema from './schema';
 
 // The turn pickers are shared with `@tavli/online` (#251).
 export { pickChoice, pickTurn } from '@tavli/online/testing';
@@ -78,5 +81,41 @@ export async function authUsers(
       ids.push(user._id);
     }
     return ids;
+  });
+}
+
+/** Counts the usernames `nameUsers` made, so each one is new. */
+let namesMade = 0;
+
+/**
+ * Gives each player a username (`User_<n>`), with the terms and the age
+ * box, as `setMyUsername` saves them. Friends and Play ranked need one
+ * (#599). Rows put in directly: no call per player.
+ */
+export async function nameUsers(
+  t: TestConvex<typeof schema>,
+  playerIds: readonly string[],
+): Promise<void> {
+  await t.run(async (ctx) => {
+    for (const playerId of playerIds) {
+      const username = `User_${namesMade++}`;
+      const now = Date.now();
+      const fields = {
+        username,
+        usernameKey: usernameKey(username),
+        ageCheckedAt: now,
+        termsVersion: TERMS_VERSION,
+        termsAcceptedAt: now,
+      };
+      const row = await ctx.db
+        .query('playerNames')
+        .withIndex('by_player', (q) => q.eq('playerId', playerId))
+        .first();
+      if (row === null) {
+        await ctx.db.insert('playerNames', { playerId, guestNumber: '1000', ...fields });
+      } else {
+        await ctx.db.patch(row._id, fields);
+      }
+    }
   });
 }

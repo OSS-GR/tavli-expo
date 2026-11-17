@@ -11,9 +11,11 @@ import {
 } from '@tavli/contracts';
 import { act, render, screen } from '@testing-library/react-native';
 
-import { auth } from '@/services';
+import { auth, usernames } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { markNamed } from '@tavli/online/testing';
+
 import { onlineFake } from '../../../test/onlineFake';
 
 import { boardStatus, ratingText, RatingsScreen } from './RatingsScreen';
@@ -30,9 +32,10 @@ async function flush(): Promise<void> {
 }
 
 /** Signs me in with a saved account. */
-function signInSaved(): void {
+async function signInSaved(): Promise<void> {
   onlineFake.authStore.session = { id: ME, isGuest: false };
-  onlineFake.server().markSaved(ME);
+  // Friends and the leaderboards need a username (#599).
+  await markNamed(onlineFake.server(), ME);
 }
 
 /** `winner` beats `loser` in a rated 3-point match (both saved). */
@@ -60,7 +63,7 @@ async function setUsername(id: string, name: string): Promise<void> {
 
 async function show(ratings: Ratings = onlineFake.ratings) {
   const props = { onBack: jest.fn(), onAccount: jest.fn(), onUsername: jest.fn() };
-  await render(<RatingsScreen auth={auth!} ratings={ratings} {...props} />);
+  await render(<RatingsScreen auth={auth!} usernames={usernames!} ratings={ratings} {...props} />);
   await flush();
   return props;
 }
@@ -84,7 +87,7 @@ describe('<RatingsScreen />', () => {
   });
 
   it('a new player sees a dash, never a rating, the matches left, and only themselves', async () => {
-    signInSaved();
+    await signInSaved();
     await show();
     expect(screen.getByTestId('ratings-mine-rating')).toHaveTextContent('—');
     expect(
@@ -93,13 +96,12 @@ describe('<RatingsScreen />', () => {
     expect(screen.getByTestId('ratings-status-fewMatches')).toHaveTextContent(
       `${MIN_BOARD_MATCHES} more rated matches to join the global board`,
     );
-    // No game yet, so no guest name either.
-    const me = screen.getByLabelText('Place 1: Player (you), no rating yet');
-    expect(me).toHaveTextContent(/Player\s*You\s*—/);
+    const me = screen.getByLabelText('Place 1: U_me (you), no rating yet');
+    expect(me).toHaveTextContent(/U_me\s*You\s*—/);
   });
 
   it('after a rated match shows the rating, the chip and the matches left', async () => {
-    signInSaved();
+    await signInSaved();
     await win(ME, 'ann');
     await show();
     const rating = screen.getByTestId('ratings-mine-rating');
@@ -112,10 +114,11 @@ describe('<RatingsScreen />', () => {
   });
 
   it('shows rated friends best first, and my place among them', async () => {
-    signInSaved();
+    await signInSaved();
     await win('ann', ME);
-    // Ann and I become friends.
+    // Ann and I become friends (a friend request needs a username, #599).
     const server = onlineFake.server();
+    await markNamed(server, 'ann');
     await server.friendsFor('ann').sendRequest(ME);
     await server.friendsFor(ME).acceptRequest('ann');
     // Bob beats me too, but he is no friend.
@@ -123,22 +126,34 @@ describe('<RatingsScreen />', () => {
     await show();
     const ann = screen.getByTestId('ratings-friends-row-ann');
     const me = screen.getByTestId(`ratings-friends-row-${ME}`);
-    expect(ann.props.accessibilityLabel).toMatch(/^Place 1: Guest \d{4}, rating 15\d\d$/);
-    expect(me.props.accessibilityLabel).toMatch(/^Place 2: Guest \d{4} \(you\), rating 14\d\d$/);
+    expect(ann.props.accessibilityLabel).toMatch(/^Place 1: U_ann, rating 15\d\d$/);
+    expect(me.props.accessibilityLabel).toMatch(/^Place 2: U_me \(you\), rating 14\d\d$/);
     expect(screen.queryByTestId('ratings-friends-row-bob')).toBeNull();
   });
 
-  it('asks for a username when it is the only thing missing for the global board', async () => {
-    signInSaved();
-    await enoughMatches();
-    const props = await show();
-    expect(screen.getByTestId('ratings-status-noUsername')).toBeOnTheScreen();
-    await setupUser().press(screen.getByRole('button', { name: 'Pick a username' }));
-    expect(props.onUsername).toHaveBeenCalled();
+  it('a saved account with no username picks one first, then the boards open (#599)', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: false };
+    onlineFake.server().markSaved(ME);
+    await show();
+    expect(screen.getByTestId('ratings-username-gate')).toBeOnTheScreen();
+    expect(screen.getByText('Pick a username first')).toBeOnTheScreen();
+    expect(
+      screen.getByText('The leaderboards show each player by username. Pick one to open them.'),
+    ).toBeOnTheScreen();
+    expect(screen.queryByTestId('ratings-mine')).toBeNull();
+    const user = setupUser();
+    await user.type(screen.getByTestId('username-input'), 'Orestis');
+    await user.press(screen.getByTestId('username-terms'));
+    await user.press(screen.getByTestId('username-age'));
+    await user.press(screen.getByTestId('username-save'));
+    await flush();
+    expect(screen.queryByTestId('ratings-username-gate')).toBeNull();
+    expect(screen.getByTestId('ratings-mine')).toBeOnTheScreen();
+    expect((await onlineFake.usernames.mine()).name).toBe('Orestis');
   });
 
   it('lists me on Everyone with a username, and the switch takes me off and back', async () => {
-    signInSaved();
+    await signInSaved();
     await enoughMatches();
     await setUsername(ME, 'Orestis');
     await show();
@@ -168,7 +183,7 @@ describe('<RatingsScreen />', () => {
   });
 
   it('a failed switch opens the problem popup and keeps the board', async () => {
-    signInSaved();
+    await signInSaved();
     const failing: Ratings = {
       ...onlineFake.ratings,
       setShown: () => Promise.reject(new Error('offline')),
@@ -185,7 +200,7 @@ describe('<RatingsScreen />', () => {
   });
 
   it('a failed load says so, and Try again loads', async () => {
-    signInSaved();
+    await signInSaved();
     let fail = true;
     const flaky: Ratings = {
       ...onlineFake.ratings,
@@ -202,7 +217,7 @@ describe('<RatingsScreen />', () => {
 
 describe('the global board switch', () => {
   it('has a lock and the reason before I can show there, and still lets me hide', async () => {
-    signInSaved();
+    await signInSaved();
     await win(ME, 'ann');
     await show();
     const user = setupUser();
@@ -213,7 +228,7 @@ describe('the global board switch', () => {
     );
     // Not on the board: my row pins under it, with my rating.
     expect(screen.getByTestId('ratings-pinned-row').props.accessibilityLabel).toMatch(
-      /^Guest \d{4} \(you\), not on the board yet, rating 15\d\d$/,
+      /^U_me \(you\), not on the board yet, rating 15\d\d$/,
     );
     await user.press(toggle);
     await flush();
@@ -223,7 +238,7 @@ describe('the global board switch', () => {
 
 describe('How ratings work', () => {
   it('opens the five rules and closes with Got it', async () => {
-    signInSaved();
+    await signInSaved();
     await show();
     const user = setupUser();
     await user.press(screen.getByRole('button', { name: 'How ratings work' }));

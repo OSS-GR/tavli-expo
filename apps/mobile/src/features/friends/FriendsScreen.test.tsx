@@ -11,9 +11,11 @@ import {
   saveFriendInviteSetup,
 } from '@/features/invites/friendInviteSetup';
 import { TOAST_MS } from '@/components/Toast';
-import { analytics, auth, storage } from '@/services';
+import { analytics, auth, storage, usernames } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { markNamed } from '@tavli/online/testing';
+
 import { onlineFake } from '../../../test/onlineFake';
 
 import { FriendsScreen } from './FriendsScreen';
@@ -36,27 +38,28 @@ async function flush(): Promise<void> {
 }
 
 /** Signs me in with a saved account. */
-function signInSaved(): void {
+async function signInSaved(): Promise<void> {
   onlineFake.authStore.session = { id: ME, isGuest: false };
-  onlineFake.server().markSaved(ME);
+  // Friends and the leaderboards need a username (#599).
+  await markNamed(onlineFake.server(), ME);
 }
 
 /** A saved player I met in a game (so each of us has a name). */
-function meet(id: string): void {
+async function meet(id: string): Promise<void> {
   const server = onlineFake.server();
-  server.markSaved(id);
+  await markNamed(server, id);
   server.createGame(ME, { white: ME, black: id }, 'portes', 3, null);
 }
 
 /** `id` and I become friends: they ask, I accept. */
 async function befriend(id: string): Promise<void> {
-  meet(id);
+  await meet(id);
   const server = onlineFake.server();
   await server.friendsFor(id).sendRequest(ME);
   await server.friendsFor(ME).acceptRequest(id);
 }
 
-const nameOf = (id: string) => `Guest ${onlineFake.guestNumber(id)}`;
+const nameOf = (id: string) => `U_${id}`;
 
 /** Opens the friend sheet of `id` (the row's "more" button). */
 async function openSheet(user: ReturnType<typeof setupUser>, id: string): Promise<void> {
@@ -77,6 +80,7 @@ async function show(friends: Friends = onlineFake.friends, ratings?: Ratings) {
   await render(
     <FriendsScreen
       auth={auth!}
+      usernames={usernames!}
       friends={friends}
       safety={onlineFake.safety}
       {...(ratings === undefined ? {} : { ratings })}
@@ -98,6 +102,39 @@ describe('<FriendsScreen />', () => {
     expect(props.onAccount).toHaveBeenCalled();
   });
 
+  it('a saved account with no username picks one first, then Friends opens (#599)', async () => {
+    onlineFake.authStore.session = { id: ME, isGuest: false };
+    onlineFake.server().markSaved(ME);
+    await show();
+    expect(screen.getByTestId('friends-username-gate')).toBeOnTheScreen();
+    expect(screen.getByText('Pick a username first')).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        'Friends find you by your username and see it in each game. Pick one to add friends and invite them.',
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.queryByTestId('friends-empty')).toBeNull();
+    const user = setupUser();
+    await user.type(screen.getByTestId('username-input'), 'Orestis');
+    await user.press(screen.getByTestId('username-terms'));
+    await user.press(screen.getByTestId('username-age'));
+    await user.press(screen.getByTestId('username-save'));
+    await flush();
+    expect(screen.queryByTestId('friends-username-gate')).toBeNull();
+    expect(screen.getByTestId('friends-empty')).toBeOnTheScreen();
+  });
+
+  it('a call that gets USERNAME_NEEDED shows the username gate (#599)', async () => {
+    await signInSaved();
+    // The owner clears the name while the list shows (`clearUsername`).
+    const failing: Friends = {
+      ...onlineFake.friends,
+      listFriends: () => Promise.reject({ code: 'USERNAME_NEEDED', message: 'pick a username' }),
+    };
+    await show(failing);
+    expect(screen.getByTestId('friends-username-gate')).toBeOnTheScreen();
+  });
+
   it('with nobody signed in, says so and makes no account', async () => {
     const props = await show();
     expect(screen.getByTestId('friends-signed-out')).toBeOnTheScreen();
@@ -106,7 +143,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('with no friends, shows the empty state: Add a friend and a Leaderboards link', async () => {
-    signInSaved();
+    await signInSaved();
     const mine = jest
       .fn()
       .mockResolvedValue({ rating: 1490, matches: 1, experience: 3, shown: true, listed: false });
@@ -126,8 +163,8 @@ describe('<FriendsScreen />', () => {
   });
 
   it('with a request but no friend, shows the list and says it has no friend', async () => {
-    signInSaved();
-    meet('ann');
+    await signInSaved();
+    await meet('ann');
     await onlineFake.server().friendsFor('ann').sendRequest(ME);
     await show();
     expect(screen.getByTestId('friends-incoming')).toBeOnTheScreen();
@@ -138,7 +175,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('shows my rating on the Leaderboards row once I have a rated match', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     const mine = jest
       .fn()
@@ -152,7 +189,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('shows no rating chip before the first rated match', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     const mine = jest
       .fn()
@@ -163,7 +200,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('shows no rating chip when the rating call fails, and no problem line', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     const failing = jest.fn().mockRejectedValue(new Error('offline'));
     await show(onlineFake.friends, { ...onlineFake.ratings, mine: failing });
@@ -172,7 +209,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('loads again each time the screen shows (a new visit)', async () => {
-    signInSaved();
+    await signInSaved();
     const props = {
       onBack: jest.fn(),
       onAdd: jest.fn(),
@@ -184,6 +221,7 @@ describe('<FriendsScreen />', () => {
     const ui = (visit: number) => (
       <FriendsScreen
         auth={auth!}
+        usernames={usernames!}
         friends={onlineFake.friends}
         safety={onlineFake.safety}
         visit={visit}
@@ -204,7 +242,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('keeps the list and says it may be old when a reload on the way back fails', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     let down = false;
     const flaky: Friends = {
@@ -223,6 +261,7 @@ describe('<FriendsScreen />', () => {
     const ui = (visit: number) => (
       <FriendsScreen
         auth={auth!}
+        usernames={usernames!}
         friends={flaky}
         safety={onlineFake.safety}
         visit={visit}
@@ -249,7 +288,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('lists friends with a count, and Invite with no saved setup opens the full setup', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     const props = await show();
     expect(screen.getByText(nameOf('ann'))).toBeOnTheScreen();
@@ -267,7 +306,7 @@ describe('<FriendsScreen />', () => {
     const LAST: NewInvite = { choice: 'plakoto', targetPoints: 3, turnTimeMinutes: null };
 
     it('asks first with the setup, and says nothing of the 24-hour default', async () => {
-      signInSaved();
+      await signInSaved();
       await befriend('ann');
       saveFriendInviteSetup(LAST);
       const props = await show();
@@ -282,7 +321,7 @@ describe('<FriendsScreen />', () => {
     });
 
     it('names a turn timer when the setup has one', async () => {
-      signInSaved();
+      await signInSaved();
       await befriend('ann');
       saveFriendInviteSetup({ choice: 'portes', targetPoints: 1, turnTimeMinutes: 5 });
       await show();
@@ -294,7 +333,7 @@ describe('<FriendsScreen />', () => {
     });
 
     it('Send sends that setup to the friend and stays, with "Invite sent" (#507)', async () => {
-      signInSaved();
+      await signInSaved();
       await befriend('ann');
       saveFriendInviteSetup(LAST);
       const sent = jest.spyOn(analytics, 'track');
@@ -328,7 +367,7 @@ describe('<FriendsScreen />', () => {
     });
 
     it('a send from the full setup comes back with "Invite sent" (#507)', async () => {
-      signInSaved();
+      await signInSaved();
       await befriend('ann');
       noteInviteSent({ playerId: 'ann', code: 'ABCD2345' });
       await show();
@@ -340,7 +379,7 @@ describe('<FriendsScreen />', () => {
     });
 
     it('drops a note that waited too long for Friends (#507)', async () => {
-      signInSaved();
+      await signInSaved();
       await befriend('ann');
       const sentAt = Date.now();
       noteInviteSent({ playerId: 'ann', code: 'ABCD2345' });
@@ -353,7 +392,7 @@ describe('<FriendsScreen />', () => {
     });
 
     it('Change opens the full setup; Cancel sends nothing', async () => {
-      signInSaved();
+      await signInSaved();
       await befriend('ann');
       saveFriendInviteSetup(LAST);
       const props = await show();
@@ -372,7 +411,7 @@ describe('<FriendsScreen />', () => {
     });
 
     it('a failed send closes the confirm and says why', async () => {
-      signInSaved();
+      await signInSaved();
       await befriend('ann');
       saveFriendInviteSetup(LAST);
       const inviteFriend = jest
@@ -392,9 +431,9 @@ describe('<FriendsScreen />', () => {
   });
 
   it('Accept makes a friend; Decline takes the request away', async () => {
-    signInSaved();
-    meet('ann');
-    meet('bob');
+    await signInSaved();
+    await meet('ann');
+    await meet('bob');
     await onlineFake.server().friendsFor('ann').sendRequest(ME);
     await onlineFake.server().friendsFor('bob').sendRequest(ME);
     await show();
@@ -410,8 +449,8 @@ describe('<FriendsScreen />', () => {
   });
 
   it('Cancel takes back a request I sent', async () => {
-    signInSaved();
-    meet('ann');
+    await signInSaved();
+    await meet('ann');
     await onlineFake.server().friendsFor(ME).sendRequest('ann');
     await show();
     await setupUser().press(
@@ -422,7 +461,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('the friend sheet shows since when, and Invite to a game invites', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     const props = await show();
     const user = setupUser();
@@ -436,7 +475,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('Remove asks first, then ends the friendship', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     await show();
     const user = setupUser();
@@ -456,7 +495,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('Report or block opens the sheet; a block ends the friendship', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     await show();
     const user = setupUser();
@@ -472,7 +511,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('shows a friend invite to me; Open opens the invite', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     const code = await onlineFake
       .server()
@@ -486,7 +525,7 @@ describe('<FriendsScreen />', () => {
   });
 
   it('a failed call keeps the list and says why', async () => {
-    signInSaved();
+    await signInSaved();
     await befriend('ann');
     const removeFriend = jest.fn().mockRejectedValue(new Error('offline'));
     await show({ ...onlineFake.friends, removeFriend });
@@ -507,7 +546,7 @@ describe('<FriendsScreen />', () => {
   ])(
     'a call that gets %s shows that in place of the list, as a load would',
     async (code, shown) => {
-      signInSaved();
+      await signInSaved();
       await befriend('ann');
       const removeFriend = jest.fn().mockRejectedValue({ code, message: 'no' });
       await show({ ...onlineFake.friends, removeFriend });
@@ -523,7 +562,7 @@ describe('<FriendsScreen />', () => {
   );
 
   it('a failed load offers Try again', async () => {
-    signInSaved();
+    await signInSaved();
     const listFriends = jest.fn().mockRejectedValueOnce(new Error('offline'));
     listFriends.mockImplementation(() => onlineFake.friends.listFriends());
     await show({ ...onlineFake.friends, listFriends });

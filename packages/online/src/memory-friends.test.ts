@@ -17,6 +17,7 @@ import type { FriendsContractSubject } from '@tavli/contracts/testing';
 import { createSeededRng } from '@tavli/engine';
 
 import { createMemoryGameServer } from './memory-server';
+import { markNamed } from './testing';
 import type { MemoryGameServer } from './memory-server';
 
 const START = Date.UTC(2026, 10, 9, 12, 0, 0);
@@ -54,9 +55,13 @@ describe('Friends contract (in-memory server)', () => {
 });
 
 /** `ids` saved players. */
-function savedPlayers(server: MemoryGameServer, prefix: string, count: number): string[] {
+async function savedPlayers(
+  server: MemoryGameServer,
+  prefix: string,
+  count: number,
+): Promise<string[]> {
   const ids = Array.from({ length: count }, (_, i) => `${prefix}${i}`);
-  for (const id of ids) server.markSaved(id);
+  for (const id of ids) await markNamed(server, id);
   return ids;
 }
 
@@ -69,8 +74,8 @@ async function ask(server: MemoryGameServer, from: string, to: string) {
 describe('friends on the in-memory server', () => {
   it('caps open requests sent at MAX_OPEN_FRIEND_REQUESTS', async () => {
     const { server } = setup();
-    server.markSaved('me');
-    const others = savedPlayers(server, 'p', MAX_OPEN_FRIEND_REQUESTS + 1);
+    await markNamed(server, 'me');
+    const others = await savedPlayers(server, 'p', MAX_OPEN_FRIEND_REQUESTS + 1);
     for (const other of others.slice(0, -1)) await ask(server, 'me', other);
     await expect(ask(server, 'me', others.at(-1) ?? '')).rejects.toMatchObject({
       code: 'TOO_MANY_REQUESTS',
@@ -82,8 +87,8 @@ describe('friends on the in-memory server', () => {
 
   it('a full inbox refuses new requests with TRY_LATER', async () => {
     const { server } = setup();
-    server.markSaved('me');
-    const others = savedPlayers(server, 'p', MAX_INCOMING_FRIEND_REQUESTS + 1);
+    await markNamed(server, 'me');
+    const others = await savedPlayers(server, 'p', MAX_INCOMING_FRIEND_REQUESTS + 1);
     for (const other of others.slice(0, -1)) await ask(server, other, 'me');
     await expect(ask(server, others.at(-1) ?? '', 'me')).rejects.toMatchObject({
       code: 'TRY_LATER',
@@ -95,9 +100,9 @@ describe('friends on the in-memory server', () => {
 
   it('caps friends at MAX_FRIENDS, on both sides', async () => {
     const { server } = setup();
-    server.markSaved('me');
-    server.markSaved('late');
-    const others = savedPlayers(server, 'p', MAX_FRIENDS);
+    await markNamed(server, 'me');
+    await markNamed(server, 'late');
+    const others = await savedPlayers(server, 'p', MAX_FRIENDS);
     for (const other of others) {
       await ask(server, other, 'me');
       await server.friendsFor('me').acceptRequest(other);
@@ -118,7 +123,7 @@ describe('friends on the in-memory server', () => {
 
   it('limits username searches per hour, over a moving window', async () => {
     const { server, passTime } = setup();
-    server.markSaved('me');
+    await markNamed(server, 'me');
     const friends = server.friendsFor('me');
     for (let i = 0; i < FRIEND_SEARCHES_PER_HOUR - 1; i += 1) await friends.findPlayer(`n${i}`);
     // A request by username counts too.
@@ -134,8 +139,8 @@ describe('friends on the in-memory server', () => {
 
   it('a declined sender may ask again after FRIEND_REQUEST_WAIT_MS', async () => {
     const { server, passTime } = setup();
-    server.markSaved('a');
-    server.markSaved('b');
+    await markNamed(server, 'a');
+    await markNamed(server, 'b');
     await ask(server, 'a', 'b');
     await server.friendsFor('b').declineRequest('a');
     passTime(FRIEND_REQUEST_WAIT_MS - 1);

@@ -14,6 +14,7 @@ import type { MatchmakingContractSubject } from '@tavli/contracts/testing';
 import { createSeededRng } from '@tavli/engine';
 
 import { createMemoryGameServer } from './memory-server';
+import { markNamed } from './testing';
 
 const START = Date.UTC(2026, 10, 13, 12, 0, 0);
 const DAY = 24 * 60 * 60 * 1000;
@@ -39,6 +40,7 @@ function contractSubject(): MatchmakingContractSubject {
     invitesFor: (player) => server.invitesFor(player),
     safetyFor: (player) => server.safetyFor(player),
     onlineDataFor: (player) => server.onlineDataFor(player),
+    usernamesFor: (player) => server.usernamesFor(player, player !== 'guest'),
     setRating: (player, rating) => {
       server.setRatingForTest(player, rating);
       return Promise.resolve();
@@ -57,9 +59,16 @@ describe('Matchmaking contract (in-memory server)', () => {
   }
 });
 
+/** `setup()` with usernames for alice, bob and carol: a seek needs one (#599). */
+async function namedSetup() {
+  const made = setup();
+  for (const player of ['alice', 'bob', 'carol']) await markNamed(made.server, player);
+  return made;
+}
+
 describe('matchmaking on the in-memory server', () => {
   it('forgets a matched seek after its time; the game goes on', async () => {
-    const { server, passTime } = setup();
+    const { server, passTime } = await namedSetup();
     await server.matchmakingFor('alice').seek({ game: 'portes' });
     await server.matchmakingFor('bob').seek({ game: 'portes' });
     const mine = await server.matchmakingFor('alice').mySeek();
@@ -75,7 +84,7 @@ describe('matchmaking on the in-memory server', () => {
   });
 
   it('matches the pair again on the next UTC day', async () => {
-    const { server, passTime } = setup();
+    const { server, passTime } = await namedSetup();
     const both = async () => {
       await server.matchmakingFor('alice').seek({ game: 'portes' });
       await server.matchmakingFor('bob').seek({ game: 'portes' });
@@ -96,7 +105,7 @@ describe('matchmaking on the in-memory server', () => {
   });
 
   it('runs the matching only for live seeks: a seek that ended is gone', async () => {
-    const { server, passTime } = setup();
+    const { server, passTime } = await namedSetup();
     await server.matchmakingFor('alice').seek({ game: 'fevga' });
     passTime(SEEK_RANGE_GROW_MS);
     await server.runMatching();

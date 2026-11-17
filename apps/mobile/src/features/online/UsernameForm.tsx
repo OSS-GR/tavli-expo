@@ -43,6 +43,8 @@ export interface UsernameFormProps {
   onNotNow?: () => void;
   /** A title above the form (the sign-in card). Focus moves to it. */
   title?: string;
+  /** The text under the title. Default: what a username is for. */
+  body?: string;
   /** For tests. Default: the phone's region. */
   region?: string | null;
 }
@@ -55,6 +57,7 @@ export function UsernameForm({
   onDone,
   onNotNow,
   title,
+  body,
   region,
 }: UsernameFormProps) {
   const { t, i18n } = useTranslation();
@@ -148,7 +151,7 @@ export function UsernameForm({
           {title}
         </Text>
       ) : null}
-      <Text style={styles.body}>{t('username.body')}</Text>
+      <Text style={styles.body}>{body ?? t('username.body')}</Text>
       <TextInput
         testID="username-input"
         style={[styles.input, problemText !== null && styles.inputProblem]}

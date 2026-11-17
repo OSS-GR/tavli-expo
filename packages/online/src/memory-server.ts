@@ -127,6 +127,7 @@ import type { SavedGame } from './calls';
 import {
   FriendsError,
   checkFriendTarget,
+  checkFriendUsername,
   checkFriends,
   checkOpenRequest,
   checkSaved,
@@ -156,6 +157,7 @@ import {
   MatchmakingError,
   checkRankedChoice,
   checkSeekSaved,
+  checkSeekUsername,
   countLooking,
   isMatchedSeekDone,
   isSeekExpired,
@@ -1396,6 +1398,11 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     }
   }
 
+  /** `playerId` has picked a username (#405), like the Convex `playerNames.username`. */
+  function hasUsername(playerId: string): boolean {
+    return nameRecords.get(playerId)?.username !== undefined;
+  }
+
   /** `playerId` has a saved account that exists. */
   function isSaved(playerId: string): boolean {
     return savedPlayers.has(playerId) && !deletedPlayers.has(playerId);
@@ -1686,6 +1693,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       seek: (request) =>
         call(async () => {
           const id = saved();
+          checkSeekUsername(hasUsername(id));
           const game = checkRankedChoice((request as { game?: unknown } | null)?.game);
           const at = now();
           const existing = seeks.get(id) ?? null;
@@ -1759,6 +1767,12 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       checkSaved(savedPlayers.has(id));
       return id;
     };
+    // The calls that reach another player need a username too (#599).
+    const named = (): string => {
+      const id = saved();
+      checkFriendUsername(hasUsername(id));
+      return id;
+    };
     const call = async <T>(step: () => T): Promise<T> => {
       await nextTick();
       try {
@@ -1822,13 +1836,13 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         }),
       findPlayer: (username) =>
         call(() => {
-          const id = saved();
+          const id = named();
           countSearch(id);
           return found(id, holderOfUsername(username));
         }),
       myFriendLink: () =>
         call(() => {
-          const id = saved();
+          const id = named();
           const kept = tokenOf.get(id);
           if (kept !== undefined) return kept;
           const token = pickFriendTokenNow(tokenRng, (taken) => friendTokens.has(taken));
@@ -1838,7 +1852,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         }),
       resetFriendLink: () =>
         call(() => {
-          const id = saved();
+          const id = named();
           const old = tokenOf.get(id);
           if (old !== undefined) friendTokens.delete(old);
           const token = pickFriendTokenNow(tokenRng, (taken) => friendTokens.has(taken));
@@ -1849,7 +1863,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       openFriendLink: (token) => call(() => found(caller(), ownerOfToken(token))),
       requestByLink: (token) =>
         call(() => {
-          const id = saved();
+          const id = named();
           const owner = ownerOfToken(token);
           if (owner !== null && owner !== id && blockedEither(id, owner)) {
             throw new FriendsError('NOT_FOUND', 'no such player');
@@ -1858,19 +1872,19 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
         }),
       requestByUsername: (username) =>
         call(() => {
-          const id = saved();
+          const id = named();
           countSearch(id);
           return request(id, holderOfUsername(username), 'username');
         }),
       sendRequest: (other) =>
         call(() => {
-          const id = saved();
+          const id = named();
           checkFriendTarget(id, other);
           return request(id, other, 'met');
         }),
       acceptRequest: (other) =>
         call(() => {
-          const id = saved();
+          const id = named();
           const theirs = friendRequests.get(requestKey(other, id)) ?? null;
           checkOpenRequest(theirs);
           const plan = planRequest({
@@ -1915,7 +1929,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       inviteFriend: (other, game) => {
         const { choice, targetPoints, turnTimeMinutes } = copy(game);
         return call(() => {
-          const id = saved();
+          const id = named();
           checkFriends(isFriend(id, other));
           try {
             return makeInvite(id, choice, targetPoints, turnTimeMinutes, other);

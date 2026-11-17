@@ -7,9 +7,11 @@ import { TERMS_VERSION, type Friends } from '@tavli/contracts';
 import { act, render, screen } from '@testing-library/react-native';
 import { Linking, Share } from 'react-native';
 
-import { auth } from '@/services';
+import { auth, usernames } from '@/services';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { markNamed } from '@tavli/online/testing';
+
 import { onlineFake } from '../../../test/onlineFake';
 
 import { AddFriendScreen } from './AddFriendScreen';
@@ -25,23 +27,26 @@ async function flush(): Promise<void> {
   });
 }
 
-function signInSaved(): void {
+async function signInSaved(): Promise<void> {
   onlineFake.authStore.session = { id: ME, isGuest: false };
-  onlineFake.server().markSaved(ME);
+  // Friends and the leaderboards need a username (#599).
+  await markNamed(onlineFake.server(), ME);
 }
 
 /** A saved player I met in a game. */
-function meet(id: string): void {
+async function meet(id: string): Promise<void> {
   const server = onlineFake.server();
-  server.markSaved(id);
+  await markNamed(server, id);
   server.createGame(ME, { white: ME, black: id }, 'portes', 3, null);
 }
 
-const nameOf = (id: string) => `Guest ${onlineFake.guestNumber(id)}`;
+const nameOf = (id: string) => `U_${id}`;
 
 async function show(friends: Friends = onlineFake.friends) {
   const props = { onBack: jest.fn(), onLink: jest.fn(), onAccount: jest.fn() };
-  await render(<AddFriendScreen auth={auth!} friends={friends} {...props} />);
+  await render(
+    <AddFriendScreen auth={auth!} usernames={usernames!} friends={friends} {...props} />,
+  );
   await flush();
   return props;
 }
@@ -62,7 +67,7 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('shows my friend link and its QR code', async () => {
-    signInSaved();
+    await signInSaved();
     await show();
     const link = await myLink();
     expect(screen.getByTestId('add-friend-link')).toHaveTextContent(link);
@@ -70,7 +75,7 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('Share link opens the share sheet, Message the Messages app, with the link', async () => {
-    signInSaved();
+    await signInSaved();
     const share = jest
       .spyOn(Share, 'share')
       .mockResolvedValue({ action: 'sharedAction', activityType: undefined });
@@ -87,7 +92,7 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('New link asks first, then shows a new link; the old one stops working', async () => {
-    signInSaved();
+    await signInSaved();
     await show();
     const old = await myLink();
     const user = setupUser();
@@ -100,10 +105,16 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('after New link, a later load shows the link the server has', async () => {
-    signInSaved();
+    await signInSaved();
     const props = { onBack: jest.fn(), onLink: jest.fn(), onAccount: jest.fn() };
     const ui = (visit: number) => (
-      <AddFriendScreen auth={auth!} friends={onlineFake.friends} visit={visit} {...props} />
+      <AddFriendScreen
+        auth={auth!}
+        usernames={usernames!}
+        friends={onlineFake.friends}
+        visit={visit}
+        {...props}
+      />
     );
     await render(ui(1));
     await flush();
@@ -120,7 +131,7 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('a load that started before New link never brings the old link back', async () => {
-    signInSaved();
+    await signInSaved();
     // While `held` is a list, myFriendLink waits until the test lets it answer.
     let held: (() => void)[] | null = null;
     const slow: Friends = {
@@ -136,7 +147,13 @@ describe('<AddFriendScreen />', () => {
     };
     const props = { onBack: jest.fn(), onLink: jest.fn(), onAccount: jest.fn() };
     const ui = (visit: number) => (
-      <AddFriendScreen auth={auth!} friends={slow} visit={visit} {...props} />
+      <AddFriendScreen
+        auth={auth!}
+        usernames={usernames!}
+        friends={slow}
+        visit={visit}
+        {...props}
+      />
     );
     await render(ui(1));
     await flush();
@@ -164,7 +181,7 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('on a new visit, shows no QR code and shares nothing until the link loads', async () => {
-    signInSaved();
+    await signInSaved();
     let held: (() => void)[] | null = null;
     let down = false;
     const slow: Friends = {
@@ -182,7 +199,13 @@ describe('<AddFriendScreen />', () => {
     const share = jest.spyOn(Share, 'share');
     const props = { onBack: jest.fn(), onLink: jest.fn(), onAccount: jest.fn() };
     const ui = (visit: number) => (
-      <AddFriendScreen auth={auth!} friends={slow} visit={visit} {...props} />
+      <AddFriendScreen
+        auth={auth!}
+        usernames={usernames!}
+        friends={slow}
+        visit={visit}
+        {...props}
+      />
     );
     await render(ui(1));
     await flush();
@@ -218,7 +241,7 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('after New link, a failed reload keeps the new link shown and shareable', async () => {
-    signInSaved();
+    await signInSaved();
     let down = false;
     const flaky: Friends = {
       ...onlineFake.friends,
@@ -241,8 +264,8 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('after Ask, a failed reload keeps the link of this visit shown', async () => {
-    signInSaved();
-    meet('ann');
+    await signInSaved();
+    await meet('ann');
     let down = false;
     const flaky: Friends = {
       ...onlineFake.friends,
@@ -268,8 +291,8 @@ describe('<AddFriendScreen />', () => {
   ])(
     'a call that gets %s shows that in place of the link, as a load would',
     async (code, shown) => {
-      signInSaved();
-      meet('ann');
+      await signInSaved();
+      await meet('ann');
       const sendRequest = jest.fn().mockRejectedValue({ code, message: 'no' });
       await show({ ...onlineFake.friends, sendRequest });
       await setupUser().press(
@@ -283,7 +306,7 @@ describe('<AddFriendScreen />', () => {
   );
 
   it('finds a player by exact username and asks them', async () => {
-    signInSaved();
+    await signInSaved();
     onlineFake.server().markSaved('ann');
     await onlineFake
       .server()
@@ -310,7 +333,7 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('a pasted friend link opens; other text says it is not one', async () => {
-    signInSaved();
+    await signInSaved();
     const props = await show();
     const user = setupUser();
     // The paste field shows once its row is open.
@@ -327,8 +350,8 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('lists recent players: Ask sends a request, and the row then says so', async () => {
-    signInSaved();
-    meet('ann');
+    await signInSaved();
+    await meet('ann');
     await show();
     const user = setupUser();
     await user.press(screen.getByRole('button', { name: `Ask ${nameOf('ann')} to be friends` }));
@@ -338,8 +361,8 @@ describe('<AddFriendScreen />', () => {
   });
 
   it('a refused request says why', async () => {
-    signInSaved();
-    meet('ann');
+    await signInSaved();
+    await meet('ann');
     const sendRequest = jest
       .fn()
       .mockRejectedValue({ code: 'TOO_MANY_REQUESTS', message: 'too many' });

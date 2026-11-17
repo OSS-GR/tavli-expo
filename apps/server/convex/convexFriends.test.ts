@@ -44,7 +44,7 @@ import { setPushProvider } from './push';
 import schema from './schema';
 import { convexTestNetwork } from './test.network';
 import type { Tester } from './test.network';
-import { authUsers, modules } from './test.setup';
+import { authUsers, modules, nameUsers } from './test.setup';
 
 // The players, made by `setup()`.
 let ALICE = '';
@@ -52,11 +52,13 @@ let BOB = '';
 let CAROL = '';
 let GUEST = '';
 
-async function setup() {
+/** `named`: alice, bob and carol get a username (friends and seeks need one, #599). */
+async function setup(named = true) {
   const t = convexTest(schema, modules);
   betterAuthTest.register(t);
   [ALICE = '', BOB = '', CAROL = ''] = await authUsers(t, 3, true);
   [GUEST = ''] = await authUsers(t, 1);
+  if (named) await nameUsers(t, [ALICE, BOB, CAROL]);
   return t;
 }
 
@@ -93,7 +95,7 @@ async function runScheduled(t: Tester) {
 }
 
 async function contractSubject(): Promise<FriendsContractSubject> {
-  const t = await setup();
+  const t = await setup(false);
   const network = convexTestNetwork(t);
   const ids = { alice: ALICE, bob: BOB, carol: CAROL, guest: GUEST } as const;
   const clientOf = (player: FriendsContractPlayer) => network.clientFor(ids[player]);
@@ -146,6 +148,7 @@ describe('friends on the Convex server', () => {
   it('caps open requests sent at MAX_OPEN_FRIEND_REQUESTS; a cancel frees a place', async () => {
     const t = await setup();
     const others = await authUsers(t, MAX_OPEN_FRIEND_REQUESTS + 1, true);
+    await nameUsers(t, others);
     for (const other of others.slice(0, -1)) await ask(t, ALICE, other);
     const last = others.at(-1) ?? '';
     await expect(ask(t, ALICE, last)).rejects.toMatchObject({

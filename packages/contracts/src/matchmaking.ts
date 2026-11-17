@@ -3,7 +3,8 @@
  * know each other ask for a game, and the server pairs them.
  *
  * - **Who:** saved accounts only (a guest gets `NOT_SAVED`), like friends
- *   and ratings (ADR-0008). One open seek per player.
+ *   and ratings (ADR-0008). A seek needs a username too (owner,
+ *   2026-11-17, #599: `USERNAME_NEEDED`). One open seek per player.
  * - **What:** the player picks one of `RANKED_GAMES`. A ranked match is a
  *   match to `RANKED_TARGET_POINTS`, with the fixed turn time
  *   `RANKED_TURN_TIME_MINUTES` (ADR-0009). The game plays the default
@@ -114,6 +115,8 @@ export const MATCHMAKING_ERROR_CODES = [
   'NOT_SIGNED_IN',
   /** The caller is a guest: Play ranked needs a saved account. */
   'NOT_SAVED',
+  /** `seek` only: a saved account with no username (#599). */
+  'USERNAME_NEEDED',
   /** Not a ranked game. */
   'BAD_REQUEST',
 ] as const;
@@ -143,7 +146,8 @@ export interface SeekRequest {
 
 /**
  * The matchmaking port. Every call rejects with `MatchmakingErrorData`:
- * `NOT_SIGNED_IN` with nobody signed in, `NOT_SAVED` for a guest.
+ * `NOT_SIGNED_IN` with nobody signed in, `NOT_SAVED` for a guest, and
+ * `USERNAME_NEEDED` on `seek` for a saved account with no username.
  */
 export interface Matchmaking {
   /**
