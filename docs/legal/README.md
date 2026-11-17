@@ -58,7 +58,7 @@ Remove the `<!-- ... -->` comments first. Wrap each `<table>…</table>` in `<di
 2. Point `tavlaki.com` at the host. Both `https://tavlaki.com/privacy` and `https://tavlaki.com/el/privacy` must open the pages. Cloudflare serves `privacy/index.html` at `/privacy/` and redirects `/privacy` there.
 3. Use HTTPS. Do not add analytics or cookies to the site.
 4. Put `https://tavlaki.com/privacy` in App Store Connect (App Privacy → Privacy Policy URL) and in the Google Play Console (App content → Privacy policy).
-5. Put `https://tavlaki.com` in App Store Connect as the Support URL and the Marketing URL (Greek localization: `https://tavlaki.com/el/`). The homepage shows `support@tavlaki.com`: make that address work.
+5. Put `https://tavlaki.com` in App Store Connect as the Support URL and the Marketing URL (Greek localization: `https://tavlaki.com/el/`). The homepage shows `support@tavlaki.com` (a Proton Mail mailbox since 2026-11-09, see "Mail" in `docs/process/running-the-app.md`).
 
 ## Invite links (#332)
 
@@ -80,7 +80,7 @@ Do not add analytics, cookies or outside fonts to the site. The invite pages car
 
 - [ ] Publish only after PR #89 (`feat/61-analytics`) is merged. The policy describes the consent screen and the one privacy switch from that PR. On `main` before #89, crash reports always carry the install id.
 - [x] Put your full name in "Who is responsible", in both languages (Orestis Stefanis, 2026-11-16).
-- [ ] Make `privacy@tavlaki.com` work (or change it in all four files).
+- [x] One contact address: `support@tavlaki.com` in the policy, the terms and the homepage (owner, 2026-11-16).
 - [ ] Sentry: check that the organization uses the **EU** data region (Frankfurt). Sentry sets it when the organization is made, and it cannot change later. If it is the US region, change the table in the policy.
 - [ ] Sentry: turn on **Prevent Storing of IP Addresses** (see `packages/adapters/crash-sentry/README.md`).
 - [ ] PostHog: use an **EU** project and turn on **Discard client IP data** (see `docs/architecture/analytics-events.md`).

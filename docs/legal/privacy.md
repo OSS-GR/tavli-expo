@@ -32,7 +32,7 @@ Tavlaki is a Greek backgammon (tavli) app for iPhone and Android. This policy sa
 
 Tavlaki is made by **Orestis Stefanis**, an individual developer in New York, USA. We are the "controller" for the data on this page: we decide what data the app uses and why. For players in the EU and the EEA, the EU General Data Protection Regulation (GDPR) applies.
 
-Contact: **privacy@tavlaki.com** <!-- OWNER: confirm this address works before publishing. --> <!-- OWNER: a lawyer checks GDPR Article 27: a controller outside the EU that serves players in the EU may need a representative in the EU. Article 27(2) has an exception for processing that is occasional and low risk; we do not claim it here. Also check the line on our own access from the USA under "Services that process the data". -->
+Contact: **support@tavlaki.com** <!-- OWNER: a lawyer checks GDPR Article 27: a controller outside the EU that serves players in the EU may need a representative in the EU. Article 27(2) has an exception for processing that is occasional and low risk; we do not claim it here. Also check the line on our own access from the USA under "Services that process the data". -->
 
 ## What stays on your phone
 
@@ -229,7 +229,7 @@ Under the GDPR you have the right to:
 - get your data in a portable form;
 - **complain** to the data protection authority of the EU or EEA country where you live, where you work, or where the problem happened. In Greece, for example, this is the Hellenic Data Protection Authority ([www.dpa.gr](https://www.dpa.gr)).
 
-To ask, write to **privacy@tavlaki.com**. We answer within one month.
+To ask, write to **support@tavlaki.com**. We answer within one month.
 
 If you live outside the EU and the EEA, you can ask us the same things, and we answer the same way. We do not sell your personal data, and we do not share it for ads.
 
@@ -272,4 +272,4 @@ If we change this policy, we update the date at the top. If a change affects wha
 
 ## Contact
 
-**privacy@tavlaki.com**
+**support@tavlaki.com**

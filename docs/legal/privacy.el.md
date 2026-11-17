@@ -32,7 +32,7 @@ English: [tavlaki.com/privacy](https://tavlaki.com/privacy)
 
 Το Ταβλάκι το φτιάχνει ο **Ορέστης Στεφανής**, ιδιώτης στη Νέα Υόρκη των ΗΠΑ. Είμαστε ο «υπεύθυνος επεξεργασίας» για τα δεδομένα αυτής της σελίδας: αποφασίζουμε ποια δεδομένα χρησιμοποιεί η εφαρμογή και γιατί. Για τους παίκτες στην ΕΕ και στον ΕΟΧ ισχύει ο Γενικός Κανονισμός για την Προστασία Δεδομένων (ΓΚΠΔ / GDPR).
 
-Επικοινωνία: **privacy@tavlaki.com** <!-- OWNER: confirm this address works before publishing. --> <!-- OWNER: a lawyer checks GDPR Article 27: a controller outside the EU that serves players in the EU may need a representative in the EU. Article 27(2) has an exception for processing that is occasional and low risk; we do not claim it here. Also check the line on our own access from the USA under "Services that process the data". -->
+Επικοινωνία: **support@tavlaki.com** <!-- OWNER: a lawyer checks GDPR Article 27: a controller outside the EU that serves players in the EU may need a representative in the EU. Article 27(2) has an exception for processing that is occasional and low risk; we do not claim it here. Also check the line on our own access from the USA under "Services that process the data". -->
 
 ## Τι μένει στο κινητό σας
 
@@ -229,7 +229,7 @@ English: [tavlaki.com/privacy](https://tavlaki.com/privacy)
 - να πάρετε τα δεδομένα σας σε μορφή που μεταφέρεται·
 - **καταγγελίας** στην αρχή προστασίας δεδομένων της χώρας της ΕΕ ή του ΕΟΧ όπου ζείτε, όπου εργάζεστε ή όπου έγινε το πρόβλημα. Στην Ελλάδα, για παράδειγμα, είναι η Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα ([www.dpa.gr](https://www.dpa.gr)).
 
-Για οποιοδήποτε αίτημα, γράψτε στο **privacy@tavlaki.com**. Απαντάμε μέσα σε έναν μήνα.
+Για οποιοδήποτε αίτημα, γράψτε στο **support@tavlaki.com**. Απαντάμε μέσα σε έναν μήνα.
 
 Αν ζείτε εκτός ΕΕ και ΕΟΧ, μπορείτε να μας ζητήσετε τα ίδια, και απαντάμε με τον ίδιο τρόπο. Δεν πουλάμε τα προσωπικά σας δεδομένα και δεν τα δίνουμε σε κανέναν για διαφημίσεις.
 
@@ -272,4 +272,4 @@ English: [tavlaki.com/privacy](https://tavlaki.com/privacy)
 
 ## Επικοινωνία
 
-**privacy@tavlaki.com**
+**support@tavlaki.com**

@@ -27,7 +27,7 @@ These terms are the agreement between you and us about Tavlaki, a free app for G
 
 Tavlaki is made by **Orestis Stefanis**, an individual developer in New York, USA ("we", "us").
 
-Email: **privacy@tavlaki.com**
+Email: **support@tavlaki.com**
 
 
 This email is our contact point for players and for the authorities. You can write to us in Greek or in English.
@@ -127,7 +127,7 @@ We pick the smallest step that fixes the problem. We also look at what the playe
 
 **We tell you why.** When we take a step against your account or your name, we tell you which step, why and which rule, by email when we have your email. We may not be able to reach a guest account. We do not tell you when the law forbids it or when it would put someone at risk.
 
-**You can ask us to look again.** Write to **privacy@tavlaki.com** within 6 months, with your username or guest name and why you think we were wrong. A person (we) looks at it again and answers you. If we were wrong, we undo the step. You can also go to a consumer body or a court (see "Law and disputes").
+**You can ask us to look again.** Write to **support@tavlaki.com** within 6 months, with your username or guest name and why you think we were wrong. A person (we) looks at it again and answers you. If we were wrong, we undo the step. You can also go to a consumer body or a court (see "Law and disputes").
 
 ## Ratings and leaderboards
 
@@ -211,4 +211,4 @@ If you got Tavlaki from the App Store, these points also apply. They are the poi
 
 ## Contact
 
-**privacy@tavlaki.com**
+**support@tavlaki.com**
