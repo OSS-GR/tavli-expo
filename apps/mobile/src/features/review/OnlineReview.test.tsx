@@ -4,7 +4,7 @@
  * dialog with Try again. Scripted Portes games (`test/reviewGame.ts`) on fake timers.
  */
 import type { GameRecord, GameTransport } from '@tavli/contracts';
-import { screen, within } from '@testing-library/react-native';
+import { act, screen, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
@@ -113,9 +113,9 @@ describe('<OnlineReview /> (#604)', () => {
     expect(screen.queryByTestId('review-loading')).toBeNull();
     await user.press(screen.getByRole('button', { name: 'OK' }));
     expect(onBack).toHaveBeenCalledTimes(1);
-    // A fixed text: never the error, which may hold the game id.
+    // The code only: never the error's text, which may hold the game id.
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn).toHaveBeenCalledWith('could not load the game to review');
+    expect(warn).toHaveBeenCalledWith('could not load the game to review', 'unknown');
   });
 
   it('Try again loads the record again, and it shows', async () => {
@@ -156,5 +156,46 @@ describe('<OnlineReview /> (#604)', () => {
       <OnlineReview gameId="g1" gameNumber={1} transport={transport} onBack={jest.fn()} />,
     );
     expect(await screen.findByText('The review did not load')).toBeOnTheScreen();
+    // Another try would get the same record: no Try again.
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
+  it('offers no Try again for a refusal, and logs only its code', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const { transport } = transportOf(() =>
+      Promise.reject({ code: 'ILLEGAL_ACTION', message: 'game g1 is still in play' }),
+    );
+    await renderWithRoot(
+      <OnlineReview gameId="g1" gameNumber={1} transport={transport} onBack={jest.fn()} />,
+    );
+    expect(await screen.findByText('The review did not load')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(warn).toHaveBeenCalledWith('could not load the game to review', 'ILLEGAL_ACTION');
+  });
+
+  it('shows the new game loading, not the old review, when the game changes', async () => {
+    const flow = oneBadTurn();
+    let second: (record: GameRecord) => void = () => {};
+    let calls = 0;
+    const { transport } = transportOf(() => {
+      calls += 1;
+      return calls === 1
+        ? Promise.resolve({ choice: 'portes', side: 'black', log: flow.log })
+        : new Promise<GameRecord>((resolve) => {
+            second = resolve;
+          });
+    });
+    const sent = jest.spyOn(reviewAnalytics, 'sendReviewOpened');
+    const props = { transport, onBack: jest.fn(), analyzer: testAnalyzer };
+    const view = await renderWithRoot(<OnlineReview gameId="g1" gameNumber={1} {...props} />);
+    await screen.findByTestId('review-mistake-1');
+    await view.rerender(<OnlineReview gameId="g1" gameNumber={2} {...props} />);
+    expect(screen.getByTestId('review-loading')).toBeOnTheScreen();
+    expect(screen.queryByTestId('review-mistake-1')).toBeNull();
+    await act(async () => {
+      second({ choice: 'portes', side: 'black', log: flow.log });
+    });
+    await screen.findByTestId('review-mistake-1');
+    expect(sent).toHaveBeenCalledTimes(2);
   });
 });
