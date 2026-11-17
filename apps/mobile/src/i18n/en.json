@@ -1149,7 +1149,7 @@
       },
       "support": {
         "title": "Support Tavlaki",
-        "body": "Tavlaki is free, with no ads. If you enjoy it, you can buy me a coffee on Ko-fi. You get nothing extra: everyone plays the same game.",
+        "body": "Tavlaki is free, with no ads. If you enjoy it, you can buy me a coffee on Ko-fi.",
         "where": "Settings › Help › Support Tavlaki"
       }
     }
@@ -2234,7 +2234,6 @@
     "title": "Support Tavlaki",
     "lead": "Tavlaki is free, with no ads, and made by one person.",
     "body": "If you enjoy it, you can buy me a coffee on Ko-fi. It keeps Tavlaki going and growing.",
-    "nothingExtra": "You get nothing extra in the app. Everyone plays the same game.",
     "button": "Support on Ko-fi",
     "opensIn": "Opens tavlaki.com in your browser.",
     "otherWays": "Other ways to help",
